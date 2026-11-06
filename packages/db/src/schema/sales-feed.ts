@@ -133,6 +133,11 @@ export const salesFeedCursors = pgTable(
     /** The platform's opaque position of the last line recorded; `null` reads from the start of the register. */
     position: text('position'),
     readAt: timestampTz('read_at'),
+    /**
+     * When a read last reached the end of the register, nothing more to read (ADR 0073 § 2): a report's check is
+     * complete only once this is past its shift's window plus a quarter of an hour.
+     */
+    caughtUpAt: timestampTz('caught_up_at'),
     /** A 429's `Retry-After`: no read before this. */
     pausedUntil: timestampTz('paused_until'),
     updatedAt: updatedAt(),

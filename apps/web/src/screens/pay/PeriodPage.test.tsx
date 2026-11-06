@@ -467,6 +467,29 @@ describe('Paie › Quinzaine', () => {
     expect(text(row('Iris'))).toContain('Ton relevé : un autre membre de l’agence le valide.');
   });
 
+  it('says that a gap still waiting for its member holds the period too, and that sending it back frees it (ADR 0073)', async () => {
+    periods[OCT2] = endedOctober({}, false);
+    reports = [
+      { ...report(1, BASILE.id), status: 'submitted' },
+      {
+        ...report(2, LOU.id),
+        status: 'submitted',
+        check: {
+          state: 'complete',
+          readMinor: 17_200,
+          gapMinor: 1_200,
+          verdict: 'gap',
+          explainBy: '2099-01-01T00:00:00.000Z',
+        },
+      },
+    ];
+    renderPage(OWNER);
+    const title = await screen.findByText('2 rapports de la quinzaine attendent leur relecture');
+    expect(text(title.closest('.rp-notice'))).toContain(
+      'Un rapport en écart attend l’explication de son membre, 48 h au plus : le renvoyer libère la quinzaine.',
+    );
+  });
+
   it('says in amber that pay could not compute the period, who lacks a rate, and never shows its figures as true', async () => {
     const blocked = {
       code: 'commission_rate_missing_conflict',
@@ -1399,6 +1422,9 @@ function report(n: number, memberId: string) {
     incident: null,
     version: 1,
     byAgency: false,
+    reviewKind: null,
+    explanation: null,
+    check: null,
     canReview: true,
     submittedAt: '2026-10-31T22:00:00.000Z',
     reviewedAt: null,

@@ -25,6 +25,8 @@ export interface ReportDraft {
   readonly comment: string;
   readonly incidentOn: boolean;
   readonly incident: string;
+  /** Why a report differs from its platform (ADR 0073 § 5), when its panel asked for it. */
+  readonly explanation?: string;
 }
 
 /** The screens that open a report panel: a manager makes his own from Équipe › Planning (EQP-02). */

@@ -1,7 +1,9 @@
 import {
   CurrencySchema,
+  REPORT_GAP_THRESHOLD_DEFAULT,
   SHIFT_FEEDBACK_SIGNALS_MAX,
   SHIFT_REPORT_MAX_MINOR,
+  SHIFT_REPORT_REVIEW_KINDS,
   SHIFT_REPORT_STATUSES,
 } from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
@@ -76,6 +78,9 @@ export const schedulingSettings = pgTable(
     slotStartMinute: integer('slot_start_minute').notNull(),
     slotLengthMinutes: integer('slot_length_minutes').notNull(),
     accessMarginMinutes: integer('access_margin_minutes').notNull(),
+    /** The threshold of a report against the platform (ADR 0073 § 3): 1 % (100) or 5 € (500) by default. */
+    reportGapBps: integer('report_gap_bps').notNull().default(REPORT_GAP_THRESHOLD_DEFAULT.bps),
+    reportGapMinor: integer('report_gap_minor').notNull().default(REPORT_GAP_THRESHOLD_DEFAULT.minor),
     updatedBy: text('updated_by')
       .notNull()
       .references(() => user.id),
@@ -88,6 +93,10 @@ export const schedulingSettings = pgTable(
       sql`${t.slotLengthMinutes} in (60, 120, 180, 240, 360, 480, 720) and ${t.slotStartMinute} >= 0 and ${t.slotStartMinute} < ${t.slotLengthMinutes}`,
     ),
     check('scheduling_settings_margin_check', sql`${t.accessMarginMinutes} between 0 and 120`),
+    check(
+      'scheduling_settings_report_gap_check',
+      sql`${t.reportGapBps} between 0 and 10000 and ${t.reportGapMinor} between 0 and 100000`,
+    ),
     pgPolicy('team_read', { for: 'select', using: sql`${currentScope} is not null` }),
     pgPolicy('owner_insert', {
       for: 'insert',
@@ -508,9 +517,23 @@ export const shiftReports = pgTable(
       .notNull()
       .references(() => user.id),
     submittedAt: timestampTz('submitted_at').notNull(),
+    /** Empty for the automatic check (`review_kind` `automatic`, ADR 0073 § 4), which never names a person. */
     reviewedBy: text('reviewed_by').references(() => user.id),
     reviewedAt: timestampTz('reviewed_at'),
     reviewNote: text('review_note'),
+    /**
+     * Who reviewed it (`ShiftReportReviewKind`): `human` or `automatic`; `null` while submitted, and on a review written
+     * before ADR 0073, a person's. The application's policies never set `automatic`: only the job, as the admin role.
+     */
+    reviewKind: text('review_kind'),
+    /** Its member's explanation of a gap with the platform (ADR 0073 § 5): a report's only, never logged. */
+    explanation: text('explanation'),
+    /**
+     * What its validation saw of the platform (ADR 0073, Conséquences): `{ check, threshold }`, the check as
+     * `ShiftReportCheckSchema` and the threshold as `ReportGapThresholdSchema`, read back through them. A validated
+     * report's only; `null` when its account's sales were not read.
+     */
+    reviewCheck: jsonb('review_check'),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),
@@ -549,12 +572,19 @@ export const shiftReports = pgTable(
     check('shift_reports_incident_check', sql`${t.correctsId} is null or ${t.incident} is null`),
     check(
       'shift_reports_texts_check',
-      sql`coalesce(char_length(${t.comment}), 1) between 1 and 1000 and coalesce(char_length(${t.incident}), 1) between 1 and 1000 and coalesce(char_length(${t.reviewNote}), 1) between 1 and 500`,
+      sql`coalesce(char_length(${t.comment}), 1) between 1 and 1000 and coalesce(char_length(${t.incident}), 1) between 1 and 1000 and coalesce(char_length(${t.reviewNote}), 1) between 1 and 500 and coalesce(char_length(${t.explanation}), 1) between 1 and 1000`,
     ),
+    check('shift_reports_explanation_check', sql`${t.correctsId} is null or ${t.explanation} is null`),
     check('shift_reports_version_check', sql`${t.version} >= 1`),
+    enumCheck('shift_reports', t.reviewKind, SHIFT_REPORT_REVIEW_KINDS),
+    // A review names its person, but the automatic check's, which only validates (ADR 0073 § 4).
     check(
       'shift_reports_state_check',
-      sql`(${t.reviewedAt} is null) = (${t.reviewedBy} is null) and (${t.status} = 'submitted') = (${t.reviewedAt} is null) and (${t.status} = 'rejected') = (${t.reviewNote} is not null)`,
+      sql`(${t.status} = 'submitted') = (${t.reviewedAt} is null) and (${t.status} = 'rejected') = (${t.reviewNote} is not null) and (${t.reviewKind} is null or ${t.reviewedAt} is not null) and case when ${t.reviewKind} = 'automatic' then ${t.reviewedBy} is null and ${t.status} = 'validated' else (${t.reviewedAt} is null) = (${t.reviewedBy} is null) end`,
+    ),
+    check(
+      'shift_reports_review_seen_check',
+      sql`${t.reviewCheck} is null or (${t.status} = 'validated' and jsonb_typeof(${t.reviewCheck}) = 'object')`,
     ),
     pgPolicy('member_read', {
       for: 'select',
@@ -576,7 +606,7 @@ export const shiftReports = pgTable(
     pgPolicy('team_review', {
       for: 'update',
       using: sql`${t.creatorId} = ${currentCreator} and ${plans} and ${t.status} = 'submitted'`,
-      withCheck: sql`${t.creatorId} = ${currentCreator} and ${plans} and ${t.status} in ('validated', 'rejected') and ${t.reviewedBy} = ${currentUser} and not ${isMine(t.memberId)} and (${isOwner} or ${t.submittedBy} <> ${currentUser})`,
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${plans} and ${t.status} in ('validated', 'rejected') and ${t.reviewedBy} = ${currentUser} and ${t.reviewKind} = 'human' and not ${isMine(t.memberId)} and (${isOwner} or ${t.submittedBy} <> ${currentUser})`,
     }),
   ],
 );

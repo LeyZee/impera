@@ -288,9 +288,16 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
             changed.push({ platformSaleId: sale.platformSaleId, event: sale.event });
           }
         }
+        // A page with nothing after it: the register was read to its end at `at` (ADR 0073 § 2).
         await tx
           .update(cursors)
-          .set({ position: page.endPosition ?? current, readAt: at, pausedUntil: null, updatedAt: at })
+          .set({
+            position: page.endPosition ?? current,
+            readAt: at,
+            ...(!page.hasMore && { caughtUpAt: at }),
+            pausedUntil: null,
+            updatedAt: at,
+          })
           .where(eq(cursors.platform, platform));
         return { stale: false, recorded, quarantined, duplicates, changed, unlinkedModels: [...unlinked] };
       });

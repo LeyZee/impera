@@ -78,6 +78,14 @@
 .rp-notice[data-tone='warn'] .rp-notice__title {
   color: var(--nv-warning);
 }
+/* A report that matches its platform (ADR 0073 § 4): the same notice, tinted green, never a bar on its side. */
+.rp-notice[data-tone='ok'] {
+  background: color-mix(in srgb, var(--nv-success) 8%, var(--nv-glass-fill));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 24%, transparent);
+}
+.rp-notice[data-tone='ok'] .rp-notice__title {
+  color: var(--nv-success);
+}
 .rp-notice__text {
   margin: 0;
   color: var(--nv-ink-muted);
@@ -193,6 +201,8 @@
   letter-spacing: var(--nv-text-hero-tracking);
   font-weight: 680;
 }
+/* What the platform read during a validated shift (ADR 0073), quiet under the figure. */
+.rp-figure__read,
 .rp-figure__note {
   margin: 0;
   color: var(--nv-ink-muted);
@@ -601,6 +611,11 @@
 .rp-mine__all {
   margin: 0 calc(-1 * var(--nv-space-2));
 }
+/* « Tous mes rapports » on the card's text edge, as « Ta commission… » above it: the summary's own padding (14px)
+   goes outside (recette ADR 0073). « Renvoyés aux membres », in Équipe › Rapports, keeps its place. */
+.rp-mine .rp-mine__all {
+  margin: 0 -14px;
+}
 .rp-lines {
   margin: 0;
   list-style: none;
@@ -757,6 +772,35 @@
   .rp-late summary .nv-disclosure__sum {
     display: none;
   }
+  /* A member's period on a phone: what it holds goes under the name, whole, on the name's edge, rather than cut
+     (« 2 écarts » after the money, ADR 0073). */
+  .rp-member.nv-disclosure > summary {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-content: center;
+    row-gap: 2px;
+    padding-block: var(--nv-space-2);
+  }
+  .rp-member .nv-disclosure__title {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .rp-member.nv-disclosure > summary > .rp-chip {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  /* The chevron centred on the name and what the period holds (recette ADR 0073). */
+  .rp-member.nv-disclosure > summary::after {
+    grid-column: 4;
+    grid-row: 1 / span 2;
+  }
+  .rp-member .nv-disclosure__sum {
+    grid-column: 2 / 4;
+    grid-row: 2;
+    text-align: left;
+    white-space: normal;
+  }
 }
 
 .rp-all {
@@ -872,6 +916,33 @@
   color: var(--nv-warning);
   font-weight: 700;
 }
+/* What the platform read during the shift (ADR 0073), quiet under where and when. */
+.rp-review__check,
+.rp-review__wait {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+/* The member's explanation of a gap: their words, set apart like a quote, never tinted like an incident. */
+.rp-review__explain {
+  margin: 2px 0 0;
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-ink) 5%, transparent);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.rp-review__label {
+  margin-right: 4px;
+  font-weight: 700;
+}
+/* Until when the gap waits for its member: a warning, so amber, never red. */
+.rp-review__wait {
+  color: var(--nv-warning);
+}
 .rp-review__side {
   display: flex;
   flex-direction: column;
@@ -931,23 +1002,34 @@
 .rp-member__late {
   color: var(--nv-warning);
 }
+/* The period's lines on a computer: the same columns for every member, each line taking those of its list
+   (subgrid), so the amounts share one right edge and the statuses one left edge from the first member to the last,
+   whatever the width of a chip (recette ADR 0073). The widths hold « 1 234,56 € », « Validé automatiquement » and
+   « Message copié ». What qualifies an amount (« écart +12,00 € », « dont 1 correction ») goes under it, never
+   against it. */
+.rp-member .rp-lines {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem 11rem 7.5rem;
+  column-gap: var(--nv-space-3);
+}
 .rp-pline {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: var(--nv-space-3);
   min-height: var(--nv-target-min);
-  padding: 0 var(--nv-space-3);
+  padding: var(--nv-space-1) var(--nv-space-3);
   border-radius: var(--nv-radius-md);
   transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
 }
 .rp-pline:hover {
   background: var(--nv-plate-hover);
 }
-.rp-pline[data-missing='true'] {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+.rp-pline__row {
+  display: contents;
 }
 .rp-pline__when {
+  grid-column: 1;
   overflow: hidden;
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
@@ -955,13 +1037,37 @@
   white-space: nowrap;
 }
 .rp-pline__amount {
+  display: flex;
+  grid-column: 2;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+.rp-pline__sum {
   font-weight: 650;
   white-space: nowrap;
+}
+.rp-pline__status {
+  grid-column: 3;
+  justify-self: start;
+}
+.rp-pline__fix-btn,
+.rp-pline > .rp-nudge,
+.rp-pline > .rp-chip {
+  grid-column: 4;
+  justify-self: start;
 }
 .rp-pline__fix {
   color: var(--nv-ink-faint);
   font-size: var(--nv-text-caption);
   font-weight: 500;
+  white-space: nowrap;
+}
+.rp-pline__gap {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* ── Réglages › Règles de paie ── */
@@ -1165,6 +1271,49 @@ a.sc-sheet__report:focus-visible,
     /* Above the floating tab bar (shell.css, « Phone »). */
     bottom: calc(14px + 64px + 12px + env(safe-area-inset-bottom, 0px));
   }
+  /* Under the shell's breakpoint (a phone, upright or not, a tablet, a folded rail), where the computer's columns
+     would cut the day: the shift's day is whole on the first line, its action at the end of it; its amount, what
+     qualifies it and its status on the line under, from the same left edge (recette ADR 0073). The period's rows give
+     up their indent for the width it takes. */
+  .rp-member .rp-lines {
+    display: flex;
+    padding-inline: 0;
+  }
+  .rp-pline {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--nv-space-2);
+    row-gap: var(--nv-space-1);
+    padding: var(--nv-space-2) var(--nv-space-3);
+  }
+  .rp-pline__when {
+    grid-row: 1;
+    overflow: visible;
+    white-space: normal;
+  }
+  .rp-pline__fix-btn,
+  .rp-pline > .rp-nudge,
+  .rp-pline > .rp-chip {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .rp-pline__row {
+    display: flex;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--nv-space-1) var(--nv-space-2);
+  }
+  .rp-pline__amount {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--nv-space-2);
+    text-align: left;
+  }
+  .rp-pline .rp-nudge__text {
+    grid-row: 3;
+  }
 }
 @media (max-width: 520px) {
   .rp-line {
@@ -1186,13 +1335,6 @@ a.sc-sheet__report:focus-visible,
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-  }
-  .rp-pline {
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding: var(--nv-space-2) var(--nv-space-3);
-  }
-  .rp-pline .rp-chip {
-    justify-self: start;
   }
   .rp-account__now,
   .rp-account__next {

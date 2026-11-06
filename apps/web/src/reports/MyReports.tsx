@@ -5,6 +5,8 @@ import type { JSX } from 'react';
 import { useReports, useSchedulingSettings } from './api';
 import {
   amountText,
+  GAP_TO_EXPLAIN,
+  gapWaits,
   linesOf,
   MEMBER_STATUS,
   mergeLists,
@@ -19,6 +21,7 @@ import {
 
 import { swapShiftLine } from '@/scheduling/model';
 import { readerZone } from '@/scheduling/time';
+import { useNow } from '@/scheduling/useNow';
 import { Panel } from '@/shell/layout';
 
 /** What the member's reports read: the period running in the agency's zone, and the one before for a late report. */
@@ -54,8 +57,11 @@ export function useMyReports(now: Date): MyReports {
  * The reports left to do, a report to make or one sent back, the oldest first; the hero's own shift is left to the
  * hero's button. Aujourd'hui lists them in « À faire » with the rest of what waits (D-03).
  */
-export const reportToDos = (list: ShiftReportList, heroShiftId: string | null): ReturnType<typeof toDoOf> =>
-  toDoOf(list).filter((one) => one.shift.id !== heroShiftId);
+export const reportToDos = (
+  list: ShiftReportList,
+  heroShiftId: string | null,
+  now?: Date,
+): ReturnType<typeof toDoOf> => toDoOf(list, now).filter((one) => one.shift.id !== heroShiftId);
 
 /**
  * Aujourd'hui's « Mes rapports » (EQ-03): the period's figures and, folded, each report of it. What is left to do is
@@ -72,6 +78,7 @@ export function MyReportsCard({
 }): JSX.Element | null {
   const { list, period } = reports;
   const zone = readerZone();
+  const now = useNow();
   if (reports.isError) {
     return (
       <Panel className="rp-mine nv-enter" eyebrow="Mes rapports">
@@ -182,6 +189,7 @@ export function MyReportsCard({
                   line={line}
                   creatorName={accounts.get(line.shift.platformAccountId)?.creatorName}
                   zone={zone}
+                  now={now}
                   onOpen={onOpen}
                 />
               ))}
@@ -197,16 +205,19 @@ function MyLine({
   line,
   creatorName,
   zone,
+  now,
   onOpen,
 }: {
   line: ShiftLine;
   creatorName: string | undefined;
   zone: string;
+  now: Date;
   onOpen: (shiftId: string) => void;
 }): JSX.Element | null {
   const { report } = line;
   if (report === null) return null;
   const pending = line.corrections.some((one) => one.status !== 'validated');
+  const explain = gapWaits(report, now);
   return (
     <li>
       <button
@@ -225,8 +236,8 @@ function MyLine({
             report.amount.currency,
           )}
         </span>
-        <span className={`rp-chip rp-chip--${STATUS_TONES[report.status]}`}>
-          {MEMBER_STATUS[report.status]}
+        <span className={`rp-chip rp-chip--${explain ? 'warn' : STATUS_TONES[report.status]}`}>
+          {explain ? GAP_TO_EXPLAIN : MEMBER_STATUS[report.status]}
           {pending ? ' · correction en attente' : ''}
         </span>
       </button>

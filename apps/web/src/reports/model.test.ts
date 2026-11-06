@@ -14,6 +14,9 @@ import {
   incidentsOf,
   currencyTyped,
   estimateLine,
+  awaitsDecision,
+  gapWaits,
+  hasGap,
   lateFor,
   MEMBER_STATUS,
   parseAmount,
@@ -28,7 +31,9 @@ import {
   signedAmountText,
   SOURCE_REFUSAL_TEXTS,
   startablePeriods,
+  thresholdText,
   toDoOf,
+  uncheckedText,
   validatedTotal,
 } from './model';
 
@@ -71,6 +76,9 @@ const report = (
     status,
     version: 1,
     byAgency: false,
+    reviewKind: null,
+    explanation: null,
+    check: null,
     canReview: false,
     submittedAt: '2026-10-20T10:00:00.000Z',
     reviewedAt: status === 'submitted' ? null : '2026-10-20T11:00:00.000Z',
@@ -272,5 +280,81 @@ describe('the estimate under a report’s amount (reco 19)', () => {
     expect(plain(estimateLine(-80, true, null))).toBe('Effet estimé sur ta commission : −0,80 €');
     expect(plain(estimateLine(80, true, 'Théo'))).toBe('Effet estimé sur la commission de Théo : +0,80 €');
     expect(plain(estimateLine(803, false, 'Théo'))).toBe('Commission estimée de Théo : 8,03 €');
+  });
+});
+
+describe('a report against its platform (ADR 0073)', () => {
+  const ofShift = shift('01a17ff2-0000-7000-8000-00000000000d', '2026-10-19T08:00:00.000Z');
+  const made = report('01a17ff2-0000-7000-8000-0000000000d1', ofShift.id, 11_000, 'submitted');
+  const gap = (explanation: string | null = null): ShiftReport => ({
+    ...made,
+    explanation,
+    check: {
+      state: 'complete',
+      readMinor: 10_000,
+      gapMinor: 1_000,
+      verdict: 'gap',
+      explainBy: '2026-10-21T10:00:00.000Z',
+    },
+  });
+  const BEFORE = new Date('2026-10-21T09:59:59Z');
+  const AT = new Date('2026-10-21T10:00:00Z');
+
+  it('waits for its member while a gap is neither explained nor past its 48 hours (§ 5)', () => {
+    expect(gapWaits(gap(), BEFORE)).toBe(true);
+    expect(gapWaits(gap(), AT)).toBe(false);
+    expect(gapWaits(gap('Un pourboire noté deux fois.'), BEFORE)).toBe(false);
+    const within: ShiftReport = {
+      ...made,
+      check: { state: 'complete', readMinor: 11_000, gapMinor: 0, verdict: 'within', explainBy: null },
+    };
+    expect(gapWaits(within, BEFORE)).toBe(false);
+    expect(gapWaits({ ...made, check: { state: 'provisional', readMinor: 3_000 } }, BEFORE)).toBe(false);
+    expect(gapWaits(made, BEFORE)).toBe(false);
+  });
+
+  it('awaits the reader’s decision only when it is theirs now: no gap still waiting, no automatic check coming', () => {
+    const mine = (one: ShiftReport): ShiftReport => ({ ...one, canReview: true });
+    expect(awaitsDecision(mine(made), BEFORE)).toBe(true);
+    expect(awaitsDecision(made, BEFORE)).toBe(false);
+    expect(awaitsDecision(mine(gap()), BEFORE)).toBe(false);
+    expect(awaitsDecision(mine(gap()), AT)).toBe(true);
+    expect(awaitsDecision(mine(gap('Un pourboire noté deux fois.')), BEFORE)).toBe(true);
+    const within: ShiftReport = {
+      ...mine(made),
+      check: { state: 'complete', readMinor: 11_000, gapMinor: 0, verdict: 'within', explainBy: null },
+    };
+    expect(awaitsDecision(within, BEFORE)).toBe(false);
+    expect(awaitsDecision({ ...mine(made), check: { state: 'provisional', readMinor: 3_000 } }, BEFORE)).toBe(
+      true,
+    );
+    expect(awaitsDecision({ ...mine(made), status: 'rejected' }, BEFORE)).toBe(false);
+  });
+
+  it('counts a gap whatever became of it, and nothing the comparison cannot say', () => {
+    expect(hasGap(gap('Un pourboire noté deux fois.'))).toBe(true);
+    expect(hasGap({ ...gap(), status: 'validated' })).toBe(true);
+    expect(hasGap({ ...made, check: { state: 'unavailable', reason: 'feed_off' } })).toBe(false);
+  });
+
+  it('leaves to do a gap that waits for its member, given the hour', () => {
+    const list = { reports: [gap()], shifts: [ofShift], accounts: [], members: [] };
+    expect(toDoOf(list)).toEqual([]);
+    expect(toDoOf(list, BEFORE).map((one) => one.report?.id)).toEqual([made.id]);
+    expect(toDoOf(list, AT)).toEqual([]);
+  });
+
+  it('says the threshold and why nothing is compared, to the agency or to the member', () => {
+    expect(plain(thresholdText({ bps: 100, minor: 500 }))).toBe('1 % ou 5,00 €');
+    expect(plain(thresholdText({ bps: 250, minor: 1_000 }, 'USD'))).toBe('2,5 % ou 10,00 $US');
+    expect(plain(thresholdText({ bps: 0, minor: 500 }))).toBe('5,00 €');
+    expect(plain(thresholdText({ bps: 100, minor: 0 }))).toBe('1 %');
+    expect(thresholdText({ bps: 0, minor: 0 })).toBe('Aucun écart');
+    expect(uncheckedText('model_unlinked', 'Reveal', true)).toBe(
+      'Ce compte n’est relié à aucun modèle de Reveal : relie-le dans Réglages › Ventes pour comparer ses rapports.',
+    );
+    expect(uncheckedText('chatter_unlinked', 'Reveal', false)).toBe(
+      'Ton compte de chatteur sur Reveal n’est pas encore relié : l’agence relit ton rapport.',
+    );
   });
 });
