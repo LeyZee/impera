@@ -24,7 +24,7 @@ export function isLoopbackUrl(value: string): boolean {
 }
 
 /** The services the fake world imitates, each under its own path of the world's address. */
-export interface SandboxBaseUrls {
+interface SandboxBaseUrls {
   readonly xai: string;
   readonly google: string;
   readonly mistral: string;

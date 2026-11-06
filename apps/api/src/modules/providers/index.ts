@@ -32,7 +32,7 @@ export { nextAction } from './domain/next-action';
 export { createMemoryCredentialStore };
 
 /** The verified services' base addresses, each optional. */
-export type VerifierBaseUrls = Partial<Record<'xai' | 'google' | 'elevenlabs' | 'mistral', string>>;
+type VerifierBaseUrls = Partial<Record<'xai' | 'google' | 'elevenlabs' | 'mistral', string>>;
 
 /** Spreads `{ baseUrl }` only when one is given: the verifiers keep their real address otherwise. */
 const at = (baseUrl: string | undefined): { baseUrl?: string } => (baseUrl === undefined ? {} : { baseUrl });
