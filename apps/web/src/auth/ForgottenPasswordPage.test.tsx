@@ -3,7 +3,7 @@ import { PASSWORD_RESET_REQUESTED_MESSAGE } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ForgottenPasswordPage } from './ForgottenPasswordPage';
+import { ForgottenPasswordPage, keepUnits } from './ForgottenPasswordPage';
 import { forgetTakenToken } from './api';
 
 const TOKEN = 'lien-invente-pour-les-tests';
@@ -107,13 +107,16 @@ describe('« Mot de passe oublié » with its link (SEC-05 lot 3)', () => {
     expect(await screen.findByRole('heading', { name: 'Nouveau mot de passe' })).toBeDefined();
     expect(screen.getByLabelText('E-mail')).toHaveProperty('value', 'theo@example.test');
     const until = new Date(PREVIEW.expiresAt);
-    const hour = `${String(until.getHours()).padStart(2, '0')} h ${String(until.getMinutes()).padStart(2, '0')}`;
-    expect(screen.getByText(hour)).toBeDefined();
+    // « 15 h 40 » never breaks: non-breaking spaces.
+    const hour = `${String(until.getHours()).padStart(2, '0')}\u00a0h\u00a0${String(until.getMinutes()).padStart(2, '0')}`;
+    expect(
+      screen.getByText((_, node) => node?.tagName === 'SPAN' && node.textContent === hour),
+    ).toBeDefined();
 
     fireEvent.change(screen.getByLabelText('Nouveau mot de passe'), { target: { value: PASSWORD } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     await vi.waitFor(() => {
-      expect(onChanged).toHaveBeenCalled();
+      expect(onChanged).toHaveBeenCalledWith('theo@example.test');
     });
     expect(callsTo(fake, 'inspect')).toEqual([
       { url: '/v1/auth/password-reset/inspect', body: { token: TOKEN } },
@@ -157,5 +160,14 @@ describe('« Mot de passe oublié » with its link (SEC-05 lot 3)', () => {
     fireEvent.change(screen.getByLabelText('Nouveau mot de passe'), { target: { value: `${PASSWORD} bis` } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(await screen.findByRole('heading', { name: 'Ce lien ne marche plus' })).toBeDefined();
+  });
+});
+
+describe('keepUnits', () => {
+  it('keeps a number on the line of its unit, in the server\u2019s sentence too', () => {
+    expect(keepUnits('Le lien vaut 15 minutes et 6 chiffres.')).toBe(
+      'Le lien vaut 15\u00a0minutes et 6\u00a0chiffres.',
+    );
+    expect(keepUnits('Rien à garder : 2026 - fin.')).toBe('Rien à garder : 2026 - fin.');
   });
 });

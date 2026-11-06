@@ -927,6 +927,36 @@
   flex-direction: column;
   gap: 8px;
 }
+/* The password and the code under their labels, the actions at the foot (house rule for a confirmation). */
+.tg-reauth__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.tg-reauth__fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--nv-space-3);
+  align-items: end;
+}
+.tg-reauth__fields .nv-field,
+.tg-reauth__fields .nv-field__control {
+  min-width: 0;
+  width: 100%;
+}
+.tg-reauth__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+@media (max-width: 520px) {
+  .tg-reauth__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tg-reauth__actions > .nv-btn {
+    flex: 1 1 0;
+  }
+}
 .tg-verify {
   display: flex;
   align-items: center;
@@ -1084,10 +1114,19 @@
   .tg-health__count {
     display: none;
   }
-  /* Two scrolling bars on top of each other hid tabs off screen: on a phone the tabs wrap instead. */
+  /* Two scrolling bars on top of each other hid tabs off screen: on a phone the tabs sit on a regular grid, the last
+   * one alone across the width when they are odd. */
   .tg-tabs {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     overflow-x: visible;
+  }
+  .tg-tabs .tg-tab {
+    justify-content: center;
+    min-width: 0;
+  }
+  .tg-tabs .tg-tab:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }
 @media (prefers-reduced-motion: reduce) {

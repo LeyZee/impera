@@ -66,34 +66,45 @@ export function Reauth({
     >
       <p className="tg-hint">{hint}</p>
       <form
-        className="tg-inline-form"
+        className="tg-reauth__form"
         onSubmit={(event) => {
           event.preventDefault();
           void confirm(input.current?.value ?? '', codeInput.current?.value ?? '');
         }}
       >
-        <input
-          ref={input}
-          className="nv-field__control nv-glass"
-          type="password"
-          autoComplete="current-password"
-          aria-label="Mot de passe"
-          aria-invalid={error !== null}
-          aria-describedby="tg-reauth-msg"
-          disabled={isBusy}
-        />
-        <CodeInput ref={codeInput} disabled={isBusy} invalid={error !== null} />
-        <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={isBusy}>
-          Confirmer
-        </button>
-        <button
-          type="button"
-          className="nv-btn nv-btn--plain nv-btn--sm"
-          disabled={isBusy}
-          onClick={onCancel}
-        >
-          Annuler
-        </button>
+        <div className="tg-reauth__fields">
+          <label className="nv-field tg-reauth__password">
+            <span className="nv-field__label">Mot de passe</span>
+            <input
+              ref={input}
+              className="nv-field__control nv-glass"
+              type="password"
+              autoComplete="current-password"
+              aria-invalid={error !== null}
+              aria-describedby="tg-reauth-msg"
+              disabled={isBusy}
+            />
+          </label>
+          <CodeInput ref={codeInput} disabled={isBusy} invalid={error !== null} />
+        </div>
+        <div className="tg-reauth__actions">
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm"
+            disabled={isBusy}
+            onClick={onCancel}
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="nv-btn nv-btn--neon nv-btn--sm"
+            disabled={isBusy}
+            aria-busy={isBusy}
+          >
+            Confirmer
+          </button>
+        </div>
       </form>
       <p id="tg-reauth-msg" className="tg-hint" data-error={error !== null} aria-live="polite">
         {error}

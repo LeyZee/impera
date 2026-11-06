@@ -78,10 +78,7 @@ describe('« Mon chat privé » (SEC-05 lot 2)', () => {
 
     vi.mocked(fetchPrivateLink).mockResolvedValue(LINKED);
     comeBack();
-    expect(
-      await screen.findByText('C’est fait : ce chat recevra ton lien si tu oublies ton mot de passe Impera.'),
-    ).toBeTruthy();
-    expect(screen.getByText('@demo_bot')).toBeTruthy();
+    expect(await screen.findByText('@demo_bot')).toBeTruthy();
     expect(screen.getByText('06/11/2026')).toBeTruthy();
     expect(screen.queryByText('/start ABCDEFGH23')).toBeNull();
   });
@@ -112,6 +109,8 @@ describe('« Mon chat privé » (SEC-05 lot 2)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Lier mon Telegram' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Bots et groupes' }));
     expect(onAddBot).toHaveBeenCalled();
+    // One way out only: no « Lier mon Telegram » that would fail the same way.
+    expect(screen.queryByRole('button', { name: 'Lier mon Telegram' })).toBeNull();
     cleanup();
 
     renderChat(false);

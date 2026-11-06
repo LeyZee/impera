@@ -326,12 +326,7 @@ export function TelegramSection({
           <PrivateChat
             owner
             onAddBot={openBots}
-            frame={(body) => (
-              <section>
-                <p className="tg-eyebrow">Mon chat privé</p>
-                <div className="nv-plate pc-plate">{body}</div>
-              </section>
-            )}
+            frame={(body) => <div className="nv-plate pc-plate">{body}</div>}
           />
         )}
       </div>

@@ -7,7 +7,7 @@ import { NewPasswordField, REFUSED_PASSWORD, Refused, missingOf, useNoReferrer }
 
 /** What the sign-in page says once the password is changed (SEC-05 lot 3). */
 export const PASSWORD_CHANGED_NOTICE =
-  'Mot de passe changé, connecte-toi. Ton code à 6 chiffres reste demandé.';
+  'Mot de passe changé, connecte-toi. Ton code à 6\u00a0chiffres reste demandé.';
 
 type Step =
   | { readonly kind: 'ask' }
@@ -18,10 +18,15 @@ type Step =
 
 const two = (n: number): string => String(n).padStart(2, '0');
 
+/** A number and its unit stay on one line (« 15 minutes », « 6 chiffres »), in the server's sentence too. */
+export function keepUnits(text: string): string {
+  return text.replace(/(\d) (?=\p{L})/gu, '$1\u00a0');
+}
+
 /** « 15 h 40 », in the browser's time. */
 function hourOf(iso: string): string {
   const at = new Date(iso);
-  return `${two(at.getHours())} h ${two(at.getMinutes())}`;
+  return `${two(at.getHours())}\u00a0h\u00a0${two(at.getMinutes())}`;
 }
 
 /**
@@ -36,8 +41,8 @@ export function ForgottenPasswordPage({
 }: {
   /** Back to the sign-in page. */
   onLeave: () => void;
-  /** The password is changed: the sign-in page says so. */
-  onChanged: () => void;
+  /** The password is changed for this address: the sign-in page says so, with the address filled in. */
+  onChanged: (email: string) => void;
 }): JSX.Element {
   const [link] = useState(() => takeLink());
   const [step, setStep] = useState<Step>(() =>
@@ -92,7 +97,7 @@ export function ForgottenPasswordPage({
               <span className="nv-orb nv-tone--ok mt-1 shrink-0" aria-hidden="true" />
               <div className="flex flex-col gap-1">
                 <h1 className="text-xl font-semibold">Demande reçue</h1>
-                <p className="text-sm text-[var(--nv-ink-muted)]">{step.message}</p>
+                <p className="text-sm text-[var(--nv-ink-muted)]">{keepUnits(step.message)}</p>
               </div>
             </div>
             <button
@@ -125,15 +130,15 @@ export function ForgottenPasswordPage({
           <Refused
             title="Ce lien ne marche plus"
             action={{ label: 'Demander un nouveau lien', onClick: askAgain }}
-            secondary={{ label: 'Aller à la connexion', onClick: onLeave }}
+            secondary={{ label: 'Retour à la connexion', onClick: onLeave }}
           >
-            Il a déjà servi, un plus récent l’a remplacé, ou ses 15 minutes sont passées.
+            Il a déjà servi, un plus récent l’a remplacé, ou ses 15&nbsp;minutes sont passées.
           </Refused>
         );
       case 'used_by_this_page':
         // An answer lost after the server used the link: the password chosen here is most likely the one saved.
         return (
-          <Refused title="Ce lien a déjà servi" action={{ label: 'Aller à la connexion', onClick: onLeave }}>
+          <Refused title="Ce lien a déjà servi" action={{ label: 'Retour à la connexion', onClick: onLeave }}>
             Ton mot de passe a sans doute été enregistré à l’essai précédent : connecte-toi avec lui.
           </Refused>
         );
@@ -258,7 +263,7 @@ function ResetForm({
   token: string;
   /** `afterLostAnswer`: an earlier try from this page got no answer, and may have used the link. */
   onGone: (afterLostAnswer: boolean) => void;
-  onChanged: () => void;
+  onChanged: (email: string) => void;
 }): JSX.Element {
   const [password, setPassword] = useState('');
   const [hasLostAnswer, setHasLostAnswer] = useState(false);
@@ -275,7 +280,7 @@ function ResetForm({
     setIsSending(false);
     switch (result.kind) {
       case 'ok':
-        onChanged();
+        onChanged(preview.email);
         return;
       case 'gone':
         onGone(hasLostAnswer);
@@ -309,7 +314,7 @@ function ResetForm({
       <label className="nv-field nv-enter" style={{ '--nv-i': 2 }}>
         <span className="nv-field__label">E-mail</span>
         <input
-          className="nv-field__control text-[var(--nv-ink-muted)]"
+          className="nv-field__control nv-field__control--readonly"
           name="email"
           type="email"
           autoComplete="username"

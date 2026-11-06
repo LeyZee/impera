@@ -270,9 +270,15 @@ describe('App and a forgotten password (SEC-05 lot 3)', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(
-      await screen.findByText('Mot de passe changé, connecte-toi. Ton code à 6 chiffres reste demandé.'),
+      await screen.findByText(
+        (_, node) =>
+          node?.getAttribute('role') === 'status' &&
+          node.textContent === 'Mot de passe changé, connecte-toi. Ton code à 6\u00a0chiffres reste demandé.',
+      ),
     ).toBeDefined();
-    expect(screen.getByLabelText('Mot de passe')).toBeDefined();
+    // The address is filled in, and the password is asked first.
+    expect(screen.getByLabelText('E-mail')).toHaveProperty('value', 'theo@example.test');
+    expect(document.activeElement).toBe(screen.getByLabelText('Mot de passe'));
     expect(window.location.pathname).toBe('/');
   });
 

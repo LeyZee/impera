@@ -52,7 +52,8 @@ export function App(): JSX.Element {
   // The session ended while the app was open (closed elsewhere, past its 12 h or 7 days): the sign-in page says so.
   const [hasEnded, setHasEnded] = useState(false);
   // A new password just chosen from the « mot de passe oublié » link: the sign-in page says so (SEC-05 lot 3).
-  const [passwordChanged, setPasswordChanged] = useState(false);
+  // Holds the account's address, so the sign-in page has it filled in.
+  const [passwordChanged, setPasswordChanged] = useState<string | null>(null);
   const isRechecking = useRef(false);
   // A sign-out she asked for: a screen's 401 in flight meanwhile is not a session that ended (relecture #538).
   const isLeaving = useRef(false);
@@ -67,7 +68,7 @@ export function App(): JSX.Element {
           void refreshPushSubscription();
           keepSession(current.user);
           setHasEnded(false);
-          setPasswordChanged(false);
+          setPasswordChanged(null);
           isLeaving.current = false;
           // Signed in by now: a password kept for the code's activation has nothing left to do.
           forgetChosenPassword();
@@ -160,18 +161,18 @@ export function App(): JSX.Element {
   }, [session, refresh]);
 
   if (linkPage === 'forgotten') {
-    const toSignIn = (changed: boolean) => {
+    const toSignIn = (changedFor: string | null) => {
       window.history.replaceState(null, '', '/');
-      setPasswordChanged(changed);
+      setPasswordChanged(changedFor);
       setLinkPage(null);
     };
     return (
       <ForgottenPasswordPage
         onLeave={() => {
-          toSignIn(false);
+          toSignIn(null);
         }}
-        onChanged={() => {
-          toSignIn(true);
+        onChanged={(email) => {
+          toSignIn(email);
         }}
       />
     );
@@ -206,7 +207,8 @@ export function App(): JSX.Element {
       <SignInPage
         onSignedIn={refresh}
         notice={hasEnded ? 'Ta session a pris fin. Reconnecte-toi pour continuer.' : null}
-        confirmation={passwordChanged ? PASSWORD_CHANGED_NOTICE : null}
+        confirmation={passwordChanged === null ? null : PASSWORD_CHANGED_NOTICE}
+        email={passwordChanged}
       />
     );
   }

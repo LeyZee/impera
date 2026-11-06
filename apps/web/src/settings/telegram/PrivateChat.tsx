@@ -18,8 +18,6 @@ import './private-chat.css';
 /** While a code waits, the link is read again this often: the bot tells the CRM nothing (SEC-05 lot 2). */
 const POLL_MS = 3_000;
 const OFFLINE = 'Le serveur ne répond pas. Réessaie dans un instant.';
-/** What the bot answers in the chat once linked: the screen says the same. */
-const LINKED_NOTICE = 'C’est fait : ce chat recevra ton lien si tu oublies ton mot de passe Impera.';
 
 type Load =
   | { kind: 'loading' }
@@ -73,11 +71,8 @@ export function PrivateChat({
     try {
       const link = await fetchPrivateLink();
       if (ticket !== latest.current) return;
-      // Linked since the last answer: the code goes, and the screen says what the bot said.
-      if (link.linked && wasLinked.current === false) {
-        setCode(null);
-        setNotice(LINKED_NOTICE);
-      }
+      // Linked since the last answer: the code goes; the state line says it, once.
+      if (link.linked && wasLinked.current === false) setCode(null);
       wasLinked.current = link.linked;
       setLoad({ kind: 'ready', link });
     } catch (reason) {
@@ -222,7 +217,9 @@ export function PrivateChat({
     return frame(
       <div className="pc-chat">
         <div className="pc-state">
-          <span className="tg-state-dot" data-tone="ok" aria-hidden="true" />
+          <span className="pc-state__dot" aria-hidden="true">
+            <span className="tg-state-dot" data-tone="ok" />
+          </span>
           <p className="pc-state__line">
             Relié à <b>@{link.botUsername}</b>
             {link.linkedAt === null ? null : (
@@ -247,7 +244,7 @@ export function PrivateChat({
               <div className="pc-actions">
                 <button
                   type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm"
+                  className="nv-btn nv-btn--soft nv-btn--sm"
                   disabled={busy}
                   onClick={() => {
                     setConfirming(false);
@@ -257,7 +254,7 @@ export function PrivateChat({
                 </button>
                 <button
                   type="button"
-                  className="nv-btn nv-btn--soft nv-btn--sm"
+                  className="nv-btn nv-btn--soft nv-btn--destructive nv-btn--sm"
                   disabled={busy}
                   aria-busy={busy}
                   onClick={unlink}
@@ -270,7 +267,7 @@ export function PrivateChat({
             <div className="pc-actions">
               <button
                 type="button"
-                className="nv-btn nv-btn--plain nv-btn--sm"
+                className="nv-btn nv-btn--soft nv-btn--sm"
                 onClick={() => {
                   setNotice(null);
                   setConfirming(true);
@@ -346,7 +343,7 @@ export function PrivateChat({
               En attente du bot…
             </p>
           </div>
-        ) : (
+        ) : noBot ? null : (
           <>
             {expired ? <p className="pc-lead">Ce code a expiré : demande-en un nouveau.</p> : null}
             <button

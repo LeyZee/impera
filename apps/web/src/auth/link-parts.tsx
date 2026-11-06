@@ -110,7 +110,8 @@ export function NewPasswordField({
   const hint = `${id}-hint`;
   return (
     <>
-      <div className="flex items-center justify-between">
+      {/* The button's own padding is pulled back, so its word ends on the field's right edge. */}
+      <div className="-mr-3 flex items-center justify-between">
         <label className="nv-field__label" htmlFor={id}>
           {label}
         </label>

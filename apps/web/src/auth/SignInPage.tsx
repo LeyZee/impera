@@ -52,12 +52,15 @@ export function SignInPage({
   onSignedIn,
   notice = null,
   confirmation = null,
+  email = null,
 }: {
   onSignedIn: () => void;
   /** Why the page is shown again, when the session ended while the app was open (recette 05/11, SEC-01). */
   notice?: string | null;
   /** What just went well before it: a new password chosen from the « mot de passe oublié » link (SEC-05 lot 3). */
   confirmation?: string | null;
+  /** The account's address when it is already known (that same link): filled in, and the password asked first. */
+  email?: string | null;
 }): JSX.Element {
   const [step, setStep] = useState<'password' | 'code' | 'offer'>('password');
   // The notice stands in the error's place until the first try, which says its own.
@@ -132,7 +135,8 @@ export function SignInPage({
               type="email"
               autoComplete="username"
               required
-              autoFocus
+              defaultValue={email ?? undefined}
+              autoFocus={email === null}
             />
           </label>
           <label className="nv-field">
@@ -143,6 +147,7 @@ export function SignInPage({
               type="password"
               autoComplete="current-password"
               required
+              autoFocus={email !== null}
             />
           </label>
           {error === null ? null : (
