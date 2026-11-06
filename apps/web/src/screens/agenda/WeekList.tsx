@@ -9,10 +9,10 @@ import { useState, type JSX } from 'react';
 
 import type { DayActions } from './DayView';
 import { ShortReplies } from './ReplyLines';
-import { SuggestionCard } from './SuggestionCard';
+import { SuggestionCard, UndatedSuggestions } from './SuggestionCard';
 import { AGENDA_KEY, archiveAvailability } from './api';
 import { CategoryMark } from './category';
-import { planOf, proposedRoutinesOf, undatedOf, type DayWindow } from './model';
+import { planOf, proposedRoutinesOf, type DayWindow } from './model';
 import { repliesOn } from './replies';
 
 import { clockOf, dayNumber, weekOf } from '@/scheduling/time';
@@ -36,7 +36,6 @@ export function WeekList({
   shifts: readonly CreatorAccountShift[];
   onOpenDay: (day: string) => void;
 } & DayActions): JSX.Element {
-  const undated = undatedOf(agenda);
   const routines = proposedRoutinesOf(agenda, monday);
   const cards = (suggestions: readonly CreatorSuggestion[]): JSX.Element[] =>
     suggestions.map((suggestion) => (
@@ -50,15 +49,7 @@ export function WeekList({
     ));
   return (
     <div className="ag-week">
-      {undated.length === 0 ? null : (
-        <section className="ag-sec">
-          <div className="ag-sec__head">
-            <h2>Sans date</h2>
-            <span className="ag-count nv-num">{undated.length}</span>
-          </div>
-          {cards(undated)}
-        </section>
-      )}
+      <UndatedSuggestions agenda={agenda} onDecline={actions.onDecline} onPlace={actions.onPlace} />
       {routines.length === 0 ? null : (
         <section className="ag-sec">
           <div className="ag-sec__head">

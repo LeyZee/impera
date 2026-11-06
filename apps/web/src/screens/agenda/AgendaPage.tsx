@@ -13,7 +13,7 @@ import { AddDialog, type AddPreset } from './AddDialog';
 import { DayView } from './DayView';
 import { MonthView } from './MonthView';
 import { PhoneDialog } from './PhoneDialog';
-import { SuggestionDialog } from './SuggestionCard';
+import { SuggestionDialog, UndatedSuggestions } from './SuggestionCard';
 import { DeclineDialog, PlaceDialog } from './SuggestionDialogs';
 import { TaskDialog } from './TaskDialog';
 import { WeekGrid } from './WeekGrid';
@@ -375,17 +375,21 @@ function Views({
     );
   if (view === 'month') return <MonthView agenda={agenda} day={day} shifts={shifts} onOpenDay={openDay} />;
   return wide ? (
-    <WeekGrid
-      agenda={agenda}
-      monday={monday}
-      shifts={shifts}
-      onOpenDay={openDay}
-      onMove={onMove}
-      onSuggestion={(suggestion) => {
-        onOpen({ kind: 'suggestion', suggestion });
-      }}
-      {...actions}
-    />
+    // « Sans date » above the grid too: a suggestion with no room has no column of its own (recette des dates).
+    <div className="ag-week">
+      <UndatedSuggestions agenda={agenda} onDecline={actions.onDecline} onPlace={actions.onPlace} />
+      <WeekGrid
+        agenda={agenda}
+        monday={monday}
+        shifts={shifts}
+        onOpenDay={openDay}
+        onMove={onMove}
+        onSuggestion={(suggestion) => {
+          onOpen({ kind: 'suggestion', suggestion });
+        }}
+        {...actions}
+      />
+    </div>
   ) : (
     <WeekList agenda={agenda} monday={monday} shifts={shifts} onOpenDay={openDay} {...actions} />
   );

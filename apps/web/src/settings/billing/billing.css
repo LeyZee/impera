@@ -134,7 +134,7 @@
   place-items: center;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
-  background: var(--nv-glass-fill);
+  background: var(--nv-select);
   transition:
     background-color var(--nv-dur-slow) var(--nv-ease-out),
     color var(--nv-dur-slow) var(--nv-ease-out),

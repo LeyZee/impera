@@ -118,7 +118,9 @@ describe('Agenda, the creator’s (CR-05)', () => {
     );
     expect(screen.getByRole('heading', { name: 'À faire' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Programme' })).toBeDefined();
-    expect(screen.getByText('Proposé par l’agence')).toBeDefined();
+    expect(screen.getAllByText('Proposé par l’agence').length).toBeGreaterThan(0);
+    // The suggestion that found no room is reachable from today, at any width (recette des dates).
+    expect(screen.getByRole('heading', { name: 'Sans date' })).toBeDefined();
     expect(screen.getByText(/12/u, { selector: '.ag-streak b' })).toBeDefined();
     // Two words only: never « créneau », which belongs to the shifts (ADR 0049).
     expect(document.body.textContent).not.toMatch(/créneau/iu);
@@ -266,6 +268,8 @@ describe('Agenda, the creator’s (CR-05)', () => {
       await screen.findByRole('button', { name: /^Tournage tenue rouge, 14\sh – 16\sh$/u }),
     ).toBeDefined();
     expect(screen.getByText(/Glisse sur une heure libre/u)).toBeDefined();
+    // A suggestion with no room has no column of its own: « Sans date » sits above the grid (recette des dates).
+    expect(screen.getByRole('heading', { name: 'Sans date' })).toBeDefined();
     expect(screen.getByRole('radio', { name: 'Mois' })).toBeDefined();
     cleanup();
     show('month');

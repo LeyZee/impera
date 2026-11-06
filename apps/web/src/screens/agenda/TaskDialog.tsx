@@ -7,7 +7,7 @@ import { AGENDA_KEY, archiveTask, moveTask, NOT_SENT } from './api';
 import { dayInReach, OUT_OF_REACH, spanOf } from './draft';
 import { whenWords } from './words';
 
-import { DayField } from '@/scheduling/DayField';
+import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf, dayOf, minuteOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
@@ -173,7 +173,10 @@ function MoveForm({
   const [badDay, setBadDay] = useState(false);
   const [tried, setTried] = useState(false);
   const [dayUnreadable, setDayUnreadable] = useState(false);
-  const dayWrong = badDay || (tried && dayUnreadable);
+  const [noSuchDay, setNoSuchDay] = useState(false);
+  // What is not a day is said once its field is left, the button staying off until it reads (recette des dates).
+  const [dayLeft, setDayLeft] = useState(false);
+  const dayWrong = badDay || ((tried || dayLeft) && dayUnreadable);
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
     setTried(true);
@@ -194,13 +197,20 @@ function MoveForm({
   };
   return (
     <form className="tm-dialog__body" noValidate onSubmit={submit}>
-      <div className="nv-field tm-field">
+      <div
+        className="nv-field tm-field"
+        onFocus={() => {
+          setDayLeft(false);
+        }}
+        onBlur={() => {
+          setDayLeft(true);
+        }}
+      >
         <label className="nv-field__label" htmlFor={`${id}-day`}>
           Jour
         </label>
         <DayField
           id={`${id}-day`}
-          className="tm-date"
           value={day}
           autofocus
           invalid={dayWrong}
@@ -209,28 +219,32 @@ function MoveForm({
             setDay(next);
             setBadDay(false);
           }}
-          onUnreadable={(bad) => {
+          onUnreadable={(bad, none) => {
             setDayUnreadable(bad);
+            setNoSuchDay(none);
             onUnreadable('day', bad);
           }}
         />
         {dayWrong ? (
           <p id={`${id}-day-error`} className="tm-hint tm-hint--error" role="alert">
-            {badDay ? OUT_OF_REACH : 'Un jour comme 28/03/2027, ou 28/3.'}
+            {badDay ? OUT_OF_REACH : noSuchDay ? NO_SUCH_DAY : 'Un jour comme 28/03/2027, ou 28/3.'}
           </p>
         ) : null}
       </div>
       {timed ? (
-        <div className="ag-hours">
-          <div className="nv-field tm-field">
-            <span className="nv-field__label">Début</span>
-            <TimeField value={start} label="Début" onChange={setStart} onUnreadable={onUnreadable} />
+        // Début and Fin side by side, as in « Ajouter » (recette des dates).
+        <div className="nv-field tm-field">
+          <div className="tm-pair">
+            <label className="nv-field tm-field">
+              <span className="nv-field__label">Début</span>
+              <TimeField value={start} label="Début" onChange={setStart} onUnreadable={onUnreadable} />
+            </label>
+            <label className="nv-field tm-field">
+              <span className="nv-field__label">Fin</span>
+              <TimeField value={end} label="Fin" onChange={setEnd} onUnreadable={onUnreadable} />
+            </label>
           </div>
-          <div className="nv-field tm-field">
-            <span className="nv-field__label">Fin</span>
-            <TimeField value={end} label="Fin" onChange={setEnd} onUnreadable={onUnreadable} />
-            {end <= start ? <p className="tm-hint nv-num">Jusqu’à {clockOf(end)} le lendemain.</p> : null}
-          </div>
+          {end <= start ? <p className="tm-hint nv-num">Jusqu’à {clockOf(end)} le lendemain.</p> : null}
         </div>
       ) : null}
       <div className="tm-dialog__foot">

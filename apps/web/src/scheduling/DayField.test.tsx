@@ -10,6 +10,7 @@ afterEach(cleanup);
 function Harness({ optional = false }: { optional?: boolean }): JSX.Element {
   const [day, setDay] = useState('2026-11-05');
   const [unreadable, setUnreadable] = useState(false);
+  const [noSuchDay, setNoSuchDay] = useState(false);
   return (
     <>
       <label htmlFor="day">Jour</label>
@@ -20,11 +21,12 @@ function Harness({ optional = false }: { optional?: boolean }): JSX.Element {
         today="2026-11-05"
         optional={optional}
         onChange={setDay}
-        onUnreadable={(bad) => {
+        onUnreadable={(bad, none) => {
           setUnreadable(bad);
+          setNoSuchDay(none);
         }}
       />
-      <output>{unreadable ? 'bloqué' : day === '' ? 'vide' : day}</output>
+      <output>{unreadable ? (noSuchDay ? 'inexistant' : 'bloqué') : day === '' ? 'vide' : day}</output>
       <button
         type="button"
         onClick={() => {
@@ -52,8 +54,11 @@ describe('DayField', () => {
   it('holds the form back while it is no day, and marks it only once left', () => {
     render(<Harness />);
     const field = screen.getByLabelText('Jour');
-    fireEvent.change(field, { target: { value: '31/02' } });
+    fireEvent.change(field, { target: { value: 'le 31' } });
     expect(screen.getByRole('status').textContent).toBe('bloqué');
+    // Written as a day the calendar has not: told apart, for the form to say it does not exist.
+    fireEvent.change(field, { target: { value: '31/02' } });
+    expect(screen.getByRole('status').textContent).toBe('inexistant');
     expect(field.getAttribute('aria-invalid')).toBeNull();
     fireEvent.blur(field);
     expect(field.getAttribute('aria-invalid')).toBe('true');

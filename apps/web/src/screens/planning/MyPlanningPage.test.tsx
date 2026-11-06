@@ -730,6 +730,33 @@ describe('the chatter’s Planning', () => {
     expect(text(panel)).toContain('Du dim. 1er nov. au jeu. 5 nov., 5 jours.');
   });
 
+  // Relecture des captures (#575): « 31/02 » was told how a day is written, under both fields.
+  it('says under the last day itself that a day does not exist, once it is left', async () => {
+    serve({});
+    renderPage();
+    await screen.findByText('2 shifts · 12 h');
+    fireEvent.click(await screen.findByRole('button', { name: 'Demander un congé' }));
+    const panel = await screen.findByRole('dialog', { name: 'Demander un congé' });
+    const last = within(panel).getByLabelText('Dernier jour');
+    fireEvent.focus(last);
+    fireEvent.change(last, { target: { value: '31/02' } });
+    expect(within(panel).queryByText('Ce jour n’existe pas.')).toBeNull();
+    fireEvent.blur(last);
+    const said = within(panel).getByText('Ce jour n’existe pas.');
+    expect(said.parentElement).toBe(last.parentElement);
+    expect(last.getAttribute('aria-describedby')).toBe(said.id);
+    fireEvent.focus(last);
+    fireEvent.change(last, { target: { value: 'jeudi' } });
+    fireEvent.blur(last);
+    expect(within(panel).getByText('Un jour comme 28/03/2027, ou 28/3.').parentElement).toBe(
+      last.parentElement,
+    );
+    expect(within(panel).getByRole('button', { name: 'Envoyer la demande' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+  });
+
   it('shows the leave of the week, and folds his leaves and swaps with a pending request to withdraw', async () => {
     const written = serve(
       {
