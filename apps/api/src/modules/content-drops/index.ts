@@ -58,7 +58,7 @@ export interface ContentDropsModule {
   };
 }
 
-export type { IdeaContentRequest, ScriptVersions } from './domain/ports';
+export type { DropStorage, IdeaContentRequest, ScriptVersions } from './domain/ports';
 
 export interface ContentDropsDeps {
   /** Application role: her own account's RLS, or the team's. */

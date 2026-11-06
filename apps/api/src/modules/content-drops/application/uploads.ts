@@ -290,6 +290,7 @@ export const NO_STORAGE: DropStorage = {
   sizeOf: unconfigured,
   remove: unconfigured,
   download: unconfigured,
+  read: unconfigured,
   upload: unconfigured,
 };
 

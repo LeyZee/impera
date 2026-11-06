@@ -36,6 +36,7 @@ import {
 
 import { dropRefusals, mayWithdraw, needsRequest } from '../../domain/drops';
 import {
+  ContentDropExportUnprocessable,
   ContentDropFileNotFound,
   ContentDropFileSettled,
   ContentDropFormatUnprocessable,
@@ -58,6 +59,7 @@ import type {
   FileOutcome,
   AskedScript,
   IdeaContentRequest,
+  SentScript,
   ScriptContentRequest,
   ReceiptStore,
 } from '../../domain/ports';
@@ -386,6 +388,53 @@ export function createDrizzleCreatorContentStore(db: Database): CreatorContentSt
   };
 }
 
+/** The states a sent script is whole in: every file settled, kept, a duplicate or refused (SC-03 c). */
+const EXPORTABLE_STATES: ReadonlySet<string> = new Set(['ready', 'scheduled', 'published']);
+
+/**
+ * A sent script as its archive reads it, by the team's policies: its number, its request's frozen version, each live
+ * file of a slot that the library keeps (a refused one has no medium, an empty slot no file). An original already
+ * erased refuses the whole archive rather than leave a hole in it.
+ */
+async function sentScriptIn(tx: Transaction, dropId: string): Promise<SentScript> {
+  const row = await readDrop(tx, dropId);
+  if (row === undefined || row.state === 'withdrawn') throw new ContentDropNotFound();
+  if (row.category !== 'script' || row.scriptNumber === null || row.requestId === null)
+    throw new ContentDropExportUnprocessable('not_a_script');
+  if (!EXPORTABLE_STATES.has(row.state)) throw new ContentDropExportUnprocessable('not_ready');
+  const request = await readRequest(tx, row.requestId);
+  if (request?.structureVersionId == null) throw new ContentDropExportUnprocessable('not_a_script');
+  const files = await tx
+    .select({
+      slotKey: contentDropFiles.slotKey,
+      storageKey: schema.mediaAssets.storageKey,
+      mime: schema.mediaAssets.mime,
+      bytes: schema.mediaAssets.bytes,
+      erasedAt: schema.mediaAssets.erasedAt,
+    })
+    .from(contentDropFiles)
+    .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, contentDropFiles.mediaAssetId))
+    .where(
+      and(
+        eq(contentDropFiles.dropId, dropId),
+        sql`${contentDropFiles.replacedAt} is null`,
+        sql`${contentDropFiles.slotKey} is not null`,
+        inArray(contentDropFiles.state, ['kept', 'duplicate']),
+      ),
+    );
+  if (files.some((file) => file.erasedAt !== null))
+    throw new ContentDropExportUnprocessable('original_erased');
+  return {
+    scriptNumber: row.scriptNumber,
+    versionId: request.structureVersionId,
+    files: files.flatMap((file) =>
+      file.slotKey === null
+        ? []
+        : [{ slotKey: file.slotKey, storageKey: file.storageKey, mime: file.mime, bytes: file.bytes }],
+    ),
+  };
+}
+
 /** `withTenantMember` for the owner and an active manager; a chatter is refused before any read. */
 export function createDrizzleAgencyContentStore(db: Database): AgencyContentStore {
   const asTeam = <T>(creatorId: string, userId: string, run: (tx: Transaction) => Promise<T>): Promise<T> =>
@@ -518,6 +567,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
       asTeam(creatorId, userId, (tx) => fileTargetIn(tx, dropId, fileId)),
     markSent: (creatorId, userId, dropId, fileId, correlationId) =>
       asTeam(creatorId, userId, (tx) => markSentIn(tx, dropId, fileId, correlationId)),
+    sentScript: (creatorId, userId, dropId) => asTeam(creatorId, userId, (tx) => sentScriptIn(tx, dropId)),
   };
 }
 

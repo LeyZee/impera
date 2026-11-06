@@ -11,6 +11,7 @@ import type {
   DropMime,
   DropState,
   FillScriptSlotBody,
+  ScriptMoment,
   ScriptSegment,
   ScriptSlot,
   ScriptVariantLetter,
@@ -18,6 +19,7 @@ import type {
   StartScriptDropBody,
 } from '@impera/contracts';
 
+import type { ExportedFile } from './script-export';
 import type { FileFamily } from './sniff';
 import type { StoredPart } from './upload';
 
@@ -80,11 +82,19 @@ export interface ScriptDropStore {
 /** The library's versions (`scripts`, wired by the composition root). */
 export interface ScriptVersions {
   /** A frozen version, as her script shows it; `null` for one that does not exist or is not frozen. */
-  frozen(
-    versionId: string,
-  ): Promise<{ readonly name: string; readonly segments: readonly ScriptSegment[] } | null>;
+  frozen(versionId: string): Promise<{
+    readonly name: string;
+    readonly moment: ScriptMoment;
+    readonly segments: readonly ScriptSegment[];
+  } | null>;
   /** A card of a frozen version, its SVG; `null` for a segment or series it does not have. */
   card(versionId: string, segmentKey: string, variant: ScriptVariantLetter | null): Promise<string | null>;
+  /** The same card as the folder's PNG (SC-03): what goes at `00` of its series. */
+  folderCard(
+    versionId: string,
+    segmentKey: string,
+    variant: ScriptVariantLetter | null,
+  ): Promise<Uint8Array | null>;
   /**
    * The latest version of a structure frozen for a request the agency asks by hand, by the one who asks; `null` for a
    * structure unknown, archived, or out of reach of that account.
@@ -219,6 +229,12 @@ export interface DropStorage {
    * limit grows with its size (ADR 0070 § 4).
    */
   download(key: string, path: string, bytes: number): Promise<boolean>;
+  /**
+   * The object at `key`, read as it comes, for an archive the response pulls (SC-03); `null` when there is none. A cut
+   * stream, or a storage silent for 30 s while a chunk is awaited, throws `ContentDropStorageUnavailable`; the reader
+   * stopped early closes the connection.
+   */
+  read(key: string): Promise<AsyncIterable<Uint8Array> | null>;
   /** The local file `path` written at `key`, signed with its fingerprint, in parts when it is large. */
   upload(key: string, path: string, mime: DropMime, sha256: string): Promise<void>;
 }
@@ -290,6 +306,19 @@ export interface AgencyContentStore {
     fileId: string,
     correlationId: string,
   ): Promise<ContentDrop>;
+  /**
+   * A sent script as its archive reads it (SC-03 c): its number, its frozen version, and each live file of a slot with
+   * its kept medium. Refused (`ContentDropExportUnprocessable`) for a drop that is not a numbered script, one not
+   * `ready`, `scheduled` or `published` yet, or one whose original is already erased.
+   */
+  sentScript(creatorId: string, userId: string, dropId: string): Promise<SentScript>;
+}
+
+/** A sent script's facts for its archive (SC-03 c). */
+export interface SentScript {
+  readonly scriptNumber: number;
+  readonly versionId: string;
+  readonly files: readonly ExportedFile[];
 }
 
 /**

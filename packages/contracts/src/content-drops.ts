@@ -510,6 +510,23 @@ export const CONTENT_DROP_SLOT_NOT_FOUND = 'content_drop_slot_not_found';
 export const CONTENT_DROP_SLOTS_UNPROCESSABLE = 'content_drop_slots_unprocessable';
 /** A card her script does not have: a segment or a series not in its frozen version (SC-02 lot b2). */
 export const CONTENT_DROP_CARD_NOT_FOUND = 'content_drop_card_not_found';
+/**
+ * A script's archive refused (SC-03 c, ADR 0056 § 7): not a sent script, its files not all settled yet, an original
+ * already erased, a « both » structure whose moment is not fixed, or media past what a ZIP without ZIP64 holds
+ * (4 Gio). `details.reason` says which.
+ */
+export const CONTENT_DROP_EXPORT_UNPROCESSABLE = 'content_drop_export_unprocessable';
+export const SCRIPT_EXPORT_REFUSALS = [
+  'not_a_script',
+  'not_ready',
+  'original_erased',
+  'moment_unknown',
+  'too_large',
+] as const;
+export const ScriptExportRefusalSchema = z.enum(SCRIPT_EXPORT_REFUSALS);
+export type ScriptExportRefusal = z.infer<typeof ScriptExportRefusalSchema>;
+/** The archive of a sent script: a ZIP, its files stored as they are. */
+export const SCRIPT_EXPORT_MEDIA_TYPE = 'application/zip';
 export const CONTENT_REQUEST_NOT_FOUND = 'content_request_not_found';
 export const CONTENT_REQUEST_ID_CONFLICT = 'content_request_id_conflict';
 export const CONTENT_REQUEST_CLOSED_CONFLICT = 'content_request_closed_conflict';
