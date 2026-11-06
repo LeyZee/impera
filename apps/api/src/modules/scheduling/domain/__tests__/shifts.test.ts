@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   accessWindow,
+  creatorsInAccessWindow,
   assertCanWork,
   assertPlanningRange,
   assertPlans,
@@ -140,6 +141,43 @@ describe('on shift and the access window (ADR 0025)', () => {
     expect(iso(window.endsAt)).toBe('2026-11-03T05:15:00.000Z');
     const stopped = { ...shift, endsAt: at('2026-11-03T01:12:00Z'), stoppedAt: at('2026-11-03T01:12:40Z') };
     expect(iso(accessWindow(stopped, 15).endsAt)).toBe('2026-11-03T01:12:00.000Z');
+  });
+});
+
+describe('the creators an access window opens (ADR 0025, EQ-13)', () => {
+  const night = {
+    creatorId: 'nora',
+    startsAt: at('2026-11-02T23:00:00Z'),
+    endsAt: at('2026-11-03T05:00:00Z'),
+    stoppedAt: null,
+  };
+  const day = {
+    ...night,
+    creatorId: 'lea',
+    startsAt: at('2026-11-03T12:00:00Z'),
+    endsAt: at('2026-11-03T18:00:00Z'),
+  };
+
+  it('opens the creator from the margin before the start to the margin after the end, across midnight', () => {
+    const open = (instant: string): string[] => creatorsInAccessWindow([night, day], at(instant), 15);
+    expect(open('2026-11-02T22:44:59Z')).toEqual([]);
+    expect(open('2026-11-02T22:45:00Z')).toEqual(['nora']);
+    expect(open('2026-11-03T00:30:00Z')).toEqual(['nora']);
+    expect(open('2026-11-03T05:14:59Z')).toEqual(['nora']);
+    expect(open('2026-11-03T05:15:00Z')).toEqual([]);
+    expect(open('2026-11-03T11:50:00Z')).toEqual(['lea']);
+  });
+
+  it('closes at the end of a stopped shift, without its margin', () => {
+    const stopped = { ...night, endsAt: at('2026-11-03T01:12:00Z'), stoppedAt: at('2026-11-03T01:12:40Z') };
+    expect(creatorsInAccessWindow([stopped], at('2026-11-03T01:11:59Z'), 15)).toEqual(['nora']);
+    expect(creatorsInAccessWindow([stopped], at('2026-11-03T01:12:00Z'), 15)).toEqual([]);
+  });
+
+  it('names a creator once, whatever her accounts and shifts, and opens nothing without a margin outside a shift', () => {
+    const twice = { ...night, startsAt: at('2026-11-03T05:00:00Z'), endsAt: at('2026-11-03T06:00:00Z') };
+    expect(creatorsInAccessWindow([night, twice, day], at('2026-11-03T05:05:00Z'), 15)).toEqual(['nora']);
+    expect(creatorsInAccessWindow([night], at('2026-11-03T05:00:00Z'), 0)).toEqual([]);
   });
 });
 

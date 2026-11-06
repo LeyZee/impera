@@ -716,6 +716,11 @@
 }
 
 /* An empty state or a first read: one shape, the list's own width or a centred notice, as tall as its words. */
+/* A chatter off shift (or away) reads his banner under the title: the banner keeps its own height, and what he still
+ * holds takes the rest of the screen below it, never pushed to its foot by an empty row (EQ-13). */
+.nv-page.tr-page:has(> .sc-off) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
 .tr-page > .nv-coming {
   align-self: start;
   justify-self: center;

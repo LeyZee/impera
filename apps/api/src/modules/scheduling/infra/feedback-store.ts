@@ -106,6 +106,10 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
   return {
     read: (actor, shiftId) =>
       inShiftCreator(shiftId, actor, async (tx) => {
+        // The shift as his policies show it: one he does not see answers as an unknown id, never `null`, which would
+        // tell him it exists (isolation sweep of the 06/11).
+        const [seen] = await tx.select({ id: shifts.id }).from(shifts).where(eq(shifts.id, shiftId));
+        if (seen === undefined) throw new ShiftNotFound();
         const found = await feedbackWhere(tx, shiftFeedbacks.shiftId, shiftId);
         return found?.feedback ?? null;
       }),

@@ -76,7 +76,7 @@ Branche : task/<id>-<slug>
 | EQ-10 | Connexion et premier accès du chatteur | équipe | todo | EQ-01, EQ-11 |
 | EQ-11 | Shell par rôle : rail, barre du téléphone et gardes de route | équipe | todo | ADR 0024, EQ-01 (`/v1/me`) |
 | EQ-12 | Annonces, prise de poste et notifications de l'équipe, sans Telegram | équipe | todo | CR-01, EQ-02, CR-13, EQ-10, EQ-11 |
-| EQ-13 | Accès d'un chatteur borné à son shift | équipe | todo | ADR 0025, EQ-01, EQ-02, filtre des conversations routées |
+| EQ-13 | Accès d'un chatteur borné à son shift | équipe | in_progress | ADR 0025, EQ-01, EQ-02, filtre des conversations routées |
 | EQ-14 | Gestes de la fiche d'un membre et départ | équipe | in_progress | EQ-01 (gestes) ; EQ-02, EQ-04 à EQ-06 (départ) |
 | EQ-15 | Double authentification pour le propriétaire et les managers | équipe | todo | EQ-01, EQ-10, EQ-11 |
 | EQ-16 | S'entraîner : les recrues s'exercent contre des fans simulés | équipe | blocked (clés, comme le playground) | EQ-10, EQ-11, P3-01, P3-05 |
