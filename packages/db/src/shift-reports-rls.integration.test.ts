@@ -105,6 +105,7 @@ describe('end-of-shift reports and pay rules (EQ-03): the member, the agency, fo
           reviewedBy: by,
           reviewedAt: new Date(),
           reviewNote: status === 'rejected' ? 'Le pack de 40 € manque' : null,
+          reviewKind: 'human',
           ...values,
         })
         .where(eq(s.shiftReports.id, id))
@@ -305,6 +306,7 @@ describe('end-of-shift reports and pay rules (EQ-03): the member, the agency, fo
               reviewedBy: null,
               reviewedAt: null,
               reviewNote: null,
+              reviewKind: null,
             })
             .where(eq(s.shiftReports.id, report.id))
             .returning({ version: s.shiftReports.version }),
@@ -335,6 +337,54 @@ describe('end-of-shift reports and pay rules (EQ-03): the member, the agency, fo
       const owners = correction(owner);
       await make(owner, owners);
       expect(await review(owner, owners.id, 'validated')).toHaveLength(1);
+    });
+
+    it('keeps the automatic check’s mark from every member, the owner included (ADR 0073 § 4)', async () => {
+      const shift = await plan(nora, chatterA);
+      const report = reportRow(shift, chatterA);
+      await make(chatterA, report);
+      // A person's review is `human`: neither the owner nor a manager validates in the check's name, with or
+      // without their own name on it.
+      for (const by of [owner, manager]) {
+        expect(
+          await failure(review(by, report.id, 'validated', { reviewKind: 'automatic', reviewedBy: null })),
+        ).toMatch(/row-level security|violates check constraint/u);
+        expect(await failure(review(by, report.id, 'validated', { reviewKind: 'automatic' }))).toMatch(
+          /row-level security|violates check constraint/u,
+        );
+      }
+      // Nor does its member, on the report they may still change.
+      expect(
+        await failure(
+          withTenantMember(test.app.db, nora.creatorId, chatterA, (tx) =>
+            tx
+              .update(s.shiftReports)
+              .set({ reviewKind: 'automatic', version: sql`${s.shiftReports.version} + 1` })
+              .where(eq(s.shiftReports.id, report.id)),
+          ),
+        ),
+      ).toMatch(/row-level security|violates check constraint/u);
+      // As the admin role, a validation without an author is the check's alone, and the check names nobody.
+      const byAdmin = (values: Partial<typeof s.shiftReports.$inferInsert>) =>
+        withAdmin(test.admin.db, (tx) =>
+          tx
+            .update(s.shiftReports)
+            .set({
+              status: 'validated',
+              version: sql`${s.shiftReports.version} + 1`,
+              reviewedAt: new Date(),
+              ...values,
+            })
+            .where(eq(s.shiftReports.id, report.id))
+            .returning({ id: s.shiftReports.id }),
+        );
+      expect(await failure(byAdmin({ reviewKind: 'human', reviewedBy: null }))).toMatch(
+        /shift_reports_state_check/u,
+      );
+      expect(await failure(byAdmin({ reviewKind: 'automatic', reviewedBy: owner }))).toMatch(
+        /shift_reports_state_check/u,
+      );
+      expect(await byAdmin({ reviewKind: 'automatic', reviewedBy: null })).toHaveLength(1);
     });
 
     it('a shift that has its report is no longer cancelled', async () => {
