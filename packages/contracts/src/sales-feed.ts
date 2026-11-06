@@ -4,6 +4,7 @@ import { PlatformSchema } from './enums';
 import { refusalBodySchema } from './errors';
 import { CreatorIdSchema, FanIdSchema, PlatformAccountIdSchema, TeamMemberIdSchema } from './ids';
 import { CurrencySchema } from './money';
+import { pastedSecret } from './pasted-secret';
 
 /**
  * The sales feed (ADR 0050 § 2): a platform's own register of sales and refunds, read by a stored cursor without any
@@ -238,7 +239,7 @@ export const SalesFeedStatusSchema = z.object({
 });
 export type SalesFeedStatus = z.infer<typeof SalesFeedStatusSchema>;
 
-export const SaveSalesFeedKeyBodySchema = z.object({ key: z.string().trim().min(1).max(512) });
+export const SaveSalesFeedKeyBodySchema = z.object({ key: pastedSecret(512) });
 export type SaveSalesFeedKeyBody = z.infer<typeof SaveSalesFeedKeyBodySchema>;
 
 export const SalesFeedRefusalSchema = z.object({
