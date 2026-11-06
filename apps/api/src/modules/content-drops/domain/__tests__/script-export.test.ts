@@ -94,6 +94,8 @@ describe('a sent script’s archive (ADR 0056 § 7)', () => {
   });
 
   it('writes a sheet to copy, step by step, with each series and its files', () => {
+    expect(plan.sheet).toContain('Moment : Nuit\n');
+    expect(plan.moment).toBe('night');
     expect(plan.sheet).toContain('01 · E1 — Salon (GRATUIT)');
     expect(plan.sheet).toContain('02 · P12 — Pont (GRATUIT)');
     expect(plan.sheet).toContain('03 · E2 — Chambre (PAYANT)');

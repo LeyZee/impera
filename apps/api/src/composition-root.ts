@@ -311,9 +311,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const contentDrops = wireContentDrops(shared, {
     scriptVersions: {
       frozen: (versionId) => scripts.module.frozenVersion(versionId),
-      card: (versionId, segmentKey, variant) => scripts.module.frozenCard(versionId, segmentKey, variant),
-      folderCard: (versionId, segmentKey, variant) =>
-        scripts.module.frozenFolderCard(versionId, segmentKey, variant),
+      card: (versionId, segmentKey, variant, moment) =>
+        scripts.module.frozenCard(versionId, segmentKey, variant, moment),
+      folderCard: (versionId, segmentKey, variant, moment) =>
+        scripts.module.frozenFolderCard(versionId, segmentKey, variant, moment),
       freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
     },
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
