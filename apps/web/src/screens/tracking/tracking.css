@@ -774,12 +774,16 @@
 .tr-draft .nv-draft-panel__actions > .nv-btn--neon {
   flex-grow: 1.6;
 }
-/* The emergency stop, said above the list before any decision (recette CHAT-07). */
+/* The emergency stop, said above the list before any decision (recette CHAT-07): a row of its own, as tall as its
+ * sentence; the list and the reader keep the rest of the screen. */
+.nv-page.tr-page:has(> .tr-stop) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
 .tr-stop__in {
   margin: 0;
-  padding: 14px 18px;
+  padding: 10px 14px;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--nv-space-3);
   font-size: var(--nv-text-callout);
   line-height: var(--nv-text-callout-leading);
