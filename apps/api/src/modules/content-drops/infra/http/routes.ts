@@ -330,6 +330,14 @@ export function createContentDropRoutes(
       },
     );
 
+    // « Copié dans Reveal » (SC-03 c): her originals of the script go 30 days later.
+    app.post(
+      '/creators/:creatorId/drops/:id/script-export/confirm',
+      { ...team, schema: { params: CreatorDropParamsSchema, response: { 200: ContentDropSchema } } },
+      (request) =>
+        agency.confirmExport(request.params.creatorId, signedIn(request.user), request.params.id, clock()),
+    );
+
     app.post(
       '/creators/:creatorId/content-requests',
       {

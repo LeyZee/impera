@@ -6,6 +6,7 @@ import {
   DROP_MEDIA_KINDS,
   DROP_MIME_TYPES,
   DROP_STATES,
+  SHOT_MOMENTS,
 } from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -70,6 +71,12 @@ export const contentRequests = pgTable(
      * and for a script asked by hand before SC-02.
      */
     structureVersionId: uuid('structure_version_id').references(() => scriptStructureVersions.id),
+    /**
+     * The moment the script is shot as, `day` or `night` (SC-03, « ok alternance » 06/11): its version's own, or, for a
+     * « both » structure, the other one than the last script asked of her (`night` for her first). Written by the code,
+     * never asked. `null` outside a script, and for a script asked before SC-03 c.
+     */
+    moment: enumText('moment'),
     origin: enumText('origin').notNull(),
     state: enumText('state').notNull().default('open'),
     refusalReason: text('refusal_reason'),
@@ -93,6 +100,11 @@ export const contentRequests = pgTable(
         and (${t.refusalReason} is null or (${t.state} = 'refused' and char_length(${t.refusalReason}) between 1 and 200))`,
     ),
     check('content_requests_author_check', sql`(${t.origin} = 'agency') = (${t.createdBy} is not null)`),
+    enumCheck('content_requests', t.moment, SHOT_MOMENTS),
+    check(
+      'content_requests_moment_version_check',
+      sql`${t.moment} is null or ${t.structureVersionId} is not null`,
+    ),
     check(
       'content_requests_structure_version_check',
       sql`${t.structureVersionId} is null or ${t.structureId} is not null`,
@@ -159,6 +171,12 @@ export const contentDrops = pgTable(
      * `S<nnn>`. Null for any other drop and for a script still being filled.
      */
     scriptNumber: integer('script_number'),
+    /**
+     * When the team confirmed it copied her sent script into Reveal from its archive (SC-03 c, ADR 0056 § 7), and who:
+     * her originals of it go 30 days later (ADR 0044 § 2). Null until then.
+     */
+    exportedAt: timestampTz('exported_at'),
+    exportedBy: text('exported_by').references(() => user.id),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),
@@ -194,6 +212,10 @@ export const contentDrops = pgTable(
     check(
       'content_drops_script_number_check',
       sql`${t.scriptNumber} is null or (${t.category} = 'script' and ${t.scriptNumber} >= 1)`,
+    ),
+    check(
+      'content_drops_exported_check',
+      sql`(${t.exportedAt} is null) = (${t.exportedBy} is null) and (${t.exportedAt} is null or ${t.scriptNumber} is not null)`,
     ),
     uniqueIndex('content_drops_script_number_unique')
       .on(t.creatorId, t.scriptNumber)
