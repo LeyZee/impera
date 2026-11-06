@@ -221,3 +221,26 @@ export const TELEGRAM_JOB_PAYLOADS = {
   'telegram.connection_reminders': z.object({}),
   'telegram.purge': z.object({}),
 } as const;
+
+/**
+ * `/v1/auth/telegram-link` (SEC-05 lot 2, ADR 0068 § 4): the account's own private chat with the agency's bot, where
+ * its reset link will go. Never the chat's id, only whether it is linked and by which bot.
+ */
+export const TelegramPrivateLinkSchema = z.object({
+  linked: z.boolean(),
+  botUsername: z.string().nullable(),
+  linkedAt: z.iso.datetime().nullable(),
+});
+export type TelegramPrivateLink = z.infer<typeof TelegramPrivateLinkSchema>;
+
+/** The one-time code to send the bot (`/start <code>`), ten minutes; `url` opens the bot with the code already in. */
+export const TelegramLinkCodeSchema = z.object({
+  code: z.string().regex(/^[A-Z2-9]{10}$/),
+  botUsername: z.string().min(1),
+  url: z.url(),
+  expiresAt: z.iso.datetime(),
+});
+export type TelegramLinkCode = z.infer<typeof TelegramLinkCodeSchema>;
+
+/** No active bot can take the code yet (422): one is added first in Réglages › Telegram. */
+export const TELEGRAM_LINK_NO_BOT_UNPROCESSABLE = 'telegram_link_no_bot_unprocessable';

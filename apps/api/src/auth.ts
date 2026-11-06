@@ -38,6 +38,7 @@ import type { FastifyReply, FastifyRequest, preValidationAsyncHookHandler } from
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { backupCodeOptions } from './backup-codes';
 import type { Config } from './config';
 import type { Logger } from './logger';
 import {
@@ -338,7 +339,7 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
         issuer: 'Impera',
         trustDeviceMaxAge: TRUSTED_DEVICE_SECONDS,
         twoFactorCookieMaxAge: SIGN_IN_CODE_SECONDS,
-        backupCodeOptions: { amount: 10, storeBackupCodes: 'encrypted' },
+        backupCodeOptions: backupCodeOptions(config.AUTH_SECRET),
         accountLockout: CODE_LOCK,
       }),
       // ADR 0053: a passkey is worth the password and the code. The plugin asks the browser for user verification

@@ -8,6 +8,8 @@ export interface AskScriptsDeps {
   readonly cadences: CadenceStore;
   readonly requests: ScriptRequests;
   readonly limitsOf: LimitsOf;
+  /** Told each creator whose run failed, with its cause, for the job's log: the count alone says nothing of why. */
+  readonly onFailure?: (creatorId: CreatorId, error: unknown) => void;
 }
 
 /** What one run did, for the job's log line: counts only, never a name. */
@@ -36,8 +38,9 @@ export async function askScripts(deps: AskScriptsDeps, now: Date): Promise<AskSc
       const outcome = await askOne(deps, creator.id, calendarDayAt(now, creator.timeZone), now);
       if (outcome === 'asked') asked += 1;
       if (outcome === 'warned') warned += 1;
-    } catch {
+    } catch (error) {
       failed += 1;
+      deps.onFailure?.(creator.id, error);
     }
   }
   return { asked, warned, failed };

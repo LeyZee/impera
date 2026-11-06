@@ -63,9 +63,13 @@ const UpdateSchema = z.object({
       chat: ChatSchema,
       migrate_to_chat_id: z.number().int().optional(),
       new_chat_title: z.string().optional(),
+      text: z.string().max(4096).optional(),
     })
     .optional(),
 });
+
+/** `/start <code>` (or `/start@bot <code>`), the deep link's form: the code alone is kept, never the rest of a text. */
+const START = /^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{1,64})\s*$/u;
 
 type Call = { ok: true; result: unknown } | { ok: false; failure: ChannelFailure; description: string };
 
@@ -159,6 +163,15 @@ function toUpdate(raw: unknown): ChannelUpdate | null {
       updateId: update.update_id,
       telegramChatId: String(message.chat.id),
       title: message.new_chat_title,
+    };
+  }
+  const start = message?.chat.type === 'private' ? START.exec(message.text ?? '') : null;
+  if (message !== undefined && start?.[1] !== undefined) {
+    return {
+      kind: 'start',
+      updateId: update.update_id,
+      telegramChatId: String(message.chat.id),
+      code: start[1],
     };
   }
   return { kind: 'other', updateId: update.update_id };

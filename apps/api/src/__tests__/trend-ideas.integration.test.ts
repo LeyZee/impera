@@ -1,7 +1,9 @@
 import {
   AvailabilityIdSchema,
+  ContentDropIdSchema,
   ContentIdeaIdSchema,
   ContentIdeaListSchema,
+  ContentRequestIdSchema,
   CreatorAgendaSchema,
   CreatorIdSchema,
   CreatorTaskSchema,
@@ -327,6 +329,17 @@ describe('/v1/creators/:creatorId/ideas', () => {
       }),
     ]);
     expect(await ideaOf(yes)).toEqual({ state: 'suggested', requestId: String(yes) });
+    // Her drop for that request has all its bytes (VEI-01 d3): the idea is deposited, once; another creator's drop
+    // naming the request moves nothing.
+    const received = {
+      dropId: newId(ContentDropIdSchema),
+      requestId: ContentRequestIdSchema.parse(String(yes)),
+    };
+    await app.modules.trends.jobs.followDeposit({ ...received, creatorId: ines });
+    expect(await ideaOf(yes)).toEqual({ state: 'suggested', requestId: String(yes) });
+    await app.modules.trends.jobs.followDeposit({ ...received, creatorId: nora });
+    await app.modules.trends.jobs.followDeposit({ ...received, creatorId: nora });
+    expect(await ideaOf(yes)).toEqual({ state: 'deposited', requestId: String(yes) });
 
     const no = await seedIdea(nora, { title: 'Bain moussant' });
     await validate(cookies.owner, nora, no);

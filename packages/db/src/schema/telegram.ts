@@ -19,6 +19,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { user } from './auth';
 import { createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './columns';
 import { creators } from './tenancy';
 
@@ -176,3 +177,34 @@ export const telegramSettings = pgTable(
     enumCheck('telegram_settings', t.topic, ['sale']),
   ],
 );
+
+/**
+ * ADR 0068 § 4: the private chat where a member's own reset link goes, found when they send `/start <code>` to the
+ * agency's bot. One per account, used for that link alone; read and written as the admin role only (RLS forced, no
+ * policy, revoked from `nirvana_app`).
+ */
+export const telegramPrivateLinks = pgTable('telegram_private_links', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  botId: uuid('bot_id')
+    .notNull()
+    .references(() => telegramBots.id, { onDelete: 'cascade' }),
+  /** Signed 64-bit id of the private chat, kept as text. */
+  telegramChatId: text('telegram_chat_id').notNull(),
+  linkedAt: timestampTz('linked_at').notNull().defaultNow(),
+});
+
+/**
+ * The one-time code a member shows the bot to link their private chat (ADR 0068 § 4): its SHA-256 alone is kept, ten
+ * minutes, one per account (a new code replaces the last). Admin role only, as above.
+ */
+export const telegramLinkCodes = pgTable('telegram_link_codes', {
+  codeHash: text('code_hash').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  expiresAt: timestampTz('expires_at').notNull(),
+  createdAt: createdAt(),
+});

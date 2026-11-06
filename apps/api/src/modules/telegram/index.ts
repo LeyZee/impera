@@ -7,6 +7,13 @@ import type { TelegramApi } from './application/api';
 import { connectionReminders } from './application/connections';
 import { flushChat, type FlushDeps } from './application/flush';
 import { dispatchPolls, pollBot } from './application/poll';
+import {
+  hasPrivateLink,
+  issueLinkCode,
+  privateLinkOf,
+  sendPrivate,
+  type PrivateSendOutcome,
+} from './application/private-link';
 import { eveningDigest, saleSettings, saveSaleSettings } from './application/sales';
 import { scanEvents } from './application/scan';
 import {
@@ -29,11 +36,18 @@ import type {
   Clock,
   DeliveriesStore,
   NotificationChannel,
+  PrivateLinksStore,
   SalesDayReader,
   UsdRateReader,
 } from './domain/ports';
 import type { ScannedEvent } from './domain/signals';
 import { createPostgresTelegramStore, type ResealReport } from './infra/postgres.store';
+import {
+  createPrivateLinkRoutes,
+  type PrivateLinkApi,
+  type PrivateLinkRoutesOptions,
+} from './infra/private-link-routes';
+import { createPostgresPrivateLinksStore } from './infra/private-links.store';
 import { createTelegramRoutes, type TelegramRoutesOptions } from './infra/routes';
 import { createTelegramApi } from './infra/telegram-api';
 
@@ -43,6 +57,8 @@ export interface TelegramDeps {
   readonly bots: BotsStore;
   readonly deliveries: DeliveriesStore;
   readonly channel: NotificationChannel;
+  /** ADR 0068 § 4: the accounts' private chats; without it, no link is made and `/start` is read past. */
+  readonly privateLinks?: PrivateLinksStore;
   readonly clock?: Clock;
   /** WEB_ORIGIN: the links of the messages open the CRM. */
   readonly webOrigin: string;
@@ -77,11 +93,40 @@ export interface TelegramModule extends TelegramApi {
   readonly start: () => Promise<ResealReport>;
   /** `/v1/settings/telegram`, behind the guards given here. */
   readonly routes: (options: TelegramRoutesOptions) => FastifyPluginAsyncZod;
+  /** An account's private chat (ADR 0068 § 4): whether it is linked, and the reset link sent there (`auth`). */
+  readonly privateChat: PrivateChat;
+  /** `/v1/auth/telegram-link` (ADR 0068 § 4), the signed-in account's own private chat. */
+  readonly privateLinkRoutes: (options: PrivateLinkRoutesOptions) => FastifyPluginAsyncZod;
+}
+
+interface PrivateChat {
+  has(userId: string): Promise<boolean>;
+  send(userId: string, text: string): Promise<PrivateSendOutcome>;
 }
 
 export function createTelegramModule(deps: TelegramDeps): TelegramModule {
   const clock = deps.clock ?? { now: () => new Date() };
   const base: FlushDeps = { bots: deps.bots, deliveries: deps.deliveries, channel: deps.channel, clock };
+  const privateLinks = deps.privateLinks;
+  const linking: PrivateLinkApi = {
+    issueCode: (userId) =>
+      privateLinks === undefined ? Promise.resolve(null) : issueLinkCode({ ...base, privateLinks }, userId),
+    linkOf: (userId) =>
+      privateLinks === undefined
+        ? Promise.resolve({ linked: false, botUsername: null, linkedAt: null })
+        : privateLinkOf({ ...base, privateLinks }, userId),
+    unlink: async (userId) => {
+      await privateLinks?.removeLink(userId);
+    },
+  };
+  const privateChat: PrivateChat = {
+    has: (userId) =>
+      privateLinks === undefined ? Promise.resolve(false) : hasPrivateLink({ ...base, privateLinks }, userId),
+    send: (userId, text) =>
+      privateLinks === undefined
+        ? Promise.resolve('no_link')
+        : sendPrivate({ ...base, privateLinks }, userId, text),
+  };
   const api: TelegramApi = {
     overview: () => overview(base),
     addBot: (token) => addBot(base, token),
@@ -110,7 +155,8 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
         }),
       flushChat: (chatId) => flushChat(base, chatId),
       dispatchPolls: () => dispatchPolls(base),
-      pollUpdates: (botId, waitSeconds) => pollBot(base, botId, waitSeconds),
+      pollUpdates: (botId, waitSeconds) =>
+        pollBot({ ...base, ...(privateLinks !== undefined && { privateLinks }) }, botId, waitSeconds),
       morningDigest: () => morningDigest(base),
       eveningDigest: () =>
         deps.salesDay === undefined
@@ -121,6 +167,8 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
     },
     start: () => deps.resealTokens?.() ?? Promise.resolve({ rewritten: 0, unreadable: [] }),
     routes: (options) => createTelegramRoutes(api, options),
+    privateChat,
+    privateLinkRoutes: (options) => createPrivateLinkRoutes(linking, options),
   };
 }
 
@@ -146,6 +194,7 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
   const module = createTelegramModule({
     bots: store.bots,
     deliveries: store.deliveries,
+    privateLinks: createPostgresPrivateLinksStore(options.adminDb),
     channel: createTelegramApi({ fetch }),
     webOrigin: options.webOrigin,
     onUncovered: options.onUncovered,
