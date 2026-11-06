@@ -49,7 +49,7 @@ interface Asked {
 }
 
 /** One creator, her queue, the library and the requests, in memory: what the database holds, as the job sees it. */
-function world(options: { readonly limits: PersonaLimits | null }) {
+function world(options: { readonly limits: PersonaLimits | null; readonly failure?: Error }) {
   const creatorId = newId(CreatorIdSchema);
   const library = new Map<ScriptStructureId, ScriptStructureVersion>();
   let queue: ScriptStructureId[] = [];
@@ -116,9 +116,12 @@ function world(options: { readonly limits: PersonaLimits | null }) {
     onFreeze: (fn: () => void) => {
       onFreeze = fn;
     },
-    run: (at: string) => {
+    creatorId,
+    run: (at: string, onFailure?: (creator: CreatorId, error: unknown) => void) => {
+      const limitsOf = () =>
+        options.failure === undefined ? Promise.resolve(options.limits) : Promise.reject(options.failure);
       return askScripts(
-        { cadences, requests, limitsOf: () => Promise.resolve(options.limits) },
+        { cadences, requests, limitsOf, ...(onFailure === undefined ? {} : { onFailure }) },
         new Date(at),
       );
     },
@@ -126,6 +129,19 @@ function world(options: { readonly limits: PersonaLimits | null }) {
 }
 
 describe('scripts.ask_scripts (SC-02)', () => {
+  it('counts a creator whose run failed and tells its cause, for the log', async () => {
+    const failure = new Error('persona store down');
+    const w = world({ limits: LIMITS, failure });
+    w.setQueue([w.add('Salon', 'Canapé')]);
+    const heard: [CreatorId, unknown][] = [];
+    expect(await w.run('2026-11-05T10:00:00Z', (creator, error) => heard.push([creator, error]))).toEqual({
+      asked: 0,
+      warned: 0,
+      failed: 1,
+    });
+    expect(heard).toEqual([[w.creatorId, failure]]);
+  });
+
   it('asks nothing without an active persona', async () => {
     const w = world({ limits: null });
     w.setQueue([w.add('Salon', 'Canapé')]);
