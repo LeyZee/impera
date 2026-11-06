@@ -2,6 +2,7 @@ import {
   AccountPayRulesIdSchema,
   ApiErrorSchema,
   newId,
+  payPeriodAt,
   payPeriodOfDay,
   PlatformAccountIdSchema,
   ReportGapThresholdSchema,
@@ -427,5 +428,54 @@ describe('Rapports de fin de shift comparés à Reveal (ADR 0073)', () => {
           .where(eq(schema.shiftReports.id, declared.id)),
       ),
     ).rejects.toMatchObject({ cause: { code: '42501' } });
+  });
+
+  it('goes through every candidate: older reports a person still has to decide never hide a newer one', async () => {
+    // More gaps than one page of the check, sent before: Theo declared 1,00 € on each of these short shifts, where
+    // Reveal read nothing. They wait for a person, and stay submitted.
+    const held = 201;
+    const first = parisInstant(parisDay(-10), 0);
+    for (let index = 0; index < held; index += 1) {
+      const startsAt = new Date(first.getTime() + index * 5 * 60_000);
+      const endsAt = new Date(startsAt.getTime() + 5 * 60_000);
+      const shiftId = newId(ShiftIdSchema);
+      await test.admin.db.insert(schema.shifts).values({
+        id: shiftId,
+        creatorId: anna,
+        platformAccountId: annaMain,
+        memberId: theo.id,
+        startsAt,
+        endsAt,
+        createdBy: ownerId,
+        updatedBy: ownerId,
+      });
+      await test.admin.db.insert(schema.shiftReports).values({
+        id: newId(ShiftReportIdSchema),
+        creatorId: anna,
+        platformAccountId: annaMain,
+        shiftId,
+        memberId: theo.id,
+        period: payPeriodAt(startsAt, 'Europe/Paris'),
+        amountMinor: 100,
+        currency: 'EUR',
+        status: 'submitted',
+        submittedBy: theo.userId,
+        submittedAt: endsAt,
+        createdBy: theo.userId,
+      });
+    }
+    // A newer report, within the threshold: the check finds it behind them.
+    const shift = await shiftOf(-6);
+    await sold(-6, 630, 10_000);
+    const declared = await report(shift, 10_000);
+    await feedRead(new Date());
+
+    await run();
+    expect(await stored(declared.id)).toMatchObject({ status: 'validated', reviewKind: 'automatic' });
+    const waiting = await test.admin.db
+      .select({ id: schema.shiftReports.id })
+      .from(schema.shiftReports)
+      .where(and(eq(schema.shiftReports.status, 'submitted'), eq(schema.shiftReports.amountMinor, 100)));
+    expect(waiting).toHaveLength(held);
   });
 });

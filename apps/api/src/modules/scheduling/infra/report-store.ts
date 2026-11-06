@@ -95,8 +95,11 @@ const {
   teamMembers,
 } = schema;
 
-/** The most reports one run of the automatic check looks at: the next run takes the rest. */
-const CHECK_BATCH = 200;
+/**
+ * The automatic check reads its candidates a page at a time, in its own admin transaction each: a run goes through
+ * them all, so the reports a person still has to decide (a gap, a member not linked) never hide a newer one.
+ */
+const CHECK_PAGE = 200;
 
 const reportColumns = {
   id: shiftReports.id,
@@ -639,36 +642,51 @@ export function createDrizzleShiftReportStore(
 
     reader: (actor) => withMember(db, actor, (tx, scope) => readerIn(tx, actor, scope)),
 
-    checkCandidatesUnscoped: (now) =>
-      withAdmin(adminDb, async (tx) => {
-        const settings = await checkSettingsIn(tx);
-        // The submitted reports whose window is over plus the quarter of an hour, on an account whose platform's
-        // register was read to its end since: the others cannot be complete yet. The oldest first, a bounded batch.
-        const late = settings.marginMinutes + SHIFT_REPORT_CHECK_LATE_MINUTES;
-        const rows = await tx
-          .select({ ...reportColumns, shift: shiftColumns })
-          .from(shiftReports)
-          .innerJoin(shifts, eq(shifts.id, shiftReports.shiftId))
-          .innerJoin(platformAccounts, eq(platformAccounts.id, shiftReports.platformAccountId))
-          .innerJoin(salesFeedCursors, eq(salesFeedCursors.platform, platformAccounts.platform))
-          .where(
-            and(
-              eq(shiftReports.status, 'submitted'),
-              sql`${shiftReports.correctsId} is null`,
-              sql`${shifts.endsAt} + make_interval(mins => ${late}) <= ${now}`,
-              sql`${salesFeedCursors.caughtUpAt} >= ${shifts.endsAt} + make_interval(mins => ${late})`,
-            ),
-          )
-          .orderBy(shiftReports.submittedAt)
-          .limit(CHECK_BATCH);
-        const due: { id: ShiftReportId; version: number }[] = [];
-        for (const { shift, ...row } of rows) {
-          const report = toReport(row);
-          const check = await checkOf(tx, report, toShift(shift), readShiftSales, settings, now);
-          if (validatesByItself(check)) due.push({ id: report.id, version: report.version });
-        }
-        return due;
-      }),
+    checkCandidatesUnscoped: async (now) => {
+      const due: { id: ShiftReportId; version: number }[] = [];
+      let after: { readonly submittedAt: Date; readonly id: ShiftReportId } | null = null;
+      for (;;) {
+        const page = await withAdmin(adminDb, async (tx) => {
+          const settings = await checkSettingsIn(tx);
+          // The submitted reports whose window is over plus the quarter of an hour, on an account whose platform's
+          // register was read to its end since: the others cannot be complete yet. The oldest first, after the page
+          // before: a keyset on (submitted_at, id), the instant to the millisecond a JavaScript date carries back.
+          const late = settings.marginMinutes + SHIFT_REPORT_CHECK_LATE_MINUTES;
+          const sent = sql`date_trunc('milliseconds', ${shiftReports.submittedAt})`;
+          const rows = await tx
+            .select({ ...reportColumns, shift: shiftColumns })
+            .from(shiftReports)
+            .innerJoin(shifts, eq(shifts.id, shiftReports.shiftId))
+            .innerJoin(platformAccounts, eq(platformAccounts.id, shiftReports.platformAccountId))
+            .innerJoin(salesFeedCursors, eq(salesFeedCursors.platform, platformAccounts.platform))
+            .where(
+              and(
+                eq(shiftReports.status, 'submitted'),
+                sql`${shiftReports.correctsId} is null`,
+                sql`${shifts.endsAt} + make_interval(mins => ${late}) <= ${now}`,
+                sql`${salesFeedCursors.caughtUpAt} >= ${shifts.endsAt} + make_interval(mins => ${late})`,
+                after === null
+                  ? undefined
+                  : sql`(${sent}, ${shiftReports.id}) > (${after.submittedAt}::timestamptz, ${after.id}::uuid)`,
+              ),
+            )
+            .orderBy(sent, shiftReports.id)
+            .limit(CHECK_PAGE);
+          const found: { id: ShiftReportId; version: number }[] = [];
+          let last: { submittedAt: Date; id: ShiftReportId } | null = null;
+          for (const { shift, ...row } of rows) {
+            const report = toReport(row);
+            last = { submittedAt: report.submittedAt, id: report.id };
+            const check = await checkOf(tx, report, toShift(shift), readShiftSales, settings, now);
+            if (validatesByItself(check)) found.push({ id: report.id, version: report.version });
+          }
+          return { found, last, full: rows.length === CHECK_PAGE };
+        });
+        due.push(...page.found);
+        if (!page.full || page.last === null) return due;
+        after = page.last;
+      }
+    },
 
     autoValidateUnscoped: (id, version, now) =>
       withAdmin(adminDb, async (tx) => {

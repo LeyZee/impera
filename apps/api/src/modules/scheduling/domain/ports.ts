@@ -563,7 +563,8 @@ export interface ShiftReportStore {
   reader(actor: UserId): Promise<Reader>;
   /**
    * The automatic check's candidates (ADR 0073 § 4), as the admin role: the submitted reports, never a correction,
-   * whose comparison may be complete at `now`, each with the version to check.
+   * whose comparison may be complete at `now` and is within, each with the version to check. All of them, a page at a
+   * time: the reports a person still has to decide never hide a newer one.
    */
   checkCandidatesUnscoped(now: Date): Promise<{ id: ShiftReportId; version: number }[]>;
   /**
