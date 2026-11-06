@@ -329,6 +329,8 @@
 .tr-sheet {
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);
+  /* A hairline holds its edge where the tint is too light to (Jour, recette CHAT-07). */
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
 .tr-sheet > summary {
   gap: var(--nv-space-3);
@@ -787,4 +789,26 @@
   gap: var(--nv-space-3);
   font-size: var(--nv-text-callout);
   line-height: var(--nv-text-callout-leading);
+}
+/* The owner's way to the lift: the Dashboard, said as a link. */
+.tr-stop__link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* A draft held by the stop: the banner's amber dot beside its sentence. */
+.tr-held {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-2);
+}
+.tr-held__dot {
+  flex: none;
+  /* Centred on the first line, however many the sentence takes. */
+  margin-top: calc(0.5lh - 3.5px);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--nv-warning);
 }

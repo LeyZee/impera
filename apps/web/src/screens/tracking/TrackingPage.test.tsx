@@ -116,8 +116,8 @@ function serve(routes: {
   messages?: unknown[];
   /** « À traiter » across creators; the Dashboard's todos, named after its creator, when not given. */
   todos?: Reply | (() => Reply);
-  /** The emergency stop holds her messages (recette CHAT-07); off when not given. */
-  stopped?: boolean;
+  /** The emergency stop holds her messages (recette CHAT-07); off when not given, unread when `'down'`. */
+  stopped?: boolean | 'down';
 }): Posted[] {
   const posted: Posted[] = [];
   vi.stubGlobal(
@@ -150,7 +150,10 @@ function serve(routes: {
       } else if (path === '/v1/creators') {
         reply = typeof routes.creators === 'function' ? routes.creators() : routes.creators;
       } else if (path === '/v1/conversations/stop') {
-        reply = { status: 200, body: { stopped: routes.stopped ?? false } };
+        reply =
+          routes.stopped === 'down'
+            ? { status: 500 }
+            : { status: 200, body: { stopped: routes.stopped ?? false } };
       } else if (path === '/v1/conversations') {
         reply = { status: 200, body: routes.conversations?.[url.searchParams.get('creatorId') ?? ''] };
       } else if (path === '/v1/dashboard/todos') {
@@ -636,11 +639,22 @@ describe('the reader of Suivi', () => {
     renderPage(OPEN);
     expect(
       (await screen.findByText(/L’arrêt d’urgence est actif\./u)).closest('[role="status"]')?.textContent,
-    ).toContain('Préviens ton responsable si ça dure.');
+    ).toContain('Les envois sont en pause\u00a0: préviens ton responsable si ça dure.');
     const draft = await screen.findByRole('region', { name: 'Brouillon à valider' });
     expect(within(draft).getByText(/attend qu’il soit levé/u)).toBeDefined();
     expect(within(draft).queryByRole('button', { name: 'Valider' })).toBeNull();
+    expect(screen.getAllByText('Arrêt actif')).toHaveLength(2);
+    // Her line says the stop, never « À valider »: nothing can be decided until it is lifted.
+    const list = screen.getByRole('list', { name: 'À toi' });
+    expect(within(list).getByText('Arrêt actif')).toBeDefined();
+    expect(within(list).queryByText('À valider')).toBeNull();
     expect(posted).toEqual([]);
+  });
+
+  it('says when the emergency stop could not be read, rather than nothing (relecture #597)', async () => {
+    serve({ ...withDraft, stopped: 'down', detail: () => ({ status: 200, body: waiting() }) });
+    renderPage(OPEN);
+    expect(await screen.findByText(/L’arrêt d’urgence n’a pas pu être lu\./u)).toBeDefined();
   });
 
   it('sends the retouched bubbles, one per line', async () => {
@@ -1399,8 +1413,9 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     renderPage(OPEN, true, false, true);
     fireEvent.click(await screen.findByRole('button', { name: 'Valider' }));
     expect(
+      // The matcher reads the no-break space before « : » as a space.
       await screen.findByText(
-        'L’agence a tout arrêté : rien ne part pour l’instant. Préviens ton responsable si ça dure.',
+        'L’arrêt d’urgence est actif : rien ne part pour l’instant. Préviens ton responsable si ça dure.',
       ),
     ).toBeDefined();
     expect(screen.queryByText(/sur le Dashboard/u)).toBeNull();

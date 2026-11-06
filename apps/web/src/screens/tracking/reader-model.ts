@@ -293,8 +293,9 @@ export function isStopped(body: unknown): boolean {
  */
 export const stoppedText = (routedOnly: boolean): string =>
   routedOnly
-    ? 'L’agence a tout arrêté : rien ne part pour l’instant. Préviens ton responsable si ça dure.'
-    : 'L’arrêt d’urgence est actif : rien ne part tant qu’il n’est pas levé sur le Dashboard.';
+    ? // The stop may hold one creator only: never « tout arrêté » while another keeps sending (recette CHAT-07, v2).
+      'L’arrêt d’urgence est actif\u00a0: rien ne part pour l’instant. Préviens ton responsable si ça dure.'
+    : 'L’arrêt d’urgence est actif\u00a0: rien ne part tant qu’il n’est pas levé sur le Dashboard.';
 
 /** The codes a refusal names; one this screen does not know yet is left out, never shown raw. */
 const GuardsSchema = z.object({ guards: z.array(z.string()) });

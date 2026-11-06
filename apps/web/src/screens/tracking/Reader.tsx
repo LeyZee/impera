@@ -23,7 +23,14 @@ import {
   whyHuman,
 } from './reader-model';
 import { bringIntoView, useEndInView } from './scroll';
-import { bubblesFromText, bubblesProblem, MODE_LABELS, READER_STATE_LABELS, situationOf } from './view';
+import {
+  bubblesFromText,
+  bubblesProblem,
+  MODE_LABELS,
+  READER_STATE_LABELS,
+  situationOf,
+  STOP_SITUATION,
+} from './view';
 
 import { initialOf } from '@/lib/utils';
 
@@ -161,10 +168,14 @@ function Loaded({
   const isHuman = drafts.state === 'human';
   const why = isHuman ? whyHuman(read) : null;
   // The same words as the list and « À traiter »: an idle conversation whose fan waits is « Sans réponse » (PRO-03).
-  const situation = situationOf(
-    { state: drafts.state, lastInboundAt: detail.lastInboundAt, lastOutboundAt: detail.lastOutboundAt },
-    routedOnly,
-  );
+  // A draft the stop holds says so, as its line does (recette CHAT-07, v2).
+  const situation =
+    stopAhead && drafts.state === 'awaiting_approval'
+      ? STOP_SITUATION
+      : situationOf(
+          { state: drafts.state, lastInboundAt: detail.lastInboundAt, lastOutboundAt: detail.lastOutboundAt },
+          routedOnly,
+        );
   const pendingDraft = detail.openDrafts.some((draft) => draft.status === 'pending');
   // Nobody will answer him (a draft refused, the hand given back with nothing new): a person must, in Reveal (CHAT-25).
   const fanWaits =
@@ -605,8 +616,9 @@ function DraftPanel({
       ) : blocked === 'reader' ? (
         <p className="nv-draft-panel__brief">Tu lis seulement : l’équipe décide.</p>
       ) : blocked === 'stopped' ? (
-        <p className="nv-draft-panel__brief">
-          L’arrêt est actif : ce brouillon attend qu’il soit levé pour être validé.
+        <p className="nv-draft-panel__brief tr-held">
+          <span className="tr-held__dot" aria-hidden="true" />
+          {'L’arrêt est actif\u00a0: ce brouillon attend qu’il soit levé pour être validé.'}
         </p>
       ) : step === 'rejecting' ? (
         <div className="nv-draft-panel__actions">
