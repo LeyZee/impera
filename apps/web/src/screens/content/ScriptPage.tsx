@@ -95,10 +95,10 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
 
   // She comes back where she left: the first card not done, or the preview when every one is.
   useEffect(() => {
-    if (step !== null || drop === undefined || cards.length === 0) return;
+    if (step !== null || drop === undefined || segments === undefined) return;
     const first = cards.findIndex((card) => !cardDone(card, drop.files));
     setStep(first === -1 ? cards.length : first);
-  }, [step, drop, cards]);
+  }, [step, drop, cards, segments]);
 
   const reread = (): void => {
     void client.invalidateQueries({ queryKey: scriptDropKey(dropId) });
@@ -399,15 +399,17 @@ function SlotTile({
       setRefusal(sentence);
       return;
     }
+    // Busy from here: reading a video's length can take seconds, a second choice must wait for it.
+    setBusy(true);
     const kind = kindOfMime(mime);
     if (kind === 'video' || kind === 'audio') {
       const length = slotDurationRefusal(slotLengths(slot.slot), await durationOf(picked, kind));
       if (length !== null) {
         setRefusal(length);
+        setBusy(false);
         return;
       }
     }
-    setBusy(true);
     try {
       onFilled(picked, declared, await fillSlot(dropId, slot.key, declared));
     } catch (error) {
