@@ -83,6 +83,19 @@ describe('« Mon chat privé » (SEC-05 lot 2)', () => {
     expect(screen.queryByText('/start ABCDEFGH23')).toBeNull();
   });
 
+  it('gives the code up with « Annuler », and asks a new one after', async () => {
+    vi.mocked(fetchPrivateLink).mockResolvedValue(UNLINKED);
+    vi.mocked(requestLinkCode).mockResolvedValue(CODE);
+    renderChat();
+    fireEvent.click(await screen.findByRole('button', { name: 'Lier mon Telegram' }));
+    await screen.findByText('/start ABCDEFGH23');
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+    expect(screen.queryByText('/start ABCDEFGH23')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Lier mon Telegram' }));
+    expect(await screen.findByText('/start ABCDEFGH23')).toBeTruthy();
+    expect(requestLinkCode).toHaveBeenCalledTimes(2);
+  });
+
   it('asks the password and the code when the sign-in is old, then asks the code again', async () => {
     vi.mocked(fetchPrivateLink).mockResolvedValue(UNLINKED);
     vi.mocked(requestLinkCode).mockRejectedValueOnce(new ReauthRequired()).mockResolvedValueOnce(CODE);

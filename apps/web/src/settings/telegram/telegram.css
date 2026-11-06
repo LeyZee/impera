@@ -1110,23 +1110,15 @@
   .tg-log em {
     grid-column: 3;
   }
-  .tg-health__sep,
-  .tg-health__count {
+  /* The counts stay on a phone; only the rule between them goes, since the strip may wrap there. */
+  .tg-health__sep {
     display: none;
   }
-  /* Two scrolling bars on top of each other hid tabs off screen: on a phone the tabs sit on a regular grid, the last
-   * one alone across the width when they are odd. */
+  /* Two scrolling bars on top of each other hid tabs off screen: on a phone the tabs wrap like chips, each at its own
+   * width, so none is hidden and none is stretched. */
   .tg-tabs {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex-wrap: wrap;
     overflow-x: visible;
-  }
-  .tg-tabs .tg-tab {
-    justify-content: center;
-    min-width: 0;
-  }
-  .tg-tabs .tg-tab:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -122,9 +122,10 @@ export function SignInPage({
           <h1 className="sr-only">Connexion</h1>
           {/* Said first, before the fields it is about: what just went well, until the first try. */}
           {done === null ? null : (
-            <p role="status" className="nv-enter flex items-start gap-3 text-sm">
-              <span className="nv-orb nv-tone--ok mt-0.5 shrink-0" aria-hidden="true" />
-              <span>{done}</span>
+            <p role="status" className="nv-enter flex items-start gap-4 text-sm">
+              {/* The same dot, gap and grey as « Demande reçue », the page she comes from. */}
+              <span className="nv-orb nv-tone--ok mt-1 shrink-0" aria-hidden="true" />
+              <span className="text-[var(--nv-ink-muted)]">{done}</span>
             </p>
           )}
           <label className="nv-field">

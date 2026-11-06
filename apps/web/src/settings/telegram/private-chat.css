@@ -53,10 +53,7 @@
 .pc-confirm {
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-3);
-  padding: var(--nv-space-3);
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-fill-soft);
+  gap: var(--nv-space-4);
 }
 
 .pc-notice {

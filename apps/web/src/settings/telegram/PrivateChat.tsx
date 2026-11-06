@@ -241,10 +241,11 @@ export function PrivateChat({
               <p className="pc-lead">
                 Délier ce chat ? Tu ne pourras plus y recevoir le lien « mot de passe oublié ».
               </p>
-              <div className="pc-actions">
+              {/* Laid out like the password-and-code confirmation: the actions at the foot, on the right. */}
+              <div className="tg-reauth__actions">
                 <button
                   type="button"
-                  className="nv-btn nv-btn--soft nv-btn--sm"
+                  className="nv-btn nv-btn--plain nv-btn--sm"
                   disabled={busy}
                   onClick={() => {
                     setConfirming(false);
@@ -254,7 +255,7 @@ export function PrivateChat({
                 </button>
                 <button
                   type="button"
-                  className="nv-btn nv-btn--soft nv-btn--destructive nv-btn--sm"
+                  className="nv-btn nv-btn--neon nv-btn--sm"
                   disabled={busy}
                   aria-busy={busy}
                   onClick={unlink}
@@ -311,7 +312,7 @@ export function PrivateChat({
                   1
                 </span>
                 <span className="pc-steps__text">
-                  Ouvre la conversation avec <b>@{code.botUsername}</b> : le code part tout seul.
+                  Ouvre la conversation avec <b>@{code.botUsername}</b> : le code est déjà dans le lien.
                 </span>
               </li>
               <li>
@@ -319,18 +320,30 @@ export function PrivateChat({
                   2
                 </span>
                 <span className="pc-steps__text">
-                  Le bot te répond « C’est fait » ; cette page le dit aussi, toute seule.
+                  Le bot répond « C’est fait » et cette page se met à jour.
                 </span>
               </li>
             </ol>
-            <a
-              className="nv-btn nv-btn--neon pc-open"
-              href={code.url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Ouvrir Telegram
-            </a>
+            <div className="pc-actions">
+              <a
+                className="nv-btn nv-btn--neon pc-open"
+                href={code.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Ouvrir Telegram
+              </a>
+              {/* Gives the code up: « Lier mon Telegram » comes back and asks a new one. */}
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain"
+                onClick={() => {
+                  setCode(null);
+                }}
+              >
+                Annuler
+              </button>
+            </div>
             <div className="pc-typed">
               <p className="pc-typed__label">Ou écris au bot :</p>
               <p className="pc-typed__code nv-num">/start {code.code}</p>
