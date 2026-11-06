@@ -13,7 +13,7 @@ import {
 } from 'react';
 
 import { Reader } from './Reader';
-import { fetchConversations, todosAcrossQuery } from './api';
+import { fetchConversations, fetchSendingStop, todosAcrossQuery } from './api';
 import { todoLabel } from './reader-model';
 import {
   duration,
@@ -28,6 +28,7 @@ import {
   searchLines,
   sharedMode,
   situationOf,
+  STOP_SITUATION,
   storeListOrder,
   subline,
   type Hand,
@@ -37,6 +38,7 @@ import './tracking.css';
 
 import { useCreators } from '@/creators/api';
 import { initialOf } from '@/lib/utils';
+import { dashboardSearch } from '@/screens/dashboard/logic';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 const REFRESH_MS = 30_000;
@@ -58,6 +60,7 @@ export function TrackingPage({
   onSelect,
   canDecide,
   canAddCreator,
+  liftsStop = false,
   offShift,
   selfScope = false,
   nothingListed,
@@ -72,6 +75,8 @@ export function TrackingPage({
   canDecide: boolean;
   /** Créatrices is in the account's rail: the owner adds a creator from there; a team member waits for his. */
   canAddCreator: boolean;
+  /** The owner lifts an emergency stop on the Dashboard; anyone else is told to warn his manager (recette CHAT-07). */
+  liftsStop?: boolean;
   /**
    * A chatter off shift (EQ-13): said under the title, in place of the empty list. Told whether a conversation is still
    * listed: off shift, the server only lists the one whose handover he took, until he gives it back (ADR 0025).
@@ -97,6 +102,20 @@ export function TrackingPage({
       refetchInterval: REFRESH_MS,
     })),
   });
+  // The emergency stop of each creator, said above the list before any decision (recette CHAT-07).
+  const stops = useQueries({
+    queries: creators.map((creator) => ({
+      queryKey: ['sending-stop', creator.id],
+      queryFn: () => fetchSendingStop(creator.id),
+      refetchInterval: REFRESH_MS,
+    })),
+  });
+  const stoppedCreators = creators.filter((_, i) => stops[i]?.data === true);
+  const isStopped = (creatorId: string): boolean =>
+    stoppedCreators.some((creator) => creator.id === creatorId);
+  const stoppedNames = stoppedCreators.map((creator) => creator.displayName);
+  // An unread stop is never silent: « Valider » may be refused without the screen having said why (relecture #597).
+  const stopUnread = stops.some((stop) => stop.isError);
   // « À traiter » of every creator followed, not only the one the Dashboard shows (SUIVI-09).
   const queue = useQuery(todosAcrossQuery);
   const now = useNow();
@@ -161,6 +180,24 @@ export function TrackingPage({
         actions={nav}
       />
       {offShift?.(lines.length > 0)}
+      {stoppedNames.length === 0 ? null : (
+        <StopBanner
+          names={creators.length > 1 ? stoppedNames : []}
+          liftsStop={liftsStop}
+          creatorId={stoppedCreators.length === 1 ? stoppedCreators[0]?.id : undefined}
+        />
+      )}
+      {stopUnread && stoppedNames.length === 0 ? (
+        <Panel className="tr-stop">
+          <p className="tr-stop__in" role="status">
+            <span className="nv-orb nv-tone--warn" aria-hidden="true" />
+            <span>
+              L’arrêt d’urgence n’a pas pu être lu.{' '}
+              {'Si un envoi est refusé, c’est peut-être lui\u00a0: réessaie dans un instant.'}
+            </span>
+          </p>
+        </Panel>
+      ) : null}
       {creatorsQuery.isError || (failed.length > 0 && lines.length === 0) ? (
         <Notice
           title="Le serveur ne répond pas"
@@ -292,13 +329,14 @@ export function TrackingPage({
                           ) : null}
                         </h3>
                         <ul className="nv-list tr-list" aria-label={HAND_TITLES[group.hand]}>
-                          {group.lines.map(({ conversation, creatorName }) => (
+                          {group.lines.map(({ conversation, creatorId, creatorName }) => (
                             <Row
                               key={conversation.id}
                               conversation={conversation}
                               hand={group.hand}
                               selfScope={selfScope}
                               creatorName={showsCreator ? creatorName : undefined}
+                              stopped={isStopped(creatorId)}
                               now={now}
                               isOpen={conversation.id === selected}
                               onOpen={() => {
@@ -341,6 +379,7 @@ export function TrackingPage({
               conversationId={selected}
               canDecide={canDecide}
               selfScope={selfScope}
+              stopAhead={isStopped(open)}
               // Off shift, only the conversations he holds are listed: the way back says so.
               backLabel={offShift === undefined ? undefined : 'Tes conversations'}
               onClose={() => {
@@ -486,6 +525,7 @@ function Row({
   hand,
   selfScope,
   creatorName,
+  stopped,
   now,
   isOpen,
   onOpen,
@@ -497,13 +537,18 @@ function Row({
   selfScope: boolean;
   /** Shown beside his pseudo when the account sees several creators, never cut. */
   creatorName: string | undefined;
+  /** Her emergency stop is on: a draft waits for it to be lifted, so the line never says « À valider » (CHAT-07). */
+  stopped: boolean;
   now: Date;
   isOpen: boolean;
   onOpen: () => void;
 }): JSX.Element {
   const name = conversation.fanDisplayName.trim() === '' ? 'Fan sans nom' : conversation.fanDisplayName;
   const line = subline(conversation, now);
-  const situation = situationOf(conversation, selfScope);
+  const situation =
+    stopped && conversation.state === 'awaiting_approval'
+      ? STOP_SITUATION
+      : situationOf(conversation, selfScope);
   // Outside « À toi », only a pause and another person's hand are worth a word: the group says the rest.
   const says =
     hand === 'yours'
@@ -604,4 +649,44 @@ function useNow(): Date {
     };
   }, []);
   return now;
+}
+
+/**
+ * The emergency stop, said before a decision (recette CHAT-07): in amber, like every warning, with what this reader can
+ * do about it. `names` lists the creators it holds when Suivi shows several; empty for one creator, or all of them.
+ */
+function StopBanner({
+  names,
+  liftsStop,
+  creatorId,
+}: {
+  names: readonly string[];
+  liftsStop: boolean;
+  /** The one creator stopped: the link opens her Dashboard, where her stop is lifted. */
+  creatorId: string | undefined;
+}): JSX.Element {
+  const whom = names.length === 0 ? '' : ` pour ${names.join(', ')}`;
+  // Only what is stopped: another creator followed here keeps sending (recette CHAT-07, v2).
+  const whose = names.length > 1 ? 'Leurs envois' : names.length === 1 ? 'Ses envois' : 'Les envois';
+  return (
+    <Panel className="tr-stop">
+      <p className="tr-stop__in" role="status">
+        <span className="nv-orb nv-tone--warn" aria-hidden="true" />
+        <span>
+          <strong>L’arrêt d’urgence est actif{whom}.</strong>{' '}
+          {liftsStop ? (
+            <>
+              Rien ne part tant qu’il n’est pas levé sur le{' '}
+              <Link to="/" search={dashboardSearch('day', creatorId)} className="tr-stop__link">
+                Dashboard
+              </Link>
+              .
+            </>
+          ) : (
+            `${whose} sont en pause\u00a0: préviens ton responsable si ça dure.`
+          )}
+        </span>
+      </p>
+    </Panel>
+  );
 }

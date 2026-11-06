@@ -437,7 +437,7 @@ describe('the times and notes of the thread (CHAT-24)', () => {
     expect(isStopped(apiError('draft_conflict'))).toBe(false);
     expect(isStopped(null)).toBe(false);
     expect(stoppedText(true)).toBe(
-      'L’agence a tout arrêté : rien ne part pour l’instant. Préviens ton responsable si ça dure.',
+      'L’arrêt d’urgence est actif\u00a0: rien ne part pour l’instant. Préviens ton responsable si ça dure.',
     );
     expect(stoppedText(false)).toContain('Dashboard');
   });

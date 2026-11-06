@@ -6,6 +6,7 @@ import {
   FanFlagsViewSchema,
   FanKycViewSchema,
   MessageViewSchema,
+  SendingStopSchema,
   pageOf,
   TodosAcrossCreatorsSchema,
   type ConversationDetail,
@@ -63,6 +64,14 @@ async function read<T>(path: string, query: URLSearchParams, parse: (body: unkno
   if (response.status === 403) throw new ConversationClosed(path);
   if (!response.ok) throw new Error(`GET ${path}: ${String(response.status)}`);
   return parse(await response.json());
+}
+
+/** Whether the emergency stop holds her messages (recette CHAT-07): said above the list, before any decision. */
+export async function fetchSendingStop(creatorId: string): Promise<boolean> {
+  const query = new URLSearchParams({ creatorId });
+  const response = await fetch(`/v1/conversations/stop?${query.toString()}`, { credentials: 'include' });
+  if (!response.ok) throw new Error(`GET /v1/conversations/stop: ${String(response.status)}`);
+  return SendingStopSchema.parse(await response.json()).stopped;
 }
 
 export interface ConversationRead {

@@ -92,6 +92,13 @@ export function situationOf(
   return { hand: 'quiet', label: STATE_LABELS[state], pill };
 }
 
+/** A draft held by the emergency stop: nothing to decide until it is lifted, said in amber (recette CHAT-07). */
+export const STOP_SITUATION: Situation = {
+  hand: 'yours',
+  label: 'Arrêt actif',
+  pill: statusClass('awaiting_approval'),
+};
+
 /** The lines split by who acts, each group in the order it came; an empty group is left out. */
 export function groupByHand<T extends { readonly conversation: ConversationSummary }>(
   lines: readonly T[],

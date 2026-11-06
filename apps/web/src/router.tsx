@@ -193,6 +193,7 @@ const tracking = createRoute({
       onSelect: (id: string | null) => void navigate({ search: id === null ? {} : { conversation: id } }),
       canDecide: user.role !== 'creator',
       canAddCreator: canOpen(rail, '/creatrices'),
+      liftsStop: user.role === 'owner',
     };
     // A chatter reads Suivi within his shift (EQ-13): outside it, the page says so; away, it says that (CHAT-09).
     return rail.kind === 'chatter' ? (

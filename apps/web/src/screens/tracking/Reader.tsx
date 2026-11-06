@@ -24,7 +24,14 @@ import {
   whyHuman,
 } from './reader-model';
 import { bringIntoView, useEndInView } from './scroll';
-import { bubblesFromText, bubblesProblem, MODE_LABELS, READER_STATE_LABELS, situationOf } from './view';
+import {
+  bubblesFromText,
+  bubblesProblem,
+  MODE_LABELS,
+  READER_STATE_LABELS,
+  situationOf,
+  STOP_SITUATION,
+} from './view';
 
 import { initialOf } from '@/lib/utils';
 
@@ -48,6 +55,7 @@ export function Reader({
   conversationId,
   canDecide,
   selfScope = false,
+  stopAhead = false,
   onClose,
   onReleased,
   onClosedToYou,
@@ -59,6 +67,8 @@ export function Reader({
   canDecide: boolean;
   /** A team member whose scope is `self` (a chatter): see `TrackingPage`. */
   selfScope?: boolean;
+  /** The stop already holds her messages (recette CHAT-07): Valider waits, the banner above the list says why. */
+  stopAhead?: boolean;
   onClose: () => void;
   /**
    * The hand was given back by a member whose scope is `self` and the conversation left his list (off shift): the
@@ -159,6 +169,7 @@ export function Reader({
           creatorId={creatorId}
           canDecide={canDecide}
           selfScope={selfScope}
+          stopAhead={stopAhead}
           settle={settle}
           released={released}
         />
@@ -174,6 +185,7 @@ function Loaded({
   creatorId,
   canDecide,
   selfScope,
+  stopAhead,
   settle,
   released,
 }: {
@@ -185,6 +197,7 @@ function Loaded({
   creatorId: string;
   canDecide: boolean;
   selfScope: boolean;
+  stopAhead: boolean;
   settle: () => Promise<void>;
   /** Set for a member whose scope is `self`: a hand given back closes the reader if the conversation left his list. */
   released: ((fan: string) => Promise<boolean>) | undefined;
@@ -197,15 +210,19 @@ function Loaded({
   const mine = detail.heldBy === 'you';
   const why = isHuman ? whyHuman(read, mine) : null;
   // The same words as the list and « À traiter »: an idle conversation whose fan waits is « Sans réponse » (PRO-03).
-  const situation = situationOf(
-    {
-      state: drafts.state,
-      lastInboundAt: detail.lastInboundAt,
-      lastOutboundAt: detail.lastOutboundAt,
-      heldBy: detail.heldBy,
-    },
-    selfScope,
-  );
+  // A draft the stop holds says so, as its line does (recette CHAT-07, v2).
+  const situation =
+    stopAhead && drafts.state === 'awaiting_approval'
+      ? STOP_SITUATION
+      : situationOf(
+          {
+            state: drafts.state,
+            lastInboundAt: detail.lastInboundAt,
+            lastOutboundAt: detail.lastOutboundAt,
+            heldBy: detail.heldBy,
+          },
+          selfScope,
+        );
   // A chatter gives back his own hand, or a handoff nobody took; another person's he only reads (EQ-13).
   const canGiveBack = canDecide && !(selfScope && detail.heldBy === 'other');
   const pendingDraft = detail.openDrafts.some((draft) => draft.status === 'pending');
@@ -500,7 +517,7 @@ function Loaded({
             draft={pending}
             creatorId={creatorId}
             conversationId={detail.id}
-            blocked={!canDecide ? 'reader' : isHuman ? 'human' : null}
+            blocked={!canDecide ? 'reader' : isHuman ? 'human' : stopAhead ? 'stopped' : null}
             stopped={stopped}
             decided={decided}
           />
@@ -563,8 +580,11 @@ function DraftPanel({
   draft: DraftView;
   creatorId: string;
   conversationId: string;
-  /** Why this person cannot decide now: a human has the hand, or she only reads (a creator); null when she can. */
-  blocked: 'human' | 'reader' | null;
+  /**
+   * Why this person cannot decide now: a human has the hand, she only reads (a creator), or the stop already holds
+   * every message (recette CHAT-07); null when she can.
+   */
+  blocked: 'human' | 'reader' | 'stopped' | null;
   /**
    * The emergency stop refused the last decision (said at the top of the reader, CHAT-07): Valider stays, since only
    * the server knows when it is lifted; its own sentence is not said twice.
@@ -644,6 +664,11 @@ function DraftPanel({
         </p>
       ) : blocked === 'reader' ? (
         <p className="nv-draft-panel__brief">Tu lis seulement : l’équipe décide.</p>
+      ) : blocked === 'stopped' ? (
+        <p className="nv-draft-panel__brief tr-held">
+          <span className="tr-held__dot" aria-hidden="true" />
+          {'L’arrêt est actif\u00a0: ce brouillon attend qu’il soit levé pour être validé.'}
+        </p>
       ) : step === 'rejecting' ? (
         <div className="nv-draft-panel__actions">
           <button

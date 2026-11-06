@@ -1,5 +1,6 @@
 import {
   AgentModeResultSchema,
+  SendingStopSchema,
   ApiErrorSchema,
   CreatorIdSchema,
   DashboardSchema,
@@ -280,6 +281,23 @@ describe('PUT /v1/agent/mode', () => {
         where key = ${`conversation.respond:${conversationId}`}`)
     ).rows;
     expect(job).toEqual({ due: true });
+  });
+
+  it('tells Suivi the stop before a decision, hers or global, and nobody outside her (recette CHAT-07)', async () => {
+    const stop = async (cookie = ownerCookie) =>
+      send('GET', `/v1/conversations/stop?creatorId=${creatorId}`, undefined, cookie);
+    const stopped = async () => SendingStopSchema.parse((await stop()).json()).stopped;
+    await setMode('copilot');
+    expect(await stopped()).toBe(false);
+    await setMode('stop');
+    expect(await stopped()).toBe(true);
+    await setMode('copilot');
+    expect(await stopped()).toBe(false);
+    await setKillSwitch(test.admin.db, { active: true, scope: 'global', scopeId: null, reason: 'test' });
+    expect(await stopped()).toBe(true);
+    await setKillSwitch(test.admin.db, { active: false, scope: 'global', scopeId: null, reason: 'test' });
+    expect(await stopped()).toBe(false);
+    expect((await stop(operatorCookie)).statusCode).toBe(403);
   });
 
   it('applies clicks sent together one after the other', async () => {
