@@ -117,7 +117,6 @@ export function TextInput({
   maxLength,
   placeholder,
   example,
-  type = 'text',
   list,
   invalid = false,
 }: {
@@ -128,7 +127,6 @@ export function TextInput({
   placeholder?: string;
   /** What one could write, shown « Ex. : … » in the empty field. */
   example?: string;
-  type?: 'text' | 'date';
   list?: string;
   /** Refused as it stands, so that a screen reader says so on the control itself. */
   invalid?: boolean;
@@ -136,7 +134,7 @@ export function TextInput({
   return (
     <input
       id={id}
-      type={type}
+      type="text"
       aria-invalid={invalid ? true : undefined}
       className="nv-glass nv-field__control ps-input"
       value={isPlaceholder(value) ? '' : value}

@@ -10,7 +10,6 @@ import {
   dayInReach,
   dispoIds,
   OUT_OF_REACH,
-  reachOf,
   newTaskId,
   taskBodyOf,
   taskProblems,
@@ -22,6 +21,7 @@ import {
 } from './draft';
 import { whenWords } from './words';
 
+import { DayField } from '@/scheduling/DayField';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf, dayOf, longDay, minuteOf, weekdayOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
@@ -174,39 +174,47 @@ export function Hours({
   );
 }
 
-/** A day, offered within her agenda's reach (CREA-14): a year back, two years ahead. */
-export function DayField({
+/**
+ * A day within her agenda's reach (CREA-14): a year back, two years ahead. Typed, never the system's calendar; what is
+ * not a day is told to the form through `onUnreadable`, which then does not save.
+ */
+export function AgendaDay({
   value,
   invalid = false,
+  tried,
   onChange,
+  onUnreadable,
 }: {
   value: string;
   invalid?: boolean;
+  /** The form was sent once: a day that does not read is then said. */
+  tried: boolean;
   onChange: (day: string) => void;
+  onUnreadable: (field: string, unreadable: boolean) => void;
 }): JSX.Element {
   const id = useId();
-  const [reach] = useState(() => reachOf());
+  const [unreadable, setUnreadable] = useState(false);
+  const shown = invalid || (tried && unreadable);
   return (
     <div className="nv-field tm-field">
       <label className="nv-field__label" htmlFor={id}>
         Jour
       </label>
-      <input
+      <DayField
         id={id}
-        type="date"
-        className="nv-field__control nv-glass tm-date"
+        className="tm-date"
         value={value}
-        min={reach.min}
-        max={reach.max}
-        aria-invalid={invalid ? 'true' : undefined}
-        aria-describedby={invalid ? `${id}-error` : undefined}
-        onChange={(event) => {
-          onChange(event.target.value);
+        invalid={shown}
+        describedBy={shown ? `${id}-error` : undefined}
+        onChange={onChange}
+        onUnreadable={(bad) => {
+          setUnreadable(bad);
+          onUnreadable('day', bad);
         }}
       />
-      {invalid ? (
+      {shown ? (
         <p id={`${id}-error`} className="tm-hint tm-hint--error" role="alert">
-          {OUT_OF_REACH}
+          {tried && unreadable ? 'Un jour comme 28/03/2027, ou 28/3.' : OUT_OF_REACH}
         </p>
       ) : null}
     </div>
@@ -504,12 +512,14 @@ function TaskForm({
           }}
         />
       ) : (
-        <DayField
+        <AgendaDay
           value={draft.day}
           invalid={tried && problems.includes('day')}
+          tried={tried}
           onChange={(day) => {
             set({ day });
           }}
+          onUnreadable={onUnreadable}
         />
       )}
       {draft.kind === 'timed' ? (
@@ -572,13 +582,14 @@ function DispoForm({
   const [failed, setFailed] = useState<string | null>(null);
   const { unreadable, onUnreadable } = useUnreadableTimes();
   const noDay = draft.kind === 'weekly' && draft.weekdays.length === 0;
+  const badDay = draft.kind !== 'weekly' && !dayInReach(draft.day);
   const set = (patch: Partial<AvailabilityDraft>): void => {
     setDraft((before) => ({ ...before, ...patch }));
   };
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
     setTried(true);
-    if (noDay || unreadable) return;
+    if (noDay || badDay || unreadable) return;
     setBusy(true);
     setFailed(null);
     void Promise.all(availabilityBodiesOf(draft, zone, idFor).map(createAvailability)).then(
@@ -627,11 +638,14 @@ function DispoForm({
           }}
         />
       ) : (
-        <DayField
+        <AgendaDay
           value={draft.day}
+          invalid={tried && badDay}
+          tried={tried}
           onChange={(day) => {
             set({ day });
           }}
+          onUnreadable={onUnreadable}
         />
       )}
       <Hours

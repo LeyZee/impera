@@ -30,6 +30,8 @@ import {
 import '@/payroll/pay.css';
 import { amountText, periodLine } from '@/reports/model';
 import '@/reports/reports.css';
+import { DayField } from '@/scheduling/DayField';
+import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { fullDay } from '@/scheduling/time';
 import { useMembers } from '@/screens/team/api';
 import { useBillingSettings } from '@/settings/billing/api';
@@ -384,6 +386,12 @@ function ArchiveReady({ archive }: { archive: ArchiveFile }): JSX.Element {
   );
 }
 
+/** The two ends of a period, in the order they are typed. */
+const DAY_ENDS: readonly { key: 'from' | 'to'; label: string }[] = [
+  { key: 'from', label: 'Du' },
+  { key: 'to', label: 'Au' },
+];
+
 /**
  * Two days, both included, two years at most: the fiscal year in progress by default, the one before it a click away,
  * any other typed (a first fiscal year runs up to 24 months). The contract's reason is said before anything is sent.
@@ -406,8 +414,8 @@ function RangeForm({
   const id = useId();
   const [range, setRange] = useState<DayRange>(years.current);
   const [tried, setTried] = useState(false);
+  const { unreadable, isUnreadable, onUnreadable } = useUnreadableTimes();
   const checked = periodQuery(range);
-  const wrong = tried && !checked.ok;
   const choose = (next: DayRange): void => {
     setRange(next);
     onChange();
@@ -415,7 +423,7 @@ function RangeForm({
   const onSubmit = (event: SyntheticEvent): void => {
     event.preventDefault();
     setTried(true);
-    if (!checked.ok || busy) return;
+    if (unreadable || !checked.ok || busy) return;
     void onAsk(checked.query);
   };
   const same = (one: DayRange): boolean => one.from === range.from && one.to === range.to;
@@ -444,49 +452,54 @@ function RangeForm({
         </button>
       </div>
       <div className="ex-days">
-        <div className="nv-field tm-field" data-invalid={wrong ? 'true' : undefined}>
-          <label className="nv-field__label" htmlFor={`${id}-from`}>
-            Du
-          </label>
-          <input
-            id={`${id}-from`}
-            type="date"
-            className="nv-field__control nv-glass nv-num"
-            value={range.from}
-            aria-invalid={wrong}
-            aria-describedby={`${id}-hint`}
-            onChange={(event) => {
-              choose({ ...range, from: event.target.value });
-            }}
-          />
-        </div>
-        <div className="nv-field tm-field" data-invalid={wrong ? 'true' : undefined}>
-          <label className="nv-field__label" htmlFor={`${id}-to`}>
-            Au
-          </label>
-          <input
-            id={`${id}-to`}
-            type="date"
-            className="nv-field__control nv-glass nv-num"
-            value={range.to}
-            aria-invalid={wrong}
-            aria-describedby={`${id}-hint`}
-            onChange={(event) => {
-              choose({ ...range, to: event.target.value });
-            }}
-          />
-        </div>
-        <button type="submit" className="nv-btn nv-btn--neon ex-ask" disabled={busy} aria-busy={busy}>
-          {busy ? 'Préparation…' : action}
-        </button>
+        {DAY_ENDS.map(({ key, label }) => {
+          const bad = tried && isUnreadable(key);
+          return (
+            <div
+              key={key}
+              className="nv-field tm-field"
+              data-invalid={bad || (tried && !checked.ok) ? 'true' : undefined}
+            >
+              <label className="nv-field__label" htmlFor={`${id}-${key}`}>
+                {label}
+              </label>
+              <DayField
+                id={`${id}-${key}`}
+                value={range[key]}
+                invalid={bad || (tried && !checked.ok)}
+                describedBy={bad ? `${id}-${key}-error ${id}-hint` : `${id}-hint`}
+                onChange={(next) => {
+                  choose({ ...range, [key]: next });
+                }}
+                toward="year"
+                onUnreadable={(unread) => {
+                  onUnreadable(key, unread);
+                }}
+              />
+              {bad ? (
+                <p id={`${id}-${key}-error`} className="tm-hint tm-hint--error">
+                  Un jour comme 01/01/2026.
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
-      <p id={`${id}-hint`} className={wrong ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-        {checked.ok
-          ? `Du ${fullDay(checked.query.from)} au ${fullDay(checked.query.to)}, les deux compris.`
-          : tried
-            ? checked.reason
-            : 'Deux jours compris, deux ans au plus.'}
+      <p
+        id={`${id}-hint`}
+        className={tried && !unreadable && !checked.ok ? 'tm-hint tm-hint--error' : 'tm-hint'}
+      >
+        {unreadable
+          ? 'Deux jours compris, deux ans au plus.'
+          : checked.ok
+            ? `Du ${fullDay(checked.query.from)} au ${fullDay(checked.query.to)}, les deux compris.`
+            : tried
+              ? checked.reason
+              : 'Deux jours compris, deux ans au plus.'}
       </p>
+      <button type="submit" className="nv-btn nv-btn--neon ex-ask" disabled={busy} aria-busy={busy}>
+        {busy ? 'Préparation…' : action}
+      </button>
     </form>
   );
 }

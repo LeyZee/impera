@@ -624,7 +624,7 @@ describe('the chatter’s Planning', () => {
     expect(text(panel)).toContain('à ton heure (Antananarivo)');
     fireEvent.change(within(panel).getByLabelText('Premier jour'), { target: { value: '2026-11-03' } });
     // The last day follows a first day moved past it.
-    expect(within(panel).getByLabelText('Dernier jour')).toHaveProperty('value', '2026-11-03');
+    expect(within(panel).getByLabelText('Dernier jour')).toHaveProperty('value', '03/11/2026');
     fireEvent.change(within(panel).getByLabelText('Dernier jour'), { target: { value: '2026-11-05' } });
     expect(text(panel)).toContain('Du mar. 3 nov. au jeu. 5 nov., 3 jours.');
     fireEvent.change(within(panel).getByLabelText('Dernier jour'), { target: { value: '2026-12-10' } });
@@ -644,6 +644,25 @@ describe('the chatter’s Planning', () => {
     const { id: requestId, ...request } = CreateLeaveRequestBodySchema.parse(written[0]?.body);
     expect(requestId).not.toBe('');
     expect(request).toEqual({ firstDay: '2026-11-03', lastDay: '2026-11-05', note: 'Examens' });
+  });
+
+  // Relecture d'Équipe (#569): « 3/1 » on its way to « 3/11 » is the 3rd of January; the last day kept it.
+  it('keeps the last day on the first while the first is typed digit by digit', async () => {
+    serve({});
+    renderPage();
+    await screen.findByText('2 shifts · 12 h');
+    fireEvent.click(await screen.findByRole('button', { name: 'Demander un congé' }));
+    const panel = await screen.findByRole('dialog', { name: 'Demander un congé' });
+    const first = within(panel).getByLabelText('Premier jour');
+    for (const typed of ['3', '3/', '3/1', '3/11']) fireEvent.change(first, { target: { value: typed } });
+    expect(within(panel).getByLabelText('Dernier jour')).toHaveProperty('value', '03/11/2026');
+    expect(text(panel)).toContain('Le mar. 3 nov., 1 jour.');
+    // A last day typed itself stays where it was put; a first day past it is said, not followed.
+    fireEvent.change(within(panel).getByLabelText('Dernier jour'), { target: { value: '5/11' } });
+    fireEvent.blur(within(panel).getByLabelText('Dernier jour'));
+    for (const typed of ['1', '1/', '1/1', '1/11']) fireEvent.change(first, { target: { value: typed } });
+    expect(within(panel).getByLabelText('Dernier jour')).toHaveProperty('value', '05/11/2026');
+    expect(text(panel)).toContain('Du dim. 1er nov. au jeu. 5 nov., 5 jours.');
   });
 
   it('shows the leave of the week, and folds his leaves and swaps with a pending request to withdraw', async () => {

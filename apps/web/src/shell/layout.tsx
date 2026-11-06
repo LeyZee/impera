@@ -132,6 +132,7 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
   const placed = useRef(false);
   const counts = items.map((item) => item.count ?? 0).join(',');
   const lit = items.findIndex((item) => item.current === true);
+  const tabs = items.map((item) => `${item.to}${item.label}`).join('|');
 
   useLayoutEffect(() => {
     const nav = navRef.current;
@@ -196,13 +197,31 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     };
     mark();
     nav.addEventListener('scroll', mark, { passive: true });
-    const observer = new ResizeObserver(mark);
+    // The tabs too: a count that arrives, or the font once loaded, widens them without resizing the capped nav, and
+    // the end they push out of view would be cut without its fade (relecture d'Équipe, #567). The glass follows the
+    // lit tab where it now sits, without sliding; the first report of each size is its placing, not a change, and
+    // leaves a slide in progress alone.
+    const widths = new Map<Element, number>();
+    const observer = new ResizeObserver((entries) => {
+      mark();
+      let moved = false;
+      for (const { target, contentRect } of entries) {
+        const before = widths.get(target);
+        widths.set(target, contentRect.width);
+        if (before !== undefined && before !== contentRect.width) moved = true;
+      }
+      const active = nav.querySelector('[aria-current="page"]');
+      if (moved && placed.current && active instanceof HTMLElement) {
+        placeStill(nav, active, thumbRef.current ?? undefined);
+      }
+    });
     observer.observe(nav);
+    for (const tab of nav.querySelectorAll('a')) observer.observe(tab);
     return () => {
       nav.removeEventListener('scroll', mark);
       observer.disconnect();
     };
-  }, []);
+  }, [tabs]);
 
   return (
     <div className="nv-subnav-pill nv-glass nv-glass--thin">
