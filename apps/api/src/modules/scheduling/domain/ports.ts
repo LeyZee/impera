@@ -33,7 +33,7 @@ import type {
 import type { CreatorAgent } from './calendar';
 import type { FeedEvent } from './calendar-feed';
 import type { Reader, RulesRow } from './reports';
-import type { WorkingMember } from './shifts';
+import type { PlannedCreators, WorkingMember } from './shifts';
 
 /** Who writes, for the policies (`withTenantMember`) and the audit line. */
 export interface Actor {
@@ -109,6 +109,11 @@ export interface StoredMember {
  */
 interface PlanningRead {
   readonly scope: TeamScope;
+  /**
+   * What a planner plans (`plannedCreatorsOf`): what he is shown. The rest is read only for what stands in the way of
+   * his templates. `null` for anyone who does not plan.
+   */
+  readonly planned: PlannedCreators;
   /** Not cancelled, overlapping the range read. */
   readonly shifts: readonly StoredShift[];
   /** Every account of the creators for a planner; for anyone else, those their shifts are on. */
@@ -196,17 +201,29 @@ export interface PlanningStore {
     creatorIds: readonly CreatorId[],
     range: { readonly from: Date; readonly to: Date },
   ): Promise<PlanningRead>;
-  /** Owner and active manager: each shift covering `at`, of an active member, with that member. */
+  /**
+   * The member's own shifts not cancelled whose access window may still be open at `now` (ended after `since`), with
+   * their accounts, read as the member himself creator by creator: `null` for an account with no member row.
+   */
+  memberShifts(
+    actor: UserId,
+    creatorIds: readonly CreatorId[],
+    since: Date,
+  ): Promise<{
+    status: TeamMemberStatus;
+    shifts: (StoredShift & { platform: Platform; handle: string })[];
+  } | null>;
+  /** Owner and active manager: each shift covering `at`, of an active member, with that member, on what he plans. */
   onDuty(
     actor: UserId,
     creatorIds: readonly CreatorId[],
     at: Date,
   ): Promise<{ shift: StoredShift; member: StoredMember }[]>;
-  /** Owner and active manager. */
+  /** Owner and active manager, on a creator he plans: `creator_not_found` on any other. */
   createShift(actor: Actor, shift: NewShift, clock: PlanningClock): Promise<StoredShift>;
   /**
-   * Owner and active manager; `shift_not_found` for a cancelled shift or one the actor cannot read. `null` when the
-   * change cancelled it (stopped in the minute it started).
+   * Owner and active manager; `shift_not_found` for a cancelled shift, one the actor cannot read or one on a creator he
+   * does not plan. `null` when the change cancelled it (stopped in the minute it started).
    */
   updateShift(
     actor: Actor,
@@ -215,11 +232,17 @@ export interface PlanningStore {
     clock: PlanningClock,
   ): Promise<StoredShift | null>;
   cancelShift(actor: Actor, id: ShiftId, clock: PlanningClock): Promise<void>;
-  /** Owner and active manager: the templates running from `today`. */
+  /** Owner and active manager: the templates running from `today`, on what he plans. */
   templates(actor: UserId, creatorIds: readonly CreatorId[], today: string): Promise<StoredTemplate[]>;
-  /** Owner and active manager: the template, and its shifts ahead, made in the same transaction. */
+  /**
+   * Owner and active manager, on a creator he plans (`creator_not_found` on any other): the template, and its shifts
+   * ahead, made in the same transaction.
+   */
   createTemplate(actor: Actor, template: NewTemplate, clock: PlanningClock): Promise<StoredTemplate>;
-  /** Owner and active manager: ends today, its shifts not yet started cancelled with it. */
+  /**
+   * Owner and active manager: ends today, its shifts not yet started cancelled with it; `shift_template_not_found` on
+   * a creator he does not plan.
+   */
   endTemplate(actor: Actor, id: ShiftTemplateId, clock: PlanningClock): Promise<void>;
 }
 
@@ -233,14 +256,6 @@ export interface OnShift {
 
 /** The reads and the job that cross creators, on the admin connection (`*Unscoped`). */
 export interface PlanningAdmin {
-  /** The member's shifts not cancelled whose access window may still be open at `now`, with their accounts. */
-  memberShiftsUnscoped(
-    userId: UserId,
-    since: Date,
-  ): Promise<{
-    status: TeamMemberStatus;
-    shifts: (StoredShift & { platform: Platform; handle: string })[];
-  } | null>;
   /** `onShift` on a creator at `at`, without the margin: her active members whose shift covers it. */
   onShiftUnscoped(creatorId: CreatorId, at: Date): Promise<OnShift[]>;
   /** The settings in force now, for the job (no member behind it). */
@@ -643,6 +658,8 @@ export interface CalendarReads {
   ): Promise<{
     view: CalendarView;
     settings: SchedulingSettings;
+    /** What an `agency` reader plans (`plannedCreatorsOf`): his calendar is theirs; `null` for every creator. */
+    planned: PlannedCreators;
     shifts: CalendarRow[];
     agents: CreatorAgent[];
     agency: { accounts: StoredAccount[]; shifts: StoredShift[]; away: ReadonlySet<string> } | null;

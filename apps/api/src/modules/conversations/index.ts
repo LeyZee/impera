@@ -49,10 +49,20 @@ export interface ConversationsModule extends ConversationCommands {
   /** Mounted under `/v1` by the server. */
   readonly routes: FastifyPluginAsyncZod;
   /**
-   * Whether a conversation of this fan is routed to that account (ADR 0024): the `fans` routes let the member who
-   * holds it read the fan's limits and what is left to learn, never write them (ADR 0025, recette 05/11 CHAT-03).
+   * Whether that account holds a conversation of this fan, routed to it or taken over by it (ADR 0024, ADR 0025): the
+   * `fans` routes let the member who holds it read the fan's limits and what is left to learn, never write them
+   * (recette 05/11 CHAT-03).
    */
-  isFanRoutedTo(creatorId: CreatorId, fanId: FanId, userId: UserId): Promise<boolean>;
+  isFanHeldBy(creatorId: CreatorId, fanId: FanId, userId: UserId): Promise<boolean>;
+  /**
+   * A chatter's read of a fan's sheet on its own, in the audit log with the opening of the fan's conversation (ADR
+   * 0025): the `fans` routes call it before they read for anyone who does not read the whole creator.
+   */
+  traceFanOpening(
+    creatorId: CreatorId,
+    fanId: FanId,
+    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' },
+  ): Promise<void>;
   /** Handlers of the module's jobs; the composition root registers them with Graphile Worker. */
   readonly jobs: {
     respond(payload: JobPayload<'conversation.respond'>, logger: JobLogger): Promise<void>;
@@ -117,7 +127,8 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
   return {
     name: 'conversations',
     ...commands,
-    isFanRoutedTo: (creatorId, fanId, userId) => reader.isFanRoutedTo(creatorId, fanId, userId),
+    isFanHeldBy: (creatorId, fanId, userId) => reader.isFanHeldBy(creatorId, fanId, userId),
+    traceFanOpening: (creatorId, fanId, trace) => reader.traceFanOpening(creatorId, fanId, trace),
     routes: async (app, options) => {
       await createConversationRoutes(reader, commands, {
         requireRole: deps.requireRole,

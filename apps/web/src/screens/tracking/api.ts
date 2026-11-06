@@ -52,9 +52,16 @@ const READER_LIMIT = 100;
 /** The conversation was not found for this creator (deleted, or another creator's): nothing to read again. */
 export class ConversationGone extends Error {}
 
+/**
+ * The conversation is no longer open to this reader (403): a chatter whose shift ended, or who gave back the hand that
+ * kept it in his list outside his shift (EQ-13). Read again at his next shift, never before.
+ */
+export class ConversationClosed extends Error {}
+
 async function read<T>(path: string, query: URLSearchParams, parse: (body: unknown) => T): Promise<T> {
   const response = await fetch(`${path}?${query.toString()}`, { credentials: 'include' });
   if (response.status === 404) throw new ConversationGone(path);
+  if (response.status === 403) throw new ConversationClosed(path);
   if (!response.ok) throw new Error(`GET ${path}: ${String(response.status)}`);
   return parse(await response.json());
 }

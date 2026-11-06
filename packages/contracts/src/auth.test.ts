@@ -17,7 +17,11 @@ describe('auth contracts', () => {
 
   it('describes the signed-in user without any token', () => {
     const user = { id: 'u1', email: 'owner@example.test', name: 'Owner', role: 'owner', creatorIds: [] };
-    expect(CurrentUserSchema.parse({ ...user, token: 'secret' })).toEqual({ ...user, routedCreatorIds: [] });
+    expect(CurrentUserSchema.parse({ ...user, token: 'secret' })).toEqual({
+      ...user,
+      routedCreatorIds: [],
+      shiftCreatorIds: [],
+    });
   });
 
   it('reads an authenticator code or a backup code, spaces dropped, and nothing else', () => {

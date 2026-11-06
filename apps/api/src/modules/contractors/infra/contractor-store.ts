@@ -261,9 +261,12 @@ export function createDrizzlePayrollContractorStore(
   });
   return {
     file: (userId, memberId) =>
-      withMember(db, userId, async (tx) =>
-        fileOf(tx, await memberOf(tx, memberId), await dayOf(tx), invoices),
-      ),
+      withMember(db, userId, async (tx, scope) => {
+        const member = await memberOf(tx, memberId);
+        // His and the owner's (reco 10, 05/11): an active manager, whom the policies let read every file, reads his own.
+        if (scope !== 'owner' && member.userId !== userId) throw new ContractorProfileForbidden('read');
+        return fileOf(tx, member, await dayOf(tx), invoices);
+      }),
 
     writeProfile: (actor, memberId, body) =>
       withMember(db, actor.userId, async (tx, scope) => {

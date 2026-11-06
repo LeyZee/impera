@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import {
   ApiErrorSchema,
+  CalendarSchema,
   LeaveRequestIdSchema,
   MyShiftsSchema,
   newId,
@@ -1024,5 +1025,136 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     expect([kept.statusCode, codeOf(kept)]).toEqual([409, 'slot_version_effective_conflict']);
     // The version written « tout de suite » is withdrawn while still ahead.
     expect((await withdraw(owner, next?.id ?? '')).statusCode).toBe(200);
+  });
+
+  it('bounds a manager’s planning to the creators of his list (Charles, 06/11)', async () => {
+    const { cookie: mila } = await addMember({
+      email: 'mila@example.test',
+      displayName: 'Mila',
+      teamRole: 'manager',
+      creatorIds: [anna],
+    });
+    const day = parisDay(20);
+    // Basile works on both creators: the owner puts him on Inès, then Mila wants him on Anna at the same hours.
+    const onInes = await call(
+      'POST',
+      '/scheduling/shifts',
+      owner,
+      shiftBody(basile.id, ines, inesAccount, parisInstant(day, 14 * 60), parisInstant(day, 16 * 60)),
+    );
+    expect(onInes.statusCode).toBe(201);
+    const inesShift = ShiftSchema.parse(onInes.json());
+    const inesTemplate = ShiftTemplateSchema.parse(
+      (
+        await call('POST', '/scheduling/shift-templates', owner, {
+          creatorId: ines,
+          platformAccountId: inesAccount,
+          memberId: basile.id,
+          weekday: weekdayOf(parisDay(23)),
+          startMinute: 20 * 60,
+          endMinute: 22 * 60,
+          validFrom: parisDay(0),
+        })
+      ).json(),
+    );
+    const onAnna = await call('POST', '/scheduling/shift-templates', mila, {
+      creatorId: anna,
+      platformAccountId: annaAccount,
+      memberId: basile.id,
+      weekday: weekdayOf(day),
+      startMinute: 14 * 60,
+      endMinute: 16 * 60,
+      validFrom: parisDay(14),
+    });
+    expect(onAnna.statusCode).toBe(201);
+    const annaTemplate = ShiftTemplateSchema.parse(onAnna.json());
+
+    // She is shown Anna alone; Basile's shift on Inès still stands in the way of her template, by an id she cannot open.
+    const from = parisInstant(day, 0);
+    const to = parisInstant(parisDay(21), 0);
+    const seen = await planning(mila, from, to);
+    expect(seen.accounts.map((account) => account.id)).toEqual([annaAccount]);
+    expect(seen.shifts.filter((shift) => shift.creatorId !== anna)).toEqual([]);
+    expect(seen.conflicts).toEqual([
+      {
+        templateId: annaTemplate.id,
+        startsAt: parisInstant(day, 14 * 60).toISOString(),
+        endsAt: parisInstant(day, 16 * 60).toISOString(),
+        reason: 'member_busy',
+        shiftId: inesShift.id,
+      },
+    ]);
+    const askedInes = await planning(mila, from, to, ines);
+    expect([askedInes.accounts, askedInes.shifts, askedInes.conflicts]).toEqual([[], [], []]);
+    const both = await planning(noraCookie, from, to);
+    expect(both.accounts.map((account) => account.id)).toEqual(
+      expect.arrayContaining([annaAccount, inesAccount]),
+    );
+    expect(both.shifts.map((shift) => shift.id)).toContain(inesShift.id);
+
+    // Nothing of Inès is hers to plan: as if it did not exist.
+    const later = (minute: number) => parisInstant(parisDay(21), minute);
+    const create = await call(
+      'POST',
+      '/scheduling/shifts',
+      mila,
+      shiftBody(basile.id, ines, inesAccount, later(600), later(720)),
+    );
+    expect([create.statusCode, codeOf(create)]).toEqual([404, 'creator_not_found']);
+    const move = await call('PATCH', `/scheduling/shifts/${inesShift.id}`, mila, { endsAt: iso(later(0)) });
+    expect([move.statusCode, codeOf(move)]).toEqual([404, 'shift_not_found']);
+    const cancel = await call('DELETE', `/scheduling/shifts/${inesShift.id}`, mila);
+    expect([cancel.statusCode, codeOf(cancel)]).toEqual([404, 'shift_not_found']);
+    const template = await call('POST', '/scheduling/shift-templates', mila, {
+      creatorId: ines,
+      platformAccountId: inesAccount,
+      memberId: basile.id,
+      weekday: 1,
+      startMinute: 0,
+      endMinute: 60,
+      validFrom: parisDay(1),
+    });
+    expect([template.statusCode, codeOf(template)]).toEqual([404, 'creator_not_found']);
+    const templates = ShiftTemplateListSchema.parse(
+      (await call('GET', '/scheduling/shift-templates', mila)).json(),
+    );
+    expect(templates.templates.map((one) => one.creatorId)).not.toContain(ines);
+    expect(templates.templates.map((one) => one.id)).toContain(annaTemplate.id);
+    const end = await call('DELETE', `/scheduling/shift-templates/${inesTemplate.id}`, mila);
+    expect([end.statusCode, codeOf(end)]).toEqual([404, 'shift_template_not_found']);
+    expect((await planning(owner, from, to, ines)).shifts.map((shift) => shift.id)).toContain(inesShift.id);
+
+    // Who is on duty now, and the calendar, follow her list too: Lina on a second account of Inès, now.
+    const { member: lina } = await addMember({
+      email: 'lina@example.test',
+      displayName: 'Lina',
+      teamRole: 'chatter',
+      creatorIds: [ines],
+    });
+    const inesSecond = newId(PlatformAccountIdSchema);
+    await test.admin.db
+      .insert(schema.platformAccounts)
+      .values({ id: inesSecond, creatorId: ines, platform: 'reveal', handle: 'ines-seconde-inventee' });
+    const underWay = await call(
+      'POST',
+      '/scheduling/shifts',
+      owner,
+      shiftBody(lina.id, ines, inesSecond, minutesFromNow(-5), minutesFromNow(60)),
+    );
+    expect(underWay.statusCode, underWay.body).toBe(201);
+    const onDutyOf = async (cookie: string) =>
+      OnDutyListSchema.parse((await call('GET', '/scheduling/on-duty', cookie)).json()).onDuty.map(
+        (row) => row.creatorId,
+      );
+    expect(await onDutyOf(mila)).not.toContain(ines);
+    expect(await onDutyOf(noraCookie)).toContain(ines);
+    const query = new URLSearchParams({ from: iso(from), to: iso(to) });
+    const calendar = CalendarSchema.parse(
+      (await call('GET', `/scheduling/calendar?${query.toString()}`, mila)).json(),
+    );
+    expect(calendar.view).toBe('agency');
+    expect(calendar.creators.map((one) => one.id)).toEqual([anna]);
+    expect(calendar.shifts.filter((shift) => shift.creatorId !== anna)).toEqual([]);
+    expect(calendar.agency?.accounts.map((account) => account.id)).toEqual([annaAccount]);
   });
 });

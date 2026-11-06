@@ -43,6 +43,7 @@ import { z } from 'zod';
 
 import { authHeaders, meOf, type Auth, type RequireRole } from './auth';
 import type { Config } from './config';
+import type { ShiftCreators } from './modules/scheduling';
 import type { PasswordBreachCheck } from './password-breaches';
 import { publishSecurityAlert, roleOf } from './security-alerts';
 
@@ -611,6 +612,8 @@ export interface InvitationLinkRoutesDeps {
   readonly requireRole: RequireRole;
   readonly recentLogin: preValidationAsyncHookHandler;
   readonly passwordBreaches: PasswordBreachCheck;
+  /** The creators a member's shift opens now, for the `/v1/me` the redeem answers (EQ-13). */
+  readonly shiftCreators: ShiftCreators;
 }
 
 const MemberParamsSchema = z.object({ memberId: TeamMemberIdSchema });
@@ -729,7 +732,7 @@ export function createInvitationLinkRoutes(deps: InvitationLinkRoutesDeps): Fast
         const passwordHash = await (await deps.auth.$context).password.hash(password);
         const account = await redeemLinkUnscoped(deps.adminDb, { token, passwordHash, ip: request.ip });
         await openSession(deps.auth, request, reply, { email: account.email, password });
-        const me = await meOf(deps.db, account);
+        const me = await meOf(deps.db, deps.shiftCreators, account);
         if (me === null) throw new Error('redeemed account does not validate');
         return me;
       },

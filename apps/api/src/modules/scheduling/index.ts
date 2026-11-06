@@ -49,6 +49,11 @@ import { createDrizzleSwapStore } from './infra/swap-store';
 
 /** @public The accounts the automatic sales check compares (CRM-04 b3), read on the job's admin connection. */
 export { salesCheckReads } from './infra/sales-check-reads';
+/**
+ * Those of a chatter's creators whose access window is open now (ADR 0025, EQ-13), read as him at each request: the
+ * session of every route (`auth.ts`) asks it, so it needs nothing but the app connection.
+ */
+export { createShiftAccessReader, type ShiftCreators } from './infra/access-window';
 /** @public An account the automatic sales check compares: its platform and its rules' currency. */
 export type { DetectedAccountForCheck } from './domain/sales-checks';
 

@@ -15,6 +15,7 @@ import { createOwner } from '../auth';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 import { activateDemoPersona } from './support/persona';
+import { MethodSchema, namesOf, routesOf, type Route } from './support/routes';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 /**
@@ -24,7 +25,6 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
  * it is said below what it names. Invented data only (ADR 0010).
  */
 
-const MethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 const PASSWORD = 'staple battery horse';
 const PERIOD = PayPeriodSchema.parse('2026-11-01');
 
@@ -53,13 +53,13 @@ const bodiesFor = (
 /**
  * What an active manager of A reaches of B, and only that: the whole team, its reports and its pay (ADR 0023, « le
  * manager voit en plus toute l'équipe, la validation des rapports et des paies »), never B's fans, conversations nor
- * persona. Exact: a route of B's content he would reach tomorrow fails the test.
+ * persona, nor her planning, which is that of the managers who have her on their list (Charles, 06/11). Exact: a route
+ * of B's content he would reach tomorrow fails the test.
  */
 const AGENCY_SCOPE: readonly string[] = [
   'manager of A: GET /v1/scheduling/shifts/:shiftId/report → 200',
   'manager of A: GET /v1/scheduling/shifts/:shiftId/report → 200 shows Béa, bea-inventee',
   'manager of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200',
-  'manager of A: DELETE /v1/scheduling/shift-templates/:templateId → 204',
   'manager of A: GET /v1/team/members → 200 shows Bérénice',
   'manager of A: GET /v1/team/members/:memberId → 200',
   'manager of A: GET /v1/team/members/:memberId → 200 shows Bérénice',
@@ -68,11 +68,10 @@ const AGENCY_SCOPE: readonly string[] = [
   'manager of A: GET /v1/team/members/:memberId/notes → 200',
   'manager of A: POST /v1/team/members/:memberId/notes → 201',
   'manager of A: GET /v1/team/pay-rules → 200 shows Béa, bea-inventee',
-  'manager of A: GET /v1/payroll/contractors/:memberId/file → 200',
 ];
 
-/** B's tables the manager changes through those routes: the planning of the team, never her content. */
-const AGENCY_WRITES: readonly string[] = ['shift_templates'];
+/** B's tables the manager changes through those routes: none, her planning included (Charles, 06/11). */
+const AGENCY_WRITES: readonly string[] = [];
 
 /** What B's seeded ids stand for, by the parameter that names them in a path. */
 type Seeded =
@@ -129,6 +128,7 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'GET /v1/creator-space/content/script-drops/:dropId': 'creator space: script drops tests',
   'PUT /v1/creator-space/content/script-drops/:dropId/slots/:slotKey': 'creator space: script drops tests',
   'POST /v1/creator-space/content/script-drops/:dropId/submit': 'creator space: script drops tests',
+  'GET /v1/creator-space/content/script-drops/:dropId/cards/:segmentKey': 'creator space: script drops tests',
   'POST /v1/creator-space/suggestions/:id/accept': 'creator space: agenda tests',
   'POST /v1/creator-space/suggestions/:id/decline': 'creator space: agenda tests',
   'DELETE /v1/creator-space/availabilities/:id': 'creator space: agenda tests',
@@ -156,40 +156,7 @@ const RESIDUAL: Readonly<Record<string, string>> = {
  * Answers 2xx with B's ids today, known and owned elsewhere: each says why and who corrects it. The list must stay
  * exact, so the day the route is corrected this test fails until its line is removed.
  */
-const KNOWN_REACHED: Readonly<Record<string, string>> = {
-  'operator of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200':
-    'oracle d’existence, correction Équipe: 200 with no feedback for B’s shift, 404 for an unknown one',
-  'chatter of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200':
-    'oracle d’existence, correction Équipe: 200 with no feedback for B’s shift, 404 for an unknown one',
-};
-
-/** A route of the server: its method and its path as declared, `:a|:b` where two routes name one segment apart. */
-interface Route {
-  readonly method: string;
-  readonly path: string;
-}
-
-/** The routes `printRoutes` draws as a tree, flattened; HEAD and the CORS preflight are left out. */
-function routesOf(tree: string): Route[] {
-  const stack: string[] = [];
-  const routes: Route[] = [];
-  for (const line of tree.split('\n')) {
-    const found = /^(?<indent>[│ ]*)[├└]── (?<segment>.+?)(?: \((?<methods>[A-Z, ]+)\))?$/u.exec(line);
-    if (found?.groups === undefined) continue;
-    const depth = (found.groups['indent'] ?? '').length / 4;
-    const path = `${depth === 0 ? '' : (stack[depth - 1] ?? '')}${found.groups['segment'] ?? ''}`;
-    stack[depth] = path;
-    stack.length = depth + 1;
-    for (const method of (found.groups['methods'] ?? '').split(', ')) {
-      if (method !== '' && method !== 'HEAD' && method !== 'OPTIONS') routes.push({ method, path });
-    }
-  }
-  return routes;
-}
-
-/** The names a segment may carry: `:creatorId|:id` is one segment, named both ways by two routes. */
-const namesOf = (segment: string): string[] =>
-  segment.startsWith(':') ? segment.split('|').map((name) => name.replace(/^:/u, '')) : [];
+const KNOWN_REACHED: Readonly<Record<string, string>> = {};
 
 /** What B's id a parameter takes in this path, if B has one seeded for it. */
 function seededFor(path: string, name: string): Seeded | undefined {

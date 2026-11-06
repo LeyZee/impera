@@ -194,6 +194,8 @@ describe('threadOf', () => {
     const started = event(3, 3, { type: 'takeover_started', payload: { conversationId: CONVERSATION } });
     expect(whyHuman({ events: [started, ended, handoff] })).toBe('Un humain a repris la main');
     expect(whyHuman({ events: [started] })).toBe('Un humain a repris la main');
+    // Said to the person who holds it (EQ-13).
+    expect(whyHuman({ events: [started] }, true)).toBe('Tu as repris la main');
   });
 
   it('says why a send failed for good, when the code is one a person can act on', () => {

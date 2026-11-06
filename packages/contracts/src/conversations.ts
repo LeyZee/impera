@@ -42,6 +42,10 @@ export type ConversationDesire = z.infer<typeof ConversationDesireSchema>;
 export const SendingStopSchema = z.object({ stopped: z.boolean() });
 export type SendingStop = z.infer<typeof SendingStopSchema>;
 
+/** Who holds a conversation, said to the person reading it: him, or another person (EQ-13). */
+export const ConversationHolderSchema = z.enum(['you', 'other']);
+export type ConversationHolder = z.infer<typeof ConversationHolderSchema>;
+
 export const ConversationSummarySchema = z.object({
   id: ConversationIdSchema,
   fanId: FanIdSchema,
@@ -53,6 +57,12 @@ export const ConversationSummarySchema = z.object({
   unreadCount: z.number().int().min(0),
   updatedAt: z.iso.datetime(),
   desire: ConversationDesireSchema.nullable(),
+  /**
+   * Who holds it, for the person reading (ADR 0025, EQ-13): `you`, routed to him or his takeover not ended, so a human
+   * hand is his (« Tu as la main ») and he gives it back; `other`, another person the same way, whose hand a chatter
+   * only reads; `null`, nobody: the agent, or a handoff waiting for whoever is on shift.
+   */
+  heldBy: ConversationHolderSchema.nullable(),
 });
 export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;
 

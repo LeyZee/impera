@@ -135,7 +135,14 @@ export function canonicalExchangeRates<R extends { readonly currency: string }>(
 export const ExchangeRatesSchema = z.object({ usd: ExchangeRateSchema.nullable() });
 export type ExchangeRates = z.infer<typeof ExchangeRatesSchema>;
 
+/**
+ * The highest payout minimum the owner sets, in euro cents: 5 000 € (Charles, 06/11). A slip guard on what he types,
+ * nothing caps what a statement pays. A minimum written before it keeps its value: reads take the wider bound below.
+ */
+export const PAYOUT_MINIMUM_MAX_MINOR = 500_000;
+
 const MinimumPayoutMinorSchema = z.number().int().min(0).max(PAY_AMOUNT_MAX_MINOR);
+const NewMinimumPayoutMinorSchema = MinimumPayoutMinorSchema.max(PAYOUT_MINIMUM_MAX_MINOR);
 
 /** Business days between a statement's validation and its payout, as the owner announces it (PAIE-32). */
 const PayoutDelaySchema = z.number().int().min(1).max(PAYOUT_DELAY_MAX_BUSINESS_DAYS);
@@ -176,11 +183,14 @@ export const PayoutMinimumSchema = z.object({
 });
 export type PayoutMinimum = z.infer<typeof PayoutMinimumSchema>;
 
-/** `POST /v1/payroll/payout-minimums` (owner) → 201 `PayoutMinimumSchema`, 200 for the same `id` and values. */
+/**
+ * `POST /v1/payroll/payout-minimums` (owner) → 201 `PayoutMinimumSchema`, 200 for the same `id` and values. The minimum
+ * is at most 5 000 € (`PAYOUT_MINIMUM_MAX_MINOR`), else 400.
+ */
 export const CreatePayoutMinimumBodySchema = z.object({
   id: PayoutMinimumIdSchema,
   fromPeriod: PayPeriodSchema,
-  minimumPayoutMinor: MinimumPayoutMinorSchema,
+  minimumPayoutMinor: NewMinimumPayoutMinorSchema,
 });
 export type CreatePayoutMinimumBody = z.infer<typeof CreatePayoutMinimumBodySchema>;
 

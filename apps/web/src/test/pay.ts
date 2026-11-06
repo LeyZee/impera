@@ -40,7 +40,7 @@ export const payId = (n: number): string => `0199f2a0-0000-7000-8000-${String(n)
 
 export const OWNER_USER = payId(1);
 
-const me = { email: 'compte@example.test', creatorIds: [], routedCreatorIds: [] };
+const me = { email: 'compte@example.test', creatorIds: [], routedCreatorIds: [], shiftCreatorIds: [] };
 export const OWNER: Me = {
   ...me,
   id: OWNER_USER,
