@@ -7,6 +7,8 @@ import { createScriptsModule, type ScriptsModule } from '../modules/scripts';
 
 import type { Routes, Shared, TasksOf } from './shared';
 
+type AskedScriptRow = Awaited<ReturnType<ContentDropsModule['scriptRequests']['last']>>;
+
 export interface WiredScripts {
   readonly module: ScriptsModule;
   readonly tasks: TasksOf<'scripts'>;
@@ -27,6 +29,8 @@ export function wireScripts(
     readonly now?: () => Date;
   },
 ): WiredScripts {
+  const asked = (last: AskedScriptRow | null) =>
+    last === null ? null : { ...last, structureId: ScriptStructureIdSchema.parse(last.structureId) };
   const module = createScriptsModule({
     db: shared.db,
     adminDb: shared.adminDb,
@@ -35,12 +39,9 @@ export function wireScripts(
     limitsOf: async (creatorId) => (await deps.persona.versions.active(creatorId))?.persona.limits ?? null,
     requests: {
       ask: (request) => deps.contentDrops.scriptRequests.ask(request),
-      last: async (creatorId) => {
-        const last = await deps.contentDrops.scriptRequests.last(creatorId);
-        return last === null
-          ? null
-          : { ...last, structureId: ScriptStructureIdSchema.parse(last.structureId) };
-      },
+      last: async (creatorId) => asked(await deps.contentDrops.scriptRequests.last(creatorId)),
+      lastFor: async (creatorId, userId) =>
+        asked(await deps.contentDrops.scriptRequests.lastFor(creatorId, userId)),
     },
   });
   const now = deps.now ?? (() => new Date());
