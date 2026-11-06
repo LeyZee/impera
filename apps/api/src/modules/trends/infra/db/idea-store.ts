@@ -3,7 +3,7 @@ import {
   ContentIdeaSchema,
   ContentIdeaStateSchema,
   CreatorIdSchema,
-  DropCategorySchema,
+  IdeaDropCategorySchema,
   TrendSignalIdSchema,
   TrendSignalSchema,
   type ContentIdea,
@@ -188,7 +188,7 @@ export function createDrizzleIdeaFollowStore(adminDb: Database): IdeaFollowStore
           id: row.id,
           creatorId: row.creatorId,
           state: ContentIdeaStateSchema.parse(row.state),
-          category: DropCategorySchema.parse(row.category),
+          category: IdeaDropCategorySchema.parse(row.category),
           title: row.title,
           requestId: row.requestId,
         };
