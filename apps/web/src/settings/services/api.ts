@@ -2,8 +2,9 @@ import {
   ApiErrorSchema,
   ProviderOverviewSchema,
   REAUTHENTICATION_ERROR_CODE,
-  ProviderRefusalSchema,
+  ProviderRefusalBodySchema,
   ProviderStatusSchema,
+  refusalOf,
   type AiProvider,
   type ProviderOverview,
   type ProviderRefusal,
@@ -144,7 +145,7 @@ export async function connectKey(provider: AiProvider, key: string): Promise<Con
   });
   return parsed(response, (body): ConnectResult =>
     response.status === 422
-      ? { ok: false, refusal: ProviderRefusalSchema.parse(body) }
+      ? { ok: false, refusal: refusalOf(ProviderRefusalBodySchema.parse(body)) }
       : { ok: true, status: ProviderStatusSchema.parse(body) },
   );
 }

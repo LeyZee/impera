@@ -73,7 +73,7 @@ type RequestRow = typeof contentRequests.$inferSelect;
 const DROPS_READ = 100;
 
 /** The Postgres error behind a failed query (Drizzle wraps it as `cause`). */
-function pgErrorOf(error: unknown): { code: string; constraint: string | null } | null {
+export function pgErrorOf(error: unknown): { code: string; constraint: string | null } | null {
   for (let current = error; typeof current === 'object' && current !== null;) {
     if ('code' in current && typeof current.code === 'string') {
       const constraint =
@@ -107,6 +107,7 @@ function dropOf(row: DropRow, files: readonly FileRow[]): ContentDrop {
         bytes: file.bytes,
         state: file.state,
         refusal: file.refusal,
+        slotKey: file.slotKey,
       })),
     createdAt: row.createdAt.toISOString(),
   });
@@ -128,15 +129,16 @@ function requestOf(row: RequestRow, dropId: string | null): ContentRequest {
   });
 }
 
+/** The live files of these drops: a file replaced in its slot (SC-02 lot b) is in no view and moves no drop. */
 async function filesOf(tx: Transaction, dropIds: readonly string[]): Promise<FileRow[]> {
   if (dropIds.length === 0) return [];
   return tx
     .select()
     .from(contentDropFiles)
-    .where(inArray(contentDropFiles.dropId, [...dropIds]));
+    .where(and(inArray(contentDropFiles.dropId, [...dropIds]), sql`${contentDropFiles.replacedAt} is null`));
 }
 
-async function readDrop(tx: Transaction, dropId: string, lock = false): Promise<DropRow | undefined> {
+export async function readDrop(tx: Transaction, dropId: string, lock = false): Promise<DropRow | undefined> {
   const query = tx.select().from(contentDrops).where(eq(contentDrops.id, dropId));
   const [row] = lock ? await query.for('update') : await query;
   return row;
@@ -146,7 +148,7 @@ async function readDrop(tx: Transaction, dropId: string, lock = false): Promise<
  * A request as the reader sees it; locked, through the update policy too, which hides a request the reader may no
  * longer change: read it unlocked first to tell « not there » from « closed ».
  */
-async function readRequest(
+export async function readRequest(
   tx: Transaction,
   requestId: string,
   lock = false,
@@ -156,7 +158,7 @@ async function readRequest(
   return row;
 }
 
-async function viewOf(tx: Transaction, row: DropRow): Promise<ContentDrop> {
+export async function viewOf(tx: Transaction, row: DropRow): Promise<ContentDrop> {
   return dropOf(row, await filesOf(tx, [row.id]));
 }
 
@@ -306,7 +308,8 @@ async function fileTargetIn(tx: Transaction, dropId: string, fileId: string): Pr
     .select()
     .from(contentDropFiles)
     .where(and(eq(contentDropFiles.id, fileId), eq(contentDropFiles.dropId, dropId)));
-  if (file === undefined) throw new ContentDropFileNotFound();
+  // Replaced in its slot (SC-02 lot b): out of her script, its bytes no longer go up.
+  if (file?.replacedAt !== null) throw new ContentDropFileNotFound();
   return {
     creatorId: drop.creatorId,
     dropId,
@@ -315,6 +318,10 @@ async function fileTargetIn(tx: Transaction, dropId: string, fileId: string): Pr
     bytes: file.bytes,
     fileState: DropFileStateSchema.parse(file.state),
     dropState: DropStateSchema.parse(drop.state),
+    lengths:
+      file.minSeconds === null || file.maxSeconds === null
+        ? null
+        : { minSeconds: file.minSeconds, maxSeconds: file.maxSeconds },
   };
 }
 
@@ -330,7 +337,8 @@ async function markSentIn(
 ): Promise<ContentDrop> {
   const target = await fileTargetIn(tx, dropId, fileId);
   if (target.fileState === 'awaiting') {
-    if (target.dropState !== 'uploading') throw new ContentDropFileSettled();
+    if (target.dropState !== 'uploading' && target.dropState !== 'filling')
+      throw new ContentDropFileSettled();
     await tx.execute(
       sql`select public.enqueue_job(
         task => 'content_drops.receive_file',
@@ -445,7 +453,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         if (updated === undefined) throw new ContentDropNotFound();
         return viewOf(tx, updated);
       }),
-    ask: (creatorId, userId, body: CreateContentRequestBody) =>
+    ask: (creatorId, userId, body: CreateContentRequestBody, freeze) =>
       asTeam(creatorId, userId, async (tx) => {
         const [known] = await tx.select().from(contentRequests).where(eq(contentRequests.id, body.id));
         if (known !== undefined) {
@@ -470,6 +478,9 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
             structure?.archivedAt === null && (structure.reservedCreatorId ?? creatorId) === creatorId;
           if (!usable) throw new ContentRequestStructureUnprocessable();
         }
+        // Checked hers first, then frozen (SC-02 lot b): the version she will shoot, whatever the library writes next.
+        const versionId = body.structureId === null ? null : await freeze(body.structureId);
+        if (body.structureId !== null && versionId === null) throw new ContentRequestStructureUnprocessable();
         try {
           await tx.insert(contentRequests).values({
             id: body.id,
@@ -478,6 +489,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
             dueOn: body.dueOn,
             reason: body.reason,
             structureId: body.structureId,
+            structureVersionId: versionId,
             origin: 'agency',
             createdBy: userId,
           });
@@ -585,6 +597,46 @@ export async function lastScriptRequest(adminDb: Database, creatorId: string): P
 
 /** Where conversions pass one at a time (ADR 0070 § 4): a long one never takes the whole machine. */
 const CONVERSION_QUEUE = 'content_drops:convert';
+
+/**
+ * The drop follows its live files, as the admin role, the drop locked by the caller: received with
+ * `content_drop_received` once none waits for its bytes, then ready when every file is settled and one was kept, blocked
+ * when all were refused. A drop still being filled (SC-02 lot b) moves only once she sends it.
+ */
+export async function follow(
+  tx: Transaction,
+  drop: DropRow,
+  now: Date,
+  correlationId: string,
+): Promise<void> {
+  const states = (await filesOf(tx, [drop.id])).map((one) => one.state);
+  let state = drop.state;
+  if (state === 'uploading' && !states.includes('awaiting')) {
+    state = 'received';
+    await tx.update(contentDrops).set({ state, updatedAt: now }).where(eq(contentDrops.id, drop.id));
+    // In the same transaction, once per drop: the drop was locked and still sending.
+    await tx.insert(schema.domainEvents).values({
+      id: newId(EventIdSchema),
+      creatorId: drop.creatorId,
+      type: 'content_drop_received',
+      payload: { dropId: drop.id, requestId: drop.requestId },
+      actor: 'system',
+      correlationId,
+      createdAt: now,
+    });
+  }
+  if (state === 'received' && !states.includes('awaiting') && !states.includes('received')) {
+    const kept = states.some((one) => one === 'kept' || one === 'duplicate');
+    await tx
+      .update(contentDrops)
+      .set(
+        kept
+          ? { state: 'ready', updatedAt: now }
+          : { state: 'blocked', blockedReason: NOTHING_KEPT, updatedAt: now },
+      )
+      .where(eq(contentDrops.id, drop.id));
+  }
+}
 
 /**
  * The receipt job's side, as the admin role (`withAdmin`): the states of a drop move by the job only (0108's trigger
@@ -699,33 +751,7 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
             .where(eq(contentDropFiles.id, fileId));
         }
 
-        const states = (await filesOf(tx, [drop.id])).map((one) => one.state);
-        let state = drop.state;
-        if (state === 'uploading' && !states.includes('awaiting')) {
-          state = 'received';
-          await tx.update(contentDrops).set({ state, updatedAt: now }).where(eq(contentDrops.id, drop.id));
-          // In the same transaction, once per drop: the drop was locked and still sending.
-          await tx.insert(schema.domainEvents).values({
-            id: newId(EventIdSchema),
-            creatorId: drop.creatorId,
-            type: 'content_drop_received',
-            payload: { dropId: drop.id, requestId: drop.requestId },
-            actor: 'system',
-            correlationId,
-            createdAt: now,
-          });
-        }
-        if (state === 'received' && !states.includes('awaiting') && !states.includes('received')) {
-          const kept = states.some((one) => one === 'kept' || one === 'duplicate');
-          await tx
-            .update(contentDrops)
-            .set(
-              kept
-                ? { state: 'ready', updatedAt: now }
-                : { state: 'blocked', blockedReason: NOTHING_KEPT, updatedAt: now },
-            )
-            .where(eq(contentDrops.id, drop.id));
-        }
+        await follow(tx, drop, now, correlationId);
       }),
 
     enqueue: (task, file, correlationId, runAt) =>

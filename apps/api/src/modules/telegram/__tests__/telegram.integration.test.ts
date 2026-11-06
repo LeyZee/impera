@@ -1084,7 +1084,13 @@ describe('telegram module on Postgres', () => {
         payload: { token: 'nope' },
       });
       expect(refused.statusCode).toBe(422);
-      expect(refused.json()).toMatchObject({ kind: 'token_shape' });
+      // MOT-13: the common body, the kind in `details`.
+      expect(refused.json()).toMatchObject({
+        error: {
+          code: 'telegram_token_unprocessable',
+          details: { kind: 'token_shape' },
+        },
+      });
       const overview = await server.inject({ method: 'GET', url: '/v1/settings/telegram', headers });
       expect(overview.json()).toMatchObject({ bots: [{ username: 'demo_bot' }], routes: [] });
       const conflict = await server.inject({
@@ -1094,6 +1100,9 @@ describe('telegram module on Postgres', () => {
         payload: { version: 999, routes: [] },
       });
       expect(conflict.statusCode).toBe(409);
+      expect(conflict.json()).toMatchObject({
+        error: { code: 'telegram_routes_conflict', details: { kind: 'routes_version_conflict' } },
+      });
       // Refusals in the common error body (recette 28/10): an invalid body was a 500 against the route's own schema.
       const invalid = await server.inject({
         method: 'PUT',
