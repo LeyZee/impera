@@ -97,6 +97,29 @@ describe('ffmpeg media tools', () => {
     await expect(tools.toJpeg(bmp)).rejects.toThrow(/whitelist/);
   });
 
+  it('fails without quoting the file’s own metadata, only the binary, its exit and its last line', async () => {
+    // A file with sound and no picture: keyframes fails after ffmpeg printed the input's metadata on stderr.
+    const sound = make(
+      'sound.mp4',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=duration=1',
+      '-metadata',
+      'title=TitreDeLaCreatrice',
+      '-c:a',
+      'aac',
+    );
+    const failure = await tools.keyframes(sound, 4).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    const message = failure instanceof Error ? failure.message : '';
+    expect(message).toMatch(/^ffmpeg failed \(exit \d+\)/u);
+    expect(message).not.toContain('TitreDeLaCreatrice');
+  });
+
   it('kills a call that runs past its time', async () => {
     // A 1 ms budget is spent before ffmpeg has even started: a tiny clip is enough, and keeps the test fast on a busy
     // machine (encoding a long one here outgrew Vitest's 5 s during a loaded pre-push).

@@ -70,6 +70,12 @@ describe('database errors (recette 05/11)', () => {
     expect(cut.stack ?? '').not.toContain('secret');
 
     expect(storableError(new Error('bad\u0000text')).message).toBe('badtext');
+    // Another message is one short line: `JSON.parse` quotes the start of what it was given.
+    const quoted = storableError(new Error(`Unexpected token\n"${'x'.repeat(400)}" is not valid JSON`));
+    expect(quoted.message.length).toBeLessThanOrEqual(300);
+    expect(quoted.message).not.toContain('\n');
+    expect(quoted.message.startsWith('Unexpected token "xxx')).toBe(true);
+
     const plain = new Error('nothing to hide');
     expect(storableError(plain)).toBe(plain);
   });

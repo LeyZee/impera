@@ -110,10 +110,21 @@ export function jsonWithoutNul(value: unknown): unknown {
   return value;
 }
 
+const MESSAGE_MAX = 300;
+
+function isShortLine(message: string): boolean {
+  return message.length <= MESSAGE_MAX && !message.includes('\n');
+}
+
+function shortLine(message: string): string {
+  const line = message.replace(/\s*\n\s*/gu, ' ');
+  return line.length <= MESSAGE_MAX ? line : `${line.slice(0, MESSAGE_MAX - 1)}…`;
+}
+
 /**
  * An error safe to hand to the job runner and to the logs: U+0000 dropped from its message (Graphile stores the
- * message in a text column and would fail on it, killing the process, MOT-01), and no SQL parameters (Drizzle
- * copies them into its message, MOT-10).
+ * message in a text column and would fail on it, killing the process, MOT-01), no SQL parameters (Drizzle
+ * copies them into its message, MOT-10), and any other message on one line of at most 300 characters.
  */
 export function storableError(error: unknown): Error {
   if (!(error instanceof Error)) return new Error(withoutNul(String(error)));
@@ -121,9 +132,12 @@ export function storableError(error: unknown): Error {
   // Drizzle writes « Failed query: <sql>\nparams: <values> »: the query helps, the values are someone's data. Cut
   // whatever the cause, a connection reset in the middle of a query included (relecture #585).
   const hasParams = error.message.includes('\nparams:');
-  if (code === undefined && !hasParams && !error.message.includes('\u0000')) return error;
+  const isQuery = code !== undefined || hasParams;
+  if (!isQuery && !error.message.includes('\u0000') && isShortLine(error.message)) return error;
   const query = withoutNul(error.message.split('\nparams:')[0] ?? '');
-  const message = code === undefined ? query : `${query} [SQLSTATE ${code}]`;
+  // Any other message is bounded to one short line: a library may quote what it was given (`JSON.parse` quotes the
+  // start of the text), and this message is kept in `last_error` and the logs (relecture des données gardées, 06/11).
+  const message = !isQuery ? shortLine(query) : code === undefined ? query : `${query} [SQLSTATE ${code}]`;
   const safe = new Error(message);
   safe.name = error.name;
   const frames = (error.stack ?? '').split('\n').filter((line) => line.startsWith('    at '));
