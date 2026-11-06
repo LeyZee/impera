@@ -1189,7 +1189,8 @@
 .nv-field__control--readonly:focus {
   background: transparent;
   box-shadow: none;
-  padding-inline: 0;
+  min-height: 0;
+  padding: 2px 0;
   color: var(--nv-ink-muted);
   cursor: default;
 }
