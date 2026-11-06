@@ -1,6 +1,7 @@
 import {
   ConversationIdSchema,
   CreatorConversationSchema,
+  CreatorFanInsightsSchema,
   CreatorFanPageSchema,
   CreatorFansQuerySchema,
   CreatorMessagePageSchema,
@@ -50,6 +51,7 @@ async function asCreator<T>(read: () => Promise<T>): Promise<T> {
 export function createCreatorSpaceRoutes(
   reader: CreatorSpaceReader,
   requireRole: RequireRole,
+  clock: { now(): Date },
 ): FastifyPluginAsyncZod {
   return (app) => {
     const creatorOnly = { preValidation: requireRole('creator') };
@@ -61,6 +63,13 @@ export function createCreatorSpaceRoutes(
         schema: { querystring: CreatorFansQuerySchema, response: { 200: CreatorFanPageSchema } },
       },
       (request) => asCreator(() => reader.fans(creatorOf(request), request.query)),
+    );
+
+    // « Qui sont tes fans » (CR-15, ADR 0074): shares on all her fans, never a value a fan wrote nor a case's count.
+    app.get(
+      '/creator-space/fan-insights',
+      { ...creatorOnly, schema: { response: { 200: CreatorFanInsightsSchema } } },
+      (request) => asCreator(() => reader.fanInsights(creatorOf(request), clock.now())),
     );
 
     app.get(

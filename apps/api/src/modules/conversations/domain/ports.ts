@@ -15,6 +15,7 @@ import type {
   ConversationSummary,
   CreatorConversation,
   CreatorFanPage,
+  CreatorFanInsights,
   CreatorId,
   CreatorMessagePage,
   Currency,
@@ -558,7 +559,11 @@ export interface CreatorSpaceReader {
     id: ConversationId,
     page: PageRequest,
     ip: string,
-  ): Promise<CreatorMessagePage | null>;
+  ): Promise<CreatorMessagePage | null>; /**
+   * « Qui sont tes fans » (CR-15, ADR 0065, ADR 0074): figures on all her fans, at the last midnight in her time zone
+   * before `now`; shares only, never a value a fan wrote nor a case's count.
+   */
+  fanInsights(userId: UserId, now: Date): Promise<CreatorFanInsights>;
 }
 
 export interface PageRequest {

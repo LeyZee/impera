@@ -1,8 +1,10 @@
 import {
   CreatorConversationSchema,
+  CreatorFanInsightsSchema,
   CreatorFanPageSchema,
   CreatorMessagePageSchema,
   type CreatorConversation,
+  type CreatorFanInsights,
   type CreatorFanPage,
   type CreatorMessagePage,
 } from '@impera/contracts';
@@ -91,6 +93,20 @@ export function useCreatorMessages(
     initialPageParam: FIRST_PAGE,
     getNextPageParam: (last) => last.nextCursor,
     refetchInterval: (query) => (query.state.error instanceof ConversationGone ? false : 30_000),
+    retry: retryOnce,
+    retryDelay: 400,
+  });
+}
+
+/**
+ * `GET /v1/creator-space/fan-insights`: « Qui sont tes fans », shares on all her fans, stopped at midnight in her time
+ * zone (ADR 0074 § 2). They change once a day: read again every ten minutes, never every minute.
+ */
+export function useCreatorFanInsights(): UseQueryResult<CreatorFanInsights> {
+  return useQuery({
+    queryKey: ['creator-space', 'fan-insights'],
+    queryFn: () => read(`${BASE}/fan-insights`, (body) => CreatorFanInsightsSchema.parse(body)),
+    refetchInterval: 600_000,
     retry: retryOnce,
     retryDelay: 400,
   });
