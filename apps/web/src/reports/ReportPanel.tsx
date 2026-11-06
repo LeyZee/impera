@@ -25,6 +25,7 @@ import {
   currencyTyped,
   ESTIMATE_LEAVES,
   estimateLine,
+  gapWaits,
   MEMBER_STATUS,
   parseAmount,
   periodLine,
@@ -33,11 +34,12 @@ import {
   reportOf,
   signedAmountText,
   STATUS_TONES,
+  uncheckedText,
   validatedTotal,
 } from './model';
 import { useReopen, type ReportDraft, type ReportScreen } from './reopen';
 
-import { accountLine, swapShiftLine } from '@/scheduling/model';
+import { accountLine, platformName, swapShiftLine } from '@/scheduling/model';
 import { clockAt, dayMonth, dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
@@ -219,6 +221,7 @@ function Body({
     return (
       <Validated
         report={report}
+        platform={platformName(data.account.platform)}
         today={dayOf(now, zone)}
         corrections={corrections}
         total={validatedTotal(data.reports, data.shift.id)}
@@ -283,9 +286,78 @@ const validatedWhen = (reviewedAt: string, today: string, zone: string): string 
     : `le ${dayMonth(day)} à ${clockAt(reviewedAt, zone)}`;
 };
 
+/** Until when a gap waits for its member: « avant 23 h » the same day, « avant le sam. 7 nov. à 23 h » another. */
+const beforeWhen = (instant: string, today: string, zone: string): string => {
+  const day = dayOf(instant, zone);
+  return day === today
+    ? `avant ${clockAt(instant, zone)}`
+    : `avant le ${dayMonth(day)} à ${clockAt(instant, zone)}`;
+};
+
+/**
+ * A report against what its platform read during the shift, to its member (ADR 0073): what was read so far, why
+ * nothing is compared, or the gap and what unblocks it. The server compares and decides; this only says it.
+ */
+function CheckNote({
+  report,
+  platform,
+  today,
+  zone,
+  now,
+}: {
+  report: ShiftReport;
+  platform: string;
+  today: string;
+  zone: string;
+  now: Date;
+}): JSX.Element | null {
+  const { check } = report;
+  if (check === null) return null;
+  const { currency } = report.amount;
+  if (check.state === 'unavailable') {
+    return <p className="tm-hint rp-check">{uncheckedText(check.reason, platform, false)}</p>;
+  }
+  if (check.state === 'provisional') {
+    return (
+      <p className="tm-hint rp-check">
+        {platform} a lu <span className="nv-num">{amountText(check.readMinor, currency)}</span> pour l’instant
+        : la comparaison se fait un quart d’heure après la fin du shift.
+      </p>
+    );
+  }
+  const read = <span className="nv-num">{amountText(check.readMinor, currency)}</span>;
+  if (check.verdict === 'within') {
+    return (
+      <div className="rp-notice nv-enter" data-tone="ok">
+        <p className="rp-notice__title">Conforme à {platform}</p>
+        <p className="rp-notice__text">
+          {platform} a lu {read} pendant ton shift : ton rapport se valide tout seul, sans attendre l’agence.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="rp-notice nv-enter" data-tone="warn">
+      <p className="rp-notice__title">
+        Écart avec {platform} · <span className="nv-num">{signedAmountText(check.gapMinor, currency)}</span>
+      </p>
+      <p className="rp-notice__text">
+        Tu déclares <span className="nv-num">{amountText(report.amount.amountMinor, currency)}</span>,{' '}
+        {platform} a lu {read} pendant ton shift.{' '}
+        {report.explanation !== null
+          ? 'Ton explication est envoyée : l’agence décide.'
+          : gapWaits(report, now) && check.explainBy !== null
+            ? `Corrige le montant, ou explique l’écart ${beforeWhen(check.explainBy, today, zone)} : l’agence ne peut pas le valider avant.`
+            : 'Le délai pour l’expliquer est passé : l’agence décide.'}
+      </p>
+    </div>
+  );
+}
+
 /** A validated report: its amount first, then its corrections and their total; a correction is added from here. */
 function Validated({
   report,
+  platform,
   today,
   corrections,
   total,
@@ -293,6 +365,8 @@ function Validated({
   onClose,
 }: {
   report: ShiftReport;
+  /** The account's platform, which the automatic check compared it with (ADR 0073). */
+  platform: string;
   /** The reader's day, which a validation of today leaves unsaid. */
   today: string;
   corrections: readonly ShiftReport[];
@@ -307,9 +381,16 @@ function Validated({
       <div className="rp-figure nv-enter">
         <span className={`nv-status rp-status rp-status--${STATUS_TONES[report.status]}`}>
           <span className="nv-dot nv-tone--ok" />
-          Validé{report.reviewedAt === null ? '' : ` ${validatedWhen(report.reviewedAt, today, zone)}`}
+          Validé{report.reviewKind === 'automatic' ? ' automatiquement' : ''}
+          {report.reviewedAt === null ? '' : ` ${validatedWhen(report.reviewedAt, today, zone)}`}
         </span>
         <p className="rp-figure__value nv-num">{amountText(report.amount.amountMinor, currency)}</p>
+        {report.check?.state === 'complete' ? (
+          <p className="rp-figure__read">
+            {platform} a lu <span className="nv-num">{amountText(report.check.readMinor, currency)}</span>{' '}
+            pendant ce shift
+          </p>
+        ) : null}
         {report.comment === null ? null : <p className="rp-figure__note">« {report.comment} »</p>}
       </div>
       {corrections.length === 0 ? null : (
@@ -391,6 +472,15 @@ function Form({
     () => draft?.incidentOn ?? (report?.incident ?? null) !== null,
   );
   const [incident, setIncident] = useState(() => draft?.incident ?? report?.incident ?? '');
+  const [explanation, setExplanation] = useState(() => draft?.explanation ?? report?.explanation ?? '');
+  const now = useNow(15_000);
+  const zone = readerZone();
+  const platform = platformName(data.account.platform);
+  // A report the platform reads otherwise (ADR 0073 § 5): its member explains the gap, or corrects the amount.
+  const explaining =
+    report !== null &&
+    !correcting &&
+    ((report.check?.state === 'complete' && report.check.verdict === 'gap') || report.explanation !== null);
   const [touched, setTouched] = useState(draft !== null);
   /** How many sends found something to fix: each takes the reader to the first field to fix. */
   const [tries, setTries] = useState(0);
@@ -428,9 +518,18 @@ function Form({
     report !== null &&
     minor === report.amount.amountMinor &&
     (comment.trim() === '' ? null : comment.trim()) === report.comment &&
-    (incidentOn ? incident.trim() : null) === report.incident;
+    (incidentOn ? incident.trim() : null) === report.incident &&
+    (!explaining || (explanation.trim() === '' ? null : explanation.trim()) === report.explanation);
 
-  const draftNow = (): ReportDraft => ({ id: reportId, correcting, amount, comment, incidentOn, incident });
+  const draftNow = (): ReportDraft => ({
+    id: reportId,
+    correcting,
+    amount,
+    comment,
+    incidentOn,
+    incident,
+    ...(explaining && { explanation }),
+  });
 
   const submit = (): void => {
     setTouched(true);
@@ -467,7 +566,11 @@ function Form({
             currency,
             ...body,
           })
-        : changeReport(report.id, { version: report.version, ...body });
+        : changeReport(report.id, {
+            version: report.version,
+            ...body,
+            ...(explaining && { explanation: explanation.trim() === '' ? null : explanation.trim() }),
+          });
     };
     hold.hold(
       {
@@ -519,6 +622,9 @@ function Form({
           <p className="rp-notice__text">« {report.reviewNote} »</p>
         </div>
       ) : null}
+      {report === null || correcting ? null : (
+        <CheckNote report={report} platform={platform} today={dayOf(now, zone)} zone={zone} now={now} />
+      )}
       {correcting ? (
         <p className="tm-hint">
           Validé : <span className="nv-num">{amountText(total, currency)}</span>. Indique ce qui manque (20)
@@ -574,6 +680,26 @@ function Form({
           </p>
         )}
       </div>
+
+      {explaining ? (
+        <div className="nv-field tm-field">
+          <label className="nv-field__label" htmlFor={`${id}-explanation`}>
+            Pourquoi cet écart <span className="sc-optional">si ton montant est juste</span>
+          </label>
+          <textarea
+            id={`${id}-explanation`}
+            className="nv-field__control nv-glass sc-note"
+            rows={2}
+            maxLength={COMMENT_MAX}
+            value={explanation}
+            placeholder="Une vente juste avant le shift, un remboursement…"
+            onChange={(event) => {
+              setExplanation(event.target.value);
+            }}
+          />
+          <p className="tm-hint">Lu par l’agence avec ton rapport. Jamais le message ni le nom d’un fan.</p>
+        </div>
+      ) : null}
 
       <div className="nv-field tm-field">
         <label className="nv-field__label" htmlFor={`${id}-comment`}>

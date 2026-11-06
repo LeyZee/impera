@@ -8,9 +8,10 @@ import { useInvoices } from '@/invoices/api';
 import { deadlineText, kindLabel, periodText } from '@/invoices/model';
 import { reportToDos, type MyReports } from '@/reports/MyReports';
 import { useSchedulingSettings } from '@/reports/api';
-import { amountText } from '@/reports/model';
-import { swapShiftLine } from '@/scheduling/model';
+import { amountText, signedAmountText } from '@/reports/model';
+import { platformName, swapShiftLine } from '@/scheduling/model';
 import { readerZone } from '@/scheduling/time';
+import { useNow } from '@/scheduling/useNow';
 import { useMembers } from '@/screens/team/api';
 import { Panel } from '@/shell/layout';
 import './today.css';
@@ -42,10 +43,11 @@ export function TodoCard({
   const pending = useInvoices(me === null ? null : { acceptance: ['pending'], memberId: me.id });
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
   const zone = readerZone();
+  const now = useNow();
 
   const list = reports.list;
   const accounts = new Map((list?.accounts ?? []).map((account) => [account.id, account]));
-  const toDo = list === undefined ? [] : reportToDos(list, heroShiftId);
+  const toDo = list === undefined ? [] : reportToDos(list, heroShiftId, now);
   const invoices = timeZone === null ? [] : (pending.data?.documents ?? []);
   const fromFile =
     file.data === undefined || regimes.data === undefined
@@ -58,25 +60,39 @@ export function TodoCard({
   return (
     <Panel className="td-todo nv-enter" eyebrow="À faire">
       <ul className="rp-todo td-todo__list">
-        {toDo.map(({ shift, report }) => (
-          <Line
-            key={shift.id}
-            index={index++}
-            tone={report === null ? 'due' : 'back'}
-            title={report === null ? 'Rapport à faire' : 'Rapport renvoyé par l’agence'}
-            sub={swapShiftLine(
-              shift.startsAt,
-              shift.endsAt,
-              accounts.get(shift.platformAccountId)?.creatorName,
-              zone,
-            )}
-            note={report?.reviewNote ?? null}
-            go={report === null ? 'Faire' : 'Reprendre'}
-            onClick={() => {
-              onReport(shift.id);
-            }}
-          />
-        ))}
+        {toDo.map(({ shift, report }) => {
+          const account = accounts.get(shift.platformAccountId);
+          // Neither to make nor sent back: its gap with the platform waits for him (ADR 0073 § 5).
+          const gap =
+            report !== null && report.status !== 'rejected' && report.check?.state === 'complete'
+              ? report.check
+              : null;
+          return (
+            <Line
+              key={shift.id}
+              index={index++}
+              tone={report === null ? 'due' : 'back'}
+              title={
+                report === null ? (
+                  'Rapport à faire'
+                ) : gap !== null ? (
+                  <>
+                    Écart avec {account === undefined ? 'la plateforme' : platformName(account.platform)} ·{' '}
+                    <span className="nv-num">{signedAmountText(gap.gapMinor, report.amount.currency)}</span>
+                  </>
+                ) : (
+                  'Rapport renvoyé par l’agence'
+                )
+              }
+              sub={swapShiftLine(shift.startsAt, shift.endsAt, account?.creatorName, zone)}
+              note={gap === null ? (report?.reviewNote ?? null) : null}
+              go={report === null ? 'Faire' : gap === null ? 'Reprendre' : 'Expliquer'}
+              onClick={() => {
+                onReport(shift.id);
+              }}
+            />
+          );
+        })}
         {timeZone === null
           ? null
           : invoices.map((item) => (

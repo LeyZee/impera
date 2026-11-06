@@ -14,6 +14,9 @@ import { AWAY_WORDS } from './model';
 import {
   AGENCY_STATUS,
   amountText,
+  GAP_TO_EXPLAIN,
+  gapWaits,
+  hasGap,
   MEMBER_STATUS,
   periodAt,
   reportOf,
@@ -100,6 +103,8 @@ export function ShiftSheet({
   // The reader's own shift: a manager who chats (EQP-02). The owner has no record, so never one.
   const mine = record !== null && record.userId === userId;
   const report = reports === null ? null : reportOf(reports, shift.id);
+  // His report's gap with the platform waits for him (ADR 0073 § 5): its chip says what to do.
+  const explain = report !== null && gapWaits(report, now);
   const corrected = reports?.some((one) => one.correctsId !== null && one.status === 'validated') ?? false;
   const startDay = dayOf(shift.startsAt, agency);
   // Who may take it: active, on its creator, and already joined that day (`member_not_joined_conflict`).
@@ -280,11 +285,11 @@ export function ShiftSheet({
                   </span>
                   <button
                     type="button"
-                    className={`rp-chip rp-chip--${STATUS_TONES[report.status]} nv-tap`}
-                    aria-label={`Mon rapport : ${MEMBER_STATUS[report.status]}`}
+                    className={`rp-chip rp-chip--${explain ? 'warn' : STATUS_TONES[report.status]} nv-tap`}
+                    aria-label={`Mon rapport : ${explain ? 'écart à expliquer' : MEMBER_STATUS[report.status]}`}
                     onClick={onReport}
                   >
-                    {MEMBER_STATUS[report.status]}
+                    {explain ? GAP_TO_EXPLAIN : MEMBER_STATUS[report.status]}
                   </button>
                 </span>
               )}
@@ -296,9 +301,14 @@ export function ShiftSheet({
                 <span className="nv-num">
                   {amountText(report.amount.amountMinor, report.amount.currency)}
                 </span>
-                <span className={`rp-chip rp-chip--${STATUS_TONES[report.status]}`}>
-                  {AGENCY_STATUS[report.status]}
-                </span>
+                {/* A gap with the platform still to decide is said in amber (ADR 0073 § 5). */}
+                {report.status === 'submitted' && hasGap(report) ? (
+                  <span className="rp-chip rp-chip--warn">Écart · {AGENCY_STATUS.submitted}</span>
+                ) : (
+                  <span className={`rp-chip rp-chip--${STATUS_TONES[report.status]}`}>
+                    {AGENCY_STATUS[report.status]}
+                  </span>
+                )}
               </Link>
             </li>
           ) : reports !== null && phase === 'past' ? (

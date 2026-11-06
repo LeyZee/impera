@@ -25,6 +25,8 @@ import {
 import {
   AGENCY_STATUS,
   amountText,
+  gapWaits,
+  hasGap,
   linesOf,
   mergeLists,
   periodAt,
@@ -37,13 +39,14 @@ import {
   lateFor,
   lateLines,
   nudgeText,
+  uncheckedText,
   type ShiftLine,
 } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
-import { accountLine, swapShiftLine } from '@/scheduling/model';
+import { accountLine, platformName, swapShiftLine } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
-import { readerZone } from '@/scheduling/time';
+import { clockAt, dayMonth, dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { PeriodArrows, PeriodHeading } from '@/screens/pay/parts';
 import { Page, PageHeader, Panel } from '@/shell/layout';
@@ -133,7 +136,10 @@ export function ReportsPage({
   const refresh = useRefreshReports();
 
   const waiting = (open.data?.reports ?? []).filter((one) => one.status === 'submitted');
-  const chosen = waiting.filter((one) => selected.has(one.id) && one.canReview && !held.has(one.id));
+  // A gap with the platform waits for its member (ADR 0073 § 5): out of the selection until it is answered.
+  const chosen = waiting.filter(
+    (one) => selected.has(one.id) && one.canReview && !held.has(one.id) && !gapWaits(one, now),
+  );
 
   const validate = (): void => {
     if (chosen.length === 0) return;
@@ -400,7 +406,7 @@ function ToValidate({
     );
   }
   const names = namesOf(list);
-  const reviewable = waiting.filter((one) => one.canReview && !held.has(one.id));
+  const reviewable = waiting.filter((one) => one.canReview && !held.has(one.id) && !gapWaits(one, now));
   const all = reviewable.length > 0 && reviewable.every((one) => selected.has(one.id));
   const sums = periodSums(waiting);
   const sentBack = list.reports.filter((one) => one.status === 'rejected');
@@ -483,6 +489,7 @@ function ToValidate({
                   index={index}
                   names={names}
                   zone={zone}
+                  now={now}
                   held={held.has(report.id)}
                   checked={selected.has(report.id)}
                   onCheck={(on) => {
@@ -552,6 +559,7 @@ function Review({
   index,
   names,
   zone,
+  now,
   held,
   checked,
   onCheck,
@@ -560,6 +568,7 @@ function Review({
   index: number;
   names: ReturnType<typeof namesOf>;
   zone: string;
+  now: Date;
   held: boolean;
   checked: boolean;
   onCheck: (on: boolean) => void;
@@ -570,6 +579,9 @@ function Review({
   const account = names.accounts.get(report.platformAccountId);
   const shift = names.shifts.get(report.shiftId);
   const correction = report.correctsId !== null;
+  // Its gap with the platform waits for its member: no validation before (ADR 0073 § 5), « Renvoyer » stays.
+  const waits = gapWaits(report, now);
+  const free = report.canReview && !waits;
 
   return (
     <li
@@ -578,15 +590,15 @@ function Review({
       data-checked={checked ? 'true' : undefined}
       data-held={held ? 'true' : undefined}
       aria-busy={held}
-      data-locked={report.canReview ? undefined : 'true'}
+      data-locked={free ? undefined : 'true'}
     >
       <label className="rp-review__pick" htmlFor={`${id}-pick`}>
         <input
           id={`${id}-pick`}
           type="checkbox"
           className="nv-check"
-          checked={checked || held}
-          disabled={!report.canReview || held}
+          checked={(checked && free) || held}
+          disabled={!free || held}
           aria-label={`Sélectionner le rapport de ${member?.displayName ?? 'ce membre'}`}
           onChange={(event) => {
             onCheck(event.target.checked);
@@ -602,11 +614,31 @@ function Review({
               {report.byAgency ? 'Correction de l’agence' : 'Correction'}
             </span>
           ) : null}
+          {report.check?.state === 'complete' ? (
+            report.check.verdict === 'gap' ? (
+              <span className="rp-chip rp-chip--warn">
+                Écart{' '}
+                <span className="nv-num">
+                  {signedAmountText(report.check.gapMinor, report.amount.currency)}
+                </span>
+              </span>
+            ) : (
+              <span className="rp-chip rp-chip--ok">Conforme</span>
+            )
+          ) : null}
         </p>
         <p className="rp-review__where nv-num">
           {account === undefined ? null : `${account.creatorName} · ${accountLine(account)} · `}
           {shift === undefined ? null : swapShiftLine(shift.startsAt, shift.endsAt, undefined, zone)}
         </p>
+        <ReviewCheck
+          report={report}
+          platform={account === undefined ? 'la plateforme' : platformName(account.platform)}
+          memberName={member?.displayName ?? 'Son membre'}
+          waits={waits}
+          today={dayOf(now, zone)}
+          zone={zone}
+        />
         {report.comment === null ? null : <p className="rp-review__quote">« {report.comment} »</p>}
         {report.incident === null ? null : (
           <p className="rp-review__incident">
@@ -653,6 +685,77 @@ function Review({
     </li>
   );
 }
+
+/**
+ * What the platform read during a report's shift, to the agency (ADR 0073): the figure beside the declared one, why
+ * nothing is compared, or the gap, its member's explanation, and until when it waits for them. The server compares
+ * and decides; this only says it.
+ */
+function ReviewCheck({
+  report,
+  platform,
+  memberName,
+  waits,
+  today,
+  zone,
+}: {
+  report: ShiftReport;
+  platform: string;
+  memberName: string;
+  waits: boolean;
+  today: string;
+  zone: string;
+}): JSX.Element | null {
+  const { check } = report;
+  if (check === null) return null;
+  const { currency } = report.amount;
+  if (check.state === 'unavailable') {
+    return <p className="rp-review__check">{uncheckedText(check.reason, platform, true)}</p>;
+  }
+  const read = <span className="nv-num">{amountText(check.readMinor, currency)}</span>;
+  if (check.state === 'provisional') {
+    return (
+      <p className="rp-review__check">
+        {platform} a lu {read} pour l’instant : la comparaison se fait un quart d’heure après la fin du shift.
+      </p>
+    );
+  }
+  if (check.verdict === 'within') {
+    return (
+      <p className="rp-review__check">
+        {platform} a lu {read} pendant le shift : le rapport se valide tout seul.
+      </p>
+    );
+  }
+  return (
+    <>
+      <p className="rp-review__check">
+        {platform} a lu {read} pendant le shift.
+      </p>
+      {report.explanation === null ? null : (
+        <p className="rp-review__explain">
+          <span className="rp-review__label">Explication</span> « {report.explanation} »
+        </p>
+      )}
+      {waits && check.explainBy !== null ? (
+        <p className="rp-review__wait">
+          {memberName} peut corriger ou expliquer l’écart {untilWhen(check.explainBy, today, zone)} : la
+          validation attend.
+        </p>
+      ) : report.explanation === null ? (
+        <p className="rp-review__wait">Délai passé sans explication : à toi de décider.</p>
+      ) : null}
+    </>
+  );
+}
+
+/** « jusqu’à 23:00 » the same day, « jusqu’au 8 nov. à 23:00 » another. */
+const untilWhen = (instant: string, today: string, zone: string): string => {
+  const day = dayOf(instant, zone);
+  return day === today
+    ? `jusqu’à ${clockAt(instant, zone)}`
+    : `jusqu’au ${dayMonth(day)} à ${clockAt(instant, zone)}`;
+};
 
 /** « Renvoyer » opened under a report: the word for its member, sent at once (the member sends it again). */
 function RefuseForm({
@@ -890,6 +993,8 @@ function MemberPeriod({
   const sums = periodSums(reports);
   const waiting = reports.filter((one) => one.status === 'submitted').length;
   const sentBack = reports.filter((one) => one.status === 'rejected').length;
+  // His gaps with the platform this period, whatever became of them: a repeated one shows here (ADR 0073 § 5).
+  const gaps = reports.filter(hasGap).length;
   // What the member's period holds, said only where there is something: « 210,00 € validés · 1 à valider ». Only
   // the shifts without a report are amber, not the money validated beside them (EQ-14). A report validated at 0 €
   // still says « 0,00 € validés », never a blank row like a member without a shift (recette EQP-14).
@@ -914,6 +1019,12 @@ function MemberPeriod({
             <span className="rp-member__late">
               {summary === '' ? '' : ' · '}
               {String(missing)} sans rapport
+            </span>
+          )}
+          {gaps === 0 ? null : (
+            <span className="rp-member__late">
+              {summary === '' && missing === 0 ? '' : ' · '}
+              {String(gaps)} écart{gaps > 1 ? 's' : ''}
             </span>
           )}
         </span>
@@ -955,9 +1066,17 @@ function MemberPeriod({
                         dont {line.corrections.length} correction{line.corrections.length > 1 ? 's' : ''}
                       </span>
                     )}
+                    {report.check?.state === 'complete' && report.check.verdict === 'gap' ? (
+                      <span className="rp-pline__gap">
+                        {' '}
+                        écart {signedAmountText(report.check.gapMinor, report.amount.currency)}
+                      </span>
+                    ) : null}
                   </span>
                   <span className={`rp-chip rp-chip--${STATUS_TONES[report.status]}`}>
-                    {AGENCY_STATUS[report.status]}
+                    {report.status === 'validated' && report.reviewKind === 'automatic'
+                      ? 'Validé automatiquement'
+                      : AGENCY_STATUS[report.status]}
                   </span>
                   {report.status === 'validated' ? (
                     <button

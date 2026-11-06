@@ -17,7 +17,7 @@ import { SwapPanel } from './SwapPanel';
 
 import { ReportPanel } from '@/reports/ReportPanel';
 import { useReportsOf } from '@/reports/api';
-import { MEMBER_STATUS, periodAt, reportOf, STATUS_TONES } from '@/reports/model';
+import { GAP_TO_EXPLAIN, gapWaits, MEMBER_STATUS, periodAt, reportOf, STATUS_TONES } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
@@ -505,6 +505,7 @@ function Week({
               held={held}
               offeredTo={offers.get(shift.id) ?? []}
               report={phase === 'past' ? reportFor(shift) : null}
+              now={now}
               onSwap={onSwap}
               onReport={onReport}
             />
@@ -564,6 +565,7 @@ function MyShiftRow({
   held,
   offeredTo,
   report,
+  now,
   onSwap,
   onReport,
 }: {
@@ -577,9 +579,12 @@ function MyShiftRow({
   /** The colleagues an open proposal of this shift waits on. */
   offeredTo: readonly string[];
   report: RowReport;
+  /** Whether a gap with the platform still waits for him (ADR 0073 § 5). */
+  now: Date;
   onSwap: (shiftId: string) => void;
   onReport: (shiftId: string) => void;
 }): JSX.Element {
+  const explain = report !== null && report.kind !== 'todo' && gapWaits(report.report, now);
   const day = `${longDay(dayOf(shift.startsAt, zone))}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}`;
   const length = new Date(shift.endsAt).getTime() - new Date(shift.startsAt).getTime();
   const sameHours =
@@ -630,15 +635,17 @@ function MyShiftRow({
       ) : (
         <button
           type="button"
-          className={`rp-chip rp-chip--${STATUS_TONES[report.report.status]} nv-tap sc-mine__report`}
-          aria-label={`Rapport du ${day} : ${MEMBER_STATUS[report.report.status]}`}
+          className={`rp-chip rp-chip--${explain ? 'warn' : STATUS_TONES[report.report.status]} nv-tap sc-mine__report`}
+          aria-label={`Rapport du ${day} : ${explain ? 'écart à expliquer' : MEMBER_STATUS[report.report.status]}`}
           onClick={() => {
             onReport(shift.id);
           }}
         >
           {report.report.status === 'rejected'
             ? 'Renvoyé · Reprendre'
-            : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
+            : explain
+              ? GAP_TO_EXPLAIN
+              : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
         </button>
       )}
       {phase === 'later' ? (

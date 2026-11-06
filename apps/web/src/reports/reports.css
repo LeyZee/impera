@@ -78,6 +78,14 @@
 .rp-notice[data-tone='warn'] .rp-notice__title {
   color: var(--nv-warning);
 }
+/* A report that matches its platform (ADR 0073 § 4): the same notice, tinted green, never a bar on its side. */
+.rp-notice[data-tone='ok'] {
+  background: color-mix(in srgb, var(--nv-success) 8%, var(--nv-glass-fill));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 24%, transparent);
+}
+.rp-notice[data-tone='ok'] .rp-notice__title {
+  color: var(--nv-success);
+}
 .rp-notice__text {
   margin: 0;
   color: var(--nv-ink-muted);
@@ -193,6 +201,8 @@
   letter-spacing: var(--nv-text-hero-tracking);
   font-weight: 680;
 }
+/* What the platform read during a validated shift (ADR 0073), quiet under the figure. */
+.rp-figure__read,
 .rp-figure__note {
   margin: 0;
   color: var(--nv-ink-muted);
@@ -872,6 +882,33 @@
   color: var(--nv-warning);
   font-weight: 700;
 }
+/* What the platform read during the shift (ADR 0073), quiet under where and when. */
+.rp-review__check,
+.rp-review__wait {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+/* The member's explanation of a gap: their words, set apart like a quote, never tinted like an incident. */
+.rp-review__explain {
+  margin: 2px 0 0;
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-ink) 5%, transparent);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.rp-review__label {
+  margin-right: 4px;
+  font-weight: 700;
+}
+/* Until when the gap waits for its member: a warning, so amber, never red. */
+.rp-review__wait {
+  color: var(--nv-warning);
+}
 .rp-review__side {
   display: flex;
   flex-direction: column;
@@ -962,6 +999,11 @@
   color: var(--nv-ink-faint);
   font-size: var(--nv-text-caption);
   font-weight: 500;
+}
+.rp-pline__gap {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
 }
 
 /* ── Réglages › Règles de paie ── */
