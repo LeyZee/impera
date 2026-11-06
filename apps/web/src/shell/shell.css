@@ -1126,15 +1126,22 @@
        uncut and without a 1 px vertical scroll (relecture d'Extension, #417). */
     padding-block: 5px;
   }
-  /* More tabs past an edge: that edge fades out instead of cutting a tab in two. */
+  /* More tabs past an edge: that edge fades out instead of cutting a tab in two. Its last 20 px are clear and the fade
+     runs 72 px, so a tab half out of view reads as « more », never as a word cut (« Expor… », capture de #573). */
   .nv-subnav[data-more='end'] {
-    mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent calc(100% - 20px));
   }
   .nv-subnav[data-more='start'] {
-    mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent);
+    mask-image: linear-gradient(to left, #000 calc(100% - 72px), transparent calc(100% - 20px));
   }
   .nv-subnav[data-more='both'] {
-    mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+    mask-image: linear-gradient(
+      to right,
+      transparent 20px,
+      #000 72px,
+      #000 calc(100% - 72px),
+      transparent calc(100% - 20px)
+    );
   }
   .nv-subnav__item {
     padding: 0 12px;
