@@ -294,6 +294,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const contentDrops = wireContentDrops(shared, {
     scriptVersions: {
       frozen: (versionId) => scripts.module.frozenVersion(versionId),
+      card: (versionId, segmentKey, variant) => scripts.module.frozenCard(versionId, segmentKey, variant),
       freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
     },
   });

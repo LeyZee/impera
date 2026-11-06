@@ -1,0 +1,316 @@
+/*
+ * Her script, card by card (SC-02 lot b2): the back link, the title and the progress above; one card and its slots;
+ * Précédent / Suivant pinned at the foot of a phone. Pills for states, never a coloured bar (Charles, 05/11).
+ */
+
+.sk-page {
+  max-width: 560px;
+}
+.sk-top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  scroll-margin-top: var(--nv-space-4);
+}
+.sk-top .nv-page__head {
+  padding-top: var(--nv-space-1);
+}
+.nv-btn.sk-back {
+  align-self: flex-start;
+  /* Its arrow on the title's left edge: the button keeps its touch height, not its side padding. */
+  padding-left: var(--nv-space-2);
+  margin-left: calc(-1 * var(--nv-space-2));
+  gap: var(--nv-space-1);
+}
+
+/* The progress: where she is on the left, her media on the right, the gauge under both. */
+.sk-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-1);
+}
+.sk-progress__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+}
+.sk-progress__step {
+  font-weight: 650;
+}
+.sk-progress__count {
+  color: var(--nv-ink-muted);
+}
+
+.sk-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-6);
+  min-width: 0;
+}
+.sk-gone {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+
+/* ---- One card ---- */
+.sk-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.sk-card__titles {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.sk-card__title {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+  font-weight: 650;
+}
+.sk-card__detail {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.sk-card__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  margin-top: var(--nv-space-1);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+}
+
+/* The card's code, as the library writes it (E2A, P12): a quiet pill. */
+.sk-code {
+  flex: none;
+  display: inline-block;
+  padding: 2px var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+  line-height: 18px;
+  vertical-align: 1px;
+}
+
+/* ---- Its slots ---- */
+.sk-slots {
+  list-style: none;
+  margin: var(--nv-space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.sk-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4);
+}
+.sk-slot__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+}
+.sk-slot__rank {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+}
+.sk-slot__titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 2px;
+}
+.sk-slot__kind {
+  font-weight: 650;
+}
+.sk-slot__hint {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.sk-slot__file {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  padding-left: calc(24px + var(--nv-space-3));
+}
+.sk-slot__done {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+  font-weight: 650;
+}
+.sk-slot__line {
+  flex: 1;
+  min-width: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.sk-slot__line--warn {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.sk-slot .nv-gauge {
+  margin-left: calc(24px + var(--nv-space-3));
+}
+.sk-slot__refusal {
+  margin: 0 0 0 calc(24px + var(--nv-space-3));
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.sk-slot__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---- The preview ---- */
+.sk-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.sk-preview__title {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+  font-weight: 650;
+}
+.sk-preview__lead {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.sk-preview__list {
+  list-style: none;
+  margin: var(--nv-space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.sk-row {
+  appearance: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-3);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.sk-row:hover {
+  background: var(--nv-plate-hover);
+}
+.sk-row:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+.sk-row__image {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--nv-radius-xs);
+  background: var(--nv-fill-soft);
+}
+.sk-row__titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sk-row__name {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sk-row__meta {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.sk-pill {
+  flex: none;
+  padding: 2px var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sk-pill--ok {
+  background: color-mix(in srgb, var(--nv-success) 14%, transparent);
+  color: var(--nv-success);
+}
+.sk-pill--warn {
+  background: color-mix(in srgb, var(--nv-warning) 16%, transparent);
+  color: var(--nv-warning);
+}
+
+/* ---- Précédent / Suivant: a floating bar, above the phone's tab bar ---- */
+.sk-foot {
+  position: sticky;
+  bottom: var(--nv-space-4);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-2);
+  border: 1px solid var(--nv-glass-edge);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill-strong);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: var(--nv-shadow-glass);
+}
+@media (max-width: 820px) {
+  .sk-foot {
+    bottom: calc(var(--nv-tabbar-room) - var(--nv-space-4));
+  }
+}
+.sk-foot__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.sk-foot__row .nv-btn--neon {
+  flex: 1;
+  max-width: 260px;
+  margin-left: auto;
+}
+.sk-foot__alert {
+  margin: 0;
+  padding: var(--nv-space-1) var(--nv-space-2) 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}

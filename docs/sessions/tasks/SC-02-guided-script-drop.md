@@ -1,5 +1,5 @@
 # SC-02 « Ton prochain script » : la créatrice tourne et dépose carton par carton
-Statut : en cours, lot a (cadence, API et job) fait le 05/11/2026 ; lot b1 (API du dépôt par emplacements) fait le 06/11/2026 ; lot b2 (parcours dans la PWA) à faire
+Statut : en cours, lot a (cadence, API et job) fait le 05/11/2026 ; lot b1 (API du dépôt par emplacements) fait le 06/11/2026 ; lot b2 (parcours dans la PWA) fait le 06/11/2026 ; restent les rappels de l'ADR 0055 § 4, `touchesTerm` et l'écran d'agence de la cadence
 Phase : scripts (ADR 0056)
 Dépend de : SC-01, CR-06 (amendée par l'ADR 0055), CR-05 (tâches de l'agenda)
 Branche : task/sc-02-guided-script-drop
@@ -29,3 +29,4 @@ Nomenclature et export (SC-03), descriptions (SC-04).
 ## Notes de session
 - 05/11/2026, lot a (migration 0121) : cadence, version figée sur la demande, job horaire. Reste : lot b (emplacements du dépôt de script, parcours carton par carton, captures), rappels de l'ADR 0055 § 4, `touchesTerm`, l'écran d'agence de la cadence (ambre).
 - 06/11/2026, lot b1 (migration 0122) : API du dépôt de script par emplacements (début, reprise, remplissage, remplacement, envoi), durée vérifiée sur le fichier nettoyé, original d'un fichier remplacé effacé. Reste : lot b2 (parcours PWA, route créatrice des cartons de sa version figée, captures Nuit et Jour), rappels de l'ADR 0055 § 4, `touchesTerm`, écran d'agence de la cadence.
+- 06/11/2026, lot b2 (sans migration) : route créatrice des cartons de sa version figée ; dans la PWA, « Commencer » sur une demande de script à version figée, « Continuer » sur un script en cours, un écran par carton (une série par carton pour une étape à variantes) avec ses emplacements, genre et durée vérifiés sur le téléphone avant tout envoi, chaque fichier envoyé dès qu'il est choisi, aperçu final et « Envoyer le script ». Reste : rappels de l'ADR 0055 § 4, `touchesTerm`, écran d'agence de la cadence.
