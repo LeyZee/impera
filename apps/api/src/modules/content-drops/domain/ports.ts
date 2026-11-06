@@ -1,6 +1,7 @@
 import type {
   ContentDrop,
   ContentDropFileId,
+  ShotMoment,
   ContentRequest,
   CreateContentDropBody,
   CreateContentRequestBody,
@@ -312,12 +313,20 @@ export interface AgencyContentStore {
    * `ready`, `scheduled` or `published` yet, or one whose original is already erased.
    */
   sentScript(creatorId: string, userId: string, dropId: string): Promise<SentScript>;
+  /**
+   * The team says it copied her sent script into Reveal from its archive (SC-03 c, ADR 0056 § 7): said once (replayed,
+   * the drop as it is), with its audit line; each original the script alone kept now goes 30 days later (ADR 0044 § 2),
+   * never later than it already went. Refused like `sentScript`.
+   */
+  confirmExport(creatorId: string, userId: string, dropId: string, now: Date): Promise<ContentDrop>;
 }
 
 /** A sent script's facts for its archive (SC-03 c). */
 export interface SentScript {
   readonly scriptNumber: number;
   readonly versionId: string;
+  /** The moment its request fixed (« ok alternance »); `null` for a script asked before SC-03 c. */
+  readonly moment: ShotMoment | null;
   readonly files: readonly ExportedFile[];
 }
 

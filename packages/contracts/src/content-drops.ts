@@ -7,6 +7,7 @@ import {
   ScriptSlotKeySchema,
   ScriptStructureIdSchema,
   ScriptStructureVersionIdSchema,
+  ShotMomentSchema,
   ScriptVariantLetterSchema,
   type MediaSlot,
 } from './scripts';
@@ -328,6 +329,10 @@ export const ContentDropSchema = z.strictObject({
   blockedReason: DropRefusalSchema.nullable(),
   requestId: ContentRequestIdSchema.nullable(),
   files: z.array(ContentDropFileSchema),
+  /** Her sent script's number, the `S<nnn>` of its folder (SC-03); `null` for another drop or a script being filled. */
+  scriptNumber: z.int().min(1).nullable(),
+  /** When the team confirmed its archive copied into Reveal (SC-03 c): her originals of it go 30 days later. */
+  exportedAt: z.iso.datetime({ offset: true }).nullable(),
   createdAt: z.iso.datetime({ offset: true }),
 });
 export type ContentDrop = z.infer<typeof ContentDropSchema>;
@@ -458,6 +463,8 @@ export const ContentRequestSchema = z.strictObject({
   structureId: ScriptStructureIdSchema.nullable(),
   /** The version asked, frozen with the request (SC-02); `null` for another category and a script asked before. */
   structureVersionId: ScriptStructureVersionIdSchema.nullable(),
+  /** Jour or Nuit, fixed by the code when the script is asked (« ok alternance »); `null` for another category. */
+  moment: ShotMomentSchema.nullable(),
   origin: ContentRequestOriginSchema,
   state: ContentRequestStateSchema,
   refusalReason: DropRefusalSchema.nullable(),

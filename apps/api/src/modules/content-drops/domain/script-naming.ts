@@ -5,6 +5,7 @@ import {
   type ScriptSegment,
   type ScriptSlotKey,
   type ScriptVariantLetter,
+  type ShotMoment,
 } from '@impera/contracts';
 
 /**
@@ -23,9 +24,6 @@ import {
  */
 
 type ScriptFileKind = 'carton' | 'photo' | 'video' | 'vocal';
-
-/** The moment a script was shot as: a « both » structure is shot as the one its request says. */
-export type ShotMoment = 'day' | 'night';
 
 const KIND_OF_SLOT: Record<MediaSlotKind, ScriptFileKind> = {
   image: 'photo',
