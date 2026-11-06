@@ -42,7 +42,7 @@ export function TodoCard({
   // His own, named: the server scopes a chatter to himself, but an owner or an active manager would get everyone's.
   const pending = useInvoices(me === null ? null : { acceptance: ['pending'], memberId: me.id });
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
-  const zone = readerZone();
+  const zone = me?.timeZone ?? readerZone();
   const now = useNow();
 
   const list = reports.list;
