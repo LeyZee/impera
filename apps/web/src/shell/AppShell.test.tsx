@@ -221,6 +221,41 @@ describe('Réglages › Sauvegardes', () => {
   });
 });
 
+describe('a page inside an open section that is not the account’s', () => {
+  // A sub-page guard says it too, not only the root (recette Équipe 07/11, EQP-03): the page is someone else's, not
+  // broken.
+  it('sends to the section’s own page and says why', async () => {
+    // Moi and Suivi carry a sub-nav, which watches its tabs' widths.
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+    const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self' };
+    const cases: readonly (readonly [Me, string, string])[] = [
+      [manager, '/creatrices/structures', '/creatrices'],
+      [chatter, '/suivi/alertes', '/suivi'],
+      [manager, '/moi/persona', '/moi/profil'],
+      [creator, '/moi/profil', '/moi/persona'],
+    ];
+    for (const [user, path, landing] of cases) {
+      const router = renderApp(user, path);
+      await waitFor(() => {
+        expect(router.state.location.pathname, path).toBe(landing);
+      });
+      await waitFor(() => {
+        expect(
+          screen.queryByText('Cette page n’est pas dans ton espace.')?.closest('[role="status"]'),
+          path,
+        ).toBeTruthy();
+      });
+      cleanup();
+    }
+  });
+});
+
 describe('« Plus » on the phone', () => {
   const item = (to: NavItem['to'], label: string, icon: NavItem['icon']): NavItem => ({
     to,
