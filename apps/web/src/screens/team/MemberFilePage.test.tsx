@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { TeamMemberSchema } from '@impera/contracts';
+import { BillingRegimeSchema, TeamMemberSchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -20,11 +20,12 @@ import {
   documentOf,
   fileOf,
   fileServer,
+  FRANCE_REGIME,
   profileOf,
   serveFile,
   type FileServer,
 } from '@/test/contractors';
-import { IRIS, OWNER, OWNER_USER, THEO } from '@/test/pay';
+import { IRIS, OWNER, OWNER_USER, payId, THEO } from '@/test/pay';
 import { chooseValue, openList } from '@/test/select';
 
 let server: FileServer;
@@ -157,18 +158,25 @@ describe('Équipe › Membres › Dossier', () => {
     expect(regime.textContent).toContain('attestation de résidence fiscale');
 
     fireEvent.click(within(regime).getByRole('button', { name: 'Attribuer un régime' }));
-    const select = within(dialog()).getByRole('combobox', { name: 'Régime' });
+    // Two regimes: chips in sight, never a list to open (five at most, docs/design/README.md).
+    expect(within(dialog()).queryByRole('combobox', { name: 'Régime' })).toBeNull();
+    const choices = within(dialog()).getByRole('radiogroup', { name: 'Régime' });
     // The regimes of Benin alone, the newest first: never the one of France.
     expect(
-      within(openList(select))
-        .getAllByRole('option')
-        .map((one) => one.textContent),
-    ).toEqual([BENIN_DRAFT.name, BENIN_REGIME.name]);
-    fireEvent.keyDown(select, { key: 'Escape' });
-    expect(within(dialog()).getByText(/^pas encore validé par le comptable/u).className).toBe(
+      within(choices)
+        .getAllByRole('radio')
+        .map((one) => [one.textContent, one.getAttribute('aria-checked')]),
+    ).toEqual([
+      [BENIN_DRAFT.name, 'true'],
+      [BENIN_REGIME.name, 'false'],
+    ]);
+    expect(within(dialog()).getByText(/^Pas encore validé par le comptable/u).className).toBe(
       'tm-hint cf-amber',
     );
-    chooseValue(select, BENIN_REGIME.id);
+    fireEvent.click(within(choices).getByRole('radio', { name: BENIN_REGIME.name }));
+    expect(within(choices).getByRole('radio', { name: BENIN_REGIME.name }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
     fireEvent.change(within(dialog()).getByLabelText('À partir du'), { target: { value: '2026-11-04' } });
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Attribuer' }));
     expect(within(dialog()).getByText('Aujourd’hui au plus tôt, le 5 novembre 2026.')).toBeTruthy();
@@ -180,6 +188,36 @@ describe('Équipe › Membres › Dossier', () => {
     expect(server.writes.map((one) => [one.method, one.path])).toEqual([
       ['POST', `/v1/payroll/contractors/${THEO.id}/regimes`],
     ]);
+    expect(server.writes[0]?.body).toMatchObject({ regimeId: BENIN_REGIME.id, from: '2026-11-16' });
+  });
+
+  it('offers the regimes in the design system’s list past five, never more chips', async () => {
+    // Six regimes for Benin: one validated, five versions after it.
+    const versions = [2, 3, 4, 5, 6].map((n) =>
+      BillingRegimeSchema.parse({
+        ...BENIN_REGIME,
+        id: payId(700 + n),
+        name: `Prestataire Bénin, version ${String(n)}`,
+        createdAt: `2026-11-0${String(n)}T08:00:00.000Z`,
+      }),
+    );
+    server.regimes = [...versions.toReversed(), BENIN_REGIME, FRANCE_REGIME];
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Attribuer un régime' }));
+    expect(within(dialog()).queryByRole('radiogroup', { name: 'Régime' })).toBeNull();
+    const select = within(dialog()).getByRole('combobox', { name: 'Régime' });
+    expect(
+      within(openList(select))
+        .getAllByRole('option')
+        .map((one) => one.textContent),
+    ).toEqual([...versions.toReversed().map((one) => one.name), BENIN_REGIME.name]);
+    fireEvent.keyDown(select, { key: 'Escape' });
+    chooseValue(select, BENIN_REGIME.id);
+    fireEvent.change(within(dialog()).getByLabelText('À partir du'), { target: { value: '2026-11-16' } });
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Attribuer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
     expect(server.writes[0]?.body).toMatchObject({ regimeId: BENIN_REGIME.id, from: '2026-11-16' });
   });
 

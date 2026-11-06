@@ -27,6 +27,11 @@ import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
 import { Panel } from '@/shell/layout';
 
+/** `nv-chip` for a choice among a few, five at most; `Select` past that (docs/design/README.md). */
+const CHIPS_AT_MOST = 5;
+
+const upperFirst = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
 /**
  * The owner's checks on a member's identity (EQ-06 lot 8b): « Vérifier » the file as he read it, and the prefix of
  * the member's invoices until the first one freezes it. Never on his own file, which he does not check.
@@ -318,6 +323,11 @@ function AssignDialog({
   // answer is the same assignment; a choice changed draws a new key.
   const [key, setKey] = useState(() => crypto.randomUUID());
   const chosen = available.find((regime) => regime.id === regimeId) ?? null;
+  const choose = (next: string): void => {
+    if (next === regimeId) return;
+    setRegimeId(next);
+    setKey(crypto.randomUUID());
+  };
   const [fromUnreadable, setFromUnreadable] = useState(false);
   const fromOk = !fromUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(from) && from >= earliest;
 
@@ -350,21 +360,46 @@ function AssignDialog({
         ) : (
           <>
             <div className="nv-field tm-field">
-              <label className="nv-field__label" htmlFor={`${id}-regime`}>
-                Régime
-              </label>
-              <Select
-                id={`${id}-regime`}
-                value={regimeId}
-                options={available.map((regime) => ({ value: regime.id, label: regime.name }))}
-                onChange={(value) => {
-                  setRegimeId(value);
-                  setKey(crypto.randomUUID());
-                }}
-              />
+              {available.length <= CHIPS_AT_MOST ? (
+                <>
+                  {/* A country has a regime or two: chips, each one in sight, rather than a list to open. */}
+                  <span className="nv-field__label" id={`${id}-regime`}>
+                    Régime
+                  </span>
+                  <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-regime`}>
+                    {available.map((regime) => (
+                      <button
+                        key={regime.id}
+                        type="button"
+                        role="radio"
+                        className="nv-chip"
+                        aria-checked={regime.id === regimeId}
+                        onClick={() => {
+                          choose(regime.id);
+                        }}
+                      >
+                        {regime.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label className="nv-field__label" htmlFor={`${id}-regime`}>
+                    Régime
+                  </label>
+                  <Select
+                    id={`${id}-regime`}
+                    value={regimeId}
+                    options={available.map((regime) => ({ value: regime.id, label: regime.name }))}
+                    onChange={choose}
+                  />
+                </>
+              )}
               {chosen === null ? null : (
                 <p className={chosen.validatedOn === null ? 'tm-hint cf-amber' : 'tm-hint'}>
-                  {validationText(chosen)}.
+                  {/* A sentence of its own under the chips: it starts with a capital. */}
+                  {upperFirst(validationText(chosen))}.
                 </p>
               )}
             </div>
