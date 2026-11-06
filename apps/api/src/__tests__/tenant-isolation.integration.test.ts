@@ -156,12 +156,7 @@ const RESIDUAL: Readonly<Record<string, string>> = {
  * Answers 2xx with B's ids today, known and owned elsewhere: each says why and who corrects it. The list must stay
  * exact, so the day the route is corrected this test fails until its line is removed.
  */
-const KNOWN_REACHED: Readonly<Record<string, string>> = {
-  'operator of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200':
-    'oracle d’existence, correction Équipe: 200 with no feedback for B’s shift, 404 for an unknown one',
-  'chatter of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200':
-    'oracle d’existence, correction Équipe: 200 with no feedback for B’s shift, 404 for an unknown one',
-};
+const KNOWN_REACHED: Readonly<Record<string, string>> = {};
 
 /** What B's id a parameter takes in this path, if B has one seeded for it. */
 function seededFor(path: string, name: string): Seeded | undefined {

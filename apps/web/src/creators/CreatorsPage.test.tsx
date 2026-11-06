@@ -14,7 +14,14 @@ import { parsePersonaYaml } from './persona/source';
 const ANNA = { id: '0192f3a0-0000-7000-8000-0000000000a1', displayName: 'Anna', timezone: 'Europe/Paris' };
 const BEA = { id: '0192f3a0-0000-7000-8000-0000000000b2', displayName: 'Bea', timezone: 'Europe/Paris' };
 const CLEO = { id: '0192f3a0-0000-7000-8000-0000000000c3', displayName: 'Cleo', timezone: 'Europe/Paris' };
-const base = { id: 'u1', email: 'membre@example.test', name: 'Nora', creatorIds: [], routedCreatorIds: [] };
+const base = {
+  id: 'u1',
+  email: 'membre@example.test',
+  name: 'Nora',
+  creatorIds: [],
+  routedCreatorIds: [],
+  shiftCreatorIds: [],
+};
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 /** An operator without a team row: the rail that still opens Créatrices, read-only. */
 const operator: Me = { ...base, role: 'operator', team: null, teamScope: 'self' };

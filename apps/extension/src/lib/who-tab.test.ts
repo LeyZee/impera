@@ -11,6 +11,7 @@ const me = (over: Partial<Me>): Me => ({
   role: 'owner',
   creatorIds: [],
   routedCreatorIds: [],
+  shiftCreatorIds: [],
   team: null,
   teamScope: 'owner',
   ...over,

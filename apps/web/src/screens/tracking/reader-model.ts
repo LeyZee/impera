@@ -219,15 +219,19 @@ export function endsRun(items: readonly ThreadItem[], index: number): boolean {
 
 /**
  * Why a human has the hand, from the latest change of hand (events come newest first): the agent's handoff, or a
- * person who took it. A handoff the hand was given back for since is no longer the reason.
+ * person who took it, said to him when the reader is that person (`mine`, EQ-13). A handoff the hand was given back
+ * for since is no longer the reason.
  */
-export function whyHuman(read: { readonly events: readonly ConversationEventView[] }): string | null {
+export function whyHuman(
+  read: { readonly events: readonly ConversationEventView[] },
+  mine = false,
+): string | null {
   const event = read.events.find(
     (e) => e.type === 'handoff_requested' || e.type === 'takeover_started' || e.type === 'takeover_ended',
   );
   if (event?.type === 'handoff_requested') return noteOf(event, viewerZone());
   if (event?.type === 'takeover_started')
-    return withReason('Un humain a repris la main', event.payload.reason);
+    return withReason(mine ? 'Tu as repris la main' : 'Un humain a repris la main', event.payload.reason);
   return null;
 }
 
@@ -291,8 +295,8 @@ export function isStopped(body: unknown): boolean {
  * The emergency stop, said to whoever reads (CHAT-07): the owner lifts it on the Dashboard; a team member has no
  * Dashboard, he is told to warn the agency.
  */
-export const stoppedText = (routedOnly: boolean): string =>
-  routedOnly
+export const stoppedText = (selfScope: boolean): string =>
+  selfScope
     ? 'L’agence a tout arrêté : rien ne part pour l’instant. Préviens ton responsable si ça dure.'
     : 'L’arrêt d’urgence est actif : rien ne part tant qu’il n’est pas levé sur le Dashboard.';
 

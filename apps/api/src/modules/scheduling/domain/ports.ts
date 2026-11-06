@@ -201,6 +201,18 @@ export interface PlanningStore {
     creatorIds: readonly CreatorId[],
     range: { readonly from: Date; readonly to: Date },
   ): Promise<PlanningRead>;
+  /**
+   * The member's own shifts not cancelled whose access window may still be open at `now` (ended after `since`), with
+   * their accounts, read as the member himself creator by creator: `null` for an account with no member row.
+   */
+  memberShifts(
+    actor: UserId,
+    creatorIds: readonly CreatorId[],
+    since: Date,
+  ): Promise<{
+    status: TeamMemberStatus;
+    shifts: (StoredShift & { platform: Platform; handle: string })[];
+  } | null>;
   /** Owner and active manager: each shift covering `at`, of an active member, with that member, on what he plans. */
   onDuty(
     actor: UserId,
@@ -244,14 +256,6 @@ export interface OnShift {
 
 /** The reads and the job that cross creators, on the admin connection (`*Unscoped`). */
 export interface PlanningAdmin {
-  /** The member's shifts not cancelled whose access window may still be open at `now`, with their accounts. */
-  memberShiftsUnscoped(
-    userId: UserId,
-    since: Date,
-  ): Promise<{
-    status: TeamMemberStatus;
-    shifts: (StoredShift & { platform: Platform; handle: string })[];
-  } | null>;
   /** `onShift` on a creator at `at`, without the margin: her active members whose shift covers it. */
   onShiftUnscoped(creatorId: CreatorId, at: Date): Promise<OnShift[]>;
   /** The settings in force now, for the job (no member behind it). */

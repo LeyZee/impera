@@ -31,6 +31,7 @@ function conversation(id: string, patch: Partial<ConversationSummary> = {}): Con
     unreadCount: 0,
     updatedAt: '2026-10-17T20:00:00Z',
     desire: null,
+    heldBy: null,
     ...patch,
   });
 }
@@ -130,9 +131,25 @@ describe('situationOf and groupByHand (CHAT-22, PRO-03)', () => {
     expect(situationOf(conversation('1', { state: 'error' })).label).toBe('Pas parti');
   });
 
-  it('tells the chatter the hand is his, anyone else that a human answers', () => {
-    expect(situationOf(conversation('1', { state: 'human' }), true).label).toBe('Tu as la main');
+  it('tells whoever holds the hand that it is his, anyone else that a human answers (EQ-13)', () => {
+    expect(situationOf(conversation('1', { state: 'human', heldBy: 'you' }), true).label).toBe(
+      'Tu as la main',
+    );
+    expect(situationOf(conversation('1', { state: 'human', heldBy: 'you' })).label).toBe('Tu as la main');
+    expect(situationOf(conversation('1', { state: 'human', heldBy: 'other' }), true).label).toBe(
+      'Un humain répond',
+    );
     expect(situationOf(conversation('1', { state: 'human' })).label).toBe('Un humain répond');
+  });
+
+  it('puts another person’s hand with the quiet ones for a chatter, never a handoff nobody took (EQ-13)', () => {
+    const hand = (heldBy: ConversationSummary['heldBy'], selfScope: boolean) =>
+      situationOf(conversation('1', { state: 'human', heldBy }), selfScope).hand;
+    expect(hand('other', true)).toBe('quiet');
+    expect(hand(null, true)).toBe('yours');
+    expect(hand('you', true)).toBe('yours');
+    // Whoever reads the whole creator finds every human hand under « À toi » (CHAT-22).
+    expect(hand('other', false)).toBe('yours');
   });
 
   it('groups the lines in the order À toi, the agent, nothing to do, keeping their order and leaving empty ones out', () => {

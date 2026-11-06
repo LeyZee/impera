@@ -110,6 +110,7 @@ const ownerOnly: preValidationAsyncHookHandler = async (request, reply) => {
     role: 'owner',
     creatorIds: [],
     routedCreatorIds: [],
+    shiftCreatorIds: [],
   };
 };
 
