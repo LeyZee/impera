@@ -33,6 +33,7 @@ import { useCreators } from '@/creators/api';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { useAlerts } from '@/settings/alerts/api';
+import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /** The conversation a line opened, with its creator: the reader needs both, and the list may change under it. */
@@ -317,41 +318,32 @@ function History({
         <label className="sr-only" htmlFor={`${id}-alert`}>
           Alerte
         </label>
-        <select
+        <Select<string>
           id={`${id}-alert`}
-          className="nv-field__control nv-glass hi-select"
+          className="hi-select"
           value={alert ?? ''}
-          onChange={(event) => {
-            onAlert(choiceOf(event.target.value));
+          options={[{ value: '', label: 'Toutes les alertes' }, ...choices]}
+          onChange={(value) => {
+            onAlert(choiceOf(value));
           }}
-        >
-          <option value="">Toutes les alertes</option>
-          {choices.map((choice) => (
-            <option key={choice.value} value={choice.value}>
-              {choice.label}
-            </option>
-          ))}
-        </select>
+        />
         {several ? (
           <>
             <label className="sr-only" htmlFor={`${id}-creator`}>
               Créatrice
             </label>
-            <select
+            <Select<string>
               id={`${id}-creator`}
-              className="nv-field__control nv-glass hi-select"
+              className="hi-select"
               value={creator ?? ''}
-              onChange={(event) => {
-                onCreator(creators.find((one) => one.id === event.target.value)?.id ?? null);
+              options={[
+                { value: '', label: 'Toutes les créatrices' },
+                ...creators.map((one) => ({ value: one.id, label: one.displayName })),
+              ]}
+              onChange={(value) => {
+                onCreator(creators.find((one) => one.id === value)?.id ?? null);
               }}
-            >
-              <option value="">Toutes les créatrices</option>
-              {creators.map((one) => (
-                <option key={one.id} value={one.id}>
-                  {one.displayName}
-                </option>
-              ))}
-            </select>
+            />
           </>
         ) : null}
       </div>

@@ -23,6 +23,7 @@ import { countryName } from '@/lib/country';
 import { fullDay } from '@/scheduling/time';
 import { Loading, Unreachable } from '@/screens/pay/parts';
 import { Dialog } from '@/shell/Dialog';
+import { Select } from '@/shell/Select';
 import { Panel } from '@/shell/layout';
 
 /**
@@ -350,21 +351,15 @@ function AssignDialog({
               <label className="nv-field__label" htmlFor={`${id}-regime`}>
                 Régime
               </label>
-              <select
+              <Select
                 id={`${id}-regime`}
-                className="nv-field__control nv-glass tm-select"
                 value={regimeId}
-                onChange={(event) => {
-                  setRegimeId(event.target.value);
+                options={available.map((regime) => ({ value: regime.id, label: regime.name }))}
+                onChange={(value) => {
+                  setRegimeId(value);
                   setKey(crypto.randomUUID());
                 }}
-              >
-                {available.map((regime) => (
-                  <option key={regime.id} value={regime.id}>
-                    {regime.name}
-                  </option>
-                ))}
-              </select>
+              />
               {chosen === null ? null : (
                 <p className={chosen.validatedOn === null ? 'tm-hint cf-amber' : 'tm-hint'}>
                   {validationText(chosen)}.

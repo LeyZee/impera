@@ -59,3 +59,8 @@ Les écrans fonctionnels (inbox, conversation, fan, supervision) : ils arrivent 
 - Reste : passe téléphone (Playground) ; choix du thème Jour, en attente de Charles.
 - Fait (choix de Charles du 25/10) : Réglages › Apparence, Nuit / Jour / Appareil, Nuit par défaut, gardé par le navigateur et posé avant le premier affichage. Reste : passe téléphone (Playground).
 - Fait : passe téléphone. Le Playground tient l'écran au-dessus de la barre d'onglets, champ en pied comme dans Messages ; le pourquoi, le fan et le taux viennent dessous, dans le défilement de la colonne. Le taux sous l'objectif n'a plus qu'un ton (ambre). Les onglets d'une section trop larges pour le téléphone défilent dans leur capsule, bord estompé. Reste : rien sur D-01.
+
+2026-11-05 (consigne de Charles : aucun contrôle du système) :
+- Fait : la liste du design system (`Select`, `apps/web/src/shell/Select.tsx`, classes `nv-select*`) remplace les douze `<select>` du CRM : liens des modèles et de l'équipe Reveal, import, voix, règles de paie, régimes, facturation, fuseau d'une créatrice, pays d'un membre, primes, factures, exports, régime d'un membre, filtres de l'historique des alertes. Au-delà de dix choix, elle s'ouvre avec un champ de recherche (sans accents, mots qui commencent par le texte d'abord). Elle s'ouvre au-dessus de son champ quand la place manque dessous, et passe au-dessus des plaques et des panneaux qui défilent.
+- Reste : les champs de date (`DayField` partagé), PR à part.
+

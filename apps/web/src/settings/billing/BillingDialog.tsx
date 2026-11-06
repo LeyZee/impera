@@ -35,6 +35,7 @@ import {
 } from './model';
 
 import { Dialog } from '@/shell/Dialog';
+import { Select } from '@/shell/Select';
 
 /** The legal forms a French agency most often has: a suggestion, never a list to choose from. */
 const LEGAL_FORMS = ['SAS', 'SASU', 'SARL', 'EURL', 'SA', 'SNC'] as const;
@@ -101,7 +102,9 @@ export function BillingDialog({
     if (form === null) return;
     (
       form.querySelector<HTMLElement>('[aria-invalid="true"]') ??
-      form.querySelector<HTMLElement>('[data-autofocus], input:not([type="file"]), textarea, select')
+      form.querySelector<HTMLElement>(
+        '[data-autofocus], input:not([type="file"]), textarea, .nv-select__field',
+      )
     )?.focus();
   }, [index, shown]);
 
@@ -409,16 +412,14 @@ function RegistrationStep(props: StepProps): JSX.Element {
         hint="Le mois que ton comptable confirme. Chaque PDF émis ensuite est gardé dix ans après la clôture de son exercice."
         problems={problems}
       >
-        <select
-          {...control(props, 'fiscalYearEndMonth', true)}
-          className="nv-field__control nv-glass tm-select"
-        >
-          {MONTHS.map((month, at) => (
-            <option key={month} value={String(at + 1)}>
-              {closeChoiceText(at + 1)}
-            </option>
-          ))}
-        </select>
+        <Select
+          id={`${id}-fiscalYearEndMonth`}
+          value={draft.fiscalYearEndMonth}
+          invalid={problems.fiscalYearEndMonth !== undefined}
+          describedBy={`${id}-fiscalYearEndMonth-hint`}
+          options={MONTHS.map((month, at) => ({ value: String(at + 1), label: closeChoiceText(at + 1) }))}
+          onChange={set('fiscalYearEndMonth')}
+        />
       </Field>
     </>
   );

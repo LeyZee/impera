@@ -127,7 +127,7 @@ describe('accountOptionsOf', () => {
 
   it('shows an account linked to another model, not choosable, with that model’s handle', () => {
     expect(accountOptionsOf(models[1] ?? model('x', 'x', null), accounts, models)).toEqual([
-      { value: ACCOUNT_A, label: '@lune · Lune (relié à @lune)', disabled: true },
+      { value: ACCOUNT_A, label: '@lune · Lune', hint: 'relié à @lune', disabled: true },
       { value: ACCOUNT_B, label: '@soleil', disabled: false },
     ]);
   });

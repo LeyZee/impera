@@ -11,6 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HoursSection } from './HoursSection';
 
+import { chooseValue } from '@/test/select';
+
 const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
 vi.mock('@/settings/services/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/settings/services/api')>()),
@@ -327,7 +329,7 @@ describe('Créatrices › Heures (P3-14)', () => {
     renderSection();
     expect(await screen.findByText('À l’heure de Nora (Paris)')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Changer de fuseau' }));
-    fireEvent.change(screen.getByLabelText('Fuseau'), { target: { value: 'America/New_York' } });
+    chooseValue(screen.getByRole('combobox', { name: 'Fuseau' }), 'America/New_York');
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le fuseau' }));
     expect(await screen.findByText('À l’heure de Nora (New York)')).toBeDefined();
     // Her hours are not touched: nothing to save, her slot as it was.

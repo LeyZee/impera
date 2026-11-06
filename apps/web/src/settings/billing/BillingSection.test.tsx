@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BillingSection } from './BillingSection';
 
+import { choose } from '@/test/select';
+
 /* An invented agency and logo (ADR 0010): 123 456 782 carries a right Luhn key, FR11 is its VAT key. */
 const SHA = 'b'.repeat(64);
 const LOGO = { sha256: SHA, mediaType: 'image/png', width: 1_200, height: 340, byteLength: 120_000 };
@@ -138,7 +140,7 @@ describe('Réglages › Facturation', () => {
     type('TVA intracommunautaire', '');
     fireEvent.click(screen.getByRole('button', { name: 'Le reprendre' }));
     expect(screen.getByLabelText<HTMLInputElement>('TVA intracommunautaire').value).toBe('FR11123456782');
-    fireEvent.change(screen.getByLabelText('Clôture de l’exercice'), { target: { value: '6' } });
+    choose(screen.getByRole('combobox', { name: 'Clôture de l’exercice' }), '30 juin');
     next();
 
     type('Désignation de la prestation', 'Prestations de messagerie pour le compte de l’agence.');

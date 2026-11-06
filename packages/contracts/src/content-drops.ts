@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { ContentDropFileIdSchema, ContentDropIdSchema, ContentRequestIdSchema } from './ids';
-import { ScriptStructureIdSchema } from './scripts';
+import { ScriptStructureIdSchema, ScriptStructureVersionIdSchema } from './scripts';
 
 /**
  * The closed list of drop categories (ADR 0055 § 1, glossary « Catégorie de dépôt »): the creator chooses it, the code
@@ -374,6 +374,8 @@ export const ContentRequestSchema = z.strictObject({
   dueOn: z.iso.date(),
   reason: ContentRequestReasonSchema,
   structureId: ScriptStructureIdSchema.nullable(),
+  /** The version asked, frozen with the request (SC-02); `null` for another category and a script asked before. */
+  structureVersionId: ScriptStructureVersionIdSchema.nullable(),
   origin: ContentRequestOriginSchema,
   state: ContentRequestStateSchema,
   refusalReason: DropRefusalSchema.nullable(),

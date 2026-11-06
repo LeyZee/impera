@@ -6,7 +6,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { eraseOriginals, type RetentionRun } from './application/retention';
 import { NO_STORAGE, receiveFile } from './application/uploads';
-import type { DropStorage, IdeaContentRequest } from './domain/ports';
+import type { AskedScript, DropStorage, IdeaContentRequest, ScriptContentRequest } from './domain/ports';
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
@@ -14,7 +14,9 @@ import {
   createDrizzleAgencyContentStore,
   createDrizzleCreatorContentStore,
   createDrizzleReceiptStore,
+  lastScriptRequest,
   requestFromIdea,
+  requestScript,
 } from './infra/db/store';
 import { createContentDropRoutes, type RequireRole } from './infra/http/routes';
 import { createS3DropStorage, type MediaBucketConfig } from './infra/storage/s3';
@@ -39,6 +41,11 @@ export interface ContentDropsModule {
    * `idea`, under the idea's id, replayable.
    */
   requestFromIdea(request: IdeaContentRequest): Promise<void>;
+  /** The scripts the cadence asks of her (SC-02), written by the scripts' job as the owner's role, replayable. */
+  readonly scriptRequests: {
+    ask(request: ScriptContentRequest): Promise<void>;
+    last(creatorId: string): Promise<AskedScript | null>;
+  };
 }
 
 export type { IdeaContentRequest } from './domain/ports';
@@ -87,5 +94,9 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
         ),
     },
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
+    scriptRequests: {
+      ask: (request) => requestScript(deps.adminDb, request),
+      last: (creatorId) => lastScriptRequest(deps.adminDb, creatorId),
+    },
   };
 }

@@ -81,6 +81,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '20 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['content_drops.erase_originals'] },
   },
+  // Her scripts (SC-02, ADR 0056 § 2): each creator's next one asked a week before it is due, in her own day; one
+  // request per due day, so a replay or a missed hour asks nothing twice. No backfill: the next run catches up.
+  {
+    task: 'scripts.ask_scripts',
+    match: '25 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.ask_scripts'] },
+  },
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
   { task: 'fans.purge_facts', match: '45 3 * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
   // The rate limiter's ended windows go, and the hashed IPs and accounts they counted with them (ADR 0027).

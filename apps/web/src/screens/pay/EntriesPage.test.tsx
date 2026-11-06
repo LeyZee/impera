@@ -35,6 +35,7 @@ import {
   summaryFor,
   THEO,
 } from '@/test/pay';
+import { chooseValue, openList } from '@/test/select';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -325,17 +326,18 @@ describe('Paie › Primes et malus', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Malus' }));
     expect(text(within(dialog).getByRole('heading'))).toBe('Ajouter un malus');
-    const member = within(dialog).getByLabelText('Pour');
-    expect([...member.querySelectorAll('option')].map((one) => one.textContent)).toEqual([
-      'Choisir un membre',
-      'Basile',
-      'Lou',
-      'Théo',
-    ]);
+    const member = within(dialog).getByRole('combobox', { name: 'Pour' });
+    expect(member.textContent).toBe('Choisir un membre');
+    expect(
+      within(openList(member))
+        .getAllByRole('option')
+        .map((one) => one.textContent),
+    ).toEqual(['Basile', 'Lou', 'Théo']);
+    fireEvent.keyDown(member, { key: 'Escape' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     expect(text(within(dialog).getByText('Le motif est obligatoire.'))).toBeTruthy();
 
-    fireEvent.change(member, { target: { value: LOU.id } });
+    chooseValue(member, LOU.id);
     // October's second half is closed and Lou had nothing there: the one period open for an entry is the one under way.
     const periodChips = await within(dialog).findAllByRole('radio', { name: /octobre|novembre/u });
     expect(periodChips.map((one) => [text(one), one.getAttribute('aria-checked')])).toEqual([
@@ -387,7 +389,7 @@ describe('Paie › Primes et malus', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Ajustement' }));
-    fireEvent.change(within(dialog).getByLabelText('Pour'), { target: { value: LOU.id } });
+    chooseValue(within(dialog).getByRole('combobox', { name: 'Pour' }), LOU.id);
     expect(text(await within(dialog).findByText(/^Il va sur la quinzaine/u))).toBe(
       'Il va sur la quinzaine du 16 au 31 octobre : la prochaine de Lou à valider.',
     );

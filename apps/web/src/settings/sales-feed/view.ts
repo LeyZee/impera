@@ -113,6 +113,8 @@ export function modelLabel(model: SalesFeedModelLink): string {
 export interface AccountOption {
   readonly value: string;
   readonly label: string;
+  /** Why it cannot be picked: the model it already serves. */
+  readonly hint?: string;
   readonly disabled: boolean;
 }
 export function accountOptionsOf(
@@ -127,7 +129,7 @@ export function accountOptionsOf(
     }
     const other = models.find((m) => m.platformModelId === account.linkedTo);
     const by = other === undefined ? 'un autre modèle' : `@${other.handle}`;
-    return { value, label: `${accountLabel(account)} (relié à ${by})`, disabled: true };
+    return { value, label: accountLabel(account), hint: `relié à ${by}`, disabled: true };
   });
 }
 
