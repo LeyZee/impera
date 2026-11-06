@@ -201,18 +201,6 @@
   box-shadow: var(--nv-shadow-focus);
 }
 
-/* Her sheet's way back to the list. */
-.cl-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--nv-ink-muted);
-  text-decoration: none;
-}
-.cl-back:hover {
-  color: var(--nv-ink);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .cl-card,
   .cl-card__go {

@@ -277,7 +277,11 @@ export function CreatorsPage({
       ) : (
         <PageHeader
           eyebrow={
-            <Link to="/creatrices" search={creatorsSearch(shown, null)} className="cl-back">
+            <Link
+              to="/creatrices"
+              search={creatorsSearch(shown, null)}
+              className="nv-btn nv-btn--plain nv-btn--sm"
+            >
               ← Créatrices
             </Link>
           }
