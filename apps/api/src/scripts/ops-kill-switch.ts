@@ -1,6 +1,7 @@
 /**
  * Turns a kill switch on or off (message-flow.md §6, runbooks/incident.md).
  * Usage: `pnpm ops:kill-switch --on|--off --scope global|creator|conversation [--id <uuid>] --reason "<texte>"`.
+ * The reason is kept as typed: it names the cause, never a fan (relecture des données gardées, Charles 06/11).
  */
 import { parseArgs } from 'node:util';
 
@@ -26,7 +27,8 @@ const input = KillSwitchInputSchema.safeParse({
 });
 if (values.on === values.off || !input.success) {
   console.error(
-    'Usage: pnpm ops:kill-switch --on|--off --scope global|creator|conversation [--id <uuid>] --reason "<texte>"',
+    'Usage: pnpm ops:kill-switch --on|--off --scope global|creator|conversation [--id <uuid>] --reason "<texte>"\n' +
+      'La raison est gardée telle quelle : décris la cause, ne nomme jamais un fan.',
   );
   process.exit(1);
 }

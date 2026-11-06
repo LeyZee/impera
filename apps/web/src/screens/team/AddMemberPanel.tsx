@@ -584,7 +584,6 @@ function Where({ id, draft, problems, onChange }: StepProps): JSX.Element {
       <Field id={`${id}-joined`} label="Dans l’équipe depuis" problem={problems.joinedOn}>
         <DayField
           id={`${id}-joined`}
-          className="tm-date"
           value={draft.joinedOn}
           toward="year"
           invalid={problems.joinedOn !== undefined}

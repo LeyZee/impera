@@ -31,6 +31,9 @@ export type MediaAssetId = z.infer<typeof MediaAssetIdSchema>;
 export const PersonaVersionIdSchema = uuid.brand<'PersonaVersionId'>();
 export type PersonaVersionId = z.infer<typeof PersonaVersionIdSchema>;
 
+export const PersonaCorrectionIdSchema = uuid.brand<'PersonaCorrectionId'>();
+export type PersonaCorrectionId = z.infer<typeof PersonaCorrectionIdSchema>;
+
 export const UserIdSchema = uuid.brand<'UserId'>();
 export type UserId = z.infer<typeof UserIdSchema>;
 

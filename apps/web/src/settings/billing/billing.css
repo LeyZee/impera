@@ -134,7 +134,7 @@
   place-items: center;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
-  background: var(--nv-glass-fill);
+  background: var(--nv-select);
   transition:
     background-color var(--nv-dur-slow) var(--nv-ease-out),
     color var(--nv-dur-slow) var(--nv-ease-out),
@@ -307,11 +307,6 @@
   padding: var(--nv-space-3) var(--nv-space-4);
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);
-}
-/* A regime the accountant has not validated yet: an amber tint (no bar on its side, Charles's rule), no invoice leaves
-   under it. */
-.bf-regime[data-pending='true'] {
-  background: color-mix(in srgb, var(--nv-warning) 10%, var(--nv-glass-fill));
 }
 .bf-version__head {
   display: flex;

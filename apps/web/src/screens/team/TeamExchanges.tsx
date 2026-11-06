@@ -98,7 +98,7 @@ export function PendingLeaves({
   if (pending.length === 0) return null;
   const members = new Map(list.members.map((member) => [member.id, member]));
   return (
-    <details className="nv-disclosure nv-plate sc-fold sc-decide nv-swap">
+    <details className="nv-disclosure nv-plate sc-fold sc-fold--decide nv-swap">
       <summary>
         <span className="nv-disclosure__title">
           {pending.length === 1 ? '1 congé à valider' : `${String(pending.length)} congés à valider`}

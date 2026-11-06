@@ -23,6 +23,8 @@ let listStatus: number;
 let answer: { status: number; body: unknown };
 /** The PDF route's answer: its status, its type and its body. */
 let pdfAnswer: { status: number; type: string; body: string };
+/** How many times the PDF route was read. */
+let pdfReads = 0;
 const writes: { path: string; body: unknown }[] = [];
 const reads: string[] = [];
 
@@ -61,13 +63,15 @@ function serve(): void {
         });
         return json(answer.body, answer.status);
       }
-      if (url.pathname.endsWith('/pdf'))
+      if (url.pathname.endsWith('/pdf')) {
+        pdfReads += 1;
         return Promise.resolve(
           new Response(pdfAnswer.body, {
             status: pdfAnswer.status,
             headers: { 'content-type': pdfAnswer.type },
           }),
         );
+      }
       switch (url.pathname) {
         case '/v1/payroll/invoices':
           reads.push(url.search);
@@ -141,6 +145,7 @@ beforeEach(() => {
   listStatus = 200;
   answer = { status: 200, body: acceptanceView(PENDING, 'accepted') };
   pdfAnswer = { status: 200, type: 'application/pdf', body: '%PDF-1.7' };
+  pdfReads = 0;
   writes.length = 0;
   reads.length = 0;
   serve();
@@ -216,10 +221,18 @@ describe('Commissions › Factures', () => {
     expect(saved).toEqual([]);
 
     pdfAnswer = { status: 200, type: 'application/pdf', body: '%PDF-1.7' };
-    fireEvent.click(within(paid).getByRole('button', { name: 'PDF' }));
-    // While it reads, the button keeps its word and its width, greyed and busy: the row never moves.
+    const button = within(paid).getByRole('button', { name: 'PDF' });
+    button.focus();
+    fireEvent.click(button);
+    // While it reads, the button keeps its word and its width, greyed and busy: the row never moves. Never
+    // `disabled`, which would drop the focus of the button just pressed on the page (Extension on #567).
     const reading = within(paid).getByRole('button', { name: 'PDF' });
-    expect([reading.getAttribute('aria-busy'), reading.hasAttribute('disabled')]).toEqual(['true', true]);
+    expect([
+      reading.getAttribute('aria-busy'),
+      reading.getAttribute('aria-disabled'),
+      reading.hasAttribute('disabled'),
+    ]).toEqual(['true', 'true', false]);
+    expect(document.activeElement).toBe(reading);
     await waitFor(() => {
       expect(saved).toEqual([`${PAID.number}.pdf`]);
     });
@@ -238,7 +251,12 @@ describe('Commissions › Factures', () => {
     expect((await within(paid).findByRole('alert')).textContent).toBe(
       'Ce PDF n’est plus disponible et ne sera pas refait. La facture, elle, reste valable.',
     );
-    expect(within(paid).getByRole('button', { name: 'PDF' })).toHaveProperty('disabled', true);
+    const gone = within(paid).getByRole('button', { name: 'PDF' });
+    expect([gone.getAttribute('aria-disabled'), gone.hasAttribute('disabled')]).toEqual(['true', false]);
+    // Pressed again, it reads nothing more.
+    const asked = pdfReads;
+    fireEvent.click(gone);
+    expect(pdfReads).toBe(asked);
     expect(saved).toEqual([`${PAID.number}.pdf`]);
   });
 

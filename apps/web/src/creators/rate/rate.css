@@ -10,19 +10,24 @@
   min-width: 0;
 }
 
+/* The « % » inside the field, at its end, as the € of a statement (relecture des captures, #575): outside, it narrowed
+   the field and broke the symmetry of the two columns. */
 .ar-percent {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  position: relative;
   min-width: 0;
 }
 .ar-percent .ps-input {
-  flex: 1 1 auto;
-  min-width: 0;
+  width: 100%;
+  padding-right: 34px;
   font-variant-numeric: tabular-nums;
 }
 .ar-percent__sign {
-  color: var(--nv-ink-muted);
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--nv-ink-faint);
+  pointer-events: none;
 }
 
 .ar-notice {

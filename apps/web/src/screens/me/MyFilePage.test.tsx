@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MyFilePage } from './MyFilePage';
 
+import { NO_SUCH_DAY } from '@/scheduling/DayField';
 import {
   acceptanceOf,
   BENIN_REGIME,
@@ -224,6 +225,27 @@ describe('Moi › Dossier', () => {
     expect(second?.search.get('id')).toBe(first?.search.get('id'));
   });
 
+  it('says a day that does not exist once its field is left, and a missing file to a screen reader', async () => {
+    renderPage();
+    const documents = await waitFor(() => panelOf('Tes pièces'));
+    const certificate = await waitFor(() => itemOf(documents, 'Attestation de résidence fiscale'));
+    fireEvent.click(within(certificate).getByRole('button', { name: 'Déposer' }));
+    const issued = within(dialog()).getByLabelText('Délivrée le');
+    fireEvent.focus(issued);
+    fireEvent.change(issued, { target: { value: '31/02/2026' } });
+    // Still typing: nothing said yet.
+    expect(within(dialog()).queryByText(NO_SUCH_DAY)).toBeNull();
+    fireEvent.blur(issued);
+    expect(within(dialog()).getByText(NO_SUCH_DAY).className).toBe('tm-hint tm-hint--error');
+    expect(issued.getAttribute('aria-invalid')).toBe('true');
+
+    const file = within(dialog()).getByLabelText('Le fichier');
+    expect(file.getAttribute('aria-invalid')).toBeNull();
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Déposer' }));
+    expect(file.getAttribute('aria-invalid')).toBe('true');
+    expect(server.writes).toEqual([]);
+  });
+
   it('reminds the renewal of his certificate from the 1st of December, in amber', async () => {
     server.file = fileOf({
       today: '2026-12-02',
@@ -240,7 +262,8 @@ describe('Moi › Dossier', () => {
     renderPage();
     const documents = await waitFor(() => panelOf('Tes pièces'));
     const certificate = await waitFor(() => itemOf(documents, 'Attestation de résidence fiscale'));
-    expect(certificate.dataset['remind']).toBe('true');
+    // Said in amber words under it, never a coloured edge on the row (Charles: pastilles only).
+    expect(certificate.querySelector('.tm-warn.cf-remind')).not.toBeNull();
     expect(
       within(certificate).getByText(/^Ton attestation se termine le 31 décembre/u).textContent,
     ).toContain('Sans celle de 2027');
@@ -261,7 +284,8 @@ describe('Moi › Dossier', () => {
     expect(within(certificate).getByText('Échue').className).toBe('rp-chip rp-chip--warn');
     expect(within(certificate).queryByText('Acceptée')).toBeNull();
     expect(certificate.textContent).toContain('Acceptée, échue le 31 décembre 2026');
-    expect(certificate.dataset['remind']).toBe('true');
+    // Said in amber words under it, never a coloured edge on the row (Charles: pastilles only).
+    expect(certificate.querySelector('.tm-warn.cf-remind')).not.toBeNull();
     expect(
       within(certificate).getByText(/^Ton attestation de 2026 s’est terminée le 31 décembre 2026\./u)
         .textContent,

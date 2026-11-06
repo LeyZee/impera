@@ -240,7 +240,8 @@ describe('Réglages › Facturation, régimes', () => {
       'Micro-entrepreneur France',
     ]);
     const draft = items[0] ?? card;
-    expect(draft.dataset['pending']).toBe('true');
+    // Its chip and its words say it, never a coloured edge (Charles: pastilles only).
+    expect(within(draft).getByText(/^Pas encore notée/u).className).toBe('cf-amber');
     expect(within(draft).getByText('À valider').className).toBe('rp-chip rp-chip--warn');
     expect(draft.textContent).toContain('Bénin, Madagascar');
     expect(draft.textContent).toContain('Autoliquidée par l’agence, 20');

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 
-import { dayOf, dayOfInput, inputOfDay, readerZone, type DayToward } from './time';
+import { dayOf, dayOfInput, inputOfDay, isDayShaped, readerZone, type DayToward } from './time';
+
+/** What a form says under a day field holding a day no calendar has (« 31/02 »), rather than how to write one. */
+export const NO_SUCH_DAY = 'Ce jour n’existe pas.';
 
 /**
  * A day, typed as text (« 28/03/2027 », « 28/3 », « 2803 » from the phone's number pad): never `<input type="date">`,
@@ -43,14 +46,18 @@ export function DayField({
   autofocus?: boolean;
   describedBy?: string | undefined;
   onChange: (day: string) => void;
-  /** Told when the field holds what is not a day, and when it no longer does: the form then refuses to save. */
-  onUnreadable?: (unreadable: boolean) => void;
+  /**
+   * Told when the field holds what is not a day, and when it no longer does: the form then refuses to save.
+   * `noSuchDay` says it is written as a day the calendar has not (« 31/02 »), for the form to say so in its words.
+   */
+  onUnreadable?: (unreadable: boolean, noSuchDay: boolean) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState<string | null>(null);
   // Marked once left, not at the first digit typed: « 2 » is no day yet, « 28/3 » is.
   const [left, setLeft] = useState(false);
   const isEmpty = (text: string): boolean => optional && text.trim() === '';
   const unreadable = draft !== null && !isEmpty(draft) && dayOfInput(draft, today, toward) === null;
+  const noSuchDay = draft !== null && unreadable && isDayShaped(draft);
   // Set from outside (a form emptied once saved, a preset chosen): the field shows the form's day again, unless it is
   // the very day being typed.
   const [seen, setSeen] = useState(value);
@@ -65,12 +72,12 @@ export function DayField({
     tell.current = onUnreadable;
   });
   useEffect(() => {
-    tell.current?.(unreadable);
-  }, [unreadable]);
+    tell.current?.(unreadable, noSuchDay);
+  }, [unreadable, noSuchDay]);
   // A field taken away no longer holds the form back.
   useEffect(
     () => () => {
-      tell.current?.(false);
+      tell.current?.(false, false);
     },
     [],
   );

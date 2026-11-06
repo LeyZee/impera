@@ -399,9 +399,18 @@
 }
 
 /* ── Équipe › Planning ── */
-/* The requests to decide, folded to one line until opened (EQ-02): the name of each requester in the summary. */
-.sc-decide > summary .nv-disclosure__title {
+/* The requests to decide, folded to one line until opened (EQ-02): the name of each requester in the summary. Its own
+   class: `.sc-decide` is her « À décider » on Aujourd'hui (#546), a row that would set the summary beside the leaves. */
+.sc-fold--decide > summary .nv-disclosure__title {
   color: var(--nv-warning);
+}
+/* The fold's own padding frames its leaves: the first one close under the summary, the last one adding none, never a
+   void under « 1 shift à donner » (#573). */
+.sc-fold--decide .sc-row:first-child {
+  padding-top: var(--nv-space-1);
+}
+.sc-fold--decide .sc-row:last-child {
+  padding-bottom: 0;
 }
 .sc-row--leave {
   transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
@@ -436,7 +445,8 @@
   flex-basis: 100%;
   max-width: 560px;
 }
-/* A shift a leave's approval found in its way: an amber ring on the grid, steady, never blinking. */
+/* A shift a leave's approval found in its way: an amber ring on the grid, steady, never blinking, and no coloured
+   edge on its side (Charles: pastilles only). */
 .sc-chip[data-flagged='true'],
 .sc-chip[data-flagged='true']:hover {
   box-shadow: 0 0 0 2px var(--nv-warning);
@@ -474,6 +484,15 @@
     flex-basis: 100%;
     text-align: left;
     white-space: normal;
+  }
+  /* The rows' text on the summary's edge, as on a computer: the body's padding and the row's add up to the summary's
+     (#573). */
+  .sc-fold > .nv-disclosure__body {
+    padding-inline: var(--nv-space-3);
+  }
+  /* « Refuser » under the leave reads on the text's edge, its padding outside it. */
+  .sc-row--leave .sc-row__actions > .nv-btn--plain:first-child {
+    margin-left: calc(-1 * var(--nv-space-4));
   }
 }
 
