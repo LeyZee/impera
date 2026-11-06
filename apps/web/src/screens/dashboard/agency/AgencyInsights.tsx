@@ -121,7 +121,8 @@ function Delta({
   previous: number;
   lowerIsBetter?: boolean;
 }): JSX.Element | null {
-  const change = changeOf(current, previous);
+  // Nothing then and nothing now is no change: « 0 % », as every other tile shows its pill.
+  const change = current === 0 && previous === 0 ? 0 : changeOf(current, previous);
   if (change === null) return null;
   const better = lowerIsBetter ? change < 0 : change > 0;
   const tone = change === 0 ? ' ins-delta-flat' : better ? ' nv-delta--better' : ' nv-delta--worse';
@@ -530,7 +531,12 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
               <span className="ins-rank__name">{name}</span>
               <span className="ins-rank__line">
                 {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''}
-                {average === null ? '' : ` · panier moyen ${euros(average)}`}
+                {average === null ? null : (
+                  <>
+                    {' · '}
+                    <span className="ins-nowrap">panier moyen {euros(average)}</span>
+                  </>
+                )}
               </span>
             </span>
             <span className="ins-rank__bar" aria-hidden="true">

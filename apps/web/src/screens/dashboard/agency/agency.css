@@ -463,6 +463,9 @@
   font-weight: 600;
   color: var(--nv-ink);
 }
+.ins-nowrap {
+  white-space: nowrap;
+}
 .ins-rank__line {
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-faint);
