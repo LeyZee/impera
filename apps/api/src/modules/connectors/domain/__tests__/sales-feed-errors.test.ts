@@ -11,6 +11,8 @@ import {
   SalesFeedModelConflict,
   SalesFeedNotConnected,
   SalesFeedNotFound,
+  SalesFeedTeamForbidden,
+  SalesFeedTeamLinked,
   SalesFeedVaultMissing,
   SalesFeedWebhookNotFound,
   SalesFeedWebhookUrlUnprocessable,
@@ -32,6 +34,8 @@ describe('sales feed refusals', () => {
       new SalesFeedExportUnprocessable('test', {}),
       new SalesFeedCheckDaysUnprocessable(),
       new SalesFeedListUnavailable(),
+      new SalesFeedTeamForbidden(),
+      new SalesFeedTeamLinked(),
     ].map((error) => error.code);
     expect([...thrown].sort()).toEqual([...SALES_FEED_ERROR_CODES].sort());
   });

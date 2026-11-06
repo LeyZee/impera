@@ -96,6 +96,10 @@ export interface FakeCrm {
   appendRaw(event: string, sale: FakeSale, occurredAt: string): string;
   /** `/v1/models` lists these from now on (the two default models otherwise). */
   setModels(models: readonly FakeModel[]): void;
+  /** `/v1/chatters` lists these from now on (`DEFAULT_CHATTERS` otherwise). */
+  setChatters(chatters: readonly FakeChatter[]): void;
+  /** What `/v1/chatters` lists now. */
+  chatters(): readonly FakeChatter[];
   /** The next `requests` calls answer 429 with this `Retry-After`. */
   rateLimit(requests: number, retryAfterSeconds: number): void;
   /** The key is revoked: every call answers 401. */
@@ -175,6 +179,79 @@ export interface FakeModel {
   readonly subscriptionPrice?: number | null;
   readonly subscriptionPlans?: readonly { readonly periodicity: string; readonly price: number }[];
 }
+
+/** A member of the agency's team as `/v1/chatters` lists it (Reveal's doc). */
+export interface FakeChatter {
+  readonly chatterId: string;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly email: string | null;
+  readonly role: string | null;
+  readonly isBot: boolean;
+  readonly isExternal: boolean;
+  readonly removedAt: string | null;
+  readonly modelIds: readonly string[];
+}
+
+/** The team the tests read: a chatter, the key's bot, a manager, a provider's member, a removed member. */
+export const DEFAULT_CHATTERS: readonly FakeChatter[] = [
+  {
+    chatterId: 'chatter_test_01',
+    firstName: 'Chatteur',
+    lastName: 'Test',
+    email: 'chatteur@recette.test',
+    role: 'chatter',
+    isBot: false,
+    isExternal: false,
+    removedAt: null,
+    modelIds: ['model_test_01'],
+  },
+  {
+    chatterId: 'bot_test_01',
+    firstName: 'Bot',
+    lastName: 'Test',
+    email: null,
+    role: 'chatter',
+    isBot: true,
+    isExternal: false,
+    removedAt: null,
+    modelIds: ['model_test_01'],
+  },
+  // A manager can sell; a chatting contractor's member has no e-mail; a removed member keeps her past sales.
+  {
+    chatterId: 'manager_test_01',
+    firstName: 'Manager',
+    lastName: 'Test',
+    email: 'manager@recette.test',
+    role: 'manager',
+    isBot: false,
+    isExternal: false,
+    removedAt: null,
+    modelIds: ['model_test_01', 'model_test_02'],
+  },
+  {
+    chatterId: 'presta_test_01',
+    firstName: 'Prestataire',
+    lastName: 'Test',
+    email: null,
+    role: 'chatter',
+    isBot: false,
+    isExternal: true,
+    removedAt: null,
+    modelIds: ['model_test_02'],
+  },
+  {
+    chatterId: 'ancien_test_01',
+    firstName: 'Ancien',
+    lastName: 'Test',
+    email: 'ancien@recette.test',
+    role: 'chatter',
+    isBot: false,
+    isExternal: false,
+    removedAt: '2026-10-01T08:00:00.000Z',
+    modelIds: [],
+  },
+];
 
 export const DEFAULT_MODELS: readonly FakeModel[] = [
   {
@@ -385,6 +462,7 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
   const deliveries: FakeDelivery[] = [];
   const windows = new Map<string, number[]>();
   let models: readonly FakeModel[] = DEFAULT_MODELS;
+  let chatters: readonly FakeChatter[] = DEFAULT_CHATTERS;
   let counter = 1000;
 
   const inScope = (modelId: string): boolean => scope === null || scope.includes(modelId);
@@ -544,66 +622,7 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
     data: models.filter((model) => inScope(model.modelId)).map(wireModel),
   }));
 
-  app.get('/v1/chatters', () => ({
-    data: [
-      {
-        chatterId: 'chatter_test_01',
-        firstName: 'Chatteur',
-        lastName: 'Test',
-        email: 'chatteur@recette.test',
-        role: 'chatter',
-        isBot: false,
-        isExternal: false,
-        removedAt: null,
-        modelIds: ['model_test_01'],
-      },
-      {
-        chatterId: 'bot_test_01',
-        firstName: 'Bot',
-        lastName: 'Test',
-        email: null,
-        role: 'chatter',
-        isBot: true,
-        isExternal: false,
-        removedAt: null,
-        modelIds: ['model_test_01'],
-      },
-      // A manager can sell; a chatting contractor's member has no e-mail; a removed member keeps her past sales.
-      {
-        chatterId: 'manager_test_01',
-        firstName: 'Manager',
-        lastName: 'Test',
-        email: 'manager@recette.test',
-        role: 'manager',
-        isBot: false,
-        isExternal: false,
-        removedAt: null,
-        modelIds: ['model_test_01', 'model_test_02'],
-      },
-      {
-        chatterId: 'presta_test_01',
-        firstName: 'Prestataire',
-        lastName: 'Test',
-        email: null,
-        role: 'chatter',
-        isBot: false,
-        isExternal: true,
-        removedAt: null,
-        modelIds: ['model_test_02'],
-      },
-      {
-        chatterId: 'ancien_test_01',
-        firstName: 'Ancien',
-        lastName: 'Test',
-        email: 'ancien@recette.test',
-        role: 'chatter',
-        isBot: false,
-        isExternal: false,
-        removedAt: '2026-10-01T08:00:00.000Z',
-        modelIds: [],
-      },
-    ],
-  }));
+  app.get('/v1/chatters', () => ({ data: chatters }));
 
   // ---- Statistics
 
@@ -1174,6 +1193,10 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
     setModels(next) {
       models = next;
     },
+    setChatters(next) {
+      chatters = next;
+    },
+    chatters: () => chatters,
     rateLimit(requests, retryAfterSeconds) {
       state.rateLimited = requests;
       state.retryAfterSeconds = retryAfterSeconds;

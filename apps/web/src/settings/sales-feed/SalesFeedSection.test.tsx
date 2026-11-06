@@ -68,6 +68,8 @@ function overview(patch: Partial<SalesFeedOverview> = {}): SalesFeedOverview {
         platformChatterId: 'c1',
         firstName: 'Ana',
         lastName: 'Test',
+        email: null,
+        role: 'chatter',
         isBot: false,
         isExternal: false,
         removedAt: null,

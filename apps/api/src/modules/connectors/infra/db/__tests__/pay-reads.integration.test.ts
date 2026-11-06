@@ -11,7 +11,7 @@ import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { salesFeedReadsForPay } from '../pay-reads';
-import { createDrizzleSalesLedger } from '../sales-ledger';
+import { createDrizzleTeamImportStore } from '../team-import-store';
 import { salesFeedTotals } from '../totals-reads';
 
 // Everything below is invented (ADR 0010).
@@ -25,6 +25,14 @@ describe('the sales feed read by pay', () => {
   let creator: string;
   const member = newId(TeamMemberIdSchema);
   const owner = 'user_test_owner';
+  /** The owner's link, through the same guarded write as his screen (`withMember`, ADR 0076 § 4). */
+  const linkAs = (
+    platformChatterId: string,
+    link: { kind: 'member'; memberId: string } | { kind: 'agent' },
+  ): Promise<unknown> =>
+    createDrizzleTeamImportStore(test.admin.db).link(owner, 'reveal', [
+      { platformChatterId, link, isExternal: false },
+    ]);
 
   const line = (
     platformAccountId: PlatformAccountId,
@@ -74,7 +82,9 @@ describe('the sales feed read by pay', () => {
     creator = newId(CreatorIdSchema);
     account = newId(PlatformAccountIdSchema);
     other = newId(PlatformAccountIdSchema);
-    await db.insert(schema.user).values({ id: owner, name: 'Owner', email: 'owner@example.test' });
+    await db
+      .insert(schema.user)
+      .values({ id: owner, name: 'Owner', email: 'owner@example.test', role: 'owner' });
     await db
       .insert(schema.user)
       .values({ id: 'user_test_member', name: 'Membre', email: 'member@example.test' });
@@ -138,9 +148,8 @@ describe('the sales feed read by pay', () => {
       line(account, { id: 'sale_old', event: 'refund', at: '2026-10-12T09:00:00Z', chatter: null, net: 200 }),
       line(other, { id: 'sale_other', at: '2026-10-10T10:00:00Z', chatter: null, net: 999 }),
     ]);
-    const ledger = createDrizzleSalesLedger(db, db);
-    await ledger.linkChatter('reveal', 'chatter_member', { kind: 'member', memberId: member }, owner);
-    await ledger.linkChatter('reveal', 'chatter_bot', { kind: 'agent' }, owner);
+    await linkAs('chatter_member', { kind: 'member', memberId: member });
+    await linkAs('chatter_bot', { kind: 'agent' });
   });
 
   afterAll(async () => {
@@ -203,15 +212,14 @@ describe('the sales feed read by pay', () => {
         ? found.linkVersion
         : null;
     };
-    const ledger = createDrizzleSalesLedger(test.admin.db, test.admin.db);
     const first = await versionOf();
     expect(first).not.toBeNull();
-    await ledger.linkChatter('reveal', 'chatter_member', { kind: 'member', memberId: member }, owner);
+    await linkAs('chatter_member', { kind: 'member', memberId: member });
     expect(await versionOf()).toBe(first);
-    await ledger.linkChatter('reveal', 'chatter_member', { kind: 'agent' }, owner);
+    await linkAs('chatter_member', { kind: 'agent' });
     const second = await versionOf();
     expect(second).not.toBe(first);
-    await ledger.linkChatter('reveal', 'chatter_member', { kind: 'member', memberId: member }, owner);
+    await linkAs('chatter_member', { kind: 'member', memberId: member });
     expect(await versionOf()).not.toBe(second);
   });
 
@@ -227,8 +235,7 @@ describe('the sales feed read by pay', () => {
 
   it('gives the lines of a chatter linked in a range whatever their sale’s day, dated by the link’s version', async () => {
     const before = new Date();
-    const ledger = createDrizzleSalesLedger(test.admin.db, test.admin.db);
-    await ledger.linkChatter('reveal', 'chatter_new', { kind: 'member', memberId: member }, owner);
+    await linkAs('chatter_new', { kind: 'member', memberId: member });
     const after = new Date(Date.now() + 1000);
     const lines = await withAdmin(test.admin.db, (tx) =>
       salesFeedReadsForPay.linesRelinkedBetween(tx, {
@@ -244,7 +251,7 @@ describe('the sales feed read by pay', () => {
     expect(at).toBeGreaterThanOrEqual(before.getTime());
     expect(lines.some((one) => one.platformSaleId === 'sale_d')).toBe(false);
     // Posing the same link again moves neither the version nor its instant.
-    await ledger.linkChatter('reveal', 'chatter_new', { kind: 'member', memberId: member }, owner);
+    await linkAs('chatter_new', { kind: 'member', memberId: member });
     const later = await withAdmin(test.admin.db, (tx) =>
       salesFeedReadsForPay.linesRelinkedBetween(tx, {
         platformAccountIds: [account],

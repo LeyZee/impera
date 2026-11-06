@@ -46,6 +46,7 @@ export * from './public-outputs';
 export * from './rails';
 export * from './result';
 export * from './sales-feed';
+export * from './sales-feed-team';
 export * from './scripts';
 export * from './script-starters';
 export * from './scheduling';

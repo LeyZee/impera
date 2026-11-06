@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import {
   AuditEntryIdSchema,
   CreatorIdSchema,
@@ -712,61 +710,6 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
         };
         const found = [await oldest(sales), await oldest(quarantine)].filter((at): at is Date => at !== null);
         return found.length === 0 ? null : new Date(Math.min(...found.map((at) => at.getTime())));
-      });
-    },
-
-    memberExists(memberId) {
-      // `team_members` is under the team policies: the owner's screen checks the id through the admin role.
-      return withAdmin(adminDb, async (tx) => {
-        const [row] = await tx
-          .select({ id: schema.teamMembers.id })
-          .from(schema.teamMembers)
-          .where(eq(schema.teamMembers.id, memberId));
-        return row !== undefined;
-      });
-    },
-
-    async linkChatter(platform, platformChatterId, link, by) {
-      const key = and(eq(chatters.platform, platform), eq(chatters.platformChatterId, platformChatterId));
-      await db.transaction(async (tx) => {
-        const [before] = await tx
-          .select({ kind: chatters.kind, memberId: chatters.memberId })
-          .from(chatters)
-          .where(key)
-          .for('update');
-        if (link === null) await tx.delete(chatters).where(key);
-        else {
-          const memberId = link.kind === 'member' ? link.memberId : null;
-          const same = before?.kind === link.kind && before.memberId === memberId;
-          const values = {
-            kind: link.kind,
-            memberId,
-            linkedBy: by,
-            linkedAt: new Date(),
-            // A new version only when the link points elsewhere: pay compares it with the one a statement froze.
-            ...(same ? {} : { linkVersion: randomUUID(), linkVersionAt: new Date() }),
-          };
-          await tx
-            .insert(chatters)
-            .values({ platform, platformChatterId, ...values })
-            .onConflictDoUpdate({ target: [chatters.platform, chatters.platformChatterId], set: values });
-        }
-        if (before === undefined && link === null) return;
-        // Whose sales a chatter's are (CRM-03 pays by this link): dated, by whom, and what it was before.
-        await tx.insert(schema.auditLog).values({
-          id: newId(AuditEntryIdSchema),
-          userId: by,
-          action: link === null ? 'sales_feed.chatter_unlinked' : 'sales_feed.chatter_linked',
-          entity: 'sales_feed_chatter',
-          entityId: `${platform}:${platformChatterId}`,
-          details: {
-            platform,
-            platformChatterId,
-            kind: link?.kind ?? null,
-            memberId: link?.kind === 'member' ? link.memberId : null,
-            previous: before === undefined ? null : { kind: before.kind, memberId: before.memberId },
-          },
-        });
       });
     },
 
