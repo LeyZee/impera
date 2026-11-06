@@ -141,6 +141,10 @@
   min-height: 12px;
   padding: 0;
 }
+/* The agency's key: amber, as the créneaux it can fill. */
+.cal-free--fill {
+  border-color: color-mix(in srgb, var(--nv-warning) 70%, transparent);
+}
 
 /* The legend: the members to follow, then the keys. */
 .cal-legend {

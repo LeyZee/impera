@@ -1584,6 +1584,11 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     const thursday = within(month).getByRole('button', { name: /^jeudi 29 octobre/u });
     expect(thursday.getAttribute('aria-label')).toBe('jeudi 29 octobre : aucun shift, 4 créneaux à pourvoir');
     expect(screen.getByRole('region', { name: 'Charge sur octobre 2026' }).textContent).toContain('6');
+    // Its legend says the amber créneaux as the agency reads them, never « Libre ».
+    const keys = document.querySelector('.cal-legend__keys');
+    expect(keys?.textContent).toContain('À pourvoir');
+    expect(keys?.textContent).not.toContain('Libre');
+    expect(keys?.querySelector('.cal-free--fill')).not.toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: 'Semaine' }));
     expect(await screen.findByRole('row', { name: /Nora Vidal/u })).toBeTruthy();
   });

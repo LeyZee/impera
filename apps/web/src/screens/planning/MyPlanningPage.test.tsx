@@ -712,6 +712,10 @@ describe('the team’s calendar on the chatter’s Planning (CR-12)', () => {
     // Nobody but the agent, in Automatique: « IA seule », said in words too.
     expect(text(row)).toContain('18 h – 0 h, l’IA seule');
     expect(within(row).getAllByText('IA seule').length).toBeGreaterThan(0);
+    // A chatter reads an empty créneau ahead « Libre », in the legend too.
+    expect(document.querySelector('.cal-legend__keys')?.textContent).toContain('Libre');
+    // « Mes congés » and « Mes échanges » under it, as wide as the calendar.
+    expect(document.querySelector('.sc-folds')?.getAttribute('data-wide')).toBe('true');
   });
 
   it('reads six weeks for the month, and opens a day touched in detail', async () => {

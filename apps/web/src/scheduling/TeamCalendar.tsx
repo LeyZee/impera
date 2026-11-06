@@ -407,18 +407,21 @@ function DayDetail({
 
 /**
  * The legend: each member in their colour, a touch to bring their shifts forward (44 px on a phone), the agent in its
- * violet, and the two patterns of a créneau.
+ * violet, and the two patterns of a créneau. An empty créneau ahead is « À pourvoir » in amber for the agency, as the
+ * calendar draws it, and « Libre » for a chatter.
  */
 export function CalendarLegend({
   calendar,
   me,
   focus,
   onFocus,
+  fill = false,
 }: {
   calendar: Calendar;
   me: string | null;
   focus: string | null;
   onFocus: (memberId: string | null) => void;
+  fill?: boolean;
 }): JSX.Element {
   const members = calendar.members.toSorted((a, b) =>
     a.id === me ? -1 : b.id === me ? 1 : a.displayName.localeCompare(b.displayName, 'fr'),
@@ -461,8 +464,11 @@ export function CalendarLegend({
           </span>
         ) : null}
         <span className="cal-legend__key">
-          <span className="cal-free cal-free--key" aria-hidden="true" />
-          Libre
+          <span
+            className={fill ? 'cal-free cal-free--key cal-free--fill' : 'cal-free cal-free--key'}
+            aria-hidden="true"
+          />
+          {fill ? 'À pourvoir' : 'Libre'}
         </span>
       </p>
     </div>
@@ -635,7 +641,7 @@ export function TeamPanel({
           <TeamMonth {...props} month={month} />
         </>
       )}
-      <CalendarLegend calendar={data} me={me} focus={focus} onFocus={onFocus} />
+      <CalendarLegend calendar={data} me={me} focus={focus} onFocus={onFocus} fill={fill} />
     </Panel>
   );
 }
