@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assertCreatorsExist,
+  assertInviteFits,
   assertOwnerScope,
   assertReadsTeam,
   assertRoleStartsAPeriod,
@@ -134,6 +135,50 @@ describe('team rules', () => {
     }).toThrow(expect.objectContaining({ code: 'role_forbidden' }));
     expect(() => {
       assertOwnerScope('owner');
+    }).not.toThrow();
+  });
+
+  it('bounds what an active manager invites from a platform, never the owner (ADR 0076 § 3)', () => {
+    const [nora, lea, ines] = [newId(CreatorIdSchema), newId(CreatorIdSchema), newId(CreatorIdSchema)];
+    const chatter = {
+      teamRole: 'chatter',
+      teamShareBps: null,
+      fromPreset: true,
+      creatorIds: [nora],
+    } as const;
+    const refused = (bound: string): unknown =>
+      expect.objectContaining({ code: 'role_forbidden', details: { bound } });
+    // A chatter at a preset of the owner's, on a creator of his own list.
+    expect(() => {
+      assertInviteFits('agency', chatter, [nora, lea]);
+    }).not.toThrow();
+    expect(() => {
+      assertInviteFits('agency', { ...chatter, creatorIds: [] }, []);
+    }).not.toThrow();
+    expect(() => {
+      assertInviteFits('agency', { ...chatter, teamRole: 'manager' }, [nora]);
+    }).toThrow(refused('role'));
+    expect(() => {
+      assertInviteFits('agency', { ...chatter, fromPreset: false }, [nora]);
+    }).toThrow(refused('rate'));
+    expect(() => {
+      assertInviteFits('agency', { ...chatter, teamShareBps: 500 }, [nora]);
+    }).toThrow(refused('rate'));
+    // One creator outside his list is enough: it would open her fans' conversations.
+    expect(() => {
+      assertInviteFits('agency', { ...chatter, creatorIds: [nora, ines] }, [nora, lea]);
+    }).toThrow(refused('creators'));
+    // A chatter, or a manager who is not active, invites no one.
+    expect(() => {
+      assertInviteFits('self', chatter, [nora]);
+    }).toThrow(expect.objectContaining({ code: 'role_forbidden' }));
+    // The owner keeps every choice of Équipe › Membres.
+    expect(() => {
+      assertInviteFits(
+        'owner',
+        { teamRole: 'manager', teamShareBps: 500, fromPreset: false, creatorIds: [ines] },
+        [],
+      );
     }).not.toThrow();
   });
 

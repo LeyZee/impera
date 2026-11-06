@@ -4,6 +4,7 @@ import {
   CommissionDateInvalid,
   CommissionStartInvalid,
   CreatorNotFound,
+  InviteOutOfBounds,
   MemberLeftConflict,
   OwnerOnly,
   RoleDateInvalid,
@@ -88,6 +89,34 @@ export function assertReadsTeam(scope: TeamScope): void {
 /** Members, rates and presets are written by the owner only; the route guard and the policies say so too. */
 export function assertOwnerScope(scope: TeamScope): void {
   if (scope !== 'owner') throw new OwnerOnly();
+}
+
+/** What a member is invited with from a platform's suggestion, as the bounds of ADR 0076 § 3 read it. */
+interface InviteChoices {
+  readonly teamRole: TeamRole;
+  readonly teamShareBps: number | null;
+  /** A preset of the owner's, rather than a rate typed by hand. */
+  readonly fromPreset: boolean;
+  readonly creatorIds: readonly CreatorId[];
+}
+
+/**
+ * Who invites a member from a platform's suggestion, and with what (ADR 0076 § 3): the owner with every choice he has
+ * in Équipe › Membres; an active manager a chatter only, at a preset of the owner's, with no share of the team's net,
+ * and with creators of his own list only (« ok créatrices-liste-manager », Charles, 06/11). The policies hold the
+ * role and the rate too; the list lives in the account, out of RLS, so this check is its only guard.
+ */
+export function assertInviteFits(
+  scope: TeamScope,
+  invite: InviteChoices,
+  ownList: readonly CreatorId[],
+): void {
+  if (scope === 'owner') return;
+  if (scope === 'self') throw new TeamScopeForbidden();
+  if (invite.teamRole !== 'chatter') throw new InviteOutOfBounds('role');
+  if (!invite.fromPreset || invite.teamShareBps !== null) throw new InviteOutOfBounds('rate');
+  const mine = new Set(ownList);
+  if (invite.creatorIds.some((id) => !mine.has(id))) throw new InviteOutOfBounds('creators');
 }
 
 /** The rate (or the role) of a day: the latest one effective on that day, or `null` before the first one starts. */
