@@ -12,6 +12,7 @@ import type { Playground } from './usePlayground';
 import { useCreators } from '@/creators/api';
 import { activateVersion, fetchPersonaOverview } from '@/creators/persona/source';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
+import { Select } from '@/shell/Select';
 
 /** The value of the invented persona in the creators' list: no creator has an empty id. */
 const INVENTED = '';
@@ -24,7 +25,12 @@ const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, A
 interface ChipOption {
   value: string;
   label: string;
+  /** Said after the label, quieter: « en vigueur ». */
+  hint?: string;
 }
+
+/** Up to this many choices, chips; past it, the design system's list (docs/design, #566). */
+const CHIPS_UP_TO = 5;
 
 /**
  * One choice among a few, as the design system draws it: chips in a radio group, the arrows moving the choice, as
@@ -60,6 +66,24 @@ function Chips({
     setFocused(next);
     ref.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
   };
+  if (options.length > CHIPS_UP_TO) {
+    return (
+      <div className="pg-who__field">
+        <label className="nv-field__label" htmlFor={id}>
+          {label}
+        </label>
+        <Select
+          id={id}
+          value={value}
+          disabled={disabled}
+          options={options}
+          onChange={(chosen) => {
+            if (chosen !== value) onChange(chosen);
+          }}
+        />
+      </div>
+    );
+  }
   return (
     <div className="pg-who__field">
       <span className="nv-field__label" id={`${id}-label`}>
@@ -89,7 +113,7 @@ function Chips({
               if (!disabled && option.value !== value) onChange(option.value);
             }}
           >
-            {option.label}
+            {option.hint === undefined ? option.label : `${option.label} · ${option.hint}`}
           </button>
         ))}
       </div>
@@ -225,7 +249,8 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
               ? [{ value: played.versionId, label: played.version }]
               : versions.map((version) => ({
                   value: version.id,
-                  label: version.isActive ? `${version.version} · en vigueur` : version.version,
+                  label: version.version,
+                  ...(version.isActive ? { hint: 'en vigueur' } : {}),
                 }))
           }
         />

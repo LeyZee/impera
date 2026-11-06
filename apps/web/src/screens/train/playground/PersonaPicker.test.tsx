@@ -6,7 +6,7 @@ import {
   type PlaygroundState,
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PersonaPicker } from './PersonaPicker';
@@ -49,7 +49,7 @@ const summary = (id: string, version: string, isActive: boolean) => ({
 });
 
 /** Mia has 0.0.3 not yet active over 0.0.2 in force; Nina has no persona. */
-function serve(activate: { status: number; body: unknown } = { status: 200, body: {} }): unknown[] {
+function serve(activate: { status: number; body: unknown } = { status: 200, body: {} }, more = 0): unknown[] {
   const asked: unknown[] = [];
   let active = LIVE;
   const json = (body: unknown, status = 200) =>
@@ -69,7 +69,18 @@ function serve(activate: { status: number; body: unknown } = { status: 200, body
         return json({
           creatorId: MIA,
           latest: null,
-          versions: [summary(DRAFT, '0.0.3', active === DRAFT), summary(LIVE, '0.0.2', active === LIVE)],
+          versions: [
+            summary(DRAFT, '0.0.3', active === DRAFT),
+            summary(LIVE, '0.0.2', active === LIVE),
+            // Older versions, when a test asks for more than chips can hold.
+            ...Array.from({ length: more }, (_, i) =>
+              summary(
+                `0199f2a0-0000-7000-8000-0000000001${String(i).padStart(2, '0')}`,
+                `0.1.${String(i)}`,
+                false,
+              ),
+            ),
+          ],
         });
       }
       if (url === `/v1/creators/${NINA}/persona`)
@@ -243,5 +254,18 @@ describe('PersonaPicker (PRO-21)', () => {
     await waitFor(() => {
       expect(chosen).toEqual([{ kind: 'version', creatorId: MIA, versionId: LIVE }]);
     });
+  });
+
+  it('lists her versions in the design system list past five, chips up to five (#566)', async () => {
+    serve(undefined, 4);
+    show({
+      ...BASE,
+      persona: { name: 'Mia', played: { creatorId: MIA, versionId: LIVE, version: '0.0.2' } },
+    });
+    const field = await screen.findByRole('combobox', { name: 'Version' });
+    fireEvent.click(field);
+    expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(6);
+    // Two creators and the invented persona: still chips.
+    expect(screen.getByRole('radiogroup', { name: 'Persona' })).toBeDefined();
   });
 });
