@@ -170,4 +170,14 @@ describe('documentTitle', () => {
     expect(documentTitle('/aide/installer/', null)).toBe('Installer Impera · Impera');
     expect(documentTitle('/nulle-part', null)).toBe('Page introuvable · Impera');
   });
+
+  it('titles the extension guide, never « Page introuvable » (recette 07/11, EXT-04)', () => {
+    expect(documentTitle('/aide/extension', null)).toBe('Installer l’extension · Impera');
+  });
+
+  it('titles a member’s file as its screen of Équipe', () => {
+    expect(documentTitle('/equipe/membres/01a1b1e4-e32c-710b-9f7b-bf6216754750/dossier', '/equipe')).toBe(
+      'Dossier · Équipe · Impera',
+    );
+  });
 });

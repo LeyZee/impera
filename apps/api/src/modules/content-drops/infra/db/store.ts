@@ -291,10 +291,14 @@ async function withdrawIn(
   if (seen === undefined) throw new ContentDropNotFound();
   // Withdrawing twice is no error: her phone may replay it.
   if (seen.state === 'withdrawn') return;
-  if (!mayWithdraw(DropStateSchema.parse(seen.state), by)) throw new ContentDropSettled();
+  // A script the team copied into Reveal is out, as a published drop is (recette MED-08): withdrawn, its request would
+  // reopen for her to shoot again and its originals would go within the hour.
+  if (seen.exportedAt !== null || !mayWithdraw(DropStateSchema.parse(seen.state), by))
+    throw new ContentDropSettled();
   // Locked through the update policy, which hides a drop the job scheduled meanwhile.
   const row = await readDrop(tx, dropId, true);
-  if (row === undefined || !mayWithdraw(DropStateSchema.parse(row.state), by)) throw new ContentDropSettled();
+  if (row?.exportedAt !== null || !mayWithdraw(DropStateSchema.parse(row.state), by))
+    throw new ContentDropSettled();
   await tx
     .update(contentDrops)
     .set({ state: 'withdrawn', withdrawnAt: now, withdrawnBy: userId, updatedAt: now })
@@ -621,6 +625,13 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         if (request.state === 'cancelled') return;
         if (request.state !== 'open' || (await readRequest(tx, requestId, true)) === undefined)
           throw new ContentRequestClosed();
+        // Answered by a drop not withdrawn (her script begun, her files sent), it is no longer the agency's to cancel:
+        // she would go on shooting a request gone (recette MED-07). Withdrawing that drop first reopens it.
+        const [answer] = await tx
+          .select({ id: contentDrops.id })
+          .from(contentDrops)
+          .where(and(eq(contentDrops.requestId, requestId), sql`${contentDrops.state} <> 'withdrawn'`));
+        if (answer !== undefined) throw new ContentRequestClosed();
         await tx
           .update(contentRequests)
           .set({ state: 'cancelled', decidedAt: now, updatedAt: now })

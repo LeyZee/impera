@@ -71,6 +71,7 @@ import {
   zonedInstant,
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { Answers } from '@/screens/planning/Exchanges';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 type Open =
@@ -340,6 +341,17 @@ export function PlanningPage({
               onOwn={setOwn}
             />
           </div>
+          {/* A manager holds shifts too, and a chatter may offer them one (ADR 0031): with no planning of their own on
+              their rail, they answer it here, or it would wait until it lapses (recette EQP-01). */}
+          {ownMemberId === null || swaps.data === undefined ? null : (
+            <Answers
+              swaps={swaps.data.swapRequests.filter(
+                (swap) => swap.targetMemberId === ownMemberId && swap.status === 'proposed',
+              )}
+              list={swaps.data}
+              zone={zone}
+            />
+          )}
           {leaves.data === undefined ? null : (
             <PendingLeaves
               list={leaves.data}

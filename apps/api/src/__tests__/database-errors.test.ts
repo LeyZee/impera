@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isDatabaseUnavailable,
   isMissingReference,
+  isNestedDeeperThan,
   jsonWithoutNul,
   postgresCode,
   storableError,
@@ -54,6 +55,16 @@ describe('database errors (recette 05/11)', () => {
     });
     const bytes = Buffer.from('a\u0000b');
     expect(jsonWithoutNul(bytes)).toBe(bytes);
+  });
+
+  it('measures how deep a JSON value nests, without recursion (BIL-03)', () => {
+    let deep: unknown = 1;
+    for (let level = 0; level < 100_000; level += 1) deep = level % 2 === 0 ? { a: deep } : [deep];
+    expect(isNestedDeeperThan(deep)).toBe(true);
+    expect(isNestedDeeperThan({ a: [{ b: 1 }] }, 3)).toBe(false);
+    expect(isNestedDeeperThan({ a: [{ b: {} }] }, 3)).toBe(true);
+    expect(isNestedDeeperThan('texte')).toBe(false);
+    expect(isNestedDeeperThan(Buffer.from('{}'))).toBe(false);
   });
 
   it('gives the job runner and the logs an error without U+0000 nor SQL parameters', () => {

@@ -1,3 +1,4 @@
+import { ConversationIdSchema, type DashboardTodo } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { ago, fromApi, replyDelay, usdNote } from './live';
@@ -10,11 +11,39 @@ const flat = (text: string | undefined): string => (text ?? '').replace(/\s/gu, 
 const card = (id: string, data = fromApi(apiDashboard())) => data.agent.cards.find((c) => c.id === id);
 
 describe('fromApi', () => {
+  it('says one failure of the agent once, after what a person can act on (recette AGT-05)', () => {
+    const [first] = apiDashboard().todos;
+    if (first === undefined) throw new Error('the fake dashboard has a todo');
+    const down = (n: number): DashboardTodo => ({
+      ...first,
+      tone: 'warn',
+      kind: 'llm_unavailable',
+      id: `down-${String(n)}`,
+      waitingMinutes: 30 + n,
+      conversationId: ConversationIdSchema.parse(`0192f3a0-0000-7000-8000-00000000020${String(n)}`),
+    });
+    const draft: DashboardTodo = {
+      ...first,
+      tone: 'warn',
+      kind: 'awaiting_approval',
+      id: 'draft',
+      waitingMinutes: 1,
+    };
+    const todos = fromApi(apiDashboard({ todos: [down(1), down(2), down(3), draft] })).todos;
+    expect(todos.map((t) => [t.kind, t.title])).toEqual([
+      ['À valider dans Suivi', first.title],
+      ['IA indisponible', '3 fans'],
+    ]);
+    // The longest wait is the group's; it opens the latest conversation.
+    expect(flat(todos[1]?.waiting)).toBe('depuis 33 min');
+    expect(todos[1]?.conversationId).toBe(down(1).conversationId);
+  });
+
   it('writes the todos in the trade’s words, how long they wait, the hour at her time (DASH-11, DASH-26)', () => {
     const [todo] = fromApi(apiDashboard()).todos;
     expect(todo).toMatchObject({ kind: 'Mineur possible', title: 'Kévin', tone: 'bad' });
     expect(flat(todo?.at)).toBe('Reçu à 13 h 41');
-    const [fresh, late] = fromApi(
+    const todos = fromApi(
       apiDashboard({
         todos: apiDashboard().todos.flatMap((t) => [
           { ...t, id: 'fresh', waitingMinutes: 3 },
@@ -22,6 +51,9 @@ describe('fromApi', () => {
         ]),
       }),
     ).todos;
+    // The longest waiting first, whatever order the route gives (recette AGT-05).
+    expect(todos.map((t) => t.id)).toEqual(['late', 'fresh']);
+    const [late, fresh] = todos;
     expect([flat(fresh?.waiting), fresh?.late]).toEqual(['depuis 3 min', false]);
     expect([flat(late?.waiting), late?.late]).toEqual(['depuis 19 min', true]);
   });

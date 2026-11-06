@@ -2,8 +2,10 @@
  * Checks a persona file against `PersonaSchema` without touching the database (playbook « Modifier la persona »).
  * Usage: `pnpm persona:validate <fichier.yaml>`.
  */
+import { requireArguments } from './command-line';
 import { describeIssues, readPersonaYaml } from './persona-file';
 
+requireArguments('Usage: pnpm persona:validate <fichier.yaml>', { positionals: true });
 const [path] = process.argv.slice(2).filter((arg) => arg !== '--');
 if (path === undefined) {
   console.error('Usage: pnpm persona:validate <fichier.yaml>');

@@ -58,6 +58,7 @@ export function ReportPanel({
   memberName,
   canSetRules = false,
   from,
+  zone = readerZone(),
   onClose,
 }: {
   shiftId: string;
@@ -68,6 +69,8 @@ export function ReportPanel({
   canSetRules?: boolean;
   /** The screen it opens on, and opens again on after « Annuler » or a refusal, wherever the reader went since. */
   from: ReportScreen;
+  /** The clock the times are read on: the member's own when the screen knows it, as Planning (recette EXT-10). */
+  zone?: string;
   onClose: () => void;
 }): JSX.Element {
   const context = useReportContext(shiftId);
@@ -77,7 +80,6 @@ export function ReportPanel({
   const onReopen = (again: ReportDraft): void => {
     reopen({ screen: from, shiftId, memberName: memberName ?? null, draft: again });
   };
-  const zone = readerZone();
   const data = context.data;
   const when =
     data === undefined ? undefined : swapShiftLine(data.shift.startsAt, data.shift.endsAt, undefined, zone);
@@ -122,6 +124,7 @@ export function ReportPanel({
         <Body
           data={data}
           draft={draft}
+          zone={zone}
           agency={memberName === undefined ? null : { canSetRules, memberName }}
           correcting={correcting}
           onCorrect={() => {
@@ -152,6 +155,7 @@ function titleOf(
 function Body({
   data,
   draft,
+  zone,
   agency,
   correcting,
   onCorrect,
@@ -160,6 +164,7 @@ function Body({
 }: {
   data: ShiftReportContext;
   draft: ReportDraft | null;
+  zone: string;
   /** The agency correcting a member's report, whose, and whether it sets the pay rules; `null` for the member. */
   agency: { readonly canSetRules: boolean; readonly memberName: string } | null;
   /** A correction is being written, from « Ajouter une correction » or a reopened draft. */
@@ -169,7 +174,6 @@ function Body({
   onReopen: (draft: ReportDraft) => void;
 }): JSX.Element {
   const now = useNow(15_000);
-  const zone = readerZone();
   const report = reportOf(data.reports, data.shift.id);
   const corrections = data.reports.filter((one) => one.correctsId !== null);
 
@@ -223,6 +227,7 @@ function Body({
         report={report}
         platform={platformName(data.account.platform)}
         today={dayOf(now, zone)}
+        zone={zone}
         corrections={corrections}
         total={validatedTotal(data.reports, data.shift.id)}
         onCorrect={onCorrect}
@@ -233,6 +238,7 @@ function Body({
   return (
     <Form
       data={data}
+      zone={zone}
       report={correcting ? null : report}
       corrected={correcting ? report : null}
       memberName={agency?.memberName ?? null}
@@ -360,6 +366,7 @@ function Validated({
   report,
   platform,
   today,
+  zone,
   corrections,
   total,
   onCorrect,
@@ -370,12 +377,12 @@ function Validated({
   platform: string;
   /** The reader's day, which a validation of today leaves unsaid. */
   today: string;
+  zone: string;
   corrections: readonly ShiftReport[];
   total: number;
   onCorrect: () => void;
   onClose: () => void;
 }): JSX.Element {
-  const zone = readerZone();
   const { currency } = report.amount;
   return (
     <div className="tm-dialog__body">
@@ -442,6 +449,7 @@ function Validated({
  */
 function Form({
   data,
+  zone,
   report,
   corrected,
   memberName,
@@ -450,6 +458,7 @@ function Form({
   onReopen,
 }: {
   data: ShiftReportContext;
+  zone: string;
   report: ShiftReport | null;
   corrected: ShiftReport | null;
   /** The member whose report the agency corrects; `null` when the member writes their own. */
@@ -475,7 +484,6 @@ function Form({
   const [incident, setIncident] = useState(() => draft?.incident ?? report?.incident ?? '');
   const [explanation, setExplanation] = useState(() => draft?.explanation ?? report?.explanation ?? '');
   const now = useNow(15_000);
-  const zone = readerZone();
   const platform = platformName(data.account.platform);
   // A report the platform reads otherwise (ADR 0073 § 5): its member explains the gap, or corrects the amount.
   const explaining =

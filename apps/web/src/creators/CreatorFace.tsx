@@ -67,3 +67,15 @@ export function ChipFace({ creator }: { creator: Face }): JSX.Element {
     />
   );
 }
+
+/**
+ * Her name in a chip, cut with « … » past a width so that one long name never pushes the others off the row; the whole
+ * name is its title (recette 07/11, EXT-05).
+ */
+export function ChipName({ name }: { name: string }): JSX.Element {
+  return (
+    <span className="cr-chip-name" title={name}>
+      {name}
+    </span>
+  );
+}

@@ -420,6 +420,10 @@ function ToValidate({
       : toDecide === 0
         ? ', aucun à décider maintenant'
         : `, dont ${toDecideText(toDecide)}`;
+  // No waiting report is compared with the platform's sales (no key yet, ADR 0073 § 7): said once, so that nobody
+  // waits for a validation by itself that cannot come (recette EQP-05, « ok ligne-aucune-vente »).
+  const reports = waiting.filter((one) => one.correctsId === null);
+  const unread = reports.length > 0 && reports.every((one) => one.check === null);
   const sentBack = list.reports.filter((one) => one.status === 'rejected');
   const ordered = waiting.toSorted((a, b) =>
     (names.shifts.get(a.shiftId)?.startsAt ?? '').localeCompare(names.shifts.get(b.shiftId)?.startsAt ?? ''),
@@ -443,6 +447,12 @@ function ToValidate({
             </p>
           )}
         </div>
+        {unread ? (
+          <p className="rp-validate__unread">
+            Les ventes de Reveal ne sont pas encore lues : aucun rapport ne se valide tout seul, chacun se
+            valide à la main.
+          </p>
+        ) : null}
 
         {lateError ? (
           <div className="sc-inline-warn nv-swap">

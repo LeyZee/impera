@@ -21,7 +21,7 @@ const LABELS: Readonly<Record<Kind, string>> = {
   owner: 'Propriétaire',
   manager: 'Manager',
   chatter: 'Chatteur',
-  operator: 'Équipe',
+  operator: 'Opérateur',
   creator: 'Créatrice',
 };
 

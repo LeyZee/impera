@@ -108,6 +108,13 @@ export function periodLine(period: PayPeriod, year = false): string {
   return `du ${dayNumber(period)} au ${dayNumber(last)} ${month}`;
 }
 
+/**
+ * « du 1er au 15 janvier 2020 » for a period of another year than `reference` (the one under way), « du 1er au
+ * 15 octobre » within it: rules in force since an old period never read as this year's (recette EQP-04).
+ */
+export const periodLineFrom = (period: PayPeriod, reference: PayPeriod | null): string =>
+  periodLine(period, period.slice(0, 4) !== reference?.slice(0, 4));
+
 /** « 1er – 15 octobre 2026 »: a period as a title; « 1er – 15 octobre » in a list that has room for no more. */
 export function periodTitle(period: PayPeriod, year = true): string {
   const last = payPeriodLastDay(period);

@@ -220,9 +220,12 @@ const SCREEN_TITLES: ReadonlyMap<string, string> = new Map(Object.entries(SCREEN
 /** Pages open to every role outside the rail: help and the account's notifications (CR-01), its security (SEC-04). */
 const OFF_RAIL_TITLES: ReadonlyMap<string, string> = new Map([
   ['/aide/installer', 'Installer Impera'],
+  ['/aide/extension', 'Installer l’extension'],
   ['/notifications', 'Notifications'],
   [ACCOUNT_SECURITY, 'Sécurité'],
 ]);
+
+const MEMBER_FILE = /^\/equipe\/membres\/[^/]+\/dossier$/u;
 
 /** The browser tab's title: the screen, its section, then the app; « Page introuvable » outside every screen. */
 export function documentTitle(pathname: string, section: Section | null): string {
@@ -231,7 +234,11 @@ export function documentTitle(pathname: string, section: Section | null): string
   if (section === null) return 'Page introuvable · Impera';
   const path = pathname.replace(/\/+$/u, '');
   // A section's own page is no screen of its own: « Suivi · Impera », not « Conversations · Suivi ».
-  const screen = path === section ? undefined : SCREEN_TITLES.get(path);
+  // A member's file has an id in its address: « Dossier · Équipe », as Moi › Dossier reads « Dossier · Moi » (EXT-04).
+  const screen =
+    path === section
+      ? undefined
+      : (SCREEN_TITLES.get(path) ?? (MEMBER_FILE.test(path) ? 'Dossier' : undefined));
   const label = sectionLabel(section);
   return `${screen === undefined ? '' : `${screen} · `}${label} · Impera`;
 }
