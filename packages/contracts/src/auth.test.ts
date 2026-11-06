@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CurrentUserSchema,
   isBackupCode,
+  normalizeBackupCode,
   SecondFactorCodeSchema,
   SignInAnswerSchema,
   UserRoleSchema,
@@ -21,7 +22,10 @@ describe('auth contracts', () => {
 
   it('reads an authenticator code or a backup code, spaces dropped, and nothing else', () => {
     expect(SecondFactorCodeSchema.parse(' 123 456 ')).toBe('123456');
-    expect(SecondFactorCodeSchema.parse('aB3dE-9fGh1')).toBe('aB3dE-9fGh1');
+    // SEC-08: a backup code is read in capitals, O as 0, I and L as 1.
+    expect(SecondFactorCodeSchema.parse('aB3dE-9fGh1')).toBe('AB3DE-9FGH1');
+    expect(SecondFactorCodeSchema.parse('mspvs-oil9z')).toBe('MSPVS-0119Z');
+    expect(normalizeBackupCode(normalizeBackupCode('IbIzF-mlh2B'))).toBe('1B1ZF-M1H2B');
     expect(isBackupCode(SecondFactorCodeSchema.parse('aB3dE-9fGh1'))).toBe(true);
     expect(isBackupCode(SecondFactorCodeSchema.parse('123456'))).toBe(false);
     for (const wrong of ['12345', '1234567', 'abcdef', 'aB3dE9fGh1', 'aB3dE-9fGh', '']) {
