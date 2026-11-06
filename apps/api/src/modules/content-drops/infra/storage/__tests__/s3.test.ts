@@ -81,3 +81,44 @@ describe('content-drops › a large cleaned file sent by the server', () => {
     }
   });
 });
+
+describe('content-drops › a kept medium read for a script’s archive (SC-03 c)', () => {
+  const storageAnswering = (answer: () => Response) =>
+    createS3DropStorage(
+      {
+        endpoint: 'http://objects.example.test',
+        region: 'us-east-1',
+        bucket: 'medias',
+        accessKeyId: 'EXAMPLEKEYID',
+        secretAccessKey: 'example-secret-for-tests-only',
+      },
+      () => Promise.resolve(answer()),
+    );
+  const all = async (chunks: AsyncIterable<Uint8Array>) => {
+    const parts: Uint8Array[] = [];
+    for await (const chunk of chunks) parts.push(chunk);
+    return Buffer.concat(parts).toString();
+  };
+
+  it('streams its bytes, `null` when it is gone, and refuses another answer', async () => {
+    const read = await storageAnswering(() => new Response('des octets inventés')).read('media/a/b', 19);
+    expect(read).not.toBeNull();
+    if (read !== null) expect(await all(read)).toBe('des octets inventés');
+    expect(await storageAnswering(() => new Response(null, { status: 404 })).read('media/a/b', 1)).toBeNull();
+    await expect(
+      storageAnswering(() => new Response('<Error/>', { status: 403 })).read('media/a/b', 1),
+    ).rejects.toThrow(ContentDropStorageUnavailable);
+  });
+
+  it('turns a stream cut midway into the storage’s refusal', async () => {
+    const cut = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('début'));
+        controller.error(new Error('connection reset'));
+      },
+    });
+    const read = await storageAnswering(() => new Response(cut)).read('media/a/b', 100);
+    expect(read).not.toBeNull();
+    if (read !== null) await expect(all(read)).rejects.toThrow(ContentDropStorageUnavailable);
+  });
+});

@@ -234,6 +234,26 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
       return true;
     },
 
+    async read(key, bytes) {
+      const what = `GET ${key}`;
+      const response = await call(what, urlOf(key), { method: 'GET' }, downloadTimeoutMs(bytes));
+      if (response.status === 404) {
+        await response.body?.cancel();
+        return null;
+      }
+      if (!response.ok || response.body === null) return refused(what, response);
+      const reader = response.body.getReader();
+      return (async function* chunks(): AsyncGenerator<Uint8Array> {
+        try {
+          for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) yield chunk.value;
+        } catch (error) {
+          throw new ContentDropStorageUnavailable(`${config.bucket}: ${what} cut off`, { cause: error });
+        } finally {
+          reader.releaseLock();
+        }
+      })();
+    },
+
     async upload(key, path, mime, sha256) {
       const size = (await stat(path)).size;
       const file = await open(path, 'r');

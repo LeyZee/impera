@@ -1,5 +1,6 @@
 import {
   CONTENT_DROP_CARD_NOT_FOUND,
+  CONTENT_DROP_EXPORT_UNPROCESSABLE,
   CONTENT_DROP_FILE_NOT_FOUND,
   CONTENT_DROP_FILE_SETTLED_CONFLICT,
   CONTENT_DROP_FORBIDDEN,
@@ -18,6 +19,7 @@ import {
   CONTENT_REQUEST_NOT_FOUND,
   CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE,
   DomainError,
+  type ScriptExportRefusal,
 } from '@impera/contracts';
 
 import type { DropRefusal } from './drops';
@@ -175,5 +177,20 @@ export class ContentDropSlotsUnprocessable extends DomainError {
 export class ContentDropCardNotFound extends DomainError {
   constructor() {
     super(CONTENT_DROP_CARD_NOT_FOUND, 'Ce carton n’est pas dans ton script');
+  }
+}
+
+const EXPORT_SENTENCES: Readonly<Record<ScriptExportRefusal, string>> = {
+  not_a_script: 'Seul un script envoyé s’exporte',
+  not_ready: 'Ce script n’est pas encore prêt : ses fichiers sont encore en cours de traitement',
+  original_erased: 'Un original de ce script a déjà été effacé : l’archive serait incomplète',
+  moment_unknown:
+    'Cette structure se tourne de jour comme de nuit : le moment de ce script n’est pas encore fixé',
+};
+
+/** A script's archive refused (SC-03 c): `details.reason` says why, the sentence says it to the agency. */
+export class ContentDropExportUnprocessable extends DomainError {
+  constructor(reason: ScriptExportRefusal) {
+    super(CONTENT_DROP_EXPORT_UNPROCESSABLE, EXPORT_SENTENCES[reason], { details: { reason } });
   }
 }

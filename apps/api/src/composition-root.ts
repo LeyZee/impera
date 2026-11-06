@@ -36,6 +36,7 @@ import type {
   ConnectorsModule,
   SalesFeedRegistry,
 } from './modules/connectors';
+import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { CreatorTasksModule } from './modules/creator-tasks';
@@ -207,6 +208,11 @@ export interface AppOptions {
    * started for it; the platform's image server and the media bucket otherwise.
    */
   readonly creatorAvatars?: Pick<AvatarPorts, 'fetch' | 'store'>;
+  /**
+   * Tests plug her content's storage here, to read a script's archive without an object store (SC-03 c); the media
+   * bucket otherwise.
+   */
+  readonly dropStorage?: DropStorage;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
 }
@@ -306,8 +312,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scriptVersions: {
       frozen: (versionId) => scripts.module.frozenVersion(versionId),
       card: (versionId, segmentKey, variant) => scripts.module.frozenCard(versionId, segmentKey, variant),
+      folderCard: (versionId, segmentKey, variant) =>
+        scripts.module.frozenFolderCard(versionId, segmentKey, variant),
       freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
     },
+    ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
   });
   const scripts = wireScripts(shared, {
     persona: persona.module,

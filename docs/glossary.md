@@ -103,6 +103,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). Sur un carton, elle s'écrit « Série A », comme dans OnlyScript (ADR 0064). |
 | File de structures | `script_structure_queue` | Les prochaines structures que l'agence demandera à une créatrice, dans l'ordre (ADR 0056). |
 | Nomenclature de script | `script_naming` | Les noms donnés par le serveur aux fichiers d'un script pour que l'ordre alphabétique soit l'ordre du script : dossier `S<nnn>-<moment>-<thème>`, fichier `<pp>-<code>-<ii>-<sorte>.<ext>` (ADR 0056). |
+| Archive d'un script | `script_export` | Le ZIP d'un script envoyé, pour l'agence : son dossier nommé selon la nomenclature, la fiche à recopier `00-fiche.txt`, puis chaque carton et chaque média dans l'ordre du script (SC-03, ADR 0056 § 7). |
 | Catégorie de dépôt | `drop_category` | Ce que la créatrice dit d'un dépôt, liste fermée : séance boudoir, vidéo short, script, relance, story Reveal, story Insta, Reel Insta, photo Insta, Telegram ; elle décide de la sortie (ADR 0055). |
 | Séance boudoir | `feed_shoot` | Chez nous, quelques photos sexy (et de courtes vidéos) d'une même séance pour le feed ; sans rapport avec la section Boudoir de Reveal (ADR 0055). |
 | Relance | `mass_dm` | La catégorie des petits médias (photo, vidéo, vocal) envoyés en Mass DM pour relancer les fans (ADR 0055). |
