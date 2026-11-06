@@ -143,7 +143,24 @@ describe('Reveal’s CRM API, read by the real adapter', () => {
     await control('/reveal/models', { preset: 'import' });
     const models = await feed('rvl_recette_ok_0003').listModels();
     expect(JSON.stringify(models)).toContain('model_imp_banned');
-    await control('/reveal/models', { preset: 'default' });
+    await control('/reveal/models', { preset: 'recette' });
+  });
+
+  it('lists by default the models of the recette data, and answers the rule of words for a Reveal key', async () => {
+    const models = await feed('rvl_recette_ok_0004').listModels();
+    expect(JSON.stringify(models)).toContain('lina-test-recette');
+    const limited = await fetch(`${base}/reveal-crm/v1/models`, {
+      headers: { 'x-api-key': 'rvl_recette_limite_0001' },
+    });
+    expect([limited.status, limited.headers.get('retry-after')]).toEqual([429, '30']);
+    const down = await fetch(`${base}/reveal-crm/v1/models`, {
+      headers: { 'x-api-key': 'rvl_recette_panne_0001' },
+    });
+    expect(down.status).toBe(503);
+    const refused = await fetch(`${base}/reveal-crm/v1/models`, {
+      headers: { 'x-api-key': 'rvl_recette_refus_0002' },
+    });
+    expect(refused.status).toBe(401);
   });
 });
 
