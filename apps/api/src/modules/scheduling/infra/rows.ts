@@ -558,3 +558,9 @@ export const RulesRowSchema = z.object({
   currency: CurrencySchema,
   earningsSource: EarningsSourceSchema,
 });
+
+/** The same with VAT and the platform's commission, as the report's context reads them (`RatedRulesRow`). */
+export const RatedRulesRowSchema = RulesRowSchema.extend({
+  vatBps: z.number().int(),
+  platformFeeBps: z.number().int(),
+});

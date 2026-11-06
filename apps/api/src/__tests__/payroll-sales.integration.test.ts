@@ -216,6 +216,7 @@ describe('Équipe › Paie : les ventes de la plateforme comptées sur leur net 
       db: team.app.db.db,
       adminDb: team.app.adminDb.db,
       reads: { ...payInputReadsOf(team.app.modules), creatorIds: () => Promise.resolve([team.bea]) },
+      shiftFacts: team.app.modules.scheduling.pay.shiftFacts,
       rateJobSince: null,
       payouts: payoutGate,
       afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },
