@@ -398,6 +398,10 @@ const LEFT_TO_DO: readonly string[] = ['Son compte membre sur Reveal est à reti
 const AWAY = (name: string): string =>
   `${name} garde sa connexion et ne voit plus que ses propres shifts, rapports et relevés. Aucun shift ne peut lui être posé. Ses créatrices restent attachées pour son retour.`;
 
+/** What the dialog says before any choice (recette Équipe 07/11, EQP-06: title, then the explanation, then the fields). */
+const STATUS_LEAD = (name: string): string =>
+  `Choisis où en est ${name}. En congé, malade, en déplacement ou suspendu : sa connexion reste, mais aucun shift ne peut lui être posé. Parti : plus aucun accès à Impera.`;
+
 /** The planning read ahead for a member's shifts still set: what make-shifts lays, four weeks, inside the read's six. */
 const AHEAD_DAYS = 42;
 
@@ -448,7 +452,12 @@ export function StatusPanel({ member, onClose }: { member: TeamMember; onClose: 
   const ready = status !== member.status && (!leaving || sure);
 
   return (
-    <Dialog title={`Statut de ${member.displayName}`} busy={busy} onClose={onClose}>
+    <Dialog
+      title={`Statut de ${member.displayName}`}
+      lead={STATUS_LEAD(member.displayName)}
+      busy={busy}
+      onClose={onClose}
+    >
       <form
         className="tm-dialog__body"
         noValidate

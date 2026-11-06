@@ -554,6 +554,8 @@ describe('changing a member once added (EQ-10)', () => {
     });
     fireEvent.click(within(await sheet()).getByRole('button', { name: 'Changer le statut' }));
     const panel = await screen.findByRole('dialog', { name: 'Statut de Théo' });
+    // Title, then the explanation before any choice (EQP-06).
+    expect(panel.textContent).toContain('Choisis où en est Théo.');
     fireEvent.click(within(panel).getByRole('radio', { name: 'Parti' }));
     // A group inside the dialog, not a second modal; the box reads what it confirms.
     const confirm = within(panel).getByRole('group', { name: 'Confirmer le départ' });
