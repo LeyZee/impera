@@ -35,6 +35,13 @@ const isManager: SQL = sql`${currentScope} = 'agency'`;
  * invites, never a later change, which stays the owner's. Not « no row of this table yet »: a policy that reads its
  * own table is refused by Postgres as infinite recursion, for every writer.
  */
+/**
+ * Today in the agency's zone: the planning's, `Europe/Paris` until the owner sets it (the scheduling module's
+ * `agencyZone`). A manager's invitation takes the owner's preset as it is in effect today, whatever arrival day he
+ * types: an earlier day never reopens an older, higher line of the same name (ADR 0076 § 3, relecture Équipe de #626).
+ */
+const agencyToday = sql`(now() at time zone coalesce((select s.time_zone from scheduling_settings s limit 1), 'Europe/Paris'))::date`;
+
 const invitedBy = (memberId: AnyColumn, effectiveFrom: AnyColumn): SQL =>
   sql`exists (select 1 from team_members m where m.id = ${memberId} and m.team_role = 'chatter' and m.user_id <> ${currentUser} and m.joined_on = ${effectiveFrom} and m.created_at = now())`;
 
@@ -75,10 +82,11 @@ export const teamMembers = pgTable(
     check('team_members_color_check', sql`${t.color} is null or ${t.color} ~ '^#[0-9a-f]{6}$'`),
     pgPolicy('member_read', { for: 'select', using: sql`${t.userId} = ${currentUser} or ${readsTeam}` }),
     pgPolicy('owner_insert', { for: 'insert', withCheck: isOwner }),
-    // ADR 0076 § 3: an active manager invites a chatter from the platform's team, never himself, never a manager.
+    // ADR 0076 § 3: an active manager invites a chatter from the platform's team, never himself, never a manager, and
+    // only onto an account created in the same transaction: never the owner's, a creator's or anyone's already there.
     pgPolicy('manager_invite', {
       for: 'insert',
-      withCheck: sql`${isManager} and ${t.teamRole} = 'chatter' and ${t.userId} <> ${currentUser}`,
+      withCheck: sql`${isManager} and ${t.teamRole} = 'chatter' and ${t.userId} <> ${currentUser} and exists (select 1 from "user" u where u.id = ${t.userId} and u.created_at = now())`,
     }),
     pgPolicy('owner_update', { for: 'update', using: isOwner, withCheck: isOwner }),
   ],
@@ -175,10 +183,10 @@ export const memberCommissionRates = pgTable(
       for: 'insert',
       withCheck: sql`${isOwner} and ${t.createdBy} = ${currentUser}`,
     }),
-    // ADR 0076 § 3: a manager gives the chatter he invites a preset of the owner, as it is in effect, and nothing else.
+    // ADR 0076 § 3: a manager gives the chatter he invites a preset of the owner, as it is in effect today, and nothing else.
     pgPolicy('manager_invite', {
       for: 'insert',
-      withCheck: sql`${isManager} and ${t.createdBy} = ${currentUser} and ${t.teamShareBps} is null and ${invitedBy(t.memberId, t.effectiveFrom)} and exists (select 1 from commission_presets p where p.id = ${t.presetId} and p.rate_bps = ${t.rateBps} and p.effective_from <= ${t.effectiveFrom} and not exists (select 1 from commission_presets q where q.name = p.name and q.effective_from > p.effective_from and q.effective_from <= ${t.effectiveFrom}))`,
+      withCheck: sql`${isManager} and ${t.createdBy} = ${currentUser} and ${t.teamShareBps} is null and ${invitedBy(t.memberId, t.effectiveFrom)} and exists (select 1 from commission_presets p where p.id = ${t.presetId} and p.rate_bps = ${t.rateBps} and p.effective_from <= ${agencyToday} and not exists (select 1 from commission_presets q where q.name = p.name and q.effective_from > p.effective_from and q.effective_from <= ${agencyToday}))`,
     }),
   ],
 );

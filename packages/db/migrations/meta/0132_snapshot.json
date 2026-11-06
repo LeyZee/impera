@@ -16060,7 +16060,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"member_commission_rates\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"member_commission_rates\".\"team_share_bps\" is null and exists (select 1 from team_members m where m.id = \"member_commission_rates\".\"member_id\" and m.team_role = 'chatter' and m.user_id <> nullif(current_setting('app.user_id', true), '') and m.joined_on = \"member_commission_rates\".\"effective_from\" and m.created_at = now()) and exists (select 1 from commission_presets p where p.id = \"member_commission_rates\".\"preset_id\" and p.rate_bps = \"member_commission_rates\".\"rate_bps\" and p.effective_from <= \"member_commission_rates\".\"effective_from\" and not exists (select 1 from commission_presets q where q.name = p.name and q.effective_from > p.effective_from and q.effective_from <= \"member_commission_rates\".\"effective_from\"))"
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"member_commission_rates\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"member_commission_rates\".\"team_share_bps\" is null and exists (select 1 from team_members m where m.id = \"member_commission_rates\".\"member_id\" and m.team_role = 'chatter' and m.user_id <> nullif(current_setting('app.user_id', true), '') and m.joined_on = \"member_commission_rates\".\"effective_from\" and m.created_at = now()) and exists (select 1 from commission_presets p where p.id = \"member_commission_rates\".\"preset_id\" and p.rate_bps = \"member_commission_rates\".\"rate_bps\" and p.effective_from <= (now() at time zone coalesce((select s.time_zone from scheduling_settings s limit 1), 'Europe/Paris'))::date and not exists (select 1 from commission_presets q where q.name = p.name and q.effective_from > p.effective_from and q.effective_from <= (now() at time zone coalesce((select s.time_zone from scheduling_settings s limit 1), 'Europe/Paris'))::date))"
         }
       },
       "checkConstraints": {
@@ -16533,7 +16533,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"team_members\".\"team_role\" = 'chatter' and \"team_members\".\"user_id\" <> nullif(current_setting('app.user_id', true), '')"
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"team_members\".\"team_role\" = 'chatter' and \"team_members\".\"user_id\" <> nullif(current_setting('app.user_id', true), '') and exists (select 1 from \"user\" u where u.id = \"team_members\".\"user_id\" and u.created_at = now())"
         },
         "owner_update": {
           "name": "owner_update",

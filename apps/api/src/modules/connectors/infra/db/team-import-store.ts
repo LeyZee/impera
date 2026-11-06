@@ -11,6 +11,7 @@ import {
 } from '@impera/contracts';
 import { and, eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
 
+import { SalesFeedMemberUnprocessable, SalesFeedTeamForbidden } from '../../domain/errors';
 import {
   isAbnormalReading,
   linkRefusal,
@@ -409,8 +410,7 @@ export const invitationChatterLinks = {
       )
       .then((result) => result.rows);
     const viewer = await viewerIn(tx, actor.userId, setting?.scope ?? '');
-    if (viewer === null)
-      throw new Error('invitation link outside the owner’s or an active manager’s transaction');
+    if (viewer === null) throw new SalesFeedTeamForbidden();
     const outcome = await linkIn(
       tx,
       viewer,
@@ -420,6 +420,12 @@ export const invitationChatterLinks = {
       { kind: 'member', memberId },
       false,
     );
-    if (!outcome.ok) throw new Error(`invitation link refused: ${outcome.kind}`);
+    // The invitation checked all this before (a free account, a new and active member): a refusal here is a gap
+    // between the two, read as the refusal it is, never as a 500.
+    if (!outcome.ok) {
+      throw outcome.kind === 'member_unknown'
+        ? new SalesFeedMemberUnprocessable()
+        : new SalesFeedTeamForbidden();
+    }
   },
 };
