@@ -1,5 +1,5 @@
 {
-  "id": "b24f73c1-8dc9-478e-99a2-740d7401f04e",
+  "id": "718ab6ff-539b-43d8-957a-eb54248b4fe1",
   "prevId": "1ed7bbd7-3651-4403-93b0-19a8bf948e2c",
   "version": "7",
   "dialect": "postgresql",
@@ -10646,172 +10646,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.persona_corrections": {
-      "name": "persona_corrections",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "section": {
-          "name": "section",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'open'"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "done_by": {
-          "name": "done_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "done_at": {
-          "name": "done_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "persona_corrections_creator_idx": {
-          "name": "persona_corrections_creator_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "persona_corrections_creator_id_creators_id_fk": {
-          "name": "persona_corrections_creator_id_creators_id_fk",
-          "tableFrom": "persona_corrections",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "persona_corrections_created_by_user_id_fk": {
-          "name": "persona_corrections_created_by_user_id_fk",
-          "tableFrom": "persona_corrections",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "persona_corrections_done_by_user_id_fk": {
-          "name": "persona_corrections_done_by_user_id_fk",
-          "tableFrom": "persona_corrections",
-          "tableTo": "user",
-          "columnsFrom": ["done_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "creator_read": {
-          "name": "creator_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "creator_insert": {
-          "name": "creator_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"persona_corrections\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"persona_corrections\".\"state\" = 'open'"
-        },
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "owner_update": {
-          "name": "owner_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'",
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"persona_corrections\".\"done_by\" = nullif(current_setting('app.user_id', true), '')"
-        }
-      },
-      "checkConstraints": {
-        "persona_corrections_section_check": {
-          "name": "persona_corrections_section_check",
-          "value": "\"persona_corrections\".\"section\" in ('details', 'limits', 'lifestyle', 'tastes', 'intimate', 'writing_style')"
-        },
-        "persona_corrections_state_check": {
-          "name": "persona_corrections_state_check",
-          "value": "\"persona_corrections\".\"state\" in ('open', 'done')"
-        },
-        "persona_corrections_text_check": {
-          "name": "persona_corrections_text_check",
-          "value": "char_length(\"persona_corrections\".\"text\") between 1 and 600"
-        },
-        "persona_corrections_done_check": {
-          "name": "persona_corrections_done_check",
-          "value": "(\"persona_corrections\".\"state\" = 'done') = (\"persona_corrections\".\"done_at\" is not null and \"persona_corrections\".\"done_by\" is not null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.persona_versions": {
       "name": "persona_versions",
       "schema": "",
@@ -15846,6 +15680,125 @@
         "member_roles_team_role_check": {
           "name": "member_roles_team_role_check",
           "value": "\"member_roles\".\"team_role\" in ('chatter', 'manager')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.password_reset_links": {
+      "name": "password_reset_links",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "password_reset_links_live_unique": {
+          "name": "password_reset_links_live_unique",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"password_reset_links\".\"used_at\" is null and \"password_reset_links\".\"revoked_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "password_reset_links_user_created_idx": {
+          "name": "password_reset_links_user_created_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "password_reset_links_user_id_user_id_fk": {
+          "name": "password_reset_links_user_id_user_id_fk",
+          "tableFrom": "password_reset_links",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "password_reset_links_token_hash_unique": {
+          "name": "password_reset_links_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": ["token_hash"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "password_reset_links_expiry_check": {
+          "name": "password_reset_links_expiry_check",
+          "value": "\"password_reset_links\".\"expires_at\" > \"password_reset_links\".\"created_at\""
+        },
+        "password_reset_links_one_end_check": {
+          "name": "password_reset_links_one_end_check",
+          "value": "\"password_reset_links\".\"used_at\" is null or \"password_reset_links\".\"revoked_at\" is null"
         }
       },
       "isRLSEnabled": false

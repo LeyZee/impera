@@ -85,3 +85,31 @@ export async function applyStart(
     replyToMessageId: null,
   });
 }
+
+/** What the module sends to a linked private chat, and nowhere else (ADR 0068 § 4). */
+export type PrivateSendOutcome = 'sent' | 'no_link' | 'failed';
+
+export async function hasPrivateLink(deps: PrivateLinkDeps, userId: string): Promise<boolean> {
+  return (await deps.privateLinks.findLink(userId)) !== null;
+}
+
+/**
+ * Sends a text to the account's private chat, now, once: the reset link (lot 3) is its only use. A bot gone, refused
+ * or unreachable is `failed`; the caller says nothing more to the page either way.
+ */
+export async function sendPrivate(
+  deps: PrivateLinkDeps,
+  userId: string,
+  text: string,
+): Promise<PrivateSendOutcome> {
+  const link = await deps.privateLinks.findLink(userId);
+  if (link === null) return 'no_link';
+  const bot = await deps.bots.findBot(link.botId);
+  if (bot?.token == null || bot.state === 'refused') return 'failed';
+  const sent = await deps.channel.send(bot.token, link.telegramChatId, {
+    text,
+    isSilent: false,
+    replyToMessageId: null,
+  });
+  return sent.ok ? 'sent' : 'failed';
+}
