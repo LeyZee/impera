@@ -441,7 +441,7 @@ function AskDialog({
   const problems: Partial<Record<AskField, string>> = {
     ...(tried ? askProblems(draft, today) : {}),
     ...(tried && unreadable ? { dueOn: 'Un jour comme 28/11/2026.' } : {}),
-    ...(refused?.field == null ? {} : { [refused.field]: refused.message }),
+    ...(refused === null ? {} : refused.field === null ? {} : { [refused.field]: refused.message }),
   };
   const options = askableStructures(structures.data ?? [], creatorId).map((structure) => ({
     value: structure.id,
@@ -475,11 +475,12 @@ function AskDialog({
     setBusy(false);
     if (outcome.kind === 'ok') {
       await client.invalidateQueries({ queryKey: contentKey(creatorId) });
-      const moment = shotMomentOf(outcome.value);
+      // The moment the code fixed, read from its value, never from the label shown.
+      const moment = outcome.value.category === 'script' ? outcome.value.moment : null;
       onAsked(
         moment === null
           ? `Demandé : ${creatorName} le voit dans son Contenu.`
-          : `Demandé : ${creatorName} le voit dans son Contenu, à tourner ${moment === '🌙 Nuit' ? 'de nuit' : 'de jour'}.`,
+          : `Demandé : ${creatorName} le voit dans son Contenu, à tourner ${moment === 'night' ? 'de nuit' : 'de jour'}.`,
       );
       return;
     }
