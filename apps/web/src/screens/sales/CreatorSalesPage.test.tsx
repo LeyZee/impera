@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CreatorSalesPage } from './CreatorSalesPage';
+import { DEMO_INSIGHTS } from './insights-fixture';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -68,7 +69,10 @@ type Served = Record<string, { status: number; body: unknown }>;
 function serve(routes: Served): ReturnType<typeof vi.fn> {
   const fetcher = vi.fn((url: string) => {
     const path = url.split('?')[0] ?? url;
-    const route = routes[path];
+    // « Qui sont tes fans » sits above her fans on every test of the page.
+    const route =
+      routes[path] ??
+      (path === '/v1/creator-space/fan-insights' ? { status: 200, body: DEMO_INSIGHTS } : undefined);
     return Promise.resolve(
       route === undefined
         ? new Response('null', { status: 404 })
@@ -101,6 +105,10 @@ function show(selected: string | null, onSelect = vi.fn()): ReturnType<typeof vi
 const scrollIntoView = vi.fn();
 
 beforeEach(() => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({ matches: true })),
+  );
   scrollIntoView.mockClear();
   Element.prototype.scrollIntoView = scrollIntoView;
   vi.useFakeTimers({ toFake: ['Date'] });

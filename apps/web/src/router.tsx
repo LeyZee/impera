@@ -124,6 +124,7 @@ const dashboard = createRoute({
         onPeriod={(next) => void navigate({ search: dashboardSearch(next, search.creatrice), replace: true })}
         onCreator={(id) => void navigate({ search: dashboardSearch(periodOf(search), id), replace: true })}
         forOwner={user.role === 'owner'}
+        reviewsReports={canOpen(railOf(user), '/equipe')}
         opensTracking={canOpen(railOf(user), '/suivi')}
         canAddCreator={canOpen(railOf(user), '/creatrices')}
       />

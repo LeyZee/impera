@@ -20,6 +20,9 @@ import {
   type CreateContentRequestBody,
   type CreatorContent,
   type DropCategory,
+  ScriptMomentSchema,
+  ShotMomentSchema,
+  type ShotMoment,
 } from '@impera/contracts';
 import {
   and,
@@ -64,6 +67,7 @@ import type {
   ReceiptStore,
 } from '../../domain/ports';
 import { keptUntil } from '../../domain/retention';
+import { shotMoment } from '../../domain/shot-moment';
 
 const { auditLog, contentDropFiles, contentDrops, contentRequests } = schema;
 
@@ -111,6 +115,8 @@ function dropOf(row: DropRow, files: readonly FileRow[]): ContentDrop {
         refusal: file.refusal,
         slotKey: file.slotKey,
       })),
+    scriptNumber: row.scriptNumber,
+    exportedAt: row.exportedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   });
 }
@@ -123,6 +129,7 @@ function requestOf(row: RequestRow, dropId: string | null): ContentRequest {
     reason: row.reason,
     structureId: row.structureId,
     structureVersionId: row.structureVersionId,
+    moment: row.moment,
     origin: row.origin,
     state: row.state,
     refusalReason: row.refusalReason,
@@ -427,12 +434,67 @@ async function sentScriptIn(tx: Transaction, dropId: string): Promise<SentScript
   return {
     scriptNumber: row.scriptNumber,
     versionId: request.structureVersionId,
+    moment: request.moment === null ? null : ShotMomentSchema.parse(request.moment),
     files: files.flatMap((file) =>
       file.slotKey === null
         ? []
         : [{ slotKey: file.slotKey, storageKey: file.storageKey, mime: file.mime, bytes: file.bytes }],
     ),
   };
+}
+
+/** Her originals of a script go this long after its archive is confirmed copied into Reveal (ADR 0044 § 2). */
+const AFTER_EXPORT_DAYS = 30;
+
+/**
+ * The export confirmed, once: who and when on the drop, its audit line, and each original the script kept, that no
+ * other live drop of hers holds, brought forward to 30 days from now (never pushed back). Its job of the night takes
+ * them as it takes the others (CR-06 c), with their notice before.
+ */
+async function confirmExportIn(
+  tx: Transaction,
+  userId: string,
+  dropId: string,
+  now: Date,
+): Promise<ContentDrop> {
+  const sent = await sentScriptIn(tx, dropId);
+  const row = await readDrop(tx, dropId, true);
+  if (row === undefined) throw new ContentDropSettled();
+  if (row.exportedAt !== null) return viewOf(tx, row);
+  await tx
+    .update(contentDrops)
+    .set({ exportedAt: now, exportedBy: userId })
+    .where(eq(contentDrops.id, dropId));
+  const until = new Date(now.getTime() + AFTER_EXPORT_DAYS * 24 * 3600 * 1000);
+  const shortened = await tx.execute<{ id: string }>(sql`
+    update media_assets m set expires_at = ${until}
+     where m.erased_at is null
+       and (m.expires_at is null or m.expires_at > ${until})
+       and m.id in (
+         select f.media_asset_id from content_drop_files f
+          where f.drop_id = ${dropId} and f.state = 'kept' and f.replaced_at is null
+       )
+       and not exists (
+         select 1 from content_drop_files o join content_drops d on d.id = o.drop_id
+          where o.media_asset_id = m.id and o.drop_id <> ${dropId} and o.replaced_at is null
+            and d.state <> 'withdrawn'
+       )
+    returning m.id`);
+  await tx.insert(auditLog).values({
+    id: newId(AuditEntryIdSchema),
+    userId,
+    action: 'content_drop.export_confirmed',
+    entity: 'content_drop',
+    entityId: dropId,
+    details: {
+      scriptNumber: sent.scriptNumber,
+      originalsUntil: until.toISOString(),
+      originals: shortened.rows.length,
+    },
+  });
+  const updated = await readDrop(tx, dropId);
+  if (updated === undefined) throw new ContentDropNotFound();
+  return viewOf(tx, updated);
 }
 
 /** `withTenantMember` for the owner and an active manager; a chatter is refused before any read. */
@@ -539,6 +601,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
             reason: body.reason,
             structureId: body.structureId,
             structureVersionId: versionId,
+            moment: versionId === null ? null : await momentIn(tx, creatorId, versionId),
             origin: 'agency',
             createdBy: userId,
           });
@@ -568,6 +631,8 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
     markSent: (creatorId, userId, dropId, fileId, correlationId) =>
       asTeam(creatorId, userId, (tx) => markSentIn(tx, dropId, fileId, correlationId)),
     sentScript: (creatorId, userId, dropId) => asTeam(creatorId, userId, (tx) => sentScriptIn(tx, dropId)),
+    confirmExport: (creatorId, userId, dropId, now) =>
+      asTeam(creatorId, userId, (tx) => confirmExportIn(tx, userId, dropId, now)),
   };
 }
 
@@ -604,6 +669,35 @@ export async function requestFromIdea(adminDb: Database, request: IdeaContentReq
 }
 
 /**
+ * The moment the script asked of her is shot as (« ok alternance », SC-03): read under a lock on her requests' moments,
+ * so that two scripts asked at once never take the same turn. Her last script is the last asked and not cancelled.
+ */
+async function momentIn(tx: Transaction, creatorId: string, versionId: string): Promise<ShotMoment> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext('content_requests.moment:' || ${creatorId}))`);
+  const [version] = await tx
+    .select({ moment: schema.scriptStructureVersions.moment })
+    .from(schema.scriptStructureVersions)
+    .where(eq(schema.scriptStructureVersions.id, versionId));
+  if (version === undefined) throw new ContentRequestStructureUnprocessable();
+  const [last] = await tx
+    .select({ moment: contentRequests.moment })
+    .from(contentRequests)
+    .where(
+      and(
+        eq(contentRequests.creatorId, creatorId),
+        sql`${contentRequests.moment} is not null`,
+        sql`${contentRequests.state} <> 'cancelled'`,
+      ),
+    )
+    .orderBy(sql`${contentRequests.createdAt} desc`, sql`${contentRequests.id} desc`)
+    .limit(1);
+  return shotMoment(
+    ScriptMomentSchema.parse(version.moment),
+    last?.moment == null ? null : ShotMomentSchema.parse(last.moment),
+  );
+}
+
+/**
  * The script the cadence asks of her (SC-02, ADR 0056 § 2), written by `scripts.ask_scripts` under the owner's role:
  * origin `cadence`, no author, with the version frozen for it. One per due day (`content_requests_cadence_unique`): a
  * replay writes nothing more.
@@ -620,6 +714,7 @@ export async function requestScript(adminDb: Database, request: ScriptContentReq
         reason: request.reason,
         structureId: request.structureId,
         structureVersionId: request.structureVersionId,
+        moment: await momentIn(tx, request.creatorId, request.structureVersionId),
         origin: 'cadence',
         createdBy: null,
       })

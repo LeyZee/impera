@@ -50,6 +50,7 @@ import {
 } from './infra/pay-reads';
 import { createDrizzlePayRulesStore, type SwitchFactsRead } from './infra/pay-rules-store';
 import { createDrizzlePlanningAdmin, createDrizzlePlanningStore } from './infra/planning-store';
+import type { ShiftSalesReader } from './infra/report-check';
 import { createDrizzleShiftReportStore } from './infra/report-store';
 import { createSchedulingRoutes, type RequireRole } from './infra/routes';
 import { agencyTimeZone } from './infra/rows';
@@ -144,6 +145,12 @@ export interface SchedulingModule {
      * It changes no amount.
      */
     readonly checkAgencyShares: (correlationId: string) => Promise<number>;
+    /**
+     * `scheduling.check_reports` (ADR 0073 § 4), every five minutes: the submitted reports whose complete check against
+     * the platform is within the threshold, validated in the name of the automatic check, each under the lock (member,
+     * period) at the version it was found at. Replayable: it changes no amount and validates nothing twice.
+     */
+    readonly checkReports: () => Promise<{ checked: number; validated: number }>;
   };
 }
 
@@ -170,6 +177,11 @@ export interface SchedulingDeps {
    * connection by the agency percentages' check (lot d3).
    */
   readonly salesTotalsOf: SalesTotalsRead;
+  /**
+   * What the platform read during a shift (ADR 0073): the `connectors` module's `salesFeedReadsForReports.shiftSales`,
+   * read in the reports' own transaction.
+   */
+  readonly shiftSalesOf: ShiftSalesReader;
   /** A creator's agenda in her calendar link's feed (CR-05 lot c2): the `creator-tasks` module's `feedOf`. */
   readonly creatorAgendaFeed: CreatorAgendaFeed;
   readonly now?: () => Date;
@@ -182,7 +194,12 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   const planning = createDrizzlePlanningStore(deps.db, deps.adminDb);
   const calendarReads = createDrizzleCalendarReads(deps.db);
   const shareCheck = createDrizzleAgencyShareCheck(deps.adminDb, deps.salesTotalsOf);
-  const reportStore = createDrizzleShiftReportStore(deps.db, deps.adminDb, deps.enqueuePayRecalculation);
+  const reportStore = createDrizzleShiftReportStore(
+    deps.db,
+    deps.adminDb,
+    deps.enqueuePayRecalculation,
+    deps.shiftSalesOf,
+  );
   const services = {
     scheduling: createSchedulingService(planning, admin, deps.creators, now),
     calendar: createCalendarService(calendarReads, deps.creators, now),
@@ -231,7 +248,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       shifts: shiftsForPay,
       accessMarginMinutes: accessMarginMinutesForPay,
       shiftFacts: async (actor, shiftId) => {
-        const { shift, period, rules } = await reportStore.context(actor, shiftId);
+        const { shift, period, rules } = await reportStore.context(actor, shiftId, now());
         return { memberId: shift.memberId, period, rules };
       },
     },
@@ -249,6 +266,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       makeShifts: (logger) => makeShifts(admin, logger, now()),
       lapseSwaps: () => colleagues.lapseSwapsUnscoped(now()),
       checkAgencyShares: (correlationId) => shareCheck.run(now(), correlationId),
+      checkReports: () => services.reports.checkReports(),
     },
   };
 }

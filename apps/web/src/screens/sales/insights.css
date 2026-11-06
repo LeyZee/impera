@@ -1,0 +1,517 @@
+/* « Qui sont tes fans » (CR-15, ADR 0065 § 2, ADR 0074): rings and bars that draw in, a case lit on hover, focus
+   or touch. Tokens only; the motion stops under reduced motion and everything stays readable at rest. */
+
+.fi-panel {
+  margin-bottom: var(--nv-space-4);
+}
+.fi-serif {
+  font-family: var(--nv-font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* Three numbers, side by side. */
+.fi-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+  margin-bottom: var(--nv-space-4);
+}
+.fi-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  transition: background var(--nv-dur-fast);
+}
+.fi-stat:hover {
+  background: var(--nv-plate-hover);
+}
+.fi-stat__value {
+  font-size: var(--nv-text-title-2);
+  line-height: 1.1;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.fi-stat__about {
+  margin-right: 0.12em;
+  font-weight: 500;
+  color: var(--nv-ink-faint);
+}
+.fi-stat__few {
+  font-size: 0.72em;
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.fi-stat__label {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+
+/* A card per question: two per row on a laptop, three on a wide screen, one on a phone. */
+.fi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--nv-space-3);
+}
+.fi-card {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  min-width: 0;
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  transition:
+    background var(--nv-dur-fast),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
+}
+.fi-card:hover {
+  background: var(--nv-plate-hover);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.fi-card--wide {
+  grid-column: span 2;
+}
+.fi-card--full {
+  grid-column: 1 / -1;
+}
+.fi-card__title {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--nv-ink-muted);
+}
+.fi-card__foot,
+.fi-note,
+.fi-empty {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+.fi-note {
+  margin-top: var(--nv-space-4);
+}
+/* Under a centred empty ring, the words sit centred too. */
+@container (max-width: 520px) {
+  .fi-empty {
+    text-align: center;
+  }
+}
+.fi-card__foot {
+  margin-top: auto;
+}
+
+/* ── The ring: arcs drawn in one after the other; a lit arc thickens, the others step back. */
+.fi-ring-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-4);
+}
+/* A card narrower than a ring beside a full legend: the ring on top, centred, the legend under it on one line per
+   case, so every ring of a row sits at the same height and no region name is cut. */
+@container (max-width: 520px) {
+  .fi-ring-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .fi-ring {
+    align-self: center;
+  }
+}
+.fi-ring {
+  position: relative;
+  flex: none;
+  width: 132px;
+  height: 132px;
+}
+.fi-ring > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+.fi-ring__track,
+.fi-ring__arc {
+  fill: none;
+  stroke-width: 14;
+}
+.fi-ring__track {
+  stroke: var(--nv-fill-track);
+}
+.fi-ring__arc {
+  stroke: var(--_c);
+  stroke-dasharray: 0 999;
+  cursor: pointer;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--_c) 35%, transparent));
+  animation: fi-draw var(--nv-dur-data) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * 90ms + 120ms);
+  transition:
+    stroke-width var(--nv-dur-base) var(--nv-ease-spring),
+    opacity var(--nv-dur-fast);
+}
+@keyframes fi-draw {
+  to {
+    stroke-dasharray: var(--_dash);
+  }
+}
+.fi-ring.is-lit .fi-ring__arc {
+  opacity: 0.35;
+}
+.fi-ring.is-lit .fi-ring__arc.is-on {
+  opacity: 1;
+  stroke-width: 18;
+}
+.fi-ring__middle {
+  position: absolute;
+  inset: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.fi-ring__value {
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.fi-ring__sub {
+  margin-top: 2px;
+  font-size: var(--nv-text-caption);
+  line-height: 1.15;
+  color: var(--nv-ink-faint);
+  overflow-wrap: normal;
+  hyphens: manual;
+}
+.fi-ring--empty .fi-ring__track {
+  stroke-dasharray: 3 6;
+}
+
+/* ── The legend: one line per case, lit with its arc. */
+.fi-legend {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fi-legend__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--nv-space-2);
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 3px var(--nv-space-2);
+  border: 0;
+  border-radius: var(--nv-radius-xs);
+  background: transparent;
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-fast),
+    color var(--nv-dur-fast);
+}
+.fi-legend__row:hover,
+.fi-legend__row.is-on {
+  background: var(--nv-select);
+  color: var(--nv-ink);
+}
+.fi-legend__row:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 1px;
+}
+.fi-legend__key {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--_c) 50%, transparent);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+.fi-legend__row.is-on .fi-legend__key {
+  transform: scale(1.35);
+}
+.fi-legend__name {
+  min-width: 0;
+  overflow-wrap: normal;
+}
+.fi-legend__share {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+
+/* ── Bars: grown from the left, one after the other; a lit bar glows, the others step back. */
+.fi-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fi-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 6px var(--nv-space-2);
+  border: 0;
+  border-radius: var(--nv-radius-xs);
+  background: transparent;
+  font: inherit;
+  color: var(--nv-ink-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-fast),
+    opacity var(--nv-dur-fast);
+}
+.fi-bar:hover,
+.fi-bar.is-on {
+  background: var(--nv-select);
+  color: var(--nv-ink);
+}
+.fi-bar:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 1px;
+}
+.fi-bars.is-lit .fi-bar:not(.is-on) {
+  opacity: 0.5;
+}
+.fi-bar__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.fi-bar__name {
+  min-width: 0;
+}
+.fi-bar__share {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.fi-bar__track {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+}
+.fi-bar__fill {
+  display: block;
+  width: var(--_w);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--_c);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--_c) 45%, transparent);
+  transform-origin: left;
+  animation: fi-grow var(--nv-dur-data) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * 70ms + 120ms);
+}
+@keyframes fi-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* ── What they unlock: the paying share and the basket, then the tiers. */
+.fi-spend {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--nv-space-4);
+  align-items: center;
+}
+.fi-spend__lead {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-4);
+}
+.fi-ring--solo .fi-ring__arc {
+  stroke-linecap: round;
+  cursor: default;
+}
+.fi-basket {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fi-basket__label,
+.fi-basket__note,
+.fi-basket__none {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+.fi-basket__value {
+  font-size: var(--nv-text-title-1);
+  line-height: var(--nv-text-title-1-leading);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-sale);
+}
+
+/* ── When they write: days by slots of three hours, the cell lit under the pointer or the finger. */
+.fi-heat__line {
+  min-height: 20px;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: 20px;
+  color: var(--nv-ink-muted);
+}
+.fi-heat__line b {
+  color: var(--nv-ink);
+}
+.fi-heat {
+  display: grid;
+  grid-template-columns: 34px repeat(8, minmax(0, 1fr));
+  gap: 4px;
+  touch-action: pan-y;
+}
+.fi-heat__hour,
+.fi-heat__day {
+  font-size: var(--nv-text-caption);
+  line-height: 14px;
+  color: var(--nv-ink-faint);
+}
+.fi-heat__day {
+  align-self: center;
+}
+.fi-heat__cell {
+  display: block;
+  width: 100%;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nv-radius-xs);
+  background: color-mix(in srgb, var(--nv-agent) calc(var(--_h) * 90%), var(--nv-fill-track));
+  opacity: 0;
+  cursor: pointer;
+  animation: fi-fade var(--nv-dur-slow) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * 8ms + 120ms);
+  transition:
+    transform var(--nv-dur-base) var(--nv-ease-spring),
+    box-shadow var(--nv-dur-fast);
+}
+.fi-heat__cell:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.fi-heat__cell:hover,
+.fi-heat__cell.is-on {
+  transform: scale(1.18);
+  box-shadow:
+    0 0 0 1.5px var(--nv-ink),
+    0 0 14px color-mix(in srgb, var(--nv-agent) 55%, transparent);
+}
+@keyframes fi-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+.fi-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--nv-space-3);
+}
+.fi-skeleton > i {
+  height: 180px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-plate-hover);
+}
+
+/* A phone: the stats stay three across, a card a row, the ring above its legend when it is too narrow. */
+@media (max-width: 720px) {
+  .fi-card--wide,
+  .fi-card--full {
+    grid-column: auto;
+  }
+  .fi-spend {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* On a phone: one line per number, the value then its label, never a label on three lines. */
+  .fi-stats {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--nv-space-2);
+  }
+  .fi-stat {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--nv-space-3);
+    padding: var(--nv-space-2) var(--nv-space-3);
+  }
+  .fi-stat__value {
+    flex: none;
+    min-width: 4.2em;
+    font-size: var(--nv-text-headline);
+  }
+  .fi-legend__row,
+  .fi-bar {
+    min-height: 44px;
+  }
+}
+@media (max-width: 420px) {
+  .fi-ring-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .fi-ring {
+    align-self: center;
+  }
+  .fi-spend__lead {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+/* On a phone, the reader takes the screen: the figures step out of the way. */
+@media (max-width: 899px) {
+  .vt-page--reading .fi-panel {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fi-ring__arc {
+    animation: none;
+    stroke-dasharray: var(--_dash);
+  }
+  .fi-bar__fill,
+  .fi-heat__cell {
+    animation: none;
+    opacity: 1;
+  }
+  .fi-ring__arc,
+  .fi-legend__key,
+  .fi-heat__cell,
+  .fi-card {
+    transition: none;
+  }
+}

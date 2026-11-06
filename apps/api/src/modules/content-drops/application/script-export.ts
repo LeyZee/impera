@@ -91,12 +91,14 @@ export async function exportScript(
   const sent = await deps.agency.sentScript(creatorId, userId, dropId);
   const version = await deps.versions.frozen(sent.versionId);
   if (version === null) throw new ContentDropExportUnprocessable('not_a_script');
-  // The request does not say yet which a « both » structure was shot as (question to Charles): refused, not guessed.
-  if (version.moment === 'both') throw new ContentDropExportUnprocessable('moment_unknown');
+  // The moment its request fixed (« ok alternance »); a script asked before it falls back on its structure's, never
+  // guessed for a « both » one.
+  const moment = sent.moment ?? (version.moment === 'both' ? null : version.moment);
+  if (moment === null) throw new ContentDropExportUnprocessable('moment_unknown');
   if (!fitsInOneArchive(sent.files)) throw new ContentDropExportUnprocessable('too_large');
   const plan = scriptExportPlan({
     number: sent.scriptNumber,
-    moment: version.moment,
+    moment,
     version,
     files: sent.files,
     // The cards in the folder become a setting per creator, on by default (ADR 0056 § 3): on for now.

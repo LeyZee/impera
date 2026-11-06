@@ -21,6 +21,7 @@ export * from './desire';
 export * from './enums';
 export * from './errors';
 export * from './events';
+export * from './fan-insights';
 export * from './fans';
 export * from './guards';
 export * from './ids';

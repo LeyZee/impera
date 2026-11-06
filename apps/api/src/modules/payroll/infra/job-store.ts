@@ -67,6 +67,7 @@ function columnsOf(draft: StatementDraft, computedAt: Date) {
     adjustmentsMinor: content.adjustmentsMinor,
     totalMinor: content.totalMinor,
     carryOverOutMinor: content.carryOverOutMinor,
+    writtenOffMinor: content.writtenOffMinor,
     payableMinor: content.payableMinor,
     teamNetMinor: content.teamNetMinor,
     collective: content.collective satisfies CollectiveReached,

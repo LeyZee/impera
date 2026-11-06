@@ -194,7 +194,7 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
       totalMinor: 800,
       carryOverOutMinor: 0,
       payableMinor: 800,
-      engineVersion: 'nirvana-2',
+      engineVersion: 'nirvana-3',
     });
   });
 

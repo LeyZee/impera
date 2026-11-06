@@ -309,6 +309,20 @@ export class ShiftReportTotal extends DomainError {
   }
 }
 
+/**
+ * ADR 0073 § 5: the report differs from the platform, and its member has neither corrected nor explained it yet; a
+ * person decides once they have, or from `explainBy`.
+ */
+export class ShiftReportGap extends DomainError {
+  constructor(explainBy: string) {
+    super(
+      'shift_report_gap_conflict',
+      'Ce rapport s’écarte de Reveal : son chatteur peut le corriger ou l’expliquer jusqu’à la fin du délai',
+      { details: { explainBy } },
+    );
+  }
+}
+
 export class ShiftReportDetected extends DomainError {
   constructor() {
     super(

@@ -4,6 +4,7 @@ import {
   newId,
   PayPeriodSchema,
   ShiftFeedbackIdSchema,
+  ShiftIdSchema,
   ShiftTemplateIdSchema,
   TeamMemberSchema,
   type TeamMember,
@@ -67,13 +68,17 @@ const bodiesFor = (
  * Routes whose request is not a JSON body under `?creatorId=`: their own query, and the body they take as it is. The
  * creator check runs after them, so only such a request proves it.
  */
-const REQUESTS: Readonly<Record<string, { query: string; contentType: string; payload: Buffer }>> = {
+const REQUESTS: Readonly<
+  Record<string, { readonly query: string; readonly contentType?: string; readonly payload?: Buffer }>
+> = {
   // A PDF's first bytes: the route reads what a file is on them, and refuses the member before it keeps anything.
   'POST /v1/payroll/contractors/:memberId/documents': {
     query: `id=${newId(ContractorDocumentIdSchema)}&kind=urssaf_vigilance&issuedOn=2026-10-01`,
     contentType: 'application/octet-stream',
     payload: Buffer.from('%PDF-1.4\n%inventé\n'),
   },
+  // Its query is strict: `?creatorId=` alone would stop it at the schema (relecture Équipe de #591).
+  'GET /v1/payroll/shifts/:shiftId/estimate': { query: 'amountMinor=12300' },
 };
 
 /**
@@ -94,6 +99,8 @@ const AGENCY_SCOPE: readonly string[] = [
   'manager of A: GET /v1/team/members/:memberId/notes → 200',
   'manager of A: POST /v1/team/members/:memberId/notes → 201',
   'manager of A: GET /v1/team/pay-rules → 200 shows Béa, bea-inventee',
+  // The commission a report would earn (reco 19): the same reach as the report and the commission above.
+  'manager of A: GET /v1/payroll/shifts/:shiftId/estimate → 200',
 ];
 
 /** B's tables the manager changes through those routes: none, her planning included (Charles, 06/11). */
@@ -257,6 +264,7 @@ describe('no route lets the people of one creator reach another one (audit des t
   let ids: Record<Seeded, string>;
   let markers: string[];
   let people: { readonly role: string; readonly cookie: string }[];
+  let onShift: { readonly member: TeamMember; readonly cookie: string };
 
   /** B's rows as the owner reads them: every table with a `creator_id`, her chatter and her account. */
   async function fingerprintOfB(): Promise<Record<string, string>> {
@@ -408,6 +416,19 @@ describe('no route lets the people of one creator reach another one (audit des t
       user: accountOfB.userId,
       template,
     };
+    onShift = await member('ambre@example.test', 'Ambre', [anna]);
+    // Whole minutes, as the planning writes them (`shifts_whole_minutes_check`).
+    const now = Math.floor(Date.now() / 60_000) * 60_000;
+    await admin.insert(schema.shifts).values({
+      id: newId(ShiftIdSchema),
+      creatorId: anna,
+      platformAccountId: team.annas,
+      memberId: onShift.member.id,
+      startsAt: new Date(now - 3_600_000),
+      endsAt: new Date(now + 3 * 3_600_000),
+      createdBy: team.ownerId,
+      updatedBy: team.ownerId,
+    });
     markers = ['Béa', 'FanDeBea', 'Bérénice', 'bea-inventee', 'Message inventé pour Béa'];
     people = [
       {
@@ -419,6 +440,8 @@ describe('no route lets the people of one creator reach another one (audit des t
         cookie: (await account('anna-compte@example.test', 'creator', [anna])).cookie,
       },
       { role: 'chatter of A', cookie: (await member('aurore@example.test', 'Aurore', [anna])).cookie },
+      // On shift now (ADR 0025, EQ-13): her window opens A's whole list to her, never anything of B.
+      { role: 'chatter of A on shift', cookie: onShift.cookie },
       {
         role: 'manager of A',
         cookie: (await member('maeva@example.test', 'Maéva', [anna], 'manager')).cookie,
@@ -443,6 +466,34 @@ describe('no route lets the people of one creator reach another one (audit des t
       .filter((route) => planOf(route, ids).kind === 'residual')
       .map((route) => `${route.method} ${route.path}`);
     expect(residual.sort()).toEqual(Object.keys(RESIDUAL).sort());
+  });
+
+  it('lets the same valid requests through on A’s own rows: the refusals above are about B, never the request', async () => {
+    const bodies = bodiesFor(ids);
+    const own = (path: string) => path.replace(':memberId', onShift.member.id);
+    const profile = 'PUT /v1/payroll/contractors/:memberId/profile';
+    const document = 'POST /v1/payroll/contractors/:memberId/documents';
+    const upload = REQUESTS[document];
+    const details = bodies[profile];
+    if (upload?.payload === undefined || details === undefined)
+      throw new Error('the profile has its body and the document its bytes');
+    const answers = [
+      await team.server.inject({
+        method: 'PUT',
+        url: own(profile.slice(4)),
+        headers: { cookie: team.owner, origin: DASHBOARD_ORIGIN },
+        payload: details,
+      }),
+      await team.server.inject({
+        method: 'POST',
+        url: `${own(document.slice(5))}?${upload.query}`,
+        headers: { cookie: team.owner, origin: DASHBOARD_ORIGIN, 'content-type': 'application/octet-stream' },
+        payload: upload.payload,
+      }),
+    ];
+    expect(
+      answers.map((answer) => [answer.statusCode >= 200 && answer.statusCode < 300, answer.body]),
+    ).toEqual(answers.map((answer) => [true, answer.body]));
   });
 
   it('answers none of A’s people with B’s ids, shows them nothing of B, and changes none of B’s rows', async () => {
@@ -474,7 +525,7 @@ describe('no route lets the people of one creator reach another one (audit des t
           headers: {
             cookie: person.cookie,
             origin: DASHBOARD_ORIGIN,
-            ...(special !== undefined && { 'content-type': special.contentType }),
+            ...(special?.contentType !== undefined && { 'content-type': special.contentType }),
           },
           // One address per request: the limiter counts by address, and a 429 would hide what the route answers.
           remoteAddress: `10.0.${String(Math.floor(asked / 250))}.${String(asked % 250)}`,

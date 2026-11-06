@@ -34,7 +34,7 @@ import {
   type MemberPayInput,
   type PeriodStatements,
 } from './commission-statements';
-import { closingPeriodOf, finalFor } from './departure';
+import { finalFor } from './departure';
 import { CommissionRateMissing } from './errors';
 import { assertFreshRates } from './exchange-rates';
 import {
@@ -81,7 +81,7 @@ export interface MemberForPay {
   readonly teamRole: TeamRole;
   readonly status: TeamMemberStatus;
   readonly joinedOn: string;
-  /** The day he left, `null` while he has not: his closing fortnight follows it (`departure.ts`). */
+  /** The day he left, `null` while he has not: the fortnight that holds it is his final one (`departure.ts`). */
   readonly leftOn: string | null;
   readonly rate: { readonly rateBps: number; readonly teamShareBps: number | null } | null;
 }
@@ -128,11 +128,6 @@ export interface PeriodSnapshot {
   /** For each currency, the latest rate read on the period's last day or before. */
   readonly latestRates: readonly ExchangeRate[];
   readonly statements: readonly StoredStatementHead[];
-  /**
-   * For each member with one, the latest period of a statement of his validated or paid: the periods up to it are
-   * closed for him, and no draft is written there again.
-   */
-  readonly lastValidated: ReadonlyMap<TeamMemberId, PayPeriod>;
 }
 
 /** One account of a statement under one set of rules, with the reports it counts. */
@@ -185,6 +180,7 @@ export interface StatementContent {
   readonly adjustmentsMinor: number;
   readonly totalMinor: number;
   readonly carryOverOutMinor: number;
+  readonly writtenOffMinor: number;
   readonly payableMinor: number;
   readonly teamNetMinor: number;
   readonly collective: CollectiveReached;
@@ -395,15 +391,16 @@ const statementOfNothing = (memberId: TeamMemberId): CommissionStatement => ({
   adjustmentsMinor: 0,
   totalMinor: 0,
   carryOverOutMinor: 0,
+  writtenOffMinor: 0,
   payableMinor: 0,
 });
 
 /**
  * The period's statements as the engine gives them, with each line's reports and the rules each one used. The
  * statements of the members with nothing are left out (`computeCommissionStatements`); `planPeriod` writes a zero
- * revision for a draft left with nothing, so that a statement never keeps what it no longer counts. A member who left
- * has one in his closing fortnight all the same, while it is open for him (ADR 0039 § 6), and each statement of his is
- * final from it on (`departure.ts`).
+ * revision for a draft left with nothing, so that a statement never keeps what it no longer counts. Each statement of a
+ * member who left is final from his departure fortnight on (`departure.ts`, ADR 0072); a later period gives him one only
+ * when something lands in it, never an empty one.
  */
 function computePeriod(snapshot: PeriodSnapshot): {
   readonly computed: PeriodStatements;
@@ -520,6 +517,7 @@ function computePeriod(snapshot: PeriodSnapshot): {
       adjustmentsMinor: statement.adjustmentsMinor,
       totalMinor: statement.totalMinor,
       carryOverOutMinor: statement.carryOverOutMinor,
+      writtenOffMinor: statement.writtenOffMinor,
       payableMinor: statement.payableMinor,
       teamNetMinor: computed.teamNetMinor,
       collective: computed.collective,
@@ -537,13 +535,6 @@ function computePeriod(snapshot: PeriodSnapshot): {
     };
   };
   const given = new Set(computed.statements.map((statement) => statement.memberId));
-  // The closing fortnight of a member who left keeps a statement, empty or not, while no later one of his is validated.
-  for (const { member } of members) {
-    const closedUpTo = snapshot.lastValidated.get(member.id);
-    if (closingPeriodOf(member.leftOn) === period && (closedUpTo === undefined || closedUpTo < period)) {
-      given.add(member.id);
-    }
-  }
   return { computed, given: members.map(({ member }) => member.id).filter((id) => given.has(id)), contentOf };
 }
 

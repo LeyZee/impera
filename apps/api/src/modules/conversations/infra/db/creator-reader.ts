@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import type { CreatorSpaceReader, MediaDescriptions, PageRequest } from '../../domain/ports';
 
+import { readFanInsights } from './fan-insights';
 import { openedLately, writeOpening } from './openings';
 import { mediaOf } from './reader';
 import { cursorInstant, decodeCursor, encodeCursor } from './rows';
@@ -109,6 +110,9 @@ export function createDrizzleCreatorSpaceReader(
           nextCursor,
         };
       }),
+
+    fanInsights: (userId, now) =>
+      withCreatorAccount(db, userId, (tx, creatorId) => readFanInsights(tx, creatorId, now)),
 
     openConversation: async (userId, id, ip) => {
       const opened = await withCreatorAccount(db, userId, async (tx, creatorId) => {

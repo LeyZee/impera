@@ -16,7 +16,7 @@ Troisième des quatre modules de la paie (ADR 0047 § 1) : `invoicing` (émissio
 ## À faire (liste vérifiable)
 
 - [x] `apps/api/src/modules/invoicing/` : domaine (`invoices`, `invoicing`, `invoice-pdf`, `invoice-acceptance`, `contest-correction`, `billing`, `settlements`, `payouts`, ses ports et ses erreurs), application, infra (magasins, file, rendu PDF et polices, routes), `pure.ts`, `index.ts`.
-- [x] `PayoutGate` et `AfterValidation` déclarés par la paie (`payroll/infra/ports.ts`), branchés par `wiring/payroll.ts` sur `payoutGate` et `invoicesAfterValidation` d'`invoicing` et `enqueuePayoutCertificateLock` de `contractors` ; `documentsOpen` remplace la lecture directe de `member_documents_open`.
+- [x] `PayoutGate` et `AfterValidation` déclarés par la paie (`payroll/infra/ports.ts`), branchés par `wiring/payroll.ts` sur `payoutGate` et `invoicesAfterValidation` d'`invoicing` et `enqueuePayoutCertificateLock` de `contractors` ; `documentsOpen` remplace la lecture directe de `member_documents_open` (retiré depuis par l'ADR 0072).
 - [x] `correctContest` : la paie écrit les ajustements d'une contestation fondée dans la transaction d'`invoicing` ; seule la paie écrit `pay_adjustments`.
 - [x] `invoiceRequeue` donné au dossier par `invoicing` ; `checkedPdf` et `pure.ts` lus par `accounting`.
 - [x] `wiring/invoicing.ts` (neuf jobs, un gestionnaire chacun), construit après la paie ; ESLint : `invoicing: ['payroll', 'contractors']`, `accounting: ['payroll', 'invoicing', 'contractors']` ; Dockerfile : chemin des polices.

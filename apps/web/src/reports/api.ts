@@ -4,6 +4,7 @@ import {
   ApiErrorSchema,
   PAY_RULES_ERROR_CODES,
   PayRulesSourceRefusalSchema,
+  ReportGapThresholdSchema,
   SchedulingSettingsSchema,
   SHIFT_REPORT_BATCH_MAX,
   SHIFT_REPORT_ERROR_CODES,
@@ -20,6 +21,7 @@ import {
   type PayRulesErrorCode,
   type PayRulesSourceRefusal,
   type RejectShiftReportBody,
+  type ReportGapThreshold,
   type SchedulingSettings,
   type ShiftReport,
   type ShiftReportContext,
@@ -169,6 +171,19 @@ export function usePayRules(enabled = true): UseQueryResult<AccountPayRulesList>
   });
 }
 
+/**
+ * The threshold a report is compared to its platform with (ADR 0073 § 3), read by the owner and the active managers,
+ * under the planning's key: a change reads the reports again.
+ */
+export function useReportGap(enabled = true): UseQueryResult<ReportGapThreshold> {
+  return useQuery({
+    queryKey: [...SCHEDULING_KEY, 'report-gap'],
+    queryFn: () => read('/v1/scheduling/report-gap', (body) => ReportGapThresholdSchema.parse(body)),
+    enabled,
+    retry: false,
+  });
+}
+
 /** Besides the reports' and the rules' own: a role guard, and a body the server refuses that the screen let through. */
 export type ReportRefusalCode =
   ShiftReportErrorCode | PayRulesErrorCode | 'role_forbidden' | 'request_invalid';
@@ -218,7 +233,7 @@ async function refusalOf(response: Response): Promise<ReportRefusal> {
 }
 
 async function send<T>(
-  method: 'POST' | 'PATCH',
+  method: 'POST' | 'PATCH' | 'PUT',
   url: string,
   body: unknown,
   parse: (json: unknown) => T,
@@ -288,6 +303,10 @@ export const rejectReport = (
 
 export const addPayRules = (body: CreateAccountPayRulesBody): Promise<ReportOutcome<AccountPayRules>> =>
   send('POST', '/v1/team/pay-rules', body, (json) => AccountPayRulesSchema.parse(json));
+
+/** The owner's threshold, from the next comparisons on; a validation keeps the one it saw. */
+export const saveReportGap = (body: ReportGapThreshold): Promise<ReportOutcome<ReportGapThreshold>> =>
+  send('PUT', '/v1/scheduling/report-gap', body, (json) => ReportGapThresholdSchema.parse(json));
 
 /** After a write, and after a refusal that says the list is read again: the reports and the planning. */
 export function useRefreshReports(): () => Promise<void> {

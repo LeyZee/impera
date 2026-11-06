@@ -29,6 +29,7 @@ import {
   PlanningSchema,
   PutShiftFeedbackBodySchema,
   RejectShiftReportBodySchema,
+  ReportGapThresholdSchema,
   SchedulingSettingsInputSchema,
   SchedulingSettingsQuerySchema,
   SchedulingSettingsSchema,
@@ -508,6 +509,22 @@ export function createSchedulingRoutes(
         },
       },
       (request) => reports.reject(actorOf(request), request.params.shiftReportId, request.body),
+    );
+
+    // The threshold of a report against the platform (ADR 0073 § 3): read by the agency, set by the owner.
+    app.get(
+      '/scheduling/report-gap',
+      { preValidation: ownerOrMember, schema: { response: { 200: ReportGapThresholdSchema } } },
+      (request) => reports.reportGap(userOf(request)),
+    );
+
+    app.put(
+      '/scheduling/report-gap',
+      {
+        preValidation: owner,
+        schema: { body: ReportGapThresholdSchema, response: { 200: ReportGapThresholdSchema } },
+      },
+      (request) => reports.saveReportGap(actorOf(request), request.body),
     );
 
     // The accounts' pay rules, which the reports read in their own transaction, at the address the contract gives.

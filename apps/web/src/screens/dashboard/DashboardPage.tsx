@@ -10,6 +10,7 @@ import { CreatorPicker } from './CreatorPicker';
 import { FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
 import { PaperworkBanner } from './PaperworkBanner';
+import { ReportsBanner } from './ReportsBanner';
 import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TopFans } from './TopFans';
@@ -155,6 +156,7 @@ export function DashboardPage({
   onPeriod,
   onCreator,
   forOwner = false,
+  reviewsReports = false,
   opensTracking = false,
   canAddCreator = false,
 }: {
@@ -165,6 +167,8 @@ export function DashboardPage({
   onCreator?: (creatorId: string) => void;
   /** The owner also reads the state of the daily export (OPS-02), the one figure that is the owner's alone. */
   forOwner?: boolean;
+  /** The account reviews the team's reports (its rail holds Équipe): what waits on it is said here (ADR 0073). */
+  reviewsReports?: boolean;
   /** The account's rail holds Suivi: a best fan opens his conversation there (DASH-14). */
   opensTracking?: boolean;
   /** The account's rail holds Créatrices: before any creator, the screen leads there (DASH-13). */
@@ -187,6 +191,7 @@ export function DashboardPage({
       onPeriod={onPeriod}
       onCreator={onCreator}
       forOwner={forOwner}
+      reviewsReports={reviewsReports}
       opensTracking={opensTracking}
     />
   );
@@ -198,6 +203,7 @@ function Loaded({
   onPeriod,
   onCreator,
   forOwner,
+  reviewsReports,
   opensTracking,
 }: {
   view: Extract<DashboardView, { status: 'live' }>;
@@ -205,6 +211,7 @@ function Loaded({
   onPeriod: (period: Period) => void;
   onCreator: ((creatorId: string) => void) | undefined;
   forOwner: boolean;
+  reviewsReports: boolean;
   opensTracking: boolean;
 }): JSX.Element {
   const tip = useFloatingTip();
@@ -299,6 +306,10 @@ function Loaded({
 
       {/* The invoices' due dates, contests and documents to check: the owner's to settle (EQ-06 lot 8d). */}
       <PaperworkBanner enabled={forOwner} />
+
+      {/* The reports that wait on the agency, never left unseen in the queue: the owner's and an active manager's to
+          decide (ADR 0073). */}
+      <ReportsBanner enabled={reviewsReports} />
 
       {/* The night's alerts and where they go are the owner's to set (Réglages › Telegram): anyone else reads it. */}
       <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />

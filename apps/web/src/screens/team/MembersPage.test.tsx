@@ -636,7 +636,7 @@ describe('changing a member once added (EQ-10)', () => {
     expect(confirm.textContent).toContain('Son compte membre sur Reveal est à retirer à la main.');
     // Pay settles his last fortnight now (EQ-14 lot 1): a carry-over is no longer left waiting.
     expect(confirm.textContent).toContain(
-      'Son relevé final, celui de la quinzaine qui suit celle de son départ, lui verse tout ce qui lui reste dû',
+      'Son relevé final, celui de la quinzaine de son départ, lui verse tout ce qui lui reste dû',
     );
     expect(confirm.textContent).not.toContain('il n’est pas versé');
   });

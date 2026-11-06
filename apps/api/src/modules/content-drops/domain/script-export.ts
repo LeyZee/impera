@@ -1,6 +1,12 @@
-import { scriptSegmentCodes, type ScriptSegment, type ScriptVariantLetter } from '@impera/contracts';
+import {
+  SCRIPT_EXPORT_MAX_BYTES,
+  scriptSegmentCodes,
+  type ScriptSegment,
+  type ScriptVariantLetter,
+  type ShotMoment,
+} from '@impera/contracts';
 
-import { scriptFileName, scriptFolderEntries, scriptFolderName, type ShotMoment } from './script-naming';
+import { scriptFileName, scriptFolderEntries, scriptFolderName } from './script-naming';
 
 /**
  * A sent script's folder as an archive (SC-03, ADR 0056 § 7): what goes in, in the script's order, under the names of
@@ -57,12 +63,6 @@ const EXTENSIONS: Readonly<Record<string, string>> = {
   'audio/aac': 'aac',
   'audio/x-m4a': 'm4a',
 };
-
-/**
- * What the media of one archive may weigh (relecture Bilan de #607): the ZIP is written without ZIP64, its sizes and
- * offsets on 4 bytes, so past 4 Gio it would come out corrupt with a 200. The cards and the headers keep 256 Mio.
- */
-const SCRIPT_EXPORT_MAX_BYTES = 4 * 1024 ** 3 - 256 * 1024 ** 2;
 
 /** Whether her script's media fit in one archive. */
 export const fitsInOneArchive = (files: readonly ExportedFile[]): boolean =>

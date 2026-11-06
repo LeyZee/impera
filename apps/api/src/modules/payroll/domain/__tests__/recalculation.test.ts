@@ -1,12 +1,13 @@
 import {
   BonusIdSchema,
   BonusTierSetIdSchema,
-  CarryOverIdSchema,
   CommissionStatementIdSchema,
   DomainError,
   newId,
+  PayAdjustmentIdSchema,
   PenaltyIdSchema,
   type Bonus,
+  type PayAdjustment,
   type Penalty,
   type ShiftReportId,
 } from '@impera/contracts';
@@ -288,64 +289,101 @@ describe('a closed period (ADR 0032)', () => {
   });
 });
 
-describe('a member who left (EQ-14, ADR 0039 § 6)', () => {
-  // He left on the 10th of March: P1 is his departure fortnight, P2 his closing fortnight.
+describe('a member who left (EQ-14, ADR 0072)', () => {
+  // He left on the 10th of March: P1 is his departure fortnight, his final one.
   const gone = () => member({ status: 'left', leftOn: '2025-03-10' });
-
-  it('has a statement in his closing fortnight even without activity, final', () => {
-    const who = gone();
-    const plan = planPeriod(snapshot({ period: P2, members: [who, member()] }));
-    expect(written(plan).inserts.map((draft) => draft.content.memberId)).toEqual([who.id]);
-    expect(draftOf(plan, who).content).toMatchObject({ lines: [], totalMinor: 0, payableMinor: 0 });
-    expect(draftOf(plan, who).content.rules.final).toBe(true);
+  const adjustment = (who: MemberForPay, period: typeof P1, amountMinor: number): PayAdjustment => ({
+    id: newId(PayAdjustmentIdSchema),
+    memberId: who.id,
+    period,
+    amountMinor,
+    reason: 'Remboursement inventé',
+    correctsStatementId: null,
+    createdBy: OWNER,
+    createdAt: '2025-03-20T10:00:00.000Z',
   });
 
-  it('keeps an ordinary statement in his departure fortnight, and none after his closing fortnight without activity', () => {
-    const who = gone();
-    const departure = planPeriod(
-      snapshot({ period: P1, members: [who], reports: [report(who, P1, 10_000)] }),
-    );
-    expect(draftOf(departure, who).content.rules.final).toBe(false);
-    expect(written(planPeriod(snapshot({ period: P3, members: [who] }))).inserts).toEqual([]);
-  });
-
-  it('gets no statement in his closing fortnight once a later one of his is validated: no draft goes behind it', () => {
-    const who = gone();
-    const plan = planPeriod(snapshot({ period: P2, members: [who], lastValidated: new Map([[who.id, P3]]) }));
-    expect(written(plan).inserts).toEqual([]);
-    const behind = planPeriod(
-      snapshot({ period: P2, members: [who], lastValidated: new Map([[who.id, P1]]) }),
-    );
-    expect(written(behind).inserts.map((draft) => draft.content.memberId)).toEqual([who.id]);
-  });
-
-  it('is paid all he is owed from his closing fortnight on, under the minimum or with a carry-over (ADR 0038)', () => {
+  it('is paid everything in his departure fortnight, under the minimum too: his final statement', () => {
     const who = gone();
     const stays = member();
-    const carried = (memberId: typeof who.id) => ({
-      id: newId(CarryOverIdSchema),
-      memberId,
-      fromPeriod: P2,
-      toPeriod: P3,
-      amountMinor: 900,
-      rank: 1,
-      statementId: newId(CommissionStatementIdSchema),
-      createdAt: '2025-04-01T00:00:00.000Z',
-    });
+    // 50 € of net at 20 %: 10 €, under a 15 € minimum.
     const plan = planPeriod(
-      snapshot({ period: P3, members: [who, stays], carryOvers: [carried(who.id), carried(stays.id)] }),
+      snapshot({
+        period: P1,
+        members: [who, stays],
+        reports: [report(who, P1, 6_250), report(stays, P1, 6_250)],
+      }),
     );
-    // 9 € under a 15 € minimum: carried again for whoever stays, paid to whoever left.
     expect(draftOf(plan, who).content).toMatchObject({
-      totalMinor: 900,
+      totalMinor: 1_000,
       carryOverOutMinor: 0,
-      payableMinor: 900,
+      payableMinor: 1_000,
     });
     expect(draftOf(plan, who).content.rules.final).toBe(true);
     expect(draftOf(plan, stays).content).toMatchObject({
-      totalMinor: 900,
-      carryOverOutMinor: 900,
+      totalMinor: 1_000,
+      carryOverOutMinor: 1_000,
       payableMinor: 0,
+    });
+    expect(draftOf(plan, stays).content.rules.final).toBe(false);
+  });
+
+  it('gets no statement after his departure fortnight while nothing lands there: no empty one', () => {
+    const who = gone();
+    expect(written(planPeriod(snapshot({ period: P2, members: [who, member()] }))).inserts).toEqual([]);
+  });
+
+  it('gets a final statement in a later period when something lands there', () => {
+    const who = gone();
+    const plan = planPeriod(
+      snapshot({ period: P2, members: [who], adjustments: [adjustment(who, P2, 2_000)] }),
+    );
+    expect(draftOf(plan, who).content).toMatchObject({ adjustmentsMinor: 2_000, payableMinor: 2_000 });
+    expect(draftOf(plan, who).content.rules.final).toBe(true);
+  });
+
+  it('has a final total below zero written off, never carried: the agency runs after nobody', () => {
+    const who = gone();
+    const stays = member();
+    const plan = planPeriod(
+      snapshot({
+        period: P2,
+        members: [who, stays],
+        adjustments: [adjustment(who, P2, -2_340), adjustment(stays, P2, -2_340)],
+      }),
+    );
+    expect(draftOf(plan, who).content).toMatchObject({
+      totalMinor: -2_340,
+      carryOverOutMinor: 0,
+      writtenOffMinor: -2_340,
+      payableMinor: 0,
+    });
+    // A member present keeps his negative carry-over without a limit (ADR 0038).
+    expect(draftOf(plan, stays).content).toMatchObject({
+      totalMinor: -2_340,
+      carryOverOutMinor: -2_340,
+      writtenOffMinor: 0,
+      payableMinor: 0,
+    });
+  });
+
+  it('turns an empty draft of the old closing fortnight to nothing when it is computed again (ADR 0072 § 6)', () => {
+    const who = gone();
+    const id = newId(CommissionStatementIdSchema);
+    const plan = planPeriod(
+      snapshot({
+        period: P2,
+        members: [who],
+        statements: [{ id, memberId: who.id, status: 'draft', revision: 1, inputsHash: 'f'.repeat(64) }],
+      }),
+    );
+    expect(written(plan).inserts).toEqual([]);
+    expect(written(plan).updates).toMatchObject([{ statementId: id, revision: 2 }]);
+    expect(draftOf(plan, who).content).toMatchObject({
+      lines: [],
+      totalMinor: 0,
+      payableMinor: 0,
+      writtenOffMinor: 0,
     });
   });
 });

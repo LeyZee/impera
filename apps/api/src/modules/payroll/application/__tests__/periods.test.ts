@@ -57,6 +57,7 @@ const stored = (goal: boolean): StoredStatement => ({
     adjustmentsMinor: 0,
     totalMinor: 1_600,
     carryOverOutMinor: 0,
+    writtenOffMinor: 0,
     payableMinor: 1_600,
     rules: rules(goal),
     computedAt: '2025-03-16T10:00:00.000Z',
