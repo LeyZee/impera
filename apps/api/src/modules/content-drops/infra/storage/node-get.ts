@@ -35,7 +35,8 @@ export function nodeGet(request: Request): Promise<Response> {
         reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
-    outgoing.once('error', reject);
+    // `on`, not `once`: a second error after the answer (a socket reset mid-body) must never go uncaught.
+    outgoing.on('error', reject);
     outgoing.end();
   });
 }
