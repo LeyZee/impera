@@ -123,7 +123,15 @@ describe('every period the engine computes', () => {
         if (one.payableMinor > 0 && member?.final !== true && carriedTwice !== true) {
           expect(one.payableMinor).toBeGreaterThanOrEqual(input.minimumPayoutMinor);
         }
-        expect(one.payableMinor + one.carryOverOutMinor).toBe(one.totalMinor);
+        expect(one.payableMinor + one.carryOverOutMinor + one.writtenOffMinor).toBe(one.totalMinor);
+        // Only a final statement writes off, and only a total below zero: then nothing is carried (ADR 0072 § 4).
+        if (member?.final === true && one.totalMinor < 0) {
+          expect(one).toMatchObject({
+            writtenOffMinor: one.totalMinor,
+            carryOverOutMinor: 0,
+            payableMinor: 0,
+          });
+        } else expect(one.writtenOffMinor).toBe(0);
       }
     }
   });

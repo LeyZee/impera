@@ -224,15 +224,6 @@ export async function readSnapshot(
     })
     .from(commissionStatements)
     .where(eq(commissionStatements.period, period));
-  // The latest validated or paid period of each member: no draft goes behind it (a closing fortnight neither).
-  const validatedRows = await tx
-    .select({
-      memberId: commissionStatements.memberId,
-      period: sql<string>`max(${commissionStatements.period})::text`,
-    })
-    .from(commissionStatements)
-    .where(sql`${commissionStatements.status} <> 'draft'`)
-    .groupBy(commissionStatements.memberId);
   const read = await readPeriodSales(
     tx,
     reads.sales,
@@ -273,9 +264,6 @@ export async function readSnapshot(
       revision: row.revision,
       inputsHash: row.inputsHash,
     })),
-    lastValidated: new Map(
-      validatedRows.map((row) => [TeamMemberIdSchema.parse(row.memberId), PayPeriodSchema.parse(row.period)]),
-    ),
   };
   return { snapshot, creatorOfAccount: read.creatorOfAccount };
 }

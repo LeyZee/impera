@@ -1,6 +1,6 @@
 # 0072. Paie : le relevé final d'un membre parti est celui de la quinzaine de son départ, et son solde négatif s'éteint
 
-Statut : accepted (Charles, 06/11/2026, 12 h 58, « ok 0072 » ; recette du 05/11, questions de paie 12 et 15, « Je suis d'accord avec tout » ; sur le texte de la tête abc4bca8, relecture de Bilan intégrée)
+Statut : accepted (Charles, 06/11/2026, 12 h 58, « ok 0072 » ; recette du 05/11, questions de paie 12 et 15, « Je suis d'accord avec tout » ; sur le texte de la tête abc4bca8, relecture de Bilan intégrée ; § 6 amendé au code, la phrase du brouillon vide de quinzaine de clôture qui « disparaît » devenue sa révision à zéro, sans suppression, « ok phrases 0072 », 06/11/2026, 14 h 34)
 Date : 2026-11-06
 Amende : l'ADR 0039 § 6 (la quinzaine de clôture) ; précise l'ADR 0038 (« le dernier relevé d'un membre qui part verse tout ») et l'ADR 0023 (§ Les règles d'Imperium : le report négatif)
 
@@ -36,7 +36,7 @@ Charles a répondu le 06/11, en acceptant les recommandations qui suivent (« Je
 **6. Rien ne change pour un membre présent.** Son report négatif reste sans limite (ADR 0038), son minimum de versement et ses reports positifs gardent leurs règles. Aucun relevé validé n'est recalculé. La règle vaut pour les brouillons à partir de l'acceptation de cette ADR, avec une nouvelle version du moteur.
 
 - Un relevé déjà validé sous l'ancienne règle reste tel quel, y compris un relevé vide de quinzaine de clôture.
-- Un brouillon de quinzaine de clôture qui existe à la bascule est recalculé par la nouvelle version. S'il ne porte rien, il disparaît. S'il porte une correction, une vente, un remboursement ou un ajustement, il reste, final.
+- Un brouillon de quinzaine de clôture qui existe à la bascule est recalculé par la nouvelle version. S'il ne porte rien, il passe à une révision à zéro, sans ligne ni montant, et n'apparaît plus nulle part, comme tout brouillon vide : rien n'est supprimé. S'il porte une correction, une vente, un remboursement ou un ajustement, il reste, final.
 
 ## Conséquences
 

@@ -469,9 +469,11 @@
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
 }
+/* What a departure leaves to do by hand: bulleted, so that a single line does not read as an orphan indent. */
 .tm-todo {
   margin: 4px 0 0;
-  padding-left: 1.2em;
+  padding-left: 1.1em;
+  list-style: disc outside;
   display: grid;
   gap: 2px;
 }

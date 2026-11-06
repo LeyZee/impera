@@ -24,6 +24,7 @@ import {
 } from '@impera/db';
 
 import { PayrollForbidden, TeamMemberNotFound, type Actor } from '../../contractors/pure';
+import { finalFor } from '../domain/departure';
 import {
   adjustmentPeriod,
   assertJoinedBy,
@@ -43,17 +44,25 @@ import {
   CommissionStatementChanged,
   CommissionStatementNotFound,
   CommissionStatementStatusConflict,
+  PayAdjustmentBelowZero,
   PayEntryConflict,
   PayPeriodClosed,
   PayoutBlocked,
   PenaltyNotFound,
 } from '../domain/errors';
 import type { PayReader, PayrollEntryStore } from '../domain/ports';
-import type { MemberForPay } from '../domain/recalculation';
+import { statementOf, type MemberForPay } from '../domain/recalculation';
 
 import type { AfterValidation, ContestCorrectionInput, PayoutGate } from './ports';
 import { enqueuePayRecalculation } from './recalculation-queue';
-import { adjustmentOfRow, bonusOfRow, closingsSpan, penaltyOfRow, type PayInputReads } from './snapshot';
+import {
+  adjustmentOfRow,
+  bonusOfRow,
+  closingsSpan,
+  penaltyOfRow,
+  readSnapshot,
+  type PayInputReads,
+} from './snapshot';
 import { audit } from './writes';
 
 const { bonuses, commissionStatements, payAdjustments, penalties, teamMembers } = schema;
@@ -194,6 +203,36 @@ async function lockAdjustmentPeriod(
   await lockFrom(tx, known.id, period, current, locked);
   await paidMemberOn(tx, reads, known.id, period);
   return period;
+}
+
+/**
+ * A negative adjustment never brings the total of a member who left below zero (ADR 0072 § 5): the agency would only
+ * write it off. Checked once the adjustment is inserted, under the (member, period) locks the write holds, on the
+ * period computed again in this transaction as a validation reads it: a concurrent adjustment waits for the locks and
+ * counts this one. A period pay cannot compute yet (a rate missing) is left to the final statement's write-off (§ 4).
+ */
+async function assertAboveZeroOnceLeft(
+  tx: Transaction,
+  reads: PayInputReads,
+  memberId: TeamMemberId,
+  period: PayPeriod,
+  amountMinor: number,
+): Promise<void> {
+  if (amountMinor >= 0) return;
+  const member = await memberOn(tx, reads, memberId, period);
+  if (!finalFor(member.leftOn, period)) return;
+  const creatorIds = await reads.creatorIds();
+  const reports = (await reads.validatedReportsScoped(tx, creatorIds, period)).flatMap((one) => one.reports);
+  let totalMinor: number;
+  try {
+    const { snapshot } = await readSnapshot(tx, reads, period, reports, { kind: 'member', creatorIds });
+    totalMinor = statementOf(snapshot, memberId).content.totalMinor;
+  } catch (error) {
+    // Only the missing rate, as said above: any other refusal of the read stays a refusal.
+    if (error instanceof CommissionRateMissing) return;
+    throw error;
+  }
+  if (totalMinor < 0) throw new PayAdjustmentBelowZero(totalMinor, memberId);
 }
 
 /** An upheld contest's correction as pay writes it (ADR 0039 § 3): see `ContestCorrectionWrite`. */
@@ -439,6 +478,7 @@ export function createDrizzlePayrollEntryStore(
           .onConflictDoNothing({ target: payAdjustments.id })
           .returning();
         if (row === undefined) return raced(await replay(), 'pay_adjustment_conflict');
+        await assertAboveZeroOnceLeft(tx, reads, body.memberId, period, body.amountMinor);
         await audit(tx, actor, 'pay_adjustment.create', { kind: 'pay_adjustment', id: row.id }, { period });
         await enqueueChanged(tx, period, period, current);
         return { value: adjustmentOfRow(row), created: true };
