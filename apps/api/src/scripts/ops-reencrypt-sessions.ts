@@ -7,6 +7,12 @@ import { createDbClient, parseEncryptionKeys } from '@impera/db';
 import { loadConfig, secretOrNull } from '../config';
 import { reencryptPlatformSessions } from '../ops';
 
+import { requireArguments } from './command-line';
+
+requireArguments(
+  'Usage: pnpm ops:reencrypt-sessions (avec SESSION_ENCRYPTION_KEYS=v2:<nouvelle>,v1:<ancienne>)',
+);
+
 const config = loadConfig();
 const keys = secretOrNull(config.SESSION_ENCRYPTION_KEYS);
 if (keys === null) {
