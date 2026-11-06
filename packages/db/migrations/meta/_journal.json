@@ -785,6 +785,13 @@
       "when": 1793966020530,
       "tag": "0127_payout_minimum_cap",
       "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1793968313282,
+      "tag": "0128_script_number",
+      "breakpoints": true
     }
   ]
 }

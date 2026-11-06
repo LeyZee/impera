@@ -284,6 +284,12 @@ describe('/v1/creator-space/content/script-drops', () => {
     expect(
       ContentDropSchema.parse((await call('POST', `${base}/${dropId}/submit`, 'nora')).json()).state,
     ).toBe('uploading');
+    // Her first script sent: number 1 (SC-03), kept when the tap is replayed.
+    const numbered = await test.admin.db
+      .select({ scriptNumber: schema.contentDrops.scriptNumber })
+      .from(schema.contentDrops)
+      .where(eq(schema.contentDrops.id, dropId));
+    expect(numbered.map((row) => row.scriptNumber)).toEqual([1]);
     const late = await fill('chambre:B:0', photo());
     expect([late.statusCode, codeOf(late.body).code]).toEqual([409, 'content_drop_file_settled_conflict']);
     expect((await call('GET', `${base}/${dropId}`, 'nora')).statusCode).toBe(200);
