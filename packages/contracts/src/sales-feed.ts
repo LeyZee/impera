@@ -128,6 +128,10 @@ export const PlatformChatterSchema = z.object({
   platformChatterId: z.string().min(1),
   firstName: z.string(),
   lastName: z.string(),
+  /** The login e-mail of an agency member, `null` for a provider's team (ADR 0076): matched, never stored. */
+  email: z.string().max(320).nullable(),
+  /** The platform's role, as it says it; it never grants a right in Impera (ADR 0076 § 3). */
+  role: z.string().max(64),
   isBot: z.boolean(),
   isExternal: z.boolean(),
   removedAt: z.iso.datetime().nullable(),
