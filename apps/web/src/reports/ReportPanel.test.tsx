@@ -69,6 +69,9 @@ const report = (patch: Record<string, unknown>): FakeReport => ({
   status: 'submitted',
   version: 1,
   byAgency: false,
+  reviewKind: null,
+  explanation: null,
+  check: null,
   canReview: false,
   submittedAt: '2026-10-27T00:00:00.000Z',
   reviewedAt: null,
@@ -521,5 +524,99 @@ describe('Mes rapports', () => {
     const amount = within(correcting).getByLabelText('À ajouter ou retirer');
     fireEvent.change(amount, { target: { value: '-15' } });
     expect(amount).toHaveProperty('value', '−15');
+  });
+});
+
+describe('Mon rapport against Reveal (ADR 0073)', () => {
+  /** 80,00 € declared on the shift of the 26th, 70,00 € read: 48 hours after its end, Thursday 0 h in Paris. */
+  const GAP = {
+    state: 'complete',
+    readMinor: 7_000,
+    gapMinor: 1_000,
+    verdict: 'gap',
+    explainBy: '2026-10-28T23:00:00.000Z',
+  };
+
+  it('puts a gap to explain in « À faire », and sends the explanation with the version it read (§ 5)', async () => {
+    served.reports = [report({ check: GAP })];
+    served.write = {
+      status: 200,
+      body: report({ check: GAP, version: 2, explanation: 'Un pourboire noté deux fois.' }),
+    };
+    renderPage();
+
+    const todo = await screen.findByRole('button', { name: /Écart de .* avec Reveal/u });
+    expect(todo.textContent.replaceAll(' ', ' ')).toContain('Écart de +10,00 € avec Reveal');
+    expect(todo.textContent).toContain('Expliquer');
+    fireEvent.click(todo);
+    const dialog = await screen.findByRole('dialog', { name: 'Modifier mon rapport' });
+    const said = dialog.textContent.replaceAll(' ', ' ');
+    expect(said).toContain('Tu déclares 80,00 €, Reveal a lu 70,00 € pendant ton shift.');
+    expect(said).toMatch(/Corrige le montant, ou explique l’écart avant le jeu\. 29 oct\. à 0 h/u);
+
+    fireEvent.change(within(dialog).getByLabelText(/Pourquoi cet écart/u), {
+      target: { value: '  Un pourboire noté deux fois.  ' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(writes).toEqual([
+      {
+        method: 'PATCH',
+        path: `/v1/scheduling/shift-reports/${id(301)}`,
+        body: {
+          version: 1,
+          amountMinor: 8_000,
+          comment: null,
+          incident: null,
+          explanation: 'Un pourboire noté deux fois.',
+        },
+      },
+    ]);
+  });
+
+  it('says an explanation sent leaves the decision to the agency, and asks for nothing more', async () => {
+    served.reports = [report({ check: GAP, explanation: 'Un pourboire noté deux fois.' })];
+    renderPage();
+    fireEvent.click(await screen.findByText('Tous mes rapports'));
+    const chip = await screen.findByRole('button', { name: /En attente/u });
+    expect(chip.textContent).not.toContain('Écart');
+    expect(screen.queryByRole('button', { name: /Écart de .* avec Reveal/u })).toBe(null);
+    fireEvent.click(chip);
+    const dialog = await screen.findByRole('dialog', { name: 'Modifier mon rapport' });
+    expect(dialog.textContent).toContain('Ton explication est envoyée : l’agence décide.');
+    expect(within(dialog).getByLabelText(/Pourquoi cet écart/u)).toHaveProperty(
+      'value',
+      'Un pourboire noté deux fois.',
+    );
+  });
+
+  it('says a report that matches Reveal validates by itself, and a validation made by the check', async () => {
+    served.reports = [
+      report({
+        status: 'validated',
+        reviewKind: 'automatic',
+        reviewedAt: '2026-10-26T23:20:00.000Z',
+        check: { state: 'complete', readMinor: 8_000, gapMinor: 0, verdict: 'within', explainBy: null },
+      }),
+    ];
+    renderPage();
+    fireEvent.click(await screen.findByText('Tous mes rapports'));
+    fireEvent.click(await screen.findByRole('button', { name: /Validé/u }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mon rapport' });
+    const said = dialog.textContent.replaceAll(' ', ' ');
+    expect(said).toMatch(/Validé automatiquement le mar\. 27 oct\. à 0 h 20/u);
+    expect(said).toContain('Reveal a lu 80,00 € pendant ce shift');
+  });
+
+  it('says why a report is not compared, without holding it (§ 7)', async () => {
+    served.reports = [report({ check: { state: 'unavailable', reason: 'feed_off' } })];
+    renderPage();
+    fireEvent.click(await screen.findByText('Tous mes rapports'));
+    fireEvent.click(await screen.findByRole('button', { name: /En attente/u }));
+    const dialog = await screen.findByRole('dialog', { name: 'Modifier mon rapport' });
+    expect(dialog.textContent).toContain(
+      'Les ventes de Reveal ne sont pas lues en ce moment : rien n’est comparé, la relecture se fait comme avant.',
+    );
+    expect(within(dialog).queryByLabelText(/Pourquoi cet écart/u)).toBe(null);
   });
 });

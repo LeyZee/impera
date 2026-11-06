@@ -534,6 +534,12 @@ export const ScriptExportRefusalSchema = z.enum(SCRIPT_EXPORT_REFUSALS);
 export type ScriptExportRefusal = z.infer<typeof ScriptExportRefusalSchema>;
 /** The archive of a sent script: a ZIP, its files stored as they are. */
 export const SCRIPT_EXPORT_MEDIA_TYPE = 'application/zip';
+/**
+ * What the media of one archive may weigh (relecture Bilan de #607): the ZIP is written without ZIP64, its sizes and
+ * offsets on 4 bytes, so past 4 Gio it would come out corrupt with a 200. The cards and the headers keep 256 Mio. The
+ * agency screen reads it too, so that it never offers an archive the server refuses (SC-03 c2b).
+ */
+export const SCRIPT_EXPORT_MAX_BYTES = 4 * 1024 ** 3 - 256 * 1024 ** 2;
 export const CONTENT_REQUEST_NOT_FOUND = 'content_request_not_found';
 export const CONTENT_REQUEST_ID_CONFLICT = 'content_request_id_conflict';
 export const CONTENT_REQUEST_CLOSED_CONFLICT = 'content_request_closed_conflict';

@@ -4,6 +4,7 @@ import {
   type CreateShiftReportBodySchema,
   type CreatorId,
   type RejectShiftReportBody,
+  type ReportGapThreshold,
   type ShiftId,
   type ShiftReport,
   type ShiftReportContext,
@@ -43,6 +44,15 @@ export interface ShiftReportService {
   validate(actor: Actor, body: ValidateShiftReportsBody): Promise<ValidateShiftReportsResult>;
   reject(actor: Actor, id: ShiftReportId, body: RejectShiftReportBody): Promise<ShiftReport>;
   list(actor: UserId, query: ShiftReportQuery): Promise<ShiftReportList>;
+  /** The threshold of a report against the platform (ADR 0073 § 3), read by the owner and an active manager. */
+  reportGap(actor: UserId): Promise<ReportGapThreshold>;
+  saveReportGap(actor: Actor, threshold: ReportGapThreshold): Promise<ReportGapThreshold>;
+  /**
+   * `scheduling.check_reports` (ADR 0073 § 4): each submitted report whose complete check is within the threshold,
+   * validated in the name of the automatic check, one transaction each, under the lock and at the version it was
+   * found at. Replayed, it validates nothing twice: a validated report is no longer submitted.
+   */
+  checkReports(): Promise<{ checked: number; validated: number }>;
 }
 
 export function createShiftReportService(
@@ -56,7 +66,7 @@ export function createShiftReportService(
 
   return {
     context: async (actor, shiftId) => {
-      const read = await store.context(actor, shiftId);
+      const read = await store.context(actor, shiftId, now());
       return {
         shift: toShiftDto(read.shift),
         account: toPlanningAccount(read.account, await names()),
@@ -123,6 +133,22 @@ export function createShiftReportService(
         accounts: read.accounts.map((account) => toPlanningAccount(account, creatorNames)),
         members: read.members.map(toPlanningMember),
       };
+    },
+
+    reportGap: async (actor) => {
+      if (!isAgency(await store.reader(actor))) throw new ShiftReportForbidden();
+      return store.reportGap(actor);
+    },
+
+    saveReportGap: (actor, threshold) => store.saveReportGap(actor, threshold),
+
+    checkReports: async () => {
+      const due = await store.checkCandidatesUnscoped(now());
+      let validated = 0;
+      for (const { id, version } of due) {
+        if (await store.autoValidateUnscoped(id, version, now())) validated += 1;
+      }
+      return { checked: due.length, validated };
     },
   };
 }

@@ -246,6 +246,32 @@ export function RailNav({
     }
   }, [current, isInMore]);
 
+  // The rail grows and shrinks with the window, and Réglages sits at its foot: the lens follows its item there at once,
+  // without its spring, rather than stay where the item was (recette ADR 0073, Réglages after a resize). The first
+  // report is the observer's placing, not a change, and leaves a slide in progress alone (as the sub-nav's).
+  useEffect(() => {
+    const nav = railRef.current;
+    const lens = lensRef.current;
+    if (nav === null || lens === null || current === null || typeof ResizeObserver === 'undefined') return;
+    let placing = true;
+    const observer = new ResizeObserver(() => {
+      if (placing) {
+        placing = false;
+        return;
+      }
+      const item = nav.querySelector<HTMLElement>(`[data-section="${current}"]`);
+      if (item === null) return;
+      lens.style.setProperty('transition', 'none');
+      lens.style.transform = `translateY(${String(item.offsetTop)}px)`;
+      lens.getBoundingClientRect();
+      lens.style.removeProperty('transition');
+    });
+    observer.observe(nav);
+    return () => {
+      observer.disconnect();
+    };
+  }, [current]);
+
   const link = (item: NavItem): JSX.Element => (
     <Link
       key={item.to}
