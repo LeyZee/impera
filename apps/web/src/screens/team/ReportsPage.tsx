@@ -99,9 +99,10 @@ export function ReportsPage({
   onPeriod?: (period: PayPeriod | null) => void;
 }): JSX.Element {
   const now = useNow();
-  const zone = readerZone();
   const hold = useAppHold();
   const settings = useSchedulingSettings();
+  // The agency's hours, those of its periods and of Planning (recette Équipe); the reader's own until they are read.
+  const zone = settings.data?.timeZone ?? readerZone();
   const open = useReports(null);
   const current = settings.data === undefined ? null : periodAt(now, settings.data.timeZone);
   const period = asked ?? current;
@@ -275,6 +276,7 @@ export function ReportsPage({
           memberName={correcting.memberName}
           canSetRules={owner}
           from="/equipe/rapports"
+          zone={zone}
           onClose={() => {
             setCorrecting(null);
           }}
