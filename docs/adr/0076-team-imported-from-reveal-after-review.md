@@ -1,6 +1,6 @@
 # 0076. L'équipe s'importe depuis Reveal par des suggestions confirmées, jamais en silence
 
-Statut : proposed (demande de Charles du 06/11/2026, 17 h 45 : « ça pourrait détecter automatiquement tous les chatters actifs liés à l'agence » ; « ok détection chatteurs », « ok prestataires-lien-seul », « ok invitation-manager », 17 h 53)
+Statut : accepted (Charles, 06/11/2026, 18 h 07, « ok 0076 » ; les deux points marqués « À valider par Charles » au § 2 et au § 3 attendent leurs mots-clés, et s'appliquent dans le sens recommandé seulement après eux ; demande de Charles du 06/11/2026, 17 h 45 : « ça pourrait détecter automatiquement tous les chatters actifs liés à l'agence » ; « ok détection chatteurs », « ok prestataires-lien-seul », « ok invitation-manager », 17 h 53)
 Date : 2026-11-06
 Précise : l'ADR 0050 § 5 (lien d'un chatteur Reveal à un membre), l'ADR 0023 (droits d'équipe), l'ADR 0024 § Rôles (« lui seul insère un taux », élargi au § 3 pour un manager, dans des bornes) et l'ADR 0069 (même démarche pour les créatrices). Ne remplace rien.
 
