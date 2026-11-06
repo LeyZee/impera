@@ -790,6 +790,54 @@ describe('Paie › Quinzaine', () => {
     ]);
   });
 
+  it('says to a withdrawal on a member who left that it never brings his total below zero, and never that he will read it (ADR 0072 § 5)', async () => {
+    team = MEMBERS.map((one): TeamMember => (one.id === LOU.id ? { ...one, status: 'left' } : one));
+    const validated = statementOf(LOU, OCT2, { status: 'validated', canValidate: false });
+    periods[OCT2] = periodOf(OCT2, [validated], {
+      closing: {
+        period: OCT2,
+        exchangeRates: [],
+        closedBy: OWNER_USER,
+        closedAt: '2026-11-02T08:41:00.000Z',
+      },
+    });
+    answer = () => ({
+      status: 409,
+      body: {
+        error: {
+          code: 'pay_adjustment_below_zero_conflict',
+          message: 'x',
+          details: { totalMinor: -1_250, memberId: LOU.id },
+          requestId: 'req-1',
+        },
+      },
+    });
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    fireEvent.click(await screen.findByRole('button', { name: 'Lou' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ajuster' }));
+    fireEvent.click(await within(dialog).findByRole('radio', { name: 'Retirer' }));
+    fireEvent.change(within(dialog).getByLabelText('Montant'), { target: { value: '20' } });
+    expect(text(within(dialog).getByText(/^Retiré de son total/u))).toBe(
+      'Retiré de son total, −20,00 €. Lou a quitté l’équipe : un retrait qui mettrait son total sous zéro est refusé.',
+    );
+    expect(
+      within(dialog).getByText('Gardé sur son relevé. Jamais le message ni le nom d’un fan.'),
+    ).toBeTruthy();
+    expect(within(dialog).queryByText(/Lu par le membre/u)).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText('Motif'), {
+      target: { value: 'Pack remboursé après son départ.' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    const summary = text(await within(dialog).findByText(/^Il corrige/u));
+    expect(summary).toContain('Le motif reste sur son relevé.');
+    expect(summary).not.toContain('le lira');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ajouter l’ajustement' }));
+    expect(text(await within(dialog).findByRole('alert'))).toBe(
+      'Ce retrait ferait passer le total de Lou, qui a quitté l’équipe, à −12,50 € : un membre parti ne finit jamais sous zéro, rien n’a été enregistré.',
+    );
+  });
+
   it('says a transfer that waits for a tax residence certificate apart, and offers no « Marquer payé » for it (ADR 0041)', async () => {
     const validatedAt = '2026-11-02T08:41:00.000Z';
     periods[OCT2] = periodOf(

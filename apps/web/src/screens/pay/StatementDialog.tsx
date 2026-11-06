@@ -98,7 +98,10 @@ export function StatementDialog({
       }
       lead={
         <>
-          Relevé de commissions · {periodTitle(statement.window.period)}
+          Relevé de commissions
+          {/* The fortnight in one block, after a dot; on a phone on its own line, no dot left at a line's end. */}
+          <span className="py-lead-sep">{' · '}</span>
+          <span className="py-lead-date">{periodTitle(statement.window.period)}</span>
           <Chip chip={{ label: status.join(' · '), tone: 'neutral' }} />
         </>
       }

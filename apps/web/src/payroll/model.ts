@@ -282,10 +282,15 @@ export function amountWhat(statement: CommissionStatement, ended: boolean, sameS
   return statement.status === 'draft' && !sameStage ? 'à verser, une fois validé' : 'à verser';
 }
 
-/** A carry-over under a row's amount: its total and where it goes, conditional until the statement is validated. */
+/**
+ * A carry-over under a row's amount: its total and where it goes, conditional until the statement is validated. A
+ * written-off balance says what is written off, the balance, in both states: the statement's line says it is
+ * conditional (ADR 0072 § 4).
+ */
 export function carryWhat(statement: CommissionStatement): string | null {
-  if (statement.carryOverOutMinor === 0) return null;
   const total = `total ${amountText(statement.totalMinor, 'EUR')}`;
+  if (statement.writtenOffMinor !== 0) return `${total} → solde abandonné`;
+  if (statement.carryOverOutMinor === 0) return null;
   return statement.status === 'draft' ? `${total} → irait en report` : `${total} → reporté`;
 }
 
@@ -608,6 +613,26 @@ export function totalsOf(statement: CommissionStatement, you: boolean, payLabelO
     statement.payableMinor === statement.commissionMinor
   )
     return [];
+  if (statement.writtenOffMinor !== 0) {
+    // A final statement under zero (ADR 0072 § 4): what the member still owed, shown positive, is not claimed.
+    rows.push({ label: 'Total', note: null, amount: amountText(statement.totalMinor, 'EUR'), kind: 'total' });
+    rows.push({
+      label: 'Solde abandonné',
+      note:
+        statement.status === 'draft'
+          ? `relevé final : ce qui resterait dû à l’agence ne serait pas réclamé, ni reporté`
+          : `relevé final : ce qui restait dû à l’agence n’est pas réclamé, ni reporté`,
+      amount: signed(-statement.writtenOffMinor),
+      kind: 'line',
+    });
+    rows.push({
+      label: payLabel,
+      note: null,
+      amount: amountText(statement.payableMinor, 'EUR'),
+      kind: 'pay',
+    });
+    return rows;
+  }
   if (statement.carryOverOutMinor === 0) {
     rows.push({
       label: payLabel,
@@ -666,9 +691,6 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return period === null
         ? `Un relevé plus ancien ${member === null ? 'de ce membre' : `de ${member}`} attend sa validation.`
         : `Valide d’abord le relevé ${member === null ? '' : `de ${member} `}${period}.`;
-    case 'commission_statement_documents_open_conflict':
-      // A member who left (ADR 0039 § 6): his last documents may still bring a correction, which this period carries.
-      return `${countOf(details.count, 'facture ou avoir attend', 'factures ou avoirs attendent')} encore une réponse ou la décision sur une contestation : le relevé final ${member === null ? 'de ce membre' : `de ${member}`} se valide ensuite.`;
     case 'pay_period_order_conflict':
       return period === null
         ? 'Une quinzaine plus ancienne attend sa validation.'
@@ -685,6 +707,11 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return period === null
         ? 'Cette quinzaine est déjà validée.'
         : `La quinzaine ${period} est déjà validée.`;
+    case 'pay_adjustment_below_zero_conflict':
+      // A member who left never ends under zero (ADR 0072 § 5): the total it would have left, when the server says it.
+      return details.totalMinor === undefined || details.totalMinor >= 0
+        ? `Ce retrait ferait passer sous zéro le total ${member === null ? 'de ce membre' : `de ${member}`}, qui a quitté l’équipe : rien n’a été enregistré.`
+        : `Ce retrait ferait passer le total ${member === null ? 'de ce membre' : `de ${member}`}, qui a quitté l’équipe, à ${signedAmountText(details.totalMinor, 'EUR')} : un membre parti ne finit jamais sous zéro, rien n’a été enregistré.`;
     case 'penalty_cancel_conflict':
       return 'Ce malus porte sur des quinzaines toutes validées : passe par un ajustement.';
     case 'exchange_rate_missing_conflict':
@@ -860,6 +887,7 @@ export function statementsCsv(
       'Ajustements',
       'Total',
       'Reporté',
+      'Solde abandonné',
       'À verser',
       'Statut',
       'Base',
@@ -886,6 +914,7 @@ export function statementsCsv(
         '',
         '',
         '',
+        '',
         // Where the line's figures come from (CRM-03): on the platform's net, « Ventes » is that net already.
         line.base === 'platform_net' ? 'Net de la plateforme' : 'Rapports',
       ]);
@@ -904,6 +933,8 @@ export function statementsCsv(
       euros(statement.adjustmentsMinor),
       euros(statement.totalMinor),
       euros(statement.carryOverOutMinor),
+      // Shown positive, as on the statement: what the member still owed and the agency does not claim (ADR 0072 § 4).
+      euros(-statement.writtenOffMinor),
       euros(statement.payableMinor),
       STATUS[statement.status],
       '',
@@ -1080,11 +1111,25 @@ function paidAfterTwoCarries(statement: CommissionStatement, ended: boolean): st
 }
 
 /**
+ * A final statement under zero (ADR 0072 § 4): what is still owed to the agency is written off, never carried. Done
+ * once validated, what would happen before — so far while the period runs, at its validation once it has ended.
+ */
+function writtenOffLine(statement: CommissionStatement, ended: boolean): string {
+  const owed = amountText(-statement.writtenOffMinor, 'EUR');
+  if (statement.status !== 'draft')
+    return `Relevé final sous zéro : les ${owed} encore dus à l’agence sont abandonnés (« Solde abandonné »), rien n’est reporté.`;
+  return ended
+    ? `Relevé final sous zéro : les ${owed} encore dus à l’agence seront abandonnés une fois le relevé validé, rien ne sera reporté.`
+    : `Relevé final sous zéro à ce jour : si la quinzaine finit ainsi, les ${owed} encore dus à l’agence seraient abandonnés.`;
+}
+
+/**
  * The sentence of a statement that carries its total over, or pays it under the minimum after two carry-overs, or
  * `null`: said as done once validated, as what would happen before — so far while the period runs, at its validation
  * once it has ended.
  */
 export function carryLine(statement: CommissionStatement, ended: boolean): string | null {
+  if (statement.writtenOffMinor !== 0) return writtenOffLine(statement, ended);
   if (statement.carryOverOutMinor === 0) return paidAfterTwoCarries(statement, ended);
   const second = secondCarry(statement, ended);
   if (statement.status === 'draft') {

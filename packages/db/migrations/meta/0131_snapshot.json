@@ -1,6 +1,6 @@
 {
-  "id": "4ecb85b3-18ce-4969-a1c4-7a8ddc47c432",
-  "prevId": "d75cc7d4-2201-4a10-aebe-13b8f18a12ba",
+  "id": "4c6465f5-0d63-4239-ba4c-7472303ed00f",
+  "prevId": "e35c4d11-71d3-4592-a01e-8b687563758d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -8795,6 +8795,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "written_off_minor": {
+          "name": "written_off_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "payable_minor": {
           "name": "payable_minor",
           "type": "integer",
@@ -8994,7 +9001,11 @@
         },
         "commission_statements_amounts_check": {
           "name": "commission_statements_amounts_check",
-          "value": "\"commission_statements\".\"payable_minor\" >= 0 and \"commission_statements\".\"payable_minor\" = \"commission_statements\".\"total_minor\" - \"commission_statements\".\"carry_over_out_minor\" and \"commission_statements\".\"penalties_minor\" between 0 and greatest(\"commission_statements\".\"penalties_requested_minor\", 0)"
+          "value": "\"commission_statements\".\"payable_minor\" >= 0 and \"commission_statements\".\"payable_minor\" = \"commission_statements\".\"total_minor\" - \"commission_statements\".\"carry_over_out_minor\" - \"commission_statements\".\"written_off_minor\" and \"commission_statements\".\"penalties_minor\" between 0 and greatest(\"commission_statements\".\"penalties_requested_minor\", 0)"
+        },
+        "commission_statements_written_off_check": {
+          "name": "commission_statements_written_off_check",
+          "value": "\"commission_statements\".\"written_off_minor\" = 0 or (coalesce((\"commission_statements\".\"rules\" ->> 'final')::boolean, false) and \"commission_statements\".\"total_minor\" < 0 and \"commission_statements\".\"written_off_minor\" = \"commission_statements\".\"total_minor\" and \"commission_statements\".\"carry_over_out_minor\" = 0)"
         },
         "commission_statements_team_share_check": {
           "name": "commission_statements_team_share_check",

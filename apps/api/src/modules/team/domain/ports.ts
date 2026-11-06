@@ -84,7 +84,7 @@ export interface TeamStore {
   update(actor: Actor, id: TeamMemberId, patch: MemberPatch): Promise<void>;
   /**
    * Owner. Leaving empties his creators and ends his sessions in the same transaction, and keeps `today` (the agency's
-   * day) as the day he left, from which pay reads his closing fortnight (EQ-14, ADR 0039 § 6).
+   * day) as the day he left, from which pay reads the fortnight of his departure, his final one (EQ-14, ADR 0072).
    */
   changeStatus(actor: Actor, id: TeamMemberId, status: TeamMemberStatus, today: string): Promise<void>;
   /**

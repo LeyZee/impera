@@ -587,8 +587,8 @@ export type CommissionStatementLine = z.infer<typeof CommissionStatementLineSche
 /**
  * The rules a statement used, copied into it: the member's rate and team share in force on the period's last day,
  * the tiers, the goal, the minimum, the rates (for each currency, the latest read on the period's last day or before;
- * once the period is closed, its closing's), and whether it is the member's final statement (EQ-14: no minimum,
- * everything paid).
+ * once the period is closed, its closing's), and whether it is a final statement of a member who left (EQ-14, ADR
+ * 0072: from the fortnight of his departure on; no minimum, everything paid, a total below zero written off).
  */
 export const CommissionStatementRulesSchema = z.object({
   commissionRateBps: BasisPointsSchema,
@@ -704,7 +704,9 @@ export type StatementPayment = z.infer<typeof StatementPaymentSchema>;
  * `teamShare` is a manager's share of the others' net. `penaltiesRequestedMinor` is what the penalties asked for,
  * `penaltiesMinor` what the cap let through. `totalMinor` = commission + team share + bonuses − penalties +
  * carry-overs in + adjustments; `carryOverOutMinor` is carried to the next period (a total under the minimum, or below
- * zero) and `payableMinor` = total − carried, never below zero.
+ * zero) and `payableMinor` = total − carried − written off, never below zero. `writtenOffMinor` is what a final
+ * statement of a member who left extinguishes (ADR 0072 § 4): its total below zero, never carried, shown positive as
+ * « Solde abandonné »; zero on every other statement (the base checks it).
  */
 export const CommissionStatementSchema = z.object({
   id: CommissionStatementIdSchema,
@@ -733,6 +735,7 @@ export const CommissionStatementSchema = z.object({
   adjustmentsMinor: MinorSchema,
   totalMinor: MinorSchema,
   carryOverOutMinor: MinorSchema,
+  writtenOffMinor: z.number().int().max(0),
   payableMinor: z.number().int().min(0),
   /** The period's team, as the engine saw it: its net (`null` for a member), and the collective goal as reached. */
   team: z
@@ -1212,8 +1215,6 @@ export type MySales = z.infer<typeof MySalesSchema>;
  * a draft ;
  * `commission_statement_open_conflict` 409, a period that has not ended ;
  * `commission_statement_order_conflict` 409, an earlier statement of the member is still a draft or not written yet ;
- * `commission_statement_documents_open_conflict` 409, a final statement of a member who left while some of his
- * documents still await an answer or stay contested (EQ-14, ADR 0039 § 6, `details.count`) ;
  * `pay_period_order_conflict` 409, an earlier period of the team must be validated first (`details.period`) ;
  * `pay_period_reports_pending_conflict` 409, reports of the period still wait for review (`details.count`) ;
  * `pay_period_reports_unread_conflict` 409, reports the validator may not read would be left out (`details.count`) ;
@@ -1223,6 +1224,8 @@ export type MySales = z.infer<typeof MySalesSchema>;
  * `pay_period_closed_conflict` 409, a bonus, a penalty, tiers or a goal for a period already validated, or for a
  * member before they joined, or a signal on a period closed or a line a closing counted (`details.period`) ;
  * `penalty_cancel_conflict` 409, every period of the penalty is closed ;
+ * `pay_adjustment_below_zero_conflict` 409, an adjustment that would bring the total of a member who left below zero
+ * (ADR 0072 § 5, `details.totalMinor`, the total it would leave, and `details.memberId`) ;
  * `bonus_conflict`, `penalty_conflict`, `pay_adjustment_conflict`, `bonus_tier_set_conflict`,
  * `collective_goal_conflict`, `payout_minimum_conflict`, `pay_sale_decision_conflict` 409, the same `id` with other
  * values (a decision written meanwhile on the same sale too) ;
@@ -1256,7 +1259,6 @@ export const PAYROLL_ERROR_CODES = [
   'commission_statement_status_conflict',
   'commission_statement_open_conflict',
   'commission_statement_order_conflict',
-  'commission_statement_documents_open_conflict',
   'pay_period_order_conflict',
   'pay_period_reports_pending_conflict',
   'pay_period_reports_unread_conflict',
@@ -1267,6 +1269,7 @@ export const PAYROLL_ERROR_CODES = [
   'bonus_conflict',
   'penalty_conflict',
   'pay_adjustment_conflict',
+  'pay_adjustment_below_zero_conflict',
   'bonus_tier_set_conflict',
   'collective_goal_conflict',
   'payout_minimum_conflict',

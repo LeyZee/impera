@@ -11,8 +11,19 @@ import {
 } from '../../lib/crm-address';
 import { readCrmSession } from '../../lib/session';
 import { placeOf } from '../../lib/tab';
+import {
+  LinkSavedSchema,
+  MarkableCreatorsSchema,
+  MarkedSchema,
+  WatchStatusSchema,
+  type FromPopup,
+  type MarkableCreators,
+} from '../../lib/watch/protocol';
+import { INSTAGRAM_PATTERN } from '../../lib/watch/watch-script';
+import { kindOf } from '../../lib/who';
 
-import { render, type Actions, type Screen } from './view';
+import { accountPathOf, render, type Actions, type Screen } from './view';
+import type { WatchNotice, WatchView } from './watch-view';
 
 /**
  * The popup's browser side (ADR 0066): the CRM address from chrome.storage.local, the session read from the CRM,
@@ -49,6 +60,10 @@ function show(next: Screen): void {
   );
 }
 
+function currentScreen(): Screen {
+  return screen;
+}
+
 async function storedOrigin(): Promise<string> {
   const stored: Record<string, unknown> = await browser.storage.local.get(ADDRESS_KEY).catch(() => ({}));
   const value = stored[ADDRESS_KEY];
@@ -60,9 +75,70 @@ async function allowed(at: string): Promise<boolean> {
   return browser.permissions.contains({ origins: [permissionPatternOf(at)] }).catch(() => false);
 }
 
-async function activeTabUrl(): Promise<string | undefined> {
+async function activeTab(): Promise<{ id: number | undefined; url: string | undefined }> {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true }).catch(() => []);
-  return tab?.url;
+  return { id: tab?.id, url: tab?.url };
+}
+
+/* ---- The watch card (VEI-02): the popup asks the service worker, which alone holds the link and sends. ---- */
+
+let tabId: number | undefined;
+let creators: MarkableCreators['items'] = [];
+let watchNotice: WatchNotice | null = null;
+let watchDraft = '';
+let busy = false;
+
+function ask(message: FromPopup): Promise<unknown> {
+  return browser.runtime.sendMessage(message).catch(() => null);
+}
+
+async function watchViewFor(): Promise<WatchView | null> {
+  if (tabId === undefined) return null;
+  const status = WatchStatusSchema.safeParse(await ask({ type: 'popup/status', tabId }));
+  if (!status.success) return null;
+  if (status.data.link === 'linked' && creators.length === 0) {
+    const answer = MarkableCreatorsSchema.safeParse(await ask({ type: 'popup/creators' }));
+    if (answer.success) creators = answer.data.items;
+  }
+  return { status: status.data, creators, notice: watchNotice, busy, now: new Date(), draft: watchDraft };
+}
+
+/** Draws the signed-in screen again with the watch as it stands now. */
+async function redrawWatch(): Promise<void> {
+  if (screen.kind !== 'signed_in' || screen.place !== 'instagram' || screen.watch === null) return;
+  const watch = await watchViewFor();
+  // The screen may have changed while the service worker answered.
+  const now = currentScreen();
+  if (now.kind === 'signed_in') show({ ...now, watch });
+}
+
+async function gesture(run: () => Promise<WatchNotice | null>): Promise<void> {
+  busy = true;
+  watchNotice = null;
+  await redrawWatch();
+  watchNotice = await run().catch(() => ({ tone: 'amber' as const, text: 'Ça n’a pas marché : réessaie.' }));
+  busy = false;
+  await redrawWatch();
+}
+
+const LINK_NOTICES: Readonly<Record<'refused' | 'unreachable' | 'malformed', string>> = {
+  malformed: 'Ce n’est pas un code de liaison : copie-le en entier depuis le CRM.',
+  refused: 'Le CRM ne reconnaît pas ce code : il a été délié ou remplacé. Crées-en un nouveau dans Sécurité.',
+  unreachable: 'Le CRM ne répond pas : réessaie dans un instant.',
+};
+
+const MARK_NOTICES: Readonly<Record<'nothing-on-screen' | 'not-watching' | 'failed', string>> = {
+  'nothing-on-screen': 'Aucun post en grand à l’écran : ouvre un Reel ou un post, puis marque-le.',
+  'not-watching': 'La veille s’est arrêtée : relance-la.',
+  failed: 'Le marquage n’est pas parti : vérifie la liaison, puis réessaie.',
+};
+
+async function beginWatch(): Promise<WatchNotice | null> {
+  if (tabId === undefined) return null;
+  const answer: unknown = await ask({ type: 'popup/begin', tabId });
+  const started =
+    typeof answer === 'object' && answer !== null && 'started' in answer && answer.started === true;
+  return started ? null : { tone: 'amber', text: 'La veille ne démarre que sur un onglet instagram.com.' };
 }
 
 async function refresh(): Promise<void> {
@@ -71,11 +147,17 @@ async function refresh(): Promise<void> {
     show({ kind: 'permission' });
     return;
   }
-  const [session, url] = await Promise.all([readCrmSession(origin), activeTabUrl()]);
+  const [session, tab] = await Promise.all([readCrmSession(origin), activeTab()]);
+  tabId = tab.id;
   switch (session.kind) {
-    case 'signed_in':
-      show({ kind: 'signed_in', me: session.me, place: placeOf(url, origin) });
+    case 'signed_in': {
+      const place = placeOf(tab.url, origin);
+      const kind = kindOf(session.me);
+      // The watch is the owner's and the managers' (VEI-02 lot a); a creator or a chatter has no link to paste.
+      const watched = place === 'instagram' && (kind === 'owner' || kind === 'manager');
+      show({ kind: 'signed_in', me: session.me, place, watch: watched ? await watchViewFor() : null });
       return;
+    }
     case 'signed_out':
       show({ kind: 'signed_out' });
       return;
@@ -152,7 +234,56 @@ const actions: Actions = {
   cancelAddress: () => {
     show(previous);
   },
+  watch: {
+    link: (code) => {
+      watchDraft = code;
+      void gesture(async () => {
+        const saved = LinkSavedSchema.safeParse(await ask({ type: 'popup/link', token: code }));
+        if (!saved.success) return { tone: 'amber', text: LINK_NOTICES.unreachable };
+        if (saved.data.state !== 'linked') return { tone: 'amber', text: LINK_NOTICES[saved.data.state] };
+        watchDraft = '';
+        creators = [];
+        return { tone: 'quiet', text: 'Extension reliée : tu peux lancer la veille.' };
+      });
+    },
+    allow: () => {
+      // Asked inside the click (a user gesture), for instagram.com alone.
+      const asked = browser.permissions.request({ origins: [INSTAGRAM_PATTERN] }).catch(() => false);
+      void gesture(async () =>
+        (await asked)
+          ? beginWatch()
+          : { tone: 'amber', text: 'Sans cette autorisation, la veille ne peut rien lire.' },
+      );
+    },
+    begin: () => {
+      void gesture(beginWatch);
+    },
+    end: () => {
+      void gesture(async () => {
+        if (tabId !== undefined) await ask({ type: 'popup/end', tabId });
+        return null;
+      });
+    },
+    mark: (creatorId) => {
+      void gesture(async () => {
+        if (tabId === undefined) return null;
+        const marked = MarkedSchema.safeParse(await ask({ type: 'popup/mark', tabId, creatorId }));
+        if (!marked.success) return { tone: 'amber', text: MARK_NOTICES.failed };
+        if (marked.data.state !== 'marked') return { tone: 'amber', text: MARK_NOTICES[marked.data.state] };
+        const name = creators.find((creator) => creator.id === creatorId)?.displayName ?? 'elle';
+        return { tone: 'quiet', text: `Marqué pour ${name}. Les captures partent en arrière-plan.` };
+      });
+    },
+    openSecurity: () => {
+      if (screen.kind === 'signed_in') void openCrm(accountPathOf(screen.me));
+    },
+  },
 };
+
+// While the popup stays open on a watch, its minutes and counts follow.
+setInterval(() => {
+  if (!busy) void redrawWatch();
+}, 15_000);
 
 void storedOrigin().then((stored) => {
   origin = stored;

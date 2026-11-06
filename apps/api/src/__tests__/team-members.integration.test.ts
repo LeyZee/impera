@@ -556,7 +556,8 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
     const after = parisDay();
     expect(response.statusCode).toBe(200);
     expect(TeamMemberSchema.parse(response.json())).toMatchObject({ status: 'left', creatorIds: [] });
-    // The day he left is the agency's day of the click, never typed (EQ-14): pay reads his closing fortnight from it.
+    // The day he left is the agency's day of the click, never typed (EQ-14): pay reads the fortnight of his departure
+    // from it.
     const leftOn = await leftOnOf(theo.id);
     expect([before, after]).toContain(leftOn);
     expect((await call('GET', '/me', theoCookie)).statusCode).toBe(401);

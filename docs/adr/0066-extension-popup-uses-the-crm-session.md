@@ -1,6 +1,6 @@
-# 0066. Le popup de l'extension : la connexion est celle du CRM, l'extension ne garde aucun secret
+# 0066. Le popup de l'extension : la connexion est celle du CRM, l'extension ne garde aucun secret de connexion
 
-Statut : accepted (Charles, 03/11/2026, 17 h 37, « ok 0066 » ; § 7 amendé pour l'aligner sur la liaison de VEI-01 : « ok phrases 0066 », 17 h 38 ; raccourcis du § 6 alignés sur le menu du CRM après la relecture d'Extension : « ok phrases 0066 », 18 h 09 ; raccourcis du § 6 lus dans la table partagée des menus : « ok phrases 0066 », 19 h 03 ; demande de Charles du 03/11/2026, 17 h 11 : « quand on clique dessus, […] il faut que ça fasse un joli design avec se connecter, etc. Enfin, vraiment que l'extension soit fonctionnelle »)
+Statut : accepted (Charles, 03/11/2026, 17 h 37, « ok 0066 » ; § 7 amendé pour l'aligner sur la liaison de VEI-01 : « ok phrases 0066 », 17 h 38 ; raccourcis du § 6 alignés sur le menu du CRM après la relecture d'Extension : « ok phrases 0066 », 18 h 09 ; raccourcis du § 6 lus dans la table partagée des menus : « ok phrases 0066 », 19 h 03 ; titre, contexte et § 7 amendés pour le jeton de liaison de veille gardé par l'extension (VEI-02 lot b) : « ok phrases 0066 », 06/11/2026, 15 h 47 ; demande de Charles du 03/11/2026, 17 h 11 : « quand on clique dessus, […] il faut que ça fasse un joli design avec se connecter, etc. Enfin, vraiment que l'extension soit fonctionnelle »)
 Date : 2026-11-03
 Précise : l'ADR 0008 (rôle de l'extension) et l'ADR 0062 § 8 (identifiant de l'extension non empaquetée). Ne remplace rien.
 
@@ -11,7 +11,7 @@ Le popup de l'extension affiche aujourd'hui le logo et une phrase : « Rien à f
 Trois contraintes existent déjà :
 
 - **La connexion au CRM a deux facteurs** (ADR 0046) et des clés d'accès Face ID ou empreinte (ADR 0053). Une clé d'accès est liée au domaine du CRM : elle ne marche pas dans un popup d'extension, dont l'adresse est `chrome-extension://…`.
-- **L'extension ne garde aucun secret** (`apps/extension/README.md`, ADR 0008 : la session Reveal ne vit jamais dans l'extension).
+- L'extension ne garde aucun secret de connexion : ni mot de passe, ni code, ni cookie, ni session Reveal (ADR 0008). Seule exception, le jeton de liaison de veille du § 7, gardé dans `chrome.storage.local` et lu par le service worker seul, jamais par le script de contenu d'Instagram : il est révocable dans le CRM et ne sert qu'à envoyer des relevés.
 - **L'API refuse toute écriture qui ne vient pas de l'adresse du CRM** (security.md § 6). Seul `POST /v1/connector/sessions` (la future capture Reveal) en est exempté, avec son jeton d'appareil.
 
 ## Décision
@@ -27,7 +27,7 @@ Trois contraintes existent déjà :
    - au plus quatre raccourcis vers le CRM, lus dans la table des menus que le CRM et l'extension partagent (`packages/contracts`) : chaque rôle y a son menu et ses raccourcis, et un test refuse un raccourci absent du menu de son rôle, pour qu'un raccourci n'ouvre jamais un écran qui refuse et qu'un écran ajouté au menu soit proposé au popup dans la même PR (propriétaire : Dashboard, Suivi, Équipe, Créatrices ; manager : Dashboard, Suivi, Équipe, Paie ; chatteur : Aujourd'hui, Suivi, Planning, Commissions ; créatrice : Aujourd'hui, Agenda, Ventes, Moi) ;
    - en pied, l'adresse du CRM et la version.
    Un CRM injoignable s'affiche en ambre avec l'adresse essayée et « Réessayer ». Rien n'est en rouge : le popup n'a pas d'urgence à montrer.
-7. **Lire n'est pas écrire.** La session du CRM ne sert qu'à savoir qui est là et ce que le popup propose. Ce que l'extension enverra à l'API (relevés de veille, capture Reveal) passe par la liaison par personne de VEI-01 (« Relier l'extension » dans le CRM : jeton haché, révocable, limité à ces envois), jamais par le cookie du CRM. Le popup montrera l'état de cette liaison quand elle existera. La capture Reveal n'est pas dans ce lot : sa carte dit « Bientôt » tant que P2 n'est pas livrée, et « Synchroniser » ne sera proposé qu'au propriétaire.
+7. **Lire n'est pas écrire.** La session du CRM ne sert qu'à savoir qui est là et ce que le popup propose. Ce que l'extension enverra à l'API (relevés de veille, capture Reveal) passe par la liaison par personne de VEI-01 (« Relier l'extension » dans le CRM : jeton haché, révocable, limité à ces envois), jamais par le cookie du CRM. Le popup montrera l'état de cette liaison quand elle existera. La capture Reveal n'est pas dans ce lot : sa carte dit « Bientôt » tant que P2 n'est pas livrée, et « Synchroniser » ne sera proposé qu'au propriétaire. Le jeton se colle une fois dans la case « Relier » du popup. Délié dans le CRM, il ne sert plus à rien, et le popup propose de le recoller.
 8. **Thème** : Nuit ou Jour selon le réglage du navigateur ou de l'ordinateur (`prefers-color-scheme`) ; le choix fait dans Réglages › Apparence du CRM appartient au site du CRM et l'extension ne peut pas le lire.
 
 ## Conséquences

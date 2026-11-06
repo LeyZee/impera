@@ -70,6 +70,5 @@ export const snapshot = (patch: Partial<PeriodSnapshot>): PeriodSnapshot => ({
   minimumPayoutMinor: 1_500,
   latestRates: [],
   statements: [],
-  lastValidated: new Map(),
   ...patch,
 });

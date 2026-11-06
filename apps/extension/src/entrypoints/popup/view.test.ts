@@ -29,6 +29,14 @@ function draw(screen: Screen): { root: HTMLElement; actions: Actions } {
     saveAddress: vi.fn(),
     resetAddress: vi.fn(),
     cancelAddress: vi.fn(),
+    watch: {
+      link: vi.fn(),
+      allow: vi.fn(),
+      begin: vi.fn(),
+      end: vi.fn(),
+      mark: vi.fn(),
+      openSecurity: vi.fn(),
+    },
   };
   const root = document.createElement('div');
   render(root, screen, frame, actions);
@@ -58,14 +66,14 @@ describe('popup', () => {
   });
 
   it('writes the name as text, never as markup', () => {
-    const { root } = draw({ kind: 'signed_in', me: ME, place: 'elsewhere' });
+    const { root } = draw({ kind: 'signed_in', me: ME, place: 'elsewhere', watch: null });
     expect(root.querySelector('b')).toBeNull();
     expect(root.querySelector('.pp-account__name')?.textContent).toBe('Alex <b>Morel</b>');
     expect(root.querySelector('.pp-whisper')?.textContent).toBe('Bonsoir, Alex.');
   });
 
   it('opens the shortcuts and the account page in the CRM', () => {
-    const { root, actions } = draw({ kind: 'signed_in', me: ME, place: 'elsewhere' });
+    const { root, actions } = draw({ kind: 'signed_in', me: ME, place: 'elsewhere', watch: null });
     buttonNamed(root, 'Suivi').click();
     root.querySelector<HTMLButtonElement>('.pp-account')?.click();
     expect(actions.open).toHaveBeenNthCalledWith(1, '/suivi');
@@ -74,9 +82,34 @@ describe('popup', () => {
 
   it('shows the Reveal card only on Reveal', () => {
     expect(
-      draw({ kind: 'signed_in', me: ME, place: 'reveal' }).root.querySelector('[data-place="reveal"]'),
+      draw({ kind: 'signed_in', me: ME, place: 'reveal', watch: null }).root.querySelector(
+        '[data-place="reveal"]',
+      ),
     ).not.toBeNull();
-    expect(draw({ kind: 'signed_in', me: ME, place: 'crm' }).root.querySelector('.pp-place')).toBeNull();
+    expect(
+      draw({ kind: 'signed_in', me: ME, place: 'crm', watch: null }).root.querySelector('.pp-place'),
+    ).toBeNull();
+  });
+
+  it('keeps one neon per screen: on a watch, « Ouvrir le CRM » steps back', () => {
+    const watch = {
+      status: { allowed: true, link: 'linked' as const, watch: null, vision: null, lastCreatorId: null },
+      creators: [],
+      notice: null,
+      busy: false,
+      now: new Date(),
+      draft: '',
+    };
+    const { root } = draw({ kind: 'signed_in', me: ME, place: 'instagram', watch });
+    expect(root.querySelector('[data-place="instagram"]')).not.toBeNull();
+    expect(root.querySelectorAll('.nv-btn--neon')).toHaveLength(1);
+    expect(buttonNamed(root, 'Ouvrir le CRM').className).toContain('nv-btn--soft');
+  });
+
+  it('shows no Instagram card to someone the watch is not for', () => {
+    const { root } = draw({ kind: 'signed_in', me: ME, place: 'instagram', watch: null });
+    expect(root.querySelector('[data-place="instagram"]')).toBeNull();
+    expect(root.textContent).not.toContain('Bientôt');
   });
 
   it('says an unreachable CRM in amber, never in red, with its address', () => {
