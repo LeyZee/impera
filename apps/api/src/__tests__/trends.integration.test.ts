@@ -292,6 +292,12 @@ describe('/v1/trends', () => {
   });
 
   it('tells the extension which creators its person may mark a post for', async () => {
+    // An archived creator is out of every list (ADR 0071 § 2, recette EXT-09): never offered, never marked for.
+    const archived = await seedCreator('Zoé');
+    await test.admin.db
+      .update(schema.creators)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.creators.id, archived));
     const hers = await readingsCreators(await newToken(cookies.creator));
     expect(hers.map((creator) => creator.id)).toEqual([nora]);
     const agency = await readingsCreators(await newToken(cookies.manager));
