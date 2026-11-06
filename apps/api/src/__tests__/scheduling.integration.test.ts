@@ -430,7 +430,14 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     expect(mine.shifts.map((shift) => shift.id)).toEqual([theoTomorrow.id]);
     expect(mine.members).toEqual([{ id: theo.id, displayName: 'Théo', color: null }]);
     expect(mine.accounts).toEqual([
-      { id: annaAccount, creatorId: anna, creatorName: 'Anna', platform: 'reveal', handle: 'anna-invente' },
+      {
+        id: annaAccount,
+        creatorId: anna,
+        creatorName: 'Anna',
+        platform: 'reveal',
+        handle: 'anna-invente',
+        archived: false,
+      },
     ]);
 
     const tooLong = await call(

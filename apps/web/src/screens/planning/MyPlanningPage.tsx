@@ -328,7 +328,8 @@ export function MyPlanningPage({
           />
         )}
         {me === null ? null : (
-          <div className="sc-folds">
+          // Under the team's calendar, as wide as it: both right edges on one line.
+          <div className="sc-folds" data-wide={team ? 'true' : undefined}>
             {leaves.data === undefined ? null : (
               <MyLeaves
                 leaves={leaves.data.leaveRequests}

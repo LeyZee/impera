@@ -231,7 +231,7 @@ export function PlanningPage({
     <button
       type="button"
       className="nv-btn nv-btn--neon"
-      disabled={data?.accounts.length === 0}
+      disabled={data?.accounts.every((account) => account.archived) === true}
       onClick={() => {
         setOpen({ kind: 'add', start: { accountId: null, day: days[pickedIndex] ?? today } });
       }}
@@ -587,8 +587,13 @@ function Filters({
   own: boolean;
   onOwn: (own: boolean) => void;
 }): JSX.Element | null {
+  // Never an archived creator (ADR 0071 § 2): her row is her history, not someone to plan.
   const creators = [
-    ...new Map(planning.accounts.map((account) => [account.creatorId, account.creatorName])),
+    ...new Map(
+      planning.accounts
+        .filter((account) => !account.archived)
+        .map((account) => [account.creatorId, account.creatorName]),
+    ),
   ].sort(([, a], [, b]) => a.localeCompare(b, 'fr'));
   const zones = mine !== agency;
   if (creators.length < 2 && !zones) return null;
@@ -930,12 +935,13 @@ function Grid({
         <div className="sc-grid__row sc-grid__row--head" role="row">
           <span className="sc-grid__corner" role="columnheader">
             <span className="nv-num">
-              {week.length === 1 ? '1 shift' : `${String(week.length)} shifts`}
-              {week.length === 0 ? '' : ` · ${lengthOf(total)}`}
+              <span>
+                {week.length === 1 ? '1 shift' : `${String(week.length)} shifts`}
+                {week.length === 0 ? '' : ` · ${lengthOf(total)}`}
+              </span>
               {/* On its own line, whole: the thing to do under the count, never « places / à pourvoir » cut in two. */}
               {toFill === 0 ? null : (
                 <span className="sc-grid__tofill">
-                  <span className="sc-grid__sep"> · </span>
                   {toFill === 1 ? '1 place à pourvoir' : `${String(toFill)} places à pourvoir`}
                 </span>
               )}
@@ -965,6 +971,7 @@ function Grid({
             <span className="sc-grid__account" role="rowheader">
               <span className="sc-grid__creator">{row.account.creatorName}</span>
               <span className="sc-grid__handle">{accountLine(row.account)}</span>
+              {row.account.archived ? <span className="sc-grid__archived">archivée</span> : null}
               <RowAgent agents={agents} creatorId={row.account.creatorId} />
             </span>
             {days.map((day, index) => (
@@ -980,6 +987,7 @@ function Grid({
                 today={day === today}
                 picked={index === picked}
                 past={day < today}
+                closed={row.account.archived}
                 now={now}
                 zone={zone}
                 focus={focus}
@@ -1030,6 +1038,7 @@ function Cell({
   today,
   picked,
   past,
+  closed,
   now,
   zone,
   focus,
@@ -1053,6 +1062,8 @@ function Cell({
   today: boolean;
   picked: boolean;
   past: boolean;
+  /** Its creator is archived (ADR 0071 § 2): her history only, nothing is added to it. */
+  closed: boolean;
   now: Date;
   zone: string;
   focus: string | null;
@@ -1119,8 +1130,10 @@ function Cell({
                       onAdd({ accountId, ...start });
                     }}
                   />
-                ) : slot.chips.length === 0 && !slot.covered && slot.to.getTime() <= now.getTime() ? (
-                  // A créneau gone by with nobody: left grey, nothing to do about it now.
+                ) : slot.chips.length === 0 &&
+                  !slot.covered &&
+                  (closed || slot.to.getTime() <= now.getTime()) ? (
+                  // A créneau gone by with nobody, or one of an archived creator: left grey, nothing to do about it.
                   <span className="sc-slot__gone" aria-hidden="true" />
                 ) : null}
                 {agent === null || alone ? null : (
@@ -1138,7 +1151,7 @@ function Cell({
               </div>
             );
           })}
-      {past ? null : (
+      {past || closed ? null : (
         <button
           type="button"
           className="sc-add"

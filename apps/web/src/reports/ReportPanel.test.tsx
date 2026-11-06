@@ -32,6 +32,7 @@ const ACCOUNT = {
   creatorName: 'Nora Vidal',
   platform: 'reveal',
   handle: 'nora',
+  archived: false,
 };
 
 const shift = (shiftId: string, startsAt: string, endsAt: string) => ({

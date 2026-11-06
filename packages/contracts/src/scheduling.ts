@@ -435,13 +435,18 @@ export type CreateShiftTemplateBody = z.infer<typeof CreateShiftTemplateBodySche
 /** How far ahead a template's shifts exist. */
 export const SHIFT_TEMPLATE_HORIZON_DAYS = 28;
 
-/** An account the reader can see on the planning, with its creator's name for the rows. */
+/**
+ * An account the reader can see on the planning, with its creator's name for the rows. `archived`: her creator is
+ * archived (ADR 0071 § 2), so the account is only there for her shifts in the window, her history: nothing of it is to
+ * fill, and no shift or template is made on it any more.
+ */
 export const PlanningAccountSchema = z.object({
   id: PlatformAccountIdSchema,
   creatorId: CreatorIdSchema,
   creatorName: z.string().min(1),
   platform: PlatformSchema,
   handle: z.string().min(1),
+  archived: z.boolean(),
 });
 export type PlanningAccount = z.infer<typeof PlanningAccountSchema>;
 
@@ -889,7 +894,8 @@ export type AnswerShiftSwapRequestBody = z.infer<typeof AnswerShiftSwapRequestBo
  * earlier end on a shift under way ; `shift_range_invalid` 400, an end at or before the start, a shift longer than
  * `SHIFT_MAX_MINUTES`, or an instant that does not fall on a minute ; `planning_range_invalid` 400,
  * `to` at or before `from`, or more than `PLANNING_MAX_DAYS` (`LEAVE_QUERY_MAX_DAYS` for the leaves) ;
- * `shift_template_date_invalid` 400, a template that starts before today. Leaves and swaps (ADR 0031) :
+ * `shift_template_date_invalid` 400, a template that starts before today ; `creator_archived_conflict` 409, a shift or
+ * a template on a creator who is archived (ADR 0071 § 2). Leaves and swaps (ADR 0031) :
  * `member_on_leave_conflict` 409, a shift on a member during their approved leave ; `leave_request_not_found` 404 ;
  * `leave_request_conflict` 409, the same `id` with other values ; `leave_overlap_conflict` 409, another pending or
  * approved leave of the member then (`details.leaveRequestId`) ; `leave_decided_conflict` 409, a request no longer
@@ -920,6 +926,7 @@ export const SCHEDULING_ERROR_CODES = [
   'shift_range_invalid',
   'planning_range_invalid',
   'shift_template_date_invalid',
+  'creator_archived_conflict',
   'member_on_leave_conflict',
   'leave_request_not_found',
   'leave_request_conflict',

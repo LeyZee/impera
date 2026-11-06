@@ -25,6 +25,13 @@ export class CreatorNotFound extends DomainError {
   }
 }
 
+/** Nothing new is planned on an archived creator (ADR 0071 § 2): the owner reopens her first. */
+export class CreatorArchived extends DomainError {
+  constructor() {
+    super('creator_archived_conflict', 'Cette créatrice est archivée : on ne la planifie plus');
+  }
+}
+
 export class PlatformAccountNotFound extends DomainError {
   constructor() {
     super('platform_account_not_found', 'Ce compte n’est pas un compte de cette créatrice');

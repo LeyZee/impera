@@ -23,7 +23,17 @@ export function wireScheduling(
   const module = createSchedulingModule({
     db,
     adminDb,
-    creators: { list: () => deps.persona.creators.list('all') },
+    creators: {
+      // The archived ones too, said so (ADR 0071 § 2): the planning keeps her history and refuses her a new shift.
+      list: async () => {
+        const [all, open] = await Promise.all([
+          deps.persona.creators.list('all'),
+          deps.persona.creators.unarchived('all'),
+        ]);
+        const listed = new Set(open.map((creator) => creator.id));
+        return all.map((creator) => ({ ...creator, archived: !listed.has(creator.id) }));
+      },
+    },
     // Pay owns `payroll.recalculate`: a validated report enqueues it through pay's own function (EQ-04).
     enqueuePayRecalculation,
     // The switch guard of the pay rules reads the sales feed's links and checks (ADR 0050 § 8, CRM-03).

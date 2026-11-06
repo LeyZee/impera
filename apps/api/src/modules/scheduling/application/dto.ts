@@ -1,7 +1,6 @@
 import type {
   AccountPayRules,
   CreatorAgencyRate,
-  CreatorSummary,
   LeaveRequest,
   PlanningAccount,
   PlanningMember,
@@ -11,6 +10,7 @@ import type {
 } from '@impera/contracts';
 
 import type {
+  ListedCreator,
   NamedMember,
   StoredAgencyRate,
   StoredAccount,
@@ -43,8 +43,11 @@ export const toPlanningMember = (member: NamedMember): PlanningMember => ({
 
 export const toPlanningAccount = (
   account: StoredAccount,
-  creatorNames: ReadonlyMap<string, CreatorSummary>,
-): PlanningAccount => ({ ...account, creatorName: creatorNames.get(account.creatorId)?.displayName ?? '—' });
+  creatorNames: ReadonlyMap<string, ListedCreator>,
+): PlanningAccount => {
+  const creator = creatorNames.get(account.creatorId);
+  return { ...account, creatorName: creator?.displayName ?? '—', archived: creator?.archived ?? false };
+};
 
 const isoOrNull = (at: Date | null): string | null => at?.toISOString() ?? null;
 

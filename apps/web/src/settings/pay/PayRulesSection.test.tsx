@@ -16,6 +16,7 @@ const account = (n: number, creatorName: string, handle: string) => ({
   creatorName,
   platform: 'reveal',
   handle,
+  archived: false,
 });
 const rules = (n: number, accountN: number, fromPeriod: string, patch: Record<string, unknown> = {}) => ({
   id: id(500 + n),

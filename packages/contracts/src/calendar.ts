@@ -99,14 +99,17 @@ export type CalendarCoverage = z.infer<typeof CalendarCoverageSchema>;
 export const CalendarSchema = z.object({
   view: CalendarViewSchema,
   settings: SchedulingSettingsSchema,
-  /** The creators the calendar names (every creator for `agency` and `team`), with their names for the rows. */
-  creators: z.array(z.object({ id: CreatorIdSchema, name: z.string().min(1) })),
+  /**
+   * The creators the calendar names (every creator for `agency` and `team`), with their names for the rows. One who is
+   * archived (ADR 0071 § 2) only when a shift of the window is hers, her history, said `archived`: nothing to fill.
+   */
+  creators: z.array(z.object({ id: CreatorIdSchema, name: z.string().min(1), archived: z.boolean() })),
   /** The members named by `shifts`: id, name in the team and colour, nothing else. */
   members: z.array(PlanningMemberSchema),
   shifts: z.array(CalendarShiftSchema),
   /** Empty for `own`. */
   agent: z.array(CalendarAgentSchema),
-  /** `null` but for `agency`. */
+  /** `null` but for `agency`. Never an archived creator's account: the agency's figures are about who to plan. */
   agency: z
     .object({
       accounts: z.array(PlanningAccountSchema),

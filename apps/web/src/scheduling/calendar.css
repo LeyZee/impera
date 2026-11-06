@@ -147,6 +147,10 @@
   min-height: 12px;
   padding: 0;
 }
+/* The agency's key: amber, as the créneaux it can fill. */
+.cal-free--fill {
+  border-color: color-mix(in srgb, var(--nv-warning) 70%, transparent);
+}
 
 /* The legend: the members to follow, then the keys. */
 .cal-legend {
@@ -406,6 +410,17 @@
 .cal-bar > .tm-choices + .tm-choices {
   padding-left: var(--nv-space-6);
   border-left: 1px solid var(--nv-hairline);
+}
+/* The calendar of « L’équipe » (or its notice) starts clear of the chips above it, never touching them. */
+.sc-stack > .cal-bar ~ .nv-panel {
+  margin-top: var(--nv-space-4);
+}
+/* On a phone the two groups may take a line each: no hairline left hanging at the start of the second. */
+@media (max-width: 520px) {
+  .cal-bar > .tm-choices + .tm-choices {
+    padding-left: 0;
+    border-left: 0;
+  }
 }
 
 /* On « À pourvoir », label and hours fill a narrow column: the tag sits on its top edge, as on a phone, clear of both. */
