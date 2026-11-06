@@ -53,13 +53,13 @@ const bodiesFor = (
 /**
  * What an active manager of A reaches of B, and only that: the whole team, its reports and its pay (ADR 0023, « le
  * manager voit en plus toute l'équipe, la validation des rapports et des paies »), never B's fans, conversations nor
- * persona. Exact: a route of B's content he would reach tomorrow fails the test.
+ * persona, nor her planning, which is that of the managers who have her on their list (Charles, 06/11). Exact: a route
+ * of B's content he would reach tomorrow fails the test.
  */
 const AGENCY_SCOPE: readonly string[] = [
   'manager of A: GET /v1/scheduling/shifts/:shiftId/report → 200',
   'manager of A: GET /v1/scheduling/shifts/:shiftId/report → 200 shows Béa, bea-inventee',
   'manager of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200',
-  'manager of A: DELETE /v1/scheduling/shift-templates/:templateId → 204',
   'manager of A: GET /v1/team/members → 200 shows Bérénice',
   'manager of A: GET /v1/team/members/:memberId → 200',
   'manager of A: GET /v1/team/members/:memberId → 200 shows Bérénice',
@@ -71,8 +71,8 @@ const AGENCY_SCOPE: readonly string[] = [
   'manager of A: GET /v1/payroll/contractors/:memberId/file → 200',
 ];
 
-/** B's tables the manager changes through those routes: the planning of the team, never her content. */
-const AGENCY_WRITES: readonly string[] = ['shift_templates'];
+/** B's tables the manager changes through those routes: none, her planning included (Charles, 06/11). */
+const AGENCY_WRITES: readonly string[] = [];
 
 /** What B's seeded ids stand for, by the parameter that names them in a path. */
 type Seeded =
