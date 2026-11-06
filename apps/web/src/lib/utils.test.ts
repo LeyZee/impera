@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cn, deOf, initialOf } from './utils';
+import { cn, deOf, frenchSpaces, initialOf } from './utils';
 
 describe('cn', () => {
   it('keeps the last conflicting Tailwind utility', () => {
@@ -32,5 +32,14 @@ describe('deOf', () => {
     expect(deOf('Yvonne')).toBe('d’Yvonne');
     expect(deOf('Yasmine')).toBe('de Yasmine');
     expect(deOf('Léa')).toBe('de Léa');
+  });
+});
+
+describe('frenchSpaces', () => {
+  it('keeps « : ; ? ! » and the quotes on the word before them', () => {
+    expect(frenchSpaces('Elle n’a pas de persona active : l’agent n’écrit rien. « Oui » ? Non !')).toBe(
+      'Elle n’a pas de persona active : l’agent n’écrit rien. « Oui » ? Non !',
+    );
+    expect(frenchSpaces('Déjà : rien à changer.')).toBe('Déjà : rien à changer.');
   });
 });

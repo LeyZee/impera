@@ -34,3 +34,11 @@ export function memberOf(search: Record<string, unknown>): { membre?: string } {
   const { membre } = search;
   return typeof membre === 'string' && /^[0-9a-f-]{36}$/iu.test(membre) ? { membre } : {};
 }
+
+/**
+ * A sentence written elsewhere (the server's words) set as French is: a no-break space before « : ; ? ! » and inside
+ * « », so that a line never starts with a lone « : » on a phone (recette AGT-05, capture #627).
+ */
+export function frenchSpaces(text: string): string {
+  return text.replace(/ ([:;?!»])/gu, ' $1').replace(/« /gu, '« ');
+}
