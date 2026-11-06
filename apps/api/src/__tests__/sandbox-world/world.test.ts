@@ -195,12 +195,14 @@ describe('Reveal’s webhooks, delivered for real on this machine', () => {
       await control('/reveal/sell', { euros: 30, id: 'sale_hook_01' });
       await control('/clock', { advanceSeconds: 20 });
       expect(received).toHaveLength(1);
-      await control('/clock', { advanceSeconds: 31 });
+      await control('/clock', { advanceSeconds: 3600 });
       expect(received).toHaveLength(2);
 
       const last = received[1];
       const t = Number(/t=(\d+)/u.exec(last?.signature ?? '')?.[1]);
       expect(last?.signature).toBe(revealSignature(secret, t, last?.body ?? ''));
+      // Signed at the real time, not the world's moved clock: Impera refuses a `t` more than 5 minutes off.
+      expect(Math.abs(t - Date.now() / 1000)).toBeLessThan(300);
       expect(last?.event).toBe('sale_created');
       expect(last?.body).toContain('sale_hook_01');
       const state = z
