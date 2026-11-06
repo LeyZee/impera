@@ -106,8 +106,17 @@ describe('Rapports de fin de shift comparés à Reveal (ADR 0073)', () => {
     return id;
   };
 
-  /** A sale Theo made on Reveal, `minute` of `day` in Paris, of `grossMinor` including VAT; its refund if asked. */
-  const sold = async (days: number, minute: number, grossMinor: number, refundedMinor = 0): Promise<void> => {
+  /**
+   * A sale made on Reveal, `minute` of `day` in Paris, of `grossMinor` including VAT; its refund if asked. Theo's
+   * unless another platform chatter is named.
+   */
+  const sold = async (
+    days: number,
+    minute: number,
+    grossMinor: number,
+    refundedMinor = 0,
+    platformChatterId = THEO_ON_REVEAL,
+  ): Promise<void> => {
     sale += 1;
     const line = {
       creatorId: anna,
@@ -117,7 +126,7 @@ describe('Rapports de fin de shift comparés à Reveal (ADR 0073)', () => {
       saleType: 'ppv',
       status: 'paid',
       platformModelId: MODEL,
-      platformChatterId: THEO_ON_REVEAL,
+      platformChatterId,
       platformFanId: null,
       currency: 'EUR',
       position: `p-${String(sale)}`,
@@ -269,9 +278,11 @@ describe('Rapports de fin de shift comparés à Reveal (ADR 0073)', () => {
 
   it('validates by itself a report within the threshold and not above Reveal, once, in no one’s name (§ 4)', async () => {
     const shift = await shiftOf(-1);
-    // 120,00 € sold, 20,00 € of it refunded since: Reveal read 100,00 €; a sale outside the window is not the shift's.
+    // 120,00 € sold, 20,00 € of it refunded since: Reveal read 100,00 €. A sale outside the window is not the shift's,
+    // nor one in it by another platform chatter (ADR 0050 § 5).
     await sold(-1, 630, 12_000, 2_000);
     await sold(-1, 760, 5_000);
+    await sold(-1, 640, 4_000, 0, 'pseudo-d-un-collegue');
     const declared = await report(shift, 9_700);
     expect(declared.check).toEqual({
       state: 'complete',
