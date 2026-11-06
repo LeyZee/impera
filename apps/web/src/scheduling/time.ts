@@ -224,6 +224,7 @@ const FRENCH_CITIES: ReadonlyMap<string, string> = new Map([
   ['Moscow', 'Moscou'],
   ['Mexico City', 'Mexico'],
   ['Sao Paulo', 'São Paulo'],
+  ['DumontDUrville', 'Dumont-d’Urville'],
   // The list of zones in French too (recette 05/11, PRO-13): the names French writes otherwise, old names updated.
   ['Addis Ababa', 'Addis-Abeba'],
   ['Algiers', 'Alger'],
@@ -330,6 +331,58 @@ export function minuteOfInput(text: string): number | null {
   const minutes = Number(match[2] ?? match[3] ?? '0');
   return hours < 24 && minutes < 60 ? hours * 60 + minutes : null;
 }
+
+/**
+ * The day a day field holds, as `YYYY-MM-DD`: « 28/03/2027 », « 28/3/27 », « 28.03.2027 », « 28 3 », digits alone as
+ * the phone's number pad types them (« 2803 », « 280327 », « 28032027 »), or the « 2027-03-28 » a paste brings; null
+ * while it is empty, half typed or not a day. Without a year, it is the first such day from `today` on, or, for a day
+ * looked back to (`toward: 'past'`: a birth, a validation, a period read), the last one up to `today`. Two digits of a
+ * year are this century, but a past one never lies ahead: « 98 » is 1998 there. The fields are text (`DayField`), never
+ * `<input type="date">`, which Chromium writes in the system's language, « 03/28/2027 » on a machine in English
+ * (recette #561), as it does the hours.
+ */
+export function dayOfInput(text: string, today: string, toward: DayToward = 'ahead'): string | null {
+  const typed = text.trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(typed);
+  const parts =
+    iso === null
+      ? (/^(\d{2})(\d{2})(\d{2}|\d{4})?$/u.exec(typed) ??
+        /^(\d{1,2})[\s./-]+(\d{1,2})(?:[\s./-]+(\d{2}|\d{4}))?$/u.exec(typed))
+      : null;
+  if (iso === null && parts === null) return null;
+  const day = Number(iso?.[3] ?? parts?.[1]);
+  const month = Number(iso?.[2] ?? parts?.[2]);
+  const typedYear = iso?.[1] ?? parts?.[3];
+  const thisYear = Number(today.slice(0, 4));
+  const century = (short: number): number =>
+    toward === 'past' && 2000 + short > thisYear ? 1900 + short : 2000 + short;
+  const year =
+    typedYear === undefined
+      ? thisYear
+      : typedYear.length === 2
+        ? century(Number(typedYear))
+        : Number(typedYear);
+  const of = (inYear: number): string | null => {
+    const at = new Date(Date.UTC(inYear, month - 1, day));
+    // 31/02 rolls over into March: not a day.
+    if (at.getUTCMonth() !== month - 1 || at.getUTCDate() !== day) return null;
+    return at.toISOString().slice(0, 10);
+  };
+  const found = of(year);
+  if (found === null || typedYear !== undefined || toward === 'year') return found;
+  if (toward === 'past') return found <= today ? found : of(year - 1);
+  return found >= today ? found : of(year + 1);
+}
+
+/**
+ * Where a day typed without its year is looked for: from today on (an appointment), up to today (a birth), or in this
+ * year (the bounds of a period, which may end after today and start before it).
+ */
+export type DayToward = 'ahead' | 'past' | 'year';
+
+/** A day into a day field's « 28/03/2027 ». */
+export const inputOfDay = (day: string): string =>
+  `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
 
 /** Minutes of the day into a time field's « 23:30 ». */
 export const inputOf = (minute: number): string =>

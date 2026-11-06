@@ -126,19 +126,6 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
   });
 
-  it('heads the page with the creator, then her sheet’s tabs, then the agency’s actions (recette 05/11, PRO-22)', async () => {
-    await serve([ANNA, BEA]);
-    renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
-    await picked('Anna');
-    const creators = screen.getByRole('radiogroup', { name: 'Créatrice' });
-    const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
-    const structures = screen.getByRole('link', { name: 'Structures de script' });
-    const follows = (a: Node, b: Node): boolean =>
-      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-    expect(follows(creators, views)).toBe(true);
-    expect(follows(views, structures)).toBe(true);
-  });
-
   it('gives the owner her Accès, in the address, and keeps it from anyone else (CR-02)', async () => {
     await serve([ANNA]);
     const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
@@ -153,6 +140,25 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     cleanup();
     await serve([ANNA]);
     const other = renderAt(operator, `/creatrices?onglet=acces&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(other.state.location.search).toEqual({ creatrice: ANNA.id });
+    });
+  });
+
+  it('gives the owner her Profil, where her name is changed, and keeps it from anyone else (ADR 0071)', async () => {
+    await serve([ANNA]);
+    const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
+    const views = await screen.findByRole('navigation', { name: 'Fiche de la créatrice' });
+    fireEvent.click(within(views).getByRole('link', { name: 'Profil' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'profil', creatrice: ANNA.id });
+    });
+    expect(await screen.findByText('Nom : Anna')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Renommer' })).toBeDefined();
+
+    cleanup();
+    await serve([ANNA]);
+    const other = renderAt(operator, `/creatrices?onglet=profil&creatrice=${ANNA.id}`);
     await waitFor(() => {
       expect(other.state.location.search).toEqual({ creatrice: ANNA.id });
     });
@@ -349,5 +355,67 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/moi/profil');
     });
+  });
+});
+
+describe('Créatrices, what is left to set up for her (CRM-07 b2)', () => {
+  /** `serve`, with her account and her percentage answered as given. */
+  async function serveSetup(account: unknown, current: unknown): Promise<void> {
+    await serve([ANNA]);
+    const inner = vi.mocked(fetch);
+    const answered = inner.getMockImplementation();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+        if (url === `/v1/creators/${ANNA.id}/account`) return json({ account });
+        if (url === `/v1/creators/${ANNA.id}/agency-rates`)
+          return json({ today: '2026-11-05', current, rates: current === null ? [] : [current] });
+        if (answered === undefined) throw new Error('serve() answers first');
+        return answered(url, init);
+      }),
+    );
+  }
+
+  it('says to the owner what is left, each step opening its tab, her zone beside it', async () => {
+    await serveSetup(null, null);
+    const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
+    const card = await screen.findByRole('region', { name: 'Pour démarrer avec Anna' });
+    expect(within(card).getByText('1 sur 3')).toBeDefined();
+    expect(within(card).getAllByRole('listitem')[0]?.textContent).toBe('Sa persona : fait');
+    expect(within(card).getByText('À créer : son lien d’invitation.')).toBeDefined();
+    expect(within(card).getByText(/Ses heures se lisent à l’heure de Paris/u)).toBeDefined();
+    fireEvent.click(within(card).getByRole('link', { name: 'Ouvrir : Le pourcentage de l’agence' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'pourcentage', creatrice: ANNA.id });
+    });
+  });
+
+  it('is gone once all is done, and never shown to anyone but the owner', async () => {
+    const rate = {
+      id: '0192f3a0-0000-7000-8000-0000000000f1',
+      creatorId: ANNA.id,
+      fromDay: '2026-11-01',
+      agencyBps: 4000,
+      createdAt: '2026-11-01T08:00:00.000Z',
+    };
+    await serveSetup(
+      { email: 'anna@example.test', invitationPending: false, invitationExpiresAt: null },
+      rate,
+    );
+    renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
+    await screen.findByRole('heading', { name: 'Créatrices' });
+    await waitFor(() => {
+      expect(vi.mocked(fetch).mock.calls.some(([url]) => url === `/v1/creators/${ANNA.id}/account`)).toBe(
+        true,
+      );
+    });
+    expect(screen.queryByRole('region', { name: /Pour démarrer/u })).toBeNull();
+    cleanup();
+
+    await serveSetup(null, null);
+    renderAt(operator, `/creatrices?creatrice=${ANNA.id}`);
+    await screen.findByRole('heading', { name: 'Créatrices' });
+    expect(screen.queryByRole('region', { name: /Pour démarrer/u })).toBeNull();
   });
 });

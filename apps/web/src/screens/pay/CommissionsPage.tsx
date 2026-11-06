@@ -16,7 +16,7 @@ import { useEffect, useState, type JSX } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';
 import { MySalesPanel } from './MySalesPanel';
-import { useCfaFrancs, useCurrentPeriod, usePayNames } from './data';
+import { useAgencySettingsDown, useCfaFrancs, useCurrentPeriod, usePayNames } from './data';
 import { Chip, Empty, Gauge, GoalTicks, Loading, MoneyPath, Unreachable } from './parts';
 
 import {
@@ -71,6 +71,7 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
 export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   const now = useNow();
   const current = useCurrentPeriod();
+  const down = useAgencySettingsDown();
   const periods = usePayPeriods();
   // PAIE-32: the usual payout delay the owner announced, read by every member; never a figure of the code.
   const delay = usePayrollSettings().data?.payoutDelayBusinessDays ?? null;
@@ -115,6 +116,17 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                 void periods.refetch();
               }}
             />
+          </Panel>
+        </div>
+      </Page>
+    );
+  if (current === null && down !== null)
+    return (
+      <Page>
+        {head()}
+        <div className="py-board">
+          <Panel className="nv-enter">
+            <Unreachable what="la quinzaine en cours" onRetry={down} />
           </Panel>
         </div>
       </Page>
@@ -579,7 +591,7 @@ function MyPeriodRow({ summary, onOpen }: { summary: PayPeriodSummary; onOpen: (
     chip.label === 'Reporté'
       ? {
           minor: summary.carriedMinor,
-          what: `reporté sur le ${periodTitle(followingPeriod(window.period), false)}`,
+          what: `reporté sur la quinzaine ${periodLine(followingPeriod(window.period))}`,
         }
       : memberPeriodAmount(summary);
   const sub = `${amountText(summary.netMinor, 'EUR')} de net${summary.ended ? '' : ' à ce jour'}`;

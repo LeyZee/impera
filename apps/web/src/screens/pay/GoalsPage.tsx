@@ -11,7 +11,7 @@ import { useState, type JSX } from 'react';
 
 import { GoalDialog, TiersDialog } from './GoalForms';
 import { PayNav } from './PayNav';
-import { useAgencyToday, useCurrentPeriod, usePayNames } from './data';
+import { useAgencySettingsDown, useAgencyToday, useCurrentPeriod, usePayNames } from './data';
 import { Gauge, GoalTicks, Loading, LockIcon, PeriodArrows, PeriodHeading, Unreachable } from './parts';
 
 import { usePayPeriod } from '@/payroll/api';
@@ -53,6 +53,7 @@ export function GoalsPage({
   const owner = user.role === 'owner';
   const me = { id: user.id, name: user.name };
   const current = useCurrentPeriod();
+  const down = useAgencySettingsDown();
   const today = useAgencyToday();
   const period = chosen ?? current;
   const read = usePayPeriod(period);
@@ -85,6 +86,17 @@ export function GoalsPage({
     />
   );
 
+  if (period === null && down !== null)
+    return (
+      <Page>
+        {head}
+        <div className="py-board">
+          <Panel className="nv-enter">
+            <Unreachable what="la quinzaine en cours" onRetry={down} />
+          </Panel>
+        </div>
+      </Page>
+    );
   if (period === null || (data === undefined && !read.isError))
     return (
       <Page>

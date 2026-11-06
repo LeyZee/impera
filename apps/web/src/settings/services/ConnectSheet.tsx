@@ -1,5 +1,5 @@
 import type { ProviderStatus, ProviderVoice } from '@impera/contracts';
-import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type JSX, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import { PasswordPrompt, SignInAgain } from './PasswordPrompt';
@@ -7,6 +7,8 @@ import { RevealKey } from './RevealKey';
 import { connectKey, ReauthRequired, saveSettings, showError, type ShownError } from './api';
 import { GUIDES, type DashboardProvider } from './guide';
 import { nextAfter, normalizeKey } from './view';
+
+import { Select } from '@/shell/Select';
 
 /** After the password, the key field is new and empty: the message says to paste the key again. */
 const PASTE_AGAIN = 'Colle la clé à nouveau.';
@@ -103,6 +105,7 @@ export function ConnectSheet({
   const [phase, setPhase] = useState<Phase>({ kind: 'edit', error: null });
   const [voices, setVoices] = useState<readonly ProviderVoice[]>([]);
   const [voiceError, setVoiceError] = useState<ShownError | null>(null);
+  const voiceFieldId = useId();
   /** Opening the console folds step one a beat later, once the new tab has taken focus. */
   const [isConsoleOpening, setIsConsoleOpening] = useState(false);
   const keyInput = useRef<HTMLInputElement>(null);
@@ -229,22 +232,16 @@ export function ConnectSheet({
         </dl>
         {showVoicePicker ? (
           <>
-            <label className="sv-voice">
-              <span>Voix utilisée</span>
-              <select
+            <div className="sv-voice">
+              <label htmlFor={voiceFieldId}>Voix utilisée</label>
+              <Select
+                id={voiceFieldId}
                 value={status.settings.voice?.id ?? ''}
-                onChange={(event) => void pickVoice(event.target.value)}
-              >
-                {status.settings.voice === undefined ? (
-                  <option value="">Choisis la voix de la créatrice</option>
-                ) : null}
-                {voices.map((voice) => (
-                  <option key={voice.id} value={voice.id}>
-                    {voice.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                placeholder="Choisis la voix de la créatrice"
+                options={voices.map((voice) => ({ value: voice.id, label: voice.name }))}
+                onChange={(id) => void pickVoice(id)}
+              />
+            </div>
             <p className="sv-hint" data-error={voiceError !== null} aria-live="polite">
               {voiceError?.message ?? 'Chaque vocal passe par toi avant d’être envoyé.'}
             </p>

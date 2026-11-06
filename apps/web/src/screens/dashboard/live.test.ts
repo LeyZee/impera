@@ -233,36 +233,36 @@ describe('fromApi', () => {
     expect(both.agent.lead).toContain('L’IA qui écrit attend aussi sa clé.');
   });
 
-  it('says her stuck jobs in amber by name, and leaves the agency’s out of her health (recette 05/11, PRO-10)', () => {
+  it('names the jobs the worker gave up on in amber, and none when it could not count them', () => {
     const stuck = fromApi(
       apiDashboard({
         jobs: {
-          dead: 4,
+          dead: 3,
           stuck: [
-            { task: 'conversation.send', creator: true, count: 3 },
-            { task: 'payroll.fetch_exchange_rates', creator: false, count: 1 },
+            { label: 'Envoi des messages', count: 2, agency: false },
+            { label: 'Lecture des comptes Reveal', count: 1, agency: false },
           ],
         },
       }),
     );
     expect(card('activity', stuck)).toMatchObject({ tone: 'warn' });
-    expect(card('activity', stuck)?.rows).toContainEqual(['Tâches bloquées', 'Envoi d’un message (3)']);
+    expect(card('activity', stuck)?.rows).toContainEqual(['Envoi des messages', '2 bloquées']);
+    expect(card('activity', stuck)?.rows).toContainEqual(['Lecture des comptes Reveal', 'bloquée']);
     expect(stuck.agent.foldSummary).toContain('3 tâches bloquées');
-    expect(stuck.agency.stuck).toEqual([
-      expect.objectContaining({
-        task: 'payroll.fetch_exchange_rates',
-        name: 'Taux de change du jour',
-        count: 1,
-      }),
-    ]);
-    const agencyOnly = fromApi(
+    const one = fromApi(
+      apiDashboard({ jobs: { dead: 1, stuck: [{ label: 'Envoi des messages', count: 1, agency: false }] } }),
+    );
+    expect(card('activity', one)?.sub).toBe('Bloqué : Envoi des messages');
+    expect(card('activity')?.rows).toContainEqual(['Tâches bloquées', 'aucune']);
+    // The agency's pay, sent to the owner alone: named, never in her health (recette 05/11, PRO-10).
+    const agency = fromApi(
       apiDashboard({
-        jobs: { dead: 1, stuck: [{ task: 'payroll.fetch_exchange_rates', creator: false, count: 1 }] },
+        jobs: { dead: 0, stuck: [{ label: 'Taux de change du jour', count: 1, agency: true }] },
       }),
     );
-    expect(card('activity', agencyOnly)?.tone).toBe('ok');
-    expect(agencyOnly.agent.foldSummary).not.toContain('bloquée');
-    expect(card('activity')?.rows).toContainEqual(['Tâches bloquées', 'aucune']);
+    expect(card('activity', agency)?.tone).toBe('ok');
+    expect(card('activity', agency)?.rows).toContainEqual(['Agence · Taux de change du jour', 'bloquée']);
+    expect(agency.agent.foldSummary).not.toContain('bloquée');
     const unread = fromApi(apiDashboard({ jobs: { dead: null, stuck: [] } }));
     expect(card('activity', unread)?.rows).toContainEqual(['Tâches bloquées', 'pas lu']);
     expect(card('activity', unread)?.tone).toBe('ok');

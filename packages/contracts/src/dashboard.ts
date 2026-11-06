@@ -166,14 +166,6 @@ export const DashboardRevealSalesSchema = z.object({
 });
 export type DashboardRevealSales = z.infer<typeof DashboardRevealSalesSchema>;
 
-/** Stuck jobs of one kind (PRO-10): the worker's task name, hers or the agency's, and how many. */
-export const StuckJobSchema = z.object({
-  task: z.string().min(1).max(120),
-  creator: z.boolean(),
-  count: z.number().int().positive(),
-});
-export type StuckJob = z.infer<typeof StuckJobSchema>;
-
 export const DashboardSchema = z.object({
   creator: z.object({ id: CreatorIdSchema, name: z.string().min(1), timezone: z.string().min(1), now: at }),
   period: DashboardPeriodSchema,
@@ -213,17 +205,15 @@ export const DashboardSchema = z.object({
     outagesLast7d: count,
   }),
   /**
-   * Stuck jobs for her or for no creator: given up on (attempts spent), or due for 15 minutes under a name no worker
-   * task takes. Work that will not happen until someone looks (operations.md). `null` when the count could not be read,
-   * and for a creator: jobs of no creator are the agency's (ADR 0023).
+   * Stuck jobs: given up on (attempts spent), or due for 15 minutes under a name no worker task takes. Work that will
+   * not happen until someone looks (operations.md). `dead` counts the ones that stop her agent: hers, and the reading
+   * of the Reveal accounts (`AGENT_SYSTEM_JOBS`); `null` when they could not be read. `stuck` names each, by its
+   * `JOB_LABELS`, with `agency` for a job of no creator that does not stop her: listed for the owner alone, never
+   * counted in her health (recette 05/11, PRO-10).
    */
   jobs: z.object({
     dead: count.nullable(),
-    /**
-     * The same jobs by kind (recette 05/11, PRO-10): the worker's task name, and whether the job is hers (`creator`) or
-     * the agency's (cron, pay, Telegram). The screen names each kind in French; only hers count in her agent's health.
-     */
-    stuck: z.array(StuckJobSchema).max(50),
+    stuck: z.array(z.object({ label: z.string().min(1), count: count.min(1), agency: z.boolean() })),
   }),
   replies: z.object({
     /** Median time between a fan's message and her answer, over the period. */

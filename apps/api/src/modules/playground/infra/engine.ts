@@ -56,8 +56,13 @@ export interface EngineDeps {
   readonly sessionId: string;
   /** Dollars per euro, the daily budget's rate: costs are journaled in USD and shown in euros (ADR 0011). */
   readonly usdPerEur: number;
-  /** The creator the ratings belong to: the only one there is, until the screen lets the trainer choose. */
+  /** The creator the ratings belong to with the invented persona: the only one there is. */
   readonly creatorId?: () => Promise<string | null>;
+  /**
+   * The creator's version played, chosen at the head of the screen (recette PRO-21): its ratings are hers, whatever
+   * `creatorId` says. Absent: the invented persona.
+   */
+  readonly played?: NonNullable<PlaygroundState['persona']['played']>;
   readonly timeZone?: string;
   readonly now?: () => Date;
 }
@@ -183,7 +188,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
   const state = (): PlaygroundState => {
     const { situation, lastExchange } = session;
     return {
-      persona: { name: deps.persona.creatorName },
+      persona: { name: deps.persona.creatorName, played: deps.played ?? null },
       presets: FAN_PRESETS.map((p) => ({ id: p.id, label: p.label, tests: p.tests, opening: p.opening })),
       presetId,
       situation: {
@@ -271,7 +276,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         ratings += 1;
         const record = ratingRecord({
           id: `${deps.sessionId}-${String(ratings)}`,
-          creatorId: (await deps.creatorId?.()) ?? undefined,
+          creatorId: deps.played?.creatorId ?? (await deps.creatorId?.()) ?? undefined,
           sessionId: deps.sessionId,
           at: (deps.now ?? (() => new Date()))(),
           // The model that wrote it: an answer of the fallback counts for the fallback, not for Grok.

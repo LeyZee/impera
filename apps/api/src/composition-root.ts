@@ -30,7 +30,12 @@ import type { AccountingModule } from './modules/accounting';
 import type { AgentModule } from './modules/agent';
 import type { AlertsModule } from './modules/alerts';
 import type { BackupsModule } from './modules/backups';
-import type { ConnectorRegistry, ConnectorsModule, SalesFeedRegistry } from './modules/connectors';
+import type {
+  AvatarPorts,
+  ConnectorRegistry,
+  ConnectorsModule,
+  SalesFeedRegistry,
+} from './modules/connectors';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { CreatorTasksModule } from './modules/creator-tasks';
@@ -60,6 +65,7 @@ import { wireConnectors } from './wiring/connectors';
 import { wireContentDrops } from './wiring/content-drops';
 import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
+import { wireCreatorArchive } from './wiring/creator-archive';
 import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
@@ -190,6 +196,11 @@ export interface AppOptions {
    * the system's otherwise.
    */
   readonly connectorsClock?: () => Date;
+  /**
+   * Tests plug the photo copy's fetch and store here (CRM-07 a2b): FakeReveal's addresses are invented and MinIO is not
+   * started for it; the platform's image server and the media bucket otherwise.
+   */
+  readonly creatorAvatars?: Pick<AvatarPorts, 'fetch' | 'store'>;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
 }
@@ -248,6 +259,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     registry: options.connectorRegistry ?? {},
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
+    ...(options.creatorAvatars !== undefined && { avatars: options.creatorAvatars }),
   });
   const providers = await wireProviders(shared);
   const alerts = wireAlerts(shared);
@@ -278,8 +290,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const notifications = wireNotifications(shared);
   const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
   const scheduling = wireScheduling(shared, { persona: persona.module, creatorTasks: creatorTasks.module });
-  const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
   const contentDrops = wireContentDrops(shared);
+  const scripts = wireScripts(shared, {
+    persona: persona.module,
+    contentDrops: contentDrops.module,
+    cardFontsDir: CARD_FONTS_DIR,
+  });
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
     requeue: invoiceRequeue,
@@ -385,6 +401,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...invoicing.tasks,
     ...notifications.tasks,
     ...contentDrops.tasks,
+    ...scripts.tasks,
     ...creatorTasks.tasks,
     ...trends.tasks,
     'rate_limit.purge': defineTask(
@@ -429,6 +446,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       }),
       ...conversations.routes,
       ...persona.routes,
+      ...wireCreatorArchive(shared, {
+        persona: persona.module,
+        scheduling: scheduling.module,
+        conversations: conversations.module,
+      }),
       ...alerts.routes,
       fans.routes(agent.kycSlotsOf, (creatorId, fanId, userId) =>
         conversations.module.isFanRoutedTo(creatorId, fanId, userId),

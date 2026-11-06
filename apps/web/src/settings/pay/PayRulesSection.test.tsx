@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayRulesSection } from './PayRulesSection';
 
 import { SCHEDULING_SETTINGS } from '@/test/pay';
+import { valuesOf } from '@/test/select';
 
 /* Invented creators and accounts (ADR 0010); the rates are examples, not anyone's. */
 const id = (n: number): string => `0199f2a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -126,8 +127,8 @@ describe('Réglages › Règles de paie', () => {
     renderSection();
     fireEvent.click(await screen.findByRole('button', { name: 'Poser les règles' }));
     const dialog = screen.getByRole('dialog', { name: 'Poser les règles de paie' });
-    const from = within(dialog).getByLabelText<HTMLSelectElement>('À partir de la quinzaine');
-    expect([...from.options].map((option) => option.value).slice(0, 2)).toEqual(['2026-10-16', '2026-11-01']);
+    const from = within(dialog).getByRole('combobox', { name: 'À partir de la quinzaine' });
+    expect(valuesOf(from).slice(0, 2)).toEqual(['2026-10-16', '2026-11-01']);
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     expect(within(dialog).getAllByText('Un taux entre 0 et 100, comme 20 ou 5,5.')).toHaveLength(2);
@@ -325,13 +326,9 @@ describe('Réglages › Règles de paie', () => {
     renderSection();
     fireEvent.click(await screen.findByRole('button', { name: 'Nouvelles règles' }));
     const dialog = screen.getByRole('dialog', { name: 'Nouvelles règles de paie' });
-    const from = within(dialog).getByLabelText<HTMLSelectElement>('À partir de la quinzaine');
+    const from = within(dialog).getByRole('combobox', { name: 'À partir de la quinzaine' });
     // 1 November already has rules: the next free periods only.
-    expect([...from.options].map((option) => option.value)).toEqual([
-      '2026-11-16',
-      '2026-12-01',
-      '2026-12-16',
-    ]);
+    expect(valuesOf(from)).toEqual(['2026-11-16', '2026-12-01', '2026-12-16']);
     expect(within(dialog).getByLabelText<HTMLInputElement>('TVA').value).toBe('5,5');
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));

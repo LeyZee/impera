@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { NewCreatorForm } from './NewCreatorForm';
+
+import { openList } from '@/test/select';
 
 /* An invented creator: no real data. */
 const LEA = { id: '0192f3a0-0000-7000-8000-0000000000c1', displayName: 'Léa', timezone: 'Europe/Paris' };
@@ -53,11 +55,12 @@ describe('NewCreatorForm', () => {
 
   it('offers her zone by city, the zone kept behind it (CREA-27)', () => {
     show(201, LEA);
-    const zone = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Fuseau horaire' });
-    expect(zone.selectedOptions[0]?.textContent).toBe('Paris');
-    const montreal = screen.getByRole<HTMLOptionElement>('option', { name: 'Toronto (Montréal)' });
-    expect(montreal.value).toBe('America/Toronto');
-    expect(screen.getByRole('option', { name: 'Tokyo · Asie' })).toBeDefined();
+    const zone = screen.getByRole('combobox', { name: 'Fuseau horaire' });
+    expect(zone.textContent).toBe('Paris');
+    const list = openList(zone);
+    const montreal = within(list).getByRole('option', { name: 'Toronto (Montréal)' });
+    expect(montreal.getAttribute('data-value')).toBe('America/Toronto');
+    expect(within(list).getByRole('option', { name: 'Tokyo · Asie' })).toBeDefined();
   });
 
   it('sends once when the form is submitted again before the answer', async () => {

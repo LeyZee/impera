@@ -25,6 +25,7 @@ import {
   type FileServer,
 } from '@/test/contractors';
 import { IRIS, OWNER, OWNER_USER, THEO } from '@/test/pay';
+import { chooseValue, openList } from '@/test/select';
 
 let server: FileServer;
 
@@ -156,17 +157,18 @@ describe('Équipe › Membres › Dossier', () => {
     expect(regime.textContent).toContain('attestation de résidence fiscale');
 
     fireEvent.click(within(regime).getByRole('button', { name: 'Attribuer un régime' }));
-    const select = within(dialog()).getByLabelText('Régime');
+    const select = within(dialog()).getByRole('combobox', { name: 'Régime' });
     // The regimes of Benin alone, the newest first: never the one of France.
     expect(
-      within(select)
+      within(openList(select))
         .getAllByRole('option')
         .map((one) => one.textContent),
     ).toEqual([BENIN_DRAFT.name, BENIN_REGIME.name]);
+    fireEvent.keyDown(select, { key: 'Escape' });
     expect(within(dialog()).getByText(/^pas encore validé par le comptable/u).className).toBe(
       'tm-hint cf-amber',
     );
-    fireEvent.change(select, { target: { value: BENIN_REGIME.id } });
+    chooseValue(select, BENIN_REGIME.id);
     fireEvent.change(within(dialog()).getByLabelText('À partir du'), { target: { value: '2026-11-04' } });
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Attribuer' }));
     expect(within(dialog()).getByText('Aujourd’hui au plus tôt, le 5 novembre 2026.')).toBeTruthy();
@@ -191,8 +193,7 @@ describe('Équipe › Membres › Dossier', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Attribuer un régime' }));
     const from = within(dialog()).getByLabelText('À partir du');
-    expect(from.getAttribute('min')).toBe('2026-12-02');
-    expect(within(dialog()).getByDisplayValue('2026-12-02')).toBe(from);
+    expect(within(dialog()).getByDisplayValue('02/12/2026')).toBe(from);
     fireEvent.change(from, { target: { value: '2026-12-01' } });
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Attribuer' }));
     expect(

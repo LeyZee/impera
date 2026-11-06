@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { CREATOR_TASK_CATEGORY_EMOJI } from './creator-tasks';
 import {
   AnswerShiftSwapRequestBodySchema,
+  CREATOR_REPLIES_EMOJI,
   CreateLeaveRequestBodySchema,
   CreateShiftBodySchema,
   CreateShiftSwapRequestBodySchema,
@@ -517,5 +519,11 @@ describe('swaps (ADR 0031)', () => {
     expect(ShiftSwapRequestSchema.safeParse({ ...withdrawn, withdrawnByAgency: undefined }).success).toBe(
       false,
     );
+  });
+});
+
+describe('« Qui répond à tes fans » at a glance', () => {
+  it('never wears one of her categories’ emojis, so a shift never reads as one of her tasks', () => {
+    expect(Object.values(CREATOR_TASK_CATEGORY_EMOJI)).not.toContain(CREATOR_REPLIES_EMOJI);
   });
 });

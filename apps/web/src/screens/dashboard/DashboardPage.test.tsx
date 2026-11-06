@@ -2,6 +2,7 @@
 import {
   AgentModeResultSchema,
   CreatorIdSchema,
+  REAUTHENTICATION_ERROR_CODE,
   TeamMemberIdSchema,
   type AgentMode,
   type Dashboard as ApiDashboard,
@@ -14,7 +15,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DashboardPage } from './DashboardPage';
@@ -557,6 +558,82 @@ describe('DashboardPage changing the mode', () => {
     expect(checked('Copilote')).toBe('true');
   });
 
+  it('asks the password and the code again before Automatique, then sends it once more (reco 9)', async () => {
+    let mode: AgentMode = 'copilot';
+    let confirmed = false;
+    const writes: AgentMode[] = [];
+    const fetch = serveDashboard(
+      (url) => {
+        if (url.pathname !== '/v1/auth/reauthenticate')
+          return { status: 200, body: apiDashboard({ mode, automatic: { open: true, missing: [] } }) };
+        confirmed = true;
+        return { status: 200, body: {} };
+      },
+      undefined,
+      (body) => {
+        writes.push(body.mode);
+        if (body.mode === 'auto' && !confirmed)
+          return {
+            status: 403,
+            body: {
+              error: {
+                code: REAUTHENTICATION_ERROR_CODE,
+                message: 'Mot de passe et code à confirmer',
+                details: {},
+                requestId: 'req-2',
+              },
+            },
+          };
+        mode = body.mode;
+        return { status: 200, body: { mode, globalStop: false } };
+      },
+    );
+    renderDashboard();
+    fireEvent.click(await screen.findByRole('radio', { name: 'Automatique' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Passer en Automatique' });
+    expect(within(dialog).getByText(/confirme ton mot de passe et ton code/u)).toBeDefined();
+    // The refusal is a question, not an error: nothing is said in the corner, and the mode has not moved.
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(checked('Copilote')).toBe('true');
+
+    fireEvent.change(within(dialog).getByLabelText('Mot de passe'), { target: { value: 'secret-de-test' } });
+    fireEvent.change(within(dialog).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmer' }));
+      await tick();
+    });
+    await waitFor(() => {
+      expect(checked('Automatique')).toBe('true');
+    });
+    expect(writes).toEqual(['auto', 'auto']);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(fetch.mock.calls.some(([input]) => String(input) === '/v1/auth/reauthenticate')).toBe(true);
+  });
+
+  it('leaves the mode as it was when the password is not given', async () => {
+    const writes = serveModes(
+      'copilot',
+      () => ({
+        status: 403,
+        body: {
+          error: { code: REAUTHENTICATION_ERROR_CODE, message: 'Confirme', details: {}, requestId: 'req-3' },
+        },
+      }),
+      { automatic: { open: true, missing: [] } },
+    );
+    renderDashboard();
+    fireEvent.click(await screen.findByRole('radio', { name: 'Automatique' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Passer en Automatique' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(checked('Copilote')).toBe('true');
+    expect(writes).toEqual([{ creatorId: CREATOR.id, mode: 'auto' }]);
+  });
+
   it('never shows a change the server did not make', async () => {
     serveModes('copilot', () => ({ status: 500 }));
     renderDashboard();
@@ -841,23 +918,6 @@ describe('DashboardPage, the fold of the agent', () => {
     expect(tiles.some((text) => text.includes('Budget IA'))).toBe(false);
     const agency = screen.getByRole('complementary', { name: 'Pour toute l’agence' });
     expect(agency.textContent).toContain('Budget IA du jour, toutes créatrices');
-  });
-
-  it('names the agency’s stuck job for the owner alone, outside her health (recette 05/11, PRO-10)', async () => {
-    const body = apiDashboard({
-      jobs: { dead: 1, stuck: [{ task: 'payroll.fetch_exchange_rates', creator: false, count: 1 }] },
-    });
-    serveDashboard({ status: 200, body });
-    renderDashboard(true);
-    await screen.findByText('Kévin');
-    expect(screen.getByRole('complementary', { name: 'Pour toute l’agence' }).textContent).toContain(
-      'Taux de change du jour : bloquée',
-    );
-    cleanup();
-    serveDashboard({ status: 200, body });
-    renderDashboard(false);
-    await screen.findByText('Kévin');
-    expect(screen.queryByText(/Taux de change du jour/u)).toBeNull();
   });
 });
 

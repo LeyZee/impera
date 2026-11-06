@@ -25,7 +25,7 @@ export function CodeInput({
       <span className="nv-field__label nv-code__label">{label}</span>
       <input
         ref={ref}
-        className="nv-field__control nv-glass font-mono tracking-[0.12em]"
+        className="nv-field__control nv-glass nv-code__control"
         type="text"
         inputMode="numeric"
         autoComplete="one-time-code"

@@ -71,9 +71,11 @@ export const JOB_NAMES = [
   'content_drops.receive_file',
   'content_drops.convert_file',
   'content_drops.erase_originals',
+  'scripts.ask_scripts',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
+  'connector.copy_avatar',
   'telegram.scan',
   'telegram.flush_chat',
   'telegram.dispatch_polls',
@@ -85,6 +87,72 @@ export const JOB_NAMES = [
 ] as const;
 export const JobNameSchema = z.enum(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
+
+/**
+ * What each job does, in the owner's words: the Dashboard names a stuck job by it, never by its identifier (recette
+ * 05/11, PRO-10).
+ */
+export const JOB_LABELS: Readonly<Record<JobName, string>> = {
+  'conversation.respond': 'Réponse aux fans',
+  'conversation.send': 'Envoi des messages',
+  'conversation.follow_up': 'Relances des fans',
+  'conversation.record_facts': 'Mémoire des fans',
+  'conversation.reopen': 'Reprise à l’ouverture de ses heures',
+  'conversation.release_unavailable': 'Conversations rendues par un membre absent',
+  'connector.dispatch': 'Lecture des comptes Reveal',
+  'connector.poll': 'Lecture d’un compte Reveal',
+  'connector.reconcile': 'Vérification des envois Reveal',
+  'fans.refresh_summary': 'Résumé des fans',
+  'fans.purge_facts': 'Nettoyage de la mémoire des fans',
+  'rate_limit.purge': 'Nettoyage des limites de connexion',
+  'backups.check': 'Vérification des sauvegardes',
+  'notifications.recap': 'Récapitulatif des notifications',
+  'notifications.creator_sale': 'Notification de vente à la créatrice',
+  'creator_tasks.remind': 'Rappels de l’agenda',
+  'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
+  'scheduling.make_shifts': 'Création des shifts réguliers',
+  'scheduling.lapse_swaps': 'Échanges de shift expirés',
+  'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
+  'team.apply_roles': 'Rôles de l’équipe',
+  'payroll.recalculate': 'Calcul de la paie',
+  'payroll.recalculate_open': 'Calcul de la paie en cours',
+  'payroll.fetch_exchange_rates': 'Taux de change du jour',
+  'payroll.issue_invoices': 'Émission des factures',
+  'payroll.requeue_invoice_issues': 'Reprise des factures',
+  'payroll.render_invoice_pdf': 'PDF des factures',
+  'payroll.mirror_invoice_pdf': 'Copie des PDF de factures',
+  'payroll.lapse_invoice': 'Factures expirées',
+  'payroll.announce_invoice_contest': 'Contestation de facture',
+  'payroll.sweep_invoice_acceptance': 'Acceptation des factures',
+  'payroll.remind_documents': 'Rappels de documents',
+  'payroll.remind_due_invoices': 'Rappels de factures dues',
+  'payroll.purge_refused_documents': 'Nettoyage des documents refusés',
+  'payroll.settle_documents': 'Règlement des documents',
+  'payroll.lock_payout_certificate': 'Attestation de paiement',
+  'media.describe': 'Description des médias',
+  'content_drops.receive_file': 'Réception des fichiers de contenu',
+  'content_drops.convert_file': 'Conversion des vidéos',
+  'content_drops.erase_originals': 'Nettoyage des originaux de contenu',
+  'scripts.ask_scripts': 'Demandes de scripts',
+  'providers.check_credentials': 'Vérification des clés des services',
+  'connector.read_sales': 'Lecture des ventes Reveal',
+  'connector.check_sales': 'Contrôle des ventes Reveal',
+  'connector.copy_avatar': 'Copie de la photo d’une créatrice',
+  'telegram.scan': 'Alertes Telegram',
+  'telegram.flush_chat': 'Envoi des messages Telegram',
+  'telegram.dispatch_polls': 'Lecture de Telegram',
+  'telegram.poll_updates': 'Réponses reçues sur Telegram',
+  'telegram.morning_digest': 'Résumé Telegram du matin',
+  'telegram.evening_digest': 'Résumé Telegram du soir',
+  'telegram.connection_reminders': 'Rappels de connexion Telegram',
+  'telegram.purge': 'Nettoyage de Telegram',
+};
+
+/**
+ * The jobs of no creator that still stop her agent when they are stuck (recette 05/11, PRO-10): the reading of the
+ * Reveal accounts. Any other job of no creator (pay, Telegram, backups) is the agency's, never her agent's health.
+ */
+export const AGENT_SYSTEM_JOBS: readonly JobName[] = ['connector.dispatch'];
 
 export const JOB_PAYLOADS = {
   /**
@@ -295,6 +363,11 @@ export const JOB_PAYLOADS = {
    * once). Replayable: each step moves only what is still due, and says each thing once.
    */
   'content_drops.erase_originals': z.object({}),
+  /**
+   * Each hour (SC-02, ADR 0056 § 2): each creator whose next script is due within the lead gets her request, with the
+   * next structure of her queue that does not touch her limits, frozen. Replayable: one request per due day.
+   */
+  'scripts.ask_scripts': z.object({}),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -312,6 +385,16 @@ export const JOB_PAYLOADS = {
    */
   'connector.check_sales': z.object({
     recheck: z.object({ platform: PlatformSchema, from: PayPeriodSchema }).optional(),
+  }),
+  /**
+   * The photo of a creator just imported from a platform (CRM-07 a2b, ADR 0069 § 3): read again from the platform's
+   * model list, fetched, re-encoded and kept in the media bucket under `creators/<id>/avatar`. Replayable: the object
+   * is written over and `creators.avatar_key` set to the same key.
+   */
+  'connector.copy_avatar': z.object({
+    platform: PlatformSchema,
+    platformModelId: z.string().min(1).max(200),
+    creatorId: CreatorIdSchema,
   }),
   ...TELEGRAM_JOB_PAYLOADS,
 } as const satisfies Record<JobName, z.ZodType>;
@@ -388,12 +471,16 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.convert_file': 9,
   // Each hour: the next run is the retry.
   'content_drops.erase_originals': 1,
+  // Each hour: the next run is the retry.
+  'scripts.ask_scripts': 1,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,
   // Twice a month and its recheck: a refusal of the platform (429, outage) is worth a retry, and a mismatch is
   // published once per platform and fortnight whatever the attempts.
   'connector.check_sales': 3,
+  // A platform or a storage out for a while: a few tries over some minutes, then her initials stay.
+  'connector.copy_avatar': 5,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
   // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
   'telegram.scan': 25,

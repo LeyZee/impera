@@ -15,6 +15,7 @@ import {
   initialsOf,
   isStatusWarning,
   modelLabel,
+  newModelsLabel,
   proposalWhy,
   proposedChoice,
   refusalLine,
@@ -122,5 +123,20 @@ describe('the review of the import (CRM-07)', () => {
     expect(batchesOf([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
     expect(batchesOf([1, 2], 2)).toEqual([[1, 2]]);
     expect(batchesOf([], 2)).toEqual([]);
+  });
+});
+
+describe('the count of new creators on Réglages › Ventes (CRM-07 b2)', () => {
+  it('says nothing when none waits', () => {
+    expect(newModelsLabel({ total: 0, byPlatform: [] })).toBeNull();
+  });
+
+  it('says it as ADR 0069 § 5 does, one and several', () => {
+    expect(newModelsLabel({ total: 1, byPlatform: [{ platform: 'reveal', count: 1 }] })).toBe(
+      '1 nouvelle créatrice sur Reveal',
+    );
+    expect(newModelsLabel({ total: 3, byPlatform: [{ platform: 'reveal', count: 3 }] })).toBe(
+      '3 nouvelles créatrices sur Reveal',
+    );
   });
 });

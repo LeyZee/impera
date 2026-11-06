@@ -393,7 +393,11 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
         create: {
           // A member who left opens no session (ADR 0023): Better Auth then answers 401, which the sign-in route turns
           // into the same refusal as a wrong password.
-          before: async (session) => ((await hasLeftTeam(db, session.userId)) ? false : undefined),
+          // Nor does the account of an archived creator (ADR 0071 § 2).
+          before: async (session) =>
+            (await hasLeftTeam(db, session.userId)) || (await isArchivedCreatorAccount(db, session.userId))
+              ? false
+              : undefined,
           after: async (session, context) => {
             // The password step of an account with an active second factor: this session is dropped at once unless
             // the device is trusted, which the sign-in route alone knows; it writes that login itself.
@@ -542,6 +546,8 @@ async function userOf(
   // A row that does not validate (unknown role) gets no access rather than a guessed one.
   if (!parsed.success) return null;
   const user = parsed.data;
+  // Her space closes with her archiving (ADR 0071 § 2): a session still open is refused at its next request.
+  if (user.role === 'creator' && (await isArchivedCreatorAccount(db, user.id))) return null;
   if (user.role !== 'operator') return { user, membership: null };
   const member = await membership(db, user.id);
   // A session still open when the member left is refused at its next request (ADR 0023), even before it is revoked.
@@ -687,6 +693,23 @@ function membership(db: Database, userId: string): Promise<Membership> {
 async function hasLeftTeam(db: Database, userId: string): Promise<boolean> {
   const { team } = await membership(db, userId);
   return team?.status === 'left';
+}
+
+/** Whether the account is a creator's own whose creator is archived (ADR 0071 § 2); no other account ever is. */
+async function isArchivedCreatorAccount(db: Database, userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .innerJoin(schema.creators, sql`${schema.creators.id} = any(${schema.user.creatorIds})`)
+    .where(
+      and(
+        eq(schema.user.id, userId),
+        eq(schema.user.role, 'creator'),
+        sql`${schema.creators.archivedAt} is not null`,
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
 }
 
 /**

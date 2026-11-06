@@ -14,6 +14,7 @@ import { ExportsPage } from './ExportsPage';
 
 import { BILLING_SETTINGS } from '@/test/billing';
 import { MEMBERS, OCT1, OCT2, OWNER, SCHEDULING_SETTINGS, THEO, LOU } from '@/test/pay';
+import { choose } from '@/test/select';
 
 /*
  * The journal's bytes as the API makes them: ISO 8859-15, where « € » is 0xA4, « é » 0xE9 and « œ » 0xBD, lines ended
@@ -200,8 +201,8 @@ describe('Paie › Exports', () => {
     renderPage();
     const panel = await waitFor(() => panelOf('Journal des prestataires'));
     // The fiscal year in progress by default: the calendar year, as the settings close it in December.
-    expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '2026-01-01');
-    expect(within(panel).getByLabelText('Au')).toHaveProperty('value', '2026-11-05');
+    expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '01/01/2026');
+    expect(within(panel).getByLabelText('Au')).toHaveProperty('value', '05/11/2026');
     fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le journal' }));
     await within(panel).findByText(JOURNAL.fileName);
     expect(reads).toEqual(['/v1/payroll/accounting/journal?from=2026-01-01&to=2026-11-05']);
@@ -215,10 +216,10 @@ describe('Paie › Exports', () => {
 
     const unlettered = within(panel).getByText('Un groupe reste sans lettre').closest('.rp-notice');
     expect(unlettered?.getAttribute('data-tone')).toBe('warn');
-    expect(unlettered?.textContent).toContain('NORA, relevé du 1er – 15 octobre 2026');
+    expect(unlettered?.textContent).toContain('NORA, relevé du 1er au 15 octobre 2026');
     const left = within(panel).getByText('Un virement reste hors du fichier').closest('.rp-notice');
     expect(left?.getAttribute('data-tone')).toBe('warn');
-    expect(left?.textContent).toContain('Lou, quinzaine du 16 – 31 octobre 2026');
+    expect(left?.textContent).toContain('Lou, quinzaine du 16 au 31 octobre 2026');
   });
 
   it('names the accounts the accountant has not given, and leads to Réglages › Facturation', async () => {
@@ -251,11 +252,11 @@ describe('Paie › Exports', () => {
     const panel = await waitFor(() => panelOf('Journal des prestataires'));
     // A fiscal year closing in June: the one in progress began on the 1st of July.
     await waitFor(() => {
-      expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '2026-07-01');
+      expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '01/07/2026');
     });
     fireEvent.click(within(panel).getByRole('button', { name: 'Exercice précédent' }));
-    expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '2025-07-01');
-    expect(within(panel).getByLabelText('Au')).toHaveProperty('value', '2026-06-30');
+    expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '01/07/2025');
+    expect(within(panel).getByLabelText('Au')).toHaveProperty('value', '30/06/2026');
 
     fireEvent.change(within(panel).getByLabelText('Du'), { target: { value: '2024-01-01' } });
     fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le journal' }));
@@ -265,11 +266,24 @@ describe('Paie › Exports', () => {
     expect(reads).toEqual([]);
   });
 
+  // Relecture des captures (#569): a day that is no day is said under its own field, and nothing is asked.
+  it('says under its own field a day it cannot read, and sends nothing', async () => {
+    renderPage();
+    const panel = await waitFor(() => panelOf('Journal des prestataires'));
+    const from = within(panel).getByLabelText('Du');
+    fireEvent.change(from, { target: { value: '31/02' } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le journal' }));
+    const said = within(panel).getByText('Un jour comme 01/01/2026.');
+    expect(from.getAttribute('aria-describedby')?.split(' ')).toContain(said.id);
+    expect(within(panel).getByLabelText('Au').getAttribute('aria-describedby')).not.toContain(said.id);
+    expect(reads).toEqual([]);
+  });
+
   it('shows the DAS2’s beneficiaries in clear, their warnings in amber, and saves the CSV as it came', async () => {
     renderPage();
     const panel = await waitFor(() => panelOf('Récapitulatif DAS2'));
     // The year just ended first: it is the one declared in the spring.
-    expect(within(panel).getByLabelText('Année des virements')).toHaveProperty('value', '2025');
+    expect(within(panel).getByRole('combobox', { name: 'Année des virements' }).textContent).toBe('2025');
     fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le récapitulatif' }));
     await within(panel).findByText(DAS2.fileName);
     expect(reads).toEqual(['/v1/payroll/accounting/das2?year=2025']);
@@ -302,7 +316,7 @@ describe('Paie › Exports', () => {
     };
     renderPage();
     const panel = await waitFor(() => panelOf('Récapitulatif DAS2'));
-    fireEvent.change(within(panel).getByLabelText('Année des virements'), { target: { value: '2024' } });
+    choose(within(panel).getByRole('combobox', { name: 'Année des virements' }), '2024');
     fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le récapitulatif' }));
     expect(
       (await within(panel).findByText(/^Personne n’a reçu plus de 2/u)).textContent.replace(

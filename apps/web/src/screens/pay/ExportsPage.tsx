@@ -3,8 +3,8 @@ import { Link } from '@tanstack/react-router';
 import { useId, useState, type SyntheticEvent, type JSX, type ReactNode } from 'react';
 
 import { PayNav } from './PayNav';
-import { useAgencyToday } from './data';
-import { Loading } from './parts';
+import { useAgencySettingsDown, useAgencyToday } from './data';
+import { Loading, Unreachable } from './parts';
 
 import {
   bytesOf,
@@ -28,13 +28,16 @@ import {
   type DayRange,
 } from '@/accounting/model';
 import '@/payroll/pay.css';
-import { amountText, periodTitle } from '@/reports/model';
+import { amountText, periodLine } from '@/reports/model';
 import '@/reports/reports.css';
+import { DayField } from '@/scheduling/DayField';
+import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { fullDay } from '@/scheduling/time';
 import { useMembers } from '@/screens/team/api';
 import { useBillingSettings } from '@/settings/billing/api';
 import { weightText } from '@/settings/billing/model';
 import '@/screens/team/team.css';
+import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /**
@@ -44,6 +47,7 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
  */
 export function ExportsPage({ user }: { user: Me }): JSX.Element {
   const today = useAgencyToday();
+  const down = useAgencySettingsDown();
   const billing = useBillingSettings();
   const members = useMembers();
   const nameOf = (memberId: string): string =>
@@ -62,7 +66,11 @@ export function ExportsPage({ user }: { user: Me }): JSX.Element {
         actions={<PayNav user={user} />}
       />
       <div className="py-board">
-        {years === null || today === null ? (
+        {today === null && down !== null ? (
+          <Panel className="nv-enter">
+            <Unreachable what="l’heure de l’agence" onRetry={down} />
+          </Panel>
+        ) : years === null || today === null ? (
           <Panel className="nv-enter">
             <Loading rows={3} />
           </Panel>
@@ -161,7 +169,7 @@ function JournalReady({
         >
           {journal.unbalanced.map((group) => (
             <li key={`${group.prefix}-${group.period}`}>
-              <span className="nv-num">{group.prefix}</span>, relevé du {periodTitle(group.period)}
+              <span className="nv-num">{group.prefix}</span>, relevé {periodLine(group.period, true)}
             </li>
           ))}
         </Notice>
@@ -177,7 +185,7 @@ function JournalReady({
         >
           {journal.transfersLeftOut.map((transfer) => (
             <li key={`${transfer.memberId}-${transfer.period}`}>
-              {nameOf(transfer.memberId)}, quinzaine du {periodTitle(transfer.period)}
+              {nameOf(transfer.memberId)}, quinzaine {periodLine(transfer.period, true)}
             </li>
           ))}
         </Notice>
@@ -213,21 +221,16 @@ function Das2Panel({ today, nameOf }: { today: string; nameOf: (memberId: string
             <label className="nv-field__label" htmlFor={`${id}-year`}>
               Année des virements
             </label>
-            <select
+            <Select
               id={`${id}-year`}
-              className="nv-field__control nv-glass tm-select nv-num"
-              value={year}
-              onChange={(event) => {
-                setYear(Number(event.target.value));
+              className="nv-num"
+              value={String(year)}
+              options={years.map((one) => ({ value: String(one), label: String(one) }))}
+              onChange={(value) => {
+                setYear(Number(value));
                 setAsked(IDLE);
               }}
-            >
-              {years.map((one) => (
-                <option key={one} value={one}>
-                  {one}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <button type="submit" className="nv-btn nv-btn--neon ex-ask" disabled={busy} aria-busy={busy}>
             {busy ? 'Préparation…' : 'Préparer le récapitulatif'}
@@ -383,6 +386,12 @@ function ArchiveReady({ archive }: { archive: ArchiveFile }): JSX.Element {
   );
 }
 
+/** The two ends of a period, in the order they are typed. */
+const DAY_ENDS: readonly { key: 'from' | 'to'; label: string }[] = [
+  { key: 'from', label: 'Du' },
+  { key: 'to', label: 'Au' },
+];
+
 /**
  * Two days, both included, two years at most: the fiscal year in progress by default, the one before it a click away,
  * any other typed (a first fiscal year runs up to 24 months). The contract's reason is said before anything is sent.
@@ -405,8 +414,8 @@ function RangeForm({
   const id = useId();
   const [range, setRange] = useState<DayRange>(years.current);
   const [tried, setTried] = useState(false);
+  const { unreadable, isUnreadable, onUnreadable } = useUnreadableTimes();
   const checked = periodQuery(range);
-  const wrong = tried && !checked.ok;
   const choose = (next: DayRange): void => {
     setRange(next);
     onChange();
@@ -414,7 +423,7 @@ function RangeForm({
   const onSubmit = (event: SyntheticEvent): void => {
     event.preventDefault();
     setTried(true);
-    if (!checked.ok || busy) return;
+    if (unreadable || !checked.ok || busy) return;
     void onAsk(checked.query);
   };
   const same = (one: DayRange): boolean => one.from === range.from && one.to === range.to;
@@ -443,49 +452,54 @@ function RangeForm({
         </button>
       </div>
       <div className="ex-days">
-        <div className="nv-field tm-field" data-invalid={wrong ? 'true' : undefined}>
-          <label className="nv-field__label" htmlFor={`${id}-from`}>
-            Du
-          </label>
-          <input
-            id={`${id}-from`}
-            type="date"
-            className="nv-field__control nv-glass nv-num"
-            value={range.from}
-            aria-invalid={wrong}
-            aria-describedby={`${id}-hint`}
-            onChange={(event) => {
-              choose({ ...range, from: event.target.value });
-            }}
-          />
-        </div>
-        <div className="nv-field tm-field" data-invalid={wrong ? 'true' : undefined}>
-          <label className="nv-field__label" htmlFor={`${id}-to`}>
-            Au
-          </label>
-          <input
-            id={`${id}-to`}
-            type="date"
-            className="nv-field__control nv-glass nv-num"
-            value={range.to}
-            aria-invalid={wrong}
-            aria-describedby={`${id}-hint`}
-            onChange={(event) => {
-              choose({ ...range, to: event.target.value });
-            }}
-          />
-        </div>
-        <button type="submit" className="nv-btn nv-btn--neon ex-ask" disabled={busy} aria-busy={busy}>
-          {busy ? 'Préparation…' : action}
-        </button>
+        {DAY_ENDS.map(({ key, label }) => {
+          const bad = tried && isUnreadable(key);
+          return (
+            <div
+              key={key}
+              className="nv-field tm-field"
+              data-invalid={bad || (tried && !checked.ok) ? 'true' : undefined}
+            >
+              <label className="nv-field__label" htmlFor={`${id}-${key}`}>
+                {label}
+              </label>
+              <DayField
+                id={`${id}-${key}`}
+                value={range[key]}
+                invalid={bad || (tried && !checked.ok)}
+                describedBy={bad ? `${id}-${key}-error ${id}-hint` : `${id}-hint`}
+                onChange={(next) => {
+                  choose({ ...range, [key]: next });
+                }}
+                toward="year"
+                onUnreadable={(unread) => {
+                  onUnreadable(key, unread);
+                }}
+              />
+              {bad ? (
+                <p id={`${id}-${key}-error`} className="tm-hint tm-hint--error">
+                  Un jour comme 01/01/2026.
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
-      <p id={`${id}-hint`} className={wrong ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-        {checked.ok
-          ? `Du ${fullDay(checked.query.from)} au ${fullDay(checked.query.to)}, les deux compris.`
-          : tried
-            ? checked.reason
-            : 'Deux jours compris, deux ans au plus.'}
+      <p
+        id={`${id}-hint`}
+        className={tried && !unreadable && !checked.ok ? 'tm-hint tm-hint--error' : 'tm-hint'}
+      >
+        {unreadable
+          ? 'Deux jours compris, deux ans au plus.'
+          : checked.ok
+            ? `Du ${fullDay(checked.query.from)} au ${fullDay(checked.query.to)}, les deux compris.`
+            : tried
+              ? checked.reason
+              : 'Deux jours compris, deux ans au plus.'}
       </p>
+      <button type="submit" className="nv-btn nv-btn--neon ex-ask" disabled={busy} aria-busy={busy}>
+        {busy ? 'Préparation…' : action}
+      </button>
     </form>
   );
 }

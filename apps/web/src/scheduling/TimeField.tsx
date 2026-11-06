@@ -14,6 +14,7 @@ export function TimeField({
   value,
   label,
   className,
+  disabled = false,
   onChange,
   onUnreadable,
 }: {
@@ -21,6 +22,7 @@ export function TimeField({
   value: number;
   label: string;
   className?: string;
+  disabled?: boolean;
   onChange: (minute: number) => void;
   /** From `useUnreadableTimes` (stable): told when the field holds what is not an hour, and when it no longer does. */
   onUnreadable: (field: string, unreadable: boolean) => void;
@@ -55,6 +57,7 @@ export function TimeField({
       className={`nv-field__control nv-glass nv-num${className === undefined ? '' : ` ${className}`}`}
       value={draft ?? inputOf(value)}
       aria-label={label}
+      disabled={disabled}
       aria-invalid={unreadable ? true : undefined}
       onChange={(event) => {
         setDraft(event.target.value);
@@ -70,9 +73,10 @@ export function TimeField({
   );
 }
 
-/** The time fields of one form that hold what is not an hour: while there is one, the form does not save. */
+/** The time and day fields of one form that hold what is not an hour or a day: while there is one, the form does not save. */
 export function useUnreadableTimes(): {
   unreadable: boolean;
+  isUnreadable: (field: string) => boolean;
   onUnreadable: (field: string, unreadable: boolean) => void;
 } {
   const [fields, setFields] = useState<ReadonlySet<string>>(() => new Set());
@@ -85,5 +89,6 @@ export function useUnreadableTimes(): {
       return after;
     });
   }, []);
-  return { unreadable: fields.size > 0, onUnreadable };
+  const isUnreadable = useCallback((field: string) => fields.has(field), [fields]);
+  return { unreadable: fields.size > 0, isUnreadable, onUnreadable };
 }

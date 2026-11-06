@@ -203,6 +203,12 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     const after = (await get(bea, owner)).json<PersonaOverview>().versions;
     expect(after.filter((v) => v.isActive).map((v) => v.version)).toEqual(['1.0.1']);
 
+    // One version by its id, active or not (Entraîner › Playground, PRO-21); never another creator's.
+    const older = after.find((v) => v.version === '1.0.0');
+    if (older === undefined) throw new Error('1.0.0 not listed');
+    expect(await versions.version(bea, older.id)).toMatchObject({ id: older.id, version: '1.0.0' });
+    expect(await versions.version(anna, older.id)).toBeNull();
+
     const changed = { ...next, additional_info: 'Autre texte' };
     await expect(
       versions.load(bea, changed, { sourcePath: 'c.yaml', activate: false }),

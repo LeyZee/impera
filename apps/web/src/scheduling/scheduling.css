@@ -60,11 +60,13 @@
 .sc-week {
   display: flex;
   align-items: center;
-  gap: var(--nv-space-1);
+  gap: var(--nv-space-2);
   min-width: 0;
 }
+/* The dates breathe between their arrows (recette #561, Charles: « trop collé au bouton »). */
 .sc-week__label {
   margin: 0;
+  padding-inline: var(--nv-space-1);
   min-width: 13ch;
   text-align: center;
   font-size: var(--nv-text-callout);
@@ -650,8 +652,19 @@ button.sc-duty__one:active {
   border: 1px dashed var(--nv-hairline);
   border-radius: var(--nv-radius-sm);
 }
+.sc-grid__corner > .nv-num {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* The places to fill, on their own line under the count and never cut (recette #564). */
 .sc-grid__tofill {
   color: var(--nv-warning);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sc-grid__sep {
+  display: none;
 }
 /* The marks of a shift, said once under the grid (EQ-24). */
 .sc-legend {
@@ -811,12 +824,28 @@ button.sc-duty__one:active {
   .sc-grid__cell[data-today='true']:hover {
     background: transparent;
   }
+  /* One template for every créneau of a day alone (recette #564): the name, its hours under it, a status on the
+     right, and « À pourvoir » on the same left edge. */
   .sc-chip {
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--nv-space-3);
-    padding: 10px 28px 10px 12px;
+    column-gap: var(--nv-space-3);
+    row-gap: 1px;
+    padding: 8px 28px 8px 12px;
+  }
+  .sc-chip__who,
+  .sc-chip__hours {
+    grid-column: 1;
+  }
+  .sc-chip__left,
+  .sc-chip__away {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    justify-self: end;
+  }
+  .sc-slot__fill {
+    padding: 8px 12px;
   }
   .sc-chip__repeat {
     top: 50%;
@@ -919,6 +948,10 @@ button.sc-duty__one:active {
   text-align: right;
   font-weight: 600;
 }
+/* A row whose value is a gesture (« Faire mon rapport », EQP-02): its label sits level with the button. */
+.sc-sheet__facts li:has(> .nv-btn, > .sc-sheet__report > .nv-tap) {
+  align-items: center;
+}
 .sc-sheet__edit {
   display: flex;
   flex-direction: column;
@@ -926,6 +959,10 @@ button.sc-duty__one:active {
 }
 .sc-sheet__foot {
   justify-content: space-between;
+}
+/* The plain action on the left reads on the content's edge, its padding outside it (recette #564). */
+.sc-sheet__foot > .nv-btn--plain:first-child {
+  margin-left: calc(-1 * var(--nv-space-3));
 }
 .sc-sheet__repeat {
   display: flex;

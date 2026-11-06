@@ -43,6 +43,9 @@ export function CloseDialog({
   const net = statements.reduce((sum, one) => sum + one.netMinor, 0);
   const payable = statements.reduce((sum, one) => sum + one.payableMinor, 0);
   const count = batch.length;
+  // What this validation pays, apart from the team's whole amount when it validates fewer than all (recette EQP-16).
+  const whole = count === statements.length;
+  const batchPayable = batch.reduce((sum, one) => sum + one.payableMinor, 0);
 
   return (
     <Dialog
@@ -100,10 +103,28 @@ export function CloseDialog({
               <dd>{percentText(Math.floor(collective.reachedBps / 100) * 100)}</dd>
             </div>
           )}
-          <div className="py-lines__pay">
-            <dt>À verser</dt>
-            <dd>{amountText(payable, 'EUR')}</dd>
-          </div>
+          {whole ? (
+            <div className="py-lines__pay">
+              <dt>À verser</dt>
+              <dd>{amountText(payable, 'EUR')}</dd>
+            </div>
+          ) : (
+            <>
+              <div>
+                <dt>
+                  À verser pour l’équipe<small>tous les relevés de la quinzaine</small>
+                </dt>
+                <dd>{amountText(payable, 'EUR')}</dd>
+              </div>
+              <div className="py-lines__pay">
+                <dt>
+                  {count === 1 ? 'Ce relevé' : `Ces ${String(count)} relevés`}
+                  <small>ce que tu valides maintenant</small>
+                </dt>
+                <dd>{amountText(batchPayable, 'EUR')}</dd>
+              </div>
+            </>
+          )}
         </dl>
         <div className="rp-notice">
           <p className="rp-notice__text">

@@ -4,9 +4,10 @@ import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { ShootBrief } from './ShootBrief';
 import { AGENDA_KEY, archiveTask, moveTask, NOT_SENT } from './api';
-import { dayInReach, OUT_OF_REACH, reachOf, spanOf } from './draft';
+import { dayInReach, OUT_OF_REACH, spanOf } from './draft';
 import { whenWords } from './words';
 
+import { DayField } from '@/scheduling/DayField';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf, dayOf, minuteOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
@@ -170,9 +171,12 @@ function MoveForm({
   const { unreadable, onUnreadable } = useUnreadableTimes();
   const [busy, setBusy] = useState(false);
   const [badDay, setBadDay] = useState(false);
-  const [reach] = useState(() => reachOf());
+  const [tried, setTried] = useState(false);
+  const [dayUnreadable, setDayUnreadable] = useState(false);
+  const dayWrong = badDay || (tried && dayUnreadable);
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
+    setTried(true);
     if (unreadable) return;
     if (!dayInReach(day)) {
       setBadDay(true);
@@ -194,24 +198,25 @@ function MoveForm({
         <label className="nv-field__label" htmlFor={`${id}-day`}>
           Jour
         </label>
-        <input
+        <DayField
           id={`${id}-day`}
-          type="date"
-          className="nv-field__control nv-glass tm-date"
+          className="tm-date"
           value={day}
-          min={reach.min}
-          max={reach.max}
-          data-autofocus
-          aria-invalid={badDay ? 'true' : undefined}
-          aria-describedby={badDay ? `${id}-day-error` : undefined}
-          onChange={(event) => {
-            setDay(event.target.value);
+          autofocus
+          invalid={dayWrong}
+          describedBy={dayWrong ? `${id}-day-error` : undefined}
+          onChange={(next) => {
+            setDay(next);
             setBadDay(false);
           }}
+          onUnreadable={(bad) => {
+            setDayUnreadable(bad);
+            onUnreadable('day', bad);
+          }}
         />
-        {badDay ? (
+        {dayWrong ? (
           <p id={`${id}-day-error`} className="tm-hint tm-hint--error" role="alert">
-            {OUT_OF_REACH}
+            {badDay ? OUT_OF_REACH : 'Un jour comme 28/03/2027, ou 28/3.'}
           </p>
         ) : null}
       </div>

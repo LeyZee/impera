@@ -1,0 +1,28 @@
+/* Créatrices › Archivées (ADR 0071 § 2): folded at the foot of the sheet, as wide as a plate. */
+.cr-archived {
+  align-self: stretch;
+  max-width: 720px;
+}
+.cr-archived__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.cr-archived__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+/* A long name with its date wraps; « Rouvrir » keeps its place. */
+.cr-archived__row > span {
+  min-width: 0;
+}
+.cr-archived__row > button {
+  flex: none;
+  /* Its words end on the right edge of the count and chevron above, not a button's padding short of it. */
+  margin-inline-end: calc(-1 * var(--nv-space-4));
+}

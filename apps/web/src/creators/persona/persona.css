@@ -34,18 +34,18 @@
   margin: 0;
 }
 /*
- * Créatrices' header (recette 05/11, PRO-22): the creators on a line of their own, first; below, her sheet's tabs and,
- * set apart on the right, the agency's actions.
+ * Who, then what: the creators on a row of their own above the tabs of her sheet, and the agency's own buttons apart
+ * at the end of the tabs' row, so a chip is never read as a tab (captures de #563).
  */
 .cr-creators {
-  flex: 1 1 100%;
+  order: -1;
+  flex-basis: 100%;
+  margin-bottom: var(--nv-space-1);
 }
-.cr-agency {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
+@media (min-width: 641px) {
+  .cr-agency-first {
+    margin-inline-start: var(--nv-space-4);
+  }
 }
 /* A phone: the creators on one line that scrolls, its far edge fading, instead of rows of chips (CREA-19). */
 @media (max-width: 640px) {
@@ -446,8 +446,10 @@
   color: var(--nv-warning);
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
+/* The mark stands apart from the words: a narrow space read as glued to them (PRO-14 a, captures). */
 .ps-error::before {
-  content: '!\202F';
+  content: '!';
+  margin-inline-end: 0.45em;
 }
 .ps-field[data-invalid='true'] .nv-field__control,
 .ps-input[aria-invalid='true'] {
@@ -810,6 +812,15 @@
   border-top: 1px solid var(--nv-hairline);
 }
 
+/* A phone: the head's actions fall under her name, each as wide as the column, their words centred on one axis. */
+@media (max-width: 640px) {
+  .ps-head__actions {
+    flex-basis: 100%;
+  }
+  .ps-head__actions > .nv-btn {
+    flex: 1 1 100%;
+  }
+}
 @media (max-width: 820px) {
   .ps-page {
     overflow: visible;
@@ -1079,6 +1090,3 @@
 }
 
 /* A zone chosen by city (CREA-27). */
-.ps-select {
-  cursor: pointer;
-}

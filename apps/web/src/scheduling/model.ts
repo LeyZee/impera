@@ -75,6 +75,7 @@ export const ERROR_MESSAGES: Readonly<Record<SchedulingRefusalCode, string>> = {
   shift_swap_self_invalid: 'Un échange se fait avec un collègue.',
   calendar_link_forbidden: 'Le lien de calendrier est réservé aux membres de l’équipe.',
   calendar_feed_not_found: 'Ce lien de calendrier n’est plus valable.',
+  calendar_link_not_found: 'Ton lien de calendrier n’est plus en service : crée-le de nouveau.',
   slot_version_not_found: 'Ce réglage des créneaux n’existe plus : la liste est relue.',
   slot_version_conflict:
     'Un autre réglage des créneaux prend déjà effet à cet instant : retire-le ou choisis un autre lundi.',
@@ -407,9 +408,10 @@ export interface SlotCell {
   readonly seats: 1 | 2;
   /**
    * The first stretch of it still ahead with fewer shifts than `seats`, from now at the minute for the créneau under
-   * way; `null` when nothing of it is left to fill. A shift stopped under way, or a short one, leaves one.
+   * way; `null` when nothing of it is left to fill. A shift stopped under way, or a short one, leaves one. `now` when it
+   * begins at the present minute of the créneau under way: said « maintenant », not « 20 h 01 » (recette #564).
    */
-  readonly open: { readonly from: Date; readonly to: Date } | null;
+  readonly open: { readonly from: Date; readonly to: Date; readonly now: boolean } | null;
   /**
    * The places to fill, as the server's `slotsToFill` counts them: `seats` less the fewest shifts at once over what is
    * left of it; 0 when `open` is `null`. One that wants two with a chatter on all of it counts one (« + 2e chatteur »).
@@ -464,7 +466,8 @@ export function slotRowOf(
     const from = window.from.getTime();
     const to = window.to.getTime();
     const seats = seatsOf(window.version, window.rank, row.account.id);
-    const { open, fewest } = shortIn(Math.max(from, ahead), to, spans, seats);
+    const { open: short, fewest } = shortIn(Math.max(from, ahead), to, spans, seats);
+    const open = short === null ? null : { ...short, now: ahead > from && short.from.getTime() === ahead };
     return {
       slot: window.slot,
       from: window.from,

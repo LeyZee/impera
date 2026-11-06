@@ -1,6 +1,7 @@
 import type { PlaygroundState } from '@impera/contracts';
 import { useEffect, useState, type JSX } from 'react';
 
+import { PersonaPicker } from './PersonaPicker';
 import { clockAt, duration, money, scriptsHint } from './logic';
 import type { CreatorMedia as CreatorMediaInput, MediaKind } from './model';
 import type { Playground } from './usePlayground';
@@ -12,7 +13,7 @@ export const MEDIA_KINDS: readonly { kind: MediaKind; label: string }[] = [
 ];
 
 /**
- * Who the fan is, what we know of him, what time it is for her, and what she can send. Only the fan stays
+ * Whom she speaks as (PRO-21), who the fan is, what we know of him, what time it is for her, and what she can send. Only the fan stays
  * open: the rest folds to one line that says what it holds (docs/design/README.md, « Hiérarchie »).
  */
 export function SetupPanel({
@@ -47,6 +48,7 @@ export function SetupPanel({
         </button>
       </div>
       <div className="nv-scroll">
+        <PersonaPicker state={state} pg={pg} />
         <FanPicker state={state} pg={pg} onPicked={onCloseSheet} />
 
         <details className="nv-disclosure pg-fold">

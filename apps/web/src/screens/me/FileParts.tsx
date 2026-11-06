@@ -39,6 +39,7 @@ import '@/contractors/contractors.css';
 import type { InvoiceOutcome, InvoiceRefusal } from '@/invoices/api';
 import { invoiceRefusalText } from '@/invoices/model';
 import { countryName } from '@/lib/country';
+import { DayField } from '@/scheduling/DayField';
 import { weightText } from '@/settings/billing/model';
 import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
@@ -510,8 +511,12 @@ export function UploadDialog({
   const [validUntil, setValidUntil] = useState('');
   const [touched, setTouched] = useState(false);
   const problem = chosen === null ? null : fileProblem(chosen.file);
-  const issuedOk = /^\d{4}-\d{2}-\d{2}$/u.test(issuedOn) && issuedOn <= today;
-  const untilOk = validUntil === '' || (/^\d{4}-\d{2}-\d{2}$/u.test(validUntil) && validUntil > issuedOn);
+  const [issuedUnreadable, setIssuedUnreadable] = useState(false);
+  const [untilUnreadable, setUntilUnreadable] = useState(false);
+  const issuedOk = !issuedUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(issuedOn) && issuedOn <= today;
+  const untilOk =
+    !untilUnreadable &&
+    (validUntil === '' || (/^\d{4}-\d{2}-\d{2}$/u.test(validUntil) && validUntil > issuedOn));
   const ready = chosen !== null && problem === null && issuedOk && untilOk;
 
   const submit = (event: SyntheticEvent): void => {
@@ -571,24 +576,26 @@ export function UploadDialog({
           <label className="nv-field__label" htmlFor={`${id}-issued`}>
             Délivrée le
           </label>
-          <input
+          <DayField
             id={`${id}-issued`}
-            type="date"
-            className="nv-field__control nv-glass nv-num"
-            max={today}
             value={issuedOn}
-            aria-invalid={touched && !issuedOk}
-            aria-describedby={`${id}-issued-hint`}
-            onChange={(event) => {
-              setIssuedOn(event.target.value);
+            invalid={touched && !issuedOk}
+            describedBy={`${id}-issued-hint`}
+            onChange={(next) => {
+              setIssuedOn(next);
             }}
+            today={today}
+            toward="past"
+            onUnreadable={setIssuedUnreadable}
           />
           <p id={`${id}-issued-hint`} className={touched && !issuedOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-            {touched && !issuedOk
-              ? 'La date écrite sur la pièce, au plus tard aujourd’hui.'
-              : kind === 'tax_residence'
-                ? 'La date écrite sur l’attestation : elle vaut pour l’année civile de sa délivrance.'
-                : 'La date écrite sur l’attestation.'}
+            {touched && issuedUnreadable
+              ? 'Un jour comme 12/05/2026, ou 12/5.'
+              : touched && !issuedOk
+                ? 'La date écrite sur la pièce, au plus tard aujourd’hui.'
+                : kind === 'tax_residence'
+                  ? 'La date écrite sur l’attestation : elle vaut pour l’année civile de sa délivrance.'
+                  : 'La date écrite sur l’attestation.'}
           </p>
         </div>
         {kind === 'tax_residence' ? null : (
@@ -596,21 +603,23 @@ export function UploadDialog({
             <label className="nv-field__label" htmlFor={`${id}-until`}>
               Valable jusqu’au <span className="cf-quiet">(si elle le dit)</span>
             </label>
-            <input
+            <DayField
               id={`${id}-until`}
-              type="date"
-              className="nv-field__control nv-glass nv-num"
               value={validUntil}
-              aria-invalid={touched && !untilOk}
-              aria-describedby={`${id}-until-hint`}
-              onChange={(event) => {
-                setValidUntil(event.target.value);
+              invalid={touched && !untilOk}
+              describedBy={`${id}-until-hint`}
+              onChange={(next) => {
+                setValidUntil(next);
               }}
+              optional
+              onUnreadable={setUntilUnreadable}
             />
             <p id={`${id}-until-hint`} className={touched && !untilOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-              {touched && !untilOk
-                ? 'La fin suit la date de délivrance.'
-                : 'Sans fin écrite, elle tient six mois à partir de sa délivrance.'}
+              {touched && untilUnreadable
+                ? 'Un jour comme 12/11/2026, ou rien.'
+                : touched && !untilOk
+                  ? 'La fin suit la date de délivrance.'
+                  : 'Sans fin écrite, elle tient six mois à partir de sa délivrance.'}
             </p>
           </div>
         )}

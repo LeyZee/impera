@@ -79,8 +79,11 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
         'À régler : aucun pourcentage pour Anna, aucune part de l’agence n’est montrée.',
       ),
     ).toBeDefined();
-    // Typed day first, never the browser's own order (recette 05/11, PRO-11).
-    expect(screen.getByLabelText('À partir du').getAttribute('placeholder')).toBe('jj/mm/aaaa');
+    // Typed, never the system's calendar: a day before today is refused in words.
+    type('À partir du', '2/11/2026');
+    expect(screen.getByText(/^Le .* au plus tôt\.$/u)).toBeDefined();
+    type('À partir du', TODAY);
+    expect(screen.queryByText(/au plus tôt\.$/u)).toBeNull();
     expect(screen.queryByText('Historique')).toBeNull();
   });
 
@@ -91,7 +94,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     const check = screen.getByRole('button', { name: 'Vérifier avant d’enregistrer' });
     expect(check).toHaveProperty('disabled', true);
     type('Pourcentage de l’agence', '35');
-    type('À partir du', '03/11/2026');
+    type('À partir du', TODAY);
     fireEvent.click(check);
     const confirm = await screen.findByRole('alertdialog');
     expect(confirm.textContent).toContain('35\u00a0% pour l’agence à partir du 03/11/2026.');
@@ -108,8 +111,8 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     const history = screen.getByRole('list');
     expect(within(history).getByText('En vigueur')).toBeDefined();
     // The next one starts tomorrow at the earliest.
-    type('À partir du', '03/11/2026');
-    expect(screen.getByText(/^Le .+ au plus tôt\.$/u)).toBeDefined();
+    type('À partir du', TODAY);
+    expect(await screen.findByText('Le 04/11/2026 au plus tôt.')).toBeDefined();
   });
 
   it('turns « Revenir » into nothing sent, and a refused day into its sentence', async () => {
@@ -124,7 +127,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     renderSection();
     await screen.findByText('35 % pour l’agence aujourd’hui, depuis le 01/11/2026.');
     type('Pourcentage de l’agence', '30,5');
-    type('À partir du', '20/11/2026');
+    type('À partir du', '2026-11-20');
     fireEvent.click(screen.getByRole('button', { name: 'Vérifier avant d’enregistrer' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Revenir' }));
     expect(posts).toEqual([]);
@@ -155,7 +158,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     type('Pourcentage de l’agence', '101');
     expect(screen.getByText('Un pourcentage de 0 à 100, comme 35 ou 35,5.')).toBeDefined();
     type('Pourcentage de l’agence', '30');
-    type('À partir du', '03/11/2026');
+    type('À partir du', TODAY);
     expect(screen.getByText('Le 04/11/2026 au plus tôt.')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Vérifier avant d’enregistrer' })).toHaveProperty(
       'disabled',

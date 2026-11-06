@@ -18,6 +18,9 @@ import {
   type RestoreDraft,
 } from './model';
 
+import { DayField } from '@/scheduling/DayField';
+import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
+import { inputOf, minuteOfInput } from '@/scheduling/time';
 import { backupStatusQuery } from '@/screens/dashboard/backups';
 
 const STEP_TITLES = ['Compte rendu', 'Vérifier'] as const;
@@ -72,8 +75,11 @@ export function RestoreTestDialog({ onClose }: { onClose: () => void }): JSX.Ele
   const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // The end of the test is a day and an hour typed: while one of them is not, the test is not noted.
+  const { unreadable, onUnreadable } = useUnreadableTimes();
   const shown: Partial<Record<DraftField, string>> = {
     ...(attempted ? problemsOf(draft, new Date()) : {}),
+    ...(attempted && unreadable ? { testedAt: 'Un jour comme 05/11/2026, une heure comme 14:30.' } : {}),
     ...(refused === null ? {} : { [refused.field]: refused.message }),
   };
 
@@ -142,7 +148,7 @@ export function RestoreTestDialog({ onClose }: { onClose: () => void }): JSX.Ele
 
   const send = async (): Promise<void> => {
     setAttempted(true);
-    const body = bodyOf(draft, testId, new Date());
+    const body = unreadable ? null : bodyOf(draft, testId, new Date());
     if (body === null) {
       setPhase({ kind: 'check' });
       return;
@@ -280,7 +286,14 @@ export function RestoreTestDialog({ onClose }: { onClose: () => void }): JSX.Ele
                 Lu dans le compte rendu. Vérifie avant de noter : rien n’est encore envoyé.
               </p>
             ) : null}
-            <CheckFields id={id} draft={draft} problems={shown} disabled={busy} onChange={change} />
+            <CheckFields
+              id={id}
+              draft={draft}
+              problems={shown}
+              disabled={busy}
+              onChange={change}
+              onUnreadable={onUnreadable}
+            />
             {failure === null ? null : (
               <p className="bk-warn nv-swap" role="alert">
                 {failure.message}
@@ -365,13 +378,18 @@ function CheckFields({
   problems,
   disabled,
   onChange,
+  onUnreadable,
 }: {
   id: string;
   draft: RestoreDraft;
   problems: Partial<Record<DraftField, string>>;
   disabled: boolean;
   onChange: (field: DraftField, value: string) => void;
+  onUnreadable: (field: string, unreadable: boolean) => void;
 }): JSX.Element {
+  // `testedAt` is the wall clock « 2026-11-05T14:30 »: a day field and an hour field, never the system's picker.
+  const testedDay = draft.testedAt.slice(0, 10);
+  const testedMinute = minuteOfInput(draft.testedAt.slice(11, 16)) ?? 0;
   const seconds = Number(draft.durationSeconds);
   const mismatches = Number(draft.rowCountMismatches);
   const control = (field: DraftField) => ({
@@ -406,15 +424,31 @@ function CheckFields({
         hint="Quand les lignes ont été comptées."
         problem={problems.testedAt}
       >
-        <input
-          {...control('testedAt')}
-          className="nv-field__control nv-glass bk-when"
-          type="datetime-local"
-          value={draft.testedAt}
-          onChange={(event) => {
-            onChange('testedAt', event.target.value);
-          }}
-        />
+        <div className="bk-when">
+          <DayField
+            id={`${id}-testedAt`}
+            value={testedDay}
+            toward="past"
+            disabled={disabled}
+            invalid={problems.testedAt !== undefined}
+            describedBy={`${id}-testedAt-hint`}
+            onChange={(day) => {
+              onChange('testedAt', `${day}T${inputOf(testedMinute)}`);
+            }}
+            onUnreadable={(bad) => {
+              onUnreadable('testedAt-day', bad);
+            }}
+          />
+          <TimeField
+            value={testedMinute}
+            label="Heure de fin de l’essai"
+            disabled={disabled}
+            onChange={(minute) => {
+              onChange('testedAt', `${testedDay}T${inputOf(minute)}`);
+            }}
+            onUnreadable={onUnreadable}
+          />
+        </div>
       </Field>
       <div className="bk-pair">
         <Field

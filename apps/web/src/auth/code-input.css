@@ -9,3 +9,11 @@
 .nv-code > input {
   width: 100%;
 }
+/* Geist's digits at an even width, a little air between them: « 123 456 » reads as a code, not as a word. */
+.nv-code__control {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+.nv-code__control::placeholder {
+  letter-spacing: 0.08em;
+}

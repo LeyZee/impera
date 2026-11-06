@@ -7,11 +7,19 @@ import type {
   UpdateShiftBody,
 } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import { useId, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { AWAY_WORDS } from './model';
 
-import { AGENCY_STATUS, amountText, periodAt, reportOf, STATUS_TONES, validatedTotal } from '@/reports/model';
+import {
+  AGENCY_STATUS,
+  amountText,
+  MEMBER_STATUS,
+  periodAt,
+  reportOf,
+  STATUS_TONES,
+  validatedTotal,
+} from '@/reports/model';
 import '@/reports/reports.css';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import {
@@ -47,7 +55,8 @@ type Arming = 'cancel' | 'stop' | 'template' | null;
  * One shift (EQ-02): who, where, when, in the zone shown, the agency's and the member's own. Before it starts it
  * changes member or hours, or is cancelled; under way it ends earlier or stops now; once over it is kept as it was.
  * A shift that comes back says so, and its template can be stopped from here. Its report says how it went: the amount,
- * where it stands, and any incident (EQ-03).
+ * where it stands, and any incident (EQ-03). A manager's own shift makes his report from here, as a chatter's Planning
+ * does (EQP-02): he has no other screen for it.
  */
 export function ShiftSheet({
   shift,
@@ -57,6 +66,9 @@ export function ShiftSheet({
   zone,
   now,
   reports,
+  userId,
+  reportable,
+  onReport,
   onClose,
 }: {
   shift: Shift;
@@ -68,9 +80,14 @@ export function ShiftSheet({
   now: Date;
   /** The shift's report and corrections, `null` while they are not read. */
   reports: readonly ShiftReport[] | null;
+  /** The reader: his own shift opens his report. */
+  userId: string;
+  /** The shift takes a report already (its `opensAt` passed), as the server lists it with its period's reports. */
+  reportable: boolean;
+  /** Opens the reader's own report of this shift. */
+  onReport: () => void;
   onClose: () => void;
 }): JSX.Element {
-  const id = useId();
   const refresh = useRefreshPlanning();
   const agency = planning.settings.timeZone;
   const account = planning.accounts.find((one) => one.id === shift.platformAccountId) ?? null;
@@ -80,6 +97,8 @@ export function ShiftSheet({
   const phase = phaseOf(shift, now);
   // His status when he is away: nobody holds the shift (EQP-03).
   const away = planning.away.find((one) => one.memberId === shift.memberId)?.status ?? null;
+  // The reader's own shift: a manager who chats (EQP-02). The owner has no record, so never one.
+  const mine = record !== null && record.userId === userId;
   const report = reports === null ? null : reportOf(reports, shift.id);
   const corrected = reports?.some((one) => one.correctsId !== null && one.status === 'validated') ?? false;
   const startDay = dayOf(shift.startsAt, agency);
@@ -247,7 +266,30 @@ export function ShiftSheet({
               <span className="nv-num">{clockAt(shift.stoppedAt, zone)}</span>
             </li>
           )}
-          {report !== null ? (
+          {mine && (report !== null || reportable) ? (
+            <li>
+              <span>Rapport</span>
+              {report === null ? (
+                <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onReport}>
+                  Faire mon rapport
+                </button>
+              ) : (
+                <span className="sc-sheet__report">
+                  <span className="nv-num">
+                    {amountText(report.amount.amountMinor, report.amount.currency)}
+                  </span>
+                  <button
+                    type="button"
+                    className={`rp-chip rp-chip--${STATUS_TONES[report.status]} nv-tap`}
+                    aria-label={`Mon rapport : ${MEMBER_STATUS[report.status]}`}
+                    onClick={onReport}
+                  >
+                    {MEMBER_STATUS[report.status]}
+                  </button>
+                </span>
+              )}
+            </li>
+          ) : report !== null ? (
             <li>
               <span>Rapport</span>
               <Link to="/equipe/rapports" search={toReports} className="sc-sheet__report">
@@ -294,29 +336,42 @@ export function ShiftSheet({
             }}
           >
             {phase === 'later' ? (
-              <div className="nv-field tm-field">
-                <label className="nv-field__label" htmlFor={`${id}-member`}>
-                  Membre
-                </label>
-                <select
-                  id={`${id}-member`}
-                  className="nv-field__control nv-glass tm-select"
-                  value={memberId}
-                  onChange={(event) => {
-                    const picked = eligible.find((member) => member.id === event.target.value);
-                    setMemberId(picked?.id ?? shift.memberId);
-                  }}
-                >
-                  {eligible.some((member) => member.id === shift.memberId) ? null : (
-                    <option value={shift.memberId}>{shown?.displayName ?? 'Membre actuel'}</option>
-                  )}
-                  {eligible.map((member) => (
-                    <option key={member.id} value={member.id}>
+              <fieldset className="sc-fieldset">
+                <legend className="nv-field__label">Membre</legend>
+                {/* A few members: chips, never a list of the system (recette #561). Whoever holds it stays first. */}
+                <div className="tm-choices" role="radiogroup" aria-label="Membre">
+                  {[
+                    ...(eligible.some((member) => member.id === shift.memberId)
+                      ? []
+                      : [
+                          {
+                            id: shift.memberId,
+                            displayName: shown?.displayName ?? 'Membre actuel',
+                            color: shown?.color ?? null,
+                          },
+                        ]),
+                    ...eligible,
+                  ].map((member) => (
+                    <button
+                      key={member.id}
+                      type="button"
+                      role="radio"
+                      className="nv-chip"
+                      aria-checked={member.id === memberId}
+                      onClick={() => {
+                        setMemberId(member.id);
+                      }}
+                    >
+                      <span
+                        className="sc-swatch"
+                        style={member.color === null ? undefined : { '--sc-color': member.color }}
+                        aria-hidden="true"
+                      />
                       {member.displayName}
-                    </option>
+                    </button>
                   ))}
-                </select>
-              </div>
+                </div>
+              </fieldset>
             ) : null}
             <fieldset className="sc-fieldset">
               <legend className="nv-field__label">

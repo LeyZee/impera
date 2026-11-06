@@ -3,12 +3,16 @@ import { Link, useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
+import { ArchivedCreators } from './ArchivedCreators';
+import { ChipFace } from './CreatorFace';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
+import { SetupCard } from './SetupCard';
 import { AgendaSection } from './agenda/AgendaSection';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
 import { PersonaSection } from './persona/PersonaSection';
+import { ProfileSection } from './profile/ProfileSection';
 import { AgencyRateSection } from './rate/AgencyRateSection';
 import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
 
@@ -145,6 +149,9 @@ export function CreatorsPage({
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
+    if (shown === 'profile' && current !== undefined) {
+      return <ProfileSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
+    }
     if (shown === 'rate' && current !== undefined) {
       return (
         <AgencyRateSection
@@ -183,9 +190,10 @@ export function CreatorsPage({
     hours: 'Heures d’activité',
     access: 'Accès',
     rate: 'Pourcentage',
+    profile: 'Profil',
   };
   // Her agenda right after her persona: the sheet a manager opens most (CR-05 lot c).
-  const order: readonly CreatorSheet[] = ['persona', 'agenda', 'hours', 'access', 'rate'];
+  const order: readonly CreatorSheet[] = ['persona', 'agenda', 'hours', 'access', 'rate', 'profile'];
 
   return (
     <Page>
@@ -194,36 +202,13 @@ export function CreatorsPage({
         title="Créatrices"
         lead={
           isOwner
-            ? 'La fiche de chaque créatrice : sa persona, son agenda, ses heures d’activité, son accès et le pourcentage de l’agence.'
+            ? 'La fiche de chaque créatrice : sa persona, son agenda, ses heures d’activité, son accès, le pourcentage de l’agence et son nom.'
             : sheets.includes('agenda')
               ? 'L’agenda de chaque créatrice : ce qu’elle a prévu, et les tâches que l’agence lui propose.'
               : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={
           <>
-            {/*
-             * The creator first, then her sheet's tabs, then the agency's actions (recette 05/11, PRO-22): the tabs
-             * speak of the creator picked, so she comes before them.
-             * While a creator is added, only « Annuler » leads back: a chip would change nothing on screen.
-             */}
-            {creators.length > 1 && !showForm ? (
-              <div className="ps-chips cr-creators" role="radiogroup" aria-label="Créatrice">
-                {creators.map((creator) => (
-                  <button
-                    key={creator.id}
-                    type="button"
-                    role="radio"
-                    className="nv-chip"
-                    aria-checked={creator.id === selected}
-                    onClick={() => {
-                      if (creator.id !== selected) onCreator(creator.id);
-                    }}
-                  >
-                    {creator.displayName}
-                  </button>
-                ))}
-              </div>
-            ) : null}
             {switchShown ? (
               <SubNav
                 label="Fiche de la créatrice"
@@ -237,26 +222,46 @@ export function CreatorsPage({
                   }))}
               />
             ) : null}
-            {isOwner && !showForm && query.isSuccess ? (
-              <div className="cr-agency">
-                {/* The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c). */}
-                <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm">
-                  Structures de script
-                </Link>
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--soft nv-btn--sm"
-                  onClick={() => {
-                    const add = (): void => {
-                      setAdding(true);
-                    };
-                    if (dirty) setPending(() => add);
-                    else add();
-                  }}
-                >
-                  Ajouter une créatrice
-                </button>
+            {/* While a creator is added, only « Annuler » leads back: a chip would change nothing on screen. */}
+            {creators.length > 1 && !showForm ? (
+              <div className="ps-chips cr-creators" role="radiogroup" aria-label="Créatrice">
+                {creators.map((creator) => (
+                  <button
+                    key={creator.id}
+                    type="button"
+                    role="radio"
+                    className="nv-chip"
+                    aria-checked={creator.id === selected}
+                    onClick={() => {
+                      if (creator.id !== selected) onCreator(creator.id);
+                    }}
+                  >
+                    <ChipFace creator={creator} />
+                    {creator.displayName}
+                  </button>
+                ))}
               </div>
+            ) : null}
+            {isOwner && !showForm && query.isSuccess ? (
+              // The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c).
+              <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm cr-agency-first">
+                Structures de script
+              </Link>
+            ) : null}
+            {isOwner && !showForm && query.isSuccess ? (
+              <button
+                type="button"
+                className="nv-btn nv-btn--soft nv-btn--sm"
+                onClick={() => {
+                  const add = (): void => {
+                    setAdding(true);
+                  };
+                  if (dirty) setPending(() => add);
+                  else add();
+                }}
+              >
+                Ajouter une créatrice
+              </button>
             ) : null}
           </>
         }
@@ -264,7 +269,18 @@ export function CreatorsPage({
       {/* One child of the page: the sheet follows the switch, never pushed to the foot of the screen (CREA-03). */}
       <div className="ps-sheet">
         {leaving ? <LeaveConfirm onLeave={leave} onStay={stay} /> : null}
+        {/* What is left to set up, above every tab of her sheet; read again with each tab (CRM-07 b2). */}
+        {isOwner && current !== undefined && !showForm && query.isSuccess ? (
+          <SetupCard
+            key={`${current.id}:${shown}`}
+            creatorId={current.id}
+            creatorName={current.displayName}
+            timezone={current.timezone}
+          />
+        ) : null}
         {body()}
+        {/* The archived creators, folded at the foot of the sheet, the owner's alone (ADR 0071 § 2). */}
+        {isOwner && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}
       </div>
     </Page>
   );

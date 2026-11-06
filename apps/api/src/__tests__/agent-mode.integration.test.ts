@@ -293,4 +293,17 @@ describe('PUT /v1/agent/mode', () => {
     for (let i = 1; i < rows.length; i += 1) expect(rows[i]).toBe(!rows[i - 1]);
     expect(await dashboardMode()).toBe(rows.at(-1) === true ? 'stop' : 'copilot');
   });
+
+  it('asks the password and the code again for Automatique only, never to stop (recette 05/11, reco 9)', async () => {
+    await test.admin.db.update(schema.session).set({ reauthenticatedAt: sql`now() - interval '1 hour'` });
+    for (const response of [
+      await setMode('auto'),
+      await send('POST', `/v1/conversations/${conversationId}/mode?creatorId=${creatorId}`, { mode: 'auto' }),
+    ]) {
+      expect(response.statusCode).toBe(403);
+      expect(ApiErrorSchema.parse(response.json()).error.code).toBe('reauthentication_forbidden');
+    }
+    expect((await setMode('stop')).statusCode).toBe(200);
+    expect((await setMode('copilot')).statusCode).toBe(200);
+  });
 });

@@ -480,18 +480,6 @@
 .sf-imp--dismissed {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
-.sf-imp__pick {
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  /* A selection, not the action: a neutral light, never the neon (docs/design, `select`). */
-  accent-color: var(--nv-ink);
-  cursor: pointer;
-}
-.sf-imp__pick:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 3px;
-}
 .sf-imp__face {
   display: grid;
   place-items: center;

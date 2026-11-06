@@ -5,7 +5,7 @@ import { useId, useState, type JSX, type ReactNode } from 'react';
 import { AnswerDialog, DetailDialog, InvoiceRow, SettleDialog } from './InvoiceRow';
 import { InvoiceYears } from './InvoiceYears';
 import { PayNav } from './PayNav';
-import { useAgencyToday, useCurrentPeriod } from './data';
+import { useAgencySettingsDown, useAgencyToday, useCurrentPeriod } from './data';
 import { Empty, Loading, PayoutHoldLine, PeriodArrows, Unreachable } from './parts';
 
 import { useInvoices, useInvoiceYears } from '@/invoices/api';
@@ -17,6 +17,7 @@ import { amountText, periodTitle, previousPeriod } from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
+import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /** What the reader opened on a document: an answer to his own, the end of a contest, or its detail. */
@@ -50,6 +51,7 @@ export function InvoicesPage({
   const id = useId();
   const owner = user.role === 'owner';
   const current = useCurrentPeriod();
+  const down = useAgencySettingsDown();
   const today = useAgencyToday();
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
   const members = useMembers();
@@ -153,22 +155,17 @@ export function InvoicesPage({
               <label className="sr-only" htmlFor={`${id}-member`}>
                 Membre
               </label>
-              <select
+              <Select<string>
                 id={`${id}-member`}
-                className="nv-field__control nv-glass tm-select"
                 value={memberId ?? ''}
-                onChange={(event) => {
-                  const value = event.target.value;
+                options={[
+                  { value: '', label: 'Toute l’équipe' },
+                  ...team.map((one) => ({ value: one.id, label: one.displayName })),
+                ]}
+                onChange={(value) => {
                   onFilter(value === '' ? (period === null ? {} : { quinzaine: period }) : { membre: value });
                 }}
-              >
-                <option value="">Toute l’équipe</option>
-                {team.map((one) => (
-                  <option key={one.id} value={one.id}>
-                    {one.displayName}
-                  </option>
-                ))}
-              </select>
+              />
               {period === null ? null : (
                 <PeriodArrows
                   period={period}
@@ -181,7 +178,9 @@ export function InvoicesPage({
             </div>
           }
         >
-          {memberId === undefined ? (
+          {down !== null && timeZone === null ? (
+            <Unreachable what="la quinzaine en cours" onRetry={down} />
+          ) : memberId === undefined ? (
             byPeriod.isError && byPeriod.data === undefined ? (
               <Unreachable
                 what="la liste des documents"

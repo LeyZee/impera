@@ -29,6 +29,7 @@ import {
   statementOf,
   THEO,
 } from '@/test/pay';
+import { choose, openList } from '@/test/select';
 
 const NBSP = /[\u00a0\u202f]/gu;
 
@@ -216,7 +217,7 @@ describe('Paie › Factures', () => {
     await waitFor(() => rowIn(documents, THEO_CREDIT.number));
     expect(reads).toContain(`?period=${OCT2}`);
     const credit = rowIn(documents, THEO_CREDIT.number);
-    expect(credit.textContent.replace(NBSP, ' ')).toContain('corrige la quinzaine du 1er – 15 octobre 2026');
+    expect(credit.textContent.replace(NBSP, ' ')).toContain('corrige la quinzaine du 1er au 15 octobre 2026');
     expect(credit.textContent.replace(NBSP, ' ')).toContain('−25,00 €');
     // Its statement is the one that owed it, as the server says: not the quinzaine it corrects.
     expect(within(credit).getByRole('link', { name: 'Voir le relevé' }).getAttribute('href')).toBe(
@@ -330,9 +331,9 @@ describe('Paie › Factures', () => {
 
   it('reads one member over a year, chosen in the list of the team', async () => {
     const { filters } = renderPage(OWNER);
-    const select = await screen.findByLabelText('Membre');
-    await waitFor(() => within(select).getByRole('option', { name: 'Théo' }));
-    fireEvent.change(select, { target: { value: THEO.id } });
+    const field = await screen.findByRole('combobox', { name: 'Membre' });
+    await waitFor(() => within(openList(field)).getByRole('option', { name: 'Théo' }));
+    choose(field, 'Théo');
     expect(filters).toEqual([{ membre: THEO.id }]);
     cleanup();
     lists = (search) => (search.get('memberId') === THEO.id && search.has('from') ? [THEO_CREDIT] : []);

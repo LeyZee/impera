@@ -6,7 +6,6 @@ import {
   TodosAcrossCreatorsSchema,
   type CreatorId,
   type DashboardPeriod,
-  type StuckJob,
   type UserRole,
   UserIdSchema,
 } from '@impera/contracts';
@@ -18,8 +17,10 @@ import {
   assembleDashboard,
   creatorQueue,
   queueAcross,
+  stuckJobsOf,
   type BudgetReading,
   type CreatorQueue,
+  type StuckJobsRow,
   type VoiceHealth,
 } from '../../domain/dashboard';
 import type {
@@ -42,8 +43,8 @@ export interface DashboardRouteDeps {
   readonly budget: () => BudgetReading;
   /** A voice model answers, main or fallback; `keyMissing` when neither has a key. */
   readonly voiceHealth: () => VoiceHealth;
-  /** Stuck jobs by kind, hers or of no creator (read with the admin role: Graphile's schema). */
-  readonly stuckJobs: (creatorId: CreatorId) => Promise<StuckJob[] | null>;
+  /** Stuck jobs, hers or of no creator, by task (read with the admin role: Graphile's schema); `null` when unread. */
+  readonly stuckJobs: (creatorId: CreatorId) => Promise<readonly StuckJobsRow[] | null>;
   readonly voice: VoiceVersion;
   readonly automatic: AutomaticView;
   /** The last ECB rate known for the dollar (pay's), to rank the best fans in euros. */
@@ -112,7 +113,8 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           window: read.window,
           budget: deps.budget(),
           voice: deps.voiceHealth(),
-          stuckJobs,
+          // The agency's jobs (pay, Telegram) are the owner's to see, never counted in her agent's health (PRO-10).
+          jobs: stuckJobsOf(stuckJobs, user.role === 'owner'),
           telegram,
           automatic,
           revealSales: sales === undefined ? null : revealSalesPanel({ ...sales, rate: usdRate }),

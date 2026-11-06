@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlanningPage } from './PlanningPage';
 import { parsePlanningSearch } from './model';
 
+import { HoldProvider } from '@/reports/Hold';
+import { ReopenProvider } from '@/reports/reopen';
 import { parseCalendarSearch } from '@/scheduling/calendar';
 import { settingsOf } from '@/test/settings';
 
@@ -171,6 +173,10 @@ function serve(
     swaps?: unknown[];
     /** The reports of every period asked. */
     reports?: unknown[];
+    /** The shifts that take a report already, listed with them. */
+    reportShifts?: unknown[];
+    /** The context of a shift's report panel, by shift (EQP-02). */
+    reportContext?: (shiftId: string) => unknown;
     /** The team's calendar (CR-12) for a window; unanswered (404) when left out. */
     calendar?: (from: string, to: string) => unknown;
     write?: (method: string, path: string, body: unknown) => Reply;
@@ -242,8 +248,16 @@ function serve(
       else if (path === '/v1/scheduling/shift-reports')
         reply = {
           status: 200,
-          body: { reports: routes.reports ?? [], shifts: [], accounts: [], members: [] },
+          body: {
+            reports: routes.reports ?? [],
+            shifts: routes.reportShifts ?? [],
+            accounts: [],
+            members: [],
+          },
         };
+      else if (path === '/v1/scheduling/settings') reply = { status: 200, body: settingsOf() };
+      else if (routes.reportContext !== undefined && /^\/v1\/scheduling\/shifts\/[^/]+\/report$/u.test(path))
+        reply = { status: 200, body: routes.reportContext(path.split('/')[4] ?? '') };
       else reply = { status: 404 };
       return Promise.resolve(
         new Response(reply.status === 204 ? null : JSON.stringify(reply.body ?? null), {
@@ -287,9 +301,14 @@ function renderPage(at = '/equipe/planning'): AnyRouter {
     routeTree: root.addChildren([page]),
     history: createMemoryHistory({ initialEntries: [at] }),
   });
+  // The app's one hold and its reopener, as the shell mounts them: a manager's own report opens here (EQP-02).
   render(
     <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
+      <HoldProvider>
+        <ReopenProvider>
+          <RouterProvider router={router} />
+        </ReopenProvider>
+      </HoldProvider>
     </QueryClientProvider>,
   );
   return router;
@@ -297,9 +316,9 @@ function renderPage(at = '/equipe/planning'): AnyRouter {
 
 const calendarReads: string[] = [];
 
-/** The agency's calendar: Théo's night, Nora's agent in `mode` day and night (ADR 0048). */
+/** The agency's calendar: Théo's night, Nora's agent in `mode` day and night (ADR 0048); no account when `bare`. */
 const agencyCalendar =
-  (mode: 'auto' | 'copilot', slotStartMinute = 0) =>
+  (mode: 'auto' | 'copilot', slotStartMinute = 0, bare = false) =>
   (from: string, to: string): unknown => ({
     view: 'agency',
     settings: settingsOf({ start: slotStartMinute }),
@@ -316,13 +335,13 @@ const agencyCalendar =
       },
     ],
     agency: {
-      accounts: ACCOUNTS,
+      accounts: bare ? [] : ACCOUNTS,
       toFill: [],
       aiAlone: [],
       workload: [{ memberId: THEO, minutes: 360 }],
-      coverage: [
-        { platformAccountId: NORA_REVEAL, withAgent: 360, chatterAlone: 0, agentAlone: 9720, nobody: 0 },
-      ],
+      coverage: bare
+        ? []
+        : [{ platformAccountId: NORA_REVEAL, withAgent: 360, chatterAlone: 0, agentAlone: 9720, nobody: 0 }],
     },
   });
 
@@ -402,7 +421,8 @@ describe('Équipe › Planning', () => {
     ).toBe('true');
     const day = within(panel).getByLabelText('Jour');
     if (!(day instanceof HTMLInputElement)) throw new Error('no day field');
-    expect(day.value).toBe('2026-10-29');
+    // Written as French writes it, never by the system's date field (recette #561).
+    expect(day.value).toBe('29/10/2026');
   });
 
   it('leaves a suspended member’s shifts to fill: marked on the grid, counted, and said in the sheet (EQP-03)', async () => {
@@ -431,13 +451,15 @@ describe('Équipe › Planning', () => {
     expect(
       within(cells[3] ?? row).getByRole('button', { name: /^À pourvoir : 12\sh – 18\sh, le jeudi 29/u }),
     ).toBeTruthy();
-    // The night under way is held by nobody either: nobody « en poste », and Wednesday's night is to fill from now.
+    // The night under way is held by nobody either: nobody « en poste », and Wednesday's night is to fill from now,
+    // said « maintenant », never at the minute (recette #564).
     const under = screen.getAllByRole('button', { name: /^Théo, 23\sh – 5\sh, .*suspendu, à pourvoir$/u });
     expect(under.length).toBeGreaterThan(0);
     for (const one of under) expect(one.getAttribute('aria-label')).not.toContain('en poste');
-    expect(
-      within(cells[2] ?? row).getByRole('button', { name: /^À pourvoir : 1\sh – 6\sh, le mercredi 28/u }),
-    ).toBeTruthy();
+    const now = within(cells[2] ?? row).getByRole('button', {
+      name: /^À pourvoir : maintenant – 6\sh, le mercredi 28/u,
+    });
+    expect(text(now.querySelector('.sc-slot__hours'))).toBe('maintenant – 6 h');
 
     fireEvent.click(chip);
     const sheet = await screen.findByRole('dialog', { name: 'Théo' });
@@ -524,9 +546,12 @@ describe('Équipe › Planning', () => {
     const panel = await screen.findByRole('dialog', { name: 'Pourvoir un shift' });
     expect(panel.textContent).toContain('Théo est en congé : choisis qui prend ce shift.');
     // Théo is away: Basile alone is offered, on the template's hours, which are none of the slots.
-    const who = within(panel).getByLabelText('Membre');
-    if (!(who instanceof HTMLSelectElement)) throw new Error('no member list');
-    expect([...who.options].map((option) => option.text)).toEqual(['Basile']);
+    const who = within(panel).getByRole('radiogroup', { name: 'Membre' });
+    expect(
+      within(who)
+        .getAllByRole('radio')
+        .map((one) => one.textContent),
+    ).toEqual(['Basile']);
     // One occurrence, never a template of its own.
     expect(within(panel).queryByRole('radiogroup', { name: 'Fréquence' })).toBe(null);
     expect(within(panel).getByRole('radio', { name: 'Autres heures' }).getAttribute('aria-checked')).toBe(
@@ -989,6 +1014,79 @@ describe('Équipe › Planning', () => {
     expect(text(over)).not.toContain('Ce shift est fini');
   });
 
+  it('lets a manager make his own report from his shift’s sheet, and open it again (recette EQP-02)', async () => {
+    const past = (n: number, day: string) => ({
+      ...night,
+      id: id(n),
+      startsAt: `${day}T15:00:00Z`,
+      endsAt: `${day}T21:00:00Z`,
+      templateId: null,
+    });
+    const monday = past(103, '2026-10-26');
+    const tuesday = past(104, '2026-10-27');
+    const sentBack = {
+      id: id(302),
+      shiftId: tuesday.id,
+      creatorId: NORA,
+      platformAccountId: NORA_REVEAL,
+      memberId: THEO,
+      period: '2026-10-16',
+      correctsId: null,
+      amount: { amountMinor: 8_000, currency: 'EUR' },
+      comment: null,
+      incident: null,
+      status: 'rejected',
+      version: 1,
+      byAgency: false,
+      canReview: false,
+      submittedAt: '2026-10-27T21:05:00Z',
+      reviewedAt: '2026-10-27T22:00:00Z',
+      reviewNote: 'Il manque la vente de 21 h.',
+      createdAt: '2026-10-27T21:05:00Z',
+    };
+    serve({
+      planning: planning([], [night, monday, tuesday]),
+      // The reader is Théo, a manager who chats (ADR 0024).
+      members: [member({ userId: OWNER_USER, teamRole: 'manager' })],
+      reports: [sentBack],
+      reportShifts: [monday, tuesday],
+      reportContext: (shiftId) => {
+        const shift = shiftId === monday.id ? monday : tuesday;
+        return {
+          shift,
+          account: ACCOUNTS[0],
+          period: '2026-10-16',
+          opensAt: '2026-10-26T20:30:00.000Z',
+          rules: { currency: 'EUR', earningsSource: 'declared' },
+          reports: shift.id === tuesday.id ? [sentBack] : [],
+        };
+      },
+    });
+    renderPage();
+
+    const [first, second] = await screen.findAllByRole('button', { name: /^Théo, 16\sh\s–\s22\sh$/u });
+    if (first === undefined || second === undefined) throw new Error('two finished shifts expected');
+    fireEvent.click(first);
+    const sheet = await screen.findByRole('dialog');
+    // His own shift: no « Sans rapport » to the agency's Rapports, his report to make.
+    expect(within(sheet).queryByRole('link', { name: 'Sans rapport' })).toBeNull();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Faire mon rapport' }));
+    const panel = await screen.findByRole('dialog', { name: 'Faire mon rapport' });
+    const [close] = within(panel).getAllByRole('button', { name: 'Fermer' });
+    if (close === undefined) throw new Error('no way to close the panel');
+    fireEvent.click(close);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    // A report sent back says so in his words, and opens to be taken up again.
+    fireEvent.click(second);
+    const again = await screen.findByRole('dialog');
+    expect(text(again)).toContain('80,00 €');
+    fireEvent.click(within(again).getByRole('button', { name: 'Mon rapport : Renvoyé' }));
+    expect(await screen.findByRole('dialog', { name: 'Reprendre mon rapport' })).toBeTruthy();
+  });
+
   it('makes one member’s shifts stand out from his record, and gives the whole team back (EQ-11)', async () => {
     // Another member's night on Thursday: not in the planning's names, so said « Un membre ».
     const other = {
@@ -1047,6 +1145,119 @@ describe('Équipe › Planning', () => {
     expect(panel.textContent).toContain('6 h.');
   });
 
+  it('says the hour the clocks skip, and the hour the shift takes in its place (recette EQP-11)', async () => {
+    serve();
+    renderPage();
+    await screen.findByRole('row', { name: /Nora Vidal/u });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter un shift' }));
+    const panel = await screen.findByRole('dialog', { name: 'Nouveau shift' });
+    fireEvent.change(within(panel).getByLabelText('Jour'), { target: { value: '2027-03-28' } });
+    fireEvent.click(within(panel).getByRole('radio', { name: 'Autres heures' }));
+    fireEvent.change(within(panel).getByLabelText('Début'), { target: { value: '02:30' } });
+    fireEvent.change(within(panel).getByLabelText('Fin'), { target: { value: '06:00' } });
+    // 2 h 30 does not exist in Paris that night: the shift is saved from 3 h, which the summary says, never 2 h 30.
+    expect(text(panel)).toContain('3 h – 6 h · 3 h.');
+    expect(text(within(panel).getByRole('status'))).toBe(
+      '2 h 30 n’existe pas cette nuit-là, à cause du changement d’heure : le shift commence à 3 h.',
+    );
+    fireEvent.change(within(panel).getByLabelText('Début'), { target: { value: '01:00' } });
+    fireEvent.change(within(panel).getByLabelText('Fin'), { target: { value: '02:30' } });
+    expect(text(panel)).toContain('1 h – 3 h · 1 h.');
+    expect(text(within(panel).getByRole('status'))).toBe(
+      '2 h 30 n’existe pas cette nuit-là, à cause du changement d’heure : le shift finit à 3 h.',
+    );
+    // Both ends in the hour skipped: nothing left to work, the panel says so and does not save (relecture #561).
+    fireEvent.change(within(panel).getByLabelText('Début'), { target: { value: '02:00' } });
+    fireEvent.change(within(panel).getByLabelText('Fin'), { target: { value: '02:45' } });
+    expect(text(panel)).toContain('Ces heures n’existent pas cette nuit-là, à cause du changement d’heure.');
+    expect(within(panel).queryByRole('status')).toBeNull();
+    expect(within(panel).getByRole('button', { name: 'Placer Théo' }).hasAttribute('disabled')).toBe(true);
+    fireEvent.change(within(panel).getByLabelText('Début'), { target: { value: '01:00' } });
+    fireEvent.change(within(panel).getByLabelText('Fin'), { target: { value: '02:30' } });
+    // Every week, a template keeps its wall-clock hours: nothing moved to say.
+    fireEvent.click(within(panel).getByRole('radio', { name: 'Chaque semaine' }));
+    expect(within(panel).queryByRole('status')).toBeNull();
+    expect(text(panel)).toContain('1 h – 2 h 30 · 1 h 30.');
+  });
+
+  it('chooses the account and the member with chips, and the day as French writes it (recette #561)', async () => {
+    const LEA = id(2);
+    const LEA_REVEAL = id(12);
+    const written = serve({
+      planning: planning(
+        [],
+        [night],
+        [
+          ...ACCOUNTS,
+          { id: LEA_REVEAL, creatorId: LEA, creatorName: 'Léa Morel', platform: 'reveal', handle: 'lea' },
+        ],
+      ),
+      members: [
+        member({}),
+        member({
+          id: BASILE,
+          userId: id(72),
+          firstName: 'Basile',
+          displayName: 'Basile',
+          color: null,
+          creatorIds: [NORA, LEA],
+        }),
+      ],
+      write: (_method, _path, body) => ({
+        status: 201,
+        body: { ...night, ...(typeof body === 'object' ? body : {}), id: id(102), templateId: null },
+      }),
+    });
+    renderPage();
+    await screen.findByRole('row', { name: /Nora Vidal/u });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter un shift' }));
+    const panel = await screen.findByRole('dialog', { name: 'Nouveau shift' });
+    // No list of the system anywhere in the panel: its date field, its accounts and members are ours.
+    expect(panel.querySelector('select, input[type="date"], input[type="time"]')).toBe(null);
+    const accounts = within(panel).getByRole('radiogroup', { name: 'Compte' });
+    expect(
+      within(accounts)
+        .getAllByRole('radio')
+        .map((one) => one.textContent),
+    ).toEqual(['Léa Morel@lea sur Reveal', 'Nora Vidal@nora sur Reveal']);
+    const who = () => within(within(panel).getByRole('radiogroup', { name: 'Membre' })).getAllByRole('radio');
+    // Léa's account first, by name: Basile alone works on her.
+    expect(who().map((one) => one.textContent)).toEqual(['Basile']);
+    fireEvent.click(within(accounts).getByRole('radio', { name: /^Nora Vidal/u }));
+    expect(who().map((one) => [one.textContent, one.getAttribute('aria-checked')])).toEqual([
+      ['Basile', 'true'],
+      ['Théo', 'false'],
+    ]);
+    fireEvent.click(within(panel).getByRole('radio', { name: 'Théo' }));
+    // « 29/10 » is the first 29 October from today on; what is not a day keeps the panel from saving.
+    const day = within(panel).getByLabelText('Jour');
+    fireEvent.change(day, { target: { value: '31/02' } });
+    expect(text(panel)).toContain('Un jour comme 28/03/2027, ou 28/3.');
+    expect(within(panel).getByRole('button', { name: 'Placer Théo' }).hasAttribute('disabled')).toBe(true);
+    fireEvent.change(day, { target: { value: '29/10' } });
+    fireEvent.blur(day);
+    expect(day instanceof HTMLInputElement ? day.value : null).toBe('29/10/2026');
+    expect(text(panel)).toContain('Jeudi 29 octobre');
+    fireEvent.click(within(panel).getByRole('radio', { name: /^18\sh – 0\sh$/u }));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Placer Théo' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBe(null);
+    });
+    expect(written).toEqual([
+      {
+        method: 'POST',
+        path: '/v1/scheduling/shifts',
+        body: {
+          creatorId: NORA,
+          platformAccountId: NORA_REVEAL,
+          memberId: THEO,
+          startsAt: '2026-10-29T17:00:00.000Z',
+          endsAt: '2026-10-29T23:00:00.000Z',
+        },
+      },
+    ]);
+  });
+
   it('refuses a single shift of more than 24 h the night the clocks go back', async () => {
     serve();
     renderPage();
@@ -1100,9 +1311,14 @@ describe('Équipe › Planning', () => {
     });
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\sh\s–\s5\sh, jusqu/u }));
-    const who = within(screen.getByRole('dialog')).getByLabelText('Membre');
-    if (!(who instanceof HTMLSelectElement)) throw new Error('no member list');
-    expect([...who.options].map((option) => option.text)).toEqual(['Basile', 'Théo']);
+    // Chips, never a list of the system (recette #561): Théo holds it, Basile may take it, Iris joins too late.
+    const who = within(screen.getByRole('dialog')).getByRole('radiogroup', { name: 'Membre' });
+    expect(
+      within(who)
+        .getAllByRole('radio')
+        .map((one) => one.textContent),
+    ).toEqual(['Basile', 'Théo']);
+    expect(within(who).getByRole('radio', { name: 'Théo' }).getAttribute('aria-checked')).toBe('true');
   });
 
   it('keeps the week shown in the address, so that a reload or a back finds it', async () => {
@@ -1162,6 +1378,18 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     const cover = screen.getByRole('region', { name: 'Couverture des comptes de la semaine' });
     expect(text(cover)).toContain('Nora Vidal, @nora sur Reveal');
     expect(text(cover)).toContain('IA seule 162 h');
+  });
+
+  it('says « Aucun compte à couvrir. » when the agency has no account, never a bare title (recette EQP-12)', async () => {
+    serve({ calendar: agencyCalendar('auto', 0, true) });
+    renderPage();
+    const cover = await screen.findByRole(
+      'region',
+      { name: 'Couverture des comptes de la semaine' },
+      { timeout: 4_000 },
+    );
+    expect(text(cover)).toBe('Couverture des comptes de la semaineAucun compte à couvrir.');
+    expect(cover.querySelector('ul')).toBeNull();
   });
 
   it('never says « IA seule » on a créneau that wants two chatters: the agent stands for none (ADR 0049 § 2)', async () => {

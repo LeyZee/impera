@@ -10,7 +10,12 @@ import type { PersonaVersionStore } from './domain/versions';
 import { createDrizzleCreatorDirectory } from './infra/db/creator-directory';
 import { createDrizzlePersonaVersionStore } from './infra/db/persona-version-store';
 import { createPersonaRoutes } from './infra/http/persona-routes';
-import { createCreatorRoutes, type RequireRole } from './infra/http/routes';
+import {
+  createCreatorArchiveRoutes,
+  createCreatorRoutes,
+  type CreatorArchiving,
+  type RequireRole,
+} from './infra/http/routes';
 
 export interface PersonaModule {
   readonly name: 'persona';
@@ -23,6 +28,11 @@ export interface PersonaModule {
   readonly versions: PersonaVersionStore;
   /** Mounted under `/v1` by the server: `/creators` and her `/agent-hours`, and each creator's `/persona` with its versions. */
   readonly routes: FastifyPluginAsyncZod;
+  /**
+   * `/creators/archived`, `/creators/:creatorId/archive` and `…/restore` (ADR 0071 § 2), mounted by the composition
+   * root once the modules her archiving closes exist.
+   */
+  archiveRoutes(archiving: CreatorArchiving): FastifyPluginAsyncZod;
 }
 
 export interface PersonaDeps {
@@ -80,5 +90,7 @@ export function createPersonaModule(deps: PersonaDeps): PersonaModule {
       await app.register(creatorRoutes);
       await app.register(personaRoutes);
     },
+    archiveRoutes: (archiving) =>
+      createCreatorArchiveRoutes(creators, deps.requireRole, deps.recentLogin, archiving),
   };
 }

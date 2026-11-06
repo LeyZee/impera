@@ -541,6 +541,27 @@ describe('conversations module (P0-05)', () => {
     });
   }
 
+  it('refuses an approval for an archived creator, whatever the switches say (ADR 0071)', async () => {
+    const { conversationId } = await ingest('c-archived-approve');
+    const draftId = await respond(conversationId);
+    await test.admin.db
+      .update(schema.creators)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.creators.id, creatorId));
+    try {
+      await expect(
+        conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Coucou'] }),
+      ).rejects.toMatchObject({ code: 'creator_archived_conflict' });
+      const [draft] = await test.admin.db.select().from(schema.drafts).where(eq(schema.drafts.id, draftId));
+      expect(draft?.status).toBe('pending');
+    } finally {
+      await test.admin.db
+        .update(schema.creators)
+        .set({ archivedAt: null })
+        .where(eq(schema.creators.id, creatorId));
+    }
+  });
+
   it('refuses an approval while a kill switch is on, and leaves the draft pending', async () => {
     const { conversationId } = await ingest('c-kill-approve');
     const draftId = await respond(conversationId);

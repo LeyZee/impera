@@ -146,6 +146,7 @@ export interface BotsStore {
   /** Replaces the whole table if it is still at `version`; false otherwise. */
   replaceRoutes(version: number, routes: readonly TelegramRoute[]): Promise<boolean>;
 
+  /** The creators not archived (ADR 0071 § 2), oldest first. */
   listCreators(): Promise<readonly CreatorRecord[]>;
   /** The display name of a CRM user, for « Pris en main par … ». */
   userName(userId: string): Promise<string | null>;

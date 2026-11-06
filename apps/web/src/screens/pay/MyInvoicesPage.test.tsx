@@ -21,6 +21,8 @@ const NBSP = /[\u00a0\u202f]/gu;
 let years: Map<string, InvoiceListItem[]>;
 let listStatus: number;
 let answer: { status: number; body: unknown };
+/** The PDF route's answer: its status, its type and its body. */
+let pdfAnswer: { status: number; type: string; body: string };
 const writes: { path: string; body: unknown }[] = [];
 const reads: string[] = [];
 
@@ -59,6 +61,13 @@ function serve(): void {
         });
         return json(answer.body, answer.status);
       }
+      if (url.pathname.endsWith('/pdf'))
+        return Promise.resolve(
+          new Response(pdfAnswer.body, {
+            status: pdfAnswer.status,
+            headers: { 'content-type': pdfAnswer.type },
+          }),
+        );
       switch (url.pathname) {
         case '/v1/payroll/invoices':
           reads.push(url.search);
@@ -131,6 +140,7 @@ beforeEach(() => {
   years = new Map([['2025-11-05', [PENDING, PAID]]]);
   listStatus = 200;
   answer = { status: 200, body: acceptanceView(PENDING, 'accepted') };
+  pdfAnswer = { status: 200, type: 'application/pdf', body: '%PDF-1.7' };
   writes.length = 0;
   reads.length = 0;
   serve();
@@ -139,6 +149,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -155,9 +166,80 @@ describe('Commissions › Factures', () => {
     const paid = rowOf(PAID.number);
     expect(paid.textContent.replace(NBSP, ' ')).toContain('payée le mar. 20 oct.');
     expect(within(paid).queryByRole('button', { name: 'J’accepte' })).toBeNull();
-    expect(within(paid).getByRole('link', { name: 'PDF' }).getAttribute('href')).toBe(
-      `/v1/payroll/invoices/${PAID.id}/pdf`,
+    expect(within(paid).getByRole('button', { name: 'PDF' })).toBeTruthy();
+  });
+
+  // Recette EQP-08: the PDF is read before it is saved; a refusal is said, never saved as « pdf.json ».
+  it('saves the PDF under the document’s number, and says why when there is none to save', async () => {
+    const created: Blob[] = [];
+    const saved: string[] = [];
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static override createObjectURL(blob: Blob): string {
+          created.push(blob);
+          return 'blob:pdf';
+        }
+        static override revokeObjectURL(): void {
+          // Nothing to free: no URL was made.
+        }
+      },
     );
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function save(this: HTMLAnchorElement) {
+      saved.push(this.download);
+    });
+    renderPage();
+    const paid = await waitFor(() => rowOf(PAID.number));
+
+    pdfAnswer = {
+      status: 503,
+      type: 'application/json',
+      body: JSON.stringify({
+        error: {
+          code: 'invoice_pdf_unavailable',
+          message: 'PDF indisponible',
+          details: {},
+          requestId: 'req-1',
+        },
+      }),
+    };
+    fireEvent.click(within(paid).getByRole('button', { name: 'PDF' }));
+    expect((await within(paid).findByRole('alert')).textContent).toContain('n’a pas pu être relu intact');
+    expect(saved).toEqual([]);
+
+    // A page that is not a PDF (a proxy, a login): nothing saved either.
+    pdfAnswer = { status: 200, type: 'text/html', body: '<html></html>' };
+    fireEvent.click(within(paid).getByRole('button', { name: 'PDF' }));
+    await waitFor(() => {
+      expect(within(paid).getByRole('alert').textContent).toContain('le PDF n’a pas pu être lu');
+    });
+    expect(saved).toEqual([]);
+
+    pdfAnswer = { status: 200, type: 'application/pdf', body: '%PDF-1.7' };
+    fireEvent.click(within(paid).getByRole('button', { name: 'PDF' }));
+    // While it reads, the button keeps its word and its width, greyed and busy: the row never moves.
+    const reading = within(paid).getByRole('button', { name: 'PDF' });
+    expect([reading.getAttribute('aria-busy'), reading.hasAttribute('disabled')]).toEqual(['true', true]);
+    await waitFor(() => {
+      expect(saved).toEqual([`${PAID.number}.pdf`]);
+    });
+    expect(created[0]?.type).toBe('application/pdf');
+    expect(within(paid).queryByRole('alert')).toBeNull();
+
+    // Lost for good (development's memory, EQP-09): said plainly, and its button goes quiet, nothing left to read.
+    pdfAnswer = {
+      status: 410,
+      type: 'application/json',
+      body: JSON.stringify({
+        error: { code: 'invoice_pdf_gone', message: 'PDF perdu', details: {}, requestId: 'req-2' },
+      }),
+    };
+    fireEvent.click(within(paid).getByRole('button', { name: 'PDF' }));
+    expect((await within(paid).findByRole('alert')).textContent).toBe(
+      'Ce PDF n’est plus disponible et ne sera pas refait. La facture, elle, reste valable.',
+    );
+    expect(within(paid).getByRole('button', { name: 'PDF' })).toHaveProperty('disabled', true);
+    expect(saved).toEqual([`${PAID.number}.pdf`]);
   });
 
   it('accepts a document once said final, then reads the list again', async () => {

@@ -7,6 +7,10 @@
   gap: var(--nv-space-4);
   max-width: 980px;
 }
+/* The header as wide as the board under it: its tabs end on the plates' right edge, not the page's (recette #567). */
+.nv-page:has(> .py-board) > .nv-page__head {
+  max-width: 980px;
+}
 /* A panel without a head (Relevés): its list as far from the top edge as from the bottom one. */
 .py-board > .nv-panel > .rp-sec:first-child {
   padding-top: 22px;

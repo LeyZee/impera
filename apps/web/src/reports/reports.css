@@ -33,6 +33,11 @@
   color: var(--nv-warning);
   background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
 }
+/* « Parti »: a tint of ink with an edge, so it holds on the white plate of Jour too (recette #564). */
+.rp-chip--neutral {
+  background: var(--nv-fill-soft);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+}
 .rp-chip--neutral::before {
   display: none;
 }
@@ -382,6 +387,38 @@
   font-size: var(--nv-text-footnote);
 }
 
+/* A period's head: « Quinzaine » over the period, its arrows on its right, centred on the title; on a phone that has
+   no room for both, they go under it, on its left edge (recette #561). */
+.rp-period > .nv-panel__head {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: var(--nv-space-3);
+}
+.rp-period__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  flex: none;
+  margin-left: auto;
+}
+@media (max-width: 480px) {
+  .rp-period > .nv-panel__head > :first-child {
+    flex-basis: 100%;
+  }
+  /* « Cette quinzaine » right after the arrows: its own padding is the space between them (recette #564). */
+  .rp-period__nav {
+    gap: var(--nv-space-1);
+    margin-left: 0;
+  }
+  .rp-period__nav > .nv-btn--plain {
+    padding-inline: var(--nv-space-3);
+  }
+  /* The arrows first, on the title's own edge; « Cette quinzaine » after them. */
+  .rp-period__nav > .sc-week {
+    order: -1;
+  }
+}
+
 /* The body of a panel under its eyebrow, at the head's own inset. */
 .rp-sec {
   display: flex;
@@ -702,57 +739,6 @@
   .rp-late summary .nv-disclosure__sum {
     display: none;
   }
-}
-
-/* A checkbox of the design: a soft square that fills with ink, its tick drawn. */
-.rp-check {
-  appearance: none;
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  margin: 0;
-  border-radius: 7px;
-  background: var(--nv-glass-fill-strong);
-  box-shadow: inset 0 0 0 1.5px var(--nv-hairline);
-  cursor: pointer;
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
-    transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.rp-check::after {
-  content: '';
-  width: 10px;
-  height: 5px;
-  margin-top: -3px;
-  border-left: 2px solid var(--nv-void);
-  border-bottom: 2px solid var(--nv-void);
-  transform: rotate(-45deg) scale(0);
-  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
-}
-.rp-check:hover:not(:disabled) {
-  box-shadow: inset 0 0 0 1.5px var(--nv-ink-faint);
-}
-.rp-check:active:not(:disabled) {
-  transform: scale(0.9);
-}
-.rp-check:checked {
-  background: var(--nv-ink);
-  box-shadow: none;
-}
-.rp-check:checked::after {
-  transform: rotate(-45deg) scale(1);
-}
-.rp-check:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 2px;
-}
-.rp-check:disabled {
-  opacity: 0.5;
-  background: transparent;
-  cursor: not-allowed;
 }
 
 .rp-all {
@@ -1206,12 +1192,7 @@ a.sc-sheet__report:focus-visible,
   .rp-correction,
   .rp-todo__go,
   .rp-review,
-  .rp-account,
-  .rp-check,
-  .rp-check::after {
+  .rp-account {
     transition: none;
-  }
-  .rp-check:active:not(:disabled) {
-    transform: none;
   }
 }

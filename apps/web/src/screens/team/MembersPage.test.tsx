@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MembersPage } from './MembersPage';
 import { parseTeamSearch } from './model';
 
+import { chooseValue } from '@/test/select';
 import { settingsOf } from '@/test/settings';
 
 const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
@@ -381,7 +382,7 @@ describe('adding a member', () => {
     await open();
     who();
     // The team name followed the first name; the zone follows the country.
-    fireEvent.change(await screen.findByLabelText('Pays'), { target: { value: 'MG' } });
+    chooseValue(await screen.findByRole('combobox', { name: 'Pays' }), 'MG');
     // The zone named by its city, never its IANA name (EQ-08).
     expect(screen.getByText(/là-bas en ce moment · Antananarivo/u)).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
@@ -390,7 +391,7 @@ describe('adding a member', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter Kofi' }));
 
     expect(await screen.findByRole('heading', { name: 'Kofi est dans l’équipe' })).toBeDefined();
-    expect(screen.getByLabelText<HTMLInputElement>('Lien à envoyer').value).toBe(
+    expect(screen.getByLabelText<HTMLInputElement>('Son lien').value).toBe(
       'https://impera.example.test/bienvenue#t=lien-invente-0001',
     );
     expect(posted[0]).toMatchObject({
@@ -436,7 +437,7 @@ describe('adding a member', () => {
     who();
     fireEvent.click(await screen.findByRole('button', { name: 'Continuer' }));
     fireEvent.click(await screen.findByRole('radio', { name: /Autre/u }));
-    fill('Taux à la main', '12,5');
+    fill('Taux à la main, en %', '12,5');
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter Kofi' }));
     expect(await screen.findByText(/Personne n’a été ajouté/u)).toBeDefined();
     expect(posted[0]?.body).toMatchObject({ commission: { rateBps: 1250 } });
@@ -592,7 +593,8 @@ describe('changing a member once added (EQ-10)', () => {
     expect(within(panel).getByLabelText<HTMLInputElement>('Part du net de l’équipe').value).toBe('5');
     expect(within(panel).queryByRole('status')).toBeNull();
     fireEvent.click(within(panel).getByRole('radio', { name: /Autre/u }));
-    fireEvent.change(within(panel).getByLabelText('Taux à la main'), { target: { value: '45' } });
+    // Named with its unit, the « % » beside it hidden from a screen reader (recette EQP-15).
+    fireEvent.change(within(panel).getByLabelText('Nouveau taux, en %'), { target: { value: '45' } });
     fireEvent.click(within(panel).getByRole('radio', { name: '1er décembre 2026' }));
     // A day that already has a rate is closed and says it.
     const set = within(panel).getByRole('radio', { name: /^16 novembre 2026 · 40\s%\sprévu$/u });
@@ -689,7 +691,7 @@ describe('a link from the sheet', () => {
       target: { value: '123456' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
-    expect(await screen.findByLabelText('Lien à envoyer')).toBeDefined();
+    expect(await screen.findByLabelText('Son lien')).toBeDefined();
     expect(confirmIdentity).toHaveBeenCalledWith('mot-de-passe-invente', '123456');
   });
 
@@ -712,7 +714,7 @@ describe('a link from the sheet', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Lien de nouveau mot de passe' }));
     // The list re-read says a link is out; the one just made is still there to send.
     expect(await screen.findByText(/Un lien pour en choisir un nouveau a été créé/u)).toBeDefined();
-    expect(screen.getByLabelText('Lien à envoyer')).toBeDefined();
+    expect(screen.getByLabelText('Son lien')).toBeDefined();
   });
 
   it('calls « Invité » only one still to choose his password, and offers to replace a live link', async () => {

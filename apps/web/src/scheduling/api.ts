@@ -324,6 +324,12 @@ export const createCalendarLink = (): Promise<Outcome<CalendarLinkCreated>> =>
 export const revokeCalendarLink = (): Promise<Outcome<null>> =>
   send('DELETE', '/v1/scheduling/calendar-link', undefined, () => null);
 
+/** Her choice (ADR 0045 § 5, CR-05): her accounts' shifts in her live link too, « Qui répond à tes fans ». */
+export const chooseCalendarShifts = (withShifts: boolean): Promise<Outcome<CalendarLinkState>> =>
+  send('PATCH', '/v1/scheduling/calendar-link', { withShifts }, (json) =>
+    CalendarLinkStateSchema.parse(json),
+  );
+
 /**
  * After a write, and after a refusal that says « la liste est relue »: the week, who is on shift, the templates, the
  * leaves and the swaps are read again together.

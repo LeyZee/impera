@@ -16,7 +16,7 @@ import { THEO_ME } from '@/test/pay';
 
 const TOKEN = 'b'.repeat(43);
 const PATH = `/v1/calendar-feed/${TOKEN}.ics`;
-let live: { createdAt: string } | null;
+let live: { createdAt: string; withShifts: boolean } | null;
 const writes: string[] = [];
 
 function serve(): void {
@@ -31,7 +31,7 @@ function serve(): void {
       if (method === 'GET') return Promise.resolve(new Response(JSON.stringify({ link: live })));
       writes.push(method);
       if (method === 'POST') {
-        live = { createdAt: '2026-11-03T08:00:00.000Z' };
+        live = { createdAt: '2026-11-03T08:00:00.000Z', withShifts: false };
         return Promise.resolve(
           new Response(JSON.stringify({ path: PATH, createdAt: live.createdAt }), { status: 201 }),
         );
@@ -115,7 +115,7 @@ describe('Moi › Calendrier (CR-12)', () => {
   });
 
   it('stops a live link after saying what it does, and replaces one after the same', async () => {
-    live = { createdAt: '2026-11-01T08:00:00.000Z' };
+    live = { createdAt: '2026-11-01T08:00:00.000Z', withShifts: false };
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Couper le lien' }));
     expect(screen.getByText('Le calendrier où tu l’as ajouté ne recevra plus tes shifts.')).toBeTruthy();
@@ -125,7 +125,7 @@ describe('Moi › Calendrier (CR-12)', () => {
     expect(await screen.findByRole('button', { name: 'Créer mon lien' })).toBeTruthy();
     expect(writes).toEqual(['DELETE']);
 
-    live = { createdAt: '2026-11-01T08:00:00.000Z' };
+    live = { createdAt: '2026-11-01T08:00:00.000Z', withShifts: false };
     cleanup();
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Remplacer le lien' }));

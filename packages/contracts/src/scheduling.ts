@@ -570,6 +570,12 @@ export const CreatorAccountShiftSchema = z.strictObject({
 });
 export type CreatorAccountShift = z.infer<typeof CreatorAccountShiftSchema>;
 
+/**
+ * « Qui répond à tes fans » at a glance, on her screens and in the calendar of her phone (Charles, 05/11): never one of
+ * her categories' emojis (`CREATOR_TASK_CATEGORY_EMOJI`), so that a shift never reads as one of her tasks.
+ */
+export const CREATOR_REPLIES_EMOJI = '👥';
+
 /** The widest read: the 42 days of her month, and one more for a change of clock. */
 export const CREATOR_SHIFTS_MAX_DAYS = 43;
 
@@ -895,7 +901,8 @@ export type AnswerShiftSwapRequestBody = z.infer<typeof AnswerShiftSwapRequestBo
  * was cancelled, or changed hands or hours since the proposal ; `shift_swap_revert_conflict` 409, an accepted swap that can no
  * longer go back ; `shift_swap_self_invalid` 400, a swap with oneself ; `calendar_link_forbidden` 403, a calendar link
  * asked by an account that is not a member of the team, or who left ; `calendar_feed_not_found` 404, a calendar feed
- * whose link is unknown, revoked or whose member left, one same answer for the three.
+ * whose link is unknown, revoked or whose member left, one same answer for the three ; `calendar_link_not_found` 404, a
+ * creator's choice about a link that is not there (none made, or stopped).
  */
 export const SCHEDULING_ERROR_CODES = [
   'shift_not_found',
@@ -930,6 +937,7 @@ export const SCHEDULING_ERROR_CODES = [
   'shift_swap_self_invalid',
   'calendar_link_forbidden',
   'calendar_feed_not_found',
+  'calendar_link_not_found',
   'slot_version_not_found',
   'slot_version_conflict',
   'slot_version_effective_conflict',

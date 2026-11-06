@@ -4,6 +4,7 @@ import { useCallback, type JSX, type ReactNode } from 'react';
 
 import { AgencyStrip } from './AgencyStrip';
 import { AgentHero } from './AgentHero';
+import { AutomaticConfirm } from './AutomaticConfirm';
 import { BackupBanner } from './BackupBanner';
 import { CreatorPicker } from './CreatorPicker';
 import { FunnelPanel } from './Funnel';
@@ -19,6 +20,7 @@ import { useDashboard, type DashboardView } from './useDashboard';
 import './dashboard.css';
 
 import { useAgentModeWriter } from '@/agent/write';
+import { CreatorFace } from '@/creators/CreatorFace';
 import { useCreators } from '@/creators/api';
 import { initialOf } from '@/lib/utils';
 import { NightBanner } from '@/settings/telegram/NightBanner';
@@ -208,7 +210,10 @@ function Loaded({
   const tip = useFloatingTip();
   const sales = data.sales?.[period] ?? null;
   // With several creators the chips above name her: the header does not say her name a second time (DASH-03).
-  const several = (useCreators().data?.length ?? 0) >= 2;
+  const creators = useCreators().data;
+  const several = (creators?.length ?? 0) >= 2;
+  // Her photo copied at her import (CRM-07 b2), read in the list: the Dashboard's answer does not carry it.
+  const hasPhoto = creators?.find((one) => one.id === creatorId)?.hasAvatar === true;
 
   const navigate = useNavigate();
   // Every line opens in Suivi, where a draft is decided and a handoff given back; a best fan too, on his conversation.
@@ -239,9 +244,10 @@ function Loaded({
         <CreatorPicker onChoose={onCreator} />
         <div className="db-top__who">
           {several ? null : (
-            <span className="db-top__av" aria-hidden="true">
-              {initialOf(data.creator.name)}
-            </span>
+            <CreatorFace
+              creator={{ id: creatorId, displayName: data.creator.name, hasAvatar: hasPhoto }}
+              className="db-top__av"
+            />
           )}
           <span>
             {several ? null : <span className="db-top__name">{data.creator.name}</span>}
@@ -260,6 +266,13 @@ function Loaded({
           running={running}
           onChange={setMode}
         />
+        {writer.asking ? (
+          <AutomaticConfirm
+            creatorName={data.creator.name}
+            onConfirmed={writer.confirmed}
+            onCancel={writer.cancelled}
+          />
+        ) : null}
         {writer.pending ? (
           <p className="db-notice db-notice--quiet" role="status">
             Envoi au serveur…
@@ -291,7 +304,7 @@ function Loaded({
       <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
 
       {/* The AI budget and the stuck jobs of no creator are the agency's, not her agent's health (reco 18, PRO-10). */}
-      <AgencyStrip agency={data.agency} forOwner={forOwner} />
+      <AgencyStrip agency={data.agency} />
 
       {sales === null ? null : (
         <>

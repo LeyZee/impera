@@ -34,9 +34,13 @@ export async function lockAtLeast(
   return after;
 }
 
-/** An object read back: its bytes when their SHA-256 is the expected one, `wrong` or `unreachable` otherwise. */
+/**
+ * An object read back: its bytes when their SHA-256 is the expected one; `wrong`, `unreachable`, or `forgotten` when a
+ * store in memory lost it with its process (development, recette EQP-09).
+ */
 export type Checked =
-  { readonly kind: 'ok'; readonly bytes: Uint8Array } | { readonly kind: 'wrong' | 'unreachable' };
+  | { readonly kind: 'ok'; readonly bytes: Uint8Array }
+  | { readonly kind: 'wrong' | 'unreachable' | 'forgotten' };
 
 export async function readChecked(store: InvoiceObjectStore, key: string, sha256: string): Promise<Checked> {
   let found: Awaited<ReturnType<InvoiceObjectStore['read']>>;
@@ -46,8 +50,8 @@ export async function readChecked(store: InvoiceObjectStore, key: string, sha256
     return { kind: 'unreachable' };
   }
   // A row whose object is gone is a wrong file too: the bucket's lock should have kept it. A store in memory forgets
-  // its objects with the process (development): one it no longer holds is out of reach, not damaged.
-  if (found === null) return { kind: store.volatile ? 'unreachable' : 'wrong' };
+  // its objects with the process (development): one it no longer holds is forgotten, not damaged, and never back.
+  if (found === null) return { kind: store.volatile ? 'forgotten' : 'wrong' };
   if (sha256Hex(found.bytes) !== sha256) return { kind: 'wrong' };
   return { kind: 'ok', bytes: found.bytes };
 }

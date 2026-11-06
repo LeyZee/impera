@@ -338,6 +338,7 @@ describe('decisionError', () => {
 
   it('says why nothing may leave, and blames the server only when it does not answer', () => {
     expect(decisionError(409, apiError('kill_switch_conflict'))).toContain('L’arrêt est actif');
+    expect(decisionError(409, apiError('creator_archived_conflict'))).toContain('est archivée');
     expect(decisionError(409, apiError('session_expired_conflict'))).toContain('La session Reveal a expiré');
     expect(decisionError(409, apiError('draft_conflict'))).toContain('a changé entre-temps');
     // Only a chatter whose shift or handover closed gets a 403 there: never « only chatters decide ».

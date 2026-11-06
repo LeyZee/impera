@@ -2,6 +2,7 @@ import {
   AgentHoursSchema,
   AuditEntryIdSchema,
   canonicalTimezone,
+  CreatorDisplayNameSchema,
   CreatorIdSchema,
   creatorNameKey,
   DEFAULT_AGENT_HOURS,
@@ -13,9 +14,11 @@ import {
   reopenJobKey,
   TimezoneSchema,
   type AgentHours,
+  type ArchivedCreator,
+  type CreatorId,
   type CreatorSummary,
 } from '@impera/contracts';
-import { eq, inArray, schema, sql, type Database } from '@impera/db';
+import { and, eq, inArray, schema, sql, type Database } from '@impera/db';
 
 import { CreatorConflict, CreatorNameConflict } from '../../domain/errors';
 import type { CreatorDirectory } from '../../domain/ports';
@@ -65,23 +68,112 @@ const toSummary = (row: { id: string; displayName: string; timezone: string }): 
   timezone: row.timezone,
 });
 
+const archivedOf = (
+  row: { id: string; displayName: string; timezone: string },
+  at: Date,
+): ArchivedCreator => ({ ...toSummary(row), archivedAt: at.toISOString() });
+
 export function createDrizzleCreatorDirectory(
   db: Database,
   now: () => Date = () => new Date(),
 ): CreatorDirectory {
-  return {
-    async list(ids) {
-      if (ids !== 'all' && ids.length === 0) return [];
-      const columns = {
+  const listOf = async (
+    ids: readonly CreatorId[] | 'all',
+    only: ReturnType<typeof sql> | null,
+  ): Promise<CreatorSummary[]> => {
+    if (ids !== 'all' && ids.length === 0) return [];
+    const among = ids === 'all' ? undefined : inArray(schema.creators.id, [...ids]);
+    const rows = await db
+      .select({
         id: schema.creators.id,
         displayName: schema.creators.displayName,
         timezone: schema.creators.timezone,
-      };
-      const query = db.select(columns).from(schema.creators);
-      const rows = await (ids === 'all' ? query : query.where(inArray(schema.creators.id, [...ids]))).orderBy(
-        schema.creators.displayName,
-      );
-      return rows.map(toSummary);
+        avatarKey: schema.creators.avatarKey,
+      })
+      .from(schema.creators)
+      .where(and(among, only ?? undefined))
+      .orderBy(schema.creators.displayName);
+    // Her photo copied at her import (CRM-07 a2b): the page asks for it only when there is one.
+    return rows.map((row) => ({ ...toSummary(row), hasAvatar: row.avatarKey !== null }));
+  };
+
+  return {
+    async list(ids) {
+      return listOf(ids, null);
+    },
+
+    async unarchived(ids) {
+      // Out of every list, the owner's included (ADR 0071 § 2); her history still reads her by `list`.
+      return listOf(ids, sql`${schema.creators.archivedAt} is null`);
+    },
+
+    async archived() {
+      const rows = await db
+        .select({
+          id: schema.creators.id,
+          displayName: schema.creators.displayName,
+          timezone: schema.creators.timezone,
+          archivedAt: schema.creators.archivedAt,
+        })
+        .from(schema.creators)
+        .where(sql`${schema.creators.archivedAt} is not null`)
+        .orderBy(sql`${schema.creators.archivedAt} desc`, schema.creators.displayName);
+      return rows.flatMap((row) => (row.archivedAt === null ? [] : [archivedOf(row, row.archivedAt)]));
+    },
+
+    async archive(id, userId) {
+      return db.transaction(async (tx) => {
+        const [current] = await tx
+          .select({
+            id: schema.creators.id,
+            displayName: schema.creators.displayName,
+            timezone: schema.creators.timezone,
+            archivedAt: schema.creators.archivedAt,
+          })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, id))
+          .for('update');
+        if (current === undefined) return null;
+        if (current.archivedAt !== null) return archivedOf(current, current.archivedAt);
+        const at = now();
+        await tx.update(schema.creators).set({ archivedAt: at }).where(eq(schema.creators.id, id));
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: 'creator.archive',
+          entity: 'creator',
+          entityId: id,
+          details: {},
+        });
+        return archivedOf(current, at);
+      });
+    },
+
+    async restore(id, userId) {
+      return db.transaction(async (tx) => {
+        const [current] = await tx
+          .select({
+            id: schema.creators.id,
+            displayName: schema.creators.displayName,
+            timezone: schema.creators.timezone,
+            archivedAt: schema.creators.archivedAt,
+          })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, id))
+          .for('update');
+        if (current === undefined) return null;
+        if (current.archivedAt === null) return toSummary(current);
+        await tx.update(schema.creators).set({ archivedAt: null }).where(eq(schema.creators.id, id));
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: 'creator.restore',
+          entity: 'creator',
+          entityId: id,
+          details: {},
+        });
+        return toSummary(current);
+      });
     },
 
     async create(input, userId) {
@@ -171,6 +263,42 @@ export function createDrizzleCreatorDirectory(
         });
         return toSummary({ ...current, timezone: zone });
       });
+    },
+
+    async rename(id, displayName, userId) {
+      const name = CreatorDisplayNameSchema.parse(displayName);
+      try {
+        return await db.transaction(async (tx) => {
+          // Locked: two renames at once each read the name the other left, and the audit says from what to what.
+          const [current] = await tx
+            .select({
+              id: schema.creators.id,
+              displayName: schema.creators.displayName,
+              timezone: schema.creators.timezone,
+            })
+            .from(schema.creators)
+            .where(eq(schema.creators.id, id))
+            .for('update');
+          if (current === undefined) return null;
+          if (current.displayName === name) return toSummary(current);
+          await tx
+            .update(schema.creators)
+            .set({ displayName: name, nameKey: creatorNameKey(name) })
+            .where(eq(schema.creators.id, id));
+          await tx.insert(schema.auditLog).values({
+            id: newId(AuditEntryIdSchema),
+            userId,
+            action: 'creator.rename',
+            entity: 'creator',
+            entityId: id,
+            details: { from: current.displayName, to: name },
+          });
+          return toSummary({ ...current, displayName: name });
+        });
+      } catch (error) {
+        if (isNameTaken(error)) throw new CreatorNameConflict();
+        throw error;
+      }
     },
 
     async agentHours(id) {

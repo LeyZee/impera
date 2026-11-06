@@ -8,8 +8,10 @@ import {
   dayMonth,
   dayNumber,
   dayOf,
+  dayOfInput,
   fullDay,
   inputOf,
+  inputOfDay,
   lengthOf,
   longDay,
   minuteOf,
@@ -85,6 +87,58 @@ describe('words for time', () => {
     expect(lengthOf(330 * 60_000)).toBe('5 h 30');
     expect(untilOf(12 * 60_000)).toBe('dans 12 min');
     expect(untilOf(3 * 86_400_000)).toBe('dans 3 jours');
+  });
+});
+
+describe('day fields', () => {
+  it('reads a day as French writes it, never as the system does (recette #561)', () => {
+    const today = '2026-11-05';
+    expect(inputOfDay('2027-03-28')).toBe('28/03/2027');
+    expect(dayOfInput('28/03/2027', today)).toBe('2027-03-28');
+    expect(dayOfInput(' 28/3/27 ', today)).toBe('2027-03-28');
+    expect(dayOfInput('28.03.2027', today)).toBe('2027-03-28');
+    expect(dayOfInput('28 3 2027', today)).toBe('2027-03-28');
+    expect(dayOfInput('2027-03-28', today)).toBe('2027-03-28');
+    // The phone's number pad: digits alone, two by two.
+    expect(dayOfInput('2803', today)).toBe('2027-03-28');
+    expect(dayOfInput('280327', today)).toBe('2027-03-28');
+    expect(dayOfInput('28032027', today)).toBe('2027-03-28');
+    // No year: the first such day from today on, today included.
+    expect(dayOfInput('5/11', today)).toBe('2026-11-05');
+    expect(dayOfInput('4/11', today)).toBe('2027-11-04');
+    expect(dayOfInput('1/1', today)).toBe('2027-01-01');
+    // A year typed stays as typed, even past: the form says it is too early.
+    expect(dayOfInput('4/11/2026', today)).toBe('2026-11-04');
+    // Not a day.
+    expect(dayOfInput('', today)).toBeNull();
+    expect(dayOfInput('28', today)).toBeNull();
+    expect(dayOfInput('28/', today)).toBeNull();
+    expect(dayOfInput('31/02/2027', today)).toBeNull();
+    expect(dayOfInput('29/02/2027', today)).toBeNull();
+    expect(dayOfInput('29/02/2028', today)).toBe('2028-02-29');
+    expect(dayOfInput('12/13/2027', today)).toBeNull();
+    expect(dayOfInput('03/28/2027', today)).toBeNull();
+    expect(dayOfInput('0/3', today)).toBeNull();
+    expect(dayOfInput('28/03/202', today)).toBeNull();
+  });
+
+  it('reads a day looked back to up to today, and two digits of a year that would lie ahead as the last century', () => {
+    const today = '2026-11-05';
+    expect(dayOfInput('5/11', today, 'past')).toBe('2026-11-05');
+    expect(dayOfInput('6/11', today, 'past')).toBe('2025-11-06');
+    expect(dayOfInput('12/05/98', today, 'past')).toBe('1998-05-12');
+    expect(dayOfInput('12/05/26', today, 'past')).toBe('2026-05-12');
+    expect(dayOfInput('120598', today, 'past')).toBe('1998-05-12');
+    expect(dayOfInput('12/05/1998', today, 'past')).toBe('1998-05-12');
+    // Ahead, two digits stay this century.
+    expect(dayOfInput('12/05/98', today)).toBe('2098-05-12');
+  });
+
+  it('reads a bound of a period in this year, before today or after it', () => {
+    const today = '2026-11-05';
+    expect(dayOfInput('1/1', today, 'year')).toBe('2026-01-01');
+    expect(dayOfInput('31/12', today, 'year')).toBe('2026-12-31');
+    expect(dayOfInput('30/06/2025', today, 'year')).toBe('2025-06-30');
   });
 });
 

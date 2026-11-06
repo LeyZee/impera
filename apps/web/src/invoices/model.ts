@@ -9,7 +9,7 @@ import {
 import type { InvoiceRefusal } from './api';
 
 import { dayMonthText, momentAt, type PayChip } from '@/payroll/model';
-import { periodTitle } from '@/reports/model';
+import { periodLine } from '@/reports/model';
 import { addDays, fullDay } from '@/scheduling/time';
 
 /**
@@ -157,7 +157,7 @@ export function dueText(item: Pick<InvoiceListItem, 'kind' | 'settlement' | 'due
  */
 export function periodText(item: Pick<InvoiceListItem, 'kind' | 'corrective' | 'period'>): string {
   const corrects = item.kind === 'credit_note' || item.corrective;
-  return `${corrects ? 'corrige la quinzaine du' : 'quinzaine du'} ${periodTitle(item.period)}`;
+  return `${corrects ? 'corrige la quinzaine' : 'quinzaine'} ${periodLine(item.period, true)}`;
 }
 
 /** The answer still open to the contractor, with the moment its delay ends; `null` once answered. */
@@ -210,6 +210,12 @@ const CORRECTION_REFUSALS: ReadonlyMap<string, string> = new Map([
   ['above_pay_amount_max', 'Ce qui reste de cette facture dépasse ce qu’un ajustement de paie peut porter.'],
 ]);
 
+/** Why a PDF was not saved: a read, so a server that does not answer has saved nothing to say (recette EQP-08). */
+export const pdfRefusalText = (refusal: InvoiceRefusal): string =>
+  refusal.kind === 'failed'
+    ? 'Le serveur ne répond pas : le PDF n’a pas pu être lu. Réessaie dans un instant.'
+    : invoiceRefusalText(refusal);
+
 /**
  * Every refusal of the invoices' routes, in French (EQ-06 lot 8: never a raw code). The codes of the file and of
  * Réglages › Facturation are worded here too, for the screens of 8b and 8c; one switch, exhaustive, so a new code
@@ -236,6 +242,8 @@ export function invoiceRefusalText(refusal: InvoiceRefusal): string {
       return 'Le PDF est en préparation : il sera là dans un instant.';
     case 'invoice_pdf_unavailable':
       return 'Le PDF n’a pas pu être relu intact : réessaie plus tard, jamais un fichier altéré n’est servi.';
+    case 'invoice_pdf_gone':
+      return 'Ce PDF n’est plus disponible et ne sera pas refait. La facture, elle, reste valable.';
     case 'agency_logo_invalid':
       return 'Ce logo n’a pas été gardé : un PNG transparent de 512 Ko au plus.';
     case 'agency_logo_not_found':

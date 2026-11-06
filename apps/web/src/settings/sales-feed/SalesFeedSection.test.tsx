@@ -12,6 +12,8 @@ import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { SalesFeedSection } from './SalesFeedSection';
 
+import { choose, openList } from '@/test/select';
+
 const ACCOUNT_LUNE = '00000000-0000-4000-8000-00000000000a';
 const ACCOUNT_SOLEIL = '00000000-0000-4000-8000-00000000000b';
 const MEMBER_ANA = '00000000-0000-4000-8000-0000000000a1';
@@ -262,11 +264,10 @@ describe('Réglages › Ventes', () => {
     expect(
       screen.getByText('3 ventes en attente : relier ce modèle les fait entrer au registre.'),
     ).toBeTruthy();
-    const soleil = screen.getByLabelText<HTMLSelectElement>('Compte de Soleil (@soleil)');
-    const taken = within(soleil).getByRole<HTMLOptionElement>('option', {
-      name: '@lune · Lune (relié à @lune)',
-    });
-    expect(taken.disabled).toBe(true);
+    const soleil = screen.getByRole('combobox', { name: 'Compte de Soleil (@soleil)' });
+    const taken = within(openList(soleil)).getByRole('option', { name: '@lune · Lune relié à @lune' });
+    expect(taken.getAttribute('aria-disabled')).toBe('true');
+    expect(document.querySelector('select')).toBeNull();
   });
 
   it('links a model and lands the server’s answer; a refusal is said under its row', async () => {
@@ -298,15 +299,15 @@ describe('Réglages › Ventes', () => {
       },
     });
     renderSection();
-    const soleil = await screen.findByLabelText<HTMLSelectElement>('Compte de Soleil (@soleil)');
-    fireEvent.change(soleil, { target: { value: ACCOUNT_SOLEIL } });
+    const soleil = await screen.findByRole('combobox', { name: 'Compte de Soleil (@soleil)' });
+    choose(soleil, /^@soleil/u);
     await waitFor(() => {
       expect(screen.queryByText(/ventes en attente/u)).toBeNull();
     });
     const put = fetch.mock.calls.find(([url]) => url === `${BASE}/reveal/models/m2`);
     expect(put?.[1]?.body).toBe(JSON.stringify({ platformAccountId: ACCOUNT_SOLEIL }));
 
-    fireEvent.change(screen.getByLabelText('Compte de Soleil (@soleil)'), { target: { value: '' } });
+    choose(screen.getByRole('combobox', { name: 'Compte de Soleil (@soleil)' }), 'Aucun compte');
     expect(
       await screen.findByText('Soleil (@soleil) n’a pas été relié. Ce compte est déjà lié.'),
     ).toBeTruthy();
@@ -346,9 +347,11 @@ describe('Réglages › Ventes', () => {
       [`PUT ${BASE}/reveal/chatters/c1`]: ok(overview()),
     });
     renderSection();
-    const select = await screen.findByLabelText<HTMLSelectElement>('Lien de Ana Test');
-    await within(select).findByRole('option', { name: 'Ana T.' });
-    fireEvent.change(select, { target: { value: `member:${MEMBER_ANA}` } });
+    const field = await screen.findByRole('combobox', { name: 'Lien de Ana Test' });
+    await waitFor(() => {
+      expect(within(openList(field)).getByRole('option', { name: 'Ana T.' })).toBeTruthy();
+    });
+    choose(field, 'Ana T.');
     await waitFor(() => {
       expect(fetch.mock.calls.some(([url]) => url === `${BASE}/reveal/chatters/c1`)).toBe(true);
     });

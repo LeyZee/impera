@@ -393,6 +393,21 @@ describe('Équipe › Rapports', () => {
     ]);
   });
 
+  it('says « 0,00 € validés » of a report validated at nothing, never a blank row (recette EQP-14)', async () => {
+    period = [
+      report(5, 1, {
+        status: 'validated',
+        amount: { amountMinor: 0, currency: 'EUR' },
+        reviewedAt: '2026-10-27T08:00:00.000Z',
+      }),
+    ];
+    renderPage();
+    const basile = await screen.findByText('Basile', { selector: '.nv-disclosure__title' });
+    expect(text(basile.closest('summary')?.querySelector('.nv-disclosure__sum') ?? null)).toMatch(
+      /^0,00 € validés/u,
+    );
+  });
+
   it('reads a period member by member, with the shifts still without a report', async () => {
     period = [
       report(5, 0, { status: 'validated', reviewedAt: '2026-10-27T08:00:00.000Z' }),
@@ -406,8 +421,10 @@ describe('Équipe › Rapports', () => {
     );
     // Only the shifts without a report are amber, not the money beside them (EQ-14).
     expect(text(summary?.querySelector('.rp-member__late') ?? null)).toBe(' · 1 sans rapport');
-    expect(screen.getByText(/16 – 31 octobre 2026/u)).toBeTruthy();
+    // The period is the panel's title, as on Paie, its arrows beside it (recette #561).
+    expect(screen.getByRole('heading', { name: '16 – 31 octobre 2026' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Quinzaine suivante' }).matches(':disabled')).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Cette quinzaine' })).toBe(null);
 
     fireEvent.click(screen.getByRole('button', { name: 'Corriger' }));
     const dialog = await screen.findByRole('dialog', { name: 'Corriger le rapport de Théo' });
@@ -491,6 +508,14 @@ describe('Équipe › Rapports', () => {
     await within(late).findAllByText('Parti');
     expect(within(late).queryByRole('button', { name: 'Relancer Basile' })).toBeNull();
     expect(within(late).getByRole('button', { name: 'Relancer Théo' })).toBeTruthy();
+    // The period says it beside his name, the fold closed: his last one (recette EQP-17).
+    const summaries = [...document.querySelectorAll('.rp-period .rp-member > summary')];
+    const basile = summaries.find(
+      (one) => one.querySelector('.nv-disclosure__title')?.textContent === 'Basile',
+    );
+    const theo = summaries.find((one) => one.querySelector('.nv-disclosure__title')?.textContent === 'Théo');
+    expect(basile?.querySelector('.rp-chip--neutral')?.textContent).toBe('Parti');
+    expect(theo?.querySelector('.rp-chip--neutral')).toBeNull();
   });
 
   it('says why « Relancer » waits when the team cannot be read, and when the late shifts cannot be', async () => {

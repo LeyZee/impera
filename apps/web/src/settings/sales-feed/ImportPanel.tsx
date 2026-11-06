@@ -36,6 +36,7 @@ import { creatorsQuery } from '@/creators/api';
 import { creatorsSearch } from '@/creators/search';
 import { PasswordPrompt, SignInAgain } from '@/settings/services/PasswordPrompt';
 import { ReauthRequired, type ShownError } from '@/settings/services/api';
+import { Select } from '@/shell/Select';
 
 /** What the last import did, line by line, with each model's name as it was shown (she leaves the list after). */
 interface Done {
@@ -324,7 +325,7 @@ function CandidateRow({
     <li className="sf-imp">
       <input
         type="checkbox"
-        className="sf-imp__pick"
+        className="nv-check"
         aria-label={`Importer ${label}`}
         checked={choice.selected}
         disabled={disabled}
@@ -335,22 +336,19 @@ function CandidateRow({
       <Face model={model} />
       <Who model={model} platformName={name} />
       <div className="sf-imp__act">
-        <select
-          className="nv-field__control nv-glass sf-select"
-          aria-label={`Que faire de ${label}`}
+        <Select
+          className="sf-select"
+          ariaLabel={`Que faire de ${label}`}
           value={actionValue(choice.action)}
           disabled={disabled}
-          onChange={(event) => {
-            onChange({ action: actionOf(event.target.value, options), selected: true });
+          options={[
+            { value: 'create', label: 'Créer sa fiche' },
+            ...options.map((option) => ({ value: `link:${option.id}`, label: `Relier à ${option.name}` })),
+          ]}
+          onChange={(value) => {
+            onChange({ action: actionOf(value, options), selected: true });
           }}
-        >
-          <option value="create">Créer sa fiche</option>
-          {options.map((option) => (
-            <option key={option.id} value={`link:${option.id}`}>
-              Relier à {option.name}
-            </option>
-          ))}
-        </select>
+        />
         {why !== null && isProposed ? <span className="sf-imp__why">{why}</span> : null}
       </div>
       <button

@@ -6,7 +6,14 @@ import { RateBar } from './playground/RateBar';
 import { SetupPanel } from './playground/SetupPanel';
 import { WhyPanel } from './playground/WhyPanel';
 import { COMPARE_MODEL, PlaygroundError, type PlaygroundErrorCode } from './playground/client';
-import { fanMessageCount, needsAttention, percent, stepOf } from './playground/logic';
+import {
+  fanMessageCount,
+  needsAttention,
+  percent,
+  personaLabel,
+  personaShort,
+  stepOf,
+} from './playground/logic';
 import { filedAck, isHandoff, suggestedDestination } from './playground/model';
 import { usePlayground } from './playground/usePlayground';
 
@@ -206,7 +213,9 @@ export function PlaygroundPage(): JSX.Element {
           <span className="pg-top__t">
             <b>{name}</b>
             {/* Phone only: the bar that names the persona is hidden there (M13). */}
-            <span className="pg-top__persona">Persona fictive : {state.persona.name}</span>
+            <span className="pg-top__persona" title={personaLabel(state)}>
+              {personaShort(state)}
+            </span>
           </span>
           {/* Phone only: the rate in short, and the situation as a sheet (the column no longer hides them). */}
           <span

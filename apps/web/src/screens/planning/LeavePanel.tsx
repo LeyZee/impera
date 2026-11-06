@@ -1,6 +1,8 @@
 import { LEAVE_MAX_DAYS, LeaveRequestIdSchema, newId, type Shift } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
+import { DayField } from '@/scheduling/DayField';
+import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { askLeave, usePlanning, useRefreshPlanning, type Refusal } from '@/scheduling/api';
 import {
   ERROR_MESSAGES,
@@ -41,16 +43,22 @@ export function LeavePanel({
   const refresh = useRefreshPlanning();
   const [requestId] = useState(() => newId(LeaveRequestIdSchema));
   const [first, setFirst] = useState(today);
-  const [last, setLast] = useState(today);
+  // The last day follows the first until it is typed itself: a first day typed digit by digit (« 3/1 » on its way to
+  // « 3/11 ») passes through days it does not mean, and none of them may stay in the last (relecture d'Équipe, #569).
+  const [lastOwn, setLastOwn] = useState<string | null>(null);
+  const last = lastOwn ?? first;
+  // A day half typed is not yet a mistake: said in amber once its field is left, as the field marks itself.
+  const [typing, setTyping] = useState(false);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
 
+  const { unreadable, onUnreadable } = useUnreadableTimes();
   const firstOk = DAY.test(first) && first >= today;
   const lastOk = DAY.test(last) && last >= first;
   const length = firstOk && lastOk ? daysFrom(first, last) + 1 : 0;
   const tooLong = length > LEAVE_MAX_DAYS;
-  const ready = firstOk && lastOk && !tooLong && !busy;
+  const ready = !unreadable && firstOk && lastOk && !tooLong && !busy;
   const now = useNow();
   // His shifts on the days asked: the planning reads 42 days at most, a leave 31.
   const planning = usePlanning(
@@ -101,24 +109,29 @@ export function LeavePanel({
           void submit();
         }}
       >
-        <div className="tm-pair">
+        <div
+          className="tm-pair"
+          onFocus={() => {
+            setTyping(true);
+          }}
+          onBlur={() => {
+            setTyping(false);
+          }}
+        >
           <div className="nv-field tm-field" data-invalid={firstOk ? undefined : 'true'}>
             <label className="nv-field__label" htmlFor={`${id}-first`}>
               Premier jour
             </label>
-            <input
+            <DayField
               id={`${id}-first`}
-              type="date"
-              className="nv-field__control nv-glass tm-date"
+              className="tm-date"
               value={first}
-              min={today}
-              data-autofocus
-              aria-invalid={!firstOk}
-              onChange={(event) => {
-                const next = event.target.value;
-                setFirst(next);
-                // The last day follows a first day moved past it: one gesture for a single day.
-                if (DAY.test(next) && next > last) setLast(next);
+              today={today}
+              autofocus
+              invalid={!firstOk}
+              onChange={setFirst}
+              onUnreadable={(bad) => {
+                onUnreadable('first', bad);
               }}
             />
           </div>
@@ -126,27 +139,35 @@ export function LeavePanel({
             <label className="nv-field__label" htmlFor={`${id}-last`}>
               Dernier jour
             </label>
-            <input
+            <DayField
               id={`${id}-last`}
-              type="date"
-              className="nv-field__control nv-glass tm-date"
+              className="tm-date"
               value={last}
-              min={firstOk ? first : today}
-              aria-invalid={!lastOk || tooLong}
-              onChange={(event) => {
-                setLast(event.target.value);
+              today={firstOk ? first : today}
+              invalid={!lastOk || tooLong}
+              onChange={setLastOwn}
+              onUnreadable={(bad) => {
+                onUnreadable('last', bad);
               }}
             />
           </div>
         </div>
-        <p className={ready || busy ? 'tm-hint sc-leave__sum' : 'tm-hint tm-hint--error sc-leave__sum'}>
-          {!firstOk
-            ? 'Un congé commence aujourd’hui au plus tôt.'
-            : !lastOk
-              ? 'Le dernier jour vient après le premier.'
-              : tooLong
-                ? `Un congé dure ${String(LEAVE_MAX_DAYS)} jours au plus : demande-le en deux fois.`
-                : `${leaveDaysLine({ firstDay: first, lastDay: last })}, ${leaveLength({ firstDay: first, lastDay: last })}.`}
+        <p
+          className={
+            ready || busy || (unreadable && typing)
+              ? 'tm-hint sc-leave__sum'
+              : 'tm-hint tm-hint--error sc-leave__sum'
+          }
+        >
+          {unreadable
+            ? 'Des jours comme 28/03/2027, ou 28/3.'
+            : !firstOk
+              ? 'Un congé commence aujourd’hui au plus tôt.'
+              : !lastOk
+                ? 'Le dernier jour vient après le premier.'
+                : tooLong
+                  ? `Un congé dure ${String(LEAVE_MAX_DAYS)} jours au plus : demande-le en deux fois.`
+                  : `${leaveDaysLine({ firstDay: first, lastDay: last })}, ${leaveLength({ firstDay: first, lastDay: last })}.`}
         </p>
 
         {clashes.length === 0 ? null : (

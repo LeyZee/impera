@@ -123,6 +123,28 @@ describe('sales feed reliability check (CRM-02)', () => {
     expect((await lastCheck(operator)).statusCode).toBe(403);
   });
 
+  it('counts only the owner’s checks in his limit, never an anonymous or a chatter’s from his address (recette SEC-05)', async () => {
+    const from = (cookie: string) =>
+      server.inject({
+        method: 'POST',
+        url: CHECK_URL,
+        remoteAddress: '198.51.100.77',
+        headers: { origin: DASHBOARD_ORIGIN, ...(cookie === '' ? {} : { cookie }) },
+        payload: { ...DAYS, export: null },
+      });
+    for (let i = 0; i < 4; i += 1) {
+      expect((await from('')).statusCode).toBe(401);
+      expect((await from(operator)).statusCode).toBe(403);
+    }
+    expect((await from(owner)).statusCode).toBe(409);
+    // His own calls still count: the fourth in the minute is refused.
+    expect((await from(owner)).statusCode).toBe(409);
+    expect((await from(owner)).statusCode).toBe(409);
+    const limited = await from(owner);
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toMatchObject({ error: { code: 'rate_limited' } });
+  });
+
   it('compares the register with the statistics per model and day, a refund taken off its sale’s day', async () => {
     const connected = await server.inject({
       method: 'PUT',

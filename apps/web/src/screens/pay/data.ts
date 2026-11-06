@@ -35,6 +35,18 @@ export function useAgencyToday(): string | null {
   return settings.data === undefined ? null : calendarDayAt(now, settings.data.timeZone);
 }
 
+/**
+ * The agency's settings could not be read (recette EQP-05): what reads them again, `null` while they are read or on
+ * their way. Without them no screen of Paie knows its day nor its quinzaine: they say so instead of waiting forever.
+ */
+export function useAgencySettingsDown(): (() => void) | null {
+  const settings = useSchedulingSettings();
+  if (!settings.isError || settings.data !== undefined) return null;
+  return () => {
+    void settings.refetch();
+  };
+}
+
 /** The period under way in the agency's zone, `null` until its settings are read. */
 export function useCurrentPeriod(): PayPeriod | null {
   const now = useNow();
@@ -130,6 +142,8 @@ export interface PayMember {
   readonly color: string | null;
   readonly manager: boolean;
   readonly userId: string | null;
+  /** Gone from the team (ADR 0023): his rows say it, so that no one reads a future in them (recette EQP-17). */
+  readonly left: boolean;
 }
 
 /** The names behind a period's ids: its members, the accounts of its lines, and whoever closed, validated or paid. */
@@ -139,7 +153,7 @@ export interface PayNames {
   readonly members: readonly TeamMember[];
 }
 
-const UNKNOWN: PayMember = { name: 'Un membre', color: null, manager: false, userId: null };
+const UNKNOWN: PayMember = { name: 'Un membre', color: null, manager: false, userId: null, left: false };
 
 /** The team's members and accounts as the agency reads them (`/v1/team/members`, `/v1/team/pay-rules`). */
 export function usePayNames(period: PayPeriod | null, agency: boolean): PayNames {
@@ -164,6 +178,7 @@ export function usePayNames(period: PayPeriod | null, agency: boolean): PayNames
           color: known.color,
           manager: known.teamRole === 'manager',
           userId: known.userId,
+          left: known.status === 'left',
         };
       const seen = planned.get(memberId);
       return seen === undefined ? UNKNOWN : { ...UNKNOWN, name: seen.displayName, color: seen.color };

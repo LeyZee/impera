@@ -38,6 +38,7 @@ export async function wirePlayground(
         personaPath: deps.personaPath,
         trainingDir: deps.trainingDir,
         activePersona: deps.activePersona,
+        personaVersion: (creatorId, versionId) => deps.persona.versions.version(creatorId, versionId),
       }).catch((error: unknown) => {
         logger.warn({ err: error }, 'playground not started: persona unreadable');
         return null;

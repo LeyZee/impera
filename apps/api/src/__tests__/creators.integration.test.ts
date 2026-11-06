@@ -98,7 +98,7 @@ describe('creators (GET /v1/creators, pnpm creator:create)', () => {
       headers: { cookie: await signIn(server, OPERATOR.email, OPERATOR.password) },
     });
     expect(operator.json()).toEqual({
-      creators: [{ id: anna.id, displayName: 'Anna', timezone: 'Europe/Paris' }],
+      creators: [{ id: anna.id, displayName: 'Anna', timezone: 'Europe/Paris', hasAvatar: false }],
     });
   });
 
@@ -371,10 +371,12 @@ describe('creators (GET /v1/creators, pnpm creator:create)', () => {
 
     expect(status(await patch(operator, { timezone: 'America/New_York' }))).toEqual([403, 'role_forbidden']);
     expect(status(await patch(owner, { timezone: 'Europe/Atlantis' }))).toEqual([400, 'request_invalid']);
-    // Her zone and nothing else: her name is not changed here.
-    expect((await patch(owner, { timezone: 'America/New_York', displayName: 'Louise' })).statusCode).toBe(
+    // Nothing to change, or a field this route does not know: refused, nothing written.
+    expect(status(await patch(owner, {}))).toEqual([400, 'request_invalid']);
+    expect(status(await patch(owner, { timezone: 'America/New_York', handle: 'lou' }))).toEqual([
       400,
-    );
+      'request_invalid',
+    ]);
     expect(await zone()).toBe('Europe/Paris');
 
     const moved = await patch(owner, { timezone: 'america/new_york' });
@@ -421,6 +423,66 @@ describe('creators (GET /v1/creators, pnpm creator:create)', () => {
     ]);
     expect(await zone()).toBe('America/New_York');
     expect(await audits()).toHaveLength(1);
+  });
+
+  it('lets the owner alone rename her, unique by name, with a recent sign-in and an audit line (ADR 0071)', async () => {
+    const [mia] = await Promise.all([
+      app.modules.persona.creators.create({ displayName: 'Mia x' }),
+      app.modules.persona.creators.create({ displayName: 'Nina' }),
+    ]);
+    const url = `/v1/creators/${mia.id}`;
+    const owner = { cookie: await signIn(server, OWNER.email, OWNER.password), origin: DASHBOARD_ORIGIN };
+    const operator = {
+      cookie: await signIn(server, OPERATOR.email, OPERATOR.password),
+      origin: DASHBOARD_ORIGIN,
+    };
+    const patch = (headers: Record<string, string>, payload: Record<string, string>) =>
+      server.inject({ method: 'PATCH', url, headers, payload });
+    const status = (response: Awaited<ReturnType<typeof patch>>) => [
+      response.statusCode,
+      response.json<{ error?: { code: string } }>().error?.code,
+    ];
+    const stored = async () =>
+      (
+        await test.admin.db
+          .select({ displayName: schema.creators.displayName, nameKey: schema.creators.nameKey })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, mia.id))
+      )[0];
+    const renames = () =>
+      test.admin.db
+        .select({ details: schema.auditLog.details })
+        .from(schema.auditLog)
+        .where(sql`${schema.auditLog.entityId} = ${mia.id} and ${schema.auditLog.action} = 'creator.rename'`);
+
+    expect(status(await patch(operator, { displayName: 'Mia' }))).toEqual([403, 'role_forbidden']);
+    expect(status(await patch(owner, { displayName: '  ' }))).toEqual([400, 'request_invalid']);
+    // Another creator's name, case and accents aside: refused, and her zone does not move either.
+    expect(status(await patch(owner, { displayName: 'NÎNA', timezone: 'Asia/Tokyo' }))).toEqual([
+      409,
+      'creator_name_conflict',
+    ]);
+    expect(await stored()).toEqual({ displayName: 'Mia x', nameKey: 'mia x' });
+    expect((await app.modules.persona.creators.list([mia.id]))[0]?.timezone).toBe('Europe/Paris');
+
+    const renamed = await patch(owner, { displayName: ' Mia ' });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json()).toEqual({ id: mia.id, displayName: 'Mia', timezone: 'Europe/Paris' });
+    expect(await stored()).toEqual({ displayName: 'Mia', nameKey: 'mia' });
+    expect(await renames()).toEqual([{ details: { from: 'Mia x', to: 'Mia' } }]);
+    // The same name again: nothing written. Her own name in another case is hers to take.
+    expect((await patch(owner, { displayName: 'Mia' })).statusCode).toBe(200);
+    expect(await renames()).toHaveLength(1);
+    expect((await patch(owner, { displayName: 'MIA' })).statusCode).toBe(200);
+    expect(await renames()).toHaveLength(2);
+    // Her old name is free again.
+    expect((await app.modules.persona.creators.create({ displayName: 'Mia x' })).displayName).toBe('Mia x');
+
+    await test.admin.db.execute(
+      sql`update "session" set reauthenticated_at = now() - interval '11 minutes' where user_id = (select id from "user" where email = ${OWNER.email})`,
+    );
+    expect(status(await patch(owner, { displayName: 'Mila' }))).toEqual([403, 'reauthentication_forbidden']);
+    expect((await stored())?.displayName).toBe('MIA');
   });
 
   it('says when her stored hours no longer read, and follows the defaults', async () => {

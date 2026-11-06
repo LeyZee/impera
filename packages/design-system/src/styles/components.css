@@ -626,6 +626,68 @@
   cursor: default;
 }
 
+/* ───────────── Check (a pick in a list: who to import, which reports) ───────────── */
+
+/* A soft square that fills with ink, its tick drawn: a selection, never the neon (`select`). The visual is 22px,
+   the target 44px around it. */
+.nv-check {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 0;
+  border-radius: 7px;
+  background: var(--nv-glass-fill-strong);
+  box-shadow: inset 0 0 0 1.5px var(--nv-hairline);
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.nv-check::before {
+  content: '';
+  position: absolute;
+  inset: -11px;
+}
+.nv-check::after {
+  content: '';
+  width: 10px;
+  height: 5px;
+  margin-top: -3px;
+  border-left: 2px solid var(--nv-void);
+  border-bottom: 2px solid var(--nv-void);
+  transform: rotate(-45deg) scale(0);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.nv-check:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink-faint);
+}
+.nv-check:active:not(:disabled) {
+  transform: scale(0.9);
+}
+.nv-check:checked {
+  background: var(--nv-ink);
+  box-shadow: none;
+}
+.nv-check:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+.nv-check:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.nv-check:disabled {
+  opacity: 0.5;
+  background: transparent;
+  cursor: not-allowed;
+}
+
 .nv-list {
   display: flex;
   flex-direction: column;
@@ -1115,6 +1177,11 @@
 }
 .nv-field__control::placeholder {
   color: var(--nv-ink-faint);
+}
+/* A field that says it is refused (a day that is no day, once left) wears it, whatever the form around it: the same
+   amber edge as the forms' own `[data-invalid]` fields. */
+.nv-field__control[aria-invalid='true']:not(:focus) {
+  box-shadow: inset 0 0 0 1px var(--nv-warning);
 }
 
 /* ───────────── Fan facts (memory) ───────────── */
@@ -2539,6 +2606,162 @@
 
 /* ───────────── Reduced motion ───────────── */
 
+/* ───────────── List (nv-select) ─────────────
+   The design system's list, never the system's `<select>` (consigne de Charles, 05/11): a field that says the choice
+   and a chevron; under it, the choices in an opaque plate, the chosen one ticked in ink, never in the accent. */
+.nv-select {
+  position: relative;
+  min-width: 0;
+}
+.nv-select__field {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  text-align: left;
+  cursor: pointer;
+}
+.nv-select__field[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.55;
+}
+.nv-select__field[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 60%, transparent);
+}
+.nv-select__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nv-select__value--empty {
+  color: var(--nv-ink-faint);
+}
+.nv-select__hint {
+  margin-inline-start: var(--nv-space-1);
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+.nv-select__chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.nv-select[data-open='true'] .nv-select__chevron {
+  transform: rotate(180deg);
+}
+.nv-select__pop {
+  /* Placed by the script under (or above) its field, at the top of the page: under the bars of the shell. */
+  position: fixed;
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--nv-radius-sm);
+  /* Opaque: the list over a form never lets the fields show through. */
+  background: var(--nv-surface-raised);
+  box-shadow:
+    inset 0 0 0 1px var(--nv-plate-edge),
+    var(--nv-shadow-float);
+  overflow: hidden;
+  transform-origin: top center;
+  animation: nv-select-unfold var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.nv-select__pop[data-side='top'] {
+  transform-origin: bottom center;
+}
+@keyframes nv-select-unfold {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+.nv-select__search {
+  margin: 6px 6px 0;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--nv-radius-xs);
+  background: var(--nv-plate-hover);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  font: inherit;
+  font-size: var(--nv-text-body);
+  color: var(--nv-ink);
+  caret-color: var(--nv-neon);
+  outline: none;
+}
+.nv-select__search::placeholder {
+  color: var(--nv-ink-faint);
+}
+.nv-select__list {
+  max-height: 280px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+.nv-select__group {
+  padding: 10px 10px 4px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.nv-select__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: var(--nv-radius-xs);
+  color: var(--nv-ink);
+  cursor: pointer;
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-select__option[data-active='true'] {
+  background: var(--nv-select);
+}
+.nv-select__option[aria-selected='true'] {
+  font-weight: 600;
+}
+.nv-select__option[aria-disabled='true'] {
+  cursor: default;
+  color: var(--nv-ink-faint);
+}
+.nv-select__label {
+  flex: 1;
+  min-width: 0;
+}
+/* In the list as in the field, the quieter words follow the label, kept whole: they go to the next line as one. */
+.nv-select__label > .nv-select__hint {
+  white-space: nowrap;
+}
+.nv-select__tick {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.nv-select__option[aria-selected='true'] .nv-select__tick {
+  opacity: 1;
+}
+.nv-select__empty {
+  padding: 10px;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nv-aura::before,
   .nv-aura::after,
@@ -2563,6 +2786,7 @@
   .nv-split__part,
   .nv-funnel__bar,
   .nv-funnel__flag,
+  .nv-select__pop,
   .nv-materialize {
     /* !important on purpose: a tone modifier (.nv-orb.nv-tone--bad::after) is more specific than this list,
        and reduced motion must win over every looping animation (recette A-03). */
@@ -2574,6 +2798,8 @@
   }
   .nv-btn,
   .nv-iconbtn,
+  .nv-check,
+  .nv-check::after,
   .nv-seg__thumb,
   .nv-tabbar__lens,
   .nv-switch::before,
@@ -2599,11 +2825,14 @@
   .nv-ring__value,
   .nv-split__part,
   .nv-tip,
-  .nv-funnel__bar {
+  .nv-funnel__bar,
+  .nv-select__chevron,
+  .nv-select__option {
     transition-duration: 1ms;
   }
   .nv-close:hover:not(:disabled),
-  .nv-close:active:not(:disabled) {
+  .nv-close:active:not(:disabled),
+  .nv-check:active:not(:disabled) {
     transform: none;
   }
 }

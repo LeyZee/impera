@@ -35,8 +35,10 @@ import {
 
 import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
+import { DayField } from '@/scheduling/DayField';
 import { cityOf } from '@/scheduling/time';
 import '@/shell/dialog.css';
+import { Select } from '@/shell/Select';
 import { useRevealAlerts } from '@/shell/reveal';
 
 const ZONES: readonly string[] = Intl.supportedValuesOf('timeZone');
@@ -56,6 +58,8 @@ interface Draft {
   timeZone: string;
   zoneOpen: boolean;
   joinedOn: string;
+  /** The arrival typed is not a day (« 31/02 »): the step does not go on. */
+  joinedUnreadable: boolean;
   presetId: string | null;
   /** « Autre » picked: the rate is typed by hand. */
   byHand: boolean;
@@ -75,6 +79,7 @@ const EMPTY = (): Draft => ({
   timeZone: suggestedZone('BJ') ?? 'Africa/Porto-Novo',
   zoneOpen: false,
   joinedOn: today(),
+  joinedUnreadable: false,
   presetId: null,
   byHand: false,
   rate: '',
@@ -101,7 +106,8 @@ export function problemsOf(step: number, draft: Draft): Problems {
   if (step === 1) {
     if (!TimezoneSchema.safeParse(draft.timeZone.trim()).success)
       problems.timeZone = 'Ce fuseau n’existe pas. Choisis-en un dans la liste.';
-    if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft.joinedOn)) problems.joinedOn = 'Une date d’arrivée.';
+    if (draft.joinedUnreadable) problems.joinedOn = 'Un jour comme 03/11/2026, ou 3/11.';
+    else if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft.joinedOn)) problems.joinedOn = 'Une date d’arrivée.';
   }
   if (step === 2) {
     if (draft.presetId === null && parseRate(draft.rate) === null)
@@ -511,29 +517,27 @@ function Where({ id, draft, problems, onChange }: StepProps): JSX.Element {
         label="Pays"
         hint="Il propose le fuseau et, plus tard, le régime de ses factures."
       >
-        <select
+        <Select
           id={`${id}-country`}
-          className="nv-field__control nv-glass tm-select"
           value={draft.country}
-          onChange={(event) => {
-            onChange({ country: event.target.value });
+          searchLabel="Chercher un pays"
+          empty="Aucun pays ne correspond."
+          options={[
+            ...FIRST_COUNTRIES.map((code) => ({
+              value: code,
+              label: `${countryFlag(code)}  ${countryName(code)}`,
+              group: 'Les plus fréquents',
+            })),
+            ...OTHER_COUNTRIES.map((country) => ({
+              value: country.code,
+              label: `${countryFlag(country.code)}  ${country.name}`,
+              group: 'Tous les pays',
+            })),
+          ]}
+          onChange={(country) => {
+            onChange({ country });
           }}
-        >
-          <optgroup label="Les plus fréquents">
-            {FIRST_COUNTRIES.map((code) => (
-              <option key={code} value={code}>
-                {`${countryFlag(code)}  ${countryName(code)}`}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="Tous les pays">
-            {OTHER_COUNTRIES.map((country) => (
-              <option key={country.code} value={country.code}>
-                {`${countryFlag(country.code)}  ${country.name}`}
-              </option>
-            ))}
-          </optgroup>
-        </select>
+        />
       </Field>
       <Field
         id={draft.zoneOpen ? `${id}-zone` : undefined}
@@ -578,14 +582,17 @@ function Where({ id, draft, problems, onChange }: StepProps): JSX.Element {
         ) : null}
       </Field>
       <Field id={`${id}-joined`} label="Dans l’équipe depuis" problem={problems.joinedOn}>
-        <input
+        <DayField
           id={`${id}-joined`}
-          className="nv-field__control nv-glass tm-date"
-          type="date"
+          className="tm-date"
           value={draft.joinedOn}
-          aria-invalid={problems.joinedOn !== undefined}
-          onChange={(event) => {
-            onChange({ joinedOn: event.target.value });
+          toward="year"
+          invalid={problems.joinedOn !== undefined}
+          onChange={(next) => {
+            onChange({ joinedOn: next });
+          }}
+          onUnreadable={(bad) => {
+            onChange({ joinedUnreadable: bad });
           }}
         />
       </Field>
@@ -650,7 +657,7 @@ function Rate({
               className="nv-field__control nv-glass"
               inputMode="decimal"
               placeholder="12,5"
-              aria-label={presets.length === 0 ? undefined : 'Taux à la main'}
+              aria-label={presets.length === 0 ? undefined : 'Taux à la main, en %'}
               aria-invalid={problems.rate !== undefined}
               value={draft.rate}
               onChange={(event) => {

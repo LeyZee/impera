@@ -20,6 +20,8 @@ import {
 } from './check';
 import { platformName, shownOf, type Notice } from './shown';
 
+import { DayField } from '@/scheduling/DayField';
+import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
 
 type Choice = 0 | 1 | 'custom';
@@ -92,7 +94,11 @@ export function CheckPanel({
   }, [platform]);
 
   const range: DayRange = choice === 'custom' ? custom : fortnights[choice];
-  const problem = rangeProblem(range, lastOver);
+  const { unreadable, isUnreadable, onUnreadable } = useUnreadableTimes();
+  // A day that cannot be read is said under its own field; the period's own rule waits until both are days.
+  const typing = choice === 'custom' && unreadable;
+  const problem = typing ? null : rangeProblem(range, lastOver);
+  const blocked = typing || problem !== null;
 
   const choose = (file: File | undefined): void => {
     setFileProblem(null);
@@ -118,7 +124,7 @@ export function CheckPanel({
   };
 
   const check = (): void => {
-    if (problem !== null || isBusy) return;
+    if (blocked || isBusy) return;
     setNotice(null);
     setIsBusy(true);
     const lead = 'La vérification n’a pas eu lieu.';
@@ -206,33 +212,49 @@ export function CheckPanel({
                 <label className="nv-field__label" htmlFor={`${id}-from`}>
                   Du
                 </label>
-                <input
+                <DayField
                   id={`${id}-from`}
-                  type="date"
-                  className="nv-field__control nv-glass"
                   value={custom.from}
-                  max={lastOver}
                   disabled={isBusy}
-                  onChange={(event) => {
-                    setCustom({ ...custom, from: event.target.value });
+                  describedBy={isUnreadable('from') ? `${id}-from-error` : undefined}
+                  onChange={(next) => {
+                    setCustom({ ...custom, from: next });
+                  }}
+                  today={lastOver}
+                  toward="past"
+                  onUnreadable={(bad) => {
+                    onUnreadable('from', bad);
                   }}
                 />
+                {isUnreadable('from') ? (
+                  <p id={`${id}-from-error`} className="sf-warn">
+                    Un jour comme 01/10/2026.
+                  </p>
+                ) : null}
               </div>
               <div className="nv-field">
                 <label className="nv-field__label" htmlFor={`${id}-to`}>
                   Au
                 </label>
-                <input
+                <DayField
                   id={`${id}-to`}
-                  type="date"
-                  className="nv-field__control nv-glass"
                   value={custom.to}
-                  max={lastOver}
                   disabled={isBusy}
-                  onChange={(event) => {
-                    setCustom({ ...custom, to: event.target.value });
+                  describedBy={isUnreadable('to') ? `${id}-to-error` : undefined}
+                  onChange={(next) => {
+                    setCustom({ ...custom, to: next });
+                  }}
+                  today={lastOver}
+                  toward="past"
+                  onUnreadable={(bad) => {
+                    onUnreadable('to', bad);
                   }}
                 />
+                {isUnreadable('to') ? (
+                  <p id={`${id}-to-error`} className="sf-warn">
+                    Un jour comme 01/10/2026.
+                  </p>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -304,7 +326,7 @@ export function CheckPanel({
         </div>
 
         <div className="sf-check__act">
-          <button type="submit" className="nv-btn nv-btn--soft" disabled={problem !== null || isBusy}>
+          <button type="submit" className="nv-btn nv-btn--soft" disabled={blocked || isBusy}>
             {isBusy ? 'Vérification…' : 'Vérifier ces jours'}
           </button>
         </div>

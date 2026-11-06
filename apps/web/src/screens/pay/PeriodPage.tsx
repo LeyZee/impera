@@ -15,6 +15,7 @@ import { HeldSalesPanel } from './HeldSalesPanel';
 import { PayNav } from './PayNav';
 import { StatementDialog } from './StatementDialog';
 import {
+  useAgencySettingsDown,
   useCurrentPeriod,
   usePayNames,
   usePeriodBlock,
@@ -85,13 +86,12 @@ import {
   followingPeriod,
   percentText,
   periodLine,
-  periodTitle,
   previousPeriod,
   signedAmountText,
 } from '@/reports/model';
 import { accountLine, platformName } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
-import { dayOf, longDay } from '@/scheduling/time';
+import { addDays, dayOf, longDay } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
@@ -150,6 +150,7 @@ function PeriodView({
   const me = { id: user.id, name: user.name };
   const now = useNow();
   const current = useCurrentPeriod();
+  const down = useAgencySettingsDown();
   const read = usePayPeriod(period);
   const before = usePayPeriod(period === null ? null : previousPeriod(period));
   const names = usePayNames(period, true);
@@ -327,6 +328,17 @@ function PeriodView({
     />
   );
 
+  if (period === null && down !== null)
+    return (
+      <Page>
+        {head}
+        <div className="py-board">
+          <Panel className="nv-enter">
+            <Unreachable what="la quinzaine en cours" onRetry={down} />
+          </Panel>
+        </div>
+      </Page>
+    );
   if (period === null || (data === undefined && !read.isError)) {
     return (
       <Page>
@@ -616,7 +628,7 @@ function Summary({
   const forecast = statements.length === 0 ? null : data.pace.forecastNetMinor;
   const previousNet =
     previous === undefined || previous.statements.length === 0 ? null : previous.summary.netMinor;
-  const versus = periodTitle(previousPeriod(data.period), false);
+  const versus = periodLine(previousPeriod(data.period));
   const goal = data.collectiveGoal;
   const reached = data.pace.goal?.reachedBps ?? 0;
   const zone = window?.timeZone ?? null;
@@ -645,18 +657,19 @@ function Summary({
   ) : (
     <>
       <Chip chip={phaseChip(summary)} />
-      <span>depuis le {longDay(lastDay)} à minuit</span>
+      {/* The period ends at midnight after its last day: the day it is over, never « le 31 à minuit » (EQP-13). */}
+      <span>depuis le {longDay(addDays(lastDay, 1))} à 0&nbsp;h</span>
     </>
   );
 
-  /** « +12 % vs 16 – 30 septembre »: a change, and what it is against, written beside it. */
+  /** « +12 % par rapport à la quinzaine du 16 au 30 septembre »: a change, and what it is against, in French (EQP-13). */
   const against = (now: number): ReactNode =>
     previous === undefined ? null : previousNet === null ? (
       'pas de quinzaine avant pour comparer'
     ) : (
       <>
-        <Delta bps={changeBps(now, previousNet)} title={`${amountText(previousNet, 'EUR')} de net`} /> vs{' '}
-        {versus}
+        <Delta bps={changeBps(now, previousNet)} title={`${amountText(previousNet, 'EUR')} de net`} /> par
+        rapport à la quinzaine {versus}
       </>
     );
 
@@ -928,7 +941,7 @@ function SelectAll({
   return (
     <div className="py-allrow">
       <label className="rp-all" htmlFor={`${id}-all`}>
-        <input id={`${id}-all`} type="checkbox" className="rp-check" checked={all} onChange={onAll} />
+        <input id={`${id}-all`} type="checkbox" className="nv-check" checked={all} onChange={onAll} />
         Tout sélectionner
         <span className="rp-all__count nv-num">
           {String(chosen)} sur {String(of)}
@@ -1023,7 +1036,7 @@ function MemberRow({
           <input
             id={`${id}-pick`}
             type="checkbox"
-            className="rp-check"
+            className="nv-check"
             checked={checked || sending}
             disabled={!pick || sending}
             aria-label={`Sélectionner le relevé de ${member.name}`}
@@ -1048,6 +1061,7 @@ function MemberRow({
             {member.name}
           </button>
           {member.manager ? <span className="py-member__role">Manager</span> : null}
+          {member.left ? <span className="rp-chip rp-chip--neutral">Parti</span> : null}
         </p>
         <p className="py-member__line nv-num">
           net <b>{amountText(statement.netMinor, 'EUR')}</b>

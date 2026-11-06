@@ -23,6 +23,10 @@ import {
 import { useMembers } from '@/screens/team/api';
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
 import type { ShownError } from '@/settings/services/api';
+import { Select } from '@/shell/Select';
+
+/** The list's value for a model tied to no account: the API's `null`. */
+const NO_ACCOUNT = '';
 
 /** The row being saved, and the refusal of the last row saved: one at a time, said under that row. */
 interface RowState {
@@ -126,23 +130,17 @@ export function ModelLinks({
                 </>
               ) : null}
             </div>
-            <select
-              className="nv-field__control nv-glass sf-select"
-              aria-label={`Compte de ${label}`}
-              value={model.platformAccountId ?? ''}
+            <Select
+              className="sf-select"
+              ariaLabel={`Compte de ${label}`}
+              value={model.platformAccountId ?? NO_ACCOUNT}
               disabled={rows.busy !== null}
-              onChange={(event) => {
-                const value = event.target.value === '' ? null : event.target.value;
-                save(id, `${label} n’a pas été relié.`, () => linkModel(platform, id, value));
+              options={[{ value: NO_ACCOUNT, label: 'Aucun compte' }, ...options]}
+              onChange={(value) => {
+                const account = value === NO_ACCOUNT ? null : value;
+                save(id, `${label} n’a pas été relié.`, () => linkModel(platform, id, account));
               }}
-            >
-              <option value="">Aucun compte</option>
-              {options.map((option) => (
-                <option key={option.value} value={option.value} disabled={option.disabled}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            />
             {model.quarantined > 0 ? (
               <p className="sf-warn sf-row__msg">{modelQuarantineLine(model.quarantined)}</p>
             ) : null}
@@ -210,26 +208,26 @@ export function ChatterLinks({
                 <span className="nv-tag nv-tag--inferred">Retiré le {dayTime(chatter.removedAt)}</span>
               )}
             </div>
-            <select
-              className="nv-field__control nv-glass sf-select"
-              aria-label={`Lien de ${label}`}
+            <Select
+              className="sf-select"
+              ariaLabel={`Lien de ${label}`}
               value={chatterValueOf(chatter)}
               disabled={rows.busy !== null}
-              onChange={(event) => {
-                const link = linkOf(event.target.value);
+              options={[
+                { value: 'none', label: 'Personne' },
+                { value: 'agent', label: 'L’agent' },
+                ...(isLinkedUnknown ? [{ value: `member:${linkedId}`, label: 'Membre relié' }] : []),
+                ...choices.map((member) => ({
+                  value: `member:${member.id}`,
+                  label: member.displayName,
+                  ...(member.status === 'left' ? { hint: 'parti' } : {}),
+                })),
+              ]}
+              onChange={(value) => {
+                const link = linkOf(value);
                 save(id, `${label} n’a pas été relié.`, () => linkChatter(platform, id, link));
               }}
-            >
-              <option value="none">Personne</option>
-              <option value="agent">L’agent</option>
-              {isLinkedUnknown ? <option value={`member:${linkedId}`}>Membre relié</option> : null}
-              {choices.map((member) => (
-                <option key={member.id} value={`member:${member.id}`}>
-                  {member.displayName}
-                  {member.status === 'left' ? ' (parti)' : ''}
-                </option>
-              ))}
-            </select>
+            />
             <RowError id={id} rows={rows} />
           </div>
         );

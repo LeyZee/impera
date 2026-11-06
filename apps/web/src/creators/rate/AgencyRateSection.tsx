@@ -7,7 +7,6 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
-import { DayField } from '../DayField';
 import { Field } from '../persona/fields';
 
 import {
@@ -21,6 +20,7 @@ import {
 import { bpsOfPercent, confirmSentence, dayLabel, earliestDay, percentOf, standing } from './model';
 import './rate.css';
 
+import { DayField } from '@/scheduling/DayField';
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
 
 /**
@@ -110,7 +110,8 @@ function RateSheet({
   const earliest = earliestDay(list);
   const bps = bpsOfPercent(percent);
   const percentWrong = percent.trim() !== '' && bps === null;
-  const dayWrong = fromDay !== '' && fromDay < earliest;
+  const [dayUnreadable, setDayUnreadable] = useState(false);
+  const dayWrong = dayUnreadable || (fromDay !== '' && fromDay < earliest);
   const ready = bps !== null && fromDay !== '' && !dayWrong;
   const dirty = percent.trim() !== '' || fromDay !== '';
   useEffect(() => {
@@ -234,18 +235,23 @@ function RateSheet({
             >
               <DayField
                 id={`${id}-day`}
+                className="ps-input"
                 value={fromDay}
                 disabled={saving}
                 invalid={dayWrong}
                 describedBy={dayWrong ? `${id}-day-error` : undefined}
-                onChange={(day) => {
-                  setFromDay(day);
+                onChange={(next) => {
+                  setFromDay(next);
                   edit();
                 }}
+                today={earliest}
+                onUnreadable={setDayUnreadable}
               />
               {dayWrong ? (
                 <p className="ps-error" id={`${id}-day-error`}>
-                  {`Le ${dayLabel(earliest)} au plus tôt.`}
+                  {dayUnreadable
+                    ? 'Un jour comme 28/03/2027, ou 28/3.'
+                    : `Le ${dayLabel(earliest)} au plus tôt.`}
                 </p>
               ) : null}
             </Field>

@@ -16,6 +16,8 @@ import { canonicalJson } from '../../domain/canonical';
 import { PersonaVersionConflict, PersonaVersionNotFound } from '../../domain/errors';
 import type { PersonaVersionStore } from '../../domain/versions';
 
+type SQL = ReturnType<typeof eq>;
+
 /** What `source_path` says of a version saved from the dashboard rather than loaded from a YAML file. */
 const FROM_DASHBOARD = 'dashboard';
 
@@ -134,29 +136,34 @@ export function createDrizzlePersonaVersionStore(
   db: Database,
   checkBeforeActivate?: (persona: Persona) => void,
 ): PersonaVersionStore {
+  /** One version of hers with her name, read under her tenant; its content reread as `Persona`, never a guess. */
+  const readOne = (creatorId: string, which: SQL) =>
+    withTenant(db, creatorId, async (tx) => {
+      const [row] = await tx
+        .select({
+          id: schema.personaVersions.id,
+          version: schema.personaVersions.version,
+          content: schema.personaVersions.content,
+          creatorName: schema.creators.displayName,
+        })
+        .from(schema.personaVersions)
+        .innerJoin(schema.creators, eq(schema.creators.id, schema.personaVersions.creatorId))
+        .where(and(eq(schema.personaVersions.creatorId, creatorId), which));
+      if (row === undefined) return null;
+      return {
+        id: PersonaVersionIdSchema.parse(row.id),
+        version: row.version,
+        creatorName: row.creatorName,
+        persona: PersonaSchema.parse(row.content),
+      };
+    });
   return {
     active(creatorId) {
-      return withTenant(db, creatorId, async (tx) => {
-        const [row] = await tx
-          .select({
-            id: schema.personaVersions.id,
-            version: schema.personaVersions.version,
-            content: schema.personaVersions.content,
-            creatorName: schema.creators.displayName,
-          })
-          .from(schema.personaVersions)
-          .innerJoin(schema.creators, eq(schema.creators.id, schema.personaVersions.creatorId))
-          .where(
-            and(eq(schema.personaVersions.creatorId, creatorId), eq(schema.personaVersions.isActive, true)),
-          );
-        if (row === undefined) return null;
-        return {
-          id: PersonaVersionIdSchema.parse(row.id),
-          version: row.version,
-          creatorName: row.creatorName,
-          persona: PersonaSchema.parse(row.content),
-        };
-      });
+      return readOne(creatorId, eq(schema.personaVersions.isActive, true));
+    },
+
+    version(creatorId, versionId) {
+      return readOne(creatorId, eq(schema.personaVersions.id, versionId));
     },
 
     overview(creatorId) {

@@ -178,9 +178,9 @@ export interface Dashboard {
 }
 
 /**
- * The agency's part of the Dashboard (recette 05/11, reco 18 and PRO-10): the AI budget of the day, counted for every
- * creator, and the stuck jobs of no creator (pay, Telegram, cron), each named in French. Said once, apart from her
- * agent's health, which they are not.
+ * The agency's part of the Dashboard (recette 05/11, reco 18): the AI budget of the day, counted for every creator.
+ * Said once, apart from her agent's health, which it is not. The agency's stuck jobs are named in the activity card,
+ * for the owner only (PRO-10).
  */
 export interface AgencyState {
   /** Null for whoever the server sends no spend (a creator never reads the agency's). */
@@ -190,13 +190,4 @@ export interface AgencyState {
     readonly sub: string;
     readonly gauge: { readonly value: number; readonly mark: number };
   } | null;
-  readonly stuck: readonly StuckKind[];
-}
-
-/** Stuck jobs of one kind, named for whoever reads them: what it is, and what it holds back. */
-export interface StuckKind {
-  readonly task: string;
-  readonly name: string;
-  readonly effect: string;
-  readonly count: number;
 }

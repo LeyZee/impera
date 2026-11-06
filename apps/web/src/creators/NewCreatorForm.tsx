@@ -73,7 +73,7 @@ export function NewCreatorForm({
       }}
     >
       <p className="ps-title">Nouvelle créatrice</p>
-      <Field label="Prénom ou pseudo" id={`${id}-name`} hint="Celui que voient ses fans.">
+      <Field label="Prénom ou pseudo" id={`${id}-name`} hint="Celui que lit toute l’équipe dans Impera.">
         <input
           id={`${id}-name`}
           className="nv-glass nv-field__control ps-input"

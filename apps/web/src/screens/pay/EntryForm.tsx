@@ -40,6 +40,7 @@ import {
   periodTitle,
   signedAmountText,
 } from '@/reports/model';
+import { Select } from '@/shell/Select';
 
 const NBSP = '\u00a0';
 
@@ -349,25 +350,15 @@ export function EntryForm({
               <label className="nv-field__label" htmlFor={`${id}-member`}>
                 Pour
               </label>
-              <select
+              <Select
                 id={`${id}-member`}
-                className="nv-field__control nv-glass tm-select"
                 value={memberId}
+                placeholder="Choisir un membre"
                 disabled={members.length === 0}
-                aria-invalid={touched && member === null}
-                onChange={(event) => {
-                  setMemberId(event.target.value);
-                }}
-              >
-                <option value="" disabled>
-                  Choisir un membre
-                </option>
-                {members.map((one) => (
-                  <option key={one.id} value={one.id}>
-                    {one.displayName}
-                  </option>
-                ))}
-              </select>
+                invalid={touched && member === null}
+                options={members.map((one) => ({ value: one.id, label: one.displayName }))}
+                onChange={setMemberId}
+              />
               <p className={touched && member === null ? 'tm-hint tm-hint--error' : 'tm-hint'}>
                 {members.length === 0
                   ? 'Aucun autre membre actif dans l’équipe.'

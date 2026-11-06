@@ -16,6 +16,7 @@ import {
   MANDATE_V2,
 } from '@/test/contractors';
 import { SCHEDULING_SETTINGS } from '@/test/pay';
+import { choose } from '@/test/select';
 
 /* Réglages › Facturation, its second half (EQ-06 lot 8c): the journal's accounts, the delays, the texts, the regimes. */
 
@@ -250,11 +251,17 @@ describe('Réglages › Facturation, régimes', () => {
     expect(within(items[1] ?? card).queryByRole('button', { name: 'Noter la validation' })).toBeNull();
 
     fireEvent.click(within(draft).getByRole('button', { name: 'Noter la validation' }));
-    expect(within(dialog()).getByLabelText<HTMLInputElement>('Validé le').value).toBe('2026-11-05');
+    expect(within(dialog()).getByLabelText<HTMLInputElement>('Validé le').value).toBe('05/11/2026');
     type('Validé le', '2026-11-06');
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Noter la validation' }));
     expect(within(dialog()).getByText('Au plus tard aujourd’hui, le 5 novembre 2026.')).toBeTruthy();
-    type('Validé le', '2026-11-04');
+    // Typed in French, never the system's calendar: what is no day is said, and nothing is sent.
+    type('Validé le', '31/10/2026');
+    type('Validé le', '31/02');
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Noter la validation' }));
+    expect(within(dialog()).getByText('Un jour comme 28/10/2026, ou 28/10.')).toBeTruthy();
+    expect(writes).toEqual([]);
+    type('Validé le', '4/11');
     answer = {
       status: 409,
       body: {
@@ -292,8 +299,8 @@ describe('Réglages › Facturation, régimes', () => {
     expect(writes).toEqual([]);
 
     type('Nom', 'Prestataire Bénin');
-    fireEvent.change(within(dialog()).getByLabelText('Ajouter un pays'), { target: { value: 'BJ' } });
-    fireEvent.change(within(dialog()).getByLabelText('Ajouter un pays'), { target: { value: 'MG' } });
+    choose(within(dialog()).getByRole('combobox', { name: 'Ajouter un pays' }), /Bénin/u);
+    choose(within(dialog()).getByRole('combobox', { name: 'Ajouter un pays' }), /Madagascar/u);
     expect(within(dialog()).getByRole('list', { name: 'Pays du régime' }).textContent).toContain(
       'Madagascar',
     );

@@ -5,17 +5,29 @@ import { CreatorIdSchema, type CreatorId, type Me } from '@impera/contracts';
  * reload or a step back lands on the same sheet of the same creator (lessons of #217 and of the recette 28/10).
  */
 export interface CreatorsSearch {
-  readonly onglet?: 'heures' | 'acces' | 'pourcentage' | 'agenda';
+  readonly onglet?: 'heures' | 'acces' | 'pourcentage' | 'agenda' | 'profil';
   readonly creatrice?: CreatorId;
 }
 
 /** The sheets of a creator, and their slug in the address; the persona has none. */
-export type CreatorSheet = 'persona' | 'hours' | 'access' | 'rate' | 'agenda';
+export type CreatorSheet = 'persona' | 'hours' | 'access' | 'rate' | 'agenda' | 'profile';
 
-const SLUGS = { hours: 'heures', access: 'acces', rate: 'pourcentage', agenda: 'agenda' } as const;
-const SHEETS = { heures: 'hours', acces: 'access', pourcentage: 'rate', agenda: 'agenda' } as const;
+const SLUGS = {
+  hours: 'heures',
+  access: 'acces',
+  rate: 'pourcentage',
+  agenda: 'agenda',
+  profile: 'profil',
+} as const;
+const SHEETS = {
+  heures: 'hours',
+  acces: 'access',
+  pourcentage: 'rate',
+  agenda: 'agenda',
+  profil: 'profile',
+} as const;
 
-const ALL_SHEETS: readonly CreatorSheet[] = ['persona', 'hours', 'access', 'rate', 'agenda'];
+const ALL_SHEETS: readonly CreatorSheet[] = ['persona', 'hours', 'access', 'rate', 'agenda', 'profile'];
 
 /**
  * The sheets a member opens: all of them for the owner; her agenda alone for an active manager (CR-05 lot c, Charles,
@@ -32,7 +44,11 @@ export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSe
   const creator = CreatorIdSchema.safeParse(search['creatrice']);
   const tab = search['onglet'];
   return {
-    ...(tab === SLUGS.hours || tab === SLUGS.access || tab === SLUGS.rate || tab === SLUGS.agenda
+    ...(tab === SLUGS.hours ||
+    tab === SLUGS.access ||
+    tab === SLUGS.rate ||
+    tab === SLUGS.agenda ||
+    tab === SLUGS.profile
       ? { onglet: tab }
       : {}),
     ...(creator.success ? { creatrice: creator.data } : {}),

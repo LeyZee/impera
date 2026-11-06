@@ -96,3 +96,38 @@ describe('Pages without a screen (recette 05/11, PRO-25)', () => {
     });
   });
 });
+
+describe('Réglages › Ventes, the creators found and not imported yet (CRM-07 b2, ADR 0069 § 5)', () => {
+  const answer = (body: unknown, status = 200): Promise<Response> =>
+    Promise.resolve(
+      new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }),
+    );
+  const serveNewModels = (reply: () => Promise<Response>): void => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) =>
+        input.endsWith('/v1/settings/sales-feeds/new-models')
+          ? reply()
+          : new Promise<Response>(() => undefined),
+      ),
+    );
+  };
+
+  it('counts them on the tab, said in words to a screen reader', async () => {
+    serveNewModels(() => answer({ total: 3, byPlatform: [{ platform: 'reveal', count: 3 }] }));
+    await settingsTabs(owner);
+    const nav = screen.getByRole('navigation', { name: 'Réglages' });
+    const tab = await within(nav).findByRole('link', { name: 'Ventes, 3 nouvelles créatrices sur Reveal' });
+    expect(within(tab).getByText('3').getAttribute('title')).toBe('3 nouvelles créatrices sur Reveal');
+  });
+
+  it('shows the tab bare when none waits or the count cannot be read', async () => {
+    serveNewModels(() => answer({ total: 0, byPlatform: [] }));
+    expect(await settingsTabs(owner)).toContain('Ventes');
+    cleanup();
+    serveNewModels(() => answer({ error: { code: 'internal', message: 'Erreur' } }, 500));
+    const tabs = await settingsTabs(owner);
+    expect(tabs).toContain('Ventes');
+    expect(tabs.some((tab) => tab.includes('nouvelle'))).toBe(false);
+  });
+});

@@ -5,7 +5,6 @@ import {
   type DashboardTodo,
 } from '@impera/contracts';
 
-import { stuckKindOf } from './jobs';
 import { eur } from './logic';
 import type { AgencyState, AgentState, Dashboard, Fan, RevealSales, RevealSeller, Todo } from './model';
 
@@ -121,8 +120,24 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
     spent === null ? 'ok' : spent >= budget.cap ? 'bad' : spent >= budget.alertAt ? 'warn' : 'ok';
   const lastRead = reveal.lastReadAt === null ? null : ago(reveal.lastReadAt, now);
   const waitingLong = replies.fansWaitingOver10Min;
-  // Only her own stuck jobs are her agent's health; the agency's are said once, apart (recette 05/11, PRO-10).
-  const dead = jobs.stuck.filter((job) => job.creator).reduce((sum, job) => sum + job.count, 0);
+  const dead = jobs.dead ?? 0;
+  // Named, never counted: hers and what stops her agent first, then the agency's, which only the owner is sent (PRO-10).
+  const hersStuck = jobs.stuck.filter((job) => !job.agency);
+  const agencyStuck = jobs.stuck.filter((job) => job.agency);
+  const stuckRows: [string, string][] =
+    jobs.dead === null
+      ? [['Tâches bloquées', 'pas lu']]
+      : hersStuck.length === 0
+        ? [['Tâches bloquées', 'aucune']]
+        : hersStuck.map((job): [string, string] => [
+            job.label,
+            job.count === 1 ? 'bloquée' : `${String(job.count)} bloquées`,
+          ]);
+  const agencyRows = agencyStuck.map((job): [string, string] => [
+    `Agence · ${job.label}`,
+    job.count === 1 ? 'bloquée' : `${String(job.count)} bloquées`,
+  ]);
+  const firstStuck = hersStuck[0]?.label;
   const cards: AgentState['cards'] = [
     {
       id: 'reveal',
@@ -193,27 +208,22 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         waitingLong > 0
           ? `${plural(waitingLong, 'fan attend', 'fans attendent')} plus de 10 min`
           : dead > 0
-            ? `${plural(dead, 'tâche bloquée', 'tâches bloquées')}, à regarder`
+            ? hersStuck.length === 1 && firstStuck !== undefined
+              ? `Bloqué : ${firstStuck}`
+              : `${plural(dead, 'tâche bloquée', 'tâches bloquées')}, à regarder`
             : plural(replies.conversationsOpen, 'conversation en cours', 'conversations en cours'),
       rows: [
         ['Conversations en cours', String(replies.conversationsOpen)],
         ['Fans qui attendent plus de 10 min', String(waitingLong)],
-        [
-          'Tâches bloquées',
-          jobs.dead === null
-            ? 'pas lu'
-            : dead === 0
-              ? 'aucune'
-              : jobs.stuck
-                  .filter((job) => job.creator)
-                  .map((job) => `${stuckKindOf(job).name} (${String(job.count)})`)
-                  .join(', '),
-        ],
+        ...stuckRows,
+        ...agencyRows,
       ],
       alarm:
         waitingLong > 0
           ? `${plural(waitingLong, 'fan attend', 'fans attendent')} depuis plus de 10 min`
-          : plural(dead, 'tâche est bloquée', 'tâches sont bloquées'),
+          : hersStuck.length === 1 && firstStuck !== undefined
+            ? `Bloqué : ${firstStuck}`
+            : plural(dead, 'tâche est bloquée', 'tâches sont bloquées'),
       brief:
         waitingLong > 0
           ? `${plural(waitingLong, 'fan attend', 'fans attendent')} plus de 10 min`
@@ -486,10 +496,10 @@ export function revealSalesOf(sales: ApiRevealSales): RevealSales {
 export type DashboardReader = 'owner' | 'team';
 
 /**
- * The agency's part (recette 05/11, reco 18 and PRO-10): the day's AI budget, one for every creator, and the stuck
- * jobs of no creator, named. Never in her agent's health, which they are not.
+ * The agency’s part (recette 05/11, reco 18): the day’s AI budget, one for every creator. Never in her agent’s
+ * health, which it is not.
  */
-function agencyOf({ budget, jobs }: ApiDashboard): AgencyState {
+function agencyOf({ budget }: ApiDashboard): AgencyState {
   const spent = budget.spentToday;
   const tone = spent === null ? 'ok' : spent >= budget.cap ? 'bad' : spent >= budget.alertAt ? 'warn' : 'ok';
   return {
@@ -505,7 +515,6 @@ function agencyOf({ budget, jobs }: ApiDashboard): AgencyState {
               mark: budget.cap > 0 ? Math.round((budget.alertAt / budget.cap) * 100) : 0,
             },
           },
-    stuck: jobs.stuck.filter((job) => !job.creator).map(stuckKindOf),
   };
 }
 
