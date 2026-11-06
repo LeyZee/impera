@@ -1,0 +1,7 @@
+# 2026-11-07 — Recette AGT-07, revenir à une version précédente de la persona — done
+Fait : Créatrices › Persona montre « Ses versions », pliée sous l'en-tête dès qu'elle en a deux : chaque version avec son jour et son heure, « Active » sur celle avec laquelle l'agent écrit, et « Réactiver la version N » sur chaque version plus ancienne (un deuxième clic « Confirmer la version N », comme « Activer »). La route d'activation existante sert telle quelle (contrôle de la version active lue, mot de passe et code si la connexion a plus de 10 minutes : la fenêtre réactive ensuite la version demandée). Une version refusée par les gardes à l'activation (422, réponses types) le dit au lieu de « Impera ne répond pas ».
+Pas fait : rien.
+Décisions : la plus récente reste activée depuis l'en-tête, où son contenu est affiché, jamais deux boutons pour la même version ; le message « interdit » dit que seul le propriétaire choisit la version (la route est réservée au propriétaire).
+Découvertes : à 1440 px, avec le neuvième onglet « Demandes » (#628), « Ajouter une créatrice » passe à la ligne dans l'en-tête de Créatrices (PageHeader/SubNav) ; l'en-tête dit « Pas encore active » d'une version qui l'a déjà été après un retour en arrière.
+Candidats à suppression : aucun.
+Vérifié : tests web de la persona (5 nouveaux), tsc et eslint sur les fichiers changés, captures Nuit et Jour, ordinateur et téléphone.

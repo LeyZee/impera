@@ -1,5 +1,5 @@
 {
-  "id": "edb5553e-16fe-41ac-bf85-d82e1b3a920b",
+  "id": "47572c1e-fc53-4f28-b621-9e393e061abf",
   "prevId": "ec2a9525-ba90-4f5a-a616-3a7c9159dfa0",
   "version": "7",
   "dialect": "postgresql",
@@ -10877,7 +10877,7 @@
       "checkConstraints": {
         "persona_corrections_section_check": {
           "name": "persona_corrections_section_check",
-          "value": "\"persona_corrections\".\"section\" in ('details', 'limits', 'lifestyle', 'tastes', 'intimate', 'writing_style')"
+          "value": "\"persona_corrections\".\"section\" in ('details', 'limits', 'lifestyle', 'tastes', 'intimate', 'writing_style', 'identity', 'preferences', 'conversation', 'relationships', 'intimacy', 'boundaries')"
         },
         "persona_corrections_state_check": {
           "name": "persona_corrections_state_check",
@@ -11510,106 +11510,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.sales_feed_chatter_reviews": {
-      "name": "sales_feed_chatter_reviews",
-      "schema": "",
-      "columns": {
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_chatter_id": {
-          "name": "platform_chatter_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "decision": {
-          "name": "decision",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_by": {
-          "name": "decided_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform_removed_at": {
-          "name": "platform_removed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "absent_since": {
-          "name": "absent_since",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_bot": {
-          "name": "is_bot",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "first_seen_at": {
-          "name": "first_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "sales_feed_chatter_reviews_pk": {
-          "name": "sales_feed_chatter_reviews_pk",
-          "columns": ["platform", "platform_chatter_id"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "agency_only": {
-          "name": "agency_only",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "sales_feed_chatter_reviews_platform_check": {
-          "name": "sales_feed_chatter_reviews_platform_check",
-          "value": "\"sales_feed_chatter_reviews\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
-        },
-        "sales_feed_chatter_reviews_decision_check": {
-          "name": "sales_feed_chatter_reviews_decision_check",
-          "value": "\"sales_feed_chatter_reviews\".\"decision\" in ('none', 'dismissed')"
-        },
-        "sales_feed_chatter_reviews_decided_check": {
-          "name": "sales_feed_chatter_reviews_decided_check",
-          "value": "(\"sales_feed_chatter_reviews\".\"decision\" is null) = (\"sales_feed_chatter_reviews\".\"decided_at\" is null)"
-        },
-        "sales_feed_chatter_reviews_id_check": {
-          "name": "sales_feed_chatter_reviews_id_check",
-          "value": "char_length(\"sales_feed_chatter_reviews\".\"platform_chatter_id\") between 1 and 200"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.sales_feed_chatters": {
       "name": "sales_feed_chatters",
       "schema": "",
@@ -11693,28 +11593,6 @@
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator'",
           "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
-        },
-        "not_own_link_insert": {
-          "name": "not_own_link_insert",
-          "as": "RESTRICTIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"sales_feed_chatters\".\"member_id\" is null or not exists (select 1 from team_members m where m.id = \"sales_feed_chatters\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))))"
-        },
-        "not_own_link_update": {
-          "name": "not_own_link_update",
-          "as": "RESTRICTIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"sales_feed_chatters\".\"member_id\" is null or not exists (select 1 from team_members m where m.id = \"sales_feed_chatters\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))))",
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"sales_feed_chatters\".\"member_id\" is null or not exists (select 1 from team_members m where m.id = \"sales_feed_chatters\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))))"
-        },
-        "not_own_link_delete": {
-          "name": "not_own_link_delete",
-          "as": "RESTRICTIVE",
-          "for": "DELETE",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"sales_feed_chatters\".\"member_id\" is null or not exists (select 1 from team_members m where m.id = \"sales_feed_chatters\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))))"
         }
       },
       "checkConstraints": {
@@ -12294,61 +12172,6 @@
         "sales_feed_models_platform_check": {
           "name": "sales_feed_models_platform_check",
           "value": "\"sales_feed_models\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.sales_feed_team_readings": {
-      "name": "sales_feed_team_readings",
-      "schema": "",
-      "columns": {
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "listed": {
-          "name": "listed",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "abnormal": {
-          "name": "abnormal",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "agency_only": {
-          "name": "agency_only",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "sales_feed_team_readings_platform_check": {
-          "name": "sales_feed_team_readings_platform_check",
-          "value": "\"sales_feed_team_readings\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
-        },
-        "sales_feed_team_readings_listed_check": {
-          "name": "sales_feed_team_readings_listed_check",
-          "value": "\"sales_feed_team_readings\".\"listed\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -16054,13 +15877,6 @@
           "for": "INSERT",
           "to": ["public"],
           "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"member_commission_rates\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
-        },
-        "manager_invite": {
-          "name": "manager_invite",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"member_commission_rates\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"member_commission_rates\".\"team_share_bps\" is null and exists (select 1 from team_members m where m.id = \"member_commission_rates\".\"member_id\" and m.team_role = 'chatter' and m.user_id <> nullif(current_setting('app.user_id', true), '') and m.joined_on = \"member_commission_rates\".\"effective_from\" and m.created_at = now()) and exists (select 1 from commission_presets p where p.id = \"member_commission_rates\".\"preset_id\" and p.rate_bps = \"member_commission_rates\".\"rate_bps\" and p.effective_from <= (now() at time zone coalesce((select s.time_zone from scheduling_settings s limit 1), 'Europe/Paris'))::date and not exists (select 1 from commission_presets q where q.name = p.name and q.effective_from > p.effective_from and q.effective_from <= (now() at time zone coalesce((select s.time_zone from scheduling_settings s limit 1), 'Europe/Paris'))::date))"
         }
       },
       "checkConstraints": {
@@ -16160,13 +15976,6 @@
           "for": "INSERT",
           "to": ["public"],
           "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"member_roles\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
-        },
-        "manager_invite": {
-          "name": "manager_invite",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"member_roles\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"member_roles\".\"team_role\" = 'chatter' and exists (select 1 from team_members m where m.id = \"member_roles\".\"member_id\" and m.team_role = 'chatter' and m.user_id <> nullif(current_setting('app.user_id', true), '') and m.joined_on = \"member_roles\".\"effective_from\" and m.created_at = now())"
         }
       },
       "checkConstraints": {
@@ -16527,13 +16336,6 @@
           "for": "INSERT",
           "to": ["public"],
           "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner'"
-        },
-        "manager_invite": {
-          "name": "manager_invite",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"team_members\".\"team_role\" = 'chatter' and \"team_members\".\"user_id\" <> nullif(current_setting('app.user_id', true), '') and exists (select 1 from \"user\" u where u.id = \"team_members\".\"user_id\" and u.created_at = now())"
         },
         "owner_update": {
           "name": "owner_update",

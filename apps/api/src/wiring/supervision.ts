@@ -5,6 +5,7 @@ import type { AppLlm } from '../llm';
 import { salesFeedTotals } from '../modules/connectors';
 import type { ConversationsModule } from '../modules/conversations';
 import type { PayrollModule } from '../modules/payroll';
+import type { SchedulingModule } from '../modules/scheduling';
 import { createSupervisionModule, type SupervisionModule } from '../modules/supervision';
 import type { TelegramModule } from '../modules/telegram';
 import { readStuckJobs } from '../readiness';
@@ -25,6 +26,7 @@ export function wireSupervision(
     readonly allCreatorIds: () => Promise<readonly CreatorId[]>;
     readonly conversations: ConversationsModule;
     readonly payroll: PayrollModule;
+    readonly scheduling: SchedulingModule;
     readonly telegram: TelegramModule | null;
     /** Every job a worker task takes: a dead one is counted on the Dashboard. */
     readonly jobNames: () => readonly string[];
@@ -42,6 +44,8 @@ export function wireSupervision(
     allCreatorIds: deps.allCreatorIds,
     // The one sum of the register (CRM-04 lot a): the sales panel reads it, never sums again.
     salesTotalsOf: salesFeedTotals.totalsOf,
+    // Who is on shift on her now, for her card in the list of Créatrices: the planning's own read, without the margin.
+    onShift: (creatorId, at) => deps.scheduling.onShift(creatorId, at),
     automatic: { read: (creatorId) => conversations.automaticLock(creatorId) },
     // The best fans in euros: dollars at pay's last ECB rate known (ADR 0033), read as whoever reads the Dashboard.
     usdRate: {

@@ -12,6 +12,8 @@ import {
   type FakeModel,
 } from '../fake-reveal/crm';
 
+import { registerGeneration } from './ai-generation';
+
 /**
  * The recette sandbox's fake world (ADR 0075, docs/recette/bac-a-sable.md): one local HTTP server that answers at the
  * addresses Impera calls, under a path per service: `/xai`, `/google`, `/mistral`, `/elevenlabs` (the routes the key
@@ -192,7 +194,7 @@ export function createWorld(
     return null;
   };
 
-  // xAI: `GET /v1/api-key` describes the key (its verifier); generation is not simulated yet (ADR 0075, phase 2).
+  // xAI: `GET /v1/api-key` describes the key (its verifier); its generation is scripted (`ai-generation.ts`).
   app.get('/xai/v1/api-key', (request, reply) => {
     const result = outcome('xai', keyOf(request, 'authorization'));
     if (trouble(reply, result) !== null) return reply;
@@ -257,7 +259,10 @@ export function createWorld(
     })),
   );
 
-  // Any other route of an AI service, generation included: not simulated yet, answered as an outage.
+  // xAI's generation, scripted (ADR 0075 § 3, phase 2): before the catch-all below.
+  registerGeneration(app, (key) => outcome('xai', key));
+
+  // Any other route of an AI service: not simulated, answered as an outage.
   for (const service of AI_SERVICES) {
     app.all(`/${service}/*`, (_request, reply) =>
       reply.code(503).send({ error: 'not simulated by the sandbox yet (ADR 0075)' }),

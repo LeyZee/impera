@@ -1,7 +1,7 @@
 import type {
   CreatePersonaVersionBody,
   CreatorId,
-  Persona,
+  StoredPersona,
   PersonaOverview,
   PersonaVersionId,
   PersonaVersionSummary,
@@ -12,19 +12,19 @@ interface ActivePersonaVersion {
   readonly id: PersonaVersionId;
   readonly version: string;
   readonly creatorName: string;
-  readonly persona: Persona;
+  readonly persona: StoredPersona;
 }
 
 /** A creator's persona versions (ADR 0010), read and written within her tenant. */
 export interface PersonaVersionStore {
   /**
    * Her only active version, read from the base at each call (ADR 0022: nothing kept in memory can be stale); `null`
-   * when she has none, or does not exist. A stored content that no longer reads as `Persona` throws: never a guess.
+   * when she has none, or does not exist. A stored content that no longer reads in its format throws: never a guess.
    */
   active(creatorId: CreatorId): Promise<ActivePersonaVersion | null>;
   /**
    * One of her versions, active or not (Entraîner › Playground, recette PRO-21: talked to before it is activated);
-   * `null` when she has no version with this id. A content that no longer reads as `Persona` throws.
+   * `null` when she has no version with this id. A content that no longer reads in its format throws.
    */
   version(creatorId: CreatorId, versionId: PersonaVersionId): Promise<ActivePersonaVersion | null>;
   overview(creatorId: CreatorId): Promise<PersonaOverview>;
@@ -51,7 +51,7 @@ export interface PersonaVersionStore {
    */
   load(
     creatorId: CreatorId,
-    persona: Persona,
+    persona: StoredPersona,
     options: { readonly sourcePath: string; readonly activate: boolean },
   ): Promise<{
     readonly version: PersonaVersionSummary;

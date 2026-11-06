@@ -153,7 +153,7 @@ export function creatorQueue(creatorId: CreatorId, facts: DashboardFacts, now: D
   return {
     creatorId,
     name: facts.creator.name,
-    todos: todos(facts.waiting, now, { stopped: mode(facts) === 'stop' }),
+    todos: todos(facts.waiting, now, { stopped: modeOf(facts) === 'stop' }),
   };
 }
 
@@ -181,7 +181,7 @@ export function queueAcross(queues: readonly CreatorQueue[]): TodosAcrossCreator
 }
 
 /** Arrêt wins; otherwise Automatique as soon as one conversation runs on its own. */
-function mode(facts: DashboardFacts): AgentMode {
+export function modeOf(facts: Pick<DashboardFacts, 'switches' | 'autoConversations'>): AgentMode {
   if (facts.switches.global || facts.switches.creator) return 'stop';
   return facts.autoConversations > 0 ? 'auto' : 'copilot';
 }
@@ -245,7 +245,7 @@ export function assembleDashboard(input: {
       now: window.now.toISOString(),
     },
     period: input.period,
-    mode: mode(facts),
+    mode: modeOf(facts),
     globalStop: facts.switches.global,
     automatic: { open: gate.open, missing: [...gate.missing] },
     liveRate: {
@@ -287,7 +287,7 @@ export function assembleDashboard(input: {
       alertAt: input.budget.alertAtEur,
       costPerEuroSold: null,
     },
-    todos: todos(facts.waiting, window.now, { stopped: mode(facts) === 'stop' }),
+    todos: todos(facts.waiting, window.now, { stopped: modeOf(facts) === 'stop' }),
     fans: facts.fans.map((fan) => ({
       id: FanIdSchema.parse(fan.id),
       name: fanNameOf(fan.name),

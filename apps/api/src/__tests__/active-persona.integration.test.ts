@@ -8,6 +8,7 @@ import {
   CreatorIdSchema,
   newId,
   PersonaSchema,
+  asPersonaV2,
   PlatformAccountIdSchema,
   type CreatorId,
   type Persona,
@@ -164,7 +165,7 @@ describe('the agent writes with her active persona version (recette G4, M13; ADR
   it('gives her only active version through the persona port, none to a creator without one', async () => {
     const active = await app.modules.persona.versions.active(anna);
     expect(active).toMatchObject({ version: '0.2.0', creatorName: 'Anna' });
-    expect(active?.persona.details.first_name).toBe('Nouvelle');
+    expect(active === null ? null : asPersonaV2(active.persona).sheet.identity.nickname).toBe('Nouvelle');
     expect(await app.modules.persona.versions.active(bea)).toBeNull();
   });
 

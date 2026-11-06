@@ -33,38 +33,6 @@
   max-width: 820px;
   margin: 0;
 }
-/*
- * Who, then what: the creators on a row of their own above the tabs of her sheet, and the agency's own buttons apart
- * at the end of the tabs' row, so a chip is never read as a tab (captures de #563).
- */
-.cr-creators {
-  order: -1;
-  flex-basis: 100%;
-  margin-bottom: var(--nv-space-1);
-}
-@media (min-width: 641px) {
-  .cr-agency-first {
-    margin-inline-start: var(--nv-space-4);
-  }
-}
-/* A phone: the creators on one line that scrolls, its far edge fading, instead of rows of chips (CREA-19). */
-@media (max-width: 640px) {
-  /* `.ps-chips` wraps and comes later in this file: the pair outweighs it, or the chips stacked one per row (PRO-22). */
-  .ps-chips.cr-creators {
-    flex-wrap: nowrap;
-    max-width: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
-    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
-    padding-right: 32px;
-  }
-  .cr-creators::-webkit-scrollbar {
-    display: none;
-  }
-  .cr-creators > .nv-chip {
-    flex: none;
-  }
-}
 .ps-head__state:empty {
   display: none;
 }
@@ -677,8 +645,9 @@
   border-radius: 4px;
 }
 
-/* A list of entries: removable tints in a field. */
-.ps-entries {
+/* A list of entries: removable tints in a field. Two classes: the field control's own `display: block` would win over
+   one, and the tints would touch with no gap (recette persona Messa 06/11). */
+.nv-field__control.ps-entries {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -728,8 +697,9 @@
   align-items: center;
   max-width: 100%;
   min-width: 0;
-  height: 28px;
-  padding: 0 4px 0 11px;
+  /* A long passion wraps inside its tint, never cut. */
+  min-height: 28px;
+  padding: 3px 4px 3px 11px;
   border-radius: var(--nv-radius-full);
   background: var(--nv-select-strong);
   font-size: var(--nv-text-footnote);
@@ -742,9 +712,8 @@
 }
 .ps-entry__text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 .ps-entry__remove {
   appearance: none;
@@ -767,11 +736,11 @@
     color var(--nv-dur-fast) var(--nv-ease-out),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
-/* 44px hit area around a small mark (docs/design, « Copilote et raccourcis »). */
+/* A larger hit area around the small mark, kept inside its own tint: never over the next one. */
 .ps-entry__remove::after {
   content: '';
   position: absolute;
-  inset: -11px -6px;
+  inset: -3px -4px -3px -2px;
 }
 .ps-entry__remove:hover {
   color: var(--nv-ink);
@@ -1218,5 +1187,65 @@
   .ps-corrections__head {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+/*
+ * Her versions (recette AGT-07), folded under the head: one line each, its number, its day, then « Active » or
+ * « Réactiver la version N » at its end. On a phone the action goes under the number and the day.
+ */
+.ps-versions {
+  --_radius: var(--nv-radius-xl);
+  padding: 6px 8px;
+}
+.ps-versions__lead {
+  margin: 0;
+}
+.ps-versions__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.ps-versions__item {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: var(--nv-space-3);
+  row-gap: var(--nv-space-1);
+  padding: var(--nv-space-2) 0;
+  border-top: 1px solid var(--nv-plate-edge);
+}
+.ps-versions__name {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ps-versions__when {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+/* Two classes: a button's own margin would win over one. */
+.ps-versions__item > .ps-versions__end {
+  flex: none;
+  margin-inline-start: auto;
+}
+.ps-versions__note {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+@media (max-width: 640px) {
+  .ps-versions {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .ps-versions__item {
+    padding: var(--nv-space-3) 0;
+  }
+  .ps-versions__item > button.ps-versions__end {
+    flex-basis: 100%;
+    margin-inline-start: 0;
   }
 }

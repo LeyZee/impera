@@ -76,7 +76,7 @@ Chaque table a exactement un module propriétaire (voir le README de chaque modu
 | persona | 3 | versions de persona, créatrices et activation d'une version (`/v1/creators`) |
 | agent | 3 | composeur sens → cerveau → politique → voix → gardes, drapeaux posés sur un risque ; aucun message réel tant que les clés manquent |
 | media | 3 (sens), 6 (catalogue) | descriptions au vocabulaire Impera, ffmpeg vérifié au démarrage ; la lecture des médias Reveal attend la capture |
-| supervision | 4 | Dashboard (`/v1/dashboard`) : santé, jobs bloqués, taux en réel ; « À traiter » de toutes les créatrices suivies et le compte de chacune (`/v1/dashboard/todos`, une transaction RLS par créatrice, SUIVI-09 et DASH-03) |
+| supervision | 4 | Dashboard (`/v1/dashboard`) : santé, jobs bloqués, taux en réel ; « À traiter » de toutes les créatrices suivies et le compte de chacune (`/v1/dashboard/todos`, une transaction RLS par créatrice, SUIVI-09 et DASH-03) ; les cartes de la liste des Créatrices (`/v1/dashboard/creators` : mode, chiffre d’affaires de la quinzaine, en poste, contenu attendu ; une transaction RLS par créatrice) |
 | sales | 6 | non créé : offres à prix codés, ventes détectées, règles de prix ; propriétaire de `offers`, `sales` (montants en centimes entiers + devise) |
 | scripts (ADR 0056) | scripts | structures de script de l'agence et leurs versions (figées dès qu'une demande les prend), file de structures par créatrice filtrée par les limites de sa persona, routes `/v1/script-structures` et `/v1/creators/:creatorId/script-queue` (SC-01 lot a) ; à venir : cartons, demande et parcours, nomenclature, runs de script par conversation |
 | playground | 3 | API de l'écran Entraîner (P3-06) |

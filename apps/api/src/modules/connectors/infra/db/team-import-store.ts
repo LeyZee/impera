@@ -91,7 +91,7 @@ async function decide(
 
 /**
  * One account's link moved, as the viewer may (ADR 0076 § 2, § 4), in the viewer's transaction: the restrictive
- * policies of migration 0132 hold the same rule for a manager's own record, this one answers row by row in French.
+ * policies of migration 0135 hold the same rule for a manager's own record, this one answers row by row in French.
  */
 async function linkIn(
   tx: Transaction,

@@ -138,7 +138,7 @@ export type LinkRefusal = 'own_link' | 'external_owner_only' | 'external_no_agen
 
 /**
  * Whether a viewer may move an account's link from `before` to `after` (ADR 0076 § 2, § 4): `null` when he may. The
- * database holds the same rule for his own record (migration 0132); this one answers in French, row by row.
+ * database holds the same rule for his own record (migration 0135); this one answers in French, row by row.
  */
 export function linkRefusal(
   viewer: TeamImportViewer,

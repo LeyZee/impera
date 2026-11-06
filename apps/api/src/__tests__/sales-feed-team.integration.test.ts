@@ -264,7 +264,7 @@ describe('team imported from the platform after review (ADR 0076)', () => {
     });
   });
 
-  it('holds the guard against himself in the base, whatever the route (migration 0132)', async () => {
+  it('holds the guard against himself in the base, whatever the route (migration 0135)', async () => {
     const key = and(
       eq(schema.salesFeedChatters.platform, 'reveal'),
       eq(schema.salesFeedChatters.platformChatterId, 'chatter_max'),

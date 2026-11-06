@@ -143,7 +143,7 @@ export interface ConnectorsModule {
   readonly salesFeedTeamRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /**
    * The link an invitation from the review poses (ADR 0076 § 3), for `team`'s port: run in the inviter's own
-   * transaction, under the policies of migration 0132.
+   * transaction, under the policies of migration 0135.
    */
   readonly invitationChatterLinks: typeof invitationChatterLinks;
   /**
