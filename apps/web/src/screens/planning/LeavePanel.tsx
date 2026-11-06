@@ -28,7 +28,12 @@ export function LeavePanel({
   const refresh = useRefreshPlanning();
   const [requestId] = useState(() => newId(LeaveRequestIdSchema));
   const [first, setFirst] = useState(today);
-  const [last, setLast] = useState(today);
+  // The last day follows the first until it is typed itself: a first day typed digit by digit (« 3/1 » on its way to
+  // « 3/11 ») passes through days it does not mean, and none of them may stay in the last (relecture d'Équipe, #569).
+  const [lastOwn, setLastOwn] = useState<string | null>(null);
+  const last = lastOwn ?? first;
+  // A day half typed is not yet a mistake: said in amber once its field is left, as the field marks itself.
+  const [typing, setTyping] = useState(false);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
@@ -70,7 +75,15 @@ export function LeavePanel({
           void submit();
         }}
       >
-        <div className="tm-pair">
+        <div
+          className="tm-pair"
+          onFocus={() => {
+            setTyping(true);
+          }}
+          onBlur={() => {
+            setTyping(false);
+          }}
+        >
           <div className="nv-field tm-field" data-invalid={firstOk ? undefined : 'true'}>
             <label className="nv-field__label" htmlFor={`${id}-first`}>
               Premier jour
@@ -82,11 +95,7 @@ export function LeavePanel({
               today={today}
               autofocus
               invalid={!firstOk}
-              onChange={(next) => {
-                setFirst(next);
-                // The last day follows a first day moved past it: one gesture for a single day.
-                if (next > last) setLast(next);
-              }}
+              onChange={setFirst}
               onUnreadable={(bad) => {
                 onUnreadable('first', bad);
               }}
@@ -102,14 +111,20 @@ export function LeavePanel({
               value={last}
               today={firstOk ? first : today}
               invalid={!lastOk || tooLong}
-              onChange={setLast}
+              onChange={setLastOwn}
               onUnreadable={(bad) => {
                 onUnreadable('last', bad);
               }}
             />
           </div>
         </div>
-        <p className={ready || busy ? 'tm-hint sc-leave__sum' : 'tm-hint tm-hint--error sc-leave__sum'}>
+        <p
+          className={
+            ready || busy || (unreadable && typing)
+              ? 'tm-hint sc-leave__sum'
+              : 'tm-hint tm-hint--error sc-leave__sum'
+          }
+        >
           {unreadable
             ? 'Des jours comme 28/03/2027, ou 28/3.'
             : !firstOk

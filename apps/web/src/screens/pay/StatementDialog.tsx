@@ -491,7 +491,11 @@ function PayForm({
                 onUnreadable={setDayUnreadable}
               />
               {touched && !dayValid ? (
-                <p className="tm-hint tm-hint--error">Un jour du {longDay(firstDay)} à aujourd’hui.</p>
+                <p className="tm-hint tm-hint--error">
+                  {dayUnreadable
+                    ? 'Un jour comme 28/10/2026, ou 28/10.'
+                    : `Un jour du ${longDay(firstDay)} à aujourd’hui.`}
+                </p>
               ) : null}
             </div>
             <div className="nv-field tm-field" data-invalid={touched && !amountValid ? 'true' : undefined}>
