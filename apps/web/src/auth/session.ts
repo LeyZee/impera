@@ -43,6 +43,21 @@ export type CurrentSession =
   /** Signed in with the password, the second factor not active yet: the activation is the only screen (ADR 0046). */
   | { readonly kind: 'second_factor_required' };
 
+/** The reverse proxy's own answers when the API behind it does not answer. */
+const PROXY_STATUSES: ReadonlySet<number> = new Set([502, 503, 504]);
+
+/**
+ * The API answered the session's read with an error of its own (a 500, a 501…): it is up, something in it fails. Not
+ * « ne répond pas », which is for an API that does not answer at all; a 502, 503 or 504 is the reverse proxy saying
+ * just that (recette EXT-12).
+ */
+export class SessionServerError extends Error {
+  constructor(readonly status: number) {
+    super(`GET /v1/session: ${String(status)}`);
+    this.name = 'SessionServerError';
+  }
+}
+
 /**
  * The session as the app opens it: who is signed in, nobody, or an account that must activate its code first. Read
  * from `GET /v1/session`, which answers 200 in every case: a page opened without a session logs no failed request
@@ -51,6 +66,8 @@ export type CurrentSession =
 export async function readSession(): Promise<CurrentSession> {
   const response = await fetch('/v1/session', { credentials: 'include' });
   markSandbox(response);
+  if (response.status >= 500 && !PROXY_STATUSES.has(response.status))
+    throw new SessionServerError(response.status);
   if (!response.ok) throw new Error(`GET /v1/session: ${String(response.status)}`);
   const answer = DashboardSessionSchema.parse(await response.json());
   return answer.state === 'signed_in' ? { kind: 'signed_in', user: answer.me } : { kind: answer.state };

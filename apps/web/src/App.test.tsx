@@ -89,6 +89,14 @@ describe('App before any session', () => {
     expect(await screen.findByLabelText('Mot de passe')).toBeDefined();
   });
 
+  it('says the API failed, not that it is silent, when it answers its own error (EXT-12)', async () => {
+    serveMe(500);
+    render(<App />);
+    expect(await screen.findByText('un problème')).toBeDefined();
+    expect(screen.queryByText('ne répond pas')).toBeNull();
+    expect(screen.queryByLabelText('Mot de passe')).toBeNull();
+  });
+
   it('says the same when the request does not even reach the server', async () => {
     vi.stubGlobal(
       'fetch',
