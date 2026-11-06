@@ -12,7 +12,8 @@ import { DASHBOARD_ORIGIN } from './support/sign-in';
 /**
  * Every route of the API, asked without a session (audit des tests d'isolation, 06/11): it answers 401, but for the
  * routes listed here, each with why it opens without one. The routes are read from the server, so a route added
- * tomorrow without its guard fails this test until it gets one or is listed.
+ * tomorrow without its guard fails this test until it gets one or is listed. Any answer but 401 is reported, a 400 or a
+ * 404 too: a check that runs before the guard already answers without a session (relecture #595).
  */
 const PUBLIC: Readonly<Record<string, string>> = {
   'GET /health': 'liveness, for the host and the uptime check',
@@ -59,7 +60,9 @@ describe('no route answers without a session, but those said (audit des tests dâ
   });
 
   it('answers 401 to every route asked without a session, but the public ones', async () => {
-    const routes = routesOf(server.printRoutes({ commonPrefix: false })).filter((r) => !r.path.includes('*'));
+    const routes = routesOf(server.printRoutes({ commonPrefix: false }));
+    // A wildcard has no single path to ask: one that comes is swept by a concrete path, not skipped (relecture #595).
+    expect(routes.filter((r) => r.path.includes('*'))).toEqual([]);
     expect(routes.length).toBeGreaterThan(200);
     const open: string[] = [];
     for (const [index, route] of routes.entries()) {
