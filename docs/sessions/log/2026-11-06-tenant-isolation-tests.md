@@ -29,4 +29,4 @@
 
 ## Découvertes
 
-- `ingestMessage` sans `correlationId` échoue sur la contrainte NOT NULL de `conversation_events.correlation_id`, alors que le type le laisse optionnel.
+- Aucune.
