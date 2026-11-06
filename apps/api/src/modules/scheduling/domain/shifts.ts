@@ -66,6 +66,22 @@ export function assertPlans(scope: TeamScope): void {
   if (scope !== 'owner' && scope !== 'agency') throw new PlanningForbidden();
 }
 
+/** The creators a planner plans: `null` for every creator, else his list. */
+export type PlannedCreators = ReadonlySet<string> | null;
+
+/**
+ * What a planner plans (Charles, 06/11 : « planning de sa liste », since several managers may be assigned to one
+ * model): the owner every creator, an active manager the creators of his list (`creator_ids`), those ADR 0023 says
+ * bound his creators. The team, its reports and its pay stay the agency's whole (ADR 0023).
+ */
+export function plannedCreatorsOf(scope: TeamScope, list: readonly string[]): PlannedCreators {
+  assertPlans(scope);
+  return scope === 'owner' ? null : new Set(list);
+}
+
+export const plansCreator = (planned: PlannedCreators, creatorId: string): boolean =>
+  planned === null || planned.has(creatorId);
+
 /** What decides whether a member can take a shift: their status, their creators, and the day they join. */
 export interface WorkingMember {
   readonly status: TeamMemberStatus;

@@ -9,6 +9,7 @@ import {
   newId,
   nextPayPeriod,
   payPeriodOfDay,
+  PAYOUT_MINIMUM_MAX_MINOR,
   PayoutMinimumIdSchema,
   PayoutMinimumSchema,
   PayPeriodSchema,
@@ -296,6 +297,14 @@ describe('Équipe › Paie : paliers, objectif collectif, minimum et délai de v
     ).toMatchObject({ code: 'payout_minimum_conflict' });
     const negative = await post('/payroll/payout-minimums', team.owner, minimumFrom(ahead, -1));
     expect(negative.statusCode).toBe(400);
+    // Capped at 5 000 € (Charles, 06/11), by the contract and by the base.
+    const tooHigh = await post(
+      '/payroll/payout-minimums',
+      team.owner,
+      minimumFrom(ahead, PAYOUT_MINIMUM_MAX_MINOR + 1),
+    );
+    expect(tooHigh.statusCode).toBe(400);
+    await expect(recordedBefore.minimum(ahead, PAYOUT_MINIMUM_MAX_MINOR + 1)).rejects.toThrow();
 
     // A minimum dated from R2 (set before it began) counts in R2's drafts, and the newest of a period wins.
     await recordedBefore.minimum(R2, 50_000);

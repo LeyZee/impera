@@ -20,8 +20,9 @@ import {
 import { z } from 'zod';
 
 import type { CalendarReads, StoredAccount, StoredShift } from '../domain/ports';
+import { plansCreator, type PlannedCreators } from '../domain/shifts';
 
-import { settingsIn, shiftColumns, StoredAccountSchema, toShift } from './rows';
+import { plannedIn, settingsIn, shiftColumns, StoredAccountSchema, toShift } from './rows';
 
 const { platformAccounts, shifts: shiftTable, teamMembers } = schema;
 
@@ -68,10 +69,12 @@ export function createDrizzleCalendarReads(db: Database): CalendarReads {
           );
           const agents = await tx.execute(sql`select * from public.calendar_agent()`);
           const settings = await settingsIn(tx, window, view === 'agency');
+          // A manager's calendar is that of the creators he plans (Charles, 06/11); `null` reads every creator.
+          const planned: PlannedCreators = view === 'agency' ? await plannedIn(tx, scope, actor) : null;
           let agency: { accounts: StoredAccount[]; shifts: StoredShift[]; away: Set<string> } | null = null;
           if (view === 'agency') {
             agency = { accounts: [], shifts: [], away: new Set() };
-            for (const creatorId of creatorIds) {
+            for (const creatorId of creatorIds.filter((id) => plansCreator(planned, id))) {
               await enterCreator(tx, creatorId, creatorIds);
               const rows = await tx
                 .select(shiftColumns)
@@ -110,6 +113,7 @@ export function createDrizzleCalendarReads(db: Database): CalendarReads {
           return {
             view,
             settings,
+            planned,
             agency,
             shifts: shifts.rows.map((raw) => {
               const row = ShiftRowSchema.parse(raw);
