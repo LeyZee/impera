@@ -11,6 +11,7 @@ import { useState, type JSX } from 'react';
 import { TodoCard } from './TodoCard';
 import './today.css';
 
+import { urgencies } from '@/agent/queue';
 import { MyReportsCard, useMyReports, type MyReports } from '@/reports/MyReports';
 import { ReportPanel } from '@/reports/ReportPanel';
 import { MEMBER_STATUS, reportOf, STATUS_TONES } from '@/reports/model';
@@ -219,7 +220,8 @@ function Hero({
   // What waits in Suivi, said on the way in: the shift's one job is there (D-03). Nothing before Suivi opens.
   const queue = useQuery({ ...todosAcrossQuery, enabled: state.kind !== 'later' });
   const waiting = queue.data?.items.length ?? 0;
-  const urgent = queue.data?.items.filter((item) => item.tone === 'bad').length ?? 0;
+  // An AI outage behind twenty fans is one urgency, as Suivi shows it (« urgent panne », 06/11).
+  const urgent = urgencies(queue.data?.items ?? []);
   const toStart = new Date(shift.startsAt).getTime() - now.getTime();
   return (
     <Panel className={`sc-hero sc-hero--${state.kind} nv-enter`}>

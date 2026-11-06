@@ -36,7 +36,7 @@ import {
 } from './view';
 import './tracking.css';
 
-import { fansWaiting, queueEntries, type QueueEntry } from '@/agent/queue';
+import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queue';
 import { useCreators } from '@/creators/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
@@ -518,7 +518,7 @@ function QueueRow({
         aria-current={isOpen ? 'true' : undefined}
         onClick={onOpen}
       >
-        <span className={`nv-dot nv-tone--${todo.tone}`} aria-hidden="true" />
+        <span className={`nv-dot nv-tone--${toneOf(todo)}`} aria-hidden="true" />
         <span className="nv-convo__main">
           {/* The fan first: the chatter looks for a fan, then reads why he waits (D-03). */}
           <span className="nv-convo__name">
@@ -558,7 +558,7 @@ function QueueGroupRow({
         aria-current={isOpen ? 'true' : undefined}
         onClick={onOpen}
       >
-        <span className={`nv-dot nv-tone--${oldest.tone}`} aria-hidden="true" />
+        <span className={`nv-dot nv-tone--${toneOf(oldest)}`} aria-hidden="true" />
         <span className="nv-convo__main">
           <span className="nv-convo__name">
             {todoLabel(oldest)}
