@@ -2,6 +2,7 @@ import type { CreatorFan } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { CreatorReader } from './CreatorReader';
+import { FanInsights } from './FanInsights';
 import { useCreatorFans } from './api';
 import { fanName, seenOf, unlockedOf } from './view';
 import './sales.css';
@@ -38,6 +39,7 @@ export function CreatorSalesPage({
         title="Ventes"
         lead="Tes fans et ce qu’ils ont débloqué. Leur conversation s’ouvre ici, en lecture seule."
       />
+      <FanInsights />
       <div className="vt-cols">
         <div className="vt-list">
           {fans.isError && fans.data === undefined ? (

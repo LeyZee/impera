@@ -5,6 +5,7 @@ import { defineTask } from '../jobs';
 import {
   createContentDropsModule,
   type ContentDropsModule,
+  type DropStorage,
   type ScriptVersions,
 } from '../modules/content-drops';
 
@@ -25,7 +26,7 @@ export interface WiredContentDrops {
  */
 export function wireContentDrops(
   shared: Shared,
-  deps: { readonly scriptVersions: ScriptVersions },
+  deps: { readonly scriptVersions: ScriptVersions; readonly storage?: DropStorage },
 ): WiredContentDrops {
   const module = createContentDropsModule({
     db: shared.db,
@@ -33,6 +34,7 @@ export function wireContentDrops(
     bucket: mediaBucket(shared.config),
     requireRole: shared.requireRole,
     scriptVersions: deps.scriptVersions,
+    ...(deps.storage !== undefined && { storage: deps.storage }),
   });
   return {
     module,

@@ -152,6 +152,7 @@ const statement = (patch: Partial<CommissionStatement> = {}): CommissionStatemen
   adjustmentsMinor: 0,
   totalMinor: 2_125,
   carryOverOutMinor: 0,
+  writtenOffMinor: 0,
   payableMinor: 2_125,
   team: null,
   rules: {
@@ -323,6 +324,12 @@ describe('a statement’s marks', () => {
       'total 9,00 € → reporté',
     );
     expect(carryWhat(draft)).toBeNull();
+    // A final statement under zero carries nothing: its total is written off (ADR 0072 § 4).
+    const writtenOff = { totalMinor: -1_200, writtenOffMinor: -1_200, payableMinor: 0 };
+    expect(plain(carryWhat(statement(writtenOff)) ?? '')).toBe('total −12,00 € → solde abandonné');
+    expect(plain(carryWhat(statement({ ...writtenOff, status: 'validated' })) ?? '')).toBe(
+      'total −12,00 € → solde abandonné',
+    );
   });
 });
 
@@ -555,6 +562,41 @@ describe('the money of a statement', () => {
         (row) => row.kind === 'carry',
       )?.label,
     ).toBe('Irait sur la quinzaine suivante');
+    // A final statement under zero: what the member still owed, shown positive, is written off (ADR 0072 § 4).
+    const writtenOff = statement({
+      status: 'validated',
+      adjustments: [
+        {
+          id: newId(PayAdjustmentIdSchema),
+          memberId: newId(TeamMemberIdSchema),
+          period: PERIOD,
+          amountMinor: -3_325,
+          reason: 'Remboursement d’un pack après le départ.',
+          correctsStatementId: null,
+          createdBy: null,
+          createdAt: '2026-11-03T10:00:00.000Z',
+        },
+      ],
+      adjustmentsMinor: -3_325,
+      totalMinor: -1_200,
+      writtenOffMinor: -1_200,
+      payableMinor: 0,
+      rules: { ...statement().rules, final: true },
+    });
+    expect(
+      totalsOf(writtenOff, false).map((row) =>
+        plain(`${row.label} | ${row.note ?? ''} | ${row.amount} | ${row.kind}`),
+      ),
+    ).toEqual([
+      'Commission |  | 21,25 € | line',
+      'Ajustement | « Remboursement d’un pack après le départ. » | −33,25 € | minus',
+      'Total |  | −12,00 € | total',
+      'Solde abandonné | relevé final : ce qui restait dû à l’agence n’est pas réclamé, ni reporté | +12,00 € | line',
+      'À verser |  | 0,00 € | pay',
+    ]);
+    expect(
+      totalsOf({ ...writtenOff, status: 'draft' }, true).find((row) => row.label === 'Solde abandonné')?.note,
+    ).toBe('relevé final : ce qui resterait dû à l’agence ne serait pas réclamé, ni reporté');
     // The screen's own name for what is paid, so that one amount has one name.
     expect(totalsOf(statement(onTop), true, 'Ce que tu vas toucher').at(-1)?.label).toBe(
       'Ce que tu vas toucher',
@@ -615,13 +657,21 @@ describe('words', () => {
         theirs,
       ),
     ).toBe('Valide d’abord le relevé de Basile du 16 au 31 octobre.');
+    // A member who left never ends under zero (ADR 0072 § 5): the total it would leave says by how much to lower it.
     expect(
-      payRefusalText(
-        { kind: 'refused', code: 'commission_statement_documents_open_conflict', details: { count: 2 } },
-        theirs,
+      plain(
+        payRefusalText(
+          { kind: 'refused', code: 'pay_adjustment_below_zero_conflict', details: { totalMinor: -1_250 } },
+          theirs,
+        ),
       ),
     ).toBe(
-      '2 factures ou avoirs attendent encore une réponse ou la décision sur une contestation : le relevé final de Basile se valide ensuite.',
+      'Ce retrait ferait passer le total de Basile, qui a quitté l’équipe, à −12,50 € : un membre parti ne finit jamais sous zéro, rien n’a été enregistré.',
+    );
+    expect(
+      payRefusalText({ kind: 'refused', code: 'pay_adjustment_below_zero_conflict', details: {} }, theirs),
+    ).toBe(
+      'Ce retrait ferait passer sous zéro le total de Basile, qui a quitté l’équipe : rien n’a été enregistré.',
     );
     expect(
       payRefusalText({ kind: 'refused', code: 'commission_statement_open_conflict', details: {} }, theirs),
@@ -729,9 +779,29 @@ describe('the export of a period', () => {
     const [head, account, total] = csv.trimEnd().split('\r\n');
     expect(head?.split(';').slice(0, 3)).toEqual(['Membre', 'Compte', 'Devise']);
     expect(head?.split(';').at(-1)).toBe('Base');
-    expect(account).toBe('Théo;"Nora Vidal; @nora";EUR;120,00;120,00;100,00;85,00;21,25;;;;;;;;;Rapports');
+    expect(account).toBe('Théo;"Nora Vidal; @nora";EUR;120,00;120,00;100,00;85,00;21,25;;;;;;;;;;Rapports');
     expect(total).toBe(
-      'Théo;Total du relevé;EUR;;;;85,00;21,25;0,00;0,00;0,00;0,00;21,25;0,00;21,25;À valider;',
+      'Théo;Total du relevé;EUR;;;;85,00;21,25;0,00;0,00;0,00;0,00;21,25;0,00;0,00;21,25;À valider;',
+    );
+    // A final statement under zero: its written-off balance, positive as on the statement, so the row adds up.
+    const [, , left] = statementsCsv(
+      {
+        ...period,
+        statements: [
+          statement({
+            adjustmentsMinor: -3_325,
+            totalMinor: -1_200,
+            writtenOffMinor: -1_200,
+            payableMinor: 0,
+            rules: { ...statement().rules, final: true },
+          }),
+        ],
+      },
+      () => 'Théo',
+      () => 'Nora',
+    ).split('\r\n');
+    expect(left).toBe(
+      'Théo;Total du relevé;EUR;;;;85,00;21,25;0,00;0,00;0,00;-33,25;-12,00;0,00;12,00;0,00;À valider;',
     );
   });
 
@@ -764,7 +834,7 @@ describe('the export of a period', () => {
       () => 'Théo',
       () => 'Nora',
     ).split('\r\n');
-    expect(account).toBe('Théo;Nora;EUR;85,00;85,00;85,00;85,00;21,25;;;;;;;;;Net de la plateforme');
+    expect(account).toBe('Théo;Nora;EUR;85,00;85,00;85,00;85,00;21,25;;;;;;;;;;Net de la plateforme');
   });
 
   it('never lets a name start a formula, and keeps the minus sign of an amount', () => {
@@ -982,6 +1052,17 @@ describe('a member’s row', () => {
     );
     expect(plain(carryLine(statement(negative), false) ?? '')).toBe(
       'Total sous zéro à ce jour : −8,00 € iraient sur la quinzaine suivante, si la quinzaine finit ainsi.',
+    );
+    // A final statement under zero: written off, never carried (ADR 0072 § 4).
+    const writtenOff = { totalMinor: -800, writtenOffMinor: -800, payableMinor: 0 };
+    expect(plain(carryLine(statement({ ...writtenOff, status: 'validated' }), true) ?? '')).toBe(
+      'Relevé final sous zéro : les 8,00 € encore dus à l’agence sont abandonnés (« Solde abandonné »), rien n’est reporté.',
+    );
+    expect(plain(carryLine(statement(writtenOff), true) ?? '')).toBe(
+      'Relevé final sous zéro : les 8,00 € encore dus à l’agence seront abandonnés une fois le relevé validé, rien ne sera reporté.',
+    );
+    expect(plain(carryLine(statement(writtenOff), false) ?? '')).toBe(
+      'Relevé final sous zéro à ce jour : si la quinzaine finit ainsi, les 8,00 € encore dus à l’agence seraient abandonnés.',
     );
   });
 

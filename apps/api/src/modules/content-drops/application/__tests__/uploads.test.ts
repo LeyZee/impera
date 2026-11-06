@@ -67,6 +67,7 @@ describe('content-drops › content_drops.receive_file and content_drops.convert
         await writeFile(path, WEBM_HEAD);
         return true;
       },
+      read: refuse('read'),
       upload: (key, _path, mime) => {
         log.push(`upload ${key} ${mime}`);
         return Promise.resolve();

@@ -230,7 +230,8 @@ export type PayRefusalCode = PayrollErrorCode | 'role_forbidden' | 'request_inva
 
 /**
  * What some refusals say more: a count of reports, a period, a member, an amount, a day; for a transfer that waits for
- * a tax residence certificate, why and the year it must cover (ADR 0041).
+ * a tax residence certificate, why and the year it must cover (ADR 0041); for an adjustment refused to a member who
+ * left, the total it would have left (ADR 0072 § 5).
  */
 const DetailsSchema = z
   .object({
@@ -239,6 +240,7 @@ const DetailsSchema = z
     memberId: z.string(),
     statementId: z.string(),
     payableMinor: z.number().int(),
+    totalMinor: z.number().int(),
     today: z.string(),
     currency: z.string(),
     reason: PayoutBlockReasonSchema,

@@ -539,3 +539,110 @@ body {
     transform: none;
   }
 }
+
+/* ───────────── Veille Instagram (VEI-02) ───────────── */
+
+.pp-watch {
+  --_radius: var(--nv-radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-3);
+}
+.pp-watch__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.pp-watch__head .pp-place__icon {
+  width: 34px;
+  height: 34px;
+}
+.pp-watch__head .pp-pill {
+  height: 20px;
+  padding: 0 8px 0 6px;
+}
+.pp-watch__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.pp-watch__text,
+.pp-watch__time {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: 16px;
+  color: var(--nv-ink-muted);
+  text-wrap: pretty;
+}
+.pp-watch__figures {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pp-watch__figures [aria-hidden='true'] {
+  color: var(--nv-ink-faint);
+  font-weight: 400;
+}
+.pp-watch__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.pp-watch__mark {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding-top: var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-watch__label {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.pp-watch__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.pp-watch__foot {
+  align-items: center;
+  justify-content: space-between;
+}
+/* « Arrêter » ends on the card's edge, like the plain actions of the CRM. */
+.pp-watch__foot .nv-btn--plain {
+  margin-right: calc(var(--nv-space-4) * -1);
+}
+.pp-watch__key-text {
+  margin-left: var(--nv-space-1);
+}
+.pp-watch__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+.pp-watch__key kbd {
+  font-family: var(--nv-font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--nv-glass-fill-strong);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  color: var(--nv-ink-muted);
+}
+.pp-watch .pp-btn:disabled,
+.pp-watch .nv-chip:disabled {
+  cursor: progress;
+}

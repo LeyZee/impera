@@ -138,6 +138,8 @@ interface Data {
   lastWeek: boolean;
   /** The report reads that fail before one answers. */
   reportsDown: number;
+  /** Tuesday's report waits for him instead: 120,00 € declared, 108,00 € read by Reveal (ADR 0073 § 5). */
+  gap: boolean;
   /** Basile's Friday shift, offered to Théo: the server's planning carries it (recette 05/11, CHAT-05). */
   offered: boolean;
   /** The zone of his record, when it is not the device's. */
@@ -163,11 +165,27 @@ const VALIDATED = {
   status: 'validated',
   version: 1,
   byAgency: false,
+  reviewKind: null,
+  explanation: null,
+  check: null,
   canReview: false,
   submittedAt: '2026-10-27T12:10:00Z',
   reviewedAt: '2026-10-27T15:00:00Z',
   reviewNote: null,
   createdAt: '2026-10-27T12:10:00Z',
+};
+
+const GAPPED = {
+  ...VALIDATED,
+  status: 'submitted',
+  reviewedAt: null,
+  check: {
+    state: 'complete',
+    readMinor: 10_800,
+    gapMinor: 1_200,
+    verdict: 'gap',
+    explainBy: '2026-10-29T12:00:00Z',
+  },
 };
 
 const weeks: string[] = [];
@@ -209,6 +227,7 @@ function serve(
     night: data.night ?? false,
     lastWeek: data.lastWeek ?? false,
     reportsDown: data.reportsDown ?? 0,
+    gap: data.gap ?? false,
     offered: data.offered ?? false,
     meZone: data.meZone ?? null,
   };
@@ -276,7 +295,7 @@ function serve(
             : {
                 status: 200,
                 body: {
-                  reports: state.earlier ? [VALIDATED] : [],
+                  reports: state.earlier ? [state.gap ? GAPPED : VALIDATED] : [],
                   shifts: state.earlier ? EARLIER : [],
                   accounts: [account],
                   members: [people[0]],
@@ -414,6 +433,21 @@ describe('the chatter’s Planning', () => {
     );
     fireEvent.click(within(monday).getByRole('button', { name: /^Faire mon rapport du lundi 26 octobre/u }));
     expect(await screen.findByRole('dialog')).toBeTruthy();
+  });
+
+  it('says in amber a report whose gap with Reveal waits for him (ADR 0073 § 5)', async () => {
+    serve({ earlier: true, gap: true });
+    renderPage();
+    const fold = await screen.findByText('Plus tôt cette semaine (2)');
+    await waitFor(() => {
+      expect(text(fold.closest('summary'))).toContain('1 rapport à faire · 1 écart à expliquer');
+    });
+    const tuesday = within(fold.closest('details') ?? document.body).getByRole('region', {
+      name: 'Mardi 27 octobre',
+    });
+    const chip = await within(tuesday).findByRole('button', { name: /Rapport du .* : écart à expliquer/u });
+    expect(chip.textContent).toBe('Écart · À expliquer');
+    expect(chip.className).toContain('rp-chip--warn');
   });
 
   it('keeps a night shift begun yesterday out of the fold while it is under way', async () => {

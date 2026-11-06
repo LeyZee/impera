@@ -14,6 +14,7 @@ import { useId, useState, type JSX } from 'react';
 
 import { MinimumPayout } from './MinimumPayout';
 import { PayoutDelay } from './PayoutDelay';
+import { ReportGap } from './ReportGap';
 
 import { addPayRules, usePayRules, useRefreshPayRules, type ReportRefusal } from '@/reports/api';
 import {
@@ -95,12 +96,14 @@ export function PayRulesSection(): JSX.Element {
   return (
     <section className="rp-rules">
       <p className="rp-rules__lede nv-enter">
-        Ce que la paie lit : le minimum de versement de toute l’équipe, puis pour chaque compte la devise, la
-        TVA, la commission de la plateforme et la source des ventes. Les règles d’un compte ne changent jamais
-        : de nouvelles prennent la suite à une quinzaine qui n’a pas commencé.
+        Ce que la paie lit : le minimum de versement de toute l’équipe, le seuil d’écart des rapports, puis
+        pour chaque compte la devise, la TVA, la commission de la plateforme et la source des ventes. Les
+        règles d’un compte ne changent jamais : de nouvelles prennent la suite à une quinzaine qui n’a pas
+        commencé.
       </p>
       <MinimumPayout />
       <PayoutDelay />
+      <ReportGap />
       {missing.length === 0 ? null : (
         <div className="rp-notice nv-enter" data-tone="warn" style={{ '--nv-i': 1 }}>
           <p className="rp-notice__title">

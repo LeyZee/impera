@@ -9,6 +9,7 @@ import {
   type LlmCallLog,
   type LlmGateway,
   type LlmGatewayDeps,
+  type ProviderBaseUrls,
   type ProviderId,
 } from '@impera/llm';
 
@@ -34,6 +35,8 @@ export interface AppLlmOptions {
   readonly logger: Logger;
   /** The llm_calls journal (`createPersistentCallLog`); in memory when absent (tests, terminal). */
   readonly log?: LlmCallLog;
+  /** The recette sandbox's fake world (ADR 0075); each provider's own API when absent. */
+  readonly baseUrls?: ProviderBaseUrls;
 }
 
 /** The one LLM gateway of the app (ADR 0009), built once by the composition root and handed to the modules. */
@@ -65,8 +68,8 @@ export function createAppLlm(options: AppLlmOptions): AppLlm {
   const gateway = createLlmGateway({
     ...deps,
     config: DEFAULT_LLM_CONFIG,
-    resolveModel: createModelResolver(deps.credentials),
-    resolveTranscriber: createTranscriberResolver(deps.credentials),
+    resolveModel: createModelResolver(deps.credentials, options.baseUrls),
+    resolveTranscriber: createTranscriberResolver(deps.credentials, options.baseUrls),
   });
   return { gateway, deps };
 }

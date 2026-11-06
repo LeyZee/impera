@@ -64,7 +64,12 @@ export {
 } from './gateway';
 export type { HealthReport, HealthState, ProviderHealth, RoleHealth } from './health';
 export { loadPrompt } from './prompts';
-export { createModelResolver, createTranscriberResolver, type ModelResolver } from './providers';
+export {
+  createModelResolver,
+  createTranscriberResolver,
+  type ModelResolver,
+  type ProviderBaseUrls,
+} from './providers';
 export {
   BRAIN_ALERTS_MAX,
   brainAlertId,

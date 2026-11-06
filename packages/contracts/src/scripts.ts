@@ -21,6 +21,14 @@ export const SCRIPT_MOMENTS = ['day', 'night', 'both'] as const;
 export const ScriptMomentSchema = z.enum(SCRIPT_MOMENTS);
 export type ScriptMoment = z.infer<typeof ScriptMomentSchema>;
 
+/**
+ * The moment a script is shot as (SC-03, « ok alternance » 06/11): a structure's own, or for a « both » one, the other
+ * than her last script's (`night` for her first). Fixed by the code when it is asked, never chosen by hand.
+ */
+export const SHOT_MOMENTS = ['day', 'night'] as const;
+export const ShotMomentSchema = z.enum(SHOT_MOMENTS);
+export type ShotMoment = z.infer<typeof ShotMomentSchema>;
+
 export const MEDIA_SLOT_KINDS = ['image', 'video', 'audio'] as const;
 export const MediaSlotKindSchema = z.enum(MEDIA_SLOT_KINDS);
 export type MediaSlotKind = z.infer<typeof MediaSlotKindSchema>;

@@ -36,6 +36,7 @@ import type {
   ConnectorsModule,
   SalesFeedRegistry,
 } from './modules/connectors';
+import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { CreatorTasksModule } from './modules/creator-tasks';
@@ -57,6 +58,7 @@ import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-
 import { createPasswordResetRoutes } from './password-reset';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
 import { checkReadiness, type Readiness } from './readiness';
+import { installSandboxGuard, sandboxOf, sdkBaseUrlsOf } from './sandbox';
 import { createSecuritySettingsRoutes } from './security-settings';
 import { wireAccounting } from './wiring/accounting';
 import { wireAgent } from './wiring/agent';
@@ -188,8 +190,8 @@ export interface AppOptions {
    */
   readonly payrollClock?: () => Date;
   /**
-   * Tests set the team's clock here, to make a member leave on a day already past and read his closing fortnight
-   * (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
+   * Tests set the team's clock here, to make a member leave on a day already past and read the fortnight of his
+   * departure (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
    */
   readonly teamClock?: () => Date;
   /**
@@ -207,6 +209,11 @@ export interface AppOptions {
    * started for it; the platform's image server and the media bucket otherwise.
    */
   readonly creatorAvatars?: Pick<AvatarPorts, 'fetch' | 'store'>;
+  /**
+   * Tests plug her content's storage here, to read a script's archive without an object store (SC-03 c); the media
+   * bucket otherwise.
+   */
+  readonly dropStorage?: DropStorage;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
 }
@@ -223,6 +230,9 @@ function breachCheckOf(config: Config, logger: Logger): PasswordBreachCheck {
 }
 
 export async function createApp(config: Config, logger: Logger, options: AppOptions = {}): Promise<App> {
+  // ADR 0075: in the recette sandbox, the guard goes on `fetch` before any module captures it.
+  const sandbox = sandboxOf(config);
+  if (sandbox !== null) installSandboxGuard(sandbox, logger);
   const db = createDbClient(config.DATABASE_URL, POOL_OPTIONS);
   const adminDb = createDbClient(config.DATABASE_ADMIN_URL, { ...POOL_OPTIONS, max: 5 });
   const rateLimitDb = createDbClient(config.DATABASE_URL, RATE_LIMIT_POOL_OPTIONS);
@@ -291,6 +301,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     reportRefusedKey: (provider, kind) => providers.module.reportRefusedKey(provider, kind),
     publishBudget: (crossing) => publishBudgetThreshold(adminDb.db, crossing),
     logger,
+    ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
   const team = wireTeam(shared, {
@@ -306,8 +317,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scriptVersions: {
       frozen: (versionId) => scripts.module.frozenVersion(versionId),
       card: (versionId, segmentKey, variant) => scripts.module.frozenCard(versionId, segmentKey, variant),
+      folderCard: (versionId, segmentKey, variant) =>
+        scripts.module.frozenFolderCard(versionId, segmentKey, variant),
       freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
     },
+    ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
   });
   const scripts = wireScripts(shared, {
     persona: persona.module,

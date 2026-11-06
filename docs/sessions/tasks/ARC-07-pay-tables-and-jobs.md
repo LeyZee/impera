@@ -42,7 +42,7 @@ Une PR par lot, dans cet ordre ; chaque lot retire ses lignes de `OPEN_CROSSINGS
 ## Hors périmètre
 
 - Les lectures de tables d'autres modules qui existaient avant le découpage (`team_members`, `platform_accounts`, `audit_log`, `domain_events`) : ADR 0047 § 1 les laisse telles quelles.
-- Les fonctions SQL qui lisent plusieurs propriétaires (`member_documents_open`) : appelées par leur propriétaire derrière un port, comme `documentsOpen`.
+- Les fonctions SQL qui lisent plusieurs propriétaires (`member_documents_open`) : appelées par leur propriétaire derrière un port, comme l'était `documentsOpen` (retiré par l'ADR 0072 : la validation du relevé final ne lit plus les documents ouverts).
 - Les frontières à l'intérieur d'un module (ARC-04).
 
 ## Notes de session (rempli par la session : décisions, surprises, fiches créées)

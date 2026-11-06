@@ -97,6 +97,7 @@ Branche : task/<id>-<slug>
 | CR-12 | Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier | espaces | todo | EQ-02, CR-02 |
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
+| CR-15 | Qui sont tes fans : les chiffres de sa base, tirés de leurs faits déclarés | espaces | todo | CR-02, ADR 0074 |
 | SC-01 | Structures de script et cartons : l'atelier de l'agence | scripts | done | ADR 0056, la persona |
 | SC-02 | « Ton prochain script » : la créatrice tourne et dépose carton par carton | scripts | todo | SC-01, CR-06, CR-05 |
 | SC-03 | Dossier de script rangé dans l'ordre, et export ZIP | scripts | todo | SC-02 |
@@ -110,7 +111,7 @@ Branche : task/<id>-<slug>
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | MCP-PUB | Publication par un agent externe : préparer, puis publier dans un plafond | MCP | blocked (lot 1 du MCP) | PROPOSED-mcp-read, PUB-01, PUB-02 |
 | VEI-01 | Signaux de tendance et idées de contenu : la base, les filtres, le lien collé | veille | todo | ADR 0060, CR-05, CR-06 |
-| VEI-02 | Capture passive dans l'extension, page « Veille » et écran « Idées du jour » | veille | todo | VEI-01 |
+| VEI-02 | Capture passive dans l'extension, page « Veille » et écran « Idées du jour » | veille | done | VEI-01 |
 | VEI-03 | Le job du matin : signaux de Grok et idées du jour | veille | blocked (clé xAI) | VEI-01, P3-01 |
 | VEI-04 | Profil de contenu : ce qui marche chez elle et ce qu'elle sait faire | veille | blocked (clé de vision) | VEI-01, CR-06 |
 | VEI-05 | Statistiques du compte de la créatrice comme signaux | veille | blocked (PUB-02) | PUB-02, VEI-04 |

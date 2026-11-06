@@ -17,7 +17,7 @@ import { SwapPanel } from './SwapPanel';
 
 import { ReportPanel } from '@/reports/ReportPanel';
 import { useReportsOf } from '@/reports/api';
-import { MEMBER_STATUS, periodAt, reportOf, STATUS_TONES } from '@/reports/model';
+import { GAP_TO_EXPLAIN, gapWaits, MEMBER_STATUS, periodAt, reportOf, STATUS_TONES } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
@@ -477,9 +477,23 @@ function Week({
   const earlier = byDay.filter(isGone);
   const ahead = byDay.filter((one) => !isGone(one));
   const earlierCount = earlier.reduce((sum, { shifts }) => sum + shifts.length, 0);
-  const toDo = earlier
+  const pastReports = earlier
     .flatMap(({ shifts }) => shifts)
-    .filter((shift) => phaseOf(shift, now) === 'past' && reportFor(shift)?.kind === 'todo').length;
+    .filter((shift) => phaseOf(shift, now) === 'past')
+    .map(reportFor);
+  const toDo = pastReports.filter((one) => one?.kind === 'todo').length;
+  // A gap with the platform that waits for him is said on the fold too (ADR 0073 § 5).
+  const toExplain = pastReports.filter((one) => one?.kind === 'made' && gapWaits(one.report, now)).length;
+  const foldSum = [
+    toDo === 0 ? null : toDo === 1 ? '1 rapport à faire' : `${String(toDo)} rapports à faire`,
+    toExplain === 0
+      ? null
+      : toExplain === 1
+        ? '1 écart à expliquer'
+        : `${String(toExplain)} écarts à expliquer`,
+  ]
+    .filter((part) => part !== null)
+    .join(' · ');
   const daySection = ({ day, shifts }: { day: string; shifts: Shift[] }, index: number): JSX.Element => (
     <section
       key={day}
@@ -505,6 +519,7 @@ function Week({
               held={held}
               offeredTo={offers.get(shift.id) ?? []}
               report={phase === 'past' ? reportFor(shift) : null}
+              now={now}
               onSwap={onSwap}
               onReport={onReport}
             />
@@ -541,11 +556,7 @@ function Week({
         <details className="nv-disclosure nv-plate sc-fold sc-mine__earlier">
           <summary>
             <span className="nv-disclosure__title">Plus tôt cette semaine ({earlierCount})</span>
-            {toDo === 0 ? null : (
-              <span className="nv-disclosure__sum">
-                {toDo === 1 ? '1 rapport à faire' : `${String(toDo)} rapports à faire`}
-              </span>
-            )}
+            {foldSum === '' ? null : <span className="nv-disclosure__sum">{foldSum}</span>}
           </summary>
           <div className="nv-disclosure__body sc-mine">{earlier.map(daySection)}</div>
         </details>
@@ -564,6 +575,7 @@ function MyShiftRow({
   held,
   offeredTo,
   report,
+  now,
   onSwap,
   onReport,
 }: {
@@ -577,9 +589,12 @@ function MyShiftRow({
   /** The colleagues an open proposal of this shift waits on. */
   offeredTo: readonly string[];
   report: RowReport;
+  /** Whether a gap with the platform still waits for him (ADR 0073 § 5). */
+  now: Date;
   onSwap: (shiftId: string) => void;
   onReport: (shiftId: string) => void;
 }): JSX.Element {
+  const explain = report !== null && report.kind !== 'todo' && gapWaits(report.report, now);
   const day = `${longDay(dayOf(shift.startsAt, zone))}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}`;
   const length = new Date(shift.endsAt).getTime() - new Date(shift.startsAt).getTime();
   const sameHours =
@@ -630,15 +645,17 @@ function MyShiftRow({
       ) : (
         <button
           type="button"
-          className={`rp-chip rp-chip--${STATUS_TONES[report.report.status]} nv-tap sc-mine__report`}
-          aria-label={`Rapport du ${day} : ${MEMBER_STATUS[report.report.status]}`}
+          className={`rp-chip rp-chip--${explain ? 'warn' : STATUS_TONES[report.report.status]} nv-tap sc-mine__report`}
+          aria-label={`Rapport du ${day} : ${explain ? 'écart à expliquer' : MEMBER_STATUS[report.report.status]}`}
           onClick={() => {
             onReport(shift.id);
           }}
         >
           {report.report.status === 'rejected'
             ? 'Renvoyé · Reprendre'
-            : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
+            : explain
+              ? GAP_TO_EXPLAIN
+              : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
         </button>
       )}
       {phase === 'later' ? (

@@ -7,6 +7,7 @@ import {
   ScriptSlotKeySchema,
   ScriptStructureIdSchema,
   ScriptStructureVersionIdSchema,
+  ShotMomentSchema,
   ScriptVariantLetterSchema,
   type MediaSlot,
 } from './scripts';
@@ -328,6 +329,10 @@ export const ContentDropSchema = z.strictObject({
   blockedReason: DropRefusalSchema.nullable(),
   requestId: ContentRequestIdSchema.nullable(),
   files: z.array(ContentDropFileSchema),
+  /** Her sent script's number, the `S<nnn>` of its folder (SC-03); `null` for another drop or a script being filled. */
+  scriptNumber: z.int().min(1).nullable(),
+  /** When the team confirmed its archive copied into Reveal (SC-03 c): her originals of it go 30 days later. */
+  exportedAt: z.iso.datetime({ offset: true }).nullable(),
   createdAt: z.iso.datetime({ offset: true }),
 });
 export type ContentDrop = z.infer<typeof ContentDropSchema>;
@@ -458,6 +463,8 @@ export const ContentRequestSchema = z.strictObject({
   structureId: ScriptStructureIdSchema.nullable(),
   /** The version asked, frozen with the request (SC-02); `null` for another category and a script asked before. */
   structureVersionId: ScriptStructureVersionIdSchema.nullable(),
+  /** Jour or Nuit, fixed by the code when the script is asked (« ok alternance »); `null` for another category. */
+  moment: ShotMomentSchema.nullable(),
   origin: ContentRequestOriginSchema,
   state: ContentRequestStateSchema,
   refusalReason: DropRefusalSchema.nullable(),
@@ -510,6 +517,29 @@ export const CONTENT_DROP_SLOT_NOT_FOUND = 'content_drop_slot_not_found';
 export const CONTENT_DROP_SLOTS_UNPROCESSABLE = 'content_drop_slots_unprocessable';
 /** A card her script does not have: a segment or a series not in its frozen version (SC-02 lot b2). */
 export const CONTENT_DROP_CARD_NOT_FOUND = 'content_drop_card_not_found';
+/**
+ * A script's archive refused (SC-03 c, ADR 0056 § 7): not a sent script, its files not all settled yet, an original
+ * already erased, a « both » structure whose moment is not fixed, or media past what a ZIP without ZIP64 holds
+ * (4 Gio). `details.reason` says which.
+ */
+export const CONTENT_DROP_EXPORT_UNPROCESSABLE = 'content_drop_export_unprocessable';
+export const SCRIPT_EXPORT_REFUSALS = [
+  'not_a_script',
+  'not_ready',
+  'original_erased',
+  'moment_unknown',
+  'too_large',
+] as const;
+export const ScriptExportRefusalSchema = z.enum(SCRIPT_EXPORT_REFUSALS);
+export type ScriptExportRefusal = z.infer<typeof ScriptExportRefusalSchema>;
+/** The archive of a sent script: a ZIP, its files stored as they are. */
+export const SCRIPT_EXPORT_MEDIA_TYPE = 'application/zip';
+/**
+ * What the media of one archive may weigh (relecture Bilan de #607): the ZIP is written without ZIP64, its sizes and
+ * offsets on 4 bytes, so past 4 Gio it would come out corrupt with a 200. The cards and the headers keep 256 Mio. The
+ * agency screen reads it too, so that it never offers an archive the server refuses (SC-03 c2b).
+ */
+export const SCRIPT_EXPORT_MAX_BYTES = 4 * 1024 ** 3 - 256 * 1024 ** 2;
 export const CONTENT_REQUEST_NOT_FOUND = 'content_request_not_found';
 export const CONTENT_REQUEST_ID_CONFLICT = 'content_request_id_conflict';
 export const CONTENT_REQUEST_CLOSED_CONFLICT = 'content_request_closed_conflict';

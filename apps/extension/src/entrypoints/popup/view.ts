@@ -6,6 +6,8 @@ import { icon, type IconName } from '../../lib/icons';
 import type { Place } from '../../lib/tab';
 import { firstNameOf, initialsOf, kindLabel, kindOf, shortcutsFor, type Shortcut } from '../../lib/who';
 
+import { watchCard, type WatchActions, type WatchView } from './watch-view';
+
 /** One screen of the popup (ADR 0066 § 6). Pure: the same state draws the same nodes; main.ts does the browser side. */
 export type Screen =
   | { readonly kind: 'loading' }
@@ -16,7 +18,13 @@ export type Screen =
   | { readonly kind: 'server_down' }
   /** A deployed CRM whose address the browser has not allowed yet. */
   | { readonly kind: 'permission' }
-  | { readonly kind: 'signed_in'; readonly me: Me; readonly place: Place }
+  | {
+      readonly kind: 'signed_in';
+      readonly me: Me;
+      readonly place: Place;
+      /** The watch card on an Instagram tab, for the owner and the managers; null elsewhere. */
+      readonly watch: WatchView | null;
+    }
   | { readonly kind: 'address'; readonly draft: string; readonly error: string | null };
 
 export interface Actions {
@@ -28,6 +36,7 @@ export interface Actions {
   readonly saveAddress: (value: string) => void;
   readonly resetAddress: () => void;
   readonly cancelAddress: () => void;
+  readonly watch: WatchActions;
 }
 
 export interface Frame {
@@ -175,11 +184,6 @@ const PLACES: Partial<Record<Place, { icon: IconName; title: string; text: strin
     title: 'Reveal',
     text: 'La capture de session arrive à la prochaine étape. Pour l’instant, rien n’est lu ni envoyé depuis cet onglet.',
   },
-  instagram: {
-    icon: 'eye',
-    title: 'Veille Instagram',
-    text: 'Tu scrolles, l’extension relèvera les posts qui marchent. Jamais un message, jamais un clic à ta place.',
-  },
 };
 
 function placeCard(place: Place): HTMLElement | null {
@@ -217,9 +221,16 @@ function tile(shortcut: Shortcut, index: number, onOpen: (path: string) => void)
   return element;
 }
 
-function signedIn(me: Me, place: Place, frame: Frame, actions: Actions): readonly HTMLElement[] {
+function signedIn(
+  me: Me,
+  place: Place,
+  watch: WatchView | null,
+  frame: Frame,
+  actions: Actions,
+): readonly HTMLElement[] {
   const first = firstNameOf(me);
   const shortcuts = shortcutsFor(kindOf(me));
+  const showsWatch = place === 'instagram' && watch !== null;
   return [
     h(
       'p',
@@ -231,7 +242,9 @@ function signedIn(me: Me, place: Place, frame: Frame, actions: Actions): readonl
     account(me, () => {
       actions.open(accountPathOf(me));
     }),
-    ...[placeCard(place)].filter((card): card is HTMLElement => card !== null),
+    ...[showsWatch ? watchCard(watch, actions.watch) : placeCard(place)].filter(
+      (card): card is HTMLElement => card !== null,
+    ),
     h(
       'nav',
       { class: 'pp-tiles', 'aria-label': 'Raccourcis du CRM', 'data-count': String(shortcuts.length) },
@@ -245,7 +258,8 @@ function signedIn(me: Me, place: Place, frame: Frame, actions: Actions): readonl
         () => {
           actions.open('/');
         },
-        { variant: 'neon', icon: 'arrowUpRight', wide: true },
+        // One neon per screen: on a watch, its action is the one; « Ouvrir le CRM » steps back.
+        { variant: showsWatch ? 'soft' : 'neon', icon: 'arrowUpRight', wide: true },
       ),
     ),
   ];
@@ -313,7 +327,7 @@ function body(screen: Screen, frame: Frame, actions: Actions): readonly HTMLElem
     case 'signed_out':
       return [signedOut(actions)];
     case 'signed_in':
-      return signedIn(screen.me, screen.place, frame, actions);
+      return signedIn(screen.me, screen.place, screen.watch, frame, actions);
     case 'unreachable':
       return [
         notice(

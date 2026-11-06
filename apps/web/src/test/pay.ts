@@ -197,6 +197,7 @@ export function statementOf(
     adjustmentsMinor: 0,
     totalMinor: 2_125,
     carryOverOutMinor: 0,
+    writtenOffMinor: 0,
     payableMinor: 2_125,
     team: null,
     rules: {

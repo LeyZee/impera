@@ -16,11 +16,13 @@ import {
 } from '@impera/contracts';
 import { and, eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
+import { unzipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
+import type { DropStorage } from '../modules/content-drops';
 import { createDrizzleRetentionStore } from '../modules/content-drops/infra/db/retention-store';
 import { buildServer, type Server } from '../server';
 
@@ -30,6 +32,28 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 const PASSWORD = 'correct horse battery';
 const PARIS = 'Europe/Paris';
 const MB = 1024 * 1024;
+
+/** The kept media of the archive's test, by storage key: invented bytes, no object store started for them. */
+const STORED = new Map<string, Uint8Array>();
+const unexpected = (what: string) => (): Promise<never> => Promise.reject(new Error(`${what} not expected`));
+const storage: DropStorage = {
+  openUpload: unexpected('openUpload'),
+  startUpload: unexpected('startUpload'),
+  storedParts: unexpected('storedParts'),
+  partUrl: unexpected('partUrl'),
+  completeUpload: unexpected('completeUpload'),
+  sizeOf: unexpected('sizeOf'),
+  remove: unexpected('remove'),
+  download: unexpected('download'),
+  upload: unexpected('upload'),
+  read: (key) => {
+    const bytes = STORED.get(key);
+    return Promise.resolve(bytes === undefined ? null : toAsync(bytes));
+  },
+};
+async function* toAsync(bytes: Uint8Array): AsyncGenerator<Uint8Array> {
+  yield await Promise.resolve(bytes);
+}
 
 /** Invented segments: never a real structure of the agency in the repository (SC-01). */
 const structure = (): CreateScriptStructureBody => ({
@@ -89,7 +113,12 @@ describe('/v1/creator-space/content/script-drops', () => {
   let structureId: string;
   const dropId = newId(ContentDropIdSchema);
   const cookies: Record<'nora' | 'ines' | 'owner', string> = { nora: '', ines: '', owner: '' };
-  const call = (method: 'GET' | 'POST' | 'PUT', url: string, who: keyof typeof cookies, body?: object) =>
+  const call = (
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    url: string,
+    who: keyof typeof cookies,
+    body?: object,
+  ) =>
     server.inject({
       method,
       url,
@@ -111,7 +140,7 @@ describe('/v1/creator-space/content/script-drops', () => {
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
-    app = await createApp(config, createLogger(config));
+    app = await createApp(config, createLogger(config), { dropStorage: storage });
     server = await buildServer({
       config,
       logger: createLogger(config),
@@ -375,5 +404,203 @@ describe('/v1/creator-space/content/script-drops', () => {
       .from(schema.scriptStructureVersions)
       .where(eq(schema.scriptStructureVersions.id, versionId));
     expect(version?.frozen).toBe(true);
+  });
+
+  it('fixes each script’s moment when it is asked: its structure’s, or for a « both » one the other than her last (« ok alternance »)', async () => {
+    const [first] = await test.admin.db
+      .select({ moment: schema.contentRequests.moment })
+      .from(schema.contentRequests)
+      .where(eq(schema.contentRequests.id, requestId));
+    // A night structure is shot at night.
+    expect(first?.moment).toBe('night');
+    const both = {
+      ...structure(),
+      id: newId(ScriptStructureIdSchema),
+      name: 'Journée inventée',
+      moment: 'both' as const,
+    };
+    const created = await call('POST', '/v1/script-structures', 'owner', both);
+    expect(created.statusCode, created.body).toBe(201);
+    const ask = async () => {
+      const asked = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
+        id: newId(ContentRequestIdSchema),
+        category: 'script',
+        dueOn: '2026-12-20',
+        reason: 'Un script de jour comme de nuit',
+        structureId: both.id,
+      });
+      expect(asked.statusCode, asked.body).toBe(200);
+      return ContentRequestSchema.parse(asked.json());
+    };
+    // Her last scripts were of night: this one is of day, the next of night again.
+    const day = await ask();
+    expect(day.moment).toBe('day');
+    // Cancelled, it is not her last script.
+    expect(
+      (await call('DELETE', `/v1/creators/${nora}/content-requests/${day.id}`, 'owner')).statusCode,
+    ).toBe(204);
+    expect((await ask()).moment).toBe('day');
+    expect((await ask()).moment).toBe('night');
+    // Another creator's turn is her own: Ines's first « both » script is of night.
+    const hers = await call('POST', `/v1/creators/${ines}/content-requests`, 'owner', {
+      id: newId(ContentRequestIdSchema),
+      category: 'script',
+      dueOn: '2026-12-20',
+      reason: 'Son premier script',
+      structureId: both.id,
+    });
+    expect(ContentRequestSchema.parse(hers.json()).moment).toBe('night');
+  });
+
+  it('gives the agency her sent script as a ZIP in its order, once every file is settled (SC-03 c)', async () => {
+    const url = `/v1/creators/${nora}/drops/${dropId}/script-export`;
+    // Still being received: not yet.
+    const early = await call('GET', url, 'owner');
+    expect(early.statusCode, early.body).toBe(422);
+    expect(codeOf(early.body)).toMatchObject({
+      code: 'content_drop_export_unprocessable',
+      details: { reason: 'not_ready' },
+    });
+
+    // The cleaning done: both series kept, the optional video refused, the drop ready.
+    const files = await test.admin.db
+      .select({ id: schema.contentDropFiles.id, slotKey: schema.contentDropFiles.slotKey })
+      .from(schema.contentDropFiles)
+      .where(
+        and(eq(schema.contentDropFiles.dropId, dropId), sql`${schema.contentDropFiles.replacedAt} is null`),
+      );
+    for (const file of files) {
+      if (file.slotKey === 'salon::1') {
+        await test.admin.db
+          .update(schema.contentDropFiles)
+          .set({ state: 'refused', refusal: 'Cette vidéo est trop courte' })
+          .where(eq(schema.contentDropFiles.id, file.id));
+        continue;
+      }
+      if (file.slotKey === 'salon::0') continue;
+      const key = `creators/${nora}/${file.slotKey ?? ''}.jpg`;
+      const [medium] = await test.admin.db
+        .insert(schema.mediaAssets)
+        .values({
+          id: crypto.randomUUID(),
+          creatorId: nora,
+          kind: 'image',
+          origin: 'creator',
+          storageKey: key,
+          mime: 'image/jpeg',
+          bytes: 10,
+          sha256: (file.slotKey === 'chambre:A:0' ? 'c' : 'd').repeat(64),
+          expiresAt: new Date('2027-11-01T00:00:00Z'),
+        })
+        .returning({ id: schema.mediaAssets.id });
+      await test.admin.db
+        .update(schema.contentDropFiles)
+        .set({ state: 'kept', mediaAssetId: medium?.id ?? null })
+        .where(eq(schema.contentDropFiles.id, file.id));
+    }
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'ready' })
+      .where(eq(schema.contentDrops.id, dropId));
+    const encoder = new TextEncoder();
+    STORED.set(`creators/${nora}/live.jpg`, encoder.encode('salon-photo'));
+    STORED.set(`creators/${nora}/chambre:A:0.jpg`, encoder.encode('serie-A'));
+    STORED.set(`creators/${nora}/chambre:B:0.jpg`, encoder.encode('serie-B'));
+
+    const exported = await call('GET', url, 'owner');
+    expect(exported.statusCode, exported.body).toBe(200);
+    expect(exported.headers['content-type']).toBe('application/zip');
+    expect(exported.headers['content-disposition']).toBe(
+      'attachment; filename="S001-nuit-soiree-inventee.zip"',
+    );
+    expect(exported.headers['cache-control']).toBe('no-store');
+    const archive = unzipSync(new Uint8Array(exported.rawPayload));
+    const folder = 'S001-nuit-soiree-inventee';
+    expect(Object.keys(archive)).toEqual(
+      [
+        '00-fiche.txt',
+        '01-E1-00-carton.png',
+        '01-E1-01-photo.jpg',
+        '02-E2A-00-carton.png',
+        '02-E2A-01-photo.jpg',
+        '02-E2B-00-carton.png',
+        '02-E2B-01-photo.jpg',
+      ].map((name) => `${folder}/${name}`),
+    );
+    const text = (name: string) => new TextDecoder().decode(archive[`${folder}/${name}`]);
+    expect(text('01-E1-01-photo.jpg')).toBe('salon-photo');
+    expect(text('02-E2B-01-photo.jpg')).toBe('serie-B');
+    expect(text('00-fiche.txt')).toContain('02 · E2 — Chambre (PAYANT)');
+    // A real PNG, drawn from the frozen version.
+    expect([...(archive[`${folder}/01-E1-00-carton.png`] ?? []).slice(0, 4)]).toEqual([
+      0x89, 0x50, 0x4e, 0x47,
+    ]);
+
+    // The agency's alone, and under her creator only.
+    expect((await call('GET', url, 'nora')).statusCode).toBe(403);
+    const elsewhere = await call('GET', `/v1/creators/${ines}/drops/${dropId}/script-export`, 'owner');
+    expect([elsewhere.statusCode, codeOf(elsewhere.body).code]).toEqual([404, 'content_drop_not_found']);
+
+    // An original already erased: refused whole, never an archive with a hole.
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ erasedAt: new Date('2026-11-06T12:00:00Z') })
+      .where(eq(schema.mediaAssets.storageKey, `creators/${nora}/chambre:A:0.jpg`));
+    const erased = await call('GET', url, 'owner');
+    expect(codeOf(erased.body)).toMatchObject({
+      code: 'content_drop_export_unprocessable',
+      details: { reason: 'original_erased' },
+    });
+  });
+
+  it('confirms her script copied into Reveal once, by the team: her originals of it go 30 days later (SC-03 c)', async () => {
+    // Given back for this test: the archive's own refused an erased original.
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ erasedAt: null })
+      .where(eq(schema.mediaAssets.storageKey, `creators/${nora}/chambre:A:0.jpg`));
+    const url = `/v1/creators/${nora}/drops/${dropId}/script-export/confirm`;
+    expect((await call('POST', url, 'nora')).statusCode).toBe(403);
+    const before = Date.now();
+    const confirmed = await call('POST', url, 'owner');
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    const drop = ContentDropSchema.parse(confirmed.json());
+    expect(drop.scriptNumber).toBe(1);
+    expect(drop.exportedAt).not.toBeNull();
+    const media = await test.admin.db
+      .select({ key: schema.mediaAssets.storageKey, expiresAt: schema.mediaAssets.expiresAt })
+      .from(schema.mediaAssets)
+      .where(eq(schema.mediaAssets.creatorId, nora));
+    const until = (key: string) =>
+      media.find((one) => one.key === `creators/${nora}/${key}`)?.expiresAt?.getTime();
+    const day = 24 * 3600 * 1000;
+    for (const key of ['live.jpg', 'chambre:A:0.jpg', 'chambre:B:0.jpg']) {
+      expect(until(key)).toBeGreaterThanOrEqual(before + 30 * day - 1000);
+      expect(until(key)).toBeLessThanOrEqual(Date.now() + 30 * day + 1000);
+    }
+    // The replaced file's original keeps its own date.
+    expect(until('gone.jpg')).toBe(new Date('2027-11-01T00:00:00Z').getTime());
+    // Replayed: the same confirmation, never moved.
+    const again = ContentDropSchema.parse((await call('POST', url, 'owner')).json());
+    expect(again.exportedAt).toBe(drop.exportedAt);
+    const audit = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.entityId, dropId),
+          eq(schema.auditLog.action, 'content_drop.export_confirmed'),
+        ),
+      );
+    expect(audit).toHaveLength(1);
+    // Confirmed once: never taken back nor moved, even by hand in the base.
+    const moved = await test.admin.db
+      .execute(sql`update content_drops set exported_at = now() where id = ${dropId}`)
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
+    const cause = moved instanceof Error && moved.cause instanceof Error ? moved.cause.message : '';
+    expect(cause).toContain('confirmed once, by the team');
   });
 });

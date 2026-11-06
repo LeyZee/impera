@@ -1,7 +1,7 @@
 import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
-import { salesFeedSwitchReads, salesFeedTotals } from '../modules/connectors';
+import { salesFeedReadsForReports, salesFeedSwitchReads, salesFeedTotals } from '../modules/connectors';
 import type { CreatorTasksModule } from '../modules/creator-tasks';
 import { enqueuePayRecalculation } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
@@ -40,6 +40,8 @@ export function wireScheduling(
     switchFactsOf: salesFeedSwitchReads.switchFactsOf,
     // The agency percentages' check reads the register's totals, the one rule of CRM-04 (lot d3).
     salesTotalsOf: salesFeedTotals.totalsOf,
+    // A declared report against what the platform read during its shift (ADR 0073), in the reports' transaction.
+    shiftSalesOf: salesFeedReadsForReports.shiftSales,
     // A creator's calendar link shows her agenda (CR-05 lot c2, ADR 0042 § 4), read by her agenda's own module.
     creatorAgendaFeed: deps.creatorTasks.feedOf,
   });
@@ -76,6 +78,17 @@ export function wireScheduling(
           context.logger.info(
             { published: await module.jobs.checkAgencyShares(`job:${context.jobId}`) },
             'scheduling: agency percentages checked against the register',
+          );
+        },
+      ),
+      'scheduling.check_reports': defineTask(
+        'scheduling.check_reports',
+        JOB_PAYLOADS['scheduling.check_reports'],
+        logger,
+        async (_payload, context) => {
+          context.logger.info(
+            await module.jobs.checkReports(),
+            'scheduling: shift reports checked against the platform',
           );
         },
       ),

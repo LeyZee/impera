@@ -29,7 +29,6 @@ import {
 import { z } from 'zod';
 
 import type { Actor } from '../../contractors/pure';
-import { assertDocumentsSettled } from '../domain/departure';
 import {
   CommissionStatementChanged,
   CommissionStatementNotFound,
@@ -458,10 +457,6 @@ export function createDrizzlePayrollValidationStore(
 
         const statement = statementOf(closed, head.memberId);
         if (statement.inputsHash !== head.inputsHash) throw new CommissionStatementChanged(head.period);
-        if (statement.content.rules.final) {
-          // A member who left (ADR 0039 § 6): his documents first, as the base's `keep_final_statement` counts them.
-          assertDocumentsSettled(true, await gate.documentsOpen(tx, head.memberId));
-        }
         await assertNothingOwedBefore(tx, reads, closed, reports, creatorIds, head.memberId);
 
         const validated = await tx

@@ -1131,12 +1131,14 @@ button.sc-duty__one:active {
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
+/* Its text on the cards' edge, its padding outside it (recette ADR 0073). */
 .sc-more {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   align-self: flex-start;
   min-height: var(--nv-target-min);
+  margin-left: calc(-1 * var(--nv-space-2));
   padding: 0 var(--nv-space-2);
   border-radius: var(--nv-radius-full);
   color: var(--nv-ink-muted);

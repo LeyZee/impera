@@ -385,11 +385,11 @@ export function RatePanel({
 }
 
 /**
- * What « Parti » does, said before it is done: it cannot be undone from Impera. His closing fortnight, the one after
- * the fortnight that holds the day he leaves, gives him a final statement (EQ-14 lot 1, ADR 0039 § 6).
+ * What « Parti » does, said before it is done: it cannot be undone from Impera. The fortnight that holds the day the
+ * member leaves gives the final statement, paid at the normal cycle (ADR 0072 § 1).
  */
 const LEAVING = (name: string): string =>
-  `${name} n’aura plus accès à Impera : ses créatrices lui sont retirées et ses sessions fermées. Sa fiche, ses rapports et ses relevés restent. Son relevé final, celui de la quinzaine qui suit celle de son départ, lui verse tout ce qui lui reste dû, même sous le minimum de versement. Ce changement est définitif.`;
+  `${name} n’aura plus accès à Impera : ses créatrices lui sont retirées et ses sessions fermées. Sa fiche, ses rapports et ses relevés restent. Son relevé final, celui de la quinzaine de son départ, lui verse tout ce qui lui reste dû, même sous le minimum de versement. Ce changement est définitif.`;
 
 /** What a departure leaves to do by hand until the departure itself is built (EQ-14): nothing reads as settled. */
 const LEFT_TO_DO: readonly string[] = ['Son compte membre sur Reveal est à retirer à la main.'];
@@ -496,6 +496,7 @@ export function StatusPanel({ member, onClose }: { member: TeamMember; onClose: 
             <label className="tm-sure">
               <input
                 type="checkbox"
+                className="nv-check"
                 aria-describedby={`${id}-leaving`}
                 checked={sure}
                 onChange={(event) => {

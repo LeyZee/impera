@@ -24,7 +24,10 @@ export interface MemberForPay {
   readonly teamRole: TeamRole;
   readonly status: TeamMemberStatus;
   readonly joinedOn: string;
-  /** The day he left, in the agency's zone, `null` while he has not (EQ-14): his closing fortnight follows it. */
+  /**
+   * The day he left, in the agency's zone, `null` while he has not (EQ-14): the fortnight that holds it is his final
+   * one (ADR 0072).
+   */
   readonly leftOn: string | null;
   /** `null` when no rate is in force on that day yet. */
   readonly rate: { readonly rateBps: number; readonly teamShareBps: number | null } | null;

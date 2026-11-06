@@ -9,7 +9,8 @@ import type { SalesFeedFetch } from '../../modules/connectors';
  * FakeReveal's CRM API (docs/reference/fake-reveal.md § API CRM, ADR 0050 § 9): the documented routes of
  * `api.reveal.me`, behind `x-api-key`, over an in-memory register. Everything is invented (`model_test_01`,
  * `fan_test_01`); the shapes follow Reveal's documentation, read on 2026-11-02, until a real answer is seen.
- * Test-only: nothing in `src` outside `__tests__` imports it.
+ * Test-only, and the recette sandbox's fake world (`../sandbox-world`, ADR 0075): nothing in `src` outside
+ * `__tests__` imports it.
  */
 
 export const FAKE_CRM_KEY = 'rvl_fake_key_for_tests_only';
@@ -54,6 +55,8 @@ export interface FakeCrm {
   rateLimit(requests: number, retryAfterSeconds: number): void;
   /** The key is revoked: every call answers 401. */
   revoke(): void;
+  /** The key works again, with every access (the recette sandbox's « clé rétablie », ADR 0075). */
+  restore(): void;
   /** The key loses an access: its routes answer 403 (`webhooks`: not opened by the support). */
   withhold(access: Access): void;
   /**
@@ -103,7 +106,7 @@ export interface FakeModel {
   readonly avatarUrl?: string | null;
 }
 
-const DEFAULT_MODELS: readonly FakeModel[] = [
+export const DEFAULT_MODELS: readonly FakeModel[] = [
   {
     modelId: 'model_test_01',
     userName: 'creatrice_test',
@@ -229,7 +232,13 @@ const DEFAULT_SALE: Omit<FakeSale, 'id'> = {
   chatterId: 'chatter_test_01',
 };
 
-export function createFakeCrm(): FakeCrm {
+export interface FakeCrmOptions {
+  /** Which `x-api-key` opens the API; `FAKE_CRM_KEY` alone when absent (the recette sandbox takes any key it is told). */
+  readonly acceptKey?: (key: string) => boolean;
+}
+
+export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
+  const acceptKey = options.acceptKey ?? ((key: string) => key === FAKE_CRM_KEY);
   const app = Fastify();
   const register: RegisterLine[] = [];
   const state = {
@@ -275,7 +284,8 @@ export function createFakeCrm(): FakeCrm {
       void reply.header('retry-after', String(state.retryAfterSeconds));
       return answer(429, { error: 'rate_limited' });
     }
-    if (state.revoked || request.headers['x-api-key'] !== FAKE_CRM_KEY) {
+    const key = request.headers['x-api-key'];
+    if (state.revoked || typeof key !== 'string' || !acceptKey(key)) {
       return answer(401, { error: 'unauthorized' });
     }
     const access: Access = path.startsWith('/v1/sales')
@@ -577,6 +587,11 @@ export function createFakeCrm(): FakeCrm {
     },
     revoke() {
       state.revoked = true;
+    },
+    restore() {
+      state.revoked = false;
+      state.withheld.clear();
+      state.rateLimited = 0;
     },
     withhold(access) {
       state.withheld.add(access);

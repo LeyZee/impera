@@ -1370,3 +1370,22 @@
     transition: none;
   }
 }
+
+/* The statements' panel: its title is an eyebrow alone, so « Exporter (CSV) » is centred on it, not on its baseline. */
+.py-statements > .nv-panel__head {
+  align-items: center;
+}
+
+/* A statement's fortnight after its kind: in one block after a dot; on a phone, the dot becomes a line break so that
+   it is never left alone at a line's end, and the status chip follows the fortnight. */
+.py-lead-date {
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .py-lead-sep {
+    display: block;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+  }
+}

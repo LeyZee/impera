@@ -14,6 +14,7 @@ import {
   DropFileUploadSchema,
   FillScriptSlotBodySchema,
   RefuseContentRequestBodySchema,
+  SCRIPT_EXPORT_MEDIA_TYPE,
   ScriptDropCardParamsSchema,
   ScriptDropCardQuerySchema,
   ScriptDropSchema,
@@ -34,6 +35,7 @@ import {
   submitScriptDrop,
   type ScriptDropDeps,
 } from '../../application/script-drops';
+import { exportScript } from '../../application/script-export';
 import { finishUpload, uploadOf } from '../../application/uploads';
 import type { AgencyContentStore, CreatorContentStore, DropStorage } from '../../domain/ports';
 
@@ -305,6 +307,35 @@ export function createContentDropRoutes(
         );
         return agency.markSent(creatorId, userId, id, fileId, request.id);
       },
+    );
+
+    // A sent script's folder as a ZIP (SC-03 c): streamed as it is zipped, her media in it, never kept by a cache.
+    app.get(
+      '/creators/:creatorId/drops/:id/script-export',
+      { ...team, schema: { params: CreatorDropParamsSchema } },
+      async (request, reply) => {
+        const archive = await exportScript(
+          { agency, versions: scripts.versions, storage },
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          clock(),
+        );
+        return reply
+          .header('content-type', SCRIPT_EXPORT_MEDIA_TYPE)
+          .header('content-disposition', `attachment; filename="${archive.fileName}"`)
+          .header('cache-control', 'no-store')
+          .header('x-content-type-options', 'nosniff')
+          .send(archive.stream);
+      },
+    );
+
+    // « Copié dans Reveal » (SC-03 c): her originals of the script go 30 days later.
+    app.post(
+      '/creators/:creatorId/drops/:id/script-export/confirm',
+      { ...team, schema: { params: CreatorDropParamsSchema, response: { 200: ContentDropSchema } } },
+      (request) =>
+        agency.confirmExport(request.params.creatorId, signedIn(request.user), request.params.id, clock()),
     );
 
     app.post(

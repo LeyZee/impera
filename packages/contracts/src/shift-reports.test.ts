@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   CreateShiftReportBodySchema,
   mayReviewShiftReport,
+  REPORT_GAP_THRESHOLD_DEFAULT,
+  ReportGapThresholdSchema,
   RejectShiftReportBodySchema,
   SHIFT_REPORT_BATCH_MAX,
   SHIFT_REPORT_ERROR_CODES,
   SHIFT_REPORT_MAX_MINOR,
+  ShiftReportCheckSchema,
   ShiftReportListSchema,
   ShiftReportQuerySchema,
   ShiftReportSchema,
@@ -56,6 +59,9 @@ const stored = {
   submittedAt: '2026-10-29T04:58:00Z',
   reviewedAt: null,
   reviewNote: null,
+  reviewKind: null,
+  explanation: null,
+  check: null,
   createdAt: '2026-10-29T04:58:00Z',
 };
 
@@ -129,7 +135,7 @@ describe('end-of-shift reports (EQ-03)', () => {
       results: [
         {
           outcome: 'validated',
-          report: { ...stored, status: 'validated', reviewedAt: '2026-10-29T09:00:00Z' },
+          report: { ...stored, status: 'validated', reviewedAt: '2026-10-29T09:00:00Z', reviewKind: 'human' },
         },
         { outcome: 'refused', id: CORRECTION, code: 'shift_report_total_conflict' },
       ],
@@ -191,6 +197,32 @@ describe('end-of-shift reports (EQ-03)', () => {
     expect(
       ShiftReportListSchema.safeParse({ reports: [stored], shifts: [], accounts: [], members: [] }).success,
     ).toBe(true);
+  });
+
+  it('compares a report with the platform, and bounds the threshold (ADR 0073)', () => {
+    const gap = {
+      state: 'complete',
+      readMinor: 18_000,
+      gapMinor: 450,
+      verdict: 'gap',
+      explainBy: '2026-10-31T05:00:00.000Z',
+    };
+    const report = ShiftReportSchema.parse({
+      ...stored,
+      check: gap,
+      explanation: 'Un pourboire noté deux fois, je corrige.',
+    });
+    expect(report.check).toEqual(gap);
+    expect(ShiftReportCheckSchema.safeParse({ state: 'unavailable', reason: 'feed_off' }).success).toBe(true);
+    expect(ShiftReportCheckSchema.safeParse({ state: 'unavailable', reason: 'late' }).success).toBe(false);
+    expect(ShiftReportCheckSchema.safeParse({ state: 'provisional', readMinor: 12.5 }).success).toBe(false);
+    expect(ShiftReportSchema.safeParse({ ...stored, reviewKind: 'robot' }).success).toBe(false);
+    // 1 % or 5 € by default, from 0 to 100 % and from 0 to 1 000.
+    expect(REPORT_GAP_THRESHOLD_DEFAULT).toEqual({ bps: 100, minor: 500 });
+    expect(ReportGapThresholdSchema.safeParse({ bps: 10_000, minor: 100_000 }).success).toBe(true);
+    expect(ReportGapThresholdSchema.safeParse({ bps: 10_001, minor: 500 }).success).toBe(false);
+    expect(ReportGapThresholdSchema.safeParse({ bps: 100, minor: -1 }).success).toBe(false);
+    expect(ReportGapThresholdSchema.safeParse({ bps: 100, minor: 500, extra: 1 }).success).toBe(false);
   });
 
   it('gives every error code a suffix that sets its status (api.md)', () => {

@@ -17,6 +17,7 @@ import {
 } from './infra/http/flag-routes';
 
 export type { FactProposal } from './domain/facts';
+export { FIGURE_KEYS, fanFigures, type FigureKey } from './domain/figures';
 
 /** Public entry point of the `fans` module (ADR 0002). Other modules import this file only. */
 export interface FansModule extends FansService {

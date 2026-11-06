@@ -27,6 +27,15 @@ export interface ScriptsModule {
     segmentKey: string,
     variant: ScriptVariantLetter | null,
   ): Promise<string | null>;
+  /**
+   * A card of a frozen version as the folder's PNG (SC-03, ADR 0056 § 3): the `folder` format, rasterised, which goes
+   * at `00` of its series in the script's folder. `null` like `frozenCard`.
+   */
+  frozenFolderCard(
+    versionId: string,
+    segmentKey: string,
+    variant: ScriptVariantLetter | null,
+  ): Promise<Uint8Array | null>;
   /** The latest version frozen for a script asked by hand (SC-02 lot b), by an owner or a manager; `null` when archived. */
   freezeForRequest(structureId: string, userId: string): Promise<string | null>;
   /** Mounted under `/v1` by the server: `/script-structures` (and their cards), each creator's `/script-queue` and `/script-cadence`. */
@@ -60,6 +69,7 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
   const structures = createDrizzleScriptStructureStore(deps.db);
   const cadences = createDrizzleCadenceStore(deps.db, deps.adminDb);
   const frozenVersion = createFrozenVersionReader(deps.adminDb);
+  const rasterize = deps.rasterizeCard ?? createCardRasterizer(deps.cardFontsDir);
   return {
     name: 'scripts',
     structures,
@@ -70,14 +80,17 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
       const content = cardContent(version, segmentKey, variant === null ? {} : { variant });
       return content === null ? null : cardSvg(content, 'card');
     },
+    frozenFolderCard: async (versionId, segmentKey, variant) => {
+      const version = await frozenVersion(versionId);
+      if (version === null) return null;
+      const content = cardContent(version, segmentKey, variant === null ? {} : { variant });
+      return content === null ? null : rasterize(cardSvg(content, 'folder'));
+    },
     freezeForRequest: createRequestFreezer(deps.adminDb),
-    routes: createScriptRoutes(
-      structures,
-      deps.limitsOf,
-      deps.requireRole,
-      deps.rasterizeCard ?? createCardRasterizer(deps.cardFontsDir),
-      { store: cadences, requests: deps.requests },
-    ),
+    routes: createScriptRoutes(structures, deps.limitsOf, deps.requireRole, rasterize, {
+      store: cadences,
+      requests: deps.requests,
+    }),
     jobs: {
       askScripts: (now, onFailure) =>
         askScripts(
