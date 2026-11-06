@@ -1,9 +1,11 @@
 import type { AiProvider } from '@impera/contracts';
+import Fastify from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { revealSalesFeed } from '../../modules/connectors';
 import { createMemoryCredentialStore, createProvidersModule } from '../../modules/providers';
+import { revealSignature } from '../fake-reveal/crm';
 
 import { createWorld, outcomeOfKey, type World } from './world';
 
@@ -155,5 +157,69 @@ describe('the control routes', () => {
     expect((await control('/services/openai', { mode: 'down' })).status).toBe(400);
     expect((await control('/reveal/sell', { euros: -3 })).status).toBe(400);
     expect((await control('/reveal/refund', { saleId: 'inconnue' })).status).toBe(404);
+  });
+});
+
+describe('Reveal’s webhooks, delivered for real on this machine', () => {
+  it('posts each sale signed to the webhook, and tries again 30 s later when the receiver failed', async () => {
+    const received: { signature: string; event: string; body: string }[] = [];
+    let failures = 1;
+    const receiver = Fastify();
+    receiver.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
+      done(null, body);
+    });
+    receiver.post('/v1/webhooks/sales-feeds/reveal', (request, reply) => {
+      const signature = request.headers['x-reveal-signature'];
+      const event = request.headers['x-reveal-event'];
+      received.push({
+        signature: typeof signature === 'string' ? signature : '',
+        event: typeof event === 'string' ? event : '',
+        body: typeof request.body === 'string' ? request.body : '',
+      });
+      if (failures > 0) {
+        failures -= 1;
+        return reply.code(503).send();
+      }
+      return reply.code(204).send();
+    });
+    const hook = `${await receiver.listen({ host: '127.0.0.1', port: 0 })}/v1/webhooks/sales-feeds/reveal`;
+    try {
+      const created = await fetch(`${base}/reveal-crm/v1/webhooks`, {
+        method: 'POST',
+        headers: { 'x-api-key': 'rvl_recette_ok_0001', 'content-type': 'application/json' },
+        body: JSON.stringify({ url: hook, events: ['sale_created', 'sale_refunded'] }),
+      });
+      expect(created.status).toBe(201);
+      const { secret } = z.object({ secret: z.string() }).parse(await created.json());
+
+      await control('/reveal/sell', { euros: 30, id: 'sale_hook_01' });
+      await control('/clock', { advanceSeconds: 20 });
+      expect(received).toHaveLength(1);
+      await control('/clock', { advanceSeconds: 31 });
+      expect(received).toHaveLength(2);
+
+      const last = received[1];
+      const t = Number(/t=(\d+)/u.exec(last?.signature ?? '')?.[1]);
+      expect(last?.signature).toBe(revealSignature(secret, t, last?.body ?? ''));
+      expect(last?.event).toBe('sale_created');
+      expect(last?.body).toContain('sale_hook_01');
+      const state = z
+        .object({
+          reveal: z.object({ envois: z.array(z.object({ statut: z.string(), essais: z.number() })) }),
+        })
+        .parse(await (await fetch(`${base}/__`)).json());
+      expect(state.reveal.envois.at(-1)).toEqual(expect.objectContaining({ statut: 'succeeded', essais: 2 }));
+    } finally {
+      await receiver.close();
+    }
+  });
+
+  it('sends nothing off this machine', async () => {
+    const created = await fetch(`${base}/reveal-crm/v1/webhooks`, {
+      method: 'POST',
+      headers: { 'x-api-key': 'rvl_recette_ok_0001', 'content-type': 'application/json' },
+      body: JSON.stringify({ url: 'http://192.0.2.10/hook', events: ['sale_created'] }),
+    });
+    expect(created.status).toBe(400);
   });
 });

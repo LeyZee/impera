@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { isLoopbackUrl } from '../../sandbox';
 import { createFakeCrm, DEFAULT_MODELS, IMPORT_MODELS, type FakeCrm } from '../fake-reveal/crm';
 
 import { registerGeneration } from './ai-generation';
@@ -15,6 +16,11 @@ import { registerGeneration } from './ai-generation';
  * A key decides its own fate, as a real one would: one with `refus` in it is refused, `credit` has no credit left,
  * `limite` is rate limited (429), `panne` finds the service down (503); any other is accepted. The control routes
  * under `/__` change a whole service afterwards (a key revoked at the provider, an outage) and make Reveal sell.
+ *
+ * Reveal's side keeps Reveal's rules (its « CRM / API » documentation): rate limits counted, the messages counted the
+ * night after the key, and every sale delivered for real to the webhooks Impera registers, signed, 15 s after the sale
+ * on the world's clock, retried on failure. The clock can be moved forward (`/__/clock`) to play the retries or the
+ * night without waiting. Deliveries go to this machine only.
  */
 
 export const AI_SERVICES = ['xai', 'google', 'mistral', 'elevenlabs'] as const;
@@ -44,6 +50,8 @@ export interface World {
   readonly app: FastifyInstance;
   readonly crm: FakeCrm;
   readonly modes: Readonly<Record<AiService, ServiceMode>>;
+  /** Stops sending the deliveries (the world's `onClose` does it too). */
+  stop(): void;
 }
 
 const keyOf = (request: FastifyRequest, header: string): string => {
@@ -58,18 +66,66 @@ const INJECTABLE_METHODS = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEA
 const SaleBodySchema = z.object({
   id: z.string().min(1).max(64).optional(),
   modelId: z.string().min(1).max(64).default('model_test_01'),
-  type: z.enum(['ppv', 'tip', 'paid_message', 'subscription']).default('ppv'),
+  type: z
+    .enum([
+      'subscription',
+      'renewal',
+      'ppv',
+      'mass_dm',
+      'tip',
+      'payment_link',
+      'boudoir',
+      'paid_message',
+      'other',
+    ])
+    .default('ppv'),
   /** Euros, TTC; the parts follow Reveal's usual split of an invented sale. */
   euros: z.number().positive().max(10_000).default(12),
-  chatterId: z.string().min(1).max(64).nullable().default('bot_test_01'),
+  /** The bot by default for the sales a chatter makes; nobody for the others, as Reveal attributes them. */
+  chatterId: z.string().min(1).max(64).nullable().optional(),
   at: z.iso.datetime().optional(),
+  /** Confirmed late (3-D Secure): its date is this many minutes before now, yet it comes last in the register. */
+  lateMinutes: z.number().int().min(1).max(1440).optional(),
 });
 
-export function createWorld(options: { readonly now?: () => Date } = {}): World {
-  const now = options.now ?? (() => new Date());
+/** Sales Reveal gives to nobody: subscriptions, renewals, payment links, boudoir, Mass DM. */
+const SOLD_BY_NOBODY = new Set(['subscription', 'renewal', 'payment_link', 'boudoir', 'mass_dm']);
+
+/** Posts a delivery to Impera on this machine; anywhere else is refused as unreachable. */
+async function deliverLocally(url: string, body: string, headers: Record<string, string>): Promise<number> {
+  if (!isLoopbackUrl(url)) return 0;
+  const response = await fetch(url, { method: 'POST', body, headers, signal: AbortSignal.timeout(10_000) });
+  return response.status;
+}
+
+export function createWorld(
+  options: {
+    readonly now?: () => Date;
+    readonly deliver?: typeof deliverLocally;
+    readonly limits?: boolean;
+  } = {},
+): World {
+  const clock = options.now ?? (() => new Date());
+  let offsetMs = 0;
+  const now = () => new Date(clock().getTime() + offsetMs);
   const app = Fastify();
-  const crm = createFakeCrm({ acceptKey: isAcceptedRevealKey });
+  const crm = createFakeCrm({
+    acceptKey: isAcceptedRevealKey,
+    now,
+    limits: options.limits ?? true,
+    allowLoopbackHttp: true,
+    deliver: options.deliver ?? deliverLocally,
+  });
   crm.statsFromRegister();
+  const pump = setInterval(() => void crm.pumpDeliveries(), 1000);
+  pump.unref();
+  const stop = () => {
+    clearInterval(pump);
+  };
+  app.addHook('onClose', (_instance, done) => {
+    stop();
+    done();
+  });
   const modes: Record<AiService, ServiceMode> = {
     xai: 'auto',
     google: 'auto',
@@ -193,7 +249,25 @@ export function createWorld(options: { readonly now?: () => Date } = {}): World 
   app.get('/__', () => ({
     monde: 'Bac à sable de recette (ADR 0075) : rien n’est réel',
     services: modes,
-    reveal: { ventes: sales, appels: crm.calls.length, webhooks: crm.webhooks.size },
+    horloge: now().toISOString(),
+    reveal: {
+      ventes: sales,
+      appels: crm.calls.length,
+      webhooks: [...crm.webhooks.entries()].map(([id, webhook]) => ({
+        id,
+        url: webhook.url,
+        actif: webhook.isActive,
+      })),
+      envois: crm.deliveries.slice(-20).map((delivery) => ({
+        id: delivery.id,
+        position: delivery.cursor,
+        evenement: delivery.event,
+        statut: delivery.status,
+        essais: delivery.attempts,
+        dernierCode: delivery.lastStatusCode,
+        prochainEssai: delivery.nextAttemptAt,
+      })),
+    },
     cles: {
       regle:
         'Une clé contenant « refus » est refusée, « credit » sans crédit, « limite » limitée (429), « panne » en panne (503) ; toute autre est acceptée. Une clé Reveal commence par rvl_.',
@@ -234,13 +308,18 @@ export function createWorld(options: { readonly now?: () => Date } = {}): World 
       id,
       modelId: body.data.modelId,
       type: body.data.type,
-      createdAt: body.data.at ?? now().toISOString(),
+      createdAt:
+        body.data.at ?? new Date(now().getTime() - (body.data.lateMinutes ?? 0) * 60_000).toISOString(),
       amountTtc,
       amountHt,
       agencyRevenue,
       modelRevenue,
-      fan: { memberId: `member_recette_${String(sales)}`, userName: `fan_recette_${String(sales)}` },
-      chatterId: body.data.chatterId,
+      // A payment link needs no account: no fan.
+      fan:
+        body.data.type === 'payment_link'
+          ? null
+          : { memberId: `member_recette_${String(sales)}`, userName: `fan_recette_${String(sales)}` },
+      chatterId: body.data.chatterId ?? (SOLD_BY_NOBODY.has(body.data.type) ? null : 'bot_test_01'),
     });
     return { id, position, net: (agencyRevenue + modelRevenue) / 100 };
   });
@@ -255,12 +334,74 @@ export function createWorld(options: { readonly now?: () => Date } = {}): World 
     }
   });
 
+  const KeyBody = z.object({
+    state: z.enum(['revoked', 'restored', 'no_sales', 'no_stats', 'no_webhooks', 'limited']),
+    modelIds: z.array(z.string().min(1)).min(1).optional(),
+  });
   app.post('/__/reveal/key', (request, reply) => {
-    const body = z.object({ state: z.enum(['revoked', 'restored']) }).safeParse(request.body);
-    if (!body.success) return reply.code(400).send({ error: 'state : revoked ou restored' });
-    if (body.data.state === 'revoked') crm.revoke();
-    else crm.restore();
+    const body = KeyBody.safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({
+        error: 'state : revoked, restored, no_sales, no_stats, no_webhooks ou limited (avec modelIds)',
+      });
+    }
+    const { state, modelIds } = body.data;
+    if (state === 'revoked') crm.revoke();
+    else if (state === 'restored') crm.restore();
+    else if (state === 'no_sales') crm.withhold('sales');
+    else if (state === 'no_stats') crm.withhold('stats');
+    else if (state === 'no_webhooks') crm.withhold('webhooks');
+    else crm.limitTo(modelIds ?? ['model_test_01']);
     return body.data;
+  });
+
+  app.post('/__/reveal/nightly', (request, reply) => {
+    const body = z.object({ done: z.boolean() }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: 'done : true ou false' });
+    crm.setNightlyDone(body.data.done);
+    return body.data;
+  });
+
+  app.post('/__/reveal/count-timeout', (request, reply) => {
+    const body = z.object({ on: z.boolean() }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: 'on : true ou false' });
+    crm.setCountTimeout(body.data.on);
+    return body.data;
+  });
+
+  const WebhookControl = z.object({
+    outage: z.boolean().optional(),
+    shuffle: z.boolean().optional(),
+    duplicateNext: z.number().int().min(0).max(100).optional(),
+    failNext: z.number().int().min(0).max(100).optional(),
+  });
+  app.post('/__/reveal/webhooks', (request, reply) => {
+    const body = WebhookControl.safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({ error: 'outage, shuffle (booléens), duplicateNext, failNext (nombres)' });
+    }
+    const { outage, shuffle, duplicateNext, failNext } = body.data;
+    if (outage !== undefined) crm.setWebhookOutage(outage);
+    if (shuffle !== undefined) crm.setShuffle(shuffle);
+    if (duplicateNext !== undefined) crm.duplicateNext(duplicateNext);
+    if (failNext !== undefined) crm.failNext(failNext);
+    return body.data;
+  });
+
+  app.post('/__/clock', async (request, reply) => {
+    const body = z
+      .object({
+        advanceSeconds: z
+          .number()
+          .int()
+          .min(1)
+          .max(7 * 86_400),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: 'advanceSeconds : de 1 à 604800' });
+    offsetMs += body.data.advanceSeconds * 1000;
+    await crm.pumpDeliveries();
+    return { now: now().toISOString() };
   });
 
   app.post('/__/reveal/rate-limit', (request, reply) => {
@@ -279,5 +420,5 @@ export function createWorld(options: { readonly now?: () => Date } = {}): World 
     return body.data;
   });
 
-  return { app, crm, modes };
+  return { app, crm, modes, stop };
 }
