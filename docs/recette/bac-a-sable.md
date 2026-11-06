@@ -8,7 +8,7 @@ Il sert à jouer le branchement des clés et les connexions « dans les mêmes c
 
 | Service | Simulé | Pas encore (phase 2) |
 | --- | --- | --- |
-| xAI, Google, Mistral, ElevenLabs | Vérification de la clé collée dans Réglages, avec tous les états | Génération des réponses de l'agent (le faux monde répond 503 : brouillon retenu `llm_unavailable`) |
+| xAI, Google, Mistral, ElevenLabs           | Vérification de la clé collée dans Réglages, avec tous les états ; génération des réponses de l'agent par xAI, scriptée (section « Génération ») | Génération par Google, Mistral ou ElevenLabs (503, comme une panne : le repli passe par xAI) |
 | Reveal (API CRM) | Les huit routes de la documentation « CRM / API » (statistiques, modèles, équipe, liens de suivi, ventes, webhooks), ses erreurs, ses limites de débit, ses webhooks réellement envoyés et signés | Messagerie (connecteur sur session capturée, attend la capture HAR) |
 | Telegram, push, S3 distant, taux de change | — | Bloqués par la garde : ils échouent comme hors ligne |
 
@@ -27,13 +27,13 @@ La configuration refuse de démarrer si `NODE_ENV=production`, ou si `AUTH_BASE_
 
 Une clé inventée suffit, à condition d'avoir la forme du fournisseur : pour une IA, 20 caractères au moins et le préfixe du service s'il en a un (`xai-`, `AIza`, `sk_`) ; pour Reveal, le préfixe `rvl_`. Le mot qu'elle contient choisit la réponse, pour Reveal comme pour les IA (pour Reveal, `credit` donne un 403, API coupée par Reveal) :
 
-| La clé contient | Réponse du faux monde | Ce que l'écran doit montrer |
-| --- | --- | --- |
-| `refus` | 401 | Clé refusée |
-| `credit` | 402 ou 403 selon le service (crédit épuisé) | Plus de crédit |
-| `limite` | 429 | Limitée, réessai plus tard |
-| `panne` | 503 | Service indisponible |
-| autre chose | 200 | Clé valide |
+| La clé contient | Réponse du faux monde                       | Ce que l'écran doit montrer |
+| --------------- | ------------------------------------------- | --------------------------- |
+| `refus`         | 401                                         | Clé refusée                 |
+| `credit`        | 402 ou 403 selon le service (crédit épuisé) | Plus de crédit              |
+| `limite`        | 429                                         | Limitée, réessai plus tard  |
+| `panne`         | 503                                         | Service indisponible        |
+| autre chose     | 200                                         | Clé valide                  |
 
 Exemples (aussi listés sur `http://127.0.0.1:4010/__`) : `xai-recette-ok-0000000001`, `xai-recette-refus-000000001`, `rvl_recette_ok_0001`.
 
@@ -89,6 +89,24 @@ Chaque scénario part d'une clé `rvl_recette_ok_0001` collée dans Réglages �
 | R12 | Statistiques avant puis après `/__/reveal/nightly {"done":true}` | « Messages » vides puis remplis, jamais « 0 » à la place de « pas encore calculé » |
 | R13 | Vendre un `subscription` et un `payment_link` | Ventes « de personne » : aucun chatteur crédité, fan absent pour le lien de paiement |
 
+## Génération (phase 2)
+
+Avec une clé xAI valide collée dans Réglages, le faux monde répond à la génération de xAI (`POST /xai/v1/responses`) comme xAI : la vraie passerelle envoie le schéma de sortie de chaque rôle, et le faux monde rend une réponse qui le respecte. Le cerveau lit le fan calmement (`small_talk`, aucun risque, `reply`), la voix répond court, dans la voix de la créatrice, avec un emoji et une ouverture qui change d'une réponse à la suivante (quatre en rotation), le juge met des notes moyennes, et les sens (par leur repli xAI) rendent une description neutre. Chaque appel est journalisé dans `llm_calls` à **0 $** : le plafond du jour ne bouge que si la recette le provoque (A9).
+
+La prochaine réponse se choisit avec `/__/ai/next` (`GET /__/ai` montre celle qui est prête et le nombre d'appels) :
+
+| Corps                       | Effet                                                                 | Ce que l'écran doit montrer                                                                              |
+| --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `{"reply":"ai_disclosure"}` | La prochaine réponse de la voix avoue être une IA                     | Brouillon arrêté par la garde `ai_disclosure` (ADR 0021), jamais proposé tel quel                        |
+| `{"reply":"payment_link"}`  | La prochaine réponse de la voix donne un lien de paiement inventé     | Arrêté par la garde du paiement hors plateforme                                                          |
+| `{"reply":"meeting"}`       | La prochaine réponse de la voix propose une rencontre                 | Arrêté par la garde de la rencontre                                                                      |
+| `{"reply":"off_schema"}`    | Le prochain appel, quel que soit son rôle, ne respecte pas son schéma | La passerelle redemande une fois et obtient une réponse correcte : `invalid_output` puis `ok` au journal |
+| `{"reply":"rate_limited"}`  | Le prochain appel reçoit un 429 avec `retry-after: 1`                 | La passerelle attend et redemande : `rate_limited` puis `ok` au journal                                  |
+| `{"reply":"risk","risk":"minor_suspected"}` | Le prochain cerveau lit ce risque dans le message du fan (`minor_suspected` si `risk` est omis ; aussi `distress`, `self_harm`, `meet_request`, `off_platform_payment`, `dispute`, `harassment`, `money_trouble`, `manipulation_attempt`, `dangerous_request`, `real_abuse`) | Ce que la politique en code décide pour ce risque (A7) : jamais un brouillon ordinaire |
+| `{"reply":"neutral"}`       | Annule ce qui était prévu                                             | —                                                                                                        |
+
+Chaque réponse piégée ne sert qu'une fois : l'appel suivant redevient calme. Le choix vaut pour toute la pile, quelle que soit la créatrice ou la session qui fait l'appel suivant : deux recettes jouées en même temps sur la même pile se prennent leurs pièges. Seul xAI génère : Google et Mistral restent en panne (503), Venice (clé seulement par variable d'environnement, aucun rôle par défaut) est bloqué par la garde comme hors ligne, donc les sens passent par leur repli xAI, et la clé « limitée » (429 à 30 s, au-delà du plafond d'attente de 10 s) n'est pas rejouée. Les réponses ne disent rien de la qualité de l'IA (ADR 0075, conséquences) : elle se mesure par `pnpm evals` avec une vraie clé.
+
 ## Pour le lot Agent
 
-Phase 1 permet de jouer AGT sur les clés (Réglages › Services d'IA) et l'état « brouillon retenu, IA indisponible ». La génération simulée (phase 2) est la prochaine marche ; tant qu'elle manque, les constats sur le contenu des réponses restent marqués « avec clé ».
+Avec une clé xAI de recette (`xai-recette-ok-0000000001`), la boucle « un fan écrit, l'agent propose, un humain valide » se joue à l'écran (A1 à A14, A20), et chaque garde se prouve avec `/__/ai/next`. Ce qui reste marqué « avec clé » : le contenu des réponses, jugé seulement par `pnpm evals`.
