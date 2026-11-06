@@ -9,10 +9,11 @@ import {
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
+import { saveFile } from '@/accounting/api';
 import {
   acceptInvoice,
   contestInvoice,
-  invoicePdfUrl,
+  readInvoicePdf,
   refuseContest,
   upholdContest,
   useInvoiceAcceptance,
@@ -30,6 +31,7 @@ import {
   eventLine,
   invoiceRefusalText,
   kindLabel,
+  pdfRefusalText,
   periodText,
   readsAgain,
   settlementText,
@@ -85,12 +87,12 @@ export function InvoiceRow({
 }): JSX.Element {
   const due = reader.agency ? dueChip(item) : null;
   const facts = [
-    who,
     periodText(item),
     `${item.kind === 'invoice' ? 'émise' : 'émis'} le ${dayMonthText(item.issuedOn)}`,
     settlementText(item) ?? dueText(item),
     reader.contractor ? deadlineText(item.acceptance, timeZone) : null,
   ].filter((fact) => fact !== null);
+  const pdf = usePdf(item);
   const answering = reader.contractor && answerable(item);
   const settling = reader.owner && !reader.contractor && item.acceptance.state === 'contested';
 
@@ -101,7 +103,22 @@ export function InvoiceRow({
           <span className="nv-num">{item.number}</span>
           <span className="iv-doc__kind">{kindLabel(item)}</span>
         </p>
-        <p className="iv-doc__sub nv-num">{facts.join(' · ')}</p>
+        {/* Each fact whole on its line (« émise le lun. 2 nov. » never cut after « lun. »), the dot kept with the
+            one before it. The member's name goes on a line of its own on a phone, never left alone with its dot. */}
+        <p className="iv-doc__sub nv-num">
+          {who === null ? null : (
+            <span className="iv-doc__fact iv-doc__who">
+              {who}
+              <span className="iv-doc__dot">{'\u00a0·'}</span>
+            </span>
+          )}
+          {facts.map((fact, index) => (
+            <span key={index} className="iv-doc__fact">
+              {fact}
+              {index === facts.length - 1 ? '' : '\u00a0·'}
+            </span>
+          ))}
+        </p>
         {item.acceptance.reason === null ? null : (
           <p className="iv-doc__reason">
             <span>{reader.contractor ? 'Ton motif' : 'Motif du prestataire'} : </span>«&nbsp;
@@ -148,9 +165,7 @@ export function InvoiceRow({
           </button>
         ) : null}
         {item.pdfReady ? (
-          <a className="nv-btn nv-btn--plain nv-btn--sm" href={invoicePdfUrl(item.id)} download>
-            PDF
-          </a>
+          <PdfButton pdf={pdf} className="nv-btn nv-btn--plain nv-btn--sm" label="PDF" />
         ) : (
           <span className="iv-doc__wait">PDF en préparation</span>
         )}
@@ -166,6 +181,7 @@ export function InvoiceRow({
         <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onDetail}>
           Historique
         </button>
+        <PdfFailure pdf={pdf} />
       </div>
     </article>
   );
@@ -241,6 +257,59 @@ function ReasonField({
   );
 }
 
+/** The PDF, read before it is saved (recette EQP-08): a refusal is said here, never saved as a file named « pdf.json ». */
+interface Pdf {
+  readonly busy: boolean;
+  /** The PDF is lost for good (`invoice_pdf_gone`): its button goes quiet, nothing left to read. */
+  readonly gone: boolean;
+  readonly failure: string | null;
+  readonly read: () => void;
+}
+
+function usePdf(item: InvoiceListItem): Pdf {
+  const [busy, setBusy] = useState(false);
+  const [gone, setGone] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const read = (): void => {
+    if (busy || gone) return;
+    setBusy(true);
+    setFailure(null);
+    void readInvoicePdf(item.id).then((outcome) => {
+      setBusy(false);
+      if (outcome.kind === 'ok') {
+        saveFile(outcome.value, `${item.number}.pdf`);
+        return;
+      }
+      setGone(outcome.kind === 'refused' && outcome.code === 'invoice_pdf_gone');
+      setFailure(pdfRefusalText(outcome));
+    });
+  };
+  return { busy, gone, failure, read };
+}
+
+function PdfButton({ pdf, className, label }: { pdf: Pdf; className: string; label: string }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className={className}
+      disabled={pdf.busy || pdf.gone}
+      aria-busy={pdf.busy}
+      onClick={pdf.read}
+    >
+      {/* Its word kept while it reads, greyed: the row never moves under the pointer (Extension on #567). */}
+      {label}
+    </button>
+  );
+}
+
+function PdfFailure({ pdf }: { pdf: Pdf }): JSX.Element | null {
+  return pdf.failure === null ? null : (
+    <p className="tm-warn sc-refusal iv-doc__failure nv-swap" role="alert">
+      {pdf.failure}
+    </p>
+  );
+}
+
 function Refusal({ refusal }: { refusal: InvoiceRefusal | null }): JSX.Element | null {
   return refusal === null ? null : (
     <p className="tm-warn sc-refusal nv-swap" role="alert">
@@ -261,6 +330,7 @@ export function AnswerDialog({
 }): JSX.Element {
   const id = useId();
   const { busy, refusal, send } = useSend(onClose);
+  const pdf = usePdf(item);
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
   const valid = InvoiceReasonSchema.safeParse(reason).success;
@@ -302,11 +372,10 @@ export function AnswerDialog({
           />
         )}
         <Refusal refusal={refusal} />
+        <PdfFailure pdf={pdf} />
         <div className="tm-dialog__foot">
           {item.pdfReady ? (
-            <a className="nv-btn nv-btn--plain" href={invoicePdfUrl(item.id)} download>
-              Relire le PDF
-            </a>
+            <PdfButton pdf={pdf} className="nv-btn nv-btn--plain" label="Relire le PDF" />
           ) : null}
           <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
             Annuler
@@ -619,6 +688,7 @@ export function DetailDialog({
   onClose: () => void;
 }): JSX.Element {
   const view = useInvoiceAcceptance(item.id);
+  const pdf = usePdf(item);
   return (
     <Dialog
       title={`${kindLabel(item)} ${item.number}`}
@@ -661,12 +731,9 @@ export function DetailDialog({
             ))}
           </ol>
         )}
+        <PdfFailure pdf={pdf} />
         <div className="tm-dialog__foot">
-          {item.pdfReady ? (
-            <a className="nv-btn nv-btn--plain" href={invoicePdfUrl(item.id)} download>
-              PDF
-            </a>
-          ) : null}
+          {item.pdfReady ? <PdfButton pdf={pdf} className="nv-btn nv-btn--plain" label="PDF" /> : null}
           <button type="button" className="nv-btn nv-btn--soft" onClick={onClose}>
             Fermer
           </button>

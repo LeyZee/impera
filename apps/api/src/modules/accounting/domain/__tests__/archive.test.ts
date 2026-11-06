@@ -44,6 +44,15 @@ describe('the archive of the PDFs (EQ-06 lot 7d)', () => {
         sha256: 'c'.repeat(64),
         state: 'unreachable',
       },
+      // Recette EQP-09: lost with a development server's memory, never « relancer l'export ».
+      {
+        number: 'NORA-2026-0005',
+        kind: 'invoice',
+        corrective: false,
+        issuedOn: '2026-10-23',
+        sha256: 'd'.repeat(64),
+        state: 'forgotten',
+      },
     ]);
     expect(text.startsWith('\uFEFF')).toBe(true);
     expect(text.endsWith('\r\n')).toBe(true);
@@ -53,6 +62,7 @@ describe('the archive of the PDFs (EQ-06 lot 7d)', () => {
       `NORA-2026-0002;Avoir;09/10/2026;;${'b'.repeat(64)};PDF faux à la relecture, propriétaire alerté`,
       'NORA-2026-0003;Facture rectificative;09/10/2026;;;PDF pas encore rendu',
       `NORA-2026-0004;Facture;16/10/2026;;${'c'.repeat(64)};hébergeurs injoignables, relancer l'export`,
+      `NORA-2026-0005;Facture;23/10/2026;;${'d'.repeat(64)};PDF perdu au redémarrage du serveur de développement, jamais refait`,
     ]);
     expect(archiveManifest([])).toBe('\uFEFFNuméro;Nature;Émise le;Fichier;Empreinte SHA-256;État\r\n');
   });

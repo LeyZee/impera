@@ -222,6 +222,7 @@ describe('error format (api.md)', () => {
     expect(statusForCode('contractor_document_file_gone')).toBe(410);
     expect(statusForCode('send_limited')).toBe(429);
     expect(statusForCode('invoice_pdf_unavailable')).toBe(503);
+    expect(statusForCode('invoice_pdf_gone')).toBe(410);
     expect(statusForCode('whatever')).toBe(500);
   });
 });

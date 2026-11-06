@@ -74,6 +74,20 @@ export class InvoicePdfUnavailable extends DomainError {
   }
 }
 
+/**
+ * The PDF was kept by a store in memory, which lost it when the server restarted (development only: production refuses
+ * to start without its buckets). It is never rendered again (ADR 0037), so it is said lost, never « réessaie »
+ * (recette EQP-09).
+ */
+export class InvoicePdfGone extends DomainError {
+  constructor() {
+    super(
+      'invoice_pdf_gone',
+      'Ce PDF est perdu : le serveur de développement le gardait en mémoire et l’a oublié en redémarrant',
+    );
+  }
+}
+
 /** A character the PDF would print that its font has no glyph for: the PDF is not rendered (ADR 0037 § 2). */
 export class InvoicePdfGlyphMissing extends Error {
   constructor(readonly codePoints: readonly number[]) {

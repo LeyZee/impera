@@ -4,7 +4,7 @@ import type { InvoiceObjectStore } from '../../contractors';
 import { lockAtLeast, readChecked, sha256Hex } from '../../contractors';
 import { invoicePdfRetainUntil } from '../../contractors/pure';
 import type { JobLogger } from '../../contractors/pure';
-import { InvoiceNotFound, InvoicePdfNotFound, InvoicePdfUnavailable } from '../domain/errors';
+import { InvoiceNotFound, InvoicePdfGone, InvoicePdfNotFound, InvoicePdfUnavailable } from '../domain/errors';
 import { invoicePdfContent, invoicePdfKey } from '../domain/invoice-pdf';
 import type {
   InvoicePdfRenderer,
@@ -328,10 +328,12 @@ export interface PdfToServe {
 /**
  * A rendered PDF read back: its bytes, or why neither bucket gave them. `wrong` when a bucket gave a file unlike its
  * fingerprint (the owner is alerted), `unreachable` when no bucket answered or the copy is not written yet (nothing is
- * damaged: a later read may succeed).
+ * damaged: a later read may succeed), `forgotten` when the stores in memory of development lost it with a restart (it
+ * is never rendered again, ADR 0037: recette EQP-09).
  */
 export type CheckedPdf =
-  { readonly kind: 'ok'; readonly bytes: Uint8Array } | { readonly kind: 'wrong' | 'unreachable' };
+  | { readonly kind: 'ok'; readonly bytes: Uint8Array }
+  | { readonly kind: 'wrong' | 'unreachable' | 'forgotten' };
 
 /**
  * The bytes of a rendered PDF (ADR 0037 § 7): from the first bucket when its fingerprint matches, from the copy
@@ -362,11 +364,18 @@ export async function checkedInvoicePdf(
   if (first.kind === 'ok') return first;
   if (first.kind === 'wrong') await wrong('primary');
   const copy = copyAt(pdf, COPY_PROVIDER);
-  // Said wrong as soon as one bucket was: the owner has been told, and a new read would not mend it.
-  const missing = (second: 'wrong' | 'unreachable'): CheckedPdf => ({
-    kind: first.kind === 'wrong' || second === 'wrong' ? 'wrong' : 'unreachable',
+  // Said wrong as soon as one bucket was: the owner has been told, and a new read would not mend it. Forgotten only
+  // when no bucket can give it back any more; a bucket that did not answer may still.
+  const missing = (second: 'wrong' | 'unreachable' | 'forgotten'): CheckedPdf => ({
+    kind:
+      first.kind === 'wrong' || second === 'wrong'
+        ? 'wrong'
+        : first.kind === 'forgotten' && second === 'forgotten'
+          ? 'forgotten'
+          : 'unreachable',
   });
-  if (copy === undefined) return missing('unreachable');
+  // No copy yet: it is written from the first bucket, so it is lost with it.
+  if (copy === undefined) return missing(first.kind === 'forgotten' ? 'forgotten' : 'unreachable');
   const second = await readChecked(deps.copy, copy.key, copy.sha256);
   if (second.kind === 'ok') {
     logger.warn({ invoiceId, first: first.kind }, 'invoice PDF: served from the copy');
@@ -378,7 +387,8 @@ export async function checkedInvoicePdf(
 
 /**
  * `GET /v1/payroll/invoices/:id/pdf` (ADR 0037 § 7): the PDF read under the invoice's policy (`checkedInvoicePdf`),
- * `invoice_pdf_unavailable` when neither bucket gives it back, whatever the reason.
+ * `invoice_pdf_gone` when development's stores in memory lost it, `invoice_pdf_unavailable` when neither bucket gives
+ * it back for any other reason.
  */
 export async function downloadInvoicePdf(
   deps: Pick<InvoicePdfDeps, 'store' | 'primary' | 'copy'>,
@@ -394,6 +404,8 @@ export async function downloadInvoicePdf(
     { invoiceId, memberId: found.memberId, number: found.number, pdf: found.pdf },
     logger,
   );
+  // Lost with development's memory, it never comes back: said so, never « réessaie » (recette EQP-09).
+  if (checked.kind === 'forgotten') throw new InvoicePdfGone();
   // A wrong file and buckets out of reach give the same answer: the PDF cannot be served now.
   if (checked.kind !== 'ok') throw new InvoicePdfUnavailable();
   return { fileName: `${found.number}.pdf`, bytes: checked.bytes };
