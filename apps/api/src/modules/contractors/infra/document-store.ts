@@ -56,6 +56,11 @@ function assertWriter(scope: string, member: { readonly userId: string | null },
   if (scope !== 'owner' && member.userId !== actor.userId) throw new ContractorProfileForbidden();
 }
 
+/** And reads it, as the file does (reco 10, 05/11): an active manager, whom the policies let read, reads his own. */
+function assertReader(scope: string, member: { readonly userId: string | null }, userId: string): void {
+  if (scope !== 'owner' && member.userId !== userId) throw new ContractorProfileForbidden('read');
+}
+
 async function lock(tx: Transaction, key: string): Promise<void> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
 }
@@ -188,7 +193,8 @@ export function createDrizzlePayrollDocumentStore(
       }),
 
     documentFor: (userId, memberId, documentId) =>
-      withMember(db, userId, async (tx) => {
+      withMember(db, userId, async (tx, scope) => {
+        assertReader(scope, await memberOf(tx, memberId), userId);
         const found = await documentById(tx, memberId, documentId);
         if (found === null) return null;
         return {

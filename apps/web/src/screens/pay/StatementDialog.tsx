@@ -36,7 +36,7 @@ import {
   previousPeriod,
   signedAmountText,
 } from '@/reports/model';
-import { DayField } from '@/scheduling/DayField';
+import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { dayOf, longDay } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
@@ -373,6 +373,8 @@ function PayForm({
 
   const sentMinor = parseAmount(amount);
   const [dayUnreadable, setDayUnreadable] = useState(false);
+  // Written as a day the calendar has not (« 31/02 »): said so, not how to write one.
+  const [dayNoSuch, setDayNoSuch] = useState(false);
   const dayValid = !dayUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(day) && day >= firstDay && day <= today;
   const amountValid = sentMinor === statement.payableMinor;
   const referenceValid = !containsIban(reference);
@@ -488,12 +490,17 @@ function PayForm({
                 }}
                 today={today}
                 toward="past"
-                onUnreadable={setDayUnreadable}
+                onUnreadable={(bad, noSuchDay) => {
+                  setDayUnreadable(bad);
+                  setDayNoSuch(noSuchDay);
+                }}
               />
               {touched && !dayValid ? (
                 <p className="tm-hint tm-hint--error">
                   {dayUnreadable
-                    ? 'Un jour comme 28/10/2026, ou 28/10.'
+                    ? dayNoSuch
+                      ? NO_SUCH_DAY
+                      : 'Un jour comme 28/10/2026, ou 28/10.'
                     : `Un jour du ${longDay(firstDay)} à aujourd’hui.`}
                 </p>
               ) : null}

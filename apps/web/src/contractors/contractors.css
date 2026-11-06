@@ -168,8 +168,39 @@
   width: 10rem;
   text-transform: uppercase;
 }
+/* A file to send: our pill over the browser's input (never its « Choose File »), the name chosen beside it. */
+.cf-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  min-width: 0;
+}
 .cf-file {
-  padding: var(--nv-space-2);
+  position: relative;
+  cursor: pointer;
+}
+/* The input stays in the page for the keyboard and the reader, unseen: the pill is its face. */
+.cf-file > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.cf-file:has(input:focus-visible) {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 3px;
+}
+.cf-file[data-invalid='true'] {
+  box-shadow: inset 0 0 0 1px var(--nv-warning);
+}
+.cf-picked {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
 }
 
 @media (max-width: 560px) {

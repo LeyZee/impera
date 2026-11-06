@@ -88,10 +88,18 @@ export class ContractorProfileNotFound extends DomainError {
   }
 }
 
-/** A manager, or another member, writing a contractor's file: only the contractor and the owner write it. */
+/**
+ * A manager, or another member, writing a contractor's file, or a manager reading it: only the contractor and the
+ * owner write it and read it (reco 10 of the recette, 05/11: the API says what the screens say).
+ */
 export class ContractorProfileForbidden extends DomainError {
-  constructor() {
-    super('contractor_profile_forbidden', 'Seuls le prestataire et le propriétaire écrivent ce dossier');
+  constructor(access: 'read' | 'write' = 'write') {
+    super(
+      'contractor_profile_forbidden',
+      access === 'read'
+        ? 'Seuls le prestataire et le propriétaire lisent ce dossier'
+        : 'Seuls le prestataire et le propriétaire écrivent ce dossier',
+    );
   }
 }
 

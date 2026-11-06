@@ -10,6 +10,7 @@ export type ConversationCommand =
   | 'create_draft'
   | 'approve'
   | 'reject'
+  | 'reject_unanswered'
   | 'expire'
   | 'expire_unanswered'
   | 'send_verified'
@@ -38,6 +39,8 @@ const TRANSITIONS: Readonly<Record<ConversationCommand, Transitions>> = {
   create_draft: { pending: 'awaiting_approval', idle: 'awaiting_approval' },
   approve: { awaiting_approval: 'sending' },
   reject: { awaiting_approval: 'idle' },
+  // Refused while he waits for an answer: a human holds it until « Rendre la main » (recette CHAT-25).
+  reject_unanswered: { awaiting_approval: 'human' },
   // A draft that is no longer valid; a fan message that caused it already moved the conversation to pending.
   expire: { awaiting_approval: 'idle', pending: 'pending', sending: 'idle' },
   // A switch or an expired session stopped the answer before it left: the fan still waits, so does the conversation,
