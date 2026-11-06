@@ -1,4 +1,4 @@
-import { PERSONA_CORRECTION_SECTIONS, PERSONA_CORRECTION_STATES } from '@impera/contracts';
+import { PERSONA_CORRECTION_STATES, PersonaCorrectionSectionSchema } from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   boolean,
@@ -75,7 +75,8 @@ export const personaCorrections = pgTable(
     doneAt: timestampTz('done_at'),
   },
   (t) => [
-    enumCheck('persona_corrections', t.section, PERSONA_CORRECTION_SECTIONS),
+    // Both sheets' sections: a stored correction keeps its own (ADR 0079 § 6).
+    enumCheck('persona_corrections', t.section, PersonaCorrectionSectionSchema.options),
     enumCheck('persona_corrections', t.state, PERSONA_CORRECTION_STATES),
     check('persona_corrections_text_check', sql`char_length(${t.text}) between 1 and 600`),
     check(

@@ -1,4 +1,4 @@
-import { JOB_PAYLOADS, ScriptStructureIdSchema } from '@impera/contracts';
+import { JOB_PAYLOADS, ScriptStructureIdSchema, asPersonaV2 } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
 import type { ContentDropsModule } from '../modules/content-drops';
@@ -36,7 +36,11 @@ export function wireScripts(
     adminDb: shared.adminDb,
     requireRole: shared.requireRole,
     cardFontsDir: deps.cardFontsDir,
-    limitsOf: async (creatorId) => (await deps.persona.versions.active(creatorId))?.persona.limits ?? null,
+    limitsOf: async (creatorId) => {
+      const active = await deps.persona.versions.active(creatorId);
+      // Her strict rules, wherever the format keeps them (ADR 0079 § 4).
+      return active === null ? null : asPersonaV2(active.persona).agent.rules;
+    },
     requests: {
       ask: (request) => deps.contentDrops.scriptRequests.ask(request),
       last: async (creatorId) => asked(await deps.contentDrops.scriptRequests.last(creatorId)),

@@ -325,17 +325,29 @@ describe('persona file', () => {
     ]);
   });
 
-  it('gives the model her age, voice and own way to run each stage, never what code applies', () => {
-    const { personaSheet } = readPersonaFile(read('demo/v0.1.0.yaml'), 'X', '2026-10-17');
-    expect(personaSheet).toContain('age: 25');
-    expect(personaSheet).toContain('additional_info:');
-    expect(personaSheet).toContain('languages:');
+  it('gives the model her sheet under Desirali’s labels, her age and own way to run each stage, never what code applies (ADR 0079)', () => {
+    const { personaSheet } = readPersonaFile(read('demo/v0.3.0.yaml'), 'X', '2026-11-06');
+    expect(personaSheet).toMatch(/^Identité et informations de base:$/m);
+    expect(personaSheet).toContain('Âge: 25');
+    expect(personaSheet).toContain('Langues parlées:\n    - Français\n    - Espagnol');
+    expect(personaSheet).toMatch(/^Intimité:$/m);
+    // The last panel has no title: its one answer stands on its own.
+    expect(personaSheet).toMatch(/^Zones interdites: La politique/m);
+    // Unanswered (her weight, her partners) stays out.
+    expect(personaSheet).not.toMatch(/Poids|Nombre de partenaires/);
     // Her written approach to the getting-to-know stage reaches the models; its numbers stay in code.
     expect(personaSheet).toContain('Une question à la fois');
     expect(personaSheet).toContain('targets:');
     expect(personaSheet).not.toMatch(
-      /date_of_birth|gender|timezone|response_delay|cooldown|max_messages|initiate_after|min_desire|follow_ups|notifications/,
+      /birth_date|Date de naissance|timezone|Fuseau|response_delay|cooldown|max_messages|initiate_after|min_desire|follow_ups|notifications/,
     );
+  });
+
+  it('reads a format-1 file through its conversion, with the same sheet the screen would open', () => {
+    const { personaSheet } = readPersonaFile(read('demo/v0.1.0.yaml'), 'X', '2026-10-17');
+    expect(personaSheet).toContain('Âge: 25');
+    expect(personaSheet).toContain('Surnom: Elena');
+    expect(personaSheet).not.toMatch(/^(details|additional_info|lifestyle|tastes):/m);
   });
 
   it('gives the code her pace, her pet names and whether she splits her messages', () => {
@@ -355,18 +367,15 @@ describe('persona file', () => {
     expect(readPersonaFile(off, 'X', '2026-10-17').followUps.delaysHours).toEqual([]);
   });
 
-  it('gives the models her blocks in their own sections, and the code her forbidden emojis (P5-01)', () => {
-    const persona = readPersonaFile(read('demo/v0.2.0.yaml'), 'X', '2026-10-28');
-    expect(persona.personaSheet).toMatch(/^lifestyle:$/m);
-    expect(persona.personaSheet).toMatch(/^writing_style:$/m);
+  it('gives the models her typical replies, her canvas lines, and the code her forbidden emojis', () => {
+    const persona = readPersonaFile(read('demo/v0.3.0.yaml'), 'X', '2026-11-06');
     expect(persona.personaSheet).toContain('Arrête tu vas me faire rougir');
     // The canvas lines she chose, in her order, for the brain's `kycMissing`.
     expect(persona.personaSheet).toContain('kyc_collect:\n  - Prénom\n  - Âge\n  - Localisation');
     expect(persona.forbiddenEmojis).toEqual(['😂']);
     expect(guardSettingsOf(persona).forbiddenEmojis).toEqual(['😂']);
-    // Without blocks, nothing new but the canvas lines, all seven.
+    // A format-1 file without her chosen lines: all seven, and no forbidden emoji.
     const before = readPersonaFile(read('demo/v0.1.0.yaml'), 'X', '2026-10-28');
-    expect(before.personaSheet).not.toMatch(/^(lifestyle|tastes|intimate|writing_style|sample_replies):/m);
     expect(before.personaSheet).toContain('  - Situation');
     expect(before.forbiddenEmojis).toEqual([]);
   });

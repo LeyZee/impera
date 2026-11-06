@@ -21,6 +21,13 @@ export const CORRECTION_SECTION_LABELS: Readonly<
   tastes: { hers: 'Tes goûts', agency: 'Ses goûts' },
   intimate: { hers: 'L’intime', agency: 'L’intime' },
   writing_style: { hers: 'Ta façon d’écrire', agency: 'Sa façon d’écrire' },
+  // The panels of the format-2 sheet, Desirali's titles (ADR 0079 § 6); the last one has none, its question names it.
+  identity: { hers: 'Identité et informations de base', agency: 'Identité et informations de base' },
+  preferences: { hers: 'Préférences', agency: 'Préférences' },
+  conversation: { hers: 'Style de conversation', agency: 'Style de conversation' },
+  relationships: { hers: 'Relations', agency: 'Relations' },
+  intimacy: { hers: 'Intimité', agency: 'Intimité' },
+  boundaries: { hers: 'Zones interdites', agency: 'Zones interdites' },
 };
 
 export const correctionsKey = (creatorId: string): readonly unknown[] => ['persona-corrections', creatorId];
