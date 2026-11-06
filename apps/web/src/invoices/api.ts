@@ -116,8 +116,6 @@ export function useInvoiceAcceptance(invoiceId: string | null): UseQueryResult<I
   });
 }
 
-/** Where a document's PDF downloads: the server names the file after its number (`attachment`). */
-
 /** Besides the invoices' own: an end of a contest by anyone but the owner, a role guard, a body let through. */
 export type InvoiceRefusalCode =
   InvoiceErrorCode | 'payroll_forbidden' | 'role_forbidden' | 'request_invalid' | 'team_member_not_found';

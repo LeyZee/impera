@@ -217,6 +217,9 @@ describe('Commissions › Factures', () => {
 
     pdfAnswer = { status: 200, type: 'application/pdf', body: '%PDF-1.7' };
     fireEvent.click(within(paid).getByRole('button', { name: 'PDF' }));
+    // While it reads, the button keeps its word and its width, greyed and busy: the row never moves.
+    const reading = within(paid).getByRole('button', { name: 'PDF' });
+    expect([reading.getAttribute('aria-busy'), reading.hasAttribute('disabled')]).toEqual(['true', true]);
     await waitFor(() => {
       expect(saved).toEqual([`${PAID.number}.pdf`]);
     });

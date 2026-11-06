@@ -113,7 +113,7 @@ export function InvoiceRow({
             </span>
           )}
           {facts.map((fact, index) => (
-            <span key={fact} className="iv-doc__fact">
+            <span key={index} className="iv-doc__fact">
               {fact}
               {index === facts.length - 1 ? '' : '\u00a0·'}
             </span>
@@ -296,7 +296,8 @@ function PdfButton({ pdf, className, label }: { pdf: Pdf; className: string; lab
       aria-busy={pdf.busy}
       onClick={pdf.read}
     >
-      {pdf.busy ? 'Lecture…' : label}
+      {/* Its word kept while it reads, greyed: the row never moves under the pointer (Extension on #567). */}
+      {label}
     </button>
   );
 }
