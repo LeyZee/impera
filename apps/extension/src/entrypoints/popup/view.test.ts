@@ -143,13 +143,24 @@ describe('popup', () => {
     expect(actions.saveAddress).toHaveBeenCalledWith('crm.exemple.fr');
   });
 
-  it('steps back from the address on Échap, without saving it', () => {
+  it('steps back from the address on Échap, without saving it nor closing the popup', () => {
     const { root, actions } = draw({ kind: 'address', draft: 'localhost:5173', error: null });
-    root
-      .querySelector('#crm-address')
-      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    root.querySelector('#crm-address')?.dispatchEvent(escape);
     expect(actions.cancelAddress).toHaveBeenCalledOnce();
     expect(actions.saveAddress).not.toHaveBeenCalled();
+    // Chrome closes the popup on an Échap left to it.
+    expect(escape.defaultPrevented).toBe(true);
+  });
+
+  it('hands the focus back to the address button when the address closes', () => {
+    const { root, actions } = draw({ kind: 'address', draft: 'localhost:5173', error: null });
+    document.body.append(root);
+    root.querySelector<HTMLInputElement>('#crm-address')?.focus();
+    expect(document.activeElement?.id).toBe('crm-address');
+    render(root, { kind: 'signed_out' }, frame, actions);
+    expect(document.activeElement?.classList.contains('pp-address')).toBe(true);
+    root.remove();
   });
 
   it('marks a refused address', () => {
