@@ -22,7 +22,7 @@ import {
  * `MEDIA_SLOTS_MAX`). The variants of a stage share its position and its number, their letter orders them.
  */
 
-export type ScriptFileKind = 'carton' | 'photo' | 'video' | 'vocal';
+type ScriptFileKind = 'carton' | 'photo' | 'video' | 'vocal';
 
 /** The moment a script was shot as: a « both » structure is shot as the one its request says. */
 export type ShotMoment = 'day' | 'night';

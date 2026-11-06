@@ -142,7 +142,7 @@ export interface ScriptRequests {
 }
 
 /** Her last script asked by the cadence. */
-export interface AskedScript {
+interface AskedScript {
   readonly dueOn: string;
   readonly structureId: ScriptStructureId;
   readonly askedAt: Date;
