@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { DEFAULT_SANDBOX_URL, isLoopbackUrl } from './sandbox';
+
 /** `1`/`true` or `0`/`false`, as written in an `.env` file. */
 // Empty counts as unset, as `KEY=` in a .env does for every optional variable (recette 07/11, BIL-02).
 const flag = z.preprocess(
@@ -56,6 +58,13 @@ const configSchema = z
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
     /** Development: run the worker inside the API process (`pnpm dev`). */
     IMPERA_INLINE_WORKER: flag,
+    /**
+     * The recette sandbox (ADR 0075): the real adapters and key verifiers aimed at a local fake world, every call
+     * outside this machine blocked. Development or test only, every address local (below).
+     */
+    IMPERA_SANDBOX: flag,
+    /** The fake world of `pnpm sandbox:world`; `http://127.0.0.1:4010` when absent. */
+    IMPERA_SANDBOX_URL: optionalValue,
     /** AI service keys pasted in the dashboard are sealed with these (ADR 0016), `v2:<base64>,v1:<base64>`. */
     CREDENTIALS_ENCRYPTION_KEYS: z.string().min(1).optional(),
     /**
@@ -101,6 +110,40 @@ const configSchema = z
     S3_BUCKET: optionalValue,
     S3_ACCESS_KEY_ID: optionalValue,
     S3_SECRET_ACCESS_KEY: optionalValue,
+  })
+  .superRefine((config, context) => {
+    // ADR 0075: never outside a developer's machine. Production refuses it, and so does any address that is not
+    // this machine, so that a recette server reachable by others can never run against the fake world.
+    if (!config.IMPERA_SANDBOX) return;
+    if (config.NODE_ENV === 'production') {
+      context.addIssue({
+        code: 'custom',
+        message: 'IMPERA_SANDBOX is for development only, never production (ADR 0075)',
+        path: ['IMPERA_SANDBOX'],
+      });
+      return;
+    }
+    const local = {
+      AUTH_BASE_URL: config.AUTH_BASE_URL,
+      WEB_ORIGIN: config.WEB_ORIGIN,
+      IMPERA_SANDBOX_URL: config.IMPERA_SANDBOX_URL ?? DEFAULT_SANDBOX_URL,
+      ...(secretOrNull(config.S3_ENDPOINT) === null ? {} : { S3_ENDPOINT: config.S3_ENDPOINT ?? '' }),
+      ...(secretOrNull(config.INVOICES_S3_ENDPOINT) === null
+        ? {}
+        : { INVOICES_S3_ENDPOINT: config.INVOICES_S3_ENDPOINT ?? '' }),
+      ...(secretOrNull(config.INVOICES_COPY_S3_ENDPOINT) === null
+        ? {}
+        : { INVOICES_COPY_S3_ENDPOINT: config.INVOICES_COPY_S3_ENDPOINT ?? '' }),
+    };
+    for (const [field, value] of Object.entries(local)) {
+      if (!isLoopbackUrl(value)) {
+        context.addIssue({
+          code: 'custom',
+          message: `${field} must be an address on this machine in the sandbox (ADR 0075)`,
+          path: [field],
+        });
+      }
+    }
   })
   .refine((config) => config.NODE_ENV !== 'production' || config.PASSWORD_BREACH_CHECK === 'on', {
     message: 'PASSWORD_BREACH_CHECK=off is for development only (ADR 0046 § 4)',

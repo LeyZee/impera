@@ -28,6 +28,15 @@ async function errorCodeOf(response: Response): Promise<string | null> {
   return parsed.success ? parsed.data.error.code : null;
 }
 
+/**
+ * The recette sandbox (ADR 0075): the API says so on its answers (`x-impera-sandbox`), and the page wears the « Bac à
+ * sable » badge of `shell/sandbox.css` on every screen, the sign-in included, for as long as it is open.
+ */
+export function markSandbox(response: Pick<Response, 'headers'>): void {
+  if (typeof document === 'undefined' || response.headers.get('x-impera-sandbox') !== '1') return;
+  document.documentElement.dataset['sandbox'] = '1';
+}
+
 export type CurrentSession =
   | { readonly kind: 'signed_in'; readonly user: Me }
   | { readonly kind: 'signed_out' }
@@ -41,6 +50,7 @@ export type CurrentSession =
  */
 export async function readSession(): Promise<CurrentSession> {
   const response = await fetch('/v1/session', { credentials: 'include' });
+  markSandbox(response);
   if (!response.ok) throw new Error(`GET /v1/session: ${String(response.status)}`);
   const answer = DashboardSessionSchema.parse(await response.json());
   return answer.state === 'signed_in' ? { kind: 'signed_in', user: answer.me } : { kind: answer.state };

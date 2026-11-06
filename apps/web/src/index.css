@@ -5,4 +5,5 @@
 @import '@impera/design-system/base.css';
 @import '@impera/design-system/components.css';
 @import './shell/shell.css';
+@import './shell/sandbox.css';
 @import './screens/train/playground/playground.css';
