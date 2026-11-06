@@ -689,6 +689,20 @@ describe('the shell while a screen loads (review of #313)', () => {
     expect(router.state.location.pathname).toBe('/');
   });
 
+  it('says it too when a tab of the rail turns a manager away: the exports, a member’s file (recette EQP-03)', async () => {
+    for (const [at, home] of [
+      ['/paie/exports', '/paie/quinzaine'],
+      ['/equipe/membres/m1/dossier', '/equipe/membres'],
+    ] as const) {
+      const router = renderApp(manager, at);
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(home);
+      });
+      expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+      cleanup();
+    }
+  });
+
   it('says nothing when the app opens on its own address, for a rail without the Dashboard (relecture #484)', async () => {
     const creator: Me = { ...base, role: 'creator', creatorIds: [], team: null, teamScope: 'self' };
     for (const [user, home] of [

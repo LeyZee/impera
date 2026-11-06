@@ -641,6 +641,16 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     expect(screen.getByRole('button', { name: 'Valider (2)' })).toBeTruthy();
   });
 
+  it('says once when no sale of the platform is read yet: every report waits for a hand (recette EQP-05)', async () => {
+    open = [report(1, 0), report(2, 1)];
+    renderPage();
+    expect(
+      await screen.findByText(
+        'Les ventes de Reveal ne sont pas encore lues : aucun rapport ne se valide tout seul, chacun se valide à la main.',
+      ),
+    ).toBeTruthy();
+  });
+
   it('says what the platform read, or why nothing is compared, beside the declared amount (§ 2, § 7)', async () => {
     open = [
       report(1, 0, {
@@ -653,6 +663,8 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     // The matching one validates by itself: not the agency's to decide.
     await screen.findByText('rapports attendent, dont 2 à décider maintenant');
     const [unlinked, matching, provisional] = [...document.querySelectorAll('.rp-review')];
+    // Some are read: the line saying none is would be wrong.
+    expect(screen.queryByText(/ne sont pas encore lues/u)).toBeNull();
     expect(text(matching)).toContain('Conforme');
     expect(text(matching)).toContain(
       'Reveal a lu 110,00 € pendant le shift : le rapport se valide tout seul dans les cinq minutes.',

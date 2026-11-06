@@ -195,6 +195,24 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
     expect(issueDecision(facts())).toEqual({ kind: 'issue', regime: ABROAD, warnings: [] });
   });
 
+  it('says first what only the agency settles: its identity, then its mandate published (recette EQP-02)', () => {
+    // A fresh agency: nothing filled, nothing published, nothing accepted. The owner is told his own step first.
+    const fresh = facts({
+      agency: null,
+      mandate: { acceptedVersion: null, currentVersion: 0 },
+      prefix: null,
+    });
+    expect(issueDecision(fresh)).toMatchObject({ kind: 'none', reason: 'agency_missing' });
+    // Its identity filled, no mandate published: no member can accept one, so it is never « not accepted ».
+    expect(
+      issueDecision(facts({ mandate: { acceptedVersion: null, currentVersion: 0 }, prefix: null })),
+    ).toMatchObject({ kind: 'none', reason: 'mandate_unpublished' });
+    // Published, not accepted: now it is the member's step.
+    expect(
+      issueDecision(facts({ mandate: { acceptedVersion: null, currentVersion: 1 }, prefix: null })),
+    ).toMatchObject({ kind: 'none', reason: 'no_mandate' });
+  });
+
   it('issues nothing without a mandate, a regime validated and of his country, or the identity the mentions need', () => {
     expect(issueDecision(facts({ mandate: { acceptedVersion: null, currentVersion: 2 } }))).toMatchObject({
       kind: 'none',

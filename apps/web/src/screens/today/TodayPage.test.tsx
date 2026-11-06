@@ -9,7 +9,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TodayPage } from './TodayPage';
@@ -110,6 +110,35 @@ describe('Aujourd’hui', () => {
     );
     expect(screen.getByRole('link', { name: 'Ouvrir Suivi' })).toBeTruthy();
     expect(screen.getByText('Ensuite').closest('section')?.textContent).toContain('Demain · 23 h – 5 h');
+  });
+
+  it('reads the shifts on the clock of his record, as Planning, not the device’s (recette EXT-10)', async () => {
+    // The device is in Paris (23 h); his record says Reykjavik (UTC), which Planning reads: 22 h – 4 h on both screens.
+    const shifts = {
+      current: null,
+      next: mine(2, '2026-10-28T22:00:00Z', '2026-10-29T04:00:00Z'),
+      ended: null,
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        const path = new URL(input, 'http://localhost').pathname;
+        const body =
+          path === '/v1/scheduling/my-shifts'
+            ? shifts
+            : path === '/v1/team/members'
+              ? { members: [{ ...THEO, timeZone: 'Atlantic/Reykjavik' }] }
+              : null;
+        return Promise.resolve(new Response(JSON.stringify(body), { status: body === null ? 404 : 200 }));
+      }),
+    );
+    renderPage();
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Nora Vidal', level: 2 }).closest('section')?.textContent,
+      ).toContain('22 h – 4 h');
+    });
+    expect(document.body.textContent).not.toContain('23 h – 5 h');
   });
 
   it('says what the next shift brings to Suivi, and offers no Suivi before', async () => {
