@@ -694,6 +694,10 @@ export const SALES_FEED_ERROR_CODES = [
   'sales_feed_export_unprocessable',
   'sales_feed_check_days_unprocessable',
   'sales_feed_list_unavailable',
+  /** The team imported from the platform (ADR 0076) is the owner's and an active manager's. */
+  'sales_feed_team_forbidden',
+  /** A linked account is not set aside: its link is changed instead (ADR 0076 § 1). */
+  'sales_feed_chatter_linked_conflict',
 ] as const;
 export const SalesFeedErrorCodeSchema = z.enum(SALES_FEED_ERROR_CODES);
 export type SalesFeedErrorCode = z.infer<typeof SalesFeedErrorCodeSchema>;

@@ -1,4 +1,4 @@
-import { TeamMemberIdSchema, type PlatformChatter } from '@impera/contracts';
+import { CreatorIdSchema, TeamMemberIdSchema, type PlatformChatter } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -6,7 +6,9 @@ import {
   isAbnormalReading,
   linkRefusal,
   proposeFor,
+  teamImportOverview,
   type ImportableMember,
+  type TeamImportContext,
 } from '../team-import';
 
 // Invented members and accounts (ADR 0010).
@@ -174,5 +176,73 @@ describe('isAbnormalReading', () => {
     expect(isAbnormalReading(1, 4)).toBe(true);
     expect(isAbnormalReading(2, 4)).toBe(false);
     expect(isAbnormalReading(0, 0)).toBe(false);
+  });
+});
+
+describe('teamImportOverview', () => {
+  const MAYA = CreatorIdSchema.parse('00000000-0000-4000-8000-0000000000a1');
+  const ZOE = CreatorIdSchema.parse('00000000-0000-4000-8000-0000000000a2');
+  const context = (patch: Partial<TeamImportContext> = {}): TeamImportContext => ({
+    viewer: { kind: 'owner' },
+    members: [{ ...members[0]!, creatorIds: [MAYA, ZOE] }],
+    links: new Map([['chatter_test_01', { kind: 'member', memberId: LEA }]]),
+    reviews: new Map(),
+    modelCreators: new Map([['model_a', { creatorId: MAYA, displayName: 'Maya' }]]),
+    creatorNames: new Map([
+      [MAYA, 'Maya'],
+      [ZOE, 'Zoé'],
+    ]),
+    abnormalRead: false,
+    ...patch,
+  });
+  const live = (chatters: PlatformChatter[] | null) => ({
+    chatters,
+    handles: new Map([['model_a', 'maya_test']]),
+    listError: null,
+    sessionChatterId: null,
+  });
+
+  it('names each model and shows the gap with the member’s creators, rewriting nothing', () => {
+    const [row] = teamImportOverview(
+      context(),
+      live([chatter({ platformModelIds: ['model_a', 'model_b'] })]),
+    ).rows;
+    expect(row?.models).toEqual([
+      { platformModelId: 'model_a', handle: 'maya_test', creatorId: MAYA, creatorDisplayName: 'Maya' },
+      { platformModelId: 'model_b', handle: 'model_b', creatorId: null, creatorDisplayName: null },
+    ]);
+    expect(row?.modelGap).toEqual({
+      inImperaOnly: [{ creatorId: ZOE, creatorDisplayName: 'Zoé' }],
+      onPlatformOnly: ['model_b'],
+    });
+    expect(row?.suggestion).toBeNull();
+  });
+
+  it('keeps a linked account the platform no longer lists, with its alert, and counts nothing new', () => {
+    const gone = teamImportOverview(
+      context({
+        reviews: new Map([
+          [
+            'chatter_test_01',
+            {
+              decision: null,
+              decidedAt: null,
+              platformRemovedAt: null,
+              absentSince: new Date(),
+              isBot: false,
+            },
+          ],
+        ]),
+      }),
+      live([]),
+    );
+    expect(gone.rows[0]?.removal).toEqual({ memberId: LEA, removedAt: null, absent: true });
+    expect([gone.newCount, gone.removalCount]).toEqual([0, 1]);
+  });
+
+  it('never alerts for a member who left', () => {
+    const left = context({ members: [{ ...members[0]!, active: false, creatorIds: [] }] });
+    const [row] = teamImportOverview(left, live([chatter({ removedAt: '2026-11-05T10:00:00.000Z' })])).rows;
+    expect(row?.removal).toBeNull();
   });
 });

@@ -25,10 +25,12 @@ import {
   resealSalesFeedWebhookSecrets,
 } from './infra/db/sales-feed-webhooks';
 import { createDrizzleSalesLedger } from './infra/db/sales-ledger';
+import { createDrizzleTeamImportStore, invitationChatterLinks } from './infra/db/team-import-store';
 import { createAvatarRoutes } from './infra/http/avatar-routes';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
 import { createSalesFeedRoutes, type SalesFeedRoutesOptions } from './infra/http/sales-feed-routes';
+import { createSalesFeedTeamRoutes } from './infra/http/sales-feed-team-routes';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
 import { createSessionVault } from './infra/session-vault';
@@ -134,6 +136,16 @@ export interface ConnectorsModule {
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
   readonly salesFeedRoutes: (options: SalesFeedRoutesOptions) => FastifyPluginAsyncZod;
+  /**
+   * `/v1/settings/sales-feeds/:platform/team` (ADR 0076), behind the guard given here (owner, operator): the base
+   * keeps it to the owner and the active managers.
+   */
+  readonly salesFeedTeamRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
+  /**
+   * The link an invitation from the review poses (ADR 0076 § 3), for `team`'s port: run in the inviter's own
+   * transaction, under the policies of migration 0132.
+   */
+  readonly invitationChatterLinks: typeof invitationChatterLinks;
   /** `/v1/webhooks/sales-feeds/:platform`: public, each delivery checked against its webhook's secret. */
   readonly salesFeedDeliveryRoutes: FastifyPluginAsyncZod;
 }
@@ -201,6 +213,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const salesFeeds = createSalesFeeds({
     keys: deps.credentialKeys === null ? null : createSalesFeedKeyStore(deps.adminDb, deps.credentialKeys),
     ledger: createDrizzleSalesLedger(deps.db, deps.adminDb),
+    team: createDrizzleTeamImportStore(deps.db),
     registry: deps.salesFeeds,
     clock,
     webhooks:
@@ -236,6 +249,8 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     },
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
+    salesFeedTeamRoutes: (guard) => createSalesFeedTeamRoutes(salesFeeds.team, guard),
+    invitationChatterLinks,
     salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),
   };
 }

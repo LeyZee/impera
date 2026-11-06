@@ -121,6 +121,7 @@ export function wireConnectors(
     routes: [
       module.routes,
       module.salesFeedRoutes({ guard: requireRole('owner'), recentLogin }),
+      module.salesFeedTeamRoutes(requireRole('owner', 'operator')),
       module.salesFeedDeliveryRoutes,
       module.avatarRoutes(requireRole('owner', 'operator', 'creator')),
     ],

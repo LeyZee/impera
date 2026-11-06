@@ -1,5 +1,5 @@
 import { INVITATION_LINK_PURPOSES, TEAM_MEMBER_STATUSES, TEAM_ROLES } from '@impera/contracts';
-import { sql, type SQL } from 'drizzle-orm';
+import { sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import {
   check,
   date,
@@ -26,6 +26,17 @@ const currentUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
 const currentScope: SQL = sql`nullif(current_setting('app.team_scope', true), '')`;
 const readsTeam: SQL = sql`${currentScope} in ('owner', 'agency')`;
 const isOwner: SQL = sql`${currentScope} = 'owner'`;
+/** An active manager (ADR 0024): the scope `withMember` gives him. */
+const isManager: SQL = sql`${currentScope} = 'agency'`;
+
+/**
+ * A member a manager may set up (ADR 0076 § 3): a chatter made in this very transaction (`created_at = now()`, the
+ * transaction's time), not himself, from the day he joins. What a manager writes is the first rows of the member he
+ * invites, never a later change, which stays the owner's. Not « no row of this table yet »: a policy that reads its
+ * own table is refused by Postgres as infinite recursion, for every writer.
+ */
+const invitedBy = (memberId: AnyColumn, effectiveFrom: AnyColumn): SQL =>
+  sql`exists (select 1 from team_members m where m.id = ${memberId} and m.team_role = 'chatter' and m.user_id <> ${currentUser} and m.joined_on = ${effectiveFrom} and m.created_at = now())`;
 
 /** A chatter or a manager, linked to one dashboard account; the e-mail and the photo stay on `user`. */
 export const teamMembers = pgTable(
@@ -64,6 +75,11 @@ export const teamMembers = pgTable(
     check('team_members_color_check', sql`${t.color} is null or ${t.color} ~ '^#[0-9a-f]{6}$'`),
     pgPolicy('member_read', { for: 'select', using: sql`${t.userId} = ${currentUser} or ${readsTeam}` }),
     pgPolicy('owner_insert', { for: 'insert', withCheck: isOwner }),
+    // ADR 0076 § 3: an active manager invites a chatter from the platform's team, never himself, never a manager.
+    pgPolicy('manager_invite', {
+      for: 'insert',
+      withCheck: sql`${isManager} and ${t.teamRole} = 'chatter' and ${t.userId} <> ${currentUser}`,
+    }),
     pgPolicy('owner_update', { for: 'update', using: isOwner, withCheck: isOwner }),
   ],
 );
@@ -159,6 +175,11 @@ export const memberCommissionRates = pgTable(
       for: 'insert',
       withCheck: sql`${isOwner} and ${t.createdBy} = ${currentUser}`,
     }),
+    // ADR 0076 § 3: a manager gives the chatter he invites a preset of the owner, as it is in effect, and nothing else.
+    pgPolicy('manager_invite', {
+      for: 'insert',
+      withCheck: sql`${isManager} and ${t.createdBy} = ${currentUser} and ${t.teamShareBps} is null and ${invitedBy(t.memberId, t.effectiveFrom)} and exists (select 1 from commission_presets p where p.id = ${t.presetId} and p.rate_bps = ${t.rateBps} and p.effective_from <= ${t.effectiveFrom} and not exists (select 1 from commission_presets q where q.name = p.name and q.effective_from > p.effective_from and q.effective_from <= ${t.effectiveFrom}))`,
+    }),
   ],
 );
 
@@ -191,6 +212,11 @@ export const memberRoles = pgTable(
     pgPolicy('owner_insert', {
       for: 'insert',
       withCheck: sql`${isOwner} and ${t.createdBy} = ${currentUser}`,
+    }),
+    // ADR 0076 § 3: the first role of a chatter a manager invites, `chatter` only.
+    pgPolicy('manager_invite', {
+      for: 'insert',
+      withCheck: sql`${isManager} and ${t.createdBy} = ${currentUser} and ${t.teamRole} = 'chatter' and ${invitedBy(t.memberId, t.effectiveFrom)}`,
     }),
   ],
 );
