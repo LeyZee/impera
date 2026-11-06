@@ -50,6 +50,7 @@ const taken = ConversationSummarySchema.parse({
   unreadCount: 0,
   updatedAt: '2026-10-27T23:50:00Z',
   desire: null,
+  heldBy: 'you',
 });
 
 /**
@@ -152,21 +153,25 @@ describe('Suivi of a chatter (EQ-13)', () => {
       ended: null,
     });
     renderPage();
-    expect(await screen.findByText('Rien pour toi pour l’instant')).toBeTruthy();
+    expect(await screen.findByText('Aucune conversation pour l’instant')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Tu n’es pas en poste' })).toBeNull();
   });
-  it('says plainly, on shift with nothing routed, what Suivi holds for now and what to do (CHAT-02, CHAT-14)', async () => {
+  it('says plainly, on shift with nothing listed, what arrives here and what to do (CHAT-14, EQ-13)', async () => {
     serve({ current: null, next: { ...tomorrow, accessStartsAt: '2026-10-27T23:55:00Z' }, ended: null });
     renderPage();
-    const empty = (await screen.findByRole('heading', { name: 'Rien pour toi pour l’instant' })).closest(
-      'div',
+    const empty = (
+      await screen.findByRole('heading', { name: 'Aucune conversation pour l’instant' })
+    ).closest('div');
+    expect(empty?.textContent).toContain(
+      'Pendant ton shift, toutes les conversations de ta créatrice arrivent ici',
     );
-    expect(empty?.textContent).toContain('Tu chattes dans Reveal.');
-    expect(empty?.textContent).toContain('n’est pas encore ouvert dans Impera');
+    expect(empty?.textContent).toContain('tu réponds aux fans dans Reveal');
+    // The access is built: never « not open yet » again (CHAT-02).
+    expect(empty?.textContent).not.toContain('pas encore ouvert');
     expect(screen.getByRole('link', { name: 'Voir mon shift' }).getAttribute('href')).toBe('/aujourdhui');
   });
 
-  it('says the same, never « dès que le premier fan écrit », when his creators have nothing routed to him', async () => {
+  it('says the same, never the owner’s notice, when his creator has no conversation yet', async () => {
     const creators = [{ id: id(1), displayName: 'Nora Vidal', timezone: 'Europe/Paris' }];
     vi.stubGlobal(
       'fetch',
@@ -187,7 +192,7 @@ describe('Suivi of a chatter (EQ-13)', () => {
     );
     renderPage();
     expect(await screen.findByRole('link', { name: 'Voir mon shift' })).toBeTruthy();
-    expect(screen.queryByText('Aucune conversation pour l’instant')).toBeNull();
+    expect(screen.queryByText(/dès que le premier fan écrit/u)).toBeNull();
   });
 
   it('tells him the hand he holds is his, in « À toi » (CHAT-22)', async () => {

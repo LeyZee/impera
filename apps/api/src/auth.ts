@@ -41,6 +41,7 @@ import { z } from 'zod';
 import { backupCodeOptions } from './backup-codes';
 import type { Config } from './config';
 import type { Logger } from './logger';
+import type { ShiftCreators } from './modules/scheduling';
 import {
   alertOwnerPasskeySignIn,
   confirmationOptions,
@@ -511,17 +512,19 @@ export async function sessionOf(
 /**
  * The signed-in user of a request, or `null`; the role and creators come from our columns, validated. A team member
  * whose scope is `self` (a chatter, a manager who is not active) reads a creator only through the conversations
- * routed to him: his creators move to `routedCreatorIds`, so every route that checks `creatorIds` refuses him at once.
- * A member who is not `active` keeps none (ADR 0024: a suspended member reads no fan and no conversation).
+ * routed to him or that he holds, and, while his access window is open, through all of hers (`shiftCreatorIds`, ADR
+ * 0025): his creators move to `routedCreatorIds`, so every route that checks `creatorIds` refuses him at once. A member
+ * who is not `active` keeps none (ADR 0024: a suspended member reads no fan and no conversation).
  */
 async function currentUser(
   auth: Auth,
   db: Database,
+  shiftCreators: ShiftCreators,
   request: FastifyRequest,
 ): Promise<{ user: CurrentUser; membership: Membership | null; secondFactorEnabled: boolean } | null> {
   const result = await sessionOf(auth, db, request);
   if (result === null) return null;
-  const signedIn = await userOf(db, result.user);
+  const signedIn = await userOf(db, shiftCreators, result.user);
   if (signedIn === null) return null;
   return { ...signedIn, secondFactorEnabled: result.user.twoFactorEnabled === true };
 }
@@ -537,6 +540,7 @@ interface AccountRow {
 
 async function userOf(
   db: Database,
+  shiftCreators: ShiftCreators,
   row: AccountRow,
 ): Promise<{ user: CurrentUser; membership: Membership | null } | null> {
   const parsed = CurrentUserSchema.safeParse({
@@ -558,8 +562,19 @@ async function userOf(
   if (member.team === null || member.teamScope !== 'self') return { user, membership: member };
   // Away (on leave, sick, travelling, suspended), he reads no conversation at all, not even one still routed to him:
   // the job `conversation.release_unavailable` hands those back within the minute (EQ-13, Charles's « oui » of 01/11).
-  const routedCreatorIds = member.team.status === 'active' ? user.creatorIds : [];
-  return { user: { ...user, creatorIds: [], routedCreatorIds }, membership: member };
+  if (member.team.status !== 'active') {
+    return {
+      user: { ...user, creatorIds: [], routedCreatorIds: [], shiftCreatorIds: [] },
+      membership: member,
+    };
+  }
+  // At work, his shift opens his creators for its length and the margin (ADR 0025, EQ-13): computed now, from the
+  // planning as it stands, so a shift cancelled or shortened closes them at the next request; unreadable, none.
+  const shiftCreatorIds = await shiftCreators(user.id, user.creatorIds);
+  return {
+    user: { ...user, creatorIds: [], routedCreatorIds: user.creatorIds, shiftCreatorIds },
+    membership: member,
+  };
 }
 
 /**
@@ -579,17 +594,17 @@ export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandle
  * whatever its role (ADR 0046 § 1: the activation is the only way in); a session with another role → 403
  * (security.md §6).
  */
-export function createRequireRole(auth: Auth, db: Database): RequireRole {
+export function createRequireRole(auth: Auth, db: Database, shiftCreators: ShiftCreators): RequireRole {
   return (...roles) =>
     async (request) => {
-      const session = await currentUser(auth, db, request);
+      const session = await currentUser(auth, db, shiftCreators, request);
       if (session === null) throw new SessionUnauthenticated();
       if (!session.secondFactorEnabled) throw new SecondFactorRequired();
       if (!roles.includes(session.user.role)) throw new RoleForbidden();
       // An operator, chatter or manager alike, reaches only the creators of his list, on every route that names one in
       // its path: her content, her ideas, her suggestions, her scripts (Charles, recette 05/11, reco 8). His team role
-      // widens the team he sees, never the creators (ADR 0023). A chatter's list is the one routed to him: the route
-      // then says what he may do there.
+      // widens the team he sees, never the creators (ADR 0023). A chatter's list is the one routed to him, which holds
+      // those his shift opens: the route then says what he may do there.
       const named = CreatorParamSchema.safeParse(request.params);
       if (session.user.role === 'operator' && named.success) {
         const { creatorIds, routedCreatorIds } = session.user;
@@ -782,8 +797,8 @@ async function isArchivedCreatorAccount(db: Database, userId: string): Promise<b
  * What `/v1/me` answers for an account, read without a request: the redeem of an invitation link (EQ-10) answers it for
  * the session it has just opened. `null` for a row that does not validate, as for a session.
  */
-export async function meOf(db: Database, row: AccountRow): Promise<Me | null> {
-  const signedIn = await userOf(db, row);
+export async function meOf(db: Database, shiftCreators: ShiftCreators, row: AccountRow): Promise<Me | null> {
+  const signedIn = await userOf(db, shiftCreators, row);
   if (signedIn === null) return null;
   return { ...signedIn.user, ...(signedIn.membership ?? (await membership(db, signedIn.user.id))) };
 }
@@ -796,6 +811,7 @@ export function createAuthRoutes(
   config: Config,
   requireRole: RequireRole,
   logger: Logger,
+  shiftCreators: ShiftCreators,
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.decorateRequest('user', null);
@@ -1162,12 +1178,13 @@ export function createAuthRoutes(
         config: perIp,
         // Signed in before the body is read: an anonymous call gets 401, never the list of fields (recette SEC-17).
         preValidation: async (request) => {
-          if ((await currentUser(auth, db, request)) === null) throw new SessionUnauthenticated();
+          if ((await currentUser(auth, db, shiftCreators, request)) === null)
+            throw new SessionUnauthenticated();
         },
         schema: { body: SecondFactorEnableBodySchema },
       },
       async (request, reply) => {
-        const session = await currentUser(auth, db, request);
+        const session = await currentUser(auth, db, shiftCreators, request);
         if (session === null) throw new SessionUnauthenticated();
         if (session.secondFactorEnabled) throw new SecondFactorAlreadyActive();
         return forward(request, reply, {
@@ -1184,7 +1201,7 @@ export function createAuthRoutes(
       '/auth/two-factor/verify-totp',
       { config: perIp, schema: { body: SecondFactorVerifyBodySchema } },
       async (request, reply) => {
-        const session = await currentUser(auth, db, request);
+        const session = await currentUser(auth, db, shiftCreators, request);
         if (session?.secondFactorEnabled === true) throw new SecondFactorAlreadyActive();
         const account = await codeAccountOf(request, session?.user.id ?? null);
         if (await exceeded(request, reply, codeAccountKey(request, account), false)) {
@@ -1235,7 +1252,8 @@ export function createAuthRoutes(
       '/auth/two-factor/verify-backup-code',
       { config: perIp, schema: { body: SecondFactorVerifyBodySchema } },
       async (request, reply) => {
-        if ((await currentUser(auth, db, request)) !== null) throw new SecondFactorAlreadyActive();
+        if ((await currentUser(auth, db, shiftCreators, request)) !== null)
+          throw new SecondFactorAlreadyActive();
         const account = await codeAccountOf(request, null);
         if (await exceeded(request, reply, codeAccountKey(request, account), false)) throw new CodeLocked();
         return forward(request, reply, {
@@ -1410,7 +1428,7 @@ export function createAuthRoutes(
     // The dashboard's first read (recette 05/11, SEC-13): 200 with or without a session, so that every public page
     // does not log « 401 » in the console. It opens nothing: the guarded routes still refuse on their own.
     app.get('/session', { schema: { response: { 200: DashboardSessionSchema } } }, async (request) => {
-      const session = await currentUser(auth, db, request);
+      const session = await currentUser(auth, db, shiftCreators, request);
       if (session === null) return { state: 'signed_out' as const };
       if (!session.secondFactorEnabled) return { state: 'second_factor_required' as const };
       const me = { ...session.user, ...(session.membership ?? (await membership(db, session.user.id))) };

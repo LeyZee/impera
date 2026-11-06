@@ -2,9 +2,12 @@ import {
   ApiErrorSchema,
   REAUTHENTICATION_ERROR_CODE,
   TELEGRAM_CHAT_MEMBER_CONFLICT,
+  TELEGRAM_LINK_NO_BOT_UNPROCESSABLE,
   TelegramBotSchema,
   TelegramDeliveriesSchema,
+  TelegramLinkCodeSchema,
   TelegramOverviewSchema,
+  TelegramPrivateLinkSchema,
   TelegramRefusalBodySchema,
   TelegramRoutesSchema,
   TelegramSalesSettingsSchema,
@@ -14,7 +17,9 @@ import {
   type TelegramBotId,
   type TelegramChatId,
   type TelegramDelivery,
+  type TelegramLinkCode,
   type TelegramOverview,
+  type TelegramPrivateLink,
   type TelegramRefusal,
   type TelegramRoute,
   type TelegramSaleSettingsEntry,
@@ -143,4 +148,47 @@ export async function sendTest(chatId: TelegramChatId): Promise<Outcome<{ sentAt
 export async function fetchDeliveries(limit = 50): Promise<TelegramDelivery[]> {
   const response = await call(`/deliveries?limit=${String(limit)}`);
   return TelegramDeliveriesSchema.parse(await response.json()).deliveries;
+}
+
+/* ---- `/v1/auth/telegram-link` (SEC-05 lot 2, ADR 0068 § 4): the account's own private chat with the agency's bot ---- */
+
+const LINK = '/v1/auth/telegram-link';
+
+/** Not served: the server runs without Telegram (404), or the account is a creator's (403 `role_forbidden`). */
+export class LinkUnavailable extends Error {}
+
+/** 429: more than ten codes asked in a minute. */
+export class LinkRateLimited extends Error {}
+
+async function linkCall(path: string, init: RequestInit = {}): Promise<Response> {
+  const response = await fetch(`${LINK}${path}`, { credentials: 'include', ...init });
+  if (response.status === 403) {
+    const body = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+    if (body.success && body.data.error.code === REAUTHENTICATION_ERROR_CODE) throw new ReauthRequired();
+    throw new LinkUnavailable();
+  }
+  if (response.status === 404) throw new LinkUnavailable();
+  if (response.status === 429) throw new LinkRateLimited();
+  if (!response.ok && response.status !== 422)
+    throw new Error(`${init.method ?? 'GET'} ${LINK}${path}: ${String(response.status)}`);
+  return response;
+}
+
+/** Whether the account's private chat is linked, and through which bot; never the chat's id. */
+export async function fetchPrivateLink(): Promise<TelegramPrivateLink> {
+  return TelegramPrivateLinkSchema.parse(await (await linkCall('')).json());
+}
+
+/** A new one-time code (ten minutes), replacing the last; `no_bot` while no active bot can take it (422). */
+export async function requestLinkCode(): Promise<TelegramLinkCode | 'no_bot'> {
+  const response = await linkCall('/code', { method: 'POST' });
+  if (response.ok) return TelegramLinkCodeSchema.parse(await response.json());
+  const body = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+  if (body.success && body.data.error.code === TELEGRAM_LINK_NO_BOT_UNPROCESSABLE) return 'no_bot';
+  throw new Error(`POST ${LINK}/code: ${String(response.status)}`);
+}
+
+/** Unlinks the chat (and drops a code still waiting); answers the state after. */
+export async function unlinkPrivateChat(): Promise<TelegramPrivateLink> {
+  return TelegramPrivateLinkSchema.parse(await (await linkCall('', { method: 'DELETE' })).json());
 }

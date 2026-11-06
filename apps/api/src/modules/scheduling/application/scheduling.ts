@@ -34,7 +34,7 @@ import type {
   StoredShift,
   StoredTemplate,
 } from '../domain/ports';
-import { accessWindow, assertPlanningRange, conflictsOf, myShiftsOf } from '../domain/shifts';
+import { accessWindow, assertPlanningRange, conflictsOf, myShiftsOf, plansCreator } from '../domain/shifts';
 import { effectiveAtOf } from '../domain/slot-versions';
 import { addMinutes, calendarDayIn } from '../domain/time';
 
@@ -128,9 +128,12 @@ export function createSchedulingService(
       const around = { from: addMinutes(from, -24 * 60), to: addMinutes(to, 24 * 60) };
       // The créneaux the grid cuts the window with, day by day: the version in force at its start, then those after.
       const settings = await store.settings(actor, around);
-      // Every creator is read even when one is asked: a member busy on another creator stands in the way too.
+      // Every creator is read even when one is asked: a member busy on another creator stands in the way too, even one
+      // a manager does not plan. He is shown what he plans only (Charles, 06/11).
       const read = await store.read(actor, await everyCreator(), around);
-      const asked = (creatorId: string) => query.creatorId === undefined || creatorId === query.creatorId;
+      const asked = (creatorId: string) =>
+        (query.creatorId === undefined || creatorId === query.creatorId) &&
+        plansCreator(read.planned, creatorId);
       const inRange = (shift: StoredShift) =>
         shift.startsAt.getTime() < to.getTime() && from.getTime() < shift.endsAt.getTime();
       const shifts = read.shifts.filter((shift) => asked(shift.creatorId) && inRange(shift));
@@ -207,7 +210,7 @@ export function createSchedulingService(
     myShifts: async (actor) => {
       const at = now();
       const { accessMarginMinutes: margin } = await settingsOf(actor);
-      const mine = await admin.memberShiftsUnscoped(actor, addMinutes(at, -margin));
+      const mine = await store.memberShifts(actor, await everyCreator(), addMinutes(at, -margin));
       if (mine?.status !== 'active') return { current: null, next: null, ended: null };
       const creatorNames = await names();
       const toMine = (shift: (typeof mine.shifts)[number] | null): MyShift | null => {

@@ -82,7 +82,12 @@ interface Served {
   rules: unknown;
   /** What `POST`/`PATCH` answer: the status and the body. */
   write: { status: number; body: unknown };
+  /** What the server estimates an amount brings (reco 19); `undefined` answers 404. */
+  estimate?: (amountMinor: number) => number | null;
 }
+
+/** The amounts whose estimate was asked, in order. */
+const estimated: number[] = [];
 
 let served: Served;
 const writes: { method: string; path: string; body: unknown }[] = [];
@@ -101,6 +106,11 @@ function serve(): void {
           body: typeof init.body === 'string' ? JSON.parse(init.body) : null,
         });
         return json(served.write.body, served.write.status);
+      }
+      if (url.pathname === `/v1/payroll/shifts/${SHIFT}/estimate` && served.estimate !== undefined) {
+        const amountMinor = Number(url.searchParams.get('amountMinor'));
+        estimated.push(amountMinor);
+        return json({ commissionMinor: served.estimate(amountMinor) });
       }
       switch (url.pathname) {
         case '/v1/scheduling/my-shifts':
@@ -182,6 +192,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-10-28T00:00:00Z'));
   writes.length = 0;
+  estimated.length = 0;
   served = {
     reports: [],
     rules: { currency: 'EUR', earningsSource: 'declared' },
@@ -231,6 +242,38 @@ describe('Faire mon rapport', () => {
       },
     });
     expect((await screen.findByText(/en attente de validation/u)).textContent).toContain('120,50');
+  });
+
+  it('says what the amount brings once the typing pauses, as the server computes it (reco 19)', async () => {
+    // 20 % VAT, 20 % to Reveal, 10 %: 120,50 € brings 8,03 €.
+    served.estimate = (amountMinor) => Math.round(((amountMinor / 1.2) * 0.8 * 10) / 100);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Faire mon rapport' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Faire mon rapport' });
+    fireEvent.change(amountField(), { target: { value: '12' } });
+    fireEvent.change(amountField(), { target: { value: '120' } });
+    fireEvent.change(amountField(), { target: { value: '120,50' } });
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    const line = await within(dialog).findByText(/^Ta commission estimée/u);
+    expect(line.textContent).toMatch(/^Ta commission estimée : 8,03\s€$/u);
+    expect(within(dialog).getByText('avant paliers, objectifs, primes et malus')).toBeTruthy();
+    // One request when the typing paused, not one a key.
+    expect(estimated).toEqual([12_050]);
+
+    // An amount the panel would not send has no estimate.
+    fireEvent.change(amountField(), { target: { value: '12,5x' } });
+    expect(within(dialog).queryByText(/^Ta commission estimée/u)).toBeNull();
+  });
+
+  it('says nothing when the server cannot estimate', async () => {
+    served.estimate = () => null;
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Faire mon rapport' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Faire mon rapport' });
+    fireEvent.change(amountField(), { target: { value: '80' } });
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(estimated).toEqual([8_000]);
+    expect(within(dialog).queryByText(/commission estimée/u)).toBeNull();
   });
 
   it('refuses « 50 € » on an account that declares in dollars, rather than reading it as $50', async () => {
@@ -459,5 +502,24 @@ describe('Mes rapports', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Validé/u }));
     const dialog = await screen.findByRole('dialog', { name: 'Mon rapport' });
     expect(dialog.textContent).toMatch(/Validé le lun\. 26 oct\. à 9\sh/u);
+    // A correction started from it is titled as one at once, not only when reopened.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ajouter une correction' }));
+    expect(await screen.findByRole('dialog', { name: 'Corriger mon rapport' })).toBeTruthy();
+  });
+
+  it('writes the true minus sign in a correction, as its hint and its estimate do (captures of #591)', async () => {
+    served.reports = [report({ status: 'validated', reviewedAt: '2026-10-26T08:00:00.000Z' })];
+    renderPage();
+    fireEvent.click(await screen.findByText('Tous mes rapports'));
+    fireEvent.click(await screen.findByRole('button', { name: /Validé/u }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Mon rapport' })).getByRole('button', {
+        name: 'Ajouter une correction',
+      }),
+    );
+    const correcting = await screen.findByRole('dialog', { name: 'Corriger mon rapport' });
+    const amount = within(correcting).getByLabelText('À ajouter ou retirer');
+    fireEvent.change(amount, { target: { value: '-15' } });
+    expect(amount).toHaveProperty('value', '−15');
   });
 });

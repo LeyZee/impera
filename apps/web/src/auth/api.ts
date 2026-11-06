@@ -3,12 +3,17 @@ import {
   InvitationLinkPreviewSchema,
   InvitationLinkTokenSchema,
   MeSchema,
+  PASSWORD_RESET_PAGE,
+  PASSWORD_RESET_REQUESTED_MESSAGE,
   PasswordInvalidReasonSchema,
+  PasswordResetPreviewSchema,
+  PasswordResetRequestedSchema,
   type ApiError,
   type InvitationLinkPreview,
   type InvitationLinkPurpose,
   type Me,
   type PasswordInvalidReason,
+  type PasswordResetPreview,
 } from '@impera/contracts';
 
 /**
@@ -22,15 +27,20 @@ export const LINK_PAGE_PATHS: Readonly<Record<InvitationLinkPurpose, string>> = 
   reset: '/nouveau-mot-de-passe',
 };
 
+/** The pages open without a session: the two invitation links, and « mot de passe oublié » (SEC-05 lot 3). */
+export type LinkPageKind = InvitationLinkPurpose | 'forgotten';
+
 /** The link page an address opens, or `null` anywhere else. */
-export function linkPageOf(pathname: string): InvitationLinkPurpose | null {
+export function linkPageOf(pathname: string): LinkPageKind | null {
   const path = pathname.replace(/\/+$/u, '');
   if (path === LINK_PAGE_PATHS.invitation) return 'invitation';
   if (path === LINK_PAGE_PATHS.reset) return 'reset';
+  if (path === PASSWORD_RESET_PAGE) return 'forgotten';
   return null;
 }
 
-let taken: { readonly token: string | null } | null = null;
+/** `present`: the address carried a link, readable or not; a cut link is not the same page as no link at all. */
+let taken: { readonly token: string | null; readonly present: boolean } | null = null;
 
 /**
  * The token of the address, read once: the fragment leaves the address at once (history, bookmarks, a screenshot of
@@ -40,12 +50,20 @@ export function takeToken(
   location: Location = window.location,
   history: History = window.history,
 ): string | null {
-  if (taken !== null) return taken.token;
+  return takeLink(location, history).token;
+}
+
+/** The same reading, and whether the address carried a link at all. */
+export function takeLink(
+  location: Location = window.location,
+  history: History = window.history,
+): { readonly token: string | null; readonly present: boolean } {
+  if (taken !== null) return taken;
   const raw = new URLSearchParams(location.hash.replace(/^#/u, '')).get('t');
   const parsed = InvitationLinkTokenSchema.safeParse(raw);
-  taken = { token: parsed.success ? parsed.data : null };
+  taken = { token: parsed.success ? parsed.data : null, present: raw !== null };
   if (location.hash !== '') history.replaceState(history.state, '', location.pathname);
-  return taken.token;
+  return taken;
 }
 
 /** Tests start each case on a fresh address. */
@@ -89,7 +107,13 @@ async function errorOf(response: Response): Promise<ApiError['error'] | null> {
 /** By the error's code, or by its status when a proxy answers in its place. */
 function refusalOf(status: number, error: ApiError['error'] | null): Refusal {
   const code = error?.code;
-  if (code === 'invitation_link_not_found' || code === 'member_left_conflict') return 'gone';
+  if (
+    code === 'invitation_link_not_found' ||
+    code === 'member_left_conflict' ||
+    code === 'password_reset_link_not_found'
+  ) {
+    return 'gone';
+  }
   if (code === 'rate_limited') return 'too_many_attempts';
   if (code === undefined && status === 404) return 'gone';
   if (code === undefined && status === 429) return 'too_many_attempts';
@@ -117,14 +141,77 @@ export async function redeemInvitationLink(token: string, password: string): Pro
     const me = MeSchema.safeParse(await response.json().catch(() => null));
     return { kind: 'ok', me: me.success ? me.data : null };
   }
-  const error = await errorOf(response);
+  return refusedOf(response.status, await errorOf(response));
+}
+
+/** Why a link refused its password, or the link itself (same rules on both link pages). */
+function refusedOf(
+  status: number,
+  error: ApiError['error'] | null,
+):
+  | { readonly kind: 'password_refused'; readonly reason: PasswordInvalidReason }
+  | { readonly kind: 'password_check_unavailable' }
+  | { readonly kind: Refusal } {
   // A refused password leaves the link unused: the member tries again on the same page.
-  if (error?.code === 'password_invalid' || (error === null && response.status === 400)) {
+  if (error?.code === 'password_invalid' || (error === null && status === 400)) {
     const reason = PasswordInvalidReasonSchema.safeParse(error?.details['reason']);
     return { kind: 'password_refused', reason: reason.success ? reason.data : 'refused' };
   }
   if (error?.code === 'service_unavailable' && error.details['reason'] === 'password_check') {
     return { kind: 'password_check_unavailable' };
   }
-  return { kind: refusalOf(response.status, error) };
+  return { kind: refusalOf(status, error) };
+}
+
+/* « Mot de passe oublié » (SEC-05 lot 3, ADR 0068): the link goes to the account's private Telegram chat. */
+
+export type ResetRequestResult =
+  | { readonly kind: 'requested'; readonly message: string }
+  | { readonly kind: 'too_many_attempts' | 'unavailable' };
+
+/**
+ * Asks a link for this address. The answer is the same whoever asks (known account or not, linked chat or not): the
+ * page shows its sentence as it is, and checks nothing of the address itself.
+ */
+export async function requestPasswordReset(email: string): Promise<ResetRequestResult> {
+  const response = await post('/v1/auth/password-reset', { email });
+  if (response === null) return { kind: 'unavailable' };
+  if (response.ok) {
+    const parsed = PasswordResetRequestedSchema.safeParse(await response.json().catch(() => null));
+    return {
+      kind: 'requested',
+      message: parsed.success ? parsed.data.message : PASSWORD_RESET_REQUESTED_MESSAGE,
+    };
+  }
+  const refusal = refusalOf(response.status, await errorOf(response));
+  return { kind: refusal === 'too_many_attempts' ? 'too_many_attempts' : 'unavailable' };
+}
+
+export type ResetInspectResult =
+  { readonly kind: 'ok'; readonly preview: PasswordResetPreview } | { readonly kind: Refusal };
+
+/** Whose the link is and until when; reading it does not use it. */
+export async function inspectPasswordReset(token: string): Promise<ResetInspectResult> {
+  const response = await post('/v1/auth/password-reset/inspect', { token });
+  if (response === null) return { kind: 'unavailable' };
+  if (!response.ok) return { kind: refusalOf(response.status, await errorOf(response)) };
+  const parsed = PasswordResetPreviewSchema.safeParse(await response.json().catch(() => null));
+  return parsed.success ? { kind: 'ok', preview: parsed.data } : { kind: 'unavailable' };
+}
+
+export type ResetRedeemResult =
+  | { readonly kind: 'ok' }
+  | { readonly kind: 'password_refused'; readonly reason: PasswordInvalidReason }
+  | { readonly kind: 'password_check_unavailable' }
+  | { readonly kind: Refusal };
+
+/**
+ * Uses the link once: the password is set and every session of the account ends, this browser's too. No session
+ * opens: the account signs in again, its code still asked.
+ */
+export async function redeemPasswordReset(token: string, password: string): Promise<ResetRedeemResult> {
+  const response = await post('/v1/auth/password-reset/redeem', { token, password });
+  if (response === null) return { kind: 'unavailable' };
+  if (response.ok) return { kind: 'ok' };
+  return refusedOf(response.status, await errorOf(response));
 }

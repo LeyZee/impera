@@ -12,6 +12,7 @@ const ME: Me = {
   role: 'owner',
   creatorIds: [],
   routedCreatorIds: [],
+  shiftCreatorIds: [],
   team: null,
   teamScope: 'owner',
 };

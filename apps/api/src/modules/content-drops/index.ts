@@ -22,6 +22,7 @@ import {
   createDrizzleCreatorContentStore,
   createDrizzleReceiptStore,
   lastScriptRequest,
+  lastScriptRequestFor,
   requestFromIdea,
   requestScript,
 } from './infra/db/store';
@@ -52,6 +53,8 @@ export interface ContentDropsModule {
   readonly scriptRequests: {
     ask(request: ScriptContentRequest): Promise<void>;
     last(creatorId: string): Promise<AskedScript | null>;
+    /** The same for a member of her team, under row-level security: `null` for anyone outside it. */
+    lastFor(creatorId: string, userId: string): Promise<AskedScript | null>;
   };
 }
 
@@ -107,6 +110,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
     scriptRequests: {
       ask: (request) => requestScript(deps.adminDb, request),
       last: (creatorId) => lastScriptRequest(deps.adminDb, creatorId),
+      lastFor: (creatorId, userId) => lastScriptRequestFor(deps.db, creatorId, userId),
     },
   };
 }

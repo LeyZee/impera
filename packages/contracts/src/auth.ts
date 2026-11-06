@@ -7,7 +7,11 @@ export type UserRole = z.infer<typeof UserRoleSchema>;
 /**
  * Who is signed in, as every route sees it. Never carries the session token. `creatorIds`: the creators whose every
  * conversation, fan and figure the account reads. `routedCreatorIds`: the creators where it reads only the
- * conversations routed to it (a team member whose scope is `self`, ADR 0024): their `creatorIds` are moved here.
+ * conversations routed to it or that it holds (a team member whose scope is `self`, ADR 0024): their `creatorIds` are
+ * moved here. `shiftCreatorIds`: those of `routedCreatorIds` whose access window is open now (ADR 0025, EQ-13), where
+ * it also reads every conversation, the « À traiter » queue and the sheet of each conversation's fan; computed at each
+ * request from the planning, never in `creatorIds`, which also opens the agent's mode, the Dashboard, the persona, the
+ * list of fans and the writing of a fan's limits.
  */
 export const CurrentUserSchema = z.object({
   id: z.string().min(1),
@@ -16,6 +20,7 @@ export const CurrentUserSchema = z.object({
   role: UserRoleSchema,
   creatorIds: z.array(z.uuid()),
   routedCreatorIds: z.array(z.uuid()).default([]),
+  shiftCreatorIds: z.array(z.uuid()).default([]),
 });
 export type CurrentUser = z.infer<typeof CurrentUserSchema>;
 

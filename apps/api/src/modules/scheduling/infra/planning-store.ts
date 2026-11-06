@@ -8,8 +8,8 @@ import {
   TeamMemberIdSchema,
   TeamMemberStatusSchema,
   type CreatorId,
+  type Platform,
   type ShiftId,
-  type UserId,
 } from '@impera/contracts';
 import {
   and,
@@ -28,6 +28,7 @@ import {
 import { z } from 'zod';
 
 import {
+  CreatorNotFound,
   OwnerOnly,
   PlatformAccountNotFound,
   ShiftNotFound,
@@ -51,13 +52,13 @@ import type {
 import {
   assertCancellable,
   assertEndsAhead,
-  assertPlans,
   assertShiftRange,
   assertTemplateStart,
   decideUpdate,
   firstStartOf,
   occurrenceKey,
   occurrencesAhead,
+  plansCreator,
 } from '../domain/shifts';
 import { addDays, calendarDayIn } from '../domain/time';
 
@@ -78,6 +79,7 @@ import {
   memberColumns,
   pgErrorOf,
   placed,
+  plannedIn,
   shiftColumns,
   shiftOnAccountInTheWay,
   StoredAccountSchema,
@@ -186,8 +188,9 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
   ): Promise<T> => {
     const creatorId = await creatorOfUnscoped(adminDb, table, id);
     if (creatorId === null) throw notFound();
-    return withTenantMember(db, creatorId, actor.userId, (tx, scope) => {
-      assertPlans(scope);
+    return withTenantMember(db, creatorId, actor.userId, async (tx, scope) => {
+      // A creator outside a manager's list: her shift or template is not his to see, nor to change.
+      if (!plansCreator(await plannedIn(tx, scope, actor.userId), creatorId)) throw notFound();
       return fn(tx, CreatorIdSchema.parse(creatorId));
     });
   };
@@ -381,6 +384,8 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
         actor,
         async (tx, scope) => {
           const plans = scope === 'owner' || scope === 'agency';
+          // Every creator is still read: a member busy on a creator outside a manager's list stands in the way too.
+          const plannedCreators = plans ? await plannedIn(tx, scope, actor) : null;
           const found: {
             shifts: StoredShift[];
             accounts: StoredAccount[];
@@ -440,7 +445,50 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
               : await tx.select(memberColumns).from(teamMembers).where(inArray(teamMembers.id, named));
           const planned = [...new Set(found.templates.map((template) => template.memberId))];
           const leaves = plans ? await leavesOf(tx, planned, range.from, range.to) : [];
-          return { scope, ...found, leaves, members: members.map(toMember) };
+          return { scope, planned: plannedCreators, ...found, leaves, members: members.map(toMember) };
+        },
+        SNAPSHOT_READ,
+      ),
+
+    // His own rows on each creator (`member_read`, `tenant_isolation`), never the admin connection: an owner or a
+    // manager reads every shift of a creator, so the member is named as well (EQ-13, audit RLS of the 06/11).
+    memberShifts: (actor, creatorIds, since) =>
+      withMember(
+        db,
+        actor,
+        async (tx) => {
+          const [member] = await tx
+            .select({ id: teamMembers.id, status: teamMembers.status })
+            .from(teamMembers)
+            .where(eq(teamMembers.userId, actor));
+          if (member === undefined) return null;
+          const mine: (StoredShift & { platform: Platform; handle: string })[] = [];
+          for (const creatorId of creatorIds) {
+            await enterCreator(tx, creatorId, creatorIds);
+            const rows = await tx
+              .select({
+                shift: shiftColumns,
+                platform: platformAccounts.platform,
+                handle: platformAccounts.handle,
+              })
+              .from(shifts)
+              .innerJoin(platformAccounts, eq(platformAccounts.id, shifts.platformAccountId))
+              .where(
+                and(
+                  eq(shifts.memberId, member.id),
+                  sql`${shifts.cancelledAt} is null`,
+                  sql`${shifts.endsAt} > ${since}`,
+                ),
+              );
+            mine.push(
+              ...rows.map((row) => ({
+                ...toShift(row.shift),
+                platform: PlatformSchema.parse(row.platform),
+                handle: row.handle,
+              })),
+            );
+          }
+          return { status: TeamMemberStatusSchema.parse(member.status), shifts: mine };
         },
         SNAPSHOT_READ,
       ),
@@ -450,9 +498,9 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
         db,
         actor,
         async (tx, scope) => {
-          assertPlans(scope);
+          const planned = await plannedIn(tx, scope, actor);
           const onDuty: { shift: StoredShift; member: StoredMember }[] = [];
-          for (const creatorId of creatorIds) {
+          for (const creatorId of creatorIds.filter((id) => plansCreator(planned, id))) {
             await enterCreator(tx, creatorId, creatorIds);
             const rows = await tx
               .select({ shift: shiftColumns, member: memberColumns })
@@ -475,7 +523,8 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
 
     createShift: (actor, shift, clock) =>
       withTenantMember(db, shift.creatorId, actor.userId, async (tx, scope) => {
-        assertPlans(scope);
+        if (!plansCreator(await plannedIn(tx, scope, actor.userId), shift.creatorId))
+          throw new CreatorNotFound();
         assertShiftRange(shift.startsAt, shift.endsAt);
         assertEndsAhead(shift.endsAt, clock.now);
         await lockAccounts(tx, [shift.platformAccountId]);
@@ -528,9 +577,9 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
         db,
         actor,
         async (tx, scope) => {
-          assertPlans(scope);
+          const planned = await plannedIn(tx, scope, actor);
           const running: StoredTemplate[] = [];
-          for (const creatorId of creatorIds) {
+          for (const creatorId of creatorIds.filter((id) => plansCreator(planned, id))) {
             await enterCreator(tx, creatorId, creatorIds);
             const rows = await tx
               .select(templateColumns)
@@ -547,7 +596,8 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
 
     createTemplate: (actor, template, clock) =>
       withTenantMember(db, template.creatorId, actor.userId, async (tx, scope) => {
-        assertPlans(scope);
+        if (!plansCreator(await plannedIn(tx, scope, actor.userId), template.creatorId))
+          throw new CreatorNotFound();
         assertTemplateStart(template.validFrom, calendarDayIn(clock.now, clock.timeZone));
         await assertMemberWorks(
           tx,
@@ -616,38 +666,6 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
 /** The reads and the job that cross creators, on the admin connection (BYPASSRLS): named `*Unscoped`. */
 export function createDrizzlePlanningAdmin(adminDb: Database): PlanningAdmin {
   return {
-    memberShiftsUnscoped: (userId: UserId, since: Date) =>
-      withAdmin(adminDb, async (tx) => {
-        const [member] = await tx
-          .select({ id: teamMembers.id, status: teamMembers.status })
-          .from(teamMembers)
-          .where(eq(teamMembers.userId, userId));
-        if (member === undefined) return null;
-        const rows = await tx
-          .select({
-            shift: shiftColumns,
-            platform: platformAccounts.platform,
-            handle: platformAccounts.handle,
-          })
-          .from(shifts)
-          .innerJoin(platformAccounts, eq(platformAccounts.id, shifts.platformAccountId))
-          .where(
-            and(
-              eq(shifts.memberId, member.id),
-              sql`${shifts.cancelledAt} is null`,
-              sql`${shifts.endsAt} > ${since}`,
-            ),
-          );
-        return {
-          status: TeamMemberStatusSchema.parse(member.status),
-          shifts: rows.map((row) => ({
-            ...toShift(row.shift),
-            platform: PlatformSchema.parse(row.platform),
-            handle: row.handle,
-          })),
-        };
-      }),
-
     onShiftUnscoped: (creatorId, at) =>
       withAdmin(adminDb, async (tx) => {
         const rows = await tx

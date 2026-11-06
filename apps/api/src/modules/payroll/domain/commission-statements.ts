@@ -163,14 +163,24 @@ function rateFor(rates: readonly ExchangeRate[], currency: Currency): number {
   return rate.rateMicros;
 }
 
+/** A gross in the account's currency, in euros, then without VAT, then net of the platform's commission: each rounded. */
+function netOf(
+  grossMinor: number,
+  rateMicros: number,
+  taken: { readonly vatBps: number; readonly platformFeeBps: number },
+): { grossEurMinor: number; exclVatMinor: number; netMinor: number } {
+  const grossEurMinor = mulDivRound(grossMinor, rateMicros, RATE_SCALE);
+  const exclVatMinor = mulDivRound(grossEurMinor, BPS, BPS + taken.vatBps);
+  const netMinor = mulDivRound(exclVatMinor, BPS - taken.platformFeeBps, BPS);
+  return { grossEurMinor, exclVatMinor, netMinor };
+}
+
 function lineOf(
   account: AccountEarnings,
   rateMicros: number,
   commissionRateBps: number,
 ): CommissionStatementLine {
-  const grossEurMinor = mulDivRound(account.grossMinor, rateMicros, RATE_SCALE);
-  const exclVatMinor = mulDivRound(grossEurMinor, BPS, BPS + account.vatBps);
-  const netMinor = mulDivRound(exclVatMinor, BPS - account.platformFeeBps, BPS);
+  const { grossEurMinor, exclVatMinor, netMinor } = netOf(account.grossMinor, rateMicros, account);
   return {
     platformAccountId: account.platformAccountId,
     currency: account.currency,
@@ -181,6 +191,22 @@ function lineOf(
     netMinor,
     commissionMinor: mulDivRound(netMinor, commissionRateBps, BPS),
   };
+}
+
+/**
+ * What one gross brings a member, by the chain of a statement's line (reco 19): the estimate under the amount of a
+ * shift's report. Only an estimate: a statement rounds an account's total for the period once, and adds the tiers,
+ * goals, bonuses and penalties. A correction's negative amount takes off as much as it would have brought.
+ */
+export function commissionOfGross(input: {
+  readonly grossMinor: number;
+  readonly rateMicros: number;
+  readonly vatBps: number;
+  readonly platformFeeBps: number;
+  readonly commissionRateBps: number;
+}): number {
+  const { netMinor } = netOf(input.grossMinor, input.rateMicros, input);
+  return mulDivRound(netMinor, input.commissionRateBps, BPS);
 }
 
 /** Of two tiers, the higher; on the same step, the larger bonus, so that the order they come in never matters. */

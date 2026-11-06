@@ -18,6 +18,7 @@ import {
   type CreatorId,
   type SchedulingSettings,
   type TeamMemberId,
+  type TeamScope,
 } from '@impera/contracts';
 import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
@@ -36,6 +37,8 @@ import {
   assertCanWork,
   assertJoined,
   DEFAULT_SCHEDULING_SETTINGS,
+  plannedCreatorsOf,
+  type PlannedCreators,
   type WorkingMember,
 } from '../domain/shifts';
 
@@ -443,6 +446,16 @@ export async function assertMemberJoined(
   assertJoined(await workingMember(tx, memberId), startsAt);
 }
 
+/**
+ * What the actor plans (`plannedCreatorsOf`), a manager's list read in the transaction from his own account, never
+ * from the request; `role_forbidden` for anyone who does not plan.
+ */
+export async function plannedIn(tx: Transaction, scope: TeamScope, userId: string): Promise<PlannedCreators> {
+  if (scope !== 'agency') return plannedCreatorsOf(scope, []);
+  const [account] = await tx.select({ creatorIds: user.creatorIds }).from(user).where(eq(user.id, userId));
+  return plannedCreatorsOf(scope, account?.creatorIds ?? []);
+}
+
 /** The account is the creator's: the tenant policy hides any other. */
 export async function assertAccountOf(tx: Transaction, platformAccountId: string): Promise<void> {
   const [account] = await tx
@@ -544,4 +557,10 @@ export const RulesRowSchema = z.object({
   fromPeriod: PayPeriodSchema,
   currency: CurrencySchema,
   earningsSource: EarningsSourceSchema,
+});
+
+/** The same with VAT and the platform's commission, as the report's context reads them (`RatedRulesRow`). */
+export const RatedRulesRowSchema = RulesRowSchema.extend({
+  vatBps: z.number().int(),
+  platformFeeBps: z.number().int(),
 });

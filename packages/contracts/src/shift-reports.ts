@@ -135,6 +135,33 @@ export const ShiftReportContextSchema = z.object({
 export type ShiftReportContext = z.infer<typeof ShiftReportContextSchema>;
 
 /**
+ * `GET /v1/payroll/shifts/:shiftId/estimate?amountMinor=` (the shift's member, the owner, an active manager; reco 19
+ * of the recette, 05/11): what `amountMinor`, typed in the « Faire mon rapport » panel in the currency of the account's
+ * rules, brings the shift's member, by pay's own chain on this amount alone: gross → euros → excluding VAT → net of the
+ * platform's commission → the member's rate for the period. An estimate: pay counts an account's total for the period,
+ * rounded once, and adds tiers, goals, bonuses and penalties on the statement. A correction's amount may be negative.
+ * 404 `shift_not_found`, 403 `shift_report_forbidden` to anyone else.
+ */
+export const ShiftReportEstimateQuerySchema = z.strictObject({
+  /** Digits only, a minus for a correction: an empty value is not 0. */
+  amountMinor: z
+    .string()
+    .regex(/^-?\d+$/u)
+    .transform(Number)
+    .pipe(AmountMinorSchema),
+});
+export type ShiftReportEstimateQuery = z.infer<typeof ShiftReportEstimateQuerySchema>;
+
+export const ShiftReportEstimateSchema = z.object({
+  /**
+   * In euro cents; `null` when it cannot be said: no rules for the period, sales read by the connector, no rate for
+   * the member that period, or no exchange rate for the currency yet.
+   */
+  commissionMinor: z.number().int().nullable(),
+});
+export type ShiftReportEstimate = z.infer<typeof ShiftReportEstimateSchema>;
+
+/**
  * `POST /v1/scheduling/shift-reports` → 201 `ShiftReportSchema`, or 200 when the same `id` was already recorded with
  * the same values (`shift_report_conflict` otherwise).
  *

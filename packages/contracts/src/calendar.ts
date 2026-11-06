@@ -16,7 +16,8 @@ import {
  * `GET /v1/scheduling/calendar?from=…&to=…[&creatorId=…][&memberId=…]`, a window of `PLANNING_MAX_DAYS` at most (a
  * month view needs 6 weeks). The database decides what each reader gets (`calendar_shifts`, `calendar_agent`):
  * - `agency`, the owner or an active manager: every shift, the agent of each creator, and `agency` (the accounts,
- *   the créneaux to fill, those the agent holds alone, each member's hours and the coverage of each account);
+ *   the créneaux to fill, those the agent holds alone, each member's hours and the coverage of each account), all of
+ *   them on the creators of his list for a manager (Charles, 06/11);
  * - `team`, an active chatter: every shift of the team and the agent, in reading, nothing more;
  * - `own`, a member who is not active (on leave, sick, travelling, suspended): his own shifts only, no agent.
  * A shift says who, on which creator, and when: never a leave, a rate, a country, a status or a report. The filters
@@ -100,7 +101,8 @@ export const CalendarSchema = z.object({
   view: CalendarViewSchema,
   settings: SchedulingSettingsSchema,
   /**
-   * The creators the calendar names (every creator for `agency` and `team`), with their names for the rows. One who is
+   * The creators the calendar names (every creator for `agency` and `team`, those of his list for a manager), with
+   * their names for the rows. One who is
    * archived (ADR 0071 § 2) only when a shift of the window is hers, her history, said `archived`: nothing to fill.
    */
   creators: z.array(z.object({ id: CreatorIdSchema, name: z.string().min(1), archived: z.boolean() })),

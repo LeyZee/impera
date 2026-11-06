@@ -4,6 +4,7 @@ import {
   ContentDropSchema,
   CreatorContentSchema,
   DropFileUploadSchema,
+  ScriptDropSchema,
   type CompleteDropFileBody,
   type ContentDrop,
   type ContentDropFileId,
@@ -12,6 +13,10 @@ import {
   type CreateContentDropBody,
   type CreatorContent,
   type DropFileUpload,
+  type FillScriptSlotBody,
+  type ScriptDrop,
+  type ScriptVariantLetter,
+  type StartScriptDropBody,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
@@ -61,9 +66,9 @@ async function refusedBy(response: Response): Promise<Refused> {
   return new Refused(response.status, refusals.success ? refusals.data.refusals : []);
 }
 
-async function post(path: string, body: unknown): Promise<Response> {
+async function post(path: string, body: unknown, method: 'POST' | 'PUT' = 'POST'): Promise<Response> {
   const response = await fetch(`${BASE}${path}`, {
-    method: 'POST',
+    method,
     credentials: 'include',
     headers: JSON_HEADERS,
     body: JSON.stringify(body),
@@ -115,3 +120,54 @@ export const completeFile = (
   stopping(async () =>
     ContentDropSchema.parse(await (await post(`/drops/${dropId}/files/${fileId}/complete`, body)).json()),
   );
+
+/* ---- Her script, card by card (SC-02 lot b2) ---- */
+
+const SCRIPT_DROPS = '/content/script-drops';
+export const scriptDropKey = (dropId: ContentDropId) => ['creator-space', 'script-drop', dropId] as const;
+
+/** `POST …/script-drops`: her script begun from its request, empty. Replayed with the same id, it answers the same. */
+export async function startScriptDrop(body: StartScriptDropBody): Promise<ScriptDrop> {
+  return ScriptDropSchema.parse(await (await post(SCRIPT_DROPS, body)).json());
+}
+
+/** `GET …/script-drops/:dropId`: her drop and the frozen version it shoots; read often while a file of it moves. */
+export function useScriptDrop(dropId: ContentDropId): UseQueryResult<ScriptDrop> {
+  return useQuery({
+    queryKey: scriptDropKey(dropId),
+    queryFn: async () => {
+      const response = await fetch(`${BASE}${SCRIPT_DROPS}/${dropId}`, { credentials: 'include' });
+      if (!response.ok) throw await refusedBy(response);
+      return ScriptDropSchema.parse(await response.json());
+    },
+    refetchInterval: (query) =>
+      query.state.data?.drop.files.some((file) => file.state === 'awaiting' || file.state === 'received')
+        ? 5_000
+        : false,
+    retry: (count, error) => !(error instanceof Refused) && count < 1,
+  });
+}
+
+/** `PUT …/slots/:slotKey`: the file she chose for a slot, declared before it goes up; the slot's old file set aside. */
+export async function fillSlot(
+  dropId: ContentDropId,
+  slotKey: string,
+  body: FillScriptSlotBody,
+): Promise<ContentDrop> {
+  return ContentDropSchema.parse(
+    await (await post(`${SCRIPT_DROPS}/${dropId}/slots/${encodeURIComponent(slotKey)}`, body, 'PUT')).json(),
+  );
+}
+
+/** `POST …/submit`: « Envoyer le script », every slot she may not leave out filled. */
+export async function submitScript(dropId: ContentDropId): Promise<ContentDrop> {
+  return ContentDropSchema.parse(await (await post(`${SCRIPT_DROPS}/${dropId}/submit`, {})).json());
+}
+
+/** The address of a card of her script, drawn by the server from her frozen version (a same-origin SVG). */
+export const cardUrl = (
+  dropId: ContentDropId,
+  segmentKey: string,
+  variant: ScriptVariantLetter | null,
+): string =>
+  `${BASE}${SCRIPT_DROPS}/${dropId}/cards/${segmentKey}${variant === null ? '' : `?variant=${variant}`}`;

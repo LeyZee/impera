@@ -1,4 +1,4 @@
-import type { Me } from '@impera/contracts';
+import { ContentDropIdSchema, type Me } from '@impera/contracts';
 import {
   createRootRouteWithContext,
   createRoute,
@@ -21,6 +21,7 @@ import { myAwayOf } from './scheduling/model';
 import { AgendaPage } from './screens/agenda/AgendaPage';
 import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
 import { ContentPage } from './screens/content/ContentPage';
+import { ScriptPage } from './screens/content/ScriptPage';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
@@ -302,7 +303,35 @@ const sales = createRoute({
 const content = createRoute({
   getParentRoute: () => rootRoute,
   path: '/contenu',
-  component: ContentPage,
+  component: function Content() {
+    const navigate = content.useNavigate();
+    return (
+      <ContentPage
+        onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
+      />
+    );
+  },
+});
+/** Her script, card by card (SC-02 lot b2): a drop of hers, by its id; any other address goes back to Contenu. */
+const contentScript = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/contenu/script/$dropId',
+  beforeLoad: ({ params }) => {
+    if (!ContentDropIdSchema.safeParse(params.dropId).success) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/contenu', replace: true });
+    }
+  },
+  component: function ContentScript() {
+    const { dropId } = contentScript.useParams();
+    const navigate = contentScript.useNavigate();
+    return (
+      <ScriptPage
+        dropId={ContentDropIdSchema.parse(dropId)}
+        onBack={() => void navigate({ to: '/contenu' })}
+      />
+    );
+  },
 });
 const myPlanning = createRoute({
   getParentRoute: () => rootRoute,
@@ -880,6 +909,7 @@ const routeTree = rootRoute.addChildren([
   agenda,
   sales,
   content,
+  contentScript,
   myPlanning,
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
