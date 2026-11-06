@@ -1,4 +1,5 @@
 import type { PayPeriod, ShiftReportList, ShiftReportStatus } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { useReports, useSchedulingSettings } from './api';
@@ -122,7 +123,8 @@ export function MyReportsCard({
                 {/* No report validated yet in this currency: no « Validé 0,00 $US » that reads as one at zero. */}
                 {sum.validated === 0 && sum.waiting + sum.sentBack > 0 ? null : (
                   <div className="rp-figures__one">
-                    <span className="rp-figures__label">Validé</span>
+                    {/* The gross he declared, as the platform shows it: not what he earns (recette 05/11, CHAT-20). */}
+                    <span className="rp-figures__label">Ventes validées</span>
                     <span className="rp-figures__value nv-num">
                       {amountText(sum.validatedMinor, sum.currency)}
                     </span>
@@ -147,6 +149,16 @@ export function MyReportsCard({
               </div>
             ))}
           </div>
+        )}
+
+        {sums.length === 0 ? null : (
+          // His commission is computed by the pay, from the net: Commissions says it, never an estimate here.
+          <Link to="/commissions" className="rp-mine__pay">
+            Ta commission est dans Commissions
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m6 3.5 4.5 4.5-4.5 4.5" />
+            </svg>
+          </Link>
         )}
 
         {lines.length === 0 ? null : (

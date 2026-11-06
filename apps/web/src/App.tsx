@@ -1,7 +1,7 @@
 import type { Me } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
-import { useCallback, useEffect, useState, type JSX } from 'react';
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
 import { NewPasswordPage } from './auth/NewPasswordPage';
 import { SecondFactorPage } from './auth/SecondFactorPage';
@@ -9,7 +9,9 @@ import { SignInPage } from './auth/SignInPage';
 import { Unreachable } from './auth/Unreachable';
 import { WelcomePage } from './auth/WelcomePage';
 import { linkPageOf } from './auth/api';
+import { forgetChosenPassword } from './auth/chosen-password';
 import { readSession, signOut } from './auth/session';
+import { watchSessionEnd } from './auth/session-end';
 import { forgetDevice } from './pwa/device';
 import { keepSession, keptSession } from './pwa/keptSession';
 import { listenForNotificationOpens } from './pwa/notificationOpen';
@@ -46,6 +48,11 @@ export function App(): JSX.Element {
   const [linkPage, setLinkPage] = useState(() => linkPageOf(window.location.pathname));
   // A sign-out the server did not make: the session stays open, and the page says so instead of doing nothing.
   const [signOutFailed, setSignOutFailed] = useState(false);
+  // The session ended while the app was open (closed elsewhere, past its 12 h or 7 days): the sign-in page says so.
+  const [hasEnded, setHasEnded] = useState(false);
+  const isRechecking = useRef(false);
+  // A sign-out she asked for: a screen's 401 in flight meanwhile is not a session that ended (relecture #538).
+  const isLeaving = useRef(false);
 
   const refresh = useCallback(() => {
     readSession().then(
@@ -56,6 +63,10 @@ export function App(): JSX.Element {
         if (current.kind === 'signed_in') {
           void refreshPushSubscription();
           keepSession(current.user);
+          setHasEnded(false);
+          isLeaving.current = false;
+          // Signed in by now: a password kept for the code's activation has nothing left to do.
+          forgetChosenPassword();
         }
         setSession(
           current.kind === 'signed_in'
@@ -78,12 +89,40 @@ export function App(): JSX.Element {
     );
   }, []);
 
+  /**
+   * A 401 on a screen, or the app shown again after a while (recette 05/11, SEC-01): the session is read again, and
+   * only a server that says « no session » leads to the sign-in page. A read that fails (offline, a server down)
+   * changes nothing: the screens say it their own way, and the agenda kept offline stays readable.
+   */
+  const recheck = useCallback(() => {
+    if (isRechecking.current || isLeaving.current) return;
+    isRechecking.current = true;
+    readSession()
+      .then(
+        (current) => {
+          if (current.kind === 'signed_in' || isLeaving.current) return;
+          void forgetDevice();
+          forgetChosenPassword();
+          setHasEnded(true);
+          setSession({ status: current.kind });
+        },
+        () => undefined,
+      )
+      .finally(() => {
+        isRechecking.current = false;
+      });
+  }, []);
+
   const leave = useCallback(() => {
     setSignOutFailed(false);
+    setHasEnded(false);
+    isLeaving.current = true;
     // While the session still opens the door: the server forgets this device before the account leaves it.
     turnOffPush()
       .then(signOut)
       .then(refresh, () => {
+        // Still signed in: a 401 from now on is a session that ended again.
+        isLeaving.current = false;
         setSignOutFailed(true);
       });
   }, [refresh]);
@@ -91,6 +130,20 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (linkPage === null) refresh();
   }, [linkPage, refresh]);
+  // Only while signed in: the sign-in pages expect their own 401s (a wrong password), and nothing is left to end.
+  const isSignedIn = session.status === 'signed_in';
+  useEffect(() => {
+    if (!isSignedIn) return undefined;
+    const unwatch = watchSessionEnd(recheck);
+    const onShown = () => {
+      if (document.visibilityState === 'visible') recheck();
+    };
+    document.addEventListener('visibilitychange', onShown);
+    return () => {
+      unwatch();
+      document.removeEventListener('visibilitychange', onShown);
+    };
+  }, [isSignedIn, recheck]);
   useEffect(() => {
     if (session.status !== 'unreachable' && session.status !== 'offline') return undefined;
     const timer = setTimeout(refresh, RETRY_MS[Math.min(session.attempt, RETRY_MS.length - 1)]);
@@ -128,7 +181,12 @@ export function App(): JSX.Element {
   }
   if (session.status === 'unreachable') return <Unreachable />;
   if (session.status === 'signed_out') {
-    return <SignInPage onSignedIn={refresh} />;
+    return (
+      <SignInPage
+        onSignedIn={refresh}
+        notice={hasEnded ? 'Ta session a pris fin. Reconnecte-toi pour continuer.' : null}
+      />
+    );
   }
   if (session.status === 'second_factor_required') {
     return <SecondFactorPage onActivated={refresh} onSignOut={leave} />;

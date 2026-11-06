@@ -15,9 +15,18 @@ const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, A
  * creator or none: her name above is enough. Another creator's urgencies show on her chip, so that none hides behind
  * the one followed (DASH-03).
  */
-export function CreatorPicker(): JSX.Element | null {
+export function CreatorPicker({
+  onChoose,
+}: {
+  /** Told after the choice is followed: the Dashboard writes her in its address (recette 05/11, PRO-28). */
+  onChoose?: ((creatorId: string) => void) | undefined;
+} = {}): JSX.Element | null {
   const creators = useCreators().data ?? [];
-  const { chosen, follow } = useFollowedCreatorId();
+  const { chosen, follow: followOnly } = useFollowedCreatorId();
+  const follow = (creatorId: string): void => {
+    followOnly(creatorId);
+    onChoose?.(creatorId);
+  };
   const ref = useRef<HTMLDivElement>(null);
   const several = creators.length >= 2;
   const queue = useQuery({ ...todosAcrossQuery, enabled: several });

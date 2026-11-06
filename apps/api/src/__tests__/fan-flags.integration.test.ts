@@ -1,4 +1,5 @@
 import {
+  ConversationIdSchema,
   FanFlagsViewSchema,
   FanKycViewSchema,
   FanIdSchema,
@@ -343,5 +344,113 @@ describe('fan flags (GET and PUT /v1/fans/:id/flags) and lines to learn (GET /v1
       expect.objectContaining({ flag: 'ageConfirmedAt', reason }),
     );
     await test.admin.db.delete(schema.teamMembers).where(eq(schema.teamMembers.userId, operatorId));
+  });
+
+  it('lets a chatter read, never change, the limits of a fan routed to him, and no other fan (CHAT-03)', async () => {
+    // His own fan, his own conversation of Anna: invented (ADR 0010).
+    const [account] = await test.admin.db
+      .select({ id: schema.platformAccounts.id })
+      .from(schema.platformAccounts)
+      .where(eq(schema.platformAccounts.creatorId, anna));
+    if (account === undefined) throw new Error('no account');
+    const routedFan = newId(FanIdSchema);
+    const conversation = newId(ConversationIdSchema);
+    const email = 'chatter-limits@example.test';
+    const { userId } = await createOwner(app.auth, app.db.db, {
+      email,
+      name: 'Chatter',
+      password: 'correct horse battery',
+    });
+    await test.admin.db
+      .update(schema.user)
+      .set({ role: 'operator', creatorIds: [anna] })
+      .where(eq(schema.user.id, userId));
+    await test.admin.db.insert(schema.teamMembers).values({
+      id: newId(TeamMemberIdSchema),
+      userId,
+      teamRole: 'chatter',
+      firstName: 'Prénom',
+      lastName: 'Inventé',
+      displayName: 'Chatter',
+      country: 'BJ',
+      timeZone: 'Africa/Porto-Novo',
+      joinedOn: '2026-10-01',
+    });
+    await withAdmin(test.admin.db, async (tx) => {
+      await tx.insert(schema.fans).values({
+        id: routedFan,
+        creatorId: anna,
+        platformAccountId: account.id,
+        platformFanId: 'fan-routed',
+        displayName: 'Fan Test Routé',
+      });
+      await tx.insert(schema.conversations).values({
+        id: conversation,
+        creatorId: anna,
+        platformAccountId: account.id,
+        fanId: routedFan,
+        platformConversationId: 'conv-routed',
+      });
+    });
+    const chatter = await signIn(server, email, 'correct horse battery');
+    const read = (fanId: string, path: 'flags' | 'kyc') =>
+      server.inject({
+        method: 'GET',
+        url: `/v1/fans/${fanId}/${path}?creatorId=${anna}`,
+        headers: { cookie: chatter },
+      });
+    await put(owner, { flag: 'doNotContact', set: true });
+
+    // Not routed to him yet: closed, like the conversation itself (ADR 0024).
+    expect((await read(routedFan, 'flags')).statusCode).toBe(403);
+    expect((await read(routedFan, 'kyc')).statusCode).toBe(403);
+
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ routedToUserId: userId })
+      .where(eq(schema.conversations.id, conversation));
+    await server.inject({
+      method: 'PUT',
+      url: url(routedFan, anna),
+      headers: { cookie: owner, origin: DASHBOARD_ORIGIN },
+      payload: { flag: 'fragile', set: true },
+    });
+    const limits = await read(routedFan, 'flags');
+    expect(limits.statusCode).toBe(200);
+    expect(FanFlagsViewSchema.parse(limits.json())).toMatchObject({
+      fanId: routedFan,
+      flags: { fragile: true },
+      mayConfirmDisputedAge: false,
+    });
+    expect((await read(routedFan, 'kyc')).statusCode).toBe(200);
+
+    // Read only: he changes none of his limits, and reads no other fan of Anna, nor anything of Bea.
+    const change = await server.inject({
+      method: 'PUT',
+      url: url(routedFan, anna),
+      headers: { cookie: chatter, origin: DASHBOARD_ORIGIN },
+      payload: { flag: 'fragile', set: false },
+    });
+    expect(change.statusCode).toBe(403);
+    expect(FanFlagsViewSchema.parse((await read(routedFan, 'flags')).json()).flags).toHaveProperty('fragile');
+    expect((await read(fan, 'flags')).statusCode).toBe(403);
+    expect((await read(fan, 'kyc')).statusCode).toBe(403);
+    expect(
+      (
+        await server.inject({
+          method: 'GET',
+          url: `/v1/fans/${routedFan}/flags?creatorId=${bea}`,
+          headers: { cookie: chatter },
+        })
+      ).statusCode,
+    ).toBe(403);
+
+    // Away (suspended), he reads nothing, even what is still routed to him.
+    await test.admin.db
+      .update(schema.teamMembers)
+      .set({ status: 'suspended' })
+      .where(eq(schema.teamMembers.userId, userId));
+    expect((await read(routedFan, 'flags')).statusCode).toBe(403);
+    await put(owner, { flag: 'doNotContact', set: false });
   });
 });

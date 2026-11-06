@@ -17,7 +17,7 @@ import { AgentPill } from './AgentPill';
 
 import { apiDashboard, CREATOR, serveDashboard } from '@/test/fakes';
 
-async function renderPill(): Promise<HTMLElement> {
+async function renderPill(at = '/suivi'): Promise<HTMLElement> {
   const root = createRootRoute({
     component: (): JSX.Element => (
       <>
@@ -26,10 +26,12 @@ async function renderPill(): Promise<HTMLElement> {
       </>
     ),
   });
-  const routes = ['/', '/suivi'].map((path) => createRoute({ getParentRoute: () => root, path }));
+  const routes = ['/', '/suivi', '/creatrices'].map((path) =>
+    createRoute({ getParentRoute: () => root, path }),
+  );
   const router = createRouter({
     routeTree: root.addChildren(routes),
-    history: createMemoryHistory({ initialEntries: ['/suivi'] }),
+    history: createMemoryHistory({ initialEntries: [at] }),
   });
   const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
   render(
@@ -168,6 +170,32 @@ describe('AgentPill', () => {
     } finally {
       localStorage.clear();
     }
+  });
+
+  it('speaks of the creator a sheet of Créatrices shows, and opens her Dashboard (recette 05/11, PRO-28)', async () => {
+    const ana = { id: '0192f3a0-0000-7000-8000-0000000000c2', displayName: 'Ana', timezone: 'Europe/Paris' };
+    localStorage.setItem('impera.followed-creator', CREATOR.id);
+    try {
+      serveDashboard(
+        (url) => live(url.searchParams.get('creatorId') === ana.id ? 'stop' : 'copilot'),
+        [ana, CREATOR],
+      );
+      const pill = await renderPill(`/creatrices?creatrice=${ana.id}`);
+      await waitFor(() => {
+        expect(pill.textContent).toContain('Arrêt');
+      });
+      expect(pill.getAttribute('href')).toBe(`/?creatrice=${ana.id}`);
+    } finally {
+      localStorage.clear();
+    }
+  });
+
+  it('cuts a long name inside the pill, the title keeping it whole (recette 05/11, PRO-12)', async () => {
+    serveDashboard(live('copilot'));
+    const pill = await renderPill();
+    await waitFor(() => {
+      expect(pill.querySelector('.nv-rail__agent-label')?.textContent).toBe('Copilote');
+    });
   });
 
   it('names no creator when the account follows only one', async () => {

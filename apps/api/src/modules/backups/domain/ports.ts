@@ -57,6 +57,6 @@ export interface BackupRequestsStore {
     actor: RestoreTestActor,
     decide: (context: RequestContext) => RequestDecision,
   ): Promise<{ readonly created: boolean; readonly request: StoredBackupRequest }>;
-  /** The oldest request not picked up yet, for the status. */
+  /** The latest request not picked up yet, for the status. */
   pending(): Promise<StoredBackupRequest | null>;
 }

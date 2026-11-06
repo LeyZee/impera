@@ -6,7 +6,9 @@ import {
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
+import { followCreator } from './agent/followed';
 import { CreatorsPage } from './creators/CreatorsPage';
 import { MyPersonaPage } from './creators/MyPersonaPage';
 import { creatorsSearch, parseCreatorsSearch, sheetOf, sheetsFor } from './creators/search';
@@ -25,6 +27,7 @@ import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { MyPreferencesPage } from './screens/me/MyPreferencesPage';
+import { MyProfilePage } from './screens/me/MyProfilePage';
 import { MySecurityPage } from './screens/me/MySecurityPage';
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
@@ -38,8 +41,6 @@ import { MyPlanningPage, type MyPlanningSearch } from './screens/planning/MyPlan
 import { CreatorSalesPage } from './screens/sales/CreatorSalesPage';
 import { parseSalesSearch } from './screens/sales/view';
 import {
-  DevicesPage,
-  AgentModePage,
   AiModelsPage,
   AlertsPage,
   BackupsPage,
@@ -62,9 +63,7 @@ import { SuiviNav } from './screens/tracking/SuiviNav';
 import { TrackingPage } from './screens/tracking/TrackingPage';
 import { AlertHistoryPage } from './screens/tracking/history/AlertHistoryPage';
 import { parseTrackingSearch } from './screens/tracking/view';
-import { CorrectionsPage } from './screens/train/CorrectionsPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
-import { TestsPage } from './screens/train/TestsPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
@@ -114,10 +113,15 @@ const dashboard = createRoute({
     const { user } = rootRoute.useRouteContext();
     const search = dashboard.useSearch();
     const navigate = dashboard.useNavigate();
+    // A link that names her opens her Dashboard, and she is followed from then on (recette 05/11, PRO-28).
+    useEffect(() => {
+      if (search.creatrice !== undefined) followCreator(search.creatrice);
+    }, [search.creatrice]);
     return (
       <DashboardPage
         period={periodOf(search)}
-        onPeriod={(next) => void navigate({ search: dashboardSearch(next), replace: true })}
+        onPeriod={(next) => void navigate({ search: dashboardSearch(next, search.creatrice), replace: true })}
+        onCreator={(id) => void navigate({ search: dashboardSearch(periodOf(search), id), replace: true })}
         forOwner={user.role === 'owner'}
         opensTracking={canOpen(railOf(user), '/suivi')}
         canAddCreator={canOpen(railOf(user), '/creatrices')}
@@ -553,13 +557,14 @@ const meIndex = createRoute({
   getParentRoute: () => me,
   path: '/',
   beforeLoad: ({ context }) => {
+    // A team member's Moi opens on his profile; the file, a task of once in a while, is the next tab (CHAT-30).
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: context.user.role === 'creator' ? '/moi/persona' : '/moi/dossier', replace: true });
+    throw redirect({ to: context.user.role === 'creator' ? '/moi/persona' : '/moi/profil', replace: true });
   },
 });
 /**
  * A creator's Moi holds her persona and her security (ADR 0042 § 8): a team member's screens (his file, his invoices,
- * his calendar of shifts) send her to her persona, as her persona sends anyone else to his file.
+ * his calendar of shifts) send her to her persona, as her persona sends anyone else to his profile.
  */
 const creatorAway = ({ context }: { context: RouterContext }): void => {
   if (context.user.role === 'creator') {
@@ -573,10 +578,19 @@ const mePersona = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'creator') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/moi/dossier', replace: true });
+      throw redirect({ to: '/moi/profil', replace: true });
     }
   },
   component: MyPersonaPage,
+});
+const meProfile = createRoute({
+  getParentRoute: () => me,
+  path: '/profil',
+  beforeLoad: creatorAway,
+  component: function MyProfile() {
+    const { user } = rootRoute.useRouteContext();
+    return <MyProfilePage user={user} />;
+  },
 });
 const meFile = createRoute({
   getParentRoute: () => me,
@@ -653,12 +667,26 @@ const playground = createRoute({
   path: '/playground',
   component: PlaygroundPage,
 });
+/*
+ * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
+ * to an « à venir » page under its header (recette 05/11, PRO-25). Each comes back with its screen.
+ */
 const corrections = createRoute({
   getParentRoute: () => train,
   path: '/corrections',
-  component: CorrectionsPage,
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/entrainer/playground', replace: true });
+  },
 });
-const tests = createRoute({ getParentRoute: () => train, path: '/tests', component: TestsPage });
+const tests = createRoute({
+  getParentRoute: () => train,
+  path: '/tests',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/entrainer/playground', replace: true });
+  },
+});
 
 const settings = createRoute({
   getParentRoute: () => rootRoute,
@@ -732,7 +760,15 @@ const alerts = createRoute({
   },
   component: AlertsPage,
 });
-const devices = createRoute({ getParentRoute: () => settings, path: '/appareils', component: DevicesPage });
+// Appareils has no screen yet (it comes with the extension's), hence no tab: its address leads to Réglages (PRO-25).
+const devices = createRoute({
+  getParentRoute: () => settings,
+  path: '/appareils',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/reglages', replace: true });
+  },
+});
 const backups = createRoute({
   getParentRoute: () => settings,
   path: '/sauvegardes',
@@ -784,7 +820,15 @@ const settingsSecurity = createRoute({
     return <SecurityPage userId={user.id} />;
   },
 });
-const agentMode = createRoute({ getParentRoute: () => settings, path: '/mode', component: AgentModePage });
+// The agent's mode changes at the top of the Dashboard: the old address leads to Réglages, not to an orphan line (PRO-25).
+const agentMode = createRoute({
+  getParentRoute: () => settings,
+  path: '/mode',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/reglages', replace: true });
+  },
+});
 
 /** /aide/installer (CR-01): open to every role, outside the rail (no section, so the guard lets it through). */
 const installHelp = createRoute({
@@ -840,7 +884,7 @@ const routeTree = rootRoute.addChildren([
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
-  me.addChildren([meIndex, mePersona, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),
+  me.addChildren([meIndex, mePersona, meProfile, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),
   accountSecurity,
   settings.addChildren([
     settingsIndex,

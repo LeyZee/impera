@@ -98,9 +98,15 @@ describe('Moi › Dossier', () => {
     await screen.findByText('Ton dossier est vide.');
     // A chatter's Moi holds one screen: no sub-tabs.
     expect(screen.queryByRole('link', { name: 'Factures' })).toBeNull();
+    // At the panel's inset, never against its rounded edge (recette 05/11, CHAT-16).
     expect(
-      within(panelOf('Tes pièces')).getByText(/Aucun régime de facturation pour l’instant/u),
-    ).toBeTruthy();
+      within(panelOf('Tes pièces'))
+        .getByText(/Aucun régime de facturation pour l’instant/u)
+        .closest('.rp-sec'),
+    ).not.toBeNull();
+    expect(
+      within(panelOf('Tes textes')).getByText('Contrat de prestation').closest('.rp-sec'),
+    ).not.toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Remplir mon dossier' }));
     expect(within(dialog()).getByText(/Pays : Bénin/u)).toBeTruthy();

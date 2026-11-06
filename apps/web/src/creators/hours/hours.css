@@ -260,6 +260,11 @@
   .hr-range__label {
     width: 100%;
   }
+  /* Its two fields share the line instead of pushing it past the card (recette 05/11, PRO-02). */
+  .hr-range .hr-slot__hours {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
   .hr-slot__hours {
     flex: 1 1 auto;
   }

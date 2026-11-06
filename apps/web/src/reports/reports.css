@@ -548,6 +548,34 @@
   line-height: var(--nv-text-title-2-leading);
   color: var(--nv-ink-muted);
 }
+/* On Aujourd'hui the shift keeps the one big figure: the period's sales read as a metric beside it (CHAT-20). */
+.rp-mine .rp-figures__value {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+}
+.rp-mine__pay {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-1);
+  align-self: flex-start;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  text-decoration: none;
+}
+.rp-mine__pay:hover {
+  color: var(--nv-ink);
+}
+.rp-mine__pay svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 /* Came back: it waits for its member, amber like the line that says it. */
 .rp-figures__value--warn {
   color: var(--nv-warning);

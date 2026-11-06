@@ -4,6 +4,8 @@ import type { JSX } from 'react';
 
 import './night-banner.css';
 
+import { deOf } from '@/lib/utils';
+
 /** What the Dashboard knows of Telegram for one creator (`GET /v1/dashboard`). */
 export interface TelegramNight {
   /** Null when Telegram is off on the server (no encryption key): no bot can run. */
@@ -41,7 +43,7 @@ export function nightBannerOf(night: TelegramNight | undefined, creatorName: str
   return {
     state: 'uncovered',
     title: 'Personne n’est prévenu la nuit',
-    text: `Aucun groupe Telegram ne reçoit les urgences de ${creatorName}. Si l’agent se met en pause pour un fan, personne ne le saura avant le matin.`,
+    text: `Aucun groupe Telegram ne reçoit les urgences ${deOf(creatorName)}. Si l’agent se met en pause pour un fan, personne ne le saura avant le matin.`,
     action: 'Choisir un groupe',
   };
 }
@@ -50,9 +52,15 @@ export function nightBannerOf(night: TelegramNight | undefined, creatorName: str
 export function NightBanner({
   night,
   creatorName,
+  opensSettings,
 }: {
   night: TelegramNight | undefined;
   creatorName: string;
+  /**
+   * The account holds Réglages, the owner alone: anyone else reads who chooses the group, never a button to a page that
+   * can only refuse (recette 05/11, PRO-08).
+   */
+  opensSettings: boolean;
 }): JSX.Element | null {
   const banner = nightBannerOf(night, creatorName);
   if (banner === null) return null;
@@ -75,8 +83,11 @@ export function NightBanner({
           {banner.title}
         </p>
         <p className="tg-night__text">{banner.text}</p>
+        {banner.action === null || opensSettings ? null : (
+          <p className="tg-night__text">Le propriétaire choisit ce groupe dans Réglages › Telegram.</p>
+        )}
       </div>
-      {banner.action === null ? null : (
+      {banner.action === null || !opensSettings ? null : (
         <Link className="nv-btn nv-btn--soft nv-btn--sm tg-night__go" to="/reglages/telegram">
           {banner.action}
         </Link>

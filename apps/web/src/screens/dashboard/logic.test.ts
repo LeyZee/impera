@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  chartTip,
-  changePercent,
-  eur,
-  gaugeClass,
   agentRuns,
+  changePercent,
+  chartTip,
+  dashboardSearch,
+  eur,
   foldOf,
+  gaugeClass,
   heroState,
   hoursMinutes,
   leverView,
   litParts,
+  parseDashboardSearch,
   sharePercent,
   signed,
   trendSeries,
@@ -205,6 +207,7 @@ describe('foldOf', () => {
     title: id,
     value: '',
     sub: '',
+    brief: id,
     rows: [],
     ...(alarm === undefined ? {} : { alarm }),
   });
@@ -233,5 +236,15 @@ describe('foldOf', () => {
       title: 'Quelque chose ne va pas',
       live: true,
     });
+  });
+});
+
+describe('the Dashboard’s address (recette 05/11, PRO-28)', () => {
+  it('names the creator shown, and drops what is not an id', () => {
+    const id = '0192f3a0-0000-7000-8000-0000000000c2';
+    expect(parseDashboardSearch({ creatrice: id, periode: '7j' })).toEqual({ creatrice: id, periode: '7j' });
+    expect(parseDashboardSearch({ creatrice: 'pas-un-id' })).toEqual({});
+    expect(dashboardSearch('day', id)).toEqual({ creatrice: id });
+    expect(dashboardSearch('month')).toEqual({ periode: '30j' });
   });
 });

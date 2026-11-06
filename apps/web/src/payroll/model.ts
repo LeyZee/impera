@@ -599,6 +599,15 @@ export function totalsOf(statement: CommissionStatement, you: boolean, payLabelO
   const paid = statement.status === 'paid';
   const payLabel =
     payLabelOf ?? (you ? (paid ? 'Ce que tu as touché' : 'Ce que tu touches') : paid ? 'Versé' : 'À verser');
+  // His own statement with nothing on top of the commission: the hero and « Ta commission » already say that amount,
+  // a total under them would say it a third and a fourth time (recette 05/11, CHAT-29).
+  if (
+    you &&
+    rows.length === 1 &&
+    statement.carryOverOutMinor === 0 &&
+    statement.payableMinor === statement.commissionMinor
+  )
+    return [];
   if (statement.carryOverOutMinor === 0) {
     rows.push({
       label: payLabel,

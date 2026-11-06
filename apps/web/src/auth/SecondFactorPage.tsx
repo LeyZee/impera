@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState, type JSX, type SyntheticEvent } from
 
 import { BackupCodesList, CopyButton } from './BackupCodesList';
 import { PublicBrand } from './PublicBrand';
+import { chosenPassword, forgetChosenPassword } from './chosen-password';
 import { confirmActivation, startActivation, type ActivationStart, type CodeResult } from './session';
 
 type Step =
@@ -49,6 +50,9 @@ export function SecondFactorPage({
   onSignOut: () => void;
 }): JSX.Element {
   const [step, setStep] = useState<Step>({ kind: 'password' });
+  // Just chosen on the link page: the first step only explains, and does not ask for it again (recette SEC-15).
+  // Only whether one is held: the password itself stays in its module, which lets it lapse (relecture #538).
+  const [isHeld, setIsHeld] = useState(() => chosenPassword() !== null);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const keyRef = useRef<HTMLElement>(null);
@@ -63,16 +67,35 @@ export function SecondFactorPage({
 
   async function sendPassword(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const held = isHeld ? chosenPassword() : null;
+    if (isHeld && held === null) {
+      // Lapsed while the page stood open: the field comes back, nothing was sent.
+      setIsHeld(false);
+      return;
+    }
+    const password = held ?? fieldOf(new FormData(event.currentTarget), 'password');
     setIsBusy(true);
     setError(null);
-    const result = await startActivation(fieldOf(form, 'password')).catch((): ActivationStart => ({
-      kind: 'unavailable',
-    }));
+    const result = await startActivation(password).catch((): ActivationStart => ({ kind: 'unavailable' }));
     setIsBusy(false);
-    if (result.kind === 'ok') setStep({ kind: 'scan', setup: result.setup });
-    else setError(START_MESSAGES[result.kind]);
+    if (result.kind === 'ok') {
+      forgetChosenPassword();
+      setStep({ kind: 'scan', setup: result.setup });
+      return;
+    }
+    if (held !== null && result.kind === 'wrong_password') {
+      // No longer the account's (changed in between): the field comes back, with nothing to blame her for.
+      forgetChosenPassword();
+      setIsHeld(false);
+      return;
+    }
+    setError(START_MESSAGES[result.kind]);
   }
+
+  const signOut = (): void => {
+    forgetChosenPassword();
+    onSignOut();
+  };
 
   async function sendCode(event: SyntheticEvent<HTMLFormElement>, setup: SecondFactorSetup): Promise<void> {
     event.preventDefault();
@@ -105,7 +128,7 @@ export function SecondFactorPage({
           </p>
         )}
         {step.kind === 'codes' ? null : (
-          <button type="button" className="nv-btn nv-btn--plain nv-btn--sm self-center" onClick={onSignOut}>
+          <button type="button" className="nv-btn nv-btn--plain nv-btn--sm self-center" onClick={signOut}>
             Se déconnecter
           </button>
         )}
@@ -126,21 +149,23 @@ export function SecondFactorPage({
                 Authenticator, Microsoft Authenticator, 1Password, Bitwarden…
               </p>
               <p className="text-sm text-[var(--nv-ink-muted)]">
-                Installe-la, puis confirme ton mot de passe.
+                {!isHeld ? 'Installe-la, puis confirme ton mot de passe.' : 'Installe-la, puis continue.'}
               </p>
             </div>
-            <label className="nv-field">
-              <span className="nv-field__label">Mot de passe</span>
-              <input
-                className="nv-field__control"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                autoFocus
-              />
-            </label>
-            <button className="nv-btn nv-btn--neon" type="submit" disabled={isBusy}>
+            {!isHeld ? (
+              <label className="nv-field">
+                <span className="nv-field__label">Mot de passe</span>
+                <input
+                  className="nv-field__control"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  autoFocus
+                />
+              </label>
+            ) : null}
+            <button className="nv-btn nv-btn--neon" type="submit" disabled={isBusy} autoFocus={isHeld}>
               {isBusy ? 'Préparation…' : 'Continuer'}
             </button>
           </form>

@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { pillOf } from '@/agent/mode';
@@ -18,7 +18,15 @@ const TITLE = {
  * mode of one is not the mode of all.
  */
 export function AgentPill(): JSX.Element {
-  const view = useAgentMode();
+  // On a creator's sheet, the pill speaks of her, not of the one the Dashboard follows (recette 05/11, PRO-28).
+  const shown = useRouterState({
+    select: ({ location }) => {
+      const search: Record<string, unknown> = location.search;
+      const { creatrice } = search;
+      return location.pathname.startsWith('/creatrices') && typeof creatrice === 'string' ? creatrice : null;
+    },
+  });
+  const view = useAgentMode(shown);
   const live = view.source === 'live' ? view : null;
   const stalled = live?.stalled ?? null;
   const pill = pillOf(live?.mode ?? null, stalled === null);
@@ -34,12 +42,27 @@ export function AgentPill(): JSX.Element {
           ? `Agent : ${label}, mais rien ne tourne : ${stalled}. Voir le Dashboard.`
           : `Agent : ${label}. Le changer sur le Dashboard.`;
   return (
-    <Link to="/" className="nv-rail__agent" data-tone={pill.tone} title={title} aria-label={title}>
+    <Link
+      to="/"
+      search={shown === null ? {} : { creatrice: shown }}
+      className="nv-rail__agent"
+      data-tone={pill.tone}
+      title={title}
+      aria-label={title}
+    >
       <span
         className={`nv-dot${pill.tone === 'unknown' ? '' : ` nv-tone--${pill.tone}`}${pill.live ? ' nv-dot--live' : ''}`}
         aria-hidden="true"
       />
-      {label}
+      {/* A long name is cut with « … » inside the pill, its title keeping it whole (recette 05/11, PRO-12). */}
+      {live !== null && several ? (
+        <>
+          <span className="nv-rail__agent-label">{live.creatorName}</span>{' '}
+          <span className="nv-rail__agent-mode">· {mode}</span>
+        </>
+      ) : (
+        <span className="nv-rail__agent-label">{label}</span>
+      )}
     </Link>
   );
 }

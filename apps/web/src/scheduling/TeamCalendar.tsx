@@ -108,13 +108,29 @@ function Slot({
         const start = Date.parse(shift.startsAt);
         const earlier = start < cell.from.getTime();
         const carried = earlier && start >= dayFrom;
+        // The same day column draws it above already: here it only goes on, greyed (recette 05/11, CHAT-15).
+        if (carried) {
+          return (
+            <div
+              key={`${shift.memberId}-${shift.startsAt}`}
+              className="sc-chip cal-chip cal-chip--cont"
+              aria-hidden="true"
+              data-phase={phase}
+              data-carried="true"
+              data-mine={shift.memberId === me ? 'true' : undefined}
+              data-muted={focus !== null && shift.memberId !== focus ? 'true' : undefined}
+            >
+              <span className="sc-chip__name">{nameFor(member, me)}</span>
+              <span className="cal-chip__cont">suite</span>
+            </div>
+          );
+        }
         return (
           <div
             key={`${shift.memberId}-${shift.startsAt}`}
             className="sc-chip cal-chip"
             aria-hidden="true"
             data-phase={phase}
-            data-carried={carried ? 'true' : undefined}
             data-mine={shift.memberId === me ? 'true' : undefined}
             data-muted={focus !== null && shift.memberId !== focus ? 'true' : undefined}
             style={member === undefined || member.color === null ? undefined : { '--sc-color': member.color }}
@@ -221,7 +237,9 @@ export function TeamWeek({ calendar, days, today, now, me, focus, loading }: Cal
             role="row"
           >
             <span className="sc-grid__account" role="rowheader">
-              <span className="sc-grid__creator">{row.creator.name}</span>
+              <span className="sc-grid__creator" title={row.creator.name}>
+                {row.creator.name}
+              </span>
               {row.creator.archived ? <span className="sc-grid__archived">archivée</span> : null}
               <AgentLine row={row} />
             </span>

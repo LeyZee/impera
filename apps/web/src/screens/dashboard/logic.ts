@@ -7,21 +7,28 @@ import type { AgentMode } from '@/agent/mode';
 /** The period in the address (`/?periode=7j`): a reload or a shared link keeps it; today is the address with none. */
 export interface DashboardSearch {
   readonly periode?: '7j' | '30j';
+  /** The creator shown (recette 05/11, PRO-28): a shared link opens hers; without it, the one followed on the device. */
+  readonly creatrice?: string;
 }
 
 const PERIOD_PARAMS = { week: '7j', month: '30j' } as const satisfies Partial<Record<Period, string>>;
 
 /** Anything else in the address than a known period reads as today. */
 export function parseDashboardSearch(search: Record<string, unknown>): DashboardSearch {
-  const { periode } = search;
-  return periode === '7j' || periode === '30j' ? { periode } : {};
+  const { periode, creatrice } = search;
+  return {
+    ...(periode === '7j' || periode === '30j' ? { periode } : {}),
+    ...(typeof creatrice === 'string' && /^[0-9a-f-]{36}$/iu.test(creatrice) ? { creatrice } : {}),
+  };
 }
 
 export const periodOf = (search: DashboardSearch): Period =>
   search.periode === '7j' ? 'week' : search.periode === '30j' ? 'month' : 'day';
 
-export const dashboardSearch = (period: Period): DashboardSearch =>
-  period === 'day' ? {} : { periode: PERIOD_PARAMS[period] };
+export const dashboardSearch = (period: Period, creatrice?: string): DashboardSearch => ({
+  ...(period === 'day' ? {} : { periode: PERIOD_PARAMS[period] }),
+  ...(creatrice === undefined ? {} : { creatrice }),
+});
 
 /** « 1 846 € », « 10,50 € »: the cents only when there are some, never rounded away (ADR 0011: exact money). */
 export function eur(value: number): string {

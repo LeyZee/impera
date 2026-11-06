@@ -33,3 +33,11 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Moi › Profil (recette 05/11, CHAT-30). */
+.me-profile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  max-width: 640px;
+}

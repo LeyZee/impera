@@ -84,6 +84,16 @@ describe('SignInPage', () => {
     const code = screen.getByLabelText('Code de secours');
     fireEvent.change(code, { target: { value: 'abcde-fghij' } });
     fireEvent.submit(code.closest('form') ?? document.body);
+    // Her phone is not at hand: its clock is beside the point (recette SEC-07).
+    expect(
+      await screen.findByText(
+        'Ce code de secours ne marche pas, ou il a déjà servi. Chacun ne sert qu’une fois.',
+      ),
+    ).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Utiliser le code de l’application' }));
+    const digits = screen.getByLabelText('Code à 6 chiffres');
+    fireEvent.change(digits, { target: { value: '123456' } });
+    fireEvent.submit(digits.closest('form') ?? document.body);
     expect(
       await screen.findByText('Ce code ne marche pas. Vérifie l’heure de ton téléphone et réessaie.'),
     ).toBeDefined();

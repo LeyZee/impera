@@ -18,8 +18,10 @@ const MAX_BYTES = 512 * 1024;
 /** 503: the page says to try again in a moment, the password is neither accepted nor called unsafe. */
 export class PasswordCheckUnavailable extends DomainError {
   constructor(cause?: unknown) {
+    // `reason` lets the page say what does not answer, rather than « the server » (recette 05/11, CHAT-10).
     super('service_unavailable', 'La vérification du mot de passe ne répond pas : réessaie dans un instant', {
       cause,
+      details: { reason: 'password_check' },
     });
   }
 }

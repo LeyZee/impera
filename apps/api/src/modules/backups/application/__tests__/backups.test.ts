@@ -76,7 +76,7 @@ function memoryRequests(latestRun: BackupRun | null = null): BackupRequestsStore
     request(entry, _actor, decide) {
       const decision = decide({
         sameId: rows.find((row) => row.id === entry.id) ?? null,
-        pending: rows.find((row) => row.pickedAt === null) ?? null,
+        pending: rows.findLast((row) => row.pickedAt === null) ?? null,
         latestRun,
       });
       if (decision.kind === 'existing') return Promise.resolve({ created: false, request: decision.request });
@@ -84,7 +84,7 @@ function memoryRequests(latestRun: BackupRun | null = null): BackupRequestsStore
       rows.push(request);
       return Promise.resolve({ created: true, request });
     },
-    pending: () => Promise.resolve(rows.find((row) => row.pickedAt === null) ?? null),
+    pending: () => Promise.resolve(rows.findLast((row) => row.pickedAt === null) ?? null),
   };
 }
 
