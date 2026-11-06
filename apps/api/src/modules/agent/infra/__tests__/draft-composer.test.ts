@@ -740,7 +740,8 @@ describe('createDraftComposer, her alerts (P4-01)', () => {
       alerts: HERS,
       script: { brief: { ...BRIEF, risks: ['minor_suspected'], alertsSeen: ['a1'] } },
     });
-    expect(await draftComposer.compose(wrote('j’ai 15 ans, une vidéo pour moi ?'))).toEqual({
+    // A minor only the brain reads (the safety net reads « j'ai 15 ans » itself, before any model).
+    expect(await draftComposer.compose(wrote('je sors des cours, une vidéo pour moi ?'))).toEqual({
       kind: 'held',
       reason: 'handoff',
       detail: ['minor_suspected'],
@@ -836,6 +837,46 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     expect(distress.protections.map((p) => p.protection)).toEqual([
       { unconfirmAge: false, stopContact: true, freezeSales: true, because: ['distress', 'money_trouble'] },
     ]);
+  });
+
+  it('hands a fan who says he is 16 or wants to end it to a human, before any model (recette AGT-01)', async () => {
+    const says = (text: string): AgentComposeInput => ({
+      ...INPUT,
+      history: [...INPUT.history, { direction: 'inbound', text, at: new Date('2026-10-17T09:59:30Z') }],
+    });
+    const minor = limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' });
+    const young = composer({}, undefined, minor.limits);
+    expect(await young.draftComposer.compose(says('j’ai 16 ans tu sais'))).toEqual({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['safety_net', 'minor_suspected'],
+      costUsd: 0,
+    });
+    expect(young.seen.traces).toHaveLength(0);
+    expect(minor.protections.map((p) => p.protection)).toEqual([
+      { unconfirmAge: true, stopContact: false, freezeSales: false, because: ['minor_suspected'] },
+    ]);
+    const distress = limitsOf({});
+    const low = composer({}, undefined, distress.limits);
+    expect(await low.draftComposer.compose(says('j’en peux plus, je veux en finir'))).toMatchObject({
+      reason: 'handoff',
+      cause: 'distress',
+      detail: ['safety_net', 'self_harm'],
+    });
+    expect(low.seen.traces).toHaveLength(0);
+    expect(distress.protections.map((p) => p.protection)).toEqual([
+      { unconfirmAge: false, stopContact: true, freezeSales: false, because: ['self_harm'] },
+    ]);
+  });
+
+  it('keeps the net when no model has a key: the minor is still a minor', async () => {
+    const { draftComposer } = composer({ hasKey: false });
+    const held = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'jsuis au collège mdr', at: new Date('2026-10-17T09:59:00Z') }],
+    });
+    expect(held).toMatchObject({ reason: 'handoff', cause: 'minor' });
   });
 
   it('sets his limits from a media flag too', async () => {

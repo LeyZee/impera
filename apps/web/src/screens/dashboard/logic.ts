@@ -202,8 +202,18 @@ export function heroState(
       action: 'Repasser en copilote',
     };
   }
-  // An agent that writes nothing says so before what waits (Reveal, the voice, its key): its own sentence leads.
-  if (!agentRuns(agent)) return agent;
+  // An agent that writes nothing says so before what waits (Reveal, the voice, its key): its own sentence leads, and
+  // the AI budget past its alert still follows it (DASH-06, recette AGT 06/11): the playground and the trend watch
+  // spend it even while Reveal is not read.
+  if (!agentRuns(agent)) {
+    return {
+      ...agent,
+      lead: withBudget(agent.lead, agent),
+      ...(agent.leadWithoutAction !== undefined && {
+        leadWithoutAction: withBudget(agent.leadWithoutAction, agent),
+      }),
+    };
+  }
   if (todos.length === 0) {
     return {
       tone: 'ok',
