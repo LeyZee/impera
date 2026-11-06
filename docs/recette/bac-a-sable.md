@@ -19,13 +19,13 @@ Prérequis : `docker compose up -d` et `pnpm db:migrate` faits.
 1. Dans `.env` : `IMPERA_SANDBOX=1` (laisser `IMPERA_SANDBOX_URL` vide pour `http://127.0.0.1:4010`).
 2. Terminal 1 : `pnpm sandbox:world` → « le faux monde écoute sur http://127.0.0.1:4010 ».
 3. Terminal 2 : `pnpm dev`. Le journal de l'API commence par « BAC À SABLE (ADR 0075) : rien n'est réel ».
-4. Le CRM affiche en bas la pastille « Bac à sable · rien n'est réel » sur tous les écrans.
+4. Le CRM porte sur tous les écrans un fin liseré ambre et, en haut au centre, un petit onglet « Bac à sable · rien n'est réel ». Aucun des deux ne couvre de champ ni ne prend les clics.
 
-La configuration refuse de démarrer si `NODE_ENV=production`, ou si `AUTH_BASE_URL`, `WEB_ORIGIN`, `IMPERA_SANDBOX_URL` ou `S3_ENDPOINT` ne sont pas des adresses de la machine. En bac à sable, les clés du `.env` (`LLM_*`, `SPEECH_*`) ne sont jamais lues : seules comptent celles collées dans le CRM.
+La configuration refuse de démarrer si `NODE_ENV=production`, ou si `AUTH_BASE_URL`, `WEB_ORIGIN`, `IMPERA_SANDBOX_URL`, `S3_ENDPOINT`, `INVOICES_S3_ENDPOINT` ou `INVOICES_COPY_S3_ENDPOINT` ne sont pas des adresses de la machine. Une redirection vers l'extérieur est bloquée comme un appel direct. En bac à sable, les clés du `.env` (`LLM_*`, `SPEECH_*`) ne sont jamais lues : seules comptent celles collées dans le CRM. Lance-le sur une base neuve (les piles de l'outillage de recette utilisent des bases `impera_rN`) : sur une base qui garde une vraie clé collée dans le CRM, cette clé partirait vers le faux monde, local, mais ce n'est pas sa place. Le contrôle des mots de passe compromis est coupé en bac à sable (il interroge un service extérieur), même avec `PASSWORD_BREACH_CHECK=on`.
 
 ## Les fausses clés
 
-Une clé inventée suffit, à condition d'avoir la forme du fournisseur : pour une IA, 20 caractères au moins et le préfixe du service s'il en a un (`xai-`, `AIza`, `sk_`) ; pour Reveal, le préfixe `rvl_`. Le mot qu'elle contient choisit la réponse :
+Une clé inventée suffit, à condition d'avoir la forme du fournisseur : pour une IA, 20 caractères au moins et le préfixe du service s'il en a un (`xai-`, `AIza`, `sk_`) ; pour Reveal, le préfixe `rvl_`. Le mot qu'elle contient choisit la réponse, pour Reveal comme pour les IA (pour Reveal, `credit` donne un 403, API coupée par Reveal) :
 
 | La clé contient | Réponse du faux monde                       | Ce que l'écran doit montrer |
 | --------------- | ------------------------------------------- | --------------------------- |
@@ -57,15 +57,15 @@ En bac à sable, Impera inscrit son webhook à l'adresse de l'API sur la machine
 | Route | Corps | Effet |
 | --- | --- | --- |
 | `/__/services/xai` (ou `google`, `mistral`, `elevenlabs`) | `{"mode":"down"}` | Force un état pour toutes les clés : `ok`, `refused`, `no_credit`, `rate_limited`, `down` ; `auto` revient à la règle des mots |
-| `/__/reveal/sell` | `{"euros":25}` | Une vente inventée (TTC, HT, part agence 30 %, part modèle 50 %). Aussi : `type` (`subscription`, `renewal`, `ppv`, `mass_dm`, `tip`, `payment_link`, `boudoir`, `paid_message`, `other`), `modelId`, `chatterId` (le bot `bot_test_01` par défaut pour une vente de chatteur, personne pour les autres), `lateMinutes` (3-D Secure confirmé tard), `id` |
+| `/__/reveal/sell` | `{"euros":25}` | Une vente inventée (TTC, HT, part agence 30 %, part modèle 50 %). Aussi : `type` (`subscription`, `renewal`, `ppv`, `mass_dm`, `tip`, `payment_link`, `boudoir`, `paid_message`, `other`), `modelId` (Lina, `model_recette_lina`, par défaut), `chatterId` (le bot `bot_test_01` par défaut pour une vente de chatteur, personne pour les autres), `lateMinutes` (3-D Secure confirmé tard), `id` |
 | `/__/reveal/refund` | `{"saleId":"…"}` | Rembourse une vente (`sale_refunded`) |
-| `/__/reveal/key` | `{"state":"revoked"}` | Clé révoquée (401) ; aussi `restored` (tout rétabli), `no_sales`, `no_stats`, `no_webhooks` (403), `limited` avec `"modelIds":["model_test_01"]` |
+| `/__/reveal/key` | `{"state":"revoked"}` | Clé révoquée (401) ; aussi `restored` (tout rétabli), `no_sales`, `no_stats`, `no_webhooks` (403), `limited` avec `"modelIds":["model_recette_lina"]` |
 | `/__/reveal/rate-limit` | `{"requests":3,"retryAfter":30}` | Les 3 prochains appels reçoivent un 429 avec `Retry-After: 30` |
 | `/__/reveal/nightly` | `{"done":true}` | La nuit de calcul est passée : les compteurs de messages ne sont plus `null` |
 | `/__/reveal/count-timeout` | `{"on":true}` | Le comptage des messages par chatteur n'aboutit pas : `null` partout |
 | `/__/reveal/webhooks` | `{"failNext":3}` | Les 3 prochains essais échouent ; aussi `outage` (les ventes faites pendant la panne n'auront aucun envoi), `duplicateNext` (envoi en double, même id), `shuffle` (désordre) |
 | `/__/clock` | `{"advanceSeconds":3600}` | Avance l'horloge du monde et envoie ce qui est dû (essais, nuit, jours) |
-| `/__/reveal/models` | `{"preset":"import"}` | Plusieurs modèles à importer (`default` pour revenir) |
+| `/__/reveal/models` | `{"preset":"import"}` | Plusieurs modèles à importer ; `recette` (par défaut) : Lina, Maya et Zoé du jeu de recette, avec les pseudos des comptes que crée `seed.ts`, donc reliées toutes seules et sans quarantaine ; `default` : les modèles des tests |
 
 Le faux monde vit en mémoire : un redémarrage remet tout à zéro.
 
@@ -78,7 +78,7 @@ Chaque scénario part d'une clé `rvl_recette_ok_0001` collée dans Réglages �
 | R1 | Coller `rvl_recette_refus_0001` | Clé refusée, rien d'enregistré, message en français |
 | R2 | Clé valide, puis `/__/reveal/key {"state":"revoked"}`, attendre la lecture suivante | Connexion Reveal en erreur « clé révoquée », alerte agence, aucune vente perdue après `restored` |
 | R3 | `/__/reveal/key {"state":"no_sales"}` puis recoller la clé | Refus clair : l'accès « Ventes une par une » manque ; rien n'est lu à moitié |
-| R4 | `/__/reveal/key {"state":"limited","modelIds":["model_test_01"]}` | Les modèles hors périmètre sont signalées, pas d'erreur générale |
+| R4 | `/__/reveal/key {"state":"limited","modelIds":["model_recette_lina"]}` | Les modèles hors périmètre sont signalées, pas d'erreur générale |
 | R5 | `/__/reveal/rate-limit {"requests":3,"retryAfter":30}` | Lecture repoussée après le délai, pas d'état « en panne », pas de doublon |
 | R6 | Vendre (`/__/reveal/sell`), attendre 15 s | Webhook reçu, vente visible au Dashboard et dans les ventes du chatteur sans attendre la minute |
 | R7 | `/__/reveal/webhooks {"failNext":2}`, vendre, puis `/__/clock {"advanceSeconds":120}` | Vente arrivée au 3e essai, une seule fois |

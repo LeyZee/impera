@@ -270,6 +270,9 @@ describe('Reveal sales feed adapter', () => {
     ).toEqual([
       ['chatter_test_01', false],
       ['bot_test_01', true],
+      ['manager_test_01', false],
+      ['presta_test_01', false],
+      ['ancien_test_01', false],
     ]);
     const daily = await feed.dailyStats({ from: '2026-10-20', to: '2026-10-20' });
     expect(daily.ok && daily.value[0]).toMatchObject({

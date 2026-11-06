@@ -2,7 +2,7 @@
 
 Zone : `apps/api/src/modules/team`, `scheduling`, `payroll`, `invoicing`, `accounting`, `contractors`, et leurs écrans (Équipe, Paie, Commissions, Planning du chatteur, Aujourd'hui du chatteur, Moi du membre, Créatrices › Heures et Pourcentage, Réglages › Règles de paie et Facturation, gains dans Ventes de la créatrice).
 
-Données : le jeu de recette de Bilan, avec en plus un chatteur à la commission (15 %), un à l'heure (5 €/h), un manager, une quinzaine close et une ouverte, et la créatrice « Lina Test » à **40 % d'agence** (jamais le vrai pourcentage). Chaque montant attendu est recalculé à la main dans le rapport.
+Données : le jeu de recette de Bilan, avec en plus deux chatteurs à la commission (15 % et 10 % ; un chatteur n'est jamais payé à l'heure, ADR 0023), un manager, une quinzaine close et une ouverte (le jeu de départ de Bilan n'a aucune quinzaine close : la clôturer en début de lot), et la créatrice « Lina Test » à **40 % d'agence** (jamais le vrai pourcentage). Chaque montant attendu est recalculé à la main dans le rapport.
 
 ## 1. Membres
 

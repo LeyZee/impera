@@ -1,26 +1,39 @@
 /*
- * The recette sandbox's badge (ADR 0075): on every screen while the API runs against the local fake world, so that
- * nobody mistakes it for the real thing. A pill at the foot of the page, out of the way of the taps, never printed.
+ * The recette sandbox's mark (ADR 0075): on every screen while the API runs against the local fake world, so that
+ * nobody mistakes it for the real thing. A thin amber frame around the page and a small tab hanging from its top
+ * edge, both transparent to taps and kept off the content (a pill at the foot covered the composer and the buttons);
+ * never printed.
  */
+html[data-sandbox='1'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--nv-warning) 70%, transparent);
+  pointer-events: none;
+}
+
 html[data-sandbox='1'] body::after {
   content: 'Bac à sable · rien n’est réel';
   position: fixed;
+  top: 0;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
   z-index: 1000;
   transform: translateX(-50%);
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--nv-warning) 55%, transparent);
+  padding: 0 10px 1px;
+  border-radius: 0 0 8px 8px;
+  border: 1px solid color-mix(in srgb, var(--nv-warning) 70%, transparent);
+  border-top: none;
   background: color-mix(in srgb, var(--nv-warning) 16%, var(--nv-surface-raised));
   color: var(--nv-warning);
-  font: 600 12px/1.4 var(--nv-font-sans);
-  letter-spacing: 0.01em;
+  font: 600 10px/1.5 var(--nv-font-sans);
+  letter-spacing: 0.02em;
   white-space: nowrap;
   pointer-events: none;
 }
 
 @media print {
+  html[data-sandbox='1'] body::before,
   html[data-sandbox='1'] body::after {
     content: none;
   }

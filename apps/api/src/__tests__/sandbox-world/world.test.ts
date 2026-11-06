@@ -143,7 +143,24 @@ describe('Reveal’s CRM API, read by the real adapter', () => {
     await control('/reveal/models', { preset: 'import' });
     const models = await feed('rvl_recette_ok_0003').listModels();
     expect(JSON.stringify(models)).toContain('model_imp_banned');
-    await control('/reveal/models', { preset: 'default' });
+    await control('/reveal/models', { preset: 'recette' });
+  });
+
+  it('lists by default the models of the recette data, and answers the rule of words for a Reveal key', async () => {
+    const models = await feed('rvl_recette_ok_0004').listModels();
+    expect(JSON.stringify(models)).toContain('lina-test-recette');
+    const limited = await fetch(`${base}/reveal-crm/v1/models`, {
+      headers: { 'x-api-key': 'rvl_recette_limite_0001' },
+    });
+    expect([limited.status, limited.headers.get('retry-after')]).toEqual([429, '30']);
+    const down = await fetch(`${base}/reveal-crm/v1/models`, {
+      headers: { 'x-api-key': 'rvl_recette_panne_0001' },
+    });
+    expect(down.status).toBe(503);
+    const refused = await fetch(`${base}/reveal-crm/v1/models`, {
+      headers: { 'x-api-key': 'rvl_recette_refus_0002' },
+    });
+    expect(refused.status).toBe(401);
   });
 });
 
@@ -195,12 +212,14 @@ describe('Reveal’s webhooks, delivered for real on this machine', () => {
       await control('/reveal/sell', { euros: 30, id: 'sale_hook_01' });
       await control('/clock', { advanceSeconds: 20 });
       expect(received).toHaveLength(1);
-      await control('/clock', { advanceSeconds: 31 });
+      await control('/clock', { advanceSeconds: 3600 });
       expect(received).toHaveLength(2);
 
       const last = received[1];
       const t = Number(/t=(\d+)/u.exec(last?.signature ?? '')?.[1]);
       expect(last?.signature).toBe(revealSignature(secret, t, last?.body ?? ''));
+      // Signed at the real time, not the world's moved clock: Impera refuses a `t` more than 5 minutes off.
+      expect(Math.abs(t - Date.now() / 1000)).toBeLessThan(300);
       expect(last?.event).toBe('sale_created');
       expect(last?.body).toContain('sale_hook_01');
       const state = z

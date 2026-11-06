@@ -550,7 +550,7 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
         chatterId: 'chatter_test_01',
         firstName: 'Chatteur',
         lastName: 'Test',
-        email: null,
+        email: 'chatteur@recette.test',
         role: 'chatter',
         isBot: false,
         isExternal: false,
@@ -567,6 +567,40 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
         isExternal: false,
         removedAt: null,
         modelIds: ['model_test_01'],
+      },
+      // A manager can sell; a chatting contractor's member has no e-mail; a removed member keeps her past sales.
+      {
+        chatterId: 'manager_test_01',
+        firstName: 'Manager',
+        lastName: 'Test',
+        email: 'manager@recette.test',
+        role: 'manager',
+        isBot: false,
+        isExternal: false,
+        removedAt: null,
+        modelIds: ['model_test_01', 'model_test_02'],
+      },
+      {
+        chatterId: 'presta_test_01',
+        firstName: 'Prestataire',
+        lastName: 'Test',
+        email: null,
+        role: 'chatter',
+        isBot: false,
+        isExternal: true,
+        removedAt: null,
+        modelIds: ['model_test_02'],
+      },
+      {
+        chatterId: 'ancien_test_01',
+        firstName: 'Ancien',
+        lastName: 'Test',
+        email: 'ancien@recette.test',
+        role: 'chatter',
+        isBot: false,
+        isExternal: false,
+        removedAt: '2026-10-01T08:00:00.000Z',
+        modelIds: [],
       },
     ],
   }));
@@ -1038,7 +1072,9 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
   const signedHeaders = (secret: string, event: string, body: string): Record<string, string> => ({
     'content-type': 'application/json',
     'x-reveal-event': event,
-    'x-reveal-signature': revealSignature(secret, Math.floor(now().getTime() / 1000), body),
+    // Signed at the real time, as the receiver checks `t` against its own clock: the world's clock, moved forward by
+    // the sandbox, schedules the attempts only.
+    'x-reveal-signature': revealSignature(secret, Math.floor(Date.now() / 1000), body),
   });
 
   const attempt = async (delivery: FakeDelivery): Promise<void> => {

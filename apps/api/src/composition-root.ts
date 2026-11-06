@@ -223,7 +223,13 @@ export interface AppOptions {
  * The check of known-breached passwords (ADR 0046 § 4), or, with `PASSWORD_BREACH_CHECK=off` outside production (config
  * refuses it there), none: every password passes, said once in amber at start (recette MOT-14).
  */
-function breachCheckOf(config: Config, logger: Logger): PasswordBreachCheck {
+export function breachCheckOf(config: Config, logger: Logger): PasswordBreachCheck {
+  // ADR 0075: the sandbox reaches nothing outside this machine, the breach list included; left on, every password
+  // set in the recette would fail as « the check does not answer ».
+  if (sandboxOf(config) !== null) {
+    logger.warn('password breach check is off in the recette sandbox (ADR 0075)');
+    return () => Promise.resolve(false);
+  }
   if (config.PASSWORD_BREACH_CHECK === 'on') return createPwnedPasswordsCheck();
   logger.warn('password breach check is off: development only (PASSWORD_BREACH_CHECK)');
   return () => Promise.resolve(false);

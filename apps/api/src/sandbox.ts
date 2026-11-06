@@ -84,16 +84,40 @@ function targetOf(input: Parameters<typeof fetch>[0]): string {
   return input.url;
 }
 
-/** `fetch` that lets through calls to this machine only; any other host fails as `fetch` fails offline. */
+const MAX_REDIRECTS = 20;
+
+/**
+ * `fetch` that lets through calls to this machine only; any other host fails as `fetch` fails offline. Redirects are
+ * followed here, one hop at a time, so that a local answer cannot send the call elsewhere.
+ */
 export function guardFetch(inner: typeof fetch, onBlocked?: (host: string) => void): typeof fetch {
+  const refuse = (target: string): never => {
+    const host = URL.canParse(target) ? new URL(target).host : 'adresse illisible';
+    onBlocked?.(host);
+    throw new TypeError('fetch failed', { cause: new SandboxBlockedCall(host) });
+  };
   return async (input, init) => {
     const target = targetOf(input);
-    if (!isLoopbackUrl(target)) {
-      const host = URL.canParse(target) ? new URL(target).host : 'adresse illisible';
-      onBlocked?.(host);
-      throw new TypeError('fetch failed', { cause: new SandboxBlockedCall(host) });
+    if (!isLoopbackUrl(target)) return refuse(target);
+    if (init?.redirect === 'manual' || init?.redirect === 'error') return inner(input, init);
+    let response = await inner(input, { ...init, redirect: 'manual' });
+    let at = target;
+    for (let hop = 0; hop < MAX_REDIRECTS && response.status >= 300 && response.status < 400; hop += 1) {
+      const location = response.headers.get('location');
+      if (location === null) return response;
+      at = new URL(location, at).href;
+      if (!isLoopbackUrl(at)) return refuse(at);
+      // As fetch does: a 303, or a 301/302 after a POST, goes on as a GET without a body.
+      const asGet =
+        response.status === 303 ||
+        ((response.status === 301 || response.status === 302) && init?.method === 'POST');
+      response = await inner(at, {
+        ...init,
+        redirect: 'manual',
+        ...(asGet && { method: 'GET', body: null }),
+      });
     }
-    return inner(input, init);
+    return response;
   };
 }
 

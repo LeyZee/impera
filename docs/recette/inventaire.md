@@ -8,7 +8,7 @@ Le rail dépend du compte (`railKindOf`) : `owner` = propriétaire ; `manager` =
 
 | Rail | Onglets (ordre) | Barre du téléphone | Accueil |
 |---|---|---|---|
-| Propriétaire | Dashboard · Suivi · Entraîner (Chatting) · Équipe · Paie · Créatrices (Agence) · Réglages | Dashboard, Suivi, Équipe, Plus | Dashboard |
+| Propriétaire | Dashboard · Suivi · Entraîner (Chatting) · Équipe · Paie · Créatrices (Agence) · Réglages | Dashboard, Suivi, Équipe, Paie, Plus | Dashboard |
 | Manager | Dashboard · Suivi · Équipe · Paie · Créatrices · Moi | Dashboard, Suivi, Équipe, Paie, Plus | Dashboard |
 | Chatteur | Aujourd'hui · Suivi · Planning · Commissions · Moi | les cinq, sans Plus | Aujourd'hui |
 | Opérateur | Dashboard · Suivi · Créatrices | les trois | Dashboard |
@@ -56,7 +56,7 @@ P = propriétaire, M = manager, C = chatteur, O = opérateur, Cr = créatrice.
 | `/equipe/planning` | **Équipe › Planning** : semaine, shifts, panneau d'un shift, échanges, lien de calendrier partagé | ✓ | ✓ | | | | Équipe |
 | `/equipe/rapports` | **Équipe › Rapports** : rapports déclarés, comparaison aux totaux lus chez Reveal, validation automatique dans le seuil, blocage 48 h (#615) | ✓ | ✓ | | | | Équipe |
 | `/equipe/membres` | **Équipe › Membres** : onglets Chatteurs / Managers, ajout, fiche, modifier, suspendre, départ | ✓ | ✓ | | | | Équipe |
-| `/equipe/membres/$memberId/dossier` | **Dossier d'un membre** (facturation, pièces) | ✓ | ✓ | | | | Équipe |
+| `/equipe/membres/$memberId/dossier` | **Dossier d'un membre** (facturation, pièces), au propriétaire seul : le manager est renvoyé à Équipe › Membres | ✓ | | | | | Équipe |
 | `/paie/quinzaine` | **Paie › Quinzaine** : calcul, blocages, bandeau rapports en attente (#615), clôture, relevé | ✓ | ✓ | | | | Équipe |
 | `/paie/releves` | **Paie › Historique** des relevés | ✓ | ✓ | | | | Équipe |
 | `/paie/primes-malus` | **Paie › Primes et malus** | ✓ | ✓ | | | | Équipe |

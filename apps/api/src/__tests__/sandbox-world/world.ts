@@ -2,7 +2,13 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { z } from 'zod';
 
 import { isLoopbackUrl } from '../../sandbox';
-import { createFakeCrm, DEFAULT_MODELS, IMPORT_MODELS, type FakeCrm } from '../fake-reveal/crm';
+import {
+  createFakeCrm,
+  DEFAULT_MODELS,
+  IMPORT_MODELS,
+  type FakeCrm,
+  type FakeModel,
+} from '../fake-reveal/crm';
 
 import { registerGeneration } from './ai-generation';
 
@@ -42,9 +48,47 @@ export function outcomeOfKey(key: string): Outcome {
   return 'ok';
 }
 
-/** A Reveal CRM key the fake world takes: Reveal's prefix, and not one that asks to be refused. */
+/**
+ * A Reveal CRM key the fake world knows: Reveal's prefix, and not one that asks to be refused. The other words of the
+ * rule (`limite`, `panne`, `credit`) are answered before FakeReveal, at `/reveal-crm`.
+ */
 export const isAcceptedRevealKey = (key: string): boolean =>
-  key.startsWith('rvl_') && outcomeOfKey(key) === 'ok';
+  key.startsWith('rvl_') && outcomeOfKey(key) !== 'refused';
+
+/**
+ * The models Reveal lists by default in the sandbox: those of the recette's invented data (`seed.ts` of the recette
+ * tooling), whose handles match the accounts it makes, so that Impera links them by itself and nothing sold here
+ * waits in quarantine. Everything is invented (ADR 0010).
+ */
+export const RECETTE_MODELS: readonly FakeModel[] = [
+  {
+    modelId: 'model_recette_lina',
+    userName: 'lina-test-recette',
+    displayName: 'Lina Test',
+    isActive: true,
+    status: 'validated',
+    subscribersCount: 128,
+    subscriptionPrice: 0,
+    subscriptionPlans: [{ periodicity: 'oneMonth', price: 0 }],
+  },
+  {
+    modelId: 'model_recette_maya',
+    userName: 'maya-demo-recette',
+    displayName: 'Maya Démo',
+    isActive: true,
+    status: 'validated',
+    subscribersCount: 42,
+    subscriptionPrice: 999,
+    subscriptionPlans: [{ periodicity: 'oneMonth', price: 999 }],
+  },
+  {
+    modelId: 'model_recette_zoe',
+    userName: 'zoe-archivee-recette',
+    displayName: 'Zoé Archivée',
+    isActive: false,
+    status: 'banned',
+  },
+];
 
 export interface World {
   readonly app: FastifyInstance;
@@ -65,7 +109,7 @@ const INJECTABLE_METHODS = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEA
 
 const SaleBodySchema = z.object({
   id: z.string().min(1).max(64).optional(),
-  modelId: z.string().min(1).max(64).default('model_test_01'),
+  modelId: z.string().min(1).max(64).default('model_recette_lina'),
   type: z
     .enum([
       'subscription',
@@ -117,6 +161,7 @@ export function createWorld(
     deliver: options.deliver ?? deliverLocally,
   });
   crm.statsFromRegister();
+  crm.setModels(RECETTE_MODELS);
   const pump = setInterval(() => void crm.pumpDeliveries(), 1000);
   pump.unref();
   const stop = () => {
@@ -224,6 +269,13 @@ export function createWorld(
 
   // Reveal's CRM API: FakeReveal's, served under `/reveal-crm`.
   app.all('/reveal-crm/*', async (request, reply) => {
+    // The rule of words, as for the AI keys: `limite` is rate limited, `panne` finds Reveal down, `credit` an API cut
+    // by Reveal (403); `refus` is an unknown key, answered by FakeReveal itself (401).
+    const result = outcomeOfKey(keyOf(request, 'x-api-key'));
+    if (result === 'rate_limited')
+      return reply.code(429).header('retry-after', '30').send({ error: 'rate_limited' });
+    if (result === 'down') return reply.code(503).send({ error: 'service_unavailable' });
+    if (result === 'no_credit') return reply.code(403).send({ error: 'forbidden' });
     const url = request.url.replace(/^\/reveal-crm/u, '');
     const headers = Object.fromEntries(
       Object.entries(request.headers).filter(
@@ -351,7 +403,7 @@ export function createWorld(
     else if (state === 'no_sales') crm.withhold('sales');
     else if (state === 'no_stats') crm.withhold('stats');
     else if (state === 'no_webhooks') crm.withhold('webhooks');
-    else crm.limitTo(modelIds ?? ['model_test_01']);
+    else crm.limitTo(modelIds ?? ['model_recette_lina']);
     return body.data;
   });
 
@@ -414,9 +466,12 @@ export function createWorld(
   });
 
   app.post('/__/reveal/models', (request, reply) => {
-    const body = z.object({ preset: z.enum(['default', 'import']) }).safeParse(request.body);
-    if (!body.success) return reply.code(400).send({ error: 'preset : default ou import' });
-    crm.setModels(body.data.preset === 'import' ? IMPORT_MODELS : DEFAULT_MODELS);
+    const body = z.object({ preset: z.enum(['recette', 'default', 'import']) }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: 'preset : recette, default ou import' });
+    const { preset } = body.data;
+    crm.setModels(
+      preset === 'import' ? IMPORT_MODELS : preset === 'default' ? DEFAULT_MODELS : RECETTE_MODELS,
+    );
     return body.data;
   });
 
