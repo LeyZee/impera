@@ -94,4 +94,4 @@ Date : AAAA-MM-JJ
 | 0069 | Les créatrices s'importent depuis Reveal par une revue du propriétaire, jamais en silence | accepted (précise 0050 § 3 et 0054) |
 | 0070 | Une vidéo déposée pèse jusqu'à 10 Go et vient dans tout format courant ; ce que les plateformes ne lisent pas est converti en MP4 | accepted (précise 0055 § 2 et § 3) |
 | 0071 | Une créatrice se renomme et s'archive, sans rien supprimer, et l'e-mail d'un accès pas encore utilisé se corrige | accepted (précise 0042 § 1 et 0069 § 5) |
-| 0072 | Paie : le relevé final d'un membre parti est celui de la quinzaine de son départ, et son solde négatif s'éteint | proposed (amende 0039 § 6, précise 0038 et 0023) |
+| 0072 | Paie : le relevé final d'un membre parti est celui de la quinzaine de son départ, et son solde négatif s'éteint | accepted (amende 0039 § 6, précise 0038 et 0023) |

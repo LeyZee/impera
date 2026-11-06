@@ -1,6 +1,6 @@
 # 0072. Paie : le relevé final d'un membre parti est celui de la quinzaine de son départ, et son solde négatif s'éteint
 
-Statut : proposed (à accepter par Charles : « ok 0072 »)
+Statut : accepted (Charles, 06/11/2026, 12 h 58, « ok 0072 » ; recette du 05/11, questions de paie 12 et 15, « Je suis d'accord avec tout » ; sur le texte de la tête abc4bca8, relecture de Bilan intégrée)
 Date : 2026-11-06
 Amende : l'ADR 0039 § 6 (la quinzaine de clôture) ; précise l'ADR 0038 (« le dernier relevé d'un membre qui part verse tout ») et l'ADR 0023 (§ Les règles d'Imperium : le report négatif)
 

@@ -10,8 +10,9 @@ Fait :
   - § 4 : CHECK sur `written_off_minor` (`<= 0`, nul hors relevé final), affiché en positif ;
   - § 5 : le refus de l'ajustement sous le verrou (membre, quinzaine), contre le brouillon recalculé dans la transaction ;
   - § 6 : relevés déjà validés gardés, brouillon de quinzaine de clôture recalculé à la bascule.
+- Acceptée par Charles le 06/11 à 12 h 58 (« ok 0072 »).
 
-Pas fait : le code. Il attend « ok 0072 » et une migration attribuée à l'arrivée sur `main`.
+Pas fait : le code, dans une PR à part, avec une migration attribuée à l'arrivée sur `main`.
 
 Décisions :
 - Une ADR et pas une note de fiche : les deux règles changent des montants et amendent l'ADR 0039 § 6.
