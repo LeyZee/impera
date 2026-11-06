@@ -10,13 +10,15 @@ import {
   riskLabel,
   risksBesideTrap,
   sentimentLabel,
+  unansweredReason,
 } from './model';
 
-type Level = 'none' | 'ok' | 'warn' | 'blocked' | 'handoff';
+type Level = 'none' | 'ok' | 'warn' | 'blocked' | 'unanswered' | 'handoff';
 
 function levelOf(answer: PlaygroundAnswer | null): Level {
   if (answer === null) return 'none';
   if (isHandoff(answer)) return 'handoff';
+  if (unansweredReason(answer) !== null) return 'unanswered';
   if (answer.isBlocked) return 'blocked';
   return needsAttention(answer) ? 'warn' : 'ok';
 }
@@ -27,6 +29,7 @@ const TITLES: Readonly<Record<Level, string>> = {
   ok: 'Toutes les règles passent',
   warn: 'À regarder',
   blocked: 'Bloquée avant envoi',
+  unanswered: 'Pas de réponse',
   handoff: 'Relayée à un humain',
 };
 
@@ -35,6 +38,7 @@ const DOTS: Readonly<Record<Level, string>> = {
   ok: 'ok',
   warn: 'warn',
   blocked: 'bad',
+  unanswered: 'warn',
   handoff: 'bad',
 };
 
@@ -135,8 +139,8 @@ export function WhyPanel({
           {(brief?.kycMissing.length ?? 0) > 0 ? (
             <Sec label="Encore à découvrir">{brief?.kycMissing.join(', ')}</Sec>
           ) : null}
-          {/* Handed to a human, nothing was written: there is no answer for the review to pass. */}
-          {level === 'handoff' ? null : (
+          {/* Handed to a human, or no model answered: nothing was written, there is no answer for the review to pass. */}
+          {level === 'handoff' || level === 'unanswered' ? null : (
             <Sec label="Relecture avant envoi">
               <ul className="pg-list">
                 {answer.violations.length === 0 ? (

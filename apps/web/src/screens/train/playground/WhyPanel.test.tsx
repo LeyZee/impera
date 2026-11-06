@@ -84,4 +84,17 @@ describe('WhyPanel', () => {
     expect(screen.queryByText('Tentative de manipulation')).toBeNull();
     expect(screen.getByText('Relecture avant envoi')).toBeTruthy();
   });
+
+  it('says no model answered, not « bloquée », and passes no review on what was never written (recette AGT 06/11)', () => {
+    why({
+      ...ANSWER,
+      isBlocked: true,
+      failure: 'grok-4.7: unavailable, mistral-large-latest: unavailable',
+    });
+    expect(screen.getByText('Pas de réponse')).toBeTruthy();
+    expect(screen.queryByText('Bloquée avant envoi')).toBeNull();
+    expect(screen.queryByText('Relecture avant envoi')).toBeNull();
+    // The models' error stays in the technical details, folded.
+    expect(screen.getByText('grok-4.7: unavailable, mistral-large-latest: unavailable')).toBeTruthy();
+  });
 });

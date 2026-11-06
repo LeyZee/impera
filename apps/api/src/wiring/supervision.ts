@@ -1,4 +1,5 @@
 import type { CreatorId } from '@impera/contracts';
+import type { RoleHealth } from '@impera/llm';
 
 import type { AppLlm } from '../llm';
 import { salesFeedTotals } from '../modules/connectors';
@@ -35,13 +36,7 @@ export function wireSupervision(
     db,
     requireRole,
     budget: () => llm.gateway.health().budget,
-    voiceHealth: () => {
-      const voice = llm.gateway.health().roles.find((r) => r.role === 'voice');
-      return {
-        ok: voice?.state === 'ok',
-        keyMissing: voice === undefined || (!voice.hasKey && voice.fallback?.hasKey !== true),
-      };
-    },
+    voiceHealth: () => voiceHealthOf(llm.gateway.health().roles.find((r) => r.role === 'voice')),
     voice: deps.activeVoice,
     stuckJobs: (creatorId) => readStuckJobs(adminDb, creatorId, deps.jobNames()),
     allCreatorIds: deps.allCreatorIds,
@@ -71,4 +66,15 @@ export function wireSupervision(
     }),
   });
   return { module, routes: [module.routes] };
+}
+
+/**
+ * The voice as the Dashboard says it. On its fallback (Mistral writes while Grok's key is refused) or after a few failed
+ * calls it still answers: only `down` stops it, as Réglages › Modèles IA says (recette AGT 06/11).
+ */
+export function voiceHealthOf(voice: RoleHealth | undefined): { ok: boolean; keyMissing: boolean } {
+  return {
+    ok: voice !== undefined && voice.state !== 'down',
+    keyMissing: voice === undefined || (!voice.hasKey && voice.fallback?.hasKey !== true),
+  };
 }

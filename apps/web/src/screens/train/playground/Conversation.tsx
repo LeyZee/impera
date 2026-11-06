@@ -22,6 +22,7 @@ import {
   rejectedWords,
   type MediaKind,
   type Turn,
+  unansweredReason,
 } from './model';
 
 const KIND_LABELS: Readonly<Record<MediaKind, string>> = { image: 'Photo', video: 'Vidéo', audio: 'Vocal' };
@@ -355,11 +356,15 @@ function Draft({
   const blocking = answer.violations.filter((v) => v.severity === 'blocking');
   const verdict = props.mode === 'lesson' ? props.lesson : undefined;
   const why = blocking.length > 0 ? blocking.map((v) => v.label).join(', ') : (answer.failure ?? 'relecture');
-  const label = answer.isBlocked
-    ? `Bloquée avant envoi : ${why}`
-    : verdict === undefined
-      ? 'Proposée, à noter'
-      : 'Proposée';
+  const unanswered = unansweredReason(answer);
+  const label =
+    unanswered !== null
+      ? `Pas de réponse : ${unanswered}`
+      : answer.isBlocked
+        ? `Bloquée avant envoi : ${why}`
+        : verdict === undefined
+          ? 'Proposée, à noter'
+          : 'Proposée';
   const bubbleState = answer.isBlocked ? 'is-blocked' : verdict === undefined ? '' : 'is-set-aside';
   return (
     <div className="pg-draft">

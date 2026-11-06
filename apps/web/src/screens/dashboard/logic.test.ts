@@ -192,6 +192,28 @@ describe('heroState and the budget, the global stop', () => {
     expect(heroState({ ...agent, tone: 'ok' }, [], 'copilot').lead).toContain('Les alertes arrivent ici');
   });
 
+  it('still says the budget when the agent writes nothing: idle, down or waiting for its key (recette AGT 06/11)', () => {
+    const budgetNote =
+      'Le budget IA du jour est atteint (21,60 € sur 20 €) : l’agent ne propose plus rien jusqu’à demain.';
+    const idle: AgentState = { ...agent, tone: 'idle', lead: 'Reveal n’est pas encore relié.', budgetNote };
+    expect(heroState(idle, [todo('a', 'warn')], 'copilot').lead).toBe(
+      `Reveal n’est pas encore relié. ${budgetNote}`,
+    );
+    const keyMissing: AgentState = {
+      ...agent,
+      tone: 'warn',
+      stalled: true,
+      lead: 'Pose-la.',
+      leadWithoutAction: 'Le propriétaire la pose.',
+      budgetNote,
+    };
+    expect(heroState(keyMissing, [], 'copilot')).toMatchObject({
+      lead: `Pose-la. ${budgetNote}`,
+      leadWithoutAction: `Le propriétaire la pose. ${budgetNote}`,
+    });
+    expect(heroState({ ...agent, tone: 'bad' }, [], 'copilot').lead).toBe(agent.lead);
+  });
+
   it('says why under a global stop, in the hero (DASH-08)', () => {
     const hero = heroState(agent, [todo('a', 'bad')], 'stop', { globalStop: true });
     expect(hero.lead).toContain('Un arrêt général est posé pour toutes les créatrices');
