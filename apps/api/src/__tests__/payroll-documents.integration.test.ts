@@ -224,7 +224,7 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
 
   it('takes a PDF, a JPEG or a PNG of 10 MB at most, from the contractor or the owner, never issued ahead', async () => {
     const query = residence('2025-03-03');
-    // A manager reads his file, never writes it; another member does not even see him.
+    // A manager neither writes his file nor reads it (reco 10); another member does not even see him.
     const manager = await upload(miaCookie, query, pdf('a certificate'));
     expect(team.refusal(manager).code).toBe('contractor_profile_forbidden');
     const another = await upload(theoCookie, query, pdf('a certificate'));
@@ -316,8 +316,11 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
 
     expect((await pay('2025-06-02'))?.details).toEqual({ reason: 'tax_residence_unverified', year: '2025' });
 
-    // He, the owner and a manager read the file, its bytes as filed; another member does not.
-    for (const cookie of [kofiCookie, team.owner, miaCookie]) {
+    // He and the owner read the file, its bytes as filed; a manager does not (reco 10, 05/11), nor another member.
+    const byManager = await download(miaCookie, of2025.id);
+    expect(byManager.statusCode).toBe(403);
+    expect(team.refusal(byManager).code).toBe('contractor_profile_forbidden');
+    for (const cookie of [kofiCookie, team.owner]) {
       const read = await download(cookie, of2025.id);
       expect(read.statusCode).toBe(200);
       expect(new Uint8Array(read.rawPayload)).toEqual(first);

@@ -72,7 +72,9 @@ Le job n'envoie jamais rien lui-même.
 ```
 approveDraft(draftId, by)  [transaction]  → status approved|edited, event, addJob('conversation.send', …, queueName conv),
                                            addJob('conversation.record_facts') si le brief a proposé des faits (P3-02)
-rejectDraft(draftId, by, reason)          → status rejected, event ; raison stockée pour les évals
+rejectDraft(draftId, by, reason)          → status rejected, event ; raison stockée pour les évals ; si le fan attend
+                                           sa réponse, l'événement porte leavesFanWaiting et la conversation passe à
+                                           human (recette CHAT-25), sinon idle
 
 conversation.send :
   • relit le draft (encore valide ? conversation toujours en idle/awaiting ? pas de nouveau message inbound depuis ? sinon → expired + re-respond)

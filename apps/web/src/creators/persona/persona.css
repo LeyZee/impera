@@ -213,6 +213,11 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-warning) 18%, transparent);
   animation: ps-breathe 2.4s var(--nv-ease-out) infinite;
 }
+/* First on its line, a dot with a halo steps in by the halo's width: the halo lines up with the title and fields of
+   its card instead of jutting past them (relecture des captures, #575). */
+.ps-dot[data-dot]:first-child {
+  margin-inline-start: 4px;
+}
 @keyframes ps-breathe {
   50% {
     box-shadow: 0 0 0 7px color-mix(in srgb, var(--nv-warning) 6%, transparent);
@@ -239,6 +244,13 @@
 }
 .ps-tabs__bar::-webkit-scrollbar {
   display: none;
+}
+/* The bar scrolls, so it clips: the thumb's shadow stays inside its padding, never cut into a grey rectangle around
+   the lit tab (relecture des captures, #575). */
+.ps-tabs__bar .nv-subnav__thumb {
+  box-shadow:
+    inset 0 1px 0 var(--nv-glass-edge),
+    0 1px 3px rgb(0 0 0 / 0.18);
 }
 /* More tabs past an edge: that edge fades instead of cutting a tab in two, and a chevron sits on it (CREA-01). */
 .ps-tabs[data-more='end'] .ps-tabs__bar {

@@ -10,6 +10,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { ShootBrief } from './ShootBrief';
 import { acceptSuggestion, AGENDA_KEY, NOT_SENT } from './api';
 import { CategoryMark } from './category';
+import { undatedOf } from './model';
 import { whenWords } from './words';
 
 import { lengthOf } from '@/scheduling/time';
@@ -148,5 +149,39 @@ export function SuggestionDialog({
         <SuggestionCard suggestion={live} zone={agenda.timeZone} onDecline={onDecline} onPlace={onPlace} />
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * « Sans date »: the agency's suggestions that found no room, which she places herself. Above her week, as a list on a
+ * phone and above the grid on a computer, and above her day when it is today: wherever she looks, she can reach them.
+ */
+export function UndatedSuggestions({
+  agenda,
+  onDecline,
+  onPlace,
+}: {
+  agenda: CreatorAgenda;
+  onDecline: (suggestion: CreatorSuggestion) => void;
+  onPlace: (suggestion: CreatorSuggestion) => void;
+}): JSX.Element | null {
+  const undated = undatedOf(agenda);
+  if (undated.length === 0) return null;
+  return (
+    <section className="ag-sec">
+      <div className="ag-sec__head">
+        <h2>Sans date</h2>
+        <span className="ag-count nv-num">{undated.length}</span>
+      </div>
+      {undated.map((suggestion) => (
+        <SuggestionCard
+          key={suggestion.id}
+          suggestion={suggestion}
+          zone={agenda.timeZone}
+          onDecline={onDecline}
+          onPlace={onPlace}
+        />
+      ))}
+    </section>
   );
 }

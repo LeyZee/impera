@@ -75,7 +75,10 @@ export const INVOICE_ERROR_CODES = [
   'contract_text_superseded_conflict',
   /** The file changed since the owner read it: he checks again what he sees. */
   'contractor_profile_changed_conflict',
-  /** A manager, or another member, writing a contractor's file: only the contractor and the owner write it. */
+  /**
+   * A manager, or another member, writing a contractor's file, or a manager reading it or one of its documents: only
+   * the contractor and the owner write it and read it (reco 10 of the recette, 05/11).
+   */
   'contractor_profile_forbidden',
   /** The contractor has not written his file yet. */
   'contractor_profile_not_found',

@@ -932,7 +932,10 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas: 'emoji label' 'emoji hint';
-  align-items: center;
+  /* At the top of the card, the label right above its hint: a card stretched to its neighbour's height no longer
+     spreads its two lines apart (relecture des captures, #575). */
+  align-content: start;
+  align-items: start;
   column-gap: var(--nv-space-3);
   row-gap: 2px;
   padding: var(--nv-space-3);
@@ -965,6 +968,7 @@
 }
 .ag-kind__emoji {
   grid-area: emoji;
+  align-self: center;
   font-size: 22px;
   line-height: 1;
 }

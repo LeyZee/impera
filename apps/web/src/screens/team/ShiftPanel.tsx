@@ -283,7 +283,6 @@ export function ShiftPanel({
           </label>
           <DayField
             id={`${id}-day`}
-            className="tm-date"
             value={day}
             today={today}
             invalid={!dayOk || notJoined}

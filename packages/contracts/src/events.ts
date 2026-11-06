@@ -76,8 +76,10 @@ const draftPayload = z.object({
   /** Why a human rejected or the system expired it; kept for the evals (message-flow.md §3). */
   reason: z.string().min(1).max(500).optional(),
   /**
-   * A draft expired by a kill switch or an expired session while the fan's last message was still unanswered: the
-   * conversation waits for an answer again, and the resume answers it (recette MOT-03). Absent everywhere else.
+   * The fan's last message was still unanswered when the draft ended, as the command saw it. On `draft_expired` (a
+   * kill switch or an expired session): the conversation waits for an answer again, and the resume answers it (recette
+   * MOT-03). On `draft_rejected`: the conversation stays with the human who refused it (recette CHAT-25). Absent
+   * everywhere else, and on the events written before: they replay as they were decided.
    */
   leavesFanWaiting: z.literal(true).optional(),
 });

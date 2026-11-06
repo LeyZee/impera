@@ -68,7 +68,6 @@ const AGENCY_SCOPE: readonly string[] = [
   'manager of A: GET /v1/team/members/:memberId/notes → 200',
   'manager of A: POST /v1/team/members/:memberId/notes → 201',
   'manager of A: GET /v1/team/pay-rules → 200 shows Béa, bea-inventee',
-  'manager of A: GET /v1/payroll/contractors/:memberId/file → 200',
 ];
 
 /** B's tables the manager changes through those routes: the planning of the team, never her content. */
