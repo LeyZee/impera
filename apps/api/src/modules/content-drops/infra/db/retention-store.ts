@@ -9,10 +9,13 @@ const { contentDropFiles, contentDrops, domainEvents, mediaAssets } = schema;
 const keptByDrop = sql`exists (select 1 from ${contentDropFiles} k
   where k.media_asset_id = ${mediaAssets.id} and k.state = 'kept')`;
 
-/** Every drop it came in by (kept or duplicate) is withdrawn: nothing she still holds points at it. */
+/**
+ * Every file it came in by (kept or duplicate) is out: its drop withdrawn, or the file replaced in its slot before she
+ * sent her script (SC-02 lot b). Nothing she still holds points at it.
+ */
 const allWithdrawn = sql`not exists (select 1 from ${contentDropFiles} f
   join ${contentDrops} d on d.id = f.drop_id
-  where f.media_asset_id = ${mediaAssets.id} and d.state <> 'withdrawn')`;
+  where f.media_asset_id = ${mediaAssets.id} and d.state <> 'withdrawn' and f.replaced_at is null)`;
 
 /** A notice for a medium, said once per date (`domain_events_content_media_unique`, migration 0113). */
 async function sayOnce(
@@ -50,9 +53,10 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
           .innerJoin(contentDrops, eq(contentDrops.id, contentDropFiles.dropId))
           .where(
             and(
-              eq(contentDrops.state, 'uploading'),
-              sql`${contentDrops.createdAt} < ${before}`,
               eq(contentDropFiles.state, 'awaiting'),
+              // A drop sending since before the limit; in a script being filled, a file chosen before it (SC-02 lot b).
+              sql`((${contentDrops.state} = 'uploading' and ${contentDrops.createdAt} < ${before})
+                or (${contentDrops.state} = 'filling' and ${contentDropFiles.createdAt} < ${before}))`,
             ),
           );
         return rows.map((row) => row.id);

@@ -290,7 +290,13 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const notifications = wireNotifications(shared);
   const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
   const scheduling = wireScheduling(shared, { persona: persona.module, creatorTasks: creatorTasks.module });
-  const contentDrops = wireContentDrops(shared);
+  // Late bound: her script drop reads the library's frozen versions, and the library asks her scripts through her content.
+  const contentDrops = wireContentDrops(shared, {
+    scriptVersions: {
+      frozen: (versionId) => scripts.module.frozenVersion(versionId),
+      freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
+    },
+  });
   const scripts = wireScripts(shared, {
     persona: persona.module,
     contentDrops: contentDrops.module,
