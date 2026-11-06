@@ -21,8 +21,8 @@ export type AgentModeView =
  * The one door to the agent's mode for the bar's pill: it reads the same `GET /v1/dashboard` as the Dashboard, so
  * both always say the same thing. The Dashboard's control writes it (`agent/write.ts`).
  */
-export function useAgentMode(): AgentModeView {
-  const live = useLiveDashboard();
+export function useAgentMode(shown: string | null = null): AgentModeView {
+  const live = useLiveDashboard('day', shown);
   if (live.kind === 'live') {
     const { reveal, voice } = live.data;
     // The Dashboard's own rule: never read once means not linked yet, read then lost means disconnected.

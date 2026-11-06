@@ -2,6 +2,8 @@ import type { TelegramBot, TelegramChat, TelegramTopic } from '@impera/contracts
 import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import { RevealKey } from '../services/RevealKey';
+import '../services/services.css';
 import { ReauthRequired } from '../services/api';
 
 import { Reauth } from './Reauth';
@@ -221,6 +223,7 @@ function TokenStep({
     verified === null ? { kind: 'idle' } : { kind: 'ok', bot: verified },
   );
   const input = useRef<HTMLInputElement>(null);
+  const [shown, setShown] = useState(false);
 
   useEffect(() => {
     if (check.kind === 'idle' || check.kind === 'error') input.current?.focus();
@@ -278,10 +281,19 @@ function TokenStep({
         >
           <input
             ref={input}
-            className="nv-field__control nv-glass tg-mono"
-            type="password"
+            className="nv-field__control nv-glass tg-mono sv-key__secret"
+            data-shown={shown ? 'true' : undefined}
+            // Masked by CSS like the service keys, not `type=password`: no password manager offers to save it (PRO-29).
+            type="text"
+            name="nv-telegram-token"
             autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
             spellCheck={false}
+            data-1p-ignore=""
+            data-lpignore="true"
+            data-form-type="other"
+            data-bwignore=""
             aria-label="Jeton du bot"
             aria-invalid={check.kind === 'error'}
             aria-describedby="tg-verify"
@@ -292,6 +304,13 @@ function TokenStep({
               const pasted = event.clipboardData.getData('text');
               event.currentTarget.value = pasted;
               void submit(pasted);
+            }}
+          />
+          <RevealKey
+            shown={shown}
+            disabled={check.kind === 'busy'}
+            onToggle={() => {
+              setShown(!shown);
             }}
           />
           <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={check.kind === 'busy'}>

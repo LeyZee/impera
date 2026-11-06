@@ -129,7 +129,7 @@ describe('runErrorOf', () => {
 describe('runNowOf (REG-24)', () => {
   it('offers to export now, says a request that waits, and hides while an export runs', () => {
     expect(runNowOf(status())).toEqual({ kind: 'offer' });
-    expect(runNowOf(status({ runRequestedAt: '2026-10-27T09:58:00Z' }), PARIS)).toEqual({
+    expect(runNowOf(status({ runRequestedAt: '2026-10-27T09:58:00Z' }), PARIS, NOW)).toEqual({
       kind: 'asked',
       text: 'Relance demandée à 10:58 : elle démarre dans la minute.',
     });
@@ -146,6 +146,15 @@ describe('runNowOf (REG-24)', () => {
         }),
       ),
     ).toEqual({ kind: 'running' });
+  });
+
+  it('says a request the service has not taken after 5 minutes, and offers to ask again (recette 05/11, PRO-06)', () => {
+    const asked = status({ runRequestedAt: '2026-10-27T09:58:00Z' });
+    expect(runNowOf(asked, PARIS, new Date('2026-10-27T10:02:00Z')).kind).toBe('asked');
+    expect(runNowOf(asked, PARIS, new Date('2026-10-27T10:12:00Z'))).toEqual({
+      kind: 'unheard',
+      text: 'Le service de sauvegarde n’a pas pris la demande de 10:58. Tu peux redemander.',
+    });
   });
 });
 

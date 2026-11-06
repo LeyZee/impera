@@ -43,6 +43,9 @@ describe('her hours in words (P3-14)', () => {
   it('names whose clock the page reads, by her first name and her city', () => {
     expect(clockHeader('Nora Vidal', 'Europe/Paris')).toBe('À l’heure de Nora (Paris)');
     expect(clockHeader('Nora', 'America/Sao_Paulo')).toBe('À l’heure de Nora (São Paulo)');
+    expect(clockHeader('Anastasia-Maria de la Fontaine', 'Europe/Paris')).toBe(
+      'À l’heure d’Anastasia-Maria (Paris)',
+    );
   });
 });
 

@@ -5,6 +5,7 @@ import {
   DomainError,
   isBackupCode,
   MeSchema,
+  DashboardSessionSchema,
   newId,
   PASSKEY_ADD_WINDOW_MINUTES,
   PasskeyConfirmOptionsBodySchema,
@@ -1333,6 +1334,15 @@ export function createAuthRoutes(
         return { ...request.user, ...(request.membership ?? (await membership(db, request.user.id))) };
       },
     );
+    // The dashboard's first read (recette 05/11, SEC-13): 200 with or without a session, so that every public page
+    // does not log « 401 » in the console. It opens nothing: the guarded routes still refuse on their own.
+    app.get('/session', { schema: { response: { 200: DashboardSessionSchema } } }, async (request) => {
+      const session = await currentUser(auth, db, request);
+      if (session === null) return { state: 'signed_out' as const };
+      if (!session.secondFactorEnabled) return { state: 'second_factor_required' as const };
+      const me = { ...session.user, ...(session.membership ?? (await membership(db, session.user.id))) };
+      return { state: 'signed_in' as const, me };
+    });
     return Promise.resolve();
   };
 }

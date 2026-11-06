@@ -145,4 +145,14 @@ describe('redeemInvitationLink', () => {
     answer(500, refusal('internal_error'));
     expect(await redeemInvitationLink(TOKEN, 'une phrase longue')).toEqual({ kind: 'unavailable' });
   });
+
+  // Recette 05/11, CHAT-10: the member read « the server does not answer » when only the breach check was down.
+  it('tells the breach check being down from the server being down', async () => {
+    answer(503, refusal('service_unavailable', { reason: 'password_check' }));
+    expect(await redeemInvitationLink(TOKEN, 'une phrase longue')).toEqual({
+      kind: 'password_check_unavailable',
+    });
+    answer(503, refusal('service_unavailable'));
+    expect(await redeemInvitationLink(TOKEN, 'une phrase longue')).toEqual({ kind: 'unavailable' });
+  });
 });

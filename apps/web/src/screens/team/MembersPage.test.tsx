@@ -685,7 +685,7 @@ describe('a link from the sheet', () => {
     confirmIdentity.mockResolvedValue('ok');
     renderPage(`/equipe/membres?membre=${THEO.id}`);
     fireEvent.click(await screen.findByRole('button', { name: 'Lien de nouveau mot de passe' }));
-    const password = await screen.findByLabelText('Ton mot de passe');
+    const password = await screen.findByLabelText('Mot de passe');
     fireEvent.change(password, { target: { value: 'mot-de-passe-invente' } });
     fireEvent.change(screen.getByLabelText('Code à 6 chiffres ou de secours'), {
       target: { value: '123456' },

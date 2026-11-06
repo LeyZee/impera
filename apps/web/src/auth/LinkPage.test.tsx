@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NewPasswordPage } from './NewPasswordPage';
 import { WelcomePage } from './WelcomePage';
 import { forgetTakenToken } from './api';
+import { chosenPassword, forgetChosenPassword } from './chosen-password';
 
 const TOKEN = 'lien-invente-pour-les-tests';
 const PASSWORD = 'une phrase que je retiens';
@@ -38,15 +39,20 @@ function refusal(code: string, details: Record<string, unknown> = {}) {
 type Answer = readonly [number, unknown] | 'offline';
 
 /**
- * The two routes; each answers its turns in order, the last one for good. `/v1/me` answers `me`, no session (401)
+ * The two routes; each answers its turns in order, the last one for good. `/v1/session` answers `me`, no session (401)
  * unless told otherwise.
  */
 function serve(routes: { inspect?: Answer[]; redeem?: Answer[]; me?: Answer }) {
   const fake = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url) => {
-    if (url === '/v1/me') {
+    if (url === '/v1/session') {
       const me = routes.me ?? ([401, {}] as const);
       if (me === 'offline') return Promise.reject(new TypeError('Failed to fetch'));
-      return Promise.resolve(new Response(JSON.stringify(me[1]), { status: me[0] }));
+      // 401 here stands for « no session », which the route answers with 200.
+      return Promise.resolve(
+        me[0] === 401
+          ? Response.json({ state: 'signed_out' })
+          : Response.json({ state: 'signed_in', me: me[1] }, { status: me[0] }),
+      );
     }
     const turns = (url.endsWith('/inspect') ? routes.inspect : routes.redeem) ?? [];
     const next = turns.length > 1 ? turns.shift() : turns[0];
@@ -83,6 +89,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   forgetTakenToken();
+  forgetChosenPassword();
   window.history.replaceState(null, '', '/');
 });
 
@@ -153,6 +160,8 @@ describe('WelcomePage', () => {
     await vi.waitFor(() => {
       expect(onSignedIn).toHaveBeenCalledWith(ME);
     });
+    // Kept in memory for the code's activation that follows, so it is not asked twice (recette SEC-15).
+    expect(chosenPassword()).toBe(PASSWORD);
   });
 
   it('welcomes a creator to her own space, she who has no country on file (CR-02)', async () => {
@@ -308,12 +317,30 @@ describe('another account signed in on this browser', () => {
       open('welcome');
       await screen.findByRole('heading', { name: 'Bienvenue, Théo' });
       await vi.waitFor(() => {
-        expect(fake.mock.calls.map(([url]) => url)).toContain('/v1/me');
+        expect(fake.mock.calls.map(([url]) => url)).toContain('/v1/session');
       });
       expect(screen.queryByText(/Ce navigateur est connecté/u)).toBeNull();
       cleanup();
       forgetTakenToken();
     }
+  });
+});
+
+describe('the page follows the link, not the address (recette SEC-10)', () => {
+  it('welcomes a first access opened on the new-password page, and moves the address', async () => {
+    serve({ inspect: [[200, preview('invitation')]] });
+    open('reset');
+    expect(await screen.findByRole('heading', { name: 'Bienvenue, Théo' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Entrer' })).toBeDefined();
+    expect(window.location.pathname).toBe('/bienvenue');
+  });
+
+  it('asks for a new password when a reset link is opened on the welcome page', async () => {
+    serve({ inspect: [[200, preview('reset')]] });
+    open('welcome');
+    expect(await screen.findByRole('heading', { name: 'Nouveau mot de passe' })).toBeDefined();
+    expect(screen.queryByText(/Bienvenue/u)).toBeNull();
+    expect(window.location.pathname).toBe('/nouveau-mot-de-passe');
   });
 });
 

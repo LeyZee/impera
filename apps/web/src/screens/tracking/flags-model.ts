@@ -146,32 +146,71 @@ export interface SheetFacts {
   readonly band: string | null;
 }
 
-/** A switch that stops the agent from writing or selling. */
-const STOPS: readonly SwitchFlag[] = ['doNotContact', 'salesFrozen'];
-
 /**
- * The fan's sheet folded to one line (limits, what is left to learn, desire): what stops the agent or flags a minor
- * first, in amber, then the rest, quiet. Each part is left out when it has nothing to say.
+ * The fan's sheet folded to one line: what is left to learn and his desire, quiet. His limits are no longer in it: they
+ * stand above the sheet, unfolded (`alertsOf`, CHAT-23). Limits that could not be read are said in amber, never as
+ * « Rien à signaler », and nothing is said while they are read (recette 05/11, CHAT-03).
  */
 export function sheetSummary(facts: SheetFacts): { readonly urgent: string | null; readonly rest: string } {
-  const urgent: string[] = [];
   const rest: string[] = [];
   const { flags } = facts;
-  if (flags === 'down') rest.push('limites non lues');
-  else if (typeof flags === 'object') {
-    if (isAgeDisputed(flags)) urgent.push('Âge contesté');
-    let quiet = flags.spendingLimitMinor === undefined ? 0 : 1;
-    for (const s of SWITCHES) {
-      if (!isOn(flags, s.flag)) continue;
-      if (STOPS.includes(s.flag)) urgent.push(s.label);
-      else quiet += 1;
-    }
-    if (quiet > 0) rest.push(quiet === 1 ? '1 limite' : `${String(quiet)} limites`);
-  }
   if (facts.toLearn !== null && facts.toLearn > 0) rest.push(`${String(facts.toLearn)} à apprendre`);
   if (facts.band !== null) rest.push(`désir ${facts.band}`);
-  return {
-    urgent: urgent.length === 0 ? null : urgent.join(' · '),
-    rest: rest.length === 0 && urgent.length === 0 ? 'Rien à signaler' : rest.join(' · '),
-  };
+  if (flags === 'refused') return { urgent: 'Limites non lisibles', rest: rest.join(' · ') };
+  if (flags === 'down') return { urgent: 'Limites non lues', rest: rest.join(' · ') };
+  if (flags === 'loading') return { urgent: null, rest: rest.length === 0 ? '…' : rest.join(' · ') };
+  if (rest.length > 0) return { urgent: null, rest: rest.join(' · ') };
+  return { urgent: null, rest: hasAnyLimit(flags) ? 'Ses limites sont en tête' : 'Rien à signaler' };
+}
+
+const hasAnyLimit = (flags: FanFlags): boolean =>
+  isAgeDisputed(flags) || flags.spendingLimitMinor !== undefined || SWITCHES.some((s) => isOn(flags, s.flag));
+
+/** One limit said above the fan's sheet: `stop` forbids (red), `care` changes how one writes (amber). */
+export interface FanAlert {
+  readonly level: 'stop' | 'care';
+  readonly label: string;
+  readonly text: string;
+}
+
+/**
+ * What a person must know before writing to him, unfolded above his sheet (CHAT-23): what forbids first, in red (no
+ * more messages, sales frozen, a disputed age), then what changes how one writes, in amber (fragile, nothing explicit,
+ * his ceiling). Said to a person, who writes in Reveal too, not only of the agent.
+ */
+export function alertsOf(flags: FanFlags): FanAlert[] {
+  const alerts: FanAlert[] = [];
+  if (flags.doNotContact !== undefined)
+    alerts.push({
+      level: 'stop',
+      label: 'Ne plus lui écrire',
+      text: 'Personne ne lui écrit, ni l’agent ni toi dans Reveal.',
+    });
+  if (flags.salesFrozen !== undefined)
+    alerts.push({
+      level: 'stop',
+      label: 'Ventes gelées',
+      text: `Aucune offre, aucune relance de vente. ${switchDetail(flags, 'salesFrozen') ?? ''}`.trim(),
+    });
+  if (isAgeDisputed(flags))
+    alerts.push({
+      level: 'stop',
+      label: 'Âge contesté',
+      text: 'Un signe de minorité : rien d’explicite tant qu’un responsable ne l’a pas confirmé.',
+    });
+  if (flags.fragile !== undefined)
+    alerts.push({
+      level: 'care',
+      label: 'Fan fragile',
+      text: 'Douceur seulement : ni chouinage ni pression.',
+    });
+  if (flags.noExplicit !== undefined && !isAgeDisputed(flags))
+    alerts.push({ level: 'care', label: 'Rien d’explicite', text: 'Suggestif, jamais explicite.' });
+  if (flags.spendingLimitMinor !== undefined)
+    alerts.push({
+      level: 'care',
+      label: `Plafond de ${euros(flags.spendingLimitMinor)}`,
+      text: 'Il l’a fixé lui-même : rien au-delà.',
+    });
+  return alerts;
 }

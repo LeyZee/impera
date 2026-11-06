@@ -3,7 +3,7 @@ import type { CreatorTask } from '@impera/contracts';
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { flushGestures, tickTask } from './api';
+import { archiveTask, flushGestures, NOT_SENT, tickTask } from './api';
 import { live, post, WEDNESDAY } from './fixtures';
 import { keepGesture, pendingGestures } from './offline';
 
@@ -83,5 +83,25 @@ describe('her ticks sent back', () => {
     await sending;
     expect(bodies).toHaveLength(2);
     expect(pendingGestures()).toEqual([]);
+  });
+});
+
+describe('a change that did not go through (recette 05/11, CREA-06)', () => {
+  it('tells a server error from no network, and promises no send for later', async () => {
+    answer(() => refusal(500, 'internal_error'));
+    expect(await archiveTask(live.id)).toEqual({ kind: 'failed' });
+    answer(() => new Response('<html>Bad gateway</html>', { status: 502 }));
+    expect(await archiveTask(live.id)).toEqual({ kind: 'failed' });
+    answer(() => refusal(404, 'creator_task_not_found'));
+    expect(await archiveTask(live.id)).toEqual({ kind: 'refused', code: 'creator_task_not_found' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    expect(await archiveTask(live.id)).toEqual({ kind: 'offline' });
+
+    expect(NOT_SENT.failed).not.toMatch(/réseau/u);
+    expect(NOT_SENT.offline).toMatch(/rien n’est parti/u);
+    for (const text of Object.values(NOT_SENT)) expect(text).not.toMatch(/part quand/u);
   });
 });

@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useCallback, type JSX, type ReactNode } from 'react';
 
+import { AgencyStrip } from './AgencyStrip';
 import { AgentHero } from './AgentHero';
 import { AutomaticConfirm } from './AutomaticConfirm';
 import { BackupBanner } from './BackupBanner';
@@ -83,14 +84,20 @@ function Alone({
  * The server does not answer: one sentence, no figure, only « Réessayer », until it answers again. Amber, not red: a
  * warning, the red stays the urgencies'.
  */
-function Offline({ creatorName }: { creatorName: string | null }): JSX.Element {
+function Offline({
+  creatorName,
+  onCreator,
+}: {
+  creatorName: string | null;
+  onCreator: ((creatorId: string) => void) | undefined;
+}): JSX.Element {
   const client = useQueryClient();
   return (
     <div className="db">
       {creatorName === null ? null : (
         <header className="db-top nv-enter">
           {/* Another creator's Dashboard may still answer: the choice stays at hand. */}
-          <CreatorPicker />
+          <CreatorPicker onChoose={onCreator} />
           <div className="db-top__who">
             <span className="db-top__av" aria-hidden="true">
               {initialOf(creatorName)}
@@ -146,6 +153,7 @@ function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.Element {
 export function DashboardPage({
   period,
   onPeriod,
+  onCreator,
   forOwner = false,
   opensTracking = false,
   canAddCreator = false,
@@ -153,6 +161,8 @@ export function DashboardPage({
   /** The period of the sales, the fans' path, the best fans and the reply delay: from the address (`?periode=`). */
   period: Period;
   onPeriod: (period: Period) => void;
+  /** Another creator chosen on the chips: the address names her (`?creatrice=`, PRO-28). */
+  onCreator?: (creatorId: string) => void;
   /** The owner also reads the state of the daily export (OPS-02), the one figure that is the owner's alone. */
   forOwner?: boolean;
   /** The account's rail holds Suivi: a best fan opens his conversation there (DASH-14). */
@@ -168,13 +178,14 @@ export function DashboardPage({
       </div>
     );
   }
-  if (view.status === 'offline') return <Offline creatorName={view.creatorName} />;
+  if (view.status === 'offline') return <Offline creatorName={view.creatorName} onCreator={onCreator} />;
   if (view.status === 'empty') return <NoCreator canAddCreator={canAddCreator} />;
   return (
     <Loaded
       view={view}
       period={period}
       onPeriod={onPeriod}
+      onCreator={onCreator}
       forOwner={forOwner}
       opensTracking={opensTracking}
     />
@@ -185,12 +196,14 @@ function Loaded({
   view: { creatorId, globalStop, readAt, data, mode, automatic },
   period,
   onPeriod,
+  onCreator,
   forOwner,
   opensTracking,
 }: {
   view: Extract<DashboardView, { status: 'live' }>;
   period: Period;
   onPeriod: (period: Period) => void;
+  onCreator: ((creatorId: string) => void) | undefined;
   forOwner: boolean;
   opensTracking: boolean;
 }): JSX.Element {
@@ -228,7 +241,7 @@ function Loaded({
     <div className="db">
       <header className="db-top nv-enter">
         {/* Whose agent this is, when the account sees several: the pill and Suivi follow the same choice. */}
-        <CreatorPicker />
+        <CreatorPicker onChoose={onCreator} />
         <div className="db-top__who">
           {several ? null : (
             <CreatorFace
@@ -287,8 +300,11 @@ function Loaded({
       {/* The invoices' due dates, contests and documents to check: the owner's to settle (EQ-06 lot 8d). */}
       <PaperworkBanner enabled={forOwner} />
 
-      {/* The night's alerts and where they go are the team's (Réglages › Telegram). */}
-      <NightBanner night={data.telegram} creatorName={data.creator.name} />
+      {/* The night's alerts and where they go are the owner's to set (Réglages › Telegram): anyone else reads it. */}
+      <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
+
+      {/* The AI budget and the stuck jobs of no creator are the agency's, not her agent's health (reco 18, PRO-10). */}
+      <AgencyStrip agency={data.agency} />
 
       {sales === null ? null : (
         <>
@@ -329,12 +345,7 @@ function Loaded({
         />
       </Section>
 
-      {/* Until Reveal's purchases are observed, one quiet line says where the sales are read, no block (DASH-02). */}
-      {sales === null && data.revealSales === null ? (
-        <p className="db-salesnote nv-enter" style={{ '--nv-i': 3 }}>
-          Ventes : bientôt lues depuis Reveal.
-        </p>
-      ) : null}
+      {/* Until Reveal's purchases are observed, nothing stands for the sales: no « bientôt » line (recette 05/11, PRO-24). */}
 
       {tip.element}
     </div>

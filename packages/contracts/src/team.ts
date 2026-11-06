@@ -316,3 +316,15 @@ export const MeSchema = CurrentUserSchema.extend({
   teamScope: TeamScopeSchema,
 });
 export type Me = z.infer<typeof MeSchema>;
+
+/**
+ * `GET /v1/session`: whether this browser has a session, answered 200 in every case, so that a page opened without one
+ * does not log a failed request (recette 05/11, SEC-13). `second_factor_required`: signed in with the password, the
+ * code not active yet, the activation is the only screen (ADR 0046 § 1). `/v1/me` stays the guarded read.
+ */
+export const DashboardSessionSchema = z.discriminatedUnion('state', [
+  z.object({ state: z.literal('signed_out') }),
+  z.object({ state: z.literal('second_factor_required') }),
+  z.object({ state: z.literal('signed_in'), me: MeSchema }),
+]);
+export type DashboardSession = z.infer<typeof DashboardSessionSchema>;

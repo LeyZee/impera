@@ -13,7 +13,7 @@ import { newModelsLabel } from '@/settings/sales-feed/importing';
 import { ServicesSection } from '@/settings/services/ServicesSection';
 import { TelegramSection } from '@/settings/telegram/TelegramSection';
 import type { TelegramTab } from '@/settings/telegram/search';
-import { ComingSoon, Page, PageHeader, SubNav, type SubNavItem } from '@/shell/layout';
+import { Page, PageHeader, SubNav, type SubNavItem } from '@/shell/layout';
 import { screenLabel, type ScreenPath } from '@/shell/nav';
 
 /**
@@ -102,29 +102,4 @@ export function BackupsPage(): JSX.Element {
 /** Réglages › Sécurité (SEC-04): the owner's sessions and backup codes, and every account's second factor. */
 export function SecurityPage({ userId }: { userId: string }): JSX.Element {
   return <SecuritySection ownerId={userId} />;
-}
-
-/*
- * Appareils and Mode de l'agent keep their routes but no tab (ADR 0024, « zéro bruit »): a tab that only says
- * « à venir » reads as a broken feature, and the mode already changes at the top of the Dashboard. Each tab comes
- * back with its screen (Appareils with the extension).
- */
-export function DevicesPage(): JSX.Element {
-  return (
-    <ComingSoon
-      title="Les extensions reliées"
-      what="Chaque navigateur où l’extension tourne, sa session Reveal et le moyen de le délier."
-      when="Avec l’extension"
-    />
-  );
-}
-
-export function AgentModePage(): JSX.Element {
-  return (
-    <ComingSoon
-      title="Copilote ou automatique"
-      what="Le mode se change en haut du Dashboard. L’automatique s’ouvre quand le serveur valide le taux en réel et le test à l’aveugle ; le Dashboard dit ce qui manque, chiffres à l’appui."
-      when="Après le copilote"
-    />
-  );
 }

@@ -19,7 +19,7 @@ import {
 
 import { computeCoverage } from '../domain/coverage';
 import { mayRemoveChat } from '../domain/membership';
-import { describeTelegramError } from '../domain/messages';
+import { describeTelegramError, describeTokenCheckFailure } from '../domain/messages';
 import type {
   BotRecord,
   BotsStore,
@@ -46,11 +46,9 @@ function refusal(kind: TelegramErrorKind): TelegramRefusal {
   return { kind, message: describeTelegramError(kind) };
 }
 
-/** What a failed `getMe` means for a pasted token. */
+/** What a failed `getMe` means for a pasted token: refused, or not checked (nothing kept, nothing retried). */
 function tokenRefusal(failure: ChannelFailure): TelegramRefusal {
-  return refusal(
-    failure.kind === 'unauthorized' || failure.kind === 'bad_request' ? 'token_refused' : 'unreachable',
-  );
+  return describeTokenCheckFailure(failure.kind);
 }
 
 function toChat(chat: ChatRecord): TelegramBot['chats'][number] {

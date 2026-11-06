@@ -2,7 +2,7 @@ import { CREATOR_TASK_CATEGORIES, CREATOR_TASK_CATEGORY_LABELS } from '@impera/c
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 
-import { AGENDA_KEY, createAvailability, createTask } from './api';
+import { AGENDA_KEY, createAvailability, createTask, NOT_SENT } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import {
   availabilityBodiesOf,
@@ -61,9 +61,6 @@ const REMINDERS: readonly (readonly [number | null, string])[] = [
   [30, '30 min avant'],
   [60, '1 h avant'],
 ];
-
-const OFFLINE =
-  'Pas de réseau : ce que tu ajoutes part quand le téléphone est en ligne. Réessaie dans un moment.';
 
 export function Choices<T>({
   label,
@@ -452,7 +449,9 @@ function TaskForm({
       setBusy(false);
       if (outcome.kind !== 'ok') {
         setFailed(
-          outcome.kind === 'failed' ? OFFLINE : 'Cette tâche n’a pas pu être ajoutée. Vérifie les heures.',
+          outcome.kind === 'refused'
+            ? 'Cette tâche n’a pas pu être ajoutée. Vérifie les heures.'
+            : NOT_SENT[outcome.kind],
         );
         return;
       }
@@ -601,10 +600,14 @@ function DispoForm({
           onClose();
           return;
         }
+        // The network first: nothing went, whatever the server would have said.
+        const notSent = missed.some((outcome) => outcome.kind === 'offline')
+          ? 'offline'
+          : missed.some((outcome) => outcome.kind === 'failed')
+            ? 'failed'
+            : null;
         setFailed(
-          missed.some((outcome) => outcome.kind === 'failed')
-            ? OFFLINE
-            : 'Cette dispo n’a pas pu être ajoutée. Vérifie les heures.',
+          notSent === null ? 'Cette dispo n’a pas pu être ajoutée. Vérifie les heures.' : NOT_SENT[notSent],
         );
       },
     );

@@ -808,6 +808,26 @@ describe('CommissionsPage', () => {
     });
   });
 
+  it('says each amount once, and puts empty cards in one quiet line (recette 05/11, CHAT-29)', async () => {
+    // His first period, under way, with neither a tier nor a team goal, and nothing before it.
+    periods = { [NOV1]: periodOf(NOV1, [statementOf(THEO, NOV1, { canValidate: false })]) };
+    renderPage();
+    const hero = await screen.findByRole('region', { name: 'Ce que tu touches à ce jour' });
+    expect(text(hero)).toContain('21,25 €');
+    const path = panel('Le parcours de ton argent');
+    expect(text(path)).toContain('Ta commission');
+    // No « Commission » and « Ce que tu touches à ce jour » under it: the hero and the path already say 21,25 €.
+    expect(path.querySelector('.py-lines')).toBeNull();
+    expect(screen.queryByText('Ma performance')).toBeNull();
+    expect(screen.queryByText('Mes relevés')).toBeNull();
+    expect(
+      screen.getByText(
+        'Pas de palier ni d’objectif d’équipe sur cette quinzaine. Tes relevés passés viendront ici.',
+      ),
+    ).toBeDefined();
+    expect(document.querySelector('.py-me')?.getAttribute('data-single')).toBe('true');
+  });
+
   it('tells a new chatter where their first statement comes from', async () => {
     periods = {};
     renderPage();

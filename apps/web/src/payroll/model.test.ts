@@ -546,7 +546,9 @@ describe('the money of a statement', () => {
       'Reporté sur la quinzaine suivante | sous le minimum de versement de 15,00 € | carry',
       'À verser |  | pay',
     ]);
-    expect(totalsOf(statement({ status: 'paid' }), true).at(-1)?.label).toBe('Ce que tu as touché');
+    // A carry-over on top: the total is said, in the past once paid.
+    const onTop = { carryOversInMinor: 500, payableMinor: 2_625 };
+    expect(totalsOf(statement({ status: 'paid', ...onTop }), true).at(-1)?.label).toBe('Ce que tu as touché');
     // Before its validation, a carry-over is only what would go on the next period.
     expect(
       totalsOf(statement({ totalMinor: 1_200, carryOverOutMinor: 1_200, payableMinor: 0 }), false).find(
@@ -554,7 +556,12 @@ describe('the money of a statement', () => {
       )?.label,
     ).toBe('Irait sur la quinzaine suivante');
     // The screen's own name for what is paid, so that one amount has one name.
-    expect(totalsOf(statement(), true, 'Ce que tu vas toucher').at(-1)?.label).toBe('Ce que tu vas toucher');
+    expect(totalsOf(statement(onTop), true, 'Ce que tu vas toucher').at(-1)?.label).toBe(
+      'Ce que tu vas toucher',
+    );
+    // His commission alone: the hero and « Ta commission » say it, no total says it again (recette 05/11, CHAT-29).
+    expect(totalsOf(statement(), true)).toEqual([]);
+    expect(totalsOf(statement(), false).map((row) => row.label)).toEqual(['Commission', 'À verser']);
   });
 });
 

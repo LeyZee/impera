@@ -55,22 +55,29 @@
 .cal-chip[data-mine='true'] .sc-chip__name {
   font-weight: 700;
 }
-/* The agent on the whole créneau: a fixed violet edge on its right, beside whoever holds it. */
-.cal-slot[data-ai]::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  right: -3px;
-  bottom: 2px;
-  width: 2px;
-  border-radius: var(--nv-radius-full);
-  background: var(--nv-agent);
-  pointer-events: none;
+/* A shift across two créneaux of the same day is read once, in the first: the next says it goes on, greyed, without
+   its hours again, so that it never reads as a second shift (recette 05/11, CHAT-15). */
+.cal-chip--cont,
+.cal-chip--cont[data-phase] {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--nv-space-1);
+  min-height: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  color: var(--nv-ink-faint);
 }
-/* On part of it: the edge stays, and a quiet tag says from or until when, « IA dès 9 h ». */
-.cal-slot[data-ai='part']::after {
-  background: repeating-linear-gradient(var(--nv-agent) 0 4px, transparent 4px 7px);
+.cal-chip--cont::after {
+  display: none;
 }
+.cal-chip--cont .sc-chip__name,
+.cal-chip__cont {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+}
+/* The agent is said once per creator, under her name: no edge on each créneau, no bar on a card's side (recette
+   05/11, CHAT-27). On part of a créneau, a quiet tag says from or until when, « IA dès 9 h ». */
 .cal-tag {
   position: absolute;
   top: 5px;
@@ -86,7 +93,7 @@
   font-weight: 600;
   white-space: nowrap;
 }
-/* Nobody but the agent, in Automatique: a solid violet edge, the word said. */
+/* Nobody but the agent, in Automatique: its soft violet, the word said, no edge. */
 .cal-alone {
   flex: 1;
   display: flex;
@@ -95,7 +102,6 @@
   padding: 4px 8px;
   border-radius: var(--nv-radius-sm);
   background: var(--nv-agent-soft);
-  box-shadow: inset 3px 0 0 var(--nv-agent);
   color: var(--nv-agent);
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);

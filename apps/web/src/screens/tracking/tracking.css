@@ -293,6 +293,11 @@
 .tr-hand p {
   margin: 0;
 }
+/* The agent stepped back, or nobody will answer him: a person must act, amber (CHAT-24, CHAT-25). */
+.tr-hand--alert {
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  color: var(--nv-ink);
+}
 /* Giving the hand back: the note the agent keeps, then the button that sends it, side by side when there is room. */
 .tr-hand__give {
   display: flex;
@@ -303,6 +308,22 @@
 .tr-hand__give .nv-field {
   flex: 1 1 14rem;
   min-width: 0;
+}
+/* Giving back a grave handoff (minor, consent, distress): said in red, kept by default (PRO-26). */
+.tr-hand__confirm {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-danger) 12%, transparent);
+}
+.tr-hand__confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
 }
 /* The fan's sheet: one folded band, its line says what is inside; opened, his limits, what is left, his desire. */
 .tr-sheet {
@@ -441,12 +462,31 @@
 /* The agent's notes in the thread: where it stopped, who took the hand, a draft refused. */
 .tr-note {
   align-self: center;
-  margin: 0;
+  margin: var(--nv-space-1) 0;
   max-width: 90%;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink-faint);
+  padding: 2px var(--nv-space-3);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
   text-align: center;
+}
+/* The agent handed the fan over, a send failed: what a person must not miss in the thread (CHAT-24). */
+.tr-note--strong {
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+/* When a run of bubbles was written, under its last bubble, on its side (CHAT-24). */
+.tr-time {
+  margin-top: -4px;
+}
+.tr-time--creator {
+  align-self: flex-end;
+}
+.tr-time--fan {
+  align-self: flex-start;
 }
 /* A media of the thread (SUIVI-26): its kind, and what it shows once described. The text is wrapped in
    .tr-text so that a media after it is not the bubble's first element and keeps its gap. */
@@ -495,6 +535,83 @@
 }
 .tr-row__creator {
   flex: none;
+}
+/* The list grouped by who acts: a quiet title over each group, a count for « À toi » only. */
+.tr-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.tr-group__title {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: var(--nv-space-1) var(--nv-space-4) 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  letter-spacing: var(--nv-text-caption-tracking);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--nv-ink-faint);
+}
+.tr-group:first-child .tr-group__title {
+  color: var(--nv-ink-muted);
+}
+.tr-group__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+/* A hand just given back (CHAT-08): said once above the list, quietly. */
+.tr-released {
+  margin: 0 0 var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+/* The emergency stop refused a decision (CHAT-07): a warning, amber, at the top of the reader. */
+.tr-stopped {
+  margin: 0;
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+/* What a person must know before writing to him (CHAT-23): unfolded above his sheet, red for what forbids, amber for
+   what changes how one writes. A tint and a word, never a stripe on the side. */
+.tr-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tr-alert {
+  --_c: var(--nv-warning);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--nv-space-2);
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--_c) 14%, transparent);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.tr-alert--stop {
+  --_c: var(--nv-danger);
+}
+.tr-alert strong {
+  color: var(--_c);
+  font-weight: 700;
 }
 
 /* « Récents · Chauds d'abord » (P3-12): above the list, quiet, the list's own width. */

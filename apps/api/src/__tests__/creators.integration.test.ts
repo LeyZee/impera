@@ -6,6 +6,7 @@ import {
   nextReplyOpening,
   reopenJobKey,
   SUGGESTED_REPLY_SLOTS,
+  TeamMemberIdSchema,
   type AgentHours,
 } from '@impera/contracts';
 import { eq, schema, sql } from '@impera/db';
@@ -98,6 +99,52 @@ describe('creators (GET /v1/creators, pnpm creator:create)', () => {
     });
     expect(operator.json()).toEqual({
       creators: [{ id: anna.id, displayName: 'Anna', timezone: 'Europe/Paris', hasAvatar: false }],
+    });
+  });
+
+  it('lists to a chatter the creators routed to him, name and zone only, and none once he is away (CHAT-01)', async () => {
+    const [cara, dana] = await Promise.all([
+      app.modules.persona.creators.create({ displayName: 'Cara' }),
+      app.modules.persona.creators.create({ displayName: 'Dana' }),
+    ]);
+    const email = 'chatter-list@example.test';
+    const { userId } = await createOwner(app.auth, app.db.db, {
+      email,
+      name: 'Chatter',
+      password: 'correct horse battery',
+    });
+    await test.admin.db
+      .update(schema.user)
+      .set({ role: 'operator', creatorIds: [cara.id] })
+      .where(eq(schema.user.id, userId));
+    // An invented member (ADR 0010): his scope is `self`, his creators move to `routedCreatorIds`.
+    await test.admin.db.insert(schema.teamMembers).values({
+      id: newId(TeamMemberIdSchema),
+      userId,
+      teamRole: 'chatter',
+      firstName: 'Prénom',
+      lastName: 'Inventé',
+      displayName: 'Chatter',
+      country: 'BJ',
+      timeZone: 'Africa/Porto-Novo',
+      joinedOn: '2026-10-01',
+    });
+    const headers = { cookie: await signIn(server, email, 'correct horse battery') };
+    const listed = await server.inject({ method: 'GET', url: '/v1/creators', headers });
+    expect(listed.json()).toEqual({
+      creators: [{ id: cara.id, displayName: 'Cara', timezone: 'Europe/Paris', hasAvatar: false }],
+    });
+    expect(JSON.stringify(listed.json())).not.toContain(dana.id);
+    // Her name opens nothing else: the agent's hours stay the owner's.
+    const hours = await server.inject({ method: 'GET', url: `/v1/creators/${cara.id}/agent-hours`, headers });
+    expect(hours.statusCode).toBe(403);
+    // Away (suspended), he reads no creator at all (ADR 0024).
+    await test.admin.db
+      .update(schema.teamMembers)
+      .set({ status: 'suspended' })
+      .where(eq(schema.teamMembers.userId, userId));
+    expect((await server.inject({ method: 'GET', url: '/v1/creators', headers })).json()).toEqual({
+      creators: [],
     });
   });
 

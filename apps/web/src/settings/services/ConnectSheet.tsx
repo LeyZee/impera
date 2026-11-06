@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState, type JSX, type ReactNo
 import { createPortal } from 'react-dom';
 
 import { PasswordPrompt, SignInAgain } from './PasswordPrompt';
+import { RevealKey } from './RevealKey';
 import { connectKey, ReauthRequired, saveSettings, showError, type ShownError } from './api';
 import { GUIDES, type DashboardProvider } from './guide';
 import { nextAfter, normalizeKey } from './view';
@@ -108,6 +109,7 @@ export function ConnectSheet({
   /** Opening the console folds step one a beat later, once the new tab has taken focus. */
   const [isConsoleOpening, setIsConsoleOpening] = useState(false);
   const keyInput = useRef<HTMLInputElement>(null);
+  const [isKeyShown, setIsKeyShown] = useState(false);
   const closeButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -365,6 +367,7 @@ export function ConnectSheet({
                   ref={keyInput}
                   type="text"
                   className="sv-key__secret"
+                  data-shown={isKeyShown ? 'true' : undefined}
                   name="nv-service-key"
                   autoComplete="off"
                   autoCorrect="off"
@@ -384,6 +387,13 @@ export function ConnectSheet({
                     const pasted = normalizeKey(event.clipboardData.getData('text'));
                     event.currentTarget.value = pasted;
                     void submit(pasted);
+                  }}
+                />
+                <RevealKey
+                  shown={isKeyShown}
+                  disabled={isBusy}
+                  onToggle={() => {
+                    setIsKeyShown(!isKeyShown);
                   }}
                 />
                 <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={isBusy}>

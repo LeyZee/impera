@@ -1,4 +1,4 @@
-import type { UserRole } from '@impera/contracts';
+import type { OpenSession, UserRole } from '@impera/contracts';
 
 /** « à l’instant », « il y a 12 min », « il y a 3 h », « il y a 2 j »: when a session was last used, the number never cut from its unit. */
 export function ago(at: string, now: Date): string {
@@ -12,7 +12,8 @@ export function ago(at: string, now: Date): string {
 
 export const ROLE_LABELS: Readonly<Record<UserRole, string>> = {
   owner: 'Propriétaire',
-  operator: 'Équipe',
+  // A person, not a group: the account of someone of the team (recette SEC-16).
+  operator: 'Membre de l’équipe',
   creator: 'Créatrice',
 };
 
@@ -43,4 +44,55 @@ export function dayText(at: string): string {
   const text = new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
   // « 1er nov. 2026 », never « 1 nov. »
   return text.replace(/^1 /u, '1er ');
+}
+
+/** Sessions of one device on one network: a browser that signs in often leaves many, read as one line. */
+export interface SessionGroup {
+  readonly key: string;
+  readonly device: string;
+  readonly network: string | null;
+  readonly current: boolean;
+  readonly ids: readonly string[];
+  readonly lastActiveAt: string;
+}
+
+/**
+ * This device's session first, alone (it closes by signing out), then the others gathered by device and network,
+ * the most recently used first (recette SEC-16: 26 lines « Appareil inconnu » drowned the rest of the screen).
+ */
+export function sessionGroups(sessions: readonly OpenSession[]): SessionGroup[] {
+  const current: SessionGroup[] = [];
+  const others = new Map<string, SessionGroup>();
+  for (const session of sessions) {
+    if (session.current) {
+      current.push({ ...groupOf(session, `current:${session.id}`) });
+      continue;
+    }
+    const key = `${session.device}\u0000${session.network ?? ''}`;
+    const before = others.get(key);
+    others.set(
+      key,
+      before === undefined
+        ? groupOf(session, key)
+        : {
+            ...before,
+            ids: [...before.ids, session.id],
+            lastActiveAt:
+              before.lastActiveAt > session.lastActiveAt ? before.lastActiveAt : session.lastActiveAt,
+          },
+    );
+  }
+  const byRecent = [...others.values()].sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
+  return [...current, ...byRecent];
+}
+
+function groupOf(session: OpenSession, key: string): SessionGroup {
+  return {
+    key,
+    device: session.device,
+    network: session.network,
+    current: session.current,
+    ids: [session.id],
+    lastActiveAt: session.lastActiveAt,
+  };
 }

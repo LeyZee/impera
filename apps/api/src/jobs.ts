@@ -3,6 +3,7 @@ import { makeWorkerUtils, type Task, type WorkerUtils } from 'graphile-worker';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 
+import { storableError } from './database-errors';
 import type { Logger } from './logger';
 
 /** Payload type of every task the worker knows. */
@@ -86,6 +87,12 @@ export function defineTask<S extends z.ZodType>(
       );
       throw new Error(`Invalid payload for ${name}`);
     }
-    await handler(parsed.data, { logger: jobLogger, jobId: helpers.job.id, attempt: helpers.job.attempts });
+    try {
+      await handler(parsed.data, { logger: jobLogger, jobId: helpers.job.id, attempt: helpers.job.attempts });
+    } catch (error) {
+      // Graphile stores the message in a text column: a U+0000 from a fan's text would make that write fail and
+      // kill the process, leaving the job and its queue locked (recette 05/11, MOT-01). SQL parameters stay out.
+      throw storableError(error);
+    }
   };
 }

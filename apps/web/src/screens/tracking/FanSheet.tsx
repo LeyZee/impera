@@ -5,14 +5,16 @@ import { DesireSheet } from './Desire';
 import { FanLimits, useFanFlags } from './FanLimits';
 import { FanToLearn, useFanKyc } from './FanToLearn';
 import { FanFlagsRefused } from './api';
-import { sheetSummary, type SheetFacts } from './flags-model';
+import { alertsOf, sheetSummary, type SheetFacts } from './flags-model';
 import { DESIRE_BAND_EMOJIS } from './view';
 
 import { DESIRE_BAND_LABELS } from '@/agent/desire';
 
 /**
- * The fan's sheet in the reader: his limits, what is left to learn and his desire, folded to one band so the thread
- * comes first. Its line says what is inside: a disputed age or a limit that stops the agent in amber, then the rest.
+ * The fan's sheet in the reader. What a person must know before writing to him stands above it, unfolded: what forbids
+ * in red, what changes how one writes in amber (CHAT-23). The rest (his limits in detail, what is left to learn, his
+ * desire) is folded to one quiet band so the thread comes first. Limits that could not be read are said, never hidden
+ * behind « Rien à signaler » (CHAT-03).
  */
 export function FanSheet({
   creatorId,
@@ -20,6 +22,7 @@ export function FanSheet({
   conversationId,
   desire,
   canDecide,
+  canSetLimits = canDecide,
 }: {
   creatorId: string;
   fanId: string;
@@ -27,6 +30,8 @@ export function FanSheet({
   desire: ConversationDesire | null;
   /** A creator reads his limits, never what is known of him (ADR 0023). */
   canDecide: boolean;
+  /** A chatter reads his limits without changing them (ADR 0025, the server refuses it). */
+  canSetLimits?: boolean;
 }): JSX.Element {
   const flags = useFanFlags(creatorId, fanId);
   const kyc = useFanKyc(creatorId, fanId, canDecide);
@@ -43,21 +48,40 @@ export function FanSheet({
           : `${DESIRE_BAND_LABELS[desire.band]} ${DESIRE_BAND_EMOJIS[desire.band]}`,
   };
   const summary = sheetSummary(facts);
+  const alerts = flags.data === undefined ? [] : alertsOf(flags.data.flags);
   return (
-    <details className="nv-disclosure tr-sheet">
-      <summary>
-        <span className="tr-limits__title">Fiche du fan</span>
-        <span className="tr-sheet__sum">
-          {summary.urgent === null ? null : <span className="tr-warn">{summary.urgent}</span>}
-          {summary.urgent !== null && summary.rest !== '' ? ' · ' : null}
-          {summary.rest}
-        </span>
-      </summary>
-      <div className="tr-sheet__body">
-        <FanLimits creatorId={creatorId} fanId={fanId} canDecide={canDecide} />
-        {canDecide ? <FanToLearn creatorId={creatorId} fanId={fanId} /> : null}
-        <DesireSheet creatorId={creatorId} conversationId={conversationId} desire={desire} />
-      </div>
-    </details>
+    <>
+      {alerts.length === 0 && facts.flags !== 'refused' ? null : (
+        <ul className="tr-alerts" aria-label="Avant de lui écrire">
+          {facts.flags === 'refused' ? (
+            <li className="tr-alert tr-alert--care">
+              <strong>Limites non lisibles</strong>
+              <span>Demande à ton responsable avant de lui écrire dans Reveal.</span>
+            </li>
+          ) : null}
+          {alerts.map((alert) => (
+            <li key={alert.label} className={`tr-alert tr-alert--${alert.level}`}>
+              <strong>{alert.label}</strong>
+              <span>{alert.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <details className="nv-disclosure tr-sheet">
+        <summary>
+          <span className="tr-limits__title">Fiche du fan</span>
+          <span className="tr-sheet__sum">
+            {summary.urgent === null ? null : <span className="tr-warn">{summary.urgent}</span>}
+            {summary.urgent !== null && summary.rest !== '' ? ' · ' : null}
+            {summary.rest}
+          </span>
+        </summary>
+        <div className="tr-sheet__body">
+          <FanLimits creatorId={creatorId} fanId={fanId} canDecide={canSetLimits} />
+          {canDecide ? <FanToLearn creatorId={creatorId} fanId={fanId} /> : null}
+          <DesireSheet creatorId={creatorId} conversationId={conversationId} desire={desire} />
+        </div>
+      </details>
+    </>
   );
 }

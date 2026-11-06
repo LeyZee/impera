@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ageLine,
+  alertsOf,
   ageQuestion,
   ceilingProblem,
   centsOf,
@@ -75,30 +76,58 @@ describe('the fan’s limits', () => {
     expect(ageQuestion({})).not.toContain('contestation');
   });
 
-  it('folds the fan’s sheet to one line: what stops the agent or flags a minor first, then the rest', () => {
-    expect(
-      sheetSummary({
-        flags: {
-          ageDisputed: { since: '2026-10-28T10:00:00.000Z', by: 'policy' },
-          doNotContact: true,
-          noExplicit: true,
-        },
-        toLearn: 7,
-        band: 'neutre',
-      }),
-    ).toEqual({
-      urgent: 'Âge contesté · Ne plus lui écrire',
-      rest: '1 limite · 7 à apprendre · désir neutre',
-    });
-    expect(sheetSummary({ flags: { spendingLimitMinor: 30000 }, toLearn: 0, band: 'chaud' })).toEqual({
+  it('folds the fan’s sheet to one quiet line, his limits being above it, and never « Rien à signaler » blind (CHAT-03)', () => {
+    const flags = {
+      ageDisputed: { since: '2026-10-28T10:00:00.000Z', by: 'policy' as const },
+      doNotContact: true as const,
+      noExplicit: true as const,
+    };
+    expect(sheetSummary({ flags, toLearn: 7, band: 'neutre' })).toEqual({
       urgent: null,
-      rest: '1 limite · désir chaud',
+      rest: '7 à apprendre · désir neutre',
     });
+    expect(sheetSummary({ flags, toLearn: 0, band: null }).rest).toBe('Ses limites sont en tête');
     expect(sheetSummary({ flags: {}, toLearn: null, band: null })).toEqual({
       urgent: null,
       rest: 'Rien à signaler',
     });
-    expect(sheetSummary({ flags: 'down', toLearn: null, band: null }).rest).toBe('limites non lues');
+    // Unread or refused limits are said in amber; while they are read, nothing is claimed.
+    expect(sheetSummary({ flags: 'refused', toLearn: null, band: null })).toEqual({
+      urgent: 'Limites non lisibles',
+      rest: '',
+    });
+    expect(sheetSummary({ flags: 'down', toLearn: 2, band: null })).toEqual({
+      urgent: 'Limites non lues',
+      rest: '2 à apprendre',
+    });
+    expect(sheetSummary({ flags: 'loading', toLearn: null, band: null })).toEqual({
+      urgent: null,
+      rest: '…',
+    });
+  });
+
+  it('puts what forbids first, in red, then what changes how one writes, in amber (CHAT-23)', () => {
+    const alerts = alertsOf({
+      fragile: true,
+      doNotContact: true,
+      spendingLimitMinor: 5000,
+      salesFrozen: { since: '2026-11-01T10:00:00.000Z', reason: 'distress' },
+    });
+    expect(alerts.map((a) => [a.level, a.label])).toEqual([
+      ['stop', 'Ne plus lui écrire'],
+      ['stop', 'Ventes gelées'],
+      ['care', 'Fan fragile'],
+      ['care', 'Plafond de 50\u00a0€'],
+    ]);
+    expect(alerts[0]?.text).toContain('ni l’agent ni toi');
+    expect(alerts[1]?.text).toContain('Depuis le 1er novembre : il allait mal.');
+    // A disputed age already says « rien d’explicite »: not twice.
+    expect(
+      alertsOf({ ageDisputed: { since: '2026-10-28T10:00:00.000Z', by: 'human' }, noExplicit: true }).map(
+        (a) => a.label,
+      ),
+    ).toEqual(['Âge contesté']);
+    expect(alertsOf({})).toEqual([]);
   });
 
   it('reads a ceiling typed in euros as cents, and refuses what is not an amount', () => {

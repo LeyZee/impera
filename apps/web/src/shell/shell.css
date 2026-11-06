@@ -168,6 +168,8 @@
   background: var(--nv-glass-fill);
   text-decoration: none;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
   transition:
     background var(--nv-dur-fast),
     color var(--nv-dur-fast),
@@ -175,8 +177,22 @@
 }
 .nv-rail__agent::before {
   content: 'Agent';
+  flex: none;
   color: var(--nv-ink-faint);
   font-weight: 500;
+}
+.nv-rail__agent .nv-dot {
+  flex: none;
+}
+/* A long name never leaves the rail (recette 05/11, PRO-12): cut with « … », the title keeps it whole. */
+.nv-rail__agent-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nv-rail__agent-mode {
+  flex: none;
+  margin-left: -4px;
 }
 .nv-rail__agent:hover {
   color: var(--nv-ink);
@@ -1575,6 +1591,12 @@ label.nv-notif__row {
   align-items: center;
   gap: 10px;
   margin-top: 14px;
+}
+.nv-notif__error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: 14px;
 }
 .nv-notif__end {
   display: inline-flex;
