@@ -209,10 +209,13 @@ function Editor({
   const [draft, setDraft] = useState(saved);
   const [saving, setSaving] = useState(false);
   /**
-   * The version whose activation asked for the password again (a sign-in over 10 minutes old): the prompt shows under
-   * the head, and activates it once confirmed.
+   * The version being activated, in its dialog; `password` once the server asked the password and the code again (a
+   * sign-in over 10 minutes old): the same dialog asks them, then activates it.
    */
-  const [reauth, setReauth] = useState<PersonaVersionSummary | null>(null);
+  const [activating, setActivating] = useState<{
+    readonly version: PersonaVersionSummary;
+    readonly password: boolean;
+  } | null>(null);
   /** Why the last save did not go through, and whether reloading is the way out. */
   const [problem, setProblem] = useState<{ text: string; reload: boolean } | null>(null);
   /** Which way the panel slides in: towards the tab picked, like a page turning. */
@@ -366,8 +369,13 @@ function Editor({
   };
 
   /** Her newest version from the head, or an older one put back in service from « Ses versions » (AGT-07). */
-  const activate = async (version: PersonaVersionSummary | undefined): Promise<void> => {
-    if (creatorId === null || version === undefined) return;
+  const ask = (version: PersonaVersionSummary | undefined): void => {
+    if (version === undefined) return;
+    setProblem(null);
+    setActivating({ version, password: false });
+  };
+  const activate = async (version: PersonaVersionSummary): Promise<void> => {
+    if (creatorId === null) return;
     setSaving(true);
     setProblem(null);
     // The active version this page read: if another tab activated one since, the server refuses.
@@ -376,8 +384,12 @@ function Editor({
       () => 'failed' as const,
     );
     setSaving(false);
+    if (result === 'reauth') {
+      setActivating({ version, password: true });
+      return;
+    }
+    setActivating(null);
     if (result === 'activated') onActivated(version.version);
-    else if (result === 'reauth') setReauth(version);
     else if (result === 'conflict') setProblem({ text: ACTIVATION_CONFLICT, reload: true });
     else if (result === 'refused') setProblem({ text: activationRefused(version.version), reload: false });
     else {
@@ -447,7 +459,7 @@ function Editor({
             void save();
           }}
           onActivate={() => {
-            void activate(ready.versions[0]);
+            ask(ready.versions[0]);
           }}
           onReload={onReload}
           onReset={reset}
@@ -487,24 +499,19 @@ function Editor({
           </div>
         )}
         {ready.source === 'api' ? (
-          <Versions
-            versions={ready.versions}
-            canActivate={canSave}
-            busy={saving}
-            onActivate={(version) => {
-              void activate(version);
-            }}
-          />
+          <Versions versions={ready.versions} canActivate={canSave} busy={saving} onActivate={ask} />
         ) : null}
-        {reauth === null ? null : (
-          <ActivationConfirm
-            version={reauth.version}
-            onConfirmed={() => {
-              setReauth(null);
-              void activate(reauth);
+        {activating === null ? null : (
+          <ActivationDialog
+            version={activating.version.version}
+            active={ready.versions.find((v) => v.isActive)?.version ?? null}
+            password={activating.password}
+            busy={saving}
+            onActivate={() => {
+              void activate(activating.version);
             }}
             onCancel={() => {
-              setReauth(null);
+              setActivating(null);
             }}
           />
         )}
@@ -588,39 +595,72 @@ function Editor({
   );
 }
 
-/** How long « Confirmer l'activation » waits for its second click. */
-const CONFIRM_MS = 4000;
-
 const plural = (n: number, one: string, many: string): string => `${String(n)} ${n > 1 ? many : one}`;
 
 /**
- * Her persona speaks to every fan: an activation on a sign-in over 10 minutes old asks the password and the code again
- * (audit de sécurité du 02/11, M1), in a dialog that names the version it activates, as « Passer en Automatique ».
+ * « Activer la version N » opens this dialog, never a second click on the same button that a hurried hand misses
+ * (recette persona Messa 06/11: an activation thought done had sent nothing). It says what changes for her fans, then
+ * « Activer » sends it. On a sign-in over 10 minutes old (audit de sécurité du 02/11, M1) the same dialog asks the
+ * password and the code, as « Passer en Automatique », and activates once they are confirmed.
  */
-function ActivationConfirm({
+function ActivationDialog({
   version,
-  onConfirmed,
+  active,
+  password,
+  busy,
+  onActivate,
   onCancel,
 }: {
   version: string;
-  onConfirmed: () => void;
+  /** Her active version now, which this one replaces; null while none is. */
+  active: string | null;
+  password: boolean;
+  busy: boolean;
+  onActivate: () => void;
   onCancel: () => void;
 }): JSX.Element {
-  const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const instead = active === null ? '' : `, à la place de la version ${active}`;
   return (
     <Dialog
       title={`Activer la version ${version}`}
-      lead={`L’agent écrira avec elle à tous ses fans. Pour l’activer, confirme ton mot de passe et ton code.`}
-      busy={busy}
+      lead={
+        password
+          ? `L’agent écrira avec elle à tous ses fans${instead}. Pour l’activer, confirme ton mot de passe et ton code.`
+          : active === null
+            ? 'L’agent écrira avec elle à tous ses fans : aucun message ne part pour elle avant cette activation.'
+            : `L’agent écrira avec elle à tous ses fans${instead}. Tu pourras revenir à l’autre dans «\u00a0Ses versions\u00a0».`
+      }
+      busy={busy || checking}
       onClose={onCancel}
     >
-      <PasswordPrompt
-        layout="dialog"
-        lead={null}
-        onConfirmed={onConfirmed}
-        onCancel={onCancel}
-        onBusyChange={setBusy}
-      />
+      {password ? (
+        <PasswordPrompt
+          layout="dialog"
+          lead={null}
+          onConfirmed={onActivate}
+          onCancel={onCancel}
+          onBusyChange={setChecking}
+        />
+      ) : (
+        <div className="tm-dialog__body">
+          <div className="tm-dialog__foot">
+            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onCancel}>
+              Annuler
+            </button>
+            <button
+              type="button"
+              className="nv-btn nv-btn--neon"
+              data-autofocus
+              disabled={busy}
+              aria-busy={busy}
+              onClick={onActivate}
+            >
+              {busy ? 'Activation…' : 'Activer'}
+            </button>
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 }
@@ -704,17 +744,6 @@ function Head({
 }): JSX.Element {
   const name = draft.details.first_name.trim();
   const fileRef = useRef<HTMLInputElement>(null);
-  /** Activating changes what the agent writes: a second click confirms it. */
-  const [confirming, setConfirming] = useState(false);
-  useEffect(() => {
-    if (!confirming) return;
-    const timer = setTimeout(() => {
-      setConfirming(false);
-    }, CONFIRM_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [confirming]);
   const first = issues[0];
   const current = ready.versions[0];
   const state =
@@ -807,14 +836,9 @@ function Head({
               className="nv-btn nv-btn--soft ps-pop"
               disabled={saving}
               title="Elle devient sa version active, à la place de la précédente."
-              onClick={() => {
-                if (confirming) {
-                  setConfirming(false);
-                  onActivate();
-                } else setConfirming(true);
-              }}
+              onClick={onActivate}
             >
-              {confirming ? 'Confirmer l’activation' : `Activer la version ${draft.meta.version}`}
+              {`Activer la version ${draft.meta.version}`}
             </button>
           ) : null}
           <button

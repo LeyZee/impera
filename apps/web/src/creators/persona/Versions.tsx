@@ -1,8 +1,5 @@
 import type { PersonaVersionSummary } from '@impera/contracts';
-import { useEffect, useState, type JSX } from 'react';
-
-/** How long a « Réactiver » waits for its second click, as « Activer » in the head. */
-const CONFIRM_MS = 4000;
+import type { JSX } from 'react';
 
 const WHEN = new Intl.DateTimeFormat('fr-FR', {
   day: 'numeric',
@@ -21,7 +18,7 @@ function versionsSum(versions: readonly PersonaVersionSummary[]): string {
 /**
  * Her stored versions, folded under the head (recette AGT-07): a bad version made active is undone here, by putting an
  * older one back in service, never by typing it again. The newest one is activated from the head, where its content
- * shows; every older one offers « Réactiver la version N », a second click confirming it like « Activer ». Nothing is
+ * shows; every older one offers « Réactiver la version N », which opens the same dialog as « Activer ». Nothing is
  * shown before she has two versions: the head says all of one.
  */
 export function Versions({
@@ -38,18 +35,6 @@ export function Versions({
   busy: boolean;
   onActivate: (version: PersonaVersionSummary) => void;
 }): JSX.Element | null {
-  /** The version whose « Réactiver » was clicked once, waiting for « Confirmer ». */
-  const [confirming, setConfirming] = useState<string | null>(null);
-  useEffect(() => {
-    if (confirming === null) return;
-    const timer = setTimeout(() => {
-      setConfirming(null);
-    }, CONFIRM_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [confirming]);
-
   if (versions.length < 2) return null;
   const newest = versions[0]?.id;
   return (
@@ -80,15 +65,10 @@ export function Versions({
                   disabled={busy}
                   title="Elle redevient sa version active, à la place de celle d’aujourd’hui."
                   onClick={() => {
-                    if (confirming === version.id) {
-                      setConfirming(null);
-                      onActivate(version);
-                    } else setConfirming(version.id);
+                    onActivate(version);
                   }}
                 >
-                  {confirming === version.id
-                    ? `Confirmer la version ${version.version}`
-                    : `Réactiver la version ${version.version}`}
+                  {`Réactiver la version ${version.version}`}
                 </button>
               ) : null}
             </li>
