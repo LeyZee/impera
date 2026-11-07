@@ -31,6 +31,12 @@ import { fortnightBefore, mismatchDays, type CheckedAccount } from '../domain/au
 import type { AvatarPorts } from '../domain/avatar';
 import { isLastingOutage, nextUnreachableRun, type UnreachableRun } from '../domain/connection-outage';
 import {
+  dailyStatsRange,
+  dailyStatsRows,
+  statsCallAllowed,
+  type DailyStatsStore,
+} from '../domain/daily-stats';
+import {
   SalesFeedAccountUnprocessable,
   SalesFeedCheckDaysUnprocessable,
   SalesFeedDeliveryRefused,
@@ -130,6 +136,11 @@ export interface SalesFeedDeps {
   ) => Promise<unknown>;
   /** Her photo's copy at import (CRM-07 a2b); `null` without a media bucket (`S3_*`): her initials stay. */
   readonly avatars?: AvatarPorts | null;
+  /**
+   * The daily photo of the statistics and the calls counted (ADR 0081). Absent in tests that do not look at it: the
+   * reading then reads nothing, and the checks count nothing.
+   */
+  readonly dailyStats?: DailyStatsStore;
 }
 
 export interface SalesFeeds {
@@ -218,12 +229,28 @@ export interface SalesFeeds {
    * left (her initials stay); a platform or storage that does not answer throws, so the job is tried again.
    */
   copyAvatar(payload: JobPayload<'connector.copy_avatar'>, logger: JobLogger): Promise<void>;
+  /**
+   * The `connector.read_daily_stats` job (ADR 0081 § 3), hourly: for each connected feed, one call for every model of
+   * the key, today and yesterday, or the 31 last days at 5 h in the platform's zone and until a reading of 31 days
+   * went through since the key was verified. No call once fewer than 100 of the day's 500 are left; a 429 pauses as
+   * the reading of the sales does; a refused key is « à reconnecter ». Only linked models are kept, never an amount.
+   */
+  readDailyStats(logger: JobLogger, correlationId: string): Promise<void>;
 }
 
-/** The two statistics of the days, one call after the other: Reveal allows ten a minute a key. */
-async function checkStats(feed: PlatformSalesFeed, range: DateRange): Promise<CheckSources['stats']> {
+/**
+ * The two statistics of the days, one call after the other: Reveal allows ten a minute a key. Each call is counted
+ * before it is made (`count`), with the daily reading's, against the agency's quota (ADR 0081 § 3).
+ */
+async function checkStats(
+  feed: PlatformSalesFeed,
+  range: DateRange,
+  count: () => Promise<unknown>,
+): Promise<CheckSources['stats']> {
+  await count();
   const daily = await feed.dailyStats(range);
   if (!daily.ok) return { ok: false, errorKind: errorKindOf(daily.failure) };
+  await count();
   const chatters = await feed.chatterDailyStats(range);
   if (!chatters.ok) return { ok: false, errorKind: errorKindOf(chatters.failure) };
   return { ok: true, daily: daily.value, chatters: chatters.value };
@@ -320,6 +347,48 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     // Best effort at the platform: its webhook then posts to an address that refuses it (404), until it gives up.
     if (feed !== null) await feed.deleteWebhook(stored.platformWebhookId);
     await store.remove(platform, by);
+  }
+
+  /** One call to the platform's statistics, counted on the platform's day before it is made (ADR 0081 § 3). */
+  async function countStatsCall(platform: Platform, timeZone: string): Promise<void> {
+    await deps.dailyStats?.countCall(platform, calendarDayAt(clock.now(), timeZone));
+  }
+
+  async function readStatsOne(
+    store: DailyStatsStore,
+    stored: StoredSalesFeedKey,
+    logger: JobLogger,
+    correlationId: string,
+  ): Promise<void> {
+    const { platform } = stored;
+    const factory = registry[platform];
+    if (factory === undefined || stored.key === null || stored.state !== 'connected') return;
+    const cursor = await ledger.cursorOf(platform);
+    const now = clock.now();
+    if (cursor.pausedUntil !== null && cursor.pausedUntil > now) return;
+    const feed = factory.create(stored.key);
+    const day = calendarDayAt(now, feed.timeZone);
+    const calls = await store.callsOn(platform, day);
+    if (!statsCallAllowed(calls)) {
+      logger.warn(
+        { platform, day, calls },
+        'daily statistics not read: the day’s reserve of calls is reached',
+      );
+      return;
+    }
+    const range = dailyStatsRange(now, feed.timeZone, {
+      fullReadAt: await store.fullReadAt(platform),
+      keyVerifiedAt: stored.verifiedAt,
+    });
+    await store.countCall(platform, day);
+    const read = await feed.dailyStats(range);
+    if (!read.ok) {
+      await onFailure(platform, stored, read.failure, logger, correlationId);
+      return;
+    }
+    const rows = dailyStatsRows(platform, read.value, await store.links(platform));
+    await store.record(platform, rows, clock.now(), range.full);
+    logger.info({ platform, from: range.from, to: range.to, rows: rows.length }, 'daily statistics read');
   }
 
   /** The feed of the saved key, or `null` when there is none that works. */
@@ -593,7 +662,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
             timeZone: feed.timeZone,
             models: models.value,
           });
-    const stats = await checkStats(feed, range);
+    const stats = await checkStats(feed, range, () => countStatsCall(platform, feed.timeZone));
     const platformChatters = await feed.listChatters();
     const [lines, firstLineAt, cursor, modelLinks, chatterLinks] = await Promise.all([
       ledger.checkLines(
@@ -881,6 +950,14 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       // Ids only: never the address, which names her at the platform.
       if (skip === null) logger.info({ platform, platformModelId, creatorId }, 'creator photo copied');
       else logger.info({ platform, platformModelId, creatorId, skip }, 'creator photo not copied');
+    },
+
+    async readDailyStats(logger, correlationId) {
+      const store = deps.dailyStats;
+      if (deps.keys === null || store === undefined) return;
+      for (const stored of await deps.keys.list()) {
+        await readStatsOne(store, stored, logger, correlationId);
+      }
     },
 
     async read(logger, correlationId, woken) {

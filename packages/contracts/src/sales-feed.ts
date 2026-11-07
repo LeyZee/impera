@@ -150,7 +150,11 @@ export const PlatformDailyStatSchema = z.object({
   date: z.iso.date(),
   platformModelId: z.string().min(1),
   newSubscribers: count,
+  /** Ends of subscription not renewed, on the day they end (ADR 0081); `null` when the platform did not give it. */
+  unsubscribes: count.nullable(),
   activeSubscribers: count,
+  /** `null` when the platform did not give it. */
+  renewals: count.nullable(),
   revenueInclVat: count,
   revenueExclVat: count,
   agency: count,
