@@ -16,7 +16,8 @@ ADR 0077, ADR 0042 § 7, `apps/api/src/modules/notifications/README.md`, `apps/a
 - [x] Job `scheduling.remind_reports` toutes les cinq minutes (`crontab.ts`), candidats lus par pages en admin, shift relu juste avant de sonner ; `notify` donné par le composition root.
 - [x] Tests : règle et message (unitaires), job (unitaire), job contre la base (rappels dus, annulé, rapport fait, source détectée, sans règles, membre parti, rejoué, rapport envoyé au dernier moment).
 - [x] ADR, glossaire (« Heures calmes », « Rappel du rapport »), README de `scheduling` et de `notifications`.
-- [ ] Pousser après la fusion de #624 (une session, une branche), migration régénérée après la 0135 de Bilan (#626), relecture de `policy.ts` par Bilan.
+- [x] Poussé après la fusion de #624 (une session, une branche), migration 0136 régénérée derrière la 0135 de Bilan.
+- [ ] Relecture de `policy.ts` par Bilan.
 
 ## Critères d'acceptation
 - Un shift fini sans rapport sonne une fois à 15 minutes et une fois à 12 heures, jamais en double, et rien hors des fenêtres.
