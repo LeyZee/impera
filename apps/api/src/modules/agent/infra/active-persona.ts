@@ -1,4 +1,4 @@
-import type { Persona } from '@impera/contracts';
+import type { StoredPersona } from '@impera/contracts';
 
 import { personaForModels, type PersonaForModels } from './persona-file';
 
@@ -6,7 +6,7 @@ import { personaForModels, type PersonaForModels } from './persona-file';
 interface StoredActivePersona {
   readonly id: string;
   readonly creatorName: string;
-  readonly persona: Persona;
+  readonly persona: StoredPersona;
 }
 
 /**

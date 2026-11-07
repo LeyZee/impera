@@ -56,6 +56,8 @@ const OVERVIEW: SalesFeedOverview = {
       platformChatterId: 'c-bot',
       firstName: 'Bot',
       lastName: 'Agence',
+      email: null,
+      role: 'chatter',
       isBot: true,
       isExternal: false,
       removedAt: null,

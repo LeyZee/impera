@@ -327,13 +327,6 @@ export interface SalesLedger {
   lastCheck(platform: Platform): Promise<StoredCheck | null>;
   /** The register's oldest line (recorded or quarantined), `null` when it has none: how far back the reading went. */
   firstLineAt(platform: Platform): Promise<Date | null>;
-  memberExists(memberId: string): Promise<boolean>;
-  linkChatter(
-    platform: Platform,
-    platformChatterId: string,
-    link: ChatterLink | null,
-    by: string | null,
-  ): Promise<void>;
   /**
    * Publishes a signal for the owner, with no creator. `once`: not when the same signal was already published
    * (an unknown value, an unlinked model).

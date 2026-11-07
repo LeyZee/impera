@@ -9,7 +9,7 @@ import {
   SalesFeedErrorKindSchema,
   SalesFeedStateSchema,
 } from '@impera/contracts';
-import { sql } from 'drizzle-orm';
+import { sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import {
   boolean,
   check,
@@ -19,6 +19,7 @@ import {
   index,
   integer,
   jsonb,
+  pgPolicy,
   pgTable,
   primaryKey,
   text,
@@ -41,6 +42,13 @@ import { teamMembers } from './team';
 import { creators, platformAccounts } from './tenancy';
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
+
+/**
+ * A link that may be written by this transaction (ADR 0076 § 4): the owner's scope, or the agency's when it does not
+ * point to the writer's own member record. Outside `withMember` no scope is set and nothing passes.
+ */
+const notOwnLink = (memberId: AnyColumn): SQL =>
+  sql`nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (${memberId} is null or not exists (select 1 from team_members m where m.id = ${memberId} and m.user_id = nullif(current_setting('app.user_id', true), ''))))`;
 
 /**
  * The sales feed of a platform (ADR 0050): its register of sales and refunds read with an agency key, without any
@@ -248,6 +256,71 @@ export const salesFeedChatters = pgTable(
     enumCheck('sales_feed_chatters', t.kind, ['member', 'agent']),
     check('sales_feed_chatters_member_check', sql`(${t.kind} = 'member') = (${t.memberId} is not null)`),
     // Who sells is the agency's: a creator's own account never reads the links (CRM-04 lot d).
+    agencyOnly(),
+    // ADR 0076 § 4: a manager never poses, moves or undoes a link to his own record, before or after; the owner may.
+    // Written through `withMember`, which sets the scope and the account; the admin role is not concerned.
+    ...(['insert', 'update', 'delete'] as const).map((command) =>
+      pgPolicy(`not_own_link_${command}`, {
+        as: 'restrictive',
+        for: command,
+        ...(command === 'insert' ? {} : { using: notOwnLink(t.memberId) }),
+        ...(command === 'delete' ? {} : { withCheck: notOwnLink(t.memberId) }),
+      }),
+    ),
+  ],
+);
+
+/**
+ * What the review of a platform's team keeps besides the links (ADR 0076): the owner's or a manager's decision on an
+ * account without a link (`none`, confirmed nobody; `dismissed`, set aside, can be taken back), and what the reading
+ * of the platform's list saw (`platform_removed_at`, `absent_since`), so that a removal is an alert as long as it lasts
+ * and never a deletion. One row per account seen; nothing of a person but the platform's id.
+ */
+export const salesFeedChatterReviews = pgTable(
+  'sales_feed_chatter_reviews',
+  {
+    platform: enumText('platform').notNull(),
+    platformChatterId: text('platform_chatter_id').notNull(),
+    decision: enumText('decision'),
+    decidedBy: text('decided_by'),
+    decidedAt: timestampTz('decided_at'),
+    /** The platform's `removedAt`, as last read. */
+    platformRemovedAt: timestampTz('platform_removed_at'),
+    /** Since when a complete, believed reading no longer lists the account; cleared when it comes back. */
+    absentSince: timestampTz('absent_since'),
+    /** The platform's `isBot` as last read: an API key's bot never makes the « new chatter » badge (§ 6). */
+    isBot: boolean('is_bot').notNull().default(false),
+    firstSeenAt: timestampTz('first_seen_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: 'sales_feed_chatter_reviews_pk', columns: [t.platform, t.platformChatterId] }),
+    enumCheck('sales_feed_chatter_reviews', t.platform, PlatformSchema.options),
+    enumCheck('sales_feed_chatter_reviews', t.decision, ['none', 'dismissed']),
+    check(
+      'sales_feed_chatter_reviews_decided_check',
+      sql`(${t.decision} is null) = (${t.decidedAt} is null)`,
+    ),
+    check('sales_feed_chatter_reviews_id_check', sql`char_length(${t.platformChatterId}) between 1 and 200`),
+    agencyOnly(),
+  ],
+);
+
+/**
+ * The last reading of a platform's team list (ADR 0076 § 5): how many accounts it listed, and whether it was believed.
+ * A list that came back empty, or lost more than half its accounts at once, is one « lecture anormale » alert, and no
+ * account is taken as gone on its word. One row per platform, updated at each reading.
+ */
+export const salesFeedTeamReadings = pgTable(
+  'sales_feed_team_readings',
+  {
+    platform: enumText('platform').primaryKey(),
+    readAt: timestampTz('read_at').notNull(),
+    listed: integer('listed').notNull(),
+    abnormal: boolean('abnormal').notNull(),
+  },
+  (t) => [
+    enumCheck('sales_feed_team_readings', t.platform, PlatformSchema.options),
+    check('sales_feed_team_readings_listed_check', sql`${t.listed} >= 0`),
     agencyOnly(),
   ],
 );

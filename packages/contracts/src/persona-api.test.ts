@@ -4,12 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
+import { PersonaSchema } from './persona';
 import {
   CreatePersonaVersionBodySchema,
   PERSONA_ERROR_CODES,
   PersonaOverviewSchema,
   PersonaSampleReplyUnprocessableDetailsSchema,
 } from './persona-api';
+import { personaSheetFromV1, TYPICAL_RESPONSES_MAX_LINES } from './persona-sheet';
 
 const demo = (): unknown =>
   parse(readFileSync(fileURLToPath(new URL('../../../personas/demo/v0.1.0.yaml', import.meta.url)), 'utf8'));
@@ -36,7 +38,9 @@ describe('persona API contract', () => {
   it('describes a creator without any version, and one with her newest', () => {
     const creatorId = '0192a0e4-7b1c-7cc0-8a4e-3f5d9b2c1a01';
     expect(PersonaOverviewSchema.safeParse({ creatorId, latest: null, versions: [] }).success).toBe(true);
-    const overview = { creatorId, latest: { summary, persona: demo() }, versions: [summary] };
+    const persona = PersonaSchema.parse(demo());
+    const { persona: draft, moved } = personaSheetFromV1(persona);
+    const overview = { creatorId, latest: { summary, persona, draft, moved }, versions: [summary] };
     expect(PersonaOverviewSchema.safeParse(overview).success).toBe(true);
     expect(
       PersonaOverviewSchema.safeParse({ ...overview, versions: [{ ...summary, version: 'v1' }] }).success,
@@ -53,7 +57,9 @@ describe('persona API contract', () => {
     const details = (faults: unknown) => PersonaSampleReplyUnprocessableDetailsSchema.safeParse({ faults });
     expect(details([{ index: 1, code: 'stage_direction' }]).success).toBe(true);
     expect(details([]).success).toBe(false);
-    expect(details([{ index: 10, code: 'stage_direction' }]).success).toBe(false);
+    // A line of « Réponses typiques » counts from 0 too (ADR 0079 § 6); past its last possible line, refused.
+    expect(details([{ index: 10, code: 'stage_direction' }]).success).toBe(true);
+    expect(details([{ index: TYPICAL_RESPONSES_MAX_LINES, code: 'stage_direction' }]).success).toBe(false);
     expect(details([{ index: 0, code: 'unknown_guard' }]).success).toBe(false);
     expect(details([{ index: 0, code: 'stage_direction', reply: 'Coucou' }]).success).toBe(false);
   });

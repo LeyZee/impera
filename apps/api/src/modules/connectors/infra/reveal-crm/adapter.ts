@@ -288,6 +288,8 @@ export function createRevealSalesFeed(options: RevealSalesFeedOptions): Platform
           platformChatterId: chatter.chatterId,
           firstName: chatter.firstName,
           lastName: chatter.lastName,
+          email: chatter.email ?? null,
+          role: chatter.role ?? '',
           isBot: chatter.isBot,
           isExternal: chatter.isExternal,
           removedAt: chatter.removedAt === null ? null : new Date(chatter.removedAt).toISOString(),

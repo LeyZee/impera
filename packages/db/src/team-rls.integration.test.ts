@@ -299,4 +299,74 @@ describe('team tables (EQ-01): one policy per account, through withMember', () =
     ).rows;
     expect(setting).toEqual({ scope: null, user: null });
   });
+
+  it('a manager invites a chatter onto a new account, at the owner’s preset in effect today, whatever arrival day (ADR 0076 § 3)', async () => {
+    const [older, current, later] = [
+      newId(CommissionPresetIdSchema),
+      newId(CommissionPresetIdSchema),
+      newId(CommissionPresetIdSchema),
+    ];
+    await withMember(test.app.db, owner, (tx) =>
+      tx.insert(s.commissionPresets).values([
+        { id: older, name: 'Invitation', rateBps: 2000, effectiveFrom: '2020-01-01', createdBy: owner },
+        { id: current, name: 'Invitation', rateBps: 1500, effectiveFrom: '2020-06-01', createdBy: owner },
+        { id: later, name: 'Invitation', rateBps: 1000, effectiveFrom: '2099-01-01', createdBy: owner },
+      ]),
+    );
+    const invite = (preset: { id: string; rateBps: number }, joinedOn: string, existing?: string) =>
+      withMember(test.app.db, manager, async (tx) => {
+        const userId = existing ?? newId(UserIdSchema);
+        if (existing === undefined) {
+          await tx
+            .insert(s.user)
+            .values({ id: userId, name: 'Compte invité', email: `${userId}@example.test`, role: 'operator' });
+        }
+        const memberId = newId(TeamMemberIdSchema);
+        await tx.insert(s.teamMembers).values({
+          id: memberId,
+          userId,
+          teamRole: 'chatter',
+          firstName: 'Prénom',
+          lastName: 'Inventé',
+          displayName: 'Membre invité',
+          country: 'BJ',
+          timeZone: 'Africa/Porto-Novo',
+          joinedOn,
+        });
+        await tx.insert(s.memberRoles).values({
+          id: newId(MemberRoleIdSchema),
+          memberId,
+          teamRole: 'chatter',
+          effectiveFrom: joinedOn,
+          createdBy: manager,
+        });
+        await tx.insert(s.memberCommissionRates).values({
+          id: newId(CommissionRateIdSchema),
+          memberId,
+          rateBps: preset.rateBps,
+          presetId: preset.id,
+          effectiveFrom: joinedOn,
+          createdBy: manager,
+        });
+        return memberId;
+      });
+
+    // Today's line, on a past arrival day too: the application proposes it, the database takes it.
+    expect(await failure(invite({ id: current, rateBps: 1500 }, '2020-03-01'))).toBe('no error');
+    // An earlier arrival day never reopens the older, higher line; a line not yet in effect never passes either.
+    expect(await failure(invite({ id: older, rateBps: 2000 }, '2020-03-01'))).toMatch(/row-level security/);
+    expect(await failure(invite({ id: later, rateBps: 1000 }, '2099-02-01'))).toMatch(/row-level security/);
+    // Only onto an account created in the same transaction: never one already there (here the owner’s).
+    const ownerless = newId(UserIdSchema);
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .insert(s.user)
+        .values({ id: ownerless, name: 'Compte existant', email: `${ownerless}@example.test` }),
+    );
+    for (const existing of [owner, ownerless]) {
+      expect(await failure(invite({ id: current, rateBps: 1500 }, '2020-03-01', existing))).toMatch(
+        /row-level security/,
+      );
+    }
+  });
 });

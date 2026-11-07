@@ -1,5 +1,5 @@
 /**
- * Checks a persona file against `PersonaSchema` without touching the database (playbook « Modifier la persona »).
+ * Checks a persona file against the persona schema, format 1 or 2, without touching the database (playbook « Modifier la persona »).
  * Usage: `pnpm persona:validate <fichier.yaml>`.
  */
 import { requireArguments } from './command-line';

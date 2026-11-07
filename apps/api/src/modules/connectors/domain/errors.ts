@@ -137,3 +137,30 @@ export class SalesFeedListUnavailable extends DomainError {
     );
   }
 }
+
+/** The review of the platform's team (ADR 0076 § 8) is the owner's and an active manager's (403). */
+export class SalesFeedTeamForbidden extends DomainError {
+  constructor() {
+    super('sales_feed_team_forbidden', 'Réservé au propriétaire et aux managers actifs');
+  }
+}
+
+/** The platform's team could not be read now: a batch of links waits for it, nothing is written (503, ADR 0076). */
+export class SalesFeedTeamListUnavailable extends DomainError {
+  constructor() {
+    super(
+      'sales_feed_list_unavailable',
+      'La liste de l’équipe sur la plateforme ne répond pas : réessaie dans un instant',
+    );
+  }
+}
+
+/** A linked account is never set aside: its link is changed instead (409, ADR 0076 § 1). */
+export class SalesFeedTeamLinked extends DomainError {
+  constructor() {
+    super(
+      'sales_feed_chatter_linked_conflict',
+      'Ce compte est relié : change son lien plutôt que de l’écarter',
+    );
+  }
+}

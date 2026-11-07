@@ -1,7 +1,6 @@
-/* Créatrices › Archivées (ADR 0071 § 2): folded at the foot of the sheet, as wide as a plate. */
+/* Créatrices › Archivées (ADR 0071 § 2): folded at the foot of the list, as wide as its cards (captures v1). */
 .cr-archived {
   align-self: stretch;
-  max-width: 720px;
 }
 .cr-archived__list {
   list-style: none;

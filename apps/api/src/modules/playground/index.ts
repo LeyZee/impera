@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { CreatorId, Persona, PersonaVersionId, PlaygroundState } from '@impera/contracts';
+import type { CreatorId, PersonaVersionId, PlaygroundState, StoredPersona } from '@impera/contracts';
 import { DEFAULT_LLM_CONFIG, loadPrompt, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -38,7 +38,7 @@ type PersonaVersionSource = (
   readonly id: string;
   readonly version: string;
   readonly creatorName: string;
-  readonly persona: Persona;
+  readonly persona: StoredPersona;
 } | null>;
 
 type PlayedVersion = NonNullable<PlaygroundState['persona']['played']>;
@@ -119,7 +119,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
 
 export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly gateway: LlmGateway;
-  /** A persona YAML (PersonaSchema); the real one lives outside the repository (ADR 0010). */
+  /** A persona YAML (`StoredPersonaSchema`, either format); the real one lives outside the repository (ADR 0010). */
   readonly personaPath: string;
   /** Where the ratings are kept, outside the repository, until a table exists. */
   readonly trainingDir: string;

@@ -1,0 +1,3 @@
+-- ADR 0079 § 6 : les corrections de la créatrice nomment aussi les panneaux de la fiche Desirali. Élargissement seul : les anciennes valeurs restent valides.
+ALTER TABLE "persona_corrections" DROP CONSTRAINT "persona_corrections_section_check";--> statement-breakpoint
+ALTER TABLE "persona_corrections" ADD CONSTRAINT "persona_corrections_section_check" CHECK ("persona_corrections"."section" in ('details', 'limits', 'lifestyle', 'tastes', 'intimate', 'writing_style', 'identity', 'preferences', 'conversation', 'relationships', 'intimacy', 'boundaries'));

@@ -19,7 +19,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { PersonaCorrectionStore } from '../../domain/corrections';
-import { sheetOf } from '../../domain/sheet';
+import { answersOf, sheetOf } from '../../domain/sheet';
 import type { PersonaVersionStore } from '../../domain/versions';
 
 import type { RequireRole } from './routes';
@@ -76,7 +76,8 @@ export function createPersonaRoutes(
         const { creatorId } = request.params;
         actorFor(request, creatorId);
         const active = await store.active(creatorId);
-        return { creatorId, sheet: active === null ? null : sheetOf(active.persona) };
+        if (active === null) return { creatorId, sheet: null, answers: null };
+        return { creatorId, sheet: sheetOf(active.persona), answers: answersOf(active.persona) };
       },
     );
 

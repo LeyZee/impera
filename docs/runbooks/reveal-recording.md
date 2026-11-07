@@ -8,14 +8,14 @@ Version courte, une page : `reveal-capture-express.md`. Cette méthode utilise l
 
 - **Rien n'est envoyé à un vrai fan.** Les écritures (message, PPV, script, note) se font uniquement vers un **fan test** : un compte Reveal à toi, abonné à Messalina. Sans fan test, saute les étapes marquées ✉.
 - **Le fichier brut ne sort jamais du PC.** Il contient les conversations de vrais fans. Seul le fichier `.anon.json` produit par le script est partagé, et il reste dans `.scratch/inbox/` (ignoré par git). Jamais sur GitHub (ADR 0010), jamais collé dans le chat, jamais dans le dossier partagé du projet.
-- **Si un cookie ou un jeton a pu fuiter** (fichier brut envoyé par erreur, export « avec données sensibles ») : déconnecte-toi de Reveal sur tous les appareils, reconnecte-toi, et préviens le fil. La déconnexion invalide la session capturée.
+- **Si un cookie ou un jeton a pu fuiter** (fichier brut envoyé par erreur, export « avec données sensibles ») : déconnecte-toi de Reveal sur tous les appareils, reconnecte-toi, et préviens dans le chat du projet. La déconnexion invalide la session capturée.
 
 ## 1. Préparer (5 min)
 
-0. **Compte du chatteur bot** (décision du 17/10) : crée une adresse mail dédiée que tu contrôles, ajoute un chatteur à ce nom dans l'équipe Reveal, et connecte-le dans un **profil Chrome séparé**. La capture se fait dans ce profil, connecté en tant que bot : elle montre exactement ce qu'un chatteur peut voir et faire, et c'est ce que l'agent pourra faire. Si une page manque à ce chatteur (statistiques, revenus), refais seulement cette étape avec ton compte et note-le. Le mot de passe reste dans ton gestionnaire de mots de passe, jamais dans le chat ni dans un fichier.
+0. **Compte du chatteur bot** (décision du 17/10) : crée une adresse mail dédiée que tu contrôles, ajoute un chatteur à ce nom dans l'équipe Reveal, et connecte-le dans un **profil de navigateur séparé** (Edge ou Chrome). La capture se fait dans ce profil, connecté en tant que bot : elle montre exactement ce qu'un chatteur peut voir et faire, et c'est ce que l'agent pourra faire. Si une page manque à ce chatteur (statistiques, revenus), note-le et passe : ne la refais jamais avec ton compte, les ventes et les chiffres se lisent par l'API CRM (ADR 0050). Le mot de passe reste dans ton gestionnaire de mots de passe, jamais dans le chat ni dans un fichier.
 
-1. Dans le dossier du dépôt (`C:\Users\USER\Downloads\Projet Nirvana`), récupère la dernière version : `git pull`. Vérifie `node -v` (22.13 ou plus).
-2. Ouvre Chrome avec le profil connecté au compte créatrice de Messalina sur Reveal.
+1. Dans le dossier du dépôt (`C:\Users\USER\Downloads\Impera Studio`), récupère la dernière version : `git pull`. Vérifie `node -v` (22.13 ou plus).
+2. Ouvre le profil de navigateur séparé, connecté en tant que « bot » (étape 0). Edge et Chrome marchent pareil. Jamais le profil de ton propre compte.
 3. Ouvre les outils de développement (`F12`), onglet **Network** (Réseau). Coche **Preserve log** (Conserver le journal). Laisse le filtre sur **All** (Tout), pour garder les WebSocket.
 4. Vérifie que le rond rouge en haut à gauche est actif (enregistrement en cours).
 
@@ -66,13 +66,13 @@ Le script remplace les secrets restants, les textes, les pseudos, les emails et 
 
 - le nombre de requêtes et de trames WebSocket ;
 - la liste des endpoints appelés ;
-- les **mots gardés tels quels** : relis-la. Ce doivent être des mots techniques (`sent`, `ppv`, `text`…). Si un pseudo de fan y apparaît, ne partage rien et dis-le dans le fil : on renforce le script.
+- les **mots gardés tels quels** : relis-la. Ce doivent être des mots techniques (`sent`, `ppv`, `text`…). Si un pseudo de fan y apparaît, ne partage rien et dis-le dans le chat du projet : on renforce le script.
 
 Puis **supprime le fichier `.har` brut**. Si l'analyse a besoin de plus, on refait une capture.
 
 ## 5. Prévenir
 
-Écris dans le fil Connexion Reveal : « capture déposée ». Le fil lit `.scratch/inbox/*.anon.json` dans le dossier du dépôt sur ton PC (avec ton autorisation), remplit `docs/reference/reveal-api-observed.md` et construit FakeReveal (fiche P1-02).
+Écris dans le chat du projet : « capture déposée ». Le fil lit `.scratch/inbox/*.anon.json` dans le dossier du dépôt sur ton PC (avec ton autorisation), remplit `docs/reference/reveal-api-observed.md` et construit FakeReveal (fiche P1-02).
 
 ## Deuxième capture (10 min, un autre jour)
 

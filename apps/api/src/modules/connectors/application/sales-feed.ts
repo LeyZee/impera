@@ -36,6 +36,7 @@ import {
   SalesFeedDeliveryRefused,
   SalesFeedListUnavailable,
   SalesFeedMemberUnprocessable,
+  SalesFeedTeamForbidden,
   SalesFeedModelConflict,
   SalesFeedNotConnected,
   SalesFeedNotFound,
@@ -69,8 +70,10 @@ import {
   type StoredSalesFeedKey,
 } from '../domain/sales-feed';
 import { SALES_FEED_ERROR_MESSAGES, salesFeedMessage } from '../domain/sales-feed-messages';
+import type { TeamImportStore } from '../domain/team-import';
 
 import { copyAvatarFrom } from './avatar-copy';
+import { createTeamImport, teamLinkOf, type TeamImport } from './team-import';
 
 /**
  * How often the reading looks at the platform's model list (CRM-07 a2): for the badge of new models, and the signal of a
@@ -97,6 +100,8 @@ export interface SalesFeedDeps {
   /** `null` without CREDENTIALS_ENCRYPTION_KEYS: no key can be kept, nothing is read. */
   readonly keys: SalesFeedKeyStore | null;
   readonly ledger: SalesLedger;
+  /** The team imported from the platform after review (ADR 0076), read and written as the viewer (`withMember`). */
+  readonly team: TeamImportStore;
   readonly registry: SalesFeedRegistry;
   readonly clock: Clock;
   /** `null` without CREDENTIALS_ENCRYPTION_KEYS, like `keys`. */
@@ -123,6 +128,8 @@ export interface SalesFeedDeps {
 }
 
 export interface SalesFeeds {
+  /** The team imported from the platform after review (ADR 0076): the owner's and an active manager's screen. */
+  readonly team: TeamImport;
   list(): Promise<SalesFeedStatus[]>;
   overview(platform: Platform): Promise<SalesFeedOverview>;
   connect(platform: Platform, key: string, by: KeyActor): Promise<Result<SalesFeedStatus, SalesFeedRefusal>>;
@@ -393,6 +400,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
         }
       } else listError = errorKindOf(listedModels.failure);
       if (listedChatters.ok) {
+        await deps.team.recordReading(platform, listedChatters.value, clock.now());
         for (const chatter of listedChatters.value) {
           chatters.push({ ...chatter, link: chatterLinks.get(chatter.platformChatterId) ?? null });
         }
@@ -664,7 +672,17 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     return 'done';
   }
 
+  const team = createTeamImport({
+    store: deps.team,
+    clock,
+    live: async (platform) => {
+      const feed = await liveFeed(platform);
+      return { feed, error: feed === null ? (await statusOf(platform)).lastErrorKind : null };
+    },
+  });
+
   return {
+    team,
     async list() {
       const platforms = Object.keys(registry).filter((name): name is Platform => name in registry);
       return Promise.all(platforms.map(statusOf));
@@ -791,10 +809,21 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
 
     async linkChatter(platform, platformChatterId, link, by) {
       factoryOf(platform);
-      if (link.kind === 'member' && !(await ledger.memberExists(link.memberId))) {
-        throw new SalesFeedMemberUnprocessable();
+      if (by === null) throw new SalesFeedTeamForbidden();
+      // The same guarded write as the review's (ADR 0076 § 4): in the owner's own transaction (`withMember`).
+      const outcomes = await deps.team.link(by, platform, [
+        {
+          platformChatterId,
+          link: teamLinkOf(link),
+          isExternal: false,
+        },
+      ]);
+      if (outcomes === null) throw new SalesFeedTeamForbidden();
+      const [outcome] = outcomes;
+      if (outcome?.ok === false) {
+        if (outcome.kind === 'member_unknown') throw new SalesFeedMemberUnprocessable();
+        throw new SalesFeedTeamForbidden();
       }
-      await ledger.linkChatter(platform, platformChatterId, link.kind === 'none' ? null : link, by);
       return overview(platform);
     },
 

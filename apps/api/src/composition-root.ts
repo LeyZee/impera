@@ -58,6 +58,7 @@ import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-
 import { createPasswordResetRoutes } from './password-reset';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
 import { checkReadiness, type Readiness } from './readiness';
+import { installSandboxGuard, sandboxOf, sdkBaseUrlsOf } from './sandbox';
 import { createSecuritySettingsRoutes } from './security-settings';
 import { wireAccounting } from './wiring/accounting';
 import { wireAgent } from './wiring/agent';
@@ -222,13 +223,22 @@ export interface AppOptions {
  * The check of known-breached passwords (ADR 0046 § 4), or, with `PASSWORD_BREACH_CHECK=off` outside production (config
  * refuses it there), none: every password passes, said once in amber at start (recette MOT-14).
  */
-function breachCheckOf(config: Config, logger: Logger): PasswordBreachCheck {
+export function breachCheckOf(config: Config, logger: Logger): PasswordBreachCheck {
+  // ADR 0075: the sandbox reaches nothing outside this machine, the breach list included; left on, every password
+  // set in the recette would fail as « the check does not answer ».
+  if (sandboxOf(config) !== null) {
+    logger.warn('password breach check is off in the recette sandbox (ADR 0075)');
+    return () => Promise.resolve(false);
+  }
   if (config.PASSWORD_BREACH_CHECK === 'on') return createPwnedPasswordsCheck();
   logger.warn('password breach check is off: development only (PASSWORD_BREACH_CHECK)');
   return () => Promise.resolve(false);
 }
 
 export async function createApp(config: Config, logger: Logger, options: AppOptions = {}): Promise<App> {
+  // ADR 0075: in the recette sandbox, the guard goes on `fetch` before any module captures it.
+  const sandbox = sandboxOf(config);
+  if (sandbox !== null) installSandboxGuard(sandbox, logger);
   const db = createDbClient(config.DATABASE_URL, POOL_OPTIONS);
   const adminDb = createDbClient(config.DATABASE_ADMIN_URL, { ...POOL_OPTIONS, max: 5 });
   const rateLimitDb = createDbClient(config.DATABASE_URL, RATE_LIMIT_POOL_OPTIONS);
@@ -297,6 +307,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     reportRefusedKey: (provider, kind) => providers.module.reportRefusedKey(provider, kind),
     publishBudget: (crossing) => publishBudgetThreshold(adminDb.db, crossing),
     logger,
+    ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
   const team = wireTeam(shared, {
@@ -351,7 +362,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     llm,
     persona: persona.module,
     activePersona: persona.activePersona,
-    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.2.0.yaml'),
+    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.3.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
   });
@@ -385,8 +396,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     allCreatorIds: persona.allCreatorIds,
     conversations: conversations.module,
     payroll: payroll.module,
+    scheduling: scheduling.module,
     telegram: telegram.module,
     jobNames: () => Object.keys(tasks),
+    salesFeeds: connectors.module.salesFeedStates,
   });
 
   const modules: Modules = {

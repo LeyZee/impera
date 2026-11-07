@@ -111,7 +111,10 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     const overview = (await get(anna, owner)).json<PersonaOverview>();
     expect(overview.versions.map((v) => v.version)).toEqual(['0.1.1', '0.1.0']);
     expect(overview.latest?.summary.version).toBe('0.1.1');
-    expect(overview.latest?.persona.details.first_name).toBe(demo().details.first_name);
+    expect(overview.latest?.persona).toEqual(withVersion(demo(), '0.1.1'));
+    // The dashboard edits format 2: the format-1 version opens converted, saying what moved (ADR 0079 § 5).
+    expect(overview.latest?.draft.sheet.identity.nickname).toBe(demo().details.first_name);
+    expect(overview.latest?.moved.map((m) => m.from)).toContain('Origine');
 
     const audit = await test.admin.db
       .select({ action: schema.auditLog.action })
@@ -333,7 +336,19 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     expect(read.statusCode, read.body).toBe(200);
     const body = MyPersonaSchema.parse(read.json());
     const active = await app.modules.persona.versions.active(anna);
-    expect(body.sheet?.limits).toEqual(active?.persona.limits);
+    expect(body.sheet?.limits).toEqual(
+      active === null || 'sheet' in active.persona ? null : active.persona.limits,
+    );
+    // Her seven panels at format 2, never the agent's settings (ADR 0079 § 6).
+    expect(Object.keys(body.answers ?? {})).toEqual([
+      'identity',
+      'lifestyle',
+      'preferences',
+      'conversation',
+      'relationships',
+      'intimacy',
+      'boundaries',
+    ]);
     expect(Object.keys(body.sheet ?? {})).not.toContain('strategies');
     expect((await mine(bea, creator)).statusCode).toBe(403);
     expect((await mine(anna, owner)).statusCode).toBe(403);

@@ -44,7 +44,8 @@
     "clean": "turbo run clean && rm -rf node_modules/.cache .turbo",
     "probe": "pnpm --filter @impera/evals run probe",
     "probe:vision": "pnpm --filter @impera/evals run probe:vision",
-    "playground": "pnpm --filter @impera/api run playground"
+    "playground": "pnpm --filter @impera/api run playground",
+    "sandbox:world": "pnpm --filter @impera/api sandbox:world"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
