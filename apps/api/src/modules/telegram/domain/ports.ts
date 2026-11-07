@@ -5,6 +5,7 @@ import type {
   SalesTotals,
   TelegramBotId,
   TelegramBotState,
+  TelegramChannelConfig,
   TelegramChatId,
   TelegramChatKind,
   TelegramDeliveryStatus,
@@ -366,4 +367,29 @@ export interface Clock {
 /** Her alerts' names by the id of their row, archived ones too (the `alerts` module, wired by the composition root). */
 export interface AlertNames {
   ofCreator(creatorId: CreatorId): Promise<ReadonlyMap<string, string>>;
+}
+
+/** The creator's channel as stored (ADR 0080): her setting, whole; the channel column is the setting's own. */
+export interface ChannelRecord {
+  readonly creatorId: CreatorId;
+  /** The `chat_id` column: it, not the setting, says which chat she holds (a removed chat empties it). */
+  readonly chatId: TelegramChatId | null;
+  /** Null when the stored setting no longer reads: her chat still counts as hers. */
+  readonly config: TelegramChannelConfig | null;
+  readonly archived: boolean;
+}
+
+/** The creators' channels, as the admin role; each save writes `audit_log`. */
+export interface ChannelsStore {
+  /** Null when the owner never saved one for her; a row it cannot read reads as never saved. */
+  findChannel(creatorId: CreatorId): Promise<ChannelRecord | null>;
+  listChannels(): Promise<readonly ChannelRecord[]>;
+  /** Whether she exists and is not archived. */
+  creatorActive(creatorId: CreatorId): Promise<boolean>;
+  /** `chat_taken` when another creator holds that channel (the unique key decides, two saves at once included). */
+  saveChannel(
+    creatorId: CreatorId,
+    config: TelegramChannelConfig,
+    userId: string,
+  ): Promise<'saved' | 'chat_taken'>;
 }
