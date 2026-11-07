@@ -91,7 +91,7 @@ function renderSection(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <TelegramChannelSection creatorId={CREATOR} creatorName="Nora" />
+      <TelegramChannelSection creatorId={CREATOR} />
     </QueryClientProvider>,
   );
 }
@@ -116,7 +116,7 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
   it('says what keeps her posts in, and offers 19 h every day', async () => {
     serve({});
     renderSection();
-    expect(await screen.findByText('Canal Telegram de Nora')).toBeDefined();
+    expect(await screen.findByText('Son canal Telegram')).toBeDefined();
     const missing = screen.getByRole('list', { name: 'Ce qui empêche les posts de partir' });
     expect(within(missing).getAllByRole('listitem')).toHaveLength(2);
     const slots = screen.getByRole('list', { name: 'Créneaux' });
@@ -148,7 +148,7 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
       'ariaPressed',
       'true',
     );
-    expect(screen.getByText('Viens me parler ✨')).toBeDefined();
+    expect(screen.getByLabelText('Texte du lien')).toHaveProperty('value', 'Viens me parler ✨');
     fireEvent.click(save());
     await waitFor(() => {
       expect(puts).toHaveLength(1);

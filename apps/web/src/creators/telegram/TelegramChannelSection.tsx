@@ -25,12 +25,12 @@ import {
   DAY_SHORT,
   LINKS_FULL,
   SLOTS_FULL,
+  SLOTS_RULE,
   WARNING_TEXT,
   choiceHint,
   clockWords,
   daysWords,
   issuesOf,
-  linkPreview,
   newLink,
   nextSlot,
   rhythmWords,
@@ -51,11 +51,9 @@ import { Select } from '@/shell/Select';
  */
 export function TelegramChannelSection({
   creatorId,
-  creatorName,
   onDirty = ignore,
 }: {
   creatorId: string;
-  creatorName: string;
   /** Told whether the setting holds changes not saved, so that leaving the page can ask first. Must be stable. */
   onDirty?: (dirty: boolean) => void;
 }): JSX.Element {
@@ -90,15 +88,7 @@ export function TelegramChannelSection({
       </section>
     );
   }
-  return (
-    <ChannelForm
-      key={creatorId}
-      creatorId={creatorId}
-      creatorName={creatorName}
-      view={query.data}
-      onDirty={onDirty}
-    />
-  );
+  return <ChannelForm key={creatorId} creatorId={creatorId} view={query.data} onDirty={onDirty} />;
 }
 
 const ignore = (): void => undefined;
@@ -122,12 +112,10 @@ interface Problem {
 
 function ChannelForm({
   creatorId,
-  creatorName,
   view,
   onDirty,
 }: {
   creatorId: string;
-  creatorName: string;
   view: TelegramChannelView;
   onDirty: (dirty: boolean) => void;
 }): JSX.Element {
@@ -215,15 +203,14 @@ function ChannelForm({
   const choices = stored.channels;
   const chosen = choices.find((choice) => choice.chatId === draft.chatId);
   const added = nextSlot(draft.slots);
-  const preview = linkPreview(draft);
   const warnings = stored.warnings;
 
   return (
-    <section className="ps-page">
+    <section className="ps-page tc-page">
       <div className="nv-plate ps-head" ref={headRef}>
         <div className="ps-head__top">
           <div className="ps-head__who">
-            <h2 className="ps-title">Canal Telegram de {creatorName}</h2>
+            <h2 className="ps-title">Son canal Telegram</h2>
           </div>
           <div className="ps-head__actions">
             {changed && !saving ? (
@@ -274,65 +261,66 @@ function ChannelForm({
 
       <div className="nv-plate ps-panel">
         <section className="ps-block" aria-labelledby="tc-channel">
-          <p className="nv-eyebrow" id="tc-channel">
+          <h3 className="ps-block__title" id="tc-channel">
             Canal
-          </p>
-          <p className="ps-lead">
-            Les canaux où le bot de l’agence est administrateur. Les posts y paraissent sous le nom et la
-            photo du canal : laisse « Signer les messages » éteint dans les réglages du canal.
-          </p>
+          </h3>
           {choices.length === 0 ? (
-            <p className="ps-hint">
-              Le bot n’est encore administrateur d’aucun canal. Ajoute-le à son canal avec le droit « Publier
-              des messages » : il apparaît ici dans la minute.
+            <p className="ps-lead">
+              Ajoute le bot de l’agence comme administrateur de son canal, avec le droit « Publier des
+              messages » : le canal apparaît ici dans la minute.
             </p>
           ) : (
-            <div className="tc-row">
-              <Select<TelegramChatId>
-                ariaLabel="Son canal"
-                value={draft.chatId ?? ''}
-                placeholder="Choisir son canal…"
-                options={choices.map((choice) => {
-                  const hint = choiceHint(choice);
-                  return {
-                    value: choice.chatId,
-                    label: choice.title,
-                    ...(hint === undefined ? {} : { hint }),
-                    disabled: choice.takenByOther || choice.routedForAlerts,
-                  };
-                })}
-                onChange={(chatId) => {
-                  edit({ ...draft, chatId });
-                }}
-              />
-              {draft.chatId === null ? null : (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm"
-                  onClick={() => {
-                    edit({ ...draft, chatId: null });
+            <>
+              <div className="tc-row">
+                <Select<TelegramChatId>
+                  ariaLabel="Son canal"
+                  value={draft.chatId ?? ''}
+                  placeholder="Choisir son canal…"
+                  options={choices.map((choice) => {
+                    const hint = choiceHint(choice);
+                    return {
+                      value: choice.chatId,
+                      label: choice.title,
+                      ...(hint === undefined ? {} : { hint }),
+                      disabled: choice.takenByOther || choice.routedForAlerts,
+                    };
+                  })}
+                  onChange={(chatId) => {
+                    edit({ ...draft, chatId });
                   }}
-                >
-                  Retirer
-                </button>
+                />
+                {draft.chatId === null ? null : (
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain nv-btn--sm"
+                    onClick={() => {
+                      edit({ ...draft, chatId: null });
+                    }}
+                  >
+                    Retirer
+                  </button>
+                )}
+              </div>
+              {chosen !== undefined && choiceHint(chosen) !== undefined ? (
+                <p className="tc-warning" role="status">
+                  {choiceHint(chosen)}
+                </p>
+              ) : (
+                <p className="ps-hint">
+                  Dans Telegram, laisse « Signer les messages » éteint : le post vient d’elle.
+                </p>
               )}
-            </div>
+            </>
           )}
-          {chosen !== undefined && choiceHint(chosen) !== undefined ? (
-            <p className="tc-warning" role="status">
-              {choiceHint(chosen)}
-            </p>
-          ) : null}
         </section>
+      </div>
 
+      <div className="nv-plate ps-panel">
         <section className="ps-block" aria-labelledby="tc-slots">
-          <p className="nv-eyebrow" id="tc-slots">
+          <h3 className="ps-block__title" id="tc-slots">
             Créneaux
-          </p>
-          <p className="ps-lead">
-            À chaque créneau, un post part seul, à son heure à elle : un média du pool, un texte dans sa voix
-            et le lien du canal. Quatre par jour au plus, à 3 h d’écart.
-          </p>
+          </h3>
+          <p className="ps-lead">{SLOTS_RULE}</p>
           <ul className="tc-slots" aria-label="Créneaux">
             {draft.slots.map((slot, rank) => (
               <SlotLine
@@ -368,10 +356,23 @@ function ChannelForm({
               <span aria-hidden="true">+</span> Ajouter un créneau
             </button>
           )}
-          <div className="tc-row">
-            <span className="tc-row__label">Aperçu pour l’agence</span>
+        </section>
+      </div>
+
+      <div className="nv-plate ps-panel">
+        <section className="ps-block" aria-labelledby="tc-check">
+          <h3 className="ps-block__title" id="tc-check">
+            Validation
+          </h3>
+          <div className="tc-setting tc-setting--select">
+            <span className="tc-setting__text">
+              <span className="tc-setting__label" aria-hidden="true">
+                Aperçu dans le groupe Info
+              </span>
+              <span className="ps-hint">Pour valider, réécrire ou changer le média.</span>
+            </span>
             <Select<PreviewValue>
-              ariaLabel="Aperçu pour l’agence"
+              ariaLabel="Aperçu dans le groupe Info"
               value={previewValueOf(draft.previewMinutes)}
               options={PREVIEW_OPTIONS}
               onChange={(value) => {
@@ -379,16 +380,12 @@ function ChannelForm({
               }}
             />
           </div>
-          <p className="ps-hint">
-            Le groupe Info de l’agence est prévenu, avec un lien vers l’aperçu : tu peux le valider, le faire
-            réécrire avec un conseil, changer de média ou ne pas le publier.
-          </p>
           <SwitchRow
             label="Publier sans validation"
             detail={
               draft.publishWithoutValidation
-                ? 'Un post part à son heure si personne ne l’arrête.'
-                : 'Un post attend « Valider » ; sans elle à l’heure, il ne part pas.'
+                ? 'Le post part à l’heure si personne ne l’arrête.'
+                : 'Sans « Valider » avant l’heure, le post ne part pas.'
             }
             checked={draft.publishWithoutValidation}
             onChange={(publishWithoutValidation) => {
@@ -396,17 +393,16 @@ function ChannelForm({
             }}
           />
         </section>
+      </div>
 
+      <div className="nv-plate ps-panel">
         <section className="ps-block" aria-labelledby="tc-links">
-          <p className="nv-eyebrow" id="tc-links">
-            Liens de redirection
-          </p>
+          <h3 className="ps-block__title" id="tc-links">
+            Liens
+          </h3>
           <p className="ps-lead">
-            Les adresses de ton service de redirection, et pour chacune où elle mène : le post parle de cet
-            endroit (son Reveal, un live TikTok…). Le code ajoute le lien du canal à la fin de chaque post ;
-            le texte n’en contient jamais d’autre. Changer de lien vaut pour le post suivant.
+            Le lien du canal finit chaque post, et le texte parle de l’endroit où il mène.
           </p>
-          {draft.links.length === 0 ? <p className="ps-hint">Aucun lien encore.</p> : null}
           <ul className="tc-links" aria-label="Liens de redirection">
             {draft.links.map((link) => (
               <LinkLine
@@ -446,39 +442,33 @@ function ChannelForm({
               <span aria-hidden="true">+</span> Ajouter un lien
             </button>
           )}
-          <div className="tc-row">
-            <span className="tc-row__label" aria-hidden="true">
-              Forme du lien
-            </span>
-            <Segment
-              label="Forme du lien"
-              options={[
-                { value: 'label', label: 'Un texte en lien' },
-                { value: 'bare', label: 'L’adresse nue' },
-              ]}
-              value={draft.linkForm}
-              onChange={(linkForm) => {
-                edit({ ...draft, linkForm });
-              }}
-            />
-          </div>
-          {draft.linkForm === 'label' ? (
-            <LabelField
-              value={draft.linkLabel}
-              issue={issues.get('label') ?? null}
-              onChange={(linkLabel) => {
-                edit({ ...draft, linkLabel });
-              }}
-            />
-          ) : null}
-          {preview === null ? null : (
-            <div className="tc-preview" aria-label="Fin d’un post, comme Telegram la montre">
-              <p className="ps-hint">La fin de chaque post :</p>
-              <p className="tc-preview__line">
-                <span className="tc-preview__link">{preview.text === '' ? '…' : preview.text}</span>
-              </p>
+          <div className="tc-form">
+            <div className="tc-setting">
+              <span className="tc-setting__label" aria-hidden="true">
+                Dans le post
+              </span>
+              <Segment
+                label="Forme du lien"
+                options={[
+                  { value: 'label', label: 'Un texte en lien' },
+                  { value: 'bare', label: 'L’adresse nue' },
+                ]}
+                value={draft.linkForm}
+                onChange={(linkForm) => {
+                  edit({ ...draft, linkForm });
+                }}
+              />
             </div>
-          )}
+            {draft.linkForm === 'label' ? (
+              <LabelField
+                value={draft.linkLabel}
+                issue={issues.get('label') ?? null}
+                onChange={(linkLabel) => {
+                  edit({ ...draft, linkLabel });
+                }}
+              />
+            ) : null}
+          </div>
         </section>
       </div>
       <SaveBar

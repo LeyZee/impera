@@ -89,6 +89,8 @@ export function nextSlot(slots: readonly ChannelSlot[]): ChannelSlot | null {
   return { minute: start, days: [1, 2, 3, 4, 5, 6, 7], enabled: true };
 }
 
+/** The rule of her slots, the lead of the block. */
+export const SLOTS_RULE = `${String(CHANNEL_POSTS_PER_DAY_MAX)} posts par jour au plus, à ${String(CHANNEL_SLOT_GAP_MINUTES / 60)}${NBSP}h d’écart.`;
 export const SLOTS_FULL = `${String(CHANNEL_SLOTS_MAX)} créneaux au plus.`;
 export const LINKS_FULL = `${String(REDIRECT_LINKS_MAX)} liens au plus.`;
 export const TOO_MANY = `${String(CHANNEL_POSTS_PER_DAY_MAX)} posts par jour au plus.`;
@@ -150,11 +152,4 @@ export function choiceHint(choice: ChannelChoice): string | undefined {
   if (choice.membership !== 'member') return 'Le bot n’y est plus';
   if (!choice.canPost) return 'Le bot ne peut pas y publier';
   return undefined;
-}
-
-/** How the end of a post will read, as Telegram shows it. */
-export function linkPreview(config: TelegramChannelConfig): { text: string; url: string } | null {
-  const link = config.links.find((candidate) => candidate.id === config.channelLinkId);
-  if (link === undefined) return null;
-  return { text: config.linkForm === 'label' ? config.linkLabel.trim() : link.url, url: link.url };
 }

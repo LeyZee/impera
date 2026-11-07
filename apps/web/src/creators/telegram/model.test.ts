@@ -1,7 +1,7 @@
 import { DEFAULT_TELEGRAM_CHANNEL_CONFIG, RedirectLinkIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { daysWords, issuesOf, linkPreview, nextSlot, postsPerDay, rhythmWords } from './model';
+import { daysWords, issuesOf, nextSlot, postsPerDay, rhythmWords } from './model';
 
 const linkId = RedirectLinkIdSchema.parse('0192f3a0-0000-7000-8000-0000000000e1');
 
@@ -73,16 +73,5 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
     });
     expect(issues.has(`link:${linkId}:name`)).toBe(true);
     expect(issues.has(`link:${linkId}:url`)).toBe(true);
-  });
-
-  it('shows the end of a post with the text, or the bare address', () => {
-    const config = {
-      ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
-      links: [{ id: linkId, name: 'Telegram', url: 'https://redirect.example.test/a', destination: '' }],
-      channelLinkId: linkId,
-    };
-    expect(linkPreview(config)?.text).toBe('Viens me parler ✨');
-    expect(linkPreview({ ...config, linkForm: 'bare' })?.text).toBe('https://redirect.example.test/a');
-    expect(linkPreview({ ...config, channelLinkId: null })).toBeNull();
   });
 });
