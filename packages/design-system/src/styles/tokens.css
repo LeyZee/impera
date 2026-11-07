@@ -77,6 +77,17 @@
   /* Data: the first series is warm white; the neon only lights the one figure a screen is about. */
   --nv-data-1: #f1e4e8;
   --nv-data-2: #e8c37a;
+  /*
+   * Categorical series of the charts (Dashboard de l'agence, ADR 0078): four hues in a fixed order (teal, blue, pink,
+   * olive), validated for colour-blind separation between neighbours and at 3:1 on the plate, Nuit and Jour (dataviz
+   * validator). A fifth folds into « Autres » (`--nv-series-other`). Never the neon, the agent's violet, the sale's
+   * gold nor a status colour.
+   */
+  --nv-series-1: #1aa37a;
+  --nv-series-2: #3d8ce6;
+  --nv-series-3: #d46a98;
+  --nv-series-4: #9c9630;
+  --nv-series-other: rgba(246, 238, 241, 0.32);
 
   /* Shadows */
   --nv-shadow-glass:
@@ -153,6 +164,13 @@
 
   --nv-data-1: #3a2630;
   --nv-data-2: #a07a20;
+
+  /* The same four hues stepped darker for the day plate, each at 3:1 at least on it. */
+  --nv-series-1: #12825d;
+  --nv-series-2: #2a6fc9;
+  --nv-series-3: #c2457e;
+  --nv-series-4: #7a7414;
+  --nv-series-other: rgba(60, 10, 30, 0.26);
 
   --nv-shadow-glass:
     inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(80, 10, 30, 0.07),
