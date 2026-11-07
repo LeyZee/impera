@@ -4,6 +4,8 @@ import {
   type CommissionPreset,
   type CreatorSummary,
   type InvitationLinkCreated,
+  type Platform,
+  type TeamImportRow,
   type TeamMember,
   type TeamRole,
 } from '@impera/contracts';
@@ -21,7 +23,7 @@ import { createPortal } from 'react-dom';
 import { z } from 'zod';
 
 import { ShareLink } from './ShareLink';
-import { createInvitationLink, createMember, MEMBERS_KEY } from './api';
+import { createInvitationLink, createMember, MEMBERS_KEY, type Outcome } from './api';
 import {
   ERROR_MESSAGES,
   FIRST_COUNTRIES,
@@ -32,11 +34,15 @@ import {
   suggestedZone,
   today,
 } from './model';
+import { chatterName, invitePrefill } from './reveal';
 
 import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
 import { DayField } from '@/scheduling/DayField';
 import { cityOf } from '@/scheduling/time';
+import { inviteFromPlatform, teamImportKey, type InviteOutcome } from '@/settings/sales-feed/api';
+import { platformName } from '@/settings/sales-feed/shown';
+import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import '@/shell/dialog.css';
 import { Select } from '@/shell/Select';
 import { useRevealAlerts } from '@/shell/reveal';
@@ -68,7 +74,7 @@ interface Draft {
   creatorIds: string[];
 }
 
-const EMPTY = (): Draft => ({
+const EMPTY = (prefill?: Partial<Draft>): Draft => ({
   firstName: '',
   lastName: '',
   displayName: '',
@@ -85,7 +91,41 @@ const EMPTY = (): Draft => ({
   rate: '',
   teamShare: '',
   creatorIds: [],
+  ...prefill,
 });
+
+/** A member added or invited, or why not: an invitation may also end on the server's own sentence. */
+type Added = Outcome<TeamMember> | { readonly kind: 'said'; readonly message: string };
+
+/** The e-mail is another member's, or the account was linked to someone meanwhile (ADR 0076 § 3). */
+const CONFLICT_FROM_PLATFORM =
+  'Un membre utilise déjà cet e-mail, ou ce compte vient d’être relié à quelqu’un. Recharge la liste.';
+
+/** An invitation's answer in the words of the panel. */
+function asOutcome(outcome: InviteOutcome): Added {
+  switch (outcome.kind) {
+    case 'ok':
+      return { kind: 'ok', value: outcome.member };
+    case 'reauth':
+      return { kind: 'reauth' };
+    case 'conflict':
+      return { kind: 'refused', code: 'member_conflict' };
+    case 'bounds':
+      return {
+        kind: 'said',
+        message:
+          'Ce choix sort de ce qu’un manager peut donner : un chatteur, un préréglage du propriétaire et tes créatrices. Reprends les étapes.',
+      };
+    case 'team':
+      return { kind: 'refused', code: outcome.code };
+    case 'refused':
+      return { kind: 'said', message: outcome.message };
+    case 'session':
+      return { kind: 'said', message: 'Ta session a expiré : reconnecte-toi, puis invite-le à nouveau.' };
+    case 'failed':
+      return { kind: 'failed' };
+  }
+}
 
 type Problems = Partial<
   Record<
@@ -95,7 +135,7 @@ type Problems = Partial<
 >;
 
 /** What stops a step, field by field, in French; empty when the step can go on. */
-export function problemsOf(step: number, draft: Draft): Problems {
+export function problemsOf(step: number, draft: Draft, presetsOnly = false): Problems {
   const problems: Problems = {};
   if (step === 0) {
     if (draft.firstName.trim() === '') problems.firstName = 'Indique son prénom.';
@@ -110,7 +150,8 @@ export function problemsOf(step: number, draft: Draft): Problems {
     else if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft.joinedOn)) problems.joinedOn = 'Une date d’arrivée.';
   }
   if (step === 2) {
-    if (draft.presetId === null && parseRate(draft.rate) === null)
+    if (presetsOnly && draft.presetId === null) problems.rate = 'Choisis un préréglage du propriétaire.';
+    else if (draft.presetId === null && parseRate(draft.rate) === null)
       problems.rate = 'Un préréglage, ou un taux entre 0 et 100 %, par exemple 12,5.';
     if (draft.teamRole === 'manager' && draft.teamShare.trim() !== '' && parseRate(draft.teamShare) === null)
       problems.teamShare = 'Une part entre 0 et 100 %, ou rien.';
@@ -125,10 +166,18 @@ export function problemsOf(step: number, draft: Draft): Problems {
 export function AddMemberPanel({
   presets,
   creators,
+  invite,
   onClose,
 }: {
   presets: readonly CommissionPreset[];
+  /** The creators the adder may give: all for the owner, his own list for a manager inviting (ADR 0076 § 3). */
   creators: readonly CreatorSummary[];
+  /**
+   * An account of a platform's team to invite (ADR 0076 § 3): its names and e-mail filled in, the member and the
+   * link made in one call, the password asked again. A manager invites a chatter at a preset of the owner's only.
+   */
+  invite?:
+    { readonly platform: Platform; readonly row: TeamImportRow; readonly bounded: boolean } | undefined;
   /** With the new member once he exists, so the list opens him; null when nothing was added. */
   onClose: (created: TeamMember | null) => void;
 }): JSX.Element {
@@ -137,7 +186,19 @@ export function AddMemberPanel({
   const dialog = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   useRevealAlerts(scroller);
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const bounded = invite?.bounded === true;
+  const [draft, setDraft] = useState<Draft>(() =>
+    EMPTY(
+      invite === undefined
+        ? undefined
+        : invitePrefill(
+            invite.row,
+            creators.map((creator) => creator.id),
+          ),
+    ),
+  );
+  /** The invitation waits for the password and the code (ADR 0076 § 3), then goes again. */
+  const [asking, setAsking] = useState(false);
   const [step, setStep] = useState(0);
   const [shown, setShown] = useState<Problems>({});
   const [busy, setBusy] = useState(false);
@@ -200,7 +261,7 @@ export function AddMemberPanel({
   };
 
   const next = (): void => {
-    const problems = problemsOf(step, draft);
+    const problems = problemsOf(step, draft, bounded);
     setShown(problems);
     if (Object.keys(problems).length > 0) return;
     if (step < 2) setStep(step + 1);
@@ -229,22 +290,32 @@ export function AddMemberPanel({
     }
     setBusy(true);
     setFailure(null);
-    const outcome = await createMember(body.data);
+    const outcome: Added =
+      invite === undefined
+        ? await createMember(body.data)
+        : asOutcome(
+            await inviteFromPlatform(invite.platform, invite.row.chatter.platformChatterId, body.data),
+          );
     if (outcome.kind !== 'ok') {
       setBusy(false);
-      if (outcome.kind === 'refused' && outcome.code === 'member_conflict') {
+      if (outcome.kind === 'reauth') {
+        setAsking(true);
+      } else if (outcome.kind === 'refused' && outcome.code === 'member_conflict') {
         setStep(0);
-        setShown({ email: ERROR_MESSAGES.member_conflict });
+        setShown({ email: invite === undefined ? ERROR_MESSAGES.member_conflict : CONFLICT_FROM_PLATFORM });
       } else {
         setFailure(
           outcome.kind === 'refused'
             ? ERROR_MESSAGES[outcome.code]
-            : 'Personne n’a été ajouté : le serveur ne répond pas. Réessaie dans un instant.',
+            : outcome.kind === 'said'
+              ? outcome.message
+              : 'Personne n’a été ajouté : le serveur ne répond pas. Réessaie dans un instant.',
         );
       }
       return;
     }
     await client.invalidateQueries({ queryKey: MEMBERS_KEY });
+    if (invite !== undefined) await client.invalidateQueries({ queryKey: teamImportKey(invite.platform) });
     // The link next; asking for the password, or a server that fails here, leaves the button to try again.
     const link = await createInvitationLink(outcome.value.id, 'invitation');
     setBusy(false);
@@ -271,7 +342,11 @@ export function AddMemberPanel({
           <header className="tm-dialog__head">
             <div className="tm-dialog__title">
               <h2 id={`${id}-title`}>
-                {created === null ? 'Nouveau membre' : `${created.member.displayName} est dans l’équipe`}
+                {created !== null
+                  ? `${created.member.displayName} est dans l’équipe`
+                  : invite === undefined
+                    ? 'Nouveau membre'
+                    : `Inviter ${chatterName(invite.row.chatter)}`}
               </h2>
               {created === null ? (
                 <ol className="tm-steps" aria-label="Étapes">
@@ -297,7 +372,20 @@ export function AddMemberPanel({
             </button>
           </header>
 
-          {created !== null ? (
+          {created === null && asking ? (
+            <div className="tm-dialog__body nv-swap" key="password">
+              <PasswordPrompt
+                lead="Inviter ouvre un compte qui lira des conversations de fans : confirme ton mot de passe et ton code."
+                onConfirmed={() => {
+                  setAsking(false);
+                  void submit();
+                }}
+                onCancel={() => {
+                  setAsking(false);
+                }}
+              />
+            </div>
+          ) : created !== null ? (
             <div className="tm-dialog__body nv-swap" key="done">
               <ShareLink
                 memberId={created.member.id}
@@ -323,7 +411,21 @@ export function AddMemberPanel({
                 next();
               }}
             >
-              {step === 0 ? <Who id={id} draft={draft} problems={shown} onChange={change} /> : null}
+              {step === 0 && invite !== undefined ? (
+                <p className="tm-hint">
+                  Le prénom, le nom et l’e-mail viennent de son compte {platformName(invite.platform)}.
+                </p>
+              ) : null}
+              {step === 0 ? (
+                <Who
+                  id={id}
+                  draft={draft}
+                  problems={shown}
+                  onChange={change}
+                  fromPlatform={invite === undefined ? null : platformName(invite.platform)}
+                  roles={bounded ? ['chatter'] : ROLES}
+                />
+              ) : null}
               {step === 1 ? <Where id={id} draft={draft} problems={shown} onChange={change} /> : null}
               {step === 2 ? (
                 <Rate
@@ -332,6 +434,7 @@ export function AddMemberPanel({
                   problems={shown}
                   presets={presets}
                   creators={creators}
+                  presetsOnly={bounded}
                   onChange={change}
                 />
               ) : null}
@@ -362,8 +465,10 @@ export function AddMemberPanel({
                   {step < 2
                     ? 'Continuer'
                     : busy
-                      ? 'Ajout…'
-                      : `Ajouter ${draft.displayName.trim() === '' ? 'le membre' : draft.displayName.trim()}`}
+                      ? invite === undefined
+                        ? 'Ajout…'
+                        : 'Invitation…'
+                      : `${invite === undefined ? 'Ajouter' : 'Inviter'} ${draft.displayName.trim() === '' ? 'le membre' : draft.displayName.trim()}`}
                 </button>
               </div>
             </form>
@@ -418,7 +523,18 @@ function Field({
   );
 }
 
-function Who({ id, draft, problems, onChange }: StepProps): JSX.Element {
+function Who({
+  id,
+  draft,
+  problems,
+  onChange,
+  fromPlatform,
+  roles,
+}: StepProps & {
+  /** The platform the e-mail comes from: it is the account's, and stays as it is. */
+  fromPlatform: string | null;
+  roles: readonly TeamRole[];
+}): JSX.Element {
   return (
     <>
       <div className="tm-pair">
@@ -470,7 +586,11 @@ function Who({ id, draft, problems, onChange }: StepProps): JSX.Element {
       <Field
         id={`${id}-email`}
         label="E-mail"
-        hint="Son identifiant pour se connecter. Impera ne lui écrit pas."
+        hint={
+          fromPlatform === null
+            ? 'Son identifiant pour se connecter. Impera ne lui écrit pas.'
+            : `Celui de son compte ${fromPlatform}, et son identifiant pour se connecter. Impera ne lui écrit pas.`
+        }
         problem={problems.email}
       >
         <input
@@ -479,6 +599,7 @@ function Who({ id, draft, problems, onChange }: StepProps): JSX.Element {
           type="email"
           inputMode="email"
           autoComplete="off"
+          readOnly={fromPlatform !== null}
           value={draft.email}
           aria-invalid={problems.email !== undefined}
           onChange={(event) => {
@@ -486,24 +607,26 @@ function Who({ id, draft, problems, onChange }: StepProps): JSX.Element {
           }}
         />
       </Field>
-      <Field label="Rôle">
-        <div className="tm-choices" role="radiogroup" aria-label="Rôle">
-          {ROLES.map((role) => (
-            <button
-              key={role}
-              type="button"
-              role="radio"
-              className="nv-chip"
-              aria-checked={draft.teamRole === role}
-              onClick={() => {
-                onChange({ teamRole: role });
-              }}
-            >
-              {ROLE_LABELS[role]}
-            </button>
-          ))}
-        </div>
-      </Field>
+      {roles.length < 2 ? null : (
+        <Field label="Rôle">
+          <div className="tm-choices" role="radiogroup" aria-label="Rôle">
+            {roles.map((role) => (
+              <button
+                key={role}
+                type="button"
+                role="radio"
+                className="nv-chip"
+                aria-checked={draft.teamRole === role}
+                onClick={() => {
+                  onChange({ teamRole: role });
+                }}
+              >
+                {ROLE_LABELS[role]}
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
     </>
   );
 }
@@ -605,15 +728,27 @@ function Rate({
   problems,
   presets,
   creators,
+  presetsOnly,
   onChange,
-}: StepProps & { presets: readonly CommissionPreset[]; creators: readonly CreatorSummary[] }): JSX.Element {
-  const byHand = presets.length === 0 || draft.byHand;
+}: StepProps & {
+  presets: readonly CommissionPreset[];
+  creators: readonly CreatorSummary[];
+  /** A manager inviting: a preset of the owner's only, never a rate by hand (ADR 0076 § 3). */
+  presetsOnly: boolean;
+}): JSX.Element {
+  const byHand = !presetsOnly && (presets.length === 0 || draft.byHand);
   return (
     <>
       <Field
-        id={presets.length === 0 ? `${id}-rate` : undefined}
+        id={byHand && presets.length === 0 ? `${id}-rate` : undefined}
         label="Commission"
-        hint={`${presets.length === 0 ? 'Aucun préréglage pour l’instant : saisis son taux. ' : ''}Il part de son arrivée ; un taux suivant partira d’un 1er ou d’un 16.`}
+        hint={
+          presetsOnly
+            ? presets.length === 0
+              ? 'Aucun préréglage pour l’instant : le propriétaire en crée un, puis tu l’invites.'
+              : 'Un préréglage du propriétaire. Il part de son arrivée.'
+            : `${presets.length === 0 ? 'Aucun préréglage pour l’instant : saisis son taux. ' : ''}Il part de son arrivée ; un taux suivant partira d’un 1er ou d’un 16.`
+        }
         problem={problems.rate}
       >
         {presets.length === 0 ? null : (
@@ -634,19 +769,21 @@ function Rate({
                 <span className="tm-preset__rate">{formatRate(preset.rateBps)}</span>
               </button>
             ))}
-            <button
-              type="button"
-              role="radio"
-              className="tm-preset nv-enter"
-              style={{ '--nv-i': presets.length }}
-              aria-checked={byHand}
-              onClick={() => {
-                onChange({ presetId: null, byHand: true });
-              }}
-            >
-              <span className="tm-preset__name">Autre</span>
-              <span className="tm-preset__rate tm-preset__rate--word">À la main</span>
-            </button>
+            {presetsOnly ? null : (
+              <button
+                type="button"
+                role="radio"
+                className="tm-preset nv-enter"
+                style={{ '--nv-i': presets.length }}
+                aria-checked={byHand}
+                onClick={() => {
+                  onChange({ presetId: null, byHand: true });
+                }}
+              >
+                <span className="tm-preset__name">Autre</span>
+                <span className="tm-preset__rate tm-preset__rate--word">À la main</span>
+              </button>
+            )}
           </div>
         )}
         {byHand ? (
@@ -693,7 +830,13 @@ function Rate({
       <Field
         label="Créatrices"
         hint={
-          creators.length === 0 ? 'Aucune créatrice pour l’instant.' : 'Celles sur lesquelles il travaille.'
+          creators.length === 0
+            ? presetsOnly
+              ? 'Aucune créatrice dans ta liste.'
+              : 'Aucune créatrice pour l’instant.'
+            : presetsOnly
+              ? 'Parmi les tiennes : celles sur lesquelles il travaille.'
+              : 'Celles sur lesquelles il travaille.'
         }
       >
         {creators.length === 0 ? null : (

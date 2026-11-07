@@ -857,3 +857,69 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Équipe › Reveal (ADR 0076): the review's plates, one under the other, as Réglages › Ventes draws its import. */
+.rv-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.rv-count {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+/* No box to tick on a row that invites or that the reader cannot confirm: the columns stay aligned. */
+.rv-tick-space {
+  width: 22px;
+  height: 22px;
+}
+.rv-end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.rv-fold.sf-dismissed {
+  border-top: 0;
+  padding: 4px 0;
+}
+.rv-fold > .sf-import__list > .sf-imp:first-child {
+  border-top: 1px solid var(--nv-hairline);
+}
+.sf-imp.rv-linked {
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 260px);
+}
+@media (max-width: 639px) {
+  .sf-imp.rv-linked {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .rv-end {
+    grid-column: 4;
+    grid-row: 1;
+  }
+  /* A row to confirm: « Écarter » beside the menu, so the name and the e-mail keep the whole line. */
+  .rv-row > .sf-imp__who {
+    grid-column: 3 / -1;
+  }
+  .rv-row > .sf-imp__act {
+    grid-column: 1 / 4;
+  }
+  .rv-row > .rv-end {
+    grid-row: 2;
+    align-self: start;
+    min-height: 44px;
+    align-items: center;
+  }
+  /* A row that invites carries two buttons: they go under the menu, at the right. */
+  .rv-inviting > .sf-imp__act {
+    grid-column: 1 / -1;
+  }
+  .rv-inviting > .rv-end {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+}
+/* A removal on the platform, under the account's name: amber, a state to act on (ADR 0076 § 5). */
+.sf-imp__meta.rv-warn {
+  color: var(--nv-warning);
+}
