@@ -643,27 +643,6 @@ function LinkLine({
             }}
           />
         </span>
-        <span className="tc-link__destination">
-          <label className="tc-link__destination-label" htmlFor={destinationId} aria-hidden="true">
-            Où il mène
-          </label>
-          <input
-            id={destinationId}
-            className="nv-field__control nv-glass"
-            value={link.destination}
-            aria-label={`Où mène ${named}`}
-            maxLength={LINK_DESTINATION_MAX}
-            placeholder="mon Reveal, mon live TikTok ce soir 21 h…"
-            aria-describedby={`${destinationId}-hint`}
-            aria-invalid={destinationIssue === null ? undefined : true}
-            onChange={(event) => {
-              onChange({ ...link, destination: event.target.value });
-            }}
-          />
-          <span className="sr-only" id={`${destinationId}-hint`}>
-            Le post parle de cet endroit, sans adresse.
-          </span>
-        </span>
         <span className="tc-link__end">
           <button
             type="button"
@@ -683,10 +662,38 @@ function LinkLine({
             ×
           </button>
         </span>
+        <span className="tc-link__destination">
+          <label className="tc-link__destination-label" htmlFor={destinationId}>
+            Où il mène<span className="sr-only"> ({named})</span>
+          </label>
+          <input
+            id={destinationId}
+            className="nv-field__control nv-glass"
+            value={link.destination}
+            maxLength={LINK_DESTINATION_MAX}
+            placeholder="mon Reveal, mon live TikTok ce soir 21 h…"
+            aria-describedby={
+              destinationIssue === null
+                ? `${destinationId}-hint`
+                : `${destinationId}-hint ${destinationId}-error`
+            }
+            aria-invalid={destinationIssue === null ? undefined : true}
+            onChange={(event) => {
+              onChange({ ...link, destination: event.target.value });
+            }}
+          />
+          <span className="sr-only" id={`${destinationId}-hint`}>
+            Le post parle de cet endroit, sans adresse.
+          </span>
+        </span>
       </div>
       {nameIssue === null ? null : <p className="ps-error">{nameIssue}</p>}
       {urlIssue === null ? null : <p className="ps-error">{urlIssue}</p>}
-      {destinationIssue === null ? null : <p className="ps-error">{destinationIssue}</p>}
+      {destinationIssue === null ? null : (
+        <p className="ps-error" id={`${destinationId}-error`}>
+          {destinationIssue}
+        </p>
+      )}
     </li>
   );
 }

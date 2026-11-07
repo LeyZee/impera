@@ -109,9 +109,8 @@
 .tc-link__field .nv-field__control {
   width: 100%;
 }
-/* Its own line under the name and the address; on a phone, before the « Lien du canal » chip. */
+/* Its own line under the name and the address, as it comes in the page; on a phone, before the chip. */
 .tc-link__destination {
-  order: 1;
   flex: 1 1 100%;
   display: flex;
   align-items: center;
@@ -168,6 +167,7 @@
     min-width: 0;
   }
   .tc-link__destination {
+    order: 1;
     flex-wrap: wrap;
   }
   .tc-link__end {

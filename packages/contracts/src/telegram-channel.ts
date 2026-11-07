@@ -88,7 +88,9 @@ export type RedirectLink = z.infer<typeof RedirectLinkSchema>;
  * or `t.me`. The address of a post is the code's, never the text's.
  */
 export function labelHasAddress(text: string): boolean {
-  return /https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,}(?:\/|$|\s)/iu.test(text);
+  // A domain ends where letters and digits stop (« tiktok.com, », « (t.me) », « café.fr »). Its ending is in lower case
+  // as people type one: « Reveal.Viens », « St.Valentin » are sentences, « mon Reveal.me » is an address.
+  return /[Hh][Tt][Tt][Pp][Ss]?:\/\/|[Ww][Ww][Ww]\.|[\p{L}\p{N}-]+\.[a-z]{2,}(?![\p{L}\p{N}-])/u.test(text);
 }
 
 /** ADR 0080 § 4.3: a short text that carries the link, or the bare address. */

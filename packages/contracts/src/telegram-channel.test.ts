@@ -39,7 +39,15 @@ describe('the setting of a creator’s Telegram channel (ADR 0080)', () => {
     ]) {
       expect(labelHasAddress(text)).toBe(true);
     }
-    for (const text of ['Viens me parler ✨', 'Ce soir… je t’attends', 'Clique ici 💌']) {
+    for (const text of [
+      'Viens me parler ✨',
+      'Ce soir… je t’attends',
+      'Clique ici 💌',
+      'mon live TikTok ce soir 21 h',
+      'M. Dupont, env. 21h30.',
+      'mon Reveal.Viens vite',
+      'la St.Valentin',
+    ]) {
       expect(labelHasAddress(text)).toBe(false);
     }
   });
