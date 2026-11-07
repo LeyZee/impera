@@ -197,11 +197,32 @@
   flex-direction: column-reverse;
   gap: 2px;
   border-radius: var(--nv-radius-xs);
-  transition: background var(--nv-dur-fast);
+  transform-origin: bottom;
+  transition:
+    background var(--nv-dur-fast),
+    opacity var(--nv-dur-fast),
+    transform var(--nv-dur-base) var(--nv-ease-spring);
 }
+/* The column under the pointer swells, the others step back: the eye lands on the day read (recette du 07/11). */
 .ins-col:hover .ins-col__stack,
 .ins-col:focus-visible .ins-col__stack {
   background: var(--nv-select);
+  transform: scaleX(1.16);
+}
+.ins-daily__bars:has(.ins-col:hover, .ins-col:focus-visible)
+  .ins-col:not(:hover, :focus-visible)
+  .ins-col__stack {
+  opacity: 0.45;
+}
+/* A finger has no hover: the tapped column, focused, swells the same way. */
+@media (hover: none) {
+  .ins-col:focus .ins-col__stack {
+    background: var(--nv-select);
+    transform: scaleX(1.16);
+  }
+  .ins-daily__bars:has(.ins-col:focus) .ins-col:not(:focus) .ins-col__stack {
+    opacity: 0.45;
+  }
 }
 .ins-col__part {
   flex: none;
@@ -296,11 +317,15 @@
   stroke: var(--_c);
   stroke-dasharray: 0 999;
   cursor: pointer;
+  transform-box: view-box;
+  transform-origin: 66px 66px;
   animation: ins-ring var(--nv-dur-data) var(--nv-ease-out) both;
   animation-delay: calc(var(--_i, 0) * 90ms + 120ms);
   transition:
     stroke-width var(--nv-dur-base) var(--nv-ease-spring),
-    opacity var(--nv-dur-fast);
+    transform var(--nv-dur-base) var(--nv-ease-spring),
+    opacity var(--nv-dur-fast),
+    filter var(--nv-dur-base);
 }
 @keyframes ins-ring {
   to {
@@ -312,7 +337,10 @@
 }
 .ins-ring.is-lit .ins-ring__arc.is-on {
   opacity: 1;
-  stroke-width: 18;
+  stroke-width: 20;
+  /* The slice comes out of the ring, a little bigger and lit with its own colour (recette du 07/11). */
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--_c) 55%, transparent));
 }
 .ins-ring__middle {
   position: absolute;
@@ -862,5 +890,15 @@
   }
   .ins-ring__arc {
     stroke-dasharray: var(--_dash);
+  }
+  /* Without motion the lit slice and column still stand out, at once, without growing. */
+  .ins-ring__arc,
+  .ins-col__stack {
+    transition: none;
+  }
+  .ins-ring.is-lit .ins-ring__arc.is-on,
+  .ins-col:hover .ins-col__stack,
+  .ins-col:focus .ins-col__stack {
+    transform: none;
   }
 }

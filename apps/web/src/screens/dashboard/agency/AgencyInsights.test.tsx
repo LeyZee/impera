@@ -147,6 +147,25 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(document.activeElement).toBe(columns[columns.length - 2]);
   });
 
+  it('lights a ring’s slice on a finger’s tap on its legend, as on a mouse’s hover', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const card = (await screen.findByRole('heading', { name: /D’où vient l’argent/u })).closest('article');
+    if (card === null) throw new Error('card');
+    const row = within(card).getByRole('button', { name: /PPV en privé/u });
+    // A tap: the pointer enters, presses, focuses, then clicks. The click must not put out what entering lit.
+    const tap = (): void => {
+      fireEvent.pointerEnter(row, { pointerType: 'touch' });
+      fireEvent.pointerDown(row, { pointerType: 'touch' });
+      fireEvent.focus(row);
+      fireEvent.click(row);
+    };
+    tap();
+    expect(row.className).toContain('is-on');
+    tap();
+    expect(row.className).not.toContain('is-on');
+  });
+
   it('shows nothing to an account whose scope is its own', async () => {
     serve(403, { error: 'creator_forbidden' });
     show(null, false);

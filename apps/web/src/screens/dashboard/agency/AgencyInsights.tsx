@@ -378,6 +378,8 @@ function Ring({
   tipFor?: string;
 }): JSX.Element {
   const [lit, setLit] = useState<number | null>(null);
+  // The pointer that pressed a legend row: its focus and its click are that pointer's, not the keyboard's.
+  const pressedBy = useRef<string | null>(null);
   const radius = 52;
   const shown = slices.filter((slice) => slice.cents > 0);
   const total = shown.reduce((sum, slice) => sum + slice.cents, 0);
@@ -448,20 +450,29 @@ function Ring({
                   type="button"
                   className={lit === i ? 'ins-legend__row is-on' : 'ins-legend__row'}
                   title={slice.key === tipFor ? OTHER_KINDS_NOTE : notes?.[slice.key]}
-                  onPointerEnter={() => {
-                    setLit(i);
+                  // A mouse lights on entering and leaving puts out; a finger's tap lights or puts out (`onClick`);
+                  // the keyboard lights on focus. A tap's own entering and focus would light before its click undoes it.
+                  onPointerEnter={(event) => {
+                    if (event.pointerType === 'mouse') setLit(i);
                   }}
                   onPointerLeave={(event) => {
                     if (event.pointerType === 'mouse') setLit(null);
                   }}
+                  onPointerDown={(event) => {
+                    pressedBy.current = event.pointerType;
+                  }}
                   onFocus={() => {
-                    setLit(i);
+                    if (pressedBy.current === null) setLit(i);
                   }}
                   onBlur={() => {
+                    pressedBy.current = null;
                     setLit(null);
                   }}
                   onClick={() => {
-                    setLit(lit === i ? null : i);
+                    const by = pressedBy.current;
+                    pressedBy.current = null;
+                    if (by === 'mouse') setLit(i);
+                    else setLit(lit === i ? null : i);
                   }}
                 >
                   <span className="ins-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
