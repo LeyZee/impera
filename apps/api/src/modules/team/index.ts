@@ -4,7 +4,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createTeamService, type InviteFromPlatform } from './application/team';
 import { calendarDayIn } from './domain/members';
-import type { Actor, CreatorRoster, InvitationLinkDirectory } from './domain/ports';
+import type { Actor, CreatorRoster, InvitationLinkDirectory, PlatformRemovals } from './domain/ports';
 import { createTeamRoutes, type RequireRole } from './infra/http/routes';
 import { membersForPay, type MemberForPay } from './infra/pay-reads';
 import { applyRolesUnscoped } from './infra/role-jobs';
@@ -56,6 +56,8 @@ export interface TeamDeps {
   readonly invitationLinks: InvitationLinkDirectory;
   /** Pay's `payroll.recalculate` for a period, which a new rate or role enqueues (the `payroll` module's, EQ-04). */
   readonly enqueuePayRecalculation: EnqueuePayRecalculation;
+  /** The removals on a platform of members still in the team (ADR 0076 § 5), the `connectors` module's reading. */
+  readonly platformRemovals: PlatformRemovals;
   readonly now?: () => Date;
 }
 
@@ -69,7 +71,7 @@ export function createTeamModule(deps: TeamDeps): TeamModule {
   );
   return {
     name: 'team',
-    routes: (requireRole) => createTeamRoutes(service, requireRole),
+    routes: (requireRole) => createTeamRoutes(service, requireRole, deps.platformRemovals),
     pay: { members: membersForPay },
     invites: (links) => {
       const invites = createDrizzleTeamInvites(deps.db, links);

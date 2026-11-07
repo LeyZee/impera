@@ -10,6 +10,7 @@ import {
   TeamMemberListSchema,
   TeamMemberNoteListSchema,
   TeamMemberSchema,
+  TeamPlatformRemovalListSchema,
   TeamRoleChangeSchema,
   TeamRoleHistorySchema,
   type CreatorId,
@@ -107,6 +108,7 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
       creators: { existing: () => Promise.resolve(new Set()) },
       invitationLinks: { live: () => Promise.resolve(new Map()) },
       enqueuePayRecalculation,
+      platformRemovals: () => Promise.resolve([]),
       now: () => new Date(`${day}T11:00:00Z`),
     });
 
@@ -319,6 +321,46 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
     const response = await call('GET', '/team/members', creator);
     expect(response.statusCode).toBe(403);
     expect(codeOf(response)).toBe('role_forbidden');
+  });
+
+  it('says who is still in the team though removed on Reveal, to the owner and an active manager (ADR 0076 § 5)', async () => {
+    const removals = async (cookie: string) => {
+      const response = await call('GET', '/team/platform-removals', cookie);
+      expect(response.statusCode).toBe(200);
+      return TeamPlatformRemovalListSchema.parse(response.json()).removals;
+    };
+    expect(await removals(owner)).toEqual([]);
+    // Théo's Reveal account, linked to him, then seen removed by a reading (invented ids).
+    await test.admin.db
+      .insert(schema.salesFeedChatters)
+      .values({ platform: 'reveal', platformChatterId: 'rv-theo', kind: 'member', memberId: theo.id });
+    await test.admin.db.insert(schema.salesFeedChatterReviews).values({
+      platform: 'reveal',
+      platformChatterId: 'rv-theo',
+      platformRemovedAt: new Date('2026-11-05T10:00:00Z'),
+    });
+    const expected = [
+      {
+        platform: 'reveal',
+        platformChatterId: 'rv-theo',
+        memberId: theo.id,
+        removedAt: '2026-11-05T10:00:00.000Z',
+        absent: false,
+      },
+    ];
+    expect(await removals(owner)).toEqual(expected);
+    expect(await removals(noraCookie)).toEqual(expected);
+    // Théo reads nothing of it, and a creator never reaches the route.
+    expect(await removals(theoCookie)).toEqual([]);
+    const byCreator = await call('GET', '/team/platform-removals', creator);
+    expect(byCreator.statusCode).toBe(403);
+    expect(codeOf(byCreator)).toBe('role_forbidden');
+    // Back on the platform: nothing left to say.
+    await test.admin.db
+      .update(schema.salesFeedChatterReviews)
+      .set({ platformRemovedAt: null })
+      .where(eq(schema.salesFeedChatterReviews.platformChatterId, 'rv-theo'));
+    expect(await removals(owner)).toEqual([]);
   });
 
   it('keeps the writes to the owner: a manager and a chatter are refused', async () => {

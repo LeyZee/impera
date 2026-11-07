@@ -2,6 +2,7 @@ import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { liveInvitationLinksUnscoped } from '../invitation-links';
 import { defineTask } from '../jobs';
+import type { ConnectorsModule } from '../modules/connectors';
 import { enqueuePayRecalculation } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import { createTeamModule, type TeamModule } from '../modules/team';
@@ -18,6 +19,8 @@ export function wireTeam(
   shared: Shared,
   deps: {
     readonly persona: PersonaModule;
+    /** Its reading of the team's removals on a platform (ADR 0076 § 5). */
+    readonly connectors: ConnectorsModule;
     /**
      * Tests set the team's clock here, to make a member leave on a day already past and read the fortnight of his
      * departure (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
@@ -35,6 +38,7 @@ export function wireTeam(
     // The links' table is read through `withAdmin` only (EQ-10): the module gets this function, never the table.
     invitationLinks: { live: (memberIds) => liveInvitationLinksUnscoped(adminDb, memberIds) },
     enqueuePayRecalculation,
+    platformRemovals: (userId) => deps.connectors.teamRemovals(userId),
     ...(deps.now !== undefined && { now: deps.now }),
   });
   return {

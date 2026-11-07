@@ -11,7 +11,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX } from 'react';
 
-import { changeStatus, MEMBERS_KEY, setCommission, updateMember, useRates, type Outcome } from './api';
+import {
+  changeStatus,
+  MEMBERS_KEY,
+  PLATFORM_REMOVALS_KEY,
+  setCommission,
+  updateMember,
+  useRates,
+  type Outcome,
+} from './api';
 import {
   ERROR_MESSAGES,
   formatRate,
@@ -49,7 +57,11 @@ function useWrite(): {
     const outcome = await write();
     setBusy(false);
     if (outcome.kind === 'ok') {
-      await client.invalidateQueries({ queryKey: MEMBERS_KEY });
+      // A departure ends a removal alert too (ADR 0076 § 5): the server no longer lists a member who left.
+      await Promise.all([
+        client.invalidateQueries({ queryKey: MEMBERS_KEY }),
+        client.invalidateQueries({ queryKey: PLATFORM_REMOVALS_KEY }),
+      ]);
       return true;
     }
     setProblem(

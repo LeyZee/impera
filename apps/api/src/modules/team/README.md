@@ -2,7 +2,7 @@
 
 **Rôle.** Équipe › Membres (EQ-01, ADR 0023, ADR 0024) : les chatteurs et les managers, leur pays, leur statut, leurs créatrices, leur commission et leur rôle datés, les préréglages de commission et les notes internes.
 
-**Peut dépendre de.** aucun module métier (feuille). Deux ports, branchés par le composition root : les créatrices qui existent, venues du module `persona` (`CreatorRoster`), le lien en cours de chaque membre, lu dans la table des liens d'EQ-10 (`InvitationLinkDirectory`), et le recalcul d'une quinzaine par la paie (`enqueuePayRecalculation`, du module `payroll`). Pour l'invitation depuis une proposition de lien (ADR 0076 § 3), un troisième, donné à l'appel : le lien d'un compte de l'équipe d'une plateforme (`PlatformChatterLinks`), l'écriture propre de `connectors` dans `sales_feed_chatters`, que le module ne touche jamais.
+**Peut dépendre de.** aucun module métier (feuille). Deux ports, branchés par le composition root : les créatrices qui existent, venues du module `persona` (`CreatorRoster`), le lien en cours de chaque membre, lu dans la table des liens d'EQ-10 (`InvitationLinkDirectory`), et le recalcul d'une quinzaine par la paie (`enqueuePayRecalculation`, du module `payroll`). Pour l'invitation depuis une proposition de lien (ADR 0076 § 3), un troisième, donné à l'appel : le lien d'un compte de l'équipe d'une plateforme (`PlatformChatterLinks`), l'écriture propre de `connectors` dans `sales_feed_chatters`, que le module ne touche jamais. Pour l'alerte de retrait (§ 5), un quatrième : les membres encore là dont le compte a été retiré de l'équipe d'une plateforme (`PlatformRemovals`), lus par `connectors.teamRemovals` dans la base, jamais sur la plateforme.
 
 **Tables possédées.** `team_members`, `team_member_notes`, `commission_presets`, `member_commission_rates`, `member_roles` (migration 0034). Toutes passent par `withMember` : la base décide de ce que lit chaque scope (`owner`, `agency` pour un manager `active`, `self` pour les autres). Hors RLS, et dans la même transaction que la fiche : il écrit dans `user` le compte d'un nouveau membre (sans mot de passe, rôle `operator`), son nom et ses créatrices ; il lit `account` pour savoir si le mot de passe est choisi ; il supprime les lignes de `session` d'un membre qui part. Ces tables restent celles de Better Auth (`auth.ts`).
 
@@ -22,7 +22,8 @@
 
 - lecture pour le propriétaire et les comptes de l'équipe, jamais pour une créatrice : `GET /team/members`, `GET /team/members/:memberId`, `GET /team/members/:memberId/commission`, `GET /team/members/:memberId/role`, `GET /team/commission-presets`, `GET /team/members/:memberId/notes` ;
 - écriture par le propriétaire seul : `POST /team/members`, `PATCH /team/members/:memberId` (sans le rôle : un `teamRole` y est refusé, `request_invalid`), `PUT /team/members/:memberId/status`, `POST /team/members/:memberId/commission`, `POST /team/members/:memberId/role` (`{ teamRole, effectiveFrom }`), `POST /team/commission-presets` ;
-- notes : `POST /team/members/:memberId/notes` par le propriétaire et les managers actifs.
+- notes : `POST /team/members/:memberId/notes` par le propriétaire et les managers actifs ;
+- alerte de retrait (ADR 0076 § 5) : `GET /team/platform-removals`, les retraits que `connectors` laisse voir au lecteur, au propriétaire et aux managers actifs ; une liste vide pour un chatteur, 403 pour une créatrice. Équipe › Membres en fait une pastille ambre « Retiré de Reveal » sur la ligne du membre et une ligne ambre sur sa fiche, tant que dure l'état : rien n'est coupé, son lien et ses ventes passées restent, son départ se fait par « Changer le statut ».
 
 Chaque écriture entre au journal (`audit_log`) sans nom, e-mail ni texte de note.
 

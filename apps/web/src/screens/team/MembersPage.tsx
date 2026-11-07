@@ -1,12 +1,26 @@
-import type { CommissionPreset, CreatorSummary, TeamMember, TeamRole } from '@impera/contracts';
+import type {
+  CommissionPreset,
+  CreatorSummary,
+  TeamMember,
+  TeamPlatformRemoval,
+  TeamRole,
+} from '@impera/contracts';
 import { placeSegmentThumb } from '@impera/design-system';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 
 import { AddMemberPanel } from './AddMemberPanel';
 import { MemberSheet } from './MemberSheet';
 import { TeamNav } from './TeamNav';
-import { useMembers, usePresets } from './api';
-import { creatorNames, invitationState, listMembers, rateLine, TAB_LABELS, teamSummary } from './model';
+import { useMembers, usePlatformRemovals, usePresets } from './api';
+import {
+  creatorNames,
+  invitationState,
+  listMembers,
+  rateLine,
+  removalPill,
+  TAB_LABELS,
+  teamSummary,
+} from './model';
 import { Avatar, Notice, StatusPill, Unread } from './parts';
 import './team.css';
 
@@ -42,6 +56,11 @@ export function MembersPage({
   const members = useMembers();
   const presets = usePresets();
   const creators = useCreators();
+  // ADR 0076 § 5: who is still here though his platform account was removed; nothing said while it cannot be read,
+  // nor for one who left, even before the list is read again.
+  const removals = usePlatformRemovals();
+  const removalsOf = (member: TeamMember): TeamPlatformRemoval[] =>
+    member.status === 'left' ? [] : (removals.data ?? []).filter((removal) => removal.memberId === member.id);
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
   const all = members.data ?? [];
@@ -147,6 +166,7 @@ export function MembersPage({
                       member={member}
                       presets={known}
                       creators={names}
+                      removals={removalsOf(member)}
                       isOpen={member.id === selected}
                       onOpen={() => {
                         onSelect(member.id);
@@ -170,6 +190,7 @@ export function MembersPage({
                         member={member}
                         presets={known}
                         creators={names}
+                        removals={removalsOf(member)}
                         isOpen={member.id === selected}
                         onOpen={() => {
                           onSelect(member.id);
@@ -194,6 +215,7 @@ export function MembersPage({
               member={open}
               presets={known}
               creators={names}
+              removals={removalsOf(open)}
               canManage={canManage}
               isSelf={open.userId === viewerId}
               onClose={() => {
@@ -224,12 +246,15 @@ function Row({
   member,
   presets,
   creators,
+  removals,
   isOpen,
   onOpen,
 }: {
   member: TeamMember;
   presets: readonly CommissionPreset[];
   creators: readonly CreatorSummary[];
+  /** His accounts removed from a platform while he is still here (ADR 0076 § 5). */
+  removals: readonly TeamPlatformRemoval[];
   isOpen: boolean;
   onOpen: () => void;
 }): JSX.Element {
@@ -256,6 +281,15 @@ function Row({
         </span>
         {/* « Actif » is the rule, not news: a pill only for what is not (EQ-05). */}
         <span className="nv-convo__side">
+          {/* Amber, beside his status: removed on the platform, nothing is turned off here (ADR 0076 § 5). */}
+          {removals.map((removal) => (
+            <span
+              key={`${removal.platform}:${removal.platformChatterId}`}
+              className="tm-invited tm-invited--warn"
+            >
+              {removalPill(removal)}
+            </span>
+          ))}
           {access === 'expired' ? (
             <span className="tm-invited tm-invited--expired">Lien expiré</span>
           ) : access !== null ? (

@@ -12,6 +12,7 @@ import type {
   TeamMemberNote,
   TeamMemberNoteId,
   TeamMemberStatus,
+  TeamPlatformRemoval,
   TeamRole,
   TeamRoleChange,
   UpdateTeamMemberBody,
@@ -146,6 +147,12 @@ export interface TeamInvites {
    */
   invite(actor: Actor, member: NewMember, account: PlatformAccountRef): Promise<TeamMemberId>;
 }
+
+/**
+ * The members still in the team whose platform account was removed or left the list (ADR 0076 § 5), as `userId` may
+ * see them: the `connectors` module's reading, given by the composition root. Read from the base, never the platform.
+ */
+export type PlatformRemovals = (userId: UserId) => Promise<TeamPlatformRemoval[]>;
 
 /** The creators that exist, among those asked (the `persona` module's, injected by the composition root). */
 export interface CreatorRoster {

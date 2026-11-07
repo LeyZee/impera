@@ -15,6 +15,7 @@ import {
   TeamMemberNoteListSchema,
   TeamMemberNoteSchema,
   TeamMemberSchema,
+  TeamPlatformRemovalListSchema,
   TeamRoleChangeSchema,
   TeamRoleHistorySchema,
   UpdateTeamMemberBodySchema,
@@ -27,7 +28,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { TeamService } from '../../application/team';
-import type { Actor } from '../../domain/ports';
+import type { Actor, PlatformRemovals } from '../../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -46,7 +47,11 @@ const actorOf = (request: FastifyRequest): Actor => ({ userId: userOf(request), 
  * is the database's call (`withMember`): everyone for the owner and an active manager, his own record otherwise.
  * Members, rates, roles and presets are written by the owner; the notes by the owner and the active managers.
  */
-export function createTeamRoutes(team: TeamService, requireRole: RequireRole): FastifyPluginAsyncZod {
+export function createTeamRoutes(
+  team: TeamService,
+  requireRole: RequireRole,
+  platformRemovals: PlatformRemovals,
+): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
   const owner = requireRole('owner');
   return (app) => {
@@ -54,6 +59,14 @@ export function createTeamRoutes(team: TeamService, requireRole: RequireRole): F
       '/team/members',
       { preValidation: ownerOrMember, schema: { response: { 200: TeamMemberListSchema } } },
       async (request) => ({ members: await team.members(userOf(request)) }),
+    );
+
+    // ADR 0076 § 5: who is still in the team though his platform account was removed, for the owner and an active
+    // manager (the `connectors` module reads it as the viewer); a chatter reads an empty list.
+    app.get(
+      '/team/platform-removals',
+      { preValidation: ownerOrMember, schema: { response: { 200: TeamPlatformRemovalListSchema } } },
+      async (request) => ({ removals: await platformRemovals(userOf(request)) }),
     );
 
     app.post(
