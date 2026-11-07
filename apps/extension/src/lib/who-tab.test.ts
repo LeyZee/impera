@@ -2,7 +2,7 @@ import type { Me } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { placeOf } from './tab';
-import { firstNameOf, initialsOf, kindLabel, kindOf, shortcutsFor } from './who';
+import { firstNameOf, initialsOf, kindLabel, kindOf, shortcutsFor, watchesInstagram } from './who';
 
 const me = (over: Partial<Me>): Me => ({
   id: 'u1',
@@ -37,6 +37,20 @@ describe('who is signed in', () => {
     (account, kind, label) => {
       expect(kindOf(account)).toBe(kind);
       expect(kindLabel(kindOf(account))).toBe(label);
+    },
+  );
+
+  it.each([
+    [me({}), true],
+    [me({ role: 'operator', team: { role: 'manager', status: 'active' }, teamScope: 'agency' }), true],
+    [me({ role: 'operator', team: { role: 'manager', status: 'on_leave' }, teamScope: 'self' }), false],
+    [me({ role: 'operator', team: { role: 'chatter', status: 'active' }, teamScope: 'self' }), false],
+    [me({ role: 'operator', teamScope: 'self' }), false],
+    [me({ role: 'creator', teamScope: 'self' }), false],
+  ])(
+    'offers the Instagram watch to the owner and an active manager only (ADR 0060 § 2)',
+    (account, watches) => {
+      expect(watchesInstagram(kindOf(account))).toBe(watches);
     },
   );
 
