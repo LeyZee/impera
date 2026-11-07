@@ -230,12 +230,14 @@ describe('sales feed reliability check (CRM-02)', () => {
   });
 
   it('agrees to the cent with the dashboard’s export, whose fan column is never read', async () => {
-    await server.inject({
-      method: 'PUT',
-      url: '/v1/settings/sales-feeds/reveal/chatters/bot_test_01',
+    // The bot's account linked to the agent from the team's review (ADR 0076).
+    const linked = await server.inject({
+      method: 'POST',
+      url: '/v1/settings/sales-feeds/reveal/team/links',
       headers: { cookie: owner, origin: DASHBOARD_ORIGIN },
-      payload: { kind: 'agent' },
+      payload: { items: [{ platformChatterId: 'bot_test_01', link: { kind: 'agent' } }] },
     });
+    expect(linked.json()).toMatchObject({ results: [{ platformChatterId: 'bot_test_01', ok: true }] });
     const answer = await check({ ...DAYS, export: EXPORT });
     expect(answer.statusCode).toBe(200);
     const report = SalesFeedCheckReportSchema.parse(answer.json());
