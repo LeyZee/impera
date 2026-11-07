@@ -102,3 +102,4 @@ Date : AAAA-MM-JJ
 | 0076 | L'équipe s'importe depuis Reveal par des suggestions confirmées, jamais en silence | accepted (précise 0050 § 5, 0023, 0024 § Rôles et 0069) |
 | 0078 | Le Dashboard de l'agence lit ses insights dans le registre des ventes, pour le propriétaire et un manager actif | accepted (précise 0050 et 0043 § 7) |
 | 0079 | La fiche persona reprend la fiche Desirali, onglet par onglet et question par question | accepted (précise 0010 ; remplace pour toute nouvelle version les blocs P5-01, `additional_info` et les listes fermées) |
+| 0081 | Les abonnés, les PPV envoyés et les messages se gardent en photo quotidienne lue chez la plateforme | proposed (précise 0078 § 6 et 0050) |
