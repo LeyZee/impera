@@ -1,6 +1,5 @@
 import {
   ImportSalesFeedModelsBodySchema,
-  LinkSalesFeedChatterBodySchema,
   LinkSalesFeedModelBodySchema,
   PlatformSchema,
   RefusalError,
@@ -27,7 +26,6 @@ import type { KeyActor } from '../../domain/sales-feed';
 const PlatformParamsSchema = z.object({ platform: PlatformSchema });
 const opaqueId = z.string().min(1).max(200);
 const ModelParamsSchema = PlatformParamsSchema.extend({ platformModelId: opaqueId });
-const ChatterParamsSchema = PlatformParamsSchema.extend({ platformChatterId: opaqueId });
 
 /** Each paste calls Reveal twice: per address, far below a person's pace and Reveal's 200 calls a minute. */
 const KEY_CALLS_PER_MINUTE = 10;
@@ -218,24 +216,6 @@ export function createSalesFeedRoutes(
           request.params.platform,
           request.params.platformModelId,
           false,
-          request.user?.id ?? null,
-        ),
-    );
-
-    app.put(
-      '/settings/sales-feeds/:platform/chatters/:platformChatterId',
-      {
-        schema: {
-          params: ChatterParamsSchema,
-          body: LinkSalesFeedChatterBodySchema,
-          response: { 200: SalesFeedOverviewSchema },
-        },
-      },
-      (request) =>
-        feeds.linkChatter(
-          request.params.platform,
-          request.params.platformChatterId,
-          request.body,
           request.user?.id ?? null,
         ),
     );

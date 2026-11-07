@@ -363,25 +363,6 @@ describe('sales feed (CRM-01)', () => {
     });
     expect(moved.statusCode).toBe(409);
     expect(moved.json()).toMatchObject({ error: { code: 'sales_feed_model_conflict' } });
-
-    const chatter = await api('PUT', '/v1/settings/sales-feeds/reveal/chatters/bot_test_01', {
-      kind: 'agent',
-    });
-    expect(chatter.statusCode).toBe(200);
-    expect(chatter.json()).toMatchObject({
-      chatters: [
-        { platformChatterId: 'chatter_test_01', link: null },
-        { link: { kind: 'agent' } },
-        { platformChatterId: 'manager_test_01' },
-        { platformChatterId: 'presta_test_01' },
-        { platformChatterId: 'ancien_test_01' },
-      ],
-    });
-    const unknownMember = await api('PUT', '/v1/settings/sales-feeds/reveal/chatters/chatter_test_01', {
-      kind: 'member',
-      memberId: newId(CreatorIdSchema),
-    });
-    expect(unknownMember.statusCode).toBe(422);
   });
 
   const readJobs = () =>

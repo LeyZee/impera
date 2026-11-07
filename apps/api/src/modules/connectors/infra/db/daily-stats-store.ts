@@ -1,3 +1,4 @@
+import { PlatformSchema, type Platform } from '@impera/contracts';
 import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import type { DailyStatsStore, LinkedAccount } from '../../domain/daily-stats';
@@ -102,7 +103,7 @@ export function createDrizzleDailyStatsStore(adminDb: Database): DailyStatsStore
 
 /** A day of the photo as the Dashboard reads it (ADR 0081 § 4): counters only, with the time of their reading. */
 export interface DailyStatsDay {
-  readonly platform: string;
+  readonly platform: Platform;
   readonly platformAccountId: string;
   readonly day: string;
   readonly newSubscribers: number;
@@ -124,7 +125,7 @@ export async function dailyStatsOf(
   tx: Transaction,
   range: { readonly from: string; readonly to: string },
 ): Promise<DailyStatsDay[]> {
-  return tx
+  const rows = await tx
     .select({
       platform: platformDailyStats.platform,
       platformAccountId: platformDailyStats.platformAccountId,
@@ -142,4 +143,5 @@ export async function dailyStatsOf(
     .from(platformDailyStats)
     .where(sql`${platformDailyStats.day} between ${range.from} and ${range.to}`)
     .orderBy(platformDailyStats.day, platformDailyStats.platformAccountId);
+  return rows.map((row) => ({ ...row, platform: PlatformSchema.parse(row.platform) }));
 }

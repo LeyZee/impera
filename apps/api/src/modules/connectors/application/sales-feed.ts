@@ -8,7 +8,6 @@ import {
   type ConnectionSignal,
   type JobPayload,
   type PayPeriod,
-  type LinkSalesFeedChatterBody,
   type Platform,
   type Result,
   type SalesFeedChatterLink,
@@ -41,8 +40,6 @@ import {
   SalesFeedCheckDaysUnprocessable,
   SalesFeedDeliveryRefused,
   SalesFeedListUnavailable,
-  SalesFeedMemberUnprocessable,
-  SalesFeedTeamForbidden,
   SalesFeedModelConflict,
   SalesFeedNotConnected,
   SalesFeedNotFound,
@@ -79,7 +76,7 @@ import { SALES_FEED_ERROR_MESSAGES, salesFeedMessage } from '../domain/sales-fee
 import type { TeamImportStore } from '../domain/team-import';
 
 import { copyAvatarFrom } from './avatar-copy';
-import { createTeamImport, teamLinkOf, type TeamImport } from './team-import';
+import { createTeamImport, type TeamImport } from './team-import';
 
 /**
  * How often the reading looks at the platform's model list (CRM-07 a2): for the badge of new models, and the signal of a
@@ -154,12 +151,6 @@ export interface SalesFeeds {
     platform: Platform,
     platformModelId: string,
     platformAccountId: string | null,
-    by: string | null,
-  ): Promise<SalesFeedOverview>;
-  linkChatter(
-    platform: Platform,
-    platformChatterId: string,
-    link: LinkSalesFeedChatterBody,
     by: string | null,
   ): Promise<SalesFeedOverview>;
   /**
@@ -886,26 +877,6 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       factoryOf(platform);
       if (dismissed) await ledger.dismissModel(platform, platformModelId, by);
       else await ledger.restoreModel(platform, platformModelId, by);
-      return overview(platform);
-    },
-
-    async linkChatter(platform, platformChatterId, link, by) {
-      factoryOf(platform);
-      if (by === null) throw new SalesFeedTeamForbidden();
-      // The same guarded write as the review's (ADR 0076 § 4): in the owner's own transaction (`withMember`).
-      const outcomes = await deps.team.link(by, platform, [
-        {
-          platformChatterId,
-          link: teamLinkOf(link),
-          isExternal: false,
-        },
-      ]);
-      if (outcomes === null) throw new SalesFeedTeamForbidden();
-      const [outcome] = outcomes;
-      if (outcome?.ok === false) {
-        if (outcome.kind === 'member_unknown') throw new SalesFeedMemberUnprocessable();
-        throw new SalesFeedTeamForbidden();
-      }
       return overview(platform);
     },
 
