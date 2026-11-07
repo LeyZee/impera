@@ -332,15 +332,18 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
               tabIndex={i === current ? 0 : -1}
               aria-label={`${column.title} : ${euros(column.total)}`}
               data-i={i}
-              {...tip.bind({
-                title: column.title,
-                rows: [
-                  ...STACKS.map((stack, s) => [stack.label, column.parts[s] ?? 0] as const)
-                    .filter(([, cents]) => cents !== 0)
-                    .map(([label, cents]) => [label, euros(cents)] as const),
-                  ['Total', euros(column.total)],
-                ],
-              })}
+              {...tip.bind(
+                {
+                  title: column.title,
+                  rows: [
+                    ...STACKS.map((stack, s) => [stack.label, column.parts[s] ?? 0] as const)
+                      .filter(([, cents]) => cents !== 0)
+                      .map(([label, cents]) => [label, euros(cents)] as const),
+                    ['Total', euros(column.total)],
+                  ],
+                },
+                { above: true },
+              )}
             >
               <span className="ins-col__stack">
                 {column.parts.map((cents, s) =>

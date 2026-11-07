@@ -73,6 +73,19 @@ export interface FloatingTip {
   readonly element: JSX.Element;
 }
 
+/**
+ * Where a tap or the keyboard puts the tip: under the element, or over its top edge at its middle with `above`, so a
+ * chart's tip stays on its own card instead of covering the next one (recette du 07/11).
+ */
+function placedOn(
+  content: TipContent,
+  box: DOMRect,
+  options: { readonly above?: boolean } | undefined,
+): { content: TipContent; x: number; y: number; above?: boolean } {
+  if (options?.above === true) return { content, x: box.left + box.width / 2, y: box.top, above: true };
+  return { content, x: box.left, y: box.bottom };
+}
+
 /** One floating `nv-tip` for the whole screen, placed under the pointer by `tipPlacement`. */
 export function useFloatingTip(): FloatingTip {
   const [tip, setTip] = useState<{
@@ -134,18 +147,17 @@ export function useFloatingTip(): FloatingTip {
         }
         setTip({ content, x: event.clientX, y: event.clientY });
       },
-      // A finger has no hover: a tap shows the tip under the element, and the next tap anywhere hides it.
+      // A finger has no hover: a tap shows the tip under the element (over it with `above`), and the next tap
+      // anywhere hides it.
       onPointerDown: (event: React.PointerEvent) => {
         if (event.pointerType === 'mouse') return;
-        const box = event.currentTarget.getBoundingClientRect();
-        setTip({ content, x: box.left, y: box.bottom });
+        setTip(placedOn(content, event.currentTarget.getBoundingClientRect(), options));
       },
       onPointerLeave: (event: React.PointerEvent) => {
         if (event.pointerType === 'mouse') hide();
       },
       onFocus: (event: React.FocusEvent) => {
-        const box = event.currentTarget.getBoundingClientRect();
-        setTip({ content, x: box.left, y: box.bottom });
+        setTip(placedOn(content, event.currentTarget.getBoundingClientRect(), options));
       },
       onBlur: hide,
     }),
