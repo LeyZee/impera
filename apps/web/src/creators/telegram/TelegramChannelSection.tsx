@@ -7,7 +7,7 @@ import {
   type TelegramChatId,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useRef, useState, type JSX } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type JSX } from 'react';
 
 import { SaveBar, useOnScreen } from '../SaveBar';
 import { Segment, SwitchRow } from '../persona/fields';
@@ -543,7 +543,9 @@ function SlotLine({
         </span>
         <span className="tc-slot__end">
           <label className="tc-slot__switch" htmlFor={id}>
-            {slot.enabled ? null : <span className="ps-hint">Coupé</span>}
+            <span className="tc-slot__state" aria-hidden="true">
+              {slot.enabled ? 'Actif' : 'Coupé'}
+            </span>
             <input
               id={id}
               type="checkbox"
@@ -653,12 +655,11 @@ function LinkLine({
           </button>
         </span>
         <span className="tc-link__destination">
-          <label className="tc-link__destination-label" htmlFor={destinationId}>
+          <label className="tc-field-label" htmlFor={destinationId}>
             Où il mène<span className="sr-only"> ({named})</span>
           </label>
-          <input
+          <DestinationArea
             id={destinationId}
-            className="nv-field__control nv-glass"
             value={link.destination}
             maxLength={LINK_DESTINATION_MAX}
             placeholder="mon Reveal, mon live TikTok ce soir 21 h…"
@@ -668,8 +669,8 @@ function LinkLine({
                 : `${destinationId}-hint ${destinationId}-error`
             }
             aria-invalid={destinationIssue === null ? undefined : true}
-            onChange={(event) => {
-              onChange({ ...link, destination: event.target.value });
+            onChange={(destination) => {
+              onChange({ ...link, destination });
             }}
           />
           <span className="sr-only" id={`${destinationId}-hint`}>
@@ -700,7 +701,7 @@ function LabelField({
   const id = useId();
   return (
     <div className="nv-field ps-field" data-invalid={issue === null ? undefined : 'true'}>
-      <label className="ps-field__head" htmlFor={id}>
+      <label className="tc-field-label" htmlFor={id}>
         Texte du lien
       </label>
       <input
@@ -714,5 +715,51 @@ function LabelField({
       />
       {issue === null ? null : <p className="ps-error">{issue}</p>}
     </div>
+  );
+}
+
+/** Whether the browser grows a text field with its text by itself (Chromium, Edge, Safari 18+). */
+const SIZED_BY_CONTENT = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
+
+/**
+ * Where a link leads: one line of text that wraps instead of being cut on a phone. Enter adds no line; a pasted line
+ * break becomes a space, since the sentence is said in one line.
+ */
+function DestinationArea({
+  id,
+  value,
+  onChange,
+  ...rest
+}: {
+  id: string;
+  value: string;
+  maxLength: number;
+  placeholder: string;
+  'aria-describedby': string;
+  'aria-invalid': true | undefined;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const area = ref.current;
+    if (area === null || SIZED_BY_CONTENT) return;
+    area.style.height = '';
+    if (area.scrollHeight > 0) area.style.height = `${String(area.scrollHeight + 2)}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      id={id}
+      rows={1}
+      className="nv-field__control nv-glass tc-link__area"
+      value={value}
+      {...rest}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.preventDefault();
+      }}
+      onChange={(event) => {
+        onChange(event.target.value.replace(/\s*[\r\n]+\s*/gu, ' '));
+      }}
+    />
   );
 }

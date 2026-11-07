@@ -149,7 +149,8 @@
   gap: 8px 12px;
   min-width: 0;
 }
-.tc-link__destination-label {
+/* One label style in the links block: « Où il mène » and « Texte du lien ». */
+.tc-field-label {
   flex: none;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
@@ -160,6 +161,19 @@
   flex: 1 1 auto;
   min-width: 0;
 }
+/* Grows to a second line rather than cutting a word; no handle, no scroll bar. */
+.tc-link__area.nv-field__control {
+  display: block;
+  min-height: var(--nv-target-min);
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+}
+.tc-slot__state {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
 .tc-link__url {
   font-family: var(--nv-font-mono);
   font-size: var(--nv-text-footnote);
@@ -167,6 +181,24 @@
 
 /* A phone: the hour and the switch on one line, the days under them; a link's fields full width. */
 @media (max-width: 560px) {
+  /* Her head: the title, then the state, then the button, not the button between them. */
+  .tc-page .ps-head__top {
+    display: contents;
+  }
+  .tc-page.ps-page .ps-head__who {
+    order: 1;
+    flex: none;
+  }
+  .tc-page .ps-head__state {
+    order: 2;
+  }
+  .tc-page.ps-page .ps-head__actions {
+    order: 3;
+    flex: none;
+  }
+  .tc-page .tc-warnings {
+    order: 4;
+  }
   .tc-setting--select > div:last-child {
     flex-basis: 100%;
   }
