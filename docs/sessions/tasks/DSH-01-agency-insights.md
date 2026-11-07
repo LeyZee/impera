@@ -1,5 +1,5 @@
 # DSH-01 Le Dashboard de l'agence : insights des ventes
-Statut : review (lot A) ; lot B à venir
+Statut : in_progress (lot A fait, PR #631, ADR 0078 acceptée le 07/11 ; lot B à venir : ADR 0080, migration 0135)
 Phase : pilotage (ADR 0078)
 Dépend de : registre des ventes (ADR 0050)
 Branche : claude/project-thread-195o3s

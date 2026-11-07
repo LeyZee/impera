@@ -1,6 +1,6 @@
 # 0078. Le Dashboard de l'agence lit ses insights dans le registre des ventes, pour le propriétaire et un manager actif
 
-Statut : proposed (demande de Charles du 06/11/2026, 19 h 25 ; proposition acceptée par « ok dashboard-insights », 19 h 31 ; numéro attribué par le coordinateur le même soir ; § 2, § 4 et § 7 précisés après les relectures du 06/11, 20 h 30)
+Statut : accepted (« ok 0078 » de Charles le 07/11/2026, 12 h 27 ; demande de Charles du 06/11/2026, 19 h 25 ; proposition acceptée par « ok dashboard-insights », 19 h 31 ; numéro attribué par le coordinateur le même soir ; § 2, § 4 et § 7 précisés après les relectures du 06/11, 20 h 30)
 Date : 2026-11-06
 Précise : l'ADR 0050 (registre des ventes d'une plateforme, § 8 : montants de la plateforme, jamais recalculés) et l'ADR 0043 § 7 (un chatteur ne voit jamais les chiffres d'un autre). Ne remplace rien.
 
