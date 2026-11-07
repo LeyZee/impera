@@ -10,9 +10,13 @@ import {
   SalesFeedOverviewSchema,
   SalesFeedRefusalBodySchema,
   SalesFeedStatusSchema,
+  TEAM_MEMBER_ERROR_CODES,
+  TeamImportCountsSchema,
+  TeamImportInvitationResultSchema,
+  TeamImportLinksResultSchema,
+  TeamImportOverviewSchema,
   refusalOf,
   type ImportSalesFeedModelsBody,
-  type LinkSalesFeedChatterBody,
   type Platform,
   type SalesFeedCheckBody,
   type SalesFeedCheckReport,
@@ -22,8 +26,15 @@ import {
   type SalesFeedOverview,
   type SalesFeedRefusal,
   type SalesFeedStatus,
+  type TeamImportCounts,
+  type TeamImportInvitationBody,
+  type TeamImportLinksBody,
+  type TeamImportLinksResult,
+  type TeamImportOverview,
+  type TeamMember,
+  type TeamMemberErrorCode,
 } from '@impera/contracts';
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { ReauthRequired, ServicesError } from '@/settings/services/api';
 
@@ -183,19 +194,6 @@ export async function linkModel(
   return parsed(response, (body) => SalesFeedOverviewSchema.parse(body));
 }
 
-export async function linkChatter(
-  platform: Platform,
-  platformChatterId: string,
-  link: LinkSalesFeedChatterBody,
-): Promise<SalesFeedOverview> {
-  const response = await call(`/${platform}/chatters/${encodeURIComponent(platformChatterId)}`, {
-    method: 'PUT',
-    headers: JSON_HEADERS,
-    body: JSON.stringify(link),
-  });
-  return parsed(response, (body) => SalesFeedOverviewSchema.parse(body));
-}
-
 export type CheckResult =
   { ok: true; report: SalesFeedCheckReport } | { ok: false; refusal: SalesFeedRefusal };
 
@@ -252,4 +250,128 @@ export async function setDismissal(
     method: dismissed ? 'PUT' : 'DELETE',
   });
   return parsed(response, (body) => SalesFeedOverviewSchema.parse(body));
+}
+
+/**
+ * The platform's team reviewed by the owner or an active manager (ADR 0076): each account with its link, its
+ * proposal and what this viewer may do on it. Reads the platform's list live; the links stay without it.
+ */
+export async function fetchTeamImport(platform: Platform): Promise<TeamImportOverview> {
+  return parsed(await call(`/${platform}/team`), (body) => TeamImportOverviewSchema.parse(body));
+}
+
+/** The badges alone (§ 5, § 6), read in the base: no call to the platform. */
+export async function fetchTeamImportCounts(platform: Platform): Promise<TeamImportCounts> {
+  return parsed(await call(`/${platform}/team/counts`), (body) => TeamImportCountsSchema.parse(body));
+}
+
+export const teamImportKey = (platform: Platform): readonly ['team-import', Platform] => [
+  'team-import',
+  platform,
+];
+export const teamImportCountsKey = (platform: Platform): readonly ['team-import', Platform, 'counts'] => [
+  'team-import',
+  platform,
+  'counts',
+];
+
+export function useTeamImport(platform: Platform): UseQueryResult<TeamImportOverview> {
+  return useQuery({
+    queryKey: teamImportKey(platform),
+    queryFn: () => fetchTeamImport(platform),
+    retry: false,
+  });
+}
+
+/** A chatter or a creator reads a 403 here: no tab, no badge. Never retried, the page stands without it. */
+export function useTeamImportCounts(platform: Platform, enabled = true): UseQueryResult<TeamImportCounts> {
+  return useQuery({
+    queryKey: teamImportCountsKey(platform),
+    queryFn: () => fetchTeamImportCounts(platform),
+    retry: false,
+    enabled,
+  });
+}
+
+/**
+ * « Confirmer la sélection » (§ 1): the rows ticked, each with its link. Each row answers on its own (a manager's own
+ * record, a provider's account); the others go through, and the overview comes after.
+ */
+export async function linkTeam(
+  platform: Platform,
+  body: TeamImportLinksBody,
+): Promise<TeamImportLinksResult> {
+  const response = await call(`/${platform}/team/links`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
+  return parsed(response, (json) => TeamImportLinksResultSchema.parse(json));
+}
+
+/** Sets an account aside (`true`), or takes it back (`false`). */
+export async function setChatterDismissal(
+  platform: Platform,
+  platformChatterId: string,
+  dismissed: boolean,
+): Promise<TeamImportOverview> {
+  const response = await call(`/${platform}/team/${encodeURIComponent(platformChatterId)}/dismissal`, {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ dismissed }),
+  });
+  return parsed(response, (json) => TeamImportOverviewSchema.parse(json));
+}
+
+/** How an invitation from a row ends; the dialog says each in its own words. */
+export type InviteOutcome =
+  | { readonly kind: 'ok'; readonly member: TeamMember }
+  | { readonly kind: 'reauth' }
+  /** `member_conflict`: the e-mail is another member's, or the account was linked meanwhile. */
+  | { readonly kind: 'conflict' }
+  /** `role_forbidden`: outside what a manager may give, or no longer a manager. */
+  | { readonly kind: 'bounds' }
+  | { readonly kind: 'team'; readonly code: TeamMemberErrorCode }
+  /** The server's own sentence (`sales_feed_*`: a provider's account, no longer listed, the list down). */
+  | { readonly kind: 'refused'; readonly message: string }
+  | { readonly kind: 'session' }
+  | { readonly kind: 'failed' };
+
+const isTeamCode = (code: string): code is TeamMemberErrorCode =>
+  TEAM_MEMBER_ERROR_CODES.some((known) => known === code);
+
+/**
+ * « Inviter » (§ 3), one row at a time, the password asked again: the member and the link in one transaction. Played
+ * again for the same account, the same member.
+ */
+export async function inviteFromPlatform(
+  platform: Platform,
+  platformChatterId: string,
+  body: TeamImportInvitationBody,
+): Promise<InviteOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}/${platform}/team/${encodeURIComponent(platformChatterId)}/invitation`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return { kind: 'failed' };
+  }
+  if (response.ok) {
+    const member = TeamImportInvitationResultSchema.safeParse(await response.json().catch(() => null));
+    return member.success ? { kind: 'ok', member: member.data } : { kind: 'failed' };
+  }
+  if (response.status === 401) return { kind: 'session' };
+  const error = await apiError(response);
+  if (error === null) return { kind: 'failed' };
+  if (error.code === REAUTHENTICATION_ERROR_CODE) return { kind: 'reauth' };
+  if (error.code === 'member_conflict') return { kind: 'conflict' };
+  if (error.code === 'role_forbidden') return { kind: 'bounds' };
+  if (isTeamCode(error.code)) return { kind: 'team', code: error.code };
+  if (SalesFeedErrorCodeSchema.safeParse(error.code).success)
+    return { kind: 'refused', message: error.message };
+  return { kind: 'failed' };
 }

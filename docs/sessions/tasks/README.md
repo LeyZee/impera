@@ -125,6 +125,7 @@ Branche : task/<id>-<slug>
 | CRM-05 | Ventes hors shift, écarts d'assignation et performance des chatteurs | API CRM | todo | CRM-01, CRM-03 pour les ventes en attente |
 | CRM-06 | CA de l'agent et achats dans la mémoire du fan | API CRM | todo | CRM-01, CRM-02 pour le CA de l'agent ; la capture Reveal pour la mémoire |
 | CRM-07 | Importer les créatrices depuis Reveal, après revue du propriétaire | API CRM | todo | CRM-01 |
+| CRM-08 | Revue de l'équipe Reveal : l'écran (ADR 0076) | API CRM | done | CRM-01, routes de Bilan (#626, #643), EQ-20 |
 | DSH-01 | Le Dashboard de l'agence : insights des ventes | API CRM | done (lots A et B) | CRM-01, ADR 0078 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |

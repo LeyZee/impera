@@ -2,6 +2,13 @@
 import type { SalesFeedCheckReport, SalesFeedOverview, SalesFeedStatus, TeamMember } from '@impera/contracts';
 import { TeamMemberSchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -165,9 +172,16 @@ function page(
     [`GET ${BASE}/reveal/check`]: lastCheck,
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // The page links to Équipe › Reveal (ADR 0076): a router, as the app gives it.
+  const rootRoute = createRootRoute();
+  const page = createRoute({ getParentRoute: () => rootRoute, path: '/', component: SalesFeedSection });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([page]),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  });
   render(
     <QueryClientProvider client={client}>
-      <SalesFeedSection />
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
   return fetch;
