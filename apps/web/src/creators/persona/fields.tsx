@@ -63,9 +63,12 @@ export function Field({
   children,
   id,
   labelHidden = false,
+  icon,
 }: {
   label: string;
   hint?: ReactNode;
+  /** A small drawing before the label (Desirali's ruler, briefcase, globe…), the inner shapes of a 24-unit icon. */
+  icon?: ReactNode;
   code?: boolean;
   /** The block's title already says it (« Infos en plus », « Mots-clés »): read aloud, not shown twice (CREA-17). */
   labelHidden?: boolean;
@@ -87,6 +90,22 @@ export function Field({
     >
       <div className={labelHidden ? 'sr-only' : 'ps-field__head'}>
         <span className="ps-changed" aria-hidden="true" />
+        {icon === undefined ? null : (
+          <svg
+            className="ps-field__icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {icon}
+          </svg>
+        )}
         {id === undefined ? (
           <span className="nv-field__label">{label}</span>
         ) : (

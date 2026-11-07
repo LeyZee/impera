@@ -3,6 +3,7 @@ import {
   newId,
   PlatformAccountIdSchema,
   TeamImportCountsSchema,
+  TeamImportInvitationResultSchema,
   TeamImportLinksResultSchema,
   TeamImportOverviewSchema,
   TeamMemberIdSchema,
@@ -410,5 +411,80 @@ describe('team imported from the platform after review (ADR 0076)', () => {
     } finally {
       listed = [...TEAM];
     }
+  });
+  // § 2, § 3: one row at a time, checked against the live list, made by `team` with the link in one transaction.
+  it('invites a listed agency account, never a provider, one no longer listed, nor as a chatter', async () => {
+    const invitation = (email: string, overrides: object = {}) => ({
+      email,
+      firstName: 'Nouveau',
+      lastName: 'Venu',
+      displayName: 'Nouveau',
+      teamRole: 'chatter',
+      country: 'MG',
+      timeZone: 'Indian/Antananarivo',
+      color: null,
+      joinedOn: '2026-10-01',
+      creatorIds: [],
+      commission: { rateBps: 1_000 },
+      teamShareBps: null,
+      ...overrides,
+    });
+    const before = listReads;
+    const closed = await api('POST', '/team/chatter_new/invitation', chatter, invitation('a@recette.test'));
+    expect(closed.statusCode).toBe(403);
+    expect(closed.json()).toMatchObject({ error: { code: 'sales_feed_team_forbidden' } });
+    expect(listReads).toBe(before);
+
+    const provider = await api(
+      'POST',
+      '/team/chatter_presta/invitation',
+      owner,
+      invitation('p@recette.test'),
+    );
+    expect(provider.statusCode, provider.body).toBe(403);
+    expect(provider.json()).toMatchObject({ error: { code: 'sales_feed_external_invite_forbidden' } });
+    const gone = await api('POST', '/team/chatter_gone/invitation', owner, invitation('g@recette.test'));
+    expect(gone.statusCode, gone.body).toBe(422);
+    expect(gone.json()).toMatchObject({ error: { code: 'sales_feed_chatter_unprocessable' } });
+    listFails = true;
+    try {
+      const down = await api('POST', '/team/chatter_new/invitation', owner, invitation('n@recette.test'));
+      expect(down.statusCode, down.body).toBe(503);
+    } finally {
+      listFails = false;
+    }
+    // A manager stays in his bounds (`team`'s): a rate typed by hand is refused, nothing written.
+    const bounded = await api(
+      'POST',
+      '/team/chatter_norole/invitation',
+      manager,
+      invitation('sans@recette.test'),
+    );
+    expect(bounded.statusCode, bounded.body).toBe(403);
+    expect(bounded.json()).toMatchObject({ error: { code: 'role_forbidden' } });
+    expect(
+      await test.admin.db.select().from(schema.user).where(eq(schema.user.email, 'sans@recette.test')),
+    ).toEqual([]);
+
+    const made = await api('POST', '/team/chatter_new/invitation', owner, invitation('nouveau@recette.test'));
+    expect(made.statusCode, made.body).toBe(201);
+    const invited = TeamImportInvitationResultSchema.parse(made.json());
+    expect(invited).toMatchObject({ email: 'nouveau@recette.test', teamRole: 'chatter' });
+    const again = await api(
+      'POST',
+      '/team/chatter_new/invitation',
+      owner,
+      invitation('nouveau@recette.test'),
+    );
+    expect(again.statusCode, again.body).toBe(201);
+    expect(TeamImportInvitationResultSchema.parse(again.json()).id).toBe(invited.id);
+    const [link] = await test.admin.db
+      .select({ kind: schema.salesFeedChatters.kind, memberId: schema.salesFeedChatters.memberId })
+      .from(schema.salesFeedChatters)
+      .where(eq(schema.salesFeedChatters.platformChatterId, 'chatter_new'));
+    expect(link).toEqual({ kind: 'member', memberId: invited.id });
+    // Someone else's e-mail on an account already linked: a conflict, not a second member.
+    const other = await api('POST', '/team/chatter_new/invitation', owner, invitation('autre@recette.test'));
+    expect(other.statusCode, other.body).toBe(409);
   });
 });
