@@ -20,7 +20,7 @@ import {
   type MarkableCreators,
 } from '../../lib/watch/protocol';
 import { INSTAGRAM_PATTERN } from '../../lib/watch/watch-script';
-import { kindOf } from '../../lib/who';
+import { kindOf, watchesInstagram } from '../../lib/who';
 
 import { accountPathOf, render, type Actions, type Screen } from './view';
 import type { WatchNotice, WatchView } from './watch-view';
@@ -153,8 +153,8 @@ async function refresh(): Promise<void> {
     case 'signed_in': {
       const place = placeOf(tab.url, origin);
       const kind = kindOf(session.me);
-      // The watch is the owner's and the managers' (VEI-02 lot a); a creator or a chatter has no link to paste.
-      const watched = place === 'instagram' && (kind === 'owner' || kind === 'manager');
+      // The watch is the owner's and the active managers' (ADR 0060 § 2): never a chatter's, nor a creator's here.
+      const watched = place === 'instagram' && watchesInstagram(kind);
       show({ kind: 'signed_in', me: session.me, place, watch: watched ? await watchViewFor() : null });
       return;
     }
