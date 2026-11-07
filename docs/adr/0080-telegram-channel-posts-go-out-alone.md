@@ -1,6 +1,6 @@
 # 0080. Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM
 
-Statut : accepted (Charles, 07/11/2026 12h26, « ok 0080 », avec ses réponses aux questions du brouillon ; demande du même jour à 12h14 ; fil « Automatiser le canal Telegram de Messa »). Les phrases écrites d'après ses réponses sont marquées † et attendent « ok phrases 0080 ».
+Statut : accepted (Charles, 07/11/2026 12h26, « ok 0080 », avec ses réponses aux questions du brouillon ; demande du même jour à 12h14 ; fil « Automatiser le canal Telegram de Messa »). Les phrases écrites d'après ses réponses, marquées †, acceptées le 07/11/2026 à 13h05 (« ok phrases 0080 »).
 Date : 2026-11-07
 Précise : l'ADR 0057 (connecteur Telegram, légendes, lien ajouté par le code), l'ADR 0055 § 1 et § 5 (catégorie `telegram_post`, stock et demandes), l'ADR 0020 (groupes de l'agence).
 Remplace : pour le canal Telegram seulement, dans l'ADR 0057 § 3, « acceptation d'un geste par le propriétaire ou un manager » (§ 2 ci-dessous) ; dans l'ADR 0057 § 6, « le code ajoute l'adresse enregistrée dans Réglages » devient le lien de redirection du § 4 ; dans l'ADR 0055 § 1, « Un média ne part que vers la sortie de sa catégorie » pour la vidéo publique Reveal (§ 3 ci-dessous).

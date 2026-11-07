@@ -827,6 +827,13 @@
       "when": 1794001220161,
       "tag": "0135_team_import_review",
       "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1794055686737,
+      "tag": "0137_telegram_channels",
+      "breakpoints": true
     }
   ]
 }

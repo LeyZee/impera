@@ -1,5 +1,5 @@
 # PUB-01 Connecteur de publication Telegram : le canal d'actualité de la créatrice
-Statut : in_progress (ADR 0057, ADR 0080 acceptée par Charles le 07/11/2026 12h26 ; lot A1)
+Statut : in_progress (ADR 0057, ADR 0080 acceptée par Charles le 07/11/2026 12h26 et 13h05 ; lot A1 fait, A2 attend ses exemples)
 Phase : publication (ADR 0057, ADR 0080)
 Dépend de : CR-06, P3-07 (bot Telegram) ; vidéo publique Reveal (lot B) : CR-08 et les captures de Charles
 Branche : claude/project-thread-km6hfy
@@ -12,10 +12,10 @@ ADR 0080, ADR 0057, ADR 0055, ADR 0020, `docs/architecture/connectors.md`, READM
 
 ## À faire
 ### Lot A1 : branchement et réglages
-- [ ] Contrats : canal, créneaux, liens de redirection, réglages du canal (Zod).
-- [ ] Migration 0137 : tables du canal, des créneaux, des liens, des posts ; RLS selon la règle des tables nouvelles.
-- [ ] Port du connecteur de publication et `FakeTelegramChannel` : publier une vidéo, une photo ; vérifier que le bot est administrateur et peut publier.
-- [ ] Routes des réglages (propriétaire) et écran Réglages › Créatrices › Canal Telegram : canal, créneaux, liens.
+- [x] Contrats : canal, créneaux, liens de redirection, réglages du canal (Zod).
+- [x] Migration 0137 : `telegram_channels` (canal, créneaux, liens, réglage entier par créatrice), RLS forcée sans politique ; la table des posts vient au lot A3.
+- [x] Le bot administrateur et son droit de publier sont lus de `telegram_chats` (découverte existante) ; le port de publication et `FakeTelegramChannel` passent au lot A3, avec l'envoi.
+- [x] Routes des réglages (propriétaire) et écran Réglages › Créatrices › Canal Telegram : canal, créneaux, liens.
 ### Lot A2 : le post
 - [ ] Exemples de Charles saisis dans le CRM (jamais dans le dépôt).
 - [ ] Prompt `telegram_channel` versionné, schéma de sortie structuré, rendu HTML Telegram échappé, gardes, conseil de réécriture en bloc délimité.
