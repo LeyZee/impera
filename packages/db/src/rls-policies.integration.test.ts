@@ -31,7 +31,12 @@ const POLICY_EXCEPTIONS: Readonly<Record<string, string>> = {
 };
 
 /** Under RLS without a policy: only `withAdmin` reads them (ADR 0068). */
-const CLOSED_TABLES = ['password_reset_links', 'telegram_link_codes', 'telegram_private_links'];
+const CLOSED_TABLES = [
+  'password_reset_links',
+  'sales_feed_stats_calls',
+  'telegram_link_codes',
+  'telegram_private_links',
+];
 
 /**
  * Outside RLS and still reachable by `nirvana_app`, as data-model.md § RLS « Hors RLS » says, with why. A table that

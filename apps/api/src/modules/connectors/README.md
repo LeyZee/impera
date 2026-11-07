@@ -54,6 +54,13 @@ Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed
 - Si l'écart tient à la seconde lecture, `publishMismatch` publie `sales_feed_mismatch` sans créatrice. Le payload donne les jours, les comptes, la devise et les deux nets, jamais un fan ni un chatteur. L'index unique de la migration 0092 le limite à une fois par plateforme et quinzaine.
 - Rien n'est gardé dans `sales_feed_checks`, aucune règle ne bascule, et la paie ne lit pas l'événement (`sales-feed-mismatch-isolation.test.ts`). Quand la plateforme refuse, le job lève une erreur et Graphile le relance (3 essais).
 
+## Photo quotidienne des statistiques (ADR 0081)
+
+- Le job `connector.read_daily_stats` tourne chaque heure (crontab, à la 7e minute). Pour chaque clé connectée et non en pause, `readStatsOne` demande `/v1/stats/daily` : les 31 derniers jours à 5 h dans le fuseau de la plateforme, ou tant qu'aucune lecture de 31 jours n'a réussi depuis la vérification de la clé ; sinon aujourd'hui et hier (`domain/daily-stats.ts`, `dailyStatsRange`).
+- Chaque appel aux statistiques, celui du job comme les deux du contrôle de fiabilité (CRM-02), est compté avant d'être fait dans `sales_feed_stats_calls`, par jour de la plateforme. Le job n'appelle plus quand il reste moins de 100 appels sur les 500 du jour (`statsCallAllowed`). Un 429 est la même pause que la lecture des ventes (`pausedUntil`), une clé refusée passe « à reconnecter ».
+- Seuls les modèles reliés à une créatrice non archivée sont gardés, un compteur absent reste `null`, aucun montant n'est gardé : l'argent reste au registre. Chaque ligne, clé (`platform_account_id`, jour), est réécrite à chaque lecture.
+- La lecture exposée est `dailyStatsOf(tx, { from, to })`, dans le `withTenantMember` de l'appelant : la politique la montre au propriétaire et au manager actif dont la liste contient la créatrice, à personne d'autre. Seul le job écrit, par `withAdmin` (`infra/db/daily-stats-store.ts`).
+
 ## Connexion en panne (Telegram P3-12)
 
 - Le registre de Reveal est le service `reveal_crm` de `connection_state_changed`. Une clé refusée le dit `down` (`refused`) tout de suite. Une lecture sans réponse ne le dit `down` (`unreachable`) qu'après trois lectures ratées de suite sur un quart d'heure (`domain/connection-outage.ts`, compte tenu en mémoire par le worker qui lit). Un 429 est une pause (`pausedUntil`), jamais une panne.

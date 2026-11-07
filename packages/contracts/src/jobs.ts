@@ -81,6 +81,7 @@ export const JOB_NAMES = [
   'connector.read_sales',
   'connector.check_sales',
   'connector.copy_avatar',
+  'connector.read_daily_stats',
   'telegram.scan',
   'telegram.flush_chat',
   'telegram.dispatch_polls',
@@ -145,6 +146,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
+  'connector.read_daily_stats': 'Statistiques quotidiennes Reveal',
   'connector.copy_avatar': 'Copie de la photo d’une créatrice',
   'telegram.scan': 'Alertes Telegram',
   'telegram.flush_chat': 'Envoi des messages Telegram',
@@ -413,6 +415,12 @@ export const JOB_PAYLOADS = {
     recheck: z.object({ platform: PlatformSchema, from: PayPeriodSchema }).optional(),
   }),
   /**
+   * Each hour (ADR 0081 § 3): the platform's statistics of each linked creator account's day, today and yesterday, or
+   * the 31 last days at 5 h in the platform's zone and until a reading of 31 days went through since the key was
+   * verified. Counters only, rewritten at each reading; no call once fewer than 100 of the day's 500 are left.
+   */
+  'connector.read_daily_stats': z.object({}),
+  /**
    * The photo of a creator just imported from a platform (CRM-07 a2b, ADR 0069 § 3): read again from the platform's
    * model list, fetched, re-encoded and kept in the media bucket under `creators/<id>/avatar`. Replayable: the object
    * is written over and `creators.avatar_key` set to the same key.
@@ -512,6 +520,8 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.check_sales': 3,
   // A platform or a storage out for a while: a few tries over some minutes, then her initials stay.
   'connector.copy_avatar': 5,
+  // Each hour: the next run is the retry, and a reading is replayable (each row written over).
+  'connector.read_daily_stats': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
   // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
   'telegram.scan': 25,
