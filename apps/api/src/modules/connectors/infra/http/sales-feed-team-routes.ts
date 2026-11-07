@@ -2,9 +2,16 @@ import {
   PlatformSchema,
   TeamImportCountsSchema,
   TeamImportDismissalBodySchema,
+  TeamImportInvitationBodySchema,
+  TeamImportInvitationResultSchema,
   TeamImportLinksBodySchema,
   TeamImportLinksResultSchema,
   TeamImportOverviewSchema,
+  UserIdSchema,
+  type Platform,
+  type TeamImportInvitationBody,
+  type TeamMember,
+  type UserId,
 } from '@impera/contracts';
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -23,16 +30,36 @@ const userOf = (request: FastifyRequest): string => {
 };
 
 /**
+ * `team`'s invitation from a link proposal (ADR 0076 § 3), given by the composition root: the member made and the
+ * account linked in one transaction, as the owner or an active manager within his bounds.
+ */
+export type InviteFromPlatform = (
+  actor: { readonly userId: UserId; readonly ip: string | null },
+  input: TeamImportInvitationBody & {
+    readonly account: { readonly platform: Platform; readonly platformChatterId: string };
+  },
+) => Promise<TeamMember>;
+
+export interface SalesFeedTeamRoutesOptions {
+  /** The owner and the team's accounts; the base decides who is a manager. */
+  readonly guard: preValidationAsyncHookHandler;
+  /** The password asked again (§ 3): an invitation opens an account that reads fans' conversations. */
+  readonly recentLogin: preValidationAsyncHookHandler;
+  readonly invite: InviteFromPlatform;
+}
+
+/**
  * `/v1/settings/sales-feeds/:platform/team` (ADR 0076): the platform's team reviewed by the owner or an active
  * manager. The guard lets the owner and the team's accounts in; the base decides who is a manager (`withMember`) and
- * keeps a manager's own record out of his reach. The invitation from a row is `team`'s route (ADR 0076 § 3).
+ * keeps a manager's own record out of his reach. The invitation from a row is checked here against the live list and
+ * made by `team` (ADR 0076 § 3).
  */
 export function createSalesFeedTeamRoutes(
   team: TeamImport,
-  guard: preValidationAsyncHookHandler,
+  options: SalesFeedTeamRoutesOptions,
 ): FastifyPluginAsyncZod {
   return (app) => {
-    app.addHook('preValidation', guard);
+    app.addHook('preValidation', options.guard);
 
     app.get(
       '/settings/sales-feeds/:platform/team',
@@ -75,6 +102,30 @@ export function createSalesFeedTeamRoutes(
           request.params.platformChatterId,
           request.body.dismissed,
         ),
+    );
+
+    // One row at a time, never in the batch (§ 1): the fields typed on screen, the password asked again. Played again
+    // for the same account and e-mail, the same member (201 both times).
+    app.post(
+      '/settings/sales-feeds/:platform/team/:platformChatterId/invitation',
+      {
+        preValidation: options.recentLogin,
+        schema: {
+          params: ChatterParamsSchema,
+          body: TeamImportInvitationBodySchema,
+          response: { 201: TeamImportInvitationResultSchema },
+        },
+      },
+      async (request, reply) => {
+        const userId = userOf(request);
+        const { platform, platformChatterId } = request.params;
+        await team.invitable(platform, userId, platformChatterId);
+        const member = await options.invite(
+          { userId: UserIdSchema.parse(userId), ip: request.ip },
+          { ...request.body, account: { platform, platformChatterId } },
+        );
+        return reply.code(201).send(member);
+      },
     );
 
     return Promise.resolve();

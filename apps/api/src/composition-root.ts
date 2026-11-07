@@ -283,6 +283,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const fans = wireFans(shared);
   const connectors = wireConnectors(shared, {
     ingest: (input) => conversations.module.ingestMessage(input),
+    // The member made by `team`, the account linked by this module's own write, in one transaction (ADR 0076 § 3).
+    invite: (actor, input) =>
+      team.module.invites(connectors.module.invitationChatterLinks).fromPlatform(actor, input),
     registry: options.connectorRegistry ?? {},
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
