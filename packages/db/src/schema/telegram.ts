@@ -208,3 +208,24 @@ export const telegramLinkCodes = pgTable('telegram_link_codes', {
   expiresAt: timestampTz('expires_at').notNull(),
   createdAt: createdAt(),
 });
+
+/**
+ * ADR 0057 § 2, ADR 0080: the creator's Telegram channel, one row per creator, the owner's setting stored whole
+ * (`TelegramChannelConfigSchema`): the channel, the slots, the preview window, the redirect links. A channel serves one
+ * creator at most. Agency settings, read and written as the admin role only (RLS forced, no policy, revoked from
+ * `nirvana_app`), like the other telegram tables.
+ */
+export const telegramChannels = pgTable(
+  'telegram_channels',
+  {
+    creatorId: uuid('creator_id')
+      .primaryKey()
+      .references(() => creators.id, { onDelete: 'cascade' }),
+    /** Null until chosen, or once the group row is gone (REG-28 removes a chat the bot left). */
+    chatId: uuid('chat_id').references(() => telegramChats.id, { onDelete: 'set null' }),
+    config: jsonb('config').notNull(),
+    updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [unique('telegram_channels_chat_unique').on(t.chatId)],
+);

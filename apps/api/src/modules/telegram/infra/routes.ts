@@ -1,5 +1,10 @@
 import {
+  CreatorIdSchema,
   RefusalError,
+  SaveTelegramChannelBodySchema,
+  TELEGRAM_CHANNEL_INVALID,
+  TelegramChannelRefusalBodySchema,
+  TelegramChannelViewSchema,
   SaveTelegramRoutesBodySchema,
   SaveTelegramTokenBodySchema,
   TelegramBotIdSchema,
@@ -25,8 +30,10 @@ import {
   TelegramBotNotFound,
   TelegramChatInvalid,
   TelegramChatMemberConflict,
+  TelegramChannelCreatorNotFound,
   TelegramChatNotFound,
   TelegramCreatorInvalid,
+  TelegramRouteToChannel,
 } from '../domain/errors';
 
 export interface TelegramRoutesOptions {
@@ -38,6 +45,7 @@ export interface TelegramRoutesOptions {
 
 const BotParamsSchema = z.object({ id: TelegramBotIdSchema });
 const ChatParamsSchema = z.object({ id: TelegramChatIdSchema });
+const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
 
 /**
  * `/v1/settings/telegram` (task P3-07). No answer ever carries a token; the request body is redacted from the logs
@@ -166,6 +174,7 @@ export function createTelegramRoutes(
         const result = await telegram.saveRoutes(request.body.version, request.body.routes);
         if (result.ok) return result.value;
         if (result.error === 'unknown_chat') throw new TelegramChatInvalid();
+        if (result.error === 'creator_channel') throw new TelegramRouteToChannel();
         throw new RefusalError(TELEGRAM_ROUTES_CONFLICT, result.error);
       },
     );
@@ -184,6 +193,41 @@ export function createTelegramRoutes(
       async (request) => ({
         deliveries: await telegram.listDeliveries(request.query.topic ?? null, request.query.limit),
       }),
+    );
+
+    // ADR 0080 § 6: Réglages › Créatrices › Canal Telegram. A change asks for a sign-in under 10 minutes: the redirect
+    // links decide where her readers land.
+    app.get(
+      '/creators/:creatorId/telegram-channel',
+      { schema: { params: CreatorParamsSchema, response: { 200: TelegramChannelViewSchema } } },
+      async (request) => {
+        const view = await telegram.channel(request.params.creatorId);
+        if (view === null) throw new TelegramChannelCreatorNotFound();
+        return view;
+      },
+    );
+
+    app.put(
+      '/creators/:creatorId/telegram-channel',
+      {
+        preValidation: options.recentLogin,
+        schema: {
+          params: CreatorParamsSchema,
+          body: SaveTelegramChannelBodySchema,
+          response: { 200: TelegramChannelViewSchema, 400: TelegramChannelRefusalBodySchema },
+        },
+      },
+      async (request) => {
+        if (request.user === null) throw new Error('requireRole ran without a user');
+        const result = await telegram.saveChannel(
+          request.params.creatorId,
+          request.body.config,
+          request.user.id,
+        );
+        if (result === null) throw new TelegramChannelCreatorNotFound();
+        if (!result.ok) throw new RefusalError(TELEGRAM_CHANNEL_INVALID, result.error);
+        return result.value;
+      },
     );
 
     return Promise.resolve();

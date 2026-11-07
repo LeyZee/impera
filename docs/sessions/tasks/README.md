@@ -109,7 +109,7 @@ Branche : task/<id>-<slug>
 | SC-07 | Mode tournage et ordre de tournage sur le téléphone de la créatrice | scripts | todo | SC-02 |
 | SC-08 | Photo d'exemple par étape | scripts | todo | SC-03, CR-06 |
 | SC-09 | Séries proposées par l'IA | scripts | blocked (clé xAI) | SC-01 |
-| PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | blocked (bot Telegram) | CR-06, CR-08, P3-07 |
+| PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | in_progress (ADR 0080, lot A1) | CR-06, P3-07 ; vidéo publique Reveal : CR-08 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | MCP-PUB | Publication par un agent externe : préparer, puis publier dans un plafond | MCP | blocked (lot 1 du MCP) | PROPOSED-mcp-read, PUB-01, PUB-02 |
 | VEI-01 | Signaux de tendance et idées de contenu : la base, les filtres, le lien collé | veille | todo | ADR 0060, CR-05, CR-06 |
