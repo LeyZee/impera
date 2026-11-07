@@ -1,9 +1,10 @@
-import type {
-  ChannelSlot,
-  RedirectLink,
-  TelegramChannelConfig,
-  TelegramChannelView,
-  TelegramChatId,
+import {
+  LINK_DESTINATION_MAX,
+  type ChannelSlot,
+  type RedirectLink,
+  type TelegramChannelConfig,
+  type TelegramChannelView,
+  type TelegramChatId,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
@@ -401,8 +402,9 @@ function ChannelForm({
             Liens de redirection
           </p>
           <p className="ps-lead">
-            Les adresses de ton service de redirection. Le code ajoute le lien du canal à la fin de chaque
-            post ; le texte n’en contient jamais d’autre. Changer de lien vaut pour le post suivant.
+            Les adresses de ton service de redirection, et pour chacune où elle mène : le post parle de cet
+            endroit (son Reveal, un live TikTok…). Le code ajoute le lien du canal à la fin de chaque post ;
+            le texte n’en contient jamais d’autre. Changer de lien vaut pour le post suivant.
           </p>
           {draft.links.length === 0 ? <p className="ps-hint">Aucun lien encore.</p> : null}
           <ul className="tc-links" aria-label="Liens de redirection">
@@ -413,6 +415,7 @@ function ChannelForm({
                 isChannelLink={draft.channelLinkId === link.id}
                 nameIssue={issues.get(`link:${link.id}:name`) ?? null}
                 urlIssue={issues.get(`link:${link.id}:url`) ?? null}
+                destinationIssue={issues.get(`link:${link.id}:destination`) ?? null}
                 onChange={(next) => {
                   editLinks(draft.links.map((one) => (one.id === link.id ? next : one)));
                 }}
@@ -583,6 +586,7 @@ function LinkLine({
   isChannelLink,
   nameIssue,
   urlIssue,
+  destinationIssue,
   onChange,
   onChoose,
   onRemove,
@@ -591,12 +595,14 @@ function LinkLine({
   isChannelLink: boolean;
   nameIssue: string | null;
   urlIssue: string | null;
+  destinationIssue: string | null;
   onChange: (link: RedirectLink) => void;
   onChoose: () => void;
   onRemove: () => void;
 }): JSX.Element {
   const nameId = useId();
   const urlId = useId();
+  const destinationId = useId();
   const name = link.name.trim();
   const named = name === '' ? 'ce lien' : `le lien « ${name} »`;
   const of = name === '' ? 'de ce lien' : `du lien « ${name} »`;
@@ -637,6 +643,27 @@ function LinkLine({
             }}
           />
         </span>
+        <span className="tc-link__destination">
+          <label className="tc-link__destination-label" htmlFor={destinationId} aria-hidden="true">
+            Où il mène
+          </label>
+          <input
+            id={destinationId}
+            className="nv-field__control nv-glass"
+            value={link.destination}
+            aria-label={`Où mène ${named}`}
+            maxLength={LINK_DESTINATION_MAX}
+            placeholder="mon Reveal, mon live TikTok ce soir 21 h…"
+            aria-describedby={`${destinationId}-hint`}
+            aria-invalid={destinationIssue === null ? undefined : true}
+            onChange={(event) => {
+              onChange({ ...link, destination: event.target.value });
+            }}
+          />
+          <span className="sr-only" id={`${destinationId}-hint`}>
+            Le post parle de cet endroit, sans adresse.
+          </span>
+        </span>
         <span className="tc-link__end">
           <button
             type="button"
@@ -659,6 +686,7 @@ function LinkLine({
       </div>
       {nameIssue === null ? null : <p className="ps-error">{nameIssue}</p>}
       {urlIssue === null ? null : <p className="ps-error">{urlIssue}</p>}
+      {destinationIssue === null ? null : <p className="ps-error">{destinationIssue}</p>}
     </li>
   );
 }

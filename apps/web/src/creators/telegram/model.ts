@@ -94,7 +94,7 @@ export const LINKS_FULL = `${String(REDIRECT_LINKS_MAX)} liens au plus.`;
 export const TOO_MANY = `${String(CHANNEL_POSTS_PER_DAY_MAX)} posts par jour au plus.`;
 
 export function newLink(): RedirectLink {
-  return { id: RedirectLinkIdSchema.parse(crypto.randomUUID()), name: '', url: '' };
+  return { id: RedirectLinkIdSchema.parse(crypto.randomUUID()), name: '', url: '', destination: '' };
 }
 
 /** What a line of the form says is wrong, by its key (`link:<id>:name`, `link:<id>:url`, `slot:<rank>`, `label`). */
@@ -113,6 +113,12 @@ export function issuesOf(config: TelegramChannelConfig): Map<string, string> {
     if (!isRedirectUrl(link.url.trim())) {
       issues.set(`link:${link.id}:url`, 'Une adresse complète qui commence par https://, sans espace.');
     }
+    if (labelHasAddress(link.destination)) {
+      issues.set(
+        `link:${link.id}:destination`,
+        'Dis l’endroit en mots, sans adresse : le lien s’ajoute seul.',
+      );
+    }
   }
   const label = config.linkLabel.trim();
   if (config.linkForm === 'label' && label === '') issues.set('label', 'Écris le texte du lien.');
@@ -125,7 +131,12 @@ export function trimmed(config: TelegramChannelConfig): TelegramChannelConfig {
   return {
     ...config,
     linkLabel: config.linkLabel.trim(),
-    links: config.links.map((link) => ({ ...link, name: link.name.trim(), url: link.url.trim() })),
+    links: config.links.map((link) => ({
+      ...link,
+      name: link.name.trim(),
+      url: link.url.trim(),
+      destination: link.destination.trim(),
+    })),
   };
 }
 

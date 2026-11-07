@@ -141,6 +141,9 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     fireEvent.change(screen.getByLabelText('Adresse du lien « Telegram »'), {
       target: { value: ' https://redirect.example.test/nora ' },
     });
+    fireEvent.change(screen.getByLabelText('Où mène le lien « Telegram »'), {
+      target: { value: 'mon live TikTok ce soir 21 h ' },
+    });
     expect(screen.getByRole('button', { name: 'Lien du canal : le lien « Telegram »' })).toHaveProperty(
       'ariaPressed',
       'true',
@@ -157,7 +160,12 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
       { minute: 1320, days: [1, 2, 3, 4, 5], enabled: true },
     ]);
     expect(sent.links).toEqual([
-      { id: sent.channelLinkId, name: 'Telegram', url: 'https://redirect.example.test/nora' },
+      {
+        id: sent.channelLinkId,
+        name: 'Telegram',
+        url: 'https://redirect.example.test/nora',
+        destination: 'mon live TikTok ce soir 21 h',
+      },
     ]);
     expect(await screen.findByText('Enregistré : les posts partiront à ces créneaux.')).toBeDefined();
   });

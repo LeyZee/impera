@@ -103,7 +103,12 @@ describe('the slots of the channel (ADR 0080 § 1)', () => {
 });
 
 describe('the redirect links (ADR 0080 § 4)', () => {
-  const link = (name: string, url: string) => ({ id: newId(RedirectLinkIdSchema), name, url });
+  const link = (name: string, url: string) => ({
+    id: newId(RedirectLinkIdSchema),
+    name,
+    url,
+    destination: '',
+  });
 
   it('reads a whole https address only', () => {
     expect(isRedirectUrl('https://example.test/messa-tg')).toBe(true);
@@ -187,7 +192,7 @@ describe('what keeps her posts in (ADR 0080 § 4.4)', () => {
     const gone = chat('Canal', { membership: 'left' });
     const mute = chat('Canal 2', { canPost: false });
     const linkId = newId(RedirectLinkIdSchema);
-    const links = [{ id: linkId, name: 'Telegram', url: 'https://example.test/a' }];
+    const links = [{ id: linkId, name: 'Telegram', url: 'https://example.test/a', destination: '' }];
     const base = { links, channelLinkId: linkId };
     expect(channelWarnings(config({ ...base, chatId: gone.id }), [gone], true)).toEqual(['channel_gone']);
     expect(channelWarnings(config({ ...base, chatId: mute.id }), [mute], true)).toEqual(['bot_cannot_post']);

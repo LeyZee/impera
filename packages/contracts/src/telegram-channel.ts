@@ -64,11 +64,22 @@ export const RedirectUrlSchema = z
   .trim()
   .refine(isRedirectUrl, 'Une adresse complète qui commence par https://, sans espace');
 
-/** A redirect link of hers (ADR 0080 § 4.1): a name the agency gives it and its address. */
+export const LINK_DESTINATION_MAX = 120;
+
+/**
+ * A redirect link of hers (ADR 0080 § 4): a name the agency gives it, its address, and where it leads in a few words
+ * (« mon live TikTok ce soir 21 h ») for the post to speak of that place (§ 4.5). Empty: the post names no place.
+ */
 export const RedirectLinkSchema = z.object({
   id: RedirectLinkIdSchema,
   name: z.string().trim().min(1, 'Donne-lui un nom').max(60),
   url: RedirectUrlSchema,
+  destination: z
+    .string()
+    .trim()
+    .max(LINK_DESTINATION_MAX)
+    .refine((text) => !labelHasAddress(text), 'Où il mène se dit sans adresse')
+    .default(''),
 });
 export type RedirectLink = z.infer<typeof RedirectLinkSchema>;
 

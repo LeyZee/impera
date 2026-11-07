@@ -1,6 +1,6 @@
 # 0080. Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM
 
-Statut : accepted (Charles, 07/11/2026 12h26, « ok 0080 », avec ses réponses aux questions du brouillon ; demande du même jour à 12h14 ; fil « Automatiser le canal Telegram de Messa »). Les phrases écrites d'après ses réponses, marquées †, acceptées le 07/11/2026 à 13h05 (« ok phrases 0080 »).
+Statut : accepted (Charles, 07/11/2026 12h26, « ok 0080 », avec ses réponses aux questions du brouillon ; demande du même jour à 12h14 ; fil « Automatiser le canal Telegram de Messa »). Les phrases écrites d'après ses réponses, marquées †, acceptées le 07/11/2026 à 13h05 (« ok phrases 0080 »). Les phrases marquées ‡ (où mène un lien, lien pour un seul post), demandées par Charles le 07/11/2026 à 14h45 (« un live TikTok »), acceptées le même jour à 14h56 (« ok lien-ponctuel »).
 Date : 2026-11-07
 Précise : l'ADR 0057 (connecteur Telegram, légendes, lien ajouté par le code), l'ADR 0055 § 1 et § 5 (catégorie `telegram_post`, stock et demandes), l'ADR 0020 (groupes de l'agence).
 Remplace : pour le canal Telegram seulement, dans l'ADR 0057 § 3, « acceptation d'un geste par le propriétaire ou un manager » (§ 2 ci-dessous) ; dans l'ADR 0057 § 6, « le code ajoute l'adresse enregistrée dans Réglages » devient le lien de redirection du § 4 ; dans l'ADR 0055 § 1, « Un média ne part que vers la sortie de sa catégorie » pour la vidéo publique Reveal (§ 3 ci-dessous).
@@ -30,7 +30,7 @@ Charles demande en plus :
 
 1. Un post **part seul** à l'heure de son créneau. Il n'attend aucune acceptation.
 2. À l'heure moins la **fenêtre d'aperçu** (1 h par défaut, réglable de 15 min à 4 h), le code prépare le post (média, légende, lien) et le groupe Telegram « Info » de l'agence reçoit « Post du canal de \<créatrice\> à 19:00 », avec un lien vers l'aperçu dans le CRM. Ni le média ni la légende ne partent dans ce groupe.
-3. Jusqu'à l'heure, le propriétaire ou un manager actif peut, dans le CRM : **Valider** (rien ne change, le post part à l'heure ; l'aperçu dit qui l'a vu) ; **Réécrire** (une nouvelle légende, avec ou sans **conseil** : quelques mots libres de l'agence, 300 caractères au plus, qui orientent la réécriture, par exemple « plus taquin, parle du week-end ») ; **Changer de média** (le code reprend le suivant dans le pool) ; **Corriger à la main** ; **Ne pas publier** (le créneau est sauté ce jour-là, le média reste dans le pool). †
+3. Jusqu'à l'heure, le propriétaire ou un manager actif peut, dans le CRM : **Valider** (rien ne change, le post part à l'heure ; l'aperçu dit qui l'a vu) ; **Réécrire** (une nouvelle légende, avec ou sans **conseil** : quelques mots libres de l'agence, 300 caractères au plus, qui orientent la réécriture, par exemple « plus taquin, parle du week-end ») ; **Changer de média** (le code reprend le suivant dans le pool) ; **Changer de lien** (§ 4.6) ; ‡ **Corriger à la main** ; **Ne pas publier** (le créneau est sauté ce jour-là, le média reste dans le pool). †
 4. Le conseil entre dans le prompt dans un bloc délimité et typé, comme une donnée : il oriente le ton et le sujet, il ne lève aucune garde et ne change ni le lien, ni le média, ni l'heure. Il est gardé avec le post au journal. †
 5. Toute légende, écrite par le modèle ou corrigée à la main, passe par les mêmes gardes (§ 5). Refusée, elle est réécrite une fois ; si elle échoue encore, le post ne part pas et passe en ambre.
 6. Un interrupteur par créatrice, « Publier sans validation », éteint, fait attendre chaque post une validation : sans elle à l'heure, il ne part pas et passe en ambre. Allumé par défaut, comme Charles le veut. †
@@ -50,6 +50,8 @@ Charles demande en plus :
 2. Le code vérifie la forme (adresse `https://` complète, sans espace, 2 048 caractères au plus) et rien d'autre : la redirection elle-même vit chez le service choisi par l'agence. †
 3. Le modèle de langage n'écrit jamais d'adresse ; la garde `contact_info` refuse toute adresse dans la légende ; le code ajoute le lien à la fin du post, sous la forme réglée : un texte court en lien (« Viens me parler ✨ », écrit par l'agence) ou l'adresse nue. Chaque post garde au journal l'adresse qu'il a portée. †
 4. Sans lien du canal, aucun post ne part et le réglage est en ambre.
+5. **Où il mène.** Chaque lien porte une phrase courte de l'agence, 120 caractères au plus (« mon Reveal », « mon live TikTok ce soir 21 h »), qui dit au modèle de langage ce que le post doit donner envie de rejoindre : le post parle de cet endroit, jamais d'un autre. La phrase entre dans le prompt comme une donnée, dans un bloc délimité et typé, et ne contient jamais d'adresse (même règle que le texte du lien). Vide, le post parle d'elle et de l'envie d'échanger sans nommer d'endroit. ‡
+6. **Un lien pour un seul post.** Dans l'aperçu, **Changer de lien** choisit un autre de ses liens pour ce post seulement ; le lien du canal ne change pas, et le post suivant reprend le sien. La légende est réécrite pour l'endroit de ce lien (point 5). Le geste se fait jusqu'à l'heure, comme ceux du § 2.3, et le journal garde le lien porté. ‡
 
 ### 5. Le post
 
@@ -66,11 +68,11 @@ Réglages › Créatrices › \<créatrice\> › Canal Telegram, propriétaire s
 
 1. **Canal** : choisi parmi les canaux où le bot de l'agence est administrateur, avec l'état vérifié (« Le bot peut publier » ou, en ambre, ce qui manque). †
 2. **Créneaux** : la liste, ajouter, retirer, allumer ; heure et jours ; fenêtre d'aperçu ; « Publier sans validation ».
-3. **Liens** : ses liens de redirection, celui du canal, la forme du lien.
+3. **Liens** : ses liens de redirection et où chacun mène, celui du canal, la forme du lien. ‡
 4. **Pool** : médias prêts, jours de stock, la demande en cours.
 5. **Vidéo publique Reveal** : chaque vidéo ou une sur N, délai (« bientôt » tant que la capture manque).
 6. **Exemples** : les posts d'exemple de l'agence.
-7. **Prochain post** : l'aperçu tel qu'il paraîtra dans Telegram, avec Valider, Réécrire (avec conseil), Changer de média, Corriger, Ne pas publier.
+7. **Prochain post** : l'aperçu tel qu'il paraîtra dans Telegram, avec Valider, Réécrire (avec conseil), Changer de média, Changer de lien, Corriger, Ne pas publier. ‡
 8. **Journal** : les derniers posts, partis, sautés ou en ambre, leur raison, le lien porté, et les vues lues à 48 h.
 
 Aucun champ n'attend une clé ou un jeton : le jeton reste celui du bot des alertes (ADR 0016, 0057 § 2), créé par la création guidée de Réglages › Telegram.
@@ -103,5 +105,6 @@ Négatives, à surveiller :
 
 - **Lot A1** : contrats, migration 0137 (canal, créneaux, liens de redirection, posts du canal), connecteur de publication Telegram et `FakeTelegramChannel`, routes et écran des réglages (canal, créneaux, liens).
 - **Lot A2** : prompt `telegram_channel`, rendu HTML, gardes, exemples, mode Post du canal du playground (après les exemples de Charles).
-- **Lot A3** : jobs des créneaux, aperçu dans le groupe Info, Valider / Réécrire / Changer / Ne pas publier, demande de dépôt automatique, journal et vues à 48 h.
+- **Lot A1 bis** : le champ « où il mène » de chaque lien (contrat et écran ; le prompt le lit au lot A2). ‡
+- **Lot A3** : jobs des créneaux, aperçu dans le groupe Info, Valider / Réécrire / Changer de média / Changer de lien / Ne pas publier, demande de dépôt automatique, journal et vues à 48 h.
 - **Lot B** : la vidéo publique Reveal, après les captures et CR-08.

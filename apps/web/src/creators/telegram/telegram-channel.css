@@ -82,6 +82,18 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 70%, transparent);
 }
 
+/* Each link with where it leads reads as one block. */
+.tc-links {
+  gap: 14px;
+}
+.tc-link + .tc-link {
+  padding-top: 14px;
+  border-top: 1px solid var(--nv-hairline);
+}
+.tc-link__fields {
+  row-gap: 10px;
+}
+
 /* One width for « Lien du canal » and « Choisir pour le canal », so the fields of every link line up. */
 .tc-link__end .nv-chip {
   min-width: 10.75rem;
@@ -96,6 +108,26 @@
 }
 .tc-link__field .nv-field__control {
   width: 100%;
+}
+/* Its own line under the name and the address; on a phone, before the « Lien du canal » chip. */
+.tc-link__destination {
+  order: 1;
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.tc-link__destination-label {
+  flex: none;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.tc-link__destination .nv-field__control {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .tc-link__url {
   font-family: var(--nv-font-mono);
@@ -135,11 +167,13 @@
   .tc-link__end .nv-chip {
     min-width: 0;
   }
-  .tc-links {
-    gap: 14px;
+  .tc-link__destination {
+    flex-wrap: wrap;
   }
-  .tc-link + .tc-link {
-    padding-top: 14px;
-    border-top: 1px solid var(--nv-hairline);
+  .tc-link__end {
+    order: 2;
+  }
+  .tc-link__destination .nv-field__control {
+    flex-basis: 100%;
   }
 }
