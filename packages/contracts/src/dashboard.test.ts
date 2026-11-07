@@ -110,6 +110,7 @@ describe('dashboard contract', () => {
       ],
       usd: { seen: false, rate: null },
       refundsWithoutSale: 0,
+      stopped: [],
     };
     expect(DashboardSchema.parse({ ...dashboard, revealSales }).revealSales?.bySeller).toHaveLength(4);
     expect(

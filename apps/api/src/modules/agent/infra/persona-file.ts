@@ -1,10 +1,16 @@
 import {
   ageOn,
+  asPersonaV2,
   KYC_SLOT_LABELS,
-  kycSlotsToCollect,
-  PersonaSchema,
+  KycSlotSchema,
+  PERSONA_OPTIONS,
+  PERSONA_SHEET,
+  sectionAnswers,
+  StoredPersonaSchema,
   type KycSlot,
-  type Persona,
+  type PersonaSheet,
+  type PersonaStrategies,
+  type StoredPersona,
 } from '@impera/contracts';
 import { parse, stringify } from 'yaml';
 
@@ -21,7 +27,7 @@ export interface PersonaForModels {
   readonly personaSheet: string;
   readonly forbiddenTerms: readonly string[];
   /**
-   * Her pace of scripts and the heat they wait for (`strategies.script_launch`), applied by `offerDecision`, never by a
+   * Her pace of scripts and the heat they wait for (`agent.strategies.script_launch`), applied by `offerDecision`, never by a
    * prompt.
    */
   readonly offerLimits: OfferLimits;
@@ -38,7 +44,7 @@ export interface PersonaForModels {
   readonly petNames: readonly string[];
   /** Her alert keywords (`notifications.alert_keywords`): one written by a fan pauses the agent for him (P4-01). */
   readonly alertKeywords: readonly string[];
-  /** Emojis she never uses (`writing_style.emojis_forbidden`, P5-01): a guard blocks them. */
+  /** Emojis she never uses (`agent.rules.emojis_forbidden`): a guard blocks them. */
   readonly forbiddenEmojis: readonly string[];
   /** The canvas lines she tries to learn of each fan, in her order (`strategies.kyc.collect`, P5-01). */
   readonly kycSlots: readonly KycSlot[];
@@ -46,12 +52,8 @@ export interface PersonaForModels {
 
 const isPlaceholder = (value: string): boolean => value.startsWith('<');
 
-function without(value: object, keys: readonly string[]): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)));
-}
-
 /** Her own way to run each stage, when she wrote one: numbers stay out (code applies them). */
-function approach(strategies: Persona['strategies']): Record<string, Record<string, string>> {
+function approach(strategies: PersonaStrategies): Record<string, Record<string, string>> {
   const stages = {
     kyc: { instructions: strategies.kyc.instructions, targets: strategies.kyc.targets },
     sexualization: { instructions: strategies.sexualization.instructions },
@@ -68,67 +70,101 @@ function approach(strategies: Persona['strategies']): Record<string, Record<stri
   return written;
 }
 
+const LANGUAGE_LABELS = new Map<string, string>(PERSONA_OPTIONS.languages.map((o) => [o.value, o.label]));
+
 /**
- * Reads a persona YAML through the single persona schema (docs/reference/persona-schema.md).
- * The sheet given to the models holds who she is, how she writes and how she likes to run each stage; delays,
- * cooldowns, follow-ups and notifications stay out of it, since code applies them (CLAUDE.md rule 3). The age is
- * computed for `today`; the gender is left out (the product serves women creators).
+ * Her answers as the model reads them (ADR 0079 § 3): each panel under Desirali's title, each answer under its label,
+ * in the sheet's order. Left out: what she left empty or as a placeholder, and the time zone, which is the creator's
+ * own; the birth date gives way to her age on `today`.
+ */
+function sheetForModels(sheet: PersonaSheet, today: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const section of PERSONA_SHEET) {
+    const answers = sectionAnswers(sheet, section.key);
+    const shown: Record<string, unknown> = {};
+    for (const question of section.questions) {
+      if (question.key === 'timezone') continue;
+      const value = answers[question.key];
+      if (value === null || value === undefined) continue;
+      if (question.key === 'birth_date' && typeof value === 'string') {
+        shown['Âge'] = ageOn(value, today);
+      } else if (question.key === 'spoken_languages' && Array.isArray(value)) {
+        shown[question.label] = value.map((language: string) => LANGUAGE_LABELS.get(language) ?? language);
+      } else if (typeof value !== 'string' || !isPlaceholder(value)) {
+        shown[question.label] = value;
+      }
+    }
+    if (Object.keys(shown).length === 0) continue;
+    // The last panel has no title on Desirali's screen: its one answer stands on its own.
+    if (section.title === null) Object.assign(out, shown);
+    else out[section.title] = shown;
+  }
+  return out;
+}
+
+/**
+ * Reads a persona YAML, at either format (docs/reference/persona-schema.md); a format-1 file is read through its
+ * conversion. The sheet given to the models holds who she is, how she writes and how she likes to run each stage;
+ * delays, cooldowns, follow-ups and notifications stay out of it, since code applies them (CLAUDE.md rule 3).
  */
 export function readPersonaFile(source: string, fallbackName: string, today: string): PersonaForModels {
-  return personaForModels(PersonaSchema.parse(parse(source)), fallbackName, today);
+  return personaForModels(StoredPersonaSchema.parse(parse(source)), fallbackName, today);
 }
 
 /**
  * The same reading for a persona already parsed: her active version stored in `persona_versions`, read by the
- * agent at each draft. `fallbackName` stands in for a first name still left as a placeholder.
+ * agent at each draft. `fallbackName` stands in for a nickname still left as a placeholder.
  */
-export function personaForModels(persona: Persona, fallbackName: string, today: string): PersonaForModels {
-  const name = persona.details.first_name;
-  const dateOfBirth = persona.details.date_of_birth;
-  // Left out: the birth date (her age is given), the gender, and the time zone and reply delay that code applies.
-  const details = without(persona.details, ['date_of_birth', 'gender', 'timezone']);
-  const behavior = without(persona.behavior, ['response_delay_minutes']);
-  const strategies = approach(persona.strategies);
-  const sheet = {
-    details: { ...details, age: ageOn(dateOfBirth, today) },
-    additional_info: persona.additional_info,
-    behavior,
+export function personaForModels(
+  stored: StoredPersona,
+  fallbackName: string,
+  today: string,
+): PersonaForModels {
+  const { sheet, agent } = asPersonaV2(stored);
+  const name = sheet.identity.nickname;
+  const strategies = approach(agent.strategies);
+  const rules = agent.rules;
+  const kycSlots = agent.strategies.kyc.collect ?? KycSlotSchema.options;
+  const forModels = {
+    ...sheetForModels(sheet, today),
+    // Réglages de l'agent the prompts name by key: code applies them, the model is told them so as not to go against.
+    behavior: {
+      split_messages: agent.behavior.split_messages,
+      pet_names: agent.behavior.pet_names.filter((term) => !isPlaceholder(term)),
+    },
     ...(Object.keys(strategies).length > 0 && { strategies }),
     // The canvas lines the brain may name in `kycMissing`: hers, in her order (P5-01).
-    kyc_collect: kycSlotsToCollect(persona).map((slot) => KYC_SLOT_LABELS[slot]),
-    limits: persona.limits,
-    // Her blocks (P5-01), each its own section; absent ones stay out.
-    ...(persona.lifestyle !== undefined && { lifestyle: persona.lifestyle }),
-    ...(persona.tastes !== undefined && { tastes: persona.tastes }),
-    ...(persona.intimate !== undefined && { intimate: persona.intimate }),
-    ...(persona.writing_style !== undefined && { writing_style: persona.writing_style }),
-    ...(persona.sample_replies !== undefined &&
-      persona.sample_replies.length > 0 && { sample_replies: persona.sample_replies }),
+    kyc_collect: kycSlots.map((slot) => KYC_SLOT_LABELS[slot]),
+    limits: {
+      never_do: rules.never_do,
+      never_show: rules.never_show,
+      never_say: rules.never_say,
+      disgusts: rules.disgusts,
+      ...(rules.emojis_forbidden.length > 0 && { emojis_forbidden: rules.emojis_forbidden }),
+    },
   };
   return {
     creatorName: isPlaceholder(name) ? fallbackName : name,
-    personaSheet: stringify(sheet).trim(),
-    forbiddenTerms: [...persona.limits.disgusts, ...persona.limits.never_say].filter(
-      (term) => !isPlaceholder(term),
-    ),
+    personaSheet: stringify(forModels).trim(),
+    forbiddenTerms: [...rules.disgusts, ...rules.never_say].filter((term) => !isPlaceholder(term)),
     offerLimits: {
-      cooldownHours: persona.strategies.script_launch.cooldown_hours,
-      minDesire: persona.strategies.script_launch.min_desire ?? DEFAULT_SCRIPT_MIN_DESIRE,
+      cooldownHours: agent.strategies.script_launch.cooldown_hours,
+      minDesire: agent.strategies.script_launch.min_desire ?? DEFAULT_SCRIPT_MIN_DESIRE,
     },
     sexualizationLimits: {
-      initiateAfterHours: persona.strategies.sexualization.initiate_after_hours,
-      minHoursBeforeFollowing: persona.strategies.kyc.min_hours_before_following,
-      minDesireToOpen: persona.strategies.sexualization.min_desire_to_open ?? DEFAULT_MIN_DESIRE_TO_OPEN,
+      initiateAfterHours: agent.strategies.sexualization.initiate_after_hours,
+      minHoursBeforeFollowing: agent.strategies.kyc.min_hours_before_following,
+      minDesireToOpen: agent.strategies.sexualization.min_desire_to_open ?? DEFAULT_MIN_DESIRE_TO_OPEN,
     },
     followUps: {
-      delaysHours: persona.follow_ups.enabled ? persona.follow_ups.delays_hours : [],
-      spirit: persona.follow_ups.text,
+      delaysHours: agent.follow_ups.enabled ? agent.follow_ups.delays_hours : [],
+      spirit: agent.follow_ups.text,
     },
-    splitMessages: persona.behavior.split_messages,
-    petNames: persona.behavior.pet_names.filter((term) => !isPlaceholder(term)),
-    alertKeywords: persona.notifications.alert_keywords.filter((term) => !isPlaceholder(term)),
-    forbiddenEmojis: persona.writing_style?.emojis_forbidden ?? [],
-    kycSlots: kycSlotsToCollect(persona),
+    splitMessages: agent.behavior.split_messages,
+    petNames: agent.behavior.pet_names.filter((term) => !isPlaceholder(term)),
+    alertKeywords: agent.notifications.alert_keywords.filter((term) => !isPlaceholder(term)),
+    forbiddenEmojis: rules.emojis_forbidden,
+    kycSlots,
   };
 }
 

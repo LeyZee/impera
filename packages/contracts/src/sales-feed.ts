@@ -4,6 +4,7 @@ import { PlatformSchema } from './enums';
 import { refusalBodySchema } from './errors';
 import { CreatorIdSchema, FanIdSchema, PlatformAccountIdSchema, TeamMemberIdSchema } from './ids';
 import { CurrencySchema } from './money';
+import { pastedSecret } from './pasted-secret';
 
 /**
  * The sales feed (ADR 0050 § 2): a platform's own register of sales and refunds, read by a stored cursor without any
@@ -128,6 +129,10 @@ export const PlatformChatterSchema = z.object({
   platformChatterId: z.string().min(1),
   firstName: z.string(),
   lastName: z.string(),
+  /** The login e-mail of an agency member, `null` for a provider's team (ADR 0076): matched, never stored. */
+  email: z.string().max(320).nullable(),
+  /** The platform's role, as it says it; it never grants a right in Impera (ADR 0076 § 3). */
+  role: z.string().max(64),
   isBot: z.boolean(),
   isExternal: z.boolean(),
   removedAt: z.iso.datetime().nullable(),
@@ -238,7 +243,7 @@ export const SalesFeedStatusSchema = z.object({
 });
 export type SalesFeedStatus = z.infer<typeof SalesFeedStatusSchema>;
 
-export const SaveSalesFeedKeyBodySchema = z.object({ key: z.string().trim().min(1).max(512) });
+export const SaveSalesFeedKeyBodySchema = z.object({ key: pastedSecret(512) });
 export type SaveSalesFeedKeyBody = z.infer<typeof SaveSalesFeedKeyBodySchema>;
 
 export const SalesFeedRefusalSchema = z.object({
@@ -690,6 +695,10 @@ export const SALES_FEED_ERROR_CODES = [
   'sales_feed_export_unprocessable',
   'sales_feed_check_days_unprocessable',
   'sales_feed_list_unavailable',
+  /** The team imported from the platform (ADR 0076) is the owner's and an active manager's. */
+  'sales_feed_team_forbidden',
+  /** A linked account is not set aside: its link is changed instead (ADR 0076 § 1). */
+  'sales_feed_chatter_linked_conflict',
 ] as const;
 export const SalesFeedErrorCodeSchema = z.enum(SALES_FEED_ERROR_CODES);
 export type SalesFeedErrorCode = z.infer<typeof SalesFeedErrorCodeSchema>;

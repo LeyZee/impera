@@ -351,8 +351,12 @@ export function createContentDropRoutes(
       (request) => {
         const userId = signedIn(request.user);
         // A script asked by hand shoots a frozen version too (SC-02 lot b), frozen by the one who asks.
-        return agency.ask(request.params.creatorId, userId, request.body, (structureId) =>
-          scripts.versions.freeze(structureId, userId),
+        return agency.ask(
+          request.params.creatorId,
+          userId,
+          request.body,
+          (structureId) => scripts.versions.freeze(structureId, userId),
+          clock(),
         );
       },
     );

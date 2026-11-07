@@ -163,6 +163,13 @@ export const DashboardRevealSalesSchema = z.object({
   usd: z.object({ seen: z.boolean(), rate: z.object({ day: z.iso.date() }).nullable() }),
   /** Refunds of the period whose sale is older than the register: counted in no figure (CRM-02's note). */
   refundsWithoutSale: count,
+  /**
+   * Her platforms whose reading stopped (a 401 or 403: the key must be connected again in Réglages, ADR 0050 § 3), with
+   * Réglages' sentence and the last read that went through: the figures stop there (recette 06/11, AGT-11).
+   */
+  stopped: z.array(
+    z.object({ platform: PlatformSchema, message: z.string().min(1), lastReadAt: at.nullable() }),
+  ),
 });
 export type DashboardRevealSales = z.infer<typeof DashboardRevealSalesSchema>;
 

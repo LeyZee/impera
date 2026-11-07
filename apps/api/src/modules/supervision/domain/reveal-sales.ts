@@ -10,6 +10,7 @@ import {
   type SalesTotalsRow,
 } from '@impera/contracts';
 
+import type { SalesFeedState } from './dashboard-ports';
 import { usdToEurMinor, type UsdRate } from './fan-ranking';
 
 /**
@@ -111,8 +112,10 @@ export function revealSalesPanel(input: {
   readonly totals: SalesTotals;
   readonly rate: UsdRate | null;
   readonly names: ReadonlyMap<string, string> | null;
+  /** Every platform's feed: those of her panel whose reading stopped are named (AGT-11). */
+  readonly feeds: readonly SalesFeedState[];
 }): DashboardRevealSales {
-  const { platforms, totals, rate, names } = input;
+  const { platforms, totals, rate, names, feeds } = input;
   const bySeller = new Map<string, { seller: SaleSeller; eur: Sums; usd: Sums }>();
   for (const row of totals.rows) {
     const key = sellerKey(row.seller);
@@ -151,6 +154,9 @@ export function revealSalesPanel(input: {
       rate: rate === null ? null : { day: rate.day },
     },
     refundsWithoutSale: totals.refundsWithoutSale,
+    stopped: feeds
+      .filter((feed) => feed.state === 'needs_reconnect' && platforms.includes(feed.platform))
+      .map(({ platform, message, lastReadAt }) => ({ platform, message, lastReadAt })),
   };
 }
 

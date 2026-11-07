@@ -169,6 +169,9 @@ describe('sales feed (CRM-01)', () => {
       chatters: [
         { platformChatterId: 'chatter_test_01', link: null },
         { platformChatterId: 'bot_test_01', isBot: true, link: null },
+        { platformChatterId: 'manager_test_01', link: null },
+        { platformChatterId: 'presta_test_01', isExternal: true, link: null },
+        { platformChatterId: 'ancien_test_01', removedAt: '2026-10-01T08:00:00.000Z', link: null },
       ],
     });
     // Exactly the accounts a model can be linked to, and the model each one already counts.
@@ -366,7 +369,13 @@ describe('sales feed (CRM-01)', () => {
     });
     expect(chatter.statusCode).toBe(200);
     expect(chatter.json()).toMatchObject({
-      chatters: [{ platformChatterId: 'chatter_test_01', link: null }, { link: { kind: 'agent' } }],
+      chatters: [
+        { platformChatterId: 'chatter_test_01', link: null },
+        { link: { kind: 'agent' } },
+        { platformChatterId: 'manager_test_01' },
+        { platformChatterId: 'presta_test_01' },
+        { platformChatterId: 'ancien_test_01' },
+      ],
     });
     const unknownMember = await api('PUT', '/v1/settings/sales-feeds/reveal/chatters/chatter_test_01', {
       kind: 'member',

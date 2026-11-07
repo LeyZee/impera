@@ -6,7 +6,10 @@ import type {
   LiveRateReading,
   Platform,
   SalesTotals,
+  TeamMemberId,
+  TeamScope,
   UserId,
+  DropCategory,
 } from '@impera/contracts';
 
 import type { UsdRate } from './fan-ranking';
@@ -121,12 +124,20 @@ export interface TelegramView {
 }
 
 /** What the sales panel reads of the platform's register (CRM-04 lot c), in one transaction of the reader. */
-interface RevealSalesReading {
+export interface RevealSalesReading {
   /** The platforms of her accounts linked to the register, at least one. */
   readonly platforms: readonly [Platform, ...Platform[]];
   readonly totals: SalesTotals;
   /** Member id to display name, for the owner and an active manager; `null` for anyone else (ADR 0043 § 7). */
   readonly names: ReadonlyMap<string, string> | null;
+}
+
+/** A platform's feed as Réglages › Ventes shows it (the connectors' `salesFeeds.list`, by the composition root). */
+export interface SalesFeedState {
+  readonly platform: Platform;
+  readonly state: 'not_connected' | 'connected' | 'needs_reconnect';
+  readonly message: string;
+  readonly lastReadAt: string | null;
 }
 
 export interface RevealSalesView {
@@ -140,3 +151,32 @@ export interface RevealSalesView {
     range: { readonly from: string; readonly to: string },
   ): Promise<RevealSalesReading | undefined>;
 }
+
+/** What one tenant transaction reads of her for her card. */
+export interface CreatorOverviewFacts {
+  readonly timezone: string;
+  readonly scope: TeamScope;
+  readonly switches: DashboardFacts['switches'];
+  readonly autoConversations: number;
+  /** Her open requests with nothing dropped, the first due first; empty for a scope of one's own (RLS). */
+  readonly requests: readonly { readonly category: DropCategory; readonly dueOn: string }[];
+  /** Member id to display name (the team's, read by the owner and an active manager). */
+  readonly names: ReadonlyMap<string, string>;
+}
+
+export interface OnShiftReading {
+  readonly memberId: TeamMemberId;
+  readonly endsAt: Date;
+}
+
+/** What a creator's card in the list of Créatrices reads of her, in one transaction of the reader (RLS). */
+export interface CreatorOverviewView {
+  /** Undefined when the creator does not exist. */
+  read(creatorId: CreatorId, userId: UserId): Promise<CreatorOverviewFacts | undefined>;
+}
+
+/**
+ * Who is on shift on her accounts at `at`, without the margin (module scheduling, wired by the composition root): read
+ * as the system, so the route asks it only for a reader whose scope reads the team.
+ */
+export type OnShiftView = (creatorId: CreatorId, at: Date) => Promise<readonly OnShiftReading[]>;

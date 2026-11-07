@@ -1,4 +1,10 @@
-import type { ConnectionService, ConnectionSignal, JobPayload } from '@impera/contracts';
+import type {
+  ConnectionService,
+  ConnectionSignal,
+  JobPayload,
+  SalesFeedStatus,
+  TeamPlatformRemoval,
+} from '@impera/contracts';
 import type { Database, EncryptionKey } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -25,10 +31,12 @@ import {
   resealSalesFeedWebhookSecrets,
 } from './infra/db/sales-feed-webhooks';
 import { createDrizzleSalesLedger } from './infra/db/sales-ledger';
+import { createDrizzleTeamImportStore, invitationChatterLinks } from './infra/db/team-import-store';
 import { createAvatarRoutes } from './infra/http/avatar-routes';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
 import { createSalesFeedRoutes, type SalesFeedRoutesOptions } from './infra/http/sales-feed-routes';
+import { createSalesFeedTeamRoutes } from './infra/http/sales-feed-team-routes';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
 import { createSessionVault } from './infra/session-vault';
@@ -134,6 +142,23 @@ export interface ConnectorsModule {
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
   readonly salesFeedRoutes: (options: SalesFeedRoutesOptions) => FastifyPluginAsyncZod;
+  /**
+   * `/v1/settings/sales-feeds/:platform/team` (ADR 0076), behind the guard given here (owner, operator): the base
+   * keeps it to the owner and the active managers.
+   */
+  readonly salesFeedTeamRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
+  /** Every platform's feed as Réglages › Ventes shows it, never the key: the Dashboard names a stopped one (AGT-11). */
+  readonly salesFeedStates: () => Promise<SalesFeedStatus[]>;
+  /**
+   * The link an invitation from the review poses (ADR 0076 § 3), for `team`'s port: run in the inviter's own
+   * transaction, under the policies of migration 0135.
+   */
+  readonly invitationChatterLinks: typeof invitationChatterLinks;
+  /**
+   * The members still in the team whose platform account was removed or is absent from the list (ADR 0076 § 5), as
+   * this viewer may see them: `team` shows the warning on the member's page. Read from the base, never the platform.
+   */
+  readonly teamRemovals: (userId: string) => Promise<TeamPlatformRemoval[]>;
   /** `/v1/webhooks/sales-feeds/:platform`: public, each delivery checked against its webhook's secret. */
   readonly salesFeedDeliveryRoutes: FastifyPluginAsyncZod;
 }
@@ -163,6 +188,11 @@ export interface ConnectorsDeps {
    * HTTP) and no webhook can be registered: the minute's reading alone brings the sales.
    */
   readonly publicBaseUrl: string | null;
+  /**
+   * The recette sandbox (ADR 0075): `publicBaseUrl` is this machine over plain HTTP, where the fake world posts its
+   * deliveries. Never set outside the sandbox, which the configuration refuses in production.
+   */
+  readonly loopbackWebhooks?: boolean;
   /**
    * The accounts paid on the platform's net over the whole of a fortnight (CRM-04 b3): the `scheduling` module's
    * `salesCheckReads`, read on the admin connection by the composition root. Never a write of the pay rules.
@@ -201,12 +231,14 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const salesFeeds = createSalesFeeds({
     keys: deps.credentialKeys === null ? null : createSalesFeedKeyStore(deps.adminDb, deps.credentialKeys),
     ledger: createDrizzleSalesLedger(deps.db, deps.adminDb),
+    team: createDrizzleTeamImportStore(deps.db),
     registry: deps.salesFeeds,
     clock,
     webhooks:
       deps.credentialKeys === null ? null : createSalesFeedWebhookStore(deps.adminDb, deps.credentialKeys),
     jobs: createSalesFeedJobs(deps.adminDb),
-    webhookUrl: (platform) => salesFeedWebhookUrl(deps.publicBaseUrl, platform),
+    webhookUrl: (platform) =>
+      salesFeedWebhookUrl(deps.publicBaseUrl, platform, deps.loopbackWebhooks === true),
     detectedAccounts: deps.detectedAccounts,
     connectionState: async (platform, signal, correlationId) => {
       const service = connectionServiceOf(platform);
@@ -236,13 +268,21 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     },
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
+    salesFeedTeamRoutes: (guard) => createSalesFeedTeamRoutes(salesFeeds.team, guard),
+    salesFeedStates: () => salesFeeds.list(),
+    invitationChatterLinks,
+    teamRemovals: (userId) => salesFeeds.team.removals(userId),
     salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),
   };
 }
 
-/** Where a platform posts its deliveries; only over HTTPS, the platform would refuse anything else. */
-function salesFeedWebhookUrl(base: string | null, platform: string): string | null {
+/**
+ * Where a platform posts its deliveries; only over HTTPS, the platform would refuse anything else, except this machine
+ * over HTTP in the recette sandbox (`loopback`, ADR 0075).
+ */
+function salesFeedWebhookUrl(base: string | null, platform: string, loopback: boolean): string | null {
   if (base === null) return null;
   const url = new URL(`v1/webhooks/sales-feeds/${platform}`, base.endsWith('/') ? base : `${base}/`);
-  return url.protocol === 'https:' ? url.toString() : null;
+  if (url.protocol === 'https:') return url.toString();
+  return loopback && url.protocol === 'http:' && url.hostname === '127.0.0.1' ? url.toString() : null;
 }

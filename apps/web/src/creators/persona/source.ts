@@ -95,7 +95,9 @@ async function loadPersona(creatorId: string | null, name: string | null): Promi
   };
   if (creatorId === null) return empty();
   const { latest, versions } = await fetchPersonaOverview(creatorId);
-  if (latest === null) return empty();
+  // This screen edits format 1 until the format-2 sheet replaces it (ADR 0079): a version stored at format 2 is not
+  // opened here, the screen starts from the example instead.
+  if (latest === null || 'sheet' in latest.persona) return empty();
   return {
     kind: 'ready',
     persona: latest.persona,
@@ -170,8 +172,11 @@ export async function saveVersion(
   return { kind: 'failed' };
 }
 
-/** `reauth`: her persona speaks to every fan, a sign-in older than 10 minutes asks for the password again (M1). */
-export type ActivateResult = 'activated' | 'conflict' | 'reauth' | 'forbidden' | 'failed';
+/**
+ * `reauth`: her persona speaks to every fan, a sign-in older than 10 minutes asks for the password again (M1).
+ * `refused`: a version stored before a guard changed teaches what it blocks now (P5-01, checked again on activation).
+ */
+export type ActivateResult = 'activated' | 'conflict' | 'reauth' | 'refused' | 'forbidden' | 'failed';
 
 /**
  * `POST /v1/creators/:id/persona/versions/:versionId/activate`. `expectedActive` is her active version as this screen
@@ -193,7 +198,9 @@ export async function activateVersion(
   );
   if (response.ok) return 'activated';
   if (response.status === 409) return 'conflict';
-  if (response.status !== 403) return 'failed';
+  if (response.status !== 403 && response.status !== 422) return 'failed';
   const error = ApiErrorSchema.safeParse(await response.json().catch(() => null));
-  return error.success && error.data.error.code === REAUTHENTICATION_ERROR_CODE ? 'reauth' : 'forbidden';
+  const code = error.success ? error.data.error.code : null;
+  if (response.status === 422) return code === 'persona_sample_reply_unprocessable' ? 'refused' : 'failed';
+  return code === REAUTHENTICATION_ERROR_CODE ? 'reauth' : 'forbidden';
 }

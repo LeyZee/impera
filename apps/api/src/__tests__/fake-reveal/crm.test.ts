@@ -79,7 +79,8 @@ describe('Reveal sales feed adapter', () => {
     const read = await feed.readSales(null);
     if (!read.ok) throw new Error('read failed');
     expect(read.value.sales.map((sale) => [sale.platformSaleId, sale.event, sale.status])).toEqual([
-      ['sale_a', 'sale', 'paid'],
+      // Reveal gives each line the sale's status at the time of reading: the sale itself reads `refunded` once refunded.
+      ['sale_a', 'sale', 'refunded'],
       ['sale_a', 'refund', 'refunded'],
     ]);
     expect(read.value.sales[1]?.amounts.net).toBe(800);
@@ -269,6 +270,9 @@ describe('Reveal sales feed adapter', () => {
     ).toEqual([
       ['chatter_test_01', false],
       ['bot_test_01', true],
+      ['manager_test_01', false],
+      ['presta_test_01', false],
+      ['ancien_test_01', false],
     ]);
     const daily = await feed.dailyStats({ from: '2026-10-20', to: '2026-10-20' });
     expect(daily.ok && daily.value[0]).toMatchObject({

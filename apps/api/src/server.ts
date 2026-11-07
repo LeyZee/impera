@@ -22,9 +22,16 @@ import {
 } from 'fastify-type-provider-zod';
 
 import type { Config } from './config';
-import { isDatabaseUnavailable, isMissingReference, jsonWithoutNul, storableError } from './database-errors';
+import {
+  isDatabaseUnavailable,
+  isMissingReference,
+  isNestedDeeperThan,
+  jsonWithoutNul,
+  storableError,
+} from './database-errors';
 import type { Logger } from './logger';
 import type { Readiness } from './readiness';
+import { SANDBOX_HEADER } from './sandbox';
 import { useFrenchValidationMessages } from './validation-messages';
 
 export interface ServerDeps {
@@ -127,6 +134,8 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
 
   server.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id);
+    // The dashboard shows its « Bac à sable » banner from this (ADR 0075).
+    if (config.IMPERA_SANDBOX) reply.header(SANDBOX_HEADER, '1');
   });
 
   // CSRF (security.md §6): a mutation must come from the dashboard. `SameSite=Lax` cookies plus this check, no
@@ -149,6 +158,11 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     }
     // JSON only: a raw body (signed Reveal sales, logos, contractor documents) keeps its exact bytes.
     if (request.body !== undefined && request.body !== null && !Buffer.isBuffer(request.body)) {
+      // A body nested past any contract is forged: refused before anything walks it (BIL-03).
+      if (isNestedDeeperThan(request.body)) {
+        await reply.code(400).send(errorBody(request, 'request_invalid', 'Requête invalide'));
+        return;
+      }
       request.body = jsonWithoutNul(request.body);
     }
   });
@@ -166,6 +180,10 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
   });
 
   server.setErrorHandler((error: FastifyError, request, reply) => {
+    // The common body is written as is, whatever the route declares for that status: a route whose 422 is a refusal
+    // (`details.kind`) must still answer another 422 of its module in French, never fail to serialize it into a
+    // 500 (recette 07/11, BIL-05: the webhook of the sales feed without an HTTPS address).
+    reply.serializer((payload: unknown) => JSON.stringify(payload));
     if (hasZodFastifySchemaValidationErrors(error)) {
       const fields = error.validation.map((issue) => ({
         path: issue.instancePath,

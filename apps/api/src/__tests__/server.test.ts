@@ -79,6 +79,21 @@ const probeRoutes: FastifyPluginAsyncZod = (app) => {
     }));
     done();
   });
+  // A route whose 422 is a refusal of one shape, throwing a 422 of another (recette 07/11, BIL-05).
+  app.get(
+    '/refusal-route',
+    {
+      schema: {
+        response: {
+          200: z.object({ ok: z.boolean() }),
+          422: z.object({ error: z.object({ details: z.object({ kind: z.enum(['malformed']) }) }) }),
+        },
+      },
+    },
+    () => {
+      throw new DomainError('webhook_url_unprocessable', 'L’adresse n’est pas en HTTPS');
+    },
+  );
   app.get('/boom', () => {
     throw new Error('select * from secrets where leaked = true');
   });
@@ -126,6 +141,15 @@ describe('health and readiness', () => {
 });
 
 describe('request id', () => {
+  it('tells the dashboard it runs in the recette sandbox, and says nothing otherwise (ADR 0075)', async () => {
+    const real = await (await server()).inject({ method: 'GET', url: '/health' });
+    expect(real.headers['x-impera-sandbox']).toBeUndefined();
+    const sandbox = await (
+      await server({ env: { IMPERA_SANDBOX: '1' } })
+    ).inject({ method: 'GET', url: '/health' });
+    expect(sandbox.headers['x-impera-sandbox']).toBe('1');
+  });
+
   it('echoes a sane x-request-id and replaces a dangerous one', async () => {
     const app = await server();
     const kept = await app.inject({ method: 'GET', url: '/health', headers: { 'x-request-id': 'req-123' } });
@@ -178,6 +202,27 @@ describe('hostile input (recette 05/11)', () => {
     const body = response.json<{ error: { code: string; message: string } }>();
     expect(body.error).toMatchObject({ code: 'request_invalid', message: 'Requête invalide' });
     expect(response.body).not.toContain('xxxxxxxx');
+  });
+
+  it('refuses a JSON body nested past any contract with 400, never 500 (recette 07/11, BIL-03)', async () => {
+    const app = await server();
+    const nested = (depth: number) => `${'{"a":'.repeat(depth)}1${'}'.repeat(depth)}`;
+    const deep = await app.inject({
+      method: 'POST',
+      url: '/v1/echo',
+      payload: nested(20_000),
+      headers: { ...ORIGIN, 'content-type': 'application/json' },
+    });
+    expect(deep.statusCode).toBe(400);
+    expect(deep.json<{ error: { code: string } }>().error.code).toBe('request_invalid');
+    // A body as deep as the limit still reaches its route (here, refused there for its fields, not here).
+    const shallow = await app.inject({
+      method: 'POST',
+      url: '/v1/echo',
+      payload: `{"text":"ok","x":${nested(62)}}`,
+      headers: { ...ORIGIN, 'content-type': 'application/json' },
+    });
+    expect(shallow.statusCode).toBe(200);
   });
 
   it('answers 503 when the database cannot answer (MOT-07)', async () => {
@@ -268,6 +313,24 @@ describe('error format (api.md)', () => {
       message: 'Conversation introuvable',
     });
     expect((await app.inject({ method: 'GET', url: '/v1/conflict' })).statusCode).toBe(409);
+  });
+
+  it('writes the common body even where the route declares another shape for that status (BIL-05)', async () => {
+    const response = await (await server()).inject({ method: 'GET', url: '/v1/refusal-route' });
+    expect(response.statusCode).toBe(422);
+    expect(response.json<{ error: { code: string; message: string } }>().error).toMatchObject({
+      code: 'webhook_url_unprocessable',
+      message: 'L’adresse n’est pas en HTTPS',
+    });
+  });
+
+  it('pins the keys of the common error body, now written without a response schema to filter it (BIL-05)', async () => {
+    const app = await server();
+    for (const url of ['/v1/refusal-route', '/v1/boom', '/v1/no-such-route']) {
+      const body = (await app.inject({ method: 'GET', url })).json<{ error: Record<string, unknown> }>();
+      expect(Object.keys(body), url).toEqual(['error']);
+      expect(Object.keys(body.error).sort(), url).toEqual(['code', 'details', 'message', 'requestId']);
+    }
   });
 
   it('hides the detail of an unexpected error behind a 500', async () => {
@@ -441,6 +504,8 @@ describe('loadConfig', () => {
     expect(testConfig().IMPERA_INLINE_WORKER).toBe(false);
     expect(testConfig({ IMPERA_INLINE_WORKER: '1' }).IMPERA_INLINE_WORKER).toBe(true);
     expect(() => testConfig({ IMPERA_INLINE_WORKER: 'yes' })).toThrow(/IMPERA_INLINE_WORKER/);
+    // Empty, as `IMPERA_INLINE_WORKER=` in a .env: unset (BIL-02).
+    expect(testConfig({ IMPERA_INLINE_WORKER: '' }).IMPERA_INLINE_WORKER).toBe(false);
   });
 
   describe('the invoices’ buckets (ADR 0037)', () => {

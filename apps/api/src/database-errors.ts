@@ -96,6 +96,24 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * How deep a request's JSON may nest. No contract of the API goes past a handful of levels; a body nested thousands
+ * deep is forged, and walking it recursively would overflow the stack (recette 07/11, BIL-03).
+ */
+const JSON_DEPTH_MAX = 64;
+
+/** Whether `value` nests deeper than `max` arrays or objects, measured without recursion. */
+export function isNestedDeeperThan(value: unknown, max: number = JSON_DEPTH_MAX): boolean {
+  const pending: (readonly [unknown, number])[] = [[value, 0]];
+  for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+    const [current, depth] = next;
+    if (!Array.isArray(current) && !isPlainObject(current)) continue;
+    if (depth >= max) return true;
+    for (const inner of Object.values(current)) pending.push([inner, depth + 1]);
+  }
+  return false;
+}
+
+/**
  * A copy of a JSON value with U+0000 dropped from every string, keys included. Anything that is not JSON (a Buffer
  * of a signed webhook or an upload, a stream) is returned untouched: its bytes are the point (relecture #538).
  */

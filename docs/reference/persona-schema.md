@@ -1,10 +1,49 @@
 # Schéma de la persona
 
+Fichier : `personas/<creator>/vX.Y.Z.yaml`. ADR 0010, ADR 0079. Deux formats se lisent, `meta.schema` 1 et 2 (`StoredPersonaSchema`) ; une version enregistrée n'est jamais réécrite. Toute nouvelle version s'écrit au format 2.
+
+## Format 2 : la fiche de Desirali (ADR 0079)
+
+Schéma Zod : `packages/contracts/src/persona-sheet.ts` (`PersonaV2Schema`, `PersonaSheetSchema`, `PersonaAgentSettingsSchema`). Les questions, leurs libellés mot pour mot, leur ordre, leur largeur à l'écran et leurs aides : `PERSONA_SHEET`, la seule liste que l'écran, la complétion et l'agent lisent. Exemples : `personas/demo/v0.3.0.yaml` (créatrice fictive, toutes les questions remplies sauf le poids et le nombre de partenaires) et `personas/messalina/v0.1.0.yaml` (placeholders).
+
+Le fichier a trois parties : `meta` (comme au format 1, `schema: 2`), `sheet` (la fiche, 7 panneaux, 59 questions) et `agent` (« Réglages de l'agent »).
+
+| Panneau (`sheet.<clé>`) | Titre à l'écran | Questions (clés de Desirali) |
+|---|---|---|
+| `identity` | Identité et informations de base | `physical_description`, `shoe_size`, `birth_date`, `height_m`, `weight_kg`, `country`, `city`, `nickname`, `job`, `eye_color`, `hair_color`, `breast_size`, `place_of_life`, Fuseau horaire (affiché, pas dans le fichier), `spoken_languages` |
+| `lifestyle` | Mode de vie | `smoking_habit`, `drinking_habit`, `traveling`, `routines`, `pets`, `dream_car` |
+| `preferences` | Préférences | `favorite_color`, `least_favorite_color`, `passions`, `favorite_dishes`, `least_liked_dishes`, `religion`, `music_genres`, `favorite_movies`, `favorite_celebrities`, `favorite_characters`, `favorite_books` |
+| `conversation` | Style de conversation | `roleplaying_description`, `favourite_emojis`, `conversation_description`, `spelling_description`, `compliment_description`, `flirt_description`, `common_expressions`, `typical_responses` |
+| `relationships` | Relations | `relationship_status`, `kids_status`, `body_count`, `turn_ons`, `turn_offs`, `ideal_man`, `ideal_date` |
+| `intimacy` | Intimité | `libido_level`, `domination_preference`, `style_in_private`, `sex_toys`, `squirting`, `cum`, `kinks`, `fetichism`, `favorite_positions`, `fantasies`, `no_go_zones` |
+| `boundaries` | (aucun titre) | `off_limits` (« Zones interdites ») |
+
+| `agent.<clé>` | Contenu | Lu par |
+|---|---|---|
+| `strategies` | comme `strategies` au format 1 (KYC et cases à apprendre, sexualisation, lancement des scripts, suivi d'offre) | la politique ; les consignes écrites vont aux modèles sans leurs chiffres |
+| `follow_ups` | comme au format 1 | la planification des relances |
+| `notifications` | comme au format 1, dont `alert_keywords` | les alertes |
+| `behavior` | `split_messages`, `pet_names` (les seuls surnoms qu'elle donne), `response_delay_minutes` | l'envoi et les gardes |
+| `rules` | `never_do`, `never_show`, `never_say`, `disgusts`, `emojis_forbidden` : les règles strictes, en listes de mots | les gardes (`guards.ts`) |
+
+Règles du format 2 :
+- **Texte libre partout**, une réponse vide vaut `null` : réponse courte 1 000 caractères, longue 4 000. Six réponses ne sont pas du texte : `birth_date` (ISO), `height_m` (1,3 à 2,1), `weight_kg` (40 à 130), `body_count` (entier, facultatif), le fuseau (celui de `creators.timezone`, affiché sans être modifié) et `spoken_languages` (au moins une, sans doublon, la première est la langue des réponses).
+- **Trois questions obligatoires** : `nickname` (le nom sous lequel l'agent écrit), `birth_date` (au moins 18 ans et moins de 100 à `meta.created_at`), une langue.
+- **Ce que l'agent lit** : toute la fiche, panneau par panneau, sous les libellés de Desirali, sauf ce qui est vide ou `<à remplir>`. L'âge remplace la date de naissance ; le fuseau n'y est pas ; « Zones interdites » se lit seul, sans titre. Suivent les réglages que les prompts nomment : `behavior` (découpage, surnoms), `strategies` (consignes écrites), `kyc_collect`, `limits` (les règles strictes). Aucune réponse de la fiche n'est une règle : le code n'en tire rien.
+- **« Réponses typiques »** : une réponse par ligne, `situation : réponse` ou la réponse seule. À l'enregistrement et à l'activation, chaque ligne passe les gardes dures (422 `persona_sample_reply_unprocessable`, `index` = numéro de ligne à partir de 0) ; la situation n'est pas lue par les gardes.
+- **Complétion** (`personaSheetCompletion`) : questions remplies sur 59, le fuseau toujours compté. Ne bloque rien.
+- **Format 1 ouvert** : `personaSheetFromV1` en fait un brouillon au format 2 (`GET /v1/creators/:id/persona` le rend dans `latest.draft`). Ce qui n'a pas de question à soi va dans la plus proche et figure dans `latest.moved` (l'origine va dans la description physique ; le caractère dans la description de la conversation ; langage et style d'écriture dans le style d'orthographe ; infos en plus, objectifs et ce qu'elle n'aime pas dans la description du jeu de rôle ; ses goûts dans les passions ; ce qu'elle ne fait et ne montre jamais, en plus des règles strictes, dans « Zones interdites / limites strictes »). L'agent lit une version au format 1 par cette même conversion.
+- **Moi › Persona** : `GET /v1/creators/:id/persona/mine` rend `answers`, les 7 panneaux, jamais `agent`. Ses corrections nomment un panneau (`identity` … `boundaries`) ; les anciennes sections restent lues (migration 0134).
+
+## Format 1 (lu, converti à l'ouverture)
+
+Schéma Zod : `packages/contracts/src/persona.ts` (`PersonaSchema`, types `Persona`, listes `PERSONA_OPTIONS`, bornes `PERSONA_BOUNDS`, `ageOn`).
+
 Schéma Zod : `packages/contracts/src/persona.ts` (`PersonaSchema`, types `Persona`, listes `PERSONA_OPTIONS`, bornes `PERSONA_BOUNDS`, `ageOn`). Fichier : `personas/<creator>/vX.Y.Z.yaml`. ADR 0010.
 
 La structure reprend la fiche créatrice d'OnlyChat, onglet par onglet (décision de Charles, 17/10/2026 : « OnlyChat sont les boss »), ajustée par la méthode de chatting de l'agence (`/mnt/project-files/chatting/methode-chatting.md`, §6, hors dépôt) : curseurs en heures, pas de réglage de négociation, surnoms en liste fermée. Le formulaire du dashboard et l'agent lisent le même schéma et les mêmes listes de valeurs, avec leurs libellés français : le dashboard n'a pas sa propre copie.
 
-Exemples : `personas/messalina/v0.0.0.yaml` (placeholders, la vraie persona est hors dépôt) et `personas/demo/v0.1.0.yaml` (créatrice fictive, pour les tests, les évals et la démonstration ; `v0.2.0.yaml` est la même rangée en blocs, P5-01, lue par défaut par le playground et les évals).
+Exemples : `personas/messalina/v0.0.0.yaml` (placeholders, la vraie persona est hors dépôt) et `personas/demo/v0.1.0.yaml` (créatrice fictive, pour les tests, les évals et la démonstration ; `v0.2.0.yaml` est la même rangée en blocs, P5-01 ; le playground et les évals lisent `v0.3.0.yaml`, au format 2).
 
 | Section | Onglet OnlyChat | Champs | Rôle |
 |---|---|---|---|

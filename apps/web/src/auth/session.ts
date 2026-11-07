@@ -28,11 +28,35 @@ async function errorCodeOf(response: Response): Promise<string | null> {
   return parsed.success ? parsed.data.error.code : null;
 }
 
+/**
+ * The recette sandbox (ADR 0075): the API says so on its answers (`x-impera-sandbox`), and the page wears the « Bac à
+ * sable » badge of `shell/sandbox.css` on every screen, the sign-in included, for as long as it is open.
+ */
+export function markSandbox(response: Pick<Response, 'headers'>): void {
+  if (typeof document === 'undefined' || response.headers.get('x-impera-sandbox') !== '1') return;
+  document.documentElement.dataset['sandbox'] = '1';
+}
+
 export type CurrentSession =
   | { readonly kind: 'signed_in'; readonly user: Me }
   | { readonly kind: 'signed_out' }
   /** Signed in with the password, the second factor not active yet: the activation is the only screen (ADR 0046). */
   | { readonly kind: 'second_factor_required' };
+
+/** The reverse proxy's own answers when the API behind it does not answer. */
+const PROXY_STATUSES: ReadonlySet<number> = new Set([502, 503, 504]);
+
+/**
+ * The API answered the session's read with an error of its own (a 500, a 501…): it is up, something in it fails. Not
+ * « ne répond pas », which is for an API that does not answer at all; a 502, 503 or 504 is the reverse proxy saying
+ * just that (recette EXT-12).
+ */
+export class SessionServerError extends Error {
+  constructor(readonly status: number) {
+    super(`GET /v1/session: ${String(status)}`);
+    this.name = 'SessionServerError';
+  }
+}
 
 /**
  * The session as the app opens it: who is signed in, nobody, or an account that must activate its code first. Read
@@ -41,6 +65,9 @@ export type CurrentSession =
  */
 export async function readSession(): Promise<CurrentSession> {
   const response = await fetch('/v1/session', { credentials: 'include' });
+  markSandbox(response);
+  if (response.status >= 500 && !PROXY_STATUSES.has(response.status))
+    throw new SessionServerError(response.status);
   if (!response.ok) throw new Error(`GET /v1/session: ${String(response.status)}`);
   const answer = DashboardSessionSchema.parse(await response.json());
   return answer.state === 'signed_in' ? { kind: 'signed_in', user: answer.me } : { kind: answer.state };

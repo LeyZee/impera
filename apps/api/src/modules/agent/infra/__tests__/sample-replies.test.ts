@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { PersonaSchema, type Persona } from '@impera/contracts';
+import { PersonaSchema, PersonaV2Schema, type Persona, type PersonaV2 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
@@ -53,5 +53,46 @@ describe('sampleReplyFaults (P5-01)', () => {
       { index: 0, code: 'forbidden_term' },
       { index: 1, code: 'forbidden_term' },
     ]);
+  });
+});
+
+describe('sampleReplyFaults, « Réponses typiques » (ADR 0079 § 6)', () => {
+  const v2 = (): PersonaV2 =>
+    PersonaV2Schema.parse(
+      parse(
+        readFileSync(
+          fileURLToPath(new URL('../../../../../../../personas/demo/v0.3.0.yaml', import.meta.url)),
+          'utf8',
+        ),
+      ),
+    );
+  const withLines = (...lines: string[]): PersonaV2 => {
+    const p = v2();
+    p.sheet.conversation.typical_responses = lines.join('\n');
+    return p;
+  };
+
+  it('lets her demo answers through', () => {
+    expect(sampleReplyFaults(v2())).toEqual([]);
+  });
+
+  it('reads each line as one answer, by its line, and never the situation before « : »', () => {
+    expect(
+      sampleReplyFaults(
+        withLines(
+          'Il propose de se voir en vrai : Haha on verra 😏',
+          '',
+          'Coucou : *sourit* tu me manques',
+          'Je suis une IA tu sais',
+        ),
+      ),
+    ).toEqual([
+      { index: 2, code: 'stage_direction' },
+      { index: 3, code: 'ai_disclosure' },
+    ]);
+  });
+
+  it('takes her forbidden words and emojis from the agent’s rules', () => {
+    expect(sampleReplyFaults(withLines('Bonne nuit 😂')).map((f) => f.code)).toEqual(['forbidden_term']);
   });
 });

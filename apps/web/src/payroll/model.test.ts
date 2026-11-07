@@ -262,6 +262,11 @@ describe('a statement’s marks', () => {
     expect(payoutBlockPlace(documents, 'prefix_missing')).toBe('file');
     expect(payoutBlockPlace(documents, null)).toBe('file');
     expect(payoutBlockPlace(documents, 'agency_missing')).toBe('billing');
+    // No mandate published: the agency's step, never the member's (recette EQP-02).
+    expect(payoutBlockText(documents, 'mandate_unpublished')).toBe(
+      'Versement bloqué : facture pas encore émise, le mandat de facturation n’est pas encore publié dans Réglages › Facturation.',
+    );
+    expect(payoutBlockPlace(documents, 'mandate_unpublished')).toBe('billing');
     expect(payoutBlockPlace(documents, 'regime_not_validated')).toBe('billing');
     expect(payoutBlockPlace(documents, 'no_invoice_to_credit')).toBeNull();
     expect(payoutBlockPlace({ reason: 'tax_residence_unverified', year: '2027' }, null)).toBe('file');
@@ -280,6 +285,11 @@ describe('a statement’s marks', () => {
       yours: false,
     });
     expect(myPayoutHold(documents, 'agency_missing').yours).toBe(false);
+    // Nothing to accept yet: never sent to Moi › Dossier for a text the agency has not published (recette EQP-02).
+    expect(myPayoutHold(documents, 'mandate_unpublished')).toMatchObject({
+      text: 'L’agence publie ton mandat de facturation : tu l’acceptes ensuite dans Moi › Dossier, puis elle émet ta facture.',
+      yours: false,
+    });
     // No reason said yet: their file says what is left, if anything.
     expect(myPayoutHold(documents, null)).toMatchObject({
       title: 'Ton versement attend ta facture',

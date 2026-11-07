@@ -1,5 +1,6 @@
 import {
   CreatorIdSchema,
+  CreatorsOverviewSchema,
   DashboardQuerySchema,
   DashboardSchema,
   DomainError,
@@ -13,6 +14,7 @@ import { startOfLocalDay } from '@impera/llm';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { creatorOverview, fortnightDays } from '../../domain/creators-overview';
 import {
   assembleDashboard,
   creatorQueue,
@@ -25,8 +27,11 @@ import {
 } from '../../domain/dashboard';
 import type {
   AutomaticView,
+  CreatorOverviewView,
   DashboardReader,
+  OnShiftView,
   RevealSalesView,
+  SalesFeedState,
   TelegramView,
   UsdRateView,
   VoiceVersion,
@@ -51,6 +56,12 @@ export interface DashboardRouteDeps {
   readonly usdRate: UsdRateView;
   /** The sales read in the platform's register (CRM-04 lot c). */
   readonly revealSales: RevealSalesView;
+  /** A creator's card in the list of Créatrices: her mode, her requests, the team's names. */
+  readonly overview: CreatorOverviewView;
+  /** Who is on shift on her accounts now (`scheduling`), read as the system. */
+  readonly onShift: OnShiftView;
+  /** Every platform's feed as Réglages › Ventes shows it: a stopped one is named on the panel (AGT-11). */
+  readonly salesFeeds: () => Promise<readonly SalesFeedState[]>;
   /** Absent when Telegram is off (no encryption key): both Telegram fields are null. */
   readonly telegram?: TelegramView;
   /** Every creator, for the owner's « À traiter » across creators (`persona` module, by the composition root). */
@@ -117,7 +128,10 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           jobs: stuckJobsOf(stuckJobs, user.role === 'owner'),
           telegram,
           automatic,
-          revealSales: sales === undefined ? null : revealSalesPanel({ ...sales, rate: usdRate }),
+          revealSales:
+            sales === undefined
+              ? null
+              : revealSalesPanel({ ...sales, rate: usdRate, feeds: await deps.salesFeeds() }),
         });
       },
     );
@@ -158,6 +172,39 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           if (found !== undefined) queues.push(creatorQueue(creatorId, found.facts, now));
         }
         return queueAcross(queues);
+      },
+    );
+    app.get(
+      '/dashboard/creators',
+      {
+        // The agency's list of Créatrices: never a creator's, never a chatter's (his creators move to
+        // `routedCreatorIds`, so the account's own list is empty for him).
+        preValidation: deps.requireRole('owner', 'operator'),
+        schema: { response: { 200: CreatorsOverviewSchema } },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const userId = UserIdSchema.parse(user.id);
+        const listed =
+          user.role === 'owner'
+            ? await deps.allCreatorIds()
+            : [...new Set(user.creatorIds)].map((id) => CreatorIdSchema.parse(id));
+        const now = (deps.now ?? (() => new Date()))();
+        const rate = listed.length === 0 ? null : await deps.usdRate.latest(userId);
+        // One tenant transaction per creator (RLS), one after the other: a refresh holds one connection of the pool.
+        const creators = [];
+        for (const creatorId of listed) {
+          const facts = await deps.overview.read(creatorId, userId);
+          if (facts === undefined) continue;
+          const reads = facts.scope !== 'self';
+          const sales = reads
+            ? await deps.revealSales.read(creatorId, userId, fortnightDays(now, facts.timezone))
+            : undefined;
+          const onShift = reads ? await deps.onShift(creatorId, now) : [];
+          creators.push(creatorOverview({ creatorId, facts, now, sales, rate, onShift }));
+        }
+        return { creators };
       },
     );
     return Promise.resolve();

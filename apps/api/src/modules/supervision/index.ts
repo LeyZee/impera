@@ -3,16 +3,17 @@ import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createDashboardRoutes, type DashboardRouteDeps } from './infra/http/dashboard-routes';
+import { createCreatorsOverviewReader } from './infra/views/creators-overview-reader';
 import { createDashboardReader } from './infra/views/dashboard-reader';
 import { createRevealSalesReader, type SalesTotalsOf } from './infra/views/reveal-sales-reader';
 
 export interface SupervisionModule {
   readonly name: 'supervision';
-  /** `GET /v1/dashboard`, mounted under `/v1` by the server. */
+  /** `GET /v1/dashboard`, `/dashboard/todos` and `/dashboard/creators`, mounted under `/v1` by the server. */
   readonly routes: FastifyPluginAsyncZod;
 }
 
-export interface SupervisionDeps extends Omit<DashboardRouteDeps, 'reader' | 'revealSales'> {
+export interface SupervisionDeps extends Omit<DashboardRouteDeps, 'reader' | 'revealSales' | 'overview'> {
   /** Application role: the Dashboard reads in tenant transactions (RLS). */
   readonly db: Database;
   /** The connectors' `salesFeedTotals.totalsOf` (CRM-04), for the sales panel. */
@@ -26,6 +27,7 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
       ...deps,
       reader: createDashboardReader(deps.db),
       revealSales: createRevealSalesReader(deps.db, deps.salesTotalsOf),
+      overview: createCreatorsOverviewReader(deps.db),
     }),
   };
 }

@@ -1,4 +1,4 @@
-import { JOB_PAYLOADS } from '@impera/contracts';
+import { JOB_PAYLOADS, asPersonaV2 } from '@impera/contracts';
 import type { LlmGateway } from '@impera/llm';
 
 import { defineTask } from '../jobs';
@@ -35,7 +35,11 @@ export function wireTrends(
     adminDb: shared.adminDb,
     requireRole: shared.requireRole,
     gateway: deps.gateway,
-    limitsOf: async (creatorId) => (await deps.persona.versions.active(creatorId))?.persona.limits ?? null,
+    limitsOf: async (creatorId) => {
+      const active = await deps.persona.versions.active(creatorId);
+      // Her strict rules, wherever the format keeps them (ADR 0079 § 4).
+      return active === null ? null : asPersonaV2(active.persona).agent.rules;
+    },
     agenda: deps.agenda,
     contentDrops: deps.contentDrops,
   });

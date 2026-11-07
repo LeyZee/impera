@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Me } from '@impera/contracts';
+import { personaSheetFromV1, type Me, type Persona } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -9,6 +9,12 @@ import blocksYaml from '../../../../personas/demo/v0.2.0.yaml?raw';
 import { createAppRouter, type AppRouter } from '../router';
 
 import { parsePersonaYaml } from './persona/source';
+
+/** The format-2 draft the API sends beside a format-1 version (ADR 0079 § 5). */
+const asDraft = (persona: Persona) => {
+  const { persona: draft, moved } = personaSheetFromV1(persona);
+  return { draft, moved };
+};
 
 /* Invented creators and members: no real data. */
 const ANNA = { id: '0192f3a0-0000-7000-8000-0000000000a1', displayName: 'Anna', timezone: 'Europe/Paris' };
@@ -49,6 +55,31 @@ const summary = (n: number) => ({
   createdAt: '2026-10-28T08:00:00.000Z',
 });
 
+/** A card of the list as the owner reads it; Anna's says her fortnight, who is on shift and what she owes. */
+const card = (creator: typeof ANNA) =>
+  creator.id === ANNA.id
+    ? {
+        creatorId: creator.id,
+        mode: 'copilot',
+        sales: {
+          from: '2026-11-16',
+          to: '2026-11-20',
+          sales: 4,
+          refunds: 0,
+          revenueMinor: 184_650,
+          usdLeftOut: false,
+        },
+        onShift: [
+          {
+            memberId: '0192f3a0-0000-7000-8000-0000000000d4',
+            name: 'Théo',
+            endsAt: '2026-11-20T22:00:00.000Z',
+          },
+        ],
+        requests: { open: 2, next: { category: 'feed_video', dueOn: '2000-01-05', late: true } },
+      }
+    : { creatorId: creator.id, mode: 'stop', sales: null, onShift: [], requests: { open: 0, next: null } };
+
 /** The creators the list answers (`null`: the list fails), each with the demo persona as her stored one. */
 async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
   const persona = await parsePersonaYaml(blocksYaml);
@@ -60,10 +91,23 @@ async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
       // A creation answers the new creator, whatever was typed: the page only needs her summary.
       if (url === '/v1/creators' && init?.method === 'POST') return json(CLEO, 201);
       if (url === '/v1/creators') return creators === null ? json({}, 500) : json({ creators });
+      // The cards of the list (« ok liste-créatrices »): Anna on Copilote with her fortnight, the others on Arrêt.
+      if (url === '/v1/dashboard/creators') return json({ creators: (creators ?? []).map(card) });
+      if (url === '/v1/dashboard/todos') {
+        return json({
+          items: [],
+          creators: (creators ?? []).map((c, i) => ({
+            creatorId: c.id,
+            name: c.displayName,
+            todos: i === 0 ? 3 : 0,
+            grave: i === 0 ? 1 : 0,
+          })),
+        });
+      }
       const index = (creators ?? []).findIndex((c) => url === `/v1/creators/${c.id}/persona`);
       const creator = creators?.[index];
       if (creator !== undefined) {
-        const latest = { summary: summary(index), persona };
+        const latest = { summary: summary(index), persona, ...asDraft(persona) };
         return json({ creatorId: creator.id, latest, versions: [summary(index)] });
       }
       // Her agency percentage (CR-04): none set yet.
@@ -88,16 +132,22 @@ function renderAt(user: Me, path: string): AppRouter {
   return router;
 }
 
-const chip = (name: string): HTMLElement => screen.getByRole('radio', { name });
-
-/** The creator on screen: her chip is the one checked; no eyebrow repeats it over the header's views (CREA-24, NAV-10). */
+/** Her sheet on screen, on her persona: her name is the page's title, the list one step back. */
 const picked = (name: string): Promise<void> =>
   waitFor(() => {
-    expect(chip(name).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('heading', { level: 1, name })).toBeDefined();
+    expect(screen.getByRole('link', { name: '← Créatrices' })).toBeDefined();
     const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
     expect(within(views).getByRole('link', { name: 'Persona' }).getAttribute('aria-current')).toBe('page');
-    expect(screen.queryByText(`${name} · Persona`)).toBeNull();
   });
+
+/** The card of a creator in the list. */
+const cardOf = async (name: string): Promise<HTMLElement> => {
+  const link = await screen.findByRole('link', { name });
+  const item = link.closest('li');
+  if (item === null) throw new Error(`no card for ${name}`);
+  return item;
+};
 
 beforeEach(() => {
   vi.stubGlobal('scrollTo', vi.fn());
@@ -122,15 +172,73 @@ afterEach(() => {
 });
 
 describe('Créatrices, the creator in the address (recette 28/10)', () => {
-  it('opens the creator the address names, and writes the one picked into it', async () => {
-    await serve([ANNA, BEA]);
-    const router = renderAt(owner, `/creatrices?creatrice=${BEA.id}`);
-    await picked('Bea');
-    expect(chip('Bea').getAttribute('aria-checked')).toBe('true');
+  it('opens on the list, even with one creator, and a card opens her sheet, « ← Créatrices » going back', async () => {
+    await serve([ANNA]);
+    const router = renderAt(owner, '/creatrices');
+    const anna = await cardOf('Anna');
+    expect(screen.getByRole('heading', { level: 1, name: 'Créatrices' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Ajouter une créatrice' })).toBeDefined();
+    expect(screen.queryByRole('navigation', { name: 'Fiche de la créatrice' })).toBeNull();
+    await waitFor(() => {
+      expect(within(anna).getByText('1 846,50 €')).toBeDefined();
+    });
+    expect(within(anna).getByText('Copilote')).toBeDefined();
+    expect(within(anna).getByText('du 16 au 20 nov.')).toBeDefined();
+    expect(within(anna).getByText(/^Théo jusqu’à/u)).toBeDefined();
+    expect(within(anna).getByText('🎬 Feed · Vidéo short')).toBeDefined();
+    expect(within(anna).getByText(/^En retard depuis .* · 1 autre attendu$/u)).toBeDefined();
+    expect(within(anna).getByText('3 à traiter, dont 1 urgent')).toBeDefined();
 
-    fireEvent.click(chip('Anna'));
+    fireEvent.click(within(anna).getByRole('link', { name: 'Anna' }));
     await picked('Anna');
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
+    // On her sheet, nothing of the list: neither the other creators nor « Ajouter une créatrice ».
+    expect(screen.queryByRole('button', { name: 'Ajouter une créatrice' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('link', { name: '← Créatrices' }));
+    await cardOf('Anna');
+    expect(router.state.location.search).toEqual({});
+  });
+
+  it('opens the creator the address names, and the list for one it does not hold', async () => {
+    await serve([ANNA, BEA]);
+    renderAt(owner, `/creatrices?creatrice=${BEA.id}`);
+    await picked('Bea');
+    cleanup();
+    await serve([ANNA, BEA]);
+    renderAt(owner, `/creatrices?creatrice=${CLEO.id}`);
+    await cardOf('Bea');
+    expect(screen.getByRole('link', { name: 'Anna' })).toBeDefined();
+  });
+
+  it('says on a card only what the server gives: no figures for a reader whose scope is his own', async () => {
+    await serve([ANNA]);
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request) => {
+      const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+      if (url === '/v1/creators') return json({ creators: [ANNA] });
+      if (url === '/v1/dashboard/creators') {
+        return json({
+          creators: [{ creatorId: ANNA.id, mode: 'auto', sales: null, onShift: null, requests: null }],
+        });
+      }
+      if (url === '/v1/dashboard/todos') return json({ items: [], creators: [] });
+      return json({});
+    });
+    const router = renderAt(operator, '/creatrices');
+    const anna = await cardOf('Anna');
+    await waitFor(() => {
+      expect(within(anna).getByText('Automatique')).toBeDefined();
+    });
+    expect(within(anna).queryByText('Chiffre d’affaires')).toBeNull();
+    expect(within(anna).queryByText('En poste')).toBeNull();
+    expect(within(anna).queryByText('Contenu attendu')).toBeNull();
+    expect(within(anna).getByText('Rien à traiter')).toBeDefined();
+    expect(within(anna).queryByText('À configurer')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ajouter une créatrice' })).toBeNull();
+    fireEvent.click(within(anna).getByRole('link', { name: 'Anna' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
+    });
   });
 
   it('gives the owner her Accès, in the address, and keeps it from anyone else (CR-02)', async () => {
@@ -177,7 +285,7 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     const name = await screen.findByLabelText('Prénom');
     fireEvent.change(name, { target: { value: 'Elenaa' } });
 
-    fireEvent.click(chip('Bea'));
+    fireEvent.click(screen.getByRole('link', { name: '← Créatrices' }));
     await screen.findByText('Tes modifications ne sont pas enregistrées.');
     fireEvent.click(screen.getByRole('button', { name: 'Rester' }));
     await waitFor(() => {
@@ -186,13 +294,11 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
     expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Elenaa');
 
-    // « Ajouter une créatrice » asks too, then « Les abandonner » lets the navigation through.
-    fireEvent.click(screen.getByRole('button', { name: 'Ajouter une créatrice' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Rester' }));
-    fireEvent.click(chip('Bea'));
+    // « Les abandonner » lets the navigation through, back to the list.
+    fireEvent.click(screen.getByRole('link', { name: '← Créatrices' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Les abandonner' }));
-    await picked('Bea');
-    expect(router.state.location.search).toEqual({ creatrice: BEA.id });
+    await cardOf('Bea');
+    expect(router.state.location.search).toEqual({});
   });
 
   it('takes the owner to Réglages › Alertes inside the app, asking first when changes wait (CREA-25)', async () => {
@@ -209,20 +315,22 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     });
   });
 
-  it('asks once on « Ajouter une créatrice », never again once the new creator is created', async () => {
+  it('adds a creator from the list, her sheet opening once she is created, « Annuler » back to the list', async () => {
     await serve([ANNA, BEA]);
-    const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
-    fireEvent.change(await screen.findByLabelText('Prénom'), { target: { value: 'Elenaa' } });
+    const router = renderAt(owner, '/creatrices');
+    await cardOf('Anna');
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter une créatrice' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Les abandonner' }));
+    await screen.findByLabelText('Prénom ou pseudo');
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+    await cardOf('Anna');
 
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter une créatrice' }));
     fireEvent.change(await screen.findByLabelText('Prénom ou pseudo'), { target: { value: 'Cleo' } });
     fireEvent.click(screen.getByRole('button', { name: 'Créer' }));
     await waitFor(() => {
-      expect(screen.queryByLabelText('Prénom ou pseudo')).toBeNull();
+      expect(router.state.location.search).toEqual({ creatrice: CLEO.id });
     });
-    expect(screen.queryByText('Tes modifications ne sont pas enregistrées.')).toBeNull();
-    expect(router.state.location.search).toEqual({ creatrice: CLEO.id });
+    expect(screen.queryByLabelText('Prénom ou pseudo')).toBeNull();
   });
 });
 
@@ -284,7 +392,7 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
       within(sheets)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Agenda', 'Idées du jour', 'Scripts']);
+    ).toEqual(['Agenda', 'Idées du jour', 'Demandes', 'Scripts']);
     router.history.push(`/creatrices?onglet=idees&creatrice=${ANNA.id}`);
     expect(await screen.findByText('Ses idées du jour')).toBeDefined();
     for (const onglet of ['pourcentage', 'acces', 'heures']) {
@@ -391,15 +499,18 @@ describe('Créatrices, what is left to set up for her (CRM-07 b2)', () => {
     );
   }
 
-  it('says to the owner what is left, each step opening its tab, her zone beside it', async () => {
+  it('says on her card what is left to the owner, each step opening its tab', async () => {
     await serveSetup(null, null);
-    const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
-    const card = await screen.findByRole('region', { name: 'Pour démarrer avec Anna' });
-    expect(within(card).getByText('1 sur 3')).toBeDefined();
-    expect(within(card).getAllByRole('listitem')[0]?.textContent).toBe('Sa persona : fait');
-    expect(within(card).getByText('À créer : son lien d’invitation.')).toBeDefined();
-    expect(within(card).getByText(/Ses heures se lisent à l’heure de Paris/u)).toBeDefined();
-    fireEvent.click(within(card).getByRole('link', { name: 'Ouvrir : Le pourcentage de l’agence' }));
+    const router = renderAt(owner, '/creatrices');
+    const anna = await cardOf('Anna');
+    await within(anna).findByText('À configurer');
+    // Her persona is stored: only her percentage and her access are left.
+    expect(
+      within(anna)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Anna', 'Pourcentage', 'Accès']);
+    fireEvent.click(within(anna).getByRole('link', { name: 'Pourcentage' }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'pourcentage', creatrice: ANNA.id });
     });
@@ -417,19 +528,22 @@ describe('Créatrices, what is left to set up for her (CRM-07 b2)', () => {
       { email: 'anna@example.test', invitationPending: false, invitationExpiresAt: null },
       rate,
     );
-    renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
-    await screen.findByRole('heading', { name: 'Créatrices' });
+    renderAt(owner, '/creatrices');
+    await cardOf('Anna');
     await waitFor(() => {
       expect(vi.mocked(fetch).mock.calls.some(([url]) => url === `/v1/creators/${ANNA.id}/account`)).toBe(
         true,
       );
     });
-    expect(screen.queryByRole('region', { name: /Pour démarrer/u })).toBeNull();
+    expect(screen.queryByText('À configurer')).toBeNull();
     cleanup();
 
     await serveSetup(null, null);
-    renderAt(operator, `/creatrices?creatrice=${ANNA.id}`);
-    await screen.findByRole('heading', { name: 'Créatrices' });
-    expect(screen.queryByRole('region', { name: /Pour démarrer/u })).toBeNull();
+    renderAt(operator, '/creatrices');
+    await cardOf('Anna');
+    expect(screen.queryByText('À configurer')).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => url === `/v1/creators/${ANNA.id}/account`)).toBe(
+      false,
+    );
   });
 });

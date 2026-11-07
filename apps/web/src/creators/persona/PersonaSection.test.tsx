@@ -1,3 +1,4 @@
+import { personaSheetFromV1, type Persona } from '@impera/contracts';
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,6 +7,12 @@ import blocksYaml from '../../../../../personas/demo/v0.2.0.yaml?raw';
 
 import { PersonaSection, tabsOutOfView } from './PersonaSection';
 import { parsePersonaYaml } from './source';
+
+/** The format-2 draft the API sends beside a format-1 version (ADR 0079 § 5). */
+const asDraft = (persona: Persona) => {
+  const { persona: draft, moved } = personaSheetFromV1(persona);
+  return { draft, moved };
+};
 
 const CREATOR = '6f1c2a0e-3b4d-4e5f-8a9b-0c1d2e3f4a5b';
 const SUMMARY = {
@@ -39,7 +46,11 @@ async function serve(saved: readonly [number, unknown]) {
       return Promise.resolve(new Response(JSON.stringify(saved[1]), { status: saved[0] }));
     }
     if (url === `/v1/creators/${CREATOR}/persona`) {
-      const overview = { creatorId: CREATOR, latest: { summary: SUMMARY, persona }, versions: [SUMMARY] };
+      const overview = {
+        creatorId: CREATOR,
+        latest: { summary: SUMMARY, persona, ...asDraft(persona) },
+        versions: [SUMMARY],
+      };
       return Promise.resolve(new Response(JSON.stringify(overview), { status: 200 }));
     }
     return Promise.resolve(new Response('{}', { status: 404 }));
@@ -119,7 +130,7 @@ describe('Créatrices › Persona, the P5-01 blocks', () => {
   });
 
   it('says a refusal it cannot read as a failed save', async () => {
-    await serve(refusal([{ index: 99, code: 'ai_disclosure' }]));
+    await serve(refusal([{ index: 999, code: 'ai_disclosure' }]));
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     await screen.findByRole('progressbar', { name: 'Complétude de la persona' });
     fireEvent.click(tab('Elle en détail'));
@@ -141,7 +152,8 @@ async function serveVersions(
       return Promise.resolve(new Response(JSON.stringify(body), { status }));
     }
     if (url === `/v1/creators/${CREATOR}/persona`) {
-      const latest = versions[0] === undefined ? null : { summary: versions[0], persona };
+      const latest =
+        versions[0] === undefined ? null : { summary: versions[0], persona, ...asDraft(persona) };
       return Promise.resolve(
         new Response(JSON.stringify({ creatorId: CREATOR, latest, versions }), { status: 200 }),
       );
@@ -168,7 +180,7 @@ describe('Créatrices › Persona, recette 28/10', () => {
     ]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Activer la version 0.2.0' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmer l’activation' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
 
     expect(
       await screen.findByText(/Sa version active a changé depuis l’ouverture de cette page/u),
@@ -187,12 +199,12 @@ describe('Créatrices › Persona, recette 28/10', () => {
     ]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Activer la version 0.2.0' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmer l’activation' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
 
-    expect(await screen.findByText(/pour l’activer, confirme ton mot de passe/u)).toBeDefined();
+    expect(await screen.findByText(/Pour l’activer, confirme ton mot de passe/u)).toBeDefined();
     expect(screen.queryByText(/Seuls le propriétaire et la créatrice/u)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
-    expect(screen.queryByText(/pour l’activer, confirme ton mot de passe/u)).toBeNull();
+    expect(screen.queryByText(/Pour l’activer, confirme ton mot de passe/u)).toBeNull();
   });
 
   it('says nothing of the state while nothing waits, and says the changes once there are some (CREA-05)', async () => {
@@ -294,6 +306,131 @@ describe('Créatrices › Persona, recette 28/10', () => {
     fireEvent.change(name, { target: { value: 'Léana' } });
     expect(screen.getByText(/^\d+ champs? à corriger$/u)).toBeDefined();
     expect(screen.getAllByText('À remplir').length).toBeGreaterThan(0);
+  });
+});
+
+describe('Créatrices › Persona, « Ses versions » (recette AGT-07)', () => {
+  const FIRST = {
+    ...SUMMARY,
+    id: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c3f',
+    version: '0.0.1',
+    contentHash: 'c'.repeat(64),
+    isActive: false,
+    createdAt: '2026-10-20T08:00:00.000Z',
+  };
+  /** A bad 0.2.0 made active: the 0.1.0 before it is the one to go back to. */
+  const BAD = { ...NEWEST, isActive: true };
+  const PREVIOUS = { ...OLDER, isActive: false };
+
+  const versionsFold = () => {
+    const title = screen.getByText('Ses versions');
+    const fold = title.closest('details');
+    if (fold === null) throw new Error('« Ses versions » is a fold');
+    return fold;
+  };
+
+  it('puts an older version back in service over the active one, once its dialog says « Activer »', async () => {
+    const fake = await serveVersions([BAD, PREVIOUS, FIRST], () => [200, { ...PREVIOUS, isActive: true }]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    await screen.findByLabelText('Prénom');
+    const fold = versionsFold();
+    expect(fold.open).toBe(false);
+    expect(within(fold).getByText('3 versions · active : 0.2.0')).toBeDefined();
+    // Every older version offers it, the active one says so, the head offers nothing (its newest is active).
+    expect(within(fold).getByRole('button', { name: 'Réactiver la version 0.0.1' })).toBeDefined();
+    expect(within(fold).getByText('Active')).toBeDefined();
+    expect(screen.queryByRole('button', { name: /^Activer la version/u })).toBeNull();
+
+    fireEvent.click(within(fold).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
+    expect(fake.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+    const dialog = screen.getByRole('dialog', { name: 'Activer la version 0.1.0' });
+    expect(within(dialog).getByText(/à la place de la version 0\.2\.0/u)).toBeDefined();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Activer' }));
+
+    expect(await screen.findByText('Version 0.1.0 marquée active')).toBeDefined();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const [url, init] = fake.mock.calls.find(([, i]) => i?.method === 'POST') ?? [];
+    expect(url).toBe(`/v1/creators/${CREATOR}/persona/versions/${PREVIOUS.id}/activate`);
+    expect(init?.body).toBe(JSON.stringify({ expectedActive: BAD.id }));
+  });
+
+  it('asks for the password, then puts back the version it was asked for', async () => {
+    let calls = 0;
+    const fake = await serveVersions([BAD, PREVIOUS], () => {
+      calls += 1;
+      return calls === 1
+        ? [403, { error: { code: 'reauthentication_forbidden', message: 'x', details: {}, requestId: 'r' } }]
+        : [200, { ...PREVIOUS, isActive: true }];
+    });
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    await screen.findByLabelText('Prénom');
+    fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
+    expect(await screen.findByRole('dialog', { name: 'Activer la version 0.1.0' })).toBeDefined();
+    const activations = fake.mock.calls.filter(([url]) => url.endsWith('/activate'));
+    expect(activations.map(([url]) => url)).toEqual([
+      `/v1/creators/${CREATOR}/persona/versions/${PREVIOUS.id}/activate`,
+    ]);
+  });
+
+  it('keeps what is typed and not saved when an older version is put back', async () => {
+    const fake = await serveVersions([BAD, PREVIOUS], () => [200, { ...PREVIOUS, isActive: true }]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    fireEvent.change(await screen.findByLabelText('Prénom'), { target: { value: 'Elenaa' } });
+    fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
+    // The page reads her versions again; the draft, the newest version's content, stays as typed.
+    await waitFor(() => {
+      expect(fake.mock.calls.filter(([url]) => url === `/v1/creators/${CREATOR}/persona`)).toHaveLength(2);
+    });
+    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Elenaa');
+    expect(screen.getByText('1 modification, prête à enregistrer')).toBeDefined();
+  });
+
+  it('says why a version stored before a guard changed is not put back', async () => {
+    await serveVersions([BAD, PREVIOUS], () => [
+      422,
+      {
+        error: {
+          code: 'persona_sample_reply_unprocessable',
+          message: 'x',
+          details: { faults: [{ index: 0, code: 'ai_disclosure' }] },
+          requestId: 'r',
+        },
+      },
+    ]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    await screen.findByLabelText('Prénom');
+    fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
+    expect(
+      await screen.findByText(/La version 0.1.0 n’est pas activée : une de ses réponses types/u),
+    ).toBeDefined();
+    expect(screen.queryByText(/Impera ne répond pas/u)).toBeNull();
+  });
+
+  it('lets a manager read the list without any button, and shows nothing for one version', async () => {
+    await serveVersions([BAD, PREVIOUS], () => [500, {}]);
+    const { unmount } = render(
+      <PersonaSection creatorId={CREATOR} canSave={false} timezone="Europe/Paris" />,
+    );
+    await screen.findByLabelText('Prénom');
+    expect(within(versionsFold()).queryByRole('button')).toBeNull();
+    expect(within(versionsFold()).getByText(/Seul le propriétaire choisit la version/u)).toBeDefined();
+    unmount();
+
+    await serveVersions([SUMMARY], () => [500, {}]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    await screen.findByLabelText('Prénom');
+    expect(screen.queryByText('Ses versions')).toBeNull();
+  });
+
+  it('leaves the newest inactive version to the head, never twice', async () => {
+    await serveVersions([NEWEST, OLDER], () => [500, {}]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    expect(await screen.findByRole('button', { name: 'Activer la version 0.2.0' })).toBeDefined();
+    expect(within(versionsFold()).getByText('La plus récente')).toBeDefined();
+    expect(within(versionsFold()).queryByRole('button')).toBeNull();
   });
 });
 

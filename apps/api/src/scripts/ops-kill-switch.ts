@@ -10,6 +10,12 @@ import { createDbClient } from '@impera/db';
 import { loadConfig } from '../config';
 import { KillSwitchInputSchema, setKillSwitch } from '../ops';
 
+import { requireArguments } from './command-line';
+
+requireArguments(
+  'Usage: pnpm ops:kill-switch --on|--off --scope global|creator|conversation [--id <uuid>] --reason "<texte>"',
+  { withValue: ['scope', 'id', 'reason'], alone: ['on', 'off'] },
+);
 const { values } = parseArgs({
   options: {
     on: { type: 'boolean', default: false },

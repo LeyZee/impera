@@ -1,0 +1,209 @@
+/*
+ * The list of Créatrices (« ok liste-créatrices », 06/11): one card per creator, as many in a row as the screen holds,
+ * one per row on a phone. The whole card opens her sheet (its name's link stretched over it); « À configurer » keeps
+ * its own links above it. No coloured bar on any side: a tone is a dot or a word's colour.
+ */
+.cl-page {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  min-width: 0;
+}
+
+.cl-note {
+  margin: 0;
+}
+
+.cl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: var(--nv-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cl-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  min-width: 0;
+  padding: var(--nv-space-5);
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out);
+}
+.cl-card:hover {
+  background-color: var(--nv-plate-hover);
+}
+.cl-card:has(.cl-card__name:focus-visible) {
+  box-shadow: var(--nv-shadow-focus);
+}
+
+.cl-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-width: 0;
+}
+
+.cl-card__face {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--nv-radius-full);
+  background: linear-gradient(160deg, var(--nv-select-strong), var(--nv-plate));
+  box-shadow: inset 0 1px 0 var(--nv-glass-edge);
+  font: italic 600 20px/1 var(--nv-font-wordmark);
+}
+
+.cl-card__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cl-card__name {
+  overflow: hidden;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  outline: none;
+}
+/* Stretched over the card: a click anywhere opens her sheet. */
+.cl-card__name::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.cl-card__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.cl-card__mode--empty {
+  height: var(--nv-text-footnote-leading);
+}
+
+.cl-card__go {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.cl-card:hover .cl-card__go {
+  transform: translateX(2px);
+}
+
+.cl-card__facts {
+  display: grid;
+  gap: var(--nv-space-3);
+  margin: 0;
+  padding-top: var(--nv-space-4);
+  border-top: 1px solid var(--nv-hairline);
+}
+
+.cl-fact {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--nv-space-3);
+}
+.cl-fact__label {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.cl-fact__value {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  margin: 0;
+  text-align: end;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.cl-fact__strong {
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+}
+.cl-fact__quiet {
+  color: var(--nv-ink-muted);
+}
+.cl-fact__note {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+
+.cl-tone--warn {
+  color: var(--nv-warning);
+}
+.cl-tone--bad {
+  color: var(--nv-danger);
+  font-weight: 600;
+}
+.cl-tone--ok {
+  color: var(--nv-success);
+}
+
+/* What is left to set up: its links sit above the stretched one, so each opens its own tab. */
+.cl-card__setup {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.cl-card__setup-label {
+  margin-inline-end: 2px;
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.cl-card__step {
+  padding: 3px 10px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink);
+  text-decoration: none;
+}
+.cl-card__step:hover {
+  background: var(--nv-fill-track);
+}
+.cl-card__step:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-card,
+  .cl-card__go {
+    transition: none;
+  }
+}

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { refusalBodySchema } from './errors';
 import { CreatorIdSchema } from './ids';
+import { pastedSecret } from './pasted-secret';
 
 /**
  * Telegram notifications managed from Réglages › Telegram (ADR 0020, task P3-07). A bot token never crosses the
@@ -111,7 +112,7 @@ export const TelegramOverviewSchema = z.object({
 export type TelegramOverview = z.infer<typeof TelegramOverviewSchema>;
 
 /** A bot token is `<digits>:<35 characters>`; 128 leaves room and stops abuse of the route. */
-export const SaveTelegramTokenBodySchema = z.object({ token: z.string().trim().min(1).max(128) });
+export const SaveTelegramTokenBodySchema = z.object({ token: pastedSecret(128) });
 export type SaveTelegramTokenBody = z.infer<typeof SaveTelegramTokenBodySchema>;
 
 export const SaveTelegramRoutesBodySchema = z.object({
