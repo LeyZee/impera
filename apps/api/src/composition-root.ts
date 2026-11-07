@@ -320,7 +320,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   // Before the planning: her calendar link's feed reads her agenda (CR-05 lot c2).
   const notifications = wireNotifications(shared);
   const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
-  const scheduling = wireScheduling(shared, { persona: persona.module, creatorTasks: creatorTasks.module });
+  const scheduling = wireScheduling(shared, {
+    persona: persona.module,
+    creatorTasks: creatorTasks.module,
+    notifications: notifications.module,
+  });
   // Late bound: her script drop reads the library's frozen versions, and the library asks her scripts through her content.
   const contentDrops = wireContentDrops(shared, {
     scriptVersions: {

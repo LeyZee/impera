@@ -16,10 +16,11 @@ import { createShiftFeedbackService } from './application/feedback';
 import { createLeaveService } from './application/leaves';
 import { makeShifts } from './application/make-shifts';
 import { createPayRulesService } from './application/pay-rules';
+import { remindReports, type ReportRemindersRun } from './application/report-reminders';
 import { createShiftReportService } from './application/reports';
 import { createSchedulingService } from './application/scheduling';
 import { createSwapService } from './application/swaps';
-import type { CreatorAgendaFeed, CreatorDirectory, JobLogger, OnShift } from './domain/ports';
+import type { CreatorAgendaFeed, CreatorDirectory, JobLogger, Notify, OnShift } from './domain/ports';
 import type { ShiftFactsForPay } from './domain/reports';
 import { calendarDayIn } from './domain/time';
 import { createDrizzleAgencyRatesStore } from './infra/agency-rates-store';
@@ -51,6 +52,7 @@ import {
 import { createDrizzlePayRulesStore, type SwitchFactsRead } from './infra/pay-rules-store';
 import { createDrizzlePlanningAdmin, createDrizzlePlanningStore } from './infra/planning-store';
 import type { ShiftSalesReader } from './infra/report-check';
+import { createDrizzleReportReminderSource } from './infra/report-reminders';
 import { createDrizzleShiftReportStore } from './infra/report-store';
 import { createSchedulingRoutes, type RequireRole } from './infra/routes';
 import { agencyTimeZone } from './infra/rows';
@@ -151,6 +153,12 @@ export interface SchedulingModule {
      * period) at the version it was found at. Replayable: it changes no amount and validates nothing twice.
      */
     readonly checkReports: () => Promise<{ checked: number; validated: number }>;
+    /**
+     * `scheduling.remind_reports` (ADR 0077), every five minutes: the member of a shift ended without its report is
+     * reminded on his phone, 15 minutes after the end, then 12 hours after; each reminder rings once. Null when push is
+     * off: the agency's « Relancer » stays.
+     */
+    readonly remindReports: (() => Promise<ReportRemindersRun>) | null;
   };
 }
 
@@ -184,11 +192,17 @@ export interface SchedulingDeps {
   readonly shiftSalesOf: ShiftSalesReader;
   /** A creator's agenda in her calendar link's feed (CR-05 lot c2): the `creator-tasks` module's `feedOf`. */
   readonly creatorAgendaFeed: CreatorAgendaFeed;
+  /**
+   * A push notification for an account (ADR 0077): the `notifications` module's `notify`, which the reports' reminders
+   * ring through; null when push is off.
+   */
+  readonly notify: Notify | null;
   readonly now?: () => Date;
 }
 
 export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   const now = deps.now ?? (() => new Date());
+  const { notify } = deps;
   const admin = createDrizzlePlanningAdmin(deps.adminDb);
   const colleagues = createDrizzleColleagueReads(deps.adminDb);
   const planning = createDrizzlePlanningStore(deps.db, deps.adminDb);
@@ -267,6 +281,10 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       lapseSwaps: () => colleagues.lapseSwapsUnscoped(now()),
       checkAgencyShares: (correlationId) => shareCheck.run(now(), correlationId),
       checkReports: () => services.reports.checkReports(),
+      remindReports:
+        notify === null
+          ? null
+          : () => remindReports({ source: createDrizzleReportReminderSource(deps.adminDb), notify }, now),
     },
   };
 }
