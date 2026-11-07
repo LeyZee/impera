@@ -92,6 +92,36 @@ class MemberNotFound extends DomainError {
   }
 }
 
+/** A link for a new password replaces one already chosen: the owner's alone (ADR 0076 § 3). */
+class ResetOwnerOnly extends DomainError {
+  constructor() {
+    super('role_forbidden', 'Seul le propriétaire crée un lien pour choisir un nouveau mot de passe');
+  }
+}
+
+class ManagersAndOwnerOnly extends DomainError {
+  constructor() {
+    super('role_forbidden', 'Réservé au propriétaire et aux managers actifs');
+  }
+}
+
+/** A manager makes the link of a chatter, never of another manager (ADR 0076 § 3). */
+class ChattersOnly extends DomainError {
+  constructor() {
+    super('role_forbidden', 'Un manager crée le lien d’invitation d’un chatteur seulement');
+  }
+}
+
+/** His password is chosen: an invitation would replace it, so only the owner's `reset` link may. */
+class PasswordChosen extends DomainError {
+  constructor() {
+    super(
+      'password_chosen_conflict',
+      'Son mot de passe est déjà choisi : seul le propriétaire peut lui créer un lien pour en choisir un nouveau',
+    );
+  }
+}
+
 class MemberLeft extends DomainError {
   constructor() {
     super('member_left_conflict', 'Ce membre a quitté l’équipe : sa fiche ne change plus');
@@ -113,7 +143,8 @@ export function passwordProblem(password: string): PasswordInvalidReason | null 
 /**
  * A link still usable: not used, not replaced, not expired, and, for a member's, its member has not left. A creator's
  * own account (CR-02) has no member: its link names the account itself (`user_id`), and dies with her archiving
- * (ADR 0071 § 2), which also revokes it.
+ * (ADR 0071 § 2), which also revokes it. An invitation chooses a first password, never another one: once the account
+ * has a password, only a `reset` link (the owner's) changes it (ADR 0076 § 3, a manager's invitation link).
  */
 const usable = sql`${schema.invitationLinks.usedAt} is null and ${schema.invitationLinks.revokedAt} is null
   and ${schema.invitationLinks.expiresAt} > now()
@@ -121,7 +152,11 @@ const usable = sql`${schema.invitationLinks.usedAt} is null and ${schema.invitat
     select 1 from ${schema.teamMembers} m where m.id = ${schema.invitationLinks.memberId} and m.status <> 'left'))
   and not exists (
     select 1 from ${schema.user} u join ${schema.creators} c on c.id = any(u.creator_ids)
-    where u.id = ${schema.invitationLinks.userId} and u.role = 'creator' and c.archived_at is not null)`;
+    where u.id = ${schema.invitationLinks.userId} and u.role = 'creator' and c.archived_at is not null)
+  and (${schema.invitationLinks.purpose} <> 'invitation' or not exists (
+    select 1 from ${schema.account} a where a.provider_id = 'credential' and a.user_id = coalesce(
+      ${schema.invitationLinks.userId},
+      (select m.user_id from ${schema.teamMembers} m where m.id = ${schema.invitationLinks.memberId}))))`;
 
 /**
  * Her archiving (ADR 0071 § 2): the live links of her own account are revoked, each audited with the owner. A link
@@ -180,20 +215,65 @@ async function audit(
  * `POST /v1/team/members/:memberId/invitation-link` (owner, recent sign-in): replaces the member's live link, if any,
  * by a new one valid 72 h. The token leaves the server once, in the URL it answers.
  */
+/**
+ * What a manager may ask besides the owner (ADR 0076 § 3): an active manager, the `invitation` link of a chatter whose
+ * password is not chosen yet, so that the chatter he invited can sign in. A `reset` link gives an account that already
+ * has a password, with its commissions and its access: the owner's alone. Who asks is checked first, so that no one
+ * else learns whether a member exists; the member next, under his lock. The redeem refuses an invitation once a
+ * password exists (`usable`), whatever happens in between.
+ */
+async function assertActiveManager(
+  tx: Transaction,
+  input: { purpose: InvitationLinkPurpose; madeBy: string },
+): Promise<void> {
+  if (input.purpose !== 'invitation') throw new ResetOwnerOnly();
+  const [maker] = await tx
+    .select({ teamRole: schema.teamMembers.teamRole, status: schema.teamMembers.status })
+    .from(schema.teamMembers)
+    .where(eq(schema.teamMembers.userId, input.madeBy));
+  if (maker?.teamRole !== 'manager' || maker.status !== 'active') throw new ManagersAndOwnerOnly();
+}
+
+/** The member a manager asks for: a chatter, still without a password. */
+async function assertChatterToInvite(
+  tx: Transaction,
+  member: { teamRole: string; userId: string },
+): Promise<void> {
+  if (member.teamRole !== 'chatter') throw new ChattersOnly();
+  const [password] = await tx
+    .select({ id: schema.account.id })
+    .from(schema.account)
+    .where(and(eq(schema.account.userId, member.userId), eq(schema.account.providerId, 'credential')));
+  if (password !== undefined) throw new PasswordChosen();
+}
+
 async function createLinkUnscoped(
   adminDb: Database,
-  input: { memberId: string; purpose: InvitationLinkPurpose; ownerId: string; ip: string },
+  input: {
+    memberId: string;
+    purpose: InvitationLinkPurpose;
+    /** Who asks: the owner, or an active manager within `assertActiveManager` and `assertChatterToInvite`. */
+    madeBy: string;
+    byOwner: boolean;
+    ip: string;
+  },
 ): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(TOKEN_BYTES).toString('base64url');
   return withAdmin(adminDb, async (tx) => {
+    if (!input.byOwner) await assertActiveManager(tx, input);
     // The member's row is the lock: two links asked at once are made one after the other.
     const [member] = await tx
-      .select({ status: schema.teamMembers.status })
+      .select({
+        status: schema.teamMembers.status,
+        teamRole: schema.teamMembers.teamRole,
+        userId: schema.teamMembers.userId,
+      })
       .from(schema.teamMembers)
       .where(eq(schema.teamMembers.id, input.memberId))
       .for('update');
     if (member === undefined) throw new MemberNotFound();
     if (member.status === 'left') throw new MemberLeft();
+    if (!input.byOwner) await assertChatterToInvite(tx, member);
     const replaced = await tx
       .update(schema.invitationLinks)
       .set({ revokedAt: sql`now()` })
@@ -206,7 +286,7 @@ async function createLinkUnscoped(
       .returning({ id: schema.invitationLinks.id });
     for (const link of replaced) {
       await audit(tx, {
-        userId: input.ownerId,
+        userId: input.madeBy,
         action: 'invitation_link.revoke',
         linkId: link.id,
         ip: input.ip,
@@ -221,13 +301,13 @@ async function createLinkUnscoped(
         memberId: input.memberId,
         purpose: input.purpose,
         tokenHash: hashOf(token),
-        createdBy: input.ownerId,
+        createdBy: input.madeBy,
         expiresAt: sql`now() + ${LINK_LIFETIME}::interval`,
       })
       .returning({ expiresAt: schema.invitationLinks.expiresAt });
     if (created === undefined) throw new Error('invitation link not created');
     await audit(tx, {
-      userId: input.ownerId,
+      userId: input.madeBy,
       action: 'invitation_link.create',
       linkId: id,
       ip: input.ip,
@@ -652,7 +732,8 @@ export function createInvitationLinkRoutes(deps: InvitationLinkRoutesDeps): Fast
     app.post(
       '/team/members/:memberId/invitation-link',
       {
-        preValidation: [deps.requireRole('owner'), deps.recentLogin],
+        // The owner, or an active manager for a chatter's first password (ADR 0076 § 3, `assertActiveManager`).
+        preValidation: [deps.requireRole('owner', 'operator'), deps.recentLogin],
         schema: {
           params: MemberParamsSchema,
           body: CreateInvitationLinkBodySchema,
@@ -664,7 +745,8 @@ export function createInvitationLinkRoutes(deps: InvitationLinkRoutesDeps): Fast
         const { token, expiresAt } = await createLinkUnscoped(deps.adminDb, {
           memberId: request.params.memberId,
           purpose: request.body.purpose,
-          ownerId: request.user.id,
+          madeBy: request.user.id,
+          byOwner: request.user.role === 'owner',
           ip: request.ip,
         });
         const url = new URL(PAGE_OF[request.body.purpose], deps.config.WEB_ORIGIN);

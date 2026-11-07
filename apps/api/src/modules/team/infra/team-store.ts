@@ -2,6 +2,7 @@ import {
   AuditEntryIdSchema,
   CommissionPresetSchema,
   CommissionRateSchema,
+  CreatorIdSchema,
   newId,
   TeamMemberNoteSchema,
   TeamMemberSchema,
@@ -37,9 +38,11 @@ import {
   MemberConflict,
   MemberNotFound,
   OwnNotesForbidden,
+  PlatformAccountLinked,
   RoleChangeConflict,
 } from '../domain/errors';
 import {
+  assertInviteFits,
   assertOwnerScope,
   assertReadsTeam,
   assertStillInTeam,
@@ -48,7 +51,15 @@ import {
   rateInForce,
   roleOn,
 } from '../domain/members';
-import type { Actor, NewRate, NewRole, TeamStore } from '../domain/ports';
+import type {
+  Actor,
+  NewMember,
+  NewRate,
+  NewRole,
+  PlatformAccountRef,
+  TeamInvites,
+  TeamStore,
+} from '../domain/ports';
 
 const {
   account,
@@ -228,6 +239,40 @@ async function audit(
   });
 }
 
+/**
+ * The account (no password yet), the record, the first rate and the first role of a member, from the day he joins:
+ * `member_conflict` when an account already has this e-mail. The policies decide who may write them.
+ */
+async function insertMember(tx: Transaction, actor: Actor, member: NewMember): Promise<void> {
+  const [taken] = await tx.select({ id: user.id }).from(user).where(eq(user.email, member.email));
+  if (taken !== undefined) throw new MemberConflict();
+  await tx.insert(user).values({
+    id: member.userId,
+    name: member.displayName,
+    email: member.email,
+    role: 'operator',
+    creatorIds: [...member.creatorIds],
+  });
+  await tx.insert(teamMembers).values({
+    id: member.id,
+    userId: member.userId,
+    teamRole: member.teamRole,
+    firstName: member.firstName,
+    lastName: member.lastName,
+    displayName: member.displayName,
+    country: member.country,
+    timeZone: member.timeZone,
+    color: member.color,
+    joinedOn: member.joinedOn,
+  });
+  await insertRate(tx, actor, member.id, member.rate);
+  await insertRole(tx, actor, member.id, {
+    id: member.roleId,
+    teamRole: member.teamRole,
+    effectiveFrom: member.joinedOn,
+  });
+}
+
 /** Pay's `payroll.recalculate` for a period, given by the composition root (the `payroll` module's, EQ-04). */
 export type EnqueuePayRecalculation = (tx: Transaction, period: PayPeriod) => Promise<void>;
 
@@ -251,33 +296,7 @@ export function createDrizzleTeamStore(
       orConflict(
         withMember(db, actor.userId, async (tx, scope) => {
           assertOwnerScope(scope);
-          const [taken] = await tx.select({ id: user.id }).from(user).where(eq(user.email, member.email));
-          if (taken !== undefined) throw new MemberConflict();
-          await tx.insert(user).values({
-            id: member.userId,
-            name: member.displayName,
-            email: member.email,
-            role: 'operator',
-            creatorIds: [...member.creatorIds],
-          });
-          await tx.insert(teamMembers).values({
-            id: member.id,
-            userId: member.userId,
-            teamRole: member.teamRole,
-            firstName: member.firstName,
-            lastName: member.lastName,
-            displayName: member.displayName,
-            country: member.country,
-            timeZone: member.timeZone,
-            color: member.color,
-            joinedOn: member.joinedOn,
-          });
-          await insertRate(tx, actor, member.id, member.rate);
-          await insertRole(tx, actor, member.id, {
-            id: member.roleId,
-            teamRole: member.teamRole,
-            effectiveFrom: member.joinedOn,
-          });
+          await insertMember(tx, actor, member);
           await audit(
             tx,
             actor,
@@ -509,5 +528,79 @@ export function createDrizzleTeamStore(
           createdAt: createdAt.toISOString(),
         });
       }),
+  };
+}
+
+/** How a platform's team account is linked: to a member of the team, or to the agent (ADR 0050 § 5). */
+type PlatformChatterLink =
+  { readonly kind: 'member'; readonly memberId: TeamMemberId } | { readonly kind: 'agent' };
+
+/**
+ * The link of a platform's team account (ADR 0050 § 5), `connectors`' table, which this module never touches: the
+ * composition root gives `connectors`' own write, run in the invitation's transaction and under its policies
+ * (`withMember`), so a member is never created without his link, nor linked without being created (ADR 0076 § 3).
+ */
+export interface PlatformChatterLinks {
+  /** Locks the account until the transaction ends; its link, `null` when it has none. */
+  lockLink(tx: Transaction, account: PlatformAccountRef): Promise<PlatformChatterLink | null>;
+  /** Links the account to the member, signed by the actor, with its own audit line. */
+  link(tx: Transaction, account: PlatformAccountRef, memberId: TeamMemberId, actor: Actor): Promise<void>;
+}
+
+/**
+ * The invitation from a link proposal (ADR 0076 § 3), in one transaction as the inviter: the bounds of an
+ * active manager (his own list read here, the rest held again by the policies), the account's lock, the member made
+ * as `create` makes him, his link, and the audit line with the platform's identifier, never a name nor an amount.
+ */
+export function createDrizzleTeamInvites(db: Database, links: PlatformChatterLinks): TeamInvites {
+  return {
+    invite: (actor, member, account) =>
+      orConflict(
+        withMember(db, actor.userId, async (tx, scope) => {
+          const [own] = await tx
+            .select({ creatorIds: user.creatorIds })
+            .from(user)
+            .where(eq(user.id, actor.userId));
+          assertInviteFits(
+            scope,
+            {
+              teamRole: member.teamRole,
+              teamShareBps: member.rate.teamShareBps,
+              fromPreset: member.rate.presetId !== null,
+              creatorIds: member.creatorIds,
+            },
+            (own?.creatorIds ?? []).map((id) => CreatorIdSchema.parse(id)),
+          );
+          const linked = await links.lockLink(tx, account);
+          if (linked !== null) {
+            if (linked.kind === 'member') {
+              // Asked again (a double click, a retry): the member this invitation made, as he is.
+              const [same] = await tx
+                .select({ id: teamMembers.id })
+                .from(teamMembers)
+                .innerJoin(user, eq(user.id, teamMembers.userId))
+                .where(and(eq(teamMembers.id, linked.memberId), eq(user.email, member.email)));
+              if (same !== undefined) return linked.memberId;
+            }
+            throw new PlatformAccountLinked();
+          }
+          await insertMember(tx, actor, member);
+          await links.link(tx, account, member.id, actor);
+          await audit(
+            tx,
+            actor,
+            'team_member.invite',
+            { entity: 'team_member', id: member.id },
+            {
+              teamRole: member.teamRole,
+              creators: member.creatorIds.length,
+              platform: account.platform,
+              platformChatterId: account.platformChatterId,
+            },
+          );
+          return member.id;
+        }),
+        () => new MemberConflict(),
+      ),
   };
 }

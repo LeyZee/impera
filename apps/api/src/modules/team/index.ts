@@ -1,13 +1,19 @@
+import type { TeamMember } from '@impera/contracts';
 import type { Database, Transaction } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
-import { createTeamService } from './application/team';
+import { createTeamService, type InviteFromPlatform } from './application/team';
 import { calendarDayIn } from './domain/members';
-import type { CreatorRoster, InvitationLinkDirectory } from './domain/ports';
+import type { Actor, CreatorRoster, InvitationLinkDirectory } from './domain/ports';
 import { createTeamRoutes, type RequireRole } from './infra/http/routes';
 import { membersForPay, type MemberForPay } from './infra/pay-reads';
 import { applyRolesUnscoped } from './infra/role-jobs';
-import { createDrizzleTeamStore, type EnqueuePayRecalculation } from './infra/team-store';
+import {
+  createDrizzleTeamInvites,
+  createDrizzleTeamStore,
+  type EnqueuePayRecalculation,
+  type PlatformChatterLinks,
+} from './infra/team-store';
 
 /** Until the agency has a setting of its own (ADR 0023 § Paie): where « today » is read for rates, roles and presets. */
 const DEFAULT_AGENCY_TIME_ZONE = 'Europe/Paris';
@@ -22,6 +28,14 @@ export interface TeamModule {
    * the rate in force on a day (pay's job on the admin connection, or a validation as its member).
    */
   readonly pay: { readonly members: (tx: Transaction, day: string) => Promise<MemberForPay[]> };
+  /**
+   * The invitation of a member from a link proposal (ADR 0076 § 3), for `connectors`' route: given the link
+   * writes of `connectors` by the composition root, it creates the member and links his account in one transaction,
+   * as the owner or an active manager within his bounds (a chatter, a preset in force, creators of his own list).
+   */
+  invites(links: PlatformChatterLinks): {
+    readonly fromPlatform: (actor: Actor, input: InviteFromPlatform) => Promise<TeamMember>;
+  };
   readonly jobs: {
     /**
      * `team.apply_roles` (hourly): each record takes the role in force today, a role dated for today taking effect
@@ -57,6 +71,10 @@ export function createTeamModule(deps: TeamDeps): TeamModule {
     name: 'team',
     routes: (requireRole) => createTeamRoutes(service, requireRole),
     pay: { members: membersForPay },
+    invites: (links) => {
+      const invites = createDrizzleTeamInvites(deps.db, links);
+      return { fromPlatform: (actor, input) => service.inviteFromPlatform(actor, input, invites) };
+    },
     jobs: {
       applyRoles: async () =>
         (await applyRolesUnscoped(deps.adminDb, calendarDayIn(now(), DEFAULT_AGENCY_TIME_ZONE))).length,
