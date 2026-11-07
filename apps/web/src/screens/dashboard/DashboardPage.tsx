@@ -1,3 +1,4 @@
+import type { AgencyPeriod } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useCallback, type JSX, type ReactNode } from 'react';
@@ -14,6 +15,7 @@ import { ReportsBanner } from './ReportsBanner';
 import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TopFans } from './TopFans';
+import { AgencyInsightsPanel } from './agency/AgencyInsights';
 import { agentRuns, litParts } from './logic';
 import type { Fan, Period, Todo, Tone } from './model';
 import { Section, TONE_COLOR, useFloatingTip } from './parts';
@@ -36,6 +38,13 @@ const REVEAL_SUB: Record<Period, string> = {
   day: 'depuis minuit, au centime près',
   week: 'les 7 derniers jours, au centime près',
   month: 'les 30 derniers jours, au centime près',
+};
+
+/** The agent's period, said on its blocks under the agency's figures: three months read as 30 days (ADR 0078 § 3). */
+const AGENT_SPAN: Record<Period, string> = {
+  day: 'aujourd’hui',
+  week: 'ces 7 jours',
+  month: 'ces 30 jours',
 };
 
 const FUNNEL_SUB: Record<Period, string> = {
@@ -88,9 +97,11 @@ function Alone({
 function Offline({
   creatorName,
   onCreator,
+  agency,
 }: {
   creatorName: string | null;
   onCreator: ((creatorId: string) => void) | undefined;
+  agency: AgencyView | undefined;
 }): JSX.Element {
   const client = useQueryClient();
   return (
@@ -98,7 +109,10 @@ function Offline({
       {creatorName === null ? null : (
         <header className="db-top nv-enter">
           {/* Another creator's Dashboard may still answer: the choice stays at hand. */}
-          <CreatorPicker onChoose={onCreator} />
+          <CreatorPicker
+            onChoose={onCreator}
+            agency={agency === undefined ? undefined : { selected: false, onChoose: agency.onAgency }}
+          />
           <div className="db-top__who">
             <span className="db-top__av" aria-hidden="true">
               {initialOf(creatorName)}
@@ -125,7 +139,7 @@ function Offline({
  * No creator yet (first launch): what to do, never a page of made-up figures (DASH-13). Whoever can add one is led to
  * Créatrices; anyone else reads who does.
  */
-function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.Element {
+export function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.Element {
   return canAddCreator ? (
     <Alone
       tone="idle"
@@ -159,6 +173,7 @@ export function DashboardPage({
   reviewsReports = false,
   opensTracking = false,
   canAddCreator = false,
+  agency,
 }: {
   /** The period of the sales, the fans' path, the best fans and the reply delay: from the address (`?periode=`). */
   period: Period;
@@ -173,6 +188,8 @@ export function DashboardPage({
   opensTracking?: boolean;
   /** The account's rail holds Créatrices: before any creator, the screen leads there (DASH-13). */
   canAddCreator?: boolean;
+  /** The owner's and an active manager's: her figures from the register lead the page (ADR 0078). */
+  agency?: AgencyView;
 }): JSX.Element {
   const view = useDashboard(period, forOwner ? 'owner' : 'team');
   if (view.status === 'loading') {
@@ -182,7 +199,8 @@ export function DashboardPage({
       </div>
     );
   }
-  if (view.status === 'offline') return <Offline creatorName={view.creatorName} onCreator={onCreator} />;
+  if (view.status === 'offline')
+    return <Offline creatorName={view.creatorName} onCreator={onCreator} agency={agency} />;
   if (view.status === 'empty') return <NoCreator canAddCreator={canAddCreator} />;
   return (
     <Loaded
@@ -193,8 +211,17 @@ export function DashboardPage({
       forOwner={forOwner}
       reviewsReports={reviewsReports}
       opensTracking={opensTracking}
+      agency={agency}
     />
   );
+}
+
+/** The agency's figures on a creator's Dashboard (ADR 0078): their period, and the way back to the whole agency. */
+export interface AgencyView {
+  readonly period: AgencyPeriod;
+  readonly onPeriod: (period: AgencyPeriod) => void;
+  readonly onAgency: () => void;
+  readonly canOpenSettings: boolean;
 }
 
 function Loaded({
@@ -205,6 +232,7 @@ function Loaded({
   forOwner,
   reviewsReports,
   opensTracking,
+  agency,
 }: {
   view: Extract<DashboardView, { status: 'live' }>;
   period: Period;
@@ -213,6 +241,7 @@ function Loaded({
   forOwner: boolean;
   reviewsReports: boolean;
   opensTracking: boolean;
+  agency: AgencyView | undefined;
 }): JSX.Element {
   const tip = useFloatingTip();
   const sales = data.sales?.[period] ?? null;
@@ -243,12 +272,30 @@ function Loaded({
   // The global stop is said in the hero, next to the sentence it explains, not in this corner (DASH-08).
   const notice = writer.notice;
 
-  const periodControl = <PeriodControl period={period} onChange={onPeriod} />;
+  // With the agency's figures above, their control sets the period of the whole page: none down here.
+  const periodControl =
+    agency === undefined ? <PeriodControl period={period} onChange={onPeriod} /> : undefined;
+  // Three months read as 30 days in the agent's blocks: their lines say so (ADR 0078 § 3).
+  const agentHero = (
+    <AgentHero
+      agent={data.agent}
+      mode={mode}
+      todos={data.todos}
+      onOpen={openTodo}
+      onResume={globalStop ? undefined : resume}
+      tip={tip}
+      globalStop={globalStop}
+      opensSettings={forOwner}
+    />
+  );
   return (
     <div className="db">
       <header className="db-top nv-enter">
         {/* Whose agent this is, when the account sees several: the pill and Suivi follow the same choice. */}
-        <CreatorPicker onChoose={onCreator} />
+        <CreatorPicker
+          onChoose={onCreator}
+          agency={agency === undefined ? undefined : { selected: false, onChoose: agency.onAgency }}
+        />
         <div className="db-top__who">
           {several ? null : (
             <CreatorFace
@@ -291,16 +338,19 @@ function Loaded({
         )}
       </header>
 
-      <AgentHero
-        agent={data.agent}
-        mode={mode}
-        todos={data.todos}
-        onOpen={openTodo}
-        onResume={globalStop ? undefined : resume}
-        tip={tip}
-        globalStop={globalStop}
-        opensSettings={forOwner}
-      />
+      {/* A creator chosen from the agency: her figures first, the agency's cards after (recette 06/11). */}
+      {agency === undefined ? (
+        agentHero
+      ) : (
+        <AgencyInsightsPanel
+          period={agency.period}
+          onPeriod={agency.onPeriod}
+          creatorId={creatorId}
+          creatorName={data.creator.name}
+          canOpenSettings={agency.canOpenSettings}
+          tip={tip}
+        />
+      )}
 
       <BackupBanner enabled={forOwner} />
 
@@ -317,6 +367,8 @@ function Loaded({
       {/* The AI budget and the stuck jobs of no creator are the agency's, not her agent's health (reco 18, PRO-10). */}
       <AgencyStrip agency={data.agency} />
 
+      {agency === undefined ? null : agentHero}
+
       {sales === null ? null : (
         <>
           <Section title="Ventes" sub={salesSub(period)} index={2} control={periodControl}>
@@ -331,7 +383,8 @@ function Loaded({
 
       {/* The platform's register, read by its API (CRM-04 lot c): the period's figures as it gives them, who sold for the
         owner and an active manager. Never on her Dashboard: the server sends her none. */}
-      {data.revealSales === null ? null : (
+      {/* With the agency's figures above, who sold is said there, richer: not a second time here. */}
+      {data.revealSales === null || agency !== undefined ? null : (
         <Section
           title={`Ventes lues chez ${data.revealSales.where}`}
           sub={REVEAL_SUB[period]}
@@ -344,8 +397,12 @@ function Loaded({
 
       <Section
         title="Meilleurs fans"
-        sub="ce qu’ils ont dépensé : d’abord la part de l’agent, puis celle des chatteurs"
-        index={(sales === null ? 2 : 4) + (data.revealSales === null ? 0 : 1)}
+        sub={
+          agency === undefined
+            ? 'ce qu’ils ont dépensé : d’abord la part de l’agent, puis celle des chatteurs'
+            : `les achats vus dans ses conversations ${AGENT_SPAN[period]} : d’abord la part de l’agent, puis celle des chatteurs`
+        }
+        index={(sales === null ? 2 : 4) + (data.revealSales === null || agency !== undefined ? 0 : 1)}
         control={sales === null && data.revealSales === null ? periodControl : undefined}
       >
         <TopFans
@@ -353,6 +410,12 @@ function Loaded({
           tip={tip}
           onOpen={opensTracking ? openFan : undefined}
           usdNote={data.usdNote}
+          {...(agency === undefined
+            ? {}
+            : {
+                empty:
+                  'Aucun achat vu dans ses conversations : elles se lisent une fois la session Reveal capturée. Les ventes du registre sont plus haut.',
+              })}
         />
       </Section>
 

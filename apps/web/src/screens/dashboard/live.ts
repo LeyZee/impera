@@ -10,7 +10,7 @@ import type { AgencyState, AgentState, Dashboard, Fan, RevealSales, RevealSeller
 
 import { CAUSE_LABELS } from '@/agent/causes';
 import { percent } from '@/agent/mode';
-import { fansWaiting, queueEntries, type QueueEntry } from '@/agent/queue';
+import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queue';
 import { frenchSpaces } from '@/lib/utils';
 import { platformName } from '@/scheduling/model';
 import { cityOf, clockAt, lengthOf, readerZone, withFirstOfMonth } from '@/scheduling/time';
@@ -365,13 +365,20 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       foldTitle: 'Quelque chose ne va pas',
     };
   }
-  // Under an urgency the hero names where to start, without saying the line of « À traiter » again (DASH-10).
+  // Under an urgency the hero names where to start, without saying the line of « À traiter » again (DASH-10): a grave
+  // fan first, then an AI outage, said for the fans it leaves without a reply (« urgent panne », 06/11).
   const urgent = todos.find((todo) => todo.tone === 'bad');
+  const down = todos.filter((todo) => toneOf(todo) === 'bad' && todo.tone !== 'bad').length;
   return {
     ...base,
     tone: cards.some((card) => card.tone !== 'ok') ? 'warn' : 'ok',
     headline: '',
-    lead: urgent === undefined ? '' : `Commence par ${urgent.title}.`,
+    lead:
+      urgent !== undefined
+        ? `Commence par ${urgent.title}.`
+        : down > 0
+          ? `Aucun modèle IA n’a répondu : ${down === 1 ? 'un fan attend' : `${fansWaiting(down)} attendent`} un chatteur.`
+          : '',
     action: 'Voir l’urgence',
     foldTitle: 'L’agent fonctionne normalement',
   };
@@ -383,7 +390,7 @@ const LATE_MINUTES = 10;
 function todoOf(todo: DashboardTodo, timeZone: string): Todo {
   return {
     id: todo.id,
-    tone: todo.tone,
+    tone: toneOf(todo),
     kind: KIND_LABEL[todo.kind],
     title: todo.title,
     why: frenchSpaces(todo.why),

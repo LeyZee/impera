@@ -209,6 +209,7 @@ Inspiré du tableau de bord de Reveal, sur le verre Impera :
 - Graphiques : courbe de la période contre la précédente (pointillés), curseur et bulle au survol ; répartition en anneau ; barres par heure ; classement des fans avec la part vendue par l'agent.
 - `nv-delta--better` / `--worse` suivent le sens « mieux », pas le signe : un temps de réponse qui baisse est en `--better`.
 - Couleurs des graphiques : le néon pour la série principale, `sale` en second, puis `ink` à 60 % et 25 %. Jamais deux rouges.
+- Dashboard de l'agence (ADR 0078) : une palette par axe, jamais partagée entre blocs voisins. Les types de vente prennent les quatre séries catégorielles `--nv-series-1` à `-4` (sarcelle, bleu, rose, olive, validées pour le daltonisme entre voisines et à 3:1 sur le fond, Nuit et Jour), puis « Autres ventes » le repli neutre `--nv-series-other`. Qui vend prend l'encre de l'équipe (`data-1`), le violet de l'agent (`agent`) et l'or des données (`data-2`) pour un chatteur non relié. Un total, les barres des créatrices et la rampe des heures prennent `data-1` seul. Jamais le néon, l'ambre ni un statut pour une série. Une légende et des valeurs écrites accompagnent toujours les couleurs.
 
 ### Pièces du Dashboard
 
@@ -237,7 +238,7 @@ Un seul composant, `nv-chart` : un SVG dessiné avec les aides de `@impera/desig
 - **Survol** : `is-hovering` sur le conteneur montre un curseur vertical (`__cursor`), un point sur la courbe (`__dot`) et une bulle de verre avec la valeur et sa date (`__tip`, placée par `--nv-tip-x` / `--nv-tip-y` d'après `nearestIndex`). Survoler une barre l'éclaire et met les autres en retrait. Au doigt, toucher et glisser fait de même.
 - **Comparer des séries** : `__tip--table`, la période (`__tip-l`) puis une ligne par série (`__tip-k` avec sa couleur `--_c`, `__tip-n` aligné à droite) et une ligne de pied (`__tip-ft`).
 - **Série en cours** : le dernier point de la journée envoie une pulsation lente (`__end`) : la journée n'est pas finie.
-- **Couleur** : `--_c`, le néon par défaut pour la série dont parle l'écran ; une seconde série en `sale`, puis `ink` à 60 % et 25 %. Une barre de parts (`nv-split`) part de `data-1`. Jamais deux rouges. Grille en `hairline`, axes en `caption` `ink-faint` à chiffres tabulaires.
+- **Couleur** : `--_c`, le néon par défaut pour la série dont parle l'écran ; une seconde série en `sale`, puis `ink` à 60 % et 25 %. Une barre de parts (`nv-split`) part de `data-1`. Jamais deux rouges. Les écrans à plusieurs axes (Dashboard de l'agence) suivent la palette par axe décrite plus haut, séries `--nv-series-*` comprises. Grille en `hairline`, axes en `caption` `ink-faint` à chiffres tabulaires.
 - **Mouvement réduit** : tout est dessiné d'emblée ; le survol reste.
 
 ## Copilote et raccourcis

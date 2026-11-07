@@ -36,7 +36,10 @@ export const InvitationLinkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{22,128
 /**
  * `POST /v1/team/members/:memberId/invitation-link` (owner): a new link cancels the one before; valid 72 h. It needs a
  * recent sign-in (`requireRecentLogin`, otherwise 403 `reauthentication_forbidden`: the page asks for the password and
- * retries), and refuses a member who left (409 `member_left_conflict`, as every route of `/v1/team`).
+ * retries), and refuses a member who left (409 `member_left_conflict`, as every route of `/v1/team`). An active manager
+ * gets the `invitation` link of a chatter only (ADR 0076 § 3), else 403 `role_forbidden`; once the chatter's password
+ * is chosen, 409 `password_chosen_conflict`: a `reset` link is the owner's. An invitation never replaces a password
+ * already chosen, whoever made it: such a link answers `invitation_link_not_found`.
  */
 export const CreateInvitationLinkBodySchema = z.object({ purpose: InvitationLinkPurposeSchema });
 export const InvitationLinkCreatedSchema = z.object({
@@ -143,6 +146,8 @@ export const INVITATION_LINK_ERROR_CODES = [
   'creator_account_not_found',
   'creator_account_conflict',
   'account_email_conflict',
+  'password_chosen_conflict',
+  'role_forbidden',
   REAUTHENTICATION_ERROR_CODE,
 ] as const;
 export type InvitationLinkErrorCode = (typeof INVITATION_LINK_ERROR_CODES)[number];

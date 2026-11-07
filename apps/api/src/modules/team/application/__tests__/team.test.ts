@@ -1,15 +1,17 @@
 import {
+  CommissionPresetIdSchema,
   CommissionRateSchema,
   DomainError,
   TeamRoleChangeSchema,
   TeamMemberIdSchema,
+  TeamMemberSchema,
   UserIdSchema,
   type PayPeriod,
   type TeamRoleChange,
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import type { TeamStore } from '../../domain/ports';
+import type { NewMember, PlatformAccountRef, TeamInvites, TeamStore } from '../../domain/ports';
 import { createTeamService } from '../team';
 
 /** Invented ids only (ADR 0010). */
@@ -122,5 +124,100 @@ describe('a member’s change of role (Charles, 28/10)', () => {
       await expect(refused).rejects.toMatchObject({ code: 'role_date_invalid' });
     }
     expect(roles).toHaveLength(3);
+  });
+});
+
+describe('a member invited from a link proposal (ADR 0076 § 3)', () => {
+  const STANDARD_OLD = CommissionPresetIdSchema.parse('0199f2a0-0000-7000-8000-0000000000c1');
+  const STANDARD = CommissionPresetIdSchema.parse('0199f2a0-0000-7000-8000-0000000000c2');
+  const MANAGER = { userId: UserIdSchema.parse('0199f2a0-0000-7000-8000-0000000000e2'), ip: null };
+  const account = { platform: 'reveal', platformChatterId: 'chatter-invented-7' } as const;
+
+  /** « Standard » at 18 % until the 15th, 15 % from the 16th: the old row is no preset on offer any more. */
+  const presets = [
+    { id: STANDARD_OLD, name: 'Standard', rateBps: 1800, effectiveFrom: '2026-10-01' },
+    { id: STANDARD, name: 'Standard', rateBps: 1500, effectiveFrom: '2026-11-16' },
+  ];
+
+  function invitedAt(instant: string) {
+    const asked: { member: NewMember; account: PlatformAccountRef }[] = [];
+    const store: TeamStore = {
+      ...storeKeeping([]),
+      presets: () => Promise.resolve(presets),
+      member: (_actor, id) =>
+        Promise.resolve(
+          TeamMemberSchema.parse({
+            id,
+            userId: asked[0]?.member.userId,
+            email: asked[0]?.member.email,
+            firstName: 'Lou',
+            lastName: 'Garnier',
+            displayName: 'Lou',
+            teamRole: 'chatter',
+            status: 'active',
+            country: 'MG',
+            timeZone: 'Indian/Antananarivo',
+            color: null,
+            joinedOn: '2026-11-20',
+            creatorIds: [],
+            commission: null,
+            invitationPending: true,
+            invitationExpiresAt: null,
+          }),
+        ),
+    };
+    const service = createTeamService(
+      store,
+      { existing: () => Promise.resolve(new Set()) },
+      { live: () => Promise.resolve(new Map()) },
+      { agencyTimeZone: 'Europe/Paris', now: () => new Date(instant) },
+    );
+    const invites: TeamInvites = {
+      invite: (_actor, member, asking) => {
+        asked.push({ member, account: asking });
+        return Promise.resolve(member.id);
+      },
+    };
+    const invite = (presetId: typeof STANDARD) =>
+      service.inviteFromPlatform(
+        MANAGER,
+        {
+          email: ' Lou.Garnier@Example.test ',
+          firstName: 'Lou',
+          lastName: 'Garnier',
+          displayName: 'Lou',
+          teamRole: 'chatter',
+          country: 'MG',
+          timeZone: 'Indian/Antananarivo',
+          color: null,
+          joinedOn: '2026-11-20',
+          creatorIds: [],
+          commission: { presetId },
+          teamShareBps: null,
+          account,
+        },
+        invites,
+      );
+    return { asked, invite };
+  }
+
+  it('asks the preset in force today, the e-mail as the account keeps it, and the account to link', async () => {
+    const { asked, invite } = invitedAt('2026-11-18T10:00:00Z');
+    const member = await invite(STANDARD);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.account).toEqual(account);
+    expect(asked[0]?.member).toMatchObject({
+      email: 'lou.garnier@example.test',
+      teamRole: 'chatter',
+      joinedOn: '2026-11-20',
+      rate: { rateBps: 1500, presetId: STANDARD, teamShareBps: null, effectiveFrom: '2026-11-20' },
+    });
+    expect(member.id).toBe(asked[0]?.member.id);
+  });
+
+  it('never takes an older, higher row of a preset: not on offer, so not found', async () => {
+    const { asked, invite } = invitedAt('2026-11-18T10:00:00Z');
+    await expect(invite(STANDARD_OLD)).rejects.toMatchObject({ code: 'commission_preset_not_found' });
+    expect(asked).toHaveLength(0);
   });
 });

@@ -104,3 +104,29 @@ export class OwnerOnly extends DomainError {
     super('role_forbidden', 'Réservé au propriétaire');
   }
 }
+
+/** Which bound of an invitation an active manager went past (ADR 0076 § 3). */
+export type InviteBound = 'role' | 'rate' | 'creators';
+
+const INVITE_BOUND_TEXT: Readonly<Record<InviteBound, string>> = {
+  role: 'Un manager invite un chatteur, jamais un manager',
+  rate: 'Un manager choisit un barème du propriétaire, sans part du net de l’équipe',
+  creators: 'Un manager ne donne que des créatrices de sa liste',
+};
+
+/**
+ * An active manager invites a chatter at a preset of the owner's, with creators of his own list (ADR 0076 § 3): the
+ * rest stays the owner's. Same code as the role guard, the bound in `details`.
+ */
+export class InviteOutOfBounds extends DomainError {
+  constructor(bound: InviteBound) {
+    super('role_forbidden', INVITE_BOUND_TEXT[bound], { details: { bound } });
+  }
+}
+
+/** The platform account is already linked to another member: inviting it again would give him its sales. */
+export class PlatformAccountLinked extends DomainError {
+  constructor() {
+    super('member_conflict', 'Ce compte de la plateforme est déjà relié à un autre membre');
+  }
+}

@@ -490,6 +490,15 @@
 .db-creators .nv-chip {
   flex: none;
 }
+/* « Toute l'agence » (ADR 0078): the first chip, a ring for the whole instead of a face. */
+.nv-chip.db-creators__agency {
+  gap: 7px;
+}
+.db-creators__agency-mark {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--nv-ink-muted);
+}
 .db-mode .nv-seg__opt {
   height: 36px;
   display: inline-flex;
@@ -707,6 +716,10 @@ div.db-fan {
 /* Past 10 min of waiting, the line's time turns amber, as the fold counts him (DASH-11). */
 .nv-todo__time[data-late] {
   color: var(--nv-warning);
+}
+/* On a red line, red: an urgency is never half amber. */
+.nv-todo.nv-tone--bad .nv-todo__time[data-late] {
+  color: var(--nv-danger);
 }
 /* More lines than the Dashboard shows: one way to all of them in Suivi (DASH-12). */
 .db-more {

@@ -61,6 +61,7 @@ export { salesFeedReadsForReports } from './infra/db/report-reads';
 export type { ShiftSales, ShiftSalesQuery } from './infra/db/report-reads';
 /** @public The sales totals of CRM-04, in the caller's transaction: the Dashboard's and the evening digest's one sum. */
 export { salesFeedTotals } from './infra/db/totals-reads';
+export { salesFeedTimeZone } from './domain/sale-days';
 /** @public Which totals a read gives (CRM-04). */
 export type { SalesRefundsQuery, SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';

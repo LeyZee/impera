@@ -16,6 +16,7 @@ export * from './conversations';
 export * from './creator-space';
 export * from './creator-tasks';
 export * from './creators';
+export * from './agency-insights';
 export * from './creators-overview';
 export * from './dashboard';
 export * from './desire';

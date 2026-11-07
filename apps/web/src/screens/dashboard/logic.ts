@@ -1,3 +1,5 @@
+import type { AgencyPeriod } from '@impera/contracts';
+
 import type { AgentCard, AgentState, Lever, Period, SalesSeries, Todo, Tone } from './model';
 
 import type { AgentMode } from '@/agent/mode';
@@ -6,7 +8,8 @@ import type { AgentMode } from '@/agent/mode';
 
 /** The period in the address (`/?periode=7j`): a reload or a shared link keeps it; today is the address with none. */
 export interface DashboardSearch {
-  readonly periode?: '7j' | '30j';
+  /** `jour`, `90j`: the agency's periods (ADR 0078), where the address without one reads 7 days. */
+  readonly periode?: '7j' | '30j' | '90j' | 'jour';
   /** The creator shown (recette 05/11, PRO-28): a shared link opens hers; without it, the one followed on the device. */
   readonly creatrice?: string;
 }
@@ -17,18 +20,41 @@ const PERIOD_PARAMS = { week: '7j', month: '30j' } as const satisfies Partial<Re
 export function parseDashboardSearch(search: Record<string, unknown>): DashboardSearch {
   const { periode, creatrice } = search;
   return {
-    ...(periode === '7j' || periode === '30j' ? { periode } : {}),
+    ...(periode === '7j' || periode === '30j' || periode === '90j' || periode === 'jour' ? { periode } : {}),
     ...(typeof creatrice === 'string' && /^[0-9a-f-]{36}$/iu.test(creatrice) ? { creatrice } : {}),
   };
 }
 
+/** The agent's period, for an account without the agency's figures: three months read as 30 days. */
 export const periodOf = (search: DashboardSearch): Period =>
-  search.periode === '7j' ? 'week' : search.periode === '30j' ? 'month' : 'day';
+  search.periode === '7j' ? 'week' : search.periode === '30j' || search.periode === '90j' ? 'month' : 'day';
 
 export const dashboardSearch = (period: Period, creatrice?: string): DashboardSearch => ({
   ...(period === 'day' ? {} : { periode: PERIOD_PARAMS[period] }),
   ...(creatrice === undefined ? {} : { creatrice }),
 });
+
+const AGENCY_PARAMS = { day: 'jour', month: '30j', quarter: '90j' } as const satisfies Partial<
+  Record<AgencyPeriod, string>
+>;
+
+/** The agency's period (ADR 0078): 7 days when the address names none. */
+export const agencyPeriodOf = (search: DashboardSearch): AgencyPeriod =>
+  search.periode === 'jour'
+    ? 'day'
+    : search.periode === '30j'
+      ? 'month'
+      : search.periode === '90j'
+        ? 'quarter'
+        : 'week';
+
+export const agencySearch = (period: AgencyPeriod, creatrice?: string): DashboardSearch => ({
+  ...(period === 'week' ? {} : { periode: AGENCY_PARAMS[period] }),
+  ...(creatrice === undefined ? {} : { creatrice }),
+});
+
+/** The agent's blocks know three periods: three months read as the last 30 days, and say so (ADR 0078 § 3). */
+export const agentPeriodOf = (period: AgencyPeriod): Period => (period === 'quarter' ? 'month' : period);
 
 /** « 1 846 € », « 10,50 € »: the cents only when there are some, never rounded away (ADR 0011: exact money). */
 export function eur(value: number): string {
@@ -231,7 +257,7 @@ export function heroState(
       lead: withBudget('Rien d’urgent : l’agent continue sur les autres conversations.', agent),
     };
   }
-  // Only urgencies: named as such. Otherwise how many of them are.
+  // Only urgencies: named as such. Otherwise how many of them are. Red, as the line it names (« urgent panne », 06/11).
   const headline =
     urgent === todos.length
       ? urgent === 1
@@ -239,7 +265,7 @@ export function heroState(
         : `**${String(urgent)} urgences** t’attendent`
       : `${waiting}, dont ${urgent === 1 ? 'une urgente' : `${String(urgent)} urgentes`}`;
   return {
-    tone: 'warn',
+    tone: 'bad',
     headline,
     lead: withBudget(agent.lead, agent),
     ...(agent.action === undefined ? {} : { action: agent.action }),

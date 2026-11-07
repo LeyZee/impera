@@ -34,13 +34,31 @@ import {
   presetsInForce,
   uniqueCreatorIds,
 } from '../domain/members';
-import type { Actor, CreatorRoster, InvitationLinkDirectory, NewRate, TeamStore } from '../domain/ports';
+import type {
+  Actor,
+  CreatorRoster,
+  InvitationLinkDirectory,
+  NewMember,
+  NewRate,
+  PlatformAccountRef,
+  TeamInvites,
+  TeamStore,
+} from '../domain/ports';
+
+/** A member invited from a link proposal: the fields of Équipe › Membres, and the account (ADR 0076 § 3). */
+export type InviteFromPlatform = CreateTeamMemberBody & { readonly account: PlatformAccountRef };
 
 /** Équipe › Membres (EQ-01): reads for the owner and the managers, writes for the owner. */
 export interface TeamService {
   members(actor: UserId): Promise<TeamMember[]>;
   member(actor: UserId, id: TeamMemberId): Promise<TeamMember>;
   addMember(actor: Actor, body: CreateTeamMemberBody): Promise<TeamMember>;
+  /**
+   * A member invited from a link proposal (ADR 0076 § 3), by the owner or an active manager within his
+   * bounds, created and linked to his platform account by `invites` in one transaction. A preset is the one in force
+   * today, as the screen offers it. Asked again for the same account, the member already invited.
+   */
+  inviteFromPlatform(actor: Actor, input: InviteFromPlatform, invites: TeamInvites): Promise<TeamMember>;
   updateMember(actor: Actor, id: TeamMemberId, body: UpdateTeamMemberBody): Promise<TeamMember>;
   changeStatus(actor: Actor, id: TeamMemberId, status: TeamMemberStatus): Promise<TeamMember>;
   setCommission(actor: Actor, id: TeamMemberId, body: SetCommissionRateBody): Promise<CommissionRate>;
@@ -93,47 +111,65 @@ export function createTeamService(
     return unique;
   };
 
-  /** A preset becomes its rate of that row; a rate typed by hand stays as it is. */
+  /**
+   * A preset becomes its rate of that row; a rate typed by hand stays as it is. `inForce`: only the presets offered
+   * today, one per name (an invitation's, which an active manager may give: never an older, higher row of a name).
+   */
   const resolveRate = async (
     actor: UserId,
     choice: CreateTeamMemberBody['commission'],
     teamShareBps: number | null,
     effectiveFrom: string,
+    inForce = false,
   ): Promise<NewRate> => {
     const id = newId(CommissionRateIdSchema);
     if ('rateBps' in choice) {
       return { id, rateBps: choice.rateBps, teamShareBps, presetId: null, effectiveFrom };
     }
-    const preset = (await store.presets(actor)).find((row) => row.id === choice.presetId);
+    const rows = await store.presets(actor);
+    const offered = inForce ? presetsInForce(rows, today()) : rows;
+    const preset = offered.find((row) => row.id === choice.presetId);
     if (preset === undefined) throw new CommissionPresetNotFound();
     return { id, rateBps: preset.rateBps, teamShareBps, presetId: preset.id, effectiveFrom };
   };
+
+  /** The account, the record, the first rate and the first role of a member, as the body asks them. */
+  const newMember = async (
+    actor: UserId,
+    body: CreateTeamMemberBody,
+    inForce = false,
+  ): Promise<NewMember> => ({
+    id: newId(TeamMemberIdSchema),
+    userId: newId(UserIdSchema),
+    email: normalizeEmail(body.email),
+    firstName: body.firstName,
+    lastName: body.lastName,
+    displayName: body.displayName,
+    teamRole: body.teamRole,
+    country: body.country,
+    timeZone: body.timeZone,
+    color: body.color,
+    joinedOn: body.joinedOn,
+    creatorIds: await knownCreators(body.creatorIds),
+    // The first rate starts the day he joins: no day of his was worked before it.
+    rate: await resolveRate(actor, body.commission, body.teamShareBps, body.joinedOn, inForce),
+    // His first role too: whatever day he joins, a later change waits for the 1st or the 16th.
+    roleId: newId(MemberRoleIdSchema),
+  });
 
   return {
     members: async (actor) => withLinks(await store.members(actor, today())),
     member: read,
 
     addMember: async (actor, body) => {
-      const creatorIds = await knownCreators(body.creatorIds);
-      const id = newId(TeamMemberIdSchema);
-      await store.create(actor, {
-        id,
-        userId: newId(UserIdSchema),
-        email: normalizeEmail(body.email),
-        firstName: body.firstName,
-        lastName: body.lastName,
-        displayName: body.displayName,
-        teamRole: body.teamRole,
-        country: body.country,
-        timeZone: body.timeZone,
-        color: body.color,
-        joinedOn: body.joinedOn,
-        creatorIds,
-        // The first rate starts the day he joins: no day of his was worked before it.
-        rate: await resolveRate(actor.userId, body.commission, body.teamShareBps, body.joinedOn),
-        // His first role too: whatever day he joins, a later change waits for the 1st or the 16th.
-        roleId: newId(MemberRoleIdSchema),
-      });
+      const member = await newMember(actor.userId, body);
+      await store.create(actor, member);
+      return read(actor.userId, member.id);
+    },
+
+    inviteFromPlatform: async (actor, input, invites) => {
+      const { account, ...body } = input;
+      const id = await invites.invite(actor, await newMember(actor.userId, body, true), account);
       return read(actor.userId, id);
     },
 

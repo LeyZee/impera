@@ -6,6 +6,7 @@ import type {
   CreatorId,
   MemberRoleId,
   PayPeriod,
+  Platform,
   TeamMember,
   TeamMemberId,
   TeamMemberNote,
@@ -40,7 +41,7 @@ export interface NewRole {
 }
 
 /** A member to create: his account (no password yet), his record, his first rate and his first role. */
-interface NewMember {
+export interface NewMember {
   readonly id: TeamMemberId;
   readonly userId: UserId;
   readonly email: string;
@@ -124,6 +125,26 @@ export interface TeamStore {
     id: TeamMemberId,
     note: { readonly id: TeamMemberNoteId; readonly body: string },
   ): Promise<TeamMemberNote>;
+}
+
+/** A platform's team account, which a member is invited from (ADR 0076 § 3). */
+export interface PlatformAccountRef {
+  readonly platform: Platform;
+  readonly platformChatterId: string;
+}
+
+/**
+ * The invitation of a member from a link proposal (ADR 0076 § 3), implemented in `infra/` with `withMember`
+ * and the link of the platform's account (`connectors`' own write), both in one transaction.
+ */
+export interface TeamInvites {
+  /**
+   * The owner, or an active manager within the bounds of `assertInviteFits`: the member made as `TeamStore.create`
+   * makes him, and linked to `account` under its lock. Asked again for an account already linked to a member with
+   * this e-mail (a double click, a retry), it creates nothing and gives that member. `member_conflict` when the
+   * account is linked to another member, or the e-mail is another account's.
+   */
+  invite(actor: Actor, member: NewMember, account: PlatformAccountRef): Promise<TeamMemberId>;
 }
 
 /** The creators that exist, among those asked (the `persona` module's, injected by the composition root). */
