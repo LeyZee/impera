@@ -243,7 +243,7 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
   const chevron = (side: 'start' | 'end'): JSX.Element => (
     <button
       type="button"
-      className="nv-glass nv-glass--thin nv-subnav__more"
+      className="nv-subnav__more"
       data-side={side}
       aria-label={side === 'end' ? 'Onglets suivants' : 'Onglets précédents'}
       title={side === 'end' ? 'Onglets suivants' : 'Onglets précédents'}
@@ -253,7 +253,10 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
         page(side);
       }}
     >
-      <span className="nv-subnav__chevron" aria-hidden="true" />
+      {/* The button is the 44 px target; the glass inside it stays 34 px. */}
+      <span className="nv-glass nv-glass--thin nv-subnav__lens" aria-hidden="true">
+        <span className="nv-subnav__chevron" />
+      </span>
     </button>
   );
 
