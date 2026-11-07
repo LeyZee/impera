@@ -9,7 +9,13 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { agencyInsights, agencyRange, type AgencyCreatorRead } from '../agency-insights';
+import {
+  agencyInsights,
+  agencyRange,
+  subscribersOf,
+  type AgencyCreatorRead,
+  type StatsDay,
+} from '../agency-insights';
 
 // Everything below is invented (ADR 0010).
 const LINA = newId(CreatorIdSchema);
@@ -52,6 +58,7 @@ function creator(
     hours: [],
     fans: [],
     refundsWithoutSale: 0,
+    stats: [],
     ...more,
   };
 }
@@ -309,5 +316,109 @@ describe('agencyInsights', () => {
     expect(result.days).toHaveLength(3);
     expect(result.fans.topTenShare).toBeNull();
     expect(result.fans.averagePerPayingMinor).toBeNull();
+  });
+});
+
+describe('subscribersOf (ADR 0081)', () => {
+  const ACCOUNT_B = newId(PlatformAccountIdSchema);
+  const READ = new Date('2026-11-06T13:05:00Z');
+  function line(day: string, patch: Partial<StatsDay> = {}): StatsDay {
+    return {
+      platformAccountId: ACCOUNT,
+      day,
+      newSubscribers: 2,
+      unsubscribes: 1,
+      activeSubscribers: 100,
+      renewals: 3,
+      ppvSent: 10,
+      ppvPurchased: 4,
+      messagesSent: 50,
+      messagesReceived: 60,
+      readAt: READ,
+      ...patch,
+    };
+  }
+  const every = (from: number, to: number, patch: (day: string) => Partial<StatsDay> = () => ({})) =>
+    Array.from({ length: to - from + 1 }, (_, i) => {
+      const day = `2026-11-0${String(from + i)}`;
+      return line(day, patch(day));
+    });
+
+  it('is null while the snapshot holds nothing', () => {
+    expect(subscribersOf([creator(LINA, 'Lina', [])], RANGE)).toBeNull();
+    expect(insights([creator(LINA, 'Lina', [row()])]).subscribers).toBeNull();
+  });
+
+  it('sums the period and the one before, with the subscribers before each', () => {
+    const stats = every(0 + 1, 6, (day) => ({ activeSubscribers: 100 + Number(day.slice(-1)) }));
+    // The day before the previous period (31/10) gives its subscribers before.
+    const result = subscribersOf(
+      [creator(LINA, 'Lina', [], { stats: [line('2026-10-31', { activeSubscribers: 90 }), ...stats] })],
+      RANGE,
+    );
+    expect(result?.current).toEqual({
+      activeAtEnd: 106,
+      activeBefore: 103,
+      newSubscribers: 6,
+      unsubscribes: 3,
+      renewals: 9,
+      ppvSent: 30,
+      ppvPurchased: 12,
+      messagesSent: 150,
+      messagesReceived: 180,
+      daysRead: 3,
+      days: 3,
+    });
+    expect(result?.previous.activeBefore).toBe(90);
+    expect(result?.previous.activeAtEnd).toBe(103);
+    expect(result?.days).toEqual([
+      { day: '2026-11-04', active: 104 },
+      { day: '2026-11-05', active: 105 },
+      { day: '2026-11-06', active: 106 },
+    ]);
+    expect(result?.readAt).toBe(READ.toISOString());
+  });
+
+  it('never counts a day one account has not been read for, and says how many days it counted', () => {
+    const result = subscribersOf(
+      [
+        creator(LINA, 'Lina', [], { stats: every(4, 6) }),
+        // Maya's account has today, not yesterday.
+        creator(MAYA, 'Maya', [], {
+          stats: [
+            line('2026-11-04', { platformAccountId: ACCOUNT_B }),
+            line('2026-11-06', { platformAccountId: ACCOUNT_B }),
+          ],
+        }),
+      ],
+      RANGE,
+    );
+    expect(result?.days.map((one) => one.active)).toEqual([200, null, 200]);
+    expect(result?.current.daysRead).toBe(2);
+    expect(result?.current.newSubscribers).toBe(8);
+    expect(result?.current.activeAtEnd).toBe(200);
+    // Nothing before the period: its subscribers before are unknown, never zero.
+    expect(result?.current.activeBefore).toBeNull();
+    expect(result?.previous.daysRead).toBe(0);
+  });
+
+  it('leaves a count still computed by the platform null for the whole period', () => {
+    const result = subscribersOf(
+      [
+        creator(LINA, 'Lina', [], {
+          stats: every(4, 6, (day) => (day === '2026-11-06' ? { messagesSent: null, ppvSent: null } : {})),
+        }),
+      ],
+      RANGE,
+    );
+    expect(result?.current.messagesSent).toBeNull();
+    expect(result?.current.ppvSent).toBeNull();
+    expect(result?.current.messagesReceived).toBe(180);
+    expect(result?.current.ppvPurchased).toBe(12);
+  });
+
+  it('passes the contract', () => {
+    const result = insights([creator(LINA, 'Lina', [row()], { stats: every(4, 6) })]);
+    expect(AgencyInsightsSchema.parse(result).subscribers?.current.daysRead).toBe(3);
   });
 });

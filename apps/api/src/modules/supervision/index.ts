@@ -4,7 +4,7 @@ import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createDashboardRoutes, type DashboardRouteDeps } from './infra/http/dashboard-routes';
-import { createAgencyInsightsReader } from './infra/views/agency-insights-reader';
+import { createAgencyInsightsReader, type DailyStatsOf } from './infra/views/agency-insights-reader';
 import { createCreatorsOverviewReader } from './infra/views/creators-overview-reader';
 import { createDashboardReader } from './infra/views/dashboard-reader';
 import { createRevealSalesReader, type SalesTotalsOf } from './infra/views/reveal-sales-reader';
@@ -25,6 +25,8 @@ export interface SupervisionDeps extends Omit<
   readonly salesTotalsOf: SalesTotalsOf;
   /** The zone a platform counts its days in (the connectors'), `null` without a sales feed. */
   readonly salesTimeZone: (platform: Platform) => string | null;
+  /** The connectors' snapshot of the platforms' daily statistics (ADR 0081), read under the caller's RLS. */
+  readonly dailyStatsOf: DailyStatsOf;
 }
 
 export function createSupervisionModule(deps: SupervisionDeps): SupervisionModule {
@@ -34,7 +36,7 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
       ...deps,
       reader: createDashboardReader(deps.db),
       revealSales: createRevealSalesReader(deps.db, deps.salesTotalsOf),
-      agency: createAgencyInsightsReader(deps.db, deps.salesTotalsOf, deps.salesTimeZone),
+      agency: createAgencyInsightsReader(deps.db, deps.salesTotalsOf, deps.salesTimeZone, deps.dailyStatsOf),
       agencyTimeZone: deps.salesTimeZone('reveal') ?? 'Europe/Paris',
       overview: createCreatorsOverviewReader(deps.db),
     }),

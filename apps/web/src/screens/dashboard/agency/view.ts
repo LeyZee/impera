@@ -282,3 +282,26 @@ export function zoneLabel(timeZone: string): string {
   const city = timeZone.split('/').pop()?.replaceAll('_', ' ') ?? timeZone;
   return `heure de ${city}`;
 }
+
+/** « 14 h 05 » today, « 6 nov., 14 h 05 » another day: when the platform's statistics were last read, in `timeZone`. */
+export function readAtLabel(iso: string, timeZone: string, now: Date = new Date()): string {
+  const at = new Date(iso);
+  const dayOf = (date: Date): string => date.toLocaleDateString('fr-CA', { timeZone });
+  const time = at
+    .toLocaleTimeString('fr-FR', { timeZone, hour: '2-digit', minute: '2-digit' })
+    .replace(':', ' h ');
+  if (dayOf(at) === dayOf(now)) return time;
+  return `${at.toLocaleDateString('fr-FR', { timeZone, day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+/** PPV bought out of PPV sent, in % rounded; null when nothing was sent or the platform still computes it. */
+export function ppvRate(sent: number | null, purchased: number): number | null {
+  if (sent === null || sent <= 0) return null;
+  return Math.round((purchased / sent) * 100);
+}
+
+/** « +12 », « −3 », « 0 »: a change in subscribers, the true minus sign. */
+export function signedCount(n: number): string {
+  const text = Math.abs(n).toLocaleString('fr-FR');
+  return n > 0 ? `+${text}` : n < 0 ? `−${text}` : '0';
+}

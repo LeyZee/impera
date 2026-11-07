@@ -157,3 +157,46 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(screen.queryByRole('heading')).toBeNull();
   });
 });
+
+describe('Les abonnés (ADR 0081)', () => {
+  it('shows active subscribers, their change, the counts and when Reveal was read', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    expect(await screen.findByRole('heading', { name: /Les abonnés/u })).toBeTruthy();
+    expect(screen.getByText('Abonnés actifs')).toBeTruthy();
+    // 1 284 now, 1 231 the day before the week.
+    expect(screen.getByText('+53', { selector: 'b' })).toBeTruthy();
+    expect(screen.getByText('Désabonnements')).toBeTruthy();
+    // 96 new, 43 gone.
+    expect(screen.getByText('+53', { selector: '.ins-tile__value' })).toBeTruthy();
+    expect(screen.getByText('18 %')).toBeTruthy();
+    expect(screen.getByText(/74 achetés sur 412 envoyés, Mass DM compris/u)).toBeTruthy();
+    expect(screen.getByText(/Lu chez Reveal à/u)).toBeTruthy();
+    expect(
+      screen.getByRole('img', { name: /Abonnés actifs jour par jour, de 1\s236 à 1\s284/u }),
+    ).toBeTruthy();
+  });
+
+  it('says a count is still computed and how many days are read, never a zero', async () => {
+    const subscribers = AGENCY_WEEK.subscribers;
+    if (subscribers === null) throw new Error('fixture');
+    serve(200, {
+      ...AGENCY_WEEK,
+      subscribers: {
+        ...subscribers,
+        current: { ...subscribers.current, unsubscribes: null, messagesSent: null, daysRead: 5 },
+        days: subscribers.days.map((one, i) => (i === 3 ? { ...one, active: null } : one)),
+      },
+    });
+    show();
+    expect(await screen.findByRole('heading', { name: /Les abonnés/u })).toBeTruthy();
+    expect(screen.getAllByText('en calcul chez Reveal').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/5 jours lus sur 7/u)).toBeTruthy();
+  });
+
+  it('waits for the first read when the snapshot is empty', async () => {
+    serve(200, { ...AGENCY_WEEK, subscribers: null });
+    show();
+    expect(await screen.findByText(/première lecture des statistiques de Reveal/u)).toBeTruthy();
+  });
+});

@@ -23,11 +23,14 @@ import {
   OTHER,
   OTHER_KINDS_NOTE,
   PERIOD_OPTIONS,
+  ppvRate,
+  readAtLabel,
   SELLER_NOTES,
   sellerSlices,
   shareOf,
   shortDay,
   shortEuros,
+  signedCount,
   slotLabel,
   STACKS,
   WEEKDAYS,
@@ -727,6 +730,224 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
   );
 }
 
+/** A count of the snapshot: « en calcul » while the platform has not computed it. */
+const LATER = 'en calcul chez Reveal';
+const countText = (n: number | null): string => (n === null ? '—' : n.toLocaleString('fr-FR'));
+
+/** Active subscribers day by day: a line over the read days, broken where a day is not read yet. */
+function ActiveLine({
+  days,
+  tip,
+}: {
+  days: NonNullable<AgencyInsights['subscribers']>['days'];
+  tip: FloatingTip;
+}): JSX.Element | null {
+  const read = days.map((one) => one.active).filter((n): n is number => n !== null);
+  if (read.length < 2) return null;
+  const low = Math.min(...read);
+  const high = Math.max(...read);
+  // Not from zero: a few subscribers more on a thousand must show. A flat week stays a flat line.
+  const pad = Math.max(1, Math.round((high - low) * 0.15));
+  const frame = { width: 600, height: 120, padTop: 8, padBottom: 8 };
+  const points = chartPoints(
+    days.map((one) => one.active ?? low),
+    frame,
+    { min: low - pad, max: high + pad },
+  );
+  // One path per run of read days: a day not read breaks the line rather than inventing it.
+  const runs: (typeof points)[] = [];
+  days.forEach((one, i) => {
+    const point = points[i];
+    if (one.active === null || point === undefined) {
+      runs.push([]);
+      return;
+    }
+    const last = runs.at(-1);
+    if (last === undefined) runs.push([point]);
+    else last.push(point);
+  });
+  return (
+    <div
+      className="ins-subs__chart"
+      role="img"
+      aria-label={`Abonnés actifs jour par jour, de ${read[0]?.toLocaleString('fr-FR') ?? ''} à ${read.at(-1)?.toLocaleString('fr-FR') ?? ''}`}
+    >
+      <div className="ins-subs__scale" aria-hidden="true">
+        <span>{high.toLocaleString('fr-FR')}</span>
+        <span>{low.toLocaleString('fr-FR')}</span>
+      </div>
+      <div className="ins-subs__plot">
+        <svg viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
+          {runs
+            .filter((run) => run.length > 0)
+            .map((run) => (
+              <path
+                key={String(run[0]?.x)}
+                className="ins-subs__line"
+                d={linePath(run)}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+        </svg>
+        <div className="ins-subs__hits" aria-hidden="true">
+          {days.map((one) => (
+            <span
+              key={one.day}
+              className="ins-subs__hit"
+              {...tip.bind({
+                title: dayLabel(one.day),
+                ...(one.active === null
+                  ? { text: 'Pas encore lu chez Reveal.' }
+                  : { rows: [['Abonnés actifs, en fin de journée', one.active.toLocaleString('fr-FR')]] }),
+              })}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Subscribers, PPV and messages (ADR 0081): the daily snapshot of the platform's statistics, never money. A day not
+ * read is never a zero, and a count the platform still computes says so.
+ */
+function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
+  const subs = insights.subscribers;
+  if (subs === null) {
+    return (
+      <p className="nv-plate ins-empty">
+        Les abonnés arrivent avec la première lecture des statistiques de Reveal, dans l’heure qui suit la
+        connexion de la clé.
+      </p>
+    );
+  }
+  const { current, previous } = subs;
+  const growth =
+    current.activeAtEnd === null || current.activeBefore === null
+      ? null
+      : current.activeAtEnd - current.activeBefore;
+  const net = current.unsubscribes === null ? null : current.newSubscribers - current.unsubscribes;
+  const rate = ppvRate(current.ppvSent, current.ppvPurchased);
+  const rateBefore = ppvRate(previous.ppvSent, previous.ppvPurchased);
+  const tiles: readonly {
+    label: string;
+    value: string;
+    note: string;
+    delta: readonly [number, number] | null;
+    lowerIsBetter?: true;
+  }[] = [
+    {
+      label: 'Nouveaux abonnés',
+      value: countText(current.newSubscribers),
+      note: 'gratuits et payants, sans les renouvellements',
+      delta: previous.daysRead > 0 ? [current.newSubscribers, previous.newSubscribers] : null,
+    },
+    {
+      label: 'Désabonnements',
+      value: countText(current.unsubscribes),
+      note: current.unsubscribes === null ? LATER : 'comptés le jour de l’échéance, pas du clic',
+      delta:
+        current.unsubscribes === null || previous.unsubscribes === null || previous.daysRead === 0
+          ? null
+          : [current.unsubscribes, previous.unsubscribes],
+      lowerIsBetter: true,
+    },
+    {
+      label: 'Solde',
+      value: net === null ? '—' : signedCount(net),
+      note: net === null ? LATER : 'nouveaux moins désabonnements',
+      delta: null,
+    },
+    {
+      label: 'Renouvellements',
+      value: countText(current.renewals),
+      note: current.renewals === null ? LATER : 'abonnements reconduits',
+      delta:
+        current.renewals === null || previous.renewals === null || previous.daysRead === 0
+          ? null
+          : [current.renewals, previous.renewals],
+    },
+    {
+      label: 'Taux d’achat des PPV',
+      value: rate === null ? '—' : `${String(rate)} %`,
+      note:
+        current.ppvSent === null
+          ? LATER
+          : `${countText(current.ppvPurchased)} achetés sur ${countText(current.ppvSent)} envoyés, Mass DM compris`,
+      delta: rate === null || rateBefore === null ? null : [rate, rateBefore],
+    },
+    {
+      label: 'Messages',
+      value: countText(current.messagesSent),
+      note:
+        current.messagesSent === null || current.messagesReceived === null
+          ? LATER
+          : `envoyés, pour ${countText(current.messagesReceived)} reçus des fans`,
+      delta:
+        current.messagesSent === null || previous.messagesSent === null || previous.daysRead === 0
+          ? null
+          : [current.messagesSent, previous.messagesSent],
+    },
+  ];
+  return (
+    <div className="nv-plate ins-subs">
+      <div className="ins-subs__lead">
+        <div className="nv-figure">
+          <span className="nv-figure__label">Abonnés actifs</span>
+          {current.activeAtEnd === null ? (
+            <span className="nv-figure__value ins-lead__value">—</span>
+          ) : (
+            <CountUp
+              className="nv-figure__value ins-lead__value"
+              value={current.activeAtEnd}
+              format={formatCount}
+            />
+          )}
+          <span className="nv-figure__note">
+            {growth === null ? (
+              <span>
+                {current.activeAtEnd === null
+                  ? 'le dernier jour n’est pas encore lu'
+                  : 'rien à comparer avant la période'}
+              </span>
+            ) : (
+              <span>
+                <b className="ins-nowrap">{signedCount(growth)}</b> depuis le début de la période
+              </span>
+            )}
+          </span>
+        </div>
+        <ActiveLine key={insights.period} days={subs.days} tip={tip} />
+      </div>
+      <dl className="ins-tiles ins-subs__tiles">
+        {tiles.map((tile) => (
+          <div key={tile.label} className="ins-tile ins-subs__tile">
+            <dt>{tile.label}</dt>
+            <dd>
+              <span className="ins-tile__value">{tile.value}</span>
+              {tile.delta === null ? null : (
+                <Delta
+                  current={tile.delta[0]}
+                  previous={tile.delta[1]}
+                  lowerIsBetter={tile.lowerIsBetter === true}
+                />
+              )}
+            </dd>
+            <dd className="ins-tile__note">{tile.note}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="ins-subs__foot">
+        Lu chez Reveal à {readAtLabel(subs.readAt, insights.timeZone)}
+        {current.daysRead < current.days
+          ? ` ; ${String(current.daysRead)} jour${current.daysRead > 1 ? 's' : ''} lu${current.daysRead > 1 ? 's' : ''} sur ${String(current.days)}, les autres arrivent avec la prochaine lecture.`
+          : '.'}
+      </p>
+    </div>
+  );
+}
+
 /** Sections' reading lines, by period. */
 const DAILY_SUB: Readonly<Record<AgencyPeriod, string>> = {
   day: 'heure par heure depuis minuit',
@@ -842,6 +1063,14 @@ export function AgencyInsightsPanel({
         index={next()}
       >
         <Daily key={insights.period} insights={insights} tip={tip} />
+      </Section>
+
+      <Section
+        title="Les abonnés"
+        sub="lus chaque heure dans les statistiques de Reveal, jamais de l’argent"
+        index={next()}
+      >
+        <Subscribers insights={insights} tip={tip} />
       </Section>
 
       <div className="ins-pair nv-enter" style={{ '--nv-i': next() }}>
