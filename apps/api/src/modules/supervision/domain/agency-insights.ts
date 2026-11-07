@@ -6,6 +6,8 @@ import {
   type AgencyInsights,
   type AgencyPeriod,
   type AgencySaleKind,
+  type AgencySubscriberFigures,
+  type AgencySubscribers,
   type CreatorId,
   type Currency,
   type DashboardSalesSeller,
@@ -83,6 +85,24 @@ interface FanSum {
   readonly seenBefore: boolean;
 }
 
+/**
+ * One account's day in the snapshot of the platform's statistics (ADR 0081), as the connectors expose it: counts only,
+ * null while the platform still computes one.
+ */
+export interface StatsDay {
+  readonly platformAccountId: string;
+  readonly day: string;
+  readonly newSubscribers: number;
+  readonly unsubscribes: number | null;
+  readonly activeSubscribers: number;
+  readonly renewals: number | null;
+  readonly ppvSent: number | null;
+  readonly ppvPurchased: number;
+  readonly messagesSent: number | null;
+  readonly messagesReceived: number | null;
+  readonly readAt: Date;
+}
+
 /** One creator's part of the read, inside her tenant. */
 export interface AgencyCreatorRead {
   readonly creatorId: CreatorId;
@@ -93,6 +113,8 @@ export interface AgencyCreatorRead {
   readonly fans: readonly FanSum[];
   /** Refunds of the period whose sale is older than the register: counted in no figure (CRM-02's note). */
   readonly refundsWithoutSale: number;
+  /** Her accounts' days in the statistics' snapshot, from the day before the previous period to today. */
+  readonly stats: readonly StatsDay[];
 }
 
 /** One hour of a day: its sums in euros and dollars, by creator and by kind. */
@@ -400,5 +422,95 @@ export function agencyInsights(input: {
     refundsWithoutSale,
     timeZone,
     dollarsLeftOut: rate === null && dollarsSeen,
+    subscribers: subscribersOf(creators, range),
   };
+}
+
+/** The counts the platform computes later: null until it has. */
+type Later = 'unsubscribes' | 'renewals' | 'ppvSent' | 'messagesSent' | 'messagesReceived';
+
+/** One day summed over every account counted; absent when one of them has no line that day. */
+interface StatsSum {
+  readonly active: number;
+  readonly newSubscribers: number;
+  readonly ppvPurchased: number;
+  readonly later: Readonly<Record<Later, number | null>>;
+}
+
+/**
+ * Subscribers, PPV and messages of the creators counted (ADR 0081 § 4). A day counts only when every account seen in
+ * the snapshot has its line that day: a day half read would look like a fall. A count the platform still computes on
+ * one day leaves the period's sum null (« en calcul »), never a partial number. Null while the snapshot is empty.
+ */
+export function subscribersOf(
+  creators: readonly Pick<AgencyCreatorRead, 'creatorId' | 'stats'>[],
+  range: { from: string; to: string; previousFrom: string; previousTo: string },
+): AgencySubscribers | null {
+  const accounts = new Set<string>();
+  const lines = new Map<string, StatsDay[]>();
+  let readAt: Date | null = null;
+  for (const creator of creators) {
+    for (const line of creator.stats) {
+      accounts.add(`${creator.creatorId}:${line.platformAccountId}`);
+      const ofDay = lines.get(line.day) ?? [];
+      ofDay.push(line);
+      lines.set(line.day, ofDay);
+      if (readAt === null || line.readAt > readAt) readAt = line.readAt;
+    }
+  }
+  if (readAt === null) return null;
+  const sumOf = (day: string): StatsSum | null => {
+    const ofDay = lines.get(day) ?? [];
+    if (ofDay.length < accounts.size) return null;
+    const later = (field: Later): number | null =>
+      ofDay.reduce<number | null>((total, line) => {
+        const value = line[field];
+        return total === null || value === null ? null : total + value;
+      }, 0);
+    return {
+      active: ofDay.reduce((total, line) => total + line.activeSubscribers, 0),
+      newSubscribers: ofDay.reduce((total, line) => total + line.newSubscribers, 0),
+      ppvPurchased: ofDay.reduce((total, line) => total + line.ppvPurchased, 0),
+      later: {
+        unsubscribes: later('unsubscribes'),
+        renewals: later('renewals'),
+        ppvSent: later('ppvSent'),
+        messagesSent: later('messagesSent'),
+        messagesReceived: later('messagesReceived'),
+      },
+    };
+  };
+  const figures = (from: string, to: string): AgencySubscriberFigures => {
+    const days = daysBetween(from, to);
+    const read = days.map(sumOf).filter((one): one is StatsSum => one !== null);
+    const laterSum = (field: Later): number | null =>
+      read.reduce<number | null>((total, one) => {
+        const value = one.later[field];
+        return total === null || value === null ? null : total + value;
+      }, 0);
+    return {
+      activeAtEnd: sumOf(to)?.active ?? null,
+      activeBefore: sumOf(shiftDay(from, -1))?.active ?? null,
+      newSubscribers: read.reduce((total, one) => total + one.newSubscribers, 0),
+      unsubscribes: laterSum('unsubscribes'),
+      renewals: laterSum('renewals'),
+      ppvSent: laterSum('ppvSent'),
+      ppvPurchased: read.reduce((total, one) => total + one.ppvPurchased, 0),
+      messagesSent: laterSum('messagesSent'),
+      messagesReceived: laterSum('messagesReceived'),
+      daysRead: read.length,
+      days: days.length,
+    };
+  };
+  return {
+    current: figures(range.from, range.to),
+    previous: figures(range.previousFrom, range.previousTo),
+    days: daysBetween(range.from, range.to).map((day) => ({ day, active: sumOf(day)?.active ?? null })),
+    readAt: readAt.toISOString(),
+  };
+}
+
+/** `day` moved by `days`, in calendar days. */
+export function shiftDay(day: string, days: number): string {
+  return new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }

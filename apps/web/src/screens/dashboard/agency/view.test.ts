@@ -7,6 +7,9 @@ import {
   busiest,
   byWeek,
   changeOf,
+  ppvRate,
+  readAtLabel,
+  signedCount,
   dayStacks,
   deltaText,
   euros,
@@ -93,5 +96,25 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
     const [first, second] = arcs([1, 3], 10, 0);
     expect(first?.offset).toBe(0);
     expect(second?.offset).toBeCloseTo(-15.71, 1);
+  });
+});
+
+describe('subscribers helpers', () => {
+  it('says when the statistics were read, the day only when it is not today', () => {
+    const now = new Date('2026-11-06T15:00:00Z');
+    expect(readAtLabel('2026-11-06T13:05:00Z', 'Europe/Paris', now)).toBe('14 h 05');
+    expect(readAtLabel('2026-11-05T13:05:00Z', 'Europe/Paris', now)).toBe('5 nov., 14 h 05');
+  });
+
+  it('gives the PPV purchase rate only when there is something to divide', () => {
+    expect(ppvRate(40, 10)).toBe(25);
+    expect(ppvRate(0, 0)).toBeNull();
+    expect(ppvRate(null, 3)).toBeNull();
+  });
+
+  it('signs a change in subscribers', () => {
+    expect(signedCount(12)).toBe('+12');
+    expect(signedCount(-3)).toBe('−3');
+    expect(signedCount(0)).toBe('0');
   });
 });
