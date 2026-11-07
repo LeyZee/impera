@@ -1,6 +1,6 @@
 import { placeTabBarLens } from '@impera/design-system';
 import { Link, useRouterState, type LinkProps } from '@tanstack/react-router';
-import { useEffect, useLayoutEffect, useRef, type JSX, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -124,6 +124,12 @@ function placeStill(nav: HTMLElement, active: HTMLElement, thumb: HTMLElement | 
 const leftAt = new Map<string, { readonly href: string; readonly at: number }>();
 const SAME_GESTURE_MS = 1_000;
 
+/** Which edges of a scrolling sub-nav hide tabs. */
+type SubNavMore = 'none' | 'start' | 'end' | 'both';
+
+const reducedMotion = (): boolean =>
+  typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /** The screens of a section, as tabs. The active one follows the URL; its glass slides from tab to tab. */
 export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: string }): JSX.Element {
   const pathname = useRouterState({ select: (router) => router.location.pathname });
@@ -133,6 +139,7 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
   const counts = items.map((item) => item.count ?? 0).join(',');
   const lit = items.findIndex((item) => item.current === true);
   const tabs = items.map((item) => `${item.to}${item.label}`).join('|');
+  const [more, setMore] = useState<SubNavMore>('none');
 
   useLayoutEffect(() => {
     const nav = navRef.current;
@@ -193,7 +200,9 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     const mark = (): void => {
       const start = nav.scrollLeft > 1;
       const end = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1;
-      nav.dataset['more'] = start && end ? 'both' : start ? 'start' : end ? 'end' : 'none';
+      const next: SubNavMore = start && end ? 'both' : start ? 'start' : end ? 'end' : 'none';
+      nav.dataset['more'] = next;
+      setMore(next);
     };
     mark();
     nav.addEventListener('scroll', mark, { passive: true });
@@ -223,8 +232,35 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     };
   }, [tabs]);
 
+  // A finger sees the fade, not that the bar scrolls: a chevron on each edge that hides tabs pages to them, as the
+  // persona's own tabs do (recette 07/11).
+  const page = (side: 'start' | 'end'): void => {
+    const nav = navRef.current;
+    if (nav === null || typeof nav.scrollBy !== 'function') return;
+    const step = Math.max(120, nav.clientWidth * 0.7);
+    nav.scrollBy({ left: side === 'end' ? step : -step, behavior: reducedMotion() ? 'auto' : 'smooth' });
+  };
+  const chevron = (side: 'start' | 'end'): JSX.Element => (
+    <button
+      type="button"
+      className="nv-glass nv-glass--thin nv-subnav__more"
+      data-side={side}
+      aria-label={side === 'end' ? 'Onglets suivants' : 'Onglets précédents'}
+      title={side === 'end' ? 'Onglets suivants' : 'Onglets précédents'}
+      // Every tab is in the tab order already: the chevron is a shortcut for the pointer and the finger.
+      tabIndex={-1}
+      onClick={() => {
+        page(side);
+      }}
+    >
+      <span className="nv-subnav__chevron" aria-hidden="true" />
+    </button>
+  );
+
   return (
     <div className="nv-subnav-pill nv-glass nv-glass--thin">
+      {more === 'start' || more === 'both' ? chevron('start') : null}
+      {more === 'end' || more === 'both' ? chevron('end') : null}
       <nav className="nv-subnav" aria-label={label} ref={navRef}>
         <span className="nv-subnav__thumb" ref={thumbRef} aria-hidden="true" />
         {items.map((item) => (
