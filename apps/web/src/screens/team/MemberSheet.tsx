@@ -99,7 +99,11 @@ export function MemberSheet({
 
       {/* A state, not news: said as long as it lasts, nothing turned off; his departure stays Équipe's (ADR 0076 § 5). */}
       {removals.map((removal) => (
-        <p key={removal.platform} className="tm-warn nv-enter" role="status">
+        <p
+          key={`${removal.platform}:${removal.platformChatterId}`}
+          className="tm-warn nv-enter"
+          role="status"
+        >
           {removalLine(removal, member.status)}. Son lien reste, ses ventes passées lui restent attribuées
           {canManage ? ' ; son départ se fait par «\u00a0Changer le statut\u00a0».' : '.'}
         </p>

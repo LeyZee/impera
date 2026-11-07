@@ -772,6 +772,40 @@ describe('a link from the sheet', () => {
     expect(screen.getByText('3 actifs · 1 absent · 1 invitation en attente · 1 lien expiré')).toBeDefined();
   });
 
+  it('says the member’s city and hour under the name, never an IANA zone (EQ-07, EQ-08)', async () => {
+    serve();
+    renderPage(`/equipe/membres?membre=${THEO.id}`);
+    const sheet = await screen.findByRole('region', { name: 'Théo' });
+    expect(sheet.querySelector('.tm-sheet__where')?.textContent).toMatch(/^🇧🇯 Porto-Novo · \d+\sh\s\d{2}$/u);
+    expect(sheet.textContent).not.toContain('Africa/');
+    expect(sheet.textContent).not.toContain('Chez lui');
+    expect(within(sheet).getByText('Dans l’équipe depuis')).toBeDefined();
+  });
+
+  it('shows a manager his own record without the notes about him', async () => {
+    serve();
+    renderPage(`/equipe/membres?onglet=managers&membre=${INES.id}`, false, INES.userId);
+    expect(await screen.findByRole('region', { name: 'Inès' })).toBeDefined();
+    expect(screen.queryByRole('region', { name: 'Notes internes' })).toBeNull();
+  });
+
+  it('opens the fold of those who left when the search finds only them', async () => {
+    serve();
+    renderPage();
+    fireEvent.change(await screen.findByLabelText('Rechercher un membre'), { target: { value: 'jules' } });
+    expect(await screen.findByText(/Aucun membre actuel ne répond à « jules »/u)).toBeDefined();
+    expect(screen.getByRole('group').hasAttribute('open')).toBe(true);
+  });
+
+  it('says why a member who left gets no link', async () => {
+    serve({ post: () => ({ status: 409, body: apiError('member_left_conflict') }) });
+    renderPage(`/equipe/membres?membre=${BASILE.id}`);
+    fireEvent.click(await screen.findByRole('button', { name: 'Lien de nouveau mot de passe' }));
+    expect(await screen.findByText('Ce membre est parti : sa fiche ne change plus.')).toBeDefined();
+  });
+});
+
+describe('a member removed from a platform (ADR 0076 § 5)', () => {
   it('says who is still here though removed from Reveal, in amber, on his line and his sheet (ADR 0076 § 5)', async () => {
     serve({
       removals: [
@@ -829,35 +863,45 @@ describe('a link from the sheet', () => {
     );
   });
 
-  it('says the member’s city and hour under the name, never an IANA zone (EQ-07, EQ-08)', async () => {
-    serve();
+  it('drops a removal once the member has left, and reads the removals again (ADR 0076 § 5)', async () => {
+    const left = { ...THEO, status: 'left', creatorIds: [] };
+    serve({
+      // The list still read before the departure: the screen never says « toujours » of one who left.
+      removals: [
+        {
+          memberId: THEO.id,
+          platform: 'reveal',
+          platformChatterId: 'rv-11',
+          removedAt: '2026-11-05T12:00:00.000Z',
+          absent: false,
+        },
+      ],
+      post: () => ({ status: 200, body: left }),
+      afterPost: { status: 200, body: { members: [left, BASILE, JULES, INES] } },
+    });
     renderPage(`/equipe/membres?membre=${THEO.id}`);
     const sheet = await screen.findByRole('region', { name: 'Théo' });
-    expect(sheet.querySelector('.tm-sheet__where')?.textContent).toMatch(/^🇧🇯 Porto-Novo · \d+\sh\s\d{2}$/u);
-    expect(sheet.textContent).not.toContain('Africa/');
-    expect(sheet.textContent).not.toContain('Chez lui');
-    expect(within(sheet).getByText('Dans l’équipe depuis')).toBeDefined();
-  });
-
-  it('shows a manager his own record without the notes about him', async () => {
-    serve();
-    renderPage(`/equipe/membres?onglet=managers&membre=${INES.id}`, false, INES.userId);
-    expect(await screen.findByRole('region', { name: 'Inès' })).toBeDefined();
-    expect(screen.queryByRole('region', { name: 'Notes internes' })).toBeNull();
-  });
-
-  it('opens the fold of those who left when the search finds only them', async () => {
-    serve();
-    renderPage();
-    fireEvent.change(await screen.findByLabelText('Rechercher un membre'), { target: { value: 'jules' } });
-    expect(await screen.findByText(/Aucun membre actuel ne répond à « jules »/u)).toBeDefined();
-    expect(screen.getByRole('group').hasAttribute('open')).toBe(true);
-  });
-
-  it('says why a member who left gets no link', async () => {
-    serve({ post: () => ({ status: 409, body: apiError('member_left_conflict') }) });
-    renderPage(`/equipe/membres?membre=${BASILE.id}`);
-    fireEvent.click(await screen.findByRole('button', { name: 'Lien de nouveau mot de passe' }));
-    expect(await screen.findByText('Ce membre est parti : sa fiche ne change plus.')).toBeDefined();
+    await within(sheet).findByText(/toujours actif chez Impera/u);
+    const reads = (): number =>
+      vi
+        .mocked(fetch)
+        .mock.calls.filter(
+          ([input]) => typeof input === 'string' && input.includes('/v1/team/platform-removals'),
+        ).length;
+    const before = reads();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Changer le statut' }));
+    const panel = await screen.findByRole('dialog', { name: 'Statut de Théo' });
+    choose(panel, 'Parti');
+    fireEvent.click(
+      within(within(panel).getByRole('group', { name: 'Confirmer le départ' })).getByRole('checkbox'),
+    );
+    fireEvent.click(within(panel).getByRole('button', { name: 'Confirmer le départ' }));
+    await waitFor(() => {
+      expect(reads()).toBeGreaterThan(before);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/toujours (actif|membre) chez Impera/u)).toBeNull();
+    });
+    expect(screen.queryByText('Retiré de Reveal')).toBeNull();
   });
 });

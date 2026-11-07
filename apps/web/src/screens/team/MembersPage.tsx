@@ -56,10 +56,11 @@ export function MembersPage({
   const members = useMembers();
   const presets = usePresets();
   const creators = useCreators();
-  // ADR 0076 § 5: who is still here though his platform account was removed; nothing said while it cannot be read.
+  // ADR 0076 § 5: who is still here though his platform account was removed; nothing said while it cannot be read,
+  // nor for one who left, even before the list is read again.
   const removals = usePlatformRemovals();
   const removalsOf = (member: TeamMember): TeamPlatformRemoval[] =>
-    (removals.data ?? []).filter((removal) => removal.memberId === member.id);
+    member.status === 'left' ? [] : (removals.data ?? []).filter((removal) => removal.memberId === member.id);
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
   const all = members.data ?? [];
@@ -282,7 +283,10 @@ function Row({
         <span className="nv-convo__side">
           {/* Amber, beside his status: removed on the platform, nothing is turned off here (ADR 0076 § 5). */}
           {removals.map((removal) => (
-            <span key={removal.platform} className="tm-invited tm-invited--warn">
+            <span
+              key={`${removal.platform}:${removal.platformChatterId}`}
+              className="tm-invited tm-invited--warn"
+            >
               {removalPill(removal)}
             </span>
           ))}

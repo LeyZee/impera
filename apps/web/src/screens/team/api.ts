@@ -61,12 +61,14 @@ export function useMembers(enabled = true): UseQueryResult<TeamMember[]> {
   return useQuery({ queryKey: MEMBERS_KEY, queryFn: fetchMembers, enabled, retry: 1 });
 }
 
+export const PLATFORM_REMOVALS_KEY = ['team', 'platform-removals'] as const;
+
 /**
  * Who is still in the team though removed from a platform (ADR 0076 § 5), read for the owner and an active manager;
  * a chatter reads an empty list. Never retried for long: the list of members stands without it.
  */
 export function usePlatformRemovals(): UseQueryResult<TeamPlatformRemoval[]> {
-  return useQuery({ queryKey: ['team', 'platform-removals'], queryFn: fetchPlatformRemovals, retry: 1 });
+  return useQuery({ queryKey: PLATFORM_REMOVALS_KEY, queryFn: fetchPlatformRemovals, retry: 1 });
 }
 
 /** The presets are the owner's settings: a manager who cannot read them sees the figures alone. */
