@@ -1,6 +1,6 @@
 # 0081. Les abonnés, les PPV envoyés et les messages se gardent en photo quotidienne lue chez la plateforme
 
-Statut : accepted (« ok 0081 » de Charles le 07/11/2026, 13 h 50 ; « go » de Charles le 07/11/2026, 13 h 09, pour le lot B de DSH-01 ; numéro attribué par le coordinateur ; § 3, § 5 et § 6 précisés après la relecture de Bilan, 13 h 20)
+Statut : accepted (« ok 0081 » de Charles le 07/11/2026, 13 h 50 ; « go » de Charles le 07/11/2026, 13 h 09, pour le lot B de DSH-01 ; numéro attribué par le coordinateur ; § 3, § 5 et § 6 précisés après la relecture de Bilan, 13 h 20 ; migration renumérotée 0138 par le coordinateur, 13 h 55)
 Date : 2026-11-07
 Précise : l'ADR 0078 § 6 (rien sur les abonnés tant que le lot B n'existe pas) et l'ADR 0050 (la clé d'agence lit la plateforme, le registre garde l'argent). Ne remplace rien.
 
@@ -45,9 +45,9 @@ Le quota des statistiques est de 10 appels par minute par clé, et de 20 par min
    - lecture : le propriétaire, toutes les lignes ; un manager actif, seulement les lignes des créatrices de sa liste où sa portée est celle de l'équipe (ADR 0078 § 1) ; personne d'autre, ni un chatteur, ni la créatrice, ni un opérateur ;
    - écriture : seulement le job, par `withAdmin`, jamais une route.
 
-   L'écriture est idempotente : rejouer une lecture redonne la même table. La photo passe à l'écran par la route du Dashboard de l'agence (`GET /v1/dashboard/agency`), sous `withTenantMember`, sans appel à la plateforme ; la route reste déclarée au harnais d'isolation, et le test d'isolation couvre la nouvelle table. La migration est la 0137 ; elle crée la photo et la table de comptage des appels.
+   L'écriture est idempotente : rejouer une lecture redonne la même table. La photo passe à l'écran par la route du Dashboard de l'agence (`GET /v1/dashboard/agency`), sous `withTenantMember`, sans appel à la plateforme ; la route reste déclarée au harnais d'isolation, et le test d'isolation couvre la nouvelle table. La migration est la 0138 ; elle crée la photo et la table de comptage des appels.
 
-6. **Qui fait quoi** (comme l'ADR 0076 § 10). Bilan : le job, l'adaptateur, les deux tables, la migration 0137 et la lecture exposée par l'`index.ts` de `connectors`. Le fil du Dashboard : la route `GET /v1/dashboard/agency` et le bloc « Abonnés ». Extension : la relecture de l'écran et les captures.
+6. **Qui fait quoi** (comme l'ADR 0076 § 10). Bilan : le job, l'adaptateur, les deux tables, la migration 0138 et la lecture exposée par l'`index.ts` de `connectors`. Le fil du Dashboard : la route `GET /v1/dashboard/agency` et le bloc « Abonnés ». Extension : la relecture de l'écran et les captures.
 
 ## Conséquences
 
