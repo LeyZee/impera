@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { act, useState, type JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -99,6 +99,31 @@ describe('SubNav', () => {
       resized([]);
     });
     expect(nav.dataset['more']).toBe('end');
+  });
+
+  // Recette 07/11: on a phone, the creator sheet's tabs scrolled under a fade a finger could not tell from an end.
+  it('puts a chevron on each edge that hides tabs, and pages to them', async () => {
+    renderNav([
+      { to: '/paie/quinzaine', label: 'Quinzaine' },
+      { to: '/paie/releves', label: 'Relevés' },
+    ]);
+    await screen.findByRole('link', { name: 'Quinzaine' });
+    const nav = screen.getByRole('navigation', { name: 'Paie' });
+    expect(screen.queryByRole('button', { name: /Onglets/u })).toBeNull();
+    const scrollBy = vi.fn();
+    Object.defineProperty(nav, 'scrollBy', { configurable: true, value: scrollBy });
+    Object.defineProperty(nav, 'clientWidth', { configurable: true, value: 300 });
+    Object.defineProperty(nav, 'scrollWidth', { configurable: true, value: 600 });
+    act(() => {
+      resized([]);
+    });
+    expect(screen.queryByRole('button', { name: 'Onglets précédents' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Onglets suivants' }));
+    expect(scrollBy).toHaveBeenCalledWith(expect.objectContaining({ left: 210 }));
+    nav.scrollLeft = 300;
+    fireEvent.scroll(nav);
+    expect(screen.getByRole('button', { name: 'Onglets précédents' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Onglets suivants' })).toBeNull();
   });
 
   // Relecture des captures (#569): the font once loaded, or a count drawn outside the list, widened a tab and the
