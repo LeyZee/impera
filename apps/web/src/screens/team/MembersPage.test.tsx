@@ -99,6 +99,7 @@ function serve(
     rates?: readonly unknown[];
     shifts?: readonly unknown[];
     planningDown?: boolean;
+    removals?: readonly unknown[];
   } = {},
 ): Posted[] {
   const posted: Posted[] = [];
@@ -116,6 +117,8 @@ function serve(
           routes.members ?? { status: 200, body: { members: TEAM } };
       else if (path === '/v1/team/commission-presets') reply = { status: 200, body: { presets: PRESETS } };
       else if (path === '/v1/creators') reply = { status: 200, body: { creators: [LEA] } };
+      else if (path === '/v1/team/platform-removals')
+        reply = { status: 200, body: { removals: routes.removals ?? [] } };
       else if (path === '/v1/scheduling/settings') reply = { status: 200, body: SETTINGS };
       else if (path.endsWith('/commission')) reply = { status: 200, body: { rates: routes.rates ?? [] } };
       else if (path === '/v1/scheduling/planning')
@@ -767,6 +770,63 @@ describe('a link from the sheet', () => {
     expect(side('Mialy')).toBe('Invité');
     expect(side('Koffi')).toBe('Lien expiré');
     expect(screen.getByText('3 actifs · 1 absent · 1 invitation en attente · 1 lien expiré')).toBeDefined();
+  });
+
+  it('says who is still here though removed from Reveal, in amber, on his line and his sheet (ADR 0076 § 5)', async () => {
+    serve({
+      removals: [
+        {
+          memberId: THEO.id,
+          platform: 'reveal',
+          platformChatterId: 'rv-11',
+          removedAt: '2026-11-05T12:00:00.000Z',
+          absent: true,
+        },
+        {
+          memberId: BASILE.id,
+          platform: 'reveal',
+          platformChatterId: 'rv-12',
+          removedAt: null,
+          absent: true,
+        },
+      ],
+    });
+    renderPage(`/equipe/membres?membre=${THEO.id}`);
+    const sheet = await screen.findByRole('region', { name: 'Théo' });
+    const list = screen.getByRole('list', { name: 'Chatteurs' });
+    const side = (name: string): string =>
+      within(list)
+        .getAllByRole('button')
+        .find((row) => row.querySelector('.nv-convo__name')?.textContent === name)
+        ?.querySelector('.nv-convo__side')?.textContent ?? 'none';
+    await waitFor(() => {
+      expect(side('Théo')).toBe('Retiré de Reveal');
+    });
+    // Beside his status, never in its place: the removal turns nothing off here.
+    expect(side('Basile')).toBe('Retiré de RevealEn congé');
+    expect(text(within(sheet).getByRole('status'))).toBe(
+      'Retiré de Reveal le 5 nov., toujours actif chez Impera. Son lien reste, ses ventes passées lui restent ' +
+        'attribuées ; son départ se fait par « Changer le statut ».',
+    );
+  });
+
+  it('tells a manager a removal without a date, never « actif » for one on leave, and no gesture (ADR 0076 § 5)', async () => {
+    serve({
+      removals: [
+        {
+          memberId: BASILE.id,
+          platform: 'reveal',
+          platformChatterId: 'rv-12',
+          removedAt: null,
+          absent: true,
+        },
+      ],
+    });
+    renderPage(`/equipe/membres?membre=${BASILE.id}`, false);
+    const sheet = await screen.findByRole('region', { name: 'Basile' });
+    expect(text(await within(sheet).findByRole('status'))).toBe(
+      'Plus dans l’équipe Reveal, toujours membre chez Impera. Son lien reste, ses ventes passées lui restent attribuées.',
+    );
   });
 
   it('says the member’s city and hour under the name, never an IANA zone (EQ-07, EQ-08)', async () => {

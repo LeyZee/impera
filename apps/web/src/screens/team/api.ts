@@ -10,6 +10,7 @@ import {
   TeamMemberNoteListSchema,
   TeamMemberNoteSchema,
   TeamMemberSchema,
+  TeamPlatformRemovalListSchema,
   type CommissionPreset,
   type CommissionRate,
   type CreateTeamMemberBody,
@@ -20,6 +21,7 @@ import {
   type TeamMemberErrorCode,
   type TeamMemberNote,
   type TeamMemberStatus,
+  type TeamPlatformRemoval,
   type UpdateTeamMemberBody,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -48,12 +50,23 @@ export const fetchPresets = (): Promise<CommissionPreset[]> =>
 export const fetchNotes = (memberId: string): Promise<TeamMemberNote[]> =>
   read(`/v1/team/members/${memberId}/notes`, (body) => TeamMemberNoteListSchema.parse(body).notes);
 
+export const fetchPlatformRemovals = (): Promise<TeamPlatformRemoval[]> =>
+  read('/v1/team/platform-removals', (body) => TeamPlatformRemovalListSchema.parse(body).removals);
+
 export const MEMBERS_KEY = ['team', 'members'] as const;
 
 /** The team as the agency reads it; `enabled` false for a member, who does not read it. */
 export function useMembers(enabled = true): UseQueryResult<TeamMember[]> {
   // One retry: a silent server is said in about a second (EQ-22).
   return useQuery({ queryKey: MEMBERS_KEY, queryFn: fetchMembers, enabled, retry: 1 });
+}
+
+/**
+ * Who is still in the team though removed from a platform (ADR 0076 § 5), read for the owner and an active manager;
+ * a chatter reads an empty list. Never retried for long: the list of members stands without it.
+ */
+export function usePlatformRemovals(): UseQueryResult<TeamPlatformRemoval[]> {
+  return useQuery({ queryKey: ['team', 'platform-removals'], queryFn: fetchPlatformRemovals, retry: 1 });
 }
 
 /** The presets are the owner's settings: a manager who cannot read them sees the figures alone. */

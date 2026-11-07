@@ -69,6 +69,9 @@ export const TeamPlatformRemovalSchema = TeamImportRemovalSchema.extend({
 });
 export type TeamPlatformRemoval = z.infer<typeof TeamPlatformRemovalSchema>;
 
+/** `GET /v1/team/platform-removals`: the removals this viewer may see, none for a chatter. */
+export const TeamPlatformRemovalListSchema = z.object({ removals: z.array(TeamPlatformRemovalSchema) });
+
 export const TeamImportRowSchema = z.object({
   chatter: PlatformChatterSchema,
   /** The link in place (`sales_feed_chatters`), `null` when none. */
