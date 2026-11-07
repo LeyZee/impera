@@ -14,9 +14,10 @@ ADR 0076 (§ 3, § 4, § 5, § 10), ADR 0024 § Rôles, ADR 0050 § 5, `apps/api
 - [x] Bornes du manager dans le domaine (`assertInviteFits`) : rôle `chatter`, préréglage en vigueur aujourd'hui sans part du net, créatrices de sa propre liste ; le propriétaire garde tous ses choix ; un chatteur n'invite personne.
 - [x] Invitation dans une transaction (`invites(links).fromPlatform`) : bornes, verrou du compte, membre créé comme par `POST /team/members`, lien posé par `connectors` (port `PlatformChatterLinks`), audit `team_member.invite` avec l'identifiant de la plateforme ; redemandée pour le même compte, elle rend le membre déjà invité.
 - [x] Lien d'invitation pour un manager actif : `invitation` d'un chatteur sans mot de passe seulement ; `reset` au propriétaire ; 409 `password_chosen_conflict`. Une invitation ne remplace jamais un mot de passe déjà choisi (`usable`).
-- [ ] Brancher sur la route de Bilan et sur `connectors` (le composition root donne `lockLink` et `link`), avec `recentLogin` sur la route.
-- [ ] Tests RLS quand la migration de Bilan est là : « un manager contre lui-même » (§ 4) et « un manager hors de ses bornes » (§ 3), et l'invitation d'un manager dans ses bornes, de bout en bout.
-- [ ] Afficher l'alerte de retrait (§ 5) : pastille sur sa ligne d'Équipe › Membres et sur sa fiche, à partir de ce que `connectors` expose.
+- [x] Brancher sur `connectors` : `invitationChatterLinks` de Bilan (#626) donne `lockLink` et `link`, essayés de bout en bout.
+- [ ] La route d'invitation, avec `recentLogin` : petite PR de Bilan après celle-ci (`team.invites(connectors.invitationChatterLinks).fromPlatform`).
+- [x] Tests RLS sur la migration 0135 : « un manager hors de ses bornes » (§ 3 : rôle manager, son propre compte, un compte déjà créé, taux au-dessus du préréglage, part du net, ligne de rôle manager, chacun refusé par la base en 42501), « un manager contre lui-même » (§ 4 : jamais invité sur son propre compte Reveal ; les écritures directes sont dans `sales-feed-team` de Bilan), et l'invitation d'un manager dans ses bornes, de bout en bout.
+- [ ] Afficher l'alerte de retrait (§ 5) : pastille sur sa ligne d'Équipe › Membres et ligne ambre sur sa fiche, à partir de `connectors.teamRemovals` (#626) ; PR suivante, avec captures.
 
 ## Critères d'acceptation
 - Tests : bornes du domaine ; invitation du propriétaire, redemandée, compte déjà relié (membre ou agent), e-mail pris ; refus du manager avant toute écriture ; lien d'un manager (chatteur, `reset`, autre manager, mot de passe choisi, chatteur, manager suspendu) ; invitation qui ne remplace pas un mot de passe.

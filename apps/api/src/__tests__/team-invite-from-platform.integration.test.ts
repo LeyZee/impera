@@ -1,13 +1,15 @@
 import {
   CommissionPresetIdSchema,
+  CommissionRateIdSchema,
   CreatorIdSchema,
+  MemberRoleIdSchema,
   newId,
   TeamMemberIdSchema,
   UserIdSchema,
-  type Platform,
+  type TeamMemberId,
   type UserId,
 } from '@impera/contracts';
-import { and, eq, schema, sql, type Transaction } from '@impera/db';
+import { eq, schema, withMember, type Transaction } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -37,45 +39,6 @@ describe('a member invited from a link proposal (ADR 0076 § 3)', () => {
   let owner: { userId: UserId; ip: null };
   let invite: ReturnType<ReturnType<typeof createTeamModule>['invites']>['fromPlatform'];
   const presetId = newId(CommissionPresetIdSchema);
-
-  /**
-   * `connectors`' link writes, as the composition root will give them: here a plain upsert of `sales_feed_chatters`
-   * in the invitation's transaction, under the account's advisory lock.
-   */
-  const links = {
-    lockLink: async (tx: Transaction, account: { platform: Platform; platformChatterId: string }) => {
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtext(${`${account.platform}:${account.platformChatterId}`}))`,
-      );
-      const [row] = await tx
-        .select({ kind: schema.salesFeedChatters.kind, memberId: schema.salesFeedChatters.memberId })
-        .from(schema.salesFeedChatters)
-        .where(
-          and(
-            eq(schema.salesFeedChatters.platform, account.platform),
-            eq(schema.salesFeedChatters.platformChatterId, account.platformChatterId),
-          ),
-        );
-      if (row === undefined) return null;
-      return row.memberId === null
-        ? ({ kind: 'agent' } as const)
-        : ({ kind: 'member', memberId: TeamMemberIdSchema.parse(row.memberId) } as const);
-    },
-    link: async (
-      tx: Transaction,
-      account: { platform: Platform; platformChatterId: string },
-      memberId: string,
-      actor: { userId: string },
-    ) => {
-      await tx
-        .insert(schema.salesFeedChatters)
-        .values({ ...account, kind: 'member', memberId, linkedBy: actor.userId })
-        .onConflictDoUpdate({
-          target: [schema.salesFeedChatters.platform, schema.salesFeedChatters.platformChatterId],
-          set: { kind: 'member', memberId, linkedBy: actor.userId },
-        });
-    },
-  };
 
   const body = (email: string, overrides: object = {}) => ({
     email,
@@ -135,7 +98,8 @@ describe('a member invited from a link proposal (ADR 0076 § 3)', () => {
       invitationLinks: { live: () => Promise.resolve(new Map()) },
       enqueuePayRecalculation,
     });
-    invite = team.invites(links).fromPlatform;
+    // `connectors`' own link writes (migration 0135), as the composition root gives them to the route.
+    invite = team.invites(app.modules.connectors.invitationChatterLinks).fromPlatform;
   });
 
   afterAll(async () => {
@@ -230,6 +194,136 @@ describe('a member invited from a link proposal (ADR 0076 § 3)', () => {
     for (const chatterId of ['rv-x1', 'rv-x2', 'rv-x3']) {
       expect(await linkOf(chatterId)).toBeNull();
       expect(await accountsWith(`${chatterId}@example.test`)).toBe(0);
+    }
+  });
+
+  it('lets an active manager invite a chatter within his bounds, under the base’s policies (§ 3)', async () => {
+    const vera = await invite(owner, {
+      ...body('vera@example.test', {
+        firstName: 'Vera',
+        displayName: 'Vera',
+        teamRole: 'manager',
+        commission: { rateBps: 1200 },
+        creatorIds: [ANNA, BELLA],
+      }),
+      account: reveal('rv-manager-2'),
+    });
+    const manager = { userId: vera.userId, ip: null };
+    const ines = await invite(manager, {
+      ...body('ines@example.test', { firstName: 'Ines', displayName: 'Ines', creatorIds: [ANNA] }),
+      account: reveal('rv-chatter-6'),
+    });
+    expect(ines).toMatchObject({
+      teamRole: 'chatter',
+      creatorIds: [ANNA],
+      invitationPending: true,
+      commission: { rateBps: 1500, presetId, teamShareBps: null },
+    });
+    expect(await linkOf('rv-chatter-6')).toEqual({ kind: 'member', memberId: ines.id });
+    expect((await invitesAudited()).filter((row) => row.entityId === ines.id)).toEqual([
+      {
+        userId: vera.userId,
+        entityId: ines.id,
+        details: { teamRole: 'chatter', creators: 1, platform: 'reveal', platformChatterId: 'rv-chatter-6' },
+      },
+    ]);
+  });
+
+  it('never lets a manager invite onto his own platform account (§ 4)', async () => {
+    const yan = await invite(owner, {
+      ...body('yan@example.test', {
+        firstName: 'Yan',
+        displayName: 'Yan',
+        teamRole: 'manager',
+        commission: { rateBps: 1200 },
+      }),
+      account: reveal('rv-manager-3'),
+    });
+    await expect(
+      invite(
+        { userId: yan.userId, ip: null },
+        { ...body('yan.bis@example.test'), account: reveal('rv-manager-3') },
+      ),
+    ).rejects.toMatchObject({ code: 'member_conflict' });
+    expect(await accountsWith('yan.bis@example.test')).toBe(0);
+    expect(await linkOf('rv-manager-3')).toEqual({ kind: 'member', memberId: yan.id });
+  });
+
+  it('holds a manager’s bounds in the base, whatever the route (§ 3, migration 0135)', async () => {
+    const zia = await invite(owner, {
+      ...body('zia@example.test', {
+        firstName: 'Zia',
+        displayName: 'Zia',
+        teamRole: 'manager',
+        commission: { rateBps: 1200 },
+      }),
+      account: reveal('rv-manager-4'),
+    });
+    /** A member written by hand as Zia, past the domain's bounds: `patch` makes one write step out of them. */
+    const asZia = (
+      email: string,
+      patch: {
+        account?: (tx: Transaction) => Promise<UserId>;
+        teamRole?: 'chatter' | 'manager';
+        rate?: { rateBps: number; teamShareBps: number | null };
+        roleRow?: 'chatter' | 'manager';
+      } = {},
+    ) =>
+      withMember(app.db.db, zia.userId, async (tx) => {
+        const fresh = async () => {
+          const id = newId(UserIdSchema);
+          await tx.insert(schema.user).values({ id, name: 'X', email, role: 'operator', creatorIds: [] });
+          return id;
+        };
+        const userId = await (patch.account ?? fresh)(tx);
+        const memberId: TeamMemberId = newId(TeamMemberIdSchema);
+        await tx.insert(schema.teamMembers).values({
+          id: memberId,
+          userId,
+          teamRole: patch.teamRole ?? 'chatter',
+          firstName: 'X',
+          lastName: 'Y',
+          displayName: 'X',
+          country: 'MG',
+          timeZone: 'Indian/Antananarivo',
+          color: null,
+          joinedOn: agencyDay(),
+        });
+        await tx.insert(schema.memberCommissionRates).values({
+          id: newId(CommissionRateIdSchema),
+          memberId,
+          rateBps: patch.rate?.rateBps ?? 1500,
+          teamShareBps: patch.rate?.teamShareBps ?? null,
+          presetId,
+          effectiveFrom: agencyDay(),
+          createdBy: zia.userId,
+        });
+        await tx.insert(schema.memberRoles).values({
+          id: newId(MemberRoleIdSchema),
+          memberId,
+          teamRole: patch.roleRow ?? 'chatter',
+          effectiveFrom: agencyDay(),
+          createdBy: zia.userId,
+        });
+      });
+
+    // The same writes inside his bounds pass: what follows fails on its one step out, not on the scaffold.
+    await asZia('inside@example.test');
+    expect(await accountsWith('inside@example.test')).toBe(1);
+
+    const outside = {
+      'a manager': { teamRole: 'manager' as const },
+      'his own account': { account: () => Promise.resolve(zia.userId) },
+      'an account made before': { account: () => Promise.resolve(owner.userId) },
+      'a rate above the preset': { rate: { rateBps: 1600, teamShareBps: null } },
+      'a share of the team’s net': { rate: { rateBps: 1500, teamShareBps: 300 } },
+      'a manager’s role row': { roleRow: 'manager' as const },
+    };
+    for (const [step, patch] of Object.entries(outside)) {
+      const email = `out-${step.replaceAll(/[^a-z]/gu, '')}@example.test`;
+      // 42501: the row-level security refusal, not a constraint the scaffold would trip on.
+      await expect(asZia(email, patch), step).rejects.toMatchObject({ cause: { code: '42501' } });
+      expect(await accountsWith(email), step).toBe(0);
     }
   });
 

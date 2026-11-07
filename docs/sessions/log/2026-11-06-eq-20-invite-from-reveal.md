@@ -9,8 +9,9 @@ Fait :
 - Lien d'invitation (`invitation-links.ts`) : un manager actif obtient le lien `invitation` d'un chatteur sans mot de passe ; qui demande est vérifié avant le membre, pour ne rien dire de son existence. Une invitation ne remplace jamais un mot de passe déjà choisi (`usable`) : avant, le rachat d'un lien d'invitation écrasait le mot de passe existant. Le bouton de la fiche n'envoyait déjà que `reset` dans ce cas.
 - Contrats : `password_chosen_conflict` et `role_forbidden` dans `INVITATION_LINK_ERROR_CODES`, et la phrase du manager sur la route.
 - Tests : domaine (bornes), service (préréglage en vigueur, e-mail, compte), intégration `team-invite-from-platform` (6) et `invitation-links` (2 nouveaux).
+- 07/11, après la fusion de #626 : main fusionnée ; l'invitation essayée avec `invitationChatterLinks` de Bilan au lieu d'un faux ; trois tests de plus (un manager invite dans ses bornes de bout en bout, jamais sur son propre compte Reveal, et la base refuse chacune de ses écritures hors bornes en 42501).
 
-Reste : brancher sur la route et la migration de Bilan (les politiques d'insertion restent au scope `owner` d'ici là), les tests RLS du § 3 et du § 4, l'affichage de l'alerte de retrait.
+Reste : la route d'invitation (petite PR de Bilan), l'affichage de l'alerte de retrait (§ 5, PR suivante, avec captures).
 
 Découvertes :
 - « Suggestion » désigne déjà dans le glossaire ce que l'agence propose à l'agenda d'une créatrice (ADR 0042) ; l'ADR 0076 l'emploie pour les comptes Reveal. Bilan prend « proposition de lien » au glossaire dans sa PR (« rapprochement » y désigne déjà le règlement d'une facture) ; cette branche l'emploie.
