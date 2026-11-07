@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   SalesFeedAccountUnprocessable,
+  SalesFeedChatterUnprocessable,
   SalesFeedCheckDaysUnprocessable,
   SalesFeedDeliveryRefused,
   SalesFeedExportUnprocessable,
+  SalesFeedExternalInviteForbidden,
   SalesFeedListUnavailable,
   SalesFeedMemberUnprocessable,
   SalesFeedModelConflict,
@@ -36,6 +38,8 @@ describe('sales feed refusals', () => {
       new SalesFeedListUnavailable(),
       new SalesFeedTeamForbidden(),
       new SalesFeedTeamLinked(),
+      new SalesFeedChatterUnprocessable(),
+      new SalesFeedExternalInviteForbidden(),
     ].map((error) => error.code);
     expect([...thrown].sort()).toEqual([...SALES_FEED_ERROR_CODES].sort());
   });
