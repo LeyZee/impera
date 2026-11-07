@@ -372,7 +372,11 @@ export interface AlertNames {
 /** The creator's channel as stored (ADR 0080): her setting, whole; the channel column is the setting's own. */
 export interface ChannelRecord {
   readonly creatorId: CreatorId;
-  readonly config: TelegramChannelConfig;
+  /** The `chat_id` column: it, not the setting, says which chat she holds (a removed chat empties it). */
+  readonly chatId: TelegramChatId | null;
+  /** Null when the stored setting no longer reads: her chat still counts as hers. */
+  readonly config: TelegramChannelConfig | null;
+  readonly archived: boolean;
 }
 
 /** The creators' channels, as the admin role; each save writes `audit_log`. */

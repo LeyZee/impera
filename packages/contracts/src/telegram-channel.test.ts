@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  DEFAULT_TELEGRAM_CHANNEL_CONFIG,
+  RedirectLinkIdSchema,
+  TelegramChannelConfigSchema,
+  labelHasAddress,
+} from './telegram-channel';
+
+const id = RedirectLinkIdSchema.parse('0192f3a0-0000-7000-8000-0000000000a1');
+const link = { id, name: 'Redirection', url: 'https://redirection.example/lina' };
+
+describe('the setting of a creator’s Telegram channel (ADR 0080)', () => {
+  it('asks for the words of the link only when the link is carried by words', () => {
+    const bare = { ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, linkForm: 'bare' as const, linkLabel: '' };
+    expect(TelegramChannelConfigSchema.safeParse(bare).success).toBe(true);
+    expect(TelegramChannelConfigSchema.safeParse({ ...bare, linkForm: 'label' }).success).toBe(false);
+  });
+
+  it('refuses two links under one id', () => {
+    const config = { ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, links: [link, { ...link, name: 'Autre' }] };
+    expect(TelegramChannelConfigSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('finds an address in the words of the link, bare domains included', () => {
+    for (const text of [
+      'https://x.example',
+      'www.reveal.me',
+      'bit.ly/abc',
+      'viens sur t.me',
+      'reveal.me/messa ✨',
+    ]) {
+      expect(labelHasAddress(text)).toBe(true);
+    }
+    for (const text of ['Viens me parler ✨', 'Ce soir… je t’attends', 'Clique ici 💌']) {
+      expect(labelHasAddress(text)).toBe(false);
+    }
+  });
+});

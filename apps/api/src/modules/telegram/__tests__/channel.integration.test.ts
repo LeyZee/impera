@@ -5,6 +5,7 @@ import {
   DEFAULT_TELEGRAM_CHANNEL_CONFIG,
   RedirectLinkIdSchema,
   TelegramBotIdSchema,
+  TelegramChannelConfigSchema,
   TelegramChannelViewSchema,
   TelegramChatIdSchema,
   newId,
@@ -251,5 +252,69 @@ describe('the creator’s Telegram channel on Postgres', () => {
       .set({ archivedAt: new Date() })
       .where(eq(schema.creators.id, lea));
     expect((await server.inject({ method: 'GET', url: url(lea), headers })).statusCode).toBe(404);
+  });
+
+  it('gives the channel of an archived creator to whoever chooses it now', async () => {
+    // Léa, archived just above, held Canal B.
+    const mia = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: mia, nameKey: mia, displayName: 'Mia', timezone: 'Europe/Paris' });
+    const view = TelegramChannelViewSchema.parse(
+      (await server.inject({ method: 'GET', url: url(mia), headers })).json(),
+    );
+    expect(view.channels.find((choice) => choice.chatId === channelB)?.takenByOther).toBe(false);
+    expect((await put(mia, { ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, chatId: channelB })).statusCode).toBe(200);
+    const [held] = await test.admin.db
+      .select({ chatId: schema.telegramChannels.chatId, config: schema.telegramChannels.config })
+      .from(schema.telegramChannels)
+      .where(eq(schema.telegramChannels.creatorId, lea));
+    expect(held?.chatId).toBeNull();
+    expect(TelegramChannelConfigSchema.parse(held?.config).chatId).toBeNull();
+  });
+
+  it('reads a removed chat as no channel, and still saves her links', async () => {
+    await test.admin.db.delete(schema.telegramChats).where(eq(schema.telegramChats.id, channelA));
+    const view = TelegramChannelViewSchema.parse(
+      (await server.inject({ method: 'GET', url: url(nora), headers })).json(),
+    );
+    expect(view.config.chatId).toBeNull();
+    expect(view.warnings).toContain('no_channel');
+    const saved = await put(nora, { ...view.config, linkLabel: 'Écris-moi ✨' });
+    expect(saved.statusCode).toBe(200);
+  });
+
+  it('lets one of two saves at once take a channel, never both', async () => {
+    const [bot] = await test.admin.db.select({ id: schema.telegramBots.id }).from(schema.telegramBots);
+    if (bot === undefined) throw new Error('no bot');
+    const chat = newId(TelegramChatIdSchema);
+    await test.admin.db.insert(schema.telegramChats).values({
+      id: chat,
+      botId: bot.id,
+      telegramChatId: '-1009',
+      title: 'Canal C',
+      kind: 'channel',
+      membership: 'member',
+      canPost: true,
+    });
+    const [one, two] = [newId(CreatorIdSchema), newId(CreatorIdSchema)];
+    await test.admin.db.insert(schema.creators).values([
+      { id: one, nameKey: one, displayName: 'Une', timezone: 'Europe/Paris' },
+      { id: two, nameKey: two, displayName: 'Deux', timezone: 'Europe/Paris' },
+    ]);
+    const store = createPostgresChannelsStore(test.admin.db);
+    const setting = { ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, chatId: chat };
+    const results = await Promise.all([
+      store.saveChannel(one, setting, 'owner-channel'),
+      store.saveChannel(two, setting, 'owner-channel'),
+    ]);
+    expect([...results].sort()).toEqual(['chat_taken', 'saved']);
+    const holders = await test.admin.db
+      .select({ creatorId: schema.telegramChannels.creatorId })
+      .from(schema.telegramChannels)
+      .where(eq(schema.telegramChannels.chatId, chat));
+    expect(holders).toHaveLength(1);
+    const loser = results[0] === 'saved' ? two : one;
+    expect(await store.findChannel(loser)).toBeNull();
   });
 });

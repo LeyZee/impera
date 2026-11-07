@@ -5,6 +5,7 @@ import {
   DEFAULT_QUIET_HOURS,
   decideNotification,
   inQuietHours,
+  isCapped,
   localClock,
   quietHoursEnd,
   type NotificationContext,
@@ -70,6 +71,25 @@ describe('decideNotification', () => {
     expect(decideNotification({ ...base, kind: 'own_shift_start', at: night, cappedRungToday: 99 })).toEqual({
       action: 'ring',
     });
+  });
+
+  it('rings the first reminder of one’s own report at night and past the cap, as the start of the shift (ADR 0077)', () => {
+    // A night shift that ends at 5:00 in Paris: its first reminder at 5:15, in the quiet hours.
+    const dawn = new Date('2026-11-11T04:15:00Z');
+    expect(decideNotification({ ...base, kind: 'own_shift_end', at: dawn, cappedRungToday: 99 })).toEqual({
+      action: 'ring',
+    });
+    expect(isCapped('own_shift_end')).toBe(false);
+    expect(isCapped('own_shift_start')).toBe(false);
+  });
+
+  it('holds the second reminder, a plain reminder, for the recap, and counts it in the cap', () => {
+    const dawn = new Date('2026-11-11T04:15:00Z');
+    expect(decideNotification({ ...base, at: dawn })).toEqual({
+      action: 'hold',
+      until: new Date('2026-11-11T07:00:00Z'),
+    });
+    expect(isCapped('reminder')).toBe(true);
   });
 
   it('keeps the rest silent past the daily cap, never a sale', () => {

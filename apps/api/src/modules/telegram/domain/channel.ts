@@ -85,6 +85,11 @@ function slotRefusal(slots: readonly ChannelSlot[]): ChannelRefusal | null {
   return null;
 }
 
+/** One address however it is typed: the host in lower case (`URL` does it), no trailing slash. */
+function sameAddress(url: string): string {
+  return new URL(url).href.replace(/\/+$/u, '');
+}
+
 function linkRefusal(config: TelegramChannelConfig): ChannelRefusal | null {
   const names = new Set<string>();
   const urls = new Set<string>();
@@ -93,14 +98,15 @@ function linkRefusal(config: TelegramChannelConfig): ChannelRefusal | null {
     if (names.has(name)) {
       return { kind: 'link_name_taken', message: `Deux liens s’appellent « ${link.name} » : renomme l’un.` };
     }
-    if (urls.has(link.url)) {
+    const address = sameAddress(link.url);
+    if (urls.has(address)) {
       return {
         kind: 'link_url_taken',
         message: `L’adresse du lien « ${link.name} » est déjà dans la liste.`,
       };
     }
     names.add(name);
-    urls.add(link.url);
+    urls.add(address);
   }
   if (config.channelLinkId !== null && !config.links.some((link) => link.id === config.channelLinkId)) {
     return {
@@ -123,7 +129,10 @@ function chatRefusal(chatId: TelegramChatId | null, context: ChannelContext): Ch
   if (chatId === null) return null;
   const chat = context.chats.find((candidate) => candidate.id === chatId);
   if (chat === undefined) {
-    return { kind: 'chat_unknown', message: 'Ce canal n’est plus vu par le bot : recharge la page.' };
+    return {
+      kind: 'chat_unknown',
+      message: 'Le bot ne voit plus ce canal : choisis-en un autre, ou retire-le.',
+    };
   }
   if (chat.kind !== 'channel') {
     return {

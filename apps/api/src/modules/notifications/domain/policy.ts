@@ -4,7 +4,8 @@ import type { NotificationReason } from '@impera/contracts';
  * When a push notification may ring (ADR 0042 § 7, CR-01), pure. The rules live here, never in a setting nor in a
  * prompt:
  * - heures calmes, chosen by each account (22 h – 8 h by default): nothing rings; what was held waits for a single
- *   recap at their end. The start of one's own shift is the only exception (glossary, « Heures calmes »);
+ *   recap at their end. The start of one's own shift and the first reminder of its report (ADR 0077) are the only
+ *   exceptions (glossary, « Heures calmes »), and neither counts in the cap;
  * - a sale rings, one notification per sale, grouped only in a burst (more than 3 within 2 minutes);
  * - everything else (reminders, routine, streak, team) shares a daily cap, in the account's own day; past it, the
  *   notification stays in the app and does not ring.
@@ -18,7 +19,7 @@ export interface QuietHours {
 
 export const DEFAULT_QUIET_HOURS: QuietHours = { startMinute: 22 * 60, endMinute: 8 * 60 };
 
-/** Notifications other than sales and one's own shift start, per account and per local day. */
+/** Notifications other than sales and one's own shift start and end, per account and per local day. */
 export const DEFAULT_DAILY_CAP = 6;
 
 /** More sales than this within 2 minutes (the caller's count) ring as one grouped notification. */
@@ -106,13 +107,19 @@ export type NotificationDecision =
   /** Over the daily cap: it stays in the app, silent. */
   | { readonly action: 'silent' };
 
+/**
+ * What rings even in the quiet hours, outside the daily cap: one's own shift that starts, and the first reminder of the
+ * report of one's own shift that just ended (ADR 0077 § 3). One set, read by both rules, so that they never part.
+ */
+const PASSES_QUIET_HOURS: ReadonlySet<NotificationReason> = new Set(['own_shift_start', 'own_shift_end']);
+
 export function isCapped(kind: NotificationReason): boolean {
-  return kind !== 'sale' && kind !== 'own_shift_start';
+  return kind !== 'sale' && !PASSES_QUIET_HOURS.has(kind);
 }
 
 /** The decision for one notification, from facts the caller has read (counts, settings, time). */
 export function decideNotification(context: NotificationContext): NotificationDecision {
-  if (context.kind !== 'own_shift_start') {
+  if (!PASSES_QUIET_HOURS.has(context.kind)) {
     const until = quietHoursEnd(context.at, context.timeZone, context.quiet);
     if (until !== null) return { action: 'hold', until };
   }

@@ -1,9 +1,11 @@
 import {
   CHANNEL_POSTS_PER_DAY_MAX,
+  CHANNEL_SLOT_GAP_MINUTES,
   CHANNEL_SLOTS_MAX,
   RedirectLinkIdSchema,
   REDIRECT_LINKS_MAX,
   isRedirectUrl,
+  labelHasAddress,
   type ChannelChoice,
   type ChannelSlot,
   type ChannelWarning,
@@ -63,12 +65,28 @@ export function rhythmWords(slots: readonly ChannelSlot[]): string {
   return on.map((slot) => `${clockWords(slot.minute)} ${daysWords(slot.days)}`).join(' · ');
 }
 
-/** A new slot three hours after the last one, every day, or null when the list is full. */
+const DAY_MINUTES = 1440;
+const gapOf = (a: number, b: number): number => {
+  const gap = Math.abs(a - b);
+  return Math.min(gap, DAY_MINUTES - gap);
+};
+
+/**
+ * A new slot, every day: 19 h for the first, then the first half hour from three hours after the last one added that
+ * stands three hours from every other (round the clock), or that hour when none does. Null when the list is full.
+ */
 export function nextSlot(slots: readonly ChannelSlot[]): ChannelSlot | null {
   if (slots.length >= CHANNEL_SLOTS_MAX) return null;
-  const last = slots.reduce((latest, slot) => Math.max(latest, slot.minute), -1);
-  const minute = last < 0 ? 19 * 60 : (last + 180) % 1440;
-  return { minute, days: [1, 2, 3, 4, 5, 6, 7], enabled: true };
+  const last = slots.at(-1);
+  if (last === undefined) return { minute: 19 * 60, days: [1, 2, 3, 4, 5, 6, 7], enabled: true };
+  const start = (last.minute + CHANNEL_SLOT_GAP_MINUTES) % DAY_MINUTES;
+  for (let step = 0; step < DAY_MINUTES; step += 30) {
+    const minute = (start + step) % DAY_MINUTES;
+    if (slots.every((slot) => gapOf(slot.minute, minute) >= CHANNEL_SLOT_GAP_MINUTES)) {
+      return { minute, days: [1, 2, 3, 4, 5, 6, 7], enabled: true };
+    }
+  }
+  return { minute: start, days: [1, 2, 3, 4, 5, 6, 7], enabled: true };
 }
 
 export const SLOTS_FULL = `${String(CHANNEL_SLOTS_MAX)} créneaux au plus.`;
@@ -98,8 +116,7 @@ export function issuesOf(config: TelegramChannelConfig): Map<string, string> {
   }
   const label = config.linkLabel.trim();
   if (config.linkForm === 'label' && label === '') issues.set('label', 'Écris le texte du lien.');
-  else if (/https?:\/\/|www\./iu.test(label))
-    issues.set('label', 'Le texte du lien ne contient pas d’adresse.');
+  else if (labelHasAddress(label)) issues.set('label', 'Le texte du lien ne contient pas d’adresse.');
   return issues;
 }
 

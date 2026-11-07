@@ -34,8 +34,8 @@ async function contextFor(deps: ChannelDeps, creatorId: CreatorId): Promise<Chan
   ]);
   const takenByOthers = new Set<TelegramChatId>();
   for (const record of all) {
-    if (record.creatorId !== creatorId && record.config.chatId !== null)
-      takenByOthers.add(record.config.chatId);
+    if (record.creatorId !== creatorId && !record.archived && record.chatId !== null)
+      takenByOthers.add(record.chatId);
   }
   return { chats, takenByOthers, routed: new Set(routes.map((route) => route.chatId)) };
 }
@@ -56,7 +56,7 @@ export async function channelView(
   return {
     creatorId,
     config,
-    saved: record !== null,
+    saved: record !== null && record.config !== null,
     channels: channelChoices(context),
     warnings: channelWarnings(config, context.chats, hasUsableBot),
   };
@@ -83,5 +83,5 @@ export async function saveChannel(
 /** The chats chosen as some creator's channel: alerts never go there (ADR 0080 § 6.1). */
 export async function creatorChannelChats(channels: ChannelsStore): Promise<ReadonlySet<TelegramChatId>> {
   const all = await channels.listChannels();
-  return new Set(all.flatMap((record) => (record.config.chatId === null ? [] : [record.config.chatId])));
+  return new Set(all.flatMap((record) => (record.chatId === null ? [] : [record.chatId])));
 }

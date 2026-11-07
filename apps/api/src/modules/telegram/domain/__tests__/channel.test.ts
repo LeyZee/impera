@@ -127,6 +127,10 @@ describe('the redirect links (ADR 0080 § 4)', () => {
     expect(
       channelRefusal(config({ links: [a, link('Insta', 'https://example.test/a')] }), context([]))?.kind,
     ).toBe('link_url_taken');
+    // One address however it is typed: the host's case and a trailing slash change nothing.
+    expect(
+      channelRefusal(config({ links: [a, link('Insta', 'https://EXAMPLE.test/a/')] }), context([]))?.kind,
+    ).toBe('link_url_taken');
   });
 
   it('refuses a link of the channel that is not in the list', () => {

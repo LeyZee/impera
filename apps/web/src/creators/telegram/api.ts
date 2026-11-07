@@ -17,12 +17,13 @@ import { ReauthRequired } from '@/settings/services/api';
  * (ADR 0016): `ReauthRequired`, then the page asks for the password and saves again.
  */
 
-export type ChannelErrorKind = 'session_expired' | 'forbidden' | 'not_found' | 'unavailable';
+export type ChannelErrorKind = 'session_expired' | 'forbidden' | 'not_found' | 'rejected' | 'unavailable';
 
 export const CHANNEL_ERRORS: Readonly<Record<ChannelErrorKind, string>> = {
   session_expired: 'Ta session a expiré. Reconnecte-toi.',
   forbidden: 'Seul le compte propriétaire règle le canal Telegram.',
   not_found: 'Cette créatrice n’existe plus.',
+  rejected: 'Le serveur a refusé ce réglage : recharge la page et vérifie chaque ligne.',
   unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
 };
 
@@ -67,6 +68,8 @@ async function call(creatorId: string, init: RequestInit = {}): Promise<Telegram
   if (response.status === 400) {
     const refused = TelegramChannelRefusalBodySchema.safeParse(body);
     if (refused.success) throw new ChannelRefused(refusalOf(refused.data).message);
+    // A setting the contract refused before the rules read it: said as refused, not as a server down.
+    if (ApiErrorSchema.safeParse(body).success) throw new ChannelError('rejected', detail);
     throw new ChannelError('unavailable', detail);
   }
   if (response.status === 401) throw new ChannelError('session_expired', detail);

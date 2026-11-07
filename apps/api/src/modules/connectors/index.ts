@@ -36,7 +36,10 @@ import { createAvatarRoutes } from './infra/http/avatar-routes';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
 import { createSalesFeedRoutes, type SalesFeedRoutesOptions } from './infra/http/sales-feed-routes';
-import { createSalesFeedTeamRoutes } from './infra/http/sales-feed-team-routes';
+import {
+  createSalesFeedTeamRoutes,
+  type SalesFeedTeamRoutesOptions,
+} from './infra/http/sales-feed-team-routes';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
 import { createSessionVault } from './infra/session-vault';
@@ -46,6 +49,7 @@ export { createAvatarFetch } from './infra/avatar/fetch-avatar';
 export { createS3AvatarStore } from './infra/avatar/s3-avatar-store';
 export type { ConnectorRegistry } from './domain/ports';
 export type { SalesFeedRegistry } from './domain/sales-feed';
+export type { InviteFromPlatform } from './infra/http/sales-feed-team-routes';
 export type { SalesFeedFetch } from './infra/reveal-crm/adapter';
 /** @public A creator's own sales, read from her view inside `withCreatorAccount` (CRM-04 lot d): her Ventes screen's. */
 export { creatorSalesReads } from './infra/db/creator-sales-reads';
@@ -145,9 +149,9 @@ export interface ConnectorsModule {
   readonly salesFeedRoutes: (options: SalesFeedRoutesOptions) => FastifyPluginAsyncZod;
   /**
    * `/v1/settings/sales-feeds/:platform/team` (ADR 0076), behind the guard given here (owner, operator): the base
-   * keeps it to the owner and the active managers.
+   * keeps it to the owner and the active managers. Its invitation (§ 3) is `team`'s, given here too.
    */
-  readonly salesFeedTeamRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
+  readonly salesFeedTeamRoutes: (options: SalesFeedTeamRoutesOptions) => FastifyPluginAsyncZod;
   /** Every platform's feed as Réglages › Ventes shows it, never the key: the Dashboard names a stopped one (AGT-11). */
   readonly salesFeedStates: () => Promise<SalesFeedStatus[]>;
   /**
@@ -269,7 +273,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     },
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
-    salesFeedTeamRoutes: (guard) => createSalesFeedTeamRoutes(salesFeeds.team, guard),
+    salesFeedTeamRoutes: (options) => createSalesFeedTeamRoutes(salesFeeds.team, options),
     salesFeedStates: () => salesFeeds.list(),
     invitationChatterLinks,
     teamRemovals: (userId) => salesFeeds.team.removals(userId),

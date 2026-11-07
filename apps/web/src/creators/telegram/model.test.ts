@@ -23,6 +23,27 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
     expect(nextSlot([{ minute: 1320, days: [1], enabled: true }])?.minute).toBe(60);
   });
 
+  it('never offers an hour already too close to another slot', () => {
+    const slots = [19, 22, 1].map((hour) => ({ minute: hour * 60, days: [1], enabled: true }));
+    // 1 h + 3 h = 4 h is three hours from 1 h, and far from 19 h and 22 h.
+    expect(nextSlot(slots)?.minute).toBe(4 * 60);
+    const round = [1, 4, 7, 10, 13, 16, 19, 22].map((hour) => ({
+      minute: hour * 60,
+      days: [1],
+      enabled: true,
+    }));
+    expect(nextSlot(round)?.minute).toBe(60);
+  });
+
+  it('refuses a bare domain in the words of the link', () => {
+    expect(
+      issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, linkLabel: 'Tout est sur bit.ly/messa' }).get('label'),
+    ).toBe('Le texte du lien ne contient pas d’adresse.');
+    expect(
+      issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, linkLabel: 'Viens me parler ✨' }).has('label'),
+    ).toBe(false);
+  });
+
   it('counts the posts of her busiest day', () => {
     const slots = [8, 12, 16, 20, 23].map((hour) => ({ minute: hour * 60, days: [2], enabled: true }));
     expect(postsPerDay(slots)).toBe(5);

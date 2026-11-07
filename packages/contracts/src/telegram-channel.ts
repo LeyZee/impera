@@ -72,30 +72,50 @@ export const RedirectLinkSchema = z.object({
 });
 export type RedirectLink = z.infer<typeof RedirectLinkSchema>;
 
+/**
+ * Whether the words of a link hold an address (ADR 0080 § 4.3): a scheme, `www.`, or a bare domain such as `bit.ly/x`
+ * or `t.me`. The address of a post is the code's, never the text's.
+ */
+export function labelHasAddress(text: string): boolean {
+  return /https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,}(?:\/|$|\s)/iu.test(text);
+}
+
 /** ADR 0080 § 4.3: a short text that carries the link, or the bare address. */
 export const ChannelLinkFormSchema = z.enum(['label', 'bare']);
 export type ChannelLinkForm = z.infer<typeof ChannelLinkFormSchema>;
 
 /** What the owner sets; stored whole, read whole. */
-export const TelegramChannelConfigSchema = z.object({
-  /** The channel, one of those where the agency's bot sits (`telegram_chats`, kind `channel`); null until chosen. */
-  chatId: TelegramChatIdSchema.nullable(),
-  slots: z.array(ChannelSlotSchema).max(CHANNEL_SLOTS_MAX),
-  previewMinutes: z.number().int().min(CHANNEL_PREVIEW_MIN).max(CHANNEL_PREVIEW_MAX),
-  /** ADR 0080 § 2.6: on, a post goes out at its hour unless stopped; off, it waits for « Valider ». */
-  publishWithoutValidation: z.boolean(),
-  linkForm: ChannelLinkFormSchema,
-  /** The words that carry the link when `linkForm` is `label`; never an address. */
-  linkLabel: z
-    .string()
-    .trim()
-    .min(1, 'Écris le texte du lien')
-    .max(60)
-    .refine((text) => !/https?:\/\/|www\./iu.test(text), 'Le texte du lien ne contient pas d’adresse'),
-  links: z.array(RedirectLinkSchema).max(REDIRECT_LINKS_MAX),
-  /** The link of the channel, one of `links`; null: no post goes out (ADR 0080 § 4.4). */
-  channelLinkId: RedirectLinkIdSchema.nullable(),
-});
+export const TelegramChannelConfigSchema = z
+  .object({
+    /** The channel, one of those where the agency's bot sits (`telegram_chats`, kind `channel`); null until chosen. */
+    chatId: TelegramChatIdSchema.nullable(),
+    slots: z.array(ChannelSlotSchema).max(CHANNEL_SLOTS_MAX),
+    previewMinutes: z.number().int().min(CHANNEL_PREVIEW_MIN).max(CHANNEL_PREVIEW_MAX),
+    /** ADR 0080 § 2.6: on, a post goes out at its hour unless stopped; off, it waits for « Valider ». */
+    publishWithoutValidation: z.boolean(),
+    linkForm: ChannelLinkFormSchema,
+    /** The words that carry the link when `linkForm` is `label`; never an address. */
+    /** Kept while `linkForm` is `bare`, so that going back to `label` finds it; required only for `label`. */
+    linkLabel: z
+      .string()
+      .trim()
+      .max(60)
+      .refine((text) => !labelHasAddress(text), 'Le texte du lien ne contient pas d’adresse'),
+    links: z.array(RedirectLinkSchema).max(REDIRECT_LINKS_MAX),
+    /** The link of the channel, one of `links`; null: no post goes out (ADR 0080 § 4.4). */
+    channelLinkId: RedirectLinkIdSchema.nullable(),
+  })
+  .superRefine((config, ctx) => {
+    if (config.linkForm === 'label' && config.linkLabel === '') {
+      ctx.addIssue({ code: 'custom', path: ['linkLabel'], message: 'Écris le texte du lien' });
+    }
+    const ids = new Set<string>();
+    config.links.forEach((link, rank) => {
+      if (ids.has(link.id))
+        ctx.addIssue({ code: 'custom', path: ['links', rank, 'id'], message: 'Id de lien en double' });
+      ids.add(link.id);
+    });
+  });
 export type TelegramChannelConfig = z.infer<typeof TelegramChannelConfigSchema>;
 
 /** 19 h every day, shown an hour before, out on its own (Charles, 07/11/2026 12h26). */

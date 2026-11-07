@@ -2,6 +2,7 @@ import {
   AuditEntryIdSchema,
   CreatorIdSchema,
   TelegramChannelConfigSchema,
+  TelegramChatIdSchema,
   newId,
   type CreatorId,
 } from '@impera/contracts';
@@ -24,11 +25,37 @@ function pgCodeOf(error: unknown): { code: string; constraint: string | null } |
   return null;
 }
 
-function toRecord(row: { creatorId: string; config: unknown }): ChannelRecord | null {
-  const config = TelegramChannelConfigSchema.safeParse(row.config);
-  const creatorId = CreatorIdSchema.safeParse(row.creatorId);
-  return config.success && creatorId.success ? { creatorId: creatorId.data, config: config.data } : null;
+interface ChannelRow {
+  creatorId: string;
+  chatId: string | null;
+  config: unknown;
+  archivedAt: Date | null;
 }
+
+/**
+ * A row as the domain reads it. The column holds the chat: when the chat was removed (`ON DELETE SET NULL`), the
+ * setting is brought back to no channel; a setting that no longer reads keeps its chat counted all the same.
+ */
+function toRecord(row: ChannelRow): ChannelRecord | null {
+  const creatorId = CreatorIdSchema.safeParse(row.creatorId);
+  if (!creatorId.success) return null;
+  const chat = TelegramChatIdSchema.safeParse(row.chatId);
+  const chatId = chat.success ? chat.data : null;
+  const config = TelegramChannelConfigSchema.safeParse(row.config);
+  return {
+    creatorId: creatorId.data,
+    chatId,
+    config: config.success ? { ...config.data, chatId } : null,
+    archived: row.archivedAt !== null,
+  };
+}
+
+const rowColumns = {
+  creatorId: channels.creatorId,
+  chatId: channels.chatId,
+  config: channels.config,
+  archivedAt: schema.creators.archivedAt,
+};
 
 /**
  * The creators' channels on Postgres (ADR 0080), as the admin role: the table is closed to `nirvana_app`. The audit
@@ -39,15 +66,19 @@ export function createPostgresChannelsStore(adminDb: Database): ChannelsStore {
     async findChannel(creatorId: CreatorId) {
       const [row] = await withAdmin(adminDb, (tx) =>
         tx
-          .select({ creatorId: channels.creatorId, config: channels.config })
+          .select(rowColumns)
           .from(channels)
+          .innerJoin(schema.creators, eq(schema.creators.id, channels.creatorId))
           .where(eq(channels.creatorId, creatorId)),
       );
       return row === undefined ? null : toRecord(row);
     },
     async listChannels() {
       const rows = await withAdmin(adminDb, (tx) =>
-        tx.select({ creatorId: channels.creatorId, config: channels.config }).from(channels),
+        tx
+          .select(rowColumns)
+          .from(channels)
+          .innerJoin(schema.creators, eq(schema.creators.id, channels.creatorId)),
       );
       return rows.flatMap((row) => {
         const record = toRecord(row);
@@ -67,6 +98,22 @@ export function createPostgresChannelsStore(adminDb: Database): ChannelsStore {
       try {
         await withAdmin(adminDb, async (tx) => {
           const stored = TelegramChannelConfigSchema.parse(config);
+          if (stored.chatId !== null) {
+            // An archived creator posts nothing: the channel she held goes to whoever chooses it now.
+            await tx
+              .update(channels)
+              .set({
+                chatId: null,
+                config: sql`jsonb_set(${channels.config}, '{chatId}', 'null'::jsonb)`,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(channels.chatId, stored.chatId),
+                  sql`${channels.creatorId} in (select ${schema.creators.id} from ${schema.creators} where ${schema.creators.archivedAt} is not null)`,
+                ),
+              );
+          }
           await tx
             .insert(channels)
             .values({ creatorId, chatId: stored.chatId, config: stored, updatedBy: userId })

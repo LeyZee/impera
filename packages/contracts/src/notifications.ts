@@ -110,12 +110,14 @@ export type PushTestResult = z.infer<typeof PushTestResultSchema>;
 
 /**
  * What a notification is about (CR-01): the reason that makes it unique for an account with its object, and sets the
- * rules. A sale and the start of one's own shift are never capped; the start of one's own shift rings even in the
- * quiet hours. EQ-12, CR-04 and CR-13 bring their own.
+ * rules. A sale and the start or the end of one's own shift are never capped; the start of one's own shift and the
+ * first reminder of its report (`own_shift_end`, ADR 0077) ring even in the quiet hours. EQ-12, CR-04 and CR-13 bring
+ * their own.
  */
 export const NOTIFICATION_REASONS = [
   'sale',
   'own_shift_start',
+  'own_shift_end',
   'reminder',
   'routine',
   'streak',

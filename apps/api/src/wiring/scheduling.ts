@@ -3,6 +3,7 @@ import { JOB_PAYLOADS } from '@impera/contracts';
 import { defineTask } from '../jobs';
 import { salesFeedReadsForReports, salesFeedSwitchReads, salesFeedTotals } from '../modules/connectors';
 import type { CreatorTasksModule } from '../modules/creator-tasks';
+import type { NotificationsModule } from '../modules/notifications';
 import { enqueuePayRecalculation } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import { createSchedulingModule, type SchedulingModule } from '../modules/scheduling';
@@ -17,7 +18,11 @@ export interface WiredScheduling {
 
 export function wireScheduling(
   shared: Shared,
-  deps: { readonly persona: PersonaModule; readonly creatorTasks: CreatorTasksModule },
+  deps: {
+    readonly persona: PersonaModule;
+    readonly creatorTasks: CreatorTasksModule;
+    readonly notifications: NotificationsModule;
+  },
 ): WiredScheduling {
   const { db, adminDb, logger, requireRole } = shared;
   const module = createSchedulingModule({
@@ -44,6 +49,8 @@ export function wireScheduling(
     shiftSalesOf: salesFeedReadsForReports.shiftSales,
     // A creator's calendar link shows her agenda (CR-05 lot c2, ADR 0042 § 4), read by her agenda's own module.
     creatorAgendaFeed: deps.creatorTasks.feedOf,
+    // The reminders of the reports ring through the push notifications (ADR 0077), as her agenda's reminders do.
+    notify: deps.notifications.notify,
   });
   return {
     module,
@@ -90,6 +97,18 @@ export function wireScheduling(
             await module.jobs.checkReports(),
             'scheduling: shift reports checked against the platform',
           );
+        },
+      ),
+      'scheduling.remind_reports': defineTask(
+        'scheduling.remind_reports',
+        JOB_PAYLOADS['scheduling.remind_reports'],
+        logger,
+        async (_payload, context) => {
+          if (module.jobs.remindReports === null) {
+            context.logger.warn('scheduling: push is off, the reports are reminded by the agency only');
+            return;
+          }
+          context.logger.info(await module.jobs.remindReports(), 'scheduling: shift reports reminded');
         },
       ),
     },
