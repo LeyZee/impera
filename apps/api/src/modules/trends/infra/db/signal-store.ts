@@ -11,7 +11,7 @@ import {
 import { TrendLinkForbidden } from '../../domain/errors';
 import type { PastedSignal, SignalStore, TrendActor } from '../../domain/ports';
 
-const { creators, teamMembers, trendSignals } = schema;
+const { creators, trendSignals } = schema;
 
 /**
  * The pasted link, kept once per creator and address (`trend_signals_link_unique`). No `returning`: the creator has no
@@ -43,7 +43,7 @@ async function insertLink(
 
 /**
  * « Coller un lien » through the person's own door: the creator in `withCreatorAccount`, for herself only; the owner
- * and a member of the team in `withTenantMember` for the creator named, who must exist, a member who left refused.
+ * and an active manager in `withTenantMember` for the creator named, who must exist; a chatter is refused.
  */
 export function createDrizzleSignalStore(db: Database): SignalStore {
   return {
@@ -60,13 +60,8 @@ export function createDrizzleSignalStore(db: Database): SignalStore {
           .from(creators)
           .where(eq(creators.id, signal.creatorId));
         if (creator === undefined) throw new TrendLinkForbidden();
-        if (scope !== 'owner') {
-          const [member] = await tx
-            .select({ status: teamMembers.status })
-            .from(teamMembers)
-            .where(eq(teamMembers.userId, actor.userId));
-          if (member === undefined || member.status === 'left') throw new TrendLinkForbidden();
-        }
+        // The owner and an active manager only: a chatter never takes part in the watch (ADR 0060 § 2, amended 07/11).
+        if (scope !== 'owner' && scope !== 'agency') throw new TrendLinkForbidden();
         return insertLink(tx, actor, signal, 'agency_link');
       });
     },
