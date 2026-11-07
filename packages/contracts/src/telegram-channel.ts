@@ -64,11 +64,22 @@ export const RedirectUrlSchema = z
   .trim()
   .refine(isRedirectUrl, 'Une adresse complète qui commence par https://, sans espace');
 
-/** A redirect link of hers (ADR 0080 § 4.1): a name the agency gives it and its address. */
+export const LINK_DESTINATION_MAX = 120;
+
+/**
+ * A redirect link of hers (ADR 0080 § 4): a name the agency gives it, its address, and where it leads in a few words
+ * (« mon live TikTok ce soir 21 h ») for the post to speak of that place (§ 4.5). Empty: the post names no place.
+ */
 export const RedirectLinkSchema = z.object({
   id: RedirectLinkIdSchema,
   name: z.string().trim().min(1, 'Donne-lui un nom').max(60),
   url: RedirectUrlSchema,
+  destination: z
+    .string()
+    .trim()
+    .max(LINK_DESTINATION_MAX)
+    .refine((text) => !labelHasAddress(text), 'Où il mène se dit sans adresse')
+    .default(''),
 });
 export type RedirectLink = z.infer<typeof RedirectLinkSchema>;
 
@@ -77,7 +88,9 @@ export type RedirectLink = z.infer<typeof RedirectLinkSchema>;
  * or `t.me`. The address of a post is the code's, never the text's.
  */
 export function labelHasAddress(text: string): boolean {
-  return /https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,}(?:\/|$|\s)/iu.test(text);
+  // A domain ends where letters and digits stop (« tiktok.com, », « (t.me) », « café.fr »). Its ending is in lower case
+  // as people type one: « Reveal.Viens », « St.Valentin » are sentences, « mon Reveal.me » is an address.
+  return /[Hh][Tt][Tt][Pp][Ss]?:\/\/|[Ww][Ww][Ww]\.|[\p{L}\p{N}-]+\.[a-z]{2,}(?![\p{L}\p{N}-])/u.test(text);
 }
 
 /** ADR 0080 § 4.3: a short text that carries the link, or the bare address. */

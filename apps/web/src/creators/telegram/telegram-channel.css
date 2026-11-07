@@ -1,5 +1,10 @@
 /* Créatrices › Canal Telegram (ADR 0080 § 6). Prefix `tc-` (`tg-` is Réglages › Telegram's). */
 
+/* One plate per block: the plate's padding is enough below the last line. */
+.tc-page .ps-block {
+  padding-bottom: 4px;
+}
+
 .tc-warnings {
   display: grid;
   gap: 6px;
@@ -22,14 +27,41 @@
   gap: 8px 12px;
   min-width: 0;
 }
-.tc-row > .nv-select,
-.tc-row > div:first-child:not(.tc-row__label) {
+.tc-row > div:first-child {
   flex: 1 1 240px;
   min-width: 0;
 }
-.tc-row__label {
-  flex: none;
+
+/* A setting on one line, like a switch row: what it is on the left, the control on the right. */
+.tc-setting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  min-width: 0;
+}
+.tc-setting__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tc-setting__label {
   font-weight: 600;
+}
+.tc-setting--select > div:last-child {
+  flex: 0 1 200px;
+  min-width: 0;
+}
+
+/* How the link shows in the post, under the links. */
+.tc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--nv-hairline);
 }
 
 .tc-slots,
@@ -82,6 +114,18 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 70%, transparent);
 }
 
+/* Each link with where it leads is one card. */
+.tc-link {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
+}
+.tc-link__fields {
+  row-gap: 10px;
+}
+
 /* One width for « Lien du canal » and « Choisir pour le canal », so the fields of every link line up. */
 .tc-link__end .nv-chip {
   min-width: 10.75rem;
@@ -97,29 +141,67 @@
 .tc-link__field .nv-field__control {
   width: 100%;
 }
+/* Its own line under the name and the address, as it comes in the page; on a phone, before the chip. */
+.tc-link__destination {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+/* One label style in the links block: « Où il mène » and « Texte du lien ». */
+.tc-field-label {
+  flex: none;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.tc-link__destination .nv-field__control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Grows to a second line rather than cutting a word; no handle, no scroll bar. */
+.tc-link__area.nv-field__control {
+  display: block;
+  min-height: var(--nv-target-min);
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+}
+.tc-slot__state {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
 .tc-link__url {
   font-family: var(--nv-font-mono);
   font-size: var(--nv-text-footnote);
 }
 
-.tc-preview {
-  display: grid;
-  gap: 4px;
-}
-.tc-preview__line {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-surface-raised);
-}
-.tc-preview__link {
-  color: var(--nv-ink);
-  text-decoration: underline;
-  overflow-wrap: anywhere;
-}
-
 /* A phone: the hour and the switch on one line, the days under them; a link's fields full width. */
 @media (max-width: 560px) {
+  /* Her head: the title, then the state, then the button, not the button between them. */
+  .tc-page .ps-head__top {
+    display: contents;
+  }
+  .tc-page.ps-page .ps-head__who {
+    order: 1;
+    flex: none;
+  }
+  .tc-page .ps-head__state {
+    order: 2;
+  }
+  .tc-page.ps-page .ps-head__actions {
+    order: 3;
+    flex: none;
+  }
+  .tc-page .tc-warnings {
+    order: 4;
+  }
+  .tc-setting--select > div:last-child {
+    flex-basis: 100%;
+  }
   .tc-days {
     order: 3;
     flex: 1 1 100%;
@@ -135,11 +217,14 @@
   .tc-link__end .nv-chip {
     min-width: 0;
   }
-  .tc-links {
-    gap: 14px;
+  .tc-link__destination {
+    order: 1;
+    flex-wrap: wrap;
   }
-  .tc-link + .tc-link {
-    padding-top: 14px;
-    border-top: 1px solid var(--nv-hairline);
+  .tc-link__end {
+    order: 2;
+  }
+  .tc-link__destination .nv-field__control {
+    flex-basis: 100%;
   }
 }

@@ -177,7 +177,14 @@ describe('the creator’s Telegram channel on Postgres', () => {
         { minute: 21 * 60 + 30, days: [6, 5], enabled: true },
         { minute: 12 * 60, days: [6], enabled: true },
       ],
-      links: [{ id: linkId, name: 'Telegram', url: 'https://redirect.example.test/nora' }],
+      links: [
+        {
+          id: linkId,
+          name: 'Telegram',
+          url: 'https://redirect.example.test/nora',
+          destination: 'mon Reveal',
+        },
+      ],
       channelLinkId: linkId,
     };
     expect((await put(nora, body, { 'x-test-stale': '1' })).statusCode).toBe(403);

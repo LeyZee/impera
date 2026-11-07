@@ -1,7 +1,7 @@
 import { DEFAULT_TELEGRAM_CHANNEL_CONFIG, RedirectLinkIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { daysWords, issuesOf, linkPreview, nextSlot, postsPerDay, rhythmWords } from './model';
+import { daysWords, issuesOf, nextSlot, postsPerDay, rhythmWords } from './model';
 
 const linkId = RedirectLinkIdSchema.parse('0192f3a0-0000-7000-8000-0000000000e1');
 
@@ -35,6 +35,22 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
     expect(nextSlot(round)?.minute).toBe(60);
   });
 
+  it('says where a link leads in words, never by an address', () => {
+    const link = {
+      id: linkId,
+      name: 'TikTok',
+      url: 'https://redirect.example.test/t',
+      destination: 'tiktok.com/@nora',
+    };
+    expect(
+      issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, links: [link] }).has(`link:${linkId}:destination`),
+    ).toBe(true);
+    const fine = { ...link, destination: 'mon live TikTok ce soir 21 h' };
+    expect(
+      issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, links: [fine] }).has(`link:${linkId}:destination`),
+    ).toBe(false);
+  });
+
   it('refuses a bare domain in the words of the link', () => {
     expect(
       issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, linkLabel: 'Tout est sur bit.ly/messa' }).get('label'),
@@ -53,20 +69,9 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
   it('marks a link without a name or with an address that is not https', () => {
     const issues = issuesOf({
       ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
-      links: [{ id: linkId, name: ' ', url: 'http://example.test' }],
+      links: [{ id: linkId, name: ' ', url: 'http://example.test', destination: '' }],
     });
     expect(issues.has(`link:${linkId}:name`)).toBe(true);
     expect(issues.has(`link:${linkId}:url`)).toBe(true);
-  });
-
-  it('shows the end of a post with the text, or the bare address', () => {
-    const config = {
-      ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
-      links: [{ id: linkId, name: 'Telegram', url: 'https://redirect.example.test/a' }],
-      channelLinkId: linkId,
-    };
-    expect(linkPreview(config)?.text).toBe('Viens me parler ✨');
-    expect(linkPreview({ ...config, linkForm: 'bare' })?.text).toBe('https://redirect.example.test/a');
-    expect(linkPreview({ ...config, channelLinkId: null })).toBeNull();
   });
 });

@@ -123,6 +123,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Post du canal | `channel_post` | Un message publié sur le canal Telegram : un média du pool, une légende dans sa voix, le lien de redirection ajouté par le code (ADR 0080). Distinct de l'annonce à l'équipe. |
 | Conseil (de réécriture) | `rewrite_hint` | Quelques mots libres de l'agence qui orientent la réécriture d'un post du canal ; une donnée dans le prompt, jamais une garde levée (ADR 0080). |
 | Lien de redirection | `redirect_link` | Une adresse `https://` d'un service de redirection, nommée et enregistrée par créatrice dans le CRM ; le code l'ajoute aux posts du canal, le modèle ne l'écrit jamais (ADR 0080). |
+| Où il mène | `destination` | La phrase courte qu'un lien de redirection porte pour le modèle (« mon live TikTok ce soir 21 h ») : le post parle de cet endroit, jamais d'un autre ; jamais d'adresse (ADR 0080 § 4.5). |
 | Mode assisté | `assisted` | Publication Instagram préparée par Impera et postée à la main, pour ajouter un son (ADR 0057). |
 | Signal de tendance | `trend_signal` | Un format, un son, un thème ou une date qui monte, venu d'une des six sources de l'ADR 0060 ; a une péremption (14 jours par défaut). |
 | Capture passive | `passive_capture` | Le relevé par l'extension de ce qu'une personne regarde elle-même sur instagram.com ; ne fait jamais défiler, ne clique jamais, n'envoie aucune requête (ADR 0060). |

@@ -181,14 +181,7 @@ export function CreatorsPage({
       );
     }
     if (shown === 'telegram' && current !== undefined) {
-      return (
-        <TelegramChannelSection
-          key={current.id}
-          creatorId={current.id}
-          creatorName={current.displayName}
-          onDirty={setDirty}
-        />
-      );
+      return <TelegramChannelSection key={current.id} creatorId={current.id} onDirty={setDirty} />;
     }
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
