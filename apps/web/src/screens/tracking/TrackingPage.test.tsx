@@ -529,7 +529,7 @@ describe('TrackingPage', () => {
     expect(within(queue).getAllByRole('listitem')).toHaveLength(5);
   });
 
-  it('says one failure of the agent once, below the draft to approve (recette AGT-05)', async () => {
+  it('says an AI outage once, in red, above the draft to approve (recette AGT-05, « urgent panne »)', async () => {
     const [first] = apiDashboard().todos;
     if (first === undefined) throw new Error('the fake dashboard has a todo');
     const down = (n: number): DashboardTodo => ({
@@ -557,9 +557,11 @@ describe('TrackingPage', () => {
     const queue = await screen.findByRole('list', { name: 'À traiter' });
     const rows = within(queue).getAllByRole('listitem');
     expect(rows.map((row) => row.textContent)).toEqual([
-      expect.stringContaining('Brouillon à valider'),
       expect.stringContaining('IA indisponible · 4 fans'),
+      expect.stringContaining('Brouillon à valider'),
     ]);
+    expect(rows[0]?.querySelector('.nv-dot')?.classList.contains('nv-tone--bad')).toBe(true);
+    expect(rows[1]?.querySelector('.nv-dot')?.classList.contains('nv-tone--warn')).toBe(true);
     expect(screen.queryByRole('button', { name: /Voir les/u })).toBeNull();
   });
 

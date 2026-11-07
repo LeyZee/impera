@@ -17,9 +17,15 @@ const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, A
  */
 export function CreatorPicker({
   onChoose,
+  agency,
 }: {
   /** Told after the choice is followed: the Dashboard writes her in its address (recette 05/11, PRO-28). */
   onChoose?: ((creatorId: string) => void) | undefined;
+  /**
+   * « Toute l'agence » in front of the creators, for the owner and an active manager (ADR 0078): checked on the
+   * agency's view, where no creator is.
+   */
+  agency?: { readonly selected: boolean; readonly onChoose: () => void } | undefined;
 } = {}): JSX.Element | null {
   const creators = useCreators().data ?? [];
   const { chosen, follow: followOnly } = useFollowedCreatorId();
@@ -29,21 +35,30 @@ export function CreatorPicker({
   };
   const ref = useRef<HTMLDivElement>(null);
   const several = creators.length >= 2;
-  const queue = useQuery({ ...todosAcrossQuery, enabled: several });
-  if (!several) return null;
+  const shown = several || (agency !== undefined && creators.length >= 1);
+  const queue = useQuery({ ...todosAcrossQuery, enabled: shown });
+  if (!shown) return null;
   // Unread, the chips would say nothing of the others' urgencies, as if there were none: the line under them says so.
   const unread = queue.isError && queue.data === undefined;
   const graveOf = (creatorId: string): number =>
     queue.data?.creators.find((count) => count.creatorId === creatorId)?.grave ?? 0;
 
-  const current = followedOf(creators, chosen)?.id;
+  const current = agency?.selected === true ? undefined : followedOf(creators, chosen)?.id;
   const index = creators.findIndex((creator) => creator.id === current);
+  // The agency's chip is the stop before the first creator: -1 in the creators' order.
+  const options = agency === undefined ? creators.length : creators.length + 1;
+  const position = agency === undefined ? Math.max(0, index) : index + 1;
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const step = STEPS[event.key];
     if (step === undefined) return;
     event.preventDefault();
-    const next = creators[(Math.max(0, index) + step + creators.length) % creators.length];
-    if (next === undefined) return;
+    const target = (position + step + options) % options;
+    const next = creators[agency === undefined ? target : target - 1];
+    if (next === undefined) {
+      ref.current?.querySelector<HTMLButtonElement>('[data-creator="agency"]')?.focus();
+      agency?.onChoose();
+      return;
+    }
     ref.current?.querySelector<HTMLButtonElement>(`[data-creator="${next.id}"]`)?.focus();
     follow(next.id);
   };
@@ -53,10 +68,26 @@ export function CreatorPicker({
       <div
         className="db-creators"
         role="radiogroup"
-        aria-label="Créatrice suivie"
+        aria-label={agency === undefined ? 'Créatrice suivie' : 'Ce que montre le Dashboard'}
         ref={ref}
         onKeyDown={onKeyDown}
       >
+        {agency === undefined ? null : (
+          <button
+            type="button"
+            role="radio"
+            className="nv-chip db-creators__agency"
+            data-creator="agency"
+            aria-checked={agency.selected}
+            tabIndex={agency.selected ? 0 : -1}
+            onClick={agency.onChoose}
+          >
+            <span className="db-creators__agency-mark" aria-hidden="true">
+              ◎
+            </span>
+            Toute l’agence
+          </button>
+        )}
         {creators.map((creator, i) => {
           const grave = creator.id === current ? 0 : graveOf(creator.id);
           return (
@@ -67,7 +98,7 @@ export function CreatorPicker({
               className="nv-chip"
               data-creator={creator.id}
               aria-checked={creator.id === current}
-              tabIndex={i === Math.max(0, index) ? 0 : -1}
+              tabIndex={agency?.selected === true ? -1 : i === Math.max(0, index) ? 0 : -1}
               onClick={() => {
                 follow(creator.id);
               }}

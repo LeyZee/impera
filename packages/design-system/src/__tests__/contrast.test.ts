@@ -134,9 +134,12 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     }
   });
 
-  it.each(['data-1', 'data-2'])('%s, a data series, stands out from void', (series) => {
-    expect(contrast(token(theme, series), ground.void)).toBeGreaterThanOrEqual(AA_NON_TEXT);
-  });
+  it.each(['data-1', 'data-2', 'series-1', 'series-2', 'series-3', 'series-4', 'agent'])(
+    '%s, a data series, stands out from void',
+    (series) => {
+      expect(contrast(token(theme, series), ground.void)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    },
+  );
 
   it('the focus ring stands out from void and from neon-solid', () => {
     expect(contrast(token(theme, 'focus'), token(theme, 'void'))).toBeGreaterThanOrEqual(AA_NON_TEXT);

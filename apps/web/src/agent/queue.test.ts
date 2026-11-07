@@ -2,7 +2,7 @@ import type { CreatorTodo, DashboardTodo } from '@impera/contracts';
 import { ConversationIdSchema, CreatorIdSchema, FanIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { queueEntries } from './queue';
+import { queueEntries, toneOf, urgencies } from './queue';
 
 let n = 0;
 function todo(
@@ -31,7 +31,7 @@ function todo(
 const LINA = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000c2');
 
 describe('« À traiter » on the screen (recette AGT-05)', () => {
-  it('says one failure of the agent once, after the grave lines and what a person can act on', () => {
+  it('says one failure of the agent once: an outage after the grave lines, the others after what a person can do', () => {
     const down = Array.from({ length: 20 }, (_, i) => todo('llm_unavailable', 60 - i));
     const draft = todo('awaiting_approval', 2);
     const minor = todo('minor', 1);
@@ -40,8 +40,8 @@ describe('« À traiter » on the screen (recette AGT-05)', () => {
     const entries = queueEntries([...down, budget, draft, minor]);
     expect(
       entries.map((e) => (e.kind === 'one' ? e.todo.kind : `${e.cause} × ${String(e.todos.length)}`)),
-    ).toEqual(['minor', 'awaiting_approval', 'budget', 'llm_unavailable × 20']);
-    const group = entries[3];
+    ).toEqual(['minor', 'llm_unavailable × 20', 'awaiting_approval', 'budget']);
+    const group = entries[1];
     if (group?.kind !== 'group') throw new Error('a group');
     expect(group.oldest.waitingMinutes).toBe(60);
     expect(group.latest.waitingMinutes).toBe(41);
@@ -56,7 +56,15 @@ describe('« À traiter » on the screen (recette AGT-05)', () => {
     ]);
     expect(
       entries.map((e) => (e.kind === 'one' ? e.todo.kind : `${e.cause} × ${String(e.todos.length)}`)),
-    ).toEqual(['persona_inactive', 'persona_inactive × 2', 'llm_unavailable']);
+    ).toEqual(['llm_unavailable', 'persona_inactive', 'persona_inactive × 2']);
+  });
+
+  it('counts an AI outage as one urgency, red, whatever tone the route gives (« urgent panne »)', () => {
+    const down = Array.from({ length: 5 }, (_, i) => todo('llm_unavailable', 20 - i));
+    expect(down.every((t) => t.tone === 'warn' && toneOf(t) === 'bad')).toBe(true);
+    expect(toneOf(todo('budget', 3))).toBe('warn');
+    expect(urgencies([...down, todo('minor', 2), todo('awaiting_approval', 1)])).toBe(2);
+    expect(urgencies([todo('budget', 3), todo('unanswered', 1)])).toBe(0);
   });
 
   it('orders the grave lines and the others by the longest wait', () => {

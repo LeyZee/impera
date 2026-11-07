@@ -2,6 +2,7 @@ import { ConversationIdSchema, type DashboardTodo } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { ago, fromApi, replyDelay, usdNote } from './live';
+import { heroState } from './logic';
 
 import { apiDashboard } from '@/test/fakes';
 
@@ -11,7 +12,7 @@ const flat = (text: string | undefined): string => (text ?? '').replace(/\s/gu, 
 const card = (id: string, data = fromApi(apiDashboard())) => data.agent.cards.find((c) => c.id === id);
 
 describe('fromApi', () => {
-  it('says one failure of the agent once, after what a person can act on (recette AGT-05)', () => {
+  it('says an AI outage once, in red, before what a person can act on (recette AGT-05, « urgent panne »)', () => {
     const [first] = apiDashboard().todos;
     if (first === undefined) throw new Error('the fake dashboard has a todo');
     const down = (n: number): DashboardTodo => ({
@@ -29,14 +30,19 @@ describe('fromApi', () => {
       id: 'draft',
       waitingMinutes: 1,
     };
-    const todos = fromApi(apiDashboard({ todos: [down(1), down(2), down(3), draft] })).todos;
-    expect(todos.map((t) => [t.kind, t.title])).toEqual([
-      ['À valider dans Suivi', first.title],
-      ['IA indisponible', '3 fans'],
+    const data = fromApi(apiDashboard({ todos: [draft, down(1), down(2), down(3)] }));
+    const { todos } = data;
+    expect(todos.map((t) => [t.kind, t.title, t.tone])).toEqual([
+      ['IA indisponible', '3 fans', 'bad'],
+      ['À valider dans Suivi', first.title, 'warn'],
     ]);
     // The longest wait is the group's; it opens the latest conversation.
-    expect(flat(todos[1]?.waiting)).toBe('depuis 33 min');
-    expect(todos[1]?.conversationId).toBe(down(1).conversationId);
+    expect(flat(todos[0]?.waiting)).toBe('depuis 33 min');
+    expect(todos[0]?.conversationId).toBe(down(1).conversationId);
+    // The hero counts it as an urgency and says what it leaves undone, never « Rien d’urgent ».
+    const hero = heroState(data.agent, todos, 'copilot');
+    expect(hero).toMatchObject({ tone: 'bad', headline: '**2 choses** t’attendent, dont une urgente' });
+    expect(hero.lead).toBe('Aucun modèle IA n’a répondu : 3 fans attendent un chatteur.');
   });
 
   it('writes the todos in the trade’s words, how long they wait, the hour at her time (DASH-11, DASH-26)', () => {
