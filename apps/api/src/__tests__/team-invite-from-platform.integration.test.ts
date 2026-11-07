@@ -97,6 +97,7 @@ describe('a member invited from a link proposal (ADR 0076 § 3)', () => {
       creators: { existing: (ids) => Promise.resolve(new Set(ids)) },
       invitationLinks: { live: () => Promise.resolve(new Map()) },
       enqueuePayRecalculation,
+      platformRemovals: () => Promise.resolve([]),
     });
     // `connectors`' own link writes (migration 0135), as the composition root gives them to the route.
     invite = team.invites(app.modules.connectors.invitationChatterLinks).fromPlatform;

@@ -487,4 +487,25 @@ describe('team imported from the platform after review (ADR 0076)', () => {
     const other = await api('POST', '/team/chatter_new/invitation', owner, invitation('autre@recette.test'));
     expect(other.statusCode, other.body).toBe(409);
   });
+  // The reading of the sales looks at the team list once an hour: a removal shows without anyone opening the review.
+  it('sees a removal from the hourly reading of the sales, with no screen opened', async () => {
+    const counts = async () => TeamImportCountsSchema.parse((await api('GET', '/team/counts', owner)).json());
+    expect((await counts()).removalCount).toBe(0);
+    listed = TEAM.map((one) =>
+      one.chatterId === 'chatter_lea' ? { ...one, removedAt: '2026-11-06T09:00:00.000Z' } : one,
+    );
+    try {
+      const before = listReads;
+      await app.modules.connectors.jobs.readSales(createLogger(testConfig(), new LogSink()), 'test', true);
+      expect(listReads).toBe(before + 1);
+      expect((await counts()).removalCount).toBe(1);
+      // Within the hour, the next reading does not ask the list again.
+      await app.modules.connectors.jobs.readSales(createLogger(testConfig(), new LogSink()), 'test', true);
+      expect(listReads).toBe(before + 1);
+    } finally {
+      listed = [...TEAM];
+    }
+    await overviewAs(owner);
+    expect((await counts()).removalCount).toBe(0);
+  });
 });

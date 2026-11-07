@@ -1,4 +1,4 @@
-import type { CommissionPreset, CreatorSummary, TeamMember } from '@impera/contracts';
+import type { CommissionPreset, CreatorSummary, TeamMember, TeamPlatformRemoval } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
@@ -15,6 +15,7 @@ import {
   longDay,
   noteDay,
   rateAhead,
+  removalLine,
   ROLE_LABELS,
 } from './model';
 import { Avatar, StatusPill } from './parts';
@@ -37,6 +38,7 @@ export function MemberSheet({
   member,
   presets,
   creators,
+  removals,
   canManage,
   isSelf,
   onClose,
@@ -44,6 +46,8 @@ export function MemberSheet({
   member: TeamMember;
   presets: readonly CommissionPreset[];
   creators: readonly CreatorSummary[];
+  /** His accounts removed from a platform while he is still here (ADR 0076 § 5). */
+  removals: readonly TeamPlatformRemoval[];
   canManage: boolean;
   /** His own record: the notes about him are never his to read (the server answers 403). */
   isSelf: boolean;
@@ -92,6 +96,18 @@ export function MemberSheet({
           </svg>
         </button>
       </header>
+
+      {/* A state, not news: said as long as it lasts, nothing turned off; his departure stays Équipe's (ADR 0076 § 5). */}
+      {removals.map((removal) => (
+        <p
+          key={`${removal.platform}:${removal.platformChatterId}`}
+          className="tm-warn nv-enter"
+          role="status"
+        >
+          {removalLine(removal, member.status)}. Son lien reste, ses ventes passées lui restent attribuées
+          {canManage ? ' ; son départ se fait par «\u00a0Changer le statut\u00a0».' : '.'}
+        </p>
+      ))}
 
       {/* What changes once a member is in: the owner's, and nothing for one who left (EQ-10). */}
       {canManage && !gone ? (
