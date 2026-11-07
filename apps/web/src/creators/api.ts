@@ -15,7 +15,7 @@ import {
   type CreatorAccount,
   type CreatorErrorCode,
   type CreatorId,
-  type CreatorPersonaSheet,
+  type PersonaSheet,
   type CreatorPlanned,
   type CreatorSummary,
   type InvitationLinkErrorCode,
@@ -49,20 +49,23 @@ export function useCreators(): UseQueryResult<CreatorSummary[]> {
   return useQuery(creatorsQuery);
 }
 
-/** `GET /v1/creators/:id/persona/mine`: her sheet in force as she reads it, `null` while the agency has none active. */
-async function fetchMyPersona(creatorId: CreatorId): Promise<CreatorPersonaSheet | null> {
+/**
+ * `GET /v1/creators/:id/persona/mine`: her sheet in force as she reads it, Desirali's seven panels (ADR 0079 § 6),
+ * `null` while the agency has none active.
+ */
+async function fetchMyPersona(creatorId: CreatorId): Promise<PersonaSheet | null> {
   const response = await fetch(`/v1/creators/${encodeURIComponent(creatorId)}/persona/mine`, {
     credentials: 'include',
   });
   if (!response.ok) throw new Error(`GET persona/mine: ${String(response.status)}`);
-  return MyPersonaSchema.parse(await response.json()).sheet;
+  return MyPersonaSchema.parse(await response.json()).answers;
 }
 
 /** The key of her own sheet, for what will change it (« Proposer une correction », CREA-01 b). */
 export const myPersonaKey = (creatorId: CreatorId): readonly unknown[] => ['my-persona', creatorId];
 
 /** Her own sheet (Moi › Persona, recette CREA-01). */
-export function useMyPersona(creatorId: CreatorId): UseQueryResult<CreatorPersonaSheet | null> {
+export function useMyPersona(creatorId: CreatorId): UseQueryResult<PersonaSheet | null> {
   return useQuery({ queryKey: myPersonaKey(creatorId), queryFn: () => fetchMyPersona(creatorId), retry: 1 });
 }
 

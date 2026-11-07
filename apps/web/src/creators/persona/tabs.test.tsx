@@ -1,23 +1,15 @@
 // @vitest-environment jsdom
-import type { Persona } from '@impera/contracts';
+import type { PersonaV2 } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState, type JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import demoYaml from '../../../../../personas/demo/v0.1.0.yaml?raw';
-import blocksYaml from '../../../../../personas/demo/v0.2.0.yaml?raw';
+import demoYaml from '../../../../../personas/demo/v0.3.0.yaml?raw';
 
-import { validate } from './model';
+import { scoped, validate } from './model';
+import { ageLine } from './sheet';
 import { parsePersonaYaml } from './source';
-import {
-  ageLine,
-  DetailsTab,
-  FollowUpsTab,
-  LimitsTab,
-  NotificationsTab,
-  orNull,
-  StrategiesTab,
-} from './tabs';
+import { FollowUpsTab, NotificationsTab, orNull, RulesTab, StrategiesTab } from './tabs';
 
 afterEach(() => {
   cleanup();
@@ -25,9 +17,9 @@ afterEach(() => {
 
 describe('Stratégies › the desire thresholds (P3-12)', () => {
   it('says the band each threshold falls in, and empties to the default', async () => {
-    const persona: Persona = await parsePersonaYaml(demoYaml);
-    const onChange = vi.fn<(value: Persona['strategies']) => void>();
-    render(<StrategiesTab value={persona.strategies} onChange={onChange} issues={[]} />);
+    const { agent } = await parsePersonaYaml(demoYaml);
+    const onChange = vi.fn<(value: PersonaV2['agent']['strategies']) => void>();
+    render(<StrategiesTab value={agent.strategies} onChange={onChange} issues={[]} />);
     const opening = screen.getByLabelText('Elle ne l’ouvre qu’à partir d’une note de désir de');
     expect(opening).toHaveProperty('value', '45');
     expect(screen.getByText('À partir de 45 : dès qu’il devient joueur.')).toBeDefined();
@@ -40,10 +32,10 @@ describe('Stratégies › the desire thresholds (P3-12)', () => {
   });
 
   it('says in plain words when scripts go out under 70, without a warning (CREA-10)', async () => {
-    const persona: Persona = await parsePersonaYaml(demoYaml);
+    const { agent } = await parsePersonaYaml(demoYaml);
     const strategies = {
-      ...persona.strategies,
-      script_launch: { ...persona.strategies.script_launch, min_desire: 60 },
+      ...agent.strategies,
+      script_launch: { ...agent.strategies.script_launch, min_desire: 60 },
     };
     render(<StrategiesTab value={strategies} onChange={vi.fn()} issues={[]} />);
     const hint = screen.getByText('À partir de 60 : dès qu’il devient joueur.');
@@ -54,9 +46,9 @@ describe('Stratégies › the desire thresholds (P3-12)', () => {
 
 describe('Stratégies › the canvas lines (P5-01)', () => {
   it('adds a line last, keeping the order she chose', async () => {
-    const persona: Persona = await parsePersonaYaml(blocksYaml);
-    const onChange = vi.fn<(value: Persona['strategies']) => void>();
-    render(<StrategiesTab value={persona.strategies} onChange={onChange} issues={[]} />);
+    const { agent } = await parsePersonaYaml(demoYaml);
+    const onChange = vi.fn<(value: PersonaV2['agent']['strategies']) => void>();
+    render(<StrategiesTab value={agent.strategies} onChange={onChange} issues={[]} />);
     fireEvent.focus(screen.getByRole('combobox', { name: 'Infos à collecter' }));
     fireEvent.click(screen.getByRole('option', { name: /Envies/u }));
     const [changed] = onChange.mock.lastCall ?? [];
@@ -73,22 +65,22 @@ describe('Stratégies › the canvas lines (P5-01)', () => {
 });
 
 /** The tab as the screen holds it: its own draft, validated on each change. */
-function Strategies({ initial }: { initial: Persona }): JSX.Element {
+function Strategies({ initial }: { initial: PersonaV2 }): JSX.Element {
   const [persona, setPersona] = useState(initial);
   return (
     <StrategiesTab
-      value={persona.strategies}
+      value={persona.agent.strategies}
       onChange={(strategies) => {
-        setPersona({ ...persona, strategies });
+        setPersona({ ...persona, agent: { ...persona.agent, strategies } });
       }}
-      issues={validate(persona)}
+      issues={scoped(validate(persona), 'agent')}
     />
   );
 }
 
 describe('recette 28/10', () => {
   it('keeps a block open once its error clears, so the next keys land in the field', async () => {
-    render(<Strategies initial={await parsePersonaYaml(blocksYaml)} />);
+    render(<Strategies initial={await parsePersonaYaml(demoYaml)} />);
     const field = screen.getByLabelText('Au plus, en messages');
     const block = field.closest('details');
     if (block === null) throw new Error('the KYC block folds');
@@ -102,15 +94,15 @@ describe('recette 28/10', () => {
   });
 
   it('never prints « NaN min » under an emptied duration', async () => {
-    render(<Strategies initial={await parsePersonaYaml(blocksYaml)} />);
+    render(<Strategies initial={await parsePersonaYaml(demoYaml)} />);
     fireEvent.change(screen.getByLabelText('Au plus, en temps'), { target: { value: '' } });
     expect(screen.queryByText(/NaN/u)).toBeNull();
   });
 
   it('switching follow-ups off drops a custom text never written, which would block the save unseen', async () => {
-    const persona = await parsePersonaYaml(blocksYaml);
-    const onChange = vi.fn<(value: Persona['follow_ups']) => void>();
-    const custom = { ...persona.follow_ups, enabled: true, type: 'custom' as const, text: '' };
+    const { agent } = await parsePersonaYaml(demoYaml);
+    const onChange = vi.fn<(value: PersonaV2['agent']['follow_ups']) => void>();
+    const custom = { ...agent.follow_ups, enabled: true, type: 'custom' as const, text: '' };
     render(<FollowUpsTab value={custom} onChange={onChange} issues={[]} />);
     const [toggle] = screen.getAllByRole('switch');
     if (toggle === undefined) throw new Error('follow-ups have their switch');
@@ -119,8 +111,8 @@ describe('recette 28/10', () => {
   });
 
   it('refuses a follow-up delay that is not a whole number of hours', async () => {
-    const persona = await parsePersonaYaml(blocksYaml);
-    render(<FollowUpsTab value={persona.follow_ups} onChange={vi.fn()} issues={[]} />);
+    const { agent } = await parsePersonaYaml(demoYaml);
+    render(<FollowUpsTab value={agent.follow_ups} onChange={vi.fn()} issues={[]} />);
     const next = screen.getByLabelText('Nouvelle relance, en heures');
     fireEvent.change(next, { target: { value: '1.5' } });
     expect(screen.getByRole('button', { name: 'Ajouter' })).toHaveProperty('disabled', true);
@@ -137,27 +129,29 @@ describe('recette 28/10', () => {
   });
 });
 
-describe('Notifications and Limites, their words (CREA-25, CREA-29)', () => {
+describe('Notifications and Règles strictes, their words (CREA-25, CREA-29)', () => {
   it('names where the alerts are routed, without a link to a page that is the owner’s', async () => {
-    const persona: Persona = await parsePersonaYaml(blocksYaml);
-    render(<NotificationsTab value={persona.notifications} onChange={vi.fn()} issues={[]} />);
+    const { agent } = await parsePersonaYaml(demoYaml);
+    render(<NotificationsTab value={agent.notifications} onChange={vi.fn()} issues={[]} />);
     expect(screen.getByText(/réglés dans Réglages › Alertes par le propriétaire/u)).toBeDefined();
     expect(screen.queryByRole('link')).toBeNull();
   });
 
-  it('does not send a creator to Heures d’activité, which is the owner’s', async () => {
-    const persona: Persona = await parsePersonaYaml(blocksYaml);
-    render(<DetailsTab value={persona.details} onChange={vi.fn()} issues={[]} timezone="Europe/Paris" />);
-    expect(
-      screen.getByText('Celui de la créatrice. Il dit à l’agent s’il fait jour ou nuit chez elle.'),
-    ).toBeDefined();
-    expect(screen.queryByText(/à changer dans Heures d’activité/u)).toBeNull();
-  });
-
   it('asks for a dislike in her words, variants included', async () => {
-    const persona: Persona = await parsePersonaYaml(blocksYaml);
-    render(<LimitsTab value={persona.limits} onChange={vi.fn()} issues={[]} />);
+    const { agent } = await parsePersonaYaml(demoYaml);
+    render(<RulesTab value={agent.rules} onChange={vi.fn()} issues={[]} />);
     expect(screen.getByPlaceholderText('Ajouter un dégoût')).toBeDefined();
     expect(screen.getByText('Variantes comprises.')).toBeDefined();
+  });
+});
+
+describe('Règles strictes (ADR 0079 § 4)', () => {
+  it('says only these lists are applied to the letter, and the free « Zones interdites » is read by the model', async () => {
+    const { agent } = await parsePersonaYaml(demoYaml);
+    render(<RulesTab value={agent.rules} onChange={vi.fn()} issues={[]} />);
+    expect(screen.getByText(/Seules ces listes sont appliquées à la lettre/u).textContent).toContain(
+      '« Zones interdites » de sa fiche est lu par le modèle, sans garde',
+    );
+    expect(screen.getByLabelText('Émojis qu’elle n’utilise jamais')).toBeDefined();
   });
 });

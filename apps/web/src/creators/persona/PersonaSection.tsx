@@ -1,12 +1,13 @@
 import {
-  PersonaSchema,
-  type Persona,
-  type PersonaCompletion,
+  PersonaV2Schema,
+  type PersonaMove,
+  type PersonaSheetCompletion,
+  type PersonaV2,
   type PersonaVersionSummary,
 } from '@impera/contracts';
 import { placeTabBarLens } from '@impera/design-system';
 import {
-  useCallback,
+  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -20,53 +21,44 @@ import { SaveBar, useOnScreen } from '../SaveBar';
 
 import { CorrectionsPanel } from './CorrectionsPanel';
 import { Versions } from './Versions';
-import {
-  InDepthTab,
-  IntimateTab,
-  LifestyleTab,
-  SampleRepliesTab,
-  TastesTab,
-  WritingStyleTab,
-} from './blocks';
 import { FormContext } from './fields';
 import {
-  blockOf,
   changedFields,
   draftCompletion,
-  withIssues,
-  hasChange,
-  IN_DEPTH_BLOCKS,
-  issueCountByTab,
-  isPlaceholder,
   fileRefusal,
   foreignFileQuestion,
+  hasChange,
   importedDraft,
+  issueCountByTab,
   localDay,
+  moveLabel,
+  nicknameOf,
   NOTHING_REFUSED,
-  refusedReplyIssues,
+  panelOf,
+  panelOfCorrection,
+  panelTitle,
+  refusedLineIssues,
+  scoped,
+  scopedPaths,
   stillRefused,
   TABS,
-  isBlockId,
-  tabOf,
-  validate,
+  tabOfField,
   UNREADABLE_FILE,
+  validate,
   versionOnSave,
+  withAnswer,
+  withIssues,
   withoutPlaceholders,
-  type BlockId,
+  type Answer,
+  type Draft,
   type FieldIssue,
-  type RefusedReplies,
+  type PanelKey,
+  type RefusedLines,
   type TabId,
 } from './model';
+import { SheetPanels } from './sheet';
 import { activateVersion, readPersonaFile, saveVersion, usePersona, type PersonaReady } from './source';
-import {
-  AdditionalInfoTab,
-  BehaviorTab,
-  DetailsTab,
-  FollowUpsTab,
-  LimitsTab,
-  NotificationsTab,
-  StrategiesTab,
-} from './tabs';
+import { AgentBehaviorTab, FollowUpsTab, NotificationsTab, RulesTab, StrategiesTab } from './tabs';
 
 import { fullDay } from '@/scheduling/time';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
@@ -74,9 +66,9 @@ import { Dialog } from '@/shell/Dialog';
 import './persona.css';
 
 /**
- * Créatrices › Persona: the creator persona (ADR 0010), tab by tab like OnlyChat's creator sheet, built on
- * `PersonaSchema`. What dominates is the state of the draft and its one action, saving a new version; the tabs
- * hold the work; secondary blocks stay folded behind their summary line (docs/design/README.md).
+ * Créatrices › Persona (ADR 0079): her sheet as Desirali asks it, seven panels that fold, then « Réglages de
+ * l'agent », what the code applies, versioned with it. What dominates is the state of the draft and its one action,
+ * saving a new version; a version stored at format 1 opens converted, and says what it moved.
  */
 export function PersonaSection({
   creatorId,
@@ -96,7 +88,7 @@ export function PersonaSection({
   /** The owner and an active manager read the corrections she proposed (CREA-01 b); the owner marks them handled. */
   readsCorrections?: boolean;
   timezone: string | null;
-  /** Her name in Impera, which a persona not written yet takes as its first name. */
+  /** Her name in Impera, which a persona not written yet takes as its nickname. */
   creatorName?: string | null;
   /** Told whether the draft holds changes not saved, so that leaving the page can ask first. Must be stable. */
   onDirty?: (dirty: boolean) => void;
@@ -105,7 +97,9 @@ export function PersonaSection({
   /** Said once a save went through, until the next edit. */
   const [notice, setNotice] = useState<string | null>(null);
   /** Kept here, so that a save, which starts the editor again from the new version, stays on the same tab. */
-  const [tab, setTab] = useState<TabId>('details');
+  const [tab, setTab] = useState<TabId>('sheet');
+  /** The panels unfolded, kept across a save for the same reason; her identity first, as at Desirali. */
+  const [open, setOpen] = useState<ReadonlySet<PanelKey>>(() => new Set<PanelKey>(['identity']));
 
   if (load.kind !== 'ready') {
     return (
@@ -140,6 +134,8 @@ export function PersonaSection({
       notice={notice}
       tab={tab}
       onTab={setTab}
+      open={open}
+      onOpen={setOpen}
       onDirty={onDirty}
       onEdit={() => {
         setNotice(null);
@@ -159,19 +155,26 @@ export function PersonaSection({
 
 const ignore = (): void => undefined;
 
-const tabIndex = (tab: TabId): number => TABS.findIndex((t) => t.id === tab);
-
+const SAVE_FAILED =
+  'L’enregistrement n’a pas abouti. Tes changements restent ici ; réessaie dans un instant.';
 const CONFLICT =
   'Une autre version a été enregistrée pendant que tu modifiais. Recharge pour repartir de la dernière : tes modifications ici seront perdues.';
 
 const ACTIVATION_CONFLICT =
   'Sa version active a changé depuis l’ouverture de cette page, sans doute dans un autre onglet. Rien n’a été activé : recharge pour voir où elle en est.';
 
-/** A version stored before a guard changed: its sample replies teach what the agent may no longer write (P5-01). */
+/** A version stored before a guard changed: its typical responses teach what the agent may no longer write. */
 const activationRefused = (version: string): string =>
-  `La version ${version} n’est pas activée : une de ses réponses types contient ce que l’agent n’a plus le droit d’écrire. Corrige-la dans une nouvelle version.`;
+  `La version ${version} n’est pas activée : une de ses réponses typiques contient ce que l’agent n’a plus le droit d’écrire. Corrige-la dans une nouvelle version.`;
 
 const READ_ONLY = 'Lecture seule : seuls le propriétaire et la créatrice modifient sa persona.';
+
+/** What the conversion of a format-1 version, or of a file, put in a nearby question (ADR 0079 § 5). */
+interface Moved {
+  readonly moves: readonly PersonaMove[];
+  /** The file it came from; null for her stored version. */
+  readonly file: string | null;
+}
 
 function Editor({
   ready,
@@ -184,6 +187,8 @@ function Editor({
   notice,
   tab,
   onTab,
+  open,
+  onOpen,
   onDirty,
   onEdit,
   onSaved,
@@ -200,14 +205,16 @@ function Editor({
   notice: string | null;
   tab: TabId;
   onTab: (tab: TabId) => void;
+  open: ReadonlySet<PanelKey>;
+  onOpen: (open: ReadonlySet<PanelKey>) => void;
   onDirty: (dirty: boolean) => void;
   onEdit: () => void;
   onSaved: (version: PersonaVersionSummary) => void;
   onActivated: (version: string) => void;
   onReload: () => void;
 }): JSX.Element {
-  const saved = ready.persona;
-  const [draft, setDraft] = useState(saved);
+  const saved: Draft = ready.persona;
+  const [draft, setDraft] = useState<Draft>(saved);
   const [saving, setSaving] = useState(false);
   /**
    * The version being activated, in its dialog; `password` once the server asked the password and the code again (a
@@ -221,14 +228,21 @@ function Editor({
   const [problem, setProblem] = useState<{ text: string; reload: boolean } | null>(null);
   /** Which way the panel slides in: towards the tab picked, like a page turning. */
   const [direction, setDirection] = useState<'left' | 'right' | 'none'>('none');
-  /** A field to bring into view once its tab is on screen (« Voir »). */
+  /** A field to bring into view once its tab and its panel are on screen (« Voir »). */
   const [focusField, setFocusField] = useState<string | null>(null);
-  /** The sample replies the server refused at the last save (422), shown on their field until their text changes. */
-  const [refused, setRefused] = useState<RefusedReplies>(NOTHING_REFUSED);
+  /** The lines of « Réponses typiques » the server refused at the last save (422), until that text changes. */
+  const [refused, setRefused] = useState<RefusedLines>(NOTHING_REFUSED);
   /** The name of the file the draft was imported from (« Importer un fichier »), until it is saved or undone. */
   const [imported, setImported] = useState<string | null>(null);
+  /** What a conversion moved: her format-1 version as opened, or the file imported. */
+  const [moved, setMoved] = useState<Moved>({ moves: ready.moved, file: null });
   /** A file read as another creator's, waiting for « L’importer quand même » (PRO-27). */
-  const [foreign, setForeign] = useState<{ persona: Persona; name: string; question: string } | null>(null);
+  const [foreign, setForeign] = useState<{
+    persona: PersonaV2;
+    moves: readonly PersonaMove[];
+    name: string;
+    question: string;
+  } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const headRef = useRef<HTMLDivElement>(null);
 
@@ -247,11 +261,17 @@ function Editor({
   const quiet = ready.source === 'example' && changed.length === 0;
   const flagged = useMemo(() => (quiet ? [] : issues), [quiet, issues]);
   const form = useMemo(() => ({ issues: flagged, changed }), [flagged, changed]);
+  const agentForm = useMemo(
+    () => ({ issues: scoped(flagged, 'agent'), changed: scopedPaths(changed, 'agent') }),
+    [flagged, changed],
+  );
+  /** Her newest version is at format 1: saving it as it opens stores it at format 2 (ADR 0079 § 5). */
+  const converted = ready.source === 'api' && ready.format === 1;
 
   const dirty = changed.length > 0;
   /** The number the next save gives: shown before it is made, by the note and after an import. */
   const upcoming = versionOnSave(
-    draft,
+    draft.meta.version,
     ready.versions.map((v) => v.version),
     imported !== null,
   );
@@ -267,44 +287,66 @@ function Editor({
 
   const select = (next: TabId): void => {
     if (next === tab) return;
-    setDirection(tabIndex(next) > tabIndex(tab) ? 'right' : 'left');
+    const at = (id: TabId): number => TABS.findIndex((t) => t.id === id);
+    setDirection(at(next) > at(tab) ? 'right' : 'left');
     onTab(next);
+  };
+  const openPanel = (panel: PanelKey): void => {
+    if (!open.has(panel)) onOpen(new Set([...open, panel]));
+  };
+  const toggle = (panel: PanelKey): void => {
+    const next = new Set(open);
+    if (next.has(panel)) next.delete(panel);
+    else next.add(panel);
+    onOpen(next);
   };
 
   useEffect(() => {
     if (focusField === null) return;
-    // The field whose path holds the issue: `details.hobbies.1` is shown by the field `details.hobbies`.
+    // The field whose path holds the issue: `agent.behavior.pet_names.1` is shown by `behavior.pet_names` in the
+    // agent's tab, whose fields go by their path without `agent.`.
+    const local = focusField.startsWith('agent.') ? focusField.slice('agent.'.length) : focusField;
     const target = [...(panelRef.current?.querySelectorAll<HTMLElement>('[data-path]') ?? [])].find((el) => {
       const path = el.dataset['path'] ?? '';
-      return focusField === path || focusField.startsWith(`${path}.`);
+      return local === path || local.startsWith(`${path}.`);
     });
-    if (target !== undefined) {
-      target.closest('details')?.setAttribute('open', '');
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const place =
+      target ?? panelRef.current?.querySelector<HTMLElement>(`[data-panel="${panelOf(focusField) ?? ''}"]`);
+    if (place !== undefined && place !== null) {
+      place.closest('details')?.setAttribute('open', '');
+      place.scrollIntoView({ behavior: 'smooth', block: 'center' });
       const control =
-        target.querySelector<HTMLElement>('input, textarea') ?? target.querySelector<HTMLElement>('button');
+        target?.querySelector<HTMLElement>('input, textarea') ?? target?.querySelector<HTMLElement>('button');
       control?.focus({ preventScroll: true });
     }
     setFocusField(null);
-  }, [focusField, tab]);
+  }, [focusField, tab, open]);
 
-  const set = <K extends BlockId>(key: K, value: Persona[K]): void => {
-    setDraft((current) => ({ ...current, [key]: value }));
+  const change = (next: (current: Draft) => Draft): void => {
+    setDraft(next);
     setProblem(null);
     onEdit();
   };
+  const setAgent = <K extends keyof PersonaV2['agent']>(key: K, value: PersonaV2['agent'][K]): void => {
+    change((current) => ({ ...current, agent: { ...current.agent, [key]: value } }));
+  };
+  const agentProps = <K extends keyof PersonaV2['agent']>(key: K) => ({
+    value: draft.agent[key],
+    onChange: (value: PersonaV2['agent'][K]) => {
+      setAgent(key, value);
+    },
+    issues: agentForm.issues,
+  });
 
   const save = async (): Promise<void> => {
     if (creatorId === null) return;
     setSaving(true);
     setProblem(null);
-    // The model reads the zone from the persona; the code goes by the creator's, so the copy follows hers.
-    // Her zone and the new number do not go through `validate`: a refusal here is a failed save, never a throw.
-    const persona = PersonaSchema.safeParse(
+    // The new number does not go through `validate`: a refusal here is a failed save, never a throw.
+    const persona = PersonaV2Schema.safeParse(
       withoutPlaceholders({
         ...draft,
-        details: { ...draft.details, timezone: timezone ?? draft.details.timezone },
-        meta: { ...draft.meta, version: upcoming, created_at: localDay() },
+        meta: { ...draft.meta, schema: 2, version: upcoming, created_at: localDay() },
       }),
     );
     const result = persona.success
@@ -318,12 +360,13 @@ function Editor({
       case 'conflict':
         setProblem({ text: CONFLICT, reload: true });
         break;
-      case 'unprocessable':
-        setRefused({
-          issues: refusedReplyIssues(result.faults),
-          replies: draft.sample_replies?.map((reply) => reply.reply) ?? [],
-        });
+      case 'unprocessable': {
+        const text = textOrNull(draft.sheet.conversation['typical_responses']);
+        const issues = refusedLineIssues(result.faults, text);
+        if (issues.length > 0) setRefused({ issues, text });
+        else setProblem({ text: SAVE_FAILED, reload: false });
         break;
+      }
       case 'forbidden':
         setProblem({
           text: 'Seuls le propriétaire et la créatrice peuvent enregistrer sa persona.',
@@ -331,25 +374,22 @@ function Editor({
         });
         break;
       case 'failed':
-        setProblem({
-          text: 'L’enregistrement n’a pas abouti. Tes changements restent ici ; réessaie dans un instant.',
-          reload: false,
-        });
+        setProblem({ text: SAVE_FAILED, reload: false });
         break;
     }
   };
 
   /**
    * « Importer un fichier »: a persona file written outside Impera (ADR 0010: never in the repository) replaces the
-   * draft, field by field, as if typed. Nothing is stored until « Enregistrer une version », and a version saved is
-   * never active until it is activated: her active version and what the agent writes stay as they are.
+   * draft, field by field, as if typed. A file at format 1 is converted first (ADR 0079 § 5). Nothing is stored until
+   * « Enregistrer une version », and a version saved is never active until it is activated.
    */
   const importFile = async (file: File): Promise<void> => {
     if (creatorId === null) return;
     const read = await readPersonaFile(file).catch(() => ({ kind: 'unreadable' as const }));
     if (read.kind !== 'persona') {
       setProblem({
-        text: read.kind === 'invalid' ? fileRefusal(read.issues) : UNREADABLE_FILE,
+        text: read.kind === 'invalid' ? fileRefusal(read.issues, read.format) : UNREADABLE_FILE,
         reload: false,
       });
       return;
@@ -357,14 +397,15 @@ function Editor({
     setProblem(null);
     // Another creator's file is asked about first, never put in her draft unseen (recette 05/11, PRO-27).
     const question = foreignFileQuestion(read.persona, draft, creatorId);
-    if (question === null) take(read.persona, file.name);
-    else setForeign({ persona: read.persona, name: file.name, question });
+    if (question === null) take(read.persona, read.moved, file.name);
+    else setForeign({ persona: read.persona, moves: read.moved, name: file.name, question });
   };
-  const take = (persona: Persona, name: string): void => {
+  const take = (persona: PersonaV2, moves: readonly PersonaMove[], name: string): void => {
     if (creatorId === null) return;
     setForeign(null);
     setDraft(importedDraft(persona, creatorId));
     setImported(name);
+    setMoved({ moves, file: name });
     setRefused(NOTHING_REFUSED);
     onEdit();
   };
@@ -410,27 +451,21 @@ function Editor({
       ? 'Ajoute d’abord une créatrice pour enregistrer sa persona.'
       : issues.length > 0
         ? 'Corrige d’abord les champs signalés.'
-        : changed.length === 0
+        : changed.length === 0 && !converted
           ? 'Rien à enregistrer pour l’instant.'
           : null;
-  const props = <K extends BlockId>(key: K) => ({
-    value: draft[key],
-    onChange: (value: Persona[K]) => {
-      set(key, value);
-    },
-    issues: flagged,
-  });
   const reset = (): void => {
     setDraft(saved);
     setProblem(null);
     setRefused(NOTHING_REFUSED);
     setImported(null);
+    setMoved({ moves: ready.moved, file: null });
   };
-  /** A block of the persona: its tab, then its folded section opened and brought into view. */
+  /** A field: its tab, its panel unfolded, then the field brought into view and focused. */
   const show = (field: string): void => {
-    const block = blockOf(field);
-    if (block === undefined) return;
-    select(tabOf(block));
+    select(tabOfField(field));
+    const panel = panelOf(field);
+    if (panel !== undefined) openPanel(panel);
     setFocusField(field);
   };
   const headOnScreen = useOnScreen(headRef);
@@ -446,6 +481,7 @@ function Editor({
           readOnly={!canSave}
           issues={issues}
           quiet={quiet}
+          converted={converted}
           completion={completion}
           changes={changed.length}
           saving={saving}
@@ -453,6 +489,7 @@ function Editor({
           canActivate={canSave && changed.length === 0 && ready.versions[0]?.isActive === false}
           canImport={canSave && creatorId !== null && changed.length === 0}
           imported={changed.length > 0 ? imported : null}
+          moved={moved}
           upcoming={upcoming}
           notice={notice}
           problem={problem}
@@ -467,10 +504,10 @@ function Editor({
           onImport={(file) => {
             void importFile(file);
           }}
-          onShowBlock={show}
-          onShowIssue={(issue) => {
-            show(issue.field);
+          onShowPanel={(panel) => {
+            show(`sheet.${panel}`);
           }}
+          onShow={show}
         />
         {foreign === null ? null : (
           <div className="nv-confirm" role="alertdialog" aria-labelledby="ps-foreign-text">
@@ -482,7 +519,7 @@ function Editor({
                 type="button"
                 className="nv-btn nv-btn--soft"
                 onClick={() => {
-                  take(foreign.persona, foreign.name);
+                  take(foreign.persona, foreign.moves, foreign.name);
                 }}
               >
                 L’importer quand même
@@ -522,8 +559,7 @@ function Editor({
             creatorName={creatorName}
             canMark={isOwner}
             onShowSection={(section) => {
-              // A panel of the format-2 sheet has no tab on this screen yet (ADR 0079): it stays where it is.
-              if (isBlockId(section)) select(tabOf(section));
+              show(`sheet.${panelOfCorrection(section)}`);
             }}
           />
         ) : null}
@@ -531,16 +567,12 @@ function Editor({
         <Tabs
           active={tab}
           errors={issueCountByTab(flagged)}
-          edited={(id) =>
-            id === 'in_depth'
-              ? IN_DEPTH_BLOCKS.some((block) => hasChange(changed, block))
-              : hasChange(changed, id)
-          }
+          edited={(id) => hasChange(changed, id)}
           onSelect={select}
         />
 
         <div
-          className="nv-plate ps-panel"
+          className="ps-tabpanel"
           role="tabpanel"
           id={`ps-panel-${tab}`}
           aria-labelledby={`ps-tab-${tab}`}
@@ -550,30 +582,32 @@ function Editor({
         >
           {/* A chatter reads her persona: every field shows, none takes a change. */}
           <fieldset className="ps-fieldset" disabled={!canSave}>
-            {tab === 'details' ? (
-              <DetailsTab {...props('details')} timezone={timezone} isOwner={isOwner} />
-            ) : null}
-            {tab === 'additional_info' ? <AdditionalInfoTab {...props('additional_info')} /> : null}
-            {tab === 'in_depth' ? (
-              <InDepthTab
-                issues={flagged}
-                missing={completion.missing}
-                sections={{
-                  lifestyle: <LifestyleTab {...props('lifestyle')} />,
-                  tastes: <TastesTab {...props('tastes')} />,
-                  intimate: <IntimateTab {...props('intimate')} />,
-                  writing_style: <WritingStyleTab {...props('writing_style')} />,
-                  sample_replies: <SampleRepliesTab {...props('sample_replies')} />,
+            {tab === 'sheet' ? (
+              <SheetPanels
+                sheet={draft.sheet}
+                onAnswer={(panel, key, value) => {
+                  change((current) => ({ ...current, sheet: withAnswer(current.sheet, panel, key, value) }));
                 }}
+                open={open}
+                onToggle={toggle}
+                timezone={timezone}
+                isOwner={isOwner}
               />
-            ) : null}
-            {tab === 'behavior' ? <BehaviorTab {...props('behavior')} /> : null}
-            {tab === 'strategies' ? <StrategiesTab {...props('strategies')} /> : null}
-            {tab === 'follow_ups' ? <FollowUpsTab {...props('follow_ups')} /> : null}
-            {tab === 'notifications' ? (
-              <NotificationsTab {...props('notifications')} isOwner={isOwner} />
-            ) : null}
-            {tab === 'limits' ? <LimitsTab {...props('limits')} /> : null}
+            ) : (
+              <FormContext.Provider value={agentForm}>
+                <div className="nv-plate ps-panel">
+                  <p className="ps-lead ps-agent-lead">
+                    Ce que le code applique pour elle, versionné avec sa fiche : l’agent le respecte à la
+                    lettre, quoi qu’il écrive.
+                  </p>
+                  <StrategiesTab {...agentProps('strategies')} />
+                  <FollowUpsTab {...agentProps('follow_ups')} />
+                  <NotificationsTab {...agentProps('notifications')} isOwner={isOwner} />
+                  <AgentBehaviorTab {...agentProps('behavior')} />
+                  <RulesTab {...agentProps('rules')} />
+                </div>
+              </FormContext.Provider>
+            )}
           </fieldset>
         </div>
         <SaveBar
@@ -678,7 +712,7 @@ function noteOf(ready: PersonaReady, known: boolean, upcoming: string): string {
   return `Chaque enregistrement crée une nouvelle version, inactive, et tu actives la nouvelle quand elle est prête. ${
     active === undefined
       ? 'Aucune version n’est active pour l’instant : l’agent n’écrit rien pour elle, et aucun message ne peut partir avant l’activation d’une version.'
-      : `Version active : ${active.version}. C’est avec elle que l’agent écrit ses brouillons.`
+      : `Version active\u00a0: ${active.version}. C’est avec elle que l’agent écrit ses brouillons.`
   }`;
 }
 
@@ -694,6 +728,7 @@ function Head({
   readOnly,
   issues,
   quiet,
+  converted,
   completion,
   changes,
   saving,
@@ -701,6 +736,7 @@ function Head({
   canActivate,
   canImport,
   imported,
+  moved,
   upcoming,
   notice,
   problem,
@@ -709,11 +745,11 @@ function Head({
   onReload,
   onReset,
   onImport,
-  onShowIssue,
-  onShowBlock,
+  onShow,
+  onShowPanel,
 }: {
   headRef: RefObject<HTMLDivElement | null>;
-  draft: Persona;
+  draft: Draft;
   ready: PersonaReady;
   known: boolean;
   /** Nothing can change here (a chatter): the state says so instead of what is still to fix. */
@@ -721,7 +757,9 @@ function Head({
   issues: readonly FieldIssue[];
   /** Her first version, nothing typed yet: what is missing is a step to take, not a fault (CREA-13). */
   quiet: boolean;
-  completion: PersonaCompletion;
+  /** Her newest version was stored at format 1 and opens converted: saving it stores it at format 2. */
+  converted: boolean;
+  completion: PersonaSheetCompletion;
   changes: number;
   saving: boolean;
   /** Why saving is not possible now, or null when it is. */
@@ -732,6 +770,7 @@ function Head({
   canImport: boolean;
   /** The file the draft comes from, while its import waits to be saved. */
   imported: string | null;
+  moved: Moved;
   /** The number the next save gives. */
   upcoming: string;
   notice: string | null;
@@ -741,10 +780,10 @@ function Head({
   onReload: () => void;
   onReset: () => void;
   onImport: (file: File) => void;
-  onShowIssue: (issue: FieldIssue) => void;
-  onShowBlock: (block: BlockId) => void;
+  onShow: (field: string) => void;
+  onShowPanel: (panel: PanelKey) => void;
 }): JSX.Element {
-  const name = draft.details.first_name.trim();
+  const name = nicknameOf(draft);
   const fileRef = useRef<HTMLInputElement>(null);
   const first = issues[0];
   const current = ready.versions[0];
@@ -771,13 +810,16 @@ function Head({
               ? { dot: 'ok', text: notice }
               : null;
   const created = fullDay(ready.persona.meta.created_at);
+  // What moved is said while it matters: her format-1 version not yet saved again, or a file not yet saved.
+  const showMoves =
+    moved.moves.length > 0 && (moved.file === null ? converted : imported !== null && changes > 0);
 
   return (
     <div className="nv-plate ps-head" ref={headRef}>
       <div className="ps-head__top">
         <div className="ps-head__who">
-          <h2 className="ps-title" data-placeholder={name === '' || isPlaceholder(name) ? 'true' : undefined}>
-            {name === '' || isPlaceholder(name) ? 'Prénom à remplir' : name}
+          <h2 className="ps-title" data-placeholder={name === '' ? 'true' : undefined}>
+            {name === '' ? 'Surnom à remplir' : name}
           </h2>
           <p className="ps-head__meta">
             {/* The example's own number and date are not hers: nothing is stored yet. */}
@@ -874,7 +916,7 @@ function Head({
             type="button"
             className="nv-btn nv-btn--plain nv-btn--sm ps-pop"
             onClick={() => {
-              onShowIssue(first);
+              onShow(first.field);
             }}
           >
             Voir le premier
@@ -883,11 +925,12 @@ function Head({
       </div>
       {imported === null ? null : (
         <p className="ps-muted ps-pop">
-          Importé de « {imported} » : relis chaque onglet avant d’enregistrer. Ce sera la version {upcoming},
+          Importé de « {imported} » : relis chaque panneau avant d’enregistrer. Ce sera la version {upcoming},
           inactive jusqu’à ce que tu l’actives.
         </p>
       )}
-      <Completion completion={completion} onShowBlock={onShowBlock} />
+      {showMoves ? <Moves moved={moved} upcoming={upcoming} onShow={onShow} /> : null}
+      <Completion completion={completion} onShowPanel={onShowPanel} />
       <p className="ps-muted" id="ps-save-note">
         {noteOf(ready, known, upcoming)}
       </p>
@@ -896,16 +939,74 @@ function Head({
 }
 
 /**
- * How much of her the agent can read (`personaCompletion`): the percent in ink beside a neutral gauge, on one line,
- * then the blocks still to write, each opening its place. Nothing is required: it says what is missing, never that a
- * save is blocked, and says nothing more once all is written.
+ * What a conversion to the new sheet put in a nearby question (ADR 0079 § 5): nothing is lost in silence. Folded
+ * behind one line, each move opens its field.
+ */
+function Moves({
+  moved,
+  upcoming,
+  onShow,
+}: {
+  moved: Moved;
+  upcoming: string;
+  onShow: (field: string) => void;
+}): JSX.Element {
+  const count = moved.moves.length;
+  const placed = plural(count, 'réponse a été placée', 'réponses ont été placées');
+  // « Relis-les » never splits at its hyphen, its colon never starts a line.
+  const reread = <span className="ps-nowrap">Relis-les</span>;
+  const lead =
+    moved.file === null ? (
+      <>
+        Sa dernière version suit l’ancienne fiche. Elle s’ouvre ici dans la nouvelle, et {placed} dans la
+        question la plus proche. {reread}
+        {`\u00a0: enregistrer en fait la version ${upcoming}.`}
+      </>
+    ) : (
+      <>
+        {`Ce fichier suit l’ancienne fiche\u00a0: ${placed} dans la question la plus proche. `}
+        {reread} avant d’enregistrer.
+      </>
+    );
+  return (
+    <details className="nv-disclosure ps-moves">
+      <summary>
+        <span className="nv-disclosure__title">Passage à la nouvelle fiche</span>
+        <span className="nv-disclosure__sum">{plural(count, 'réponse déplacée', 'réponses déplacées')}</span>
+      </summary>
+      <div className="nv-disclosure__body ps-moves__body">
+        <p className="ps-muted">{lead}</p>
+        <ul className="ps-moves__list">
+          {moved.moves.map((move, index) => (
+            <li key={`${move.from}-${String(index)}`}>
+              <button
+                type="button"
+                className="ps-completion__block"
+                onClick={() => {
+                  onShow(`sheet.${move.to.section}.${move.to.key}`);
+                }}
+              >
+                {moveLabel(move)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
+  );
+}
+
+/**
+ * How much of her sheet is answered, out of 59 (ADR 0079 § 6): the percent in ink beside a neutral gauge, on one line,
+ * then the panels with questions left, each opening its place. Nothing is required but three answers: it says what is
+ * missing, never that a save is blocked, and says nothing more once all is answered.
  */
 function Completion({
-  completion: { percent, missing },
-  onShowBlock,
+  completion: { percent, answered, total, missing },
+  onShowPanel,
 }: {
-  completion: PersonaCompletion;
-  onShowBlock: (block: BlockId) => void;
+  completion: PersonaSheetCompletion;
+  onShowPanel: (panel: PanelKey) => void;
 }): JSX.Element {
   return (
     <div className="ps-completion">
@@ -915,31 +1016,38 @@ function Completion({
         <span
           className="nv-gauge ps-completion__gauge"
           role="progressbar"
-          aria-label="Complétude de la persona"
+          aria-label="Complétude de la fiche"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
+          aria-valuetext={`${String(answered)} questions sur ${String(total)}`}
           style={{ '--nv-gauge-value': `${String(percent)}%` }}
         >
           <span className="nv-gauge__fill" />
         </span>
+        <span className="ps-completion__count">
+          {answered} sur {total}
+        </span>
       </p>
       {missing.length === 0 ? null : (
         <p className="ps-completion__missing">
-          <span className="ps-muted">À compléter :</span>
-          {missing.map(({ block, label }, index) => (
-            <span key={block}>
-              <button
-                type="button"
-                className="ps-completion__block"
-                onClick={() => {
-                  onShowBlock(block);
-                }}
-              >
-                {label}
-              </button>
-              {index < missing.length - 1 ? ', ' : null}
-            </span>
+          <span className="ps-muted">{'À compléter\u00a0:'}</span>
+          {missing.map(({ section, left }, index) => (
+            <Fragment key={section}>
+              {/* The space between two panels is where the line may break; each keeps its comma. */}{' '}
+              <span>
+                <button
+                  type="button"
+                  className="ps-completion__block"
+                  onClick={() => {
+                    onShowPanel(section);
+                  }}
+                >
+                  {panelTitle(section)} ({left})
+                </button>
+                {index < missing.length - 1 ? ',' : null}
+              </span>
+            </Fragment>
           ))}
         </p>
       )}
@@ -947,41 +1055,9 @@ function Completion({
   );
 }
 
-/** How far into a faded edge a tab may reach and still count as seen: past that, its count would be under the fade. */
-const EDGE = 48;
-
-/** The tabs out of the bar's view on each side, from its scroll and the places of its tabs. */
-export function tabsOutOfView(bar: HTMLElement): TabsHidden {
-  const from = bar.scrollLeft;
-  const to = from + bar.clientWidth;
-  const start: TabId[] = [];
-  const end: TabId[] = [];
-  if (bar.scrollWidth - bar.clientWidth <= 1) return { start, end };
-  const fadeStart = from > 1 ? EDGE : 0;
-  const fadeEnd = to < bar.scrollWidth - 1 ? EDGE : 0;
-  for (const item of bar.querySelectorAll<HTMLElement>('[data-tab]')) {
-    const id = TABS.find((t) => t.id === item.dataset['tab'])?.id;
-    if (id === undefined) continue;
-    if (item.offsetLeft < from + fadeStart - 1) start.push(id);
-    else if (item.offsetLeft + item.offsetWidth > to - fadeEnd + 1) end.push(id);
-  }
-  return { start, end };
-}
-
-interface TabsHidden {
-  readonly start: readonly TabId[];
-  readonly end: readonly TabId[];
-}
-
-const NONE_HIDDEN: TabsHidden = { start: [], end: [] };
-
-const reducedMotion = (): boolean =>
-  typeof window.matchMedia !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
 /**
- * The eight tabs of the persona on one line that scrolls (recette 28/10, CREA-01). What is past an edge is never
- * silent: that edge fades, a chevron brings the next tabs in, and it carries the amber count of the fields to fix in
- * the tabs it hides. The tab picked comes to the middle of the bar, its neighbours showing on both sides.
+ * Two tabs: her sheet and the agent's settings (ADR 0079 § 4). Each counts in amber what is left to fix in it, and a
+ * dot says it holds changes.
  */
 function Tabs({
   active,
@@ -997,59 +1073,17 @@ function Tabs({
   const navRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLSpanElement>(null);
   const placed = useRef(false);
-  const [hidden, setHidden] = useState<TabsHidden>(NONE_HIDDEN);
-
-  const measure = useCallback((): void => {
-    const bar = navRef.current;
-    if (bar === null) return;
-    const next = tabsOutOfView(bar);
-    setHidden((current) =>
-      current.start.join() === next.start.join() && current.end.join() === next.end.join() ? current : next,
-    );
-  }, []);
 
   useLayoutEffect(() => {
     const nav = navRef.current;
     const item = nav?.querySelector('[aria-selected="true"]');
     if (nav === null || !(item instanceof HTMLElement)) return;
     placeTabBarLens(nav, item, placed.current ? (thumbRef.current ?? undefined) : undefined);
-    const left = Math.max(0, item.offsetLeft - (nav.clientWidth - item.offsetWidth) / 2);
-    if (typeof nav.scrollTo === 'function') {
-      nav.scrollTo({ left, behavior: placed.current && !reducedMotion() ? 'smooth' : 'auto' });
-    }
     placed.current = true;
-    measure();
-  }, [active, measure]);
-
-  useEffect(() => {
-    const nav = navRef.current;
-    if (nav === null) return;
-    nav.addEventListener('scroll', measure, { passive: true });
-    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
-    resize?.observe(nav);
-    return () => {
-      nav.removeEventListener('scroll', measure);
-      resize?.disconnect();
-    };
-  }, [measure]);
-
-  const page = (side: 'start' | 'end'): void => {
-    const nav = navRef.current;
-    if (nav === null || typeof nav.scrollBy !== 'function') return;
-    const step = Math.max(120, nav.clientWidth * 0.7);
-    nav.scrollBy({ left: side === 'end' ? step : -step, behavior: reducedMotion() ? 'auto' : 'smooth' });
-  };
-  const more =
-    hidden.start.length > 0 && hidden.end.length > 0
-      ? 'both'
-      : hidden.start.length > 0
-        ? 'start'
-        : hidden.end.length > 0
-          ? 'end'
-          : undefined;
+  }, [active]);
 
   return (
-    <div className="ps-tabs" data-more={more}>
+    <div className="ps-tabs">
       <div className="nv-subnav ps-tabs__bar" role="tablist" aria-label="Sections de la persona" ref={navRef}>
         <span className="nv-subnav__thumb" ref={thumbRef} aria-hidden="true" />
         {TABS.map((tab) => (
@@ -1077,49 +1111,9 @@ function Tabs({
           </button>
         ))}
       </div>
-      <MoreTabs side="start" tabs={hidden.start} errors={errors} onPage={page} />
-      <MoreTabs side="end" tabs={hidden.end} errors={errors} onPage={page} />
     </div>
   );
 }
 
-/** The chevron over a faded edge: it names the tabs it hides, and counts in amber the fields to fix there. */
-function MoreTabs({
-  side,
-  tabs,
-  errors,
-  onPage,
-}: {
-  side: 'start' | 'end';
-  tabs: readonly TabId[];
-  errors: Record<TabId, number>;
-  onPage: (side: 'start' | 'end') => void;
-}): JSX.Element | null {
-  if (tabs.length === 0) return null;
-  const toFix = tabs.reduce((sum, id) => sum + errors[id], 0);
-  const names = tabs.map((id) => TABS.find((t) => t.id === id)?.label ?? id).join(', ');
-  const label = `${side === 'end' ? 'Onglets suivants' : 'Onglets précédents'} : ${names}${
-    toFix > 0 ? `, ${plural(toFix, 'champ', 'champs')} à corriger` : ''
-  }`;
-  return (
-    <button
-      type="button"
-      className="nv-glass nv-glass--thin ps-tabs__more ps-pop"
-      data-side={side}
-      aria-label={label}
-      title={label}
-      // Every tab is in the tab order already: the chevron is a shortcut for the pointer and the finger.
-      tabIndex={-1}
-      onClick={() => {
-        onPage(side);
-      }}
-    >
-      <span className="ps-tabs__chevron" aria-hidden="true" />
-      {toFix > 0 ? (
-        <span className="nv-subnav__count ps-tabs__alert" aria-hidden="true">
-          {toFix}
-        </span>
-      ) : null}
-    </button>
-  );
-}
+const textOrNull = (answer: Answer | undefined): string | null =>
+  typeof answer === 'string' ? answer : null;

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { ProposePersonaCorrectionBodySchema } from '@impera/contracts';
+import { ProposePersonaCorrectionBodySchema, type PersonaV2 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -9,36 +9,29 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import demoYaml from '../../../../personas/demo/v0.3.0.yaml?raw';
 
 import { MyPersonaPage } from './MyPersonaPage';
+import { parsePersonaYaml } from './persona/source';
 
 const CREATOR = '0199f2a0-0000-7000-8000-0000000000c1';
 
-/** An invented creator (ADR 0010): never a real one in a test. */
-const SHEET = {
-  details: {
-    first_name: 'Elena',
-    date_of_birth: '2000-04-12',
-    ethnicity: 'caucasian',
-    timezone: 'Europe/Paris',
-    languages: ['french'],
-    height_cm: 165,
-    weight_kg: null,
-    shoe_size_eu: null,
-    hair: null,
-    eyes: null,
-    bra: null,
-    hobbies: ['yoga'],
-    personality: ['taquine'],
+/** An invented creator (ADR 0010): the demo's sheet, her life left unwritten, a panel half written. */
+let DEMO: PersonaV2;
+const sheetOf = (demo: PersonaV2): PersonaV2['sheet'] => ({
+  ...demo.sheet,
+  lifestyle: {
+    ...demo.sheet.lifestyle,
+    ...Object.fromEntries(Object.keys(demo.sheet.lifestyle).map((key) => [key, null])),
   },
-  lifestyle: null,
-  tastes: { likes: ['les sushis'], dislikes: [] },
-  intimate: null,
-  writing_style: null,
-  sample_replies: [],
-  limits: { never_do: ['anal'], never_show: [], never_say: [], disgusts: ['pieds'] },
-};
+  preferences: { ...demo.sheet.preferences, favorite_books: null, religion: null },
+});
+
+beforeAll(async () => {
+  DEMO = await parsePersonaYaml(demoYaml);
+});
 
 let sheet: unknown;
 const asked: string[] = [];
@@ -79,7 +72,9 @@ function serve(): void {
         );
       }
       if (url.pathname === `/v1/creators/${CREATOR}/persona/mine`) {
-        return Promise.resolve(new Response(JSON.stringify({ creatorId: CREATOR, sheet, answers: null })));
+        return Promise.resolve(
+          new Response(JSON.stringify({ creatorId: CREATOR, sheet: null, answers: sheet })),
+        );
       }
       return Promise.resolve(new Response('{}', { status: 404 }));
     }),
@@ -121,7 +116,7 @@ beforeEach(() => {
   sent.length = 0;
   corrections = [];
   refuse = null;
-  sheet = SHEET;
+  sheet = sheetOf(DEMO);
   serve();
 });
 
@@ -133,10 +128,13 @@ afterEach(() => {
 describe('Moi › Persona (recette CREA-01)', () => {
   it('reads her sheet, in her words, with nothing to change and no word of the agent', async () => {
     renderPage();
-    expect(await screen.findByText('Qui tu es')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Identité et informations de base' })).toBeTruthy();
     expect(screen.getByText('Elena')).toBeTruthy();
-    expect(screen.getByText('les sushis')).toBeTruthy();
-    expect(screen.getByText('pieds')).toBeTruthy();
+    expect(screen.getByText('Français, Espagnol, Anglais')).toBeTruthy();
+    expect(screen.getByText(DEMO.sheet.boundaries.off_limits ?? '')).toBeTruthy();
+    // Her age, never her date of birth; her time zone is the agency's (Heures d'activité).
+    expect(screen.queryByText(/2001/u)).toBeNull();
+    expect(screen.queryByText('Fuseau horaire')).toBeNull();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByText(/enregistrer|activer/i)).toBeNull();
     expect(document.body.textContent).not.toMatch(/agent|IA\b|relance|stratégie|notification/i);
@@ -146,18 +144,27 @@ describe('Moi › Persona (recette CREA-01)', () => {
 
   it('leaves out what is not written, and says it once for a block with nothing', async () => {
     renderPage();
-    const life = await screen.findByRole('region', { name: 'Ta vie' });
+    const life = await screen.findByRole('region', { name: 'Mode de vie' });
     expect(life.textContent).toContain('Rien d’écrit pour l’instant.');
-    const limits = screen.getByRole('region', { name: 'Tes limites' });
-    expect(limits.textContent).toContain('Ce que tu ne fais jamais');
-    expect(limits.textContent).not.toContain('Ce que tu ne montres jamais');
-    expect(document.body.textContent).not.toMatch(/rien d’écrit$/mu);
-    expect(screen.getAllByText('Rien d’écrit pour l’instant.')).toHaveLength(3);
+    const tastes = screen.getByRole('region', { name: 'Préférences' });
+    expect(tastes.textContent).toContain('Passions');
+    expect(tastes.textContent).not.toContain('Livres préférés');
+    expect(tastes.textContent).not.toContain('Religion');
+    expect(screen.getAllByText('Rien d’écrit pour l’instant.')).toHaveLength(1);
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Identité et informations de base',
+      'Mode de vie',
+      'Préférences',
+      'Style de conversation',
+      'Relations',
+      'Intimité',
+      'Zones interdites',
+    ]);
   });
 
   it('sends a correction of one block to the agency, once, and shows it waiting there (CREA-01 b)', async () => {
     renderPage();
-    const tastes = await screen.findByRole('region', { name: 'Tes goûts' });
+    const tastes = await screen.findByRole('region', { name: 'Préférences' });
     fireEvent.click(within(tastes).getByRole('button', { name: 'Proposer une correction' }));
     const field = within(tastes).getByRole('textbox', { name: 'Ce qui ne te ressemble pas' });
     expect(document.activeElement).toBe(field);
@@ -171,7 +178,7 @@ describe('Moi › Persona (recette CREA-01)', () => {
     fireEvent.click(send);
     expect(await within(tastes).findByText('Plutôt le thé que le café.', { selector: 'p' })).toBeTruthy();
     expect(sent.map(({ section, text }) => [section, text])).toEqual([
-      ['tastes', 'Plutôt le thé que le café.'],
+      ['preferences', 'Plutôt le thé que le café.'],
     ]);
     expect(within(tastes).getByText(/Envoyée le 6\snov\. · l’agence la lit/)).toBeTruthy();
     expect(within(tastes).queryByRole('textbox')).toBeNull();
@@ -179,14 +186,14 @@ describe('Moi › Persona (recette CREA-01)', () => {
       within(tastes).getByRole('button', { name: 'Proposer une correction' }),
     );
     // Only under its block.
-    expect(screen.getByRole('region', { name: 'Tes limites' }).textContent).not.toContain('thé');
+    expect(screen.getByRole('region', { name: 'Zones interdites' }).textContent).not.toContain('thé');
     expect(document.body.textContent).not.toMatch(/agent|IA\b|relance|stratégie|notification/i);
   });
 
   it('says why a correction does not leave, and keeps what she typed', async () => {
     refuse = 429;
     renderPage();
-    const limits = await screen.findByRole('region', { name: 'Tes limites' });
+    const limits = await screen.findByRole('region', { name: 'Zones interdites' });
     fireEvent.click(within(limits).getByRole('button', { name: 'Proposer une correction' }));
     const field = within(limits).getByRole('textbox', { name: 'Ce qui ne te ressemble pas' });
     fireEvent.change(field, { target: { value: 'Plus de pieds du tout.' } });
@@ -197,7 +204,7 @@ describe('Moi › Persona (recette CREA-01)', () => {
 
   it('keeps what she typed when Échap closes the form, and drops it on « Annuler »', async () => {
     renderPage();
-    const life = await screen.findByRole('region', { name: 'Ta vie' });
+    const life = await screen.findByRole('region', { name: 'Mode de vie' });
     const open = () => {
       fireEvent.click(within(life).getByRole('button', { name: 'Proposer une correction' }));
       return within(life).getByRole('textbox');
@@ -211,7 +218,7 @@ describe('Moi › Persona (recette CREA-01)', () => {
     expect(sent).toEqual([]);
   });
 
-  it('shows a correction the agency handled as taken', async () => {
+  it('shows a correction the agency handled as taken, one of the former blocks under the panel that took it over', async () => {
     corrections = [
       {
         id: '0199f2a0-0000-7000-8000-00000000c0f1',
@@ -223,7 +230,7 @@ describe('Moi › Persona (recette CREA-01)', () => {
       },
     ];
     renderPage();
-    const who = await screen.findByRole('region', { name: 'Qui tu es' });
+    const who = await screen.findByRole('region', { name: 'Identité et informations de base' });
     expect(await within(who).findByText('Je fais du pilates, plus du yoga.')).toBeTruthy();
     expect(within(who).getByText(/^Prise en compte le /)).toBeTruthy();
   });
