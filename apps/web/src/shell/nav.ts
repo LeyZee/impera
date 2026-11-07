@@ -177,6 +177,7 @@ const SCREENS = {
   '/equipe/planning': 'Planning',
   '/equipe/rapports': 'Rapports',
   '/equipe/membres': 'Membres',
+  '/equipe/reveal': 'Reveal',
   '/paie/quinzaine': 'Quinzaine',
   '/paie/releves': 'Historique',
   '/paie/primes-malus': 'Primes et malus',

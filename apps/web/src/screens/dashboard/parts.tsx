@@ -55,8 +55,14 @@ interface TipContent {
 }
 
 export interface FloatingTip {
-  /** Spread on any element that explains itself on hover or focus. */
-  readonly bind: (content: TipContent) => {
+  /**
+   * Spread on any element that explains itself on hover or focus. `above` sets the tip over the element's top edge,
+   * at the pointer's x, so a chart's tip never sits over the text beside it.
+   */
+  readonly bind: (
+    content: TipContent,
+    options?: { readonly above?: boolean },
+  ) => {
     onPointerMove: (event: React.PointerEvent) => void;
     onPointerDown: (event: React.PointerEvent) => void;
     onPointerLeave: (event: React.PointerEvent) => void;
@@ -69,7 +75,12 @@ export interface FloatingTip {
 
 /** One floating `nv-tip` for the whole screen, placed under the pointer by `tipPlacement`. */
 export function useFloatingTip(): FloatingTip {
-  const [tip, setTip] = useState<{ content: TipContent; x: number; y: number } | null>(null);
+  const [tip, setTip] = useState<{
+    content: TipContent;
+    x: number;
+    y: number;
+    above?: boolean;
+  } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -80,8 +91,14 @@ export function useFloatingTip(): FloatingTip {
       { width: element.offsetWidth, height: element.offsetHeight },
       { width: window.innerWidth, height: window.innerHeight },
     );
-    element.style.left = `${String(place.left)}px`;
-    element.style.top = `${String(place.top)}px`;
+    // Above an element: centred on the pointer, kept inside the window.
+    const above = tip.above === true;
+    const top = above ? Math.max(12, tip.y - element.offsetHeight - 10) : place.top;
+    const left = above
+      ? Math.min(Math.max(12, tip.x - element.offsetWidth / 2), window.innerWidth - element.offsetWidth - 12)
+      : place.left;
+    element.style.left = `${String(left)}px`;
+    element.style.top = `${String(top)}px`;
   }, [tip]);
 
   const hide = useCallback(() => {
@@ -104,8 +121,17 @@ export function useFloatingTip(): FloatingTip {
     };
   }, [shown, hide]);
   const bind = useCallback(
-    (content: TipContent) => ({
+    (content: TipContent, options?: { readonly above?: boolean }) => ({
       onPointerMove: (event: React.PointerEvent) => {
+        if (options?.above === true) {
+          setTip({
+            content,
+            x: event.clientX,
+            y: event.currentTarget.getBoundingClientRect().top,
+            above: true,
+          });
+          return;
+        }
         setTip({ content, x: event.clientX, y: event.clientY });
       },
       // A finger has no hover: a tap shows the tip under the element, and the next tap anywhere hides it.

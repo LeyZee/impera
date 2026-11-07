@@ -2462,6 +2462,10 @@
   opacity: 1;
   transform: none;
 }
+/* A tip sits over text (a chart's neighbour, a figure's line): its glass is opaque, so nothing reads through it. */
+.nv-tip.nv-glass {
+  background: linear-gradient(180deg, var(--nv-glass-fill) 0%, transparent 40%), var(--nv-surface-raised);
+}
 .nv-tip__title {
   margin: 0 0 4px;
   font-size: var(--nv-text-footnote);

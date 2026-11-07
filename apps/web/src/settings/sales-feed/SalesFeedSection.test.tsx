@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
-import {
-  REAUTHENTICATION_ERROR_CODE,
-  TeamMemberSchema,
-  type SalesFeedOverview,
-  type SalesFeedStatus,
-  type TeamMember,
-} from '@impera/contracts';
+import { REAUTHENTICATION_ERROR_CODE, type SalesFeedOverview, type SalesFeedStatus } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -21,7 +22,6 @@ const refusalBody = (code: string, kind: string, message: string): object => ({
 
 const ACCOUNT_LUNE = '00000000-0000-4000-8000-00000000000a';
 const ACCOUNT_SOLEIL = '00000000-0000-4000-8000-00000000000b';
-const MEMBER_ANA = '00000000-0000-4000-8000-0000000000a1';
 
 function status(patch: Partial<SalesFeedStatus> = {}): SalesFeedStatus {
   return {
@@ -84,25 +84,6 @@ function overview(patch: Partial<SalesFeedOverview> = {}): SalesFeedOverview {
   };
 }
 
-const ANA: TeamMember = TeamMemberSchema.parse({
-  id: MEMBER_ANA,
-  userId: '00000000-0000-4000-8000-0000000000b1',
-  email: 'ana@example.test',
-  firstName: 'Ana',
-  lastName: 'Test',
-  displayName: 'Ana T.',
-  teamRole: 'chatter',
-  status: 'active',
-  country: 'BJ',
-  timeZone: 'Africa/Porto-Novo',
-  color: null,
-  joinedOn: '2026-01-01',
-  creatorIds: [],
-  commission: null,
-  invitationPending: false,
-  invitationExpiresAt: null,
-});
-
 const apiError = (code: string, message: string): object => ({
   error: { code, message, details: {}, requestId: 'req-1' },
 });
@@ -128,9 +109,20 @@ const ok =
 
 function renderSection(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const rootRoute = createRootRoute();
+  const page = createRoute({ getParentRoute: () => rootRoute, path: '/', component: SalesFeedSection });
+  const reveal = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/equipe/reveal',
+    component: () => null,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([page, reveal]),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  });
   render(
     <QueryClientProvider client={client}>
-      <SalesFeedSection />
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }
@@ -350,24 +342,21 @@ describe('Réglages › Ventes', () => {
     expect(put?.[1]?.body).toBe(JSON.stringify({ platformAccountId: ACCOUNT_LUNE }));
   });
 
-  it('links a platform team member to a team member, by the team’s list', async () => {
-    const fetch = serve({
+  it('sends the team’s links to Équipe › Reveal, with what waits there (ADR 0076)', async () => {
+    serve({
       [`GET ${BASE}`]: ok({ feeds: [status()] }),
       [`GET ${BASE}/reveal`]: ok(overview()),
-      'GET /v1/team/members': ok({ members: [ANA] }),
-      [`PUT ${BASE}/reveal/chatters/c1`]: ok(overview()),
+      [`GET ${BASE}/reveal/team/counts`]: ok({ newCount: 2, removalCount: 1, abnormalRead: false }),
     });
     renderSection();
-    const field = await screen.findByRole('combobox', { name: 'Lien de Ana Test' });
-    await waitFor(() => {
-      expect(within(openList(field)).getByRole('option', { name: 'Ana T.' })).toBeTruthy();
-    });
-    choose(field, 'Ana T.');
-    await waitFor(() => {
-      expect(fetch.mock.calls.some(([url]) => url === `${BASE}/reveal/chatters/c1`)).toBe(true);
-    });
-    const put = fetch.mock.calls.find(([url]) => url === `${BASE}/reveal/chatters/c1`);
-    expect(put?.[1]?.body).toBe(JSON.stringify({ kind: 'member', memberId: MEMBER_ANA }));
+    const plate = await screen.findByRole('region', { name: 'Équipe Reveal' });
+    expect(await within(plate).findByText('2 nouveaux chatteurs sur Reveal.')).toBeTruthy();
+    expect(within(plate).getByText('1 retiré de Reveal, toujours dans l’équipe.')).toBeTruthy();
+    expect(within(plate).getByRole('link', { name: 'Ouvrir Équipe › Reveal' }).getAttribute('href')).toBe(
+      '/equipe/reveal',
+    );
+    // The old list of links is gone from here: one place to link, the same for the owner and his managers.
+    expect(screen.queryByRole('combobox', { name: 'Lien de Ana Test' })).toBeNull();
   });
 
   it('tells a member who is not the owner that the page is the owner’s', async () => {

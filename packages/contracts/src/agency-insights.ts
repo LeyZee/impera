@@ -59,6 +59,42 @@ export const AgencyFiguresSchema = z.strictObject({
 });
 export type AgencyFigures = z.infer<typeof AgencyFiguresSchema>;
 
+/** A count the platform gives later (« en calcul »): null until it has computed it. */
+const later = count.nullable();
+
+/**
+ * One period's subscribers, PPV and messages, summed over the days the snapshot holds (ADR 0081). A field is null as
+ * soon as one of those days still waits for the platform to compute it.
+ */
+export const AgencySubscriberFiguresSchema = z.strictObject({
+  /** Active subscribers at the end of the period's last day (now, for today); null when that day is not read. */
+  activeAtEnd: later,
+  /** Active subscribers at the end of the day before the period; null when that day is not read. */
+  activeBefore: later,
+  newSubscribers: count,
+  unsubscribes: later,
+  renewals: later,
+  /** Paid messages sent, the fans a paid Mass DM targeted included. */
+  ppvSent: later,
+  ppvPurchased: count,
+  messagesSent: later,
+  messagesReceived: later,
+  /** Days of the period the snapshot holds for every account counted, and days of the period. */
+  daysRead: count,
+  days: count,
+});
+export type AgencySubscriberFigures = z.infer<typeof AgencySubscriberFiguresSchema>;
+
+export const AgencySubscribersSchema = z.strictObject({
+  current: AgencySubscriberFiguresSchema,
+  previous: AgencySubscriberFiguresSchema,
+  /** Every day of the period, in order: active subscribers at its end, null when not read for every account. */
+  days: z.array(z.strictObject({ day, active: later })),
+  /** When the platform was last read for the accounts counted. */
+  readAt: z.iso.datetime(),
+});
+export type AgencySubscribers = z.infer<typeof AgencySubscribersSchema>;
+
 export const AgencyInsightsSchema = z.strictObject({
   period: AgencyPeriodSchema,
   from: day,
@@ -133,5 +169,10 @@ export const AgencyInsightsSchema = z.strictObject({
   timeZone: z.string().min(1),
   /** A dollar line falls in the period and no rate is known: left out of every figure. */
   dollarsLeftOut: z.boolean(),
+  /**
+   * Subscribers, PPV and messages from the daily snapshot of the platform's statistics (ADR 0081), never money; null
+   * while the snapshot holds nothing for the creators counted.
+   */
+  subscribers: AgencySubscribersSchema.nullable(),
 });
 export type AgencyInsights = z.infer<typeof AgencyInsightsSchema>;

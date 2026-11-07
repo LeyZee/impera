@@ -2,7 +2,12 @@ import type { CreatorId } from '@impera/contracts';
 import type { RoleHealth } from '@impera/llm';
 
 import type { AppLlm } from '../llm';
-import { salesFeedTimeZone, salesFeedTotals, type ConnectorsModule } from '../modules/connectors';
+import {
+  dailyStatsOf,
+  salesFeedTimeZone,
+  salesFeedTotals,
+  type ConnectorsModule,
+} from '../modules/connectors';
 import type { ConversationsModule } from '../modules/conversations';
 import type { PayrollModule } from '../modules/payroll';
 import type { SchedulingModule } from '../modules/scheduling';
@@ -47,6 +52,8 @@ export function wireSupervision(
     // The one sum of the register (CRM-04 lot a): the sales panel reads it, never sums again.
     salesTotalsOf: salesFeedTotals.totalsOf,
     salesTimeZone: salesFeedTimeZone,
+    // The snapshot of the platforms' daily statistics (ADR 0081): subscribers, PPV and messages, never money.
+    dailyStatsOf,
     // Who is on shift on her now, for her card in the list of Créatrices: the planning's own read, without the margin.
     onShift: (creatorId, at) => deps.scheduling.onShift(creatorId, at),
     salesFeeds: deps.salesFeeds,
