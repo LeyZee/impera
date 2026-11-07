@@ -1,6 +1,6 @@
 # 0081. Les abonnés, les PPV envoyés et les messages se gardent en photo quotidienne lue chez la plateforme
 
-Statut : proposed (« go » de Charles le 07/11/2026, 13 h 09, pour le lot B de DSH-01 ; numéro attribué par le coordinateur ; § 3, § 5 et § 6 précisés après la relecture de Bilan, 13 h 20)
+Statut : accepted (« ok 0081 » de Charles le 07/11/2026, 13 h 50 ; « go » de Charles le 07/11/2026, 13 h 09, pour le lot B de DSH-01 ; numéro attribué par le coordinateur ; § 3, § 5 et § 6 précisés après la relecture de Bilan, 13 h 20)
 Date : 2026-11-07
 Précise : l'ADR 0078 § 6 (rien sur les abonnés tant que le lot B n'existe pas) et l'ADR 0050 (la clé d'agence lit la plateforme, le registre garde l'argent). Ne remplace rien.
 
