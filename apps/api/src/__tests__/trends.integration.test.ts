@@ -212,9 +212,9 @@ describe('/v1/trends', () => {
       url: 'https://www.instagram.com/reel/Cx1AbCdEf/',
       expiresAt: null,
     });
-    expect(
-      (await call('POST', '/v1/trends/links', cookies.chatter, link(ines, 'Cx2AbCdEf'))).statusCode,
-    ).toBe(200);
+    // A chatter never takes part in the watch (ADR 0060 § 2, amended 07/11).
+    const byChatter = await call('POST', '/v1/trends/links', cookies.chatter, link(ines, 'Cx2AbCdEf'));
+    expect([byChatter.statusCode, codeOf(byChatter)]).toEqual([403, 'trend_link_forbidden']);
 
     const hers = await call('POST', '/v1/trends/links', cookies.creator, link(nora, 'Cx3AbCdEf'));
     expect(hers.json()).toMatchObject({ created: true });
@@ -234,7 +234,7 @@ describe('/v1/trends', () => {
     const rows = await test.admin.db
       .select({ source: schema.trendSignals.source, creatorId: schema.trendSignals.creatorId })
       .from(schema.trendSignals);
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
     expect(rows.filter((row) => row.source === 'creator_link')).toEqual([
       { source: 'creator_link', creatorId: nora },
     ]);
@@ -289,6 +289,41 @@ describe('/v1/trends', () => {
     expect(audited.filter((row) => row.action === 'extension_link.revoke')).toHaveLength(2);
     for (const one of await liveLinks(cookies.creator))
       await call('DELETE', `/v1/trends/extension-links/${one.id}`, cookies.creator);
+  });
+
+  it('never lets a chatter take part in the watch, nor a manager once he is one (ADR 0060 § 2, amended 07/11)', async () => {
+    const refused = await call('POST', '/v1/trends/extension-links', cookies.chatter, { label: 'Chrome' });
+    expect([refused.statusCode, codeOf(refused)]).toEqual([403, 'extension_link_forbidden']);
+
+    // A manager links his browser, then becomes a chatter, then is away: his link no longer opens anything.
+    const cookie = await member('futur-chatteur@example.test', 'manager');
+    const token = await newToken(cookie, 'Edge');
+    expect((await readingsCreators(token)).length).toBeGreaterThan(0);
+    const [account] = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, 'futur-chatteur@example.test'));
+    if (account === undefined) throw new Error('no account');
+    const memberOf = eq(schema.teamMembers.userId, account.id);
+    await test.admin.db.update(schema.teamMembers).set({ teamRole: 'chatter' }).where(memberOf);
+    const asChatter = await server.inject({
+      method: 'GET',
+      url: '/v1/trends/readings/creators',
+      headers: { 'x-extension-link': token },
+    });
+    expect(asChatter.statusCode).toBe(401);
+    const paste = await call('POST', '/v1/trends/links', cookie, link(nora, 'Cx9AbCdEf'));
+    expect([paste.statusCode, codeOf(paste)]).toEqual([403, 'trend_link_forbidden']);
+    await test.admin.db
+      .update(schema.teamMembers)
+      .set({ teamRole: 'manager', status: 'on_leave' })
+      .where(memberOf);
+    const away = await server.inject({
+      method: 'GET',
+      url: '/v1/trends/readings/creators',
+      headers: { 'x-extension-link': token },
+    });
+    expect(away.statusCode).toBe(401);
   });
 
   it('tells the extension which creators its person may mark a post for', async () => {

@@ -5,6 +5,8 @@ import {
   EXTENSION_LINKS_LIVE_MAX,
   ExtensionLinkIdSchema,
   newId,
+  TeamMembershipSchema,
+  teamScopeFor,
   UserIdSchema,
   UserRoleSchema,
 } from '@impera/contracts';
@@ -54,8 +56,9 @@ async function revokeLive(tx: Transaction, actor: TrendActor, which: Condition):
 }
 
 /**
- * Who may hold a link, read in the base and never from the session: the owner, a member of the team who has not left,
- * a creator's account linked to one creator. `null` for anyone else (an account gone, a member who left).
+ * Who may hold a link, read in the base and never from the session: the owner, an active manager, a creator's account
+ * linked to one creator. `null` for anyone else: an account gone, a manager who left or is away, and a chatter, who
+ * never takes part in the watch (ADR 0060 § 2, amended 07/11).
  */
 async function holderOf(tx: Transaction, userId: string, lock: boolean): Promise<LinkHolder | null> {
   const query = tx
@@ -71,10 +74,17 @@ async function holderOf(tx: Transaction, userId: string, lock: boolean): Promise
   if (role.data === 'creator')
     return account?.creatorIds.length === 1 ? { userId: id, role: role.data } : null;
   const [member] = await tx
-    .select({ status: teamMembers.status })
+    .select({ teamRole: teamMembers.teamRole, status: teamMembers.status })
     .from(teamMembers)
     .where(eq(teamMembers.userId, userId));
-  return member === undefined || member.status === 'left' ? null : { userId: id, role: role.data };
+  const membership = TeamMembershipSchema.safeParse(
+    member === undefined ? null : { role: member.teamRole, status: member.status },
+  );
+  const scope = teamScopeFor(
+    role.data,
+    membership.success ? { teamRole: membership.data.role, status: membership.data.status } : null,
+  );
+  return scope === 'agency' ? { userId: id, role: role.data } : null;
 }
 
 /** `extension_links` through `withAdmin` (migration 0100): the application role cannot reach it. */
