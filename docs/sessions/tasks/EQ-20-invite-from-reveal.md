@@ -18,7 +18,7 @@ ADR 0076 (§ 3, § 4, § 5, § 10), ADR 0024 § Rôles, ADR 0050 § 5, `apps/api
 - [x] La route d'invitation, avec `recentLogin` : PR #643 de Bilan, fusionnée le 07/11 (`team.invites(connectors.invitationChatterLinks).fromPlatform`).
 - [x] Tests RLS sur la migration 0135 : « un manager hors de ses bornes » (§ 3 : rôle manager, son propre compte, un compte déjà créé, taux au-dessus du préréglage, part du net, ligne de rôle manager, chacun refusé par la base en 42501), « un manager contre lui-même » (§ 4 : jamais invité sur son propre compte Reveal ; les écritures directes sont dans `sales-feed-team` de Bilan), et l'invitation d'un manager dans ses bornes, de bout en bout.
 - [x] Afficher l'alerte de retrait (§ 5) : `GET /v1/team/platform-removals` (port `PlatformRemovals`, branché sur `connectors.teamRemovals` de #626), pastille ambre « Retiré de Reveal » sur sa ligne d'Équipe › Membres, ligne ambre sur sa fiche (date du retrait quand elle est connue ; le geste « Changer le statut » nommé au propriétaire seul) ; PR suivante.
-- [ ] Captures de l'alerte (Nuit et Jour, ordinateur et téléphone) vues par Charles avant fusion.
+- [x] Captures de l'alerte (Nuit et Jour, ordinateur et téléphone) vues par Charles avant fusion : « ok captures retrait », 07/11 13 h 50.
 
 ## Critères d'acceptation
 - Tests : alerte de retrait (route : propriétaire, manager, chatteur, créatrice, après effacement ; écran : pastille, ligne datée et sans date, mots du manager) ; bornes du domaine ; invitation du propriétaire, redemandée, compte déjà relié (membre ou agent), e-mail pris ; refus du manager avant toute écriture ; lien d'un manager (chatteur, `reset`, autre manager, mot de passe choisi, chatteur, manager suspendu) ; invitation qui ne remplace pas un mot de passe.
