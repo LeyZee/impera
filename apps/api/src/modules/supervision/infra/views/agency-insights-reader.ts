@@ -6,12 +6,21 @@ import {
   type Platform,
   type UserId,
 } from '@impera/contracts';
-import { sql, withTenantMember, type Database } from '@impera/db';
+import { sql, withTenantMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
-import type { AgencyCreatorRead } from '../../domain/agency-insights';
+import { shiftDay, type AgencyCreatorRead, type StatsDay } from '../../domain/agency-insights';
 
 import type { SalesTotalsOf } from './reveal-sales-reader';
+
+/**
+ * The connectors' `dailyStatsOf` (ADR 0081), given by the composition root: the snapshot of the platforms' daily
+ * statistics, read in the caller's transaction, under its RLS.
+ */
+export type DailyStatsOf = (
+  tx: Transaction,
+  range: { readonly from: string; readonly to: string },
+) => Promise<readonly StatsDay[]>;
 
 /** What the route reads of one creator: nothing out of the account's team scope, nothing before a register is linked. */
 type AgencyCreatorAnswer =
@@ -52,6 +61,7 @@ const FanSchema = z.array(
   }),
 );
 const CountSchema = z.array(z.object({ refunds: z.coerce.number().int().nonnegative() }));
+const AccountSchema = z.array(z.object({ id: z.string() }));
 const MemberSchema = z.array(z.object({ id: z.string(), display_name: z.string() }));
 
 /**
@@ -63,6 +73,7 @@ export function createAgencyInsightsReader(
   db: Database,
   totalsOf: SalesTotalsOf,
   timeZoneOf: (platform: Platform) => string | null,
+  statsOf: DailyStatsOf,
 ): AgencyInsightsReader {
   return {
     read: (creatorId, userId, range) =>
@@ -142,6 +153,20 @@ export function createAgencyInsightsReader(
                       and s.platform = r.platform and s.platform_sale_id = r.platform_sale_id)`)
           ).rows,
         );
+        // Her accounts' days in the statistics' snapshot, from the day before the previous period (its subscribers
+        // before it) to today. Kept to her own accounts, whatever the policy gives the transaction.
+        const mine = new Set(
+          AccountSchema.parse(
+            (
+              await tx.execute(
+                sql`select id::text as id from platform_accounts where creator_id = ${creatorId}::uuid`,
+              )
+            ).rows,
+          ).map((row) => row.id),
+        );
+        const stats = (await statsOf(tx, { from: shiftDay(range.previousFrom, -1), to: range.to })).filter(
+          (line) => mine.has(line.platformAccountId),
+        );
         return {
           kind: 'read',
           read: {
@@ -163,6 +188,7 @@ export function createAgencyInsightsReader(
               seenBefore: row.seen_before,
             })),
             refundsWithoutSale: orphans?.refunds ?? 0,
+            stats,
           },
         };
       }),

@@ -176,3 +176,74 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(screen.queryByRole('heading')).toBeNull();
   });
 });
+
+describe('Les abonnés (ADR 0081)', () => {
+  it('shows active subscribers, their change, the counts and when Reveal was read', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    expect(await screen.findByRole('heading', { name: /Les abonnés/u })).toBeTruthy();
+    expect(screen.getByText('Abonnés actifs')).toBeTruthy();
+    // 1 284 now, 1 231 the day before the week.
+    expect(screen.getByText('+53', { selector: 'b' })).toBeTruthy();
+    expect(screen.getByText('Désabonnements')).toBeTruthy();
+    // 96 new, 43 gone.
+    expect(screen.getByText('+53', { selector: '.ins-tile__value' })).toBeTruthy();
+    expect(screen.getByText('18 %')).toBeTruthy();
+    expect(screen.getByText(/74 achetés sur 412 envoyés, Mass DM compris/u)).toBeTruthy();
+    expect(screen.getByText(/Lu chez Reveal à/u)).toBeTruthy();
+    expect(
+      screen.getByRole('img', { name: /Abonnés actifs jour par jour, de 1\s236 à 1\s284/u }),
+    ).toBeTruthy();
+  });
+
+  it('says a count is still computed and how many days are read, never a zero', async () => {
+    const subscribers = AGENCY_WEEK.subscribers;
+    if (subscribers === null) throw new Error('fixture');
+    serve(200, {
+      ...AGENCY_WEEK,
+      subscribers: {
+        ...subscribers,
+        current: { ...subscribers.current, unsubscribes: null, messagesSent: null, daysRead: 5 },
+        days: subscribers.days.map((one, i) => (i === 3 ? { ...one, active: null } : one)),
+      },
+    });
+    show();
+    expect(await screen.findByRole('heading', { name: /Les abonnés/u })).toBeTruthy();
+    expect(screen.getAllByText('en calcul chez Reveal').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/5 jours lus sur 7/u)).toBeTruthy();
+    expect(screen.getByRole('img', { name: /1 jour pas encore lu/u })).toBeTruthy();
+  });
+
+  it('compares the PPV purchase rate in points, never a percent of a percent', async () => {
+    const subscribers = AGENCY_WEEK.subscribers;
+    if (subscribers === null) throw new Error('fixture');
+    serve(200, {
+      ...AGENCY_WEEK,
+      subscribers: { ...subscribers, previous: { ...subscribers.previous, ppvSent: 400, ppvPurchased: 88 } },
+    });
+    show();
+    expect(await screen.findByText('Achat des PPV')).toBeTruthy();
+    // 18 % now (74 on 412), 22 % before (88 on 400).
+    expect(screen.getByText(/−4\spts/u)).toBeTruthy();
+  });
+
+  it('compares nothing to a period before that is only partly read', async () => {
+    const subscribers = AGENCY_WEEK.subscribers;
+    if (subscribers === null) throw new Error('fixture');
+    serve(200, {
+      ...AGENCY_WEEK,
+      subscribers: { ...subscribers, previous: { ...subscribers.previous, daysRead: 2 } },
+    });
+    show();
+    const heading = await screen.findByRole('heading', { name: /Les abonnés/u });
+    const block = heading.closest('section');
+    if (block === null) throw new Error('section');
+    expect(block.querySelectorAll('.nv-delta')).toHaveLength(0);
+  });
+
+  it('waits for the first read when the snapshot is empty', async () => {
+    serve(200, { ...AGENCY_WEEK, subscribers: null });
+    show();
+    expect(await screen.findByText(/première lecture des statistiques de Reveal/u)).toBeTruthy();
+  });
+});

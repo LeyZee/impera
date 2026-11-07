@@ -1,5 +1,6 @@
 import {
   AgencyInsightsSchema,
+  calendarDayAt,
   CreatorIdSchema,
   newId,
   PlatformAccountIdSchema,
@@ -9,7 +10,7 @@ import {
   type PlatformAccountId,
   type TeamMemberId,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -226,6 +227,8 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     // One fan, who bought ten days ago too: paying, not new; what he spent less the refund of his sale.
     expect(result.fans).toMatchObject({ paying: 1, newPaying: 0, averagePerPayingMinor: 6000 });
     expect(result.refundsWithoutSale).toBe(1);
+    // Nothing in the photo of the statistics yet: no subscriber figure, never a zero (ADR 0081).
+    expect(result.subscribers).toBeNull();
     // Never the fan: neither his id at the platform nor anything of his.
     expect(JSON.stringify(result)).not.toMatch(/fan_test_01/u);
 
@@ -273,5 +276,35 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     expect((await get('manager', `period=day&creatorId=${elsewhere}`)).statusCode).toBe(403);
     expect((await get('creator')).statusCode).toBe(403);
     expect((await get('creator', `period=day&creatorId=${creatorId}`)).statusCode).toBe(403);
+  });
+
+  it('adds the photo of the daily statistics: subscribers for the owner and a manager, never a creator (ADR 0081)', async () => {
+    const today = calendarDayAt(new Date(), 'Europe/Paris');
+    const shift = (days: number): string =>
+      new Date(Date.parse(`${today}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+    // Yesterday, then today with the messages still computed by the platform.
+    await test.admin.db.execute(sql`
+      insert into platform_daily_stats (platform, platform_account_id, creator_id, day, new_subscribers,
+        unsubscribes, active_subscribers, renewals, ppv_sent, ppv_purchased, messages_sent, messages_received, read_at)
+      values ('reveal', ${accountId}::uuid, ${creatorId}::uuid, ${shift(-1)}::date, 4, 1, 120, 2, 10, 3, 40, 50, now()),
+             ('reveal', ${accountId}::uuid, ${creatorId}::uuid, ${today}::date, 5, 2, 123, 1, 12, 4, null, 30, now())`);
+    const week = await agency('owner', 'period=week');
+    expect(week.subscribers?.current).toMatchObject({
+      activeAtEnd: 123,
+      newSubscribers: 9,
+      unsubscribes: 3,
+      renewals: 3,
+      ppvSent: 22,
+      ppvPurchased: 7,
+      messagesSent: null,
+      messagesReceived: 80,
+      daysRead: 2,
+      days: 7,
+    });
+    expect(week.subscribers?.days.at(-1)).toEqual({ day: today, active: 123 });
+    // The day before yesterday is not read: the start of the day's change is unknown, never zero.
+    expect((await agency('owner', 'period=day')).subscribers?.current.activeBefore).toBe(120);
+    expect((await agency('manager', 'period=week')).subscribers?.current.activeAtEnd).toBe(123);
+    expect((await get('creator', 'period=week')).statusCode).toBe(403);
   });
 });
