@@ -882,9 +882,66 @@
 /* The glass pill around a section's tabs: it stays put while the tabs scroll inside it on a phone. */
 .nv-subnav-pill {
   --_radius: var(--nv-radius-full);
+  position: relative;
   display: inline-flex;
   min-width: 0;
   max-width: 100%;
+}
+/* More tabs past an edge (a phone): a chevron sits over the faded edge and pages to them. The button is the 44 px
+   touch target, clear; the glass inside it stays 34 px (touch targets). */
+.nv-subnav-pill > .nv-subnav__more {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--nv-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.nv-subnav__more[data-side='start'] {
+  left: -1px;
+}
+.nv-subnav__more[data-side='end'] {
+  right: -1px;
+}
+.nv-subnav__more:focus-visible {
+  outline: none;
+}
+.nv-subnav__more:focus-visible > .nv-subnav__lens {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.nv-subnav__lens {
+  --_radius: var(--nv-radius-full);
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  transition: transform var(--nv-dur-fast) var(--nv-ease-spring);
+}
+.nv-subnav__more:hover > .nv-subnav__lens {
+  transform: scale(1.06);
+}
+.nv-subnav__more:active > .nv-subnav__lens {
+  transform: scale(0.94);
+}
+.nv-subnav__chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 1.75px solid currentColor;
+  border-bottom: 1.75px solid currentColor;
+  transform: translateX(-2px) rotate(-45deg);
+}
+.nv-subnav__more[data-side='start'] .nv-subnav__chevron {
+  transform: translateX(2px) rotate(135deg);
 }
 .nv-subnav {
   --_radius: var(--nv-radius-full);
