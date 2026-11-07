@@ -1,4 +1,10 @@
-import type { ConnectionService, ConnectionSignal, JobPayload, TeamPlatformRemoval } from '@impera/contracts';
+import type {
+  ConnectionService,
+  ConnectionSignal,
+  JobPayload,
+  SalesFeedStatus,
+  TeamPlatformRemoval,
+} from '@impera/contracts';
 import type { Database, EncryptionKey } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -141,6 +147,8 @@ export interface ConnectorsModule {
    * keeps it to the owner and the active managers.
    */
   readonly salesFeedTeamRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
+  /** Every platform's feed as Réglages › Ventes shows it, never the key: the Dashboard names a stopped one (AGT-11). */
+  readonly salesFeedStates: () => Promise<SalesFeedStatus[]>;
   /**
    * The link an invitation from the review poses (ADR 0076 § 3), for `team`'s port: run in the inviter's own
    * transaction, under the policies of migration 0135.
@@ -261,6 +269,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedTeamRoutes: (guard) => createSalesFeedTeamRoutes(salesFeeds.team, guard),
+    salesFeedStates: () => salesFeeds.list(),
     invitationChatterLinks,
     teamRemovals: (userId) => salesFeeds.team.removals(userId),
     salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),

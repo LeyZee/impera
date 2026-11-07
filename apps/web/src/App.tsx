@@ -11,7 +11,7 @@ import { Unreachable } from './auth/Unreachable';
 import { WelcomePage } from './auth/WelcomePage';
 import { linkPageOf } from './auth/api';
 import { forgetChosenPassword } from './auth/chosen-password';
-import { readSession, signOut } from './auth/session';
+import { readSession, SessionServerError, signOut } from './auth/session';
 import { watchSessionEnd } from './auth/session-end';
 import { forgetDevice } from './pwa/device';
 import { keepSession, keptSession } from './pwa/keptSession';
@@ -24,7 +24,7 @@ import { railOf } from './shell/nav';
 type Session =
   | { status: 'loading' }
   /** `attempt` counts the failed reads in a row, so the next one waits a little longer. */
-  | { status: 'unreachable'; attempt: number }
+  | { status: 'unreachable'; attempt: number; answered: boolean }
   | { status: 'signed_out' }
   /** Signed in with the password, the code not active yet: the activation is the only screen (ADR 0046). */
   | { status: 'second_factor_required' }
@@ -79,7 +79,9 @@ export function App(): JSX.Element {
             : { status: current.kind },
         );
       },
-      () => {
+      (error: unknown) => {
+        // It answered with an error of its own: up, but failing; said apart from a server that does not answer (EXT-12).
+        const answered = error instanceof SessionServerError;
         setSession((before) => {
           const attempt =
             before.status === 'unreachable' || before.status === 'offline' ? before.attempt + 1 : 0;
@@ -88,7 +90,7 @@ export function App(): JSX.Element {
           if (kept !== null) return { status: 'offline', user: kept, attempt };
           // Back on the network while it was open offline: it stays open, and asks again.
           if (before.status === 'offline') return { ...before, attempt };
-          return { status: 'unreachable', attempt };
+          return { status: 'unreachable', attempt, answered };
         });
       },
     );
@@ -201,7 +203,7 @@ export function App(): JSX.Element {
       </main>
     );
   }
-  if (session.status === 'unreachable') return <Unreachable />;
+  if (session.status === 'unreachable') return <Unreachable answered={session.answered} />;
   if (session.status === 'signed_out') {
     return (
       <SignInPage

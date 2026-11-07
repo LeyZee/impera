@@ -188,6 +188,7 @@ describe('DashboardPage on the server’s data', () => {
           ],
           usd: { seen: false, rate: null },
           refundsWithoutSale: 1,
+          stopped: [],
         },
       }),
     });
@@ -223,6 +224,7 @@ describe('DashboardPage on the server’s data', () => {
           bySeller: null,
           usd: { seen: false, rate: null },
           refundsWithoutSale: 0,
+          stopped: [],
         },
       }),
     });

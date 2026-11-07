@@ -100,6 +100,8 @@ export function createDrizzleReadingStore(db: Database): ReadingStore {
     tx
       .select({ id: creators.id, displayName: creators.displayName })
       .from(creators)
+      // An archived creator is out of every list (ADR 0071 § 2): nothing is marked for her (EXT-09).
+      .where(sql`${creators.archivedAt} is null`)
       .orderBy(creators.displayName)
       .then((rows) =>
         rows.map((row) => ({ id: CreatorIdSchema.parse(row.id), displayName: row.displayName })),

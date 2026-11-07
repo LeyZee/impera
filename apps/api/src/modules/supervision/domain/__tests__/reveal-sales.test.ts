@@ -49,6 +49,7 @@ const totals = (rows: SalesTotalsRow[], refundsWithoutSale = 0): SalesTotals => 
 describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
   it('sums the platform’s amounts as they are, by seller in four kinds, the largest revenue first', () => {
     const panel = revealSalesPanel({
+      feeds: [],
       platforms: ['reveal'],
       totals: totals([
         row({ kind: 'member', memberId: THEO }),
@@ -97,6 +98,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
 
   it('takes a refund off, so a seller’s period can be negative, and counts the refunds older than the register apart', () => {
     const panel = revealSalesPanel({
+      feeds: [],
       platforms: ['reveal'],
       totals: totals(
         [
@@ -125,6 +127,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
 
   it('gives a chatter the totals and never who sold (ADR 0043 § 7)', () => {
     const panel = revealSalesPanel({
+      feeds: [],
       platforms: ['reveal'],
       totals: totals([row({ kind: 'member', memberId: THEO }), row({ kind: 'agent' })]),
       rate: null,
@@ -137,6 +140,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
 
   it('names a member it cannot read « Membre inconnu », never an empty label', () => {
     const panel = revealSalesPanel({
+      feeds: [],
       platforms: ['reveal'],
       totals: totals([row({ kind: 'member', memberId: THEO })]),
       rate: null,
@@ -174,6 +178,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
     ];
     // 0,925 € for a dollar: 10,01 $ is 9,259 €, rounded to 9,26 €, the refund to −9,26 €.
     const rated = revealSalesPanel({
+      feeds: [],
       platforms: ['reveal'],
       totals: totals([row({ kind: 'agent' }), ...usd]),
       rate: { day: '2026-10-31', rateMicros: 925_000 },
@@ -187,6 +192,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
     expect(rated.usd).toEqual({ seen: true, rate: { day: '2026-10-31' } });
 
     const unrated = revealSalesPanel({
+      feeds: [],
       platforms: ['reveal'],
       totals: totals([row({ kind: 'agent' }), ...usd]),
       rate: null,
@@ -203,5 +209,45 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
     expect(salesDays('day', now, 'Europe/Paris')).toEqual({ from: '2026-11-03', to: '2026-11-03' });
     expect(salesDays('week', now, 'Europe/Paris')).toEqual({ from: '2026-10-28', to: '2026-11-03' });
     expect(salesDays('month', now, 'America/Montreal')).toEqual({ from: '2026-10-04', to: '2026-11-02' });
+  });
+
+  it('names her platforms whose reading stopped, with Réglages’ sentence and the last read (AGT-11)', () => {
+    const reveal = {
+      platform: 'reveal' as const,
+      state: 'needs_reconnect' as const,
+      message: 'La lecture des ventes est arrêtée : reconnecte la clé.',
+      lastReadAt: '2026-11-02T08:00:00.000Z',
+    };
+    const feeds = [
+      reveal,
+      {
+        platform: 'onlyfans' as const,
+        state: 'needs_reconnect' as const,
+        message: 'Arrêtée',
+        lastReadAt: null,
+      },
+    ];
+    const panel = revealSalesPanel({
+      feeds,
+      platforms: ['reveal'],
+      totals: totals([]),
+      rate: null,
+      names: null,
+    });
+    expect(panel.stopped).toEqual([
+      {
+        platform: 'reveal',
+        message: 'La lecture des ventes est arrêtée : reconnecte la clé.',
+        lastReadAt: '2026-11-02T08:00:00.000Z',
+      },
+    ]);
+    const connected = revealSalesPanel({
+      feeds: [{ ...reveal, state: 'connected' as const, message: 'Connectée' }],
+      platforms: ['reveal'],
+      totals: totals([]),
+      rate: null,
+      names: null,
+    });
+    expect(connected.stopped).toEqual([]);
   });
 });
