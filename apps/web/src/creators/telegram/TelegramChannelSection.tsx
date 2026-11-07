@@ -443,17 +443,22 @@ function ChannelForm({
               <span aria-hidden="true">+</span> Ajouter un lien
             </button>
           )}
-          <Segment
-            label="Forme du lien"
-            options={[
-              { value: 'label', label: 'Un texte en lien' },
-              { value: 'bare', label: 'L’adresse nue' },
-            ]}
-            value={draft.linkForm}
-            onChange={(linkForm) => {
-              edit({ ...draft, linkForm });
-            }}
-          />
+          <div className="tc-row">
+            <span className="tc-row__label" aria-hidden="true">
+              Forme du lien
+            </span>
+            <Segment
+              label="Forme du lien"
+              options={[
+                { value: 'label', label: 'Un texte en lien' },
+                { value: 'bare', label: 'L’adresse nue' },
+              ]}
+              value={draft.linkForm}
+              onChange={(linkForm) => {
+                edit({ ...draft, linkForm });
+              }}
+            />
+          </div>
           {draft.linkForm === 'label' ? (
             <LabelField
               value={draft.linkLabel}
