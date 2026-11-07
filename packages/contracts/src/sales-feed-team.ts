@@ -165,8 +165,11 @@ export type TeamImportDismissalBody = z.infer<typeof TeamImportDismissalBodySche
 /**
  * `POST /v1/settings/sales-feeds/:platform/team/:platformChatterId/invitation` (§ 3), password asked again: the member
  * and the link in one transaction. A manager: `teamRole` `chatter`, a `presetId` in effect, no team share, creators of
- * his own list only. 201 with the member (played again: the same member); 409 `member_conflict` for an e-mail taken
- * by another member, or an account already linked to another member (`team`'s route, ADR 0076 § 3).
+ * his own list only, else 403 `role_forbidden`. 201 with the member (played again: the same member); 409
+ * `member_conflict` for an e-mail taken by another member, or an account already linked to another member. The
+ * account is read live first: 403 `sales_feed_external_invite_forbidden` for a provider's (§ 2), 422
+ * `sales_feed_chatter_unprocessable` for one the platform no longer lists, 503 `sales_feed_list_unavailable` while
+ * the list does not answer. Checked by `connectors`, made by `team` (ADR 0076 § 3).
  */
 export const TeamImportInvitationBodySchema = CreateTeamMemberBodySchema;
 export type TeamImportInvitationBody = z.infer<typeof TeamImportInvitationBodySchema>;
