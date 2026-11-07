@@ -829,7 +829,9 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
       : current.activeAtEnd - current.activeBefore;
   const net = current.unsubscribes === null ? null : current.newSubscribers - current.unsubscribes;
   const rate = ppvRate(current.ppvSent, current.ppvPurchased);
-  const rateBefore = ppvRate(previous.ppvSent, previous.ppvPurchased);
+  // A comparison needs the whole period before, read: a half-read one would show a false +700 % (ADR 0081 § 4).
+  const comparable = previous.daysRead === previous.days;
+  const rateBefore = comparable ? ppvRate(previous.ppvSent, previous.ppvPurchased) : null;
   const tiles: readonly {
     label: string;
     value: string;
@@ -841,14 +843,14 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
       label: 'Nouveaux abonnés',
       value: countText(current.newSubscribers),
       note: 'gratuits et payants, sans les renouvellements',
-      delta: previous.daysRead > 0 ? [current.newSubscribers, previous.newSubscribers] : null,
+      delta: comparable ? [current.newSubscribers, previous.newSubscribers] : null,
     },
     {
       label: 'Désabonnements',
       value: countText(current.unsubscribes),
       note: current.unsubscribes === null ? LATER : 'comptés le jour de l’échéance, pas du clic',
       delta:
-        current.unsubscribes === null || previous.unsubscribes === null || previous.daysRead === 0
+        current.unsubscribes === null || previous.unsubscribes === null || !comparable
           ? null
           : [current.unsubscribes, previous.unsubscribes],
       lowerIsBetter: true,
@@ -864,7 +866,7 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
       value: countText(current.renewals),
       note: current.renewals === null ? LATER : 'abonnements reconduits',
       delta:
-        current.renewals === null || previous.renewals === null || previous.daysRead === 0
+        current.renewals === null || previous.renewals === null || !comparable
           ? null
           : [current.renewals, previous.renewals],
     },
@@ -885,7 +887,7 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
           ? LATER
           : `envoyés, pour ${countText(current.messagesReceived)} reçus des fans`,
       delta:
-        current.messagesSent === null || previous.messagesSent === null || previous.daysRead === 0
+        current.messagesSent === null || previous.messagesSent === null || !comparable
           ? null
           : [current.messagesSent, previous.messagesSent],
     },

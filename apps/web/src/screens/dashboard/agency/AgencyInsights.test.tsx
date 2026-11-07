@@ -194,6 +194,20 @@ describe('Les abonnés (ADR 0081)', () => {
     expect(screen.getByText(/5 jours lus sur 7/u)).toBeTruthy();
   });
 
+  it('compares nothing to a period before that is only partly read', async () => {
+    const subscribers = AGENCY_WEEK.subscribers;
+    if (subscribers === null) throw new Error('fixture');
+    serve(200, {
+      ...AGENCY_WEEK,
+      subscribers: { ...subscribers, previous: { ...subscribers.previous, daysRead: 2 } },
+    });
+    show();
+    const heading = await screen.findByRole('heading', { name: /Les abonnés/u });
+    const block = heading.closest('section');
+    if (block === null) throw new Error('section');
+    expect(block.querySelectorAll('.nv-delta')).toHaveLength(0);
+  });
+
   it('waits for the first read when the snapshot is empty', async () => {
     serve(200, { ...AGENCY_WEEK, subscribers: null });
     show();
