@@ -1,6 +1,6 @@
 # CRM-08 Revue de l'équipe Reveal : l'écran (ADR 0076)
 
-Statut : in_progress (ADR 0076 acceptée par Charles le 06/11/2026, 18 h 07 ; routes de Bilan #626 et #643, invitation et alerte d'Équipe EQ-20)
+Statut : done (ADR 0076 acceptée par Charles le 06/11/2026, 18 h 07 ; routes de Bilan #626 et #643, invitation et alerte d'Équipe EQ-20)
 Phase : API CRM (ADR 0050, ADR 0076)
 Dépend de : `GET/POST /v1/settings/sales-feeds/:platform/team…` (Bilan), l'invitation depuis une proposition (Équipe, EQ-20)
 Branche : claude/extension-reveal-playground-45axcj
@@ -20,7 +20,7 @@ ADR 0076 (§ 1 à § 7), ADR 0050 § 5, ADR 0024 § Rôles, `packages/contracts/
 - [x] Repli « Bots et comptes écartés » : un compte écarté se reprend ; les bots des clés d'API y sont, cochés sur « Personne ».
 - [x] Lecture anormale et liste absente dites en ambre ; les liens restent.
 - [x] Réglages › Ventes : la liste des liens de l'équipe laisse la place à un renvoi vers Équipe › Reveal, avec ses compteurs.
-- [ ] Captures Nuit et Jour, ordinateur et téléphone, vues par Charles avant fusion.
+- [x] Captures Nuit et Jour, ordinateur et téléphone, vues par Charles avant fusion (« ok captures equipe-reveal », 07/11/2026, 15 h 18).
 
 ## Critères d'acceptation
 - Tests : règles de l'écran (`reveal.test.ts`) ; écran (`RevealPage.test.tsx` : lot sans invitation et refus d'une ligne, retrait et ligne du manager sans geste, options bornées par `actions`, écarter et reprendre, invitation d'un manager bornée avec mot de passe redemandé, phrase du serveur, lecture anormale, accès refusé) ; Réglages › Ventes renvoie vers Équipe › Reveal.
