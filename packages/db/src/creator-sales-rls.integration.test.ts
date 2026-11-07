@@ -117,6 +117,7 @@ describe('a creator’s own sales (CRM-04 lot d): her view, nothing of who sold'
   let ines: Creator;
   const creatorUser = newId(UserIdSchema);
   const operator = newId(UserIdSchema);
+  const owner = newId(UserIdSchema);
   /** A card of Ines's creator on Nora's account, `fan-x`: the view's join on `creator_id` is what keeps it out. */
   const strayCard = newId(FanIdSchema);
 
@@ -141,6 +142,7 @@ describe('a creator’s own sales (CRM-04 lot d): her view, nothing of who sold'
           role: 'operator',
           creatorIds: [nora.creatorId],
         },
+        { id: owner, name: 'Owner', email: 'owner@example.test', role: 'owner', creatorIds: [] },
       ]);
       await tx.insert(s.teamMembers).values({
         id: member,
@@ -309,12 +311,23 @@ describe('a creator’s own sales (CRM-04 lot d): her view, nothing of who sold'
       Promise.all(agencyTables.map((table) => count(tx, table))),
     );
     expect(asMember).toEqual([1, 1, 1]);
-    const asJob = await withTenant(test.app.db, nora.creatorId, async (tx) => {
+    // The links are written as the owner (or an active manager), through `withMember` (ADR 0076 § 4).
+    const asOwner = await withMember(test.app.db, owner, async (tx) => {
       await tx
         .insert(s.salesFeedChatters)
         .values({ platform: 'reveal', platformChatterId: 'chatter-3', kind: 'agent' });
       return count(tx, 'sales_feed_chatters');
     });
-    expect(asJob).toBe(2);
+    expect(asOwner).toBe(2);
+    // Outside a member's transaction no scope is set, and nothing is written.
+    expect(
+      await failure(
+        withTenant(test.app.db, nora.creatorId, (tx) =>
+          tx
+            .insert(s.salesFeedChatters)
+            .values({ platform: 'reveal', platformChatterId: 'chatter-4', kind: 'agent' }),
+        ),
+      ),
+    ).toMatch(/row-level security/u);
   });
 });

@@ -31,6 +31,7 @@ import type {
   DashboardReader,
   OnShiftView,
   RevealSalesView,
+  SalesFeedState,
   TelegramView,
   UsdRateView,
   VoiceVersion,
@@ -59,6 +60,8 @@ export interface DashboardRouteDeps {
   readonly overview: CreatorOverviewView;
   /** Who is on shift on her accounts now (`scheduling`), read as the system. */
   readonly onShift: OnShiftView;
+  /** Every platform's feed as Réglages › Ventes shows it: a stopped one is named on the panel (AGT-11). */
+  readonly salesFeeds: () => Promise<readonly SalesFeedState[]>;
   /** Absent when Telegram is off (no encryption key): both Telegram fields are null. */
   readonly telegram?: TelegramView;
   /** Every creator, for the owner's « À traiter » across creators (`persona` module, by the composition root). */
@@ -125,7 +128,10 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           jobs: stuckJobsOf(stuckJobs, user.role === 'owner'),
           telegram,
           automatic,
-          revealSales: sales === undefined ? null : revealSalesPanel({ ...sales, rate: usdRate }),
+          revealSales:
+            sales === undefined
+              ? null
+              : revealSalesPanel({ ...sales, rate: usdRate, feeds: await deps.salesFeeds() }),
         });
       },
     );

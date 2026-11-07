@@ -34,7 +34,8 @@ export function creatorOverview(input: {
   const { creatorId, facts, now, sales, rate, onShift } = input;
   const mode = modeOf(facts);
   if (facts.scope === 'self') return { creatorId, mode, sales: null, onShift: null, requests: null };
-  const panel = sales === undefined ? null : revealSalesPanel({ ...sales, rate, names: null });
+  // Her card keeps the totals only: a stopped reading is named on her Dashboard's panel (AGT-11).
+  const panel = sales === undefined ? null : revealSalesPanel({ ...sales, rate, names: null, feeds: [] });
   return {
     creatorId,
     mode,

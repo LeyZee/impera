@@ -5,9 +5,10 @@ import {
   EVENT_PAYLOADS,
   EventIdSchema,
   newId,
-  PersonaSchema,
+  personaSheetFromV1,
+  StoredPersonaSchema,
   PersonaVersionIdSchema,
-  type Persona,
+  type StoredPersona,
   type PersonaVersionSummary,
 } from '@impera/contracts';
 import { and, eq, schema, sql, withTenant, type Database, type Transaction } from '@impera/db';
@@ -134,9 +135,9 @@ async function activateRow(
  */
 export function createDrizzlePersonaVersionStore(
   db: Database,
-  checkBeforeActivate?: (persona: Persona) => void,
+  checkBeforeActivate?: (persona: StoredPersona) => void,
 ): PersonaVersionStore {
-  /** One version of hers with her name, read under her tenant; its content reread as `Persona`, never a guess. */
+  /** One version of hers with her name, read under her tenant; its content reread in its format, never a guess. */
   const readOne = (creatorId: string, which: SQL) =>
     withTenant(db, creatorId, async (tx) => {
       const [row] = await tx
@@ -154,7 +155,7 @@ export function createDrizzlePersonaVersionStore(
         id: PersonaVersionIdSchema.parse(row.id),
         version: row.version,
         creatorName: row.creatorName,
-        persona: PersonaSchema.parse(row.content),
+        persona: StoredPersonaSchema.parse(row.content),
       };
     });
   return {
@@ -175,16 +176,20 @@ export function createDrizzlePersonaVersionStore(
           .select({ content: schema.personaVersions.content })
           .from(schema.personaVersions)
           .where(eq(schema.personaVersions.id, newest.id));
+        const persona = StoredPersonaSchema.parse(content?.content);
+        // The dashboard edits format 2: a format-1 version opens as a draft, nothing stored is rewritten (ADR 0079 § 5).
+        const { persona: draft, moved } =
+          'sheet' in persona ? { persona, moved: [] } : personaSheetFromV1(persona);
         return {
           creatorId,
-          latest: { summary: toSummary(newest), persona: PersonaSchema.parse(content?.content) },
+          latest: { summary: toSummary(newest), persona, draft, moved: [...moved] },
           versions: rows.map(toSummary),
         };
       });
     },
 
     async create(creatorId, body, userId) {
-      const persona = PersonaSchema.parse(body.persona);
+      const persona = StoredPersonaSchema.parse(body.persona);
       const hash = contentHash(persona);
       const id = newId(PersonaVersionIdSchema);
       try {
@@ -223,7 +228,7 @@ export function createDrizzlePersonaVersionStore(
     },
 
     async load(creatorId, input, { sourcePath, activate }) {
-      const persona = PersonaSchema.parse(input);
+      const persona = StoredPersonaSchema.parse(input);
       const hash = contentHash(persona);
       const { version } = persona.meta;
       return withTenant(db, creatorId, async (tx) => {
@@ -278,7 +283,7 @@ export function createDrizzlePersonaVersionStore(
             .select({ content: schema.personaVersions.content })
             .from(schema.personaVersions)
             .where(eq(schema.personaVersions.id, row.id));
-          checkBeforeActivate(PersonaSchema.parse(stored?.content));
+          checkBeforeActivate(StoredPersonaSchema.parse(stored?.content));
         }
         return toSummary((await activateRow(tx, creatorId, row, userId)).row);
       });

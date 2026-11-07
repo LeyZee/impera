@@ -56,6 +56,10 @@ export const TABS: readonly { readonly id: TabId; readonly label: string }[] = [
 const isInDepth = (block: string): block is InDepthBlock => IN_DEPTH_BLOCKS.some((b) => b === block);
 
 /** The tab that shows a block: its own, or « Elle en détail » for a P5-01 block. */
+/** Whether a correction's section is a block of this screen, not a panel of the format-2 sheet (ADR 0079). */
+export const isBlockId = (section: string): section is BlockId =>
+  BLOCK_IDS.some((block) => block === section);
+
 export const tabOf = (block: BlockId): TabId => (isInDepth(block) ? 'in_depth' : block);
 
 /** One problem with the draft: the field it belongs to (`strategies.kyc.max_messages`) and what to fix. */

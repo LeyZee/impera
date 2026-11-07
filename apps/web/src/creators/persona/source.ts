@@ -95,7 +95,9 @@ async function loadPersona(creatorId: string | null, name: string | null): Promi
   };
   if (creatorId === null) return empty();
   const { latest, versions } = await fetchPersonaOverview(creatorId);
-  if (latest === null) return empty();
+  // This screen edits format 1 until the format-2 sheet replaces it (ADR 0079): a version stored at format 2 is not
+  // opened here, the screen starts from the example instead.
+  if (latest === null || 'sheet' in latest.persona) return empty();
   return {
     kind: 'ready',
     persona: latest.persona,

@@ -7,6 +7,8 @@ import { ContentDropStorageUnavailable } from '../../domain/errors';
 import type { DropStorage } from '../../domain/ports';
 import type { StoredPart } from '../../domain/upload';
 
+import { nodeGet } from './node-get';
+
 /** The media bucket (`S3_*`), S3-compatible: Hetzner in production, MinIO in the tests. Path-style URLs. */
 export interface MediaBucketConfig {
   readonly endpoint: string;
@@ -73,6 +75,8 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
     region: config.region,
   });
   const send = fetchLike ?? ((request: Request) => fetch(request));
+  // An object's body over `node:http` (MED-04): read slowly by the archive, never through undici's parser.
+  const get = fetchLike ?? nodeGet;
   const bucketUrl = `${config.endpoint.replace(/\/+$/u, '')}/${encodeURIComponent(config.bucket)}`;
   const urlOf = (key: string, query = ''): string =>
     `${bucketUrl}/${key.split('/').map(encodeURIComponent).join('/')}${query === '' ? '' : `?${query}`}`;
@@ -85,7 +89,8 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
   ): Promise<Response> => {
     const signal = typeof timeout === 'number' ? AbortSignal.timeout(timeout) : timeout;
     try {
-      return await send(new Request(await client.sign(url, init), { signal }));
+      const request = new Request(await client.sign(url, init), { signal });
+      return await (request.method === 'GET' ? get(request) : send(request));
     } catch (error) {
       throw new ContentDropStorageUnavailable(`${config.bucket}: no answer to ${what}`, { cause: error });
     }
