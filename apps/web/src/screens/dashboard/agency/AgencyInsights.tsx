@@ -746,6 +746,7 @@ function ActiveLine({
   if (read.length < 2) return null;
   const low = Math.min(...read);
   const high = Math.max(...read);
+  const unread = days.length - read.length;
   // Not from zero: a few subscribers more on a thousand must show. A flat week stays a flat line.
   const pad = Math.max(1, Math.round((high - low) * 0.15));
   const frame = { width: 600, height: 120, padTop: 8, padBottom: 8 };
@@ -766,45 +767,102 @@ function ActiveLine({
     if (last === undefined) runs.push([point]);
     else last.push(point);
   });
+  const drawn = runs.filter((run) => run.length > 0);
+  // A faint dash across each gap, so a missing day reads as missing and not as a drawing fault.
+  const gaps = drawn.slice(1).flatMap((run, i) => {
+    const from = drawn[i]?.at(-1);
+    const to = run[0];
+    return from === undefined || to === undefined ? [] : [{ from, to }];
+  });
+  // The scale's numbers sit at the height of the line's extremes, padding included.
+  const at = (value: number): string => {
+    const i = days.findIndex((one) => one.active === value);
+    return `${String(((points[i]?.y ?? 0) / frame.height) * 100)}%`;
+  };
+  const first = read[0]?.toLocaleString('fr-FR') ?? '';
+  const last = read.at(-1)?.toLocaleString('fr-FR') ?? '';
+  const missing =
+    unread === 0
+      ? ''
+      : `, ${String(unread)} jour${unread > 1 ? 's' : ''} pas encore lu${unread > 1 ? 's' : ''}`;
   return (
     <div
       className="ins-subs__chart"
       role="img"
-      aria-label={`Abonnés actifs jour par jour, de ${read[0]?.toLocaleString('fr-FR') ?? ''} à ${read.at(-1)?.toLocaleString('fr-FR') ?? ''}`}
+      aria-label={`Abonnés actifs jour par jour, de ${first} à ${last}${missing}`}
     >
       <div className="ins-subs__scale" aria-hidden="true">
-        <span>{high.toLocaleString('fr-FR')}</span>
-        <span>{low.toLocaleString('fr-FR')}</span>
+        {/* In the flow, unseen: it gives the column the width of the widest number. */}
+        <i className="ins-subs__sizer">{high.toLocaleString('fr-FR')}</i>
+        <span style={{ top: at(high) }}>{high.toLocaleString('fr-FR')}</span>
+        {low === high ? null : <span style={{ top: at(low) }}>{low.toLocaleString('fr-FR')}</span>}
       </div>
       <div className="ins-subs__plot">
         <svg viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
-          {runs
-            .filter((run) => run.length > 0)
-            .map((run) => (
+          {gaps.map(({ from, to }) => (
+            <line
+              key={`gap-${String(from.x)}`}
+              className="ins-subs__gap"
+              x1={from.x}
+              y1={from.y}
+              x2={to.x}
+              y2={to.y}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {drawn.map((run) =>
+            run.length === 1 && run[0] !== undefined ? (
+              <line
+                key={String(run[0].x)}
+                className="ins-subs__line ins-subs__dot"
+                x1={run[0].x}
+                y1={run[0].y}
+                x2={run[0].x}
+                y2={run[0].y}
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : (
               <path
                 key={String(run[0]?.x)}
                 className="ins-subs__line"
                 d={linePath(run)}
                 vectorEffect="non-scaling-stroke"
               />
-            ))}
+            ),
+          )}
         </svg>
         <div className="ins-subs__hits" aria-hidden="true">
           {days.map((one) => (
             <span
               key={one.day}
               className="ins-subs__hit"
-              {...tip.bind({
-                title: dayLabel(one.day),
-                ...(one.active === null
-                  ? { text: 'Pas encore lu chez Reveal.' }
-                  : { rows: [['Abonnés actifs, en fin de journée', one.active.toLocaleString('fr-FR')]] }),
-              })}
+              {...tip.bind(
+                {
+                  title: dayLabel(one.day),
+                  ...(one.active === null
+                    ? { text: 'Pas encore lu chez Reveal.' }
+                    : { rows: [['Abonnés actifs, en fin de journée', one.active.toLocaleString('fr-FR')]] }),
+                },
+                { above: true },
+              )}
             />
           ))}
         </div>
       </div>
     </div>
+  );
+}
+
+/** The change of a rate, in points: « −4 pts », never a percent of a percent. */
+function PointsDelta({ current, previous }: { current: number; previous: number }): JSX.Element {
+  const change = current - previous;
+  const tone = change === 0 ? ' ins-delta-flat' : change > 0 ? ' nv-delta--better' : ' nv-delta--worse';
+  const sign = change > 0 ? '+' : change < 0 ? '−' : '';
+  return (
+    <span className={`nv-delta${tone}`}>
+      {sign}
+      {String(Math.abs(change))}&nbsp;pt{Math.abs(change) > 1 ? 's' : ''}
+    </span>
   );
 }
 
@@ -838,6 +896,7 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
     note: string;
     delta: readonly [number, number] | null;
     lowerIsBetter?: true;
+    points?: true;
   }[] = [
     {
       label: 'Nouveaux abonnés',
@@ -871,13 +930,14 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
           : [current.renewals, previous.renewals],
     },
     {
-      label: 'Taux d’achat des PPV',
+      label: 'Achat des PPV',
       value: rate === null ? '—' : `${String(rate)} %`,
       note:
         current.ppvSent === null
           ? LATER
           : `${countText(current.ppvPurchased)} achetés sur ${countText(current.ppvSent)} envoyés, Mass DM compris`,
       delta: rate === null || rateBefore === null ? null : [rate, rateBefore],
+      points: true,
     },
     {
       label: 'Messages',
@@ -928,7 +988,9 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
             <dt>{tile.label}</dt>
             <dd>
               <span className="ins-tile__value">{tile.value}</span>
-              {tile.delta === null ? null : (
+              {tile.delta === null ? null : tile.points === true ? (
+                <PointsDelta current={tile.delta[0]} previous={tile.delta[1]} />
+              ) : (
                 <Delta
                   current={tile.delta[0]}
                   previous={tile.delta[1]}

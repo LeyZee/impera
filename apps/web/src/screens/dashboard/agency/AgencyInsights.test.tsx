@@ -192,6 +192,20 @@ describe('Les abonnés (ADR 0081)', () => {
     expect(await screen.findByRole('heading', { name: /Les abonnés/u })).toBeTruthy();
     expect(screen.getAllByText('en calcul chez Reveal').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/5 jours lus sur 7/u)).toBeTruthy();
+    expect(screen.getByRole('img', { name: /1 jour pas encore lu/u })).toBeTruthy();
+  });
+
+  it('compares the PPV purchase rate in points, never a percent of a percent', async () => {
+    const subscribers = AGENCY_WEEK.subscribers;
+    if (subscribers === null) throw new Error('fixture');
+    serve(200, {
+      ...AGENCY_WEEK,
+      subscribers: { ...subscribers, previous: { ...subscribers.previous, ppvSent: 400, ppvPurchased: 88 } },
+    });
+    show();
+    expect(await screen.findByText('Achat des PPV')).toBeTruthy();
+    // 18 % now (74 on 412), 22 % before (88 on 400).
+    expect(screen.getByText(/−4\spts/u)).toBeTruthy();
   });
 
   it('compares nothing to a period before that is only partly read', async () => {

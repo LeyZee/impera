@@ -764,14 +764,25 @@
   height: 120px;
 }
 .ins-subs__scale {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  position: relative;
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
   color: var(--nv-ink-muted);
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+.ins-subs__sizer {
+  display: block;
+  height: 0;
+  overflow: hidden;
+  font-style: normal;
+  visibility: hidden;
+}
+.ins-subs__scale > span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  white-space: nowrap;
 }
 .ins-subs__plot {
   position: relative;
@@ -792,6 +803,14 @@
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+.ins-subs__dot {
+  stroke-width: 6;
+}
+.ins-subs__gap {
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 4;
 }
 .ins-subs__hits {
   position: absolute;
