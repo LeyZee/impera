@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { CheckPanel } from './CheckPanel';
 import { ImportPanel } from './ImportPanel';
 import { KeyForm } from './KeyForm';
-import { ChatterLinks, ModelLinks } from './Links';
+import { ModelLinks, TeamLink } from './Links';
 import {
   connectWebhook,
   disconnect,
@@ -440,7 +440,7 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
           {/* Her creators to add first (CRM-07): what the links below are made of. */}
           <ImportPanel platform={platform} candidates={candidates} dismissed={dismissed} onChanged={land} />
           <ModelLinks platform={platform} models={models} accounts={accounts} onChanged={land} />
-          <ChatterLinks platform={platform} chatters={chatters} onChanged={land} />
+          <TeamLink platform={platform} />
           {/* The check reads the platform's statistics: only while the key is read (CRM-02). */}
           {status.state === 'connected' ? (
             <CheckPanel platform={platform} models={models} chatters={chatters} />

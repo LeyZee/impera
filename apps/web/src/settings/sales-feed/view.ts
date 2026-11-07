@@ -4,7 +4,6 @@ import type {
   SalesFeedChatterLink,
   SalesFeedModelLink,
   SalesFeedStatus,
-  TeamMember,
 } from '@impera/contracts';
 
 /** Small view rules of Réglages › Ventes, kept out of the components so they are tested. */
@@ -135,19 +134,3 @@ export function accountOptionsOf(
 
 export const chatterName = (chatter: SalesFeedChatterLink): string =>
   `${chatter.firstName} ${chatter.lastName}`.trim() || chatter.platformChatterId;
-
-/** The select's value for a chatter's link: `member:<id>`, `agent` or `none`. */
-export function chatterValueOf(chatter: SalesFeedChatterLink): string {
-  if (chatter.link === null) return 'none';
-  return chatter.link.kind === 'agent' ? 'agent' : `member:${chatter.link.memberId}`;
-}
-
-/**
- * The members a chatter can be linked to: the team still in it, by name, and the member already linked even if he
- * left (his link stays readable until the owner changes it).
- */
-export function memberChoicesOf(members: readonly TeamMember[], linkedId: string | null): TeamMember[] {
-  return members
-    .filter((member) => member.status !== 'left' || member.id === linkedId)
-    .toSorted((a, b) => a.displayName.localeCompare(b.displayName, 'fr'));
-}

@@ -64,6 +64,7 @@ import { MemberFilePage } from './screens/team/MemberFilePage';
 import { MembersPage } from './screens/team/MembersPage';
 import { PlanningPage } from './screens/team/PlanningPage';
 import { ReportsPage } from './screens/team/ReportsPage';
+import { RevealPage } from './screens/team/RevealPage';
 import { parsePlanningSearch, parseReportsSearch, parseTeamSearch } from './screens/team/model';
 import { CreatorTodayPage } from './screens/today/CreatorTodayPage';
 import { TodayPage } from './screens/today/TodayPage';
@@ -480,6 +481,30 @@ const teamMembers = createRoute({
           })
         }
         onSelect={(id) => void navigate({ search: (before) => ({ ...before, membre: id ?? undefined }) })}
+      />
+    );
+  },
+});
+
+// Reveal's team reviewed (ADR 0076), the owner's and an active manager's: anyone else is sent back to the members.
+const teamReveal = createRoute({
+  getParentRoute: () => team,
+  path: '/reveal',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner' && context.user.teamScope !== 'agency') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/equipe/membres', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: function TeamReveal() {
+    const { user } = rootRoute.useRouteContext();
+    const navigate = teamReveal.useNavigate();
+    return (
+      <RevealPage
+        platform="reveal"
+        bounded={user.role !== 'owner'}
+        ownCreatorIds={user.creatorIds}
+        onOpenMember={(id) => void navigate({ to: '/equipe/membres', search: { membre: id } })}
       />
     );
   },
@@ -963,7 +988,7 @@ const routeTree = rootRoute.addChildren([
   content,
   contentScript,
   myPlanning,
-  team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
+  team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile, teamReveal]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
   me.addChildren([meIndex, mePersona, meProfile, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),

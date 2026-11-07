@@ -1,26 +1,17 @@
 import type {
-  LinkSalesFeedChatterBody,
   Platform,
   SalesFeedAccountChoice,
-  SalesFeedChatterLink,
   SalesFeedModelLink,
   SalesFeedOverview,
 } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
-import { linkChatter, linkModel } from './api';
+import { linkModel, useTeamImportCounts } from './api';
 import { platformName, shownOf } from './shown';
-import {
-  accountOptionsOf,
-  chatterName,
-  chatterValueOf,
-  memberChoicesOf,
-  modelLabel,
-  modelQuarantineLine,
-  dayTime,
-} from './view';
+import { accountOptionsOf, modelLabel, modelQuarantineLine } from './view';
 
-import { useMembers } from '@/screens/team/api';
+import { newcomersLine, removalsLine } from '@/screens/team/reveal';
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
 import type { ShownError } from '@/settings/services/api';
 import { Select } from '@/shell/Select';
@@ -152,30 +143,14 @@ export function ModelLinks({
   );
 }
 
-function linkOf(value: string): LinkSalesFeedChatterBody {
-  if (value === 'agent') return { kind: 'agent' };
-  if (value.startsWith('member:')) return { kind: 'member', memberId: value.slice('member:'.length) };
-  return { kind: 'none' };
-}
-
 /**
- * Who is who in the platform's team (ADR 0050 § 5): a team member, the agent, or nobody yet. Pay reads these links
- * later (CRM-03); no sale is attributed here.
+ * Who is who in the platform's team (ADR 0050 § 5, ADR 0076): reviewed in Équipe › Reveal, where an active manager
+ * links and invites too. Here, the way there and what waits in it.
  */
-export function ChatterLinks({
-  platform,
-  chatters,
-  onChanged,
-}: {
-  platform: Platform;
-  chatters: readonly SalesFeedChatterLink[];
-  onChanged: (overview: SalesFeedOverview) => void;
-}): JSX.Element | null {
-  const { rows, save } = useRows(onChanged);
-  const members = useMembers(chatters.length > 0);
-  if (chatters.length === 0) return null;
+export function TeamLink({ platform }: { platform: Platform }): JSX.Element | null {
+  const counts = useTeamImportCounts(platform, platform === 'reveal').data;
+  if (platform !== 'reveal') return null;
   const name = platformName(platform);
-  const team = members.data ?? [];
   return (
     <section className="nv-plate sf-links" aria-labelledby={`sf-team-${platform}`}>
       <header className="sf-links__head">
@@ -183,55 +158,21 @@ export function ChatterLinks({
           Équipe {name}
         </h3>
         <p className="sv-muted">
-          Chaque compte de l’équipe {name} est un membre de l’équipe Impera, ou l’agent. La paie lira ce lien
-          ; aucune vente n’est attribuée ici.
+          Chaque compte de l’équipe {name} se relie à un membre, à l’agent ou à personne dans Équipe › {name},
+          où tes managers actifs relient et invitent aussi. La paie lit ces liens.
         </p>
-        {members.isError ? (
-          <p className="sf-warn">
-            La liste de l’équipe n’a pas pu être lue : les membres déjà reliés restent.
-          </p>
-        ) : null}
+        {counts === undefined || counts.newCount === 0 ? null : (
+          <p className="sv-muted">{newcomersLine(counts.newCount, name)}.</p>
+        )}
+        {counts === undefined || counts.removalCount === 0 ? null : (
+          <p className="sf-warn">{removalsLine(counts.removalCount, name)}.</p>
+        )}
       </header>
-      {chatters.map((chatter) => {
-        const id = chatter.platformChatterId;
-        const label = chatterName(chatter);
-        const linkedId = chatter.link?.kind === 'member' ? chatter.link.memberId : null;
-        const choices = memberChoicesOf(team, linkedId);
-        const isLinkedUnknown = linkedId !== null && !choices.some((member) => member.id === linkedId);
-        return (
-          <div className="sf-row" key={id}>
-            <div className="sf-row__name">
-              <span>{label}</span>
-              {chatter.isBot ? <span className="nv-tag nv-tag--declared">Bot</span> : null}
-              {chatter.isExternal ? <span className="nv-tag nv-tag--declared">Externe</span> : null}
-              {chatter.removedAt === null ? null : (
-                <span className="nv-tag nv-tag--inferred">Retiré le {dayTime(chatter.removedAt)}</span>
-              )}
-            </div>
-            <Select
-              className="sf-select"
-              ariaLabel={`Lien de ${label}`}
-              value={chatterValueOf(chatter)}
-              disabled={rows.busy !== null}
-              options={[
-                { value: 'none', label: 'Personne' },
-                { value: 'agent', label: 'L’agent' },
-                ...(isLinkedUnknown ? [{ value: `member:${linkedId}`, label: 'Membre relié' }] : []),
-                ...choices.map((member) => ({
-                  value: `member:${member.id}`,
-                  label: member.displayName,
-                  ...(member.status === 'left' ? { hint: 'parti' } : {}),
-                })),
-              ]}
-              onChange={(value) => {
-                const link = linkOf(value);
-                save(id, `${label} n’a pas été relié.`, () => linkChatter(platform, id, link));
-              }}
-            />
-            <RowError id={id} rows={rows} />
-          </div>
-        );
-      })}
+      <div className="sf-import__foot">
+        <Link to="/equipe/reveal" className="nv-btn nv-btn--soft">
+          Ouvrir Équipe › {name}
+        </Link>
+      </div>
     </section>
   );
 }
