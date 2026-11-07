@@ -919,6 +919,13 @@
     grid-row: 3;
   }
 }
+/* The reader's own account: no gesture, so who he is takes the rest of the line, its note included. */
+.sf-imp.rv-own > .sf-imp__who {
+  grid-column: 3 / -1;
+}
+.sf-imp.rv-linked.rv-own > .sf-imp__who {
+  grid-column: 2 / -1;
+}
 /* A removal on the platform, under the account's name: amber, a state to act on (ADR 0076 § 5). */
 .sf-imp__meta.rv-warn {
   color: var(--nv-warning);

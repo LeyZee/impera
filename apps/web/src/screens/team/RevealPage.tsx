@@ -480,7 +480,11 @@ function Who({
   platform,
   platformKey,
   team,
-}: Pick<RowProps, 'row' | 'platform' | 'platformKey' | 'team'>): JSX.Element {
+  note,
+}: Pick<RowProps, 'row' | 'platform' | 'platformKey' | 'team'> & {
+  /** A line under the account, where the reader has no gesture on the row (his own account). */
+  note?: string;
+}): JSX.Element {
   const models = modelsLine(row, platform);
   const gap = row.link?.kind === 'member' ? gapLine(row, platform) : null;
   const member = row.removal === null ? undefined : team.find((one) => one.id === row.removal?.memberId);
@@ -502,6 +506,7 @@ function Who({
           .
         </span>
       )}
+      {note === undefined ? null : <span className="sf-imp__meta">{note}</span>}
     </div>
   );
 }
@@ -542,7 +547,9 @@ function ToConfirmRow({
   const isInvite = edit.choice === 'invite';
   const canAct = row.actions.length > 0;
   return (
-    <li className={isInvite ? 'sf-imp rv-row rv-inviting' : 'sf-imp rv-row'}>
+    <li
+      className={canAct ? (isInvite ? 'sf-imp rv-row rv-inviting' : 'sf-imp rv-row') : 'sf-imp rv-row rv-own'}
+    >
       {canAct && !isInvite ? (
         <input
           type="checkbox"
@@ -558,50 +565,54 @@ function ToConfirmRow({
         <span className="rv-tick-space" aria-hidden="true" />
       )}
       <Face row={row} />
-      <Who row={row} platform={platform} platformKey={platformKey} team={team} />
-      <div className="sf-imp__act">
-        {canAct ? (
-          <>
-            <Select
-              className="sf-select"
-              ariaLabel={`Que faire de ${label}`}
-              value={edit.choice}
+      <Who
+        row={row}
+        platform={platform}
+        platformKey={platformKey}
+        team={team}
+        note={canAct ? undefined : 'Ton propre compte : seul le propriétaire le relie.'}
+      />
+      {canAct ? (
+        <div className="sf-imp__act">
+          <Select
+            className="sf-select"
+            ariaLabel={`Que faire de ${label}`}
+            value={edit.choice}
+            disabled={disabled}
+            options={options}
+            onChange={(choice) => {
+              onEdit({ choice, ticked: choice !== 'invite' });
+            }}
+          />
+          {why === null ? null : <span className="sf-imp__why">{why}</span>}
+        </div>
+      ) : null}
+      {canAct ? (
+        <div className="sf-imp__end rv-end">
+          {isInvite ? (
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              aria-label={`Inviter ${label}`}
               disabled={disabled}
-              options={options}
-              onChange={(choice) => {
-                onEdit({ choice, ticked: choice !== 'invite' });
-              }}
-            />
-            {why === null ? null : <span className="sf-imp__why">{why}</span>}
-          </>
-        ) : (
-          <span className="sf-imp__why">Ton propre compte : seul le propriétaire le relie.</span>
-        )}
-      </div>
-      <div className="sf-imp__end rv-end">
-        {isInvite ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            aria-label={`Inviter ${label}`}
-            disabled={disabled}
-            onClick={onInvite}
-          >
-            Inviter
-          </button>
-        ) : null}
-        {row.actions.includes('dismiss') ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--plain nv-btn--sm"
-            aria-label={`Écarter ${label}`}
-            disabled={disabled}
-            onClick={onDismiss}
-          >
-            {isDismissing ? 'Écartement…' : 'Écarter'}
-          </button>
-        ) : null}
-      </div>
+              onClick={onInvite}
+            >
+              Inviter
+            </button>
+          ) : null}
+          {row.actions.includes('dismiss') ? (
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain nv-btn--sm"
+              aria-label={`Écarter ${label}`}
+              disabled={disabled}
+              onClick={onDismiss}
+            >
+              {isDismissing ? 'Écartement…' : 'Écarter'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {error === null ? null : <RowError error={error} />}
     </li>
   );
@@ -620,31 +631,36 @@ function LinkedRow({
   const label = chatterName(row.chatter);
   // Changing a link never invites: an account already linked keeps its member, or moves to another one.
   const options = optionsOf(row, team).filter((option) => option.value !== 'invite');
+  const isOwn = row.actions.length === 0;
   return (
-    <li className="sf-imp rv-linked">
+    <li className={isOwn ? 'sf-imp rv-linked rv-own' : 'sf-imp rv-linked'}>
       <Face row={row} />
-      <Who row={row} platform={platform} platformKey={platformKey} team={team} />
-      <div className="sf-imp__act">
-        {row.actions.length === 0 ? (
-          <span className="sf-imp__why">
-            {linkLabel(row)} · ton propre compte, son lien est au propriétaire.
-          </span>
-        ) : (
-          <>
-            <Select
-              className="sf-select"
-              ariaLabel={`Lien de ${label}`}
-              value={linkedChoiceOf(row)}
-              disabled={disabled}
-              options={options}
-              onChange={(choice) => {
-                if (choice !== linkedChoiceOf(row)) onChange(choice);
-              }}
-            />
-            {isSaving ? <span className="sf-imp__why">Enregistrement…</span> : null}
-          </>
-        )}
-      </div>
+      <Who
+        row={row}
+        platform={platform}
+        platformKey={platformKey}
+        team={team}
+        note={
+          isOwn
+            ? `Relié : ${linkLabel(row)}. Ton propre compte : seul le propriétaire change son lien.`
+            : undefined
+        }
+      />
+      {isOwn ? null : (
+        <div className="sf-imp__act">
+          <Select
+            className="sf-select"
+            ariaLabel={`Lien de ${label}`}
+            value={linkedChoiceOf(row)}
+            disabled={disabled}
+            options={options}
+            onChange={(choice) => {
+              if (choice !== linkedChoiceOf(row)) onChange(choice);
+            }}
+          />
+          {isSaving ? <span className="sf-imp__why">Enregistrement…</span> : null}
+        </div>
+      )}
       {error === null ? null : <RowError error={error} />}
     </li>
   );

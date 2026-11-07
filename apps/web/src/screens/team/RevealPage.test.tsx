@@ -254,7 +254,7 @@ describe('Équipe › Reveal (ADR 0076)', () => {
     expect(within(linked).getByRole('combobox', { name: 'Lien de Théo Test' })).toBeTruthy();
     expect(within(linked).queryByRole('combobox', { name: 'Lien de Basile Test' })).toBeNull();
     expect(
-      within(linked).getByText('Basile · ton propre compte, son lien est au propriétaire.'),
+      within(linked).getByText('Relié : Basile. Ton propre compte : seul le propriétaire change son lien.'),
     ).toBeTruthy();
   });
 

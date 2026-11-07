@@ -179,9 +179,9 @@ export function invitePrefill(
   };
 }
 
-/** « 3 cochés, dont 1 dans les bots repliés »: a ticked row of the closed fold is said, never counted in silence. */
+/** « 3 cochés, dont 1 dans « Bots et comptes écartés » »: a ticked row of the fold is said, never counted in silence. */
 export function tickedCount(count: number, folded: number): string {
   const ticked = `${String(count)} coché${count > 1 ? 's' : ''}`;
   if (folded === 0) return ticked;
-  return `${ticked}, dont ${String(folded)} dans les bots repliés`;
+  return `${ticked}, dont ${String(folded)} dans « Bots et comptes écartés »`;
 }

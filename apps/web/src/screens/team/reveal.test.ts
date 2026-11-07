@@ -201,7 +201,7 @@ describe('what a row says', () => {
 
   it('says the ticked rows hidden in the fold', () => {
     expect(tickedCount(1, 0)).toBe('1 coché');
-    expect(tickedCount(3, 1)).toBe('3 cochés, dont 1 dans les bots repliés');
+    expect(tickedCount(3, 1)).toBe('3 cochés, dont 1 dans « Bots et comptes écartés »');
   });
 
   it('fills an invitation from the platform, with only the creators the inviter may give', () => {

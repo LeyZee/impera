@@ -50,6 +50,9 @@ import { useRevealAlerts } from '@/shell/reveal';
 const ZONES: readonly string[] = Intl.supportedValuesOf('timeZone');
 const ROLES: readonly TeamRole[] = ['chatter', 'manager'];
 const STEP_TITLES = ['Qui', 'Où', 'Taux'] as const;
+/** The invitation's re-authentication, said under the dialog's title in place of the steps (ADR 0076 § 3). */
+const REAUTH_LEAD =
+  'Inviter ouvre un compte qui lira des conversations de fans : confirme ton mot de passe et ton code.';
 const EmailSchema = z.email();
 
 interface Draft {
@@ -348,7 +351,9 @@ export function AddMemberPanel({
                     ? 'Nouveau membre'
                     : `Inviter ${chatterName(invite.row.chatter)}`}
               </h2>
-              {created === null ? (
+              {created === null && asking ? (
+                <p>{REAUTH_LEAD}</p>
+              ) : created === null ? (
                 <ol className="tm-steps" aria-label="Étapes">
                   {STEP_TITLES.map((title, index) => (
                     <li
@@ -375,7 +380,8 @@ export function AddMemberPanel({
           {created === null && asking ? (
             <div className="tm-dialog__body nv-swap" key="password">
               <PasswordPrompt
-                lead="Inviter ouvre un compte qui lira des conversations de fans : confirme ton mot de passe et ton code."
+                lead={null}
+                layout="dialog"
                 onConfirmed={() => {
                   setAsking(false);
                   void submit();
