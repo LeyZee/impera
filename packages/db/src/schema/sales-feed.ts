@@ -148,6 +148,11 @@ export const salesFeedCursors = pgTable(
     caughtUpAt: timestampTz('caught_up_at'),
     /** A 429's `Retry-After`: no read before this. */
     pausedUntil: timestampTz('paused_until'),
+    /**
+     * When the daily statistics were last read over 31 days (ADR 0081 § 3): before it, or before the key was verified
+     * again, the next hourly reading takes the 31 days.
+     */
+    statsFullReadAt: timestampTz('stats_full_read_at'),
     updatedAt: updatedAt(),
   },
   (t) => [enumCheck('sales_feed_cursors', t.platform, PlatformSchema.options)],
@@ -462,3 +467,74 @@ export const salesFeedChecks = pgTable(
     agencyOnly(),
   ],
 );
+
+const currentCreator: SQL = sql`nullif(current_setting('app.creator_id', true), '')::uuid`;
+const currentScope: SQL = sql`nullif(current_setting('app.team_scope', true), '')`;
+const currentUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
+const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is distinct from 'creator'`;
+
+/**
+ * The platform's statistics of a creator account's day (ADR 0081): counters only, never an amount (the money stays
+ * in `platform_sales`), never a fan nor a chatter. Rewritten at each reading, the platform's last word on the day;
+ * `null` is « not computed yet » at the platform, never 0. Written by `connector.read_daily_stats` alone, through
+ * `withAdmin` (no write policy: `nirvana_app` writes nothing). Read inside `withTenantMember` of her creator: the
+ * owner, or an active manager when she is on his list (ADR 0081 § 5); never a chatter, a creator nor an operator.
+ */
+export const platformDailyStats = pgTable(
+  'platform_daily_stats',
+  {
+    platform: enumText('platform').notNull(),
+    platformAccountId: uuid('platform_account_id').notNull(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    /** The platform's day, in its own zone (`salesFeedTimeZone`). */
+    day: date('day').notNull(),
+    newSubscribers: integer('new_subscribers').notNull(),
+    unsubscribes: integer('unsubscribes'),
+    activeSubscribers: integer('active_subscribers').notNull(),
+    renewals: integer('renewals'),
+    ppvSent: integer('ppv_sent'),
+    ppvPurchased: integer('ppv_purchased').notNull(),
+    messagesSent: integer('messages_sent'),
+    messagesReceived: integer('messages_received'),
+    readAt: timestampTz('read_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ name: 'platform_daily_stats_pk', columns: [t.platformAccountId, t.day] }),
+    foreignKey({
+      name: 'platform_daily_stats_account_creator_fk',
+      columns: [t.platformAccountId, t.creatorId],
+      foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
+    }),
+    index('platform_daily_stats_creator_day_idx').on(t.creatorId, t.day),
+    enumCheck('platform_daily_stats', t.platform, PlatformSchema.options),
+    check(
+      'platform_daily_stats_counts_check',
+      sql`${t.newSubscribers} >= 0 and ${t.activeSubscribers} >= 0 and ${t.ppvPurchased} >= 0 and coalesce(${t.unsubscribes}, 0) >= 0 and coalesce(${t.renewals}, 0) >= 0 and coalesce(${t.ppvSent}, 0) >= 0 and coalesce(${t.messagesSent}, 0) >= 0 and coalesce(${t.messagesReceived}, 0) >= 0`,
+    ),
+    pgPolicy('stats_read', {
+      for: 'select',
+      using: sql`${notCreatorAccount} and ${t.creatorId} = ${currentCreator} and (${currentScope} = 'owner' or (${currentScope} = 'agency' and exists (select 1 from "user" u where u.id = ${currentUser} and ${t.creatorId} = any(u.creator_ids))))`,
+    }),
+  ],
+);
+
+/**
+ * The calls made to a platform's statistics on one of its days (ADR 0081 § 3), by the daily reading and by the check
+ * of CRM-02 alike, counted before each call: the reading makes none when fewer than 100 of the agency's 500 are left.
+ * Agency-level, read and written through `withAdmin` only: no policy, and `nirvana_app` has no right on it.
+ */
+export const salesFeedStatsCalls = pgTable(
+  'sales_feed_stats_calls',
+  {
+    platform: enumText('platform').notNull(),
+    day: date('day').notNull(),
+    calls: integer('calls').notNull(),
+  },
+  (t) => [
+    primaryKey({ name: 'sales_feed_stats_calls_pk', columns: [t.platform, t.day] }),
+    enumCheck('sales_feed_stats_calls', t.platform, PlatformSchema.options),
+    check('sales_feed_stats_calls_calls_check', sql`${t.calls} >= 0`),
+  ],
+).enableRLS();
