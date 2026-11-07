@@ -6,13 +6,22 @@ import { CreatorIdSchema, type CreatorId, type Me } from '@impera/contracts';
  */
 export interface CreatorsSearch {
   readonly onglet?:
-    'heures' | 'acces' | 'pourcentage' | 'agenda' | 'idees' | 'demandes' | 'scripts' | 'profil';
+    'heures' | 'acces' | 'pourcentage' | 'agenda' | 'idees' | 'demandes' | 'scripts' | 'telegram' | 'profil';
   readonly creatrice?: CreatorId;
 }
 
 /** The sheets of a creator, and their slug in the address; the persona has none. */
 export type CreatorSheet =
-  'persona' | 'hours' | 'access' | 'rate' | 'agenda' | 'ideas' | 'requests' | 'scripts' | 'profile';
+  | 'persona'
+  | 'hours'
+  | 'access'
+  | 'rate'
+  | 'agenda'
+  | 'ideas'
+  | 'requests'
+  | 'scripts'
+  | 'telegram'
+  | 'profile';
 
 const SLUGS = {
   hours: 'heures',
@@ -22,6 +31,7 @@ const SLUGS = {
   ideas: 'idees',
   requests: 'demandes',
   scripts: 'scripts',
+  telegram: 'telegram',
   profile: 'profil',
 } as const;
 const SHEETS = {
@@ -32,6 +42,7 @@ const SHEETS = {
   idees: 'ideas',
   demandes: 'requests',
   scripts: 'scripts',
+  telegram: 'telegram',
   profil: 'profile',
 } as const;
 
@@ -44,6 +55,7 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
   'ideas',
   'requests',
   'scripts',
+  'telegram',
   'profile',
 ];
 
@@ -69,6 +81,7 @@ export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSe
     tab === SLUGS.ideas ||
     tab === SLUGS.requests ||
     tab === SLUGS.scripts ||
+    tab === SLUGS.telegram ||
     tab === SLUGS.profile
       ? { onglet: tab }
       : {}),

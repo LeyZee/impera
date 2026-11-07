@@ -315,6 +315,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const persona = wirePersona(shared);
   const team = wireTeam(shared, {
     persona: persona.module,
+    connectors: connectors.module,
     ...(options.teamClock !== undefined && { now: options.teamClock }),
   });
   // Before the planning: her calendar link's feed reads her agenda (CR-05 lot c2).

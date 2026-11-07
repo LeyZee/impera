@@ -8,11 +8,13 @@ import {
   type TeamMember,
   type TeamMemberErrorCode,
   type TeamMemberStatus,
+  type TeamPlatformRemoval,
   type TeamRole,
 } from '@impera/contracts';
 
 import { countryName } from '@/lib/country';
 import { memberOf } from '@/lib/utils';
+import { platformName } from '@/scheduling/model';
 import { mondayOf, withFirstOfMonth } from '@/scheduling/time';
 
 /**
@@ -366,3 +368,20 @@ export function periodStartsFrom(from: string, count: number): string[] {
   }
   return starts;
 }
+
+/** « Retiré de Reveal »: the pastille of a member's line in Équipe › Membres (ADR 0076 § 5). */
+export const removalPill = (removal: TeamPlatformRemoval): string =>
+  `Retiré de ${platformName(removal.platform)}`;
+
+/**
+ * « Retiré de Reveal le 5 nov., toujours actif chez Impera » (ADR 0076 § 5), the day in the reader's zone; without a
+ * day when the account only left the platform's list. A member suspended or on leave is « toujours membre », never
+ * « actif » beside his own status.
+ */
+export const removalLine = (removal: TeamPlatformRemoval, status: TeamMemberStatus): string => {
+  const here = status === 'active' ? 'toujours actif chez Impera' : 'toujours membre chez Impera';
+  const platform = platformName(removal.platform);
+  return removal.removedAt === null
+    ? `Plus dans l’équipe ${platform}, ${here}`
+    : `Retiré de ${platform} le ${noteDay(removal.removedAt)}, ${here}`;
+};

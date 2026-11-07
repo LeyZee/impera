@@ -4,6 +4,7 @@ import { parseEncryptionKeys, type Database, type EncryptionKey } from '@impera/
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { TelegramApi } from './application/api';
+import { channelView, saveChannel } from './application/channel';
 import { connectionReminders } from './application/connections';
 import { flushChat, type FlushDeps } from './application/flush';
 import { dispatchPolls, pollBot } from './application/poll';
@@ -29,10 +30,13 @@ import {
   replaceToken,
   saveRoutes,
   sendTest,
+  type SettingsDeps,
 } from './application/settings';
+import { TelegramChannelsUnavailable } from './domain/errors';
 import type {
   AlertNames,
   BotsStore,
+  ChannelsStore,
   Clock,
   DeliveriesStore,
   NotificationChannel,
@@ -41,6 +45,7 @@ import type {
   UsdRateReader,
 } from './domain/ports';
 import type { ScannedEvent } from './domain/signals';
+import { createPostgresChannelsStore } from './infra/channels.store';
 import { createPostgresTelegramStore, type ResealReport } from './infra/postgres.store';
 import {
   createPrivateLinkRoutes,
@@ -59,6 +64,8 @@ export interface TelegramDeps {
   readonly channel: NotificationChannel;
   /** ADR 0068 § 4: the accounts' private chats; without it, no link is made and `/start` is read past. */
   readonly privateLinks?: PrivateLinksStore;
+  /** ADR 0080: the creators' channels; without it, the channel routes answer 503 and the routing checks nothing. */
+  readonly channels?: ChannelsStore;
   readonly clock?: Clock;
   /** WEB_ORIGIN: the links of the messages open the CRM. */
   readonly webOrigin: string;
@@ -106,7 +113,14 @@ interface PrivateChat {
 
 export function createTelegramModule(deps: TelegramDeps): TelegramModule {
   const clock = deps.clock ?? { now: () => new Date() };
-  const base: FlushDeps = { bots: deps.bots, deliveries: deps.deliveries, channel: deps.channel, clock };
+  const base: FlushDeps & SettingsDeps = {
+    bots: deps.bots,
+    deliveries: deps.deliveries,
+    channel: deps.channel,
+    clock,
+    ...(deps.channels !== undefined && { channels: deps.channels }),
+  };
+  const channels = deps.channels;
   const privateLinks = deps.privateLinks;
   const linking: PrivateLinkApi = {
     issueCode: (userId) =>
@@ -140,6 +154,14 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
     nightCounts: (creatorId) => nightCounts(base, creatorId),
     saleSettings: () => saleSettings(base),
     saveSaleSettings: (entries, userId) => saveSaleSettings(base, entries, userId),
+    channel: (creatorId) =>
+      channels === undefined
+        ? Promise.reject(new TelegramChannelsUnavailable())
+        : channelView({ bots: deps.bots, channels }, creatorId),
+    saveChannel: (creatorId, config, userId) =>
+      channels === undefined
+        ? Promise.reject(new TelegramChannelsUnavailable())
+        : saveChannel({ bots: deps.bots, channels }, creatorId, config, userId),
   };
   return {
     ...api,
@@ -195,6 +217,7 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
     bots: store.bots,
     deliveries: store.deliveries,
     privateLinks: createPostgresPrivateLinksStore(options.adminDb),
+    channels: createPostgresChannelsStore(options.adminDb),
     channel: createTelegramApi({ fetch }),
     webOrigin: options.webOrigin,
     onUncovered: options.onUncovered,

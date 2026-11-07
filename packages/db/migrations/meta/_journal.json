@@ -838,7 +838,14 @@
     {
       "idx": 119,
       "version": "7",
-      "when": 1794060332075,
+      "when": 1794060885211,
+      "tag": "0137_telegram_channels",
+      "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1794062529423,
       "tag": "0138_daily_platform_stats",
       "breakpoints": true
     }

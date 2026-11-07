@@ -1,0 +1,145 @@
+/* Créatrices › Canal Telegram (ADR 0080 § 6). Prefix `tc-` (`tg-` is Réglages › Telegram's). */
+
+.tc-warnings {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tc-warning {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+
+.tc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.tc-row > .nv-select,
+.tc-row > div:first-child:not(.tc-row__label) {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.tc-row__label {
+  flex: none;
+  font-weight: 600;
+}
+
+.tc-slots,
+.tc-links {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tc-slot__fields,
+.tc-link__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.tc-slot .tc-time {
+  flex: none;
+  width: 112px;
+}
+.tc-days {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tc-day {
+  min-width: 44px;
+  justify-content: center;
+}
+.tc-slot__end,
+.tc-link__end {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.tc-slot__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.tc-slot[data-off='true'] .tc-time {
+  color: var(--nv-ink-faint);
+}
+.tc-slot[data-invalid='true'] .nv-field__control,
+.tc-link [aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 70%, transparent);
+}
+
+/* One width for « Lien du canal » and « Choisir pour le canal », so the fields of every link line up. */
+.tc-link__end .nv-chip {
+  min-width: 10.75rem;
+  justify-content: center;
+}
+.tc-link__field {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.tc-link__field--url {
+  flex: 3 1 260px;
+}
+.tc-link__field .nv-field__control {
+  width: 100%;
+}
+.tc-link__url {
+  font-family: var(--nv-font-mono);
+  font-size: var(--nv-text-footnote);
+}
+
+.tc-preview {
+  display: grid;
+  gap: 4px;
+}
+.tc-preview__line {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-surface-raised);
+}
+.tc-preview__link {
+  color: var(--nv-ink);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+/* A phone: the hour and the switch on one line, the days under them; a link's fields full width. */
+@media (max-width: 560px) {
+  .tc-days {
+    order: 3;
+    flex: 1 1 100%;
+  }
+  .tc-day {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .tc-link__field,
+  .tc-link__field--url {
+    flex: 1 1 100%;
+  }
+  .tc-link__end .nv-chip {
+    min-width: 0;
+  }
+  .tc-links {
+    gap: 14px;
+  }
+  .tc-link + .tc-link {
+    padding-top: 14px;
+    border-top: 1px solid var(--nv-hairline);
+  }
+}

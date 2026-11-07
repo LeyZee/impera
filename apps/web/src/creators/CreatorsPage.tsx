@@ -17,6 +17,7 @@ import { AgencyRateSection } from './rate/AgencyRateSection';
 import { RequestsSection } from './requests/RequestsSection';
 import { ScriptsSection } from './scripts/ScriptsSection';
 import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
+import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 
@@ -179,6 +180,16 @@ export function CreatorsPage({
         />
       );
     }
+    if (shown === 'telegram' && current !== undefined) {
+      return (
+        <TelegramChannelSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          onDirty={setDirty}
+        />
+      );
+    }
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
@@ -224,6 +235,7 @@ export function CreatorsPage({
     ideas: 'Idées du jour',
     requests: 'Demandes',
     scripts: 'Scripts',
+    telegram: 'Canal Telegram',
     hours: 'Heures d’activité',
     access: 'Accès',
     rate: 'Pourcentage',
@@ -236,6 +248,7 @@ export function CreatorsPage({
     'ideas',
     'requests',
     'scripts',
+    'telegram',
     'hours',
     'access',
     'rate',
@@ -243,7 +256,7 @@ export function CreatorsPage({
   ];
 
   const lead = isOwner
-    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, heures d’activité, accès, pourcentage et profil.'
+    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, canal Telegram, heures d’activité, accès, pourcentage et profil.'
     : sheets.includes('agenda')
       ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes et ses scripts.'
       : 'Les créatrices qui te sont confiées. Ouvre-en une pour sa persona.';

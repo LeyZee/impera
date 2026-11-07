@@ -1,29 +1,38 @@
 # PUB-01 Connecteur de publication Telegram : le canal d'actualité de la créatrice
-Statut : blocked (bot Telegram de Charles ; exemples de légendes de Charles)
-Phase : publication (ADR 0057)
-Dépend de : CR-06 (amendée), CR-08 (plan de la semaine), P3-07 (bot Telegram)
-Branche : task/pub-01-telegram-channel
+Statut : in_progress (ADR 0057, ADR 0080 acceptée par Charles le 07/11/2026 12h26 et 13h05 ; lot A1 fait, A2 attend ses exemples)
+Phase : publication (ADR 0057, ADR 0080)
+Dépend de : CR-06, P3-07 (bot Telegram) ; vidéo publique Reveal (lot B) : CR-08 et les captures de Charles
+Branche : claude/project-thread-km6hfy
 
 ## Objectif
-Les dépôts `telegram_post` entrent dans le plan de la semaine et partent sur le canal de la créatrice, avec une légende dans sa voix qui donne envie de venir sur Reveal.
+Des posts partent seuls sur le canal Telegram de la créatrice, à des créneaux réglés (19 h pour commencer), montrés une heure avant à l'agence, avec un média du pool, une légende dans sa voix et le lien de redirection réglé dans le CRM, pour ramener du monde sur Reveal.
 
 ## Contexte à lire
-ADR 0057, ADR 0055, ADR 0044 § 3 et § 4, `docs/architecture/connectors.md`, P3-07.
+ADR 0080, ADR 0057, ADR 0055, ADR 0020, `docs/architecture/connectors.md`, README du module `telegram`.
 
 ## À faire
-- [ ] Port des connecteurs de publication (propriétaire des contrats et du module `connectors`) et `FakeTelegramChannel`.
-- [ ] Réglage du canal dans Réglages › Créatrices ; vérification que le bot y est administrateur.
-- [ ] Compression sous 50 Mo, envoi, clé d'idempotence, échec en ambre.
-- [ ] Prompt de légende versionné, à partir des exemples de Charles (à recueillir avant le code) ; gardes de voix ; rien de faux sur le prix, ni amour ni rencontre.
-- [ ] Vues lues à 48 h.
-- [ ] Idempotence (relecture Bilan) : `sendVideo` n'en a pas ; une réponse perdue (délai dépassé) passe en ambre, seul un refus explicite est repris.
-- [ ] Le jeton du bot est lu par l'`index.ts` du module `telegram` (ou un port des secrets), jamais par sa table.
-- [ ] Statistiques : des nombres seulement.
+### Lot A1 : branchement et réglages
+- [x] Contrats : canal, créneaux, liens de redirection, réglages du canal (Zod).
+- [x] Migration 0137 : `telegram_channels` (canal, créneaux, liens, réglage entier par créatrice), RLS forcée sans politique ; la table des posts vient au lot A3.
+- [x] Le bot administrateur et son droit de publier sont lus de `telegram_chats` (découverte existante) ; le port de publication et `FakeTelegramChannel` passent au lot A3, avec l'envoi.
+- [x] Routes des réglages (propriétaire) et écran Réglages › Créatrices › Canal Telegram : canal, créneaux, liens.
+### Lot A2 : le post
+- [ ] Exemples de Charles saisis dans le CRM (jamais dans le dépôt).
+- [ ] Prompt `telegram_channel` versionné, schéma de sortie structuré, rendu HTML Telegram échappé, gardes, conseil de réécriture en bloc délimité.
+- [ ] Mode Post du canal du playground.
+### Lot A3 : l'automatique
+- [ ] Job des créneaux : préparation à H-fenêtre, annonce au groupe Info, envoi à l'heure, clé d'idempotence, réponse perdue = ambre.
+- [ ] Valider, Réécrire (avec conseil), Changer de média, Corriger, Ne pas publier.
+- [ ] Demande de dépôt automatique quand le pool baisse ; pool vide = ambre.
+- [ ] Journal et vues à 48 h (des nombres seulement).
+### Lot B
+- [ ] Vidéo publique Reveal reprise sur le canal (après les captures et CR-08).
 
 ## Critères d'acceptation
-- Tests contre le faux : double acceptation sans double message, bot non administrateur = ambre lisible.
+- Tests contre le faux : double déclenchement d'un créneau sans double post, bot non administrateur = ambre lisible, pool vide = rien ne part et une demande existe, conseil qui demande une adresse = refusé par la garde.
 
 ## Hors périmètre
 Instagram (PUB-02), agents externes (MCP-PUB).
 
 ## Notes de session
+- 07/11 : ADR 0080 écrite d'après les réponses de Charles (19 h, fenêtre 1 h, conseil de réécriture, pool qui se remplit seul, vidéo publique Reveal, lien de redirection hors Reveal, playground à deux modes). Bot pas encore créé ; canal de Messa existant.

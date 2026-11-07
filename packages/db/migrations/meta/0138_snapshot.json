@@ -1,6 +1,6 @@
 {
-  "id": "f0624dd5-b5ad-4e27-9bb6-f90d008881b4",
-  "prevId": "e2104a3e-f1a7-44b9-8d28-13ab5eaff41c",
+  "id": "ee966d79-d852-43c8-84a1-abfed21d9765",
+  "prevId": "a067e451-2c37-403a-b11b-be96e7f064e6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -16874,6 +16874,84 @@
           "value": "\"telegram_bots\".\"last_poll_error\" in ('token_shape', 'token_refused', 'bot_exists', 'bot_mismatch', 'bot_conflict', 'chat_unreachable', 'rate_limited', 'unreachable', 'routes_version_conflict', 'chat_removed')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.telegram_channels": {
+      "name": "telegram_channels",
+      "schema": "",
+      "columns": {
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chat_id": {
+          "name": "chat_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "telegram_channels_creator_id_creators_id_fk": {
+          "name": "telegram_channels_creator_id_creators_id_fk",
+          "tableFrom": "telegram_channels",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "telegram_channels_chat_id_telegram_chats_id_fk": {
+          "name": "telegram_channels_chat_id_telegram_chats_id_fk",
+          "tableFrom": "telegram_channels",
+          "tableTo": "telegram_chats",
+          "columnsFrom": ["chat_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "telegram_channels_updated_by_user_id_fk": {
+          "name": "telegram_channels_updated_by_user_id_fk",
+          "tableFrom": "telegram_channels",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "telegram_channels_chat_unique": {
+          "name": "telegram_channels_chat_unique",
+          "nullsNotDistinct": false,
+          "columns": ["chat_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.telegram_chats": {
