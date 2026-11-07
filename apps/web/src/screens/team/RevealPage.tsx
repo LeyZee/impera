@@ -483,7 +483,7 @@ function Who({
   note,
 }: Pick<RowProps, 'row' | 'platform' | 'platformKey' | 'team'> & {
   /** A line under the account, where the reader has no gesture on the row (his own account). */
-  note?: string;
+  note?: string | undefined;
 }): JSX.Element {
   const models = modelsLine(row, platform);
   const gap = row.link?.kind === 'member' ? gapLine(row, platform) : null;
