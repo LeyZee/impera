@@ -231,7 +231,7 @@ export function heroState(
       lead: withBudget('Rien d’urgent : l’agent continue sur les autres conversations.', agent),
     };
   }
-  // Only urgencies: named as such. Otherwise how many of them are.
+  // Only urgencies: named as such. Otherwise how many of them are. Red, as the line it names (« urgent panne », 06/11).
   const headline =
     urgent === todos.length
       ? urgent === 1
@@ -239,7 +239,7 @@ export function heroState(
         : `**${String(urgent)} urgences** t’attendent`
       : `${waiting}, dont ${urgent === 1 ? 'une urgente' : `${String(urgent)} urgentes`}`;
   return {
-    tone: 'warn',
+    tone: 'bad',
     headline,
     lead: withBudget(agent.lead, agent),
     ...(agent.action === undefined ? {} : { action: agent.action }),

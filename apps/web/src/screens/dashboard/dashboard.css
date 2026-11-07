@@ -708,6 +708,10 @@ div.db-fan {
 .nv-todo__time[data-late] {
   color: var(--nv-warning);
 }
+/* On a red line, red: an urgency is never half amber. */
+.nv-todo.nv-tone--bad .nv-todo__time[data-late] {
+  color: var(--nv-danger);
+}
 /* More lines than the Dashboard shows: one way to all of them in Suivi (DASH-12). */
 .db-more {
   display: flex;

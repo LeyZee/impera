@@ -158,7 +158,10 @@ describe('heroState', () => {
       headline: '**Une chose** t’attend',
     });
     expect(heroState(agent, [todo('a', 'warn')], 'copilot').action).toBeUndefined();
+    expect(heroState(agent, [todo('a', 'warn')], 'copilot').tone).toBe('warn');
+    // An urgency turns the hero red, as its line (« urgent panne », 06/11).
     expect(heroState(agent, [todo('a', 'bad'), todo('b', 'warn')], 'copilot')).toMatchObject({
+      tone: 'bad',
       headline: '**2 choses** t’attendent, dont une urgente',
       action: 'Voir l’urgence',
     });
