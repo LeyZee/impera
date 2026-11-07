@@ -1,63 +1,49 @@
 import {
-  ADDITIONAL_INFO_MAX,
-  ageOn,
   DESIRE_BAND_FLOORS,
   KycSlotSchema,
   PERSONA_BOUNDS,
+  PERSONA_EMOJIS_MAX,
   PERSONA_OPTIONS,
-  type Persona,
+  type PersonaAgentRules,
+  type PersonaAgentSettings,
+  type PersonaFollowUps,
+  type PersonaNotifications,
   type PersonaStrategies,
 } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 
-import {
-  Choice,
-  CodeTag,
-  Entries,
-  Field,
-  Fold,
-  NumberInput,
-  Picker,
-  Segment,
-  SwitchRow,
-  TextArea,
-  TextInput,
-} from './fields';
+import { CodeTag, Entries, Field, Fold, NumberInput, Picker, Segment, SwitchRow, TextArea } from './fields';
 import {
   collectOrAll,
   desireHint,
+  emojiKey,
   followUpsSummary,
   hoursLabel,
-  isPlaceholder,
   issuesOf,
-  localDay,
-  localTime,
   minutesLabel,
   nudgesSummary,
-  physiqueSummary,
   strategySummaries,
-  type BlockId,
   type FieldIssue,
 } from './model';
 
-import { DayField } from '@/scheduling/DayField';
-import { cityOf } from '@/scheduling/time';
-
 /**
- * One component per tab, in OnlyChat's order. Each edits its own section of the draft; the numbers the policy
- * enforces carry « Règle stricte », the rest feeds the prompt. Nothing here decides: the schema does. The mark is
- * said once per group (CREA-08): on the title of the block or of the fold that holds the rules, never on each field.
+ * « Réglages de l'agent » (ADR 0079 § 4): what the code applies, block by block, never a question of her sheet. Each
+ * block edits its own part of `agent`; its fields read their issues and changes under the same path without `agent.`
+ * (`strategies.kyc.max_messages`). The numbers the policy enforces carry « Règle stricte », said once per group
+ * (CREA-08): on the title of the block or of the fold that holds the rules, never on each field.
  */
 
-export interface TabProps<K extends BlockId> {
-  readonly value: Persona[K];
-  readonly onChange: (value: Persona[K]) => void;
+export interface TabProps<T> {
+  readonly value: T;
+  readonly onChange: (value: T) => void;
   readonly issues: readonly FieldIssue[];
 }
 
 /** Empty text, or only spaces, is « not given » (null) for the optional fields of the schema. */
 export const orNull = (text: string): string | null => (text.trim() === '' ? null : text);
+
+type AgentBehavior = PersonaAgentSettings['behavior'];
 
 /** Numbers the policy enforces, side by side, under one title that carries the mark for the group. */
 function Coded({ title, children }: { title: string; children: ReactNode }): JSX.Element {
@@ -101,319 +87,56 @@ export function Block({
   );
 }
 
-/** « 26 ans aujourd’hui », on the local calendar of today; nothing for a date not yet whole or still to come. */
-export function ageLine(dateOfBirth: string, today: string = localDay()): string | undefined {
-  try {
-    const age = ageOn(dateOfBirth, today);
-    return age >= 0 ? `${String(age)} ans aujourd’hui` : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function DetailsTab({
-  value: d,
-  onChange,
-  issues,
-  timezone,
-  isOwner = false,
-}: TabProps<'details'> & {
-  /** The creator's own zone (`creators.timezone`), the one the code goes by; the persona's is a copy for the model. */
-  timezone: string | null;
-  /** Only the owner changes it, in Heures d'activité: the others are not sent where they cannot go. */
-  isOwner?: boolean;
-}): JSX.Element {
+/** How she writes, as the code applies it when sending: split messages, her pet names, the delay before answering. */
+export function AgentBehaviorTab({ value: b, onChange }: TabProps<AgentBehavior>): JSX.Element {
   const id = useId();
-  const [dobUnreadable, setDobUnreadable] = useState(false);
-  const zone = timezone ?? d.timezone;
-  const set = <F extends keyof Persona['details']>(field: F, v: Persona['details'][F]): void => {
-    onChange({ ...d, [field]: v });
-  };
-  const physiqueIssues = ['height_cm', 'weight_kg', 'shoe_size_eu', 'hair', 'eyes', 'bra'].some(
-    (field) => issuesOf(issues, `details.${field}`).length > 0,
-  );
-  return (
-    <>
-      <Block title="Qui elle est">
-        <div className="ps-grid">
-          <Field label="Prénom" id={`${id}-name`} path="details.first_name">
-            <TextInput
-              id={`${id}-name`}
-              value={d.first_name}
-              maxLength={40}
-              onChange={(v) => {
-                set('first_name', v);
-              }}
-            />
-          </Field>
-          <Field
-            label="Date de naissance"
-            id={`${id}-dob`}
-            hint={dobUnreadable ? 'Un jour comme 12/05/1998, ou 120598.' : ageLine(d.date_of_birth)}
-            path="details.date_of_birth"
-          >
-            <DayField
-              id={`${id}-dob`}
-              className="ps-input"
-              value={isPlaceholder(d.date_of_birth) ? '' : d.date_of_birth}
-              toward="past"
-              optional
-              onChange={(v) => {
-                set('date_of_birth', v);
-              }}
-              invalid={dobUnreadable}
-              onUnreadable={setDobUnreadable}
-            />
-          </Field>
-        </div>
-        <Field label="Origine" path="details.ethnicity">
-          <Choice
-            label="Origine"
-            options={PERSONA_OPTIONS.ethnicity}
-            value={d.ethnicity}
-            onChange={(v) => {
-              if (v !== null) set('ethnicity', v);
-            }}
-          />
-        </Field>
-        <Field
-          label="Langues parlées"
-          id={`${id}-languages`}
-          hint="Celles dans lesquelles elle écrit à ses fans."
-          path="details.languages"
-        >
-          <Picker
-            id={`${id}-languages`}
-            label="Langues parlées"
-            placeholder="Choisir une ou plusieurs langues"
-            empty="Aucune langue ne correspond"
-            options={PERSONA_OPTIONS.languages}
-            values={d.languages}
-            onChange={(v) => {
-              set('languages', v);
-            }}
-          />
-        </Field>
-        {/* Not a field: it does not change here. A line of text, her city and her hour (CREA-27). */}
-        <Field
-          label="Fuseau horaire"
-          hint={
-            isOwner
-              ? 'Celui de la créatrice, à changer dans Heures d’activité. Il dit à l’agent s’il fait jour ou nuit chez elle.'
-              : 'Celui de la créatrice. Il dit à l’agent s’il fait jour ou nuit chez elle.'
-          }
-          path="details.timezone"
-        >
-          <p className="ps-static-line" title={zone}>
-            {cityOf(zone)} · {localTime(zone)} chez elle
-          </p>
-        </Field>
-      </Block>
-
-      <Block title="Passions et caractère">
-        <Field label="Passions" id={`${id}-hob`} path="details.hobbies">
-          <Entries
-            id={`${id}-hob`}
-            values={d.hobbies}
-            maxLength={80}
-            placeholder="Ajouter une passion"
-            onChange={(v) => {
-              set('hobbies', v);
-            }}
-          />
-        </Field>
-        <Field label="Personnalité" id={`${id}-per`} path="details.personality">
-          <Entries
-            id={`${id}-per`}
-            values={d.personality}
-            maxLength={80}
-            placeholder="Ajouter un trait"
-            onChange={(v) => {
-              set('personality', v);
-            }}
-          />
-        </Field>
-      </Block>
-
-      <Fold title="Physique" summary={physiqueSummary(d)} open={physiqueIssues ? true : undefined}>
-        <div className="ps-grid ps-grid--3">
-          <Field label="Taille" id={`${id}-h`} path="details.height_cm">
-            <NumberInput
-              id={`${id}-h`}
-              nullable
-              unit="cm"
-              bounds={PERSONA_BOUNDS.heightCm}
-              value={d.height_cm}
-              onChange={(v) => {
-                set('height_cm', v);
-              }}
-            />
-          </Field>
-          <Field label="Poids" id={`${id}-w`} path="details.weight_kg">
-            <NumberInput
-              id={`${id}-w`}
-              nullable
-              unit="kg"
-              bounds={PERSONA_BOUNDS.weightKg}
-              value={d.weight_kg}
-              onChange={(v) => {
-                set('weight_kg', v);
-              }}
-            />
-          </Field>
-          <Field label="Pointure" id={`${id}-s`} path="details.shoe_size_eu">
-            <NumberInput
-              id={`${id}-s`}
-              nullable
-              unit="EU"
-              bounds={PERSONA_BOUNDS.shoeSizeEu}
-              value={d.shoe_size_eu}
-              onChange={(v) => {
-                set('shoe_size_eu', v);
-              }}
-            />
-          </Field>
-        </div>
-        <Field label="Cheveux" path="details.hair">
-          <Choice
-            label="Cheveux"
-            none="Non précisé"
-            options={PERSONA_OPTIONS.hair}
-            value={d.hair}
-            onChange={(v) => {
-              set('hair', v);
-            }}
-          />
-        </Field>
-        <Field label="Yeux" path="details.eyes">
-          <Choice
-            label="Yeux"
-            none="Non précisé"
-            options={PERSONA_OPTIONS.eyes}
-            value={d.eyes}
-            onChange={(v) => {
-              set('eyes', v);
-            }}
-          />
-        </Field>
-        <Field label="Tour de poitrine" path="details.bra">
-          <Choice
-            label="Tour de poitrine"
-            none="Non précisé"
-            options={PERSONA_OPTIONS.band}
-            value={d.bra?.band ?? null}
-            onChange={(band) => {
-              set('bra', band === null ? null : { band, cup: d.bra?.cup ?? 'B' });
-            }}
-          />
-        </Field>
-        {d.bra === null ? null : (
-          <Field label="Bonnet" path="details.bra.cup">
-            <Choice
-              label="Bonnet"
-              options={PERSONA_OPTIONS.cup}
-              value={d.bra.cup}
-              onChange={(cup) => {
-                if (cup !== null && d.bra !== null) set('bra', { ...d.bra, cup });
-              }}
-            />
-          </Field>
-        )}
-      </Fold>
-    </>
-  );
-}
-
-export function AdditionalInfoTab({ value, onChange }: TabProps<'additional_info'>): JSX.Element {
-  const id = useId();
-  return (
-    // CREA-12, accepted by Charles on 29/10: what the other tabs do not say yet, never the same thing twice.
-    <Block lead="Ce que les autres onglets ne disent pas encore. L’agent le lit avant chaque réponse.">
-      <Field label="Infos en plus" labelHidden id={id} path="additional_info">
-        <TextArea id={id} rows={16} value={value} maxLength={ADDITIONAL_INFO_MAX} onChange={onChange} />
-      </Field>
-    </Block>
-  );
-}
-
-export function BehaviorTab({ value: b, onChange }: TabProps<'behavior'>): JSX.Element {
-  const id = useId();
-  const set = <F extends keyof Persona['behavior']>(field: F, v: Persona['behavior'][F]): void => {
+  const set = <F extends keyof AgentBehavior>(field: F, v: AgentBehavior[F]): void => {
     onChange({ ...b, [field]: v });
   };
   return (
-    <>
-      <Block title="Comment elle écrit">
-        <Field label="Style de langage" path="behavior.language_style">
-          <Segment
-            label="Style de langage"
-            options={PERSONA_OPTIONS.languageStyle}
-            value={b.language_style}
-            onChange={(v) => {
-              set('language_style', v);
-            }}
-          />
-        </Field>
-        <Field
-          label="Consignes de langage"
-          id={`${id}-li`}
-          hint="Facultatif : tics, ponctuation, emojis, ce qu’elle n’écrit jamais."
-          path="behavior.language_instructions"
-        >
-          <TextArea
-            id={`${id}-li`}
-            value={b.language_instructions ?? ''}
-            maxLength={2000}
-            onChange={(v) => {
-              set('language_instructions', orNull(v));
-            }}
-          />
-        </Field>
-        <SwitchRow
-          label="Découper ses messages"
-          path="behavior.split_messages"
-          detail="Plusieurs bulles courtes plutôt qu’un long message."
-          checked={b.split_messages}
+    <Block title="Comportement" code>
+      <SwitchRow
+        label="Découper ses messages"
+        path="behavior.split_messages"
+        detail="Plusieurs bulles courtes plutôt qu’un long message."
+        checked={b.split_messages}
+        onChange={(v) => {
+          set('split_messages', v);
+        }}
+      />
+      <Field
+        label="Surnoms"
+        id={`${id}-pet`}
+        hint="Les seuls surnoms qu’elle donne aux fans : elle n’en utilise aucun autre."
+        path="behavior.pet_names"
+      >
+        <Entries
+          id={`${id}-pet`}
+          values={b.pet_names}
+          maxLength={30}
+          placeholder="Ajouter un surnom"
           onChange={(v) => {
-            set('split_messages', v);
+            set('pet_names', v);
           }}
         />
-      </Block>
-      <Block title="Règles strictes">
-        <Field
-          label="Surnoms"
-          id={`${id}-pet`}
-          hint="Les seuls surnoms qu’elle donne aux fans : elle n’en utilise aucun autre."
-          path="behavior.pet_names"
-        >
-          <Entries
-            id={`${id}-pet`}
-            values={b.pet_names}
-            maxLength={30}
-            placeholder="Ajouter un surnom"
-            onChange={(v) => {
-              set('pet_names', v);
-            }}
-          />
-        </Field>
-        <Field
-          label="Délai avant de répondre"
+      </Field>
+      <Field
+        label="Délai avant de répondre"
+        id={`${id}-delay`}
+        hint="Attendu avant chaque envoi, pour répondre comme une personne."
+        path="behavior.response_delay_minutes"
+      >
+        <NumberInput
           id={`${id}-delay`}
-          hint="Attendu avant chaque envoi, pour répondre comme une personne."
-          path="behavior.response_delay_minutes"
-        >
-          <NumberInput
-            id={`${id}-delay`}
-            unit="min"
-            bounds={PERSONA_BOUNDS.responseDelayMinutes}
-            value={b.response_delay_minutes}
-            onChange={(v) => {
-              set('response_delay_minutes', v ?? Number.NaN);
-            }}
-          />
-        </Field>
-      </Block>
-    </>
+          unit="min"
+          bounds={PERSONA_BOUNDS.responseDelayMinutes}
+          value={b.response_delay_minutes}
+          onChange={(v) => {
+            set('response_delay_minutes', v ?? Number.NaN);
+          }}
+        />
+      </Field>
+    </Block>
   );
 }
 
@@ -472,7 +195,7 @@ function StyleFields<S extends Strategy>({
   );
 }
 
-export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategies'>): JSX.Element {
+export function StrategiesTab({ value: s, onChange, issues }: TabProps<PersonaStrategies>): JSX.Element {
   const id = useId();
   const summaries = strategySummaries(s);
   const set = <F extends keyof PersonaStrategies>(field: F, v: PersonaStrategies[F]): void => {
@@ -482,6 +205,7 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
   const openIf = (field: string): boolean | undefined => (at(field).length > 0 ? true : undefined);
   return (
     <Block
+      title="Stratégies"
       lead={
         <>
           Comment elle mène la conversation jusqu’à la vente, étape par étape. Les prix ne se négocient jamais
@@ -772,9 +496,9 @@ function Delays({
   );
 }
 
-export function FollowUpsTab({ value: f, onChange, issues }: TabProps<'follow_ups'>): JSX.Element {
+export function FollowUpsTab({ value: f, onChange, issues }: TabProps<PersonaFollowUps>): JSX.Element {
   const id = useId();
-  const set = <F extends keyof Persona['follow_ups']>(field: F, v: Persona['follow_ups'][F]): void => {
+  const set = <F extends keyof PersonaFollowUps>(field: F, v: PersonaFollowUps[F]): void => {
     onChange({ ...f, [field]: v });
   };
   const n = f.nudges;
@@ -934,7 +658,7 @@ export function NotificationsTab({
   value: v,
   onChange,
   isOwner = false,
-}: TabProps<'notifications'> & {
+}: TabProps<PersonaNotifications> & {
   /** Réglages › Alertes is the owner's: a link for the owner, its name alone for the others. */
   isOwner?: boolean;
 }): JSX.Element {
@@ -996,8 +720,8 @@ export function NotificationsTab({
   );
 }
 
-const LIMITS: readonly {
-  readonly field: keyof Persona['limits'];
+const RULES: readonly {
+  readonly field: Exclude<keyof PersonaAgentRules, 'emojis_forbidden'>;
   readonly label: string;
   readonly placeholder: string;
   readonly hint?: string;
@@ -1026,32 +750,53 @@ const LIMITS: readonly {
   },
 ];
 
-export function LimitsTab({ value: l, onChange }: TabProps<'limits'>): JSX.Element {
+/**
+ * The guards' lists (ADR 0079 § 4): only these are applied word for word. « Zones interdites » of her sheet is free
+ * text the model reads, never a guard: a guard does not apply to a sentence.
+ */
+export function RulesTab({ value: r, onChange }: TabProps<PersonaAgentRules>): JSX.Element {
   const id = useId();
   return (
     <Block
       title="Règles strictes"
-      lead="L’agent n’envoie jamais un message qui en franchit une, quoi qu’on lui demande."
+      lead="L’agent n’envoie jamais un message qui en franchit une, quoi qu’on lui demande. Seules ces listes sont appliquées à la lettre : « Zones interdites » de sa fiche est lu par le modèle, sans garde."
     >
-      {LIMITS.map((item) => (
+      {RULES.map((item) => (
         <Field
           key={item.field}
           label={item.label}
           hint={item.hint}
           id={`${id}-${item.field}`}
-          path={`limits.${item.field}`}
+          path={`rules.${item.field}`}
         >
           <Entries
             id={`${id}-${item.field}`}
-            values={l[item.field]}
+            values={r[item.field]}
             maxLength={item.max}
             placeholder={item.placeholder}
             onChange={(values) => {
-              onChange({ ...l, [item.field]: values });
+              onChange({ ...r, [item.field]: values });
             }}
           />
         </Field>
       ))}
+      <Field
+        label="Émojis qu’elle n’utilise jamais"
+        id={`${id}-emojis`}
+        hint={`Retirés de chaque message, quoi que l’agent écrive. Un émoji par pastille, ${String(PERSONA_EMOJIS_MAX)} au plus.`}
+        path="rules.emojis_forbidden"
+      >
+        <Entries
+          id={`${id}-emojis`}
+          values={r.emojis_forbidden}
+          maxLength={16}
+          keyOf={emojiKey}
+          placeholder="Ajouter un émoji"
+          onChange={(emojis_forbidden) => {
+            onChange({ ...r, emojis_forbidden });
+          }}
+        />
+      </Field>
     </Block>
   );
 }

@@ -84,6 +84,7 @@ Branche : task/<id>-<slug>
 | EQ-18 | Journal : qui a fait quoi, lisible par le propriétaire | équipe | todo | EQ-11 |
 | EQ-19 | « Voir comme » : l'écran exact d'un chatteur, en lecture seule | équipe | todo | EQ-10, EQ-11, EQ-15, EQ-18 |
 | EQ-20 | Inviter un chatteur depuis Reveal : la part d'Équipe de l'ADR 0076 | équipe | in_progress | ADR 0076, la route et la migration de Bilan, l'écran d'Extension |
+| EQ-21 | Rappel du rapport de fin de shift sur le téléphone du chatteur | équipe | in_progress | ADR 0077, CR-01, EQ-03 |
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
@@ -108,7 +109,7 @@ Branche : task/<id>-<slug>
 | SC-07 | Mode tournage et ordre de tournage sur le téléphone de la créatrice | scripts | todo | SC-02 |
 | SC-08 | Photo d'exemple par étape | scripts | todo | SC-03, CR-06 |
 | SC-09 | Séries proposées par l'IA | scripts | blocked (clé xAI) | SC-01 |
-| PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | blocked (bot Telegram) | CR-06, CR-08, P3-07 |
+| PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | in_progress (ADR 0080, lot A1) | CR-06, P3-07 ; vidéo publique Reveal : CR-08 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | MCP-PUB | Publication par un agent externe : préparer, puis publier dans un plafond | MCP | blocked (lot 1 du MCP) | PROPOSED-mcp-read, PUB-01, PUB-02 |
 | VEI-01 | Signaux de tendance et idées de contenu : la base, les filtres, le lien collé | veille | todo | ADR 0060, CR-05, CR-06 |

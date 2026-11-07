@@ -1,8 +1,11 @@
 import type {
+  ChannelRefusal,
   CreatorId,
   Result,
   TelegramBot,
   TelegramBotId,
+  TelegramChannelConfig,
+  TelegramChannelView,
   TelegramChatId,
   TelegramDelivery,
   TelegramNightCounts,
@@ -27,7 +30,9 @@ export interface TelegramApi {
   saveRoutes(
     version: number,
     routes: readonly TelegramRoute[],
-  ): Promise<Result<{ routes: TelegramRoute[]; version: number }, TelegramRefusal | 'unknown_chat'>>;
+  ): Promise<
+    Result<{ routes: TelegramRoute[]; version: number }, TelegramRefusal | 'unknown_chat' | 'creator_channel'>
+  >;
   sendTest(chatId: TelegramChatId): Promise<Result<{ sentAt: string }, TelegramRefusal> | null>;
   listDeliveries(topic: TelegramTopic | null, limit: number): Promise<TelegramDelivery[]>;
   nightCounts(creatorId: CreatorId): Promise<TelegramNightCounts>;
@@ -37,4 +42,11 @@ export interface TelegramApi {
     entries: readonly TelegramSaleSettingsEntry[],
     userId: string,
   ): Promise<Result<TelegramSalesSettings, 'unknown_creator'>>;
+  /** Her Telegram channel (ADR 0080); null when she does not exist or is archived. */
+  channel(creatorId: CreatorId): Promise<TelegramChannelView | null>;
+  saveChannel(
+    creatorId: CreatorId,
+    config: TelegramChannelConfig,
+    userId: string,
+  ): Promise<Result<TelegramChannelView, ChannelRefusal> | null>;
 }

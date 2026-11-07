@@ -283,6 +283,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const fans = wireFans(shared);
   const connectors = wireConnectors(shared, {
     ingest: (input) => conversations.module.ingestMessage(input),
+    // The member made by `team`, the account linked by this module's own write, in one transaction (ADR 0076 § 3).
+    invite: (actor, input) =>
+      team.module.invites(connectors.module.invitationChatterLinks).fromPlatform(actor, input),
     registry: options.connectorRegistry ?? {},
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
@@ -312,12 +315,17 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const persona = wirePersona(shared);
   const team = wireTeam(shared, {
     persona: persona.module,
+    connectors: connectors.module,
     ...(options.teamClock !== undefined && { now: options.teamClock }),
   });
   // Before the planning: her calendar link's feed reads her agenda (CR-05 lot c2).
   const notifications = wireNotifications(shared);
   const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
-  const scheduling = wireScheduling(shared, { persona: persona.module, creatorTasks: creatorTasks.module });
+  const scheduling = wireScheduling(shared, {
+    persona: persona.module,
+    creatorTasks: creatorTasks.module,
+    notifications: notifications.module,
+  });
   // Late bound: her script drop reads the library's frozen versions, and the library asks her scripts through her content.
   const contentDrops = wireContentDrops(shared, {
     scriptVersions: {

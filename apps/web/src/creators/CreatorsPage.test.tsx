@@ -1,20 +1,17 @@
 // @vitest-environment jsdom
-import { personaSheetFromV1, type Me, type Persona } from '@impera/contracts';
+import { type Me, type PersonaV2 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import blocksYaml from '../../../../personas/demo/v0.2.0.yaml?raw';
+import demoYaml from '../../../../personas/demo/v0.3.0.yaml?raw';
 import { createAppRouter, type AppRouter } from '../router';
 
 import { parsePersonaYaml } from './persona/source';
 
-/** The format-2 draft the API sends beside a format-1 version (ADR 0079 § 5). */
-const asDraft = (persona: Persona) => {
-  const { persona: draft, moved } = personaSheetFromV1(persona);
-  return { draft, moved };
-};
+/** A version stored at format 2: the draft is the version itself, nothing moved (ADR 0079 § 5). */
+const asDraft = (persona: PersonaV2) => ({ draft: persona, moved: [] });
 
 /* Invented creators and members: no real data. */
 const ANNA = { id: '0192f3a0-0000-7000-8000-0000000000a1', displayName: 'Anna', timezone: 'Europe/Paris' };
@@ -82,7 +79,7 @@ const card = (creator: typeof ANNA) =>
 
 /** The creators the list answers (`null`: the list fails), each with the demo persona as her stored one. */
 async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
-  const persona = await parsePersonaYaml(blocksYaml);
+  const persona = await parsePersonaYaml(demoYaml);
   const json = (body: unknown, status = 200) =>
     Promise.resolve(new Response(JSON.stringify(body), { status }));
   vi.stubGlobal(
@@ -282,7 +279,7 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
   it('asks before dropping changes not saved, and stays when told to', async () => {
     await serve([ANNA, BEA]);
     const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
-    const name = await screen.findByLabelText('Prénom');
+    const name = await screen.findByLabelText('Surnom');
     fireEvent.change(name, { target: { value: 'Elenaa' } });
 
     fireEvent.click(screen.getByRole('link', { name: '← Créatrices' }));
@@ -292,7 +289,7 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
       expect(screen.queryByText('Tes modifications ne sont pas enregistrées.')).toBeNull();
     });
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
-    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Elenaa');
+    expect(screen.getByLabelText('Surnom')).toHaveProperty('value', 'Elenaa');
 
     // « Les abandonner » lets the navigation through, back to the list.
     fireEvent.click(screen.getByRole('link', { name: '← Créatrices' }));
@@ -304,9 +301,9 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
   it('takes the owner to Réglages › Alertes inside the app, asking first when changes wait (CREA-25)', async () => {
     await serve([ANNA]);
     const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
-    fireEvent.change(await screen.findByLabelText('Prénom'), { target: { value: 'Elenaa' } });
+    fireEvent.change(await screen.findByLabelText('Surnom'), { target: { value: 'Elenaa' } });
     expect(screen.getByText(/à changer dans Heures d’activité/u)).toBeDefined();
-    fireEvent.click(screen.getByRole('tab', { name: /Notifications/u }));
+    fireEvent.click(screen.getByRole('tab', { name: /Réglages de l’agent/u }));
     fireEvent.click(await screen.findByRole('link', { name: 'Réglages › Alertes' }));
     await screen.findByText('Tes modifications ne sont pas enregistrées.');
     fireEvent.click(screen.getByRole('button', { name: 'Les abandonner' }));

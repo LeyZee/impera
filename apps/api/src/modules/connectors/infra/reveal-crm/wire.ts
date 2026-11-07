@@ -87,7 +87,10 @@ export const RevealDailyStatsSchema = z.object({
       date: day,
       modelId: text,
       newSubscribers: cents,
+      /** Documented; optional so that a missing one never stops the check of CRM-02 (read as `null`). */
+      unsubscribes: cents.optional(),
       activeSubscribers: cents,
+      renewals: cents.optional(),
       revenueTtc: cents,
       revenueHt: cents,
       agencyRevenue: cents,

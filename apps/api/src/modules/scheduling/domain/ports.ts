@@ -9,6 +9,8 @@ import type {
   EarningsSource,
   LeaveRequestId,
   LeaveRequestStatus,
+  NotificationOutcome,
+  NotificationRequest,
   PayPeriod,
   Platform,
   PlatformAccountId,
@@ -35,6 +37,7 @@ import type {
 
 import type { CreatorAgent } from './calendar';
 import type { FeedEvent } from './calendar-feed';
+import type { ReportReminderFacts } from './report-reminders';
 import type { RatedRulesRow, Reader } from './reports';
 import type { PlannedCreators, WorkingMember } from './shifts';
 
@@ -783,4 +786,21 @@ export interface ShiftFeedbackStore {
     feedback: ShiftFeedbackInput,
     now: Date,
   ): Promise<{ feedback: StoredShiftFeedback; created: boolean }>;
+}
+
+/**
+ * A push notification asked for an account (ADR 0077): the `notifications` module's `notify`, given by the composition
+ * root. Once only per account, reason and object, however often it is asked.
+ */
+export type Notify = (request: NotificationRequest, at: Date) => Promise<NotificationOutcome>;
+
+/** What the reminders of the reports read (ADR 0077), as the admin role: they cross creators. */
+export interface ReportReminderSource {
+  /**
+   * The shifts whose report a reminder may be due for at `now`: ended in one of the two windows, not cancelled, without
+   * any report. All of them, a page at a time.
+   */
+  candidatesUnscoped(now: Date): Promise<ShiftId[]>;
+  /** One shift's facts, read again just before its reminder rings (§ 5); null when it no longer exists. */
+  factsUnscoped(shiftId: ShiftId): Promise<ReportReminderFacts | null>;
 }

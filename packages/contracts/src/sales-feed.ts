@@ -150,7 +150,11 @@ export const PlatformDailyStatSchema = z.object({
   date: z.iso.date(),
   platformModelId: z.string().min(1),
   newSubscribers: count,
+  /** Ends of subscription not renewed, on the day they end (ADR 0081); `null` when the platform did not give it. */
+  unsubscribes: count.nullable(),
   activeSubscribers: count,
+  /** `null` when the platform did not give it. */
+  renewals: count.nullable(),
   revenueInclVat: count,
   revenueExclVat: count,
   agency: count,
@@ -699,6 +703,10 @@ export const SALES_FEED_ERROR_CODES = [
   'sales_feed_team_forbidden',
   /** A linked account is not set aside: its link is changed instead (ADR 0076 § 1). */
   'sales_feed_chatter_linked_conflict',
+  /** An invitation from the review names an account the platform no longer lists (ADR 0076 § 3). */
+  'sales_feed_chatter_unprocessable',
+  /** A provider's account is linked, never invited (ADR 0076 § 2). */
+  'sales_feed_external_invite_forbidden',
 ] as const;
 export const SalesFeedErrorCodeSchema = z.enum(SALES_FEED_ERROR_CODES);
 export type SalesFeedErrorCode = z.infer<typeof SalesFeedErrorCodeSchema>;

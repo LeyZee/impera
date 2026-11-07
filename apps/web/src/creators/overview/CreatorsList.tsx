@@ -172,6 +172,7 @@ const SHORT: Readonly<Record<CreatorSheet, string>> = {
   ideas: 'Idées du jour',
   requests: 'Demandes',
   scripts: 'Scripts',
+  telegram: 'Canal Telegram',
   hours: 'Heures d’activité',
   profile: 'Profil',
 };

@@ -18,9 +18,11 @@ import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
 import { settingsOf } from '@/test/settings';
 
+/** The reader's own zone: Paris, unless a test reads the page from elsewhere. */
+const reader = vi.hoisted(() => ({ zone: 'Europe/Paris' }));
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
-  readerZone: () => 'Europe/Paris',
+  readerZone: () => reader.zone,
 }));
 
 /* Invented people (ADR 0010). Now: 01:00 on 28 October in Paris, period 16–31. */
@@ -241,6 +243,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  reader.zone = 'Europe/Paris';
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -554,6 +557,18 @@ describe('Équipe › Rapports', () => {
     };
     renderPage(lou);
     expect(await screen.findByText('Pas de shift de Lou sur cette quinzaine.')).toBeTruthy();
+  });
+
+  it('reads the shifts at the agency’s hour, the report opened from here too, wherever the reader is', async () => {
+    reader.zone = 'Indian/Antananarivo';
+    period = [report(5, 0, { status: 'validated', reviewedAt: '2026-10-27T08:00:00.000Z' })];
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Corriger' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Corriger le rapport de Théo' });
+    // 16:00 to 22:00 UTC on 26 October: 17 h – 23 h in Paris, 19 h – 1 h in Antananarivo.
+    await waitFor(() => {
+      expect(text(dialog.querySelector('.rp-lead__when'))).toContain('17 h – 23 h');
+    });
   });
 
   it('opens the fold of the member asked from his record or a shift (EQ-11, EQ-13)', async () => {

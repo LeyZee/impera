@@ -187,7 +187,8 @@
   color: var(--nv-ink-muted);
 }
 /* A link gone dead before it was opened: amber, a new one is to make (EQ-06). */
-.tm-invited--expired {
+.tm-invited--expired,
+.tm-invited--warn {
   outline-color: color-mix(in srgb, var(--nv-warning) 70%, transparent);
   color: var(--nv-warning);
 }

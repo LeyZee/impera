@@ -155,6 +155,23 @@ export class SalesFeedTeamListUnavailable extends DomainError {
   }
 }
 
+/** An invitation from the review is for an account the platform lists now (ADR 0076 § 3). */
+export class SalesFeedChatterUnprocessable extends DomainError {
+  constructor() {
+    super('sales_feed_chatter_unprocessable', 'Ce compte n’est plus dans la liste de la plateforme');
+  }
+}
+
+/** A provider's account is never invited: it is linked to a member, or to no one (ADR 0076 § 2). */
+export class SalesFeedExternalInviteForbidden extends DomainError {
+  constructor() {
+    super(
+      'sales_feed_external_invite_forbidden',
+      'Le compte d’un prestataire ne s’invite pas : relie-le à un membre existant ou à personne',
+    );
+  }
+}
+
 /** A linked account is never set aside: its link is changed instead (409, ADR 0076 § 1). */
 export class SalesFeedTeamLinked extends DomainError {
   constructor() {

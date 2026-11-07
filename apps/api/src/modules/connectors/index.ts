@@ -24,6 +24,7 @@ import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domai
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
+import { createDrizzleDailyStatsStore } from './infra/db/daily-stats-store';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import {
   createSalesFeedJobs,
@@ -36,7 +37,10 @@ import { createAvatarRoutes } from './infra/http/avatar-routes';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
 import { createSalesFeedRoutes, type SalesFeedRoutesOptions } from './infra/http/sales-feed-routes';
-import { createSalesFeedTeamRoutes } from './infra/http/sales-feed-team-routes';
+import {
+  createSalesFeedTeamRoutes,
+  type SalesFeedTeamRoutesOptions,
+} from './infra/http/sales-feed-team-routes';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
 import { createSessionVault } from './infra/session-vault';
@@ -46,6 +50,7 @@ export { createAvatarFetch } from './infra/avatar/fetch-avatar';
 export { createS3AvatarStore } from './infra/avatar/s3-avatar-store';
 export type { ConnectorRegistry } from './domain/ports';
 export type { SalesFeedRegistry } from './domain/sales-feed';
+export type { InviteFromPlatform } from './infra/http/sales-feed-team-routes';
 export type { SalesFeedFetch } from './infra/reveal-crm/adapter';
 /** @public A creator's own sales, read from her view inside `withCreatorAccount` (CRM-04 lot d): her Ventes screen's. */
 export { creatorSalesReads } from './infra/db/creator-sales-reads';
@@ -62,6 +67,11 @@ export type { ShiftSales, ShiftSalesQuery } from './infra/db/report-reads';
 /** @public The sales totals of CRM-04, in the caller's transaction: the Dashboard's and the evening digest's one sum. */
 export { salesFeedTotals } from './infra/db/totals-reads';
 export { salesFeedTimeZone } from './domain/sale-days';
+/**
+ * The daily photo of a creator's statistics (ADR 0081 § 4, § 5), read in the caller's `withTenantMember`: the owner,
+ * or an active manager when she is on his list. Counters only, never an amount.
+ */
+export { dailyStatsOf, type DailyStatsDay } from './infra/db/daily-stats-store';
 /** @public Which totals a read gives (CRM-04). */
 export type { SalesRefundsQuery, SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';
@@ -138,6 +148,8 @@ export interface ConnectorsModule {
     ): Promise<void>;
     /** Her photo copied from the platform to the media bucket, after her import (CRM-07 a2b). */
     copyAvatar(payload: JobPayload<'connector.copy_avatar'>, logger: JobLogger): Promise<void>;
+    /** The platform's daily statistics of each linked account, kept as counters (ADR 0081 § 3). */
+    readDailyStats(logger: JobLogger, correlationId: string): Promise<void>;
   };
   /** `/v1/creators/:creatorId/avatar`, behind the guard given here (owner, operator, creator). */
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
@@ -145,9 +157,9 @@ export interface ConnectorsModule {
   readonly salesFeedRoutes: (options: SalesFeedRoutesOptions) => FastifyPluginAsyncZod;
   /**
    * `/v1/settings/sales-feeds/:platform/team` (ADR 0076), behind the guard given here (owner, operator): the base
-   * keeps it to the owner and the active managers.
+   * keeps it to the owner and the active managers. Its invitation (§ 3) is `team`'s, given here too.
    */
-  readonly salesFeedTeamRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
+  readonly salesFeedTeamRoutes: (options: SalesFeedTeamRoutesOptions) => FastifyPluginAsyncZod;
   /** Every platform's feed as Réglages › Ventes shows it, never the key: the Dashboard names a stopped one (AGT-11). */
   readonly salesFeedStates: () => Promise<SalesFeedStatus[]>;
   /**
@@ -247,6 +259,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       await deps.publishConnectionState(service, signal, correlationId);
     },
     avatars,
+    dailyStats: createDrizzleDailyStatsStore(deps.adminDb),
   });
   return {
     name: 'connectors',
@@ -265,11 +278,12 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       reconcile: createReconcileJob(accountJobs),
       readSales: (logger, correlationId, woken = false) => salesFeeds.read(logger, correlationId, woken),
       checkSales: (payload, logger, correlationId) => salesFeeds.autoCheck(payload, logger, correlationId),
+      readDailyStats: (logger, correlationId) => salesFeeds.readDailyStats(logger, correlationId),
       copyAvatar: (payload, logger) => salesFeeds.copyAvatar(payload, logger),
     },
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
-    salesFeedTeamRoutes: (guard) => createSalesFeedTeamRoutes(salesFeeds.team, guard),
+    salesFeedTeamRoutes: (options) => createSalesFeedTeamRoutes(salesFeeds.team, options),
     salesFeedStates: () => salesFeeds.list(),
     invitationChatterLinks,
     teamRemovals: (userId) => salesFeeds.team.removals(userId),

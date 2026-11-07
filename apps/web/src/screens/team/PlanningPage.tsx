@@ -519,6 +519,8 @@ function Opened({
         shiftId={shiftId}
         draft={open.draft}
         from="/equipe/planning"
+        // The hours of the week it was opened from: the agency's, or the reader's own on demand (recette Équipe).
+        zone={zone}
         onClose={() => {
           // Back on the shift's sheet it was opened from, when the week still shows it (review of #553).
           onOpen(planning.shifts.some((one) => one.id === shiftId) ? { kind: 'shift', id: shiftId } : null);

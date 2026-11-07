@@ -36,3 +36,27 @@ export class TelegramCreatorInvalid extends DomainError {
     super('telegram_creator_invalid', 'Une créatrice choisie n’existe plus : recharge la page');
   }
 }
+
+/** ADR 0080: the creator of a channel setting does not exist, or is archived (404). */
+export class TelegramChannelCreatorNotFound extends DomainError {
+  constructor() {
+    super('telegram_channel_creator_not_found', 'Cette créatrice n’existe plus');
+  }
+}
+
+/** ADR 0080 § 6.1: an alert route points at a creator's channel (400); alerts never go to a public channel. */
+export class TelegramRouteToChannel extends DomainError {
+  constructor() {
+    super(
+      'telegram_route_channel_invalid',
+      'Ce canal est celui d’une créatrice : il ne reçoit jamais d’alertes de l’agence',
+    );
+  }
+}
+
+/** The channels' store is not wired (a test or a server without it): 503. */
+export class TelegramChannelsUnavailable extends DomainError {
+  constructor() {
+    super('service_unavailable', 'Les canaux Telegram ne sont pas disponibles sur ce serveur');
+  }
+}

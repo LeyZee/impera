@@ -13,6 +13,7 @@ import {
   type ConnectorRegistry,
   type ConnectorsDeps,
   type ConnectorsModule,
+  type InviteFromPlatform,
   type SalesFeedRegistry,
 } from '../modules/connectors';
 import { createFfmpegMediaTools, sniffMediaType } from '../modules/media';
@@ -32,6 +33,8 @@ export function wireConnectors(
   deps: {
     /** Called by the jobs only, once `conversations` exists (the two modules need each other's port). */
     readonly ingest: ConnectorsDeps['ingest'];
+    /** `team`'s invitation from a link proposal (ADR 0076 § 3), late bound: `team` is wired after this module. */
+    readonly invite: InviteFromPlatform;
     /** Reveal's adapter arrives with phase 1 (ADR 0008); until then no account is polled. */
     readonly registry: ConnectorRegistry;
     /** Reveal's CRM API (ADR 0050) by default; FakeReveal's in the tests. */
@@ -116,6 +119,12 @@ export function wireConnectors(
         logger,
         (payload, context) => module.jobs.checkSales(payload, context.logger, `job:${context.jobId}`),
       ),
+      'connector.read_daily_stats': defineTask(
+        'connector.read_daily_stats',
+        JOB_PAYLOADS['connector.read_daily_stats'],
+        logger,
+        (_payload, context) => module.jobs.readDailyStats(context.logger, `job:${context.jobId}`),
+      ),
       'connector.copy_avatar': defineTask(
         'connector.copy_avatar',
         JOB_PAYLOADS['connector.copy_avatar'],
@@ -126,7 +135,11 @@ export function wireConnectors(
     routes: [
       module.routes,
       module.salesFeedRoutes({ guard: requireRole('owner'), recentLogin }),
-      module.salesFeedTeamRoutes(requireRole('owner', 'operator')),
+      module.salesFeedTeamRoutes({
+        guard: requireRole('owner', 'operator'),
+        recentLogin,
+        invite: deps.invite,
+      }),
       module.salesFeedDeliveryRoutes,
       module.avatarRoutes(requireRole('owner', 'operator', 'creator')),
     ],

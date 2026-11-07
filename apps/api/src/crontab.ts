@@ -38,6 +38,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '0 6 2,17 * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.check_sales'] },
   },
+  // The platform's daily statistics of each linked account (ADR 0081 § 3): the job picks its days in the platform's
+  // zone, the 31 last at 5 h there, so the server's zone does not matter. No backfill: the next hour reads again.
+  {
+    task: 'connector.read_daily_stats',
+    match: '7 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.read_daily_stats'] },
+  },
   // The agency's percentage of each creator against her part read on the register (CRM-04 lot d3): the same days,
   // half an hour later, the fortnight just over in the agency's zone. No backfill: a missed run waits for the next
   // fortnight, and the event is published once per account and fortnight anyway.
@@ -150,6 +157,13 @@ const CRON_JOBS: readonly CronJob[] = [
     task: 'scheduling.check_reports',
     match: '*/5 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.check_reports'] },
+  },
+  // The member of a shift ended without its report is reminded on his phone (ADR 0077): 15 minutes after its end, then
+  // 12 hours after, each within its window. Each reminder rings once; no backfill, the next run finds them all.
+  {
+    task: 'scheduling.remind_reports',
+    match: '*/5 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.remind_reports'] },
   },
   // A role dated for a 1st or a 16th becomes the member's on that day (Charles, 28/10): each record takes the role in
   // force today, before the hour's recalculation. A run missed is caught up by the next one, no backfill.

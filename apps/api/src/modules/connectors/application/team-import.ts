@@ -10,7 +10,13 @@ import type {
   TeamPlatformRemoval,
 } from '@impera/contracts';
 
-import { SalesFeedTeamForbidden, SalesFeedTeamLinked, SalesFeedTeamListUnavailable } from '../domain/errors';
+import {
+  SalesFeedChatterUnprocessable,
+  SalesFeedExternalInviteForbidden,
+  SalesFeedTeamForbidden,
+  SalesFeedTeamLinked,
+  SalesFeedTeamListUnavailable,
+} from '../domain/errors';
 import type { Clock } from '../domain/ports';
 import { errorKindOf, type PlatformSalesFeed } from '../domain/sales-feed';
 import {
@@ -41,6 +47,12 @@ export interface TeamImport {
     platformChatterId: string,
     dismissed: boolean,
   ): Promise<TeamImportOverview>;
+  /**
+   * Before an invitation from a row (§ 3): the owner or an active manager, and an account the platform lists now that
+   * is not a provider's (§ 2), read live, as the batch does. Without the live list, nothing says whether it is a
+   * provider's: 503, the invitation waits.
+   */
+  invitable(platform: Platform, userId: string, platformChatterId: string): Promise<void>;
   /** What a successful reading of the list saw, kept for the badges and the removal alerts (§ 5, § 6). */
   recordReading(platform: Platform, feed: PlatformSalesFeed): Promise<void>;
   /** Each active member linked to an account removed or gone on a platform (§ 5): Équipe shows them. */
@@ -139,6 +151,16 @@ export function createTeamImport(deps: TeamImportDeps): TeamImport {
       if (done === 'forbidden') throw new SalesFeedTeamForbidden();
       if (done === 'linked') throw new SalesFeedTeamLinked();
       return read(platform, userId);
+    },
+
+    async invitable(platform, userId, platformChatterId) {
+      await allowed(userId);
+      const { feed } = await deps.live(platform);
+      const listed = feed === null ? null : await feed.listChatters();
+      if (listed?.ok !== true) throw new SalesFeedTeamListUnavailable();
+      const chatter = listed.value.find((row) => row.platformChatterId === platformChatterId);
+      if (chatter === undefined) throw new SalesFeedChatterUnprocessable();
+      if (chatter.isExternal) throw new SalesFeedExternalInviteForbidden();
     },
 
     removals: (userId) => store.removals(userId),

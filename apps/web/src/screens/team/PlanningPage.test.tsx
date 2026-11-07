@@ -1109,6 +1109,8 @@ describe('Équipe › Planning', () => {
       reviewNote: 'Il manque la vente de 21 h.',
       createdAt: '2026-10-27T21:05:00Z',
     };
+    // Read from Antananarivo: the week and his report both keep the agency's hours.
+    reader.zone = 'Indian/Antananarivo';
     serve({
       planning: planning([], [night, monday, tuesday]),
       // The reader is Théo, a manager who chats (ADR 0024).
@@ -1137,6 +1139,10 @@ describe('Équipe › Planning', () => {
     expect(within(sheet).queryByRole('link', { name: 'Sans rapport' })).toBeNull();
     fireEvent.click(within(sheet).getByRole('button', { name: 'Faire mon rapport' }));
     const panel = await screen.findByRole('dialog', { name: 'Faire mon rapport' });
+    // 15:00 to 21:00 UTC on Monday 26: 16 h – 22 h in Paris, 18 h – 0 h in Antananarivo.
+    await waitFor(() => {
+      expect(text(panel.querySelector('.rp-lead__when'))).toContain('16 h – 22 h');
+    });
     const [close] = within(panel).getAllByRole('button', { name: 'Fermer' });
     if (close === undefined) throw new Error('no way to close the panel');
     fireEvent.click(close);

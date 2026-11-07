@@ -30,8 +30,17 @@ const POLICY_EXCEPTIONS: Readonly<Record<string, string>> = {
     'USING binds the creator; WITH CHECK names the member through team_members, under RLS',
 };
 
-/** Under RLS without a policy: only `withAdmin` reads them (ADR 0068). */
-const CLOSED_TABLES = ['password_reset_links', 'telegram_link_codes', 'telegram_private_links'];
+/**
+ * Under RLS without a policy: only `withAdmin` reads them (ADR 0068; the creators' Telegram channels, ADR 0080; the
+ * calls to a platform's statistics, ADR 0081).
+ */
+const CLOSED_TABLES = [
+  'password_reset_links',
+  'sales_feed_stats_calls',
+  'telegram_channels',
+  'telegram_link_codes',
+  'telegram_private_links',
+];
 
 /**
  * Outside RLS and still reachable by `nirvana_app`, as data-model.md § RLS « Hors RLS » says, with why. A table that
