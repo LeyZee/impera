@@ -67,7 +67,7 @@ const ROW_ERRORS: Readonly<Record<TeamImportRowErrorKind, string>> = {
   member_unknown: 'Ce membre n’existe pas ou est parti',
 };
 
-export const teamLinkOf = (link: LinkSalesFeedChatterBody): TeamLinkRequest['link'] =>
+const teamLinkOf = (link: LinkSalesFeedChatterBody): TeamLinkRequest['link'] =>
   link.kind === 'none' ? null : link.kind === 'agent' ? { kind: 'agent' } : link;
 
 export function createTeamImport(deps: TeamImportDeps): TeamImport {
