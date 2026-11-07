@@ -101,3 +101,4 @@ Date : AAAA-MM-JJ
 | 0075 | Bac à sable de recette : Reveal et IA simulés, jamais actifs hors développement | accepted (précise 0008, 0009, 0016, 0050, 0027) |
 | 0076 | L'équipe s'importe depuis Reveal par des suggestions confirmées, jamais en silence | accepted (précise 0050 § 5, 0023, 0024 § Rôles et 0069) |
 | 0079 | La fiche persona reprend la fiche Desirali, onglet par onglet et question par question | accepted (précise 0010 ; remplace pour toute nouvelle version les blocs P5-01, `additional_info` et les listes fermées) |
+| 0080 | Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM | accepted (précise 0057, 0055, 0020 ; remplace pour le canal Telegram l'acceptation de 0057 § 3 et l'adresse de 0057 § 6) |
