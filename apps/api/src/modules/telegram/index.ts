@@ -61,7 +61,7 @@ import { createTelegramRoutes, type TelegramRoutesOptions } from './infra/routes
 import { createTelegramApi } from './infra/telegram-api';
 
 export { SCANNED_EVENT_TYPES } from './domain/classify';
-export type { ChannelPersonaSource, ChannelWriterPersona } from './domain/ports';
+export type { ChannelPersonaSource } from './domain/ports';
 
 export interface TelegramDeps {
   readonly bots: BotsStore;
@@ -89,7 +89,7 @@ export interface TelegramDeps {
 }
 
 /** Her persona with her guards (from `agent`) and the gateway's voice, wired by the composition root. */
-export interface ChannelWriter {
+interface ChannelWriter {
   readonly persona: ChannelPersonaSource;
   readonly gateway: Pick<LlmGateway, 'channelPost'>;
 }

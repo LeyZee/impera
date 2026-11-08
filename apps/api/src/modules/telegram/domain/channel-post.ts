@@ -75,7 +75,7 @@ export function renderChannelPost(
  * What Telegram counts of a post: the text as read, the link as read, in UTF-16 units as its entities are counted (an
  * emoji counts two: a post near the limit is refused rather than cut by Telegram).
  */
-export function visibleLength(draft: Extract<ChannelPostDraft, { kind: 'post' }>): number {
+function visibleLength(draft: Extract<ChannelPostDraft, { kind: 'post' }>): number {
   const text = draft.segments.map((segment) => segment.text).join('');
   return text.length + (draft.link === null ? 0 : 2 + draft.link.text.length);
 }

@@ -400,7 +400,7 @@ export interface ChannelsStore {
  * ADR 0080 § 5: who she is for the post, from her active persona version, and her guards on the words of a post (the
  * agent's, plus nothing explicit on a public channel). Wired from the `agent` module, matched by shape.
  */
-export interface ChannelWriterPersona {
+interface ChannelWriterPersona {
   /** Her version, as the playground names it (« 2.0.0 »). */
   readonly version: string;
   readonly creatorName: string;
@@ -410,7 +410,7 @@ export interface ChannelWriterPersona {
 /** Null when she has no active version: nothing is written for her. */
 export type ChannelPersonaSource = (creatorId: CreatorId) => Promise<ChannelWriterPersona | null>;
 
-export interface ChannelVoiceInput {
+interface ChannelVoiceInput {
   readonly creatorId: CreatorId;
   readonly kind: ChannelPostKind;
   readonly creatorName: string;
@@ -420,7 +420,7 @@ export interface ChannelVoiceInput {
   readonly destination: string | null;
   readonly advice: string | null;
 }
-export type ChannelVoiceOutput =
+type ChannelVoiceOutput =
   | { readonly kind: 'post'; readonly text: string }
   | { readonly kind: 'poll'; readonly question: string; readonly options: readonly string[] };
 /** The voice of the gateway (role `voice`, prompt `voice/telegram-channel`); null when no model answered. */
