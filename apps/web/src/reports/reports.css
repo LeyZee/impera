@@ -1328,6 +1328,13 @@ a.sc-sheet__report:focus-visible,
   }
 }
 @media (max-width: 520px) {
+  /* On a phone the account goes under the name, whole: never « sur » at a line's end and its platform below. */
+  .rp-lead__sep {
+    display: none;
+  }
+  .rp-lead__account {
+    display: block;
+  }
   .rp-line {
     grid-template-columns: minmax(0, 1fr) auto;
   }

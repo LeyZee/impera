@@ -16,6 +16,7 @@ Fait :
   - la quinzaine vérifiée est proposée (« vérifiée ») et choisie d'office avec « Ventes relevées », tant que le propriétaire n'en prend pas une autre ;
   - en « Ventes relevées », la TVA et la commission ne sont plus demandées (la plateforme donne le net) : les règles gardent celles du compte, le récapitulatif dit « Sans effet » et la carte écrit « net de la plateforme » (relecture Extension) ;
   - le récapitulatif prévient du recalcul ;
+  - au téléphone, le sous-titre de la fenêtre met le compte sous le nom, en entier (plus de « sur » en fin de ligne et « Reveal » dessous, vu en capture) ;
   - la carte du compte dit « Ventes vérifiées » ; la colonne des pastilles s'élargit sur cette carte pour que la pastille ne mange pas la phrase (vu en capture).
 - Tests :
   - unitaires `pay-rules` ;
@@ -28,4 +29,4 @@ Captures sur la pile 3 du bac à sable (Nuit/Jour, ordinateur/téléphone) : car
 
 Reste : validation des captures par Charles, relectures de Bilan (garde, contrat) et d'Extension (écran), fusion. Côté Charles, pour novembre : relancer le CRM, relier les chatteurs, saisir les shifts de novembre, vérifier du 1er au 15 le 16/11 avec l'export, puis poser les règles à partir du 1er novembre.
 
-Découvertes : dans le design system, `.nv-chip:hover:not(:disabled)` l'emporte sur `.nv-chip[aria-checked='true']` (spécificité plus forte). Une pastille cochée sous le pointeur perd son fond plein, et sur téléphone le survol reste après le toucher : on croit que le choix n'a pas pris. Toutes les pastilles de choix sont touchées. À traiter par le propriétaire du design system.
+Découvertes : dans le design system, `.nv-chip:hover:not(:disabled)` l'emporte sur `.nv-chip[aria-checked='true']` (spécificité plus forte). Une pastille cochée sous le pointeur perd son fond plein, et sur téléphone le survol reste après le toucher : on croit que le choix n'a pas pris. Toutes les pastilles de choix sont touchées. À traiter par le propriétaire du design system (fait par Extension, #661). Le sous-titre de la fenêtre du rapport de fin de shift (`ReportPanel`, même motif nom · compte) peut couper « sur / Reveal » de la même façon au téléphone ; pas touché ici.

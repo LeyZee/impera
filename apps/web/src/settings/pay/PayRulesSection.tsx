@@ -549,7 +549,9 @@ function RulesPanel({
 function AccountLead({ account }: { account: PlanningAccount }): JSX.Element {
   return (
     <>
-      <span className="rp-lead__who">{account.creatorName}</span> · {accountLine(account)}
+      <span className="rp-lead__who">{account.creatorName}</span>
+      <span className="rp-lead__sep"> · </span>
+      <span className="rp-lead__account">{accountLine(account)}</span>
     </>
   );
 }
