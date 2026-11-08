@@ -1,5 +1,6 @@
 import {
   DROP_CATEGORY_LABELS,
+  REEL_DROP_CATEGORY,
   TREND_FORMATS,
   instagramPostOf,
   type ContentIdeaOfDay,
@@ -28,7 +29,9 @@ import {
 import './ideas.css';
 
 import { askedWhen } from '@/creators/agenda/model';
+import { ReelBriefFields } from '@/creators/reel/ReelBriefFields';
 import { addDays, dayOf, longDay } from '@/scheduling/time';
+import { ReelBrief } from '@/screens/agenda/ReelBrief';
 import { CATEGORY_EMOJIS } from '@/screens/content/model';
 import { Select } from '@/shell/Select';
 import '@/creators/agenda/agency-agenda.css';
@@ -354,6 +357,15 @@ function IdeaCard({
               }}
             />
           </Field>
+          {draft.category === REEL_DROP_CATEGORY ? (
+            <ReelBriefFields
+              draft={draft.reel}
+              tried={tried}
+              onChange={(reel) => {
+                set({ reel });
+              }}
+            />
+          ) : null}
           {error === null ? null : (
             <p className="iv-error" role="alert">
               {error}
@@ -387,6 +399,12 @@ function IdeaCard({
             <b className="iv-label">À tourner</b>
             <p className="iv-text">{idea.toShoot}</p>
           </section>
+          {idea.reelBrief === null ? null : (
+            <details className="ag-brief iv-reel">
+              <summary className="ag-brief__title">Fiche reel</summary>
+              <ReelBrief brief={idea.reelBrief} />
+            </details>
+          )}
           <p className="iv-why">{idea.reason}</p>
         </>
       )}

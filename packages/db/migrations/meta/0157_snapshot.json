@@ -1,5 +1,5 @@
 {
-  "id": "98c72fd1-5d19-469a-95a2-f62c41ad7baa",
+  "id": "802283f2-f9de-4047-a10f-aeaa424790e3",
   "prevId": "3e980465-a07e-4277-8f61-7a4470f80831",
   "version": "7",
   "dialect": "postgresql",
@@ -3510,6 +3510,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "reel_brief": {
+          "name": "reel_brief",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3655,6 +3661,10 @@
         "creator_suggestions_author_check": {
           "name": "creator_suggestions_author_check",
           "value": "(\"creator_suggestions\".\"origin\" = 'agency') = (\"creator_suggestions\".\"created_by\" is not null)"
+        },
+        "creator_suggestions_reel_brief_check": {
+          "name": "creator_suggestions_reel_brief_check",
+          "value": "\"creator_suggestions\".\"reel_brief\" is null or jsonb_typeof(\"creator_suggestions\".\"reel_brief\") = 'object'"
         }
       },
       "isRLSEnabled": false
@@ -3908,6 +3918,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "reel_brief": {
+          "name": "reel_brief",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -4059,6 +4075,10 @@
         "creator_tasks_essential_check": {
           "name": "creator_tasks_essential_check",
           "value": "not \"creator_tasks\".\"essential\" or (\"creator_tasks\".\"kind\" = 'routine' and \"creator_tasks\".\"suggestion_id\" is not null)"
+        },
+        "creator_tasks_reel_brief_check": {
+          "name": "creator_tasks_reel_brief_check",
+          "value": "\"creator_tasks\".\"reel_brief\" is null or jsonb_typeof(\"creator_tasks\".\"reel_brief\") = 'object'"
         }
       },
       "isRLSEnabled": false
@@ -7024,18 +7044,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "thumbnail_key": {
-          "name": "thumbnail_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "thumbnailed_at": {
-          "name": "thumbnailed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7129,10 +7137,6 @@
         "media_assets_origin_check": {
           "name": "media_assets_origin_check",
           "value": "\"media_assets\".\"origin\" in ('creator', 'fan')"
-        },
-        "media_assets_thumbnail_check": {
-          "name": "media_assets_thumbnail_check",
-          "value": "\"media_assets\".\"thumbnail_key\" is null or (\"media_assets\".\"thumbnailed_at\" is not null and \"media_assets\".\"kind\" <> 'audio')"
         }
       },
       "isRLSEnabled": false
@@ -18415,6 +18419,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "reel_brief": {
+          "name": "reel_brief",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -18513,6 +18523,10 @@
         "content_ideas_decided_check": {
           "name": "content_ideas_decided_check",
           "value": "(\"content_ideas\".\"state\" = 'proposed') = (\"content_ideas\".\"decided_at\" is null) and (\"content_ideas\".\"decided_by\" is null or \"content_ideas\".\"decided_at\" is not null)"
+        },
+        "content_ideas_reel_brief_check": {
+          "name": "content_ideas_reel_brief_check",
+          "value": "\"content_ideas\".\"reel_brief\" is null or (jsonb_typeof(\"content_ideas\".\"reel_brief\") = 'object' and \"content_ideas\".\"category\" = 'instagram_reel')"
         }
       },
       "isRLSEnabled": false

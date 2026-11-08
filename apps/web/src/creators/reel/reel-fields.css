@@ -1,0 +1,228 @@
+/* ── « Fiche reel », the agency's form (VEI-08): fields with counters, and beside them what she will see ───────── */
+.rb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding: var(--nv-space-4);
+}
+.rb__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rb__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  letter-spacing: var(--nv-text-headline-tracking);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.rb__help {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.rb__split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--nv-space-5);
+}
+.rb__fields {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.rb__preview {
+  flex: 1.4 1 300px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.rb__preview-label {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  letter-spacing: var(--nv-text-caption-tracking);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.rb-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+.rb-field__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.rb-count {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  transition: color var(--nv-dur-fast) var(--nv-ease-out);
+}
+/* At its bound, amber: the field takes no word more. Never red: nothing is wrong. */
+.rb-count[data-full='true'] {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.rb-shots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.rb-shots__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rb-shot {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-2);
+  animation: rb-in var(--nv-dur-base) var(--nv-ease-spring-smooth) both;
+}
+.rb-shot__n {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-ink) 8%, transparent);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+/* Grows to a second line rather than cutting a word; no handle, no scroll bar. */
+.rb-shot__input.nv-field__control {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: block;
+  min-height: var(--nv-target-min);
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+}
+/* Beside the first line of a shot that wraps. */
+.rb-shot__n {
+  margin-top: calc((var(--nv-target-min) - 22px) / 2);
+}
+.rb-shot__tools {
+  margin-top: calc((var(--nv-target-min) - 30px) / 2);
+}
+.rb-shot__tools {
+  flex: none;
+  display: flex;
+  gap: 2px;
+}
+/* Quiet tools: no neon nor its glow, the neon stays on the dialog's action. */
+.nv-iconbtn.rb-shot__btn {
+  width: 30px;
+  height: 30px;
+  color: var(--nv-ink-muted);
+  background: transparent;
+  box-shadow: none;
+}
+.nv-iconbtn.rb-shot__btn:hover:not(:disabled) {
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--nv-ink) 8%, transparent);
+}
+.nv-iconbtn.rb-shot__btn:disabled {
+  background: transparent;
+  opacity: 0.35;
+  cursor: default;
+}
+.rb-shots__add {
+  align-self: flex-start;
+}
+/* The duration: a track drawn by the page, its filled part and its thumb. */
+.rb-slider {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.rb-slider__track {
+  --rb-thumb: 22px;
+  position: relative;
+  flex: 1 1 auto;
+  height: 32px;
+  cursor: pointer;
+  touch-action: none;
+  border-radius: var(--nv-radius-full);
+}
+.rb-slider__track::before {
+  content: '';
+  position: absolute;
+  inset: 13px 0;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-ink) 12%, transparent);
+}
+.rb-slider__fill {
+  position: absolute;
+  left: 0;
+  top: 13px;
+  height: 6px;
+  width: calc(var(--rb-share) * 100%);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink-muted);
+}
+.rb-slider__thumb {
+  position: absolute;
+  top: 5px;
+  left: calc(var(--rb-share) * (100% - var(--rb-thumb)));
+  width: var(--rb-thumb);
+  height: var(--rb-thumb);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-surface-raised);
+  box-shadow:
+    0 0 0 1px var(--nv-hairline),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform var(--nv-dur-fast) var(--nv-ease-spring);
+}
+.rb-slider__track:hover .rb-slider__thumb {
+  transform: scale(1.08);
+}
+.rb-slider__track:active .rb-slider__thumb {
+  transform: scale(1.18, 0.92);
+}
+.rb-slider__track:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.rb-slider__value {
+  flex: none;
+  min-width: 64px;
+  text-align: right;
+  font-size: var(--nv-text-callout);
+  color: var(--nv-ink);
+}
+@keyframes rb-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-shot {
+    animation: none;
+  }
+  .rb-count,
+  .rb-slider__thumb {
+    transition: none;
+  }
+}

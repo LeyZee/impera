@@ -3,11 +3,14 @@ import {
   CONTENT_IDEA_FORBIDDEN,
   CONTENT_IDEA_GUARD_UNPROCESSABLE,
   CONTENT_IDEA_NOT_FOUND,
+  CONTENT_IDEA_REEL_BRIEF_INVALID,
   DomainError,
   TREND_CAPTURE_READING_NOT_FOUND,
   TREND_CAPTURE_VISION_UNAVAILABLE,
   TREND_WATCH_BUDGET_LIMITED,
 } from '@impera/contracts';
+
+import type { GuardFault } from './ideas';
 
 /** A token missing, unknown or revoked: the extension asks for « Relier l'extension » again. */
 export class ExtensionLinkUnauthenticated extends DomainError {
@@ -105,13 +108,26 @@ export class ContentIdeaDecided extends DomainError {
 
 /** The idea, as corrected, breaks one of the code's guards (ADR 0060 § 4): it does not leave for her agenda. */
 export class ContentIdeaGuarded extends DomainError {
-  constructor(reason: 'no_persona' | 'limit' | 'nudity' | 'instagram_guard') {
+  /** `field`: the field at fault (`hook`, `toShoot`…), `null` without a persona. */
+  constructor(fault: Pick<GuardFault, 'reason' | 'field'>) {
     const messages = {
       no_persona: 'Sans persona active, aucune idée ne part chez elle',
       limit: 'Cette idée touche une de ses limites : corrige-la ou refuse-la',
       nudity: 'Cette idée parle de nu pour une sortie publique : corrige-la ou refuse-la',
       instagram_guard: 'Cette idée enfreint la garde Instagram : corrige-la ou refuse-la',
     };
-    super(CONTENT_IDEA_GUARD_UNPROCESSABLE, messages[reason], { details: { reason } });
+    super(CONTENT_IDEA_GUARD_UNPROCESSABLE, messages[fault.reason], {
+      details: { reason: fault.reason, field: fault.field },
+    });
+  }
+}
+
+/** A correction that leaves a reel sheet on an idea that is no longer a Reel Insta (ADR 0082 § 3). */
+export class ContentIdeaReelBriefInvalid extends DomainError {
+  constructor() {
+    super(
+      CONTENT_IDEA_REEL_BRIEF_INVALID,
+      'Une fiche reel va seulement avec un Reel Insta : retire-la ou garde le Reel',
+    );
   }
 }

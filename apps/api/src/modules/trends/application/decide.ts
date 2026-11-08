@@ -1,5 +1,6 @@
 import {
   DROP_CATEGORY_LABELS,
+  reelBriefFits,
   type AgencySuggestion,
   type ContentIdea,
   type ContentIdeaCorrection,
@@ -10,9 +11,9 @@ import {
 } from '@impera/contracts';
 
 import { touchesTerm } from '../../agent';
-import type { ShootSuggestion } from '../../creator-tasks';
-import { ContentIdeaGuarded } from '../domain/errors';
-import { guardFaultOf } from '../domain/ideas';
+import type { GuardedShoot, ShootGuardFault, ShootSuggestion } from '../../creator-tasks';
+import { ContentIdeaGuarded, ContentIdeaReelBriefInvalid } from '../domain/errors';
+import { guardFaultOf, reelBriefTexts, textsGuardFault } from '../domain/ideas';
 import type { IdeaStore } from '../domain/ports';
 
 export interface DecideDeps {
@@ -28,7 +29,10 @@ export interface DecideDeps {
   ) => Promise<AgencySuggestion>;
 }
 
-/** What she reads in her agenda of a validated idea: its title, what it is for, and what to shoot as her sheet. */
+/**
+ * What she reads in her agenda of a validated idea: its title, what it is for, what to shoot as her sheet, and its reel
+ * sheet beside it (ADR 0082 § 3).
+ */
 function shootOf(idea: ContentIdea): ShootSuggestion {
   return {
     // The idea's id: a validation replayed meets the suggestion it already made.
@@ -36,6 +40,7 @@ function shootOf(idea: ContentIdea): ShootSuggestion {
     title: idea.title,
     purpose: `Pour : ${DROP_CATEGORY_LABELS[idea.category]}`,
     shootBrief: idea.toShoot,
+    reelBrief: idea.reelBrief,
     minutes: idea.shootMinutes,
   };
 }
@@ -61,12 +66,30 @@ export async function validateIdea(
     ideaId,
     correction,
     (idea) => {
+      if (!reelBriefFits(idea)) throw new ContentIdeaReelBriefInvalid();
       const fault = guardFaultOf(idea, limits, touchesTerm);
-      if (fault !== null) throw new ContentIdeaGuarded(fault.reason);
+      if (fault !== null) throw new ContentIdeaGuarded(fault);
     },
     now,
   );
   const suggestion = await deps.suggestShoot(creatorId, userId, shootOf(validated), now);
   const idea = await deps.ideas.suggested(creatorId, userId, ideaId);
   return { idea, suggestion };
+}
+
+/**
+ * The guards of an idea, for a shoot the agency suggests by hand for a drop category (ADR 0082 § 3): its title, what it
+ * is for and its reel sheet, read as an idea is, against her persona's limits (`null` without an active one).
+ */
+export function shootGuardFault(shoot: GuardedShoot, limits: PersonaLimits | null): ShootGuardFault | null {
+  return textsGuardFault(
+    [
+      { field: 'title', text: shoot.title },
+      ...(shoot.purpose === null ? [] : [{ field: 'purpose' as const, text: shoot.purpose }]),
+      ...reelBriefTexts(shoot.reelBrief),
+    ],
+    shoot.dropCategory,
+    limits,
+    touchesTerm,
+  );
 }

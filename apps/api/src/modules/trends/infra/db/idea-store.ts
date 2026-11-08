@@ -65,6 +65,8 @@ function ideaOf(row: IdeaRow): ContentIdea {
     toShoot: row.toShoot,
     reason: row.reason,
     shootMinutes: row.shootMinutes,
+    // Parsed on read (docs/architecture/jsonb.md).
+    reelBrief: row.reelBrief,
     state: row.state,
     proposedOn: row.proposedOn,
     refusalReason: row.refusalReason,
@@ -128,6 +130,8 @@ export function createDrizzleIdeaStore(db: Database): IdeaStore {
             toShoot: corrected.toShoot,
             reason: corrected.reason,
             shootMinutes: corrected.shootMinutes,
+            // Parsed with the idea above, on its way in (docs/architecture/jsonb.md).
+            reelBrief: corrected.reelBrief,
             state: 'validated',
             decidedBy: userId,
             decidedAt: now,

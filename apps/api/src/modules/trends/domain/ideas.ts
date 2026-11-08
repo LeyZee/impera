@@ -6,7 +6,9 @@ import {
   nudityIn,
   PUBLIC_DROP_CATEGORIES,
   type ContentIdeaDraft,
+  type IdeaDropCategory,
   type PersonaLimits,
+  type ReelBrief,
   type TrendSignalId,
 } from '@impera/contracts';
 
@@ -19,12 +21,9 @@ import {
 
 /** Why an idea was dropped. */
 type IdeaDrop =
-  | { readonly reason: 'no_persona' }
-  | { readonly reason: 'limit'; readonly term: string }
+  | GuardFault
   | { readonly reason: 'too_close' }
   | { readonly reason: 'refused_before' }
-  | { readonly reason: 'nudity'; readonly word: string }
-  | { readonly reason: 'instagram_guard' }
   | { readonly reason: 'no_live_signal' }
   | { readonly reason: 'over_daily_cap' };
 
@@ -110,30 +109,84 @@ function limitTerms(limits: PersonaLimits): readonly string[] {
   return [...limits.never_do, ...limits.never_show, ...limits.never_say, ...limits.disgusts];
 }
 
-/** What an idea's own text breaks, whoever wrote it: her limits, « jamais de nu » for a public output, the Instagram guard. */
-export type GuardFault = Extract<IdeaDrop, { reason: 'no_persona' | 'limit' | 'nudity' | 'instagram_guard' }>;
+/** The fields of an idea or of a shoot suggested by hand that the guards read, each on its own to name the one at fault. */
+type GuardedField = 'title' | 'toShoot' | 'reason' | 'purpose' | 'hook' | 'onScreen' | 'shots' | 'ending';
+
+export interface GuardedText {
+  readonly field: GuardedField;
+  readonly text: string;
+}
+
+/**
+ * What an idea's own text breaks, whoever wrote it: her limits, « jamais de nu » for a public output, the Instagram
+ * guard; with the field at fault (`null` without a persona, where no field is).
+ */
+export type GuardFault =
+  | { readonly reason: 'no_persona'; readonly field: null }
+  | { readonly reason: 'limit'; readonly term: string; readonly field: GuardedField }
+  | { readonly reason: 'nudity'; readonly word: string; readonly field: GuardedField }
+  | { readonly reason: 'instagram_guard'; readonly field: GuardedField };
+
+/** The texts of a reel sheet (ADR 0082 § 3), read by the guards like the rest of the idea. */
+export function reelBriefTexts(brief: ReelBrief | null): readonly GuardedText[] {
+  if (brief === null) return [];
+  return [
+    { field: 'hook', text: brief.hook },
+    ...(brief.onScreen === null ? [] : [{ field: 'onScreen' as const, text: brief.onScreen }]),
+    { field: 'shots', text: brief.shots.join('\n') },
+    ...(brief.ending === null ? [] : [{ field: 'ending' as const, text: brief.ending }]),
+  ];
+}
+
+/**
+ * The guards a text of a drop category is read against, the same each time: her limits first, then « jamais de nu »
+ * for a public output, then the Instagram guard; each reads every field before the next one, in the given order.
+ */
+export function textsGuardFault(
+  texts: readonly GuardedText[],
+  category: IdeaDropCategory,
+  limits: PersonaLimits | null,
+  touches: (text: string, term: string) => boolean,
+): GuardFault | null {
+  // No persona, no idea: nothing can tell what touches her.
+  if (limits === null) return { reason: 'no_persona', field: null };
+  const terms = limitTerms(limits);
+  for (const { field, text } of texts) {
+    const term = terms.find((entry) => touches(text, entry));
+    if (term !== undefined) return { reason: 'limit', term, field };
+  }
+  if (PUBLIC_DROP_CATEGORIES.has(category))
+    for (const { field, text } of texts) {
+      const word = nudityIn(text);
+      if (word !== null) return { reason: 'nudity', word, field };
+    }
+  if (INSTAGRAM_DROP_CATEGORIES.has(category))
+    for (const { field, text } of texts)
+      if (instagramFaults(text).length > 0) return { reason: 'instagram_guard', field };
+  return null;
+}
 
 /**
  * The guards an idea's text is read against, as the model wrote it or as the agency corrected it (« Idées du jour »,
  * ADR 0060 § 5): the same reading both times, so that a correction never sends what the filters would have dropped.
+ * Its reel sheet is read with it (ADR 0082 § 3).
  */
 export function guardFaultOf(
-  idea: Pick<ContentIdeaDraft, 'title' | 'category' | 'toShoot' | 'reason'>,
+  idea: Pick<ContentIdeaDraft, 'title' | 'category' | 'toShoot' | 'reason' | 'reelBrief'>,
   limits: PersonaLimits | null,
   touches: (text: string, term: string) => boolean,
 ): GuardFault | null {
-  const text = `${idea.title}\n${idea.toShoot}\n${idea.reason}`;
-  // No persona, no idea: nothing can tell what touches her.
-  if (limits === null) return { reason: 'no_persona' };
-  const term = limitTerms(limits).find((entry) => touches(text, entry));
-  if (term !== undefined) return { reason: 'limit', term };
-  if (PUBLIC_DROP_CATEGORIES.has(idea.category)) {
-    const word = nudityIn(text);
-    if (word !== null) return { reason: 'nudity', word };
-  }
-  if (INSTAGRAM_DROP_CATEGORIES.has(idea.category) && instagramFaults(text).length > 0)
-    return { reason: 'instagram_guard' };
-  return null;
+  return textsGuardFault(
+    [
+      { field: 'title', text: idea.title },
+      { field: 'toShoot', text: idea.toShoot },
+      { field: 'reason', text: idea.reason },
+      ...reelBriefTexts(idea.reelBrief),
+    ],
+    idea.category,
+    limits,
+    touches,
+  );
 }
 
 function dropOf(

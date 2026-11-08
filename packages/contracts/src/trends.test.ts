@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { IdeaDropCategorySchema } from './content-drops';
 import {
   ContentIdeaCorrectionSchema,
-  IdeaDropCategorySchema,
   instagramPostOf,
   InstagramPostUrlSchema,
   PasteTrendLinkBodySchema,

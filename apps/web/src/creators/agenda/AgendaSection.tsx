@@ -1,4 +1,12 @@
-import { CREATOR_TASK_CATEGORY_LABELS, type AgencySuggestion, type CreatorId } from '@impera/contracts';
+import {
+  CREATOR_TASK_CATEGORY_LABELS,
+  DROP_CATEGORY_LABELS,
+  IdeaDropCategorySchema,
+  REEL_DROP_CATEGORY,
+  type AgencySuggestion,
+  type CreatorId,
+  type IdeaDropCategory,
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
@@ -15,6 +23,8 @@ import {
 } from './model';
 import './agency-agenda.css';
 
+import { ReelBriefFields } from '@/creators/reel/ReelBriefFields';
+import { emptyReelDraft, reelBriefOf, reelProblems, type ReelDraft } from '@/creators/reel/model';
 import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { addDays, cityOf, dayOf, mondayOf, readerZone, weekdayOf, weekLabel } from '@/scheduling/time';
 import {
@@ -29,7 +39,9 @@ import {
 } from '@/screens/agenda/AddDialog';
 import { CategoryMark } from '@/screens/agenda/category';
 import { taskProblems, type TaskDraft } from '@/screens/agenda/draft';
+import { CATEGORY_EMOJIS } from '@/screens/content/model';
 import { Dialog } from '@/shell/Dialog';
+import { Select } from '@/shell/Select';
 import '@/screens/agenda/agenda.css';
 import '@/screens/team/team.css';
 
@@ -284,12 +296,16 @@ function ProposeDialog({
       reminderMinutes: null,
     };
   });
+  const [dropCategory, setDropCategory] = useState<IdeaDropCategory | null>(null);
+  const [reel, setReel] = useState<ReelDraft>(emptyReelDraft);
   const [suggestionId] = useState(newSuggestionId);
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const { unreadable, onUnreadable } = useUnreadableTimes();
+  const forReel = draft.category === 'shoot' && dropCategory === REEL_DROP_CATEGORY;
   const problems = taskProblems(draft);
+  const reelMissing = forReel ? reelProblems(reel) : [];
   const elsewhere = readerZone() !== zone;
   const set = (patch: Partial<TaskDraft>): void => {
     setDraft((before) => ({ ...before, ...patch }));
@@ -297,13 +313,14 @@ function ProposeDialog({
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
     setTried(true);
-    if (problems.length > 0 || unreadable) return;
+    if (problems.length > 0 || reelMissing.length > 0 || unreadable) return;
     setBusy(true);
     setFailed(null);
-    void suggestTask(creatorId, suggestionBodyOf(draft, zone, suggestionId)).then(async (outcome) => {
+    const shoot = { dropCategory, reelBrief: forReel ? reelBriefOf(reel) : null };
+    void suggestTask(creatorId, suggestionBodyOf(draft, zone, suggestionId, shoot)).then(async (outcome) => {
       setBusy(false);
       if (outcome.kind !== 'ok') {
-        setFailed(SUGGEST_ERRORS[outcome.kind]);
+        setFailed(outcome.kind === 'guarded' ? outcome.message : SUGGEST_ERRORS[outcome.kind]);
         return;
       }
       await client.invalidateQueries({ queryKey: suggestionsKey(creatorId, outcome.suggestion.week) });
@@ -311,7 +328,11 @@ function ProposeDialog({
     });
   };
   return (
-    <Dialog title={`Proposer à ${creatorName}`} className="ag-scope" onClose={onClose}>
+    <Dialog
+      title={`Proposer à ${creatorName}`}
+      className={forReel ? 'ag-scope aa-dialog--reel' : 'ag-scope'}
+      onClose={onClose}
+    >
       <form className="tm-dialog__body" noValidate onSubmit={submit}>
         <Preview
           mark={<CategoryMark category={draft.category} size="lg" />}
@@ -399,6 +420,31 @@ function ProposeDialog({
             compte pour sa série.
           </p>
         ) : null}
+        {draft.category === 'shoot' ? (
+          <div className="nv-field tm-field">
+            <label className="nv-field__label" htmlFor={`${id}-for`}>
+              Pour <span className="ag-optional">facultatif</span>
+            </label>
+            <Select<IdeaDropCategory | 'none'>
+              id={`${id}-for`}
+              value={dropCategory ?? 'none'}
+              options={[
+                { value: 'none', label: 'Rien de précis' },
+                ...IdeaDropCategorySchema.options.map((category) => ({
+                  value: category,
+                  label: `${CATEGORY_EMOJIS[category]} ${DROP_CATEGORY_LABELS[category]}`,
+                })),
+              ]}
+              onChange={(picked) => {
+                setDropCategory(picked === 'none' ? null : picked);
+              }}
+            />
+            {dropCategory === null ? null : (
+              <p className="tm-hint">Relue par ses limites et la garde de cette sortie avant de partir.</p>
+            )}
+          </div>
+        ) : null}
+        {forReel ? <ReelBriefFields draft={reel} tried={tried} onChange={setReel} /> : null}
         <div className="nv-field tm-field">
           <label className="nv-field__label" htmlFor={`${id}-purpose`}>
             À quoi ça sert <span className="ag-optional">facultatif</span>

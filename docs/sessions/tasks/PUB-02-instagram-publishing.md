@@ -8,7 +8,7 @@ Branche : task/pub-02-instagram
 Les dépôts Instagram entrent dans le plan de la semaine et partent par l'API officielle, avec la garde de légende, le quota, l'accord de la créatrice et le mode assisté pour les Reels qui ont besoin d'un son.
 
 ## Contexte à lire
-ADR 0057 (tout), ADR 0016, ADR 0055, la documentation officielle de l'API Instagram (publication de contenu) au moment du lot.
+ADR 0057 (tout), ADR 0016, ADR 0055, la documentation officielle de l'API Instagram (publication de contenu) au moment du lot. ADR 0082 § 2 et PUB-03 : la fenêtre visible d'une légende et son aperçu, à brancher dans le lot des légendes.
 
 ## À faire
 - [ ] `FakeInstagram`, puis l'adaptateur : conteneur, état, publication ; quota compté.

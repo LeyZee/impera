@@ -17,6 +17,8 @@ import {
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
+import { guardedSentence } from '@/creators/reel/model';
+
 /**
  * « Idées du jour » (VEI-02, ADR 0060 § 5) and « Coller un lien » (§ 2, source 4), the owner's and an active
  * manager's. Every answer is parsed with the contract: a shape the page does not expect reads as « Le serveur ne
@@ -81,7 +83,10 @@ async function send<T>(path: string, body: unknown, read: (json: unknown) => T):
   if (code === CONTENT_IDEA_DECIDED_CONFLICT) return { kind: 'decided', message: IDEA_ERRORS.decided };
   // The server's sentence names the guard (her limit, « jamais de nu », Instagram): said as it is.
   if (code === CONTENT_IDEA_GUARD_UNPROCESSABLE && refusal.success) {
-    return { kind: 'guarded', message: `${refusal.data.error.message}.` };
+    return {
+      kind: 'guarded',
+      message: guardedSentence(refusal.data.error.message, refusal.data.error.details),
+    };
   }
   if (response.status === 403 || response.status === 404) {
     return { kind: 'forbidden', message: IDEA_ERRORS.forbidden };
