@@ -9,7 +9,9 @@ const value = (patch: Partial<FanCardValue> = {}): FanCardValue => ({
   source: 'declared',
   observedAt: '2026-11-05T18:00:00Z',
   notedBy: null,
+  notedByName: null,
   sourceMessageId: null,
+  sourceQuote: null,
   ...patch,
 });
 
@@ -35,6 +37,9 @@ describe('the fan card (ADR 0085, lot c)', () => {
     expect(sourceLine(value({ source: 'noted', observedAt: '2026-11-07T12:00:00Z' }), now)).toBe(
       'Noté par un chatteur, hier',
     );
+    expect(
+      sourceLine(value({ source: 'noted', notedByName: 'Léa', observedAt: '2026-11-07T12:00:00Z' }), now),
+    ).toBe('Noté par Léa, hier');
     expect(ageOf('2026-11-08T17:59:40Z', now)).toBe('à l’instant');
     expect(ageOf('2026-09-01T18:00:00Z', now)).toBe('il y a 2 mois');
   });

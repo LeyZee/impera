@@ -75,8 +75,16 @@ export function ageOf(iso: string, now: Date): string {
 }
 
 /** « Dit par lui, il y a 3 jours » (§ 5): a value guessed is said as a guess. */
-export const sourceLine = (value: FanCardValue, now: Date): string =>
-  `${SOURCE_WORDS[value.source]}, ${ageOf(value.observedAt, now)}`;
+export function sourceLine(
+  value: Pick<FanCardValue, 'source' | 'observedAt' | 'notedByName'>,
+  now: Date,
+): string {
+  const who =
+    value.source === 'noted' && value.notedByName !== null
+      ? `Noté par ${value.notedByName}`
+      : SOURCE_WORDS[value.source];
+  return `${who}, ${ageOf(value.observedAt, now)}`;
+}
 
 /** The specs of a group, in the card's order. */
 export const fieldsOf = (group: FanCardGroup): readonly FanCardFieldSpec[] =>

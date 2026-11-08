@@ -23,7 +23,9 @@ const value = (items: string[], patch: Partial<FanCardValue> = {}): FanCardValue
   source: 'declared',
   observedAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
   notedBy: null,
+  notedByName: null,
   sourceMessageId: null,
+  sourceQuote: null,
   ...patch,
 });
 
@@ -106,7 +108,13 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
   it('shows each group folded with how full it is, and a value with where it comes from', async () => {
     view = card({
       first_name: { current: value(['Marc']), toCheck: [] },
-      payday: { current: value(['début du mois'], { source: 'inferred' }), toCheck: [] },
+      payday: {
+        current: value(['début du mois'], {
+          source: 'inferred',
+          sourceQuote: 'je suis payé le 1er, on verra',
+        }),
+        toCheck: [],
+      },
     });
     renderCard();
     const him = await group('Lui');
@@ -115,6 +123,10 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
     expect(within(name).getByText('Marc')).toBeTruthy();
     expect(within(name).getByText('Dit par lui, il y a 3 jours')).toBeTruthy();
     expect(within(field(him, /^Quand il a de l’argent/u)).getByText('Deviné, il y a 3 jours')).toBeTruthy();
+    // A guess shows his words it rests on, as his words.
+    expect(
+      within(field(him, /^Quand il a de l’argent/u)).getByText('je suis payé le 1er, on verra').tagName,
+    ).toBe('Q');
     expect(within(field(him, /^Son métier/u)).getByText('Pas encore su')).toBeTruthy();
     expect(within(field(him, /^Ses humeurs fréquentes/u)).getByText('Pas encore deviné')).toBeTruthy();
   });

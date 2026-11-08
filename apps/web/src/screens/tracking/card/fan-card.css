@@ -47,6 +47,16 @@
   margin: 0;
   color: var(--nv-ink-faint);
 }
+.tr-card__quote {
+  display: block;
+  margin: 0;
+  color: var(--nv-ink-muted);
+  overflow-wrap: anywhere;
+}
+.tr-card__quote q {
+  color: var(--nv-ink);
+  quotes: '«\00a0' '\00a0»';
+}
 .tr-card__choices {
   display: flex;
   flex-wrap: wrap;

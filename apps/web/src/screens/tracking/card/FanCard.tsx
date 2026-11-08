@@ -1,4 +1,10 @@
-import type { FanCardEntry, FanCardField, FanCardFieldSpec, SetFanCardFieldBody } from '@impera/contracts';
+import type {
+  FanCardEntry,
+  FanCardField,
+  FanCardFieldSpec,
+  FanCardValue,
+  SetFanCardFieldBody,
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
@@ -100,9 +106,7 @@ export function FanCard({ creatorId, fanId }: { creatorId: string; fanId: string
             {view.others.map((other) => (
               <li key={`${other.key}-${other.observedAt}`} className="tr-card__field">
                 <p className="tr-card__value">{other.value}</p>
-                <p className="tr-card__source">
-                  {sourceLine({ ...other, items: [other.value], notedBy: null, sourceMessageId: null }, now)}
-                </p>
+                <p className="tr-card__source">{sourceLine({ ...other, notedByName: null }, now)}</p>
               </li>
             ))}
           </ul>
@@ -277,7 +281,12 @@ function FieldRow({
         <p className="tr-card__value">{valueText(spec.field, current.items)}</p>
       )}
 
-      {current === null || editing ? null : <p className="tr-card__source">{sourceLine(current, now)}</p>}
+      {current === null || editing ? null : (
+        <>
+          <p className="tr-card__source">{sourceLine(current, now)}</p>
+          <Quote value={current} />
+        </>
+      )}
 
       {toCheck.length === 0 ? null : (
         <div className="tr-card__check" role="group" aria-label={`${spec.label} : à vérifier`}>
@@ -287,6 +296,7 @@ function FieldRow({
               <span className="tr-card__check-text">
                 « {valueText(spec.field, value.items)} »
                 <span className="tr-card__source"> {sourceLine(value, now)}</span>
+                <Quote value={value} />
               </span>
               <button
                 type="button"
@@ -320,5 +330,15 @@ function FieldRow({
         </p>
       )}
     </li>
+  );
+}
+
+/** His words a value rests on (ADR 0085 § 5): shown as his, never read as an instruction; nothing when there are none. */
+function Quote({ value }: { value: FanCardValue }): JSX.Element | null {
+  if (value.sourceQuote === null) return null;
+  return (
+    <span className="tr-card__quote">
+      Il a écrit : <q>{value.sourceQuote}</q>
+    </span>
   );
 }
