@@ -40,9 +40,10 @@ export function createPayRulesService(
       return {
         currentPeriod: read.currentPeriod,
         accounts: read.accounts
-          .map(({ account, rules }) => ({
+          .map(({ account, rules, checkedPeriod }) => ({
             account: toPlanningAccount(account, creatorNames),
             rules: rules.map(toPayRulesDto),
+            checkedPeriod,
           }))
           .toSorted(
             (a, b) =>

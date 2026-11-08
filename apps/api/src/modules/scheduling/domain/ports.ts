@@ -611,14 +611,17 @@ interface NewPayRules {
  * running now is read in the agency's zone, in the same transaction.
  */
 export interface PayRulesStore {
-  /** Every account of the creators, with its rules newest first, and the period running at `now`. */
+  /**
+   * Every account of the creators, with its rules newest first and the fortnight the owner may switch it from although
+   * it began (ADR 0084, `null` for a manager), and the period running at `now`.
+   */
   list(
     actor: UserId,
     creatorIds: readonly CreatorId[],
     now: Date,
   ): Promise<{
     currentPeriod: PayPeriod;
-    accounts: { account: StoredAccount; rules: StoredPayRules[] }[];
+    accounts: { account: StoredAccount; rules: StoredPayRules[]; checkedPeriod: PayPeriod | null }[];
   }>;
   /** Owner; `created` is false when the same rules were already recorded. */
   create(actor: Actor, rules: NewPayRules, now: Date): Promise<{ rules: StoredPayRules; created: boolean }>;
