@@ -1,4 +1,9 @@
-import { IdeaDropCategorySchema, type IdeaDropCategory } from '@impera/contracts';
+import {
+  IdeaDropCategorySchema,
+  REEL_DROP_CATEGORY,
+  type IdeaDropCategory,
+  type ReelBrief,
+} from '@impera/contracts';
 import type {
   ContentIdeaCorrection,
   ContentIdeaOfDay,
@@ -7,6 +12,8 @@ import type {
   TrendMetrics,
   TrendSignalSource,
 } from '@impera/contracts';
+
+import { reelBriefOf, reelDraftOf, reelProblems, type ReelDraft } from '@/creators/reel/model';
 
 /*
  * « Idées du jour » (VEI-02): pure rules, so that the screen only lays them out and the tests read them without a
@@ -93,6 +100,8 @@ export interface IdeaDraft {
   readonly toShoot: string;
   readonly reason: string;
   readonly shootMinutes: string;
+  /** Its reel sheet (ADR 0082 § 3), shown and sent only while the idea is a Reel Insta. */
+  readonly reel: ReelDraft;
 }
 
 export const draftOf = (idea: ContentIdeaOfDay): IdeaDraft => ({
@@ -101,7 +110,12 @@ export const draftOf = (idea: ContentIdeaOfDay): IdeaDraft => ({
   toShoot: idea.toShoot,
   reason: idea.reason,
   shootMinutes: String(idea.shootMinutes),
+  reel: reelDraftOf(idea.reelBrief),
 });
+
+/** The reel sheet the draft sends: its own for a Reel Insta, none for any other category. */
+const reelOf = (draft: IdeaDraft): ReelBrief | null =>
+  draft.category === REEL_DROP_CATEGORY ? reelBriefOf(draft.reel) : null;
 
 /** Why the draft cannot be sent as it is, field by field; empty when it can. */
 export function draftProblems(draft: IdeaDraft): Partial<Record<keyof IdeaDraft, string>> {
@@ -116,6 +130,8 @@ export function draftProblems(draft: IdeaDraft): Partial<Record<keyof IdeaDraft,
   const minutes = Number(draft.shootMinutes.trim());
   if (!/^\d{1,3}$/u.test(draft.shootMinutes.trim()) || minutes < 1 || minutes > 600)
     problems.shootMinutes = 'Entre 1 et 600 minutes.';
+  // Said under the reel sheet's own fields (`ReelBriefFields`); here it only holds the sending back.
+  if (draft.category === REEL_DROP_CATEGORY && reelProblems(draft.reel).length > 0) problems.reel = 'reel';
   return problems;
 }
 
@@ -127,6 +143,7 @@ export function correctionOf(idea: ContentIdeaOfDay, draft: IdeaDraft): ContentI
     toShoot?: string;
     reason?: string;
     shootMinutes?: number;
+    reelBrief?: ReelBrief | null;
   } = {};
   const title = draft.title.trim();
   const toShoot = draft.toShoot.trim();
@@ -137,5 +154,7 @@ export function correctionOf(idea: ContentIdeaOfDay, draft: IdeaDraft): ContentI
   if (toShoot !== idea.toShoot) correction.toShoot = toShoot;
   if (reason !== idea.reason) correction.reason = reason;
   if (minutes !== idea.shootMinutes) correction.shootMinutes = minutes;
+  const reel = reelOf(draft);
+  if (JSON.stringify(reel) !== JSON.stringify(idea.reelBrief)) correction.reelBrief = reel;
   return Object.keys(correction).length === 0 ? null : correction;
 }

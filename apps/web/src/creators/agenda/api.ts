@@ -3,6 +3,7 @@ import {
   AgencySuggestionSchema,
   ApiErrorSchema,
   SUGGESTION_DECLINED_RECENTLY_CONFLICT,
+  SUGGESTION_GUARD_UNPROCESSABLE,
   SUGGESTION_ID_CONFLICT,
   SUGGESTION_OPEN_CONFLICT,
   type AgencySuggestion,
@@ -11,6 +12,8 @@ import {
   type CreatorId,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+
+import { guardedSentence } from '@/creators/reel/model';
 
 /**
  * `/v1/creators/:creatorId/suggestions` (CR-05 lot c), the owner's and an active manager's. Every answer is parsed
@@ -49,11 +52,13 @@ export type SuggestOutcome =
   | { readonly kind: 'taken' }
   /** 403: not the owner nor an active manager of hers. */
   | { readonly kind: 'forbidden' }
+  /** 422: a shoot for an output that touches one of her limits or breaks a guard; the server's sentence and field. */
+  | { readonly kind: 'guarded'; readonly message: string }
   /** Any other refusal: what was typed is not taken as it is. */
   | { readonly kind: 'refused' }
   | { readonly kind: 'failed' };
 
-export const SUGGEST_ERRORS: Readonly<Record<Exclude<SuggestOutcome['kind'], 'ok'>, string>> = {
+export const SUGGEST_ERRORS: Readonly<Record<Exclude<SuggestOutcome['kind'], 'ok' | 'guarded'>, string>> = {
   declined_recently:
     'Elle a refusé cette tâche cette semaine ou la semaine dernière : on ne la lui repropose pas tout de suite.',
   open: 'Cette tâche lui est déjà proposée cette semaine et attend sa réponse : rien n’a été envoyé.',
@@ -79,6 +84,11 @@ export async function suggestTask(creatorId: CreatorId, body: CreateSuggestionBo
     if (code === SUGGESTION_DECLINED_RECENTLY_CONFLICT) return { kind: 'declined_recently' };
     if (code === SUGGESTION_OPEN_CONFLICT) return { kind: 'open' };
     if (code === SUGGESTION_ID_CONFLICT) return { kind: 'taken' };
+    if (code === SUGGESTION_GUARD_UNPROCESSABLE && refusal.success)
+      return {
+        kind: 'guarded',
+        message: guardedSentence(refusal.data.error.message, refusal.data.error.details),
+      };
     return response.status >= 500 ? { kind: 'failed' } : { kind: 'refused' };
   } catch {
     return { kind: 'failed' };

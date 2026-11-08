@@ -1,0 +1,142 @@
+/* ── Her reel sheet (VEI-08, ADR 0082 § 3): drawn rather than read; the same in the agency's preview ─────────────── */
+.ag-reel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding-top: var(--nv-space-1);
+}
+.ag-reel__label {
+  display: block;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  letter-spacing: var(--nv-text-caption-tracking);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.ag-reel__hook {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+/* Her first sentence, what she says first: the largest words of the sheet, in the serif of a spoken line. */
+.ag-reel__quote {
+  font-family: var(--nv-font-serif);
+  font-size: var(--nv-text-whisper);
+  line-height: var(--nv-text-whisper-leading);
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+  quotes: '« ' ' »';
+}
+.ag-reel__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--nv-space-4);
+}
+.ag-reel__figure {
+  flex: 0 0 120px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+}
+.ag-reel__frame {
+  position: relative;
+  width: 120px;
+  aspect-ratio: 9 / 16;
+}
+.ag-reel__frame svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ag-reel__screen {
+  fill: color-mix(in srgb, var(--nv-ink) 3%, var(--nv-surface-raised));
+}
+.ag-reel__covered {
+  fill: color-mix(in srgb, var(--nv-ink) 14%, transparent);
+}
+.ag-reel__hatch {
+  stroke: color-mix(in srgb, var(--nv-ink) 10%, transparent);
+  stroke-width: 1.2;
+}
+.ag-reel__edge {
+  fill: none;
+  stroke: color-mix(in srgb, var(--nv-ink) 22%, transparent);
+  stroke-width: 1;
+}
+.ag-reel__clear {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--nv-space-1);
+}
+.ag-reel__onscreen {
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: var(--nv-radius-xs);
+  background: var(--nv-ink);
+  color: var(--nv-surface-raised);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.ag-reel__caption {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+}
+.ag-reel__plan {
+  flex: 1 1 160px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.ag-reel__shots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: var(--nv-space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ag-reel__shot {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+}
+.ag-reel__n {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-ink) 8%, transparent);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.ag-reel__ending {
+  margin: var(--nv-space-1) 0 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+}
+.ag-reel__length {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-callout);
+  color: var(--nv-ink);
+}
