@@ -16,14 +16,162 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Three bands: « où on en est » on top, the card scrolling between, the agent's draft at the foot. Only the card moves. */
 .cp {
   box-sizing: border-box;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.cp-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--nv-hairline) transparent;
   padding: var(--nv-space-3) var(--nv-space-3) var(--nv-space-5);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
+}
+
+/* ───────────── Où on en est ───────────── */
+
+.cp-standing {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 2px;
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-3) var(--nv-space-2);
+  border-bottom: 1px solid var(--nv-hairline);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.cp-standing__stop {
+  font-weight: 600;
+  color: var(--nv-danger);
+}
+.cp-standing__care {
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+.cp-standing__band {
+  color: var(--nv-ink);
+}
+.cp-standing__dot {
+  color: var(--nv-ink-faint);
+}
+
+/* ───────────── The agent's draft ───────────── */
+
+.cp-draft {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  max-height: 55%;
+  overflow-y: auto;
+  padding: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+  background: var(--nv-glass-fill);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.cp-draft__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.cp-draft__title {
+  font-weight: 600;
+}
+.cp-draft__hint {
+  margin: 0;
+  color: var(--nv-ink-faint);
+}
+.cp-draft__writing {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.cp-bubbles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The design system's draft bubble, held still: dashed, nothing sent yet (§ 10, nothing moves). */
+.cp-bubble {
+  max-width: 88%;
+  padding: 7px 12px;
+  border-radius: var(--nv-radius-md);
+  border-bottom-right-radius: var(--nv-radius-xs);
+  background: var(--nv-glass-fill-strong);
+  outline: 1px dashed var(--nv-ink-faint);
+  outline-offset: -1px;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  user-select: text;
+}
+.cp-draft__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.cp-draft__actions .nv-btn {
+  gap: 6px;
+}
+/* The gesture of the panel, in ink like a ticked chip: red stays for a limit that forbids the sale (§ 10). */
+.cp-draft__actions .cp-send {
+  color: var(--nv-void);
+  background: var(--nv-ink);
+}
+.cp-draft__actions .cp-send:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--nv-ink) 88%, var(--nv-void));
+}
+/* Its key cap is a tint of the button, like the neon button's: a pale cap on ink read as a hole. */
+.cp-draft__actions .cp-send .nv-kbd {
+  background: color-mix(in oklab, var(--nv-void) 24%, transparent);
+  box-shadow: none;
+  opacity: 1;
+}
+.cp-draft__actions .cp-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.cp-draft__area {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+}
+.cp-draft__reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cp-draft__note {
+  width: 100%;
+  box-sizing: border-box;
+}
+.cp-draft__next {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.cp-draft__warn {
+  margin: 0;
+  font-weight: 600;
+  color: var(--nv-warning);
 }
 
 .cp-loading {

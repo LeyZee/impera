@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { Fetch } from '../session';
 
-import { readDraftView, readFanCard } from './api';
+import { readDraftView, readFanCard, readStanding } from './api';
 
 const ORIGIN = 'http://localhost:5173';
 const id = (n: number): string => `0199f2a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -51,5 +51,52 @@ describe('what the panel reads with the CRM’s session (ADR 0086 § 8)', () => 
     expect(await readFanCard(ORIGIN, id(1), id(3), fetchFn)).toEqual({ kind: 'card', card });
     expect(vi.mocked(fetchFn).mock.calls[0]?.[0]).toBe(`${ORIGIN}/v1/fans/${id(3)}/card?creatorId=${id(1)}`);
     expect((await readFanCard(ORIGIN, id(1), id(3), answer(403, error('x')))).kind).toBe('forbidden');
+  });
+
+  it('reads where things stand: his limits and his desire, and says limits it could not read', async () => {
+    const detail = {
+      id: id(2),
+      fanId: id(3),
+      fanDisplayName: 'marc_lyon',
+      state: 'idle',
+      mode: 'copilot',
+      lastInboundAt: null,
+      lastOutboundAt: null,
+      unreadCount: 0,
+      updatedAt: '2026-11-08T18:00:00.000Z',
+      desire: { score: 55, band: 'playful' },
+      heldBy: null,
+      openDrafts: [],
+      failedDraft: null,
+    };
+    const both: Fetch = vi.fn((url: string) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.includes('/flags')
+              ? { fanId: id(3), flags: { fragile: true }, mayConfirmDisputedAge: false }
+              : detail,
+          ),
+          { status: 200 },
+        ),
+      ),
+    );
+    expect(await readStanding(ORIGIN, id(1), id(2), id(3), both)).toEqual({
+      flags: { fragile: true },
+      band: 'playful',
+    });
+    expect(
+      vi
+        .mocked(both)
+        .mock.calls.map((call) => call[0])
+        .sort(),
+    ).toEqual([
+      `${ORIGIN}/v1/conversations/${id(2)}?creatorId=${id(1)}`,
+      `${ORIGIN}/v1/fans/${id(3)}/flags?creatorId=${id(1)}`,
+    ]);
+    expect(await readStanding(ORIGIN, id(1), id(2), id(3), answer(502, null))).toEqual({
+      flags: 'unread',
+      band: null,
+    });
   });
 });

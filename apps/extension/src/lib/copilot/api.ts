@@ -1,16 +1,21 @@
 import {
   ApiErrorSchema,
+  ConversationDetailSchema,
   CopilotDraftViewSchema,
   FanCardViewSchema,
+  FanFlagsViewSchema,
   type CopilotDraftView,
+  type DesireBand,
   type FanCardView,
+  type FanFlags,
 } from '@impera/contracts';
 
 import type { Fetch } from '../session';
 
 /**
  * What the panel reads from the CRM, with the CRM's session (ADR 0086 § 8): the conversation open in Reveal and its
- * draft every 5 s, the fan's card after. Nothing is written from here: the gestures go through the link (lot b, next).
+ * draft every 5 s, where things stand with him and his card after. Nothing is written from here: the gestures go
+ * through the service worker and the person's link (verdict.ts).
  */
 
 const READ_TIMEOUT_MS = 6000;
@@ -87,4 +92,36 @@ export async function readFanCard(
   if (!response.ok) return { kind: 'down' };
   const card = FanCardViewSchema.safeParse(await response.json().catch(() => null));
   return card.success ? { kind: 'card', card: card.data } : { kind: 'down' };
+}
+
+/** « Où on en est » (§ 3.1): his limits and his desire. A part that cannot be read is said, never guessed. */
+export interface StandingRead {
+  readonly flags: FanFlags | 'unread';
+  readonly band: DesireBand | null;
+}
+
+export async function readStanding(
+  origin: string,
+  creatorId: string,
+  conversationId: string,
+  fanId: string,
+  fetchFn: Fetch = fetch,
+): Promise<StandingRead> {
+  const query = new URLSearchParams({ creatorId }).toString();
+  const [flagsAnswer, detailAnswer] = await Promise.all([
+    getJson(fetchFn, `${origin}/v1/fans/${encodeURIComponent(fanId)}/flags?${query}`),
+    getJson(fetchFn, `${origin}/v1/conversations/${encodeURIComponent(conversationId)}?${query}`),
+  ]);
+  const flags =
+    flagsAnswer?.ok === true
+      ? FanFlagsViewSchema.safeParse(await flagsAnswer.json().catch(() => null))
+      : null;
+  const detail =
+    detailAnswer?.ok === true
+      ? ConversationDetailSchema.safeParse(await detailAnswer.json().catch(() => null))
+      : null;
+  return {
+    flags: flags?.success === true ? flags.data.flags : 'unread',
+    band: detail?.success === true ? (detail.data.desire?.band ?? null) : null,
+  };
 }

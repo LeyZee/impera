@@ -8,7 +8,9 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
-import { render, type PanelActions, type PanelScreen } from './view';
+import { standingOf } from '../../lib/copilot/standing';
+
+import { render, type DraftPart, type PanelActions, type PanelScreen } from './view';
 
 /* An invented fan (ADR 0010). */
 const now = new Date('2026-11-08T18:00:00Z');
@@ -37,18 +39,46 @@ function card(entries: Partial<Record<FanCardEntry['field'], Omit<FanCardEntry, 
 }
 
 function draw(screen: PanelScreen): { root: HTMLElement; actions: PanelActions } {
-  const actions: PanelActions = { openCrm: vi.fn(), toggleGroup: vi.fn() };
+  const actions: PanelActions = {
+    openCrm: vi.fn(),
+    toggleGroup: vi.fn(),
+    place: vi.fn(),
+    edit: vi.fn(),
+    editText: vi.fn(),
+    reject: vi.fn(),
+    pickReason: vi.fn(),
+    sendReject: vi.fn(),
+    cancel: vi.fn(),
+  };
   const root = document.createElement('main');
   render(root, screen, actions);
   return { root, actions };
 }
 
-const onCard = (view: FanCardView, open: string[] = []): PanelScreen => ({
+const onCard = (
+  view: FanCardView,
+  open: string[] = [],
+  patch: { draft?: DraftPart; standing?: PanelScreenStanding } = {},
+): PanelScreen => ({
   kind: 'conversation',
+  standing: patch.standing ?? standingOf({}, null),
   cardOn: true,
   card: view,
   openGroups: new Set(open.filter((g) => g === 'him' || g === 'about_her' || g === 'intimate')),
+  draft: patch.draft ?? { kind: 'hidden' },
   now,
+});
+type PanelScreenStanding = Extract<PanelScreen, { kind: 'conversation' }>['standing'];
+
+const ready = (patch: Partial<Extract<DraftPart, { kind: 'ready' }>> = {}): DraftPart => ({
+  kind: 'ready',
+  bubbles: ['coucou toi 😘', 'tu rentres quand de ta garde ?'],
+  placed: false,
+  mode: 'idle',
+  text: '',
+  reason: null,
+  done: null,
+  ...patch,
 });
 
 describe('the copilot side panel (ADR 0086, lot b)', () => {
@@ -133,16 +163,109 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
   });
 
   it('says the card is off for her, and never draws it', () => {
-    const { root } = draw({
-      kind: 'conversation',
-      cardOn: false,
-      card: card({}),
-      openGroups: new Set(),
-      now,
-    });
+    const screen = onCard(card({}));
+    if (screen.kind !== 'conversation') throw new Error('not a conversation');
+    const { root } = draw({ ...screen, cardOn: false });
     expect(root.querySelector('.cp-notice__title')?.textContent).toBe(
       'La fiche du fan est éteinte pour cette créatrice',
     );
     expect(root.querySelector('.cp-field')).toBeNull();
+  });
+
+  it('says where things stand in one line: red forbids, amber holds back, then his desire', () => {
+    const line = (screen: PanelScreen): string | null | undefined =>
+      draw(screen).root.querySelector('.cp-standing')?.textContent;
+    const { root } = draw(
+      onCard(card({}), [], {
+        standing: standingOf(
+          { salesFrozen: { reason: 'distress', since: now.toISOString() }, fragile: true },
+          'playful',
+        ),
+      }),
+    );
+    expect(root.querySelector('.cp-standing__stop')?.textContent).toBe('Ventes gelées');
+    expect(root.querySelector('.cp-standing__care')?.textContent).toBe('Fan fragile');
+    expect(root.querySelector('.cp-standing')?.textContent).toBe('Ventes gelées·Fan fragile·désir joueur 😏');
+    expect(line(onCard(card({}), [], { standing: standingOf({}, 'neutral') }))).toBe(
+      'Rien à signaler·désir neutre',
+    );
+    expect(line(onCard(card({}), [], { standing: standingOf('unread', null) }))).toBe('Limites non lues');
+    expect(line(onCard(card({}), [], { standing: standingOf({ spendingLimitMinor: 15_000 }, null) }))).toBe(
+      'Plafond 150\u00a0€',
+    );
+  });
+
+  it('shows no draft when her drafts are off or none waits, and « L’agent écrit… » while it writes', () => {
+    expect(draw(onCard(card({}))).root.querySelector('.cp-draft')).toBeNull();
+    const writing = draw(onCard(card({}), [], { draft: { kind: 'writing' } })).root;
+    expect(writing.querySelector('.cp-draft')?.textContent).toBe('L’agent écrit…');
+  });
+
+  it('puts the draft at the foot, under the card, with its three gestures and their keys', () => {
+    const { root, actions } = draw(onCard(card({}), [], { draft: ready() }));
+    // The card scrolls between the line on top and the draft at the foot: a draft pushes nothing (§ 10).
+    expect([...root.children].map((node) => node.className)).toEqual([
+      'cp-standing',
+      'cp-scroll',
+      'cp-draft',
+    ]);
+    expect([...root.querySelectorAll('.cp-bubble')].map((n) => n.textContent)).toEqual([
+      'coucou toi 😘',
+      'tu rentres quand de ta garde ?',
+    ]);
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>('.cp-draft__actions button')];
+    expect(buttons.map((b) => b.textContent)).toEqual(['Envoyer A', 'Retoucher E', 'Refuser R']);
+    buttons[0]?.click();
+    buttons[1]?.click();
+    buttons[2]?.click();
+    expect(actions.place).toHaveBeenCalledWith(false);
+    expect(actions.edit).toHaveBeenCalledOnce();
+    expect(actions.reject).toHaveBeenCalledOnce();
+  });
+
+  it('retouches in a field, one bubble per line, and places the retouched text', () => {
+    const { root, actions } = draw(
+      onCard(card({}), [], { draft: ready({ mode: 'editing', text: 'coucou toi 😘\ntu rentres quand ?' }) }),
+    );
+    const area = root.querySelector<HTMLTextAreaElement>('textarea');
+    expect(area?.value).toBe('coucou toi 😘\ntu rentres quand ?');
+    root.querySelector<HTMLButtonElement>('[data-gesture="place-edited"]')?.click();
+    expect(actions.place).toHaveBeenCalledWith(true);
+  });
+
+  it('refuses with a reason of the closed list and an optional note, the button shut until a reason', () => {
+    const shut = draw(onCard(card({}), [], { draft: ready({ mode: 'rejecting' }) })).root;
+    expect(shut.querySelector<HTMLButtonElement>('[data-gesture="send-reject"]')?.disabled).toBe(true);
+    const { root, actions } = draw(
+      onCard(card({}), [], { draft: ready({ mode: 'rejecting', reason: 'too_long' }) }),
+    );
+    expect(root.querySelector('[aria-checked="true"]')?.textContent).toBe('Trop long');
+    root.querySelector<HTMLButtonElement>('[data-reason="sounds_ai"]')?.click();
+    expect(actions.pickReason).toHaveBeenCalledWith('sounds_ai');
+    const note = root.querySelector<HTMLInputElement>('.cp-draft__note');
+    if (note !== null) note.value = 'trop poli';
+    root.querySelector<HTMLButtonElement>('[data-gesture="send-reject"]')?.click();
+    expect(actions.sendReject).toHaveBeenCalledWith('trop poli');
+  });
+
+  it('says what is left to do in Reveal, and in amber when the gesture did not count', () => {
+    const placed = draw(
+      onCard(card({}), [], {
+        draft: ready({ done: { outcome: 'placed', copyFailed: false, sent: 'sent' } }),
+      }),
+    ).root;
+    expect(placed.querySelector('.cp-draft__next')?.textContent).toBe(
+      'Texte copié : colle-le dans Reveal (Ctrl+V), relis, et envoie.',
+    );
+    expect(placed.querySelector('.cp-draft__actions')).toBeNull();
+    expect(placed.querySelector('.cp-draft__warn')).toBeNull();
+    const unlinked = draw(
+      onCard(card({}), [], {
+        draft: ready({ done: { outcome: 'rejected', copyFailed: false, sent: 'unlinked' } }),
+      }),
+    ).root;
+    expect(unlinked.querySelector('.cp-draft__warn')?.textContent).toBe(
+      'Ce geste n’a pas compté : relie l’extension dans son popup (« Relier »).',
+    );
   });
 });

@@ -6,6 +6,7 @@ import {
 } from '@impera/contracts';
 import { browser, type Browser } from 'wxt/browser';
 
+import { FromPanelSchema, sendVerdict, type VerdictSent } from '../lib/copilot/verdict';
 import { crmOriginOf, DEFAULT_CRM_ADDRESS } from '../lib/crm-address';
 import { placeOf } from '../lib/tab';
 import { fetchMarkableCreators, sendCaptures, sendReadings } from '../lib/watch/api';
@@ -369,6 +370,20 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener(
     (raw: unknown, sender: Browser.runtime.MessageSender, respond: (answer: unknown) => void) => {
       if (sender.id !== browser.runtime.id) return false;
+      // The copilot panel's gesture on a draft (ADR 0086 § 8): sent here with the link the panel never reads. Told by
+      // the page that sends it, never by a tab: in the small window of the fallback, the panel is a tab too.
+      const gesture = FromPanelSchema.safeParse(raw);
+      if (gesture.success && sender.url?.startsWith(browser.runtime.getURL('/sidepanel.html')) === true) {
+        void (async (): Promise<VerdictSent> => {
+          const token = await readLink();
+          const sent = await sendVerdict(await crmOrigin(), token, gesture.data.draftId, gesture.data.body);
+          if (sent === 'unlinked' && token !== null) await markRevoked();
+          return sent;
+        })().then(respond, () => {
+          respond('unreachable' satisfies VerdictSent);
+        });
+        return true;
+      }
       const tabId = sender.tab?.id;
       if (tabId !== undefined) {
         // A reader, from the top frame of an Instagram tab.
