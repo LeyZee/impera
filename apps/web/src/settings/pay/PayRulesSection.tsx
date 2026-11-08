@@ -1,6 +1,8 @@
 import {
   AccountPayRulesIdSchema,
   CurrencySchema,
+  EARNINGS_SOURCES,
+  earningsBaseOf,
   newId,
   payRulesFor,
   type AccountPayRules,
@@ -8,6 +10,7 @@ import {
   type Currency,
   type EarningsSource,
   type PayPeriod,
+  type Platform,
   type PlanningAccount,
 } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
@@ -39,19 +42,41 @@ type Entry = AccountPayRulesList['accounts'][number];
 const CURRENCY_NAMES: Readonly<Record<Currency, string>> = { EUR: 'Euros', USD: 'Dollars' };
 
 /** « Euros · TVA 20 % · plateforme 20 % · rapports de fin de shift »: rules in one line. */
-const rulesLine = (rules: AccountPayRules): string =>
-  [
-    CURRENCY_NAMES[rules.currency],
-    `TVA ${percentText(rules.vatBps)}`,
-    `plateforme ${percentText(rules.platformFeeBps)}`,
-    SOURCE_LABELS[rules.earningsSource].toLowerCase(),
-  ].join(' · ');
+/** On the platform's net (ADR 0050 § 8), the VAT and the commission go unused: the line leaves them out. */
+const rulesLine = (rules: AccountPayRules, platform: Platform): string =>
+  (earningsBaseOf(platform, rules.earningsSource) === 'platform_net'
+    ? [
+        CURRENCY_NAMES[rules.currency],
+        SOURCE_LABELS[rules.earningsSource].toLowerCase(),
+        'net de la plateforme',
+      ]
+    : [
+        CURRENCY_NAMES[rules.currency],
+        `TVA ${percentText(rules.vatBps)}`,
+        `plateforme ${percentText(rules.platformFeeBps)}`,
+        SOURCE_LABELS[rules.earningsSource].toLowerCase(),
+      ]
+  ).join(' · ');
+
+/**
+ * The periods new rules of an account may start with (EQ-03, ADR 0084): those that have not begun (the current one too
+ * for its first rules) and, for its platform's net, the fortnight its platform's latest clean check covers, begun or
+ * over, as the server offers it; never one the account has rules from already.
+ */
+function periodsFor(entry: Entry, currentPeriod: PayPeriod, source: EarningsSource): PayPeriod[] {
+  const startable = startablePeriods(currentPeriod, entry.rules.length === 0);
+  const checked = source === 'detected' && entry.checkedPeriod !== null ? [entry.checkedPeriod] : [];
+  return [...new Set([...checked, ...startable])]
+    .filter((period) => !entry.rules.some((one) => one.fromPeriod === period))
+    .toSorted((a, b) => a.localeCompare(b));
+}
 
 /**
  * Réglages › Règles de paie (EQ-03, ADR 0023), owner only: for each account, the currency, the VAT, the platform's
  * commission and where pay reads the sales, dated by period. Rules are only ever added: new rules start with a period
- * that has not begun (an account's first may start with the current one), and a mistake is put right by the next
- * rules. Until an account has some, its reports are refused: those accounts come first.
+ * that has not begun (an account's first may start with the current one), or, to read the platform's net, with the
+ * fortnight its latest clean check covers (ADR 0084); a mistake is put right by the next rules. Until an account has
+ * some, its reports are refused: those accounts come first.
  */
 export function PayRulesSection(): JSX.Element {
   const list = usePayRules();
@@ -100,7 +125,7 @@ export function PayRulesSection(): JSX.Element {
         Ce que la paie lit : le minimum de versement de toute l’équipe, le seuil d’écart des rapports, puis
         pour chaque compte la devise, la TVA, la commission de la plateforme et la source des ventes. Les
         règles d’un compte ne changent jamais : de nouvelles prennent la suite à une quinzaine qui n’a pas
-        commencé.
+        commencé, ou à la quinzaine vérifiée pour passer aux ventes relevées.
       </p>
       <MinimumPayout />
       <PayoutDelay />
@@ -189,16 +214,25 @@ function AccountRules({
       ) : (
         <div className="rp-account__now">
           <span className="rp-chip rp-chip--ok">En vigueur</span>
-          <p className="rp-account__rules nv-num">{rulesLine(inForce)}</p>
+          <p className="rp-account__rules nv-num">{rulesLine(inForce, entry.account.platform)}</p>
           <p className="rp-account__since">
             depuis la quinzaine {periodLineFrom(inForce.fromPeriod, currentPeriod)}
+          </p>
+        </div>
+      )}
+      {entry.checkedPeriod === null ? null : (
+        <div className="rp-account__next rp-account__checked">
+          <span className="rp-chip rp-chip--ok">Ventes vérifiées</span>
+          <p className="rp-account__since">
+            peut passer aux ventes relevées dès la quinzaine{' '}
+            {periodLineFrom(entry.checkedPeriod, currentPeriod)}
           </p>
         </div>
       )}
       {coming.map((rules) => (
         <div key={rules.id} className="rp-account__next">
           <span className="rp-chip">À venir</span>
-          <p className="rp-account__rules nv-num">{rulesLine(rules)}</p>
+          <p className="rp-account__rules nv-num">{rulesLine(rules, entry.account.platform)}</p>
           <p className="rp-account__since">
             à partir de la quinzaine {periodLineFrom(rules.fromPeriod, currentPeriod)}
           </p>
@@ -215,7 +249,7 @@ function AccountRules({
           <ul className="nv-disclosure__body rp-lines">
             {past.map((rules) => (
               <li key={rules.id} className="rp-account__old">
-                <span className="nv-num">{rulesLine(rules)}</span>
+                <span className="nv-num">{rulesLine(rules, entry.account.platform)}</span>
                 <span className="rp-account__since">
                   dès la quinzaine {periodLineFrom(rules.fromPeriod, currentPeriod)}
                 </span>
@@ -244,23 +278,30 @@ function RulesPanel({
   const id = useId();
   const refresh = useRefreshPayRules();
   const first = entry.rules.length === 0;
-  const periods = startablePeriods(currentPeriod, first).filter(
-    (period) => !entry.rules.some((one) => one.fromPeriod === period),
-  );
   const base = entry.rules[0] ?? null;
+  // Only a platform that gives a net can be paid on its sales read (ADR 0050 § 8).
+  const hasNet = earningsBaseOf(entry.account.platform, 'detected') === 'platform_net';
+  const [source, setSource] = useState<EarningsSource>('declared');
+  const periods = periodsFor(entry, currentPeriod, source);
   const [rulesId] = useState(() => newId(AccountPayRulesIdSchema));
-  const [fromPeriod, setFromPeriod] = useState<PayPeriod | null>(periods[0] ?? null);
+  // Until the owner picks one, the earliest period the source allows: with « Ventes relevées », the checked
+  // fortnight; back to the reports, the first period that has not begun.
+  const [chosenPeriod, setFromPeriod] = useState<PayPeriod | null>(null);
+  const fromPeriod =
+    chosenPeriod !== null && periods.includes(chosenPeriod) ? chosenPeriod : (periods[0] ?? null);
+  const backdated = source === 'detected' && fromPeriod !== null && fromPeriod <= currentPeriod;
   const [currency, setCurrency] = useState<Currency>(base?.currency ?? 'EUR');
   const [vat, setVat] = useState(base === null ? '' : String(base.vatBps / 100).replace('.', ','));
   const [fee, setFee] = useState(base === null ? '' : String(base.platformFeeBps / 100).replace('.', ','));
-  const source: EarningsSource = 'declared';
   const [step, setStep] = useState<'edit' | 'confirm'>('edit');
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<ReportRefusal | null>(null);
 
-  const vatBps = parsePercent(vat);
-  const feeBps = parsePercent(fee);
+  // On the platform's net the VAT and the commission go unused: not asked, the rules keep the account's last ones.
+  const netOnly = hasNet && source === 'detected';
+  const vatBps = netOnly ? (base?.vatBps ?? 0) : parsePercent(vat);
+  const feeBps = netOnly ? (base?.platformFeeBps ?? 0) : parsePercent(fee);
   const ready = fromPeriod !== null && vatBps !== null && feeBps !== null;
 
   const send = async (): Promise<void> => {
@@ -303,20 +344,35 @@ function RulesPanel({
                 <dt>Devise</dt>
                 <dd>{CURRENCY_NAMES[currency]}</dd>
               </div>
-              <div>
-                <dt>TVA</dt>
-                <dd className="nv-num">{percentText(vatBps)}</dd>
-              </div>
-              <div>
-                <dt>Commission de la plateforme</dt>
-                <dd className="nv-num">{percentText(feeBps)}</dd>
-              </div>
+              {netOnly ? (
+                <div>
+                  <dt>TVA et commission</dt>
+                  <dd>Sans effet</dd>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <dt>TVA</dt>
+                    <dd className="nv-num">{percentText(vatBps)}</dd>
+                  </div>
+                  <div>
+                    <dt>Commission de la plateforme</dt>
+                    <dd className="nv-num">{percentText(feeBps)}</dd>
+                  </div>
+                </>
+              )}
               <div>
                 <dt>Source des ventes</dt>
                 <dd>{SOURCE_LABELS[source]}</dd>
               </div>
             </dl>
           </div>
+          {backdated ? (
+            <p className="tm-warn nv-enter">
+              Cette quinzaine a déjà commencé : ses relevés en brouillon seront recalculés sur les ventes
+              relevées, et les ventes déclarées dans ses rapports ne compteront plus.
+            </p>
+          ) : null}
           <p className="tm-hint">
             Ces règles ne changeront plus. Une erreur se corrige par de nouvelles règles à une quinzaine
             suivante.
@@ -357,6 +413,37 @@ function RulesPanel({
           }}
         >
           <div className="nv-field tm-field">
+            <span className="nv-field__label" id={`${id}-source`}>
+              Source des ventes
+            </span>
+            <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-source`}>
+              {EARNINGS_SOURCES.map((one) => (
+                <button
+                  key={one}
+                  type="button"
+                  role="radio"
+                  className="nv-chip"
+                  aria-checked={source === one}
+                  disabled={one === 'detected' && !hasNet}
+                  onClick={() => {
+                    setSource(one);
+                    setRefusal(null);
+                  }}
+                >
+                  {SOURCE_LABELS[one]}
+                </button>
+              ))}
+            </div>
+            <p className="tm-hint">
+              {!hasNet
+                ? 'Cette plateforme ne donne pas de net : la paie de ce compte lit les rapports validés.'
+                : source === 'declared'
+                  ? 'La paie lit les rapports de fin de shift validés.'
+                  : 'La paie lit les ventes relevées chez la plateforme, à son net : ni TVA ni commission à retirer. Chacune va au chatteur relié qui était en poste, qui ne déclare plus ses ventes.'}
+            </p>
+          </div>
+
+          <div className="nv-field tm-field">
             <label className="nv-field__label" htmlFor={`${id}-from`}>
               À partir de la quinzaine
             </label>
@@ -372,7 +459,11 @@ function RulesPanel({
                 options={periods.map((period) => ({
                   value: period,
                   label: periodLineFrom(period, currentPeriod),
-                  ...(period === currentPeriod ? { hint: 'en cours' } : {}),
+                  ...(source === 'detected' && period === entry.checkedPeriod
+                    ? { hint: 'vérifiée' }
+                    : period === currentPeriod
+                      ? { hint: 'en cours' }
+                      : {}),
                 }))}
                 onChange={(value) => {
                   setFromPeriod(periods.find((period) => period === value) ?? null);
@@ -380,9 +471,13 @@ function RulesPanel({
               />
             )}
             <p className="tm-hint">
-              {first
-                ? 'Les premières règles d’un compte peuvent partir de la quinzaine en cours.'
-                : 'De nouvelles règles partent d’une quinzaine qui n’a pas commencé.'}
+              {source === 'detected' && entry.checkedPeriod !== null
+                ? 'Les ventes relevées peuvent partir de la quinzaine vérifiée, tant qu’aucune quinzaine n’est clôturée depuis.'
+                : source === 'detected'
+                  ? 'Pour partir d’une quinzaine déjà commencée, lance d’abord la vérification de fiabilité de cette quinzaine dans Réglages › Ventes.'
+                  : first
+                    ? 'Les premières règles d’un compte peuvent partir de la quinzaine en cours.'
+                    : 'De nouvelles règles partent d’une quinzaine qui n’a pas commencé.'}
             </p>
           </div>
 
@@ -408,42 +503,26 @@ function RulesPanel({
             </div>
           </div>
 
-          <div className="tm-pair">
-            <Percent
-              id={`${id}-vat`}
-              label="TVA"
-              hint="Retirée du brut, après la conversion en euros."
-              value={vat}
-              invalid={touched && vatBps === null}
-              onChange={setVat}
-            />
-            <Percent
-              id={`${id}-fee`}
-              label="Commission de la plateforme"
-              hint="Ce que la plateforme garde sur le hors-taxe."
-              value={fee}
-              invalid={touched && feeBps === null}
-              onChange={setFee}
-            />
-          </div>
-
-          <div className="nv-field tm-field">
-            <span className="nv-field__label" id={`${id}-source`}>
-              Source des ventes
-            </span>
-            <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-source`}>
-              <button type="button" role="radio" className="nv-chip" aria-checked>
-                {SOURCE_LABELS.declared}
-              </button>
-              <button type="button" role="radio" className="nv-chip" aria-checked={false} disabled>
-                {SOURCE_LABELS.detected}
-              </button>
+          {netOnly ? null : (
+            <div className="tm-pair">
+              <Percent
+                id={`${id}-vat`}
+                label="TVA"
+                hint="Retirée du brut, après la conversion en euros."
+                value={vat}
+                invalid={touched && vatBps === null}
+                onChange={setVat}
+              />
+              <Percent
+                id={`${id}-fee`}
+                label="Commission de la plateforme"
+                hint="Ce que la plateforme garde sur le hors-taxe."
+                value={fee}
+                invalid={touched && feeBps === null}
+                onChange={setFee}
+              />
             </div>
-            <p className="tm-hint">
-              Les ventes relevées s’ouvriront quand le connecteur saura les lire. D’ici là, la paie lit les
-              rapports validés.
-            </p>
-          </div>
+          )}
 
           {refusal === null ? null : (
             <p className="tm-warn sc-refusal nv-swap" role="alert">
@@ -470,7 +549,9 @@ function RulesPanel({
 function AccountLead({ account }: { account: PlanningAccount }): JSX.Element {
   return (
     <>
-      <span className="rp-lead__who">{account.creatorName}</span> · {accountLine(account)}
+      <span className="rp-lead__who">{account.creatorName}</span>
+      <span className="rp-lead__sep"> · </span>
+      <span className="rp-lead__account">{accountLine(account)}</span>
     </>
   );
 }

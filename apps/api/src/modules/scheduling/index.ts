@@ -49,7 +49,11 @@ import {
   type ShiftForPay,
   type ValidatedReportForPay,
 } from './infra/pay-reads';
-import { createDrizzlePayRulesStore, type SwitchFactsRead } from './infra/pay-rules-store';
+import {
+  createDrizzlePayRulesStore,
+  type PeriodClosedFrom,
+  type SwitchFactsRead,
+} from './infra/pay-rules-store';
 import { createDrizzlePlanningAdmin, createDrizzlePlanningStore } from './infra/planning-store';
 import type { ShiftSalesReader } from './infra/report-check';
 import { createDrizzleReportReminderSource } from './infra/report-reminders';
@@ -181,6 +185,12 @@ export interface SchedulingDeps {
    */
   readonly switchFactsOf: SwitchFactsRead;
   /**
+   * Whether pay closed a period at or after a given one (ADR 0084 § 2): the `payroll` module's
+   * `payReadsForPayRules.closedFrom`, read in the pay rules' own transaction before rules start with the checked
+   * fortnight.
+   */
+  readonly periodClosedFrom: PeriodClosedFrom;
+  /**
    * A creator's sales totals (CRM-04): the `connectors` module's `salesFeedTotals.totalsOf`, read on the admin
    * connection by the agency percentages' check (lot d3).
    */
@@ -239,7 +249,11 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
     reports: createShiftReportService(reportStore, deps.creators, now),
     feedback: createShiftFeedbackService(createDrizzleShiftFeedbackStore(deps.db, deps.adminDb), now),
     payRules: createPayRulesService(
-      createDrizzlePayRulesStore(deps.db, deps.adminDb, deps.switchFactsOf),
+      createDrizzlePayRulesStore(deps.db, deps.adminDb, {
+        switchFactsOf: deps.switchFactsOf,
+        periodClosedFrom: deps.periodClosedFrom,
+        enqueuePayRecalculation: deps.enqueuePayRecalculation,
+      }),
       deps.creators,
       now,
     ),

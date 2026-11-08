@@ -3,6 +3,7 @@ import {
   CreatorIdSchema,
   CurrencySchema,
   EarningsSourceSchema,
+  nextPayPeriod,
   PayPeriodSchema,
   payPeriodOfDay,
   PlatformAccountIdSchema,
@@ -13,6 +14,7 @@ import {
   and,
   enterCreator,
   eq,
+  lockPayrollClose,
   schema,
   SNAPSHOT_READ,
   withMember,
@@ -28,10 +30,17 @@ import {
   PayRulesPeriodConflict,
   PlatformAccountNotFound,
 } from '../domain/errors';
-import { assertRulesStart, assertSourceSwitchable, type SwitchFacts } from '../domain/pay-rules';
+import {
+  assertRulesStart,
+  assertSourceSwitchable,
+  checkedPeriodOf,
+  switchablePeriodOf,
+  type SwitchFacts,
+} from '../domain/pay-rules';
 import type { PayRulesStore, StoredAccount, StoredPayRules } from '../domain/ports';
 import { calendarDayIn } from '../domain/time';
 
+import type { EnqueuePayRecalculation } from './pay-reads';
 import { agencyTimeZone, audit, creatorOfUnscoped, pgErrorOf, StoredAccountSchema } from './rows';
 
 const { accountPayRules, platformAccounts } = schema;
@@ -80,15 +89,41 @@ export type SwitchFactsRead = (
 ) => Promise<SwitchFacts | null>;
 
 /**
+ * Whether a period is closed at or after `period` (ADR 0084 § 2), in the caller's transaction: the `payroll` module's
+ * `payReadsForPayRules.closedFrom`, given by the composition root.
+ */
+export type PeriodClosedFrom = (tx: Transaction, period: PayPeriod) => Promise<boolean>;
+
+/**
  * The accounts' pay rules through `withTenantMember` in the account's creator (EQ-03): `team_read` lets the owner and
  * an active manager read them, `owner_insert` lets the owner alone add them, and the table refuses any change or
- * deletion. The period running now is read in the agency's zone, in the same transaction.
+ * deletion. The period running now is read in the agency's zone, in the same transaction. Rules that start with a
+ * period that has begun (an account's first, or the checked fortnight of ADR 0084) have pay compute each period they
+ * touch again, up to the current one, once they are committed.
  */
 export function createDrizzlePayRulesStore(
   db: Database,
   adminDb: Database,
-  switchFactsOf: SwitchFactsRead,
+  reads: {
+    readonly switchFactsOf: SwitchFactsRead;
+    readonly periodClosedFrom: PeriodClosedFrom;
+    readonly enqueuePayRecalculation: EnqueuePayRecalculation;
+  },
 ): PayRulesStore {
+  const { switchFactsOf, periodClosedFrom, enqueuePayRecalculation } = reads;
+
+  /** The fortnight the owner may switch an account from although it began (ADR 0084), as the list gives it. */
+  const checkedPeriodFor = async (
+    tx: Transaction,
+    account: StoredAccount,
+    rules: readonly StoredPayRules[],
+  ): Promise<PayPeriod | null> => {
+    const facts = await switchFactsOf(tx, account.id);
+    const period = facts === null ? null : switchablePeriodOf(facts);
+    if (period === null || rules.some((one) => one.fromPeriod === period)) return null;
+    return (await periodClosedFrom(tx, period)) ? null : period;
+  };
+
   return {
     list: (actor, creatorIds, now) =>
       withMember(
@@ -101,7 +136,11 @@ export function createDrizzlePayRulesStore(
             );
           }
           const currentPeriod = await currentPeriodIn(tx, now);
-          const accounts: { account: StoredAccount; rules: StoredPayRules[] }[] = [];
+          const accounts: {
+            account: StoredAccount;
+            rules: StoredPayRules[];
+            checkedPeriod: PayPeriod | null;
+          }[] = [];
           for (const creatorId of creatorIds) {
             await enterCreator(tx, creatorId, creatorIds);
             const rows = await tx
@@ -115,9 +154,12 @@ export function createDrizzlePayRulesStore(
             const rules = (await tx.select(payRulesColumns).from(accountPayRules)).map(toPayRules);
             for (const row of rows) {
               const account = StoredAccountSchema.parse(row);
+              const own = rules.filter((one) => one.platformAccountId === account.id).toSorted(newestFirst);
               accounts.push({
                 account,
-                rules: rules.filter((one) => one.platformAccountId === account.id).toSorted(newestFirst),
+                rules: own,
+                // The owner alone sets rules: a manager is never offered a fortnight to switch from.
+                checkedPeriod: scope === 'owner' ? await checkedPeriodFor(tx, account, own) : null,
               });
             }
           }
@@ -146,11 +188,13 @@ export function createDrizzlePayRulesStore(
           if (!same) throw new PayRulesConflict();
           return { rules: toPayRules(existing), created: false };
         }
+        let checkedPeriod: PayPeriod | null = null;
         if (rules.earningsSource === 'detected') {
           // The switch guard (ADR 0050 § 8, CRM-03), read in this transaction: the account was found in its creator.
           const facts = await switchFactsOf(tx, rules.platformAccountId);
           if (facts === null) throw new PlatformAccountNotFound();
           assertSourceSwitchable(rules.earningsSource, rules.fromPeriod, facts);
+          checkedPeriod = checkedPeriodOf(facts);
         }
         const sameAccount = await tx
           .select({ id: accountPayRules.id, fromPeriod: accountPayRules.fromPeriod })
@@ -158,7 +202,18 @@ export function createDrizzlePayRulesStore(
           .where(eq(accountPayRules.platformAccountId, rules.platformAccountId));
         const taken = sameAccount.find((one) => one.fromPeriod === rules.fromPeriod);
         if (taken !== undefined) throw new PayRulesPeriodConflict(taken.id);
-        assertRulesStart(rules.fromPeriod, await currentPeriodIn(tx, now), sameAccount.length === 0);
+        const currentPeriod = await currentPeriodIn(tx, now);
+        const begun = rules.fromPeriod <= currentPeriod;
+        // Read only when it decides: rules from a period that has begun, the checked one (ADR 0084 § 2). The closing
+        // lock is held until this transaction ends, so no validation closes the period between the read and the rules.
+        const fromChecked = begun && rules.fromPeriod === checkedPeriod;
+        if (fromChecked) await lockPayrollClose(tx);
+        assertRulesStart(rules, {
+          currentPeriod,
+          first: sameAccount.length === 0,
+          checkedPeriod,
+          closedFrom: fromChecked ? await periodClosedFrom(tx, rules.fromPeriod) : false,
+        });
         try {
           await tx.transaction((savepoint) =>
             savepoint.insert(accountPayRules).values({ ...rules, creatorId, createdBy: actor.userId }),
@@ -192,6 +247,12 @@ export function createDrizzlePayRulesStore(
             earningsSource: rules.earningsSource,
           },
         );
+        // A period under way or over now reads these rules: its drafts are computed again (ADR 0084 § 3).
+        if (begun) {
+          for (let period = rules.fromPeriod; period <= currentPeriod; period = nextPayPeriod(period)) {
+            await enqueuePayRecalculation(tx, period);
+          }
+        }
         const [created] = await tx
           .select(payRulesColumns)
           .from(accountPayRules)

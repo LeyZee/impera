@@ -1099,7 +1099,10 @@ describe('Paie › Quinzaine', () => {
     }));
     rules = {
       ...PAY_RULES,
-      accounts: [...PAY_RULES.accounts, ...accounts.map((account) => ({ account, rules: [] }))],
+      accounts: [
+        ...PAY_RULES.accounts,
+        ...accounts.map((account) => ({ account, rules: [], checkedPeriod: null })),
+      ],
     };
     const lines = [NORA_REVEAL.id, LEA_ONLYFANS.id, ...accounts.map((account) => account.id)].map(
       (id, index) => euroLine({ platformAccountId: id, netMinor: (5 - index) * 1_000 }),

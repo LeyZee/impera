@@ -120,8 +120,8 @@ export const LEA_ONLYFANS = {
 export const PAY_RULES = {
   currentPeriod: '2026-11-01',
   accounts: [
-    { account: NORA_REVEAL, rules: [] },
-    { account: LEA_ONLYFANS, rules: [] },
+    { account: NORA_REVEAL, rules: [], checkedPeriod: null },
+    { account: LEA_ONLYFANS, rules: [], checkedPeriod: null },
   ],
 };
 
