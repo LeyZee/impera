@@ -288,6 +288,11 @@ export interface LlmGateway {
    * spend is at its alert, so the card never takes what a fan's answer needs.
    */
   readCard(input: FanCardReadInput): Promise<Result<LlmSuccess<FanCardRead>, LlmFailure>>;
+  /**
+   * The version of the prompts whose outputs are kept and redone when they change (ADR 0083 § 2): a drop's description
+   * and a script's synthesis, as `meta.promptHash` gives them.
+   */
+  readonly promptHashes: { readonly creatorDrop: string; readonly scriptSummary: string };
   health(): HealthReport;
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */

@@ -103,6 +103,7 @@ function recordingGateway() {
     channelPost: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
+    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
     brain: (input) => {
       brain.push(input);
       return Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } });

@@ -79,6 +79,7 @@ export const JOB_NAMES = [
   'content_drops.drop_received',
   'content_drops.describe_file',
   'content_drops.summarize_script',
+  'content_drops.describe_backlog',
   'scripts.ask_scripts',
   'providers.check_credentials',
   'connector.read_sales',
@@ -148,6 +149,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.drop_received': 'Dépôt reçu pour une idée',
   'content_drops.describe_file': 'Description des médias déposés',
   'content_drops.summarize_script': 'Synthèse des scripts tournés',
+  'content_drops.describe_backlog': 'Rattrapage des descriptions',
   'scripts.ask_scripts': 'Demandes de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
@@ -425,6 +427,12 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
+   * Each hour, and for one creator when her switch is turned on (ADR 0083 § 2, § 9): what waits for the vision or the
+   * brain is enqueued again, each medium with no description of the prompt of now (none, or an older version and no
+   * human's), each sent script with no synthesis of now. A job already waiting keeps its time.
+   */
+  'content_drops.describe_backlog': z.object({ creatorId: CreatorIdSchema.optional() }),
+  /**
    * Each hour (SC-02, ADR 0056 § 2): each creator whose next script is due within the lead gets her request, with the
    * next structure of her queue that does not touch her limits, frozen. Replayable: one request per due day.
    */
@@ -549,6 +557,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.describe_file': 5,
   // The same: every model failed, or its answer did not tell the script's steps; a spent budget puts it off.
   'content_drops.summarize_script': 5,
+  // Each hour: the next run is the retry.
+  'content_drops.describe_backlog': 1,
   // Each hour: the next run is the retry.
   'scripts.ask_scripts': 1,
   'providers.check_credentials': 1,

@@ -646,3 +646,10 @@ export type ScriptDropSummary = z.infer<typeof ScriptDropSummarySchema>;
 export const SCRIPT_SUMMARY_REVIEW_REASONS = ['price'] as const;
 export const ScriptSummaryReviewReasonSchema = z.enum(SCRIPT_SUMMARY_REVIEW_REASONS);
 export type ScriptSummaryReviewReason = z.infer<typeof ScriptSummaryReviewReasonSchema>;
+
+/**
+ * `GET`/`PUT /v1/creators/:creatorId/drop-descriptions`: her switch (ADR 0083 § 9), the owner's. Turned on, what she
+ * dropped while it was off is described and her sent scripts told.
+ */
+export const DropDescriptionsSwitchSchema = z.strictObject({ on: z.boolean() });
+export type DropDescriptionsSwitch = z.infer<typeof DropDescriptionsSwitchSchema>;

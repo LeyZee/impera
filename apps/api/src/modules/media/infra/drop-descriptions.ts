@@ -3,7 +3,7 @@ import type { LlmGateway } from '@impera/llm';
 
 import { createDropDescriber, type DropContext, type FileMediaTools } from '../application/describe-drop';
 
-import { createDrizzleDropDescriptionStore } from './drop-description-store';
+import { createDrizzleDropDescriptionStore, type DetailedDescription } from './drop-description-store';
 import { createFfmpegFileTools } from './ffmpeg-media-tools';
 import { createGatewayDropSenser, createGatewayTranscriber } from './gateway-senser';
 
@@ -20,17 +20,19 @@ interface DroppedMedia {
 
 /** The description of her dropped media (ADR 0083), for the drops' job. */
 export interface DropDescriptions {
-  /** Whether the vision AI already described this medium for a drop. */
+  /** The version of the prompt a description is written with now: a medium described with another is described again. */
+  readonly promptHash: string;
+  /** Whether this medium needs no new description: a human's, or the vision AI's with the prompt of now. */
   described(mediaAssetId: string): Promise<boolean>;
   /** The latest detailed description of each of these media that has one, by medium (ADR 0083 § 2). */
-  detailed(mediaAssetIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
+  detailed(mediaAssetIds: readonly string[]): Promise<ReadonlyMap<string, DetailedDescription>>;
   /** Described and kept with its review reasons, or why not; a file that does not open is logged by the caller. */
   describe(media: DroppedMedia): Promise<'described' | 'budget' | 'failed' | 'unreadable'>;
 }
 
 export function createDropDescriptions(deps: {
   readonly adminDb: Database;
-  readonly gateway: Pick<LlmGateway, 'describeDrop' | 'transcribe'>;
+  readonly gateway: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'>;
   /** Tests only: other tools than ffmpeg's. */
   readonly tools?: FileMediaTools;
 }): DropDescriptions {
@@ -41,7 +43,8 @@ export function createDropDescriptions(deps: {
     tools: deps.tools ?? createFfmpegFileTools(),
   });
   return {
-    described: (mediaAssetId) => store.described(mediaAssetId),
+    promptHash: deps.gateway.promptHashes.creatorDrop,
+    described: (mediaAssetId) => store.described(mediaAssetId, deps.gateway.promptHashes.creatorDrop),
     detailed: (mediaAssetIds) => store.detailed(mediaAssetIds),
     describe: async (media) => {
       const result = await describer.describe(media);

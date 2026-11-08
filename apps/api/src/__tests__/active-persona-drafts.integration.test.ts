@@ -108,6 +108,7 @@ const GATEWAY: LlmGateway = {
   channelPost: () => Promise.reject(new Error('not used')),
   summarizeScript: () => Promise.reject(new Error('not used')),
   readCard: () => Promise.reject(new Error('not used')),
+  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
   brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
   voice: () => Promise.resolve({ ok: true, value: { output: { bubbles: ['Coucou toi'] }, meta: META } }),
   health,

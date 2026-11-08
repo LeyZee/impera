@@ -22,6 +22,7 @@ export interface WiredContentDrops {
     | 'content_drops.erase_originals'
     | 'content_drops.describe_file'
     | 'content_drops.summarize_script'
+    | 'content_drops.describe_backlog'
   >;
   readonly routes: readonly Routes[];
 }
@@ -35,9 +36,9 @@ export function wireContentDrops(
   deps: {
     readonly scriptVersions: ScriptVersions;
     /** The vision AI that describes each photo and video she drops (ADR 0083). */
-    readonly vision: Pick<LlmGateway, 'describeDrop' | 'transcribe'>;
+    readonly vision: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'>;
     /** The brain that tells each script she sends, from its cards and its media's descriptions (ADR 0083 § 6). */
-    readonly brain: Pick<LlmGateway, 'summarizeScript'>;
+    readonly brain: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
     readonly storage?: DropStorage;
   },
 ): WiredContentDrops {
@@ -85,6 +86,17 @@ export function wireContentDrops(
         async (payload, context) => {
           const outcome = await module.jobs.summarizeScript(payload.dropId, payload.correlationId);
           context.logger.info({ dropId: payload.dropId, outcome }, 'content drops: sent script summarized');
+        },
+      ),
+      'content_drops.describe_backlog': defineTask(
+        'content_drops.describe_backlog',
+        JOB_PAYLOADS['content_drops.describe_backlog'],
+        shared.logger,
+        async (payload, context) => {
+          context.logger.info(
+            await module.jobs.describeBacklog(payload.creatorId ?? null, `job:${context.jobId}`),
+            'content drops: media and scripts waiting for a description enqueued again',
+          );
         },
       ),
       'content_drops.erase_originals': defineTask(
