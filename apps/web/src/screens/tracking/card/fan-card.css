@@ -10,7 +10,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--nv-space-2) 0;
+  padding: 10px 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
 }
@@ -27,6 +27,31 @@
   flex: 1;
   min-width: 0;
   color: var(--nv-ink-muted);
+}
+/* A field's action ends on the plate's text edge, like the counts of the groups under it. */
+.tr-card__head > .nv-btn--plain {
+  padding-inline: var(--nv-space-3);
+  margin-right: calc(-1 * var(--nv-space-3));
+}
+/* Beside the conversation, with a pointer, « Corriger » and « Ajouter » show under the pointer or the keyboard's focus:
+ * six times the same word read as noise (Charles, 08/11). They keep their room, so nothing moves when they show. */
+@media (hover: hover) {
+  .tr-aside .tr-card__head {
+    position: relative;
+    min-height: 0;
+  }
+  .tr-aside .tr-card__head > .nv-btn--plain {
+    position: absolute;
+    inset: 0 0 0 auto;
+    margin-block: auto;
+  }
+  .tr-aside .tr-card__field:not(:hover, :focus-within) .tr-card__head > .nv-btn--plain {
+    opacity: 0;
+  }
+  /* An unknown field says so at the edge, where « Ajouter » takes its place under the pointer. */
+  .tr-aside .tr-card__field:is(:hover, :focus-within) .tr-card__empty {
+    visibility: hidden;
+  }
 }
 .tr-card__hint {
   color: var(--nv-ink-faint);
@@ -101,10 +126,21 @@
 .tr-card__refusal {
   margin: 0;
 }
+/* On a phone and in the fan's column, his words take the width and the gesture goes under them. */
 @media (max-width: 560px) {
   .tr-card__check-row {
     flex-wrap: wrap;
   }
+}
+.tr-aside .tr-card__check-row {
+  flex-wrap: wrap;
+  row-gap: var(--nv-space-1);
+}
+.tr-aside .tr-card__check-text {
+  flex-basis: 100%;
+}
+.tr-aside .tr-card__check-row > .nv-btn--plain {
+  margin-left: calc(-1 * var(--nv-space-3));
 }
 /* In the folded band, the essentials open the sheet's body, a hairline under the line above. */
 .tr-sheet__body > .tr-card__essentials {

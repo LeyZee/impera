@@ -161,10 +161,14 @@
     grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
   }
-  /* Its panels keep their height: the column scrolls, never a squeezed panel. */
+  /* Its panels keep their height: the column scrolls, never a squeezed panel. The last one, the list, reaches the foot
+   * of the column, so the three columns end on one line (Charles, 08/11). */
   .tr-page .tr-side > * {
     flex: none;
     max-height: none;
+  }
+  .tr-page .tr-side > :last-child {
+    flex: 1 0 auto;
   }
   .tr-page .tr-side {
     min-height: 0;
@@ -215,11 +219,13 @@
   min-width: 0;
   padding: var(--nv-space-4);
 }
+/* The head lines up with the text inside the plates under it, not with their edges. */
 .tr-aside__head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--nv-space-2);
+  padding: 0 var(--nv-space-3);
 }
 .tr-aside__title {
   margin: 0;
