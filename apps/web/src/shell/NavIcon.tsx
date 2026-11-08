@@ -18,7 +18,9 @@ export type NavIconName =
   | 'me'
   | 'bell'
   | 'shield'
-  | 'more';
+  | 'more'
+  | 'eye'
+  | 'eye-off';
 
 const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
   dashboard: (
@@ -125,6 +127,21 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
     <>
       <path d="M12 3l7 3v5c0 4.5-3 8.4-7 10-4-1.6-7-5.5-7-10V6z" />
       <path d="M9 12l2 2 4-4" />
+    </>
+  ),
+  // Her media shown as they are, or blurred (SC-04 lot c4): the lid closes over the eye, the bar crosses it.
+  eye: (
+    <>
+      <path className="nav-lid" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle className="nav-pupil" cx="12" cy="12" r="2.8" />
+    </>
+  ),
+  'eye-off': (
+    <>
+      <path d="M9.9 5.8A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.6 3.4" />
+      <path d="M6.6 7.1C3.9 8.8 2.5 12 2.5 12S6 18.5 12 18.5c1.8 0 3.3-.5 4.6-1.2" />
+      <path d="M9.9 10a2.8 2.8 0 0 0 4 4" />
+      <path className="nav-strike" d="M3.5 3.5l17 17" />
     </>
   ),
   more: (

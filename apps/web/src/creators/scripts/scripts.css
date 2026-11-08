@@ -252,6 +252,133 @@
 .sx-thumb[data-kind='audio']::after {
   content: '🎙️';
 }
+/* Its reduced picture (SC-04 lot c4): the tile's emoji gives way to it; under « Flou des médias », blurred inside. */
+.sx-thumb {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+}
+.sx-thumb__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sx-thumb[data-picture='true']::after {
+  content: none;
+}
+/* A video's picture says it plays. */
+.sx-thumb[data-picture='true'][data-kind='video']::before {
+  content: '▶';
+  position: absolute;
+  z-index: 1;
+  right: 4px;
+  bottom: 4px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--nv-radius-full);
+  font-size: 8px;
+  color: var(--nv-ink);
+  background: var(--nv-glass-fill-strong);
+  -webkit-backdrop-filter: blur(var(--nv-blur-thin));
+  backdrop-filter: blur(var(--nv-blur-thin));
+}
+.sx-thumb--open {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: zoom-in;
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    box-shadow var(--nv-dur-fast);
+}
+.sx-thumb--open:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px var(--nv-glass-edge),
+    var(--nv-shadow-lift);
+}
+.sx-thumb--open:active {
+  transform: scale(0.96);
+}
+.sx-thumb--open:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+
+/* Her medium in large, its description beside it (SC-04 lot c4); one under the other on the phone. */
+.tm-dialog.sx-viewer {
+  max-width: min(980px, calc(100vw - 32px));
+}
+.sx-viewer__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--nv-space-5);
+  align-items: start;
+}
+.sx-viewer__frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  max-height: 70vh;
+  overflow: hidden;
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-fill-soft);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.sx-viewer__media {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+.sx-viewer__empty {
+  padding: var(--nv-space-6);
+  text-align: center;
+}
+/* Over the middle of the picture, whatever the button's own margins. */
+.sx-viewer__frame > .sx-viewer__reveal {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  translate: -50% -50%;
+  gap: var(--nv-space-2);
+}
+.sx-viewer__reveal .nav-icon {
+  width: 16px;
+  height: 16px;
+}
+.sx-viewer__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .sx-viewer__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sx-viewer__frame,
+  .sx-viewer__media {
+    max-height: 52vh;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-thumb--open {
+    transition: none;
+  }
+  .sx-thumb--open:hover,
+  .sx-thumb--open:active {
+    transform: none;
+  }
+}
 .sx-medium__body {
   display: flex;
   flex-direction: column;

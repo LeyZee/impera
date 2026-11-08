@@ -45,8 +45,9 @@ const segments: ScriptSegment[] = [
   },
 ];
 
-const file = (slotKey: string, mime: string) => ({
+const file = (slotKey: string, mime: string, description: string | null = null) => ({
   slotKey,
+  description,
   mime,
   bytes: 1000,
   storageKey: `media/${slotKey}`,
@@ -103,6 +104,25 @@ describe('a sent script’s archive (ADR 0056 § 7)', () => {
       '   Série B : Plein jour\n     03-E2B-00-carton.png\n     03-E2B-01-photo.heic',
     );
     expect(plan.sheet.endsWith('\n')).toBe(true);
+  });
+
+  it('puts under each medium its validated description, or that it waits for one (SC-04 lot c4)', () => {
+    const described = scriptExportPlan({
+      number: 7,
+      moment: 'night',
+      version: { name: 'Soirée inventée', segments },
+      files: [
+        file('salon::0', 'image/jpeg', 'Une silhouette inventée\n près d’une fenêtre.'),
+        file('chambre:A:0', 'image/jpeg'),
+      ],
+      cards: false,
+    });
+    expect(described.sheet).toContain(
+      '     01-E1-01-photo.jpg\n       Une silhouette inventée près d’une fenêtre.\n',
+    );
+    expect(described.sheet).toContain(
+      '     03-E2A-01-photo.jpg\n       Description à valider dans le CRM.\n',
+    );
   });
 
   it('knows the extension of every type a drop keeps', () => {

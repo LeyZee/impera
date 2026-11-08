@@ -89,6 +89,16 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
 - Le rattrapage et la description à la réception épargnent un média dont une description est validée, comme celui qu'un humain a décrit.
 - La créatrice ne valide pas encore depuis son espace (l'ADR le permet ; à venir avec son écran).
 
+## Vignettes et médias en grand (ADR 0030 § 4, SC-04 lot c4, migration 0158)
+
+- Chaque photo et vidéo gardée reçoit une **vignette** : le job `content_drops.make_thumbnail`, mis en file avec sa description quand le média entre dans sa médiathèque, la fait avec ffmpeg (JPEG de 640 px de large au plus, métadonnées retirées ; pour une vidéo, la première image parlante de ses 60 premières). Elle est écrite sous `thumbnails/<creatorId>/<sha256>.jpg`, puis la ligne est marquée (`thumbnail_key`, `thumbnailed_at`). Une seule tentative : un fichier qu'ffmpeg ne lit pas garde `thumbnailed_at` sans vignette, et l'écran montre sa tuile. Une machine à court de disque reprend 15 min plus tard. Pas de vignette pour un vocal (`media_assets_thumbnail_check`).
+- `content_drops.thumbnail_backlog` (chaque heure, à la 50e minute) remet en file jusqu'à 200 médias gardés sans tentative, pour ceux d'avant ce lot.
+- La vignette reste après l'effacement de l'original (ADR 0044 § 2) ; elle a sa colonne plutôt que de reprendre `storage_key`, qui garde la trace de l'original effacé.
+- `GET /v1/creators/:creatorId/drops/:id/files/:fileId/thumbnail` (propriétaire, manager actif) : la vignette, `image/jpeg`, `private, max-age=300`, `nosniff` ; sans vignette, 404 `content_drop_file_not_found`.
+- `GET …/files/:fileId/media` : le média lui-même, servi par l'API (la CSP du site n'admet que ses propres images et vidéos), lisible par plages pour une vidéo (`Range`, 206 ; 416 au-delà de sa fin), `private, no-store`, `inline`. Chaque ouverture (sans plage, ou la plage du début) écrit `media.opened` au journal. Un original effacé répond 404.
+- Le ZIP du script (« Copié dans Reveal ») porte sous chaque média sa description validée, ou « Description à valider dans le CRM. ».
+- À l'écran, chaque image est floutée tant que l'interrupteur « Flou des médias » est allumé (choix de ce navigateur, allumé à la première ouverture) ; « Voir net » montre un seul média sans changer le choix.
+
 ## Une demande née d'une idée (VEI-01 d2)
 
 `requestFromIdea` (index du module) écrit au rôle admin la demande d'un tournage qu'elle a accepté depuis une idée de la veille : origine `idea`, sans auteur (`content_requests_author_check`), sous l'identifiant de l'idée, rejouable (`on conflict do nothing`). Seul le job `creator_tasks.suggestion_decided` de la veille l'appelle.

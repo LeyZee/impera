@@ -240,15 +240,20 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
       return true;
     },
 
-    async read(key) {
-      const what = `GET ${key}`;
+    async read(key, range) {
+      const what =
+        range === undefined ? `GET ${key}` : `GET ${key} ${String(range.start)}-${String(range.end)}`;
       // A stall of the storage aborts the read, never a slow reader: the clock runs only while a chunk is awaited
       // (relecture Bilan de #607), the archive's client may take its time between two.
       const abort = new AbortController();
       let stalled = setTimeout(() => {
         abort.abort();
       }, REQUEST_TIMEOUT_MS);
-      const response = await call(what, urlOf(key), { method: 'GET' }, abort.signal).finally(() => {
+      const init: RequestInit =
+        range === undefined
+          ? { method: 'GET' }
+          : { method: 'GET', headers: { range: `bytes=${String(range.start)}-${String(range.end)}` } };
+      const response = await call(what, urlOf(key), init, abort.signal).finally(() => {
         clearTimeout(stalled);
       });
       if (response.status === 404) {

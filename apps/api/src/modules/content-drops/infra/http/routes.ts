@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+
 import {
   CompleteDropFileBodySchema,
   ContentDropFileIdSchema,
@@ -42,7 +44,8 @@ import {
 } from '../../application/script-drops';
 import { exportScript } from '../../application/script-export';
 import { finishUpload, uploadOf } from '../../application/uploads';
-import { DropDescriptionsCreatorNotFound } from '../../domain/errors';
+import { byteRangeOf } from '../../domain/byte-range';
+import { ContentDropFileNotFound, DropDescriptionsCreatorNotFound } from '../../domain/errors';
 import type {
   AgencyContentStore,
   CreatorContentStore,
@@ -86,6 +89,8 @@ const CreatorFileParamsSchema = z.object({
   fileId: ContentDropFileIdSchema,
 });
 const CreatorRequestParamsSchema = z.object({ creatorId: CreatorIdSchema, id: ContentRequestIdSchema });
+/** Short: a picture made meanwhile shows within minutes; the browser does not ask at each page. */
+const THUMBNAIL_CACHE_SECONDS = 300;
 const ScriptDropParamsSchema = z.object({ dropId: ContentDropIdSchema });
 
 /**
@@ -437,6 +442,62 @@ export function createContentDropRoutes(
           clock(),
           request.id,
         ),
+    );
+
+    // Her medium's reduced picture (SC-04 lot c4, ADR 0030 § 4), from our own origin (the CRM's CSP: `img-src 'self'`).
+    app.get(
+      '/creators/:creatorId/drops/:id/files/:fileId/thumbnail',
+      { ...team, schema: { params: CreatorFileParamsSchema } },
+      async (request, reply) => {
+        const { creatorId, id, fileId } = request.params;
+        const file = await review.file(creatorId, signedIn(request.user), id, fileId);
+        if (file?.thumbnailKey == null) throw new ContentDropFileNotFound();
+        const stream = await storage.read(file.thumbnailKey);
+        if (stream === null) throw new ContentDropFileNotFound();
+        return reply
+          .header('content-type', 'image/jpeg')
+          .header('cache-control', `private, max-age=${String(THUMBNAIL_CACHE_SECONDS)}`)
+          .header('x-content-type-options', 'nosniff')
+          .send(Readable.from(stream));
+      },
+    );
+
+    /*
+     * Her medium itself while its original is held (SC-04 lot c4, ADR 0044 § 2), from our own origin (`media-src
+     * 'self'`): a photo whole, a video in the parts its player asks (`Range`). Each opening is audited, not each part.
+     */
+    app.get(
+      '/creators/:creatorId/drops/:id/files/:fileId/media',
+      { ...team, schema: { params: CreatorFileParamsSchema } },
+      async (request, reply) => {
+        const { creatorId, id, fileId } = request.params;
+        const userId = signedIn(request.user);
+        const file = await review.file(creatorId, userId, id, fileId);
+        if (file?.originalKey == null) throw new ContentDropFileNotFound();
+        const range = byteRangeOf(request.headers.range, file.bytes);
+        if (range.kind === 'unsatisfiable')
+          return reply
+            .code(416)
+            .header('content-range', `bytes */${String(file.bytes)}`)
+            .send();
+        const part = range.kind === 'part' ? { start: range.start, end: range.end } : undefined;
+        const stream = await storage.read(file.originalKey, part);
+        if (stream === null) throw new ContentDropFileNotFound();
+        if (part === undefined || part.start === 0) await review.opened(creatorId, userId, file, request.id);
+        reply
+          .header('content-type', file.mime)
+          .header('accept-ranges', 'bytes')
+          .header('cache-control', 'private, no-store')
+          .header('x-content-type-options', 'nosniff')
+          .header('content-disposition', 'inline');
+        if (part === undefined) reply.header('content-length', String(file.bytes));
+        else
+          reply
+            .code(206)
+            .header('content-range', `bytes ${String(part.start)}-${String(part.end)}/${String(file.bytes)}`)
+            .header('content-length', String(part.end - part.start + 1));
+        return reply.send(Readable.from(stream));
+      },
     );
 
     app.post(

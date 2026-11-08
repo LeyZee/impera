@@ -32,7 +32,7 @@ import {
   ContentDropNotFound,
   DropDescriptionReviewConflict,
 } from '../../domain/errors';
-import type { DescriptionReview } from '../../domain/ports';
+import type { DescriptionReview, ReviewedFile } from '../../domain/ports';
 
 import { enqueueSummary } from './script-summary-store';
 
@@ -41,6 +41,7 @@ const {
   contentDropFiles,
   contentDrops,
   contentRequests,
+  mediaAssets,
   mediaDescriptions,
   scriptDropSummaries,
   scriptStructureVersions,
@@ -80,8 +81,11 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
       slotKey: contentDropFiles.slotKey,
       mediaAssetId: contentDropFiles.mediaAssetId,
       kind: contentDropFiles.kind,
+      thumbnailKey: mediaAssets.thumbnailKey,
+      erasedAt: mediaAssets.erasedAt,
     })
     .from(contentDropFiles)
+    .innerJoin(mediaAssets, eq(mediaAssets.id, contentDropFiles.mediaAssetId))
     .where(
       and(
         eq(contentDropFiles.dropId, dropId),
@@ -145,6 +149,8 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
               validatedAt: row.validatedAt?.toISOString() ?? null,
               createdAt: row.createdAt.toISOString(),
             },
+      thumbnail: file.thumbnailKey !== null,
+      original: file.erasedAt === null,
     };
   });
 
@@ -304,6 +310,55 @@ export function createDrizzleDescriptionReview(db: Database): DescriptionReview 
           .where(and(eq(scriptDropSummaries.id, summaryId), sql`${scriptDropSummaries.validatedAt} is null`));
         await audit(tx, userId, 'script_summary.validated', dropId, { summaryId });
         return (await stateOf(tx, dropId)).review;
+      }),
+
+    file: (creatorId, userId, dropId, fileId) =>
+      asTeam(creatorId, userId, async (tx): Promise<ReviewedFile | null> => {
+        const [row] = await tx
+          .select({
+            fileId: contentDropFiles.id,
+            mediaAssetId: mediaAssets.id,
+            kind: mediaAssets.kind,
+            mime: mediaAssets.mime,
+            bytes: mediaAssets.bytes,
+            storageKey: mediaAssets.storageKey,
+            erasedAt: mediaAssets.erasedAt,
+            thumbnailKey: mediaAssets.thumbnailKey,
+          })
+          .from(contentDropFiles)
+          .innerJoin(contentDrops, eq(contentDrops.id, contentDropFiles.dropId))
+          .innerJoin(mediaAssets, eq(mediaAssets.id, contentDropFiles.mediaAssetId))
+          .where(
+            and(
+              eq(contentDropFiles.id, fileId),
+              eq(contentDropFiles.dropId, dropId),
+              sql`${contentDropFiles.replacedAt} is null`,
+              sql`${contentDropFiles.state} <> 'refused'`,
+              sql`${contentDrops.state} <> 'withdrawn'`,
+            ),
+          );
+        if (row === undefined) return null;
+        return {
+          fileId: row.fileId,
+          mediaAssetId: row.mediaAssetId,
+          kind: DropMediaKindSchema.parse(row.kind),
+          mime: row.mime,
+          bytes: row.bytes,
+          originalKey: row.erasedAt === null ? row.storageKey : null,
+          thumbnailKey: row.thumbnailKey,
+        };
+      }),
+
+    opened: (creatorId, userId, file, correlationId) =>
+      asTeam(creatorId, userId, async (tx) => {
+        await tx.insert(auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: 'media.opened',
+          entity: 'media_asset',
+          entityId: file.mediaAssetId,
+          details: { fileId: file.fileId, correlationId },
+        });
       }),
   };
 }

@@ -7,12 +7,14 @@ import { UpdateNotice } from './pwa/UpdateNotice';
 import { captureInstallPrompt } from './pwa/install';
 import { registerServiceWorker } from './pwa/serviceWorker';
 import { startAppearance } from './shell/appearance';
+import { startMediaBlur } from './shell/media-blur';
 
 const root = document.getElementById('root');
 if (root === null) {
   throw new Error('Missing #root element in index.html');
 }
 startAppearance();
+startMediaBlur();
 captureInstallPrompt();
 registerServiceWorker();
 createRoot(root).render(

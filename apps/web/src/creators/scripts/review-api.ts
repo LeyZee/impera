@@ -2,6 +2,7 @@ import {
   ApiErrorSchema,
   DropDescriptionsReviewSchema,
   DropDescriptionsSwitchSchema,
+  type ContentDropFileId,
   type ContentDropId,
   type CreatorId,
   type DropDescriptionsReview,
@@ -56,6 +57,15 @@ export async function setDescribeSwitch(creatorId: CreatorId, on: boolean): Prom
     return null;
   }
 }
+
+/** Her medium's reduced picture, and the medium itself while its original is held (SC-04 lot c4): our own origin. */
+export const thumbnailUrl = (
+  creatorId: CreatorId,
+  dropId: ContentDropId,
+  fileId: ContentDropFileId,
+): string => `${reviewUrl(creatorId, dropId)}/files/${fileId}/thumbnail`;
+export const mediaUrl = (creatorId: CreatorId, dropId: ContentDropId, fileId: ContentDropFileId): string =>
+  `${reviewUrl(creatorId, dropId)}/files/${fileId}/media`;
 
 export function useDropReview(
   creatorId: CreatorId,

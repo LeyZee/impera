@@ -23,6 +23,8 @@ export interface WiredContentDrops {
     | 'content_drops.describe_file'
     | 'content_drops.summarize_script'
     | 'content_drops.describe_backlog'
+    | 'content_drops.make_thumbnail'
+    | 'content_drops.thumbnail_backlog'
   >;
   readonly routes: readonly Routes[];
 }
@@ -96,6 +98,29 @@ export function wireContentDrops(
           context.logger.info(
             await module.jobs.describeBacklog(payload.creatorId ?? null, `job:${context.jobId}`),
             'content drops: media and scripts waiting for a description enqueued again',
+          );
+        },
+      ),
+      'content_drops.make_thumbnail': defineTask(
+        'content_drops.make_thumbnail',
+        JOB_PAYLOADS['content_drops.make_thumbnail'],
+        shared.logger,
+        async (payload, context) => {
+          const outcome = await module.jobs.makeThumbnail(payload.mediaAssetId, payload.correlationId);
+          context.logger.info(
+            { mediaAssetId: payload.mediaAssetId, outcome },
+            'content drops: reduced picture of a medium',
+          );
+        },
+      ),
+      'content_drops.thumbnail_backlog': defineTask(
+        'content_drops.thumbnail_backlog',
+        JOB_PAYLOADS['content_drops.thumbnail_backlog'],
+        shared.logger,
+        async (_payload, context) => {
+          context.logger.info(
+            { media: await module.jobs.thumbnailBacklog(`job:${context.jobId}`) },
+            'content drops: media without a reduced picture enqueued',
           );
         },
       ),

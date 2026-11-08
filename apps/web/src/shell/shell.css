@@ -209,6 +209,118 @@
   color: var(--nv-warning);
 }
 
+/* « Flou des médias » (SC-04 lot c4): a switch over the settings, an eye crossed out while her media are blurred. */
+.nv-rail__blur {
+  appearance: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin: 0 2px 6px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--nv-radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  background: var(--nv-glass-fill);
+  white-space: nowrap;
+  min-width: 0;
+  transition:
+    background var(--nv-dur-fast),
+    color var(--nv-dur-fast),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.nv-rail__blur-icon {
+  display: inline-flex;
+  flex: none;
+}
+.nv-rail__blur-icon .nav-icon {
+  width: 18px;
+  height: 18px;
+}
+.nv-rail__blur-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--nv-ink-faint);
+  font-weight: 500;
+}
+.nv-rail__blur-state {
+  margin-left: auto;
+  flex: none;
+}
+.nv-rail__blur[data-on='true'] {
+  color: var(--nv-ink);
+}
+.nv-rail__blur:hover {
+  color: var(--nv-ink);
+  background: var(--nv-glass-fill-strong);
+}
+.nv-rail__blur:active {
+  transform: scale(0.96);
+}
+.nv-rail__blur:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+/* In « Plus » on the phone: a row of the sheet, its state at the end. */
+.nv-more__blur {
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  width: 100%;
+  cursor: pointer;
+  text-align: start;
+}
+.nv-more__blur .nv-rail__blur-icon .nav-icon {
+  width: 20px;
+  height: 20px;
+}
+.nv-more__blur .nv-rail__blur-label {
+  flex: 1;
+  color: inherit;
+  font-weight: inherit;
+}
+.nv-more__blur .nv-rail__blur-state {
+  color: var(--nv-ink-faint);
+  font-size: 14px;
+  font-weight: 500;
+}
+/* Her media under the switch: each picture marked `nv-blurrable` follows it; one shown on purpose stays clear. */
+:root[data-media-blur='on'] .nv-blurrable:not([data-revealed='true']) {
+  filter: blur(18px) saturate(0.85);
+  transform: scale(1.12);
+}
+.nv-blurrable {
+  transition:
+    filter var(--nv-dur-slow) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-out);
+}
+/* The eye: the lid blinks; crossed out, the bar is drawn. */
+.is-playing .nav-lid,
+.is-playing .nav-pupil {
+  transform-origin: 12px 12px;
+  animation: nv-nav-blink var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
+@keyframes nv-nav-blink {
+  40% {
+    transform: scaleY(0.15);
+  }
+}
+.is-playing .nav-strike {
+  stroke-dasharray: 25;
+  animation: nv-nav-strike var(--nv-dur-morph) var(--nv-ease-out) both;
+}
+@keyframes nv-nav-strike {
+  from {
+    stroke-dashoffset: 25;
+  }
+}
+
 /* Icons: a readable rest state, and a gesture played once on activation (`is-playing`). */
 .nav-icon {
   width: 20px;
@@ -1086,6 +1198,15 @@
     font-size: 0;
     margin-inline: 0;
   }
+  .nv-rail__blur {
+    justify-content: center;
+    padding: 0;
+    margin-inline: 0;
+  }
+  .nv-rail__blur-label,
+  .nv-rail__blur-state {
+    display: none;
+  }
   .nv-user__menu {
     left: 0;
     right: auto;
@@ -1144,6 +1265,7 @@
   .nv-rail__sp,
   .nv-rail__lens,
   .nv-rail__agent,
+  .nv-rail__blur,
   .nv-rail__heading,
   .nv-rail__gap,
   .nv-rail__item[data-phone='more'],
@@ -1716,4 +1838,9 @@ label.nv-notif__row {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-blurrable {
+    transition: none;
+  }
 }
