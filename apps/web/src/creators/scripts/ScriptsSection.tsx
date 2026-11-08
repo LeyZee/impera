@@ -210,30 +210,30 @@ function ScriptCard({
         >
           {reviewing ? 'Fermer les descriptions' : 'Relire les descriptions'}
         </button>
+        {row.blocker === null ? (
+          <>
+            <a
+              className={`nv-btn nv-btn--sm ${row.exportedAt === null ? 'nv-btn--soft' : 'nv-btn--plain'}`}
+              href={archiveHref(creatorId, row.dropId)}
+              download
+            >
+              {row.exportedAt === null ? 'Télécharger l’archive' : 'Télécharger à nouveau'}
+            </a>
+            {row.exportedAt === null ? (
+              <button
+                type="button"
+                className={`nv-btn nv-btn--sm ${leading ? 'nv-btn--neon' : 'nv-btn--soft'}`}
+                onClick={onConfirm}
+              >
+                Copié dans Reveal
+              </button>
+            ) : null}
+          </>
+        ) : null}
       </div>
       {reviewing ? (
         <div id={`${id}-review`}>
           <ScriptReview creatorId={creatorId} dropId={row.dropId} code={row.code} />
-        </div>
-      ) : null}
-      {row.blocker === null ? (
-        <div className="sx-actions">
-          <a
-            className={`nv-btn nv-btn--sm ${row.exportedAt === null ? 'nv-btn--soft' : 'nv-btn--plain'}`}
-            href={archiveHref(creatorId, row.dropId)}
-            download
-          >
-            {row.exportedAt === null ? 'Télécharger l’archive' : 'Télécharger à nouveau'}
-          </a>
-          {row.exportedAt === null ? (
-            <button
-              type="button"
-              className={`nv-btn nv-btn--sm ${leading ? 'nv-btn--neon' : 'nv-btn--soft'}`}
-              onClick={onConfirm}
-            >
-              Copié dans Reveal
-            </button>
-          ) : null}
         </div>
       ) : null}
     </li>

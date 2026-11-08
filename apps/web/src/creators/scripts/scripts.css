@@ -212,7 +212,7 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.sx-step__all {
+.sx-step__head > .sx-step__all {
   margin-left: auto;
 }
 
@@ -338,8 +338,13 @@
   .sx-synth__step .sx-price {
     grid-column: 2;
     justify-self: start;
+    margin: 0;
   }
   .sx-switch {
     padding: 16px;
+  }
+  /* In the review, a lone « Corriger » stays a small button at the end of its row, never a full-width bar. */
+  .sx-review .sx-actions > .nv-btn {
+    flex: none;
   }
 }
