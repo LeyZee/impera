@@ -251,7 +251,7 @@ async function facts(
           sql`select f.id, f.display_name as name, f.first_seen_at,
                      (select array_agg(n.value order by n.observed_at desc) from (
                         select value, observed_at from fan_facts ff
-                        where ff.fan_id = f.id and ff.superseded_by is null
+                        where ff.fan_id = f.id and ff.superseded_by is null and ff.value <> ''
                           and (ff.expires_at is null or ff.expires_at > ${now}::timestamptz)
                         order by observed_at desc limit ${NOTES_PER_FAN}) n) as notes,
                      (select h.payload->>'cause' from conversations c

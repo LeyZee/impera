@@ -626,8 +626,17 @@ export interface ConversationReader {
   traceFanOpening(
     creatorId: CreatorId,
     fanId: FanId,
-    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' },
+    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' | 'card' },
   ): Promise<void>;
+  /**
+   * The text of those of these messages this fan sent her, by id (ADR 0085 § 5: the sentence a value of his card was
+   * read in). Her messages, another fan's and unknown ids are left out.
+   */
+  fanMessageTexts(
+    creatorId: CreatorId,
+    fanId: FanId,
+    messageIds: readonly MessageId[],
+  ): Promise<ReadonlyMap<string, string>>;
   /** As the reader `userId` sees it: whether he holds it is his own. */
   get(creatorId: CreatorId, id: ConversationId, userId: UserId): Promise<ConversationDetail | null>;
   /** `null` when the creator has no such conversation, as for `get`: never an empty page that hides it. */
