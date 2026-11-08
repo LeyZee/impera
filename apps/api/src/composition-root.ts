@@ -14,6 +14,7 @@ import {
   createAuthRoutes,
   createRequireRecentLogin,
   createRequireRole,
+  currentUserById,
   type Auth,
   type RequireRole,
 } from './auth';
@@ -395,6 +396,15 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     alerts: alerts.module,
     agent,
     media,
+    copilot: {
+      // The copilot panel writes with the person's extension link (ADR 0086 § 8), read as a session would read him:
+      // his creators and his shift's at each gesture (ADR 0025).
+      linkUser: async (token) => {
+        const holder = await trends.module.linkHolder(token);
+        return holder === null ? null : currentUserById(db.db, shiftCreators, holder.userId);
+      },
+      allCreatorIds: persona.allCreatorIds,
+    },
   });
   const backups = wireBackups(shared);
   const trends = wireTrends(shared, {

@@ -43,7 +43,10 @@ import type {
   PlatformAccountId,
   SendResult,
   UserId,
+  Verdict,
   VerifyResult,
+  CopilotSwitches,
+  Platform,
 } from '@impera/contracts';
 
 import type { AwayStatus } from './away';
@@ -187,6 +190,16 @@ interface DraftRepository {
     facts?: readonly DraftFact[];
   }): Promise<void>;
   setStatus(id: DraftId, status: DraftStatus, decision?: DraftDecision): Promise<void>;
+  /**
+   * Marks a draft put in the platform's field from the copilot panel (ADR 0086 § 4), by whom and when; its status does
+   * not move. `false` when it was already placed: the first placing is kept.
+   */
+  place(id: DraftId, placedBy: UserId, at: Date): Promise<boolean>;
+  /**
+   * Writes the draft's `live` calibration rating (ADR 0086 § 5), one per draft, with the voice that wrote it: `false`
+   * when it already has one, or when no voice is known for it (a draft written by no model).
+   */
+  rateLive(id: DraftId, verdict: Verdict, at: Date): Promise<boolean>;
 }
 
 export interface EventMeta {
@@ -644,6 +657,35 @@ export interface ConversationReader {
   desireCurve(creatorId: CreatorId, id: ConversationId): Promise<DesireCurve | null>;
   /** Whether the latest global or creator-wide emergency stop of hers is on (recette CHAT-07). */
   sendingStopped(creatorId: CreatorId): Promise<boolean>;
+}
+
+/** The conversation open on the platform, as the copilot panel reads it (ADR 0086 § 3, § 9). */
+export interface CopilotRead {
+  readonly conversationId: ConversationId;
+  readonly fanId: FanId;
+  /** A fan's message waits for the agent's answer: « L'agent écrit… ». */
+  readonly writing: boolean;
+  /** Her two switches, Créatrices › (elle) › Agent (§ 6), read from her settings; unreadable, the defaults. */
+  readonly switches: CopilotSwitches;
+  /** The latest pending draft that has bubbles, if any. */
+  readonly draft: {
+    readonly id: DraftId;
+    readonly bubbles: readonly string[];
+    readonly createdAt: Date;
+    readonly placedAt: Date | null;
+  } | null;
+}
+
+export interface CopilotReader {
+  /**
+   * Her conversation of that id on the platform, `null` when she has none. With `trace`, a chatter's opening is written
+   * in the audit log first, unless one covers it (ADR 0025, ADR 0086 § 7): the panel reads every 5 s.
+   */
+  read(
+    creatorId: CreatorId,
+    conversation: { readonly platform: Platform; readonly platformConversationId: string },
+    trace?: { readonly userId: UserId; readonly ip: string },
+  ): Promise<CopilotRead | null>;
 }
 
 /** Her own alerts' names, archived ones too (`alerts` module's adapter): the history names an alert as it was. */

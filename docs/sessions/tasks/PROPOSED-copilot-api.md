@@ -1,5 +1,5 @@
 # Copilote sur Reveal : brouillons en attente et verdicts, côté API (ID à attribuer)
-Statut : proposed (décision de Charles le 17/10 à 21h44, recommandation du coordinateur ; contrat à accorder avec la fiche UI du fil Extension avant tout code ; à coder après la clé xAI et la capture Reveal)
+Statut : proposed (décision de Charles le 17/10 à 21h44, recommandation du coordinateur ; précisée par l'ADR 0086, acceptée le 08/11 : le chatteur envoie lui-même et ce qui part fait le verdict, § 4 et 5. Routes, migration 0143 et interrupteurs livrés par le fil Bilan, journal `2026-11-08-panneau-copilote-api.md` ; reste le rapprochement, fil Agent)
 Phase : 3
 Dépend de : P0-05, P0-06, P3-05, calibration_ratings (#46), lot A Reveal
 Branche : task/<id>-copilot-api

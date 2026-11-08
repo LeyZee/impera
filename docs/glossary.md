@@ -15,6 +15,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Message | `message` | Un message reçu ou envoyé. `direction: inbound | outbound`, `author: fan | human | ai`. |
 | Journal d'événements | `conversation_events` | Historique append-only de tout ce qui arrive à une conversation. Source de vérité. |
 | Brouillon, proposition | `draft` | Une réponse proposée par l'IA, en attente d'approbation ou auto-approuvée. |
+| Brouillon placé | `drafts.placed_at`, verdict `placed` | Un brouillon que le chatteur a mis dans le champ de saisie de la plateforme depuis le panneau copilote (`a`, ou `e` après retouche) : il l'envoie lui-même, le brouillon reste en attente, et c'est le message parti qui le juge validé ou corrigé (ADR 0086 § 4 et 5). Jamais « Envoyé » au clic. |
+| Note de calibrage en réel | `calibration_ratings.source = 'live'` | Le jugement d'un vrai brouillon passé par le panneau copilote, une note par brouillon, sans les mots du fan ; celles du playground sont `playground` (ADR 0086 § 5). |
 | Brief | `brief` | La sortie structurée du cerveau qui dit à la voix quoi écrire. |
 | Sens | `sense` | Rôle LLM qui décrit les médias. |
 | Cerveau | `brain` | Rôle LLM qui analyse et décide. |

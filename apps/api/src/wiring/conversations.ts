@@ -2,7 +2,11 @@ import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
 import type { ConnectorsModule } from '../modules/connectors';
-import { createConversationsModule, type ConversationsModule } from '../modules/conversations';
+import {
+  createConversationsModule,
+  type ConversationsDeps,
+  type ConversationsModule,
+} from '../modules/conversations';
 import type { FansModule } from '../modules/fans';
 import type { PersonaModule } from '../modules/persona';
 
@@ -26,6 +30,8 @@ export function wireConversations(
     readonly alerts: WiredAlerts['module'];
     readonly agent: WiredAgent;
     readonly media: WiredMedia;
+    /** The copilot panel's doors (ADR 0086): the person an extension link names, every creator for the owner. */
+    readonly copilot: NonNullable<ConversationsDeps['copilot']>;
   },
 ): WiredConversations {
   const { db, adminDb, logger, requireRole, recentLogin } = shared;
@@ -51,6 +57,7 @@ export function wireConversations(
     },
     alertNames: { ofCreator: (creatorId) => alerts.store.names(creatorId) },
     mediaDescriptions: deps.media.descriptions,
+    copilot: deps.copilot,
   });
   return {
     module,

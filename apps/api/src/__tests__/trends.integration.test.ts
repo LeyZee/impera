@@ -292,8 +292,15 @@ describe('/v1/trends', () => {
   });
 
   it('never lets a chatter take part in the watch, nor a manager once he is one (ADR 0060 § 2, amended 07/11)', async () => {
-    const refused = await call('POST', '/v1/trends/extension-links', cookies.chatter, { label: 'Chrome' });
-    expect([refused.statusCode, codeOf(refused)]).toEqual([403, 'extension_link_forbidden']);
+    // A chatter links his browser for the copilot panel's writes only (ADR 0086 § 8): the watch's doors stay shut.
+    const chatterToken = await newToken(cookies.chatter, 'Chrome');
+    const shut = await server.inject({
+      method: 'GET',
+      url: '/v1/trends/readings/creators',
+      headers: { 'x-extension-link': chatterToken },
+    });
+    expect([shut.statusCode, codeOf(shut)]).toEqual([403, 'trend_watch_forbidden']);
+    expect((await readings(chatterToken, { readings: [] })).statusCode).toBe(403);
 
     // A manager links his browser, then becomes a chatter, then is away: his link no longer opens anything.
     const cookie = await member('futur-chatteur@example.test', 'manager');
@@ -311,13 +318,14 @@ describe('/v1/trends', () => {
       url: '/v1/trends/readings/creators',
       headers: { 'x-extension-link': token },
     });
-    expect(asChatter.statusCode).toBe(401);
+    expect([asChatter.statusCode, codeOf(asChatter)]).toEqual([403, 'trend_watch_forbidden']);
     const paste = await call('POST', '/v1/trends/links', cookie, link(nora, 'Cx9AbCdEf'));
     expect([paste.statusCode, codeOf(paste)]).toEqual([403, 'trend_link_forbidden']);
     await test.admin.db
       .update(schema.teamMembers)
       .set({ teamRole: 'manager', status: 'on_leave' })
       .where(memberOf);
+    // Away, his link names nobody any more, for the watch as for the panel.
     const away = await server.inject({
       method: 'GET',
       url: '/v1/trends/readings/creators',

@@ -8,6 +8,7 @@ import type { ContentDropsModule, IdeaContentRequest } from '../content-drops';
 import type { CreatorTasksModule } from '../creator-tasks';
 
 import { followDecision, followDeposit } from './application/follow';
+import type { LinkHolder } from './domain/ports';
 import { createDrizzleIdeaFollowStore, createDrizzleIdeaStore } from './infra/db/idea-store';
 import { createDrizzleExtensionLinkStore } from './infra/db/link-store';
 import { createDrizzleReadingStore } from './infra/db/reading-store';
@@ -22,6 +23,11 @@ export interface TrendsModule {
    * and « Idées du jour » under `/creators/:creatorId/ideas`.
    */
   readonly routes: FastifyPluginAsyncZod;
+  /**
+   * The account a live extension link names, read again at each call, its last use stamped: the copilot panel writes
+   * with it (ADR 0086 § 8). `null` for a link missing, revoked, or naming nobody any more.
+   */
+  linkHolder(token: string): Promise<LinkHolder | null>;
   readonly jobs: {
     /** `creator_tasks.suggestion_decided`: her gesture on an idea's shoot, its content request or its decline (VEI-01 d2). */
     followDecision(decision: JobPayload<'creator_tasks.suggestion_decided'>): Promise<void>;
@@ -51,12 +57,14 @@ export function createTrendsModule(deps: TrendsDeps): TrendsModule {
     ideas: createDrizzleIdeaFollowStore(deps.adminDb),
     requestFromIdea: (request: IdeaContentRequest) => deps.contentDrops.requestFromIdea(request),
   };
+  const links = createDrizzleExtensionLinkStore(deps.adminDb);
   return {
     name: 'trends',
+    linkHolder: (token) => links.holder(token, { touch: true }),
     routes: createTrendRoutes(
       {
         signals: createDrizzleSignalStore(deps.db),
-        links: createDrizzleExtensionLinkStore(deps.adminDb),
+        links,
         readings: createDrizzleReadingStore(deps.db),
         vision: createGatewayCaptureVision(deps.gateway),
       },

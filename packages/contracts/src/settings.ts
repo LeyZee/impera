@@ -32,5 +32,7 @@ export const CreatorSettingsSchema = z.object({
       fanMediaDays: z.number().int().min(1).max(365).default(30),
     })
     .prefault({}),
+  /** Her two switches of the extension's copilot panel (ADR 0086 § 6): the fan's card on, the agent's drafts off. */
+  copilot: z.object({ fanCard: z.boolean().default(true), drafts: z.boolean().default(false) }).prefault({}),
 });
 export type CreatorSettings = z.infer<typeof CreatorSettingsSchema>;
