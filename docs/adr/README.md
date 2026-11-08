@@ -106,3 +106,5 @@ Date : AAAA-MM-JJ
 | 0080 | Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM | accepted (précise 0057, 0055, 0020 ; remplace pour le canal Telegram l'acceptation de 0057 § 3 et l'adresse de 0057 § 6) |
 | 0081 | Les abonnés, les PPV envoyés et les messages se gardent en photo quotidienne lue chez la plateforme | accepted (précise 0078 § 6 et 0050) |
 | 0083 | Chaque média que la créatrice dépose est décrit en détail, seul, et validé avant tout usage | accepted (précise 0030 § 3 et 0056 § 6) |
+| 0085 | La fiche du fan : vingt cases fermées que l'IA remplit en lisant la conversation, et que le chatteur corrige | accepted (précise P3-02, 0018 § 1 et 0063) |
+| 0086 | Le panneau copilote : à côté de la conversation Reveal, la fiche du fan d'abord, le brouillon de l'agent ensuite, et c'est le chatteur qui envoie | accepted (précise 0025, 0019, 0066 § 7 et 0085) |
