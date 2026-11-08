@@ -28,6 +28,9 @@ export type DraftId = z.infer<typeof DraftIdSchema>;
 export const MediaAssetIdSchema = uuid.brand<'MediaAssetId'>();
 export type MediaAssetId = z.infer<typeof MediaAssetIdSchema>;
 
+export const MediaDescriptionIdSchema = uuid.brand<'MediaDescriptionId'>();
+export type MediaDescriptionId = z.infer<typeof MediaDescriptionIdSchema>;
+
 export const PersonaVersionIdSchema = uuid.brand<'PersonaVersionId'>();
 export type PersonaVersionId = z.infer<typeof PersonaVersionIdSchema>;
 

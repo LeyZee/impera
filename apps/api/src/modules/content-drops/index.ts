@@ -4,10 +4,12 @@ import { tmpdir } from 'node:os';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { describeFile, type DescribeOutcome } from './application/describe';
 import { eraseOriginals, type RetentionRun } from './application/retention';
 import { NO_STORAGE, receiveFile } from './application/uploads';
 import type {
   AskedScript,
+  DropDescriber,
   DropStorage,
   IdeaContentRequest,
   ScriptContentRequest,
@@ -15,6 +17,7 @@ import type {
 } from './domain/ports';
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
+import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
 import { createDrizzleScriptDropStore } from './infra/db/script-drop-store';
 import {
@@ -43,6 +46,11 @@ export interface ContentDropsModule {
      * before an original goes, the originals due erased. Counts only.
      */
     eraseOriginals(correlationId: string): Promise<RetentionRun>;
+    /**
+     * `content_drops.describe_file` (ADR 0083): a photo or a video she dropped, described by the vision AI with what
+     * the drop says of it, kept for the agency to validate. What happened, for the log.
+     */
+    describeFile(mediaAssetId: string, correlationId: string): Promise<DescribeOutcome>;
   };
   /**
    * The content request of a shoot she accepted from an idea (VEI-01 d2), written by the trend watch's job: origin
@@ -70,6 +78,8 @@ export interface ContentDropsDeps {
   readonly requireRole: RequireRole;
   /** The library's frozen versions (`scripts`, wired by the composition root): what her script drop shoots. */
   readonly scriptVersions: ScriptVersions;
+  /** The media module's description of her dropped media (ADR 0083); without it, nothing is described. */
+  readonly describer?: DropDescriber;
   /** Tests only: another storage than the bucket's (a fake, or a bucket reached another way). */
   readonly storage?: DropStorage;
   /** Where the job writes a file while it cleans it; the system's temporary folder by default. */
@@ -99,6 +109,22 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       receiveFile: (fileId, correlationId) => receiveFile(receipt, fileId, clock(), correlationId),
       convertFile: (fileId, correlationId) =>
         receiveFile(receipt, fileId, clock(), correlationId, 'content_drops.convert_file'),
+      describeFile: async (mediaAssetId, correlationId) =>
+        deps.describer === undefined
+          ? 'off'
+          : describeFile(
+              {
+                storage,
+                queue: createDrizzleDescriptionQueue(deps.adminDb),
+                describer: deps.describer,
+                versions: deps.scriptVersions,
+                scratchDir,
+                room: receipt.room,
+              },
+              mediaAssetId,
+              clock(),
+              correlationId,
+            ),
       eraseOriginals: (correlationId) =>
         eraseOriginals(
           { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb) },

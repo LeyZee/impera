@@ -76,6 +76,7 @@ export const JOB_NAMES = [
   'content_drops.convert_file',
   'content_drops.erase_originals',
   'content_drops.drop_received',
+  'content_drops.describe_file',
   'scripts.ask_scripts',
   'providers.check_credentials',
   'connector.read_sales',
@@ -142,6 +143,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.convert_file': 'Conversion des vidéos',
   'content_drops.erase_originals': 'Nettoyage des originaux de contenu',
   'content_drops.drop_received': 'Dépôt reçu pour une idée',
+  'content_drops.describe_file': 'Description des médias déposés',
   'scripts.ask_scripts': 'Demandes de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
@@ -392,6 +394,16 @@ export const JOB_PAYLOADS = {
     requestId: ContentRequestIdSchema,
   }),
   /**
+   * A photo or a video she dropped, kept as a new medium of her library, described by the vision AI with what the drop
+   * says of it (ADR 0083 § 1). Enqueued in the transaction that keeps it, under `content_drops.describe_file:<id>`;
+   * put off by itself when the day's budget is spent or the disk short. Nothing while her switch is off (§ 9).
+   */
+  'content_drops.describe_file': z.object({
+    creatorId: CreatorIdSchema,
+    mediaAssetId: MediaAssetIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
    * Each hour (SC-02, ADR 0056 § 2): each creator whose next script is due within the lead gets her request, with the
    * next structure of her queue that does not touch her limits, frozen. Replayable: one request per due day.
    */
@@ -510,6 +522,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.erase_originals': 1,
   // Replayable: the idea moves only from `suggested`.
   'content_drops.drop_received': 5,
+  // Every model failed (an outage, a refusal): a few tries; a spent budget is not a failure, the job puts itself off.
+  'content_drops.describe_file': 5,
   // Each hour: the next run is the retry.
   'scripts.ask_scripts': 1,
   'providers.check_credentials': 1,
