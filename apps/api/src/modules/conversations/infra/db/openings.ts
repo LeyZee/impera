@@ -14,9 +14,9 @@ export type OpenedBy = 'creator' | 'chatter';
 
 /**
  * The read written as an opening when no opening covers it: the thread, the journal or the desire curve, or the fan's
- * sheet read on its own (his limits, what is left to learn).
+ * sheet read on its own (his limits, what is left to learn), or the copilot panel of the extension (ADR 0086 § 7).
  */
-export type ReadVia = 'messages' | 'events' | 'desire' | 'flags' | 'kyc' | 'card';
+export type ReadVia = 'messages' | 'events' | 'desire' | 'flags' | 'kyc' | 'card' | 'copilot';
 
 /** An opening of a conversation, in the audit log, without what was read (ADR 0042 § 2, ADR 0025). */
 export async function writeOpening(

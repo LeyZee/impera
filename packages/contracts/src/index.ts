@@ -13,6 +13,7 @@ export * from './calendar';
 export * from './connector';
 export * from './content-drops';
 export * from './conversations';
+export * from './copilot';
 export * from './creator-space';
 export * from './creator-tasks';
 export * from './creators';

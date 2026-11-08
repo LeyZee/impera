@@ -26,6 +26,13 @@ export class ExtensionLinkForbidden extends DomainError {
   }
 }
 
+/** A chatter's link on a door of the watch: his link writes only through the copilot panel (ADR 0086 § 8). */
+export class TrendWatchForbidden extends DomainError {
+  constructor() {
+    super('trend_watch_forbidden', 'La veille n’est pas ouverte aux chatteurs');
+  }
+}
+
 /** Past `EXTENSION_LINKS_LIVE_MAX` live links: one is to be removed first. */
 export class ExtensionLinksFull extends DomainError {
   constructor() {

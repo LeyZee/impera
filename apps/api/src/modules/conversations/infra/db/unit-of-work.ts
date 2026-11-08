@@ -1,6 +1,7 @@
 import {
   AuditEntryIdSchema,
   BlindTestIdSchema,
+  CalibrationRatingIdSchema,
   ConversationIdSchema,
   EventIdSchema,
   ExternalMediaSchema,
@@ -205,6 +206,28 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
                 }),
           })
           .where(eq(schema.drafts.id, id));
+      },
+      async place(id, placedBy, at) {
+        const placed = await tx
+          .update(schema.drafts)
+          .set({ placedBy, placedAt: at })
+          .where(and(eq(schema.drafts.id, id), sql`${schema.drafts.placedAt} is null`))
+          .returning({ id: schema.drafts.id });
+        return placed.length > 0;
+      },
+      async rateLive(id, verdict, at) {
+        // The version is the draft's own (ADR 0019): a draft written by no model has none, and no rating. Its bubbles
+        // are hers; the fan's words are never copied here (migration 0149).
+        const rows = await tx.execute(sql`
+          insert into calibration_ratings
+            (id, creator_id, source, draft_id, rated_at, voice_prompt, voice_model, verdict_kind, verdict, bubbles)
+          select ${newId(CalibrationRatingIdSchema)}, creator_id, 'live', id, ${at}, prompt_hashes->>'voicePrompt',
+            prompt_hashes->>'voiceModel', ${verdict.kind}, ${JSON.stringify(verdict)}::jsonb, to_jsonb(bubbles)
+          from drafts
+          where id = ${id} and prompt_hashes ? 'voicePrompt' and prompt_hashes ? 'voiceModel'
+          on conflict (draft_id) where draft_id is not null do nothing
+          returning id`);
+        return rows.rows.length > 0;
       },
     },
 

@@ -1,6 +1,6 @@
 {
   "id": "802283f2-f9de-4047-a10f-aeaa424790e3",
-  "prevId": "6ad9c772-f757-4394-bfc3-bd2aecbdad5f",
+  "prevId": "4888b090-038a-4c51-946f-c2be16cee5d1",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -924,7 +924,20 @@
           "name": "session_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'playground'"
+        },
+        "draft_id": {
+          "name": "draft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "rated_at": {
           "name": "rated_at",
@@ -966,7 +979,7 @@
           "name": "fan_message",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "bubbles": {
           "name": "bubbles",
@@ -995,6 +1008,22 @@
         }
       },
       "indexes": {
+        "calibration_ratings_draft_unique": {
+          "name": "calibration_ratings_draft_unique",
+          "columns": [
+            {
+              "expression": "draft_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"calibration_ratings\".\"draft_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "calibration_ratings_creator_at_idx": {
           "name": "calibration_ratings_creator_at_idx",
           "columns": [
@@ -1059,6 +1088,15 @@
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "calibration_ratings_draft_id_drafts_id_fk": {
+          "name": "calibration_ratings_draft_id_drafts_id_fk",
+          "tableFrom": "calibration_ratings",
+          "tableTo": "drafts",
+          "columnsFrom": ["draft_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1089,9 +1127,13 @@
           "name": "calibration_ratings_destination_check",
           "value": "\"calibration_ratings\".\"destination\" in ('voice_example', 'rule', 'test')"
         },
-        "calibration_ratings_moment_purge_check": {
-          "name": "calibration_ratings_moment_purge_check",
-          "value": "(\"calibration_ratings\".\"moment\" is null) = (\"calibration_ratings\".\"moment_purged_at\" is not null)"
+        "calibration_ratings_source_check": {
+          "name": "calibration_ratings_source_check",
+          "value": "\"calibration_ratings\".\"source\" in ('playground', 'live')"
+        },
+        "calibration_ratings_source_shape_check": {
+          "name": "calibration_ratings_source_shape_check",
+          "value": "(\"calibration_ratings\".\"source\" = 'playground' and \"calibration_ratings\".\"session_id\" is not null and \"calibration_ratings\".\"draft_id\" is null and \"calibration_ratings\".\"fan_message\" is not null and (\"calibration_ratings\".\"moment\" is null) = (\"calibration_ratings\".\"moment_purged_at\" is not null))\n        or (\"calibration_ratings\".\"source\" = 'live' and \"calibration_ratings\".\"draft_id\" is not null and \"calibration_ratings\".\"session_id\" is null and \"calibration_ratings\".\"fan_message\" is null and \"calibration_ratings\".\"moment\" is null and \"calibration_ratings\".\"moment_purged_at\" is null)"
         }
       },
       "isRLSEnabled": false
@@ -2781,6 +2823,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "placed_by": {
+          "name": "placed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "placed_at": {
+          "name": "placed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "idempotency_key": {
           "name": "idempotency_key",
           "type": "text",
@@ -2845,6 +2899,15 @@
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "drafts_placed_by_user_id_fk": {
+          "name": "drafts_placed_by_user_id_fk",
+          "tableFrom": "drafts",
+          "tableTo": "user",
+          "columnsFrom": ["placed_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2876,6 +2939,10 @@
         "drafts_status_check": {
           "name": "drafts_status_check",
           "value": "\"drafts\".\"status\" in ('pending', 'approved', 'edited', 'rejected', 'sent', 'failed', 'expired')"
+        },
+        "drafts_placed_check": {
+          "name": "drafts_placed_check",
+          "value": "(\"drafts\".\"placed_by\" is null) = (\"drafts\".\"placed_at\" is null)"
         }
       },
       "isRLSEnabled": false

@@ -2,12 +2,14 @@ import {
   AgentHoursViewSchema,
   ArchivedCreatorListSchema,
   ArchivedCreatorSchema,
+  CopilotSwitchesSchema,
   CreatorIdSchema,
   CreatorListSchema,
   CreatorSummarySchema,
   DomainError,
   NewCreatorSchema,
   SetAgentHoursBodySchema,
+  SetCopilotSwitchesBodySchema,
   UpdateCreatorBodySchema,
   type CreatorErrorCode,
   type CreatorId,
@@ -140,6 +142,40 @@ export function createCreatorRoutes(
         const view = await directory.agentHours(id);
         if (view === null) throw new CreatorNotFound();
         return view;
+      },
+    );
+
+    // Créatrices › (elle) › Agent: her two switches of the extension's copilot panel (ADR 0086 § 6). Neither changes
+    // the agent's mode, nor sends anything: no second sign-in asked.
+    app.get(
+      '/creators/:id/copilot',
+      {
+        preValidation: requireRole('owner'),
+        schema: { params: CreatorParamsSchema, response: { 200: CopilotSwitchesSchema } },
+      },
+      async (request) => {
+        const switches = await directory.copilotSwitches(request.params.id);
+        if (switches === null) throw new CreatorNotFound();
+        return switches;
+      },
+    );
+
+    app.put(
+      '/creators/:id/copilot',
+      {
+        preValidation: requireRole('owner'),
+        schema: {
+          params: CreatorParamsSchema,
+          body: SetCopilotSwitchesBodySchema,
+          response: { 200: CopilotSwitchesSchema },
+        },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const switches = await directory.setCopilotSwitches(request.params.id, request.body, user.id);
+        if (switches === null) throw new CreatorNotFound();
+        return switches;
       },
     );
     return Promise.resolve();
