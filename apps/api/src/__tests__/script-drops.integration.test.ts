@@ -7,6 +7,7 @@ import {
   ContentRequestSchema,
   CreatorContentSchema,
   CreatorIdSchema,
+  DropDescriptionsReviewSchema,
   JOB_PAYLOADS,
   MEDIA_VOCABULARY_VERSION,
   newId,
@@ -69,7 +70,8 @@ async function* toAsync(bytes: Uint8Array): AsyncGenerator<Uint8Array> {
 
 /** The brain that tells her sent script (ADR 0083 § 6), with a fixed answer that tells each step it is given. */
 const told: ScriptSummaryInput[] = [];
-const scriptBrain: Pick<LlmGateway, 'summarizeScript'> = {
+const scriptBrain: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'> = {
+  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
   summarizeScript: (input) => {
     told.push(input);
     return Promise.resolve(
@@ -804,5 +806,257 @@ describe('/v1/creator-space/content/script-drops', () => {
         (error: unknown) => error,
       );
     expect(written).toBeInstanceOf(Error);
+  });
+
+  it('lets the owner alone turn her switch; turned on, what waits for a description is enqueued again (ADR 0083 § 2, § 9)', async () => {
+    const url = `/v1/creators/${nora}/drop-descriptions`;
+    const queued = async (task: string) => {
+      const rows = await test.admin.db.execute(sql`
+        select j.key from graphile_worker._private_jobs j
+          join graphile_worker._private_tasks t on t.id = j.task_id
+         where t.identifier = ${task} and j.locked_at is null`);
+      return z
+        .array(z.object({ key: z.string().nullable() }))
+        .parse(rows.rows)
+        .map((row) => row.key ?? '')
+        .sort();
+    };
+    // The hourly run, for every creator whose switch is on.
+    const hourly = () =>
+      test.admin.db.execute(
+        sql`select public.enqueue_job(task => 'content_drops.describe_backlog', payload => '{}'::jsonb)`,
+      );
+    const backlog = () =>
+      runOnce({
+        pgPool: test.admin.pool,
+        taskList: { 'content_drops.describe_backlog': app.tasks['content_drops.describe_backlog'] },
+      });
+
+    // Hers to read nowhere, the owner's alone.
+    expect((await call('GET', url, 'nora')).statusCode).toBe(403);
+    expect((await call('PUT', url, 'nora', { on: false })).statusCode).toBe(403);
+    expect((await call('GET', url, 'owner')).json()).toEqual({ on: true });
+    const missing = await call('GET', `/v1/creators/${newId(CreatorIdSchema)}/drop-descriptions`, 'owner');
+    expect([missing.statusCode, codeOf(missing.body).code]).toEqual([404, 'creator_not_found']);
+
+    // Off, then on again: audited each time; on, her backlog is asked at once.
+    expect((await call('PUT', url, 'owner', { on: false })).json()).toEqual({ on: false });
+    expect(await queued('content_drops.describe_backlog')).toEqual([]);
+    expect((await call('PUT', url, 'owner', { on: true })).json()).toEqual({ on: true });
+    expect((await call('PUT', url, 'owner', { on: true })).json()).toEqual({ on: true });
+    expect(await queued('content_drops.describe_backlog')).toEqual([
+      `content_drops.describe_backlog:${nora}`,
+    ]);
+    const audit = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, nora))
+      .orderBy(schema.auditLog.createdAt);
+    expect(audit.map((row) => row.action)).toEqual([
+      'creator.describe_drops_off',
+      'creator.describe_drops_on',
+    ]);
+
+    // Her media were described with another prompt than the gateway's of now: each one is asked again, once. Her
+    // script told with the brain's prompt of now, after its last description, is left alone; the two others, never
+    // told, are asked.
+    await backlog();
+    const media = await test.admin.db
+      .select({ id: schema.contentDropFiles.mediaAssetId })
+      .from(schema.contentDropFiles)
+      .where(
+        and(
+          eq(schema.contentDropFiles.dropId, dropId),
+          eq(schema.contentDropFiles.state, 'kept'),
+          sql`${schema.contentDropFiles.replacedAt} is null`,
+        ),
+      );
+    expect(await queued('content_drops.describe_file')).toEqual(
+      media.map((one) => `content_drops.describe_file:${one.id ?? ''}`).sort(),
+    );
+    const scripts = await queued('content_drops.summarize_script');
+    expect(scripts).toHaveLength(2);
+    expect(scripts).not.toContain(`content_drops.summarize_script:${dropId}`);
+
+    // A human's correction, newer than the synthesis: her script is told again; that medium is never described again.
+    const corrected = media[0]?.id ?? '';
+    const [latest] = await test.admin.db
+      .select({ content: schema.mediaDescriptions.content })
+      .from(schema.mediaDescriptions)
+      .where(eq(schema.mediaDescriptions.mediaAssetId, corrected))
+      .limit(1);
+    await test.admin.db.execute(sql`delete from graphile_worker._private_jobs`);
+    await test.admin.db.insert(schema.mediaDescriptions).values({
+      id: crypto.randomUUID(),
+      creatorId: nora,
+      mediaAssetId: corrected,
+      vocabularyVersion: MEDIA_VOCABULARY_VERSION,
+      content: latest?.content ?? {},
+      model: 'human',
+      promptHash: 'human',
+      author: 'human',
+    });
+    await hourly();
+    await backlog();
+    expect(await queued('content_drops.summarize_script')).toContain(
+      `content_drops.summarize_script:${dropId}`,
+    );
+    expect(await queued('content_drops.describe_file')).not.toContain(
+      `content_drops.describe_file:${corrected}`,
+    );
+  });
+  it('lets her team validate and correct her script’s descriptions and synthesis, stamped by its account (ADR 0030 § 3)', async () => {
+    const url = `/v1/creators/${nora}/drops/${dropId}`;
+    const review = async (method: 'GET' | 'POST', path: string, body?: object) => {
+      const answer = await call(method, `${url}${path}`, 'owner', body);
+      expect(answer.statusCode, answer.body).toBe(200);
+      return DropDescriptionsReviewSchema.parse(answer.json());
+    };
+    const summarize = () =>
+      runOnce({
+        pgPool: test.admin.pool,
+        taskList: { 'content_drops.summarize_script': app.tasks['content_drops.summarize_script'] },
+      });
+    const [owner] = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, 'owner@example.test'));
+    const conflict = async (path: string, body: object) => {
+      const answer = await call('POST', `${url}${path}`, 'owner', body);
+      return [answer.statusCode, codeOf(answer.body).details] as const;
+    };
+
+    // Hers to review nowhere: the agency's screen.
+    expect((await call('GET', `${url}/descriptions`, 'nora')).statusCode).toBe(403);
+
+    // Each medium in her script's order with the row it is shown with: the human correction of the test before, the
+    // latest written. Her synthesis was told before it: not current, until it is told again.
+    let state = await review('GET', '/descriptions');
+    expect(state.media.map((one) => [one.slotKey, one.description?.author])).toEqual([
+      ['salon::0', 'human'],
+      ['chambre:A:0', 'sense'],
+      ['chambre:B:0', 'sense'],
+    ]);
+    // Grouped by the steps of the version she shot, as her cards name them.
+    expect(state.steps.map((step) => [step.code, step.fileIds])).toEqual(
+      state.media.map((one, index) => [['E1', 'E2A', 'E2B'][index], [one.fileId]]),
+    );
+    expect(state.summary?.current).toBe(false);
+    await summarize();
+    state = await review('GET', '/descriptions');
+    expect([state.summary?.current, state.summary?.validatedAt]).toEqual([true, null]);
+    const [first, second, third] = state.media.map((one) => one.description?.id ?? '');
+
+    // « Tout valider » for two steps: stamped with the owner's account, once; replayed, the same.
+    const now = Date.now();
+    state = await review('POST', '/descriptions/validate', { descriptionIds: [second, third] });
+    expect(state.media.map((one) => one.description?.validatedAt === null)).toEqual([true, false, false]);
+    await review('POST', '/descriptions/validate', { descriptionIds: [second, third] });
+    const stamped = await test.admin.db
+      .select({ by: schema.mediaDescriptions.validatedBy, at: schema.mediaDescriptions.validatedAt })
+      .from(schema.mediaDescriptions)
+      .where(sql`${schema.mediaDescriptions.validatedAt} is not null`);
+    expect(stamped.map((row) => row.by)).toEqual([owner?.id, owner?.id]);
+    expect(stamped.every((row) => (row.at?.getTime() ?? 0) >= now - 1000)).toBe(true);
+
+    // A newer row for the first medium, waiting for a human (the vision unsure): never under « Tout valider », alone
+    // yes; the row it replaced is no longer the one shown.
+    const [base] = await test.admin.db
+      .select({
+        content: schema.mediaDescriptions.content,
+        mediaAssetId: schema.mediaDescriptions.mediaAssetId,
+      })
+      .from(schema.mediaDescriptions)
+      .where(eq(schema.mediaDescriptions.id, first ?? ''));
+    const unsure = crypto.randomUUID();
+    await test.admin.db.insert(schema.mediaDescriptions).values({
+      id: unsure,
+      creatorId: nora,
+      mediaAssetId: base?.mediaAssetId ?? '',
+      vocabularyVersion: MEDIA_VOCABULARY_VERSION,
+      content: base?.content ?? {},
+      model: 'vision-test',
+      promptHash: 'drop-v2',
+      author: 'sense',
+      reviewReasons: ['unsure'],
+    });
+    expect(await conflict('/descriptions/validate', { descriptionIds: [unsure, second] })).toEqual([
+      409,
+      { reason: 'alone' },
+    ]);
+    expect(await conflict('/descriptions/validate', { descriptionIds: [first] })).toEqual([
+      409,
+      { reason: 'not_shown' },
+    ]);
+    state = await review('POST', '/descriptions/validate', { descriptionIds: [unsure] });
+    expect(state.media[0]?.description).toMatchObject({ id: unsure, reviewReasons: ['unsure'] });
+    expect(state.media.every((one) => one.description?.validatedAt !== null)).toBe(true);
+
+    // Corrected inline: a new row, the vision's labels kept, validated by whoever wrote it; her script told again, so
+    // the synthesis of before can no longer be validated.
+    const before = state.summary?.id ?? '';
+    state = await review('POST', '/descriptions/correct', {
+      descriptionId: second,
+      detailed: 'Une silhouette inventée, assise sur le lit, lumière douce.',
+    });
+    const fixed = state.media[1]?.description;
+    expect(fixed).toMatchObject({
+      author: 'human',
+      detailed: 'Une silhouette inventée, assise sur le lit, lumière douce.',
+      reviewReasons: [],
+    });
+    expect(fixed?.id).not.toBe(second);
+    expect(fixed?.validatedAt).not.toBeNull();
+    expect(state.summary?.current).toBe(false);
+    expect(await conflict('/summary/validate', { summaryId: before })).toEqual([
+      409,
+      { reason: 'summary_stale' },
+    ]);
+    await summarize();
+    state = await review('GET', '/descriptions');
+    expect(told.at(-1)?.steps[1]?.media[0]?.description).toBe(
+      'Une silhouette inventée, assise sur le lit, lumière douce.',
+    );
+    const summaryId = state.summary?.id ?? '';
+    state = await review('POST', '/summary/validate', { summaryId });
+    expect(state.summary?.validatedAt).not.toBeNull();
+    await review('POST', '/summary/validate', { summaryId });
+    const audit = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(
+        and(eq(schema.auditLog.entityId, dropId), sql`${schema.auditLog.action} not like 'content_drop.%'`),
+      )
+      .orderBy(schema.auditLog.createdAt);
+    expect(audit.map((row) => row.action)).toEqual([
+      'media_description.validated',
+      'media_description.validated',
+      'media_description.corrected',
+      'script_summary.validated',
+    ]);
+
+    // Written once, validated once: never changed after, by the application nor by the admin.
+    const refused = (query: Promise<unknown>) =>
+      query.then(
+        () => null,
+        (error: unknown) => error,
+      );
+    expect(
+      await refused(
+        test.admin.db.execute(sql`update media_descriptions set validated_at = now() where id = ${unsure}`),
+      ),
+    ).toBeInstanceOf(Error);
+    expect(
+      await refused(
+        test.admin.db.execute(
+          sql`update script_drop_summaries set content = '{"x":1}'::jsonb where id = ${summaryId}`,
+        ),
+      ),
+    ).toBeInstanceOf(Error);
+    expect(
+      await refused(
+        test.app.db.execute(sql`update media_descriptions set model = 'x' where id = ${first ?? ''}`),
+      ),
+    ).toBeInstanceOf(Error);
   });
 });

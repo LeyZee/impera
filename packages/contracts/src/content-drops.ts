@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
-import { ContentDropFileIdSchema, ContentDropIdSchema, ContentRequestIdSchema } from './ids';
+import {
+  ContentDropFileIdSchema,
+  ContentDropIdSchema,
+  ContentRequestIdSchema,
+  MediaAssetIdSchema,
+  MediaDescriptionIdSchema,
+  ScriptDropSummaryIdSchema,
+} from './ids';
+import { DescriptionReviewReasonSchema } from './media';
 import {
   ScriptSegmentKeySchema,
   ScriptSegmentSchema,
@@ -654,3 +662,96 @@ export type ScriptDropSummary = z.infer<typeof ScriptDropSummarySchema>;
 export const SCRIPT_SUMMARY_REVIEW_REASONS = ['price'] as const;
 export const ScriptSummaryReviewReasonSchema = z.enum(SCRIPT_SUMMARY_REVIEW_REASONS);
 export type ScriptSummaryReviewReason = z.infer<typeof ScriptSummaryReviewReasonSchema>;
+
+/**
+ * `GET`/`PUT /v1/creators/:creatorId/drop-descriptions`: her switch (ADR 0083 § 9), the owner's. Turned on, what she
+ * dropped while it was off is described and her sent scripts told.
+ */
+export const DropDescriptionsSwitchSchema = z.strictObject({ on: z.boolean() });
+export type DropDescriptionsSwitch = z.infer<typeof DropDescriptionsSwitchSchema>;
+
+/* ----------------------------------------------------------------------------------------------------------------
+ * ADR 0030 § 3 (amended 08/11/2026) and ADR 0083 § 7: the agency validates a drop's descriptions and a script's
+ * synthesis, row by row, as the account that validates. A correction is a new row, validated as it is written.
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+const Instant = z.iso.datetime({ offset: true });
+
+/** A description of one of her media as the agency reviews it: the latest validated, else the latest written. */
+export const DropDescriptionViewSchema = z.strictObject({
+  id: MediaDescriptionIdSchema,
+  /** `sense`, the vision AI; `human`, a correction. */
+  author: z.enum(['sense', 'human']),
+  detailed: z.string().min(1).max(6000),
+  reviewReasons: z.array(DescriptionReviewReasonSchema),
+  /** Her own word on the media (P6-01). */
+  creatorNote: z.string().nullable(),
+  validatedAt: Instant.nullable(),
+  createdAt: Instant,
+});
+export type DropDescriptionView = z.infer<typeof DropDescriptionViewSchema>;
+
+/** A file of the drop and its description, in the drop's order; an audio note is not described (ADR 0083 § 1). */
+export const DropMediaReviewSchema = z.strictObject({
+  fileId: ContentDropFileIdSchema,
+  slotKey: ScriptSlotKeySchema.nullable(),
+  mediaAssetId: MediaAssetIdSchema,
+  kind: DropMediaKindSchema,
+  description: DropDescriptionViewSchema.nullable(),
+});
+export type DropMediaReview = z.infer<typeof DropMediaReviewSchema>;
+
+/** A script's latest synthesis; `current` when it tells the media and descriptions the script holds now. */
+export const ScriptSummaryViewSchema = z.strictObject({
+  id: ScriptDropSummaryIdSchema,
+  content: ScriptDropSummarySchema,
+  reviewReasons: z.array(ScriptSummaryReviewReasonSchema),
+  current: z.boolean(),
+  validatedAt: Instant.nullable(),
+  createdAt: Instant,
+});
+export type ScriptSummaryView = z.infer<typeof ScriptSummaryViewSchema>;
+
+/** A step of a sent script as its cards name it, with its files in their order (the review groups them by step). */
+export const ScriptReviewStepSchema = z.strictObject({
+  step: ScriptStepKeySchema,
+  /** `E1`, `E2A`, as her cards say. */
+  code: z.string().min(1).max(16),
+  name: z.string().min(1).max(200),
+  fileIds: z.array(ContentDropFileIdSchema).min(1),
+});
+export type ScriptReviewStep = z.infer<typeof ScriptReviewStepSchema>;
+
+/** `GET /v1/creators/:creatorId/drops/:id/descriptions`, and the answer of each review below. */
+export const DropDescriptionsReviewSchema = z.strictObject({
+  dropId: ContentDropIdSchema,
+  media: z.array(DropMediaReviewSchema),
+  /** A sent script's steps in its order; empty for another drop. */
+  steps: z.array(ScriptReviewStepSchema),
+  /** A sent script's synthesis; `null` for another drop, or before the first one is written. */
+  summary: ScriptSummaryViewSchema.nullable(),
+});
+export type DropDescriptionsReview = z.infer<typeof DropDescriptionsReviewSchema>;
+
+/**
+ * `POST …/descriptions/validate`: these rows, validated as they are (« Tout valider » for a step). A row that waits
+ * for a human (a back reference, someone else seen, a doubt, a safety flag) is validated alone, never in a batch.
+ */
+export const ValidateDropDescriptionsBodySchema = z.strictObject({
+  descriptionIds: z.array(MediaDescriptionIdSchema).min(1).max(60),
+});
+export type ValidateDropDescriptionsBody = z.infer<typeof ValidateDropDescriptionsBodySchema>;
+
+/** `POST …/descriptions/correct`: a new row from this one, its `detailed` rewritten, validated by whoever writes it. */
+export const CorrectDropDescriptionBodySchema = z.strictObject({
+  descriptionId: MediaDescriptionIdSchema,
+  detailed: z.string().trim().min(1).max(6000),
+});
+export type CorrectDropDescriptionBody = z.infer<typeof CorrectDropDescriptionBodySchema>;
+
+/** `POST …/summary/validate`: the script's current synthesis, validated as it is. */
+export const ValidateScriptSummaryBodySchema = z.strictObject({ summaryId: ScriptDropSummaryIdSchema });
+export type ValidateScriptSummaryBody = z.infer<typeof ValidateScriptSummaryBodySchema>;
+
+/** A row named that is not this drop's latest (a newer one came meanwhile), or a batch holding a row to see alone. */
+export const DROP_DESCRIPTION_REVIEW_CONFLICT = 'drop_description_review_conflict';

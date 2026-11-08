@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import {
   DROP_CATEGORY_LABELS,
   scriptSegmentCodes,
@@ -162,4 +164,68 @@ export function mentionsPrice(summary: ScriptDropSummary): boolean {
   return [summary.shootingContext, ...summary.steps.flatMap((one) => [one.overview, one.summary])].some(
     (text) => PRICE.test(text),
   );
+}
+
+/**
+ * A script's slots, their media and the description each is told with, in the order of the slot keys: the same files
+ * with the same descriptions, the same hash; a slot changed or another description shown (a correction, a row
+ * validated), another. The synthesis is written for one hash, and is current while the script keeps it.
+ */
+export function mediaHashOf(
+  files: readonly { readonly slotKey: string; readonly mediaAssetId: string }[],
+  descriptions: ReadonlyMap<string, { readonly descriptionId: string }>,
+): string {
+  const lines = files
+    .map(
+      (file) =>
+        `${file.slotKey}=${file.mediaAssetId}=${descriptions.get(file.mediaAssetId)?.descriptionId ?? ''}`,
+    )
+    .sort();
+  return createHash('sha256').update(lines.join('\n')).digest('hex');
+}
+
+/** A description row as the review reads it. */
+export interface ReviewedRow {
+  readonly id: string;
+  readonly mediaAssetId: string;
+  readonly reviewReasons: readonly string[];
+  readonly validatedAt: Date | null;
+  readonly createdAt: Date;
+}
+
+/**
+ * The row a media is told with (ADR 0030 § 3): the latest validated, by `validated_at`, else the latest written; the
+ * agent reads only a validated one, the review and the synthesis this one.
+ */
+export function shownRow<R extends ReviewedRow>(rows: readonly R[]): R | null {
+  let shown: R | null = null;
+  for (const row of rows) {
+    if (shown === null || shownBefore(row, shown)) shown = row;
+  }
+  return shown;
+}
+
+function shownBefore(a: ReviewedRow, b: ReviewedRow): boolean {
+  if (a.validatedAt !== null && b.validatedAt === null) return true;
+  if (a.validatedAt === null && b.validatedAt !== null) return false;
+  const byValidation = (a.validatedAt?.getTime() ?? 0) - (b.validatedAt?.getTime() ?? 0);
+  if (byValidation !== 0) return byValidation > 0;
+  const byCreation = a.createdAt.getTime() - b.createdAt.getTime();
+  return byCreation !== 0 ? byCreation > 0 : a.id > b.id;
+}
+
+export type ValidationRefusal = 'not_shown' | 'alone';
+
+/**
+ * Whether these rows can be validated together: each the one its media is shown with now (a newer row came, the
+ * screen is late), and a row that waits for a human (ADR 0083 § 3 to 5) only alone, never under « Tout valider ».
+ */
+export function validationRefusal(
+  named: readonly ReviewedRow[],
+  shownOf: (mediaAssetId: string) => ReviewedRow | null,
+): ValidationRefusal | null {
+  if (named.some((row) => shownOf(row.mediaAssetId)?.id !== row.id)) return 'not_shown';
+  if (named.length > 1 && named.some((row) => row.reviewReasons.length > 0 && row.validatedAt === null))
+    return 'alone';
+  return null;
 }

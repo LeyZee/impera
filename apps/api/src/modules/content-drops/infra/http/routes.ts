@@ -6,6 +6,7 @@ import {
   ContentRequestIdSchema,
   ContentRequestSchema,
   CorrectDropCategoryBodySchema,
+  CorrectDropDescriptionBodySchema,
   CreateContentDropBodySchema,
   CreateContentRequestBodySchema,
   CreatorContentSchema,
@@ -19,7 +20,11 @@ import {
   ScriptDropCardQuerySchema,
   ScriptDropSchema,
   ScriptSlotParamsSchema,
+  DropDescriptionsReviewSchema,
+  DropDescriptionsSwitchSchema,
   StartScriptDropBodySchema,
+  ValidateDropDescriptionsBodySchema,
+  ValidateScriptSummaryBodySchema,
   type UserRole,
 } from '@impera/contracts';
 import { NotACreatorAccount } from '@impera/db';
@@ -37,7 +42,14 @@ import {
 } from '../../application/script-drops';
 import { exportScript } from '../../application/script-export';
 import { finishUpload, uploadOf } from '../../application/uploads';
-import type { AgencyContentStore, CreatorContentStore, DropStorage } from '../../domain/ports';
+import { DropDescriptionsCreatorNotFound } from '../../domain/errors';
+import type {
+  AgencyContentStore,
+  CreatorContentStore,
+  DescribeSwitch,
+  DescriptionReview,
+  DropStorage,
+} from '../../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -86,12 +98,15 @@ export function createContentDropRoutes(
   agency: AgencyContentStore,
   storage: DropStorage,
   scripts: ScriptDropDeps,
+  describeSwitch: DescribeSwitch,
+  review: DescriptionReview,
   requireRole: RequireRole,
   clock: () => Date = () => new Date(),
 ): FastifyPluginAsyncZod {
   return (app) => {
     const creatorOnly = { preValidation: requireRole('creator') };
     const team = { preValidation: requireRole('owner', 'operator') };
+    const owner = { preValidation: requireRole('owner') };
 
     app.get(
       '/creator-space/content',
@@ -367,6 +382,113 @@ export function createContentDropRoutes(
       async (request, reply) => {
         await agency.cancel(request.params.creatorId, signedIn(request.user), request.params.id, clock());
         return reply.code(204).send();
+      },
+    );
+
+    // The review of a drop's descriptions and of a script's synthesis (ADR 0030 § 3, ADR 0083 § 7): each write stamped
+    // with the account that makes it, each answering the drop's review as it now stands.
+    app.get(
+      '/creators/:creatorId/drops/:id/descriptions',
+      {
+        ...team,
+        schema: { params: CreatorDropParamsSchema, response: { 200: DropDescriptionsReviewSchema } },
+      },
+      (request) => review.read(request.params.creatorId, signedIn(request.user), request.params.id),
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/descriptions/validate',
+      {
+        ...team,
+        schema: {
+          params: CreatorDropParamsSchema,
+          body: ValidateDropDescriptionsBodySchema,
+          response: { 200: DropDescriptionsReviewSchema },
+        },
+      },
+      (request) =>
+        review.validate(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.body.descriptionIds,
+          clock(),
+          request.id,
+        ),
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/descriptions/correct',
+      {
+        ...team,
+        schema: {
+          params: CreatorDropParamsSchema,
+          body: CorrectDropDescriptionBodySchema,
+          response: { 200: DropDescriptionsReviewSchema },
+        },
+      },
+      (request) =>
+        review.correct(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.body.descriptionId,
+          request.body.detailed,
+          clock(),
+          request.id,
+        ),
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/summary/validate',
+      {
+        ...team,
+        schema: {
+          params: CreatorDropParamsSchema,
+          body: ValidateScriptSummaryBodySchema,
+          response: { 200: DropDescriptionsReviewSchema },
+        },
+      },
+      (request) =>
+        review.validateSummary(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.body.summaryId,
+          clock(),
+        ),
+    );
+
+    // Her switch (ADR 0083 § 9): the owner's alone, turned on once the vision model is checked on her real media.
+    // Turned on, what she dropped meanwhile is described and her sent scripts told.
+    app.get(
+      '/creators/:creatorId/drop-descriptions',
+      { ...owner, schema: { params: CreatorParamsSchema, response: { 200: DropDescriptionsSwitchSchema } } },
+      async (request) => {
+        const on = await describeSwitch.read(request.params.creatorId);
+        if (on === null) throw new DropDescriptionsCreatorNotFound();
+        return { on };
+      },
+    );
+
+    app.put(
+      '/creators/:creatorId/drop-descriptions',
+      {
+        ...owner,
+        schema: {
+          params: CreatorParamsSchema,
+          body: DropDescriptionsSwitchSchema,
+          response: { 200: DropDescriptionsSwitchSchema },
+        },
+      },
+      async (request) => {
+        const on = await describeSwitch.set(
+          request.params.creatorId,
+          request.body.on,
+          signedIn(request.user),
+        );
+        if (on === null) throw new DropDescriptionsCreatorNotFound();
+        return { on };
       },
     );
 

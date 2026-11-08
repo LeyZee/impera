@@ -66,7 +66,28 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
 - Les étapes viennent du code (`scriptStepsOf`, `domain/describe.ts`) : chaque segment, chaque série d'une étape à variantes à part (`E2A`, `E2B`), avec son carton dans la version figée et les médias de ses emplacements remplis. Le rôle `brain` (prompt `brain/script-summary.md`) écrit pour chacune une description générale (déroulé, objectif, ambiance) et un résumé, puis le contexte du tournage. Le code remet les étapes dans l'ordre et refuse une réponse qui en oublie, en ajoute ou en répète une (le job lève, Graphile réessaie 5 fois).
 - Aucun prix ne vient du modèle (ADR 0056 § 6) : une somme ou une devise dans la synthèse est redemandée une fois, puis gardée avec la raison `price` pour l'agence. Les prix de la grille s'affichent à côté de chaque étape sur l'écran de validation (lot c).
 - Une ligne de `script_drop_summaries` par jeu de médias (`media_hash`, l'empreinte de ses emplacements et de leurs médias) et par version du prompt : rejoué, le job ne rappelle rien. Budget du jour épuisé : une heure plus tard, comme pour un média. Seul un job l'écrit ; l'équipe la lit.
-- Un média déjà dans sa médiathèque (doublon) garde la description qu'il a reçue à son premier dépôt ; s'il n'en a pas (interrupteur éteint à l'époque), le script attend le rattrapage du lot c.
+- Un média déjà dans sa médiathèque (doublon) garde la description qu'il a reçue à son premier dépôt ; s'il n'en a pas (interrupteur éteint à l'époque), le rattrapage ci-dessous la lui donne.
+- `media_hash` couvre aussi la ligne de description de chaque média : une description corrigée (une nouvelle ligne) ou un nouveau prompt du cerveau (`summarized` lit la version du prompt) racontent le script de nouveau, dans une nouvelle ligne.
+
+## L'interrupteur et le rattrapage (ADR 0083 § 2 et § 9, SC-04 lot c1)
+
+- `GET` et `PUT /v1/creators/:creatorId/drop-descriptions` (`{ on }`) : l'interrupteur d'une créatrice, au propriétaire seul (on l'allume après avoir vérifié la vision sur quelques vrais médias, § 9). Chaque changement est journalisé (`creator.describe_drops_on` / `_off`) ; rallumer un interrupteur déjà allumé ne fait rien.
+- Allumé, il met en file `content_drops.describe_backlog` pour elle, dans la même transaction. Le même job tourne chaque heure (`35 * * * *`) pour toutes les créatrices allumées et non archivées.
+- Le job remet en file, sans avancer l'heure d'un job déjà en attente (`preserve_run_at` : un budget épuisé garde son heure) :
+  - chaque média d'un dépôt vivant sans description du prompt de maintenant : aucune, ou seulement celle de la vision avec une version plus ancienne et aucune d'un humain (au plus 500 par heure) ;
+  - chaque script envoyé sans synthèse du prompt de maintenant, ou dont la synthèse est plus ancienne qu'une description de ses médias (au plus 200 par heure).
+- La description d'un média lit la version du prompt de maintenant (`promptHashes` de la passerelle) : un média décrit avec une autre version est décrit de nouveau, jamais par-dessus une description humaine. L'ancienne ligne reste (table en ajout seul).
+
+## La validation des descriptions et de la synthèse (ADR 0030 § 3, ADR 0083 § 7, SC-04 lot c2, migration 0152)
+
+- `GET /v1/creators/:creatorId/drops/:id/descriptions` (propriétaire, manager actif) rend chaque fichier vivant du dépôt dans son ordre, avec la description qu'il montre : la plus récente **validée** (par `validated_at`), sinon la plus récente écrite (`shownRow`). Pour un script envoyé, sa dernière synthèse, `current` quand elle raconte les médias et les descriptions que le script montre maintenant (la même empreinte que le job, `mediaHashOf`).
+- `POST …/descriptions/validate` valide les lignes nommées telles quelles (« Tout valider » pour une étape) : chacune doit être celle que son média montre, sinon 409 `not_shown` ; une ligne qui attend un humain (renvoi, autre personne, doute, alerte) se valide **seule**, sinon 409 `alone`. Rejouée, rien ne change.
+- `POST …/descriptions/correct` écrit une **nouvelle ligne** à partir de celle nommée (le texte `detailed` réécrit, les étiquettes fermées et le ressenti de la créatrice gardés, `author = human`), validée par qui l'écrit. Le script est alors raconté de nouveau.
+- `POST …/summary/validate` valide la synthèse courante ; une synthèse dépassée (une description corrigée depuis) répond 409 `summary_stale`.
+- Chaque geste porte le compte qui valide (`validated_by` vers `user.id`, ADR 0030 § 3 amendé le 08/11/2026) et une ligne de journal (`media_description.validated`, `media_description.corrected`, `script_summary.validated`).
+- Une ligne s'écrit une fois puis se valide une fois : le déclencheur `refuse_description_change` refuse tout autre changement, pour tous les rôles, l'admin compris ; `nirvana_app` ne peut modifier que les deux colonnes du tampon.
+- Le rattrapage et la description à la réception épargnent un média dont une description est validée, comme celui qu'un humain a décrit.
+- La créatrice ne valide pas encore depuis son espace (l'ADR le permet ; à venir avec son écran).
 
 ## Une demande née d'une idée (VEI-01 d2)
 

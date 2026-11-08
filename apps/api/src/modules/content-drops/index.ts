@@ -5,6 +5,7 @@ import type { Database } from '@impera/db';
 import type { LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { describeBacklog } from './application/backlog';
 import { describeFile, type DescribeOutcome } from './application/describe';
 import { eraseOriginals, type RetentionRun } from './application/retention';
 import { summarizeScript, type SummarizeOutcome } from './application/summarize';
@@ -19,7 +20,9 @@ import type {
 } from './domain/ports';
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
+import { createDrizzleDescribeSwitch, createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
+import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
 import { createDrizzleScriptDropStore } from './infra/db/script-drop-store';
 import { createDrizzleScriptSummaryStore } from './infra/db/script-summary-store';
@@ -60,6 +63,14 @@ export interface ContentDropsModule {
      * step by step and summed up by the brain, kept for the agency to validate. What happened, for the log.
      */
     summarizeScript(dropId: string, correlationId: string): Promise<SummarizeOutcome>;
+    /**
+     * `content_drops.describe_backlog` (ADR 0083 § 2, § 9): each hour, and for one creator when her switch is turned
+     * on, what waits for the vision or the brain enqueued again. Counts, for the log.
+     */
+    describeBacklog(
+      creatorId: string | null,
+      correlationId: string,
+    ): Promise<{ readonly media: number; readonly scripts: number }>;
   };
   /**
    * The content request of a shoot she accepted from an idea (VEI-01 d2), written by the trend watch's job: origin
@@ -90,7 +101,7 @@ export interface ContentDropsDeps {
   /** The media module's description of her dropped media (ADR 0083); without it, nothing is described. */
   readonly describer?: DropDescriber;
   /** The brain that tells her sent scripts (ADR 0083 § 6); without it, or without the describer, nothing is told. */
-  readonly brain?: Pick<LlmGateway, 'summarizeScript'>;
+  readonly brain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
   /** Tests only: another storage than the bucket's (a fake, or a bucket reached another way). */
   readonly storage?: DropStorage;
   /** Where the job writes a file while it cleans it; the system's temporary folder by default. */
@@ -114,6 +125,8 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       createDrizzleAgencyContentStore(deps.db),
       storage,
       { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
+      createDrizzleDescribeSwitch(deps.adminDb),
+      createDrizzleDescriptionReview(deps.db),
       deps.requireRole,
       clock,
     ),
@@ -150,6 +163,18 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
               },
               dropId,
               clock(),
+              correlationId,
+            ),
+      describeBacklog: async (creatorId, correlationId) =>
+        deps.describer === undefined || deps.brain === undefined
+          ? { media: 0, scripts: 0 }
+          : describeBacklog(
+              {
+                backlog: createDrizzleDescriptionBacklog(deps.adminDb),
+                describer: deps.describer,
+                summarizer: createGatewayScriptSummarizer(deps.brain),
+              },
+              creatorId,
               correlationId,
             ),
       eraseOriginals: (correlationId) =>

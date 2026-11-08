@@ -1,6 +1,6 @@
 {
   "id": "802283f2-f9de-4047-a10f-aeaa424790e3",
-  "prevId": "4888b090-038a-4c51-946f-c2be16cee5d1",
+  "prevId": "b3cdcd87-b5aa-42f0-938f-b77fbdfa3143",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2080,6 +2080,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "validated_by": {
+          "name": "validated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "validated_at": {
+          "name": "validated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2142,6 +2154,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "script_drop_summaries_validated_by_user_id_fk": {
+          "name": "script_drop_summaries_validated_by_user_id_fk",
+          "tableFrom": "script_drop_summaries",
+          "tableTo": "user",
+          "columnsFrom": ["validated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "script_drop_summaries_drop_fk": {
           "name": "script_drop_summaries_drop_fk",
           "tableFrom": "script_drop_summaries",
@@ -2161,9 +2182,21 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "team_validate": {
+          "name": "team_validate",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
         }
       },
       "checkConstraints": {
+        "script_drop_summaries_validated_check": {
+          "name": "script_drop_summaries_validated_check",
+          "value": "(\"script_drop_summaries\".\"validated_by\" is null) = (\"script_drop_summaries\".\"validated_at\" is null)"
+        },
         "script_drop_summaries_review_reasons_check": {
           "name": "script_drop_summaries_review_reasons_check",
           "value": "\"script_drop_summaries\".\"review_reasons\" <@ array['price']::text[]"
@@ -7162,6 +7195,18 @@
           "notNull": true,
           "default": "'{}'::text[]"
         },
+        "validated_by": {
+          "name": "validated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "validated_at": {
+          "name": "validated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7227,6 +7272,15 @@
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "media_descriptions_validated_by_user_id_fk": {
+          "name": "media_descriptions_validated_by_user_id_fk",
+          "tableFrom": "media_descriptions",
+          "tableTo": "user",
+          "columnsFrom": ["validated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7263,6 +7317,10 @@
         }
       },
       "checkConstraints": {
+        "media_descriptions_validated_check": {
+          "name": "media_descriptions_validated_check",
+          "value": "(\"media_descriptions\".\"validated_by\" is null) = (\"media_descriptions\".\"validated_at\" is null)"
+        },
         "media_descriptions_author_check": {
           "name": "media_descriptions_author_check",
           "value": "\"media_descriptions\".\"author\" in ('sense', 'human')"

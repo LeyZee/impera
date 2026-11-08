@@ -414,8 +414,10 @@ interface FanStats {
 }
 
 interface FanContext extends FanStats {
-  /** Her active facts about the fan (`fans.activeFacts`), as « key : value ». */
+  /** Her active facts about the fan (`fans.activeFacts`), as « key : value », that both the brain and the voice read. */
   readonly notes: readonly string[];
+  /** Those the brain reads alone (ADR 0085 § 9: when he has money, his attachment, his moods); never the voice. */
+  readonly brainNotes?: readonly string[];
 }
 
 /** A fact as the brief proposes it: its category is the model's word until `conversations` reads it (P3-02). */

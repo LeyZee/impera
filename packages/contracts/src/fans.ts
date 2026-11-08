@@ -17,6 +17,12 @@ export const KycSlotSchema = z.enum([
 ]);
 export type KycSlot = z.infer<typeof KycSlotSchema>;
 
+/**
+ * The slots the brain may ask about (ADR 0085 § 2): all but `desires`, which is still read and kept but never asked.
+ * The code filters her `strategies.kyc.collect` before the prompt and the brain's `kycMissing` after it.
+ */
+export const KYC_ASKABLE: readonly KycSlot[] = KycSlotSchema.options.filter((slot) => slot !== 'desires');
+
 /** The canvas line of each slot, word for word. */
 export const KYC_SLOT_LABELS: Readonly<Record<KycSlot, string>> = {
   first_name: 'Prénom',

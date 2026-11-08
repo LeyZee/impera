@@ -75,7 +75,7 @@ Session du 08/11/2026 (branche de la session `claude/project-thread-0r0fge`, à 
 ## Résultat
 
 - **Contrat** : `ReelBriefSchema`, bornes exportées, `countWords` et `keepWords` partagés par le schéma et les compteurs de l'écran. `reelBrief` sur l'idée (brouillon, correction, lecture), la suggestion et la tâche ; 400 hors `instagram_reel`.
-- **Base** : migration `0150_reel_brief` (`reel_brief jsonb` + `CHECK jsonb_typeof = 'object'` sur les trois tables ; sur `content_ideas`, seulement en catégorie `instagram_reel`).
+- **Base** : migration `0154_reel_brief` (`reel_brief jsonb` + `CHECK jsonb_typeof = 'object'` sur les trois tables ; sur `content_ideas`, seulement en catégorie `instagram_reel`).
 - **Gardes** : `guardFaultOf` lit la fiche reel champ par champ ; la 422 dit le champ fautif (`details.field`). Une suggestion écrite à la main pour une sortie (« Pour : Reel Insta », `dropCategory`, envoyé et non stocké) passe les mêmes gardes par un `ShootGuard` branché à la racine de composition : `creator-tasks` n'importe pas `trends`.
 - **Écran** : `ReelBrief` chez elle (plié sur la proposition, ouvert dans la tâche), « Fiche reel » chez l'agence (suggestion et correction d'idée) avec compteurs ambre, plans déplaçables, curseur de durée dessiné, aperçu exact à côté. Zones grisées dans `apps/web/src/screens/agenda/reel-zones.ts`.
 

@@ -368,6 +368,8 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       );
     },
 
+    promptHashes: { creatorDrop: creatorDropPrompt.hash, scriptSummary: scriptSummaryPrompt.hash },
+
     health() {
       return computeHealth(deps.config, deps.credentials, deps.log, now(), status(), trendWatchStatus());
     },

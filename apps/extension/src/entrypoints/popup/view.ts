@@ -33,6 +33,8 @@ export interface Actions {
   readonly retry: () => void;
   readonly grant: () => void;
   readonly editAddress: () => void;
+  /** The copilot side panel (ADR 0086), from a Reveal tab. */
+  readonly openPanel: () => void;
   readonly saveAddress: (value: string) => void;
   readonly resetAddress: () => void;
   readonly cancelAddress: () => void;
@@ -182,13 +184,18 @@ const PLACES: Partial<Record<Place, { icon: IconName; title: string; text: strin
   reveal: {
     icon: 'message',
     title: 'Reveal',
-    text: 'La capture de session arrive à la prochaine étape. Pour l’instant, rien n’est lu ni envoyé depuis cet onglet.',
+    text: 'Le copilote s’ouvre sur le côté et suit la conversation ouverte. Rien n’est envoyé depuis l’extension.',
   },
 };
 
-function placeCard(place: Place): HTMLElement | null {
+function placeCard(place: Place, openPanel: () => void): HTMLElement | null {
   const card = PLACES[place];
   if (card === undefined) return null;
+  // ADR 0086 § 1: the popup closes at the first click in the page; the copilot lives in the side panel.
+  const open =
+    place === 'reveal'
+      ? button('Ouvrir le copilote', openPanel, { variant: 'soft', icon: 'arrowUpRight' })
+      : null;
   return h(
     'section',
     { class: 'pp-place nv-plate nv-enter', style: '--nv-i: 3', 'data-place': place },
@@ -200,9 +207,10 @@ function placeCard(place: Place): HTMLElement | null {
         'span',
         { class: 'pp-place__head' },
         h('span', { class: 'pp-place__title' }, card.title),
-        pill('idle', 'Bientôt'),
+        open === null ? pill('idle', 'Bientôt') : null,
       ),
       h('span', { class: 'pp-place__text' }, card.text),
+      open,
     ),
   );
 }
@@ -242,7 +250,7 @@ function signedIn(
     account(me, () => {
       actions.open(accountPathOf(me));
     }),
-    ...[showsWatch ? watchCard(watch, actions.watch) : placeCard(place)].filter(
+    ...[showsWatch ? watchCard(watch, actions.watch) : placeCard(place, actions.openPanel)].filter(
       (card): card is HTMLElement => card !== null,
     ),
     h(
