@@ -70,6 +70,8 @@ function fakes(
     readonly target?: ScriptToSummarize | null;
     readonly summarized?: boolean;
     readonly described?: readonly string[];
+    /** The row each description comes from, by medium: a correction is a new row. */
+    readonly rows?: Readonly<Record<string, string>>;
     readonly answers?: readonly Awaited<ReturnType<ScriptSummarizer['summarize']>>[];
   } = {},
 ) {
@@ -77,9 +79,13 @@ function fakes(
   const later: Date[] = [];
   const asked: Parameters<ScriptSummarizer['summarize']>[0][] = [];
   const target = options.target === undefined ? TARGET : options.target;
+  const asks: string[] = [];
   const store: ScriptSummaryStore = {
     target: () => Promise.resolve(target),
-    summarized: () => Promise.resolve(options.summarized ?? false),
+    summarized: (_dropId, mediaHash, promptHash) => {
+      asks.push(`${mediaHash}@${promptHash}`);
+      return Promise.resolve(options.summarized ?? false);
+    },
     save: (_creatorId, _dropId, summary) => {
       saved.push(summary);
       return Promise.resolve();
@@ -97,10 +103,18 @@ function fakes(
     describer: {
       detailed: (ids: readonly string[]) =>
         Promise.resolve(
-          new Map(ids.filter((id) => described.includes(id)).map((id) => [id, `Description de ${id}.`])),
+          new Map(
+            ids
+              .filter((id) => described.includes(id))
+              .map((id) => [
+                id,
+                { descriptionId: options.rows?.[id] ?? `d-${id}`, detailed: `Description de ${id}.` },
+              ]),
+          ),
         ),
     },
     summarizer: {
+      promptHash: 'summary-v1',
       summarize: (input: Parameters<ScriptSummarizer['summarize']>[0]) => {
         asked.push(input);
         const answers = options.answers ?? [
@@ -116,7 +130,7 @@ function fakes(
       frozen: () => Promise.resolve({ name: 'Soirée salon', moment: 'both' as const, segments }),
     },
   };
-  return { deps, saved, later, asked };
+  return { deps, saved, later, asked, asks };
 }
 
 describe('content-drops › content_drops.summarize_script (ADR 0083 § 6)', () => {
@@ -182,6 +196,16 @@ describe('content-drops › content_drops.summarize_script (ADR 0083 § 6)', () 
     expect(second.saved[0]?.mediaHash).toBe(first.saved[0]?.mediaHash);
     // `both` and no moment fixed by her request: none is said.
     expect(second.asked[0]?.moment).toBeNull();
+  });
+
+  it('tells the script again once a description is corrected, with the prompt of now', async () => {
+    const first = fakes();
+    const corrected = fakes({ rows: { m3: 'd-m3-human' } });
+    await summarizeScript(first.deps, 'drop', NOW, 'corr');
+    await summarizeScript(corrected.deps, 'drop', NOW, 'corr');
+
+    expect(corrected.saved[0]?.mediaHash).not.toBe(first.saved[0]?.mediaHash);
+    expect(first.asks[0]).toMatch(/@summary-v1$/u);
   });
 
   it('waits while a file is in the cleaning or a photo or video is not described yet', async () => {

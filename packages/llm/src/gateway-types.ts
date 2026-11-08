@@ -261,6 +261,11 @@ export interface LlmGateway {
   channelPost(input: ChannelPostInput): Promise<Result<LlmSuccess<ChannelPostResult>, LlmFailure>>;
   /** A sent script's steps and synthesis (ADR 0083 § 6, prompt `brain/script-summary`), under the daily cap. */
   summarizeScript(input: ScriptSummaryInput): Promise<Result<LlmSuccess<ScriptDropSummary>, LlmFailure>>;
+  /**
+   * The version of the prompts whose outputs are kept and redone when they change (ADR 0083 § 2): a drop's description
+   * and a script's synthesis, as `meta.promptHash` gives them.
+   */
+  readonly promptHashes: { readonly creatorDrop: string; readonly scriptSummary: string };
   health(): HealthReport;
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */

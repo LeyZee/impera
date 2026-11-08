@@ -86,12 +86,18 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
           })),
         };
       }),
-    summarized: (dropId, mediaHash) =>
+    summarized: (dropId, mediaHash, promptHash) =>
       withAdmin(adminDb, async (tx) => {
         const [row] = await tx
           .select({ id: scriptDropSummaries.id })
           .from(scriptDropSummaries)
-          .where(and(eq(scriptDropSummaries.dropId, dropId), eq(scriptDropSummaries.mediaHash, mediaHash)))
+          .where(
+            and(
+              eq(scriptDropSummaries.dropId, dropId),
+              eq(scriptDropSummaries.mediaHash, mediaHash),
+              eq(scriptDropSummaries.promptHash, promptHash),
+            ),
+          )
           .limit(1);
         return row !== undefined;
       }),

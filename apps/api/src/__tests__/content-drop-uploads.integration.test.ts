@@ -128,7 +128,8 @@ const DESCRIBED: DropMediaDescription = {
   flags: [],
 };
 const seen: DropSenseInput[] = [];
-const dropVision: Pick<LlmGateway, 'describeDrop' | 'transcribe'> = {
+const dropVision: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'> = {
+  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
   describeDrop: (input) => {
     seen.push(input);
     return Promise.resolve(

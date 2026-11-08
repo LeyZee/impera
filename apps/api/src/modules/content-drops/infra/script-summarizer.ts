@@ -4,9 +4,10 @@ import type { ScriptSummarizer } from '../domain/ports';
 
 /** The brain of the gateway tells her script (ADR 0083 § 6, prompt `brain/script-summary`), under the daily cap. */
 export function createGatewayScriptSummarizer(
-  gateway: Pick<LlmGateway, 'summarizeScript'>,
+  gateway: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>,
 ): ScriptSummarizer {
   return {
+    promptHash: gateway.promptHashes.scriptSummary,
     summarize: async ({ creatorId, ...input }) => {
       const result = await gateway.summarizeScript({ ...input, trace: { creatorId } });
       if (result.ok)

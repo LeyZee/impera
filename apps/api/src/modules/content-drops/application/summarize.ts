@@ -23,9 +23,20 @@ const BUDGET_DELAY_MS = 60 * 60_000;
 
 export type SummarizeOutcome = 'summarized' | 'already' | 'off' | 'waiting' | 'gone' | 'later';
 
-/** Its slots and their media, in the order of the slot keys: the same script with the same files, the same hash. */
-function mediaHashOf(files: readonly { readonly slotKey: string; readonly mediaAssetId: string }[]): string {
-  const lines = files.map((file) => `${file.slotKey}=${file.mediaAssetId}`).sort();
+/**
+ * Its slots, their media and the description each is told with, in the order of the slot keys: the same files with the
+ * same descriptions, the same hash; a slot changed or a description corrected (a new row), another.
+ */
+function mediaHashOf(
+  files: readonly { readonly slotKey: string; readonly mediaAssetId: string }[],
+  descriptions: ReadonlyMap<string, { readonly descriptionId: string }>,
+): string {
+  const lines = files
+    .map(
+      (file) =>
+        `${file.slotKey}=${file.mediaAssetId}=${descriptions.get(file.mediaAssetId)?.descriptionId ?? ''}`,
+    )
+    .sort();
   return createHash('sha256').update(lines.join('\n')).digest('hex');
 }
 
@@ -40,7 +51,8 @@ const withMedium = (
  * validate beside the grid's prices. It waits while a file is still in the cleaning or a media undescribed (the job
  * comes back after each description), and does nothing while her switch is off. The code holds the steps: an answer
  * that tells others is a failure, retried. A sum or a currency is asked again once, then kept with its reason.
- * Replayable: a set of media already told is left alone.
+ * Replayable: the same media with the same descriptions, told with the same prompt, are left alone; a description
+ * corrected or a new prompt tells the script again (a new row: the one validated stays).
  */
 export async function summarizeScript(
   deps: SummarizeDeps,
@@ -53,14 +65,14 @@ export async function summarizeScript(
   if (!target.describes) return 'off';
   if (!target.files.every(withMedium)) return 'waiting';
   const files = target.files.filter(withMedium);
-  const mediaHash = mediaHashOf(files);
-  if (await deps.store.summarized(dropId, mediaHash)) return 'already';
-
-  const version = await deps.versions.frozen(target.versionId);
-  if (version === null) return 'gone';
   const seen = files.filter((file) => file.kind !== 'audio').map((file) => file.mediaAssetId);
   const descriptions = await deps.describer.detailed(seen);
   if (seen.some((id) => !descriptions.has(id))) return 'waiting';
+  const mediaHash = mediaHashOf(files, descriptions);
+  if (await deps.store.summarized(dropId, mediaHash, deps.summarizer.promptHash)) return 'already';
+
+  const version = await deps.versions.frozen(target.versionId);
+  if (version === null) return 'gone';
 
   const steps = scriptStepsOf(version.segments, files);
   if (steps.length === 0) return 'gone';
@@ -76,7 +88,7 @@ export async function summarizeScript(
       media: step.media.map((file) => ({
         kind: file.kind,
         durationS: file.durationS,
-        description: descriptions.get(file.mediaAssetId) ?? null,
+        description: descriptions.get(file.mediaAssetId)?.detailed ?? null,
       })),
     })),
   };

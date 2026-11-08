@@ -212,3 +212,10 @@ export class ContentRequestDueUnprocessable extends DomainError {
     );
   }
 }
+
+/** A creator the agency does not have (her switch, ADR 0083 § 9). */
+export class DropDescriptionsCreatorNotFound extends DomainError {
+  constructor() {
+    super('creator_not_found', 'Créatrice introuvable');
+  }
+}
