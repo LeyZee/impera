@@ -46,6 +46,8 @@ Un fait n'est jamais mis à jour en place : un nouveau fait remplace l'ancien (`
 
 D'où viennent les faits (P3-02) : les `factsProposed` du brief restent sur le brouillon (`drafts.brief`), datés par le message du fan où ils ont été lus ; une catégorie inconnue est ignorée, et `operator_note` n'est jamais acceptée d'un modèle. Quand un humain approuve le brouillon, le job `conversation.record_facts` les fait écrire par le module `fans`, puis écrit un `fact_confirmed` par fait nouveau dans le journal de la conversation ; un brouillon refusé ou expiré n'écrit rien. La note qu'un chatteur laisse en rendant la main (`release`, `note`) devient un fait `operator_note`, une clé par note (sa date) : les notes s'ajoutent sans se remplacer. Rejoué, le job ne réécrit rien.
 
+La fiche du fan se remplit aussi sans brouillon (ADR 0085 § 7) : chaque message du fan met en file `fans.read_card` (clé par conversation, remplacée), qui part cinq minutes après son dernier message, ou tout de suite après dix messages non lus, jamais moins de dix minutes après la lecture précédente. Le job donne au rôle `brain` la fiche telle qu'elle est et ses messages non lus avec ce qui les précède, puis le module `fans` vérifie chaque case (forme, valeurs fermées, ce que la fiche ne garde jamais) et l'écrit comme toute proposition : la note d'un chatteur reste, ce qui la contredit attend « à vérifier ». Jusqu'où ses messages ont été lus est sur la conversation (`card_read_at`, `card_read_through`, l'heure d'arrivée du dernier lu) ; une lecture refusée (budget à son alerte, aucun modèle) ne marque rien, et le message suivant les relit.
+
 ## Conversations (module `conversations`)
 
 ```

@@ -5,6 +5,7 @@ import type { FansModule } from '../fans';
 
 import { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
 import { createBubbleGuard, type AgentBubbleGuard } from './infra/bubble-guard';
+import { createCardReader, type AgentCardReader } from './infra/card-reader';
 import {
   createDraftComposer,
   type AgentDraftComposer,
@@ -139,6 +140,17 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     ...(options.alertsOf !== undefined && { alertsOf: options.alertsOf }),
     ...(options.chatterOnShift !== undefined && { chatterOnShift: options.chatterOnShift }),
   });
+}
+
+/**
+ * His card read in his new messages (ADR 0085 § 7), on the app's gateway: wired for every conversation, whoever
+ * answers him. A line of his card shaped like an order is counted here, never logged.
+ */
+export function startCardReader(options: {
+  readonly gateway: LlmGateway;
+  readonly onDroppedNotes?: (event: { readonly conversationId: string; readonly dropped: number }) => void;
+}): AgentCardReader {
+  return createCardReader(options);
 }
 
 /** Her follow-up delays: `conversations`' `FollowUpPlan` port, matched by shape. */

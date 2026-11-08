@@ -2,6 +2,7 @@ import {
   BLIND_TEST_TARGET,
   ConversationIdSchema,
   DomainError,
+  cardReadRunAt,
   jobKeyFor,
   MessageIdSchema,
   newId,
@@ -258,6 +259,20 @@ export function createConversationCommands({
           meta,
         );
         if (isInbound) {
+          // His card is read whoever answers him (ADR 0085 § 7): each message of his puts the next read off.
+          const pace = await tx.cardReads.pace(conversation.id);
+          await tx.jobs.enqueue(
+            'fans.read_card',
+            {
+              creatorId: input.creatorId,
+              conversationId: conversation.id,
+              correlationId: input.correlationId,
+            },
+            {
+              jobKey: jobKeyFor('fans.read_card', conversation.id),
+              runAt: cardReadRunAt({ now: at, unread: pace.unread, lastReadAt: pace.lastReadAt }),
+            },
+          );
           conversation = await expireOpenDrafts(tx, conversation, NEW_FAN_MESSAGE, {
             ...meta,
             actor: 'system',

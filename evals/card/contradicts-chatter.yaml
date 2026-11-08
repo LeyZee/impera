@@ -1,0 +1,17 @@
+description: >-
+  Un chatteur a noté sa ville ; il en donne une autre. La lecture la propose quand même, dite par lui : c'est le code
+  qui la met « à vérifier » sous la note du chatteur (ADR 0085 § 6), jamais la lecture qui la tait.
+card:
+  - 'location : Annecy (noté par un chatteur)'
+  - 'first_name : Basile (dit par lui)'
+history:
+  - from: creator
+    text: Il fait beau chez toi aujourd'hui ?
+inbound:
+  - Grand soleil ! J'ai déménagé à Chambéry le mois dernier, je t'avais pas dit
+expect:
+  proposed:
+    - field: location
+      source: declared
+      match: 'chamb'
+  absent: [first_name]

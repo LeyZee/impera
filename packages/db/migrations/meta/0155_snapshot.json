@@ -1,5 +1,5 @@
 {
-  "id": "1a68db9b-6866-460f-8036-e3b8d88a7ae3",
+  "id": "3e980465-a07e-4277-8f61-7a4470f80831",
   "prevId": "b3cdcd87-b5aa-42f0-938f-b77fbdfa3143",
   "version": "7",
   "dialect": "postgresql",
@@ -2590,6 +2590,18 @@
         },
         "desire_at": {
           "name": "desire_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "card_read_at": {
+          "name": "card_read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "card_read_through": {
+          "name": "card_read_through",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -7012,18 +7024,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "thumbnail_key": {
-          "name": "thumbnail_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "thumbnailed_at": {
-          "name": "thumbnailed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7117,10 +7117,6 @@
         "media_assets_origin_check": {
           "name": "media_assets_origin_check",
           "value": "\"media_assets\".\"origin\" in ('creator', 'fan')"
-        },
-        "media_assets_thumbnail_check": {
-          "name": "media_assets_thumbnail_check",
-          "value": "\"media_assets\".\"thumbnail_key\" is null or (\"media_assets\".\"thumbnailed_at\" is not null and \"media_assets\".\"kind\" <> 'audio')"
         }
       },
       "isRLSEnabled": false
