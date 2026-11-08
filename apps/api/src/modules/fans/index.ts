@@ -17,6 +17,8 @@ import {
   type RequireRole,
 } from './infra/http/flag-routes';
 
+/** @public The evals read his card on the path a real read takes (`pnpm evals`, `evals/card`). */
+export { proposalsOfRead, type ReadSource } from './domain/card-read';
 export type { FactProposal } from './domain/facts';
 export { FIGURE_KEYS, fanFigures, type FigureKey } from './domain/figures';
 

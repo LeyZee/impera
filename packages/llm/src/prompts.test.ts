@@ -54,6 +54,9 @@ describe('prompts', () => {
     const summary = loadPrompt('brain', 'script-summary');
     expect(summary.header).toMatchObject({ role: 'brain', output_schema: 'ScriptDropSummary' });
     expect(summary.variables).toEqual(['canary']);
+    const card = loadPrompt('brain', 'fan-card');
+    expect(card.header).toMatchObject({ role: 'brain', output_schema: 'FanCardRead' });
+    expect(card.variables).toEqual(['canary']);
   });
 
   it('puts what changes at each message last, so the stable head is cached', () => {

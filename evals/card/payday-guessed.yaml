@@ -1,0 +1,18 @@
+description: >-
+  Il laisse entendre quand il a de l'argent sans le dire : la lecture le devine, et le code l'écrit comme une
+  hypothèse (ADR 0085 § 2). Il dit aussi son métier en toutes lettres.
+history:
+  - from: creator
+    text: Tu fais quoi de beau ce soir ?
+inbound:
+  - Pas grand-chose, je rentre du chantier, je suis maçon
+  - Là c'est la fin du mois c'est tendu, mais dès que j'ai ma paie le 1er je me fais plaisir avec toi 😏
+expect:
+  proposed:
+    - field: payday
+      source: inferred
+      match: '1|début|mois'
+    - field: job
+      source: declared
+      match: 'maçon'
+  absent: [first_name, age]

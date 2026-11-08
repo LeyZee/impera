@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  cardReadRunAt,
   FAN_CARD_FIELDS,
+  FanCardReadSchema,
   FanCardFieldSchema,
   FanCardViewSchema,
   fanCardFieldSpec,
@@ -64,5 +66,30 @@ describe('the fan’s card (ADR 0085)', () => {
       FanCardViewSchema.safeParse({ ...card, fields: [{ field: 'location', current: tooLong, toCheck: [] }] })
         .success,
     ).toBe(false);
+  });
+});
+
+describe('when the AI reads his messages again (ADR 0085 § 7)', () => {
+  const now = new Date('2026-11-08T21:00:00Z');
+  const minutes = (n: number): Date => new Date(now.getTime() + n * 60_000);
+
+  it('waits for five minutes of silence, or reads at once after ten messages', () => {
+    expect(cardReadRunAt({ now, unread: 1, lastReadAt: null })).toEqual(minutes(5));
+    expect(cardReadRunAt({ now, unread: 10, lastReadAt: null })).toEqual(now);
+  });
+
+  it('never reads a conversation twice within ten minutes', () => {
+    expect(cardReadRunAt({ now, unread: 12, lastReadAt: minutes(-4) })).toEqual(minutes(6));
+    expect(cardReadRunAt({ now, unread: 2, lastReadAt: minutes(-30) })).toEqual(minutes(5));
+  });
+
+  it('takes a closed list of fields from the model, each with its message', () => {
+    const read = {
+      facts: [{ field: 'payday', items: ['le 5'], kind: 'inferred', confidence: 0.6, message: 3 }],
+    };
+    expect(FanCardReadSchema.safeParse(read).success).toBe(true);
+    const unknown = { facts: [{ ...read.facts[0], field: 'religion' }] };
+    expect(FanCardReadSchema.safeParse(unknown).success).toBe(false);
+    expect(FanCardReadSchema.safeParse({ ...read, note: 'x' }).success).toBe(false);
   });
 });

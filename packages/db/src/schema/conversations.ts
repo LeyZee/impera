@@ -81,6 +81,12 @@ export const conversations = pgTable(
     desireScore: integer('desire_score'),
     desireBand: enumText('desire_band'),
     desireAt: timestampTz('desire_at'),
+    /**
+     * The fan's card read in his messages (ADR 0085 § 7, `fans.read_card`): when it was last read, and the ingestion
+     * time of the last of his messages it read. Null before the first read.
+     */
+    cardReadAt: timestampTz('card_read_at'),
+    cardReadThrough: timestampTz('card_read_through'),
     updatedAt: updatedAt(),
   },
   (t) => [

@@ -883,6 +883,13 @@
       "when": 1794172123527,
       "tag": "0152_description_validation",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1794175300707,
+      "tag": "0155_fan_card_read",
+      "breakpoints": true
     }
   ]
 }

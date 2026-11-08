@@ -29,6 +29,7 @@ import type {
   ExternalRef,
   FactCategory,
   FactKind,
+  FanCardRead,
   FanId,
   GuardCode,
   MediaAssetId,
@@ -279,9 +280,37 @@ interface AutomaticEvidence {
 }
 
 /** Everything a command touches, bound to one tenant transaction. */
+/** A message of the conversation his card is read in (ADR 0085 § 7): his not read yet are new, the rest context. */
+export interface CardReadMessage {
+  readonly id: MessageId;
+  readonly from: 'fan' | 'creator';
+  readonly text: string;
+  readonly isNew: boolean;
+  readonly at: Date;
+}
+
+/** Where the reading of his card stands in a conversation (`conversations.card_read_at`, `card_read_through`). */
+interface CardReads {
+  /** His messages not read yet for his card (the one just in included), and when it was last read: the next read's time. */
+  pace(
+    conversationId: ConversationId,
+  ): Promise<{ readonly unread: number; readonly lastReadAt: Date | null }>;
+  /**
+   * The conversation's last `limit` messages with words, oldest first, his not read yet marked new; `through` is when
+   * the newest of those new ones came in, null when none did.
+   */
+  toRead(
+    conversationId: ConversationId,
+    limit: number,
+  ): Promise<{ readonly messages: readonly CardReadMessage[]; readonly through: Date | null }>;
+  /** His messages in up to `through` are read, at `at`. */
+  markRead(conversationId: ConversationId, through: Date, at: Date): Promise<void>;
+}
+
 export interface Transaction {
   readonly conversations: ConversationRepository;
   readonly messages: MessageRepository;
+  readonly cardReads: CardReads;
   readonly drafts: DraftRepository;
   readonly events: EventWriter;
   readonly jobs: JobEnqueuer;
@@ -360,6 +389,15 @@ export interface FanDirectory {
     fanId: FanId,
     facts: readonly DraftFact[],
   ): Promise<readonly { readonly id: string; readonly category: FactCategory }[]>;
+  /** His card as the AI's read gets it (ADR 0085 § 7): one line per field it shows. */
+  cardLines(creatorId: CreatorId, fanId: FanId): Promise<readonly string[]>;
+  /** What the AI read in his new messages, checked and written by the `fans` module (§ 6, § 8); returns those written. */
+  proposeRead(
+    creatorId: CreatorId,
+    fanId: FanId,
+    read: FanCardRead,
+    sources: readonly { readonly number: number; readonly messageId: MessageId; readonly at: Date }[],
+  ): Promise<readonly { readonly id: string; readonly key: string }[]>;
   /** Her active facts about this fan, as the engine reads them (sorted, 40 at most). */
   activeFacts(
     creatorId: CreatorId,
@@ -535,6 +573,27 @@ interface ComposedAlert {
  */
 export interface DraftComposer {
   compose(input: ComposeInput): Promise<ComposeResult>;
+}
+
+/**
+ * His card read again in his new messages (ADR 0085 § 7), implemented by the agent on the gateway's `brain`: `budget`
+ * when the day's spend is at its alert (the card stops before a fan's answer would), `failed` when no model answered.
+ */
+export interface CardReader {
+  read(input: {
+    readonly creatorId: CreatorId;
+    readonly conversationId: ConversationId;
+    readonly card: readonly string[];
+    readonly messages: readonly {
+      readonly number: number;
+      readonly from: 'fan' | 'creator';
+      readonly text: string;
+      readonly isNew: boolean;
+    }[];
+  }): Promise<
+    | { readonly ok: true; readonly read: FanCardRead }
+    | { readonly ok: false; readonly reason: 'budget' | 'failed' }
+  >;
 }
 
 /**
