@@ -25,7 +25,7 @@ import {
   type ShiftReportId,
   type TeamMember,
 } from '@impera/contracts';
-import { eq, lockMemberPeriod, schema, sql, type Transaction } from '@impera/db';
+import { eq, lockMemberPeriod, lockPayrollClose, schema, sql, type Transaction } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -919,11 +919,22 @@ describe('Équipe › Rapports de fin de shift (/v1/scheduling, EQ-03, ADR 0023)
       expect(await checkedOf(owner, annaThird)).toBeNull();
     });
 
-    it('never switches from the checked fortnight once pay closed it (ADR 0084 § 2)', async () => {
+    it('never switches from the checked fortnight once pay closed it, even by a closing that crosses the switch (ADR 0084 § 2)', async () => {
       const checked = previousPayPeriod(currentPeriod());
       await linkModel(annaMain, 'modele-invente-main');
       expect(await checkedOf(owner, annaMain)).toBe(checked);
-      await test.admin.db.transaction(async (tx) => {
+      // A validation holds the closing lock: the switch waits for it, then reads the closing it wrote.
+      let release: () => void = () => undefined;
+      let held: () => void = () => undefined;
+      const ready = new Promise<void>((resolve) => {
+        held = resolve;
+      });
+      const closing = test.admin.db.transaction(async (tx) => {
+        await lockPayrollClose(tx);
+        held();
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
         await tx
           .insert(schema.payPeriods)
           .values({
@@ -941,13 +952,21 @@ describe('Équipe › Rapports de fin de shift (/v1/scheduling, EQ-03, ADR 0023)
           closedBy: ownerId,
         });
       });
-      expect(await checkedOf(owner, annaMain)).toBeNull();
-      const closed = await add(owner, { ...rulesBody(annaMain, checked), earningsSource: 'detected' });
+      await ready;
+      const switching = add(owner, { ...rulesBody(annaMain, checked), earningsSource: 'detected' });
+      for (let tries = 0; (await lockWaits(test.admin.db, 'advisory')) < 1; tries += 1) {
+        if (tries > 250) throw new Error('the switch never waited for the closing lock');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      release();
+      await closing;
+      const closed = await switching;
       expect([closed.statusCode, codeOf(closed), detailsOf(closed)]).toEqual([
         409,
         'pay_rules_source_conflict',
         { reason: 'period_closed' },
       ]);
+      expect(await checkedOf(owner, annaMain)).toBeNull();
     });
   });
 });

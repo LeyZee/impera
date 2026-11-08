@@ -9,7 +9,8 @@ Fait :
   - `assertRulesStart` prend la source et la quinzaine vérifiée (`checkedPeriodOf`, `switchablePeriodOf`) ;
   - `assertSourceSwitchable` accepte la quinzaine vérifiée elle-même ;
   - le store lit le fait « quinzaine clôturée depuis » chez `payroll` (`payReadsForPayRules.closedFrom`, câblé par `wiring/scheduling.ts`) ;
-  - le store met en file `payroll.recalculate` pour chaque quinzaine commencée que les règles touchent.
+  - le store met en file `payroll.recalculate` pour chaque quinzaine commencée que les règles touchent ;
+  - des règles qui partent de la quinzaine vérifiée commencée prennent le verrou de clôture (`lockPayrollClose`) avant de lire les clôtures : une validation simultanée ne passe pas entre la lecture et la pose (relecture Bilan).
 - Écran Réglages › Règles de paie :
   - « Ventes relevées » est ouvert pour une plateforme qui donne un net, et la source vient en premier dans la fenêtre ;
   - la quinzaine vérifiée est proposée (« vérifiée ») et choisie d'office avec « Ventes relevées », tant que le propriétaire n'en prend pas une autre ;
@@ -17,7 +18,7 @@ Fait :
   - la carte du compte dit « Ventes vérifiées » ; la colonne des pastilles s'élargit sur cette carte pour que la pastille ne mange pas la phrase (vu en capture).
 - Tests :
   - unitaires `pay-rules` ;
-  - intégration `scheduling-reports` : quinzaine vérifiée acceptée et recalculée, rapports refusés sur elle, quinzaine d'avant refusée, quinzaine clôturée refusée, rien pour un manager ;
+  - intégration `scheduling-reports` : quinzaine vérifiée acceptée et recalculée, rapports refusés sur elle, quinzaine d'avant refusée, quinzaine clôturée refusée même par une clôture qui croise la bascule, rien pour un manager ;
   - écran `PayRulesSection` : bascule, retour aux rapports, plateforme sans net, refus `period_closed`.
 
 État de la base de Charles le 08/11, lu sans écriture : un compte Reveal, aucune règle de paie, aucune clôture, aucun shift en novembre, aucun chatteur relié, aucune vérification ; 13 ventes du 3 au 6 novembre ; CRM arrêté depuis le 06/11 au soir. Son clone est à jour sur main c38159c4 (migrations 0137 et 0138).

@@ -14,6 +14,7 @@ import {
   and,
   enterCreator,
   eq,
+  lockPayrollClose,
   schema,
   SNAPSHOT_READ,
   withMember,
@@ -203,15 +204,15 @@ export function createDrizzlePayRulesStore(
         if (taken !== undefined) throw new PayRulesPeriodConflict(taken.id);
         const currentPeriod = await currentPeriodIn(tx, now);
         const begun = rules.fromPeriod <= currentPeriod;
+        // Read only when it decides: rules from a period that has begun, the checked one (ADR 0084 § 2). The closing
+        // lock is held until this transaction ends, so no validation closes the period between the read and the rules.
+        const fromChecked = begun && rules.fromPeriod === checkedPeriod;
+        if (fromChecked) await lockPayrollClose(tx);
         assertRulesStart(rules, {
           currentPeriod,
           first: sameAccount.length === 0,
           checkedPeriod,
-          // Read only when it decides: rules from a period that has begun, the checked one (ADR 0084 § 2).
-          closedFrom:
-            begun && rules.fromPeriod === checkedPeriod
-              ? await periodClosedFrom(tx, rules.fromPeriod)
-              : false,
+          closedFrom: fromChecked ? await periodClosedFrom(tx, rules.fromPeriod) : false,
         });
         try {
           await tx.transaction((savepoint) =>
