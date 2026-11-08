@@ -850,6 +850,99 @@ describe('the reader of Suivi', () => {
     expect(posted).toEqual([{ action: 'flags', body: { flag: 'doNotContact', set: false } }]);
   });
 
+  it('asks above his sheet whether to mark him fragile, and marks him or sets it aside (ADR 0085, lot b2)', async () => {
+    const fan = conversation('1');
+    let proposed = true;
+    const line = {
+      id: `fragile_proposed-${fan.id}`,
+      tone: 'warn',
+      kind: 'fragile_proposed',
+      title: 'Fan 1',
+      why: 'Il est très attaché et semble en détresse. L’IA propose de le marquer fragile : à toi d’accepter ou d’écarter.',
+      at: '2026-10-17T19:00:00Z',
+      waitingMinutes: 60,
+      conversationId: fan.id,
+      fanId: fan.fanId,
+      creatorId: LEA.id,
+      creatorName: LEA.displayName,
+    };
+    const posted = serve({
+      ...withDraft,
+      detail: () => ({ status: 200, body: waiting() }),
+      todos: () => ({ status: 200, body: { items: proposed ? [line] : [], creators: [] } }),
+      command: (action) => {
+        proposed = false;
+        return action === 'dismiss'
+          ? { status: 200, body: { fanId: fan.fanId, dismissedAt: '2026-10-17T20:00:00.000Z' } }
+          : {
+              status: 200,
+              body: { fanId: fan.fanId, flags: { fragile: true }, mayConfirmDisputedAge: false },
+            };
+      },
+    });
+    renderPage(OPEN);
+    const banner = await screen.findByRole('list', { name: 'Avant de lui écrire' });
+    const proposal = await within(banner).findByText('Le marquer fragile ?');
+    expect(proposal.closest('.tr-alert')?.textContent).toContain('semble en détresse');
+    fireEvent.click(within(banner).getByRole('button', { name: 'Marquer fragile' }));
+    await waitFor(() => {
+      expect(screen.queryByText('Le marquer fragile ?')).toBeNull();
+    });
+    expect(posted).toEqual([{ action: 'flags', body: { flag: 'fragile', set: true } }]);
+    cleanup();
+
+    proposed = true;
+    const dismissed = serve({
+      ...withDraft,
+      detail: () => ({ status: 200, body: waiting() }),
+      todos: () => ({ status: 200, body: { items: proposed ? [line] : [], creators: [] } }),
+      command: () => {
+        proposed = false;
+        return { status: 200, body: { fanId: fan.fanId, dismissedAt: '2026-10-17T20:00:00.000Z' } };
+      },
+    });
+    renderPage(OPEN);
+    fireEvent.click(await screen.findByRole('button', { name: 'Écarter' }));
+    await waitFor(() => {
+      expect(screen.queryByText('Le marquer fragile ?')).toBeNull();
+    });
+    expect(dismissed).toEqual([{ action: 'dismiss', body: null }]);
+  });
+
+  it('shows a chatter who cannot change his limits the proposal without its buttons (ADR 0085, lot b2)', async () => {
+    const fan = conversation('1');
+    serve({
+      ...withDraft,
+      detail: () => ({ status: 200, body: waiting() }),
+      todos: {
+        status: 200,
+        body: {
+          items: [
+            {
+              id: `fragile_proposed-${fan.id}`,
+              tone: 'warn',
+              kind: 'fragile_proposed',
+              title: 'Fan 1',
+              why: 'Il est très attaché et dépense de plus en plus vite. L’IA propose de le marquer fragile : à toi d’accepter ou d’écarter.',
+              at: '2026-10-17T19:00:00Z',
+              waitingMinutes: 60,
+              conversationId: fan.id,
+              fanId: fan.fanId,
+              creatorId: LEA.id,
+              creatorName: LEA.displayName,
+            },
+          ],
+          creators: [],
+        },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    const banner = await screen.findByRole('list', { name: 'Avant de lui écrire' });
+    expect(await within(banner).findByText('Le marquer fragile ?')).toBeDefined();
+    expect(screen.getByText('Le propriétaire ou un manager décide.')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Marquer fragile' })).toBeNull();
+  });
+
   it('freezes sales as a human’s call, and shows the limits the server answers', async () => {
     const posted = serve({
       ...withDraft,

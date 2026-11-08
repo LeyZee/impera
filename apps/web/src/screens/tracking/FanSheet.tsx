@@ -4,6 +4,7 @@ import type { JSX } from 'react';
 import { DesireSheet } from './Desire';
 import { FanLimits, useFanFlags } from './FanLimits';
 import { FanToLearn, useFanKyc } from './FanToLearn';
+import { FragileProposal, useFragileTodo } from './FragileProposal';
 import { FanFlagsRefused } from './api';
 import { FanCard } from './card/FanCard';
 import { useFanCard } from './card/api';
@@ -45,7 +46,12 @@ export function FanSheet({
   const flags = useFanFlags(creatorId, fanId);
   const kyc = useFanKyc(creatorId, fanId, canDecide);
   const card = useFanCard(creatorId, fanId, canDecide);
+  // The AI's proposal to mark him « fragile » (ADR 0085 § 9, lot b2): never to a creator, who sees nothing of him.
+  const fragile = useFragileTodo(creatorId, fanId);
+  const proposal = canDecide ? fragile : undefined;
   const facts: SheetFacts = {
+    // Folded, the line says it waits; beside the conversation it stands right under the line already.
+    ...(proposal === undefined || layout === 'aside' ? {} : { fragileProposed: true }),
     flags:
       flags.data?.flags ??
       (flags.error instanceof FanFlagsRefused ? 'refused' : flags.isError ? 'down' : 'loading'),
@@ -58,10 +64,12 @@ export function FanSheet({
           ? DESIRE_BAND_LABELS[desire.band]
           : `${DESIRE_BAND_LABELS[desire.band]} ${DESIRE_BAND_EMOJIS[desire.band]}`,
   };
-  const summary = sheetSummary(facts);
+  const read = sheetSummary(facts);
+  // Never « Rien à signaler » above a proposal that waits for a person.
+  const summary = proposal !== undefined && read.rest === 'Rien à signaler' ? { ...read, rest: '' } : read;
   const alerts = flags.data === undefined ? [] : alertsOf(flags.data.flags);
   const alertList =
-    alerts.length === 0 && facts.flags !== 'refused' ? null : (
+    alerts.length === 0 && facts.flags !== 'refused' && proposal === undefined ? null : (
       <ul className="tr-alerts" aria-label="Avant de lui écrire">
         {facts.flags === 'refused' ? (
           <li className="tr-alert tr-alert--care">
@@ -75,6 +83,9 @@ export function FanSheet({
             <span>{alert.text}</span>
           </li>
         ))}
+        {proposal === undefined ? null : (
+          <FragileProposal creatorId={creatorId} fanId={fanId} todo={proposal} canDecide={canSetLimits} />
+        )}
       </ul>
     );
   const line = (

@@ -146,6 +146,8 @@ export interface SheetFacts {
   readonly band: string | null;
   /** How many fields of his card wait for a chatter (ADR 0085 § 6); none when not read (a creator). */
   readonly toCheck?: number;
+  /** The AI proposes to mark him « fragile » and a person has not answered yet (ADR 0085 § 9, lot b2). */
+  readonly fragileProposed?: boolean;
 }
 
 /**
@@ -161,8 +163,10 @@ export function sheetSummary(facts: SheetFacts): { readonly urgent: string | nul
   // What his card waits for is said in amber even folded: a chatter who never opens the sheet still sees it.
   const check =
     facts.toCheck !== undefined && facts.toCheck > 0 ? `${String(facts.toCheck)} à vérifier` : null;
+  // The AI's proposal waits for a person: never « Rien à signaler » beside it.
+  const fragile = facts.fragileProposed === true ? 'Le marquer fragile ?' : null;
   const urgent = (limits: string | null): string | null => {
-    const parts = [limits, check].filter((part): part is string => part !== null);
+    const parts = [limits, fragile, check].filter((part): part is string => part !== null);
     return parts.length === 0 ? null : parts.join(' · ');
   };
   if (flags === 'refused') return { urgent: urgent('Limites non lisibles'), rest: rest.join(' · ') };
@@ -171,7 +175,7 @@ export function sheetSummary(facts: SheetFacts): { readonly urgent: string | nul
     return { urgent: urgent(null), rest: rest.length === 0 && check === null ? '…' : rest.join(' · ') };
   if (rest.length > 0) return { urgent: urgent(null), rest: rest.join(' · ') };
   if (hasAnyLimit(flags)) return { urgent: urgent(null), rest: 'Ses limites sont en tête' };
-  return { urgent: urgent(null), rest: check === null ? 'Rien à signaler' : '' };
+  return { urgent: urgent(null), rest: check === null && fragile === null ? 'Rien à signaler' : '' };
 }
 
 const hasAnyLimit = (flags: FanFlags): boolean =>

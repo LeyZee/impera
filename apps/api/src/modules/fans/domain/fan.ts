@@ -97,4 +97,13 @@ export interface FlagStore {
     change: (flags: FanFlags, scope: TeamScope | null) => FanFlags | null,
     event: FlagWrite,
   ): Promise<{ flags: FanFlags; scope: TeamScope | null }>;
+  /**
+   * A person sets aside the AI's proposal to mark him « fragile » (ADR 0085 § 9, lot b2): `fan_fragile_dismissed`,
+   * written as that person, in a transaction that checks the fan is hers (`FanNotFound` otherwise). Returns when.
+   */
+  dismissFragile(
+    creatorId: CreatorId,
+    fanId: FanId,
+    event: { readonly author: `human:${string}`; readonly correlationId: string },
+  ): Promise<Date>;
 }

@@ -243,6 +243,7 @@ export const EVENT_TYPES = [
   'automatic_closed',
   'fan_flag_set',
   'fan_flag_cleared',
+  'fan_fragile_dismissed',
   'sales_feed_signal',
   'sales_feed_mismatch',
   'agency_share_mismatch',
@@ -527,6 +528,11 @@ export const EVENT_PAYLOADS = {
   fan_flag_set: fanFlagPayload,
   fan_flag_cleared: fanFlagPayload,
   /**
+   * A human set aside the proposal to mark him « fragile » (ADR 0085 § 9, lot b2): « À traiter » no longer shows it for
+   * 30 days, unless a new sign of distress comes. The author is the actor; never a value of his card.
+   */
+  fan_fragile_dismissed: z.object({ fanId: FanIdSchema }),
+  /**
    * The sales feed of a platform needs the owner (ADR 0050 § 3): a refused key, a value it does not know, a line for a
    * model linked to no creator account, a line read again changed, an answer it cannot read. Published with no
    * creator, never with a fan's id or pseudo, at most once per kind and value while it lasts.
@@ -656,6 +662,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('automatic_closed'),
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),
+  typedEvent('fan_fragile_dismissed'),
   typedEvent('sales_feed_signal'),
   typedEvent('sales_feed_mismatch'),
   typedEvent('agency_share_mismatch'),

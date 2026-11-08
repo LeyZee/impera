@@ -22,14 +22,17 @@ export interface VoiceVersion {
 
 /**
  * A conversation waiting for a human: handed over, with a draft unread for more than 10 minutes, stopped by a
- * send that failed for good (state `error`), or his message left with nothing under way for 30 minutes (P3-11).
+ * send that failed for good (state `error`), his message left with nothing under way for 30 minutes (P3-11), or a
+ * fan the AI proposes to mark « fragile », in his latest conversation (ADR 0085 § 9, lot b2).
  */
 export interface WaitingConversation {
   readonly conversationId: string;
   readonly fanId: string;
   readonly fanName: string;
-  readonly kind: HandoffCause | 'awaiting_approval' | 'send_failed' | 'unanswered';
+  readonly kind: HandoffCause | 'awaiting_approval' | 'send_failed' | 'unanswered' | 'fragile_proposed';
   readonly since: Date;
+  /** Its own sentence, where the kind's is not enough (the signs of a « fragile » proposal). */
+  readonly why?: string;
 }
 
 interface TopFan {

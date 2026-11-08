@@ -890,6 +890,13 @@
       "when": 1794175300707,
       "tag": "0155_fan_card_read",
       "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1794179463993,
+      "tag": "0159_fan_fragile_dismissed",
+      "breakpoints": true
     }
   ]
 }

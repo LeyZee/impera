@@ -5,6 +5,7 @@ import {
   DesireCurveSchema,
   FanFlagsViewSchema,
   FanKycViewSchema,
+  FragileDismissalSchema,
   MessageViewSchema,
   SendingStopSchema,
   pageOf,
@@ -254,6 +255,27 @@ export async function setFanFlag(
     return { ok: true, view: FanFlagsViewSchema.parse(await response.json()) };
   } catch {
     return { ok: false, message: flagError(0, null) };
+  }
+}
+
+/**
+ * `POST /v1/fans/:id/fragile/dismiss` (ADR 0085 § 9, lot b2): « Écarter » on the AI's proposal to mark him « fragile ».
+ * `null` once set aside, or what the screen says when it was not.
+ */
+export async function dismissFragile(creatorId: string, fanId: string): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `/v1/fans/${encodeURIComponent(fanId)}/fragile/dismiss?${new URLSearchParams({ creatorId }).toString()}`,
+      { method: 'POST', credentials: 'include' },
+    );
+    if (!response.ok) {
+      const answer: unknown = await response.json().catch(() => null);
+      return flagError(response.status, answer);
+    }
+    FragileDismissalSchema.parse(await response.json());
+    return null;
+  } catch {
+    return flagError(0, null);
   }
 }
 

@@ -104,6 +104,11 @@ describe('the fan’s limits', () => {
       urgent: null,
       rest: '…',
     });
+    // The AI's proposal to mark him fragile waits for a person: in amber, never beside « Rien à signaler » (lot b2).
+    expect(sheetSummary({ flags: {}, toLearn: null, band: null, fragileProposed: true })).toEqual({
+      urgent: 'Le marquer fragile ?',
+      rest: '',
+    });
     // What his card waits for is said in amber folded, and never under « Rien à signaler » (ADR 0085 § 6).
     expect(sheetSummary({ flags: {}, toLearn: null, band: null, toCheck: 1 })).toEqual({
       urgent: '1 à vérifier',

@@ -51,13 +51,15 @@ export const DashboardTodoSchema = z.object({
   tone: DashboardToneSchema,
   /**
    * A handoff cause, a draft waiting for a chatter's approval, a send that failed for good, or his message left with
-   * no answer, no draft and nothing under way for more than 30 minutes (P3-11).
+   * no answer, no draft and nothing under way for more than 30 minutes (P3-11), or the AI proposing to mark him
+   * « fragile », which a human accepts or sets aside (ADR 0085 § 9, lot b2).
    */
   kind: z.union([
     HandoffCauseSchema,
     z.literal('awaiting_approval'),
     z.literal('send_failed'),
     z.literal('unanswered'),
+    z.literal('fragile_proposed'),
   ]),
   /** The fan's name. */
   title: z.string().min(1),
