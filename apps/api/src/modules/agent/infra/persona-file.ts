@@ -16,6 +16,7 @@ import { parse, stringify } from 'yaml';
 
 import { DEFAULT_MIN_DESIRE_TO_OPEN, DEFAULT_SCRIPT_MIN_DESIRE } from '../domain/desire';
 import { DEFAULT_GUARD_SETTINGS, type GuardSettings } from '../domain/guards';
+import { askableSlots } from '../domain/kyc';
 import type { OfferLimits } from '../domain/policy';
 import type { SexualizationLimits } from '../domain/sexualization';
 
@@ -130,7 +131,8 @@ export function personaForModels(
   const name = sheet.identity.nickname;
   const strategies = approach(agent.strategies);
   const rules = agent.rules;
-  const kycSlots = agent.strategies.kyc.collect ?? KycSlotSchema.options;
+  // Only what she may ask (ADR 0085 § 2): `desires` stays in a stored persona, never in what the brain may name.
+  const kycSlots = askableSlots(agent.strategies.kyc.collect ?? KycSlotSchema.options);
   const forModels = {
     ...sheetForModels(sheet, today, omitted),
     // Réglages de l'agent the prompts name by key: code applies them, the model is told them so as not to go against.

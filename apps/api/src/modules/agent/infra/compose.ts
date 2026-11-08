@@ -27,6 +27,7 @@ import {
   type GuardViolation,
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
+import { askableOnly } from '../domain/kyc';
 import { offerDecision, offerSignals, type OfferBlock, type OfferContext } from '../domain/policy';
 import {
   declaredAdultAge,
@@ -58,6 +59,11 @@ export interface ComposeTurnInput {
   readonly fanText: string;
   readonly media: readonly MediaDescription[];
   readonly fanNotes: string;
+  /**
+   * Her notes the brain reads alone (ADR 0085 § 9: when he has money, his attachment, his moods): added to its notes,
+   * never to the voice's, whatever a prompt says.
+   */
+  readonly brainNotes?: string;
   readonly situation: Situation;
   readonly trace?: CallTrace;
   /**
@@ -321,6 +327,7 @@ export async function composeTurn(
     };
   }
   const notes = screenNotes(input.fanNotes);
+  // The voice's notes are the shared ones only: what is the brain's alone never reaches its prompt (ADR 0085 § 9).
   const base = {
     creatorName: persona.creatorName,
     personaSheet: persona.personaSheet,
@@ -331,11 +338,15 @@ export async function composeTurn(
   };
   if (input.followUp !== undefined)
     return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped);
+  const brainOnly = screenNotes(input.brainNotes ?? '');
+  const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   const brain = await gateway.brain({
     ...base,
+    fanNotes: [notes.kept, brainOnly.kept].filter((block) => block !== '').join('\n'),
     ...(input.alerts !== undefined && input.alerts.length > 0 && { alerts: input.alerts }),
   });
-  const brief = brain.ok ? brain.value.output : undefined;
+  // She asks only what the card lets her ask (ADR 0085 § 2): whatever the brain names, `desires` is never asked.
+  const brief = brain.ok ? askableOnly(brain.value.output) : undefined;
   // A trap overrides whatever the brain suggested: she does not play along (agent/domain/traps.ts).
   const trap = assessTrap({
     fanText: input.fanText,
@@ -393,7 +404,7 @@ export async function composeTurn(
   if (input.skipVoice?.(brief) === true) {
     return {
       ...(trap.isTrap && { trap }),
-      ...(notes.dropped.length > 0 && { droppedNotes: notes.dropped }),
+      ...(droppedNotes.length > 0 && { droppedNotes }),
       ...(brief && { brief }),
       ...(!brain.ok && { briefFailure: brain.error }),
       ...(sexualization !== undefined && { sexualization }),
@@ -420,7 +431,7 @@ export async function composeTurn(
   const bubbles = asSent(written, persona.splitMessages);
   return {
     ...(trap.isTrap && { trap }),
-    ...(notes.dropped.length > 0 && { droppedNotes: notes.dropped }),
+    ...(droppedNotes.length > 0 && { droppedNotes }),
     ...(brief && { brief }),
     ...(!brain.ok && { briefFailure: brain.error }),
     ...(sexualization !== undefined && { sexualization }),

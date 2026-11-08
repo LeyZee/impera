@@ -1,6 +1,7 @@
 import {
   DESIRE_SIGNALS_MAX,
   DraftIdSchema,
+  isBrainOnlyFact,
   jobKeyFor,
   newId,
   nextReplyOpening,
@@ -83,11 +84,27 @@ const WAITED_NO_REPLY_REASON = 'après l’attente, l’agent n’avait plus rie
 const EMPTY_DRAFT: ComposeResult = { kind: 'draft', bubbles: [], softViolations: [], costUsd: 0 };
 
 /** One line of her notes about the fan; a chatter's note reads as such, its dated key says nothing to the engine. */
-export const noteLine = (fact: {
+const noteLine = (fact: {
   readonly category: string;
   readonly key: string;
   readonly value: string;
 }): string => (fact.category === 'operator_note' ? `Note : ${fact.value}` : `${fact.key} : ${fact.value}`);
+
+/**
+ * Her notes about the fan, split by who reads them (ADR 0085 § 9): when he has money, his attachment and his moods
+ * go to the brain only (`brainNotes`), never to the voice; the rest to both.
+ */
+export function fanNotesOf(
+  facts: readonly (Parameters<typeof isBrainOnlyFact>[0] & { readonly value: string })[],
+): {
+  readonly notes: string[];
+  readonly brainNotes: string[];
+} {
+  return {
+    notes: facts.filter((fact) => !isBrainOnlyFact(fact)).map(noteLine),
+    brainNotes: facts.filter(isBrainOnlyFact).map(noteLine),
+  };
+}
 
 /** The same alert, however it matched: a custom one by its row, a system one by its code. */
 const alertKey = ({ alert }: AlertTrigger): string => (alert.kind === 'custom' ? alert.id : alert.code);
@@ -269,7 +286,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       platformAccountId: read.conversation.platformAccountId,
       platformConversationId: read.conversation.platformConversationId,
       history: read.history,
-      fan: { ...read.stats, notes: notes.map(noteLine) },
+      fan: { ...read.stats, ...fanNotesOf(notes) },
       ...(waitedFor !== null && { waited: 1 }),
       ...(hours !== null && { hours: hours.hours }),
       ...(read.conversation.desireScore !== null &&

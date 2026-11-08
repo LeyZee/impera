@@ -20,7 +20,7 @@ import { readProposedFacts } from '../facts';
 import { enqueueFollowUp, followUpJobKey } from '../follow-ups';
 import { appendEvent } from '../journal';
 
-import { DEFAULT_CAUSES, handoffDetail, HISTORY_LIMIT, noteLine } from './respond';
+import { DEFAULT_CAUSES, fanNotesOf, handoffDetail, HISTORY_LIMIT } from './respond';
 
 /** Holds of a follow-up that still give the conversation to the chatters. */
 const FOLLOW_UP_HANDOFFS: readonly HoldReason[] = ['guard_blocked', 'handoff'];
@@ -132,7 +132,7 @@ export function createFollowUpJob({ uow, clock, fans, composer, followUps, reply
       platformAccountId: read.conversation.platformAccountId,
       platformConversationId: read.conversation.platformConversationId,
       history: read.history,
-      fan: { ...read.stats, notes: notes.map(noteLine) },
+      fan: { ...read.stats, ...fanNotesOf(notes) },
       followUp: { step: payload.step, steps, silentSince: anchor },
       ...(hours !== null && { hours: hours.hours }),
     };
