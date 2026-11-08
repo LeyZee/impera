@@ -6,10 +6,10 @@ Branche : task/vei-06-reference-accounts
 Propriétaire : Bilan (connecteur)
 
 ## Objectif
-Une liste de comptes de référence choisie par l'agence, lue chaque jour ; un post qui dépasse nettement la moyenne de son compte devient un signal.
+Une liste de comptes de référence choisie par l'agence, lue chaque jour ; un post qui ressort de son compte (trois fois la médiane, ADR 0082 § 1) devient un signal.
 
 ## Contexte à lire
-ADR 0060 § 2 (source 3), documentation Business Discovery de Meta au moment du lot.
+ADR 0060 § 2 (source 3), ADR 0082 § 1 (médiane, écart, `standoutOf` de VEI-07, phrase d'aide sur la taille des comptes), documentation Business Discovery de Meta au moment du lot.
 
 ## À faire
 - [ ] Faux d'abord ; branchement du compte de l'agence par la voie Facebook Login ; jeton scellé (ADR 0016).
@@ -17,7 +17,7 @@ ADR 0060 § 2 (source 3), documentation Business Discovery de Meta au moment du 
 - [ ] Débit borné : les appels Business Discovery comptent dans la limite horaire de l'application Meta.
 
 ## Critères d'acceptation
-- Tests contre le faux ; seuil de dépassement réglable.
+- Tests contre le faux ; le seuil de dépassement est celui de `standoutOf` (VEI-07), une constante du code (ADR 0082 § 1).
 
 ## Hors périmètre
 Hashtags (pas une source de l'ADR 0060).

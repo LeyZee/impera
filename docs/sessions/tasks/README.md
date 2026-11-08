@@ -111,6 +111,7 @@ Branche : task/<id>-<slug>
 | SC-09 | Séries proposées par l'IA | scripts | blocked (clé xAI) | SC-01 |
 | PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | in_progress (ADR 0080, lot A1) | CR-06, P3-07 ; vidéo publique Reveal : CR-08 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
+| PUB-03 | Légende Instagram : la fenêtre visible avant « … plus », vérifiée pour le modèle, montrée à tous | publication | blocked (PUB-02) | PUB-02, ADR 0082 |
 | MCP-PUB | Publication par un agent externe : préparer, puis publier dans un plafond | MCP | blocked (lot 1 du MCP) | PROPOSED-mcp-read, PUB-01, PUB-02 |
 | VEI-01 | Signaux de tendance et idées de contenu : la base, les filtres, le lien collé | veille | todo | ADR 0060, CR-05, CR-06 |
 | VEI-02 | Capture passive dans l'extension, page « Veille » et écran « Idées du jour » | veille | done | VEI-01 |
@@ -118,6 +119,8 @@ Branche : task/<id>-<slug>
 | VEI-04 | Profil de contenu : ce qui marche chez elle et ce qu'elle sait faire | veille | blocked (clé de vision) | VEI-01, CR-06 |
 | VEI-05 | Statistiques du compte de la créatrice comme signaux | veille | blocked (PUB-02) | PUB-02, VEI-04 |
 | VEI-06 | Comptes de référence par Business Discovery | veille | blocked (compte pro et page Facebook de l'agence, revue Meta) | VEI-01 |
+| VEI-07 | Relevés de l'extension devenus signaux, sur la médiane du compte, et l'écart visible par l'agence | veille | todo | VEI-01, VEI-02, ADR 0082 |
+| VEI-08 | Fiche reel : la créatrice tourne un reel depuis un dessin, l'agence l'écrit avec des compteurs | veille | todo | VEI-01, ADR 0082 |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01, l'export du dashboard fourni par Charles hors dépôt |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
