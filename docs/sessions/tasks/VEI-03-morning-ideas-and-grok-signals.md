@@ -9,7 +9,7 @@ Propriétaire : Agent (prompts, génération, évals)
 Chaque matin, Grok rend des signaux sourcés pour toute l'agence, puis au plus trois idées par créatrice passent les filtres du code et arrivent dans « Idées du jour ».
 
 ## Contexte à lire
-ADR 0060 § 2 (source 2), § 4, § 6 et § 7, ADR 0009, ADR 0042 § 5 (aucun chiffre non reçu), méthode de chatting (`/mnt/project-files/chatting/`, hors dépôt) pour « jamais de nu » en public.
+ADR 0060 § 2 (source 2), § 4, § 6 et § 7, ADR 0009, ADR 0042 § 5 (aucun chiffre non reçu), méthode de chatting (`/mnt/project-files/chatting/`, hors dépôt) pour « jamais de nu » en public. ADR 0082 § 1 (signaux rangés par écart, multiple reçu comme un fait) et § 3 (une idée Reel porte sa fiche reel, `ReelBriefSchema` de VEI-08).
 
 ## À faire
 - [ ] Job quotidien des signaux (recherche X et web de Grok), une fois pour l'agence, schéma Zod, sources gardées, péremption.

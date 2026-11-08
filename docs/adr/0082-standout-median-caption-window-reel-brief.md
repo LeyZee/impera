@@ -1,6 +1,6 @@
 # 0082. Veille et Instagram : la médiane du compte, ce que le fil montre avant « … plus », la fiche reel
 
-Statut : proposed (demande de Charles du 08/11/2026 : « Et bien vas y 👌 fais en sorte que ça soit vraiment intuitif, que ça s'intègre bien dans nos process […] pour faciliter la vie des modèles » ; à accepter par Charles)
+Statut : accepted (Charles, 08/11/2026, 14 h 47, « ok 0082 » ; demande du 08/11/2026 : « Et bien vas y 👌 fais en sorte que ça soit vraiment intuitif, que ça s'intègre bien dans nos process […] pour faciliter la vie des modèles »)
 Date : 2026-11-08
 Précise : l'ADR 0060 (§ 2, sources 3 et 6 : « dépasse nettement la moyenne de son compte » ; § 4 et § 5 : l'idée et sa fiche de tournage), l'ADR 0057 (§ 6 garde Instagram, § 7 son accord sur les légendes), l'ADR 0042 (§ 4 fiche de tournage). Ne change rien à l'ADR 0060 § 1 : aucun agent ne navigue sur un réseau.
 

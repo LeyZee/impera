@@ -1,7 +1,7 @@
-# Légende Instagram : ce que le fil montre avant « … plus », vérifié pour le modèle et montré à tous
-Statut : proposed (attend l'acceptation de l'ADR 0082 ; ID proposé : PUB-03)
+# PUB-03 Légende Instagram : ce que le fil montre avant « … plus », vérifié pour le modèle et montré à tous
+Statut : blocked (PUB-02 : compte pro de la créatrice, appli Meta ; le lot a peut s'écrire avant, voir « Ordre »)
 Phase : publication (ADR 0057, ADR 0082 § 2)
-Dépend de : ADR 0082 acceptée ; PUB-02 (bloquée : compte pro, appli Meta) pour les écrans où une légende Instagram se relit
+Dépend de : ADR 0082 (acceptée le 08/11/2026) ; PUB-02 (bloquée : compte pro, appli Meta) pour les écrans où une légende Instagram se relit
 Branche : task/pub-03-caption-window
 Propriétaire proposé : Bilan (lot a : contrats et garde) ; Extension (lot b : aperçu)
 
