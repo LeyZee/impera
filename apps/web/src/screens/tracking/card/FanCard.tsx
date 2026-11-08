@@ -14,6 +14,7 @@ import {
   CLOSED_CHOICES,
   editText,
   entryOf,
+  essentialSpecs,
   fieldsOf,
   groupLine,
   isClosed,
@@ -67,8 +68,24 @@ export function FanCard({ creatorId, fanId }: { creatorId: string; fanId: string
     return false;
   };
 
+  const row = (spec: FanCardFieldSpec): JSX.Element => (
+    <FieldRow
+      key={spec.field}
+      spec={spec}
+      entry={entryOf(view.fields, spec.field)}
+      now={now}
+      pending={pending !== null}
+      refusal={refusal?.field === spec.field ? refusal.message : null}
+      write={write}
+    />
+  );
+
   return (
     <>
+      {/* What a chatter needs at a glance stays unfolded on top (ADR 0086 § 10, Charles 08/11). */}
+      <ul className="tr-card__fields tr-card__essentials" aria-label="L’essentiel">
+        {essentialSpecs().map(row)}
+      </ul>
       {CARD_GROUPS.map(({ group, title }) => {
         const line = groupLine(view.fields, group);
         return (
@@ -80,19 +97,7 @@ export function FanCard({ creatorId, fanId }: { creatorId: string; fanId: string
                 {line.filled}
               </span>
             </summary>
-            <ul className="tr-card__fields">
-              {fieldsOf(group).map((spec) => (
-                <FieldRow
-                  key={spec.field}
-                  spec={spec}
-                  entry={entryOf(view.fields, spec.field)}
-                  now={now}
-                  pending={pending !== null}
-                  refusal={refusal?.field === spec.field ? refusal.message : null}
-                  write={write}
-                />
-              ))}
-            </ul>
+            <ul className="tr-card__fields">{fieldsOf(group).map(row)}</ul>
           </details>
         );
       })}

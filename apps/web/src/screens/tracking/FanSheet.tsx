@@ -26,6 +26,7 @@ export function FanSheet({
   desire,
   canDecide,
   canSetLimits = canDecide,
+  layout = 'band',
 }: {
   creatorId: string;
   fanId: string;
@@ -35,6 +36,11 @@ export function FanSheet({
   canDecide: boolean;
   /** A chatter reads his limits without changing them (ADR 0025, the server refuses it). */
   canSetLimits?: boolean;
+  /**
+   * `band`: one folded band above the thread. `aside`: its own column beside the conversation on a wide screen, always
+   * in view (Charles, 08/11): what forbids, what he is like at a glance, then the rest folded.
+   */
+  layout?: 'band' | 'aside';
 }): JSX.Element {
   const flags = useFanFlags(creatorId, fanId);
   const kyc = useFanKyc(creatorId, fanId, canDecide);
@@ -54,32 +60,53 @@ export function FanSheet({
   };
   const summary = sheetSummary(facts);
   const alerts = flags.data === undefined ? [] : alertsOf(flags.data.flags);
+  const alertList =
+    alerts.length === 0 && facts.flags !== 'refused' ? null : (
+      <ul className="tr-alerts" aria-label="Avant de lui écrire">
+        {facts.flags === 'refused' ? (
+          <li className="tr-alert tr-alert--care">
+            <strong>Limites non lisibles</strong>
+            <span>Demande à ton responsable avant de lui écrire dans Reveal.</span>
+          </li>
+        ) : null}
+        {alerts.map((alert) => (
+          <li key={alert.label} className={`tr-alert tr-alert--${alert.level}`}>
+            <strong>{alert.label}</strong>
+            <span>{alert.text}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  const line = (
+    <>
+      {summary.urgent === null ? null : <span className="tr-warn">{summary.urgent}</span>}
+      {summary.urgent !== null && summary.rest !== '' ? ' · ' : null}
+      {summary.rest}
+    </>
+  );
+  if (layout === 'aside')
+    return (
+      <>
+        <header className="tr-aside__head">
+          <h3 className="tr-aside__title">Le fan</h3>
+          <span className="tr-aside__sum">{line}</span>
+        </header>
+        {alertList}
+        {canDecide ? <FanCard creatorId={creatorId} fanId={fanId} /> : null}
+        <div className="tr-aside__more">
+          <FanLimits creatorId={creatorId} fanId={fanId} canDecide={canSetLimits} />
+          {canDecide ? <FanToLearn creatorId={creatorId} fanId={fanId} /> : null}
+          <DesireSheet creatorId={creatorId} conversationId={conversationId} desire={desire} />
+        </div>
+      </>
+    );
   return (
     <>
-      {alerts.length === 0 && facts.flags !== 'refused' ? null : (
-        <ul className="tr-alerts" aria-label="Avant de lui écrire">
-          {facts.flags === 'refused' ? (
-            <li className="tr-alert tr-alert--care">
-              <strong>Limites non lisibles</strong>
-              <span>Demande à ton responsable avant de lui écrire dans Reveal.</span>
-            </li>
-          ) : null}
-          {alerts.map((alert) => (
-            <li key={alert.label} className={`tr-alert tr-alert--${alert.level}`}>
-              <strong>{alert.label}</strong>
-              <span>{alert.text}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {alertList}
       <details className="nv-disclosure tr-sheet">
         <summary>
           <span className="tr-limits__title">Fiche du fan</span>
-          <span className="tr-sheet__sum">
-            {summary.urgent === null ? null : <span className="tr-warn">{summary.urgent}</span>}
-            {summary.urgent !== null && summary.rest !== '' ? ' · ' : null}
-            {summary.rest}
-          </span>
+          <span className="tr-sheet__sum">{line}</span>
         </summary>
         <div className="tr-sheet__body">
           <FanLimits creatorId={creatorId} fanId={fanId} canDecide={canSetLimits} />

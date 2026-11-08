@@ -1,7 +1,18 @@
 import { FAN_CARD_FIELDS, type FanCardEntry, type FanCardValue } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { ageOf, cardError, fieldsOf, groupLine, itemsOf, itemsProblem, sourceLine, valueText } from './model';
+import {
+  ageOf,
+  cardError,
+  ESSENTIALS,
+  essentialSpecs,
+  fieldsOf,
+  groupLine,
+  itemsOf,
+  itemsProblem,
+  sourceLine,
+  valueText,
+} from './model';
 
 const now = new Date('2026-11-08T18:00:00Z');
 const value = (patch: Partial<FanCardValue> = {}): FanCardValue => ({
@@ -16,17 +27,20 @@ const value = (patch: Partial<FanCardValue> = {}): FanCardValue => ({
 });
 
 describe('the fan card (ADR 0085, lot c)', () => {
-  it('splits the twenty fields in its three groups, in the card’s order', () => {
-    expect(fieldsOf('him')).toHaveLength(13);
+  it('puts six essentials on top and every other field once in its group, in the card’s order', () => {
+    expect(essentialSpecs().map((spec) => spec.field)).toEqual([...ESSENTIALS]);
+    expect(fieldsOf('him')).toHaveLength(9);
     expect(fieldsOf('about_her').map((spec) => spec.field)).toEqual([
       'likes_about_her',
       'dislikes_about_her',
       'outfits',
     ]);
-    expect(fieldsOf('intimate')).toHaveLength(4);
-    expect(fieldsOf('him').length + fieldsOf('about_her').length + fieldsOf('intimate').length).toBe(
-      FAN_CARD_FIELDS.length,
-    );
+    expect(fieldsOf('intimate').map((spec) => spec.field)).toEqual(['intensity', 'lead']);
+    const shown = [
+      ...ESSENTIALS,
+      ...(['him', 'about_her', 'intimate'] as const).flatMap((g) => fieldsOf(g).map((spec) => spec.field)),
+    ];
+    expect(shown.toSorted()).toEqual(FAN_CARD_FIELDS.map((spec) => spec.field).toSorted());
   });
 
   it('says where a value comes from and how old it is, a guess as a guess', () => {
@@ -53,10 +67,12 @@ describe('the fan card (ADR 0085, lot c)', () => {
   it('counts a group’s known fields and those that wait for a chatter', () => {
     const entries: FanCardEntry[] = [
       { field: 'first_name', current: value({ items: ['Marc'] }), toCheck: [] },
-      { field: 'location', current: value({ source: 'noted' }), toCheck: [value({ source: 'inferred' })] },
+      { field: 'job', current: value({ source: 'noted' }), toCheck: [value({ source: 'inferred' })] },
+      { field: 'hobbies', current: value({ items: ['course'] }), toCheck: [] },
     ];
-    expect(groupLine(entries, 'him')).toEqual({ filled: '2 sur 13', toCheck: 1 });
-    expect(groupLine(entries, 'intimate')).toEqual({ filled: '0 sur 4', toCheck: 0 });
+    // The first name is among the essentials: the folded line counts the fields its group holds.
+    expect(groupLine(entries, 'him')).toEqual({ filled: '2 sur 9', toCheck: 1 });
+    expect(groupLine(entries, 'intimate')).toEqual({ filled: '0 sur 2', toCheck: 0 });
   });
 
   it('takes one line for a one-value field, one item per line for a list, and keeps the save shut when empty', () => {

@@ -86,16 +86,32 @@ export function sourceLine(
   return `${who}, ${ageOf(value.observedAt, now)}`;
 }
 
-/** The specs of a group, in the card's order. */
+/**
+ * What a chatter needs at a glance (ADR 0086 § 10), always shown on top: first name, age, town, what excites him, what
+ * he does not want, the last thing he told. The extension's panel shows the same six.
+ */
+export const ESSENTIALS: readonly FanCardField[] = [
+  'first_name',
+  'age',
+  'location',
+  'desires',
+  'limits',
+  'life_events',
+];
+
+export const essentialSpecs = (): readonly FanCardFieldSpec[] =>
+  ESSENTIALS.flatMap((field) => FAN_CARD_FIELDS.filter((spec) => spec.field === field));
+
+/** The specs of a group the essentials do not already show, in the card's order. */
 export const fieldsOf = (group: FanCardGroup): readonly FanCardFieldSpec[] =>
-  FAN_CARD_FIELDS.filter((spec) => spec.group === group);
+  FAN_CARD_FIELDS.filter((spec) => spec.group === group && !ESSENTIALS.includes(spec.field));
 
 /** The entry of a field, an empty one when the server has none for it. */
 export function entryOf(entries: readonly FanCardEntry[], field: FanCardField): FanCardEntry {
   return entries.find((one) => one.field === field) ?? { field, current: null, toCheck: [] };
 }
 
-/** « 4 sur 13 », and how many wait for a chatter: the folded line of a group. */
+/** « 4 sur 9 », and how many wait for a chatter: the folded line of a group, on the fields it holds. */
 export function groupLine(
   entries: readonly FanCardEntry[],
   group: FanCardGroup,

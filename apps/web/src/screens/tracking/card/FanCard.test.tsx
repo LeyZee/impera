@@ -98,6 +98,8 @@ const group = async (title: string): Promise<HTMLElement> => {
   return details;
 };
 
+const essentials = (): Promise<HTMLElement> => screen.findByRole('list', { name: 'L’essentiel' });
+
 const field = (within_: HTMLElement, label: RegExp): HTMLElement => {
   const row = within(within_).getByText(label).closest<HTMLElement>('.tr-card__field');
   if (row === null) throw new Error('No row');
@@ -118,8 +120,9 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
     });
     renderCard();
     const him = await group('Lui');
-    expect(within(him).getByText('2 sur 13')).toBeTruthy();
-    const name = field(him, /^Son prénom/u);
+    // The first name is among the essentials, unfolded on top: the group counts the fields it holds.
+    expect(within(him).getByText('1 sur 9')).toBeTruthy();
+    const name = field(await essentials(), /^Son prénom/u);
     expect(within(name).getByText('Marc')).toBeTruthy();
     expect(within(name).getByText('Dit par lui, il y a 3 jours')).toBeTruthy();
     expect(within(field(him, /^Quand il a de l’argent/u)).getByText('Deviné, il y a 3 jours')).toBeTruthy();
@@ -134,8 +137,7 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
   it('corrects a field in one gesture and shows the card the server answers', async () => {
     view = card({ location: { current: value(['Lyon']), toCheck: [] } });
     renderCard();
-    const him = await group('Lui');
-    const row = field(him, /^Sa ville ou sa région/u);
+    const row = field(await essentials(), /^Sa ville ou sa région/u);
     fireEvent.click(within(row).getByRole('button', { name: 'Corriger' }));
     const input = within(row).getByRole('textbox', { name: 'Sa ville ou sa région' });
     fireEvent.change(input, { target: { value: ' Villeurbanne ' } });
@@ -201,8 +203,7 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
       body: { error: { code: 'fan_card_value_unprocessable', message: 'x', requestId: 'r' } },
     };
     renderCard();
-    const him = await group('Lui');
-    const row = field(him, /^Sa ville ou sa région/u);
+    const row = field(await essentials(), /^Sa ville ou sa région/u);
     fireEvent.click(within(row).getByRole('button', { name: 'Ajouter' }));
     fireEvent.change(within(row).getByRole('textbox'), { target: { value: '12 rue des Lilas' } });
     fireEvent.click(within(row).getByRole('button', { name: 'Enregistrer' }));

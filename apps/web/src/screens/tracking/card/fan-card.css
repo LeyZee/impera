@@ -106,3 +106,7 @@
     flex-wrap: wrap;
   }
 }
+/* In the folded band, the essentials open the sheet's body, a hairline under the line above. */
+.tr-sheet__body > .tr-card__essentials {
+  border-top: 1px solid var(--nv-hairline);
+}

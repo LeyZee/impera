@@ -178,12 +178,66 @@
     overflow-y: auto;
   }
 }
+/* From 1320 px, three columns (Charles, 08/11): the list, the conversation, and the fan always in view beside it.
+ * The list narrows to leave the thread its room; a reader with no fan's column (nothing open) takes both. */
+@media (min-width: 1320px) {
+  .tr-layout {
+    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) minmax(300px, 360px);
+  }
+  .tr-layout > .tr-reader:last-child {
+    grid-column: span 2;
+  }
+  .tr-page .tr-aside {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--nv-hairline) transparent;
+  }
+}
 .tr-reader {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
   min-width: 0;
   padding: var(--nv-space-4);
+}
+/* The fan's column: who he is and what forbids on top, his essentials unfolded, the rest folded under them. */
+.tr-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  min-width: 0;
+  padding: var(--nv-space-4);
+}
+.tr-aside__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.tr-aside__title {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+}
+.tr-aside__sum {
+  min-width: 0;
+  text-align: right;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.tr-aside > .tr-card__essentials {
+  padding: 0 var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.tr-aside__more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
 }
 .tr-reader__head {
   display: flex;
