@@ -4,7 +4,7 @@
 
 Fait :
 - Contrat `packages/contracts/src/fan-card.ts` : `FanCardFieldSchema` (20 codes, les 7 du canevas KYC gardés), `FAN_CARD_FIELDS` (groupe, libellé, aide, catégorie, forme, façon d'apprendre), `FanCardViewSchema` et `SetFanCardFieldBodySchema` (`strict`), valeurs fermées d'`intensity` et `lead`. `StoredFactKindSchema` ajoute `noted`.
-- Migration 0142 : `fan_facts.kind` gagne `noted`, colonne `noted_by` et son check. RLS inchangée.
+- Migration 0147 (attribuée 0142, renumérotée après 0145 dans main) : `fan_facts.kind` gagne `noted`, colonne `noted_by` et son check. RLS inchangée.
 - Domaine `fans` : une case est un seul emplacement quelle que soit sa catégorie ; force noté > dit > deviné ; « à vérifier » ; retrait par une ligne vide ; filtre du § 8 (`neverKept`).
 - Routes `GET /v1/fans/:id/card` et `PUT /v1/fans/:id/card/:field`, déclarées au harnais d'isolation.
 

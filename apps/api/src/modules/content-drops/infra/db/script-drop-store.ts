@@ -28,6 +28,7 @@ import {
 import type { ScriptDropStore, StartedScript } from '../../domain/ports';
 import { requiredSlotsMissing } from '../../domain/script-drops';
 
+import { enqueueSummary } from './script-summary-store';
 import { follow, pgErrorOf, readDrop, readRequest, viewOf } from './store';
 
 const { contentDropFiles, contentDrops } = schema;
@@ -170,6 +171,8 @@ export function createDrizzleScriptDropStore(db: Database, adminDb: Database): S
             details: { files: drop.files.length, scriptNumber },
           });
           await follow(tx, { ...row, state: 'uploading' }, now, correlationId);
+          // Told once its media are described (ADR 0083 § 6): the job waits for the last description.
+          await enqueueSummary(tx, { creatorId, dropId, correlationId }, null);
           const after = await readDrop(tx, dropId);
           if (after === undefined) throw new ContentDropNotFound();
           return viewOf(tx, after);

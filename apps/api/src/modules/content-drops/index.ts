@@ -2,10 +2,12 @@
 import { tmpdir } from 'node:os';
 
 import type { Database } from '@impera/db';
+import type { LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { describeFile, type DescribeOutcome } from './application/describe';
 import { eraseOriginals, type RetentionRun } from './application/retention';
+import { summarizeScript, type SummarizeOutcome } from './application/summarize';
 import { NO_STORAGE, receiveFile } from './application/uploads';
 import type {
   AskedScript,
@@ -20,6 +22,7 @@ import { createScratchRoom } from './infra/cleaning/room';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
 import { createDrizzleScriptDropStore } from './infra/db/script-drop-store';
+import { createDrizzleScriptSummaryStore } from './infra/db/script-summary-store';
 import {
   createDrizzleAgencyContentStore,
   createDrizzleCreatorContentStore,
@@ -30,6 +33,7 @@ import {
   requestScript,
 } from './infra/db/store';
 import { createContentDropRoutes, type RequireRole } from './infra/http/routes';
+import { createGatewayScriptSummarizer } from './infra/script-summarizer';
 import { createS3DropStorage, type MediaBucketConfig } from './infra/storage/s3';
 
 export interface ContentDropsModule {
@@ -51,6 +55,11 @@ export interface ContentDropsModule {
      * the drop says of it, kept for the agency to validate. What happened, for the log.
      */
     describeFile(mediaAssetId: string, correlationId: string): Promise<DescribeOutcome>;
+    /**
+     * `content_drops.summarize_script` (ADR 0083 § 6): a script she sent, once each of its media is described, told
+     * step by step and summed up by the brain, kept for the agency to validate. What happened, for the log.
+     */
+    summarizeScript(dropId: string, correlationId: string): Promise<SummarizeOutcome>;
   };
   /**
    * The content request of a shoot she accepted from an idea (VEI-01 d2), written by the trend watch's job: origin
@@ -80,6 +89,8 @@ export interface ContentDropsDeps {
   readonly scriptVersions: ScriptVersions;
   /** The media module's description of her dropped media (ADR 0083); without it, nothing is described. */
   readonly describer?: DropDescriber;
+  /** The brain that tells her sent scripts (ADR 0083 § 6); without it, or without the describer, nothing is told. */
+  readonly brain?: Pick<LlmGateway, 'summarizeScript'>;
   /** Tests only: another storage than the bucket's (a fake, or a bucket reached another way). */
   readonly storage?: DropStorage;
   /** Where the job writes a file while it cleans it; the system's temporary folder by default. */
@@ -95,6 +106,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const clock = deps.clock ?? (() => new Date());
   const scratchDir = deps.scratchDir ?? tmpdir();
   const receipt = { storage, receipts, cleaner, scratchDir, room: createScratchRoom(scratchDir) };
+  const summaries = createDrizzleScriptSummaryStore(deps.adminDb);
   return {
     name: 'content-drops',
     routes: createContentDropRoutes(
@@ -117,11 +129,26 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
                 storage,
                 queue: createDrizzleDescriptionQueue(deps.adminDb),
                 describer: deps.describer,
+                summaries,
                 versions: deps.scriptVersions,
                 scratchDir,
                 room: receipt.room,
               },
               mediaAssetId,
+              clock(),
+              correlationId,
+            ),
+      summarizeScript: async (dropId, correlationId) =>
+        deps.describer === undefined || deps.brain === undefined
+          ? 'off'
+          : summarizeScript(
+              {
+                store: summaries,
+                describer: deps.describer,
+                summarizer: createGatewayScriptSummarizer(deps.brain),
+                versions: deps.scriptVersions,
+              },
+              dropId,
               clock(),
               correlationId,
             ),

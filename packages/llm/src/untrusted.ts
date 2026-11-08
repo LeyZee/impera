@@ -14,6 +14,8 @@ export type UntrustedKind =
   | 'creator_alert'
   /** What the code knows of a drop she made (ADR 0083): a step's name and instruction are written by the agency. */
   | 'drop_context'
+  /** A sent script's steps (ADR 0083 § 6): the agency's cards and the media's descriptions, read as data. */
+  | 'script_steps'
   /**
    * Her channel's posts (ADR 0080 § 5): the examples the agency chose, where her link leads, an advice of the agency.
    * Written by the agency, still read as data, never as an order.

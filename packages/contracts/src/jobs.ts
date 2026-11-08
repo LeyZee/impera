@@ -77,6 +77,7 @@ export const JOB_NAMES = [
   'content_drops.erase_originals',
   'content_drops.drop_received',
   'content_drops.describe_file',
+  'content_drops.summarize_script',
   'scripts.ask_scripts',
   'providers.check_credentials',
   'connector.read_sales',
@@ -144,6 +145,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.erase_originals': 'Nettoyage des originaux de contenu',
   'content_drops.drop_received': 'Dépôt reçu pour une idée',
   'content_drops.describe_file': 'Description des médias déposés',
+  'content_drops.summarize_script': 'Synthèse des scripts tournés',
   'scripts.ask_scripts': 'Demandes de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
@@ -404,6 +406,16 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
+   * A script she sent, told step by step with its synthesis once each of its media is described (ADR 0083 § 6).
+   * Enqueued when she sends it and after each of its media is described, under `content_drops.summarize_script:<id>`;
+   * waits for the last description, puts itself off when the day's budget is spent. Nothing while her switch is off.
+   */
+  'content_drops.summarize_script': z.object({
+    creatorId: CreatorIdSchema,
+    dropId: ContentDropIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
    * Each hour (SC-02, ADR 0056 § 2): each creator whose next script is due within the lead gets her request, with the
    * next structure of her queue that does not touch her limits, frozen. Replayable: one request per due day.
    */
@@ -524,6 +536,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.drop_received': 5,
   // Every model failed (an outage, a refusal): a few tries; a spent budget is not a failure, the job puts itself off.
   'content_drops.describe_file': 5,
+  // The same: every model failed, or its answer did not tell the script's steps; a spent budget puts it off.
+  'content_drops.summarize_script': 5,
   // Each hour: the next run is the retry.
   'scripts.ask_scripts': 1,
   'providers.check_credentials': 1,

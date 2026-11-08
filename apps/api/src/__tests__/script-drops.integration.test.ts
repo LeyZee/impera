@@ -7,23 +7,31 @@ import {
   ContentRequestSchema,
   CreatorContentSchema,
   CreatorIdSchema,
+  JOB_PAYLOADS,
+  MEDIA_VOCABULARY_VERSION,
   newId,
+  ok,
   ScriptDropSchema,
   ScriptStructureIdSchema,
   ScriptStructureSchema,
   type CreateScriptStructureBody,
   type CreatorId,
+  type DropMediaDescription,
 } from '@impera/contracts';
 import { and, eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
+import type { LlmGateway, ScriptSummaryInput } from '@impera/llm';
 import { unzipSync } from 'fflate';
+import { runOnce } from 'graphile-worker';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { z } from 'zod';
 
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
 import type { DropStorage } from '../modules/content-drops';
 import { createDrizzleRetentionStore } from '../modules/content-drops/infra/db/retention-store';
+import { createDrizzleScriptSummaryStore } from '../modules/content-drops/infra/db/script-summary-store';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
@@ -58,6 +66,33 @@ const storage: DropStorage = {
 async function* toAsync(bytes: Uint8Array): AsyncGenerator<Uint8Array> {
   yield await Promise.resolve(bytes);
 }
+
+/** The brain that tells her sent script (ADR 0083 § 6), with a fixed answer that tells each step it is given. */
+const told: ScriptSummaryInput[] = [];
+const scriptBrain: Pick<LlmGateway, 'summarizeScript'> = {
+  summarizeScript: (input) => {
+    told.push(input);
+    return Promise.resolve(
+      ok({
+        output: {
+          shootingContext: 'Un soir inventé, du salon à la chambre.',
+          steps: input.steps.map((step) => ({
+            step: step.step,
+            overview: `L’étape ${step.code}, inventée.`,
+            summary: `Résumé de ${step.code}.`,
+          })),
+        },
+        meta: {
+          provider: 'xai',
+          model: 'brain-test',
+          isFallback: false,
+          latencyMs: 1,
+          promptHash: 'summary-v1',
+        },
+      }),
+    );
+  },
+};
 
 /** Invented segments: never a real structure of the agency in the repository (SC-01). */
 const structure = (): CreateScriptStructureBody => ({
@@ -144,7 +179,7 @@ describe('/v1/creator-space/content/script-drops', () => {
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
-    app = await createApp(config, createLogger(config), { dropStorage: storage });
+    app = await createApp(config, createLogger(config), { dropStorage: storage, scriptBrain });
     server = await buildServer({
       config,
       logger: createLogger(config),
@@ -629,5 +664,145 @@ describe('/v1/creator-space/content/script-drops', () => {
     expect([hers.statusCode, codeOf(hers.body).code]).toEqual([409, 'content_drop_settled_conflict']);
     const team = await call('DELETE', `/v1/creators/${nora}/drops/${dropId}`, 'owner');
     expect([team.statusCode, codeOf(team.body).code]).toEqual([409, 'content_drop_settled_conflict']);
+  });
+
+  it('tells her sent script step by step once each of its media is described, never twice (ADR 0083 § 6)', async () => {
+    // Enqueued when she sent it, under its key.
+    const queued = await test.admin.db.execute(sql`
+      select j.payload from graphile_worker._private_jobs j
+        join graphile_worker._private_tasks t on t.id = j.task_id
+       where t.identifier = 'content_drops.summarize_script' and j.key = ${`content_drops.summarize_script:${dropId}`}`);
+    expect(
+      z.array(z.object({ payload: JOB_PAYLOADS['content_drops.summarize_script'] })).parse(queued.rows),
+    ).toMatchObject([{ payload: { creatorId: nora, dropId } }]);
+    const summarize = () =>
+      runOnce({
+        pgPool: test.admin.pool,
+        taskList: { 'content_drops.summarize_script': app.tasks['content_drops.summarize_script'] },
+      });
+    const again = () =>
+      test.admin.db.execute(sql`select public.enqueue_job(
+        task => 'content_drops.summarize_script',
+        payload => ${JSON.stringify({ creatorId: nora, dropId, correlationId: 'test' })}::jsonb
+      )`);
+    const summaries = () =>
+      test.admin.db
+        .select({
+          content: schema.scriptDropSummaries.content,
+          model: schema.scriptDropSummaries.model,
+          reviewReasons: schema.scriptDropSummaries.reviewReasons,
+        })
+        .from(schema.scriptDropSummaries)
+        .where(eq(schema.scriptDropSummaries.dropId, dropId));
+    const kept = await test.admin.db
+      .select({
+        slotKey: schema.contentDropFiles.slotKey,
+        mediaAssetId: schema.contentDropFiles.mediaAssetId,
+      })
+      .from(schema.contentDropFiles)
+      .where(
+        and(
+          eq(schema.contentDropFiles.dropId, dropId),
+          eq(schema.contentDropFiles.state, 'kept'),
+          sql`${schema.contentDropFiles.replacedAt} is null`,
+        ),
+      )
+      .orderBy(schema.contentDropFiles.position);
+    const media = kept.map((file) => file.mediaAssetId ?? '');
+    expect(kept.map((file) => file.slotKey)).toEqual(['salon::0', 'chambre:A:0', 'chambre:B:0']);
+    const describe = (mediaAssetId: string) => {
+      const content: DropMediaDescription = {
+        vocabularyVersion: MEDIA_VOCABULARY_VERSION,
+        kind: 'image',
+        detailed: `Photo inventée ${mediaAssetId.slice(0, 4)} : une silhouette près d’une fenêtre.`,
+        factualDescription: 'Une silhouette près d’une fenêtre.',
+        durationS: null,
+        segments: [],
+        intensity: 'soft',
+        anatomyVisible: [],
+        castMode: 'solo',
+        mood: [],
+        setting: null,
+        audio: null,
+        textVisible: null,
+        quality: 'good',
+        confidenceLow: false,
+        notVisible: false,
+        flags: [],
+      };
+      return test.admin.db.insert(schema.mediaDescriptions).values({
+        id: crypto.randomUUID(),
+        creatorId: nora,
+        mediaAssetId,
+        vocabularyVersion: content.vocabularyVersion,
+        content,
+        model: 'vision-test',
+        promptHash: 'drop-v1',
+        author: 'sense',
+      });
+    };
+
+    // Her switch off (§ 9): the brain is never called.
+    await summarize();
+    expect(told).toEqual([]);
+
+    // On, a media not described yet: it waits.
+    await test.admin.db
+      .update(schema.creators)
+      .set({ settings: { describeDrops: true } })
+      .where(eq(schema.creators.id, nora));
+    for (const id of media.slice(0, 2)) await describe(id);
+    await again();
+    await summarize();
+    expect(told).toEqual([]);
+
+    // The last one described: the job asked for this script alone, which is told and kept.
+    await describe(media[2] ?? '');
+    expect(await createDrizzleScriptSummaryStore(test.admin.db).enqueueFor(media[2] ?? '', 'test')).toBe(1);
+    await summarize();
+    expect(told).toHaveLength(1);
+    expect(told[0]?.scriptName).toBe('Soirée inventée');
+    expect(told[0]?.moment).toBe('night');
+    expect(told[0]?.trace).toEqual({ creatorId: nora });
+    // The refused video is left out of its step.
+    expect(told[0]?.steps.map((step) => [step.step, step.code, step.media.length])).toEqual([
+      ['salon:', 'E1', 1],
+      ['chambre:A', 'E2A', 1],
+      ['chambre:B', 'E2B', 1],
+    ]);
+    expect(told[0]?.steps[1]?.card).toBe('Elle se dévoile plus. Série A : Lumière tamisée.');
+    expect(told[0]?.steps[0]?.media[0]?.description).toContain('Photo inventée');
+    expect(await summaries()).toEqual([
+      {
+        content: {
+          shootingContext: 'Un soir inventé, du salon à la chambre.',
+          steps: ['E1', 'E2A', 'E2B'].map((code, index) => ({
+            step: told[0]?.steps[index]?.step,
+            overview: `L’étape ${code}, inventée.`,
+            summary: `Résumé de ${code}.`,
+          })),
+        },
+        model: 'brain-test',
+        reviewReasons: [],
+      },
+    ]);
+
+    // Replayed: nothing called, nothing written twice.
+    await again();
+    await summarize();
+    expect(told).toHaveLength(1);
+    expect(await summaries()).toHaveLength(1);
+
+    // Written by a job alone: the application's role cannot.
+    const written = await test.app.db
+      .execute(
+        sql`insert into script_drop_summaries (id, creator_id, drop_id, media_hash, content, model, prompt_hash)
+        values (gen_random_uuid(), ${nora}, ${dropId}, ${'0'.repeat(64)}, '{}'::jsonb, 'x', 'y')`,
+      )
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
+    expect(written).toBeInstanceOf(Error);
   });
 });
