@@ -25,10 +25,11 @@ ADR 0080, ADR 0057, ADR 0055, ADR 0020, `docs/architecture/connectors.md`, READM
 - [x] Le prompt lit « où il mène » du lien porté (bloc délimité) : le post parle de cet endroit, jamais d'un autre.
 - [x] Prompt `voice/telegram-channel` versionné, schéma de sortie structuré (post ou sondage), rendu HTML Telegram échappé (gras, souligné, lien ajouté par le code), gardes de l'agent plus celles du canal (adresse dans le texte, longueur d'une légende), conseil en bloc délimité.
 - [x] Sondages (ADR 0080 § 5.7, ◊) : une question et 2 à 4 réponses dans sa voix, sans lien.
-- [x] Mode Post du canal du playground : onglet d'Entraîner (« Chatting » et « Post du canal », les deux modes de § 7), post ou sondage, lien choisi, média décrit, conseil, aperçu façon Telegram, gardes en ambre.
+- [x] Rôle de chaque créneau (§ 1.5, § 5.8, ◆, « ok posts-engagement » 08/11 15h20) : Principal (média + lien, au plus un par jour, 19 h par défaut) ou Engagement (sans lien) ; un réglage enregistré avant se lit 19 h Principal, le reste Engagement.
+- [x] Mode Post du canal du playground : onglet d'Entraîner (« Chatting » et « Post du canal », les deux modes de § 7), Principal, Engagement ou Sondage, lien choisi, média décrit, conseil, aperçu façon Telegram, gardes en ambre.
 - Reste pour plus tard : italique, citation et caché (§ 5.1) si les exemples de Charles en montrent ; un média du pool dans le playground (le pool vient au lot A3) ; « en faire un exemple » depuis le playground ; refus d'une légende identique aux dix dernières (il faut la table des posts, lot A3).
 ### Lot A3 : l'automatique
-- [ ] Place des sondages : au plus un par jour, jamais sur deux créneaux de suite (§ 5.7).
+- [ ] Place des sondages : sur un créneau d'Engagement, au plus un par jour, jamais sur deux créneaux de suite (§ 5.7, § 5.8).
 - [ ] Job des créneaux : préparation à H-fenêtre, annonce au groupe Info, envoi à l'heure, clé d'idempotence, réponse perdue = ambre.
 - [ ] Valider, Réécrire (avec conseil), Changer de média, Changer de lien (ce post seulement, légende réécrite pour son endroit), Corriger, Ne pas publier.
 - [ ] Demande de dépôt automatique quand le pool baisse ; pool vide = ambre.

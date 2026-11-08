@@ -85,6 +85,21 @@
   flex: none;
   width: 112px;
 }
+/* A slot reads hour, role, then whether it runs; its days take the line below. Two lines each: more air between slots. */
+.tc-slots {
+  gap: 20px;
+}
+.tc-slot__role {
+  flex: none;
+  width: 150px;
+}
+.tc-slot .tc-slot__end {
+  order: 1;
+}
+.tc-slot .tc-days {
+  order: 2;
+  flex: 1 1 100%;
+}
 .tc-days {
   display: inline-flex;
   flex-wrap: wrap;
@@ -239,6 +254,14 @@
   .tc-days {
     order: 3;
     flex: 1 1 100%;
+  }
+  /* Its role under its hour, the whole width, then its days. */
+  .tc-slot__role {
+    order: 2;
+    width: 100%;
+  }
+  .tc-slot .tc-days {
+    order: 3;
   }
   .tc-day {
     flex: 1 1 0;

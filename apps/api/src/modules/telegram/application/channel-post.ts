@@ -15,7 +15,8 @@ import type { ChannelPersonaSource, ChannelsStore, ChannelVoice } from '../domai
 
 /**
  * A post of her channel written as production will write it (ADR 0080 § 5), for the playground's « Post du canal »
- * (§ 7): her persona, her examples, where the link leads, the agency's advice, then the guards. Nothing is sent.
+ * (§ 7): the main post, an engagement post or a poll; her persona, her examples, where the link leads, the agency's
+ * advice, then the guards. Nothing is sent.
  */
 export interface ChannelPostDeps {
   readonly channels: ChannelsStore;
@@ -31,9 +32,11 @@ export async function tryChannelPost(
 ): Promise<Result<TriedChannelPost, ChannelTryRefusalKind> | null> {
   if (!(await deps.channels.creatorActive(creatorId))) return null;
   const config = (await deps.channels.findChannel(creatorId))?.config ?? DEFAULT_TELEGRAM_CHANNEL_CONFIG;
-  const linkId = body.linkId ?? config.channelLinkId;
+  // Only the main post carries a link (§ 5.8): an engagement post or a poll has none, whatever was asked.
+  const main = body.kind === 'main';
+  const linkId = main ? (body.linkId ?? config.channelLinkId) : null;
   const link = linkId === null ? null : (config.links.find((one) => one.id === linkId) ?? null);
-  if (body.kind === 'post' && body.linkId !== null && link === null) return err('link_unknown');
+  if (main && body.linkId !== null && link === null) return err('link_unknown');
 
   const persona = await deps.persona(creatorId);
   if (persona === null) return err('no_persona');
@@ -43,8 +46,8 @@ export async function tryChannelPost(
     creatorName: persona.creatorName,
     personaSheet: persona.personaSheet,
     examples: config.examples,
-    media: body.kind === 'post' ? body.media : null,
-    destination: body.kind === 'post' ? (link?.destination ?? null) : null,
+    media: body.kind === 'poll' ? null : body.media,
+    destination: link?.destination ?? null,
     advice: body.advice,
   });
   if (written === null) return err('llm_unavailable');

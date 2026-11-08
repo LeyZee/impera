@@ -1,4 +1,4 @@
-import type { ChannelPostViolation, StoredPersona } from '@impera/contracts';
+import { PERSONA_SHEET, type ChannelPostViolation, type StoredPersona } from '@impera/contracts';
 
 import { checkExplicit, checkVoiceOutput } from '../domain/guards';
 
@@ -6,6 +6,16 @@ import { guardSettingsOf, personaForModels } from './persona-file';
 
 /** A Telegram caption holds 1 024 characters: a post is one message, read whole by the guards. */
 const CHANNEL_GUARD_CHARS = 1024;
+
+/**
+ * A public post reads nothing of her intimacy (relecture Agent de #654): what she does in private would pull the model
+ * toward what the guards then refuse. Her strict limits stay, so that the post never goes near them.
+ */
+const PRIVATE_ANSWERS: ReadonlySet<string> = new Set(
+  PERSONA_SHEET.filter((section) => section.key === 'intimacy')
+    .flatMap((section) => section.questions.map((question) => question.key))
+    .filter((key) => key !== 'no_go_zones'),
+);
 
 /** Her active persona version as the `persona` module stores it (`versions.active`), matched by shape. */
 interface StoredVersion {
@@ -28,7 +38,12 @@ export function channelWriterPersona(
   readonly personaSheet: string;
   check(texts: readonly string[]): ChannelPostViolation[];
 } {
-  const persona = personaForModels(stored.persona, stored.creatorName, now.toISOString().slice(0, 10));
+  const persona = personaForModels(
+    stored.persona,
+    stored.creatorName,
+    now.toISOString().slice(0, 10),
+    PRIVATE_ANSWERS,
+  );
   const settings = { ...guardSettingsOf(persona), maxBubbleChars: CHANNEL_GUARD_CHARS };
   return {
     version: stored.version,

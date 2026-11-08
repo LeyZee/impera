@@ -21,6 +21,10 @@
   flex: 0 1 240px;
   min-width: 0;
 }
+/* Three choices need their own width: the 240px of a select would squeeze them together. */
+.cp-setting--kind > div:last-child {
+  flex: none;
+}
 .cp-area.nv-field__control {
   display: block;
   width: 100%;
@@ -101,4 +105,12 @@
   .cp-setting > div:last-child {
     flex-basis: 100%;
   }
+}
+.cp-hint {
+  margin-top: -4px;
+}
+.cp-result {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
 }

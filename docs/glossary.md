@@ -121,6 +121,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Canal Telegram (de la créatrice) | `telegram_channel` | Son canal d'actualité, où le bot de l'agence publie en administrateur ; les posts y paraissent sous le nom du canal (ADR 0057, 0080). |
 | Créneau de publication | `channel_slot` | Une heure et des jours où un post part seul sur le canal Telegram de la créatrice, montré une heure avant (ADR 0080). Distinct du créneau des shifts. |
 | Post du canal | `channel_post` | Un message publié sur le canal Telegram : un média du pool, une légende dans sa voix, le lien de redirection ajouté par le code (ADR 0080). Distinct de l'annonce à l'équipe. |
+| Post principal | `role: 'main'` | Le post du jour qui porte le lien de redirection : un média du pool, un texte qui réagit au média et donne envie d'aller la voir ; au plus un par jour, 19 h par défaut (ADR 0080 § 1.5, § 5.8). |
+| Post d'engagement | `role: 'engagement'` | Un post du canal sans lien : une question, une anecdote, un moment, ou un sondage ; avec ou sans média (ADR 0080 § 5.8). |
 | Sondage du canal | `kind: 'poll'` | Un post du canal en forme de sondage Telegram : une question et 2 à 4 réponses dans sa voix, sans lien ; au plus un par jour (ADR 0080 § 5.7). |
 | Exemple du canal | `examples` | Un post de son canal qui a marché, collé dans le CRM par l'agence ; le modèle en prend le ton, jamais les phrases (ADR 0080 § 5.5). Distinct des données d'exemple. |
 | Conseil (de réécriture) | `rewrite_hint` | Quelques mots libres de l'agence qui orientent la réécriture d'un post du canal ; une donnée dans le prompt, jamais une garde levée (ADR 0080). |

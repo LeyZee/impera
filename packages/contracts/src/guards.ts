@@ -34,6 +34,8 @@ export const GUARD_CODES = [
   // Recette 05/11, MOT-04 (Charles, « go recos »).
   'off_platform_payment',
   'price_outside_offer',
+  // ADR 0080 § 5.3, relecture Agent de #654: a post of her Telegram channel only.
+  'false_scarcity',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;
@@ -44,3 +46,6 @@ export type GuardCode = z.infer<typeof GuardCodeSchema>;
  * proposed with those words is `meeting_promise`.
  */
 export const OBSOLETE_GUARD_CODES: readonly GuardCode[] = ['platform_meeting_word'];
+
+/** Codes the agent's guards never emit: the checks of a post of her Telegram channel's own (ADR 0080 § 5.3). */
+export const CHANNEL_ONLY_GUARD_CODES: readonly GuardCode[] = ['false_scarcity'];

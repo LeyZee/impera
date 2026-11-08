@@ -351,17 +351,20 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
 
 /** What this one post is: written by the code, the agency's words in their blocks (CLAUDE.md rule 4). */
 function channelPostRequest(input: ChannelPostInput): string {
+  const media = input.kind === 'poll' ? null : input.media;
   const lines = [
     input.kind === 'poll'
       ? 'Écris un sondage pour son canal : une question et deux à quatre réponses.'
-      : input.media === null
-        ? 'Écris un post pour son canal, un texte seul, sans média.'
-        : 'Écris le texte du post qui accompagne ce média sur son canal.',
+      : input.kind === 'main'
+        ? media === null
+          ? 'Écris le post principal du jour pour son canal, un texte seul, sans média : il mène au lien ajouté à la fin.'
+          : 'Écris le post principal du jour pour son canal : il réagit à ce média et mène au lien ajouté à la fin.'
+        : media === null
+          ? 'Écris un post d’engagement pour son canal, un texte seul, sans média et sans lien.'
+          : 'Écris un post d’engagement pour son canal qui accompagne ce média, sans lien.',
   ];
-  if (input.kind === 'post' && input.media !== null) {
-    lines.push('', wrapUntrusted('creator_media_description', input.media));
-  }
-  if (input.kind === 'post') {
+  if (media !== null) lines.push('', wrapUntrusted('creator_media_description', media));
+  if (input.kind === 'main') {
     const destination = input.destination?.trim() ?? '';
     lines.push(
       '',

@@ -81,13 +81,46 @@ function visibleLength(draft: Extract<ChannelPostDraft, { kind: 'post' }>): numb
 }
 
 /**
- * The checks of the channel itself, on top of the agent's guards (§ 4.3, § 5.4): an address in her words is the code's
- * to add, never hers; a post longer than a caption would be refused by Telegram.
+ * A false deadline or a false scarcity (§ 5.3: the springs of a post rest on what is true only). Read on her words
+ * without accents nor case. « Ce soir je réponds à tout le monde » is a moment, not a deadline, and passes.
+ */
+const FALSE_SCARCITY = [
+  /\bderniere chance\b/u,
+  /\boffre (?:limitee|speciale|exclusive)\b/u,
+  /\bplus que \d+ (?:places?|jours?|heures?|h|minutes?|min)\b/u,
+  /\b(?:aujourd'hui|ce soir|cette nuit) seulement\b/u,
+  /\b(?:expire|disparait|supprime|retire)e?s? (?:ce soir|demain|cette nuit|dans \d+)/u,
+  /\bavant qu'il (?:ne )?soit trop tard\b/u,
+  /\bdepeche[- ]toi\b|\bdepechez[- ]vous\b/u,
+];
+
+const plain = (text: string): string =>
+  text.normalize('NFD').replace(/\p{M}/gu, '').replace(/[’‘]/gu, "'").toLocaleLowerCase('fr');
+
+/** The first false deadline of her words, as read (lower case, no accent); null: none. */
+function falseScarcity(texts: readonly string[]): string | null {
+  for (const text of texts) {
+    const read = plain(text);
+    for (const pattern of FALSE_SCARCITY) {
+      const found = pattern.exec(read);
+      if (found !== null) return found[0];
+    }
+  }
+  return null;
+}
+
+/**
+ * The checks of the channel itself, on top of the agent's guards (§ 4.3, § 5.3, § 5.4): an address in her words is the
+ * code's to add, never hers; no false deadline nor false scarcity; a post longer than a caption would be refused by
+ * Telegram.
  */
 export function channelChecks(draft: ChannelPostDraft): ChannelPostViolation[] {
   const violations: ChannelPostViolation[] = [];
-  const address = guardedTexts(draft).find(labelHasAddress);
+  const texts = guardedTexts(draft);
+  const address = texts.find(labelHasAddress);
   if (address !== undefined) violations.push({ code: 'contact_info', blocking: true, match: null });
+  const scarcity = falseScarcity(texts);
+  if (scarcity !== null) violations.push({ code: 'false_scarcity', blocking: true, match: scarcity });
   if (draft.kind === 'post' && visibleLength(draft) > TELEGRAM_CAPTION_MAX) {
     violations.push({ code: 'bubble_too_long', blocking: true, match: null });
   }

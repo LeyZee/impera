@@ -1,6 +1,6 @@
 # 0080. Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM
 
-Statut : accepted (Charles, 07/11/2026 12h26, « ok 0080 », avec ses réponses aux questions du brouillon ; demande du même jour à 12h14 ; fil « Automatiser le canal Telegram de Messa »). Les phrases écrites d'après ses réponses, marquées †, acceptées le 07/11/2026 à 13h05 (« ok phrases 0080 »). Les phrases marquées ‡ (où mène un lien, lien pour un seul post), demandées par Charles le 07/11/2026 à 14h45 (« un live TikTok »), acceptées le même jour à 14h56 (« ok lien-ponctuel »). Les phrases marquées ◊ (sondages du canal, § 5.7), demandées par Charles le 08/11/2026 à 14h36 (« de temps en temps des sondages »), acceptées le même jour à 14h37 (« ok sondages »).
+Statut : accepted (Charles, 07/11/2026 12h26, « ok 0080 », avec ses réponses aux questions du brouillon ; demande du même jour à 12h14 ; fil « Automatiser le canal Telegram de Messa »). Les phrases écrites d'après ses réponses, marquées †, acceptées le 07/11/2026 à 13h05 (« ok phrases 0080 »). Les phrases marquées ‡ (où mène un lien, lien pour un seul post), demandées par Charles le 07/11/2026 à 14h45 (« un live TikTok »), acceptées le même jour à 14h56 (« ok lien-ponctuel »). Les phrases marquées ◊ (sondages du canal, § 5.7), demandées par Charles le 08/11/2026 à 14h36 (« de temps en temps des sondages »), acceptées le même jour à 14h37 (« ok sondages »). Les phrases marquées ◆ (rôle des créneaux, § 1.5 et § 5.8), demandées par Charles le 08/11/2026 à 15h13 (« celui à 19h… c'est lui le plus important »), acceptées le même jour à 15h20 (« ok posts-engagement »).
 Date : 2026-11-07
 Précise : l'ADR 0057 (connecteur Telegram, légendes, lien ajouté par le code), l'ADR 0055 § 1 et § 5 (catégorie `telegram_post`, stock et demandes), l'ADR 0020 (groupes de l'agence).
 Remplace : pour le canal Telegram seulement, dans l'ADR 0057 § 3, « acceptation d'un geste par le propriétaire ou un manager » (§ 2 ci-dessous) ; dans l'ADR 0057 § 6, « le code ajoute l'adresse enregistrée dans Réglages » devient le lien de redirection du § 4 ; dans l'ADR 0055 § 1, « Un média ne part que vers la sortie de sa catégorie » pour la vidéo publique Reveal (§ 3 ci-dessous).
@@ -25,6 +25,7 @@ Charles demande en plus :
 2. Le premier créneau proposé est **19 h, tous les jours**. Tout se change à l'écran.
 3. Deux créneaux d'un même jour sont à 3 h d'écart au moins (le code refuse l'enregistrement sinon). †
 4. Une seule publication par créneau et par jour : clé d'idempotence `telegram_channel:<créneau>:<jour>`. Le job est rejouable ; une réponse perdue de Telegram passe en ambre (aucun renvoi), seul un refus explicite est repris (relecture Bilan de PUB-01).
+5. Un créneau est « Principal » ou « Engagement ». 19 h est Principal par défaut, et il y a au plus un Principal par jour (le code refuse l'enregistrement sinon). ◆
 
 ### 2. Ça part seul, montré une heure avant
 
@@ -69,6 +70,11 @@ Charles demande en plus :
    4. Telegram ne met pas de lien dans un sondage, donc il part sans lien.
    5. L'IA ne connaît pas l'actu du jour. Pour un sujet d'actualité, le propriétaire ou un manager le donne en conseil dans l'aperçu, sinon elle reste sur des sujets intemporels.
 
+8. **Le post principal et les posts d'engagement** ◆ :
+   1. **Principal :** un média du pool et le lien vers Reveal. Le texte réagit à ce qu'on voit dans le média (« nouvelle tenue… ») et donne envie d'aller voir la suite chez elle : curiosité, proximité, ce qu'on ne voit que là-bas. Tout reste vrai, sans fausse urgence.
+   2. **Engagement :** une question, une anecdote ou un sondage, avec ou sans média, et sans lien. Le sondage (§ 5.7) devient un post d'Engagement, toujours au plus un par jour.
+   3. Le playground propose le choix Principal ou Engagement, pour régler les deux (§ 7).
+
 ### 6. L'écran
 
 Réglages › Créatrices › \<créatrice\> › Canal Telegram, propriétaire seulement :
@@ -111,7 +117,7 @@ Négatives, à surveiller :
 ## Découpage
 
 - **Lot A1** : contrats, migration 0137 (canal, créneaux, liens de redirection, posts du canal), connecteur de publication Telegram et `FakeTelegramChannel`, routes et écran des réglages (canal, créneaux, liens).
-- **Lot A2** : prompt `voice/telegram-channel` (post et sondage ◊), rendu HTML, gardes, bloc Exemples de l'écran, mode Post du canal du playground (post ou sondage). Les exemples de Charles se saisissent ensuite dans l'écran.
+- **Lot A2** : prompt `voice/telegram-channel` (post principal, post d'engagement ◆ et sondage ◊), rendu HTML, gardes, bloc Exemples de l'écran, rôle de chaque créneau ◆, mode Post du canal du playground (Principal, Engagement, Sondage). Les exemples de Charles se saisissent ensuite dans l'écran.
 - **Lot A1 bis** : le champ « où il mène » de chaque lien (contrat et écran ; le prompt le lit au lot A2). ‡
 - **Lot A3** : jobs des créneaux (dont la place des sondages, § 5.7 ◊), aperçu dans le groupe Info, Valider / Réécrire / Changer de média / Changer de lien / Ne pas publier, demande de dépôt automatique, journal et vues à 48 h.
 - **Lot B** : la vidéo publique Reveal, après les captures et CR-08.

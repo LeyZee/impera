@@ -54,4 +54,36 @@ describe('a post of her channel as Telegram shows it (ADR 0080 § 5)', () => {
     ]);
     expect(channelChecks(renderChannelPost('Ce soir je réponds à tout le monde ✨', link))).toEqual([]);
   });
+
+  it('refuses a false deadline or a false scarcity, never a moment of her evening', () => {
+    const scarce = (text: string): unknown[] =>
+      channelChecks(renderChannelPost(text, link)).filter((one) => one.code === 'false_scarcity');
+    expect(scarce('Dernière chance pour me voir ✨')).toEqual([
+      { code: 'false_scarcity', blocking: true, match: 'derniere chance' },
+    ]);
+    for (const text of [
+      'Offre limitée ce soir',
+      'Plus que 3 places 💋',
+      'Aujourd’hui seulement',
+      'La vidéo expire demain',
+      'Elle disparaît dans 2 h',
+      'Dépêchez-vous les loulous',
+    ]) {
+      expect(scarce(text), text).toHaveLength(1);
+    }
+    for (const text of [
+      'Ce soir je réponds à tout le monde ✨',
+      'Plus que jamais envie de papoter',
+      'Ce soir seule à la maison',
+    ]) {
+      expect(scarce(text), text).toEqual([]);
+    }
+    expect(
+      channelChecks({
+        kind: 'poll',
+        question: 'Dernière chance : live ou story ?',
+        options: ['Live', 'Story'],
+      }),
+    ).toEqual([{ code: 'false_scarcity', blocking: true, match: 'derniere chance' }]);
+  });
 });

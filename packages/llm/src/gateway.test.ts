@@ -540,7 +540,7 @@ describe('key source', () => {
 
 describe('channelPost (ADR 0080 § 5)', () => {
   const base: ChannelPostInput = {
-    kind: 'post',
+    kind: 'main',
     creatorName: 'Lina',
     personaSheet: 'identity:\n  first_name: Lina',
     examples: ['Ce soir je réponds à tout le monde ✨'],
@@ -578,6 +578,19 @@ describe('channelPost (ADR 0080 § 5)', () => {
     expect(prompt).toContain('un texte seul');
     expect(system).toContain('Aucun exemple pour l’instant.');
     expect(prompt).not.toContain('<agency_advice>');
+  });
+
+  it('writes an engagement post with its media, never the place of a link', async () => {
+    const xai = scripted([{ text: JSON.stringify({ text: 'Vous faites quoi ce soir ? 😏' }) }]);
+    const { gateway } = setup({ xai });
+
+    const result = await gateway.channelPost({ ...base, kind: 'engagement' });
+
+    expect(result.ok && result.value.output).toEqual({ kind: 'post', text: 'Vous faites quoi ce soir ? 😏' });
+    const prompt = JSON.stringify(xai.doGenerateCalls[0]?.prompt.filter((m) => m.role === 'user'));
+    expect(prompt).toContain('post d’engagement');
+    expect(prompt).toContain('<creator_media_description>');
+    expect(prompt).not.toContain('<link_destination>');
   });
 
   it('writes a poll, two to four answers, without the link', async () => {

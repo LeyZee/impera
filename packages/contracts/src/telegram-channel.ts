@@ -26,11 +26,22 @@ export const CHANNEL_PREVIEW_MAX = 240;
 export const REDIRECT_URL_MAX = 2048;
 
 /**
+ * What a slot's post is for (ADR 0080 § 1.5): the main post, a media and the link that leads to her platform, one a
+ * day at most; or a post of engagement, a question, a moment or a poll, without a link.
+ */
+export const ChannelSlotRoleSchema = z.enum(['main', 'engagement']);
+export type ChannelSlotRole = z.infer<typeof ChannelSlotRoleSchema>;
+
+/** The main post's hour (Charles, 08/11/2026): a slot stored before roles existed is the main one at 19 h. */
+export const CHANNEL_MAIN_MINUTE = 19 * 60;
+
+/**
  * A slot: an hour on her clock and the days it goes out (ADR 0080 § 1.1), switched off without being deleted. The
  * days are kept sorted and distinct.
  */
 export const ChannelSlotSchema = z.object({
   minute: MinuteOfDaySchema,
+  role: ChannelSlotRoleSchema,
   days: z
     .array(IsoDaySchema)
     .min(1, 'Choisis au moins un jour')
@@ -149,7 +160,7 @@ export type TelegramChannelConfig = z.infer<typeof TelegramChannelConfigSchema>;
 /** 19 h every day, shown an hour before, out on its own (Charles, 07/11/2026 12h26). */
 export const DEFAULT_TELEGRAM_CHANNEL_CONFIG: TelegramChannelConfig = {
   chatId: null,
-  slots: [{ minute: 19 * 60, days: [1, 2, 3, 4, 5, 6, 7], enabled: true }],
+  slots: [{ minute: CHANNEL_MAIN_MINUTE, role: 'main', days: [1, 2, 3, 4, 5, 6, 7], enabled: true }],
   previewMinutes: 60,
   publishWithoutValidation: true,
   linkForm: 'label',
@@ -201,6 +212,7 @@ export type SaveTelegramChannelBody = z.infer<typeof SaveTelegramChannelBodySche
 export const ChannelRefusalKindSchema = z.enum([
   'too_many_posts',
   'slots_too_close',
+  'two_main_posts',
   'link_name_taken',
   'link_url_taken',
   'channel_link_unknown',
@@ -219,10 +231,11 @@ export const TELEGRAM_CHANNEL_INVALID = 'telegram_channel_invalid';
 export const TelegramChannelRefusalBodySchema = refusalBodySchema(ChannelRefusalKindSchema);
 
 /**
- * A post of her channel tried in the playground (ADR 0080 § 7, mode « Post du canal »): a post or a poll (§ 5.7),
- * written by the same path as production, never sent. `POST /v1/creators/:creatorId/telegram-channel/try`.
+ * A post of her channel tried in the playground (ADR 0080 § 7, mode « Post du canal »): the main post (§ 5.8), a post
+ * of engagement, or a poll (§ 5.7), written by the same path as production, never sent.
+ * `POST /v1/creators/:creatorId/telegram-channel/try`.
  */
-export const ChannelPostKindSchema = z.enum(['post', 'poll']);
+export const ChannelPostKindSchema = z.enum(['main', 'engagement', 'poll']);
 export type ChannelPostKind = z.infer<typeof ChannelPostKindSchema>;
 
 export const CHANNEL_MEDIA_TEXT_MAX = 600;
@@ -239,7 +252,7 @@ export const TryChannelPostBodySchema = z.object({
   media: z.string().trim().min(1).max(CHANNEL_MEDIA_TEXT_MAX).nullable(),
   /** The agency's advice (§ 2.3), a subject, an angle, a piece of news; null: none. */
   advice: z.string().trim().min(1).max(CHANNEL_ADVICE_MAX).nullable(),
-  /** One of her links for this post only (§ 4.6); null: the channel's link. A poll carries none. */
+  /** One of her links for this post only (§ 4.6); null: the channel's link. Only the main post carries one. */
   linkId: RedirectLinkIdSchema.nullable(),
 });
 export type TryChannelPostBody = z.infer<typeof TryChannelPostBodySchema>;

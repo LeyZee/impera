@@ -120,12 +120,12 @@ export interface TrendCapturesInput {
 }
 
 /**
- * A post of her Telegram channel (ADR 0080 § 5), written in her voice for everyone who reads the channel: a text that
- * goes with a media, or a poll (§ 5.7). The examples, where her link leads and the advice are the agency's words, read
- * as data.
+ * A post of her Telegram channel (ADR 0080 § 5), written in her voice for everyone who reads the channel: the main post
+ * that reacts to its media and leads to her link (§ 5.8), a post of engagement without a link, or a poll (§ 5.7). The
+ * examples, where her link leads and the advice are the agency's words, read as data.
  */
 export interface ChannelPostInput {
-  readonly kind: 'post' | 'poll';
+  readonly kind: 'main' | 'engagement' | 'poll';
   readonly creatorName: string;
   /** Her persona sheet, rendered as text, as the voice reads it. */
   readonly personaSheet: string;
@@ -133,7 +133,7 @@ export interface ChannelPostInput {
   readonly examples: readonly string[];
   /** The media the post goes with, described in words; null: a text alone. */
   readonly media: string | null;
-  /** Where the link of this post leads (§ 4.5); null or empty: no place is named. */
+  /** Where the link of the main post leads (§ 4.5); null or empty: no place is named. Ignored for another kind. */
   readonly destination: string | null;
   /** The agency's advice for this post (§ 2.3); null: none. */
   readonly advice: string | null;

@@ -215,8 +215,8 @@ describe('the creator’s Telegram channel on Postgres', () => {
       ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
       chatId: channelA,
       slots: [
-        { minute: 21 * 60 + 30, days: [6, 5], enabled: true },
-        { minute: 12 * 60, days: [6], enabled: true },
+        { minute: 21 * 60 + 30, role: 'engagement', days: [6, 5], enabled: true },
+        { minute: 12 * 60, role: 'engagement', days: [6], enabled: true },
       ],
       links: [
         {
@@ -250,8 +250,8 @@ describe('the creator’s Telegram channel on Postgres', () => {
     const response = await put(lea, {
       ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
       slots: [
-        { minute: 19 * 60, days: [1], enabled: true },
-        { minute: 20 * 60, days: [1], enabled: true },
+        { minute: 19 * 60, role: 'engagement', days: [1], enabled: true },
+        { minute: 20 * 60, role: 'engagement', days: [1], enabled: true },
       ],
     });
     expect(response.statusCode).toBe(400);
@@ -332,6 +332,27 @@ describe('the creator’s Telegram channel on Postgres', () => {
     expect(saved.statusCode).toBe(200);
   });
 
+  it('reads slots stored before they had a role: 19 h is the main post, the others engagement', async () => {
+    const stored = {
+      ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
+      slots: [
+        { minute: 9 * 60, days: [1], enabled: true },
+        { minute: 19 * 60, days: [1], enabled: true },
+      ],
+    };
+    await test.admin.db
+      .update(schema.telegramChannels)
+      .set({ config: stored })
+      .where(eq(schema.telegramChannels.creatorId, nora));
+    const view = TelegramChannelViewSchema.parse(
+      (await server.inject({ method: 'GET', url: url(nora), headers })).json(),
+    );
+    expect(view.config.slots.map((slot) => [slot.minute, slot.role])).toEqual([
+      [540, 'engagement'],
+      [1140, 'main'],
+    ]);
+  });
+
   it('lets one of two saves at once take a channel, never both', async () => {
     const [bot] = await test.admin.db.select({ id: schema.telegramBots.id }).from(schema.telegramBots);
     if (bot === undefined) throw new Error('no bot');
@@ -372,7 +393,7 @@ describe('the creator’s Telegram channel on Postgres', () => {
     const tryUrl = (creatorId: string) => `${url(creatorId)}/try`;
     const tryPost = (creatorId: string, payload: Record<string, unknown>) =>
       server.inject({ method: 'POST', url: tryUrl(creatorId), headers, payload });
-    const body = { kind: 'post', media: 'Une photo au miroir', advice: 'Parle du live', linkId: null };
+    const body = { kind: 'main', media: 'Une photo au miroir', advice: 'Parle du live', linkId: null };
 
     beforeAll(async () => {
       const saved = await put(nora, {
@@ -424,7 +445,7 @@ describe('the creator’s Telegram channel on Postgres', () => {
       expect(tried.violations).toEqual([{ code: 'forbidden_term', blocking: true, match: 'bisous' }]);
       expect(voiceCalls).toEqual([
         expect.objectContaining({
-          kind: 'post',
+          kind: 'main',
           creatorName: 'Nora',
           examples: ['Ce soir je réponds à tout le monde ✨'],
           media: 'Une photo au miroir',
@@ -462,6 +483,19 @@ describe('the creator’s Telegram channel on Postgres', () => {
         options: ['Un live', 'Une story'],
       });
       expect(voiceCalls[0]).toMatchObject({ kind: 'poll', media: null, destination: null });
+    });
+
+    it('writes an engagement post without a link, whatever link was asked', async () => {
+      voiceCalls.length = 0;
+      const response = await tryPost(nora, { ...body, kind: 'engagement', linkId: live });
+
+      const tried = TriedChannelPostSchema.parse(response.json());
+      expect(tried.draft).toMatchObject({ kind: 'post', link: null });
+      expect(voiceCalls[0]).toMatchObject({
+        kind: 'engagement',
+        media: 'Une photo au miroir',
+        destination: null,
+      });
     });
 
     it('says why nothing was written: no persona, no model, no creator', async () => {

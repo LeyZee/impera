@@ -21,10 +21,19 @@ const NOW = new Date('2026-11-08T10:00:00Z');
 describe('her persona for a post of her channel (ADR 0080 § 5)', () => {
   const persona = channelWriterPersona({ version: '0.3.0', creatorName: 'Nora', persona: DEMO }, NOW);
 
-  it('reads her sheet as her drafts do, and names her version', () => {
+  it('reads her sheet as her drafts do, without her intimacy but with her strict limits', () => {
     expect(persona.version).toBe('0.3.0');
     expect(persona.creatorName).toBe('Elena');
     expect(persona.personaSheet).toContain('Elena');
+    expect(persona.personaSheet).not.toContain('Pratiques / Kinks');
+    expect(persona.personaSheet).not.toContain('Jouets sexuels');
+    expect(persona.personaSheet).toContain('Zones interdites');
+  });
+
+  it('never asks for the media of a post that has one (no media_not_sent on the channel)', () => {
+    expect(persona.check(['Regarde cette photo, nouvelle tenue ✨']).map((v) => v.code)).not.toContain(
+      'media_not_sent',
+    );
   });
 
   it('lets a post of hers through', () => {

@@ -18,6 +18,7 @@ import {
   tryChannelPost,
   useTelegramChannel,
 } from '@/creators/telegram/api';
+import { useGrowingArea } from '@/lib/growing-area';
 import { Select, type SelectOption } from '@/shell/Select';
 
 import '@/creators/persona/persona.css';
@@ -25,14 +26,21 @@ import '@/creators/telegram/telegram-channel.css';
 import './channel/channel-post.css';
 
 /**
- * Entraîner › Post du canal (ADR 0080 § 7): her channel's post or poll written as production will write it, with her
- * persona, her examples and where the link leads, then the guards. Nothing is published.
+ * Entraîner › Post du canal (ADR 0080 § 7): her channel's main post, engagement post or poll written as production
+ * will write it, with her persona, her examples and where the link leads, then the guards. Nothing is published.
  */
 
+/** The three posts of her channel (ADR 0080 § 5.7, § 5.8), each said in one line under the choice. */
 const KINDS = [
-  { value: 'post', label: 'Post' },
+  { value: 'main', label: 'Principal' },
+  { value: 'engagement', label: 'Engagement' },
   { value: 'poll', label: 'Sondage' },
 ] as const;
+const KIND_HINTS: Readonly<Record<ChannelPostKind, string>> = {
+  main: 'Le post du jour qui mène au lien : il réagit au média.',
+  engagement: 'Une question, un moment de sa journée, sans lien.',
+  poll: 'Une question et 2 à 4 réponses, sans lien.',
+};
 
 /** « Le lien du canal » is her channel's link, whichever it is; another one is tried by its name. */
 const CHANNEL_LINK = 'channel';
@@ -79,7 +87,7 @@ function ChannelPostWriter({
   onCreator: (id: string) => void;
 }): JSX.Element {
   const channel = useTelegramChannel(creatorId);
-  const [kind, setKind] = useState<ChannelPostKind>('post');
+  const [kind, setKind] = useState<ChannelPostKind>('main');
   const [media, setMedia] = useState('');
   const [advice, setAdvice] = useState('');
   const [linkChoice, setLinkChoice] = useState<LinkChoice>(CHANNEL_LINK);
@@ -93,8 +101,6 @@ function ChannelPostWriter({
     if (tried === null || section === null || typeof section.scrollIntoView !== 'function') return;
     section.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [tried]);
-  const mediaId = useId();
-  const adviceId = useId();
 
   const config = channel.data?.config;
   const links = config?.links ?? [];
@@ -114,9 +120,9 @@ function ChannelPostWriter({
       setTried(
         await tryChannelPost(creatorId, {
           kind,
-          media: kind === 'post' && media.trim() !== '' ? media.trim() : null,
+          media: kind !== 'poll' && media.trim() !== '' ? media.trim() : null,
           advice: advice.trim() === '' ? null : advice.trim(),
-          linkId: kind === 'post' && linkChoice !== CHANNEL_LINK ? linkChoice : null,
+          linkId: kind === 'main' && linkChoice !== CHANNEL_LINK ? linkChoice : null,
         }),
       );
     } catch (error) {
@@ -139,64 +145,43 @@ function ChannelPostWriter({
             </span>
             <Select<string> ariaLabel="Créatrice" value={creatorId} options={creators} onChange={onCreator} />
           </div>
-          <div className="tc-setting cp-setting">
+          <div className="tc-setting cp-setting cp-setting--kind">
             <span className="tc-setting__label" aria-hidden="true">
               Type
             </span>
             <Segment<ChannelPostKind> label="Type" options={KINDS} value={kind} onChange={setKind} />
           </div>
-          {kind === 'post' ? (
-            <>
-              <div className="tc-setting tc-setting--select cp-setting">
-                <span className="tc-setting__label" aria-hidden="true">
-                  Lien
-                </span>
-                <Select<LinkChoice>
-                  ariaLabel="Lien"
-                  value={linkChoice}
-                  options={linkOptions}
-                  onChange={setLinkChoice}
-                  disabled={links.length === 0}
-                />
-              </div>
-              <div className="nv-field ps-field">
-                <label className="tc-field-label" htmlFor={mediaId}>
-                  Le média
-                </label>
-                <textarea
-                  id={mediaId}
-                  className="nv-field__control nv-glass cp-area"
-                  rows={2}
-                  maxLength={CHANNEL_MEDIA_TEXT_MAX}
-                  placeholder="Ce qu’on voit : « selfie au miroir, robe noire »"
-                  value={media}
-                  onChange={(event) => {
-                    setMedia(event.target.value);
-                  }}
-                />
-              </div>
-            </>
-          ) : (
-            <p className="ps-hint">
-              Une question et 2 à 4 réponses, sans lien : Telegram n’en met pas sous un sondage.
-            </p>
-          )}
-          <div className="nv-field ps-field">
-            <label className="tc-field-label" htmlFor={adviceId}>
-              Conseil de l’agence
-            </label>
-            <textarea
-              id={adviceId}
-              className="nv-field__control nv-glass cp-area"
-              rows={2}
-              maxLength={CHANNEL_ADVICE_MAX}
-              placeholder="Facultatif : « parle du live de ce soir »"
-              value={advice}
-              onChange={(event) => {
-                setAdvice(event.target.value);
-              }}
+          <p className="ps-hint cp-hint">{KIND_HINTS[kind]}</p>
+          {kind === 'main' ? (
+            <div className="tc-setting tc-setting--select cp-setting">
+              <span className="tc-setting__label" aria-hidden="true">
+                Lien
+              </span>
+              <Select<LinkChoice>
+                ariaLabel="Lien"
+                value={linkChoice}
+                options={linkOptions}
+                onChange={setLinkChoice}
+                disabled={links.length === 0}
+              />
+            </div>
+          ) : null}
+          {kind === 'poll' ? null : (
+            <GrowingField
+              label="Le média"
+              value={media}
+              maxLength={CHANNEL_MEDIA_TEXT_MAX}
+              placeholder="Ce qu’on voit : « selfie au miroir, robe noire »"
+              onChange={setMedia}
             />
-          </div>
+          )}
+          <GrowingField
+            label="Conseil de l’agence"
+            value={advice}
+            maxLength={CHANNEL_ADVICE_MAX}
+            placeholder="Facultatif : « parle du live de ce soir »"
+            onChange={setAdvice}
+          />
           <button
             type="button"
             className="nv-btn nv-btn--neon ps-self-start"
@@ -211,7 +196,7 @@ function ChannelPostWriter({
       </div>
 
       <div className="nv-plate ps-panel">
-        <section ref={preview} className="ps-block" aria-labelledby="cp-preview" aria-live="polite">
+        <section ref={preview} className="ps-block" aria-labelledby="cp-preview">
           <h3 className="ps-block__title" id="cp-preview">
             Aperçu
           </h3>
@@ -220,13 +205,53 @@ function ChannelPostWriter({
               {failure}
             </p>
           )}
-          {tried === null ? (
-            <p className="ps-lead">Le post apparaît ici, comme dans Telegram. Rien n’est publié.</p>
-          ) : (
-            <Preview tried={tried} creatorName={creatorName} />
-          )}
+          {/* Read once when a post arrives; a refusal is the alert's alone. */}
+          <div className="cp-result" aria-live="polite">
+            {tried === null ? (
+              <p className="ps-lead">Le post apparaît ici, comme dans Telegram. Rien n’est publié.</p>
+            ) : (
+              <Preview tried={tried} creatorName={creatorName} />
+            )}
+          </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+/** A text field of the form that grows with its text, on every browser (`useGrowingArea`). */
+function GrowingField({
+  label,
+  value,
+  maxLength,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  maxLength: number;
+  placeholder: string;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  const id = useId();
+  const ref = useGrowingArea(value);
+  return (
+    <div className="nv-field ps-field">
+      <label className="tc-field-label" htmlFor={id}>
+        {label}
+      </label>
+      <textarea
+        ref={ref}
+        id={id}
+        className="nv-field__control nv-glass cp-area"
+        rows={2}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
     </div>
   );
 }

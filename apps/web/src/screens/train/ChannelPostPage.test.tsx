@@ -118,12 +118,29 @@ describe('Entraîner › Post du canal (ADR 0080 § 7)', () => {
     );
     expect(screen.getByText('Ne partirait pas : du contenu explicite sur un canal public.')).toBeDefined();
     expect(TryChannelPostBodySchema.parse(asked[0])).toEqual({
-      kind: 'post',
+      kind: 'main',
       media: 'selfie au miroir',
       advice: null,
       linkId: SHOP,
     });
     expect(screen.getByRole('button', { name: 'Réécrire' })).toBeDefined();
+  });
+
+  it('writes an engagement post with its media and without a link', async () => {
+    const asked = serve(() => ({ status: 200, body: { ...post, draft: { ...post.draft, link: null } } }));
+    renderPage();
+    fireEvent.click(await screen.findByRole('radio', { name: 'Engagement' }));
+    expect(screen.getByText('Une question, un moment de sa journée, sans lien.')).toBeDefined();
+    expect(screen.queryByRole('combobox', { name: 'Lien' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Le média'), { target: { value: 'café au soleil' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Écrire' }));
+    expect(await screen.findByRole('article', { name: 'Le post' })).toBeDefined();
+    expect(TryChannelPostBodySchema.parse(asked[0])).toEqual({
+      kind: 'engagement',
+      media: 'café au soleil',
+      advice: null,
+      linkId: null,
+    });
   });
 
   it('writes a poll without a link nor a media', async () => {

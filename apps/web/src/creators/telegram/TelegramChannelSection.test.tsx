@@ -156,8 +156,8 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     const sent = SaveTelegramChannelBodySchema.parse(puts[0]).config;
     expect(sent.chatId).toBe(CHANNEL);
     expect(sent.slots).toEqual([
-      { minute: 1140, days: [1, 2, 3, 4, 5, 6, 7], enabled: true },
-      { minute: 1320, days: [1, 2, 3, 4, 5], enabled: true },
+      { minute: 1140, role: 'main', days: [1, 2, 3, 4, 5, 6, 7], enabled: true },
+      { minute: 1320, role: 'engagement', days: [1, 2, 3, 4, 5], enabled: true },
     ]);
     expect(sent.links).toEqual([
       {
@@ -185,6 +185,17 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
       expect(puts).toHaveLength(1);
     });
     expect(SaveTelegramChannelBodySchema.parse(puts[0]).config.examples).toEqual(['Ce soir je suis là ✨']);
+  });
+
+  it('makes a new slot an engagement post, and refuses a second main post on a day', async () => {
+    serve({});
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /Ajouter un créneau/u }));
+    const role = screen.getByRole('combobox', { name: /^Rôle du créneau de 22/u });
+    expect(role.textContent).toContain('Engagement');
+    choose(role, 'Principal');
+    expect(screen.getByText('Un seul post principal par jour.')).toBeDefined();
+    expect(save()).toHaveProperty('disabled', true);
   });
 
   it('keeps the save shut on an address that is not https, and says why', async () => {

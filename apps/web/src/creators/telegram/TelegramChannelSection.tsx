@@ -3,13 +3,14 @@ import {
   CHANNEL_EXAMPLES_MAX,
   LINK_DESTINATION_MAX,
   type ChannelSlot,
+  type ChannelSlotRole,
   type RedirectLink,
   type TelegramChannelConfig,
   type TelegramChannelView,
   type TelegramChatId,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { SaveBar, useOnScreen } from '../SaveBar';
 import { Segment, SwitchRow } from '../persona/fields';
@@ -27,6 +28,7 @@ import {
   DAY_SHORT,
   EXAMPLES_FULL,
   LINKS_FULL,
+  SLOT_ROLES,
   SLOTS_FULL,
   SLOTS_RULE,
   WARNING_TEXT,
@@ -42,6 +44,7 @@ import {
 } from './model';
 import './telegram-channel.css';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { PasswordPrompt, SignInAgain } from '@/settings/services/PasswordPrompt';
 import { ReauthRequired } from '@/settings/services/api';
@@ -562,6 +565,15 @@ function SlotLine({
           }}
           onUnreadable={onUnreadable}
         />
+        <Select<ChannelSlotRole>
+          className="tc-slot__role"
+          ariaLabel={`Rôle du ${name}`}
+          value={slot.role}
+          options={SLOT_ROLES}
+          onChange={(role) => {
+            onChange({ ...slot, role });
+          }}
+        />
         <span className="tc-days" role="group" aria-label={`Jours du ${name}`}>
           {DAY_SHORT.map((short, index) => {
             const day = index + 1;
@@ -764,9 +776,6 @@ function LabelField({
   );
 }
 
-/** Whether the browser grows a text field with its text by itself (Chromium, Edge, Safari 18+). */
-const SIZED_BY_CONTENT = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
-
 /**
  * Where a link leads: one line of text that wraps instead of being cut on a phone. Enter adds no line; a pasted line
  * break becomes a space, since the sentence is said in one line.
@@ -785,13 +794,7 @@ function DestinationArea({
   'aria-invalid': true | undefined;
   onChange: (value: string) => void;
 }): JSX.Element {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const area = ref.current;
-    if (area === null || SIZED_BY_CONTENT) return;
-    area.style.height = '';
-    if (area.scrollHeight > 0) area.style.height = `${String(area.scrollHeight + 2)}px`;
-  }, [value]);
+  const ref = useGrowingArea(value);
   return (
     <textarea
       ref={ref}
@@ -825,13 +828,7 @@ function ExampleLine({
   onRemove: () => void;
 }): JSX.Element {
   const id = useId();
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const area = ref.current;
-    if (area === null || SIZED_BY_CONTENT) return;
-    area.style.height = '';
-    if (area.scrollHeight > 0) area.style.height = `${String(area.scrollHeight + 2)}px`;
-  }, [value]);
+  const ref = useGrowingArea(value);
   const left = CHANNEL_EXAMPLE_MAX - value.length;
   return (
     <li className="tc-example">
