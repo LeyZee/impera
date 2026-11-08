@@ -1,0 +1,10 @@
+# 2026-11-08 — Le panneau copilote dans l'extension (ADR 0086, lot b) — en recette
+
+**Session** : Extension et playground · **Branche** : `claude/extension-reveal-playground-45axcj`
+
+Fait : l'extension ouvre un panneau latéral à côté de Reveal (side panel ; le popup garde la connexion et les raccourcis). Le panneau suit la conversation ouverte et change de fan tout seul. En haut, une ligne « où on en est » toujours visible : en rouge ce qui interdit la vente (ne plus lui écrire, ventes gelées, âge contesté), en ambre ce qui change la façon d'écrire (fan fragile, rien d'explicite, plafond), puis son désir en un mot ; des limites illisibles sont dites en ambre, jamais tues. Au milieu, la fiche du fan qui défile seule. En bas, le brouillon de l'agent, qui ne pousse jamais la fiche, avec trois touches : A envoyer, E retoucher, R refuser (raison dans la liste fermée de l'ADR, note facultative). Échap annule, Ctrl+Entrée place un texte retouché. Le geste part au CRM par le service worker avec le lien de l'extension, jamais le cookie du CRM ; le panneau ne lit jamais ce lien. Tant que la capture Reveal n'est pas faite, A copie le texte et le panneau dit de le coller dans Reveal. Aucun son, aucune notification, rien ne bouge.
+Pas fait : placer le texte directement dans la zone de saisie de Reveal (après la capture de Charles) ; essai du panneau latéral d'Edge sur le PC de Charles ; « Relier l'extension » pour les chatteurs depuis le panneau.
+Décisions : le service worker n'accepte un geste que s'il vient de la page du panneau (`sender.url`), sinon la fenêtre de repli était prise pour un onglet Reveal.
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : pnpm check, pnpm test (pre-push), captures Nuit/Jour PC (`recette/2026-11-08/extension/copilote/`, « ok captures copilote » de Charles, 08/11 19 h 12).
