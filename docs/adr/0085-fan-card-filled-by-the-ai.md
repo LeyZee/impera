@@ -1,6 +1,6 @@
 # 0085. La fiche du fan : vingt cases fermées que l'IA remplit en lisant la conversation, et que le chatteur corrige
 
-Statut : proposed (demande de Charles du 08/11/2026, 16 h 37, fil « Bilan projet », et précision du 08/11/2026, 16 h 39 ; numéro attribué par le coordinateur)
+Statut : accepted (« ok 0085 » de Charles le 08/11/2026, 16 h 59, fil « Concevoir la fiche fan remplie par l'IA » ; demande de Charles du 08/11/2026, 16 h 37, fil « Bilan projet », et précision du 08/11/2026, 16 h 39 ; numéro attribué par le coordinateur)
 Date : 2026-11-08
 Précise : P3-02 (mémoire du fan, `fan_facts`), l'ADR 0018 § 1 (la note client de la plateforme reste lue en direct, jamais copiée) et l'ADR 0063 (la créatrice ne lit aucune note d'un fan). Ne remplace rien.
 
