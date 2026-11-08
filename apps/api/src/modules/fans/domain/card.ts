@@ -12,7 +12,7 @@ import {
 } from '@impera/contracts';
 
 import { FanCardValueInvalid, FanCardValueRefused } from './errors';
-import { cardFieldOf, isActive, saysSomething, SOURCE_RANK, type FactWrite, type StoredFact } from './facts';
+import { fieldOfFact, isActive, saysSomething, SOURCE_RANK, type FactWrite, type StoredFact } from './facts';
 
 /**
  * The fan's card (ADR 0085): his facts read field by field, and a chatter's correction planned against them. Pure: the
@@ -76,9 +76,7 @@ export function checkedValue(field: FanCardField, items: readonly string[]): str
 
 /** His active facts of a field, whatever category they were written in before the card existed. */
 const factsOfField = (field: FanCardField, active: readonly StoredFact[], now: Date): StoredFact[] =>
-  active.filter(
-    (fact) => isActive(fact, now) && fact.category !== 'operator_note' && cardFieldOf(fact.key) === field,
-  );
+  active.filter((fact) => isActive(fact, now) && fieldOfFact(fact) === field);
 
 /** The fact a field shows: the strongest source, then the newest (§ 6). */
 function shownFact(facts: readonly StoredFact[]): StoredFact | undefined {
@@ -216,7 +214,7 @@ export function cardOf(
     };
   });
   const others = active
-    .filter((fact) => isActive(fact, now) && saysSomething(fact) && cardFieldOf(fact.key) === null)
+    .filter((fact) => isActive(fact, now) && saysSomething(fact) && fieldOfFact(fact) === null)
     .sort(newestFirst)
     .map((fact): CardOther => ({
       key: fact.key,

@@ -74,9 +74,20 @@ function normalizeValue(value: string, category: FactCategory): string {
 }
 
 /** The card field a key names (ADR 0085 § 1), whatever its case; null for a key outside the card. */
-export function cardFieldOf(key: string): FanCardField | null {
+function cardFieldOf(key: string): FanCardField | null {
   const field = FanCardFieldSchema.safeParse(normalizeKey(key));
   return field.success ? field.data : null;
+}
+
+/**
+ * The card field a fact fills: its key's, except a chatter's note left at the hand-back, which stays a note whatever
+ * its key (« Autres », never a field).
+ */
+export function fieldOfFact(fact: {
+  readonly category: FactCategory;
+  readonly key: string;
+}): FanCardField | null {
+  return fact.category === 'operator_note' ? null : cardFieldOf(fact.key);
 }
 
 /** A fact that says something: a field a chatter cleared is an empty line, never a value. */
@@ -105,7 +116,7 @@ export function kycSlotsToLearn(
 
 /** A card field is one slot whatever the category it was written in (ADR 0085 § 1); any other key, its category's. */
 const slot = (fact: { readonly category: FactCategory; readonly key: string }) => {
-  const field = cardFieldOf(fact.key);
+  const field = fieldOfFact(fact);
   return field === null ? `${fact.category}:${normalizeKey(fact.key)}` : `card:${field}`;
 };
 
@@ -140,7 +151,7 @@ export function planFacts(
     const key = normalizeKey(proposal.key);
     const value = normalizeValue(proposal.value, proposal.category);
     if (key === '' || value === '') continue;
-    const field = cardFieldOf(key);
+    const field = fieldOfFact({ category: proposal.category, key });
     const fact: FactWrite['fact'] = {
       category: field === null ? proposal.category : fanCardFieldSpec(field).category,
       key,

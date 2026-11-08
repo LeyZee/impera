@@ -18,4 +18,6 @@ Découvertes :
 - `conversations/infra/db/fan-insights.ts` (Qui sont tes fans) ne lit que `kind = 'declared'` : une valeur corrigée par un chatteur (`noted`) n'y compte pas. Un `kind in ('declared', 'noted') and value <> ''` suffirait, mais ce fichier n'est pas à Agent.
 - Religion, opinions, origine et santé détaillée ne se trouvent pas par motif : le prompt du lot (b) doit les tenir dehors.
 
+- `fan_facts` reste lisible par le compte créatrice (`creatorReadsOnly`, pour « Qui sont tes fans », ADR 0074) : la base lui laisse lire les lignes `noted` et les cases intimes, seule la route de la fiche l'en empêche (relecture Bilan). Une vue d'agrégats pour ses statistiques fermerait la table à son compte.
+
 Candidats à suppression : aucun.

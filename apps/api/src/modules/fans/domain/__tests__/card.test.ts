@@ -123,6 +123,22 @@ describe('the AI against a chatter’s note (§ 6)', () => {
     expect(planFacts([noted], [proposal({ value: 'annecy' })], now)).toEqual([]);
   });
 
+  it('leaves a chatter’s hand-back note a note, whatever its key: it fills no field', () => {
+    const handBack = proposal({ category: 'operator_note', key: 'first_name', value: 'Prénom à demander' });
+    const [write] = planFacts([], [handBack], now);
+    expect(write?.fact.category).toBe('operator_note');
+    expect(
+      kycSlotsToLearn(['first_name'], [stored({ category: 'operator_note', key: 'first_name' })], now),
+    ).toEqual(['first_name']);
+    const card = cardOf(
+      [stored({ category: 'operator_note', key: 'first_name', value: 'À demander' })],
+      [],
+      now,
+    );
+    expect(card.fields.find((entry) => entry.field === 'first_name')?.current).toBeNull();
+    expect(card.others.map((other) => other.value)).toEqual(['À demander']);
+  });
+
   it('writes a card field in its card category, one slot whatever the category it is proposed under', () => {
     const [write] = planFacts([stored()], [proposal({ category: 'life' })], now);
     expect(write).toMatchObject({ fact: { category: 'identity', value: 'Grenoble' }, supersedes: 'f-1' });
