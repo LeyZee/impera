@@ -21,6 +21,7 @@ export interface WiredContentDrops {
     | 'content_drops.convert_file'
     | 'content_drops.erase_originals'
     | 'content_drops.describe_file'
+    | 'content_drops.summarize_script'
   >;
   readonly routes: readonly Routes[];
 }
@@ -35,6 +36,8 @@ export function wireContentDrops(
     readonly scriptVersions: ScriptVersions;
     /** The vision AI that describes each photo and video she drops (ADR 0083). */
     readonly vision: Pick<LlmGateway, 'describeDrop' | 'transcribe'>;
+    /** The brain that tells each script she sends, from its cards and its media's descriptions (ADR 0083 § 6). */
+    readonly brain: Pick<LlmGateway, 'summarizeScript'>;
     readonly storage?: DropStorage;
   },
 ): WiredContentDrops {
@@ -45,6 +48,7 @@ export function wireContentDrops(
     requireRole: shared.requireRole,
     scriptVersions: deps.scriptVersions,
     describer: createDropDescriptions({ adminDb: shared.adminDb, gateway: deps.vision }),
+    brain: deps.brain,
     ...(deps.storage !== undefined && { storage: deps.storage }),
   });
   return {
@@ -72,6 +76,15 @@ export function wireContentDrops(
             { mediaAssetId: payload.mediaAssetId, outcome },
             'content drops: dropped media described',
           );
+        },
+      ),
+      'content_drops.summarize_script': defineTask(
+        'content_drops.summarize_script',
+        JOB_PAYLOADS['content_drops.summarize_script'],
+        shared.logger,
+        async (payload, context) => {
+          const outcome = await module.jobs.summarizeScript(payload.dropId, payload.correlationId);
+          context.logger.info({ dropId: payload.dropId, outcome }, 'content drops: sent script summarized');
         },
       ),
       'content_drops.erase_originals': defineTask(

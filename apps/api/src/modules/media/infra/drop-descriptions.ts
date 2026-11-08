@@ -22,6 +22,8 @@ interface DroppedMedia {
 export interface DropDescriptions {
   /** Whether the vision AI already described this medium for a drop. */
   described(mediaAssetId: string): Promise<boolean>;
+  /** The latest detailed description of each of these media that has one, by medium (ADR 0083 § 2). */
+  detailed(mediaAssetIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
   /** Described and kept with its review reasons, or why not; a file that does not open is logged by the caller. */
   describe(media: DroppedMedia): Promise<'described' | 'budget' | 'failed' | 'unreadable'>;
 }
@@ -40,6 +42,7 @@ export function createDropDescriptions(deps: {
   });
   return {
     described: (mediaAssetId) => store.described(mediaAssetId),
+    detailed: (mediaAssetIds) => store.detailed(mediaAssetIds),
     describe: async (media) => {
       const result = await describer.describe(media);
       if (!result.ok) return result.error.code;

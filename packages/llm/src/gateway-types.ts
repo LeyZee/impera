@@ -3,6 +3,7 @@ import type {
   LlmPurpose,
   MediaDescription,
   Result,
+  ScriptDropSummary,
   TrendCaptureDescription,
 } from '@impera/contracts';
 import type { TranscriptionModel } from 'ai';
@@ -173,6 +174,35 @@ export interface ChannelPostInput {
   readonly trace?: CallTrace;
 }
 
+/** A media of a step, as its description tells it; a voice note is not described by the vision AI. */
+export interface ScriptSummaryMedia {
+  readonly kind: 'image' | 'video' | 'audio';
+  readonly durationS: number | null;
+  /** The detailed description of the photo or video (ADR 0083 § 2); null for a voice note. */
+  readonly description: string | null;
+}
+
+/** A step of the script she shot: its key, its code (`E1A`, `P12`), its card and its media in order. */
+export interface ScriptSummaryStep {
+  readonly step: string;
+  readonly code: string;
+  readonly name: string;
+  /** What the card says beyond its name (what it sells, mood, outfit, place, the series' and slots' hints). */
+  readonly card: string | null;
+  readonly media: readonly ScriptSummaryMedia[];
+}
+
+/**
+ * A sent script told step by step, then its synthesis (ADR 0083 § 6, role `brain`): from the cards and the media's
+ * descriptions only, never a price (ADR 0056 § 6). The cards and the descriptions are read as data.
+ */
+export interface ScriptSummaryInput {
+  readonly scriptName: string;
+  readonly moment: 'day' | 'night' | null;
+  readonly steps: readonly ScriptSummaryStep[];
+  readonly trace?: CallTrace;
+}
+
 export type ChannelPostResult =
   ({ readonly kind: 'post' } & ChannelPostOutput) | ({ readonly kind: 'poll' } & ChannelPollOutput);
 
@@ -229,6 +259,8 @@ export interface LlmGateway {
   ): Promise<Result<LlmSuccess<TrendCaptureDescription>, LlmFailure>>;
   /** A post or a poll of her Telegram channel (ADR 0080 § 5, role `voice`). */
   channelPost(input: ChannelPostInput): Promise<Result<LlmSuccess<ChannelPostResult>, LlmFailure>>;
+  /** A sent script's steps and synthesis (ADR 0083 § 6, prompt `brain/script-summary`), under the daily cap. */
+  summarizeScript(input: ScriptSummaryInput): Promise<Result<LlmSuccess<ScriptDropSummary>, LlmFailure>>;
   health(): HealthReport;
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */
@@ -256,6 +288,7 @@ export interface LlmGatewayDeps {
     readonly trendCaptures?: PromptTemplate;
     readonly creatorDrop?: PromptTemplate;
     readonly channelPost?: PromptTemplate;
+    readonly scriptSummary?: PromptTemplate;
   };
   /** Secret written in every system prompt: an output that contains it has leaked the prompt. */
   readonly canary?: string;
