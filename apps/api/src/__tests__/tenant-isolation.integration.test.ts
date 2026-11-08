@@ -159,6 +159,8 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'DELETE /v1/script-structures/:structureId': 'the agency’s script library',
   'GET /v1/script-structures/:structureId/cards/:segmentKey': 'the agency’s script library',
   'DELETE /v1/trends/extension-links/:id': 'the person’s own extension link',
+  'GET /v1/copilot/conversations/:platformConversationId/draft':
+    'a platform’s conversation id, looked up only among the reader’s creators: copilot tests',
   'POST /v1/creator-space/content-requests/:id/refuse': 'creator space: content-drops tests',
   'GET /v1/creator-space/content/script-drops/:dropId': 'creator space: script drops tests',
   'PUT /v1/creator-space/content/script-drops/:dropId/slots/:slotKey': 'creator space: script drops tests',

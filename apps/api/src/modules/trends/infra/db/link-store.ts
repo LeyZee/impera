@@ -57,8 +57,8 @@ async function revokeLive(tx: Transaction, actor: TrendActor, which: Condition):
 
 /**
  * Who may hold a link, read in the base and never from the session: the owner, an active manager, a creator's account
- * linked to one creator. `null` for anyone else: an account gone, a manager who left or is away, and a chatter, who
- * never takes part in the watch (ADR 0060 § 2, amended 07/11).
+ * linked to one creator, for the watch; an active chatter, for the copilot panel's writes only (ADR 0086 § 8), never the
+ * watch (ADR 0060 § 2, amended 07/11). `null` for anyone else: an account gone, a member who left or is away.
  */
 async function holderOf(tx: Transaction, userId: string, lock: boolean): Promise<LinkHolder | null> {
   const query = tx
@@ -70,9 +70,9 @@ async function holderOf(tx: Transaction, userId: string, lock: boolean): Promise
   const role = UserRoleSchema.safeParse(account?.role);
   if (!role.success) return null;
   const id = UserIdSchema.parse(userId);
-  if (role.data === 'owner') return { userId: id, role: role.data };
+  if (role.data === 'owner') return { userId: id, role: role.data, watch: true };
   if (role.data === 'creator')
-    return account?.creatorIds.length === 1 ? { userId: id, role: role.data } : null;
+    return account?.creatorIds.length === 1 ? { userId: id, role: role.data, watch: true } : null;
   const [member] = await tx
     .select({ teamRole: teamMembers.teamRole, status: teamMembers.status })
     .from(teamMembers)
@@ -84,7 +84,11 @@ async function holderOf(tx: Transaction, userId: string, lock: boolean): Promise
     role.data,
     membership.success ? { teamRole: membership.data.role, status: membership.data.status } : null,
   );
-  return scope === 'agency' ? { userId: id, role: role.data } : null;
+  if (scope === 'agency') return { userId: id, role: role.data, watch: true };
+  // A chatter at work: his link writes only through the copilot panel, which checks his shift at each write.
+  return scope === 'self' && membership.success && membership.data.status === 'active'
+    ? { userId: id, role: role.data, watch: false }
+    : null;
 }
 
 /** `extension_links` through `withAdmin` (migration 0100): the application role cannot reach it. */

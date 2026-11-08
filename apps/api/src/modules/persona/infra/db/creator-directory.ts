@@ -5,6 +5,7 @@ import {
   CreatorDisplayNameSchema,
   CreatorIdSchema,
   creatorNameKey,
+  CreatorSettingsSchema,
   DEFAULT_AGENT_HOURS,
   JOB_MAX_ATTEMPTS,
   JOB_PAYLOADS,
@@ -15,6 +16,7 @@ import {
   TimezoneSchema,
   type AgentHours,
   type ArchivedCreator,
+  type CopilotSwitches,
   type CreatorId,
   type CreatorSummary,
 } from '@impera/contracts';
@@ -344,5 +346,50 @@ export function createDrizzleCreatorDirectory(
         return true;
       });
     },
+
+    async copilotSwitches(id) {
+      const [row] = await db
+        .select({ settings: schema.creators.settings })
+        .from(schema.creators)
+        .where(eq(schema.creators.id, id));
+      return row === undefined ? null : copilotOf(row.settings);
+    },
+
+    setCopilotSwitches(id, change, userId) {
+      return db.transaction(async (tx) => {
+        // Locked: two changes at once each keep the switch the other set.
+        const [row] = await tx
+          .select({ settings: schema.creators.settings })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, id))
+          .for('update');
+        if (row === undefined) return null;
+        const before = copilotOf(row.settings);
+        const after = { ...before, ...change };
+        if (after.fanCard === before.fanCard && after.drafts === before.drafts) return after;
+        // Only her `copilot` key is written: the rest of her settings stays as stored, defaults never materialised.
+        await tx
+          .update(schema.creators)
+          .set({
+            settings: sql`${schema.creators.settings} || jsonb_build_object('copilot', ${JSON.stringify(after)}::jsonb)`,
+          })
+          .where(eq(schema.creators.id, id));
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: 'creator.copilot_switches',
+          entity: 'creator',
+          entityId: id,
+          details: { from: before, to: after },
+        });
+        return after;
+      });
+    },
   };
+}
+
+/** Her copilot switches (ADR 0086 § 6); settings that no longer read give the defaults: the card on, the drafts off. */
+function copilotOf(settings: unknown): CopilotSwitches {
+  const parsed = CreatorSettingsSchema.safeParse(settings);
+  return (parsed.success ? parsed.data : CreatorSettingsSchema.parse({})).copilot;
 }

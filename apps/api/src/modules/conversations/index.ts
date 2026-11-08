@@ -25,10 +25,12 @@ import type {
 } from './domain/ports';
 import { createDrizzleAlertHistory } from './infra/db/alert-history';
 import { createDrizzleAwayHolds } from './infra/db/away-holds';
+import { createDrizzleCopilotReader } from './infra/db/copilot-reader';
 import { createDrizzleCreatorSpaceReader } from './infra/db/creator-reader';
 import { createDrizzleConversationReader } from './infra/db/reader';
 import { createDrizzleUnitOfWork } from './infra/db/unit-of-work';
 import { createAlertHistoryRoutes } from './infra/http/alert-history-routes';
+import { createCopilotRoutes, type CopilotRouteDeps } from './infra/http/copilot-routes';
 import { createCreatorSpaceRoutes } from './infra/http/creator-routes';
 import { createConversationRoutes, type RequireRole } from './infra/http/routes';
 
@@ -109,6 +111,11 @@ export interface ConversationsDeps {
   readonly alertNames?: AlertNames;
   /** What her media show (SUIVI-26, `media` module's adapter); without it, Suivi shows a media's kind only. */
   readonly mediaDescriptions?: MediaDescriptions;
+  /**
+   * The copilot panel's doors (ADR 0086): the person an extension link names, and every creator the owner's panel looks
+   * in. Without them, `/v1/copilot` is not mounted.
+   */
+  readonly copilot?: Pick<CopilotRouteDeps, 'linkUser' | 'allCreatorIds'>;
   readonly clock?: Clock;
 }
 
@@ -149,6 +156,13 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         deps.alertNames ?? noAlertNames,
         deps.requireRole,
       )(app, options);
+      if (deps.copilot !== undefined)
+        await createCopilotRoutes({
+          ...deps.copilot,
+          reader: createDrizzleCopilotReader(deps.db),
+          gestures: { uow, clock, commands },
+          requireRole: deps.requireRole,
+        })(app, options);
       await createCreatorSpaceRoutes(
         createDrizzleCreatorSpaceReader(deps.db, deps.mediaDescriptions ?? noMediaDescriptions),
         deps.requireRole,
