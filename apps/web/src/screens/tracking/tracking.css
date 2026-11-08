@@ -189,6 +189,11 @@
   }
   .tr-page .tr-aside {
     min-height: 0;
+    overflow: hidden;
+  }
+  .tr-page .tr-aside__body {
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
@@ -228,7 +233,13 @@
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
 }
-.tr-aside > .tr-card__essentials {
+.tr-aside__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  min-width: 0;
+}
+.tr-aside__body > .tr-card__essentials {
   padding: 0 var(--nv-space-3);
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);

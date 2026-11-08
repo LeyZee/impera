@@ -138,7 +138,10 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
     view = card({ location: { current: value(['Lyon']), toCheck: [] } });
     renderCard();
     const row = field(await essentials(), /^Sa ville ou sa région/u);
+    // The hint guides the writing: it waits for the field to be opened.
+    expect(within(row).queryByText(/jamais une adresse/u)).toBeNull();
     fireEvent.click(within(row).getByRole('button', { name: 'Corriger' }));
+    expect(within(row).getByText(/jamais une adresse/u)).toBeTruthy();
     const input = within(row).getByRole('textbox', { name: 'Sa ville ou sa région' });
     fireEvent.change(input, { target: { value: ' Villeurbanne ' } });
     fireEvent.keyDown(input, { key: 'Enter' });

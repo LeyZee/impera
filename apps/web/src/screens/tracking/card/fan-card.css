@@ -40,7 +40,7 @@
   overflow-wrap: anywhere;
 }
 .tr-card__empty {
-  margin: 0;
+  flex: none;
   color: var(--nv-ink-faint);
 }
 .tr-card__source {

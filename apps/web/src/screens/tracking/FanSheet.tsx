@@ -92,11 +92,14 @@ export function FanSheet({
           <span className="tr-aside__sum">{line}</span>
         </header>
         {alertList}
-        {canDecide ? <FanCard creatorId={creatorId} fanId={fanId} /> : null}
-        <div className="tr-aside__more">
-          <FanLimits creatorId={creatorId} fanId={fanId} canDecide={canSetLimits} />
-          {canDecide ? <FanToLearn creatorId={creatorId} fanId={fanId} /> : null}
-          <DesireSheet creatorId={creatorId} conversationId={conversationId} desire={desire} />
+        {/* Only what is below the alerts scrolls: his name, the summary and what forbids stay in view. */}
+        <div className="tr-aside__body">
+          {canDecide ? <FanCard creatorId={creatorId} fanId={fanId} /> : null}
+          <div className="tr-aside__more">
+            <FanLimits creatorId={creatorId} fanId={fanId} canDecide={canSetLimits} />
+            {canDecide ? <FanToLearn creatorId={creatorId} fanId={fanId} /> : null}
+            <DesireSheet creatorId={creatorId} conversationId={conversationId} desire={desire} />
+          </div>
         </div>
       </>
     );

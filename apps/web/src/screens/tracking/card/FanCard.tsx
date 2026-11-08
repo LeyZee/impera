@@ -160,8 +160,15 @@ function FieldRow({
       <div className="tr-card__head">
         <span className="tr-card__label">
           {spec.label}
-          {spec.hint === undefined ? null : <span className="tr-card__hint"> · {spec.hint}</span>}
+          {/* The hint guides the writing: it shows once the field is opened, not on every empty line. */}
+          {spec.hint === undefined || !editing ? null : <span className="tr-card__hint"> · {spec.hint}</span>}
         </span>
+        {/* An empty field holds one line: what is not known yet is said beside its name, quietly. */}
+        {current === null && !editing && !closed ? (
+          <span className="tr-card__empty">
+            {spec.learning === 'observe' ? 'Pas encore deviné' : 'Pas encore su'}
+          </span>
+        ) : null}
         {editing || closed ? null : (
           <button
             type="button"
@@ -278,11 +285,7 @@ function FieldRow({
             </button>
           </span>
         </div>
-      ) : current === null ? (
-        <p className="tr-card__empty">
-          {spec.learning === 'observe' ? 'Pas encore deviné' : 'Pas encore su'}
-        </p>
-      ) : (
+      ) : current === null ? null : (
         <p className="tr-card__value">{valueText(spec.field, current.items)}</p>
       )}
 
