@@ -18,6 +18,7 @@ import { AppearanceChoice } from './AppearanceChoice';
 import { MediaBlurToggle } from './MediaBlurToggle';
 import { NavIcon } from './NavIcon';
 import { keepTabInside } from './focus';
+import { seesHerMedia } from './media-blur';
 import {
   documentTitle,
   FAMILY_LABELS,
@@ -52,7 +53,7 @@ export interface Account {
   readonly security: string;
   /** The extension's guide (ADR 0067), for the team: a creator has no use for it. */
   readonly extension: boolean;
-  /** « Flou des médias » (SC-04 lot c4), for the team who sees her media: a creator sees only her own. */
+  /** « Flou des médias » (SC-04 lot c4), for those who see her media: the owner and an active manager. */
   readonly media: boolean;
 }
 
@@ -64,7 +65,7 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
       role: roleLabel(user),
       security: securityPathOf(user),
       extension: user.role !== 'creator',
-      media: user.role !== 'creator',
+      media: seesHerMedia(user),
     }),
     [user],
   );
@@ -451,7 +452,7 @@ export function MoreSheet({
           </div>
         )}
         {account?.media === true ? (
-          <div className="nv-enter" style={{ '--nv-i': items.length + 2 }}>
+          <div className="nv-enter" style={{ '--nv-i': items.length + 3 }}>
             <MediaBlurToggle variant="sheet" />
           </div>
         ) : null}
@@ -459,7 +460,7 @@ export function MoreSheet({
           <Link
             to="/notifications"
             className="nv-more__item nv-enter"
-            style={{ '--nv-i': items.length + 3 }}
+            style={{ '--nv-i': items.length + 4 }}
             onClick={onClose}
           >
             <NavIcon name="bell" />
@@ -470,7 +471,7 @@ export function MoreSheet({
           <Link
             to={account.security}
             className="nv-more__item nv-enter"
-            style={{ '--nv-i': items.length + 4 }}
+            style={{ '--nv-i': items.length + 5 }}
             onClick={onClose}
           >
             <NavIcon name="shield" />
@@ -481,7 +482,7 @@ export function MoreSheet({
           <button
             type="button"
             className="nv-more__item nv-more__out nv-enter"
-            style={{ '--nv-i': items.length + 5 }}
+            style={{ '--nv-i': items.length + 6 }}
             onClick={onSignOut}
           >
             Se déconnecter

@@ -291,6 +291,30 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     expect(document.documentElement.dataset['mediaBlur']).toBe('on');
   });
 
+  it('plays a video without its controls while it is blurred, and with them once « Voir net » (SC-04 lot c4)', async () => {
+    window.localStorage.clear();
+    startMediaBlur();
+    serve({
+      ...base,
+      [`GET ${REVIEW}`]: () => ({
+        status: 200,
+        body: reviewOf(SENT.id, FILES, { thumbnails: true, video: true }),
+      }),
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Relire les descriptions' }));
+    const region = await screen.findByRole('region', { name: 'Descriptions de S012' });
+    fireEvent.click(within(region).getByRole('button', { name: 'Voir la vidéo en grand' }));
+    const viewer = await screen.findByRole('dialog', { name: 'Vidéo · E2B' });
+    const video = viewer.querySelector('video.sx-viewer__media');
+    expect(video?.getAttribute('src')).toBe(
+      `/v1/creators/${CREATOR}/drops/${SENT.id}/files/${FILES[2]}/media`,
+    );
+    expect(video?.hasAttribute('controls')).toBe(false);
+    fireEvent.click(within(viewer).getByRole('button', { name: 'Voir net' }));
+    expect(viewer.querySelector('video.sx-viewer__media')?.hasAttribute('controls')).toBe(true);
+  });
+
   it('shows its picture alone once the original is erased', async () => {
     serve({
       ...base,

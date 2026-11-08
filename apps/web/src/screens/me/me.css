@@ -41,3 +41,9 @@
   gap: var(--nv-space-4);
   max-width: 640px;
 }
+/* « Flou des médias » (SC-04 lot c4): its row on the panel's inset, its icon under the panel's text. */
+.me-prefs .nv-more__blur {
+  align-self: stretch;
+  width: calc(100% + 28px);
+  margin-inline: -14px;
+}

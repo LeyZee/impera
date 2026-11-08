@@ -1,3 +1,4 @@
+import type { Me } from '@impera/contracts';
 import { useSyncExternalStore } from 'react';
 
 /**
@@ -8,6 +9,13 @@ import { useSyncExternalStore } from 'react';
  */
 
 export const MEDIA_BLUR_KEY = 'impera.media-blur';
+
+/**
+ * Who has the switch: those who see her media on the agency's screens, the owner and an active manager (the media and
+ * thumbnail routes answer them alone). A chatter and the creator herself would get a switch that changes nothing.
+ */
+export const seesHerMedia = (user: Pick<Me, 'teamScope'>): boolean =>
+  user.teamScope === 'owner' || user.teamScope === 'agency';
 
 /** What a stored value means: blurred unless it says `off` (nothing stored, an old value, storage refused). */
 export const parseMediaBlur = (stored: string | null): boolean => stored !== 'off';

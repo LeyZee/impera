@@ -424,7 +424,8 @@ function DescriptionBlock({
 /**
  * Her medium in large (SC-04 lot c4), its description beside it: the original while it is held (a video plays in the
  * parts it asks), its reduced picture once the original is gone or when the browser cannot show it (a HEIC photo).
- * Under « Flou des médias » it opens blurred; « Voir net » shows this one alone, for as long as it is open.
+ * Under « Flou des médias » it opens blurred, a video without its controls (blurred and cropped with it otherwise);
+ * « Voir net » shows this one alone, its controls with it, for as long as it is open.
  */
 function MediaViewer({
   media,
@@ -450,7 +451,7 @@ function MediaViewer({
         data-revealed={shown}
         src={urls.media}
         poster={media.thumbnail ? urls.thumbnail : undefined}
-        controls
+        controls={shown === 'true'}
         playsInline
         preload="metadata"
         onError={() => {

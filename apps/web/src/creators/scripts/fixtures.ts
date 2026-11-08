@@ -38,6 +38,8 @@ export const reviewOf = (
     /** Its reduced picture made, its original still held (SC-04 lot c4). */
     readonly thumbnails?: boolean;
     readonly original?: boolean;
+    /** Its last medium a video. */
+    readonly video?: boolean;
   } = {},
 ): DropDescriptionsReview =>
   DropDescriptionsReviewSchema.parse({
@@ -46,7 +48,7 @@ export const reviewOf = (
       fileId,
       slotKey: ['salon::0', 'chambre:A:0', 'chambre:B:0'][index],
       mediaAssetId: `0192f3a0-0000-7000-8000-00000000e00${String(index)}`,
-      kind: 'image',
+      kind: fields.video === true && index === 2 ? 'video' : 'image',
       description: {
         id: `0192f3a0-0000-7000-8000-00000000f00${String(index)}`,
         author: 'sense',
