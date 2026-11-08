@@ -1,10 +1,13 @@
 import type {
+  ChannelPostKind,
+  ChannelPostViolation,
   CreatorId,
   SalesFeedReading,
   SalesRefunds,
   SalesTotals,
   TelegramBotId,
   TelegramBotState,
+  TelegramChannelConfig,
   TelegramChatId,
   TelegramChatKind,
   TelegramDeliveryStatus,
@@ -367,3 +370,58 @@ export interface Clock {
 export interface AlertNames {
   ofCreator(creatorId: CreatorId): Promise<ReadonlyMap<string, string>>;
 }
+
+/** The creator's channel as stored (ADR 0080): her setting, whole; the channel column is the setting's own. */
+export interface ChannelRecord {
+  readonly creatorId: CreatorId;
+  /** The `chat_id` column: it, not the setting, says which chat she holds (a removed chat empties it). */
+  readonly chatId: TelegramChatId | null;
+  /** Null when the stored setting no longer reads: her chat still counts as hers. */
+  readonly config: TelegramChannelConfig | null;
+  readonly archived: boolean;
+}
+
+/** The creators' channels, as the admin role; each save writes `audit_log`. */
+export interface ChannelsStore {
+  /** Null when the owner never saved one for her; a row it cannot read reads as never saved. */
+  findChannel(creatorId: CreatorId): Promise<ChannelRecord | null>;
+  listChannels(): Promise<readonly ChannelRecord[]>;
+  /** Whether she exists and is not archived. */
+  creatorActive(creatorId: CreatorId): Promise<boolean>;
+  /** `chat_taken` when another creator holds that channel (the unique key decides, two saves at once included). */
+  saveChannel(
+    creatorId: CreatorId,
+    config: TelegramChannelConfig,
+    userId: string,
+  ): Promise<'saved' | 'chat_taken'>;
+}
+
+/**
+ * ADR 0080 § 5: who she is for the post, from her active persona version, and her guards on the words of a post (the
+ * agent's, plus nothing explicit on a public channel). Wired from the `agent` module, matched by shape.
+ */
+interface ChannelWriterPersona {
+  /** Her version, as the playground names it (« 2.0.0 »). */
+  readonly version: string;
+  readonly creatorName: string;
+  readonly personaSheet: string;
+  check(texts: readonly string[]): readonly ChannelPostViolation[];
+}
+/** Null when she has no active version: nothing is written for her. */
+export type ChannelPersonaSource = (creatorId: CreatorId) => Promise<ChannelWriterPersona | null>;
+
+interface ChannelVoiceInput {
+  readonly creatorId: CreatorId;
+  readonly kind: ChannelPostKind;
+  readonly creatorName: string;
+  readonly personaSheet: string;
+  readonly examples: readonly string[];
+  readonly media: string | null;
+  readonly destination: string | null;
+  readonly advice: string | null;
+}
+type ChannelVoiceOutput =
+  | { readonly kind: 'post'; readonly text: string }
+  | { readonly kind: 'poll'; readonly question: string; readonly options: readonly string[] };
+/** The voice of the gateway (role `voice`, prompt `voice/telegram-channel`); null when no model answered. */
+export type ChannelVoice = (input: ChannelVoiceInput) => Promise<ChannelVoiceOutput | null>;

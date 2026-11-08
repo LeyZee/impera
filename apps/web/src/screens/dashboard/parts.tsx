@@ -55,8 +55,15 @@ interface TipContent {
 }
 
 export interface FloatingTip {
-  /** Spread on any element that explains itself on hover or focus. */
-  readonly bind: (content: TipContent) => {
+  /**
+   * Spread on any element that explains itself on hover or focus. `above` sets the tip over the element's top edge,
+   * at the pointer's x, so a chart's tip never sits over the text beside it; a tap or the keyboard sets it beside the
+   * element instead.
+   */
+  readonly bind: (
+    content: TipContent,
+    options?: { readonly above?: boolean },
+  ) => {
     onPointerMove: (event: React.PointerEvent) => void;
     onPointerDown: (event: React.PointerEvent) => void;
     onPointerLeave: (event: React.PointerEvent) => void;
@@ -67,21 +74,95 @@ export interface FloatingTip {
   readonly element: JSX.Element;
 }
 
+/** The box a tip opened by a tap or the keyboard sits beside. */
+interface Beside {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+interface PlacedTip {
+  content: TipContent;
+  x: number;
+  y: number;
+  above?: boolean;
+  beside?: Beside;
+}
+
+/**
+ * Where a tap or the keyboard puts the tip: under the element, or beside it with `above`. A phone has no room over a
+ * chart's column: there the tip covered the chart's title, under it the next card's (recette du 07/11).
+ */
+function placedOn(
+  content: TipContent,
+  box: DOMRect,
+  options: { readonly above?: boolean } | undefined,
+): PlacedTip {
+  if (options?.above === true) {
+    return {
+      content,
+      x: box.left,
+      y: box.top,
+      beside: { left: box.left, right: box.right, top: box.top, bottom: box.bottom },
+    };
+  }
+  return { content, x: box.left, y: box.bottom };
+}
+
+const TIP_GAP = 8;
+const TIP_MARGIN = 12;
+
+/**
+ * Beside a box, on the side with more room, its middle on the box's middle, kept inside the window. Exported for its
+ * tests.
+ */
+export function besidePlacement(
+  box: Beside,
+  tip: { readonly width: number; readonly height: number },
+  view: { readonly width: number; readonly height: number },
+): { left: number; top: number } {
+  const roomLeft = box.left - TIP_GAP - TIP_MARGIN;
+  const roomRight = view.width - box.right - TIP_GAP - TIP_MARGIN;
+  const wanted =
+    roomRight >= tip.width || roomRight >= roomLeft ? box.right + TIP_GAP : box.left - TIP_GAP - tip.width;
+  const left = Math.min(Math.max(TIP_MARGIN, wanted), view.width - tip.width - TIP_MARGIN);
+  const middle = (box.top + box.bottom) / 2 - tip.height / 2;
+  const top = Math.min(Math.max(TIP_MARGIN, middle), view.height - tip.height - TIP_MARGIN);
+  return { left, top };
+}
+
 /** One floating `nv-tip` for the whole screen, placed under the pointer by `tipPlacement`. */
 export function useFloatingTip(): FloatingTip {
-  const [tip, setTip] = useState<{ content: TipContent; x: number; y: number } | null>(null);
+  const [tip, setTip] = useState<PlacedTip | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     const element = ref.current;
     if (element === null || tip === null) return;
+    if (tip.beside !== undefined) {
+      const beside = besidePlacement(
+        tip.beside,
+        { width: element.offsetWidth, height: element.offsetHeight },
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      element.style.left = `${String(beside.left)}px`;
+      element.style.top = `${String(beside.top)}px`;
+      return;
+    }
     const place = tipPlacement(
       { x: tip.x, y: tip.y },
       { width: element.offsetWidth, height: element.offsetHeight },
       { width: window.innerWidth, height: window.innerHeight },
     );
-    element.style.left = `${String(place.left)}px`;
-    element.style.top = `${String(place.top)}px`;
+    // Above an element: centred on the pointer, kept inside the window.
+    const above = tip.above === true;
+    const top = above ? Math.max(12, tip.y - element.offsetHeight - 10) : place.top;
+    const left = above
+      ? Math.min(Math.max(12, tip.x - element.offsetWidth / 2), window.innerWidth - element.offsetWidth - 12)
+      : place.left;
+    element.style.left = `${String(left)}px`;
+    element.style.top = `${String(top)}px`;
   }, [tip]);
 
   const hide = useCallback(() => {
@@ -104,22 +185,30 @@ export function useFloatingTip(): FloatingTip {
     };
   }, [shown, hide]);
   const bind = useCallback(
-    (content: TipContent) => ({
+    (content: TipContent, options?: { readonly above?: boolean }) => ({
       onPointerMove: (event: React.PointerEvent) => {
+        if (options?.above === true) {
+          setTip({
+            content,
+            x: event.clientX,
+            y: event.currentTarget.getBoundingClientRect().top,
+            above: true,
+          });
+          return;
+        }
         setTip({ content, x: event.clientX, y: event.clientY });
       },
-      // A finger has no hover: a tap shows the tip under the element, and the next tap anywhere hides it.
+      // A finger has no hover: a tap shows the tip under the element (beside it with `above`), and the next tap
+      // anywhere hides it.
       onPointerDown: (event: React.PointerEvent) => {
         if (event.pointerType === 'mouse') return;
-        const box = event.currentTarget.getBoundingClientRect();
-        setTip({ content, x: box.left, y: box.bottom });
+        setTip(placedOn(content, event.currentTarget.getBoundingClientRect(), options));
       },
       onPointerLeave: (event: React.PointerEvent) => {
         if (event.pointerType === 'mouse') hide();
       },
       onFocus: (event: React.FocusEvent) => {
-        const box = event.currentTarget.getBoundingClientRect();
-        setTip({ content, x: box.left, y: box.bottom });
+        setTip(placedOn(content, event.currentTarget.getBoundingClientRect(), options));
       },
       onBlur: hide,
     }),

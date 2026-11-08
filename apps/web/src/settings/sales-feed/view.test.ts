@@ -1,9 +1,4 @@
-import {
-  TeamMemberSchema,
-  type SalesFeedModelLink,
-  type SalesFeedStatus,
-  type TeamMember,
-} from '@impera/contracts';
+import type { SalesFeedModelLink, SalesFeedStatus } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -11,7 +6,6 @@ import {
   ago,
   dotOf,
   lineOf,
-  memberChoicesOf,
   modelQuarantineLine,
   quarantineLine,
   webhookViewOf,
@@ -135,41 +129,6 @@ describe('accountOptionsOf', () => {
   it('keeps the model’s own account choosable', () => {
     const own = accountOptionsOf(models[0] ?? model('x', 'x', null), accounts, models);
     expect(own[0]).toEqual({ value: ACCOUNT_A, label: '@lune · Lune', disabled: false });
-  });
-});
-
-describe('memberChoicesOf', () => {
-  const member = (id: string, displayName: string, status: TeamMember['status']): TeamMember =>
-    TeamMemberSchema.parse({
-      id: `00000000-0000-4000-8000-00000000000${id}`,
-      userId: `00000000-0000-4000-8000-0000000001${id}0`,
-      email: `${id}@example.test`,
-      firstName: displayName,
-      lastName: 'Test',
-      displayName,
-      teamRole: 'chatter',
-      status,
-      country: 'BJ',
-      timeZone: 'Africa/Porto-Novo',
-      color: null,
-      joinedOn: '2026-01-01',
-      creatorIds: [],
-      commission: null,
-      invitationPending: false,
-      invitationExpiresAt: null,
-    });
-  const team = [member('b', 'Zoé', 'active'), member('a', 'Ana', 'on_leave'), member('c', 'Paul', 'left')];
-
-  it('keeps the team still in it, by name, and leaves out who left', () => {
-    expect(memberChoicesOf(team, null).map((m) => m.displayName)).toEqual(['Ana', 'Zoé']);
-  });
-
-  it('keeps a member who left when he is the one linked', () => {
-    expect(memberChoicesOf(team, '00000000-0000-4000-8000-00000000000c').map((m) => m.displayName)).toEqual([
-      'Ana',
-      'Paul',
-      'Zoé',
-    ]);
   });
 });
 

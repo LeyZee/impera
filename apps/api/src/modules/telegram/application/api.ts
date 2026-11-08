@@ -1,8 +1,12 @@
 import type {
+  ChannelRefusal,
+  ChannelTryRefusalKind,
   CreatorId,
   Result,
   TelegramBot,
   TelegramBotId,
+  TelegramChannelConfig,
+  TelegramChannelView,
   TelegramChatId,
   TelegramDelivery,
   TelegramNightCounts,
@@ -12,6 +16,8 @@ import type {
   TelegramSaleSettingsEntry,
   TelegramSalesSettings,
   TelegramTopic,
+  TriedChannelPost,
+  TryChannelPostBody,
 } from '@impera/contracts';
 
 /** What the routes and other modules (the Dashboard) use; the jobs are separate (index.ts). */
@@ -27,7 +33,9 @@ export interface TelegramApi {
   saveRoutes(
     version: number,
     routes: readonly TelegramRoute[],
-  ): Promise<Result<{ routes: TelegramRoute[]; version: number }, TelegramRefusal | 'unknown_chat'>>;
+  ): Promise<
+    Result<{ routes: TelegramRoute[]; version: number }, TelegramRefusal | 'unknown_chat' | 'creator_channel'>
+  >;
   sendTest(chatId: TelegramChatId): Promise<Result<{ sentAt: string }, TelegramRefusal> | null>;
   listDeliveries(topic: TelegramTopic | null, limit: number): Promise<TelegramDelivery[]>;
   nightCounts(creatorId: CreatorId): Promise<TelegramNightCounts>;
@@ -37,4 +45,19 @@ export interface TelegramApi {
     entries: readonly TelegramSaleSettingsEntry[],
     userId: string,
   ): Promise<Result<TelegramSalesSettings, 'unknown_creator'>>;
+  /** Her Telegram channel (ADR 0080); null when she does not exist or is archived. */
+  channel(creatorId: CreatorId): Promise<TelegramChannelView | null>;
+  saveChannel(
+    creatorId: CreatorId,
+    config: TelegramChannelConfig,
+    userId: string,
+  ): Promise<Result<TelegramChannelView, ChannelRefusal> | null>;
+  /**
+   * A post of her channel written as production will, never sent (ADR 0080 § 7, « Post du canal »); null when she
+   * does not exist or is archived.
+   */
+  tryChannelPost(
+    creatorId: CreatorId,
+    body: TryChannelPostBody,
+  ): Promise<Result<TriedChannelPost, ChannelTryRefusalKind> | null>;
 }

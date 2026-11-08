@@ -24,6 +24,7 @@ import type {
   BotRecord,
   BotsStore,
   ChannelFailure,
+  ChannelsStore,
   ChatRecord,
   Clock,
   DeliveriesStore,
@@ -33,6 +34,7 @@ import { renderPlain } from '../domain/render';
 import { DELIVERY_RETENTION_MS, morningDigestKey, nightOf } from '../domain/schedule';
 import { botIdOfToken } from '../domain/token';
 
+import { creatorChannelChats } from './channel';
 import { LISTEN_SECONDS } from './poll';
 
 export interface SettingsDeps {
@@ -40,6 +42,8 @@ export interface SettingsDeps {
   readonly deliveries: DeliveriesStore;
   readonly channel: NotificationChannel;
   readonly clock: Clock;
+  /** The creators' channels (ADR 0080): an alert route never points at one. */
+  readonly channels?: ChannelsStore;
 }
 
 function refusal(kind: TelegramErrorKind): TelegramRefusal {
@@ -181,9 +185,16 @@ export async function saveRoutes(
   deps: SettingsDeps,
   version: number,
   routes: readonly TelegramRoute[],
-): Promise<Result<{ routes: TelegramRoute[]; version: number }, TelegramRefusal | 'unknown_chat'>> {
+): Promise<
+  Result<{ routes: TelegramRoute[]; version: number }, TelegramRefusal | 'unknown_chat' | 'creator_channel'>
+> {
   const chats = new Set((await deps.bots.listChats()).map((chat) => chat.id));
   if (routes.some((route) => !chats.has(route.chatId))) return err('unknown_chat');
+  // ADR 0080 § 6.1: a creator's channel is public; no alert ever goes there.
+  if (deps.channels !== undefined) {
+    const channels = await creatorChannelChats(deps.channels);
+    if (routes.some((route) => channels.has(route.chatId))) return err('creator_channel');
+  }
   const unique = new Map(
     routes.map((route) => [`${route.creatorId ?? '*'}|${route.topic}|${route.chatId}`, route]),
   );

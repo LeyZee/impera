@@ -103,3 +103,6 @@ Date : AAAA-MM-JJ
 | 0077 | Rapport de fin de shift : Impera le rappelle au chatteur sur son téléphone | accepted (précise 0042 § 7, 0023 et 0073 § 5) |
 | 0078 | Le Dashboard de l'agence lit ses insights dans le registre des ventes, pour le propriétaire et un manager actif | accepted (précise 0050 et 0043 § 7) |
 | 0079 | La fiche persona reprend la fiche Desirali, onglet par onglet et question par question | accepted (précise 0010 ; remplace pour toute nouvelle version les blocs P5-01, `additional_info` et les listes fermées) |
+| 0080 | Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM | accepted (précise 0057, 0055, 0020 ; remplace pour le canal Telegram l'acceptation de 0057 § 3 et l'adresse de 0057 § 6) |
+| 0081 | Les abonnés, les PPV envoyés et les messages se gardent en photo quotidienne lue chez la plateforme | accepted (précise 0078 § 6 et 0050) |
+| 0083 | Chaque média que la créatrice dépose est décrit en détail, seul, et validé avant tout usage | accepted (précise 0030 § 3 et 0056 § 6) |

@@ -1,9 +1,12 @@
 /** Public entry point of the `telegram` module (ADR 0002, ADR 0020). Other modules import this file only. */
 import type { TelegramBotId, TelegramChatId } from '@impera/contracts';
 import { parseEncryptionKeys, type Database, type EncryptionKey } from '@impera/db';
+import type { LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { TelegramApi } from './application/api';
+import { channelView, saveChannel } from './application/channel';
+import { tryChannelPost } from './application/channel-post';
 import { connectionReminders } from './application/connections';
 import { flushChat, type FlushDeps } from './application/flush';
 import { dispatchPolls, pollBot } from './application/poll';
@@ -29,10 +32,14 @@ import {
   replaceToken,
   saveRoutes,
   sendTest,
+  type SettingsDeps,
 } from './application/settings';
+import { TelegramChannelsUnavailable, TelegramChannelWriterUnavailable } from './domain/errors';
 import type {
   AlertNames,
   BotsStore,
+  ChannelPersonaSource,
+  ChannelsStore,
   Clock,
   DeliveriesStore,
   NotificationChannel,
@@ -41,6 +48,8 @@ import type {
   UsdRateReader,
 } from './domain/ports';
 import type { ScannedEvent } from './domain/signals';
+import { channelVoiceOf } from './infra/channel-voice';
+import { createPostgresChannelsStore } from './infra/channels.store';
 import { createPostgresTelegramStore, type ResealReport } from './infra/postgres.store';
 import {
   createPrivateLinkRoutes,
@@ -52,6 +61,7 @@ import { createTelegramRoutes, type TelegramRoutesOptions } from './infra/routes
 import { createTelegramApi } from './infra/telegram-api';
 
 export { SCANNED_EVENT_TYPES } from './domain/classify';
+export type { ChannelPersonaSource } from './domain/ports';
 
 export interface TelegramDeps {
   readonly bots: BotsStore;
@@ -59,6 +69,8 @@ export interface TelegramDeps {
   readonly channel: NotificationChannel;
   /** ADR 0068 § 4: the accounts' private chats; without it, no link is made and `/start` is read past. */
   readonly privateLinks?: PrivateLinksStore;
+  /** ADR 0080: the creators' channels; without it, the channel routes answer 503 and the routing checks nothing. */
+  readonly channels?: ChannelsStore;
   readonly clock?: Clock;
   /** WEB_ORIGIN: the links of the messages open the CRM. */
   readonly webOrigin: string;
@@ -72,6 +84,14 @@ export interface TelegramDeps {
   readonly salesDay?: SalesDayReader;
   /** Pay's dollar rate (`latestRateOf` of `payroll`), for the minimum price of a dollar sale. */
   readonly usdRate?: UsdRateReader;
+  /** ADR 0080 § 5: her persona and the voice that write her channel's posts; without them, nothing is written. */
+  readonly channelWriter?: ChannelWriter;
+}
+
+/** Her persona with her guards (from `agent`) and the gateway's voice, wired by the composition root. */
+interface ChannelWriter {
+  readonly persona: ChannelPersonaSource;
+  readonly gateway: Pick<LlmGateway, 'channelPost'>;
 }
 
 /** The job handlers, one per `telegram.*` job (TELEGRAM_JOB_PAYLOADS); the worker wires them. */
@@ -106,7 +126,15 @@ interface PrivateChat {
 
 export function createTelegramModule(deps: TelegramDeps): TelegramModule {
   const clock = deps.clock ?? { now: () => new Date() };
-  const base: FlushDeps = { bots: deps.bots, deliveries: deps.deliveries, channel: deps.channel, clock };
+  const base: FlushDeps & SettingsDeps = {
+    bots: deps.bots,
+    deliveries: deps.deliveries,
+    channel: deps.channel,
+    clock,
+    ...(deps.channels !== undefined && { channels: deps.channels }),
+  };
+  const channels = deps.channels;
+  const writer = deps.channelWriter;
   const privateLinks = deps.privateLinks;
   const linking: PrivateLinkApi = {
     issueCode: (userId) =>
@@ -140,6 +168,24 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
     nightCounts: (creatorId) => nightCounts(base, creatorId),
     saleSettings: () => saleSettings(base),
     saveSaleSettings: (entries, userId) => saveSaleSettings(base, entries, userId),
+    channel: (creatorId) =>
+      channels === undefined
+        ? Promise.reject(new TelegramChannelsUnavailable())
+        : channelView({ bots: deps.bots, channels }, creatorId),
+    saveChannel: (creatorId, config, userId) =>
+      channels === undefined
+        ? Promise.reject(new TelegramChannelsUnavailable())
+        : saveChannel({ bots: deps.bots, channels }, creatorId, config, userId),
+    tryChannelPost: (creatorId, body) =>
+      channels === undefined
+        ? Promise.reject(new TelegramChannelsUnavailable())
+        : writer === undefined
+          ? Promise.reject(new TelegramChannelWriterUnavailable())
+          : tryChannelPost(
+              { channels, persona: writer.persona, voice: channelVoiceOf(writer.gateway) },
+              creatorId,
+              body,
+            ),
   };
   return {
     ...api,
@@ -183,6 +229,7 @@ export interface TelegramStartOptions {
   readonly alertNames: AlertNames;
   readonly salesDay: SalesDayReader;
   readonly usdRate: UsdRateReader;
+  readonly channelWriter?: ChannelWriter;
 }
 
 /** Builds the module on Postgres and the Telegram Bot API, and re-seals the tokens of a past rotation. */
@@ -195,6 +242,7 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
     bots: store.bots,
     deliveries: store.deliveries,
     privateLinks: createPostgresPrivateLinksStore(options.adminDb),
+    channels: createPostgresChannelsStore(options.adminDb),
     channel: createTelegramApi({ fetch }),
     webOrigin: options.webOrigin,
     onUncovered: options.onUncovered,
@@ -202,6 +250,7 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
     alertNames: options.alertNames,
     salesDay: options.salesDay,
     usdRate: options.usdRate,
+    ...(options.channelWriter !== undefined && { channelWriter: options.channelWriter }),
   });
   const report = await module.start();
   if (report.unreadable.length > 0) options.onUnreadableTokens(report.unreadable);

@@ -119,6 +119,12 @@ export function wireConnectors(
         logger,
         (payload, context) => module.jobs.checkSales(payload, context.logger, `job:${context.jobId}`),
       ),
+      'connector.read_daily_stats': defineTask(
+        'connector.read_daily_stats',
+        JOB_PAYLOADS['connector.read_daily_stats'],
+        logger,
+        (_payload, context) => module.jobs.readDailyStats(context.logger, `job:${context.jobId}`),
+      ),
       'connector.copy_avatar': defineTask(
         'connector.copy_avatar',
         JOB_PAYLOADS['connector.copy_avatar'],

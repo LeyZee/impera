@@ -197,11 +197,32 @@
   flex-direction: column-reverse;
   gap: 2px;
   border-radius: var(--nv-radius-xs);
-  transition: background var(--nv-dur-fast);
+  transform-origin: bottom;
+  transition:
+    background var(--nv-dur-fast),
+    opacity var(--nv-dur-fast),
+    transform var(--nv-dur-base) var(--nv-ease-spring);
 }
+/* The column under the pointer swells, the others step back: the eye lands on the day read (recette du 07/11). */
 .ins-col:hover .ins-col__stack,
 .ins-col:focus-visible .ins-col__stack {
   background: var(--nv-select);
+  transform: scaleX(1.16);
+}
+.ins-daily__bars:has(.ins-col:hover, .ins-col:focus-visible)
+  .ins-col:not(:hover, :focus-visible)
+  .ins-col__stack {
+  opacity: 0.45;
+}
+/* A finger has no hover: the tapped column, focused, swells the same way. */
+@media (hover: none) {
+  .ins-col:focus .ins-col__stack {
+    background: var(--nv-select);
+    transform: scaleX(1.16);
+  }
+  .ins-daily__bars:has(.ins-col:focus) .ins-col:not(:focus) .ins-col__stack {
+    opacity: 0.45;
+  }
 }
 .ins-col__part {
   flex: none;
@@ -296,11 +317,15 @@
   stroke: var(--_c);
   stroke-dasharray: 0 999;
   cursor: pointer;
+  transform-box: view-box;
+  transform-origin: 66px 66px;
   animation: ins-ring var(--nv-dur-data) var(--nv-ease-out) both;
   animation-delay: calc(var(--_i, 0) * 90ms + 120ms);
   transition:
     stroke-width var(--nv-dur-base) var(--nv-ease-spring),
-    opacity var(--nv-dur-fast);
+    transform var(--nv-dur-base) var(--nv-ease-spring),
+    opacity var(--nv-dur-fast),
+    filter var(--nv-dur-base);
 }
 @keyframes ins-ring {
   to {
@@ -312,7 +337,10 @@
 }
 .ins-ring.is-lit .ins-ring__arc.is-on {
   opacity: 1;
-  stroke-width: 18;
+  stroke-width: 20;
+  /* The slice comes out of the ring, a little bigger and lit with its own colour (recette du 07/11). */
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--_c) 55%, transparent));
 }
 .ins-ring__middle {
   position: absolute;
@@ -744,6 +772,100 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* Les abonnés (ADR 0081): the lead and its line, then six counts, then when Reveal was read. */
+.ins-subs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 8px 24px;
+  padding: 20px 22px 16px;
+}
+.ins-subs__lead {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.ins-subs__chart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  height: 120px;
+}
+.ins-subs__scale {
+  position: relative;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ins-subs__sizer {
+  display: block;
+  height: 0;
+  overflow: hidden;
+  font-style: normal;
+  visibility: hidden;
+}
+.ins-subs__scale > span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+.ins-subs__plot {
+  position: relative;
+  min-width: 0;
+  border-bottom: 1px solid var(--nv-plate-edge);
+}
+.ins-subs__plot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  clip-path: inset(-4px 100% -4px -4px);
+  animation: ins-draw var(--nv-dur-data) var(--nv-ease-out) 200ms forwards;
+}
+.ins-subs__line {
+  fill: none;
+  stroke: var(--nv-data-1);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ins-subs__dot {
+  stroke-width: 6;
+}
+.ins-subs__gap {
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 4;
+}
+.ins-subs__hits {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.ins-subs__hit {
+  flex: 1 1 0;
+}
+.ins-subs__hit:hover {
+  background: var(--nv-plate-hover);
+}
+.nv-plate.ins-subs .ins-subs__tiles {
+  align-content: start;
+}
+.ins-subs__tile {
+  padding: 10px 0;
+  border-top: 1px solid var(--nv-plate-edge);
+}
+.ins-subs__foot {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+}
+
 @media (max-width: 720px) {
   .ins-period {
     width: 100%;
@@ -846,10 +968,16 @@
     gap: 18px;
     padding: 16px;
   }
+  .ins-subs {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ins-spark,
+  .ins-subs__plot svg,
   .ins-col__part,
   .ins-ring__arc,
   .ins-rank__bar > span,
@@ -862,5 +990,15 @@
   }
   .ins-ring__arc {
     stroke-dasharray: var(--_dash);
+  }
+  /* Without motion the lit slice and column still stand out, at once, without growing. */
+  .ins-ring__arc,
+  .ins-col__stack {
+    transition: none;
+  }
+  .ins-ring.is-lit .ins-ring__arc.is-on,
+  .ins-col:hover .ins-col__stack,
+  .ins-col:focus .ins-col__stack {
+    transform: none;
   }
 }

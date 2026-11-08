@@ -24,6 +24,7 @@ import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domai
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
+import { createDrizzleDailyStatsStore } from './infra/db/daily-stats-store';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import {
   createSalesFeedJobs,
@@ -66,6 +67,11 @@ export type { ShiftSales, ShiftSalesQuery } from './infra/db/report-reads';
 /** @public The sales totals of CRM-04, in the caller's transaction: the Dashboard's and the evening digest's one sum. */
 export { salesFeedTotals } from './infra/db/totals-reads';
 export { salesFeedTimeZone } from './domain/sale-days';
+/**
+ * The daily photo of a creator's statistics (ADR 0081 § 4, § 5), read in the caller's `withTenantMember`: the owner,
+ * or an active manager when she is on his list. Counters only, never an amount.
+ */
+export { dailyStatsOf, type DailyStatsDay } from './infra/db/daily-stats-store';
 /** @public Which totals a read gives (CRM-04). */
 export type { SalesRefundsQuery, SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';
@@ -142,6 +148,8 @@ export interface ConnectorsModule {
     ): Promise<void>;
     /** Her photo copied from the platform to the media bucket, after her import (CRM-07 a2b). */
     copyAvatar(payload: JobPayload<'connector.copy_avatar'>, logger: JobLogger): Promise<void>;
+    /** The platform's daily statistics of each linked account, kept as counters (ADR 0081 § 3). */
+    readDailyStats(logger: JobLogger, correlationId: string): Promise<void>;
   };
   /** `/v1/creators/:creatorId/avatar`, behind the guard given here (owner, operator, creator). */
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
@@ -251,6 +259,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       await deps.publishConnectionState(service, signal, correlationId);
     },
     avatars,
+    dailyStats: createDrizzleDailyStatsStore(deps.adminDb),
   });
   return {
     name: 'connectors',
@@ -269,6 +278,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       reconcile: createReconcileJob(accountJobs),
       readSales: (logger, correlationId, woken = false) => salesFeeds.read(logger, correlationId, woken),
       checkSales: (payload, logger, correlationId) => salesFeeds.autoCheck(payload, logger, correlationId),
+      readDailyStats: (logger, correlationId) => salesFeeds.readDailyStats(logger, correlationId),
       copyAvatar: (payload, logger) => salesFeeds.copyAvatar(payload, logger),
     },
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),

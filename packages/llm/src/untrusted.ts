@@ -11,7 +11,14 @@ export type UntrustedKind =
   | 'brief'
   | 'candidate_reply'
   /** A phrase of one of her alerts (P4-01): written by the agency, still read as a criterion, never as an order. */
-  | 'creator_alert';
+  | 'creator_alert'
+  /**
+   * Her channel's posts (ADR 0080 § 5): the examples the agency chose, where her link leads, an advice of the agency.
+   * Written by the agency, still read as data, never as an order.
+   */
+  | 'channel_examples'
+  | 'link_destination'
+  | 'agency_advice';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.

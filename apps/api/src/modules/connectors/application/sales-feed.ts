@@ -8,7 +8,6 @@ import {
   type ConnectionSignal,
   type JobPayload,
   type PayPeriod,
-  type LinkSalesFeedChatterBody,
   type Platform,
   type Result,
   type SalesFeedChatterLink,
@@ -31,12 +30,16 @@ import { fortnightBefore, mismatchDays, type CheckedAccount } from '../domain/au
 import type { AvatarPorts } from '../domain/avatar';
 import { isLastingOutage, nextUnreachableRun, type UnreachableRun } from '../domain/connection-outage';
 import {
+  dailyStatsRange,
+  dailyStatsRows,
+  statsCallAllowed,
+  type DailyStatsStore,
+} from '../domain/daily-stats';
+import {
   SalesFeedAccountUnprocessable,
   SalesFeedCheckDaysUnprocessable,
   SalesFeedDeliveryRefused,
   SalesFeedListUnavailable,
-  SalesFeedMemberUnprocessable,
-  SalesFeedTeamForbidden,
   SalesFeedModelConflict,
   SalesFeedNotConnected,
   SalesFeedNotFound,
@@ -73,13 +76,18 @@ import { SALES_FEED_ERROR_MESSAGES, salesFeedMessage } from '../domain/sales-fee
 import type { TeamImportStore } from '../domain/team-import';
 
 import { copyAvatarFrom } from './avatar-copy';
-import { createTeamImport, teamLinkOf, type TeamImport } from './team-import';
+import { createTeamImport, type TeamImport } from './team-import';
 
 /**
  * How often the reading looks at the platform's model list (CRM-07 a2): for the badge of new models, and the signal of a
  * linked model gone or banned. One call more in a quarter of an hour, under Reveal's ten a minute.
  */
 const WATCH_MODELS_MS = 15 * 60 * 1000;
+/**
+ * How often the reading looks at the platform's team list (ADR 0076 § 5, § 6): a removal or a newcomer then shows
+ * within the hour, not only when someone opens the review. One call an hour, under the general limit; no statistics.
+ */
+const WATCH_TEAM_MS = 60 * 60 * 1000;
 /** At most this many pages per platform and run (500 lines each): the next minute goes on from the cursor. */
 const MAX_PAGES_PER_RUN = 20;
 /** The inbox only tells a second sending of a delivery, which the platform makes within hours: a week is plenty. */
@@ -125,6 +133,11 @@ export interface SalesFeedDeps {
   ) => Promise<unknown>;
   /** Her photo's copy at import (CRM-07 a2b); `null` without a media bucket (`S3_*`): her initials stay. */
   readonly avatars?: AvatarPorts | null;
+  /**
+   * The daily photo of the statistics and the calls counted (ADR 0081). Absent in tests that do not look at it: the
+   * reading then reads nothing, and the checks count nothing.
+   */
+  readonly dailyStats?: DailyStatsStore;
 }
 
 export interface SalesFeeds {
@@ -138,12 +151,6 @@ export interface SalesFeeds {
     platform: Platform,
     platformModelId: string,
     platformAccountId: string | null,
-    by: string | null,
-  ): Promise<SalesFeedOverview>;
-  linkChatter(
-    platform: Platform,
-    platformChatterId: string,
-    link: LinkSalesFeedChatterBody,
     by: string | null,
   ): Promise<SalesFeedOverview>;
   /**
@@ -213,12 +220,28 @@ export interface SalesFeeds {
    * left (her initials stay); a platform or storage that does not answer throws, so the job is tried again.
    */
   copyAvatar(payload: JobPayload<'connector.copy_avatar'>, logger: JobLogger): Promise<void>;
+  /**
+   * The `connector.read_daily_stats` job (ADR 0081 § 3), hourly: for each connected feed, one call for every model of
+   * the key, today and yesterday, or the 31 last days at 5 h in the platform's zone and until a reading of 31 days
+   * went through since the key was verified. No call once fewer than 100 of the day's 500 are left; a 429 pauses as
+   * the reading of the sales does; a refused key is « à reconnecter ». Only linked models are kept, never an amount.
+   */
+  readDailyStats(logger: JobLogger, correlationId: string): Promise<void>;
 }
 
-/** The two statistics of the days, one call after the other: Reveal allows ten a minute a key. */
-async function checkStats(feed: PlatformSalesFeed, range: DateRange): Promise<CheckSources['stats']> {
+/**
+ * The two statistics of the days, one call after the other: Reveal allows ten a minute a key. Each call is counted
+ * before it is made (`count`), with the daily reading's, against the agency's quota (ADR 0081 § 3).
+ */
+async function checkStats(
+  feed: PlatformSalesFeed,
+  range: DateRange,
+  count: () => Promise<unknown>,
+): Promise<CheckSources['stats']> {
+  await count();
   const daily = await feed.dailyStats(range);
   if (!daily.ok) return { ok: false, errorKind: errorKindOf(daily.failure) };
+  await count();
   const chatters = await feed.chatterDailyStats(range);
   if (!chatters.ok) return { ok: false, errorKind: errorKindOf(chatters.failure) };
   return { ok: true, daily: daily.value, chatters: chatters.value };
@@ -234,6 +257,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
   const unreachable = new Map<Platform, UnreachableRun>();
   /** When each platform's model list was last looked at, in the worker that reads; a restart looks at once. */
   const watchedAt = new Map<Platform, number>();
+  const teamWatchedAt = new Map<Platform, number>();
 
   /**
    * One reading of the model list kept (ADR 0069 § 5): the sightings, a signal for a linked model gone or banned (sent
@@ -314,6 +338,48 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     // Best effort at the platform: its webhook then posts to an address that refuses it (404), until it gives up.
     if (feed !== null) await feed.deleteWebhook(stored.platformWebhookId);
     await store.remove(platform, by);
+  }
+
+  /** One call to the platform's statistics, counted on the platform's day before it is made (ADR 0081 § 3). */
+  async function countStatsCall(platform: Platform, timeZone: string): Promise<void> {
+    await deps.dailyStats?.countCall(platform, calendarDayAt(clock.now(), timeZone));
+  }
+
+  async function readStatsOne(
+    store: DailyStatsStore,
+    stored: StoredSalesFeedKey,
+    logger: JobLogger,
+    correlationId: string,
+  ): Promise<void> {
+    const { platform } = stored;
+    const factory = registry[platform];
+    if (factory === undefined || stored.key === null || stored.state !== 'connected') return;
+    const cursor = await ledger.cursorOf(platform);
+    const now = clock.now();
+    if (cursor.pausedUntil !== null && cursor.pausedUntil > now) return;
+    const feed = factory.create(stored.key);
+    const day = calendarDayAt(now, feed.timeZone);
+    const calls = await store.callsOn(platform, day);
+    if (!statsCallAllowed(calls)) {
+      logger.warn(
+        { platform, day, calls },
+        'daily statistics not read: the day’s reserve of calls is reached',
+      );
+      return;
+    }
+    const range = dailyStatsRange(now, feed.timeZone, {
+      fullReadAt: await store.fullReadAt(platform),
+      keyVerifiedAt: stored.verifiedAt,
+    });
+    await store.countCall(platform, day);
+    const read = await feed.dailyStats(range);
+    if (!read.ok) {
+      await onFailure(platform, stored, read.failure, logger, correlationId);
+      return;
+    }
+    const rows = dailyStatsRows(platform, read.value, await store.links(platform));
+    await store.record(platform, rows, clock.now(), range.full);
+    logger.info({ platform, from: range.from, to: range.to, rows: rows.length }, 'daily statistics read');
   }
 
   /** The feed of the saved key, or `null` when there is none that works. */
@@ -506,6 +572,13 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       // A list that does not answer is looked at again in a quarter of an hour; the sales are read all the same.
       if (listed.ok) await watchModels(platform, listed.value, correlationId);
     }
+    if (now.getTime() - (teamWatchedAt.get(platform) ?? 0) >= WATCH_TEAM_MS) {
+      teamWatchedAt.set(platform, now.getTime());
+      const listedTeam = await feed.listChatters();
+      // Kept as the review keeps it (an empty or halved list is one « abnormal » alert, never a removal per member);
+      // a list that does not answer is looked at again in an hour, the sales are read all the same.
+      if (listedTeam.ok) await deps.team.recordReading(platform, listedTeam.value, clock.now());
+    }
     if (!woken && cursor.readAt !== null && now.getTime() - cursor.readAt.getTime() < CATCH_UP_MS) {
       const webhook = await deps.webhooks?.find(platform);
       // A webhook whose secret still opens: its deliveries wake the reading, the minute has nothing to add.
@@ -580,7 +653,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
             timeZone: feed.timeZone,
             models: models.value,
           });
-    const stats = await checkStats(feed, range);
+    const stats = await checkStats(feed, range, () => countStatsCall(platform, feed.timeZone));
     const platformChatters = await feed.listChatters();
     const [lines, firstLineAt, cursor, modelLinks, chatterLinks] = await Promise.all([
       ledger.checkLines(
@@ -807,26 +880,6 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       return overview(platform);
     },
 
-    async linkChatter(platform, platformChatterId, link, by) {
-      factoryOf(platform);
-      if (by === null) throw new SalesFeedTeamForbidden();
-      // The same guarded write as the review's (ADR 0076 § 4): in the owner's own transaction (`withMember`).
-      const outcomes = await deps.team.link(by, platform, [
-        {
-          platformChatterId,
-          link: teamLinkOf(link),
-          isExternal: false,
-        },
-      ]);
-      if (outcomes === null) throw new SalesFeedTeamForbidden();
-      const [outcome] = outcomes;
-      if (outcome?.ok === false) {
-        if (outcome.kind === 'member_unknown') throw new SalesFeedMemberUnprocessable();
-        throw new SalesFeedTeamForbidden();
-      }
-      return overview(platform);
-    },
-
     async check(platform, body, by) {
       const feed = await liveFeed(platform);
       if (feed === null) throw new SalesFeedNotConnected();
@@ -868,6 +921,14 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       // Ids only: never the address, which names her at the platform.
       if (skip === null) logger.info({ platform, platformModelId, creatorId }, 'creator photo copied');
       else logger.info({ platform, platformModelId, creatorId, skip }, 'creator photo not copied');
+    },
+
+    async readDailyStats(logger, correlationId) {
+      const store = deps.dailyStats;
+      if (deps.keys === null || store === undefined) return;
+      for (const stored of await deps.keys.list()) {
+        await readStatsOne(store, stored, logger, correlationId);
+      }
     },
 
     async read(logger, correlationId, woken) {

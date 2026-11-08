@@ -155,7 +155,6 @@ export class SalesFeedTeamListUnavailable extends DomainError {
   }
 }
 
-/** A linked account is never set aside: its link is changed instead (409, ADR 0076 § 1). */
 /** An invitation from the review is for an account the platform lists now (ADR 0076 § 3). */
 export class SalesFeedChatterUnprocessable extends DomainError {
   constructor() {
@@ -173,6 +172,7 @@ export class SalesFeedExternalInviteForbidden extends DomainError {
   }
 }
 
+/** A linked account is never set aside: its link is changed instead (409, ADR 0076 § 1). */
 export class SalesFeedTeamLinked extends DomainError {
   constructor() {
     super(

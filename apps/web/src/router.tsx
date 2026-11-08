@@ -64,6 +64,7 @@ import { MemberFilePage } from './screens/team/MemberFilePage';
 import { MembersPage } from './screens/team/MembersPage';
 import { PlanningPage } from './screens/team/PlanningPage';
 import { ReportsPage } from './screens/team/ReportsPage';
+import { RevealPage } from './screens/team/RevealPage';
 import { parsePlanningSearch, parseReportsSearch, parseTeamSearch } from './screens/team/model';
 import { CreatorTodayPage } from './screens/today/CreatorTodayPage';
 import { TodayPage } from './screens/today/TodayPage';
@@ -72,6 +73,7 @@ import { SuiviNav } from './screens/tracking/SuiviNav';
 import { TrackingPage } from './screens/tracking/TrackingPage';
 import { AlertHistoryPage } from './screens/tracking/history/AlertHistoryPage';
 import { parseTrackingSearch } from './screens/tracking/view';
+import { ChannelPostPage } from './screens/train/ChannelPostPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
@@ -485,6 +487,30 @@ const teamMembers = createRoute({
   },
 });
 
+// Reveal's team reviewed (ADR 0076), the owner's and an active manager's: anyone else is sent back to the members.
+const teamReveal = createRoute({
+  getParentRoute: () => team,
+  path: '/reveal',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner' && context.user.teamScope !== 'agency') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/equipe/membres', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: function TeamReveal() {
+    const { user } = rootRoute.useRouteContext();
+    const navigate = teamReveal.useNavigate();
+    return (
+      <RevealPage
+        platform="reveal"
+        bounded={user.role !== 'owner'}
+        ownCreatorIds={user.creatorIds}
+        onOpenMember={(id) => void navigate({ to: '/equipe/membres', search: { membre: id } })}
+      />
+    );
+  },
+});
+
 // A member's file (EQ-06 lot 8b), the owner's alone: anyone else is sent back to the members.
 const teamMemberFile = createRoute({
   getParentRoute: () => team,
@@ -748,6 +774,11 @@ const playground = createRoute({
   path: '/playground',
   component: PlaygroundPage,
 });
+const channelPost = createRoute({
+  getParentRoute: () => train,
+  path: '/canal',
+  component: ChannelPostPage,
+});
 /*
  * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
  * to an « à venir » page under its header (recette 05/11, PRO-25). Each comes back with its screen.
@@ -954,7 +985,7 @@ const routeTree = rootRoute.addChildren([
   dashboard,
   creators,
   scriptStructures,
-  train.addChildren([trainIndex, playground, corrections, tests]),
+  train.addChildren([trainIndex, playground, channelPost, corrections, tests]),
   tracking,
   trackingAlerts,
   today,
@@ -963,7 +994,7 @@ const routeTree = rootRoute.addChildren([
   content,
   contentScript,
   myPlanning,
-  team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
+  team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile, teamReveal]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
   me.addChildren([meIndex, mePersona, meProfile, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),
