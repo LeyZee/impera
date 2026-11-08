@@ -1,6 +1,6 @@
 # 0030. Médiathèque : un média, ses liaisons par plateforme, le coffre fait foi
 
-Statut : accepted (Charles, 27/10 20h37, carte « J'accepte, vignette seule » ; texte précisé avant fusion à la relecture de Bilan, § 1, § 3 et § 5, sans changer la décision acceptée ; § 3 amendé le 08/11/2026 : `validated_by` vise le compte de la personne qui valide, le propriétaire n'ayant pas de fiche d'équipe, phrase lue et acceptée par Charles à 21h03, « ok phrases 0030 » ; § 4 amendé le 08/11/2026 (SC-04 lot c4) : la vignette a sa propre clé `thumbnail_key`, `storage_key` ne désigne que l'original, phrase en attente de l'accord de Charles)
+Statut : accepted (Charles, 27/10 20h37, carte « J'accepte, vignette seule » ; texte précisé avant fusion à la relecture de Bilan, § 1, § 3 et § 5, sans changer la décision acceptée ; § 3 amendé le 08/11/2026 : `validated_by` vise le compte de la personne qui valide, le propriétaire n'ayant pas de fiche d'équipe, phrase lue et acceptée par Charles à 21h03, « ok phrases 0030 » ; § 4 amendé le 08/11/2026 (SC-04 lot c4) : la vignette a sa propre clé `thumbnail_key`, `storage_key` ne désigne que l'original, phrase lue et acceptée par Charles à 23h05, « ok phrases 0030 »)
 Date : 2026-10-27
 
 ## Contexte
