@@ -2,6 +2,7 @@ import type {
   AgentHours,
   AgentHoursView,
   ArchivedCreator,
+  CopilotSwitches,
   CreatorId,
   CreatorSummary,
   NewCreator,
@@ -50,4 +51,15 @@ export interface CreatorDirectory {
    * to her next opening under them in the same transaction; `false` when she does not exist.
    */
   setAgentHours(id: CreatorId, hours: AgentHours | null, userId: string): Promise<boolean>;
+  /**
+   * Her two switches of the extension's copilot panel (ADR 0086 § 6), the defaults when none is stored or the stored
+   * settings no longer read; `null` when she does not exist.
+   */
+  copilotSwitches(id: CreatorId): Promise<CopilotSwitches | null>;
+  /** Changes the switches named, keeps the other, audited with the owner who set them; `null` when she does not exist. */
+  setCopilotSwitches(
+    id: CreatorId,
+    change: Partial<CopilotSwitches>,
+    userId: string,
+  ): Promise<CopilotSwitches | null>;
 }

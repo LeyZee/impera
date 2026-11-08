@@ -26,6 +26,7 @@ function draw(screen: Screen): { root: HTMLElement; actions: Actions } {
     retry: vi.fn(),
     grant: vi.fn(),
     editAddress: vi.fn(),
+    openPanel: vi.fn(),
     saveAddress: vi.fn(),
     resetAddress: vi.fn(),
     cancelAddress: vi.fn(),
@@ -89,6 +90,13 @@ describe('popup', () => {
     expect(
       draw({ kind: 'signed_in', me: ME, place: 'crm', watch: null }).root.querySelector('.pp-place'),
     ).toBeNull();
+  });
+
+  it('opens the copilot beside a Reveal tab in one click (ADR 0086 § 1)', () => {
+    const { root, actions } = draw({ kind: 'signed_in', me: ME, place: 'reveal', watch: null });
+    const open = [...root.querySelectorAll('button')].find((one) => one.textContent === 'Ouvrir le copilote');
+    open?.click();
+    expect(actions.openPanel).toHaveBeenCalledOnce();
   });
 
   it('keeps one neon per screen: on a watch, « Ouvrir le CRM » steps back', () => {

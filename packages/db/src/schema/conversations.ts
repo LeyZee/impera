@@ -131,11 +131,18 @@ export const drafts = pgTable(
     guardTrace: jsonb('guard_trace').notNull().default({}),
     decidedBy: text('decided_by'),
     decidedAt: timestampTz('decided_at'),
+    /**
+     * Who put it in the platform's field from the copilot panel, and when (ADR 0086 § 4): the chatter sends it himself,
+     * so it stays `pending` until what left is reconciled with it (§ 5). Both null before.
+     */
+    placedBy: text('placed_by').references(() => user.id),
+    placedAt: timestampTz('placed_at'),
     idempotencyKey: text('idempotency_key').notNull(),
     createdAt: createdAt(),
   },
   (t) => [
     enumCheck('drafts', t.status, DraftStatusSchema.options),
+    check('drafts_placed_check', sql`(${t.placedBy} is null) = (${t.placedAt} is null)`),
     unique('drafts_idempotency_key_unique').on(t.idempotencyKey),
     index('drafts_conversation_idx').on(t.conversationId, t.createdAt.desc()),
     tenantPolicy(t.creatorId),

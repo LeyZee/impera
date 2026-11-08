@@ -10,6 +10,7 @@ describe('CreatorSettings', () => {
       retention: { factMonthsAfterLastContact: 12, fanMediaDays: 30 },
       // Off until the agency has checked the vision model on her real media (ADR 0083 § 9).
       describeDrops: false,
+      copilot: { fanCard: true, drafts: false },
     });
   });
 

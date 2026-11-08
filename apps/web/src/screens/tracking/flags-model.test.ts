@@ -104,6 +104,16 @@ describe('the fan’s limits', () => {
       urgent: null,
       rest: '…',
     });
+    // What his card waits for is said in amber folded, and never under « Rien à signaler » (ADR 0085 § 6).
+    expect(sheetSummary({ flags: {}, toLearn: null, band: null, toCheck: 1 })).toEqual({
+      urgent: '1 à vérifier',
+      rest: '',
+    });
+    expect(sheetSummary({ flags: 'refused', toLearn: 2, band: null, toCheck: 3 })).toEqual({
+      urgent: 'Limites non lisibles · 3 à vérifier',
+      rest: '2 à apprendre',
+    });
+    expect(sheetSummary({ flags: {}, toLearn: null, band: null, toCheck: 0 }).rest).toBe('Rien à signaler');
   });
 
   it('puts what forbids first, in red, then what changes how one writes, in amber (CHAT-23)', () => {

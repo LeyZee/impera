@@ -1,4 +1,10 @@
-import { AGE_DISPUTE_FORBIDDEN, AGE_DISPUTE_REASON_INVALID, DomainError } from '@impera/contracts';
+import {
+  AGE_DISPUTE_FORBIDDEN,
+  AGE_DISPUTE_REASON_INVALID,
+  DomainError,
+  FAN_CARD_VALUE_INVALID,
+  FAN_CARD_VALUE_UNPROCESSABLE,
+} from '@impera/contracts';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
 export class FanNotFound extends DomainError {
@@ -21,5 +27,22 @@ export class AgeDisputeForbidden extends DomainError {
 export class AgeDisputeReasonInvalid extends DomainError {
   constructor() {
     super(AGE_DISPUTE_REASON_INVALID, 'Écris pourquoi tu confirmes son âge malgré le soupçon');
+  }
+}
+
+/** A value that does not fit its field of the card (ADR 0085 § 3): a list for one value, outside a closed list, too long. */
+export class FanCardValueInvalid extends DomainError {
+  constructor() {
+    super(FAN_CARD_VALUE_INVALID, 'Cette valeur ne va pas dans cette case');
+  }
+}
+
+/** What the card never keeps (ADR 0085 § 8): nothing that finds him outside the platform. Nothing is written. */
+export class FanCardValueRefused extends DomainError {
+  constructor() {
+    super(
+      FAN_CARD_VALUE_UNPROCESSABLE,
+      'La fiche ne garde ni adresse, ni numéro, ni e-mail, ni compte ailleurs que sur la plateforme',
+    );
   }
 }

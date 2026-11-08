@@ -64,7 +64,10 @@ conversation_events  id, creator_id, conversation_id, seq bigint, type, payload 
 drafts               id, creator_id, conversation_id, status (pending|approved|edited|rejected|sent|failed|expired),
                      brief jsonb (sortie du cerveau), bubbles text[], final_bubbles text[] (après édition),
                      persona_version_id (la version avec laquelle le composeur l'a écrit, lue avec la persona du brouillon, jamais celle active à l'enregistrement ; ADR 0022), prompt_hashes jsonb, policy_trace jsonb, guard_trace jsonb,
-                     decided_by (nullable user_id), decided_at, idempotency_key, created_at
+                     decided_by (nullable user_id), decided_at, placed_by (nullable user_id), placed_at (nullable),
+                     idempotency_key, created_at
+                     placed_by / placed_at : le chatteur l'a mis dans le champ de la plateforme depuis le panneau copilote
+                     (ADR 0086 § 4, migration 0149), les deux ensemble ; le statut ne bouge pas, ce qui part décide (§ 5).
 blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_id (nullable), rate_per_mille (0 à 1000, 800 = 80 %), recorded_by,
                      recorded_at      (append-only : ni UPDATE ni DELETE pour nirvana_app)
                      Le test à l'aveugle d'une version de la voix et de la persona active (ADR 0019, 0022) ; le dernier
@@ -142,11 +145,16 @@ llm_calls   id, creator_id (nullable), role (sense|brain|voice|judge), provider,
 ## Calibrage (module `agent`, playground)
 
 ```
-calibration_ratings   id, creator_id, session_id, rated_at, voice_prompt, voice_model,
+calibration_ratings   id, creator_id, source (playground|live), session_id (playground), draft_id (live, unique),
+                      rated_at, voice_prompt, voice_model,
                       verdict_kind (validated|corrected|rejected), verdict jsonb (Verdict), destination
-                      (voice_example|rule|test, nullable), fan_message, bubbles jsonb, moment jsonb (RatedMoment,
-                      opaque, nullable une fois purgé), moment_purged_at, created_at
+                      (voice_example|rule|test, nullable), fan_message (playground), bubbles jsonb, moment jsonb
+                      (RatedMoment, opaque, nullable une fois purgé), moment_purged_at, created_at
   Append-only (trigger) : seule la purge de `moment` après 90 jours est permise, le verdict et la version restent.
+  `live` (ADR 0086 § 5, migration 0149) : un vrai brouillon jugé par le panneau copilote, une note par brouillon, la
+  version prise sur le brouillon (`prompt_hashes`) ; ni message du fan ni moment (ses mots restent dans la conversation,
+  sous leur propre conservation). Un brouillon écrit sans modèle n'a pas de note. Le taux de l'Automatique reste lu sur
+  `drafts` (ADR 0019).
   Lu pour le taux de validation (50 derniers par version), les exemples de voix du playground seulement (corrected + voice_example, 12 max ; jamais dans la fiche d'une créatrice)
   et les tests rejouables (tout sauf validated). Contenu intime : jamais copié dans les logs.
 ```

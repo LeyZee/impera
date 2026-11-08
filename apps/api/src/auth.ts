@@ -818,6 +818,30 @@ export async function meOf(db: Database, shiftCreators: ShiftCreators, row: Acco
   return { ...signedIn.user, ...(signedIn.membership ?? (await membership(db, signedIn.user.id))) };
 }
 
+/**
+ * The user an extension link names, read as a session would read him (his creators, his shift's, ADR 0025), without a
+ * request: the copilot panel writes with the link, never with the dashboard's cookie (ADR 0066 § 7, ADR 0086 § 8).
+ * `null` for an account gone, a member who left, or a row that does not validate.
+ */
+export async function currentUserById(
+  db: Database,
+  shiftCreators: ShiftCreators,
+  userId: string,
+): Promise<CurrentUser | null> {
+  const [row] = await db
+    .select({
+      id: schema.user.id,
+      email: schema.user.email,
+      name: schema.user.name,
+      role: schema.user.role,
+      creatorIds: schema.user.creatorIds,
+    })
+    .from(schema.user)
+    .where(eq(schema.user.id, userId));
+  if (row === undefined) return null;
+  return (await userOf(db, shiftCreators, row))?.user ?? null;
+}
+
 /** Mounts Better Auth's own handler under `/v1/auth/*` and adds `GET /v1/me`. */
 export function createAuthRoutes(
   auth: Auth,

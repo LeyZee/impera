@@ -24,6 +24,7 @@ import {
   whyHuman,
 } from './reader-model';
 import { bringIntoView, useEndInView } from './scroll';
+import { useThreeColumns } from './useThreeColumns';
 import {
   bubblesFromText,
   bubblesProblem,
@@ -140,7 +141,8 @@ export function Reader({
     </button>
   );
 
-  return (
+  const beside = useThreeColumns();
+  const reader = (
     <section className="nv-plate tr-reader" aria-label="Conversation">
       {loaded ? null : back}
       {query.error instanceof ConversationGone ? (
@@ -172,9 +174,29 @@ export function Reader({
           stopAhead={stopAhead}
           settle={settle}
           released={released}
+          sheetBeside={beside}
         />
       )}
     </section>
+  );
+  if (!beside || query.data === undefined || !loaded) return reader;
+  const { detail } = query.data;
+  return (
+    <>
+      {reader}
+      {/* The third column (Charles, 08/11): what is known of him stays in view while the thread scrolls. */}
+      <aside className="nv-plate tr-aside" aria-label="Le fan">
+        <FanSheet
+          creatorId={creatorId}
+          fanId={detail.fanId}
+          conversationId={detail.id}
+          desire={detail.desire}
+          canDecide={canDecide}
+          canSetLimits={canDecide && !selfScope}
+          layout="aside"
+        />
+      </aside>
+    </>
   );
 }
 
@@ -188,6 +210,7 @@ function Loaded({
   stopAhead,
   settle,
   released,
+  sheetBeside,
 }: {
   /** The way back to the list, kept with the fan's name at the top of the screen on a phone. */
   back: JSX.Element;
@@ -201,6 +224,8 @@ function Loaded({
   settle: () => Promise<void>;
   /** Set for a member whose scope is `self`: a hand given back closes the reader if the conversation left his list. */
   released: ((fan: string) => Promise<boolean>) | undefined;
+  /** On a wide screen his sheet has its own column beside the reader (`useThreeColumns`): not drawn here again. */
+  sheetBeside: boolean;
 }): JSX.Element {
   const { detail } = read;
   const name = detail.fanDisplayName.trim() === '' ? 'Fan sans nom' : detail.fanDisplayName;
@@ -349,14 +374,16 @@ function Loaded({
           {canDecide && !isHuman && !fanWaits ? handButton : null}
         </header>
         {/* With the fan's name, never scrolled away: on a phone the top stays in view above the thread (D-03). */}
-        <FanSheet
-          creatorId={creatorId}
-          fanId={detail.fanId}
-          conversationId={detail.id}
-          desire={detail.desire}
-          canDecide={canDecide}
-          canSetLimits={canDecide && !selfScope}
-        />
+        {sheetBeside ? null : (
+          <FanSheet
+            creatorId={creatorId}
+            fanId={detail.fanId}
+            conversationId={detail.id}
+            desire={detail.desire}
+            canDecide={canDecide}
+            canSetLimits={canDecide && !selfScope}
+          />
+        )}
       </div>
       {stopped ? (
         <p className="tr-stopped" role="alert">

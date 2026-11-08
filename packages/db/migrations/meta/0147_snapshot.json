@@ -1,6 +1,6 @@
 {
-  "id": "718ab6ff-539b-43d8-957a-eb54248b4fe1",
-  "prevId": "1ed7bbd7-3651-4403-93b0-19a8bf948e2c",
+  "id": "6ad9c772-f757-4394-bfc3-bd2aecbdad5f",
+  "prevId": "948cce28-013b-4cc1-9052-2195b19e3610",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1447,6 +1447,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "script_number": {
+          "name": "script_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exported_at": {
+          "name": "exported_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exported_by": {
+          "name": "exported_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -1481,6 +1499,28 @@
         }
       },
       "indexes": {
+        "content_drops_script_number_unique": {
+          "name": "content_drops_script_number_unique",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "script_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"content_drops\".\"script_number\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "content_drops_request_live_unique": {
           "name": "content_drops_request_live_unique",
           "columns": [
@@ -1538,6 +1578,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "content_drops_exported_by_user_id_fk": {
+          "name": "content_drops_exported_by_user_id_fk",
+          "tableFrom": "content_drops",
+          "tableTo": "user",
+          "columnsFrom": ["exported_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "content_drops_created_by_user_id_fk": {
           "name": "content_drops_created_by_user_id_fk",
           "tableFrom": "content_drops",
@@ -1587,7 +1636,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '')\n        and (\"content_drops\".\"state\" = 'uploading' or (\"content_drops\".\"state\" = 'filling' and \"content_drops\".\"category\" = 'script'))\n        and \"content_drops\".\"corrected_from\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '')\n        and (\"content_drops\".\"state\" = 'uploading' or (\"content_drops\".\"state\" = 'filling' and \"content_drops\".\"category\" = 'script'))\n        and \"content_drops\".\"corrected_from\" is null and \"content_drops\".\"script_number\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
         },
         "creator_withdraw": {
           "name": "creator_withdraw",
@@ -1609,7 +1658,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"content_drops\".\"state\" = 'uploading'\n        and \"content_drops\".\"corrected_from\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"content_drops\".\"state\" = 'uploading'\n        and \"content_drops\".\"corrected_from\" is null and \"content_drops\".\"script_number\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
         },
         "team_update": {
           "name": "team_update",
@@ -1652,6 +1701,14 @@
         "content_drops_script_check": {
           "name": "content_drops_script_check",
           "value": "\"content_drops\".\"category\" <> 'script' or \"content_drops\".\"request_id\" is not null"
+        },
+        "content_drops_script_number_check": {
+          "name": "content_drops_script_number_check",
+          "value": "\"content_drops\".\"script_number\" is null or (\"content_drops\".\"category\" = 'script' and \"content_drops\".\"script_number\" >= 1)"
+        },
+        "content_drops_exported_check": {
+          "name": "content_drops_exported_check",
+          "value": "(\"content_drops\".\"exported_at\" is null) = (\"content_drops\".\"exported_by\" is null) and (\"content_drops\".\"exported_at\" is null or \"content_drops\".\"script_number\" is not null)"
         }
       },
       "isRLSEnabled": false
@@ -1699,6 +1756,12 @@
         "structure_version_id": {
           "name": "structure_version_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "moment": {
+          "name": "moment",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -1907,9 +1970,169 @@
           "name": "content_requests_author_check",
           "value": "(\"content_requests\".\"origin\" = 'agency') = (\"content_requests\".\"created_by\" is not null)"
         },
+        "content_requests_moment_check": {
+          "name": "content_requests_moment_check",
+          "value": "\"content_requests\".\"moment\" in ('day', 'night')"
+        },
+        "content_requests_moment_version_check": {
+          "name": "content_requests_moment_version_check",
+          "value": "\"content_requests\".\"moment\" is null or \"content_requests\".\"structure_version_id\" is not null"
+        },
         "content_requests_structure_version_check": {
           "name": "content_requests_structure_version_check",
           "value": "\"content_requests\".\"structure_version_id\" is null or \"content_requests\".\"structure_id\" is not null"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.script_drop_summaries": {
+      "name": "script_drop_summaries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "drop_id": {
+          "name": "drop_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "media_hash": {
+          "name": "media_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "review_reasons": {
+          "name": "review_reasons",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt_hash": {
+          "name": "prompt_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "script_drop_summaries_unique": {
+          "name": "script_drop_summaries_unique",
+          "columns": [
+            {
+              "expression": "drop_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "media_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "prompt_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "script_drop_summaries_creator_idx": {
+          "name": "script_drop_summaries_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "script_drop_summaries_creator_id_creators_id_fk": {
+          "name": "script_drop_summaries_creator_id_creators_id_fk",
+          "tableFrom": "script_drop_summaries",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "script_drop_summaries_drop_fk": {
+          "name": "script_drop_summaries_drop_fk",
+          "tableFrom": "script_drop_summaries",
+          "tableTo": "content_drops",
+          "columnsFrom": ["drop_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "script_drop_summaries_review_reasons_check": {
+          "name": "script_drop_summaries_review_reasons_check",
+          "value": "\"script_drop_summaries\".\"review_reasons\" <@ array['price']::text[]"
+        },
+        "script_drop_summaries_media_hash_check": {
+          "name": "script_drop_summaries_media_hash_check",
+          "value": "\"script_drop_summaries\".\"media_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "script_drop_summaries_content_check": {
+          "name": "script_drop_summaries_content_check",
+          "value": "jsonb_typeof(\"script_drop_summaries\".\"content\") = 'object'"
         }
       },
       "isRLSEnabled": false
@@ -6832,6 +7055,26 @@
           "primaryKey": false,
           "notNull": true
         },
+        "author": {
+          "name": "author",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'sense'"
+        },
+        "creator_note": {
+          "name": "creator_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_reasons": {
+          "name": "review_reasons",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -6852,6 +7095,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "media_descriptions_drop_unique": {
+          "name": "media_descriptions_drop_unique",
+          "columns": [
+            {
+              "expression": "media_asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "prompt_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"media_descriptions\".\"author\" = 'sense' and \"media_descriptions\".\"content\" ? 'detailed'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -6910,7 +7175,16 @@
           "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
-      "checkConstraints": {},
+      "checkConstraints": {
+        "media_descriptions_author_check": {
+          "name": "media_descriptions_author_check",
+          "value": "\"media_descriptions\".\"author\" in ('sense', 'human')"
+        },
+        "media_descriptions_review_reasons_check": {
+          "name": "media_descriptions_review_reasons_check",
+          "value": "\"media_descriptions\".\"review_reasons\" <@ array['back_reference', 'not_alone', 'unsure', 'flagged']::text[]"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.media_sends": {
@@ -7163,6 +7437,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "noted_by": {
+          "name": "noted_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7225,6 +7505,15 @@
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "fan_facts_noted_by_user_id_fk": {
+          "name": "fan_facts_noted_by_user_id_fk",
+          "tableFrom": "fan_facts",
+          "tableTo": "user",
+          "columnsFrom": ["noted_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7267,7 +7556,11 @@
         },
         "fan_facts_kind_check": {
           "name": "fan_facts_kind_check",
-          "value": "\"fan_facts\".\"kind\" in ('declared', 'inferred')"
+          "value": "\"fan_facts\".\"kind\" in ('declared', 'inferred', 'noted')"
+        },
+        "fan_facts_noted_by_check": {
+          "name": "fan_facts_noted_by_check",
+          "value": "(\"fan_facts\".\"kind\" = 'noted') = (\"fan_facts\".\"noted_by\" is not null)"
         },
         "fan_facts_confidence_check": {
           "name": "fan_facts_confidence_check",
@@ -7521,7 +7814,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'reminder', 'routine', 'streak', 'team')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team')"
         }
       },
       "isRLSEnabled": false
@@ -8724,6 +9017,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "written_off_minor": {
+          "name": "written_off_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "payable_minor": {
           "name": "payable_minor",
           "type": "integer",
@@ -8923,7 +9223,11 @@
         },
         "commission_statements_amounts_check": {
           "name": "commission_statements_amounts_check",
-          "value": "\"commission_statements\".\"payable_minor\" >= 0 and \"commission_statements\".\"payable_minor\" = \"commission_statements\".\"total_minor\" - \"commission_statements\".\"carry_over_out_minor\" and \"commission_statements\".\"penalties_minor\" between 0 and greatest(\"commission_statements\".\"penalties_requested_minor\", 0)"
+          "value": "\"commission_statements\".\"payable_minor\" >= 0 and \"commission_statements\".\"payable_minor\" = \"commission_statements\".\"total_minor\" - \"commission_statements\".\"carry_over_out_minor\" - \"commission_statements\".\"written_off_minor\" and \"commission_statements\".\"penalties_minor\" between 0 and greatest(\"commission_statements\".\"penalties_requested_minor\", 0)"
+        },
+        "commission_statements_written_off_check": {
+          "name": "commission_statements_written_off_check",
+          "value": "\"commission_statements\".\"written_off_minor\" = 0 or (coalesce((\"commission_statements\".\"rules\" ->> 'final')::boolean, false) and \"commission_statements\".\"total_minor\" < 0 and \"commission_statements\".\"written_off_minor\" = \"commission_statements\".\"total_minor\" and \"commission_statements\".\"carry_over_out_minor\" = 0)"
         },
         "commission_statements_team_share_check": {
           "name": "commission_statements_team_share_check",
@@ -10357,7 +10661,7 @@
         },
         "payout_minimums_minimum_check": {
           "name": "payout_minimums_minimum_check",
-          "value": "\"payout_minimums\".\"minimum_payout_minor\" between 0 and 5000000"
+          "value": "\"payout_minimums\".\"minimum_payout_minor\" between 0 and 500000"
         }
       },
       "isRLSEnabled": false
@@ -10443,7 +10747,7 @@
         },
         "payroll_settings_minimum_check": {
           "name": "payroll_settings_minimum_check",
-          "value": "\"payroll_settings\".\"minimum_payout_minor\" between 0 and 5000000"
+          "value": "\"payroll_settings\".\"minimum_payout_minor\" between 0 and 500000"
         },
         "payroll_settings_payout_delay_check": {
           "name": "payroll_settings_payout_delay_check",
@@ -10646,6 +10950,172 @@
       },
       "isRLSEnabled": false
     },
+    "public.persona_corrections": {
+      "name": "persona_corrections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "section": {
+          "name": "section",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "done_by": {
+          "name": "done_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "done_at": {
+          "name": "done_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "persona_corrections_creator_idx": {
+          "name": "persona_corrections_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "persona_corrections_creator_id_creators_id_fk": {
+          "name": "persona_corrections_creator_id_creators_id_fk",
+          "tableFrom": "persona_corrections",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "persona_corrections_created_by_user_id_fk": {
+          "name": "persona_corrections_created_by_user_id_fk",
+          "tableFrom": "persona_corrections",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "persona_corrections_done_by_user_id_fk": {
+          "name": "persona_corrections_done_by_user_id_fk",
+          "tableFrom": "persona_corrections",
+          "tableTo": "user",
+          "columnsFrom": ["done_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "creator_read": {
+          "name": "creator_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_insert": {
+          "name": "creator_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"persona_corrections\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"persona_corrections\".\"state\" = 'open'"
+        },
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "owner_update": {
+          "name": "owner_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"persona_corrections\".\"done_by\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "persona_corrections_section_check": {
+          "name": "persona_corrections_section_check",
+          "value": "\"persona_corrections\".\"section\" in ('details', 'limits', 'lifestyle', 'tastes', 'intimate', 'writing_style', 'identity', 'preferences', 'conversation', 'relationships', 'intimacy', 'boundaries')"
+        },
+        "persona_corrections_state_check": {
+          "name": "persona_corrections_state_check",
+          "value": "\"persona_corrections\".\"state\" in ('open', 'done')"
+        },
+        "persona_corrections_text_check": {
+          "name": "persona_corrections_text_check",
+          "value": "char_length(\"persona_corrections\".\"text\") between 1 and 600"
+        },
+        "persona_corrections_done_check": {
+          "name": "persona_corrections_done_check",
+          "value": "(\"persona_corrections\".\"state\" = 'done') = (\"persona_corrections\".\"done_at\" is not null and \"persona_corrections\".\"done_by\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.persona_versions": {
       "name": "persona_versions",
       "schema": "",
@@ -10776,6 +11246,160 @@
         }
       },
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.platform_daily_stats": {
+      "name": "platform_daily_stats",
+      "schema": "",
+      "columns": {
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "new_subscribers": {
+          "name": "new_subscribers",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unsubscribes": {
+          "name": "unsubscribes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active_subscribers": {
+          "name": "active_subscribers",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "renewals": {
+          "name": "renewals",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ppv_sent": {
+          "name": "ppv_sent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ppv_purchased": {
+          "name": "ppv_purchased",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "messages_sent": {
+          "name": "messages_sent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "messages_received": {
+          "name": "messages_received",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "platform_daily_stats_creator_day_idx": {
+          "name": "platform_daily_stats_creator_day_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "platform_daily_stats_creator_id_creators_id_fk": {
+          "name": "platform_daily_stats_creator_id_creators_id_fk",
+          "tableFrom": "platform_daily_stats",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platform_daily_stats_account_creator_fk": {
+          "name": "platform_daily_stats_account_creator_fk",
+          "tableFrom": "platform_daily_stats",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "platform_daily_stats_pk": {
+          "name": "platform_daily_stats_pk",
+          "columns": ["platform_account_id", "day"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "stats_read": {
+          "name": "stats_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"platform_daily_stats\".\"creator_id\" = any(u.creator_ids))))"
+        }
+      },
+      "checkConstraints": {
+        "platform_daily_stats_platform_check": {
+          "name": "platform_daily_stats_platform_check",
+          "value": "\"platform_daily_stats\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        },
+        "platform_daily_stats_counts_check": {
+          "name": "platform_daily_stats_counts_check",
+          "value": "\"platform_daily_stats\".\"new_subscribers\" >= 0 and \"platform_daily_stats\".\"active_subscribers\" >= 0 and \"platform_daily_stats\".\"ppv_purchased\" >= 0 and coalesce(\"platform_daily_stats\".\"unsubscribes\", 0) >= 0 and coalesce(\"platform_daily_stats\".\"renewals\", 0) >= 0 and coalesce(\"platform_daily_stats\".\"ppv_sent\", 0) >= 0 and coalesce(\"platform_daily_stats\".\"messages_sent\", 0) >= 0 and coalesce(\"platform_daily_stats\".\"messages_received\", 0) >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.platform_sales": {
@@ -11262,6 +11886,106 @@
       },
       "isRLSEnabled": false
     },
+    "public.sales_feed_chatter_reviews": {
+      "name": "sales_feed_chatter_reviews",
+      "schema": "",
+      "columns": {
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_chatter_id": {
+          "name": "platform_chatter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "decision": {
+          "name": "decision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_by": {
+          "name": "decided_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform_removed_at": {
+          "name": "platform_removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "absent_since": {
+          "name": "absent_since",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_bot": {
+          "name": "is_bot",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "sales_feed_chatter_reviews_pk": {
+          "name": "sales_feed_chatter_reviews_pk",
+          "columns": ["platform", "platform_chatter_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "agency_only": {
+          "name": "agency_only",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "sales_feed_chatter_reviews_platform_check": {
+          "name": "sales_feed_chatter_reviews_platform_check",
+          "value": "\"sales_feed_chatter_reviews\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        },
+        "sales_feed_chatter_reviews_decision_check": {
+          "name": "sales_feed_chatter_reviews_decision_check",
+          "value": "\"sales_feed_chatter_reviews\".\"decision\" in ('none', 'dismissed')"
+        },
+        "sales_feed_chatter_reviews_decided_check": {
+          "name": "sales_feed_chatter_reviews_decided_check",
+          "value": "(\"sales_feed_chatter_reviews\".\"decision\" is null) = (\"sales_feed_chatter_reviews\".\"decided_at\" is null)"
+        },
+        "sales_feed_chatter_reviews_id_check": {
+          "name": "sales_feed_chatter_reviews_id_check",
+          "value": "char_length(\"sales_feed_chatter_reviews\".\"platform_chatter_id\") between 1 and 200"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.sales_feed_chatters": {
       "name": "sales_feed_chatters",
       "schema": "",
@@ -11345,6 +12069,28 @@
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator'",
           "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "not_own_link_insert": {
+          "name": "not_own_link_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"sales_feed_chatters\".\"member_id\" is null or not exists (select 1 from team_members m where m.id = \"sales_feed_chatters\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))))"
+        },
+        "not_own_link_update": {
+          "name": "not_own_link_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"sales_feed_chatters\".\"member_id\" is null or not exists (select 1 from team_members m where m.id = \"sales_feed_chatters\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))))",
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"sales_feed_chatters\".\"member_id\" is null or not exists (select 1 from team_members m where m.id = \"sales_feed_chatters\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))))"
+        },
+        "not_own_link_delete": {
+          "name": "not_own_link_delete",
+          "as": "RESTRICTIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"sales_feed_chatters\".\"member_id\" is null or not exists (select 1 from team_members m where m.id = \"sales_feed_chatters\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))))"
         }
       },
       "checkConstraints": {
@@ -11590,8 +12336,20 @@
           "primaryKey": false,
           "notNull": false
         },
+        "caught_up_at": {
+          "name": "caught_up_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "paused_until": {
           "name": "paused_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stats_full_read_at": {
+          "name": "stats_full_read_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -11918,6 +12676,106 @@
         "sales_feed_models_platform_check": {
           "name": "sales_feed_models_platform_check",
           "value": "\"sales_feed_models\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.sales_feed_stats_calls": {
+      "name": "sales_feed_stats_calls",
+      "schema": "",
+      "columns": {
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calls": {
+          "name": "calls",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "sales_feed_stats_calls_pk": {
+          "name": "sales_feed_stats_calls_pk",
+          "columns": ["platform", "day"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "sales_feed_stats_calls_platform_check": {
+          "name": "sales_feed_stats_calls_platform_check",
+          "value": "\"sales_feed_stats_calls\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        },
+        "sales_feed_stats_calls_calls_check": {
+          "name": "sales_feed_stats_calls_calls_check",
+          "value": "\"sales_feed_stats_calls\".\"calls\" >= 0"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.sales_feed_team_readings": {
+      "name": "sales_feed_team_readings",
+      "schema": "",
+      "columns": {
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "listed": {
+          "name": "listed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "abnormal": {
+          "name": "abnormal",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "agency_only": {
+          "name": "agency_only",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "sales_feed_team_readings_platform_check": {
+          "name": "sales_feed_team_readings_platform_check",
+          "value": "\"sales_feed_team_readings\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        },
+        "sales_feed_team_readings_listed_check": {
+          "name": "sales_feed_team_readings_listed_check",
+          "value": "\"sales_feed_team_readings\".\"listed\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -12340,6 +13198,20 @@
           "primaryKey": false,
           "notNull": true
         },
+        "report_gap_bps": {
+          "name": "report_gap_bps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 100
+        },
+        "report_gap_minor": {
+          "name": "report_gap_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 500
+        },
         "updated_by": {
           "name": "updated_by",
           "type": "text",
@@ -12404,6 +13276,10 @@
         "scheduling_settings_margin_check": {
           "name": "scheduling_settings_margin_check",
           "value": "\"scheduling_settings\".\"access_margin_minutes\" between 0 and 120"
+        },
+        "scheduling_settings_report_gap_check": {
+          "name": "scheduling_settings_report_gap_check",
+          "value": "\"scheduling_settings\".\"report_gap_bps\" between 0 and 10000 and \"scheduling_settings\".\"report_gap_minor\" between 0 and 100000"
         }
       },
       "isRLSEnabled": false
@@ -13043,6 +13919,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "review_kind": {
+          "name": "review_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "explanation": {
+          "name": "explanation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_check": {
+          "name": "review_check",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -13255,7 +14149,7 @@
           "for": "UPDATE",
           "to": ["public"],
           "using": "\"shift_reports\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"shift_reports\".\"status\" = 'submitted'",
-          "withCheck": "\"shift_reports\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"shift_reports\".\"status\" in ('validated', 'rejected') and \"shift_reports\".\"reviewed_by\" = nullif(current_setting('app.user_id', true), '') and not exists (select 1 from team_members m where m.id = \"shift_reports\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and (nullif(current_setting('app.team_scope', true), '') = 'owner' or \"shift_reports\".\"submitted_by\" <> nullif(current_setting('app.user_id', true), ''))"
+          "withCheck": "\"shift_reports\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"shift_reports\".\"status\" in ('validated', 'rejected') and \"shift_reports\".\"reviewed_by\" = nullif(current_setting('app.user_id', true), '') and \"shift_reports\".\"review_kind\" = 'human' and not exists (select 1 from team_members m where m.id = \"shift_reports\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and (nullif(current_setting('app.team_scope', true), '') = 'owner' or \"shift_reports\".\"submitted_by\" <> nullif(current_setting('app.user_id', true), ''))"
         }
       },
       "checkConstraints": {
@@ -13285,15 +14179,27 @@
         },
         "shift_reports_texts_check": {
           "name": "shift_reports_texts_check",
-          "value": "coalesce(char_length(\"shift_reports\".\"comment\"), 1) between 1 and 1000 and coalesce(char_length(\"shift_reports\".\"incident\"), 1) between 1 and 1000 and coalesce(char_length(\"shift_reports\".\"review_note\"), 1) between 1 and 500"
+          "value": "coalesce(char_length(\"shift_reports\".\"comment\"), 1) between 1 and 1000 and coalesce(char_length(\"shift_reports\".\"incident\"), 1) between 1 and 1000 and coalesce(char_length(\"shift_reports\".\"review_note\"), 1) between 1 and 500 and coalesce(char_length(\"shift_reports\".\"explanation\"), 1) between 1 and 1000"
+        },
+        "shift_reports_explanation_check": {
+          "name": "shift_reports_explanation_check",
+          "value": "\"shift_reports\".\"corrects_id\" is null or \"shift_reports\".\"explanation\" is null"
         },
         "shift_reports_version_check": {
           "name": "shift_reports_version_check",
           "value": "\"shift_reports\".\"version\" >= 1"
         },
+        "shift_reports_review_kind_check": {
+          "name": "shift_reports_review_kind_check",
+          "value": "\"shift_reports\".\"review_kind\" in ('human', 'automatic')"
+        },
         "shift_reports_state_check": {
           "name": "shift_reports_state_check",
-          "value": "(\"shift_reports\".\"reviewed_at\" is null) = (\"shift_reports\".\"reviewed_by\" is null) and (\"shift_reports\".\"status\" = 'submitted') = (\"shift_reports\".\"reviewed_at\" is null) and (\"shift_reports\".\"status\" = 'rejected') = (\"shift_reports\".\"review_note\" is not null)"
+          "value": "(\"shift_reports\".\"status\" = 'submitted') = (\"shift_reports\".\"reviewed_at\" is null) and (\"shift_reports\".\"status\" = 'rejected') = (\"shift_reports\".\"review_note\" is not null) and (\"shift_reports\".\"review_kind\" is null or \"shift_reports\".\"reviewed_at\" is not null) and case when \"shift_reports\".\"review_kind\" = 'automatic' then \"shift_reports\".\"reviewed_by\" is null and \"shift_reports\".\"status\" = 'validated' else (\"shift_reports\".\"reviewed_at\" is null) = (\"shift_reports\".\"reviewed_by\" is null) end"
+        },
+        "shift_reports_review_seen_check": {
+          "name": "shift_reports_review_seen_check",
+          "value": "\"shift_reports\".\"review_check\" is null or (\"shift_reports\".\"status\" = 'validated' and jsonb_typeof(\"shift_reports\".\"review_check\") = 'object')"
         }
       },
       "isRLSEnabled": false
@@ -15575,6 +16481,13 @@
           "for": "INSERT",
           "to": ["public"],
           "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"member_commission_rates\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "manager_invite": {
+          "name": "manager_invite",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"member_commission_rates\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"member_commission_rates\".\"team_share_bps\" is null and exists (select 1 from team_members m where m.id = \"member_commission_rates\".\"member_id\" and m.team_role = 'chatter' and m.user_id <> nullif(current_setting('app.user_id', true), '') and m.joined_on = \"member_commission_rates\".\"effective_from\" and m.created_at = now()) and exists (select 1 from commission_presets p where p.id = \"member_commission_rates\".\"preset_id\" and p.rate_bps = \"member_commission_rates\".\"rate_bps\" and p.effective_from <= (now() at time zone coalesce((select s.time_zone from scheduling_settings s limit 1), 'Europe/Paris'))::date and not exists (select 1 from commission_presets q where q.name = p.name and q.effective_from > p.effective_from and q.effective_from <= (now() at time zone coalesce((select s.time_zone from scheduling_settings s limit 1), 'Europe/Paris'))::date))"
         }
       },
       "checkConstraints": {
@@ -15674,6 +16587,13 @@
           "for": "INSERT",
           "to": ["public"],
           "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"member_roles\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "manager_invite": {
+          "name": "manager_invite",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"member_roles\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"member_roles\".\"team_role\" = 'chatter' and exists (select 1 from team_members m where m.id = \"member_roles\".\"member_id\" and m.team_role = 'chatter' and m.user_id <> nullif(current_setting('app.user_id', true), '') and m.joined_on = \"member_roles\".\"effective_from\" and m.created_at = now())"
         }
       },
       "checkConstraints": {
@@ -16035,6 +16955,13 @@
           "to": ["public"],
           "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner'"
         },
+        "manager_invite": {
+          "name": "manager_invite",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'agency' and \"team_members\".\"team_role\" = 'chatter' and \"team_members\".\"user_id\" <> nullif(current_setting('app.user_id', true), '') and exists (select 1 from \"user\" u where u.id = \"team_members\".\"user_id\" and u.created_at = now())"
+        },
         "owner_update": {
           "name": "owner_update",
           "as": "PERMISSIVE",
@@ -16169,6 +17096,84 @@
           "value": "\"telegram_bots\".\"last_poll_error\" in ('token_shape', 'token_refused', 'bot_exists', 'bot_mismatch', 'bot_conflict', 'chat_unreachable', 'rate_limited', 'unreachable', 'routes_version_conflict', 'chat_removed')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.telegram_channels": {
+      "name": "telegram_channels",
+      "schema": "",
+      "columns": {
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chat_id": {
+          "name": "chat_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "telegram_channels_creator_id_creators_id_fk": {
+          "name": "telegram_channels_creator_id_creators_id_fk",
+          "tableFrom": "telegram_channels",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "telegram_channels_chat_id_telegram_chats_id_fk": {
+          "name": "telegram_channels_chat_id_telegram_chats_id_fk",
+          "tableFrom": "telegram_channels",
+          "tableTo": "telegram_chats",
+          "columnsFrom": ["chat_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "telegram_channels_updated_by_user_id_fk": {
+          "name": "telegram_channels_updated_by_user_id_fk",
+          "tableFrom": "telegram_channels",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "telegram_channels_chat_unique": {
+          "name": "telegram_channels_chat_unique",
+          "nullsNotDistinct": false,
+          "columns": ["chat_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.telegram_chats": {
