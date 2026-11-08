@@ -211,8 +211,10 @@ describe('fan facts from the conversations', () => {
     // Dated by the fan's message they were read in.
     expect(facts.map((fact) => fact.sourceMessageId)).toEqual([lastFanMessage?.id, lastFanMessage?.id]);
     expect(facts[0]?.observedAt).toEqual(lastFanMessage?.at);
+    // A card field is written in its card's category, whatever the brief named (ADR 0085 § 3): the job is « life ».
+    expect(facts.map((fact) => fact.category)).toEqual(['identity', 'life']);
     expect((await factEvents(id)).map((event) => event.payload)).toEqual(
-      facts.map((fact) => ({ fanId, factId: fact.id, category: 'identity' })),
+      facts.map((fact) => ({ fanId, factId: fact.id, category: fact.category })),
     );
 
     // A replayed job writes nothing, and no event twice.

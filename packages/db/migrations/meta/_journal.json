@@ -862,6 +862,13 @@
       "when": 1794160164499,
       "tag": "0145_script_drop_summaries",
       "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1794161910755,
+      "tag": "0147_fan_card_noted",
+      "breakpoints": true
     }
   ]
 }

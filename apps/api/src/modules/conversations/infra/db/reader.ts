@@ -23,7 +23,17 @@ import {
   type ConversationState,
   type UserId,
 } from '@impera/contracts';
-import { and, eq, schema, SNAPSHOT_READ, sql, withTenant, type Database, type Transaction } from '@impera/db';
+import {
+  and,
+  eq,
+  inArray,
+  schema,
+  SNAPSHOT_READ,
+  sql,
+  withTenant,
+  type Database,
+  type Transaction,
+} from '@impera/db';
 import { z } from 'zod';
 
 import type { Clock, ConversationReader, MediaDescriptions, PageRequest } from '../../domain/ports';
@@ -250,6 +260,24 @@ export function createDrizzleConversationReader(
           if (!(await openedLately(tx, userId, id)))
             await writeOpening(tx, { userId, id, ip, creatorId, by: 'chatter', via });
         }
+      }),
+
+    fanMessageTexts: (creatorId, fanId, messageIds) =>
+      withTenant(db, creatorId, async (tx) => {
+        if (messageIds.length === 0) return new Map<string, string>();
+        const rows = await tx
+          .select({ id: schema.messages.id, text: schema.messages.text })
+          .from(schema.messages)
+          .innerJoin(schema.conversations, eq(schema.conversations.id, schema.messages.conversationId))
+          .where(
+            and(
+              eq(schema.conversations.fanId, fanId),
+              eq(schema.messages.direction, 'inbound'),
+              eq(schema.messages.author, 'fan'),
+              inArray(schema.messages.id, [...messageIds]),
+            ),
+          );
+        return new Map(rows.map((row) => [row.id, row.text]));
       }),
 
     // State and open drafts in one snapshot: read apart, a draft committed in between showed with the old state.
