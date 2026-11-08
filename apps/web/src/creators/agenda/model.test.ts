@@ -15,6 +15,7 @@ const base: AgencySuggestion = {
   purpose: null,
   essential: false,
   shootBrief: null,
+  reelBrief: null,
   origin: 'agency',
   state: 'suggested',
   reason: null,
@@ -117,7 +118,43 @@ describe('the body sent', () => {
       category: 'live',
       title: 'Live',
       purpose: null,
+      dropCategory: null,
+      reelBrief: null,
     });
+  });
+
+  it('sends what a shoot is for and its reel sheet only for a shoot of a Reel Insta (ADR 0082 § 3)', () => {
+    // Invented sentences only (ADR 0010).
+    const reelBrief = {
+      hook: 'Devine ce que je prépare',
+      onScreen: null,
+      shots: ['Reflet dans le miroir', 'Tenue de soirée'],
+      ending: null,
+      seconds: 20,
+    };
+    const draft = {
+      title: 'Reel miroir',
+      category: 'shoot' as const,
+      kind: 'day' as const,
+      day: '2026-11-04',
+      start: 0,
+      end: 60,
+      weekdays: [3],
+      purpose: '',
+      reminderMinutes: null,
+    };
+    expect(
+      suggestionBodyOf(draft, ZONE, base.id, { dropCategory: 'instagram_reel', reelBrief }),
+    ).toMatchObject({ dropCategory: 'instagram_reel', reelBrief });
+    expect(
+      suggestionBodyOf(draft, ZONE, base.id, { dropCategory: 'instagram_post', reelBrief }),
+    ).toMatchObject({ dropCategory: 'instagram_post', reelBrief: null });
+    expect(
+      suggestionBodyOf({ ...draft, category: 'live' }, ZONE, base.id, {
+        dropCategory: 'instagram_reel',
+        reelBrief,
+      }),
+    ).toMatchObject({ dropCategory: null, reelBrief: null });
   });
 });
 

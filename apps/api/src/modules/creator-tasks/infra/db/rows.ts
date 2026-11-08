@@ -63,6 +63,8 @@ export function taskOf(row: TaskRow): CreatorTask {
     title: row.title,
     purpose: row.purpose,
     shootBrief: row.shootBrief,
+    // Parsed on read (docs/architecture/jsonb.md): the schema refuses a sheet out of its bounds.
+    reelBrief: row.reelBrief,
     essential: row.essential,
     reminderMinutes: row.reminderMinutes,
     createdAt: row.createdAt.toISOString(),
@@ -132,6 +134,7 @@ const creatorSide = (row: SuggestionRow) => ({
   title: row.title,
   purpose: row.purpose,
   shootBrief: row.shootBrief,
+  reelBrief: row.reelBrief,
   essential: row.kind === 'routine',
 });
 

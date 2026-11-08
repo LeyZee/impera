@@ -1,6 +1,6 @@
 {
-  "id": "6e5d2709-76e5-4399-aa5b-0d7909b680a6",
-  "prevId": "3e980465-a07e-4277-8f61-7a4470f80831",
+  "id": "3b090044-433d-47d1-8c73-2a0dcd80733c",
+  "prevId": "802283f2-f9de-4047-a10f-aeaa424790e3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3424,6 +3424,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "reel_brief": {
+          "name": "reel_brief",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "starts_at": {
           "name": "starts_at",
           "type": "timestamp with time zone",
@@ -3640,6 +3646,10 @@
           "name": "creator_suggestions_shoot_brief_check",
           "value": "\"creator_suggestions\".\"shoot_brief\" is null or char_length(\"creator_suggestions\".\"shoot_brief\") between 1 and 600"
         },
+        "creator_suggestions_reel_brief_check": {
+          "name": "creator_suggestions_reel_brief_check",
+          "value": "\"creator_suggestions\".\"reel_brief\" is null or jsonb_typeof(\"creator_suggestions\".\"reel_brief\") = 'object'"
+        },
         "creator_suggestions_reason_check": {
           "name": "creator_suggestions_reason_check",
           "value": "\"creator_suggestions\".\"reason\" is null or (\"creator_suggestions\".\"state\" = 'declined' and char_length(\"creator_suggestions\".\"reason\") between 1 and 200)"
@@ -3837,6 +3847,12 @@
         "shoot_brief": {
           "name": "shoot_brief",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reel_brief": {
+          "name": "reel_brief",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -4051,6 +4067,10 @@
         "creator_tasks_shoot_brief_check": {
           "name": "creator_tasks_shoot_brief_check",
           "value": "\"creator_tasks\".\"shoot_brief\" is null or char_length(\"creator_tasks\".\"shoot_brief\") between 1 and 600"
+        },
+        "creator_tasks_reel_brief_check": {
+          "name": "creator_tasks_reel_brief_check",
+          "value": "\"creator_tasks\".\"reel_brief\" is null or jsonb_typeof(\"creator_tasks\".\"reel_brief\") = 'object'"
         },
         "creator_tasks_reminder_check": {
           "name": "creator_tasks_reminder_check",
@@ -18365,6 +18385,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "reel_brief": {
+          "name": "reel_brief",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "state": {
           "name": "state",
           "type": "text",
@@ -18511,6 +18537,10 @@
         "content_ideas_shoot_minutes_check": {
           "name": "content_ideas_shoot_minutes_check",
           "value": "\"content_ideas\".\"shoot_minutes\" between 1 and 600"
+        },
+        "content_ideas_reel_brief_check": {
+          "name": "content_ideas_reel_brief_check",
+          "value": "\"content_ideas\".\"reel_brief\" is null or (jsonb_typeof(\"content_ideas\".\"reel_brief\") = 'object' and \"content_ideas\".\"category\" = 'instagram_reel')"
         },
         "content_ideas_refusal_check": {
           "name": "content_ideas_refusal_check",

@@ -382,6 +382,96 @@ describe('/v1/creators/:creatorId/ideas', () => {
     expect([none.statusCode, codeOf(none)]).toEqual([422, 'content_idea_guard_unprocessable']);
   });
 
+  it('carries a Reel Insta idea’s reel sheet to her agenda and copies it once into her task (ADR 0082 § 3)', async () => {
+    const sheet = {
+      hook: 'Devine ce que je cache ce soir',
+      onScreen: 'Soirée miroir',
+      shots: ['Reflet dans le miroir', 'Tenue de soirée, regard caméra'],
+      ending: 'Retour au miroir du début',
+      seconds: 20,
+    };
+    const ideaId = await seedIdea(nora, { title: 'Reel miroir du soir', category: 'instagram_reel' });
+    // Moved to another category with a sheet: refused before anything is read (400).
+    const elsewhere = await validate(cookies.owner, nora, ideaId, {
+      category: 'instagram_post',
+      reelBrief: sheet,
+    });
+    expect([elsewhere.statusCode, codeOf(elsewhere)]).toEqual([400, 'request_invalid']);
+    // A word of her limits in the sheet: the 422, the field named.
+    const touching = await validate(cookies.owner, nora, ideaId, {
+      reelBrief: { ...sheet, shots: ['Reflet dans le miroir', 'Un appel vidéo avec un fan'] },
+    });
+    expect([touching.statusCode, codeOf(touching)]).toEqual([422, 'content_idea_guard_unprocessable']);
+    expect(touching.json()).toMatchObject({ error: { details: { field: 'shots' } } });
+
+    const response = await validate(cookies.manager, nora, ideaId, { reelBrief: sheet });
+    expect(response.statusCode, response.body).toBe(200);
+    const { idea, suggestion } = ValidatedContentIdeaSchema.parse(response.json());
+    expect(idea.reelBrief).toEqual(sheet);
+    expect(suggestion).toMatchObject({ purpose: 'Pour : Reel Insta', reelBrief: sheet });
+    const to = new Date(Date.parse(suggestion.week) + 13 * 86_400_000).toISOString().slice(0, 10);
+    const agenda = CreatorAgendaSchema.parse(
+      (await call('GET', `/v1/creator-space/agenda?from=${suggestion.week}&to=${to}`, cookies.nora)).json(),
+    );
+    expect(agenda.suggestions.find((one) => String(one.id) === String(ideaId))?.reelBrief).toEqual(sheet);
+    const accepted = await call('POST', `/v1/creator-space/suggestions/${ideaId}/accept`, cookies.nora, {});
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    expect(CreatorTaskSchema.parse(accepted.json()).reelBrief).toEqual(sheet);
+  });
+
+  it('takes a reel sheet written by hand on a shoot for a Reel Insta, read by the guards first (ADR 0082 § 3)', async () => {
+    const sheet = {
+      hook: 'Trois secondes pour te convaincre',
+      onScreen: null,
+      shots: ['Gros plan sur la tasse', 'Elle sourit à la caméra'],
+      ending: null,
+      seconds: 15,
+    };
+    const body = (values: object) => ({
+      id: newId(SuggestionIdSchema),
+      when: { kind: 'day', day: '2026-12-02' },
+      category: 'shoot',
+      title: 'Reel café du matin',
+      ...values,
+    });
+    const suggest = (cookie: string, values: object) =>
+      call('POST', `/v1/creators/${nora}/suggestions`, cookie, body(values));
+
+    const other = await suggest(cookies.owner, { dropCategory: 'instagram_post', reelBrief: sheet });
+    expect([other.statusCode, codeOf(other)]).toEqual([400, 'request_invalid']);
+    const tooLong = await suggest(cookies.owner, {
+      dropCategory: 'instagram_reel',
+      reelBrief: { ...sheet, hook: 'un deux trois quatre cinq six sept huit neuf' },
+    });
+    expect([tooLong.statusCode, codeOf(tooLong)]).toEqual([400, 'request_invalid']);
+    const guarded = await suggest(cookies.manager, {
+      dropCategory: 'instagram_reel',
+      reelBrief: { ...sheet, ending: 'Le lien en bio, pack à 15 €' },
+    });
+    expect([guarded.statusCode, codeOf(guarded)]).toEqual([422, 'creator_suggestion_guard_unprocessable']);
+    expect(guarded.json()).toMatchObject({
+      error: { details: { reason: 'instagram_guard', field: 'ending' } },
+    });
+    // A chatter is refused before any guard is read.
+    const chatter = await suggest(cookies.chatter, { dropCategory: 'instagram_reel', reelBrief: sheet });
+    expect(chatter.statusCode).toBe(403);
+    // Without an active persona, nothing for an output leaves; a plain task still does.
+    const ofInes = await call('POST', `/v1/creators/${ines}/suggestions`, cookies.owner, {
+      ...body({ dropCategory: 'instagram_reel', reelBrief: sheet }),
+    });
+    expect([ofInes.statusCode, codeOf(ofInes)]).toEqual([422, 'creator_suggestion_guard_unprocessable']);
+    const plain = await call('POST', `/v1/creators/${ines}/suggestions`, cookies.owner, body({}));
+    expect(plain.statusCode, plain.body).toBe(200);
+
+    const made = await suggest(cookies.manager, { dropCategory: 'instagram_reel', reelBrief: sheet });
+    expect(made.statusCode, made.body).toBe(200);
+    expect(made.json()).toMatchObject({ purpose: 'Pour : Reel Insta', reelBrief: sheet, shootBrief: null });
+    const agenda = CreatorAgendaSchema.parse(
+      (await call('GET', '/v1/creator-space/agenda?from=2026-11-30&to=2026-12-06', cookies.nora)).json(),
+    );
+    expect(agenda.suggestions.find((one) => one.title === 'Reel café du matin')?.reelBrief).toEqual(sheet);
+  });
+
   it('leaves the suggestion undated when no dispo has room', async () => {
     const ideaId = await seedIdea(nora, { title: 'Journée plage', shootMinutes: 480 });
     const { suggestion } = ValidatedContentIdeaSchema.parse(

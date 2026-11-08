@@ -81,7 +81,9 @@ export function SuggestionCard({
         </div>
       </div>
       {suggestion.purpose === null ? null : <p className="ag-proposal__purpose">{suggestion.purpose}</p>}
-      {suggestion.shootBrief === null ? null : <ShootBrief brief={suggestion.shootBrief} folded />}
+      {suggestion.shootBrief === null && suggestion.reelBrief === null ? null : (
+        <ShootBrief brief={suggestion.shootBrief} reel={suggestion.reelBrief} folded />
+      )}
       {failed === null ? null : (
         <p className="ag-proposal__failed" role="alert">
           {failed}

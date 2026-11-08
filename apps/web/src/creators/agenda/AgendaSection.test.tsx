@@ -41,6 +41,8 @@ function serve(answer?: { status: number; body: unknown }): unknown[] {
           ? json({
               ...declined,
               ...sent,
+              // Sent, never read back: what a shoot is for leaves its trace in « À quoi ça sert ».
+              dropCategory: undefined,
               when: null,
               minutes: 60,
               state: 'suggested',
@@ -104,6 +106,48 @@ describe('Créatrices › Agenda (CR-05 lot c)', () => {
       // It is 18 h 30 in Paris: the form opens on the next half hour, never on an hour already begun.
       when: { kind: 'timed', startsAt: '2026-11-03T18:00:00.000Z', endsAt: '2026-11-03T19:00:00.000Z' },
       purpose: null,
+    });
+  });
+
+  it('writes a reel sheet for a shoot of a Reel Insta, previewed as she will see it (VEI-08)', async () => {
+    const posts = serve();
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Proposer une tâche' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Proposer à Anna' });
+    fireEvent.change(within(dialog).getByLabelText('Quoi'), { target: { value: 'Reel café du matin' } });
+    expect(within(dialog).queryByRole('heading', { name: 'Fiche reel' })).toBeNull();
+    fireEvent.click(within(dialog).getByLabelText(/^Pour/u));
+    fireEvent.click(await screen.findByRole('option', { name: /Reel Insta/u }));
+    expect(within(dialog).getByRole('heading', { name: 'Fiche reel' })).toBeDefined();
+    fireEvent.change(within(dialog).getByLabelText(/Première phrase/u), {
+      target: { value: 'Trois secondes pour te convaincre' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Plan 1'), {
+      target: { value: 'Gros plan sur la tasse' },
+    });
+    // One shot only: what is missing is said, nothing is sent.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Proposer' }));
+    expect(within(dialog).getByText('Deux plans au moins.')).toBeDefined();
+    expect(posts).toEqual([]);
+    fireEvent.change(within(dialog).getByLabelText('Plan 2'), { target: { value: 'Elle sourit' } });
+    const preview = within(within(dialog).getByRole('group', { name: 'Ce qu’elle verra' }));
+    expect(preview.getByText('Trois secondes pour te convaincre')).toBeDefined();
+    const filmed = within(preview.getByRole('region', { name: 'Puis filme, dans l’ordre' }));
+    expect(filmed.getAllByRole('listitem').map((shot) => shot.textContent)).toEqual([
+      'Gros plan sur la tasse',
+      'Elle sourit',
+    ]);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Proposer' }));
+    expect(await screen.findByText(/^Proposée sans heure/u)).toBeDefined();
+    expect(posts[0]).toMatchObject({
+      dropCategory: 'instagram_reel',
+      reelBrief: {
+        hook: 'Trois secondes pour te convaincre',
+        onScreen: null,
+        shots: ['Gros plan sur la tasse', 'Elle sourit'],
+        ending: null,
+        seconds: 20,
+      },
     });
   });
 

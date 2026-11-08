@@ -1,4 +1,4 @@
-import { JOB_PAYLOADS, asPersonaV2 } from '@impera/contracts';
+import { JOB_PAYLOADS, asPersonaV2, type CreatorId, type PersonaLimits } from '@impera/contracts';
 import type { LlmGateway } from '@impera/llm';
 
 import { defineTask } from '../jobs';
@@ -35,11 +35,7 @@ export function wireTrends(
     adminDb: shared.adminDb,
     requireRole: shared.requireRole,
     gateway: deps.gateway,
-    limitsOf: async (creatorId) => {
-      const active = await deps.persona.versions.active(creatorId);
-      // Her strict rules, wherever the format keeps them (ADR 0079 § 4).
-      return active === null ? null : asPersonaV2(active.persona).agent.rules;
-    },
+    limitsOf: personaLimitsOf(deps.persona),
     agenda: deps.agenda,
     contentDrops: deps.contentDrops,
   });
@@ -60,5 +56,15 @@ export function wireTrends(
       ),
     },
     routes: [module.routes],
+  };
+}
+
+/** Her active persona's limits, `null` without one: her strict rules, wherever the format keeps them (ADR 0079 § 4). */
+export function personaLimitsOf(
+  persona: PersonaModule,
+): (creatorId: CreatorId) => Promise<PersonaLimits | null> {
+  return async (creatorId) => {
+    const active = await persona.versions.active(creatorId);
+    return active === null ? null : asPersonaV2(active.persona).agent.rules;
   };
 }

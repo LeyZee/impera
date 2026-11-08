@@ -1,10 +1,13 @@
 import {
   CreateSuggestionBodySchema,
   newId,
+  REEL_DROP_CATEGORY,
   SuggestionIdSchema,
   type AgencySuggestion,
   type CreateSuggestionBody,
   type CreatorTaskWhen,
+  type IdeaDropCategory,
+  type ReelBrief,
 } from '@impera/contracts';
 
 import { addDays, dayOf, lengthOf, minuteOf } from '@/scheduling/time';
@@ -43,15 +46,34 @@ export function proposalSlotOf(
 /** A suggestion's id, drawn once when the form opens: sent again after a lost answer, it adds nothing. */
 export const newSuggestionId = (): string => newId(SuggestionIdSchema);
 
+/**
+ * What a shoot is for (ADR 0082 § 3), and its reel sheet when it is for a Reel Insta: only for « Tournage », left out
+ * for any other category whatever the form still holds.
+ */
+export interface ShootFor {
+  readonly dropCategory: IdeaDropCategory | null;
+  readonly reelBrief: ReelBrief | null;
+}
+
+export const NOTHING_FOR: ShootFor = { dropCategory: null, reelBrief: null };
+
 /** The body of `POST /v1/creators/:creatorId/suggestions`. */
-export function suggestionBodyOf(draft: TaskDraft, zone: string, id: string): CreateSuggestionBody {
+export function suggestionBodyOf(
+  draft: TaskDraft,
+  zone: string,
+  id: string,
+  shoot: ShootFor = NOTHING_FOR,
+): CreateSuggestionBody {
   const purpose = draft.purpose.trim();
+  const dropCategory = draft.category === 'shoot' ? shoot.dropCategory : null;
   return CreateSuggestionBodySchema.parse({
     id,
     when: whenOf(draft, zone),
     category: draft.category,
     title: draft.title.trim(),
     purpose: purpose === '' ? null : purpose,
+    dropCategory,
+    reelBrief: dropCategory === REEL_DROP_CATEGORY ? shoot.reelBrief : null,
   });
 }
 

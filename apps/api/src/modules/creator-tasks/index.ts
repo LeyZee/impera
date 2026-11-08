@@ -5,14 +5,14 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { remind } from './application/remind';
 import type { AgendaFeedEntry } from './domain/feed';
-import type { ShootSuggestion } from './domain/ports';
+import type { ShootGuard, ShootSuggestion } from './domain/ports';
 import { createDrizzleCreatorAgendaStore } from './infra/db/agenda-store';
 import { createDrizzleAgendaFeed } from './infra/db/feed-reads';
 import { createReminderSource } from './infra/db/reminder-source';
 import { createDrizzleSuggestionStore } from './infra/db/suggestion-store';
 import { createCreatorTaskRoutes, type RequireRole } from './infra/http/routes';
 
-export type { ShootSuggestion } from './domain/ports';
+export type { GuardedShoot, ShootGuardFault, ShootSuggestion } from './domain/ports';
 
 export interface CreatorTasksModule {
   readonly name: 'creator-tasks';
@@ -54,6 +54,11 @@ export interface CreatorTasksDeps {
   /** Owner role: what a job reads of a task and her accounts, with no account to read under. */
   readonly adminDb: Database;
   readonly requireRole: RequireRole;
+  /**
+   * The guards of an idea, for a shoot the agency suggests by hand for a drop category (ADR 0082 § 3): handed by the
+   * composition root, from the trend watch and her persona's limits.
+   */
+  readonly guardShoot: ShootGuard;
   /** The `notifications` module's `notify`, null when push is off. */
   readonly notify: ((request: NotificationRequest, at: Date) => Promise<NotificationOutcome>) | null;
   /** Tests only: another clock than the server's. */
@@ -69,6 +74,7 @@ export function createCreatorTasksModule(deps: CreatorTasksDeps): CreatorTasksMo
     routes: createCreatorTaskRoutes(
       createDrizzleCreatorAgendaStore(deps.db),
       suggestions,
+      deps.guardShoot,
       deps.requireRole,
       deps.clock,
     ),
