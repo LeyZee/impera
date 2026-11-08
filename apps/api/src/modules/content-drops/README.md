@@ -52,6 +52,22 @@ Le même job, une fois le fichier reçu, le télécharge dans un dossier tempora
 
 Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au moins un est gardé, à « bloqué » (« Aucun fichier de ce dépôt n'a pu être gardé ») quand tous sont refusés. Un ffmpeg absent ou tué par son délai fait réessayer le job, jamais refuser le fichier.
 
+## La description de ce qu'elle dépose (ADR 0083, SC-04 lot a, migration 0141)
+
+- Chaque photo et chaque vidéo gardée comme **nouveau** média de sa médiathèque met en file `content_drops.describe_file` dans la transaction qui la garde, sous la clé `content_drops.describe_file:<média>` : une fois par média, quel que soit le nombre de dépôts qui le donnent. Un doublon ne relance rien ; un vocal n'est pas décrit (sa transcription est ailleurs).
+- Le job lit le premier fichier vivant d'un dépôt qui tient ce média (gardé, non remplacé, dépôt non retiré) : il donne le contexte écrit par le code (`domain/describe.ts`), la catégorie telle que son écran la nomme et, pour un script, l'étape de la version figée qu'elle a tournée (numéro et nom du carton, ce qu'elle vend, ambiance, tenue, lieu, consigne de la série et de l'emplacement, place du média dans l'étape). Le modèle ne pose jamais de question.
+- Rien tant que son interrupteur est éteint (`CreatorSettings.describeDrops`, faux par défaut, ADR 0083 § 9) ; rien pour un original effacé ou un média qu'aucun dépôt vivant ne tient ; rien pour un média déjà décrit pour un dépôt.
+- Le job prend sur le disque le poids du fichier, le télécharge dans un dossier à lui, puis le passe au module `media` (`createDropDescriptions`, branché par `wiring/content-drops.ts` sur la passerelle). Budget du jour épuisé : il se remet une heure plus tard, jusqu'au lendemain, jamais abandonné ; disque trop plein : 15 minutes ; tous les modèles en échec : il lève, et Graphile réessaie (5 fois).
+
+## La synthèse d'un script envoyé (ADR 0083 § 6, SC-04 lot b, migration 0145)
+
+- `content_drops.summarize_script` (clé `content_drops.summarize_script:<dépôt>`) est mis en file quand elle envoie son script, dans la transaction de l'envoi, puis après chaque description d'un média que tient un emplacement vivant d'un script envoyé. Un seul job attend par script, quel que soit celui qui l'a demandé.
+- Le job attend tant qu'un fichier est encore au nettoyage ou qu'une photo ou une vidéo n'a pas sa description détaillée ; il revient après chaque description. Un fichier refusé sort de son étape, un vocal y reste sans description. Rien tant que son interrupteur est éteint (`describeDrops`, le même que pour les médias).
+- Les étapes viennent du code (`scriptStepsOf`, `domain/describe.ts`) : chaque segment, chaque série d'une étape à variantes à part (`E2A`, `E2B`), avec son carton dans la version figée et les médias de ses emplacements remplis. Le rôle `brain` (prompt `brain/script-summary.md`) écrit pour chacune une description générale (déroulé, objectif, ambiance) et un résumé, puis le contexte du tournage. Le code remet les étapes dans l'ordre et refuse une réponse qui en oublie, en ajoute ou en répète une (le job lève, Graphile réessaie 5 fois).
+- Aucun prix ne vient du modèle (ADR 0056 § 6) : une somme ou une devise dans la synthèse est redemandée une fois, puis gardée avec la raison `price` pour l'agence. Les prix de la grille s'affichent à côté de chaque étape sur l'écran de validation (lot c).
+- Une ligne de `script_drop_summaries` par jeu de médias (`media_hash`, l'empreinte de ses emplacements et de leurs médias) et par version du prompt : rejoué, le job ne rappelle rien. Budget du jour épuisé : une heure plus tard, comme pour un média. Seul un job l'écrit ; l'équipe la lit.
+- Un média déjà dans sa médiathèque (doublon) garde la description qu'il a reçue à son premier dépôt ; s'il n'en a pas (interrupteur éteint à l'époque), le script attend le rattrapage du lot c.
+
 ## Une demande née d'une idée (VEI-01 d2)
 
 `requestFromIdea` (index du module) écrit au rôle admin la demande d'un tournage qu'elle a accepté depuis une idée de la veille : origine `idea`, sans auteur (`content_requests_author_check`), sous l'identifiant de l'idée, rejouable (`on conflict do nothing`). Seul le job `creator_tasks.suggestion_decided` de la veille l'appelle.

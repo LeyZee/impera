@@ -1544,9 +1544,13 @@
     box-shadow var(--nv-dur-base) var(--nv-ease-out),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
-.nv-chip:hover:not(:disabled) {
-  color: var(--nv-ink);
-  background: var(--nv-glass-fill-strong);
+/* Only an unchecked chip lightens under the pointer, and only where a pointer hovers: a checked chip keeps its fill,
+   and a finger's tap, whose hover sticks on a phone, never makes the choice look undone (recette du 08/11). */
+@media (hover: hover) {
+  .nv-chip:hover:not(:disabled, [aria-checked='true'], [aria-pressed='true']) {
+    color: var(--nv-ink);
+    background: var(--nv-glass-fill-strong);
+  }
 }
 .nv-chip:active:not(:disabled) {
   transform: scale(0.95);

@@ -12,14 +12,17 @@ import type {
   DropMime,
   DropState,
   FillScriptSlotBody,
+  ScriptDropSummary,
   ScriptMoment,
   ScriptSegment,
+  ScriptSummaryReviewReason,
   ScriptSlot,
   ScriptVariantLetter,
   SlotLengths,
   StartScriptDropBody,
 } from '@impera/contracts';
 
+import type { DropMediaContext } from './describe';
 import type { ExportedFile } from './script-export';
 import type { FileFamily } from './sniff';
 import type { StoredPart } from './upload';
@@ -365,4 +368,118 @@ export interface FileCleaner {
    */
   needsConversion(raw: string, family: FileFamily, mime: DropMime): Promise<boolean>;
   clean(raw: string, out: string, family: FileFamily, mime: DropMime): Promise<CleanedFile>;
+}
+
+/**
+ * A media of her library to describe (ADR 0083 § 1): the medium, and the first live file of a drop that kept it,
+ * which gives the context. `null` from the store when no live drop holds it any more (refused, withdrawn, replaced).
+ */
+export interface MediaToDescribe {
+  readonly creatorId: string;
+  readonly kind: 'image' | 'video' | 'audio';
+  readonly mime: string;
+  readonly bytes: number;
+  readonly storageKey: string;
+  /** Its original left the storage (CR-06 c): nothing to read. */
+  readonly erased: boolean;
+  /** Her switch (`CreatorSettings.describeDrops`, ADR 0083 § 9): off, her drops wait undescribed. */
+  readonly describes: boolean;
+  readonly category: DropCategory;
+  /** For a script's slot: its key and the frozen version she shot. */
+  readonly script: { readonly slotKey: string; readonly versionId: string } | null;
+}
+
+/** `content_drops.describe_file`'s reads and its next run, as the owner role. */
+export interface DescriptionQueue {
+  target(mediaAssetId: string): Promise<MediaToDescribe | null>;
+  /** The job again at `runAt` (budget spent, disk short), keyed by the medium: a new job, never twice. */
+  later(creatorId: string, mediaAssetId: string, correlationId: string, runAt: Date): Promise<void>;
+}
+
+/** The media module's description of a dropped media, seen from here (ADR 0083). */
+export interface DropDescriber {
+  described(mediaAssetId: string): Promise<boolean>;
+  /** The latest detailed description of each of these media that has one, by medium (ADR 0083 § 2). */
+  detailed(mediaAssetIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
+  /**
+   * Described and kept, or why not: `budget`, the day's cap spent, asked again later; `failed`, every model failed;
+   * `unreadable`, the file did not open.
+   */
+  describe(file: {
+    readonly creatorId: string;
+    readonly mediaAssetId: string;
+    readonly path: string;
+    readonly mime: string;
+    readonly kind: 'image' | 'video';
+    readonly bytes: number;
+    readonly context: DropMediaContext;
+  }): Promise<'described' | 'budget' | 'failed' | 'unreadable'>;
+}
+
+/** A sent script to be told step by step (ADR 0083 § 6), as the owner role reads it. */
+export interface ScriptToSummarize {
+  readonly creatorId: string;
+  /** Her switch (`CreatorSettings.describeDrops`, § 9): off, her script waits untold. */
+  readonly describes: boolean;
+  readonly versionId: string;
+  /** The moment her request fixed; `null`, the structure's own. */
+  readonly moment: ShotMoment | null;
+  /** Its live slots' files: a refused one is left out, one still in the cleaning has no medium yet. */
+  readonly files: readonly {
+    readonly slotKey: string;
+    readonly mediaAssetId: string | null;
+    readonly kind: DropMediaKind;
+    readonly durationS: number | null;
+  }[];
+}
+
+/** What a script's synthesis keeps (`script_drop_summaries`), written once per set of media and prompt. */
+export interface SummarizedScript {
+  readonly mediaHash: string;
+  readonly content: ScriptDropSummary;
+  readonly reviewReasons: readonly ScriptSummaryReviewReason[];
+  readonly model: string;
+  readonly promptHash: string;
+}
+
+/** `content_drops.summarize_script`'s reads, writes and next runs, as the owner role. */
+export interface ScriptSummaryStore {
+  /** `null` for a drop that is not a script, is withdrawn, or is still being filled. */
+  target(dropId: string): Promise<ScriptToSummarize | null>;
+  /** Whether this set of media of the script was already told, whatever the prompt. */
+  summarized(dropId: string, mediaHash: string): Promise<boolean>;
+  save(creatorId: string, dropId: string, summary: SummarizedScript): Promise<void>;
+  /** The job again at `runAt` (budget spent), keyed by the drop. */
+  later(creatorId: string, dropId: string, correlationId: string, runAt: Date): Promise<void>;
+  /** The job for each sent script holding this medium in a live slot, now; how many. */
+  enqueueFor(mediaAssetId: string, correlationId: string): Promise<number>;
+}
+
+/** The brain that tells a script (ADR 0083 § 6), seen from here: never a price, from the cards and descriptions. */
+export interface ScriptSummarizer {
+  summarize(input: {
+    readonly creatorId: string;
+    readonly scriptName: string;
+    readonly moment: ShotMoment | null;
+    readonly steps: readonly {
+      readonly step: string;
+      readonly code: string;
+      readonly name: string;
+      readonly card: string | null;
+      readonly media: readonly {
+        readonly kind: DropMediaKind;
+        readonly durationS: number | null;
+        readonly description: string | null;
+      }[];
+    }[];
+  }): Promise<
+    | {
+        readonly kind: 'summarized';
+        readonly summary: ScriptDropSummary;
+        readonly model: string;
+        readonly promptHash: string;
+      }
+    | { readonly kind: 'budget' }
+    | { readonly kind: 'failed' }
+  >;
 }

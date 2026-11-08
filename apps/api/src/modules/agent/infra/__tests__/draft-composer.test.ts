@@ -111,7 +111,9 @@ function gateway(script: Script, seen: Seen): LlmGateway {
     sense: () => Promise.reject(new Error('not used')),
     transcribe: () => Promise.reject(new Error('not used')),
     describeTrendCaptures: () => Promise.reject(new Error('not used')),
+    describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
+    summarizeScript: () => Promise.reject(new Error('not used')),
     brain: (input) => {
       seen.traces.push(input.trace);
       seen.brainInputs?.push(input);

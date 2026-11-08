@@ -28,6 +28,9 @@ export type DraftId = z.infer<typeof DraftIdSchema>;
 export const MediaAssetIdSchema = uuid.brand<'MediaAssetId'>();
 export type MediaAssetId = z.infer<typeof MediaAssetIdSchema>;
 
+export const MediaDescriptionIdSchema = uuid.brand<'MediaDescriptionId'>();
+export type MediaDescriptionId = z.infer<typeof MediaDescriptionIdSchema>;
+
 export const PersonaVersionIdSchema = uuid.brand<'PersonaVersionId'>();
 export type PersonaVersionId = z.infer<typeof PersonaVersionIdSchema>;
 
@@ -227,6 +230,10 @@ export type SuggestionId = z.infer<typeof SuggestionIdSchema>;
 /** A drop of hers (`content_drops`, CR-06, ADR 0044 § 1 and ADR 0055): drawn by her phone, so that a replay adds nothing. */
 export const ContentDropIdSchema = uuid.brand<'ContentDropId'>();
 export type ContentDropId = z.infer<typeof ContentDropIdSchema>;
+
+/** A sent script's synthesis (ADR 0083 § 6). */
+export const ScriptDropSummaryIdSchema = uuid.brand<'ScriptDropSummaryId'>();
+export type ScriptDropSummaryId = z.infer<typeof ScriptDropSummaryIdSchema>;
 
 /** One file of a drop (`content_drop_files`), drawn by her phone with the drop. */
 export const ContentDropFileIdSchema = uuid.brand<'ContentDropFileId'>();

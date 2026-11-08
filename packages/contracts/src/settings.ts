@@ -32,5 +32,10 @@ export const CreatorSettingsSchema = z.object({
       fanMediaDays: z.number().int().min(1).max(365).default(30),
     })
     .prefault({}),
+  /**
+   * Whether each photo and video she drops is described by the vision AI on arrival (ADR 0083 § 9): off until the
+   * agency has checked the vision model on a few of her real media; her drops wait undescribed meanwhile.
+   */
+  describeDrops: z.boolean().default(false),
 });
 export type CreatorSettings = z.infer<typeof CreatorSettingsSchema>;

@@ -1,0 +1,165 @@
+import {
+  DROP_CATEGORY_LABELS,
+  scriptSegmentCodes,
+  scriptSlots,
+  type DropCategory,
+  type ScriptDropSummary,
+  type ScriptSegment,
+} from '@impera/contracts';
+
+/**
+ * What the code knows of a dropped media, given to the vision AI as data (ADR 0083 § 5): her category as her screen
+ * names it, and for a script the step on its card, its instruction and the media's place in it. The model never asks.
+ */
+export interface DropMediaContext {
+  readonly category: string;
+  readonly step: {
+    readonly number: number;
+    readonly name: string;
+    readonly instruction: string | null;
+    /** 1 for the step's first media. */
+    readonly position: number;
+    readonly count: number;
+  } | null;
+}
+
+const sentence = (text: string): string => (/[.!?…]$/u.test(text) ? text : `${text}.`);
+
+/** What a step's card says, as the vision and the brain read it: its number and name, and its lines. */
+interface StepCard {
+  readonly number: number;
+  readonly name: string;
+  readonly lines: readonly string[];
+}
+
+/**
+ * A step's card in the frozen version she shot: a stage by its number and name (« ÉTAPE 2 », as on its card), what it
+ * sells, its mood, outfit and place, the series' hint; a bridge by the number of the stage it leaves and its teaser.
+ */
+function stepCardOf(
+  segments: readonly ScriptSegment[],
+  segment: ScriptSegment,
+  variant: string | null,
+): StepCard {
+  const stageNumbers = new Map(
+    scriptSegmentCodes(segments)
+      .filter((code) => code.code.startsWith('E'))
+      .map((code) => [code.key, Number(code.code.slice(1))]),
+  );
+  if (segment.kind === 'bridge')
+    return {
+      number: stageNumbers.get(segment.from) ?? 0,
+      name: `Pont vers l’étape ${String(stageNumbers.get(segment.to) ?? '?')}`,
+      lines: [segment.teaser],
+    };
+  const series = segment.variants.find((one) => one.letter === variant);
+  return {
+    number: stageNumbers.get(segment.key) ?? 0,
+    name: segment.name,
+    lines: [
+      segment.intention,
+      segment.mood,
+      segment.outfit === null ? null : `Tenue : ${segment.outfit}`,
+      segment.place === null ? null : `Lieu : ${segment.place}`,
+      series === undefined ? null : `Série ${series.letter} : ${series.hint}`,
+    ].filter((text) => text !== null),
+  };
+}
+
+const textOf = (lines: readonly string[]): string | null =>
+  lines.length === 0 ? null : lines.map(sentence).join(' ');
+
+/**
+ * The context of one media of her drop: its step's card and the slot's own hint, and its place in the step. A slot the
+ * version does not have, or a drop of another category, gives no step.
+ */
+export function dropContextOf(
+  category: DropCategory,
+  script: { readonly slotKey: string; readonly segments: readonly ScriptSegment[] } | null,
+): DropMediaContext {
+  const label = DROP_CATEGORY_LABELS[category];
+  if (script === null) return { category: label, step: null };
+  const slot = scriptSlots(script.segments).find((one) => one.key === script.slotKey);
+  const segment = script.segments.find((one) => one.key === slot?.segmentKey);
+  if (slot === undefined || segment === undefined) return { category: label, step: null };
+  const card = stepCardOf(script.segments, segment, slot.variant);
+  return {
+    category: label,
+    step: {
+      number: card.number,
+      name: card.name,
+      instruction: textOf([...card.lines, ...(slot.slot.hint === null ? [] : [slot.slot.hint])]),
+      position: slot.rank + 1,
+      count: segment.mediaSlots.length,
+    },
+  };
+}
+
+/** A slot's file of her sent script: its slot and its medium, and whatever its reader keeps of it. */
+interface SlotFile {
+  readonly slotKey: string;
+  readonly mediaAssetId: string;
+}
+
+/** A step of her sent script, to be told (ADR 0083 § 6): one segment, one series of a stage with variants. */
+export interface ScriptStepToTell<F extends SlotFile = SlotFile> {
+  /** `<segment>:<series>`, as its slots begin. */
+  readonly step: string;
+  /** `E1A`, `P12`, as her cards say. */
+  readonly code: string;
+  readonly name: string;
+  readonly card: string | null;
+  /** Its filled slots' files, in their order. */
+  readonly media: readonly F[];
+}
+
+/**
+ * The steps of her sent script, in its order, each with the media of its filled slots; a step with none (an optional
+ * slot left empty, a bridge without media) is not told. A file whose slot the version does not have is left out.
+ */
+export function scriptStepsOf<F extends SlotFile>(
+  segments: readonly ScriptSegment[],
+  files: readonly F[],
+): ScriptStepToTell<F>[] {
+  const filled = new Map(files.map((file) => [file.slotKey, file]));
+  const steps: ScriptStepToTell<F>[] = [];
+  for (const slot of scriptSlots(segments)) {
+    const file = filled.get(slot.key);
+    if (file === undefined) continue;
+    const key = `${slot.segmentKey}:${slot.variant ?? ''}`;
+    const last = steps.at(-1);
+    if (last?.step === key) {
+      steps[steps.length - 1] = { ...last, media: [...last.media, file] };
+      continue;
+    }
+    const segment = segments.find((one) => one.key === slot.segmentKey);
+    if (segment === undefined) continue;
+    const card = stepCardOf(segments, segment, slot.variant);
+    steps.push({ step: key, code: slot.code, name: card.name, card: textOf(card.lines), media: [file] });
+  }
+  return steps;
+}
+
+/**
+ * The brain's answer in the script's order, or `null` when it does not tell each step once: a step missing, added or
+ * told twice. The code holds the steps; the model only writes about them.
+ */
+export function orderedSummary(
+  steps: readonly string[],
+  summary: ScriptDropSummary,
+): ScriptDropSummary | null {
+  const told = new Map(summary.steps.map((one) => [one.step, one]));
+  if (told.size !== summary.steps.length || told.size !== steps.length) return null;
+  const ordered = steps.map((step) => told.get(step));
+  if (ordered.some((one) => one === undefined)) return null;
+  return { shootingContext: summary.shootingContext, steps: ordered.filter((one) => one !== undefined) };
+}
+
+/** A sum or a currency in the synthesis: prices come from the agency's grid alone (ADR 0056 § 6). */
+const PRICE = /[€$£]|\b(?:euros?|eur|dollars?|usd|livres sterling)\b|\d\s*balles\b/iu;
+
+export function mentionsPrice(summary: ScriptDropSummary): boolean {
+  return [summary.shootingContext, ...summary.steps.flatMap((one) => [one.overview, one.summary])].some(
+    (text) => PRICE.test(text),
+  );
+}

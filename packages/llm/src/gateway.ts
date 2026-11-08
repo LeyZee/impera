@@ -1,6 +1,12 @@
 import { randomBytes } from 'node:crypto';
 
-import { err, MEDIA_VOCABULARY_VERSION, ok, type LlmPurpose } from '@impera/contracts';
+import {
+  err,
+  MEDIA_VOCABULARY_VERSION,
+  ok,
+  ScriptDropSummarySchema,
+  type LlmPurpose,
+} from '@impera/contracts';
 import { generateText, transcribe as transcribeAudio } from 'ai';
 
 import { budgetStatus, type BudgetStatus } from './budget';
@@ -14,6 +20,7 @@ import type {
   LlmFailure,
   LlmGateway,
   LlmGatewayDeps,
+  ScriptSummaryInput,
   VideoKeyframes,
 } from './gateway-types';
 import { computeHealth } from './health';
@@ -23,11 +30,12 @@ import {
   ChannelPollOutputSchema,
   ChannelPostOutputSchema,
   JudgeOutputSchema,
+  DropSenseOutputSchema,
   SenseOutputSchema,
   TrendCapturesOutputSchema,
   VoiceOutputSchema,
 } from './schemas';
-import { senseContent } from './sense-content';
+import { dropSenseContent, senseContent } from './sense-content';
 import { wrapUntrusted } from './untrusted';
 
 export type * from './gateway-types';
@@ -41,7 +49,9 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   };
   const judgePrompt = prompts.judge ?? loadPrompt('judge');
   const trendCapturesPrompt = prompts.trendCaptures ?? loadPrompt('sense', 'trend-captures');
+  const creatorDropPrompt = prompts.creatorDrop ?? loadPrompt('sense', 'creator-drop');
   const channelPostPrompt = prompts.channelPost ?? loadPrompt('voice', 'telegram-channel');
+  const scriptSummaryPrompt = prompts.scriptSummary ?? loadPrompt('brain', 'script-summary');
   const canary = deps.canary ?? `nv-${randomBytes(6).toString('hex')}`;
 
   const reportRefusal = (provider: ProviderId, status: 401 | 403): void => {
@@ -123,6 +133,38 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
           return content === undefined ? undefined : [{ role: 'user', content }];
         },
         SenseOutputSchema,
+        input.trace,
+      );
+      if (!result.ok) return result;
+      const { media } = input;
+      return ok({
+        ...result.value,
+        output: {
+          ...result.value.output,
+          vocabularyVersion: MEDIA_VOCABULARY_VERSION,
+          kind: media.kind,
+          durationS: media.kind === 'image' ? null : media.durationS,
+        },
+      });
+    },
+
+    async describeDrop(input) {
+      const system = renderPrompt(creatorDropPrompt, { canary });
+      let pending: Promise<VideoKeyframes> | undefined;
+      const keyframes = (): Promise<VideoKeyframes> => {
+        if (input.media.kind !== 'video') return Promise.resolve({ frames: [] });
+        pending ??= input.media.keyframes();
+        return pending;
+      };
+      const result = await run(
+        'sense',
+        creatorDropPrompt,
+        system,
+        async (ref) => {
+          const content = await dropSenseContent(input, ref, keyframes);
+          return content === undefined ? undefined : [{ role: 'user', content }];
+        },
+        DropSenseOutputSchema,
         input.trace,
       );
       if (!result.ok) return result;
@@ -313,6 +355,19 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       return result.ok ? ok({ ...result.value, output: { kind: 'post', ...result.value.output } }) : result;
     },
 
+    async summarizeScript(input) {
+      const system = renderPrompt(scriptSummaryPrompt, { canary });
+      const content = scriptSummaryRequest(input);
+      return run(
+        'brain',
+        scriptSummaryPrompt,
+        system,
+        () => Promise.resolve([{ role: 'user', content }]),
+        ScriptDropSummarySchema,
+        input.trace,
+      );
+    },
+
     health() {
       return computeHealth(deps.config, deps.credentials, deps.log, now(), status(), trendWatchStatus());
     },
@@ -375,4 +430,29 @@ function channelPostRequest(input: ChannelPostInput): string {
   }
   if (input.advice !== null) lines.push('', wrapUntrusted('agency_advice', input.advice));
   return lines.join('\n');
+}
+
+const MOMENT_WORDS = { day: 'de jour', night: 'de nuit' } as const;
+
+function mediaLine(media: ScriptSummaryInput['steps'][number]['media'][number], index: number): string {
+  const length = media.durationS === null ? '' : `, ${String(Math.round(media.durationS))} s`;
+  const head = `Média ${String(index + 1)} (${{ image: 'photo', video: 'vidéo', audio: 'note vocale' }[media.kind]}${length})`;
+  return media.description === null ? `${head} : non décrit.` : `${head} :\n${media.description}`;
+}
+
+/** The script, step by step: each card and its media's descriptions, in one data block. */
+function scriptSummaryRequest(input: ScriptSummaryInput): string {
+  const steps = input.steps.map((step) =>
+    [
+      `## Étape ${step.code} « ${step.name} » (clé ${step.step})`,
+      step.card === null ? 'Carton : rien de plus que son nom.' : `Carton : ${step.card}`,
+      ...step.media.map(mediaLine),
+    ].join('\n'),
+  );
+  const moment = input.moment === null ? '' : `, tourné ${MOMENT_WORDS[input.moment]}`;
+  return [
+    `Écris la fiche de ce script${moment} : chacune de ses ${String(input.steps.length)} étapes, dans cet ordre, puis le contexte du tournage.`,
+    '',
+    wrapUntrusted('script_steps', [`# Script « ${input.scriptName} »`, ...steps].join('\n\n')),
+  ].join('\n');
 }
