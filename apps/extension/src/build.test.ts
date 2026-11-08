@@ -57,6 +57,13 @@ describe('the built manifest', () => {
     expect(mentionsInstagram(manifest['content_scripts'])).toBe(false);
   });
 
+  it('opens the copilot in the browser’s side panel and puts nothing in Reveal’s page (ADR 0086 § 1)', () => {
+    expect(manifest['side_panel']).toEqual({ default_path: 'sidepanel.html' });
+    expect(manifest['permissions']).toContain('sidePanel');
+    expect(JSON.stringify(manifest['content_scripts'] ?? [])).not.toContain('reveal');
+    expect(JSON.stringify(manifest['web_accessible_resources'] ?? [])).not.toContain('reveal');
+  });
+
   it('exposes no file of the extension to Instagram', () => {
     expect(mentionsInstagram(manifest['web_accessible_resources'])).toBe(false);
     const resources = JSON.stringify(manifest['web_accessible_resources'] ?? []);
