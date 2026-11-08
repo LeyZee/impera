@@ -71,6 +71,8 @@ export interface AgentComposeInput {
   }[];
   readonly fan: {
     readonly notes: readonly string[];
+    /** Read by the brain alone (ADR 0085 § 9): when he has money, his attachment, his moods. */
+    readonly brainNotes?: readonly string[];
     readonly spentMinor: number;
     readonly firstMessageAt: Date | null;
   };
@@ -672,6 +674,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         fanText,
         media,
         fanNotes: input.fan.notes.join('\n'),
+        ...(input.fan.brainNotes !== undefined &&
+          input.fan.brainNotes.length > 0 && { brainNotes: input.fan.brainNotes.join('\n') }),
         ...(offer !== undefined && { offer }),
         ...(withHer.sexualizationLimits !== undefined && {
           sexualization: {

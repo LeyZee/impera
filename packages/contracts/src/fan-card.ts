@@ -237,6 +237,19 @@ export function fanCardFieldSpec(field: FanCardField): FanCardFieldSpec {
   return spec;
 }
 
+/**
+ * Fields only the brain reads (ADR 0085 § 9): when he has money, his attachment, his moods. They time an offer or a
+ * follow-up; the voice never gets them, so she can never say « t'as été payé ? ». A rule of code, whatever a prompt says.
+ */
+export const FAN_CARD_BRAIN_ONLY: readonly FanCardField[] = ['payday', 'attachment', 'moods'];
+
+/** Whether a fact is one of the brain's only (§ 9): a field of `FAN_CARD_BRAIN_ONLY`, whatever its key's case. */
+export function isBrainOnlyFact(fact: { readonly category: FactCategory; readonly key: string }): boolean {
+  if (fact.category === 'operator_note') return false;
+  const field = FanCardFieldSchema.safeParse(fact.key.trim().toLowerCase().replace(/\s+/g, '_'));
+  return field.success && FAN_CARD_BRAIN_ONLY.includes(field.data);
+}
+
 /** A value is a line of his notes, not a message (`fan_facts`, 300 characters at most), a list included whole. */
 export const FAN_CARD_VALUE_MAX = 300;
 
