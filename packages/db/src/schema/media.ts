@@ -17,7 +17,6 @@ import {
 import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { conversations, messages } from './conversations';
 import { fans } from './fans';
-import { teamMembers } from './team';
 import { creators } from './tenancy';
 
 /** Module `media`: files (the bytes live in object storage), their descriptions, and what was sold to whom. */
@@ -83,9 +82,6 @@ export const mediaDescriptions = pgTable(
      * (the table is append-only).
      */
     author: enumText('author').notNull().default('sense'),
-    /** The member of the agency who validated this very row, and when (ADR 0030 § 3); both or neither. */
-    validatedBy: uuid('validated_by').references(() => teamMembers.id),
-    validatedAt: timestampTz('validated_at'),
     /** Her own word on the media (P6-01), free text. */
     creatorNote: text('creator_note'),
     /**
@@ -105,7 +101,6 @@ export const mediaDescriptions = pgTable(
       'media_descriptions_review_reasons_check',
       sql`${t.reviewReasons} <@ array[${sql.raw(DESCRIPTION_REVIEW_REASONS.map((r) => `'${r}'`).join(', '))}]::text[]`,
     ),
-    check('media_descriptions_validated_check', sql`(${t.validatedBy} is null) = (${t.validatedAt} is null)`),
     // The vision AI describes a media once per describer (ADR 0083 § 1): a replayed job writes nothing twice.
     uniqueIndex('media_descriptions_sense_unique')
       .on(t.mediaAssetId, t.promptHash)

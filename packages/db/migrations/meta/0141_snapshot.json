@@ -1,5 +1,5 @@
 {
-  "id": "26d229d4-4a70-4a1c-8451-8ca1530efe2a",
+  "id": "68a0286a-6779-44c2-acae-c7749c75e8cf",
   "prevId": "ee966d79-d852-43c8-84a1-abfed21d9765",
   "version": "7",
   "dialect": "postgresql",
@@ -6910,18 +6910,6 @@
           "notNull": true,
           "default": "'sense'"
         },
-        "validated_by": {
-          "name": "validated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "validated_at": {
-          "name": "validated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "creator_note": {
           "name": "creator_note",
           "type": "text",
@@ -7000,15 +6988,6 @@
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "media_descriptions_validated_by_team_members_id_fk": {
-          "name": "media_descriptions_validated_by_team_members_id_fk",
-          "tableFrom": "media_descriptions",
-          "tableTo": "team_members",
-          "columnsFrom": ["validated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7052,10 +7031,6 @@
         "media_descriptions_review_reasons_check": {
           "name": "media_descriptions_review_reasons_check",
           "value": "\"media_descriptions\".\"review_reasons\" <@ array['back_reference', 'not_alone', 'unsure', 'flagged']::text[]"
-        },
-        "media_descriptions_validated_check": {
-          "name": "media_descriptions_validated_check",
-          "value": "(\"media_descriptions\".\"validated_by\" is null) = (\"media_descriptions\".\"validated_at\" is null)"
         }
       },
       "isRLSEnabled": false

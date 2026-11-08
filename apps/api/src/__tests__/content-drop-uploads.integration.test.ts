@@ -564,7 +564,6 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
           content: schema.mediaDescriptions.content,
           model: schema.mediaDescriptions.model,
           reviewReasons: schema.mediaDescriptions.reviewReasons,
-          validatedAt: schema.mediaDescriptions.validatedAt,
         })
         .from(schema.mediaDescriptions)
         .where(eq(schema.mediaDescriptions.mediaAssetId, mediaAssetId));
@@ -585,14 +584,13 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     expect(seen[0]?.context).toEqual({ category: 'Feed · Séance boudoir', step: null });
     expect(seen[0]?.trace).toEqual({ creatorId: nora });
     expect(seen[0]?.media).toMatchObject({ kind: 'image', mediaType: 'image/jpeg' });
-    // Kept for the agency, not validated, held back: she always shoots alone (§ 4).
+    // Kept for the agency, held back: she always shoots alone (§ 4).
     expect(await descriptions()).toEqual([
       {
         author: 'sense',
         content: DESCRIBED,
         model: 'vision-test',
         reviewReasons: ['not_alone'],
-        validatedAt: null,
       },
     ]);
 
