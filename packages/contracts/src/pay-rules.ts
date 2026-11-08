@@ -36,8 +36,8 @@ const PLATFORM_NET_PLATFORMS: readonly Platform[] = ['reveal'];
 /**
  * The base of an account's sales under its rules of a period (ADR 0050 § 8): the platform's net only for a `detected`
  * account of a platform that gives one; the chain of ADR 0023 everywhere else, `declared` accounts included, since the
- * platform then gives no net. Read from the rules in force, so it follows them period by period and is never
- * retroactive; a statement freezes it in its inputs with the rules.
+ * platform then gives no net. Read from the rules in force, so it follows them period by period; a statement freezes
+ * it in its inputs with the rules, and a closed period never changes base (ADR 0084 § 2).
  */
 export function earningsBaseOf(platform: Platform, source: EarningsSource): EarningsBase {
   return source === 'detected' && PLATFORM_NET_PLATFORMS.includes(platform) ? 'platform_net' : 'gross_chain';
@@ -76,11 +76,20 @@ export function payRulesFor<R extends { readonly fromPeriod: PayPeriod }>(
 
 /**
  * `GET /v1/team/pay-rules` (owner, active manager): every platform account, with its rules newest first (none while
- * they are not set), and the period running now in the agency's zone.
+ * they are not set), and the period running now in the agency's zone. `checkedPeriod` is the fortnight the owner may
+ * switch the account to its platform's net from although it has begun (ADR 0084): the one the platform's latest
+ * check covers, when that check is clean, a model of the platform is linked to the account, no period is closed from
+ * it on and the account has no rules from it yet; `null` otherwise, and always for a manager, who sets no rules.
  */
 export const AccountPayRulesListSchema = z.object({
   currentPeriod: PayPeriodSchema,
-  accounts: z.array(z.object({ account: PlanningAccountSchema, rules: z.array(AccountPayRulesSchema) })),
+  accounts: z.array(
+    z.object({
+      account: PlanningAccountSchema,
+      rules: z.array(AccountPayRulesSchema),
+      checkedPeriod: PayPeriodSchema.nullable(),
+    }),
+  ),
 });
 export type AccountPayRulesList = z.infer<typeof AccountPayRulesListSchema>;
 
@@ -90,13 +99,15 @@ export type AccountPayRulesList = z.infer<typeof AccountPayRulesListSchema>;
  * when the panel opens, so a retry records one rule. Rules start with a period that has not begun, the next one at the
  * earliest, so that a period never changes rules under way; the account's first rules alone may start with the
  * current period, since nothing of that account could be declared before them (`pay_rules_period_invalid`
- * otherwise). A second rule for the same account and period answers `pay_rules_period_conflict` with
+ * otherwise). `detected` rules may also start with the fortnight the platform's latest clean check covers, begun or
+ * over, while no period is closed from it on (ADR 0084; `pay_rules_source_conflict` with `period_closed` when one is):
+ * the drafts of each period they touch are computed again at once. A second rule for the same account and period answers `pay_rules_period_conflict` with
  * `details.accountPayRulesId`: the screen has the owner confirm the rules before sending them, and a mistake is put
  * right by the next rules, and in the periods it touched by an adjustment (EQ-04). `detected` answers
  * `pay_rules_source_conflict` (`details.reason`, `PayRulesSourceRefusal`) unless the account can be paid on its
  * platform's net (ADR 0050 § 8): a platform that gives one, a model of it linked to the account, and the platform's
- * latest reliability check clean over a fortnight that ends before the rules start (CRM-02, CRM-03). The switch is the
- * owner's own act: nothing switches an account by itself.
+ * latest reliability check clean over that very fortnight (ADR 0084) or one that ends before the rules start (CRM-02,
+ * CRM-03). The switch is the owner's own act: nothing switches an account by itself.
  */
 export const CreateAccountPayRulesBodySchema = z.object({
   id: AccountPayRulesIdSchema,
@@ -115,7 +126,9 @@ export type CreateAccountPayRulesBody = z.input<typeof CreateAccountPayRulesBody
  * - `model_unlinked`: no model of the platform is linked to the account, so none of its sales is recorded;
  * - `check_missing`: the platform's sales were never checked against its statistics and export (CRM-02);
  * - `check_not_clean`: the platform's latest check is not a clean match over one whole fortnight;
- * - `check_not_before`: the latest clean check does not end before the period the rules start with.
+ * - `check_not_before`: the latest clean check covers neither the period the rules start with nor a fortnight that ends
+ *   before it;
+ * - `period_closed`: the rules start with the checked fortnight, but a period is closed from it on (ADR 0084 § 2).
  */
 export const PAY_RULES_SOURCE_REFUSALS = [
   'platform_without_net',
@@ -123,6 +136,7 @@ export const PAY_RULES_SOURCE_REFUSALS = [
   'check_missing',
   'check_not_clean',
   'check_not_before',
+  'period_closed',
 ] as const;
 export const PayRulesSourceRefusalSchema = z.enum(PAY_RULES_SOURCE_REFUSALS);
 export type PayRulesSourceRefusal = z.infer<typeof PayRulesSourceRefusalSchema>;

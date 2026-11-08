@@ -29,7 +29,7 @@ Le schéma applicatif a **24** colonnes `jsonb`. C’est le même nombre dans `p
 
 `provider_credentials.facts`, `settings` et `voices` sont parsés en lecture, sur une ligne par fournisseur. `persona_versions.content` est un document versionné et haché, parsé à l’écriture et à la lecture ; il lui faudra un *upcast* le jour où `PersonaSchema` change.
 
-`reel_brief` (`content_ideas`, `creator_suggestions`, `creator_tasks` ; VEI-08, ADR 0082 § 3, migration 0154) est la fiche reel, une forme fermée qu’aucune requête ne lit : parsée par `ReelBriefSchema` à l’écriture et à la lecture, avec `CHECK (jsonb_typeof(reel_brief) = 'object')` ; sur `content_ideas`, le `CHECK` la réserve aussi à la catégorie `instagram_reel`.
+`reel_brief` (`content_ideas`, `creator_suggestions`, `creator_tasks` ; VEI-08, ADR 0082 § 3, migration 0157) est la fiche reel, une forme fermée qu’aucune requête ne lit : parsée par `ReelBriefSchema` à l’écriture et à la lecture, avec `CHECK (jsonb_typeof(reel_brief) = 'object')` ; sur `content_ideas`, le `CHECK` la réserve aussi à la catégorie `instagram_reel`.
 
 ## Les colonnes mortes
 

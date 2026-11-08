@@ -1,0 +1,15 @@
+description: >-
+  « Je déteste les talons » : ce qu'il ne veut pas voir d'elle, dit par lui (ADR 0085 § 3), jamais rangé dans ses
+  passions ni dans ses fantasmes.
+history:
+  - from: creator
+    text: Je me suis acheté de nouvelles chaussures aujourd'hui 🙈
+inbound:
+  - Ah j'espère que c'est pas des talons, je déteste les talons sur une femme
+  - Toi en baskets et en jogging c'est parfait, t'es trop mignonne comme ça
+expect:
+  proposed:
+    - field: dislikes_about_her
+      source: declared
+      match: 'talon'
+  absent: [hobbies, desires, limits]

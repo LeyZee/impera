@@ -6,6 +6,7 @@ import {
   createAgentModule,
   guardContextOf,
   startBubbleGuard,
+  startCardReader,
   startDraftComposer,
   startFollowUpPlan,
   startKycSlots,
@@ -13,7 +14,7 @@ import {
   type AgentModule,
 } from '../modules/agent';
 import type { AlertsModule } from '../modules/alerts';
-import type { BubbleGuard, DraftComposer } from '../modules/conversations';
+import type { BubbleGuard, CardReader, DraftComposer } from '../modules/conversations';
 import type { FansModule } from '../modules/fans';
 import type { PersonaModule } from '../modules/persona';
 import type { SchedulingModule } from '../modules/scheduling';
@@ -26,6 +27,8 @@ export interface WiredAgent {
   /** Undefined beside a composer plugged by a test: it would answer his last message again. */
   readonly followUps: ReturnType<typeof startFollowUpPlan> | undefined;
   readonly guard: BubbleGuard;
+  /** His card read in his messages (ADR 0085 § 7), on the app's gateway, whoever answers him. */
+  readonly cardReader: CardReader;
   /** The canvas lines her active persona collects, for « À apprendre » in the Suivi (P5-01); every line without one. */
   readonly kycSlotsOf: ReturnType<typeof startKycSlots>;
   /** The voice version the server writes with now, the one Automatique is proved on (ADR 0019): defined here only. */
@@ -98,6 +101,12 @@ export function wireAgent(
     composer,
     followUps,
     guard,
+    cardReader: startCardReader({
+      gateway: deps.llm.gateway,
+      onDroppedNotes: (event) => {
+        logger.warn(event, 'fan card lines shaped like an order kept out of the read');
+      },
+    }),
     kycSlotsOf: startKycSlots({ activePersona }),
     activeVoice: {
       voicePrompt: loadPrompt('voice').header.version,

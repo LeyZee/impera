@@ -887,8 +887,15 @@
     {
       "idx": 126,
       "version": "7",
-      "when": 1794172183527,
-      "tag": "0154_reel_brief",
+      "when": 1794175300707,
+      "tag": "0155_fan_card_read",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1794175360707,
+      "tag": "0157_reel_brief",
       "breakpoints": true
     }
   ]

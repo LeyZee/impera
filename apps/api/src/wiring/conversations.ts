@@ -13,11 +13,12 @@ import type { PersonaModule } from '../modules/persona';
 import type { WiredAgent } from './agent';
 import type { WiredAlerts } from './alerts';
 import type { WiredMedia } from './media';
-import type { Routes, Shared, TasksOf } from './shared';
+import type { Routes, Shared, TasksNamed, TasksOf } from './shared';
 
 export interface WiredConversations {
   readonly module: ConversationsModule;
-  readonly tasks: TasksOf<'conversation'>;
+  /** `fans.read_card` too: the conversation holds his messages and how far they were read (ADR 0085 § 7). */
+  readonly tasks: TasksOf<'conversation'> & TasksNamed<'fans.read_card'>;
   readonly routes: readonly Routes[];
 }
 
@@ -46,6 +47,7 @@ export function wireConversations(
     voice: agent.activeVoice,
     guard: agent.guard,
     composer: agent.composer,
+    cardReader: agent.cardReader,
     ...(agent.followUps !== undefined && { followUps: agent.followUps }),
     replyHours: {
       of: async (creatorId) => {
@@ -85,6 +87,12 @@ export function wireConversations(
         JOB_PAYLOADS['conversation.record_facts'],
         logger,
         (payload, context) => module.jobs.recordFacts(payload, context.logger),
+      ),
+      'fans.read_card': defineTask(
+        'fans.read_card',
+        JOB_PAYLOADS['fans.read_card'],
+        logger,
+        (payload, context) => module.jobs.readCard(payload, context.logger),
       ),
       'conversation.reopen': defineTask(
         'conversation.reopen',

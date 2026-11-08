@@ -1,6 +1,6 @@
 {
   "id": "802283f2-f9de-4047-a10f-aeaa424790e3",
-  "prevId": "b3cdcd87-b5aa-42f0-938f-b77fbdfa3143",
+  "prevId": "3e980465-a07e-4277-8f61-7a4470f80831",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2590,6 +2590,18 @@
         },
         "desire_at": {
           "name": "desire_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "card_read_at": {
+          "name": "card_read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "card_read_through": {
+          "name": "card_read_through",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

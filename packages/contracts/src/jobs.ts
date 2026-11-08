@@ -43,6 +43,7 @@ export const JOB_NAMES = [
   'connector.poll',
   'connector.reconcile',
   'fans.refresh_summary',
+  'fans.read_card',
   'fans.purge_facts',
   'rate_limit.purge',
   'backups.check',
@@ -112,6 +113,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.poll': 'Lecture d’un compte Reveal',
   'connector.reconcile': 'Vérification des envois Reveal',
   'fans.refresh_summary': 'Résumé des fans',
+  'fans.read_card': 'Fiche des fans remplie par l’IA',
   'fans.purge_facts': 'Nettoyage de la mémoire des fans',
   'rate_limit.purge': 'Nettoyage des limites de connexion',
   'backups.check': 'Vérification des sauvegardes',
@@ -220,6 +222,13 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   'fans.refresh_summary': conversationJob.extend({ fanId: FanIdSchema }),
+  /**
+   * The AI reads his new messages in a conversation and fills his card (ADR 0085 § 7), whoever answers him: debounced
+   * per conversation, when he has been silent `FAN_CARD_READ.silenceMinutes` or has written `FAN_CARD_READ.burst`
+   * messages, at most once every `FAN_CARD_READ.spacingMinutes` (`cardReadRunAt`). Replayable: it reads from where the
+   * last read stopped, and the facts it proposes are written once.
+   */
+  'fans.read_card': conversationJob,
   'fans.purge_facts': z.object({}),
   'rate_limit.purge': z.object({}),
   'backups.check': z.object({}),
@@ -484,6 +493,8 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.poll': 3,
   'connector.reconcile': 3,
   'fans.refresh_summary': 3,
+  // Replayable: it reads from where the last read stopped (`conversations.card_read_through`).
+  'fans.read_card': 3,
   'fans.purge_facts': 1,
   'rate_limit.purge': 1,
   'backups.check': 1,
@@ -580,6 +591,7 @@ export const DEBOUNCED_JOBS = [
   'conversation.respond',
   'conversation.follow_up',
   'fans.refresh_summary',
+  'fans.read_card',
 ] as const;
 
 export function queueNameFor(conversationId: string): `conv:${string}` {

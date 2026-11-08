@@ -342,3 +342,51 @@ export type SetFanCardFieldBody = z.infer<typeof SetFanCardFieldBodySchema>;
 export const FAN_CARD_VALUE_INVALID = 'fan_card_value_invalid';
 /** What the card never keeps (§ 8), 422: an address, a number, an e-mail, an account elsewhere. Nothing is written. */
 export const FAN_CARD_VALUE_UNPROCESSABLE = 'fan_card_value_unprocessable';
+
+/**
+ * When the AI reads his messages again (ADR 0085 § 7): once he has been silent `silenceMinutes`, or at once after
+ * `burst` messages not read yet, and never sooner than `spacingMinutes` after the last read of the conversation.
+ */
+export const FAN_CARD_READ = { silenceMinutes: 5, burst: 10, spacingMinutes: 10 } as const;
+
+const MINUTE_MS = 60_000;
+
+/**
+ * When the next read of a conversation runs, a message of his just in (§ 7): `unread` counts his messages since the
+ * last read, this one included; `lastReadAt` is that read, null before the first.
+ */
+export function cardReadRunAt(input: { now: Date; unread: number; lastReadAt: Date | null }): Date {
+  const { now, unread, lastReadAt } = input;
+  const wanted =
+    unread >= FAN_CARD_READ.burst ? now.getTime() : now.getTime() + FAN_CARD_READ.silenceMinutes * MINUTE_MS;
+  const earliest = lastReadAt === null ? 0 : lastReadAt.getTime() + FAN_CARD_READ.spacingMinutes * MINUTE_MS;
+  return new Date(Math.max(wanted, earliest));
+}
+
+/** The most values one read proposes: what he said in a few messages, never a questionnaire. */
+export const FAN_CARD_READ_MAX = 20;
+
+/**
+ * What the AI reads in his messages (`fans.read_card`, role `brain`, prompt `brain/fan-card.md`): a closed list of
+ * the card's fields (§ 3), each with its items, what he said or what is guessed, and the message it rests on (its
+ * number in the block given). The code checks every value against its field and § 8 before writing; the fields to
+ * observe are always written as guessed.
+ */
+export const FanCardReadSchema = z
+  .object({
+    facts: z
+      .array(
+        z
+          .object({
+            field: FanCardFieldSchema,
+            items: z.array(z.string().trim().min(1).max(FAN_CARD_VALUE_MAX)).min(1).max(FAN_CARD_ITEMS_MAX),
+            kind: z.enum(['declared', 'inferred']),
+            confidence: z.number().min(0).max(1),
+            message: z.number().int().min(1),
+          })
+          .strict(),
+      )
+      .max(FAN_CARD_READ_MAX),
+  })
+  .strict();
+export type FanCardRead = z.infer<typeof FanCardReadSchema>;

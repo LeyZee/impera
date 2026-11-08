@@ -4,7 +4,7 @@ import { defineTask } from '../jobs';
 import { salesFeedReadsForReports, salesFeedSwitchReads, salesFeedTotals } from '../modules/connectors';
 import type { CreatorTasksModule } from '../modules/creator-tasks';
 import type { NotificationsModule } from '../modules/notifications';
-import { enqueuePayRecalculation } from '../modules/payroll';
+import { enqueuePayRecalculation, payReadsForPayRules } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import { createSchedulingModule, type SchedulingModule } from '../modules/scheduling';
 
@@ -43,6 +43,8 @@ export function wireScheduling(
     enqueuePayRecalculation,
     // The switch guard of the pay rules reads the sales feed's links and checks (ADR 0050 § 8, CRM-03).
     switchFactsOf: salesFeedSwitchReads.switchFactsOf,
+    // The checked fortnight may be switched while pay has closed nothing from it on (ADR 0084 § 2).
+    periodClosedFrom: payReadsForPayRules.closedFrom,
     // The agency percentages' check reads the register's totals, the one rule of CRM-04 (lot d3).
     salesTotalsOf: salesFeedTotals.totalsOf,
     // A declared report against what the platform read during its shift (ADR 0073), in the reports' transaction.

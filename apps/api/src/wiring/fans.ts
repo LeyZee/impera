@@ -3,14 +3,15 @@ import { JOB_PAYLOADS } from '@impera/contracts';
 import { defineTask } from '../jobs';
 import { createFansModule, type FansModule } from '../modules/fans';
 
-import type { Routes, Shared, TasksOf } from './shared';
+import type { Routes, Shared, TasksNamed } from './shared';
 
 type KycSlotsOf = NonNullable<Parameters<FansModule['routes']>[1]>;
 type FanAccess = NonNullable<Parameters<FansModule['routes']>[2]>;
 
 export interface WiredFans {
   readonly module: FansModule;
-  readonly tasks: TasksOf<'fans'>;
+  /** `fans.read_card` is the conversations' file's: his messages are read where they are kept (ADR 0085 § 7). */
+  readonly tasks: TasksNamed<'fans.purge_facts'>;
   /**
    * Her canvas lines come from the agent, and who holds a fan's conversation and the trace of a chatter's reading from
    * `conversations`, both wired after: the routes are built once they exist.

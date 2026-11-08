@@ -384,7 +384,9 @@ export const SOURCE_REFUSAL_TEXTS: Readonly<Record<PayRulesSourceRefusal, string
   check_not_clean:
     'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, avec l’export, où tout concorde et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
   check_not_before:
-    'La dernière vérification porte sur une quinzaine qui ne finit pas avant ces règles : fais-les partir d’une quinzaine plus tardive, ou vérifie une quinzaine qui finit avant elles.',
+    'La dernière vérification ne porte ni sur cette quinzaine ni sur une quinzaine qui finit avant elle : fais partir ces règles de la quinzaine vérifiée ou d’une plus tardive.',
+  period_closed:
+    'La paie a déjà clôturé une quinzaine depuis la quinzaine vérifiée : ses montants ne changent plus. Fais partir ces règles d’une quinzaine qui n’a pas commencé.',
 };
 
 /** What a refusal says: the exact reason of a refused « Ventes relevées » when the server gives one, else its code. */

@@ -25,7 +25,7 @@ import {
 } from '@impera/db';
 import { z } from 'zod';
 
-import type { Transaction, UnitOfWork } from '../../domain/ports';
+import type { CardReadMessage, Transaction, UnitOfWork } from '../../domain/ports';
 
 import { heldBy } from './holds';
 import { toConversation, toDraft, toStoredBrief, toStoredEvent } from './rows';
@@ -155,6 +155,78 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           spentMinor: totals?.spentMinor ?? 0,
           firstMessageAt: firstMessageAt === null ? null : new Date(firstMessageAt),
         };
+      },
+    },
+
+    cardReads: {
+      async pace(conversationId) {
+        const [row] = await tx
+          .select({
+            lastReadAt: schema.conversations.cardReadAt,
+            through: schema.conversations.cardReadThrough,
+          })
+          .from(schema.conversations)
+          .where(eq(schema.conversations.id, conversationId));
+        const through = row?.through ?? null;
+        const [count] = await tx
+          .select({ unread: sql<number>`count(*)::int` })
+          .from(schema.messages)
+          .where(
+            and(
+              eq(schema.messages.conversationId, conversationId),
+              eq(schema.messages.author, 'fan'),
+              // Compared to the millisecond, as `toRead` compares them once read in JavaScript.
+              through === null
+                ? undefined
+                : sql`date_trunc('milliseconds', ${schema.messages.createdAt}) > ${through.toISOString()}::timestamptz`,
+            ),
+          );
+        return { unread: count?.unread ?? 0, lastReadAt: row?.lastReadAt ?? null };
+      },
+      async toRead(conversationId, limit) {
+        const [conversation] = await tx
+          .select({ through: schema.conversations.cardReadThrough })
+          .from(schema.conversations)
+          .where(eq(schema.conversations.id, conversationId));
+        const readThrough = conversation?.through ?? null;
+        const rows = await tx
+          .select({
+            id: schema.messages.id,
+            author: schema.messages.author,
+            text: schema.messages.text,
+            at: schema.messages.platformCreatedAt,
+            createdAt: schema.messages.createdAt,
+          })
+          .from(schema.messages)
+          .where(and(eq(schema.messages.conversationId, conversationId), sql`${schema.messages.text} <> ''`))
+          .orderBy(sql`${schema.messages.platformCreatedAt} desc, ${schema.messages.id} desc`)
+          .limit(limit);
+        const messages: CardReadMessage[] = rows.reverse().map((row) => {
+          const isFan = MessageAuthorSchema.parse(row.author) === 'fan';
+          return {
+            id: MessageIdSchema.parse(row.id),
+            from: isFan ? 'fan' : 'creator',
+            text: row.text,
+            isNew: isFan && (readThrough === null || row.createdAt.getTime() > readThrough.getTime()),
+            at: row.at,
+          };
+        });
+        const newest = Math.max(
+          ...rows
+            .filter((row, index) => messages[index]?.isNew === true)
+            .map((row) => row.createdAt.getTime()),
+        );
+        const through = Number.isFinite(newest) ? new Date(newest) : null;
+        return { messages, through };
+      },
+      async markRead(conversationId, through, at) {
+        await tx
+          .update(schema.conversations)
+          .set({
+            cardReadAt: at,
+            cardReadThrough: sql`greatest(${schema.conversations.cardReadThrough}, ${through.toISOString()}::timestamptz)`,
+          })
+          .where(eq(schema.conversations.id, conversationId));
       },
     },
 
