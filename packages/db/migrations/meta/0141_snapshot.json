@@ -1,5 +1,5 @@
 {
-  "id": "68a0286a-6779-44c2-acae-c7749c75e8cf",
+  "id": "8795ed26-09eb-40e5-a79f-b9ea427d3bef",
   "prevId": "ee966d79-d852-43c8-84a1-abfed21d9765",
   "version": "7",
   "dialect": "postgresql",
@@ -6947,8 +6947,8 @@
           "method": "btree",
           "with": {}
         },
-        "media_descriptions_sense_unique": {
-          "name": "media_descriptions_sense_unique",
+        "media_descriptions_drop_unique": {
+          "name": "media_descriptions_drop_unique",
           "columns": [
             {
               "expression": "media_asset_id",
@@ -6964,7 +6964,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"media_descriptions\".\"author\" = 'sense'",
+          "where": "\"media_descriptions\".\"author\" = 'sense' and \"media_descriptions\".\"content\" ? 'detailed'",
           "concurrently": false,
           "method": "btree",
           "with": {}

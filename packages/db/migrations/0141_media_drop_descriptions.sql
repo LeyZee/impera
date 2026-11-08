@@ -6,6 +6,6 @@
 ALTER TABLE "media_descriptions" ADD COLUMN "author" text DEFAULT 'sense' NOT NULL;--> statement-breakpoint
 ALTER TABLE "media_descriptions" ADD COLUMN "creator_note" text;--> statement-breakpoint
 ALTER TABLE "media_descriptions" ADD COLUMN "review_reasons" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "media_descriptions_sense_unique" ON "media_descriptions" USING btree ("media_asset_id","prompt_hash") WHERE "media_descriptions"."author" = 'sense';--> statement-breakpoint
+CREATE UNIQUE INDEX "media_descriptions_drop_unique" ON "media_descriptions" USING btree ("media_asset_id","prompt_hash") WHERE "media_descriptions"."author" = 'sense' and "media_descriptions"."content" ? 'detailed';--> statement-breakpoint
 ALTER TABLE "media_descriptions" ADD CONSTRAINT "media_descriptions_author_check" CHECK ("media_descriptions"."author" in ('sense', 'human'));--> statement-breakpoint
 ALTER TABLE "media_descriptions" ADD CONSTRAINT "media_descriptions_review_reasons_check" CHECK ("media_descriptions"."review_reasons" <@ array['back_reference', 'not_alone', 'unsure', 'flagged']::text[]);

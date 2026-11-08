@@ -7,7 +7,7 @@ import type { DescribedDrop } from '../application/describe-drop';
 export interface DropDescriptionStore {
   /** Whether the vision AI already described this media of hers for a drop, whatever its describer's version. */
   described(mediaAssetId: string): Promise<boolean>;
-  /** Written once per media and describer: a replayed job writes nothing twice (`media_descriptions_sense_unique`). */
+  /** Written once per media and describer: a replayed job writes nothing twice (`media_descriptions_drop_unique`). */
   save(creatorId: string, mediaAssetId: string, described: DescribedDrop): Promise<void>;
 }
 

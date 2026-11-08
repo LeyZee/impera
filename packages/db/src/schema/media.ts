@@ -101,10 +101,11 @@ export const mediaDescriptions = pgTable(
       'media_descriptions_review_reasons_check',
       sql`${t.reviewReasons} <@ array[${sql.raw(DESCRIPTION_REVIEW_REASONS.map((r) => `'${r}'`).join(', '))}]::text[]`,
     ),
-    // The vision AI describes a media once per describer (ADR 0083 § 1): a replayed job writes nothing twice.
-    uniqueIndex('media_descriptions_sense_unique')
+    // The vision AI describes a dropped media once per describer (ADR 0083 § 1): a replayed job writes nothing twice.
+    // Only a drop's description (it alone has `detailed`): a fan's media keeps its latest description (SUIVI-26).
+    uniqueIndex('media_descriptions_drop_unique')
       .on(t.mediaAssetId, t.promptHash)
-      .where(sql`${t.author} = 'sense'`),
+      .where(sql`${t.author} = 'sense' and ${t.content} ? 'detailed'`),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
   ],
