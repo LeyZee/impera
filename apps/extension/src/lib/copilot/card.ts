@@ -61,7 +61,7 @@ export const valueText = (field: FanCardField, items: readonly string[]): string
   items.map((item) => closedLabel(field, item)).join(' · ');
 
 /** « hier », « il y a 3 jours »: how old a value is, said as a person says it. */
-export function ageOf(iso: string, now: Date): string {
+function ageOf(iso: string, now: Date): string {
   const minutes = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000));
   if (minutes < 1) return 'à l’instant';
   if (minutes < 60) return `il y a ${String(minutes)} min`;
