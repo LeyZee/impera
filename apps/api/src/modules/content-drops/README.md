@@ -78,6 +78,17 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
   - chaque script envoyé sans synthèse du prompt de maintenant, ou dont la synthèse est plus ancienne qu'une description de ses médias (au plus 200 par heure).
 - La description d'un média lit la version du prompt de maintenant (`promptHashes` de la passerelle) : un média décrit avec une autre version est décrit de nouveau, jamais par-dessus une description humaine. L'ancienne ligne reste (table en ajout seul).
 
+## La validation des descriptions et de la synthèse (ADR 0030 § 3, ADR 0083 § 7, SC-04 lot c2, migration 0152)
+
+- `GET /v1/creators/:creatorId/drops/:id/descriptions` (propriétaire, manager actif) rend chaque fichier vivant du dépôt dans son ordre, avec la description qu'il montre : la plus récente **validée** (par `validated_at`), sinon la plus récente écrite (`shownRow`). Pour un script envoyé, sa dernière synthèse, `current` quand elle raconte les médias et les descriptions que le script montre maintenant (la même empreinte que le job, `mediaHashOf`).
+- `POST …/descriptions/validate` valide les lignes nommées telles quelles (« Tout valider » pour une étape) : chacune doit être celle que son média montre, sinon 409 `not_shown` ; une ligne qui attend un humain (renvoi, autre personne, doute, alerte) se valide **seule**, sinon 409 `alone`. Rejouée, rien ne change.
+- `POST …/descriptions/correct` écrit une **nouvelle ligne** à partir de celle nommée (le texte `detailed` réécrit, les étiquettes fermées et le ressenti de la créatrice gardés, `author = human`), validée par qui l'écrit. Le script est alors raconté de nouveau.
+- `POST …/summary/validate` valide la synthèse courante ; une synthèse dépassée (une description corrigée depuis) répond 409 `summary_stale`.
+- Chaque geste porte le compte qui valide (`validated_by` vers `user.id`, ADR 0030 § 3 amendé le 08/11/2026) et une ligne de journal (`media_description.validated`, `media_description.corrected`, `script_summary.validated`).
+- Une ligne s'écrit une fois puis se valide une fois : le déclencheur `refuse_description_change` refuse tout autre changement, pour tous les rôles, l'admin compris ; `nirvana_app` ne peut modifier que les deux colonnes du tampon.
+- Le rattrapage et la description à la réception épargnent un média dont une description est validée, comme celui qu'un humain a décrit.
+- La créatrice ne valide pas encore depuis son espace (l'ADR le permet ; à venir avec son écran).
+
 ## Une demande née d'une idée (VEI-01 d2)
 
 `requestFromIdea` (index du module) écrit au rôle admin la demande d'un tournage qu'elle a accepté depuis une idée de la veille : origine `idea`, sans auteur (`content_requests_author_check`), sous l'identifiant de l'idée, rejouable (`on conflict do nothing`). Seul le job `creator_tasks.suggestion_decided` de la veille l'appelle.

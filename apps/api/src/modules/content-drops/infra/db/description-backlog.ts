@@ -17,7 +17,8 @@ const switchedOn = (creatorId: string | null) =>
 
 /**
  * Each medium of a live drop with no description of now: none for a drop, or only the vision's of an older prompt,
- * and no human's (ADR 0083 § 2). Enqueued under the medium's key, keeping the time of a job already waiting.
+ * and none a human wrote or validated (ADR 0083 § 2, ADR 0030 § 3). Enqueued under the medium's key, keeping the
+ * time of a job already waiting.
  */
 async function enqueueMedia(
   tx: Transaction,
@@ -46,7 +47,7 @@ async function enqueueMedia(
          and not exists (
            select 1 from media_descriptions md
             where md.media_asset_id = m.id and md.content ? 'detailed'
-              and (md.author = 'human' or md.prompt_hash = ${promptHash}))
+              and (md.author = 'human' or md.validated_at is not null or md.prompt_hash = ${promptHash}))
        order by m.created_at, m.id
        limit ${MEDIA_PER_RUN}
     ) q`);
@@ -55,7 +56,8 @@ async function enqueueMedia(
 
 /**
  * Each sent script with no synthesis of now: none with the prompt of now, or one older than a description of its
- * media (a correction, a new describer). The job waits by itself for what is not described yet.
+ * media or its validation (a correction, a new describer, an older row validated). The job waits by itself for what
+ * is not described yet.
  */
 async function enqueueScripts(
   tx: Transaction,
@@ -81,7 +83,7 @@ async function enqueueScripts(
            select 1 from script_drop_summaries s
             where s.drop_id = d.id and s.prompt_hash = ${promptHash}
               and s.created_at >= coalesce((
-                select max(md.created_at) from media_descriptions md
+                select max(greatest(md.created_at, md.validated_at)) from media_descriptions md
                   join content_drop_files f on f.media_asset_id = md.media_asset_id
                  where f.drop_id = d.id and f.slot_key is not null and f.replaced_at is null
                    and md.content ? 'detailed'), '-infinity'::timestamptz))

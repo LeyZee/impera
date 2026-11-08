@@ -22,6 +22,7 @@ import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
 import { createDrizzleDescribeSwitch, createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
+import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
 import { createDrizzleScriptDropStore } from './infra/db/script-drop-store';
 import { createDrizzleScriptSummaryStore } from './infra/db/script-summary-store';
@@ -125,6 +126,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       storage,
       { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
       createDrizzleDescribeSwitch(deps.adminDb),
+      createDrizzleDescriptionReview(deps.db),
       deps.requireRole,
       clock,
     ),

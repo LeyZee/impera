@@ -6,11 +6,12 @@ import type { DescribedDrop } from '../application/describe-drop';
 /** What the drop descriptions keep, as the owner role: only a job writes the vision AI's rows (ADR 0083 § 1). */
 export interface DropDescriptionStore {
   /**
-   * Whether this media of hers needs no new description: a human wrote one, or the vision AI described it for a drop
-   * with this version of the prompt (ADR 0083 § 2: a new version describes it again, never over a human's).
+   * Whether this media of hers needs no new description: a human wrote or validated one, or the vision AI described it
+   * for a drop with this version of the prompt (ADR 0083 § 2: a new version describes it again, never over a human's,
+   * never over one validated, ADR 0030 § 3).
    */
   described(mediaAssetId: string, promptHash: string): Promise<boolean>;
-  /** The latest detailed description of each of these media that has one, a human's or the vision AI's. */
+  /** The detailed description each of these media is told with: the latest validated, else the latest written. */
   detailed(mediaAssetIds: readonly string[]): Promise<ReadonlyMap<string, DetailedDescription>>;
   /** Written once per media and describer: a replayed job writes nothing twice (`media_descriptions_drop_unique`). */
   save(creatorId: string, mediaAssetId: string, described: DescribedDrop): Promise<void>;
@@ -35,7 +36,7 @@ export function createDrizzleDropDescriptionStore(adminDb: Database): DropDescri
               eq(mediaDescriptions.mediaAssetId, mediaAssetId),
               // A drop's description, not the short one a fan's media or the catalogue gets (ADR 0083 § 2).
               sql`${mediaDescriptions.content} ? 'detailed'`,
-              sql`(${mediaDescriptions.author} = 'human' or ${mediaDescriptions.promptHash} = ${promptHash})`,
+              sql`(${mediaDescriptions.author} = 'human' or ${mediaDescriptions.validatedAt} is not null or ${mediaDescriptions.promptHash} = ${promptHash})`,
             ),
           )
           .limit(1);
@@ -58,7 +59,10 @@ export function createDrizzleDropDescriptionStore(adminDb: Database): DropDescri
               sql`${mediaDescriptions.content} ? 'detailed'`,
             ),
           )
-          .orderBy(sql`${mediaDescriptions.createdAt} desc, ${mediaDescriptions.id} desc`);
+          // The row it is told with (ADR 0030 § 3, `shownRow`): the latest validated, else the latest written.
+          .orderBy(
+            sql`${mediaDescriptions.validatedAt} desc nulls last, ${mediaDescriptions.createdAt} desc, ${mediaDescriptions.id} desc`,
+          );
         for (const row of rows) {
           if (latest.has(row.mediaAssetId)) continue;
           const parsed = DropMediaDescriptionSchema.safeParse(row.content);
