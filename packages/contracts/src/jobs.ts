@@ -79,6 +79,8 @@ export const JOB_NAMES = [
   'content_drops.describe_file',
   'content_drops.summarize_script',
   'content_drops.describe_backlog',
+  'content_drops.make_thumbnail',
+  'content_drops.thumbnail_backlog',
   'scripts.ask_scripts',
   'providers.check_credentials',
   'connector.read_sales',
@@ -148,6 +150,8 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.describe_file': 'Description des médias déposés',
   'content_drops.summarize_script': 'Synthèse des scripts tournés',
   'content_drops.describe_backlog': 'Rattrapage des descriptions',
+  'content_drops.make_thumbnail': 'Vignettes des médias déposés',
+  'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
@@ -424,6 +428,18 @@ export const JOB_PAYLOADS = {
    */
   'content_drops.describe_backlog': z.object({ creatorId: CreatorIdSchema.optional() }),
   /**
+   * A photo or a video of her library gets its reduced picture for the agency's screen (ADR 0030 § 4, SC-04 lot c4),
+   * whatever her switch of the descriptions. Enqueued in the transaction that keeps it, under
+   * `content_drops.make_thumbnail:<id>`; tried once, made or not.
+   */
+  'content_drops.make_thumbnail': z.object({
+    creatorId: CreatorIdSchema,
+    mediaAssetId: MediaAssetIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /** Each hour: each photo and video of a live drop never tried, its original still held, gets its picture's job. */
+  'content_drops.thumbnail_backlog': z.object({}),
+  /**
    * Each hour (SC-02, ADR 0056 § 2): each creator whose next script is due within the lead gets her request, with the
    * next structure of her queue that does not touch her limits, frozen. Replayable: one request per due day.
    */
@@ -548,6 +564,10 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.summarize_script': 5,
   // Each hour: the next run is the retry.
   'content_drops.describe_backlog': 1,
+  // A storage or an ffmpeg that does not answer: a few tries; a file ffmpeg cannot read is not a failure.
+  'content_drops.make_thumbnail': 5,
+  // Each hour: the next run is the retry.
+  'content_drops.thumbnail_backlog': 1,
   // Each hour: the next run is the retry.
   'scripts.ask_scripts': 1,
   'providers.check_credentials': 1,

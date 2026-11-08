@@ -49,11 +49,22 @@ export const mediaAssets = pgTable(
      * description; `storage_key` then names nothing.
      */
     erasedAt: timestampTz('erased_at'),
+    /**
+     * Its reduced picture for the agency's screen (ADR 0030 § 4, SC-04 lot c4), a JPEG kept after the original is
+     * erased; `null` before it is made, or when it could not be made (`thumbnailed_at` set, a file ffmpeg cannot read).
+     */
+    thumbnailKey: text('thumbnail_key'),
+    /** When its reduced picture was tried, made or not: a medium is tried once. */
+    thumbnailedAt: timestampTz('thumbnailed_at'),
     createdAt: createdAt(),
   },
   (t) => [
     enumCheck('media_assets', t.kind, MEDIA_KINDS),
     enumCheck('media_assets', t.origin, MEDIA_ORIGINS),
+    check(
+      'media_assets_thumbnail_check',
+      sql`${t.thumbnailKey} is null or (${t.thumbnailedAt} is not null and ${t.kind} <> 'audio')`,
+    ),
     unique('media_assets_creator_sha256_unique').on(t.creatorId, t.sha256),
     // The originals still held with a date (CR-06 c): `content_drops.erase_originals` reads them each hour.
     index('media_assets_due_idx')

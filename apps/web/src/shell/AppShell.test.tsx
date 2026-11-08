@@ -91,6 +91,17 @@ describe('the rail of each role', () => {
     expect(screen.getByText('Propriétaire')).toBeDefined();
   });
 
+  it('gives the team « Flou des médias » over Réglages, never a creator (SC-04 lot c4)', async () => {
+    renderApp(owner, '/');
+    await screen.findByText('Chatting');
+    const rail = screen.getByRole('navigation', { name: 'Navigation' });
+    expect(within(rail).getByRole('switch', { name: 'Flou des médias' })).toBeDefined();
+    cleanup();
+    renderApp({ ...base, role: 'creator', team: null, teamScope: 'self', creatorIds: ['c1'] }, '/');
+    await screen.findByRole('navigation', { name: 'Navigation' });
+    expect(screen.queryByRole('switch', { name: 'Flou des médias' })).toBeNull();
+  });
+
   it('opens Équipe on its Planning, Membres a tab away', async () => {
     vi.stubGlobal(
       'ResizeObserver',

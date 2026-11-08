@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom';
 
 import { AgentPill } from './AgentPill';
 import { AppearanceChoice } from './AppearanceChoice';
+import { MediaBlurToggle } from './MediaBlurToggle';
 import { NavIcon } from './NavIcon';
 import { keepTabInside } from './focus';
 import {
@@ -51,6 +52,8 @@ export interface Account {
   readonly security: string;
   /** The extension's guide (ADR 0067), for the team: a creator has no use for it. */
   readonly extension: boolean;
+  /** « Flou des médias » (SC-04 lot c4), for the team who sees her media: a creator sees only her own. */
+  readonly media: boolean;
 }
 
 export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
@@ -61,6 +64,7 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
       role: roleLabel(user),
       security: securityPathOf(user),
       extension: user.role !== 'creator',
+      media: user.role !== 'creator',
     }),
     [user],
   );
@@ -328,6 +332,7 @@ export function RailNav({
       <span className="nv-rail__sp" />
       {/* On the Dashboard the mode's own control is on screen: the pill would say it twice (NAV-07). */}
       {rail.items.some(({ to }) => to === '/') && current !== '/' ? <AgentPill /> : null}
+      {account?.media === true ? <MediaBlurToggle variant="rail" /> : null}
       {rail.settings === null ? null : link(rail.settings)}
       {/* No « Plus » when the tabs fit and Moi › Préférences holds the rest (D-03). */}
       {more.length === 0 && (onSignOut === undefined || !rail.phoneMenu) ? null : (
@@ -445,6 +450,11 @@ export function MoreSheet({
             <AppearanceChoice />
           </div>
         )}
+        {account?.media === true ? (
+          <div className="nv-enter" style={{ '--nv-i': items.length + 2 }}>
+            <MediaBlurToggle variant="sheet" />
+          </div>
+        ) : null}
         {account === undefined ? null : (
           <Link
             to="/notifications"

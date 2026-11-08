@@ -118,6 +118,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '35 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['content_drops.describe_backlog'] },
   },
+  // The reduced pictures of her media for the agency's screen (SC-04 lot c4): those never tried, their original held.
+  // No backfill: the next run finds them.
+  {
+    task: 'content_drops.thumbnail_backlog',
+    match: '50 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['content_drops.thumbnail_backlog'] },
+  },
   // Her scripts (SC-02, ADR 0056 § 2): each creator's next one asked a week before it is due, in her own day; one
   // request per due day, so a replay or a missed hour asks nothing twice. No backfill: the next run catches up.
   {

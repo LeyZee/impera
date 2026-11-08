@@ -35,6 +35,9 @@ export const reviewOf = (
     readonly validated?: readonly boolean[];
     readonly reasons?: readonly (readonly DescriptionReviewReason[])[];
     readonly summary?: 'none' | 'current' | 'stale' | 'validated' | 'price';
+    /** Its reduced picture made, its original still held (SC-04 lot c4). */
+    readonly thumbnails?: boolean;
+    readonly original?: boolean;
   } = {},
 ): DropDescriptionsReview =>
   DropDescriptionsReviewSchema.parse({
@@ -53,6 +56,8 @@ export const reviewOf = (
         validatedAt: fields.validated?.[index] === true ? '2026-11-08T20:00:00.000Z' : null,
         createdAt: '2026-11-08T19:00:00.000Z',
       },
+      thumbnail: fields.thumbnails ?? false,
+      original: fields.original ?? true,
     })),
     steps: [
       { step: 'salon:', code: 'E1', name: 'Le salon', fileIds: [fileIds[0]] },

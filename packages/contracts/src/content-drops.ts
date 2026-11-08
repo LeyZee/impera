@@ -690,6 +690,13 @@ export const DropMediaReviewSchema = z.strictObject({
   mediaAssetId: MediaAssetIdSchema,
   kind: DropMediaKindSchema,
   description: DropDescriptionViewSchema.nullable(),
+  /**
+   * Its reduced picture is made (SC-04 lot c4): `GET …/files/:fileId/thumbnail` gives it, kept after the original goes
+   * (ADR 0030 § 4).
+   */
+  thumbnail: z.boolean(),
+  /** Its original is still held (ADR 0044 § 2): `GET …/files/:fileId/media` plays it, in parts for a video. */
+  original: z.boolean(),
 });
 export type DropMediaReview = z.infer<typeof DropMediaReviewSchema>;
 

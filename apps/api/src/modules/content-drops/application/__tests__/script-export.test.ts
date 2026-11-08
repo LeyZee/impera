@@ -97,9 +97,9 @@ const sent: SentScript = {
   versionId: 'version',
   moment: null,
   files: [
-    { slotKey: 'chambre:B:0', mime: 'image/heic', bytes: 9, storageKey: 'media/b' },
-    { slotKey: 'salon::0', mime: 'image/jpeg', bytes: 9, storageKey: 'media/s' },
-    { slotKey: 'chambre:A:0', mime: 'image/jpeg', bytes: 9, storageKey: 'media/a' },
+    { slotKey: 'chambre:B:0', mime: 'image/heic', bytes: 9, storageKey: 'media/b', description: null },
+    { slotKey: 'salon::0', mime: 'image/jpeg', bytes: 9, storageKey: 'media/s', description: null },
+    { slotKey: 'chambre:A:0', mime: 'image/jpeg', bytes: 9, storageKey: 'media/a', description: null },
   ],
 };
 const objects = { 'media/s': 'photo-sal', 'media/a': 'photo-A..', 'media/b': 'photo-B..' };

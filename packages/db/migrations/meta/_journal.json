@@ -883,6 +883,13 @@
       "when": 1794172123527,
       "tag": "0152_description_validation",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1794175355216,
+      "tag": "0153_media_thumbnails",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { ScriptsSection } from './ScriptsSection';
 import { reviewOf, structureOf } from './fixtures';
 
 import { dropOf, fileOf, requestOf } from '@/screens/content/fixtures';
+import { startMediaBlur } from '@/shell/media-blur';
 
 /* An invented creator, structure and scripts (ADR 0010). */
 const CREATOR = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000c1');
@@ -256,6 +257,57 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     expect(await within(region).findByText('2 descriptions à valider')).toBeDefined();
     expect(validated).toBe(true);
     expect(within(region).queryByRole('button', { name: 'Tout valider' })).toBeNull();
+  });
+
+  it('shows each medium’s picture, blurred, and opens it in large beside its description (SC-04 lot c4)', async () => {
+    window.localStorage.clear();
+    startMediaBlur();
+    serve({
+      ...base,
+      [`GET ${REVIEW}`]: () => ({ status: 200, body: reviewOf(SENT.id, FILES, { thumbnails: true }) }),
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Relire les descriptions' }));
+    const region = await screen.findByRole('region', { name: 'Descriptions de S012' });
+    const opens = within(region).getAllByRole('button', { name: 'Voir la photo en grand' });
+    expect(opens).toHaveLength(3);
+    expect(opens[0]?.querySelector('img')?.getAttribute('src')).toBe(
+      `/v1/creators/${CREATOR}/drops/${SENT.id}/files/${FILES[0]}/thumbnail`,
+    );
+    expect(document.documentElement.dataset['mediaBlur']).toBe('on');
+
+    fireEvent.click(opens[1] ?? region);
+    const viewer = await screen.findByRole('dialog', { name: 'Photo · E2A' });
+    const picture = viewer.querySelector('img.sx-viewer__media');
+    expect(picture?.getAttribute('src')).toBe(
+      `/v1/creators/${CREATOR}/drops/${SENT.id}/files/${FILES[1]}/media`,
+    );
+    expect(picture?.getAttribute('data-revealed')).toBe('false');
+    expect(within(viewer).getByText('Photo inventée 2 : une silhouette près d’une fenêtre.')).toBeDefined();
+    expect(within(viewer).getByRole('button', { name: 'Corriger' })).toBeDefined();
+    // « Voir net » shows this one alone, the switch stays as it is.
+    fireEvent.click(within(viewer).getByRole('button', { name: 'Voir net' }));
+    expect(picture?.getAttribute('data-revealed')).toBe('true');
+    expect(document.documentElement.dataset['mediaBlur']).toBe('on');
+  });
+
+  it('shows its picture alone once the original is erased', async () => {
+    serve({
+      ...base,
+      [`GET ${REVIEW}`]: () => ({
+        status: 200,
+        body: reviewOf(SENT.id, FILES, { thumbnails: true, original: false }),
+      }),
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Relire les descriptions' }));
+    const region = await screen.findByRole('region', { name: 'Descriptions de S012' });
+    fireEvent.click(within(region).getAllByRole('button', { name: 'Voir la photo en grand' })[0] ?? region);
+    const viewer = await screen.findByRole('dialog', { name: 'Photo · E1' });
+    expect(viewer.querySelector('img.sx-viewer__media')?.getAttribute('src')).toBe(
+      `/v1/creators/${CREATOR}/drops/${SENT.id}/files/${FILES[0]}/thumbnail`,
+    );
+    expect(within(viewer).getByText(/l’original est effacé/u)).toBeDefined();
   });
 
   it('corrects a description inline, and says the server’s refusal when a newer one came', async () => {
