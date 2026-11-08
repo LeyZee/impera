@@ -9,11 +9,19 @@ import { classify, createCallRunner } from './call-runner';
 import { acceptsInput, MODELS, TRANSCRIPTION_MODEL } from './catalog';
 import type { ProviderId } from './config';
 import { alertsBlock, describeBrief, notesBlock, toMessages } from './conversation-messages';
-import type { LlmFailure, LlmGateway, LlmGatewayDeps, VideoKeyframes } from './gateway-types';
+import type {
+  ChannelPostInput,
+  LlmFailure,
+  LlmGateway,
+  LlmGatewayDeps,
+  VideoKeyframes,
+} from './gateway-types';
 import { computeHealth } from './health';
 import { loadPrompt, renderPrompt } from './prompts';
 import {
   BriefSchema,
+  ChannelPollOutputSchema,
+  ChannelPostOutputSchema,
   JudgeOutputSchema,
   DropSenseOutputSchema,
   SenseOutputSchema,
@@ -35,6 +43,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   const judgePrompt = prompts.judge ?? loadPrompt('judge');
   const trendCapturesPrompt = prompts.trendCaptures ?? loadPrompt('sense', 'trend-captures');
   const creatorDropPrompt = prompts.creatorDrop ?? loadPrompt('sense', 'creator-drop');
+  const channelPostPrompt = prompts.channelPost ?? loadPrompt('voice', 'telegram-channel');
   const canary = deps.canary ?? `nv-${randomBytes(6).toString('hex')}`;
 
   const reportRefusal = (provider: ProviderId, status: 401 | 403): void => {
@@ -303,6 +312,41 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       );
     },
 
+    async channelPost(input) {
+      const system = renderPrompt(channelPostPrompt, {
+        creator_name: input.creatorName,
+        persona_sheet: input.personaSheet,
+        examples:
+          input.examples.length === 0
+            ? 'Aucun exemple pour l’instant.'
+            : wrapUntrusted('channel_examples', input.examples.join('\n\n---\n\n')),
+        canary,
+      });
+      const content = channelPostRequest(input);
+      const messages = (): Promise<{ role: 'user'; content: string }[]> =>
+        Promise.resolve([{ role: 'user', content }]);
+      if (input.kind === 'poll') {
+        const result = await run(
+          'voice',
+          channelPostPrompt,
+          system,
+          messages,
+          ChannelPollOutputSchema,
+          input.trace,
+        );
+        return result.ok ? ok({ ...result.value, output: { kind: 'poll', ...result.value.output } }) : result;
+      }
+      const result = await run(
+        'voice',
+        channelPostPrompt,
+        system,
+        messages,
+        ChannelPostOutputSchema,
+        input.trace,
+      );
+      return result.ok ? ok({ ...result.value, output: { kind: 'post', ...result.value.output } }) : result;
+    },
+
     health() {
       return computeHealth(deps.config, deps.credentials, deps.log, now(), status(), trendWatchStatus());
     },
@@ -337,4 +381,32 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       }
     },
   };
+}
+
+/** What this one post is: written by the code, the agency's words in their blocks (CLAUDE.md rule 4). */
+function channelPostRequest(input: ChannelPostInput): string {
+  const media = input.kind === 'poll' ? null : input.media;
+  const lines = [
+    input.kind === 'poll'
+      ? 'Écris un sondage pour son canal : une question et deux à quatre réponses.'
+      : input.kind === 'main'
+        ? media === null
+          ? 'Écris le post principal du jour pour son canal, un texte seul, sans média : il mène au lien ajouté à la fin.'
+          : 'Écris le post principal du jour pour son canal : il réagit à ce média et mène au lien ajouté à la fin.'
+        : media === null
+          ? 'Écris un post d’engagement pour son canal, un texte seul, sans média et sans lien.'
+          : 'Écris un post d’engagement pour son canal qui accompagne ce média, sans lien.',
+  ];
+  if (media !== null) lines.push('', wrapUntrusted('creator_media_description', media));
+  if (input.kind === 'main') {
+    const destination = input.destination?.trim() ?? '';
+    lines.push(
+      '',
+      destination === ''
+        ? 'Le lien ajouté à la fin ne dit pas où il mène : ne nomme aucun endroit.'
+        : `Le lien ajouté à la fin mène ici :\n${wrapUntrusted('link_destination', destination)}`,
+    );
+  }
+  if (input.advice !== null) lines.push('', wrapUntrusted('agency_advice', input.advice));
+  return lines.join('\n');
 }

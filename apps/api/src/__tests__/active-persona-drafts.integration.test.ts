@@ -105,6 +105,7 @@ const GATEWAY: LlmGateway = {
   transcribe: () => Promise.reject(new Error('not used')),
   describeTrendCaptures: () => Promise.reject(new Error('not used')),
   describeDrop: () => Promise.reject(new Error('not used')),
+  channelPost: () => Promise.reject(new Error('not used')),
   brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
   voice: () => Promise.resolve({ ok: true, value: { output: { bubbles: ['Coucou toi'] }, meta: META } }),
   health,

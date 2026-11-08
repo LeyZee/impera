@@ -83,6 +83,7 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
     transcribe: () => Promise.reject(new Error('not used')),
     describeTrendCaptures: () => Promise.reject(new Error('not used')),
     describeDrop: () => Promise.reject(new Error('not used')),
+    channelPost: () => Promise.reject(new Error('not used')),
     brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
     voice: async () => {
       await control.hold;

@@ -1,4 +1,4 @@
-import { GUARD_CODES, OBSOLETE_GUARD_CODES } from '@impera/contracts';
+import { CHANNEL_ONLY_GUARD_CODES, GUARD_CODES, OBSOLETE_GUARD_CODES } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -164,7 +164,12 @@ describe('voice guards (P3-13)', () => {
     const known: readonly string[] = GUARD_CODES;
     expect([...emitted].filter((code) => !known.includes(code))).toEqual([]);
     const obsolete: readonly string[] = OBSOLETE_GUARD_CODES;
-    expect(known.filter((code) => !emitted.has(code) && !obsolete.includes(code))).toEqual([]);
+    // The channel's own checks emit theirs (telegram/domain/channel-post.ts), never the agent's guards.
+    const elsewhere: readonly string[] = CHANNEL_ONLY_GUARD_CODES;
+    expect(
+      known.filter((code) => !emitted.has(code) && !obsolete.includes(code) && !elsewhere.includes(code)),
+    ).toEqual([]);
+    expect([...emitted].filter((code) => elsewhere.includes(code))).toEqual([]);
     expect([...emitted].filter((code) => obsolete.includes(code))).toEqual([]);
   });
 });
