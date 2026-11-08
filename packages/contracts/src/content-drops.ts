@@ -621,3 +621,36 @@ export const CONTENT_DROP_FILE_SETTLED_CONFLICT = 'content_drop_file_settled_con
 export const CONTENT_DROP_UPLOAD_UNPROCESSABLE = 'content_drop_upload_unprocessable';
 /** No storage configured, or it does not answer: the phone tries again later. */
 export const CONTENT_DROP_STORAGE_UNAVAILABLE = 'content_drop_storage_unavailable';
+
+/* ----------------------------------------------------------------------------------------------------------------
+ * ADR 0083 § 6: a sent script, told step by step once each of its media is described, and its synthesis. No price:
+ * the screen shows the agency's grid beside each step (ADR 0056 § 6).
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/** A step of a script as its slots name it: `<segment>:<series>`, `salon:` or `chambre:B`. */
+export const ScriptStepKeySchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}:[ABC]?$/);
+
+export const ScriptStepSummarySchema = z.object({
+  step: ScriptStepKeySchema,
+  /** The general description of the step: how it unfolds, what it aims at, its mood, from its card and its media. */
+  overview: z.string().min(1).max(2000),
+  /** One or two sentences, for the synthesis. */
+  summary: z.string().min(1).max(400),
+});
+export type ScriptStepSummary = z.infer<typeof ScriptStepSummarySchema>;
+
+export const ScriptDropSummarySchema = z.object({
+  /** The shoot as a whole: where, when, in what outfits, the thread from the first step to the last. */
+  shootingContext: z.string().min(1).max(2000),
+  /** Each step of the script, in its order, once. */
+  steps: z.array(ScriptStepSummarySchema).min(1).max(60),
+});
+export type ScriptDropSummary = z.infer<typeof ScriptDropSummarySchema>;
+
+/**
+ * Why a script's synthesis waits for a human before any use, read by the code (ADR 0083 § 6): `price`, it names a sum
+ * or a currency, still after one more try, when prices come from the agency's grid alone (ADR 0056 § 6).
+ */
+export const SCRIPT_SUMMARY_REVIEW_REASONS = ['price'] as const;
+export const ScriptSummaryReviewReasonSchema = z.enum(SCRIPT_SUMMARY_REVIEW_REASONS);
+export type ScriptSummaryReviewReason = z.infer<typeof ScriptSummaryReviewReasonSchema>;

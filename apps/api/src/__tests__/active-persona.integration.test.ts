@@ -101,6 +101,7 @@ function recordingGateway() {
     describeTrendCaptures: () => Promise.reject(new Error('not used')),
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
+    summarizeScript: () => Promise.reject(new Error('not used')),
     brain: (input) => {
       brain.push(input);
       return Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } });
