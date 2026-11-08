@@ -1,6 +1,6 @@
 # 0084. La quinzaine vérifiée peut être la première payée sur les ventes Reveal
 
-Statut : proposed (« ok novembre-reveal » de Charles le 08/11/2026, 16 h 29, fil Équipe : la paie de novembre se calcule sur les ventes Reveal ; numéro attribué par le coordinateur ; « ok 0084 » attendu sur ce texte)
+Statut : accepted (« ok 0084 » de Charles le 08/11/2026, 16 h 46, chat du projet ; « ok novembre-reveal » le 08/11/2026, 16 h 29, fil Équipe : la paie de novembre se calcule sur les ventes Reveal ; numéro attribué par le coordinateur)
 Date : 2026-11-08
 Amende : l'ADR 0050 § 8, pour deux phrases : « posée à une frontière de période et jamais rétroactive » et « sur une quinzaine passée couverte par le registre […] La bascule se fait ensuite à une frontière de période ». Amende aussi la règle de départ des règles de paie (EQ-03 : de nouvelles règles partent d'une quinzaine qui n'a pas commencé). Ne change ni la vérification (CRM-02, `isCleanMatch`), ni le calcul (CRM-03), ni l'attribution d'une vente (ADR 0050 § 5).
 
@@ -32,7 +32,7 @@ Le § 8 demande que Charles voie le net concorder avant qu'on paie. Or une quinz
 
 **4. Une seule règle par compte et par quinzaine, comme aujourd'hui.** Si le compte a déjà des règles qui partent de la quinzaine vérifiée, la bascule part d'une quinzaine suivante.
 
-**5. La bascule reste un geste du propriétaire, dans le CRM.** Le choix « Ventes relevées » s'ouvre dans la fenêtre des règles de paie (Réglages › Paie). La fenêtre propose la quinzaine vérifiée quand elle peut basculer. Sinon, elle dit pourquoi : modèle à relier, vérification à lancer, ou quinzaine déjà clôturée.
+**5. La bascule reste un geste du propriétaire, dans le CRM.** Le choix « Ventes relevées » s'ouvre dans la fenêtre des règles de paie (Réglages › Règles de paie). La fenêtre propose la quinzaine vérifiée quand elle peut basculer. Sinon, elle dit pourquoi : modèle à relier, vérification à lancer, ou quinzaine déjà clôturée.
 
 ## Pour novembre
 

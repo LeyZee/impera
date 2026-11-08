@@ -865,5 +865,89 @@ describe('Équipe › Rapports de fin de shift (/v1/scheduling, EQ-03, ADR 0023)
         earningsSource: 'detected',
       });
     });
+
+    // Reveal's latest check, from the test above: clean over the fortnight before the current one.
+    const checkedOf = async (cookie: string, account: PlatformAccountId) =>
+      AccountPayRulesListSchema.parse((await call('GET', '/team/pay-rules', cookie)).json()).accounts.find(
+        (one) => one.account.id === account,
+      )?.checkedPeriod;
+    const linkModel = (account: PlatformAccountId, platformModelId: string) =>
+      test.admin.db
+        .insert(schema.salesFeedModels)
+        .values({ platform: 'reveal', platformModelId, platformAccountId: account, creatorId: anna });
+    const recalculations = async (): Promise<string[]> =>
+      (
+        await test.admin.db.execute<{ key: string }>(
+          sql`select key from graphile_worker._private_jobs where key like 'payroll.recalculate:%' order by key`,
+        )
+      ).rows.map((row) => row.key);
+
+    it('pays the checked fortnight itself on the platform’s net, and computes it again at once (ADR 0084)', async () => {
+      const checked = previousPayPeriod(currentPeriod());
+      expect(await checkedOf(owner, annaThird)).toBeNull();
+      await linkModel(annaThird, 'modele-invente-ter');
+      expect(await checkedOf(owner, annaThird)).toBe(checked);
+      // A manager sets no rules: she is offered nothing.
+      expect(await checkedOf(noraCookie, annaThird)).toBeNull();
+
+      const reports = await add(owner, rulesBody(annaThird, checked));
+      expect([reports.statusCode, codeOf(reports)]).toEqual([400, 'pay_rules_period_invalid']);
+      const before = await add(owner, {
+        ...rulesBody(annaThird, previousPayPeriod(checked)),
+        earningsSource: 'detected',
+      });
+      expect([before.statusCode, codeOf(before), detailsOf(before)]).toEqual([
+        409,
+        'pay_rules_source_conflict',
+        { reason: 'check_not_before' },
+      ]);
+
+      await test.admin.db.execute(
+        sql`delete from graphile_worker._private_jobs where key like 'payroll.recalculate:%'`,
+      );
+      const switched = await add(owner, { ...rulesBody(annaThird, checked), earningsSource: 'detected' });
+      expect(switched.statusCode, switched.body).toBe(201);
+      expect(AccountPayRulesSchema.parse(switched.json())).toMatchObject({
+        fromPeriod: checked,
+        earningsSource: 'detected',
+      });
+      expect(await recalculations()).toEqual([
+        `payroll.recalculate:${checked}`,
+        `payroll.recalculate:${currentPeriod()}`,
+      ]);
+      // It has rules from that fortnight now: nothing more to offer.
+      expect(await checkedOf(owner, annaThird)).toBeNull();
+    });
+
+    it('never switches from the checked fortnight once pay closed it (ADR 0084 § 2)', async () => {
+      const checked = previousPayPeriod(currentPeriod());
+      await linkModel(annaMain, 'modele-invente-main');
+      expect(await checkedOf(owner, annaMain)).toBe(checked);
+      await test.admin.db.transaction(async (tx) => {
+        await tx
+          .insert(schema.payPeriods)
+          .values({
+            period: checked,
+            startsAt: parisInstant(checked, 0),
+            endsAt: parisInstant(nextPayPeriod(checked), 0),
+            timeZone: PARIS,
+          })
+          .onConflictDoNothing();
+        await tx.insert(schema.payPeriodClosings).values({
+          period: checked,
+          teamNetMinor: 0,
+          collective: null,
+          exchangeRates: [],
+          closedBy: ownerId,
+        });
+      });
+      expect(await checkedOf(owner, annaMain)).toBeNull();
+      const closed = await add(owner, { ...rulesBody(annaMain, checked), earningsSource: 'detected' });
+      expect([closed.statusCode, codeOf(closed), detailsOf(closed)]).toEqual([
+        409,
+        'pay_rules_source_conflict',
+        { reason: 'period_closed' },
+      ]);
+    });
   });
 });

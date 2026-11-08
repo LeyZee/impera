@@ -74,7 +74,7 @@ Date : AAAA-MM-JJ
 | 0047 | Ranger le code qui a grossi : la paie en quatre modules, l'argent calculé par le seul serveur, l'assemblage par module, le dashboard par domaine | accepted (précise 0002) |
 | 0048 | L'IA dans le calendrier des shifts : ses heures se lisent à côté de celles des chatteurs | accepted (précise 0045) |
 | 0049 | Créneaux libres, plusieurs chatteurs sur un compte, fans confiés ; la créatrice sans notification de shift | accepted (remplace le réglage de créneaux d'EQ-02, la contrainte d'un membre par compte et 0045 § 4 pour la créatrice) |
-| 0050 | Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste | accepted (complète 0008 ; remplace dans 0018 l'alternative « un second port » pour les ventes et les chiffres, dans 0043 § 4 la vente sans attribution et § 5 le rapport d'un compte détecté ; précise 0023, dont le calcul des montants par plateforme, 0025, 0049 ; § 8, part de la créatrice, précisé par 0054) |
+| 0050 | Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste | accepted (complète 0008 ; remplace dans 0018 l'alternative « un second port » pour les ventes et les chiffres, dans 0043 § 4 la vente sans attribution et § 5 le rapport d'un compte détecté ; précise 0023, dont le calcul des montants par plateforme, 0025, 0049 ; § 8, part de la créatrice, précisé par 0054 ; § 8, frontière de la bascule, amendé par 0084) |
 | 0051 | Un second point d'entrée, pur, pour les règles qu'un module prête aux domaines qui en dépendent | accepted (précise 0002 pour l'ADR 0047 § 1) |
 | 0052 | Le chatteur sous l'œil de la persona : chaque message qu'il écrit dans Reveal est relu, chaque écart lui est signalé, rien n'est bloqué ni retenu sur sa paie | accepted (précise 0025 et 0043 § 6 ; au § 5 la phrase sur Telegram remplacée par 0059) |
 | 0053 | Clé d'accès (Face ID, empreinte) : un geste vaut mot de passe et code | accepted (précise 0046 § 1, 3, 5 à 8) |
@@ -106,4 +106,4 @@ Date : AAAA-MM-JJ
 | 0080 | Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM | accepted (précise 0057, 0055, 0020 ; remplace pour le canal Telegram l'acceptation de 0057 § 3 et l'adresse de 0057 § 6) |
 | 0081 | Les abonnés, les PPV envoyés et les messages se gardent en photo quotidienne lue chez la plateforme | accepted (précise 0078 § 6 et 0050) |
 | 0083 | Chaque média que la créatrice dépose est décrit en détail, seul, et validé avant tout usage | accepted (précise 0030 § 3 et 0056 § 6) |
-| 0084 | La quinzaine vérifiée peut être la première payée sur les ventes Reveal | proposed (amende 0050 § 8 et la règle de départ des règles de paie d'EQ-03) |
+| 0084 | La quinzaine vérifiée peut être la première payée sur les ventes Reveal | accepted (amende 0050 § 8 et la règle de départ des règles de paie d'EQ-03) |

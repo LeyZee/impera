@@ -403,7 +403,10 @@ const SOURCE_REFUSALS: Record<PayRulesSourceRefusal, string> = {
   check_missing: 'Les ventes de cette plateforme n’ont jamais été vérifiées sur une quinzaine passée',
   check_not_clean:
     'La dernière vérification des ventes de cette plateforme ne concorde pas sur une quinzaine entière',
-  check_not_before: 'La dernière vérification doit porter sur une quinzaine qui finit avant ces règles',
+  check_not_before:
+    'La dernière vérification doit porter sur la quinzaine de ces règles ou sur une quinzaine qui finit avant elles',
+  period_closed:
+    'Une quinzaine est déjà clôturée à partir de la quinzaine vérifiée : ces règles partent d’une quinzaine qui n’a pas commencé',
 };
 
 /** `detected` on an account that cannot be paid on its platform's net yet (ADR 0050 § 8, CRM-03). */

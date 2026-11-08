@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayRulesSection } from './PayRulesSection';
 
 import { SCHEDULING_SETTINGS } from '@/test/pay';
-import { valuesOf } from '@/test/select';
+import { chooseValue, valuesOf } from '@/test/select';
 
 /* Invented creators and accounts (ADR 0010); the rates are examples, not anyone's. */
 const id = (n: number): string => `0199f2a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -65,8 +65,9 @@ function serve(): void {
             {
               account: account(1, 'Anna Lys', 'anna'),
               rules: [rules(2, 1, '2026-11-01', { vatBps: 550 }), rules(1, 1, '2026-10-01')],
+              checkedPeriod: null,
             },
-            { account: account(2, 'Inès Moreau', 'ines'), rules: [] },
+            { account: account(2, 'Inès Moreau', 'ines'), rules: [], checkedPeriod: null },
           ],
         });
       }
@@ -402,6 +403,106 @@ describe('Réglages › Règles de paie', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
     expect((await within(dialog).findByRole('alert')).textContent).toBe(
       'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, avec l’export, où tout concorde et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
+    );
+  });
+
+  it('switches a Reveal account to its sales read from the checked fortnight, said before it is posted (ADR 0084)', async () => {
+    accounts = [{ account: account(2, 'Inès Moreau', 'ines'), rules: [], checkedPeriod: '2026-10-01' }];
+    answer = { status: 201, body: rules(9, 2, '2026-10-01', { earningsSource: 'detected' }) };
+    renderSection();
+    const card = (await screen.findByText('Inès Moreau')).closest<HTMLElement>('.rp-account');
+    if (card === null) throw new Error('No card');
+    expect(plain(card.textContent)).toContain(
+      'Ventes vérifiéespeut passer aux ventes relevées dès la quinzaine du 1er au 15 octobre',
+    );
+    fireEvent.click(within(card).getByRole('button', { name: 'Poser les règles' }));
+    const dialog = screen.getByRole('dialog', { name: 'Poser les règles de paie' });
+    const from = within(dialog).getByRole('combobox', { name: 'À partir de la quinzaine' });
+    // The reports never start with a fortnight over: the checked one comes with « Ventes relevées » only.
+    expect(valuesOf(from)[0]).toBe('2026-10-16');
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Ventes relevées par le connecteur' }));
+    expect(valuesOf(from).slice(0, 2)).toEqual(['2026-10-01', '2026-10-16']);
+    // Until the owner picks another, the earliest the source allows: the checked fortnight.
+    expect(plain(from.textContent)).toContain('1er au 15 octobre');
+    fireEvent.change(within(dialog).getByLabelText('TVA'), { target: { value: '20' } });
+    fireEvent.change(within(dialog).getByLabelText('Commission de la plateforme'), {
+      target: { value: '20' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+
+    expect(plain(within(dialog).getByText(/^Cette quinzaine a déjà commencé/u).textContent)).toBe(
+      'Cette quinzaine a déjà commencé : ses relevés en brouillon seront recalculés sur les ventes relevées, et les ventes déclarées dans ses rapports ne compteront plus.',
+    );
+    expect(writes).toEqual([]);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
+    await act(() => Promise.resolve());
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({
+      path: '/v1/team/pay-rules',
+      body: { platformAccountId: id(12), fromPeriod: '2026-10-01', earningsSource: 'detected' },
+    });
+  });
+
+  it('takes the checked fortnight back with the reports, and keeps « Ventes relevées » shut on a platform without a net', async () => {
+    accounts = [
+      { account: account(2, 'Inès Moreau', 'ines'), rules: [], checkedPeriod: '2026-10-01' },
+      { account: { ...account(3, 'Léa Brun', 'lea'), platform: 'onlyfans' }, rules: [], checkedPeriod: null },
+    ];
+    renderSection();
+    const ines = (await screen.findByText('Inès Moreau')).closest<HTMLElement>('.rp-account');
+    if (ines === null) throw new Error('No card');
+    fireEvent.click(within(ines).getByRole('button', { name: 'Poser les règles' }));
+    let dialog = screen.getByRole('dialog', { name: 'Poser les règles de paie' });
+    const from = within(dialog).getByRole('combobox', { name: 'À partir de la quinzaine' });
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Ventes relevées par le connecteur' }));
+    chooseValue(from, '2026-10-01');
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Rapports de fin de shift' }));
+    expect(valuesOf(from)).not.toContain('2026-10-01');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(within(dialog).queryByText(/^Cette quinzaine a déjà commencé/u)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+
+    const lea = screen.getByText('Léa Brun').closest<HTMLElement>('.rp-account');
+    if (lea === null) throw new Error('No card');
+    fireEvent.click(within(lea).getByRole('button', { name: 'Poser les règles' }));
+    dialog = screen.getByRole('dialog', { name: 'Poser les règles de paie' });
+    expect(
+      within(dialog)
+        .getByRole('radio', { name: 'Ventes relevées par le connecteur' })
+        .hasAttribute('disabled'),
+    ).toBe(true);
+    expect(
+      within(dialog).getByText(
+        'Cette plateforme ne donne pas de net : la paie de ce compte lit les rapports validés.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('says a fortnight closed by pay cannot be switched any more', async () => {
+    accounts = [{ account: account(2, 'Inès Moreau', 'ines'), rules: [], checkedPeriod: '2026-10-01' }];
+    answer = {
+      status: 409,
+      body: {
+        error: {
+          code: 'pay_rules_source_conflict',
+          message: 'x',
+          details: { reason: 'period_closed' },
+          requestId: 'r',
+        },
+      },
+    };
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Poser les règles' }));
+    const dialog = screen.getByRole('dialog', { name: 'Poser les règles de paie' });
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Ventes relevées par le connecteur' }));
+    fireEvent.change(within(dialog).getByLabelText('TVA'), { target: { value: '20' } });
+    fireEvent.change(within(dialog).getByLabelText('Commission de la plateforme'), {
+      target: { value: '20' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
+    expect((await within(dialog).findByRole('alert')).textContent).toBe(
+      'La paie a déjà clôturé une quinzaine depuis la quinzaine vérifiée : ses montants ne changent plus. Fais partir ces règles d’une quinzaine qui n’a pas commencé.',
     );
   });
 

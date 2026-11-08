@@ -1164,9 +1164,13 @@
 .rp-account__next {
   display: grid;
   /* The chips share one column, so that the rules line up whatever the chip says. */
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: var(--rp-chip-column, 92px) minmax(0, 1fr);
   align-items: center;
   gap: 2px var(--nv-space-3);
+}
+/* « Ventes vérifiées » is the widest chip: where it shows, every chip of the card takes its width (ADR 0084). */
+.rp-account:has(.rp-account__checked) {
+  --rp-chip-column: 128px;
 }
 .rp-account__now .rp-account__since,
 .rp-account__next .rp-account__since {
