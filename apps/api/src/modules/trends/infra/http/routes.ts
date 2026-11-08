@@ -39,6 +39,7 @@ import {
   ExtensionLinksFull,
   ExtensionLinkUnauthenticated,
   TrendWatchBudgetLimited,
+  TrendWatchForbidden,
 } from '../../domain/errors';
 import type {
   CaptureVision,
@@ -145,6 +146,8 @@ export function createTrendRoutes(
         const touch = request.method === 'POST';
         const holder = token.success ? await stores.links.holder(token.data, { touch }) : null;
         if (holder === null) throw new ExtensionLinkUnauthenticated();
+        // A chatter's link is for the copilot panel only: the watch stays closed to him (ADR 0060 § 2, ADR 0086 § 8).
+        if (!holder.watch) throw new TrendWatchForbidden();
         holders.set(request, holder);
         return payload;
       },

@@ -16,6 +16,7 @@ import { MethodSchema, namesOf, routesOf } from './support/routes';
  */
 const NO_ORIGIN_CHECK: Readonly<Record<string, string>> = {
   'POST /v1/connector/sessions': 'the extension, by its device token',
+  'POST /v1/copilot/drafts/:draftId/verdict': 'the extension’s copilot panel, by its link token',
   'POST /v1/trends/readings': 'the extension, by its link token',
   'POST /v1/trends/readings/captures': 'the extension, by its link token',
   'POST /v1/webhooks/sales-feeds/:platform': 'the platform’s webhook, checked by its signature',

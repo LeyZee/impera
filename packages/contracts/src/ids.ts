@@ -25,6 +25,9 @@ export type MessageId = z.infer<typeof MessageIdSchema>;
 export const DraftIdSchema = uuid.brand<'DraftId'>();
 export type DraftId = z.infer<typeof DraftIdSchema>;
 
+/** A calibration rating (`calibration_ratings`): the playground's, or a real draft's through the copilot panel. */
+export const CalibrationRatingIdSchema = uuid.brand<'CalibrationRatingId'>();
+
 export const MediaAssetIdSchema = uuid.brand<'MediaAssetId'>();
 export type MediaAssetId = z.infer<typeof MediaAssetIdSchema>;
 

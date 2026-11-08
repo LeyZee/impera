@@ -1,0 +1,148 @@
+/* What is known of him (ADR 0085, lot c): folded groups laid out like his limits, a hairline between fields. */
+.tr-card__fields {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0 var(--nv-space-3) var(--nv-space-2);
+  list-style: none;
+}
+.tr-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.tr-card__field + .tr-card__field {
+  border-top: 1px solid var(--nv-hairline);
+}
+.tr-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-height: 28px;
+}
+.tr-card__label {
+  flex: 1;
+  min-width: 0;
+  color: var(--nv-ink-muted);
+}
+/* A field's action ends on the plate's text edge, like the counts of the groups under it. */
+.tr-card__head > .nv-btn--plain {
+  padding-inline: var(--nv-space-3);
+  margin-right: calc(-1 * var(--nv-space-3));
+}
+/* Beside the conversation, with a pointer, « Corriger » and « Ajouter » show under the pointer or the keyboard's focus:
+ * six times the same word read as noise (Charles, 08/11). They keep their room, so nothing moves when they show. */
+@media (hover: hover) {
+  .tr-aside .tr-card__head {
+    position: relative;
+    min-height: 0;
+  }
+  .tr-aside .tr-card__head > .nv-btn--plain {
+    position: absolute;
+    inset: 0 0 0 auto;
+    margin-block: auto;
+  }
+  .tr-aside .tr-card__field:not(:hover, :focus-within) .tr-card__head > .nv-btn--plain {
+    opacity: 0;
+  }
+  /* An unknown field says so at the edge, where « Ajouter » takes its place under the pointer. */
+  .tr-aside .tr-card__field:is(:hover, :focus-within) .tr-card__empty {
+    visibility: hidden;
+  }
+}
+.tr-card__hint {
+  color: var(--nv-ink-faint);
+}
+.tr-card__value {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+}
+.tr-card__empty {
+  flex: none;
+  color: var(--nv-ink-faint);
+}
+.tr-card__source {
+  margin: 0;
+  color: var(--nv-ink-faint);
+}
+.tr-card__quote {
+  display: block;
+  margin: 0;
+  color: var(--nv-ink-muted);
+  overflow-wrap: anywhere;
+}
+.tr-card__quote q {
+  color: var(--nv-ink);
+  quotes: '«\00a0' '\00a0»';
+}
+.tr-card__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+  padding-top: 2px;
+}
+.tr-card__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.tr-card__input.nv-field__control {
+  width: 100%;
+  resize: none;
+}
+/* « À vérifier »: amber, it waits for a chatter, it stops nothing (ADR 0085 § 6). */
+.tr-card__check {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-1);
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in oklab, var(--nv-warning) 12%, transparent);
+}
+.tr-card__check-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+.tr-card__check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.tr-card__check-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+}
+.tr-card__refusal {
+  margin: 0;
+}
+/* On a phone and in the fan's column, his words take the width and the gesture goes under them. */
+@media (max-width: 560px) {
+  .tr-card__check-row {
+    flex-wrap: wrap;
+  }
+}
+.tr-aside .tr-card__check-row {
+  flex-wrap: wrap;
+  row-gap: var(--nv-space-1);
+}
+.tr-aside .tr-card__check-text {
+  flex-basis: 100%;
+}
+.tr-aside .tr-card__check-row > .nv-btn--plain {
+  margin-left: calc(-1 * var(--nv-space-3));
+}
+/* In the folded band, the essentials open the sheet's body, a hairline under the line above. */
+.tr-sheet__body > .tr-card__essentials {
+  border-top: 1px solid var(--nv-hairline);
+}

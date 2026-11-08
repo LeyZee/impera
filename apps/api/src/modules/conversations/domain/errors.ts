@@ -84,6 +84,41 @@ export class DraftConflict extends DomainError {
   }
 }
 
+/** A gesture of the copilot panel on a draft already settled otherwise: sent, expired, or rejected then placed. */
+export class CopilotDraftConflict extends DomainError {
+  constructor() {
+    super('copilot_draft_conflict', 'Ce brouillon a déjà été traité');
+  }
+}
+
+/** The copilot panel opens a creator only to the chatter on shift on her, margin included (ADR 0086 § 7). */
+export class CopilotOffShift extends DomainError {
+  constructor() {
+    super('copilot_shift_forbidden', 'Tu n’es pas en poste sur cette créatrice.');
+  }
+}
+
+/** The extension's link missing, unknown or revoked: it asks for « Relier l'extension » again (ADR 0066 § 7). */
+export class CopilotLinkUnauthenticated extends DomainError {
+  constructor() {
+    super('extension_link_unauthenticated', 'Extension non reliée : relie-la depuis le CRM');
+  }
+}
+
+/** A creator's own link: she has no copilot panel (ADR 0063, ADR 0086 § 7). */
+export class CopilotForbidden extends DomainError {
+  constructor() {
+    super('copilot_forbidden', 'Le panneau copilote est réservé à l’agence');
+  }
+}
+
+/** Two of the reader's creators have a conversation of that id on the platform: the panel names the creator. */
+export class CopilotCreatorConflict extends DomainError {
+  constructor() {
+    super('copilot_creator_conflict', 'Deux créatrices ont cette conversation : précise laquelle');
+  }
+}
+
 const BLOCKED_MESSAGES: Readonly<Record<BlockedReason, string>> = {
   creator_archived: 'Cette créatrice est archivée : rien ne part en son nom',
   kill_switch: 'Arrêt d’urgence actif : rien ne part tant qu’il n’est pas levé',

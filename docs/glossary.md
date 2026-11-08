@@ -15,6 +15,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Message | `message` | Un message reçu ou envoyé. `direction: inbound | outbound`, `author: fan | human | ai`. |
 | Journal d'événements | `conversation_events` | Historique append-only de tout ce qui arrive à une conversation. Source de vérité. |
 | Brouillon, proposition | `draft` | Une réponse proposée par l'IA, en attente d'approbation ou auto-approuvée. |
+| Brouillon placé | `drafts.placed_at`, verdict `placed` | Un brouillon que le chatteur a mis dans le champ de saisie de la plateforme depuis le panneau copilote (`a`, ou `e` après retouche) : il l'envoie lui-même, le brouillon reste en attente, et c'est le message parti qui le juge validé ou corrigé (ADR 0086 § 4 et 5). Jamais « Envoyé » au clic. |
+| Note de calibrage en réel | `calibration_ratings.source = 'live'` | Le jugement d'un vrai brouillon passé par le panneau copilote, une note par brouillon, sans les mots du fan ; celles du playground sont `playground` (ADR 0086 § 5). |
 | Brief | `brief` | La sortie structurée du cerveau qui dit à la voix quoi écrire. |
 | Sens | `sense` | Rôle LLM qui décrit les médias. |
 | Cerveau | `brain` | Rôle LLM qui analyse et décide. |
@@ -44,7 +46,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Main rendue automatiquement | `conversation.release_unavailable` | Un membre qui n'est plus « actif » (en congé, malade, en déplacement, suspendu, parti) ne lit plus aucune conversation, et ce qu'il tenait est rendu par le système dans la minute, avec son statut pour raison (EQ-13). |
 | Mode copilote | `copilot` | Le bot propose, un humain approuve. |
 | Mode auto | `auto` | Le bot envoie seul pour les catégories autorisées. |
-| Fait (mémoire) | `fan_fact` | Une information mémorisée sur un fan, avec source, date, confiance, `kind: declared | inferred`. |
+| Fait (mémoire) | `fan_fact` | Une information mémorisée sur un fan, avec source, date, confiance, `kind: declared | inferred | noted` (`noted` : écrit par un chatteur sur la fiche du fan, avec son auteur, ADR 0085). |
+| À vérifier (fiche du fan) | `toCheck` | Ce que l'IA a lu après la note d'un chatteur et qui la contredit : gardé sous la case, jamais lu par l'agent, jusqu'à ce qu'un chatteur garde l'une ou l'autre valeur (ADR 0085 § 6). |
 | Qui sont tes fans | `fanInsights`, `GET /v1/creator-space/fan-insights` | Le panneau de la créatrice en tête de Ventes : des parts sur l'ensemble de ses fans, jamais un nombre par case ni un fan seul, tirées de leurs faits déclarés, arrêtées à minuit, et une case ne s'affiche qu'au-delà du seuil (ADR 0065, ADR 0074). |
 | Famille de métiers | `jobFamily` | La case dans laquelle se range un métier dit par un fan, par des mots-clés écrits dans le code (Santé et soin, Étudiant…) ; ce qui ne se reconnaît pas va dans « Autres » (ADR 0074 § 5). |
 | Panneau copilote | `side_panel` de l'extension, `/v1/copilot/*` | Le panneau latéral de l'extension Impera, ouvert à côté de Reveal pendant le shift : où en est le fan, sa fiche, puis le brouillon de l'agent ; le chatteur envoie lui-même dans Reveal, et ce qui est parti fait le verdict (ADR 0086). |

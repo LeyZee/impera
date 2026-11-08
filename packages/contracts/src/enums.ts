@@ -65,6 +65,13 @@ export type FactCategory = z.infer<typeof FactCategorySchema>;
 export const FactKindSchema = z.enum(['declared', 'inferred']);
 export type FactKind = z.infer<typeof FactKindSchema>;
 
+/**
+ * A fact as stored (`fan_facts.kind`): what a model proposes (`FactKindSchema`), or a value a chatter wrote on the fan's
+ * card (`noted`, ADR 0085 § 5), never proposed by a model.
+ */
+export const StoredFactKindSchema = z.enum([...FactKindSchema.options, 'noted']);
+export type StoredFactKind = z.infer<typeof StoredFactKindSchema>;
+
 export const LlmRoleSchema = z.enum(['sense', 'brain', 'voice', 'judge']);
 export type LlmRole = z.infer<typeof LlmRoleSchema>;
 

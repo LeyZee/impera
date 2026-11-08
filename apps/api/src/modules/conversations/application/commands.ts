@@ -18,6 +18,7 @@ import {
   type ExternalMessage,
   type PlatformAccountId,
   type UserId,
+  type Verdict,
 } from '@impera/contracts';
 
 import {
@@ -97,7 +98,13 @@ interface ConversationCommand {
 export interface ConversationCommands {
   ingestMessage(input: IngestMessage): Promise<IngestResult>;
   approveDraft(input: ConversationCommand & { draftId: DraftId; bubbles?: readonly string[] }): Promise<void>;
-  rejectDraft(input: ConversationCommand & { draftId: DraftId; reason?: string }): Promise<void>;
+  /**
+   * `live`: the rejection came from the copilot panel (ADR 0086 § 4), and its `live` calibration rating is written in
+   * the same transaction (§ 5).
+   */
+  rejectDraft(
+    input: ConversationCommand & { draftId: DraftId; reason?: string; live?: Verdict & { kind: 'rejected' } },
+  ): Promise<void>;
   expireDraft(
     input: Omit<ConversationCommand, 'userId'> & { draftId: DraftId; reason: string },
   ): Promise<void>;
@@ -374,6 +381,7 @@ export function createConversationCommands({
           meta,
         );
         await setDraftStatus(tx, draft, 'rejected', { decidedBy: meta.actor, at: meta.at });
+        if (input.live !== undefined) await tx.drafts.rateLive(draft.id, input.live, meta.at);
       });
       await afterDecision(input.creatorId, input.correlationId);
     },
