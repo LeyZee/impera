@@ -64,3 +64,24 @@ export const MediaDescriptionSchema = z.object({
 });
 export type MediaDescription = z.infer<typeof MediaDescriptionSchema>;
 export type MediaFlag = MediaDescription['flags'][number];
+
+/**
+ * A media she drops, described in detail (ADR 0083 § 2): everything the short sentence and the closed labels say, and
+ * `detailed`, what a text written without seeing it needs: her look, her outfit, the room and its light, what she
+ * does, her position, the framing, what is heard, and for a video the words said, in their order.
+ */
+export const DropMediaDescriptionSchema = MediaDescriptionSchema.extend({
+  detailed: z.string().min(1).max(6000),
+});
+export type DropMediaDescription = z.infer<typeof DropMediaDescriptionSchema>;
+
+/**
+ * Why a description waits for a human before any use (ADR 0083 § 3 to 5), each read by the code, never by the model:
+ * - `back_reference`: it points to another media (« à nouveau », « la même »…), still after one more try;
+ * - `not_alone`: another person is seen or flagged, when she always shoots alone;
+ * - `unsure`: the model says it is not sure;
+ * - `flagged`: a safety flag (a possible minor, a weapon…).
+ */
+export const DESCRIPTION_REVIEW_REASONS = ['back_reference', 'not_alone', 'unsure', 'flagged'] as const;
+export const DescriptionReviewReasonSchema = z.enum(DESCRIPTION_REVIEW_REASONS);
+export type DescriptionReviewReason = z.infer<typeof DescriptionReviewReasonSchema>;

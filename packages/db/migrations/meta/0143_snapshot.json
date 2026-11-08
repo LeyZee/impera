@@ -1,6 +1,6 @@
 {
-  "id": "e5a2b483-ba11-42d7-aab4-1c8a54d93574",
-  "prevId": "ee966d79-d852-43c8-84a1-abfed21d9765",
+  "id": "3364ca25-fe52-4e85-975d-594ac1657c5e",
+  "prevId": "8795ed26-09eb-40e5-a79f-b9ea427d3bef",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6970,6 +6970,26 @@
           "primaryKey": false,
           "notNull": true
         },
+        "author": {
+          "name": "author",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'sense'"
+        },
+        "creator_note": {
+          "name": "creator_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_reasons": {
+          "name": "review_reasons",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -6990,6 +7010,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "media_descriptions_drop_unique": {
+          "name": "media_descriptions_drop_unique",
+          "columns": [
+            {
+              "expression": "media_asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "prompt_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"media_descriptions\".\"author\" = 'sense' and \"media_descriptions\".\"content\" ? 'detailed'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -7048,7 +7090,16 @@
           "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
-      "checkConstraints": {},
+      "checkConstraints": {
+        "media_descriptions_author_check": {
+          "name": "media_descriptions_author_check",
+          "value": "\"media_descriptions\".\"author\" in ('sense', 'human')"
+        },
+        "media_descriptions_review_reasons_check": {
+          "name": "media_descriptions_review_reasons_check",
+          "value": "\"media_descriptions\".\"review_reasons\" <@ array['back_reference', 'not_alone', 'unsure', 'flagged']::text[]"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.media_sends": {

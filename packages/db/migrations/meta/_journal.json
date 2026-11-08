@@ -852,7 +852,14 @@
     {
       "idx": 121,
       "version": "7",
-      "when": 1794158583947,
+      "when": 1794157443733,
+      "tag": "0141_media_drop_descriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1794160090262,
       "tag": "0143_copilot_live_calibration",
       "breakpoints": true
     }

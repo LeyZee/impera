@@ -1,4 +1,10 @@
-import type { LlmPurpose, MediaDescription, Result, TrendCaptureDescription } from '@impera/contracts';
+import type {
+  DropMediaDescription,
+  LlmPurpose,
+  MediaDescription,
+  Result,
+  TrendCaptureDescription,
+} from '@impera/contracts';
 import type { TranscriptionModel } from 'ai';
 
 import type { BudgetEvent } from './budget';
@@ -42,7 +48,8 @@ export type SenseMedia =
       readonly durationS: number;
       /** The file, read natively (picture and sound) by a model that takes video, such as Gemini. */
       readonly mediaType: string;
-      readonly data: Uint8Array;
+      /** `null` when it is too heavy to be sent whole: only its keyframes are read (ADR 0083, a drop up to 10 Gio). */
+      readonly data: Uint8Array | null;
       /**
        * Dated keyframes and transcript, for a model that reads images only (Grok). Called only when the call
        * falls back to such a model, at most once: a fan's video costs ffmpeg and speech to text only then.
@@ -75,6 +82,32 @@ export interface SenseInput {
   readonly origin: 'fan' | 'creator';
   readonly media: SenseMedia;
   readonly trace?: CallTrace;
+}
+
+/**
+ * A photo or a video she dropped (ADR 0083): described alone, in detail, with what the code knows of its drop. Never
+ * any other media of the drop, nor their descriptions: a description that cannot see them cannot point to them.
+ */
+export interface DropSenseInput {
+  readonly media: Exclude<SenseMedia, { readonly kind: 'audio' }>;
+  readonly context: DropContext;
+  readonly trace?: CallTrace;
+}
+
+/** What the code knows of a drop, given to the model as data. */
+export interface DropContext {
+  /** Her category, as her screen names it (« Feed · Séance boudoir », « Script »). */
+  readonly category: string;
+  /** For a script: its step and the media's place in it. */
+  readonly step: {
+    readonly number: number;
+    readonly name: string;
+    /** The step's instruction on its card, as the agency wrote it; `null` when it has none. */
+    readonly instruction: string | null;
+    /** 1 for the step's first media. */
+    readonly position: number;
+    readonly count: number;
+  } | null;
 }
 
 export interface ConversationInput {
@@ -181,6 +214,8 @@ export interface ConnectionTest {
 
 export interface LlmGateway {
   sense(input: SenseInput): Promise<Result<LlmSuccess<MediaDescription>, LlmFailure>>;
+  /** A media she dropped, described in detail (ADR 0083, prompt `sense/creator-drop`), under the daily cap. */
+  describeDrop(input: DropSenseInput): Promise<Result<LlmSuccess<DropMediaDescription>, LlmFailure>>;
   brain(input: BrainInput): Promise<Result<LlmSuccess<Brief>, LlmFailure>>;
   voice(input: VoiceInput): Promise<Result<LlmSuccess<VoiceOutput>, LlmFailure>>;
   /** Scores a reply against the rubric criteria (`pnpm evals`). */
@@ -219,6 +254,7 @@ export interface LlmGatewayDeps {
     readonly sense: PromptTemplate;
     readonly judge?: PromptTemplate;
     readonly trendCaptures?: PromptTemplate;
+    readonly creatorDrop?: PromptTemplate;
     readonly channelPost?: PromptTemplate;
   };
   /** Secret written in every system prompt: an output that contains it has leaked the prompt. */

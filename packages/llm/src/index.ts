@@ -48,6 +48,8 @@ export {
   type ConnectionTest,
   type ConversationInput,
   type ConversationTurn,
+  type DropContext,
+  type DropSenseInput,
   type LlmFailure,
   type LlmGateway,
   type CallTrace,

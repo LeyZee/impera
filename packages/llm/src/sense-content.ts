@@ -2,7 +2,7 @@ import type { TextPart, UserContent } from 'ai';
 
 import { acceptsInput } from './catalog';
 import type { ModelRef } from './config';
-import type { SenseInput, VideoKeyframes } from './gateway-types';
+import type { DropContext, DropSenseInput, SenseInput, VideoKeyframes } from './gateway-types';
 import { wrapUntrusted } from './untrusted';
 
 const INLINE_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
@@ -37,7 +37,11 @@ export async function senseContent(
       ];
     case 'video': {
       const intro = `${origin} Vidéo de ${String(Math.round(media.durationS))} s`;
-      if (acceptsInput(ref, 'video') && media.data.byteLength <= INLINE_VIDEO_MAX_BYTES) {
+      if (
+        acceptsInput(ref, 'video') &&
+        media.data !== null &&
+        media.data.byteLength <= INLINE_VIDEO_MAX_BYTES
+      ) {
         return [
           { type: 'text', text: `${intro}, avec son.` },
           { type: 'file', data: media.data, mediaType: media.mediaType },
@@ -56,4 +60,35 @@ export async function senseContent(
       ];
     }
   }
+}
+
+/** The drop's context in words, built by the code from typed fields, then wrapped as data like anything it quotes. */
+function contextText(context: DropContext): string {
+  const lines = [`Catégorie : ${context.category}.`];
+  const { step } = context;
+  if (step !== null) {
+    lines.push(
+      `Étape ${String(step.number)} du script : ${step.name}.`,
+      `Média ${String(step.position)} sur ${String(step.count)} de cette étape.`,
+    );
+    if (step.instruction !== null) lines.push(`Consigne de l'étape : ${step.instruction}`);
+  }
+  return wrapUntrusted('drop_context', lines.join('\n'));
+}
+
+/**
+ * The user message of a `describeDrop` call (ADR 0083): the drop's context, then the media alone, as `sense` reads one
+ * of her catalogue. Undefined when this model cannot read it.
+ */
+export async function dropSenseContent(
+  input: DropSenseInput,
+  ref: ModelRef,
+  keyframes: () => Promise<VideoKeyframes>,
+): Promise<UserContent | undefined> {
+  const media = await senseContent({ origin: 'creator', media: input.media }, ref, keyframes);
+  if (media === undefined) return undefined;
+  return [
+    { type: 'text', text: contextText(input.context) },
+    ...(typeof media === 'string' ? [{ type: 'text' as const, text: media }] : media),
+  ];
 }

@@ -32,6 +32,11 @@ export const CreatorSettingsSchema = z.object({
       fanMediaDays: z.number().int().min(1).max(365).default(30),
     })
     .prefault({}),
+  /**
+   * Whether each photo and video she drops is described by the vision AI on arrival (ADR 0083 § 9): off until the
+   * agency has checked the vision model on a few of her real media; her drops wait undescribed meanwhile.
+   */
+  describeDrops: z.boolean().default(false),
   /** Her two switches of the extension's copilot panel (ADR 0086 § 6): the fan's card on, the agent's drafts off. */
   copilot: z.object({ fanCard: z.boolean().default(true), drafts: z.boolean().default(false) }).prefault({}),
 });
