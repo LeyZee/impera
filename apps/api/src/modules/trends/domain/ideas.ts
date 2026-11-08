@@ -110,8 +110,7 @@ function limitTerms(limits: PersonaLimits): readonly string[] {
 }
 
 /** The fields of an idea or of a shoot suggested by hand that the guards read, each on its own to name the one at fault. */
-export type GuardedField =
-  'title' | 'toShoot' | 'reason' | 'purpose' | 'hook' | 'onScreen' | 'shots' | 'ending';
+type GuardedField = 'title' | 'toShoot' | 'reason' | 'purpose' | 'hook' | 'onScreen' | 'shots' | 'ending';
 
 export interface GuardedText {
   readonly field: GuardedField;

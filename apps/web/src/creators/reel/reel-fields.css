@@ -92,7 +92,7 @@
 }
 .rb-shot {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--nv-space-2);
   animation: rb-in var(--nv-dur-base) var(--nv-ease-spring-smooth) both;
 }
@@ -108,26 +108,42 @@
   font-weight: 600;
   color: var(--nv-ink-muted);
 }
-.rb-shot__input {
+/* Grows to a second line rather than cutting a word; no handle, no scroll bar. */
+.rb-shot__input.nv-field__control {
   flex: 1 1 auto;
   min-width: 0;
+  display: block;
+  min-height: var(--nv-target-min);
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+}
+/* Beside the first line of a shot that wraps. */
+.rb-shot__n {
+  margin-top: calc((var(--nv-target-min) - 22px) / 2);
+}
+.rb-shot__tools {
+  margin-top: calc((var(--nv-target-min) - 30px) / 2);
 }
 .rb-shot__tools {
   flex: none;
   display: flex;
   gap: 2px;
 }
+/* Quiet tools: no neon nor its glow, the neon stays on the dialog's action. */
 .nv-iconbtn.rb-shot__btn {
   width: 30px;
   height: 30px;
   color: var(--nv-ink-muted);
   background: transparent;
+  box-shadow: none;
 }
 .nv-iconbtn.rb-shot__btn:hover:not(:disabled) {
   color: var(--nv-ink);
   background: color-mix(in srgb, var(--nv-ink) 8%, transparent);
 }
 .nv-iconbtn.rb-shot__btn:disabled {
+  background: transparent;
   opacity: 0.35;
   cursor: default;
 }

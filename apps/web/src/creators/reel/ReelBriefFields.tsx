@@ -1,5 +1,5 @@
 import { REEL_HOOK_WORDS_MAX, REEL_LINE_MAX, REEL_ON_SCREEN_WORDS_MAX } from '@impera/contracts';
-import { useId, type JSX, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, type JSX, type ReactNode } from 'react';
 
 import { SecondsSlider } from './SecondsSlider';
 import {
@@ -22,6 +22,51 @@ import './reel-fields.css';
 import { ReelBrief } from '@/screens/agenda/ReelBrief';
 import '@/screens/agenda/agenda.css';
 import '@/screens/team/team.css';
+
+/** Whether the browser grows a text field with its text by itself (Chromium, Edge, Safari 18+). */
+const SIZED_BY_CONTENT = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
+
+/**
+ * A shot: one line said in a sentence, that wraps on a phone rather than being cut. Enter adds no line; a pasted line
+ * break becomes a space.
+ */
+function ShotArea({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (text: string) => void;
+}): JSX.Element {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const area = ref.current;
+    if (area === null || SIZED_BY_CONTENT) return;
+    area.style.height = '';
+    if (area.scrollHeight > 0) area.style.height = `${String(area.scrollHeight + 2)}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      className="nv-field__control nv-glass rb-shot__input"
+      aria-label={label}
+      rows={1}
+      value={value}
+      maxLength={REEL_LINE_MAX}
+      autoComplete="off"
+      placeholder={placeholder}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.preventDefault();
+      }}
+      onChange={(event) => {
+        onChange(event.target.value.replace(/\s*[\r\n]+\s*/gu, ' '));
+      }}
+    />
+  );
+}
 
 /** A field of words with its counter: amber once full, and the field takes no word more. */
 function WordsField({
@@ -168,15 +213,12 @@ export function ReelBriefFields({
                   <span className="rb-shot__n nv-num" aria-hidden="true">
                     {index + 1}
                   </span>
-                  <input
-                    className="nv-field__control nv-glass rb-shot__input"
-                    aria-label={`Plan ${String(index + 1)}`}
+                  <ShotArea
+                    label={`Plan ${String(index + 1)}`}
                     value={shot.text}
-                    maxLength={REEL_LINE_MAX}
-                    autoComplete="off"
                     placeholder={index === 0 ? 'Le premier plan, une ligne' : 'Puis…'}
-                    onChange={(event) => {
-                      onChange(setShot(draft, shot.key, event.target.value));
+                    onChange={(text) => {
+                      onChange(setShot(draft, shot.key, text));
                     }}
                   />
                   <span className="rb-shot__tools">

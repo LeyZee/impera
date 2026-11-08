@@ -12,7 +12,7 @@ import { createReminderSource } from './infra/db/reminder-source';
 import { createDrizzleSuggestionStore } from './infra/db/suggestion-store';
 import { createCreatorTaskRoutes, type RequireRole } from './infra/http/routes';
 
-export type { GuardedShoot, ShootGuard, ShootGuardFault, ShootSuggestion } from './domain/ports';
+export type { GuardedShoot, ShootGuardFault, ShootSuggestion } from './domain/ports';
 
 export interface CreatorTasksModule {
   readonly name: 'creator-tasks';
