@@ -1,5 +1,6 @@
 import type {
   ContentDrop,
+  DropDescriptionsReview,
   ContentDropFileId,
   ShotMoment,
   ContentRequest,
@@ -513,4 +514,40 @@ export interface DescribeSwitch {
    * while it was off). `null` for a creator that does not exist.
    */
   set(creatorId: string, on: boolean, userId: string): Promise<boolean | null>;
+}
+
+/**
+ * The agency's review of a drop's descriptions and of a script's synthesis (ADR 0030 § 3, ADR 0083 § 7), as the owner
+ * or an active manager (`withTenantMember`; a chatter is refused). Every write is stamped with the account that makes
+ * it and audited; each answers the drop's review as it now stands.
+ */
+export interface DescriptionReview {
+  read(creatorId: string, userId: string, dropId: string): Promise<DropDescriptionsReview>;
+  /** These rows validated as they are; a row already validated stays as it was. */
+  validate(
+    creatorId: string,
+    userId: string,
+    dropId: string,
+    descriptionIds: readonly string[],
+    now: Date,
+    correlationId: string,
+  ): Promise<DropDescriptionsReview>;
+  /** A new row from this one, its `detailed` rewritten, validated by whoever writes it; the script told again. */
+  correct(
+    creatorId: string,
+    userId: string,
+    dropId: string,
+    descriptionId: string,
+    detailed: string,
+    now: Date,
+    correlationId: string,
+  ): Promise<DropDescriptionsReview>;
+  /** The script's current synthesis validated as it is. */
+  validateSummary(
+    creatorId: string,
+    userId: string,
+    dropId: string,
+    summaryId: string,
+    now: Date,
+  ): Promise<DropDescriptionsReview>;
 }

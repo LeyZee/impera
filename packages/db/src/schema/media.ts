@@ -14,6 +14,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { user } from './auth';
 import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { conversations, messages } from './conversations';
 import { fans } from './fans';
@@ -92,10 +93,17 @@ export const mediaDescriptions = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    /**
+     * Who validated this very row (ADR 0030 § 3, amended 08/11/2026): the account of the owner, an active manager or
+     * her, never a free text. Set once with `validated_at`, the only change a row takes (`media_descriptions_kept`).
+     */
+    validatedBy: text('validated_by').references(() => user.id),
+    validatedAt: timestampTz('validated_at'),
     createdAt: createdAt(),
   },
   (t) => [
     index('media_descriptions_asset_idx').on(t.mediaAssetId),
+    check('media_descriptions_validated_check', sql`(${t.validatedBy} is null) = (${t.validatedAt} is null)`),
     enumCheck('media_descriptions', t.author, DESCRIPTION_AUTHORS),
     check(
       'media_descriptions_review_reasons_check',

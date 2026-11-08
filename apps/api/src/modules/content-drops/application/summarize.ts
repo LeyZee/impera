@@ -1,6 +1,4 @@
-import { createHash } from 'node:crypto';
-
-import { mentionsPrice, orderedSummary, scriptStepsOf } from '../domain/describe';
+import { mediaHashOf, mentionsPrice, orderedSummary, scriptStepsOf } from '../domain/describe';
 import { ScriptSummaryFailed } from '../domain/errors';
 import type {
   DropDescriber,
@@ -22,23 +20,6 @@ export interface SummarizeDeps {
 const BUDGET_DELAY_MS = 60 * 60_000;
 
 export type SummarizeOutcome = 'summarized' | 'already' | 'off' | 'waiting' | 'gone' | 'later';
-
-/**
- * Its slots, their media and the description each is told with, in the order of the slot keys: the same files with the
- * same descriptions, the same hash; a slot changed or a description corrected (a new row), another.
- */
-function mediaHashOf(
-  files: readonly { readonly slotKey: string; readonly mediaAssetId: string }[],
-  descriptions: ReadonlyMap<string, { readonly descriptionId: string }>,
-): string {
-  const lines = files
-    .map(
-      (file) =>
-        `${file.slotKey}=${file.mediaAssetId}=${descriptions.get(file.mediaAssetId)?.descriptionId ?? ''}`,
-    )
-    .sort();
-  return createHash('sha256').update(lines.join('\n')).digest('hex');
-}
 
 const withMedium = (
   file: ScriptToSummarize['files'][number],

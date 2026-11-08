@@ -394,9 +394,16 @@ export const scriptDropSummaries = pgTable(
       .default(sql`'{}'::text[]`),
     model: text('model').notNull(),
     promptHash: text('prompt_hash').notNull(),
+    /** Who validated it (ADR 0030 § 3): an account, set once with `validated_at` (`script_drop_summaries_kept`). */
+    validatedBy: text('validated_by').references(() => user.id),
+    validatedAt: timestampTz('validated_at'),
     createdAt: createdAt(),
   },
   (t) => [
+    check(
+      'script_drop_summaries_validated_check',
+      sql`(${t.validatedBy} is null) = (${t.validatedAt} is null)`,
+    ),
     check(
       'script_drop_summaries_review_reasons_check',
       sql`${t.reviewReasons} <@ array[${sql.raw(SCRIPT_SUMMARY_REVIEW_REASONS.map((r) => `'${r}'`).join(', '))}]::text[]`,
@@ -411,5 +418,11 @@ export const scriptDropSummaries = pgTable(
     uniqueIndex('script_drop_summaries_unique').on(t.dropId, t.mediaHash, t.promptHash),
     index('script_drop_summaries_creator_idx').on(t.creatorId),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
+    // Her team validates a synthesis; only the two columns of the stamp are granted (migration 0152).
+    pgPolicy('team_validate', {
+      for: 'update',
+      using: ofHerTeam(t.creatorId),
+      withCheck: ofHerTeam(t.creatorId),
+    }),
   ],
 );
