@@ -44,7 +44,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Main rendue automatiquement | `conversation.release_unavailable` | Un membre qui n'est plus « actif » (en congé, malade, en déplacement, suspendu, parti) ne lit plus aucune conversation, et ce qu'il tenait est rendu par le système dans la minute, avec son statut pour raison (EQ-13). |
 | Mode copilote | `copilot` | Le bot propose, un humain approuve. |
 | Mode auto | `auto` | Le bot envoie seul pour les catégories autorisées. |
-| Fait (mémoire) | `fan_fact` | Une information mémorisée sur un fan, avec source, date, confiance, `kind: declared | inferred`. |
+| Fait (mémoire) | `fan_fact` | Une information mémorisée sur un fan, avec source, date, confiance, `kind: declared | inferred | noted` (`noted` : écrit par un chatteur sur la fiche du fan, avec son auteur, ADR 0085). |
+| À vérifier (fiche du fan) | `toCheck` | Ce que l'IA a lu après la note d'un chatteur et qui la contredit : gardé sous la case, jamais lu par l'agent, jusqu'à ce qu'un chatteur garde l'une ou l'autre valeur (ADR 0085 § 6). |
 | Qui sont tes fans | `fanInsights`, `GET /v1/creator-space/fan-insights` | Le panneau de la créatrice en tête de Ventes : des parts sur l'ensemble de ses fans, jamais un nombre par case ni un fan seul, tirées de leurs faits déclarés, arrêtées à minuit, et une case ne s'affiche qu'au-delà du seuil (ADR 0065, ADR 0074). |
 | Famille de métiers | `jobFamily` | La case dans laquelle se range un métier dit par un fan, par des mots-clés écrits dans le code (Santé et soin, Étudiant…) ; ce qui ne se reconnaît pas va dans « Autres » (ADR 0074 § 5). |
 | Note du chatteur | `operator_note` | Ce qu'un chatteur veut qu'elle retienne d'un fan, laissé en rendant la main ; gardé comme un fait de cette catégorie, jamais proposé par un modèle. |

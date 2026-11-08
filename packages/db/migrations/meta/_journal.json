@@ -848,6 +848,13 @@
       "when": 1794062529423,
       "tag": "0138_daily_platform_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1794157612867,
+      "tag": "0142_fan_card_noted",
+      "breakpoints": true
     }
   ]
 }

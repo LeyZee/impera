@@ -8,6 +8,7 @@ import { createDrizzleFactPurge } from './infra/fact-purge';
 import { createDrizzleFactStore } from './infra/fact-store';
 import { createDrizzleFanStore } from './infra/fan-store';
 import { createDrizzleFlagStore } from './infra/flag-store';
+import { createCardRoutes } from './infra/http/card-routes';
 import {
   createFlagRoutes,
   createKycRoutes,
@@ -28,7 +29,7 @@ export interface FansModule extends FansService {
   };
   /**
    * Mounted under `/v1` by the server: `/fans/:id/flags`, read by the dashboard and set by a chatter, and
-   * `/fans/:id/kyc`, what is left to learn among `kycSlotsOf` (her active persona's canvas lines, read at each
+   * `/fans/:id/card`, his card read and corrected (ADR 0085), and `/fans/:id/kyc`, what is left to learn among `kycSlotsOf` (her active persona's canvas lines, read at each
    * request; all of them when she has none, or without it). `fanAccess` (the `conversations` module) lets a member
    * whose scope is `self` read, never write, the sheet of a fan of a creator his window opens or of a conversation he
    * holds, each read in the audit log (ADR 0025).
@@ -60,6 +61,7 @@ export function createFansModule(deps: FansDeps): FansModule {
       (requireRole, kycSlotsOf = () => Promise.resolve(null), fanAccess = noFanAccess) =>
       async (app) => {
         await app.register(createFlagRoutes(service, requireRole, undefined, fanAccess));
+        await app.register(createCardRoutes(service, requireRole, fanAccess));
         await app.register(
           createKycRoutes(
             service,

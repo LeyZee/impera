@@ -626,7 +626,7 @@ export interface ConversationReader {
   traceFanOpening(
     creatorId: CreatorId,
     fanId: FanId,
-    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' },
+    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' | 'card' },
   ): Promise<void>;
   /** As the reader `userId` sees it: whether he holds it is his own. */
   get(creatorId: CreatorId, id: ConversationId, userId: UserId): Promise<ConversationDetail | null>;

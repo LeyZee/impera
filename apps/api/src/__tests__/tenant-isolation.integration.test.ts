@@ -39,6 +39,7 @@ const bodiesFor = (
 ): Readonly<Record<string, Record<string, unknown>>> => ({
   'POST /v1/conversations/:id/mode': { mode: 'auto' },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
+  'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
   'PATCH /v1/scheduling/shift-reports/:shiftReportId': { version: 1, amountMinor: 1 },
   'POST /v1/scheduling/shift-reports/:shiftReportId/reject': { version: 1, note: 'Note inventée' },
   'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },
@@ -139,6 +140,7 @@ const NOT_TENANT: Readonly<Record<string, string>> = {
   textId: 'a contract text, agency-wide',
   sha256: 'a logo of the agency',
   file: 'a calendar feed token, read without a session',
+  field: 'a field of the fan’s card, a closed code (ADR 0085)',
 };
 
 /**
@@ -217,6 +219,7 @@ function seededFor(path: string, name: string): Seeded | undefined {
 function filler(name: string): string {
   if (name === 'day') return '2026-11-06';
   if (name === 'slotKey' || name === 'segmentKey') return 'a';
+  if (name === 'field') return 'first_name';
   return '00000000-0000-4000-8000-000000000000';
 }
 

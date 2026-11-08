@@ -3,6 +3,7 @@ import {
   newId,
   type CreatorId,
   type ClearableFanFlagName,
+  type FanCardField,
   type FanFlags,
   type FanId,
   type KycSlot,
@@ -10,6 +11,8 @@ import {
   type UserId,
 } from '@impera/contracts';
 
+import { cardOf, planCardEdit, type Card, type CardEdit } from '../domain/card';
+import { FanNotFound } from '../domain/errors';
 import {
   kycSlotsToLearn,
   planFacts,
@@ -58,6 +61,19 @@ export interface FansService {
   activeFacts(creatorId: CreatorId, fanId: FanId): Promise<StoredFact[]>;
   /** The lines of `slots` none of his active facts fills, read on all of them, not the 40 of the context (P5-01). */
   kycToLearn(creatorId: CreatorId, fanId: FanId, slots: readonly KycSlot[]): Promise<KycSlot[]>;
+  /** His card (ADR 0085 § 3): each field, its value and what waits « à vérifier », then « Autres ». 404 unknown. */
+  card(creatorId: CreatorId, fanId: FanId): Promise<Card>;
+  /**
+   * A chatter writes or clears a field of his card (§ 6), in one gesture, and gets the card back. The value is checked
+   * against the field and against what the card never keeps (§ 8) before anything is written.
+   */
+  editCard(
+    creatorId: CreatorId,
+    fanId: FanId,
+    field: FanCardField,
+    edit: CardEdit,
+    author: UserId,
+  ): Promise<Card>;
   /** His limits (`fans.flags`), read by the policy before any offer. */
   flags(creatorId: CreatorId, fanId: FanId): Promise<FanFlags>;
   /**
@@ -114,7 +130,21 @@ export function createFansService(
     upsertFanByPlatformId: (sighting) => store.upsert(sighting, newId(FanIdSchema)),
     getFan: (creatorId, id) => store.get(creatorId, id),
     proposeFacts: (creatorId, fanId, proposals) =>
-      facts.write(creatorId, fanId, (current) => planFacts(current, proposals, now())),
+      facts.write(creatorId, fanId, (current, pending) => planFacts(current, proposals, now(), pending)),
+    card: async (creatorId, fanId) => {
+      if ((await store.get(creatorId, fanId)) === null) throw new FanNotFound();
+      const { active, pending } = await facts.card(creatorId, fanId);
+      return cardOf(active, pending, now());
+    },
+    editCard: async (creatorId, fanId, field, edit, author) => {
+      const at = now();
+      // Planned under the fan's lock (404 unknown); a refused value throws there and nothing is written.
+      await facts.write(creatorId, fanId, (current, pending) =>
+        planCardEdit(field, edit, current, pending, author, at),
+      );
+      const { active, pending } = await facts.card(creatorId, fanId);
+      return cardOf(active, pending, at);
+    },
     activeFacts: async (creatorId, fanId) => selectActiveFacts(await facts.current(creatorId, fanId), now()),
     kycToLearn: async (creatorId, fanId, slots) =>
       kycSlotsToLearn(slots, await facts.current(creatorId, fanId), now()),

@@ -61,7 +61,7 @@ export interface ConversationsModule extends ConversationCommands {
   traceFanOpening(
     creatorId: CreatorId,
     fanId: FanId,
-    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' },
+    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' | 'card' },
   ): Promise<void>;
   /** Handlers of the module's jobs; the composition root registers them with Graphile Worker. */
   readonly jobs: {

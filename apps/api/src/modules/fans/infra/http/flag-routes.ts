@@ -50,9 +50,12 @@ export interface FanAccess {
   traceOpening(
     creatorId: CreatorId,
     fanId: FanId,
-    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' },
+    trace: { readonly userId: UserId; readonly ip: string; readonly via: FanSheetVia },
   ): Promise<void>;
 }
+
+/** What a chatter opened of a fan's sheet, as the audit log says it: his limits, what is left to learn, his card. */
+export type FanSheetVia = 'flags' | 'kyc' | 'card';
 
 /** Without the `conversations` module: nothing is held, only the whole creator reads a fan, nothing to trace. */
 export const noFanAccess: FanAccess = {
@@ -67,12 +70,12 @@ export const noFanAccess: FanAccess = {
  * Limites du fan (en lecture) », recette 05/11 CHAT-03). A chatter's read is in the audit log before anything is read
  * (ADR 0025). Never a write.
  */
-async function readerFor(
+export async function readerFor(
   request: FastifyRequest,
   creatorId: CreatorId,
   fanId: FanId,
   access: FanAccess,
-  via: 'flags' | 'kyc',
+  via: FanSheetVia,
 ): Promise<UserId> {
   const { user } = request;
   if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
