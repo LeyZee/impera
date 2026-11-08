@@ -1,6 +1,7 @@
 import {
   BriefIntentSchema,
   DESIRE_BRAIN_SIGNALS,
+  DropMediaDescriptionSchema,
   MediaDescriptionSchema,
   TrendCaptureDescriptionSchema,
 } from '@impera/contracts';
@@ -67,6 +68,13 @@ export type VoiceOutput = z.infer<typeof VoiceOutputSchema>;
 
 /** What the sense model writes; the gateway adds the version, the kind and the duration it already knows. */
 export const SenseOutputSchema = MediaDescriptionSchema.omit({
+  vocabularyVersion: true,
+  kind: true,
+  durationS: true,
+});
+
+/** A drop's media described in detail (ADR 0083): the senses' output and `detailed`. */
+export const DropSenseOutputSchema = DropMediaDescriptionSchema.omit({
   vocabularyVersion: true,
   kind: true,
   durationS: true,

@@ -180,6 +180,8 @@ export interface AppOptions {
   readonly composer?: DraftComposer;
   /** Tests plug a vision with a fixed description here, for a marked post's captures; the app's gateway otherwise. */
   readonly trendVision?: Pick<LlmGateway, 'describeTrendCaptures'>;
+  /** Tests plug a vision with a fixed description here, for her dropped media (ADR 0083); the app's gateway otherwise. */
+  readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
   readonly withPlayground?: boolean;
   /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
@@ -336,6 +338,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         scripts.module.frozenFolderCard(versionId, segmentKey, variant, moment),
       freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
     },
+    vision: options.dropVision ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
   });
   const scripts = wireScripts(shared, {

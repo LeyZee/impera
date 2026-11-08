@@ -11,7 +11,9 @@ export type UntrustedKind =
   | 'brief'
   | 'candidate_reply'
   /** A phrase of one of her alerts (P4-01): written by the agency, still read as a criterion, never as an order. */
-  | 'creator_alert';
+  | 'creator_alert'
+  /** What the code knows of a drop she made (ADR 0083): a step's name and instruction are written by the agency. */
+  | 'drop_context';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.

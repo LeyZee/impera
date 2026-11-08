@@ -1,16 +1,30 @@
-import { CurrencySchema } from '@impera/contracts';
+import { CurrencySchema, DESCRIPTION_REVIEW_REASONS } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
-import { bigint, char, check, index, integer, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  char,
+  check,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { conversations, messages } from './conversations';
 import { fans } from './fans';
+import { teamMembers } from './team';
 import { creators } from './tenancy';
 
 /** Module `media`: files (the bytes live in object storage), their descriptions, and what was sold to whom. */
 
 export const MEDIA_KINDS = ['image', 'video', 'audio'] as const;
 export const MEDIA_ORIGINS = ['creator', 'fan'] as const;
+export const DESCRIPTION_AUTHORS = ['sense', 'human'] as const;
 
 export const mediaAssets = pgTable(
   'media_assets',
@@ -64,10 +78,38 @@ export const mediaDescriptions = pgTable(
     content: jsonb('content').notNull(),
     model: text('model').notNull(),
     promptHash: text('prompt_hash').notNull(),
+    /**
+     * Who wrote it (ADR 0030 § 3): `sense`, the vision AI; `human`, a correction by the agency or her, as a new row
+     * (the table is append-only).
+     */
+    author: enumText('author').notNull().default('sense'),
+    /** The member of the agency who validated this very row, and when (ADR 0030 § 3); both or neither. */
+    validatedBy: uuid('validated_by').references(() => teamMembers.id),
+    validatedAt: timestampTz('validated_at'),
+    /** Her own word on the media (P6-01), free text. */
+    creatorNote: text('creator_note'),
+    /**
+     * Why it waits for a human before any use (ADR 0083 § 3 to 5, `DESCRIPTION_REVIEW_REASONS`): read by the code
+     * on the model's answer; empty when nothing holds it back. It is still validated before use (§ 7).
+     */
+    reviewReasons: text('review_reasons')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     createdAt: createdAt(),
   },
   (t) => [
     index('media_descriptions_asset_idx').on(t.mediaAssetId),
+    enumCheck('media_descriptions', t.author, DESCRIPTION_AUTHORS),
+    check(
+      'media_descriptions_review_reasons_check',
+      sql`${t.reviewReasons} <@ array[${sql.raw(DESCRIPTION_REVIEW_REASONS.map((r) => `'${r}'`).join(', '))}]::text[]`,
+    ),
+    check('media_descriptions_validated_check', sql`(${t.validatedBy} is null) = (${t.validatedAt} is null)`),
+    // The vision AI describes a media once per describer (ADR 0083 § 1): a replayed job writes nothing twice.
+    uniqueIndex('media_descriptions_sense_unique')
+      .on(t.mediaAssetId, t.promptHash)
+      .where(sql`${t.author} = 'sense'`),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
   ],

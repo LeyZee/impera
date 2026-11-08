@@ -15,11 +15,12 @@ import { loadPrompt, renderPrompt } from './prompts';
 import {
   BriefSchema,
   JudgeOutputSchema,
+  DropSenseOutputSchema,
   SenseOutputSchema,
   TrendCapturesOutputSchema,
   VoiceOutputSchema,
 } from './schemas';
-import { senseContent } from './sense-content';
+import { dropSenseContent, senseContent } from './sense-content';
 import { wrapUntrusted } from './untrusted';
 
 export type * from './gateway-types';
@@ -33,6 +34,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   };
   const judgePrompt = prompts.judge ?? loadPrompt('judge');
   const trendCapturesPrompt = prompts.trendCaptures ?? loadPrompt('sense', 'trend-captures');
+  const creatorDropPrompt = prompts.creatorDrop ?? loadPrompt('sense', 'creator-drop');
   const canary = deps.canary ?? `nv-${randomBytes(6).toString('hex')}`;
 
   const reportRefusal = (provider: ProviderId, status: 401 | 403): void => {
@@ -114,6 +116,38 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
           return content === undefined ? undefined : [{ role: 'user', content }];
         },
         SenseOutputSchema,
+        input.trace,
+      );
+      if (!result.ok) return result;
+      const { media } = input;
+      return ok({
+        ...result.value,
+        output: {
+          ...result.value.output,
+          vocabularyVersion: MEDIA_VOCABULARY_VERSION,
+          kind: media.kind,
+          durationS: media.kind === 'image' ? null : media.durationS,
+        },
+      });
+    },
+
+    async describeDrop(input) {
+      const system = renderPrompt(creatorDropPrompt, { canary });
+      let pending: Promise<VideoKeyframes> | undefined;
+      const keyframes = (): Promise<VideoKeyframes> => {
+        if (input.media.kind !== 'video') return Promise.resolve({ frames: [] });
+        pending ??= input.media.keyframes();
+        return pending;
+      };
+      const result = await run(
+        'sense',
+        creatorDropPrompt,
+        system,
+        async (ref) => {
+          const content = await dropSenseContent(input, ref, keyframes);
+          return content === undefined ? undefined : [{ role: 'user', content }];
+        },
+        DropSenseOutputSchema,
         input.trace,
       );
       if (!result.ok) return result;

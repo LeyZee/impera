@@ -20,6 +20,7 @@ import type {
   StartScriptDropBody,
 } from '@impera/contracts';
 
+import type { DropMediaContext } from './describe';
 import type { ExportedFile } from './script-export';
 import type { FileFamily } from './sniff';
 import type { StoredPart } from './upload';
@@ -365,4 +366,48 @@ export interface FileCleaner {
    */
   needsConversion(raw: string, family: FileFamily, mime: DropMime): Promise<boolean>;
   clean(raw: string, out: string, family: FileFamily, mime: DropMime): Promise<CleanedFile>;
+}
+
+/**
+ * A media of her library to describe (ADR 0083 § 1): the medium, and the first live file of a drop that kept it,
+ * which gives the context. `null` from the store when no live drop holds it any more (refused, withdrawn, replaced).
+ */
+export interface MediaToDescribe {
+  readonly creatorId: string;
+  readonly kind: 'image' | 'video' | 'audio';
+  readonly mime: string;
+  readonly bytes: number;
+  readonly storageKey: string;
+  /** Its original left the storage (CR-06 c): nothing to read. */
+  readonly erased: boolean;
+  /** Her switch (`CreatorSettings.describeDrops`, ADR 0083 § 9): off, her drops wait undescribed. */
+  readonly describes: boolean;
+  readonly category: DropCategory;
+  /** For a script's slot: its key and the frozen version she shot. */
+  readonly script: { readonly slotKey: string; readonly versionId: string } | null;
+}
+
+/** `content_drops.describe_file`'s reads and its next run, as the owner role. */
+export interface DescriptionQueue {
+  target(mediaAssetId: string): Promise<MediaToDescribe | null>;
+  /** The job again at `runAt` (budget spent, disk short), keyed by the medium: a new job, never twice. */
+  later(creatorId: string, mediaAssetId: string, correlationId: string, runAt: Date): Promise<void>;
+}
+
+/** The media module's description of a dropped media, seen from here (ADR 0083). */
+export interface DropDescriber {
+  described(mediaAssetId: string): Promise<boolean>;
+  /**
+   * Described and kept, or why not: `budget`, the day's cap spent, asked again later; `failed`, every model failed;
+   * `unreadable`, the file did not open.
+   */
+  describe(file: {
+    readonly creatorId: string;
+    readonly mediaAssetId: string;
+    readonly path: string;
+    readonly mime: string;
+    readonly kind: 'image' | 'video';
+    readonly bytes: number;
+    readonly context: DropMediaContext;
+  }): Promise<'described' | 'budget' | 'failed' | 'unreadable'>;
 }
