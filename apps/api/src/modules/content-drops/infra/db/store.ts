@@ -71,6 +71,8 @@ import type {
 import { keptUntil } from '../../domain/retention';
 import { shotMoment } from '../../domain/shot-moment';
 
+import { enqueueDescription } from './description-queue';
+
 const { auditLog, contentDropFiles, contentDrops, contentRequests } = schema;
 
 type DropRow = typeof contentDrops.$inferSelect;
@@ -925,6 +927,13 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
                 ...(revived ? { erasedAt: null, storageKey: media.storageKey } : {}),
               })
               .where(eq(schema.mediaAssets.id, known.id));
+          // A new medium of hers is described once (ADR 0083 § 1); a voice note has its transcription elsewhere.
+          if (inserted.length > 0 && media.kind !== 'audio')
+            await enqueueDescription(
+              tx,
+              { creatorId: drop.creatorId, mediaAssetId: known.id, correlationId },
+              null,
+            );
           await tx
             .update(contentDropFiles)
             .set({

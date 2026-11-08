@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 
 import { z } from 'zod';
 
+import type { FileMediaTools } from '../application/describe-drop';
 import type { ExtractedFrame, MediaTools } from '../application/describe-media';
 
 const execFileAsync = promisify(execFile);
@@ -146,11 +147,23 @@ async function inTempDir<T>(input: Uint8Array, use: (dir: string, path: string) 
   }
 }
 
-/** ffmpeg and ffprobe come with the Docker image (operations.md); files never leave a private temp folder. */
-export function createFfmpegMediaTools(
+async function inEmptyDir<T>(use: (dir: string) => Promise<T>): Promise<T> {
+  const dir = await mkdtemp(join(tmpdir(), 'impera-media-'));
+  try {
+    return await use(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * The same work on a file already on disk (ADR 0083): a dropped video, up to 10 Gio, is never read into memory. Its
+ * outputs (frames, sound, a JPEG) go to a private temp folder of their own.
+ */
+export function createFfmpegFileTools(
   binaries = BINARIES,
   timeouts: Readonly<Record<keyof typeof TIMEOUTS_MS, number>> = TIMEOUTS_MS,
-): MediaTools {
+): FileMediaTools {
   const ffmpeg = (args: readonly string[], timeout: number) =>
     run(binaries.ffmpeg, ['-v', 'error', '-y', ...INPUT_LIMITS, ...args], {
       maxBuffer: FFMPEG_BUFFER,
@@ -158,32 +171,31 @@ export function createFfmpegMediaTools(
     });
 
   return {
-    probe: (video) =>
-      inTempDir(video, async (_, path) => {
-        const { stdout } = await run(
-          binaries.ffprobe,
-          [
-            '-v',
-            'error',
-            ...INPUT_LIMITS,
-            '-show_entries',
-            'format=duration:stream=codec_type',
-            '-of',
-            'json',
-            path,
-          ],
-          { timeout: timeouts.probe },
-        );
-        const info = ProbeSchema.parse(JSON.parse(stdout));
-        if (!Number.isFinite(info.format.duration)) throw new Error('ffprobe gave no duration');
-        return {
-          durationS: info.format.duration,
-          hasAudio: info.streams.some((s) => s.codec_type === 'audio'),
-        };
-      }),
+    probe: async (path) => {
+      const { stdout } = await run(
+        binaries.ffprobe,
+        [
+          '-v',
+          'error',
+          ...INPUT_LIMITS,
+          '-show_entries',
+          'format=duration:stream=codec_type',
+          '-of',
+          'json',
+          path,
+        ],
+        { timeout: timeouts.probe },
+      );
+      const info = ProbeSchema.parse(JSON.parse(stdout));
+      if (!Number.isFinite(info.format.duration)) throw new Error('ffprobe gave no duration');
+      return {
+        durationS: info.format.duration,
+        hasAudio: info.streams.some((s) => s.codec_type === 'audio'),
+      };
+    },
 
-    keyframes: (video, perSecond) =>
-      inTempDir(video, async (dir, path) => {
+    keyframes: (path, perSecond) =>
+      inEmptyDir(async (dir) => {
         // A few frames a second at most, near-duplicates dropped (mpdecimate); showinfo prints each kept
         // frame's time. A long video is sampled sparser rather than decoded in full and thinned afterwards.
         const { stderr } = await run(
@@ -217,8 +229,8 @@ export function createFfmpegMediaTools(
         return frames;
       }),
 
-    audioTrack: (video) =>
-      inTempDir(video, async (dir, path) => {
+    audioTrack: (path) =>
+      inEmptyDir(async (dir) => {
         const out = join(dir, 'audio.mp3');
         await ffmpeg(
           ['-i', path, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '48k', out],
@@ -227,11 +239,25 @@ export function createFfmpegMediaTools(
         return new Uint8Array(await readFile(out));
       }),
 
-    toJpeg: (image) =>
-      inTempDir(image, async (dir, path) => {
+    toJpeg: (path) =>
+      inEmptyDir(async (dir) => {
         const out = join(dir, 'image.jpg');
         await ffmpeg(['-i', path, '-vf', SCALE, '-frames:v', '1', '-q:v', '3', out], timeouts.toJpeg);
         return new Uint8Array(await readFile(out));
       }),
+  };
+}
+
+/** ffmpeg and ffprobe come with the Docker image (operations.md); files never leave a private temp folder. */
+export function createFfmpegMediaTools(
+  binaries = BINARIES,
+  timeouts: Readonly<Record<keyof typeof TIMEOUTS_MS, number>> = TIMEOUTS_MS,
+): MediaTools {
+  const files = createFfmpegFileTools(binaries, timeouts);
+  return {
+    probe: (video) => inTempDir(video, (_, path) => files.probe(path)),
+    keyframes: (video, perSecond) => inTempDir(video, (_, path) => files.keyframes(path, perSecond)),
+    audioTrack: (video) => inTempDir(video, (_, path) => files.audioTrack(path)),
+    toJpeg: (image) => inTempDir(image, (_, path) => files.toJpeg(path)),
   };
 }

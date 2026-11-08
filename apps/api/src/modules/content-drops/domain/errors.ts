@@ -154,6 +154,9 @@ export class UnreadableFile extends Error {}
  */
 export class MediumErasedMeanwhile extends Error {}
 
+/** Every model failed to describe a dropped media (ADR 0083): thrown, so the job is retried. */
+export class DropDescriptionFailed extends Error {}
+
 /** A slot her script does not have (SC-02 lot b). */
 export class ContentDropSlotNotFound extends DomainError {
   constructor() {

@@ -12,6 +12,8 @@ export type UntrustedKind =
   | 'candidate_reply'
   /** A phrase of one of her alerts (P4-01): written by the agency, still read as a criterion, never as an order. */
   | 'creator_alert'
+  /** What the code knows of a drop she made (ADR 0083): a step's name and instruction are written by the agency. */
+  | 'drop_context'
   /**
    * Her channel's posts (ADR 0080 § 5): the examples the agency chose, where her link leads, an advice of the agency.
    * Written by the agency, still read as data, never as an order.

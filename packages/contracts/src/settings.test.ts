@@ -8,6 +8,8 @@ describe('CreatorSettings', () => {
       llm: { roles: {}, contextBudgetTokens: 12_000 },
       autoApproveCategories: [],
       retention: { factMonthsAfterLastContact: 12, fanMediaDays: 30 },
+      // Off until the agency has checked the vision model on her real media (ADR 0083 § 9).
+      describeDrops: false,
     });
   });
 

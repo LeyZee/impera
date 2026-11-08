@@ -52,6 +52,13 @@ Le même job, une fois le fichier reçu, le télécharge dans un dossier tempora
 
 Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au moins un est gardé, à « bloqué » (« Aucun fichier de ce dépôt n'a pu être gardé ») quand tous sont refusés. Un ffmpeg absent ou tué par son délai fait réessayer le job, jamais refuser le fichier.
 
+## La description de ce qu'elle dépose (ADR 0083, SC-04 lot a, migration 0141)
+
+- Chaque photo et chaque vidéo gardée comme **nouveau** média de sa médiathèque met en file `content_drops.describe_file` dans la transaction qui la garde, sous la clé `content_drops.describe_file:<média>` : une fois par média, quel que soit le nombre de dépôts qui le donnent. Un doublon ne relance rien ; un vocal n'est pas décrit (sa transcription est ailleurs).
+- Le job lit le premier fichier vivant d'un dépôt qui tient ce média (gardé, non remplacé, dépôt non retiré) : il donne le contexte écrit par le code (`domain/describe.ts`), la catégorie telle que son écran la nomme et, pour un script, l'étape de la version figée qu'elle a tournée (numéro et nom du carton, ce qu'elle vend, ambiance, tenue, lieu, consigne de la série et de l'emplacement, place du média dans l'étape). Le modèle ne pose jamais de question.
+- Rien tant que son interrupteur est éteint (`CreatorSettings.describeDrops`, faux par défaut, ADR 0083 § 9) ; rien pour un original effacé ou un média qu'aucun dépôt vivant ne tient ; rien pour un média déjà décrit pour un dépôt.
+- Le job prend sur le disque le poids du fichier, le télécharge dans un dossier à lui, puis le passe au module `media` (`createDropDescriptions`, branché par `wiring/content-drops.ts` sur la passerelle). Budget du jour épuisé : il se remet une heure plus tard, jusqu'au lendemain, jamais abandonné ; disque trop plein : 15 minutes ; tous les modèles en échec : il lève, et Graphile réessaie (5 fois).
+
 ## Une demande née d'une idée (VEI-01 d2)
 
 `requestFromIdea` (index du module) écrit au rôle admin la demande d'un tournage qu'elle a accepté depuis une idée de la veille : origine `idea`, sans auteur (`content_requests_author_check`), sous l'identifiant de l'idée, rejouable (`on conflict do nothing`). Seul le job `creator_tasks.suggestion_decided` de la veille l'appelle.

@@ -91,6 +91,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Rester en personnage | `asks_if_bot`, `ai_disclosure` | Le bot ne dit jamais qu'il est une IA : à « t'es un bot ? » (`asks_if_bot`), il répond en personnage, et la garde `ai_disclosure` bloque tout aveu. Fixé dans le code, pas un réglage (ADR 0021). |
 | Média | `media_asset` | Une photo, vidéo ou audio de la créatrice (catalogue) ou reçue d'un fan. |
 | Description de média | `media_description` | La sortie du rôle sens, au vocabulaire Impera. |
+| Description détaillée | `detailed` | La description complète d'un média qu'elle dépose (physique, tenue, pièce, action, son, paroles dans l'ordre), écrite seule par la vision ; s'ajoute à la phrase courte et aux étiquettes (ADR 0083). |
+| Raison de relecture | `review_reason` | Ce que le code lit dans une description qui la fait regarder d'abord par l'agence : renvoi à un autre média, autre personne, doute, drapeau (ADR 0083). |
 | Offre | `offer` | Une proposition commerciale (média + prix + plancher). Phase 6. |
 | Budget nul | `hasNoBudget` | Drapeau posé par le code quand le fan dit ne pas pouvoir payer : plus aucune offre ni bouderie ni relance de vente tant qu'il ne revient pas de lui-même vers le payant. |
 | Délai entre deux scripts | `cooldownHours` | Temps minimum entre deux scripts proposés à un même fan, lu dans la persona (`strategies.script_launch.cooldown_hours`, réglable par créatrice) ; après, un script ne part que si le fan sexualise de nouveau (`offerDecision`). |
