@@ -9,6 +9,7 @@ import {
   isGrantedAtInstall,
   permissionPatternOf,
 } from '../../lib/crm-address';
+import { ADDRESS_KEY, storedOrigin } from '../../lib/crm-origin-store';
 import { readCrmSession } from '../../lib/session';
 import { placeOf } from '../../lib/tab';
 import {
@@ -30,7 +31,6 @@ import type { WatchNotice, WatchView } from './watch-view';
  * the open tab through activeTab. It opens tabs and asks the browser for a site; it never writes to the API.
  */
 
-const ADDRESS_KEY = 'crmOrigin';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 
 /** Nuit or Jour as the browser or the computer is set (ADR 0066 § 8). */
@@ -62,12 +62,6 @@ function show(next: Screen): void {
 
 function currentScreen(): Screen {
   return screen;
-}
-
-async function storedOrigin(): Promise<string> {
-  const stored: Record<string, unknown> = await browser.storage.local.get(ADDRESS_KEY).catch(() => ({}));
-  const value = stored[ADDRESS_KEY];
-  return typeof value === 'string' ? (crmOriginOf(value) ?? DEFAULT_CRM_ADDRESS) : DEFAULT_CRM_ADDRESS;
 }
 
 async function allowed(at: string): Promise<boolean> {
@@ -214,7 +208,38 @@ function saveAddress(value: string): void {
   show({ kind: 'loading' });
 }
 
+/** This window, read at once: `sidePanel.open` must run in the click itself, before any await (ADR 0086 § 1). */
+let windowId: number | undefined;
+void browser.windows
+  .getCurrent()
+  .then((current) => {
+    windowId = current.id;
+  })
+  .catch(() => undefined);
+
+/**
+ * The copilot beside Reveal: the browser's side panel, or the same page in a small window next to it where the browser
+ * has none (ADR 0086 § 1). The window is told which window's tab to follow.
+ */
+function openPanel(): void {
+  if (windowId === undefined) return;
+  const atWindow = windowId;
+  const fallback = (): void => {
+    const url = browser.runtime.getURL(`/sidepanel.html?window=${String(atWindow)}`);
+    void browser.windows.create({ url, type: 'popup', width: 380, height: 760 }).catch(() => undefined);
+  };
+  if ('sidePanel' in browser && typeof browser.sidePanel.open === 'function') {
+    browser.sidePanel.open({ windowId: atWindow }).then(() => {
+      window.close();
+    }, fallback);
+  } else {
+    fallback();
+    window.close();
+  }
+}
+
 const actions: Actions = {
+  openPanel,
   signIn: () => void openCrm('/'),
   open: (path) => void openCrm(path),
   retry: () => void refresh(),

@@ -1,0 +1,177 @@
+/*
+ * The copilot side panel (ADR 0086). Design system tokens only; `cp-` is local to this page. Read in three seconds:
+ * the essentials on top in plain rows, the rest folded by group. Amber for what waits for a chatter, never red here:
+ * red is kept for a limit that forbids the sale (§ 10). Nothing moves, nothing blinks.
+ */
+
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--nv-void);
+  color: var(--nv-ink);
+  font-family: var(--nv-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.cp {
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--nv-space-3) var(--nv-space-3) var(--nv-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+
+.cp-loading {
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+
+/* ───────────── Notices ───────────── */
+
+.cp-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+.cp-notice[data-tone='amber'] {
+  background: color-mix(in oklab, var(--nv-warning) 12%, transparent);
+}
+.cp-notice__title {
+  margin: 0;
+  font-weight: 600;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.cp-notice[data-tone='amber'] .cp-notice__title {
+  color: var(--nv-warning);
+}
+.cp-notice__text {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.cp-notice .nv-btn {
+  align-self: flex-start;
+  margin-top: var(--nv-space-2);
+}
+
+/* ───────────── The card ───────────── */
+
+.cp-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.cp-head__title {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+}
+.cp-head__check {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+
+.cp-fields {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-fields--essentials {
+  padding: 0 var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+.cp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--nv-space-2) 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  overflow-wrap: anywhere;
+}
+.cp-field + .cp-field {
+  border-top: 1px solid var(--nv-hairline);
+}
+.cp-field__label {
+  color: var(--nv-ink-muted);
+}
+.cp-field__value {
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.cp-field__empty,
+.cp-field__source {
+  color: var(--nv-ink-faint);
+}
+.cp-field__quote {
+  color: var(--nv-ink-muted);
+}
+.cp-field__quote q {
+  color: var(--nv-ink);
+  quotes: '«\00a0' '\00a0»';
+}
+.cp-field__check {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: var(--nv-space-1);
+  padding: var(--nv-space-1) var(--nv-space-2);
+  border-radius: var(--nv-radius-sm);
+  color: var(--nv-warning);
+  background: color-mix(in oklab, var(--nv-warning) 12%, transparent);
+}
+
+/* ───────────── Folded groups ───────────── */
+
+.cp-group {
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+.cp-group > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+  min-height: 40px;
+  padding: 0 var(--nv-space-3);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+}
+.cp-group > summary::-webkit-details-marker {
+  display: none;
+}
+.cp-group > summary:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+  border-radius: var(--nv-radius-md);
+}
+.cp-group__title {
+  font-weight: 600;
+}
+.cp-group__sum {
+  color: var(--nv-ink-muted);
+}
+.cp-group .cp-fields {
+  padding: 0 var(--nv-space-3) var(--nv-space-1);
+  border-top: 1px solid var(--nv-hairline);
+}
