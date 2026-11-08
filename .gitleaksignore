@@ -1,0 +1,4 @@
+# Findings gitleaks keeps reading in the history, each checked by hand and known not to be a secret (« ok gitleaks »,
+# fil Bilan). A line is a fingerprint, `commit:file:rule:line`; a new real secret never goes here, it is revoked.
+# The test token of the extension links panel, 'abcdefghijkl…' (the alphabet), replaced by 'x'.repeat(43) since.
+0cc8fdd92c0e15e0dbb30356692e5dd3e8c37c45:apps/web/src/security/ExtensionLinksPanel.test.tsx:generic-api-key:21
