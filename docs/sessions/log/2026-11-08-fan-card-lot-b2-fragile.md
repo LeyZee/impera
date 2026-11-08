@@ -11,7 +11,9 @@ Fait :
 - Tests : `fragile.test.ts` (règle), `fan-fragile.integration.test.ts` (détresse, dépenses, écart puis retour, marquage, 403 et 404), deux tests dans `TrackingPage.test.tsx`.
 - Docs : glossaire (« Proposition fragile », « À traiter »), `data-model.md`.
 
-Pas fait : les seuils attendent « ok fragile » de Charles ; les captures Nuit/Jour, PC et téléphone.
+Captures Nuit/Jour, PC et téléphone vues ; défauts corrigés : « Rien à signaler » et le titre répétés à côté de la proposition, délai « 0 min ».
+
+Pas fait : les seuils attendent « ok fragile » de Charles.
 
 Décisions :
 - Rien n'est stocké pour une proposition : elle se recalcule à chaque lecture, seul l'écart est un événement. Aucune table nouvelle.
