@@ -50,8 +50,6 @@ export function FanSheet({
   const fragile = useFragileTodo(creatorId, fanId);
   const proposal = canDecide ? fragile : undefined;
   const facts: SheetFacts = {
-    // Folded, the line says it waits; beside the conversation it stands right under the line already.
-    ...(proposal === undefined || layout === 'aside' ? {} : { fragileProposed: true }),
     flags:
       flags.data?.flags ??
       (flags.error instanceof FanFlagsRefused ? 'refused' : flags.isError ? 'down' : 'loading'),
@@ -65,7 +63,8 @@ export function FanSheet({
           : `${DESIRE_BAND_LABELS[desire.band]} ${DESIRE_BAND_EMOJIS[desire.band]}`,
   };
   const read = sheetSummary(facts);
-  // Never « Rien à signaler » above a proposal that waits for a person.
+  // The proposal stands right above the summary in both layouts, so the summary never repeats it, nor says
+  // « Rien à signaler » under it.
   const summary = proposal !== undefined && read.rest === 'Rien à signaler' ? { ...read, rest: '' } : read;
   const alerts = flags.data === undefined ? [] : alertsOf(flags.data.flags);
   const alertList =
