@@ -1,5 +1,6 @@
 import {
   FAN_CARD_FIELDS,
+  FAN_CARD_QUOTE_MAX,
   FAN_CARD_VALUE_MAX,
   FanCardIntensitySchema,
   FanCardLeadSchema,
@@ -138,6 +139,7 @@ export interface CardValue {
   readonly source: FanCardSource;
   readonly observedAt: Date;
   readonly notedBy: UserId | null;
+  readonly notedByName: string | null;
   readonly sourceMessageId: MessageId | null;
 }
 
@@ -159,13 +161,35 @@ export interface Card {
   readonly others: readonly CardOther[];
 }
 
-const cardValue = (field: FanCardField, fact: StoredFact): CardValue => ({
-  items: itemsOf(field, fact.value),
-  source: fact.kind,
-  observedAt: fact.observedAt,
-  notedBy: fact.notedBy ?? null,
-  sourceMessageId: fact.sourceMessageId,
-});
+/** Members' display names by id: who noted a value (§ 5). */
+export type MemberNames = ReadonlyMap<string, string>;
+
+function cardValue(field: FanCardField, fact: StoredFact, names: MemberNames): CardValue {
+  const notedBy = fact.notedBy ?? null;
+  return {
+    items: itemsOf(field, fact.value),
+    source: fact.kind,
+    observedAt: fact.observedAt,
+    notedBy,
+    notedByName: notedBy === null ? null : (names.get(notedBy) ?? null),
+    sourceMessageId: fact.sourceMessageId,
+  };
+}
+
+/**
+ * His message as a value of the card quotes it (§ 5): on one line, cut to `FAN_CARD_QUOTE_MAX` with an ellipsis; null
+ * when nothing is left to read (a media alone).
+ */
+export function quoteOf(text: string): string | null {
+  const line = text.replace(/\s+/gu, ' ').trim();
+  if (line === '') return null;
+  const chars = Array.from(line);
+  if (chars.length <= FAN_CARD_QUOTE_MAX) return line;
+  return `${chars
+    .slice(0, FAN_CARD_QUOTE_MAX - 1)
+    .join('')
+    .trimEnd()}…`;
+}
 
 const newestFirst = (a: StoredFact, b: StoredFact): number => b.observedAt.getTime() - a.observedAt.getTime();
 
@@ -173,17 +197,22 @@ const newestFirst = (a: StoredFact, b: StoredFact): number => b.observedAt.getTi
  * His card (§ 3, § 6): each field in the card's order, its shown value (none when cleared) and what waits under it;
  * then « Autres », the facts outside the fields, a chatter's notes at the hand-back included, newest first.
  */
-export function cardOf(active: readonly StoredFact[], pending: readonly StoredFact[], now: Date): Card {
+export function cardOf(
+  active: readonly StoredFact[],
+  pending: readonly StoredFact[],
+  now: Date,
+  names: MemberNames = new Map(),
+): Card {
   const fields = FAN_CARD_FIELDS.map(({ field }): CardEntry => {
     const shown = shownFact(factsOfField(field, active, now));
     if (shown === undefined) return { field, current: null, toCheck: [] };
     return {
       field,
-      current: saysSomething(shown) ? cardValue(field, shown) : null,
+      current: saysSomething(shown) ? cardValue(field, shown, names) : null,
       toCheck: pending
         .filter((fact) => isWaitingOn(fact, shown, now))
         .sort(newestFirst)
-        .map((fact) => cardValue(field, fact)),
+        .map((fact) => cardValue(field, fact, names)),
     };
   });
   const others = active

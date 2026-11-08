@@ -1,7 +1,7 @@
 import { MessageIdSchema, UserIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { cardOf, checkedValue, itemsOf, neverKept, planCardEdit } from '../card';
+import { cardOf, checkedValue, itemsOf, neverKept, planCardEdit, quoteOf } from '../card';
 import { FanCardValueInvalid, FanCardValueRefused } from '../errors';
 import { kycSlotsToLearn, planFacts, selectActiveFacts, type FactProposal, type StoredFact } from '../facts';
 
@@ -154,6 +154,7 @@ describe('the card as it reads (§ 3, § 5)', () => {
       ],
       [waiting, older],
       now,
+      new Map([[chatter, 'Léa']]),
     );
     expect(card.fields.map((entry) => entry.field)[0]).toBe('first_name');
     expect(card.fields.find((entry) => entry.field === 'location')).toEqual({
@@ -163,6 +164,7 @@ describe('the card as it reads (§ 3, § 5)', () => {
         source: 'noted',
         observedAt: june,
         notedBy: chatter,
+        notedByName: 'Léa',
         sourceMessageId: null,
       },
       toCheck: [
@@ -171,6 +173,7 @@ describe('the card as it reads (§ 3, § 5)', () => {
           source: 'inferred',
           observedAt: august,
           notedBy: null,
+          notedByName: null,
           sourceMessageId: message,
         },
       ],
@@ -187,6 +190,16 @@ describe('the card as it reads (§ 3, § 5)', () => {
   it('shows a cleared field empty', () => {
     const card = cardOf([note({ value: '' })], [], now);
     expect(card.fields.find((entry) => entry.field === 'location')?.current).toBeNull();
+  });
+});
+
+describe('the quote of his message (§ 5)', () => {
+  it('keeps his words on one line, cut with an ellipsis, and nothing for a media alone', () => {
+    expect(quoteOf('  je suis\n  à Lyon  ')).toBe('je suis à Lyon');
+    const long = quoteOf('a'.repeat(250));
+    expect(long).toHaveLength(200);
+    expect(long?.endsWith('…')).toBe(true);
+    expect(quoteOf(' \n ')).toBeNull();
   });
 });
 

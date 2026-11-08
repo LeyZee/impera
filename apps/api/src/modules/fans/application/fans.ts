@@ -133,8 +133,8 @@ export function createFansService(
       facts.write(creatorId, fanId, (current, pending) => planFacts(current, proposals, now(), pending)),
     card: async (creatorId, fanId) => {
       if ((await store.get(creatorId, fanId)) === null) throw new FanNotFound();
-      const { active, pending } = await facts.card(creatorId, fanId);
-      return cardOf(active, pending, now());
+      const { active, pending, names } = await facts.card(creatorId, fanId);
+      return cardOf(active, pending, now(), names);
     },
     editCard: async (creatorId, fanId, field, edit, author) => {
       const at = now();
@@ -142,8 +142,8 @@ export function createFansService(
       await facts.write(creatorId, fanId, (current, pending) =>
         planCardEdit(field, edit, current, pending, author, at),
       );
-      const { active, pending } = await facts.card(creatorId, fanId);
-      return cardOf(active, pending, at);
+      const { active, pending, names } = await facts.card(creatorId, fanId);
+      return cardOf(active, pending, at, names);
     },
     activeFacts: async (creatorId, fanId) => selectActiveFacts(await facts.current(creatorId, fanId), now()),
     kycToLearn: async (creatorId, fanId, slots) =>

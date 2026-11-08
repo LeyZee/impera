@@ -48,5 +48,21 @@ describe('the fan’s card (ADR 0085)', () => {
     };
     expect(FanCardViewSchema.safeParse(card).success).toBe(true);
     expect(FanCardViewSchema.safeParse({ ...card, payday: 'le 5' }).success).toBe(false);
+    const value = {
+      items: ['Lyon'],
+      source: 'inferred',
+      observedAt: '2026-11-08T10:00:00.000Z',
+      notedBy: null,
+      notedByName: null,
+      sourceMessageId: '00000000-0000-4000-8000-0000000000a1',
+      sourceQuote: 'je rentre à Lyon ce soir',
+    };
+    const filled = { ...card, fields: [{ field: 'location', current: value, toCheck: [] }] };
+    expect(FanCardViewSchema.safeParse(filled).success).toBe(true);
+    const tooLong = { ...value, sourceQuote: 'x'.repeat(201) };
+    expect(
+      FanCardViewSchema.safeParse({ ...card, fields: [{ field: 'location', current: tooLong, toCheck: [] }] })
+        .success,
+    ).toBe(false);
   });
 });

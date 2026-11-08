@@ -518,6 +518,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         holds: (creatorId, fanId, userId) => conversations.module.isFanHeldBy(creatorId, fanId, userId),
         traceOpening: (creatorId, fanId, trace) =>
           conversations.module.traceFanOpening(creatorId, fanId, trace),
+        messageTexts: (creatorId, fanId, messageIds) =>
+          conversations.module.fanMessageTexts(creatorId, fanId, messageIds),
       }),
       ...team.routes,
       ...scheduling.routes,

@@ -4,14 +4,16 @@ import {
   FanCardViewSchema,
   FanIdSchema,
   SetFanCardFieldBodySchema,
+  type CreatorId,
   type FanCardView,
   type FanId,
+  type MessageId,
 } from '@impera/contracts';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { FansService } from '../../application/fans';
-import type { Card, CardValue } from '../../domain/card';
+import { quoteOf, type Card, type CardValue } from '../../domain/card';
 
 import { noFanAccess, readerFor, type FanAccess, type RequireRole } from './flag-routes';
 
@@ -19,16 +21,38 @@ const CardParamsSchema = z.object({ id: FanIdSchema });
 const CardFieldParamsSchema = z.object({ id: FanIdSchema, field: FanCardFieldSchema });
 const CreatorQuerySchema = z.object({ creatorId: CreatorIdSchema });
 
-const valueView = (value: CardValue) => ({
-  items: [...value.items],
-  source: value.source,
-  observedAt: value.observedAt.toISOString(),
-  notedBy: value.notedBy,
-  sourceMessageId: value.sourceMessageId,
-});
-
-/** The card as the contract says it (`strict`, the same on the CRM and the extension, ADR 0085 § 10). */
-function cardView(fanId: FanId, card: Card): FanCardView {
+/**
+ * The card as the contract says it (`strict`, the same on the CRM and the extension, ADR 0085 § 10), each value with
+ * the words of his message it was read in (§ 5), read from `conversations` in one call.
+ */
+async function cardView(
+  access: FanAccess,
+  creatorId: CreatorId,
+  fanId: FanId,
+  card: Card,
+): Promise<FanCardView> {
+  const values = card.fields.flatMap((entry) => [
+    ...(entry.current === null ? [] : [entry.current]),
+    ...entry.toCheck,
+  ]);
+  const ids = [
+    ...new Set(values.flatMap((value) => (value.sourceMessageId === null ? [] : [value.sourceMessageId]))),
+  ];
+  const texts =
+    ids.length === 0 ? new Map<string, string>() : await access.messageTexts(creatorId, fanId, ids);
+  const quote = (id: MessageId | null): string | null => {
+    const text = id === null ? undefined : texts.get(id);
+    return text === undefined ? null : quoteOf(text);
+  };
+  const valueView = (value: CardValue) => ({
+    items: [...value.items],
+    source: value.source,
+    observedAt: value.observedAt.toISOString(),
+    notedBy: value.notedBy,
+    notedByName: value.notedByName,
+    sourceMessageId: value.sourceMessageId,
+    sourceQuote: quote(value.sourceMessageId),
+  });
   return {
     fanId,
     fields: card.fields.map((entry) => ({
@@ -66,7 +90,7 @@ export function createCardRoutes(
         const { creatorId } = request.query;
         const fanId = request.params.id;
         await readerFor(request, creatorId, fanId, access, 'card');
-        return cardView(fanId, await fans.card(creatorId, fanId));
+        return cardView(access, creatorId, fanId, await fans.card(creatorId, fanId));
       },
     );
 
@@ -85,7 +109,12 @@ export function createCardRoutes(
         const { creatorId } = request.query;
         const { id: fanId, field } = request.params;
         const author = await readerFor(request, creatorId, fanId, access, 'card');
-        return cardView(fanId, await fans.editCard(creatorId, fanId, field, request.body, author));
+        return cardView(
+          access,
+          creatorId,
+          fanId,
+          await fans.editCard(creatorId, fanId, field, request.body, author),
+        );
       },
     );
     return Promise.resolve();

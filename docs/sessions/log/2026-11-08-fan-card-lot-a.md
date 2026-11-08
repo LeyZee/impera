@@ -12,7 +12,7 @@ Pas fait : lot (b) (`fans.read_card`, `KYC_ASKABLE`, filtre par rôle du bloc de
 
 Décisions :
 - Celui qui peut lire la fiche peut la corriger : un chatteur dont la fenêtre est ouverte sur elle, ou qui tient une conversation du fan, écrit aussi. Sinon le chatteur qui parle au fan ne pourrait pas corriger ce qu'il lit (§ 6). Ce n'est pas la règle des limites, où seule la liste de la créatrice écrit.
-- La vue donne l'identifiant du chatteur (`notedBy`) et le message source (`sourceMessageId`), pas le nom ni la phrase. Les deux lectures viendront par un port quand l'écran les demandera.
+- La vue donne aussi le nom de qui a noté (`notedByName`, lu dans `user`) et la phrase du fan qui fonde une valeur (`sourceQuote`, 200 caractères au plus, sur une ligne), demandés par Extension pour le § 5. La phrase vient de `conversations` par le port `FanAccess.messageTexts` (seuls les messages entrants de ce fan) ; un message de la créatrice ou disparu donne `null`.
 
 Découvertes :
 - `conversations/infra/db/fan-insights.ts` (Qui sont tes fans) ne lit que `kind = 'declared'` : une valeur corrigée par un chatteur (`noted`) n'y compte pas. Un `kind in ('declared', 'noted') and value <> ''` suffirait, mais ce fichier n'est pas à Agent.

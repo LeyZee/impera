@@ -9,6 +9,7 @@ import {
   type CreatorId,
   type FanId,
   type KycSlot,
+  type MessageId,
   type UserId,
   type UserRole,
 } from '@impera/contracts';
@@ -43,7 +44,8 @@ function actorFor(request: FastifyRequest, creatorId: CreatorId): UserId {
 /**
  * What the `conversations` module says of a member whose scope is `self` and a fan (by the composition root, ADR 0024,
  * ADR 0025): whether he holds a conversation of this fan, routed to him or taken over by him (how he reads the sheet
- * outside his access window), and the trace of his reading the sheet, written as the opening of the fan's conversation.
+ * outside his access window), the trace of his reading the sheet, written as the opening of the fan's conversation,
+ * and the words of his own messages a value of his card was read in (ADR 0085 § 5).
  */
 export interface FanAccess {
   holds(creatorId: CreatorId, fanId: FanId, userId: UserId): Promise<boolean>;
@@ -52,6 +54,12 @@ export interface FanAccess {
     fanId: FanId,
     trace: { readonly userId: UserId; readonly ip: string; readonly via: FanSheetVia },
   ): Promise<void>;
+  /** The text of those of these messages he sent, by id; a message of someone else, or gone, is left out. */
+  messageTexts(
+    creatorId: CreatorId,
+    fanId: FanId,
+    messageIds: readonly MessageId[],
+  ): Promise<ReadonlyMap<string, string>>;
 }
 
 /** What a chatter opened of a fan's sheet, as the audit log says it: his limits, what is left to learn, his card. */
@@ -61,6 +69,7 @@ export type FanSheetVia = 'flags' | 'kyc' | 'card';
 export const noFanAccess: FanAccess = {
   holds: () => Promise.resolve(false),
   traceOpening: () => Promise.resolve(),
+  messageTexts: () => Promise.resolve(new Map()),
 };
 
 /**

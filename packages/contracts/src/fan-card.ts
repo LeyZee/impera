@@ -243,6 +243,9 @@ export const FAN_CARD_VALUE_MAX = 300;
 /** Items of a list field, at most. */
 export const FAN_CARD_ITEMS_MAX = 12;
 
+/** The longest quote of his message a value shows (§ 5), ellipsis included. */
+export const FAN_CARD_QUOTE_MAX = 200;
+
 /**
  * Where a value comes from (§ 5): he said it, it was guessed from what he wrote, or a chatter noted it. The order of
  * strength is noted, then declared, then inferred (§ 6).
@@ -258,8 +261,15 @@ export const FanCardValueSchema = z
     observedAt: z.iso.datetime(),
     /** The chatter who noted it, for a `noted` value; null otherwise. */
     notedBy: UserIdSchema.nullable(),
+    /** His display name (« noté par Léa », § 5): a chatter does not read the team's list. Null when unknown. */
+    notedByName: z.string().min(1).nullable(),
     /** His message it was read in, for a value he said or one guessed; null for a chatter's note. */
     sourceMessageId: MessageIdSchema.nullable(),
+    /**
+     * That message's words, cut to `FAN_CARD_QUOTE_MAX` (§ 5: what a guess rests on). His words are data: shown as a
+     * quote, never as markup. Null when there is no message or it can no longer be read.
+     */
+    sourceQuote: z.string().min(1).max(FAN_CARD_QUOTE_MAX).nullable(),
   })
   .strict();
 export type FanCardValue = z.infer<typeof FanCardValueSchema>;

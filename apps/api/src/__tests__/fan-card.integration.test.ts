@@ -1,11 +1,14 @@
 import {
+  ConversationIdSchema,
   FanCardViewSchema,
   FanIdSchema,
+  MessageIdSchema,
   newId,
   PlatformAccountIdSchema,
   type CreatorId,
   type FanCardView,
   type FanId,
+  type MessageId,
 } from '@impera/contracts';
 import { and, eq, schema, withAdmin } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
@@ -14,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
+import type { FactProposal } from '../modules/fans';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
@@ -130,6 +134,8 @@ describe('the fan’s card (GET /v1/fans/:id/card, PUT /v1/fans/:id/card/:field,
       items: ['Annecy'],
       source: 'noted',
       notedBy: operatorId,
+      notedByName: 'Operator',
+      sourceQuote: null,
     });
     // What he says later never replaces the chatter's note: it waits under it.
     await app.modules.fans.proposeFacts(anna, fan, [
@@ -175,6 +181,67 @@ describe('the fan’s card (GET /v1/fans/:id/card, PUT /v1/fans/:id/card/:field,
     expect(refused.statusCode).toBe(422);
     expect(refused.json()).toMatchObject({ error: { code: 'fan_card_value_unprocessable' } });
     expect(entry(await read(operator), 'location')?.current?.items).toEqual(['Grenoble']);
+  });
+
+  it('quotes his own message a value was read in, never hers', async () => {
+    const conversationId = newId(ConversationIdSchema);
+    const his = newId(MessageIdSchema);
+    const hers = newId(MessageIdSchema);
+    await withAdmin(test.admin.db, async (tx) => {
+      const [account] = await tx
+        .select({ id: schema.platformAccounts.id })
+        .from(schema.platformAccounts)
+        .where(eq(schema.platformAccounts.creatorId, anna));
+      if (account === undefined) throw new Error('no account');
+      await tx.insert(schema.conversations).values({
+        id: conversationId,
+        creatorId: anna,
+        platformAccountId: account.id,
+        fanId: fan,
+        platformConversationId: 'conv-1',
+      });
+      const message = (
+        id: string,
+        direction: 'inbound' | 'outbound',
+        author: 'fan' | 'ai',
+        text: string,
+      ) => ({
+        id,
+        creatorId: anna,
+        platformAccountId: account.id,
+        conversationId,
+        platformMessageId: id,
+        direction,
+        author,
+        text,
+        platformCreatedAt: new Date('2026-11-02T10:00:00Z'),
+      });
+      await tx
+        .insert(schema.messages)
+        .values([
+          message(his, 'inbound', 'fan', 'je bosse   à l’hôpital,\nde nuit'),
+          message(hers, 'outbound', 'ai', 'Tu fais quoi dans la vie ?'),
+        ]);
+    });
+    const fact = (key: string, value: string, sourceMessageId: MessageId): FactProposal => ({
+      category: 'life',
+      key,
+      value,
+      kind: 'inferred',
+      confidence: 0.7,
+      sourceMessageId,
+      observedAt: new Date('2026-11-02T10:00:00Z'),
+    });
+    await app.modules.fans.proposeFacts(anna, fan, [
+      fact('job', 'Infirmier', his),
+      fact('pets', 'Un chat', hers),
+    ]);
+    const card = await read(operator);
+    expect(entry(card, 'job')?.current).toMatchObject({
+      sourceMessageId: his,
+      sourceQuote: 'je bosse à l’hôpital, de nuit',
+    });
+    expect(entry(card, 'pets')?.current).toMatchObject({ sourceMessageId: hers, sourceQuote: null });
   });
 
   it('refuses the creator, another creator and an unknown fan', async () => {

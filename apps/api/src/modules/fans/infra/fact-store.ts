@@ -61,14 +61,26 @@ async function pending(tx: Transaction, creatorId: string, fanId: string): Promi
   return rows.map(toFact);
 }
 
+/** The display names of the members who noted these facts (ADR 0085 § 5). */
+async function namesOf(tx: Transaction, facts: readonly StoredFact[]): Promise<Map<string, string>> {
+  const ids = [...new Set(facts.flatMap((fact) => (fact.notedBy ? [fact.notedBy] : [])))];
+  if (ids.length === 0) return new Map();
+  const rows = await tx
+    .select({ id: schema.user.id, name: schema.user.name })
+    .from(schema.user)
+    .where(inArray(schema.user.id, ids));
+  return new Map(rows.filter((row) => row.name.trim() !== '').map((row) => [row.id, row.name]));
+}
+
 export function createDrizzleFactStore(db: Database): FactStore {
   return {
     current: (creatorId, fanId) => withTenant(db, creatorId, (tx) => current(tx, creatorId, fanId)),
     card: (creatorId, fanId) =>
-      withTenant(db, creatorId, async (tx) => ({
-        active: await current(tx, creatorId, fanId),
-        pending: await pending(tx, creatorId, fanId),
-      })),
+      withTenant(db, creatorId, async (tx) => {
+        const active = await current(tx, creatorId, fanId);
+        const waiting = await pending(tx, creatorId, fanId);
+        return { active, pending: waiting, names: await namesOf(tx, [...active, ...waiting]) };
+      }),
     write: (creatorId, fanId, plan) =>
       withTenant(db, creatorId, async (tx) => {
         const [fan] = await tx
