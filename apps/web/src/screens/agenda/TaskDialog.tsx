@@ -51,7 +51,7 @@ export function TaskDialog({
   };
   return (
     <Dialog
-      className="ag-scope"
+      className={task.reelBrief === null || mode === 'move' ? 'ag-scope' : 'ag-scope ag-dialog--reel'}
       title={task.title}
       lead={`${CREATOR_TASK_CATEGORY_LABELS[task.category]} · ${whenWords(task.when, agenda.timeZone)}`}
       busy={busy}
@@ -75,7 +75,9 @@ export function TaskDialog({
       ) : (
         <div className="tm-dialog__body">
           {task.purpose === null ? null : <p className="ag-explain">{task.purpose}</p>}
-          {task.shootBrief === null ? null : <ShootBrief brief={task.shootBrief} folded={false} />}
+          {task.shootBrief === null && task.reelBrief === null ? null : (
+            <ShootBrief brief={task.shootBrief} reel={task.reelBrief} folded={false} />
+          )}
           {task.essential ? (
             <p className="ag-explain">
               <span className="ag-ess">essentielle</span> Elle compte pour ta série : coche-la chaque jour

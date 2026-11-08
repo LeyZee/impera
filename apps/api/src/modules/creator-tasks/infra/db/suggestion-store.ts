@@ -168,7 +168,7 @@ function momentOf(columns: {
 /** `withTenantMember` for the owner and an active manager; a chatter is refused before any read. */
 export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStore {
   return {
-    create: (creatorId, userId, body, now) =>
+    create: (creatorId, userId, body, now, check) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
         if (!readsTeam(scope)) throw new SuggestionForbidden();
         const zone = await zoneOf(tx, creatorId);
@@ -180,11 +180,13 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
           if (
             stored.title !== body.title ||
             stored.category !== body.category ||
-            stored.purpose !== body.purpose
+            stored.purpose !== body.purpose ||
+            JSON.stringify(stored.reelBrief) !== JSON.stringify(body.reelBrief)
           )
             throw new SuggestionIdTaken();
           return stored;
         }
+        await check();
         const week = weekOfSuggestion(body.when, now, zone);
         const declined = await tx
           .select({
@@ -232,6 +234,8 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
             category: body.category,
             title: body.title,
             purpose: body.purpose,
+            // Parsed with the body on its way in (docs/architecture/jsonb.md).
+            reelBrief: body.reelBrief,
             createdBy: userId,
           })
           // An id already used for another creator, which her RLS hides: a conflict, never a 500.
@@ -250,7 +254,11 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
         if (known !== undefined) {
           const stored = agencySuggestionOf(known, (await followUps(tx, [known])).get(known.id) ?? null);
           // The same shoot replayed answers itself; anything else under its id is refused.
-          if (stored.title !== shoot.title || stored.shootBrief !== shoot.shootBrief)
+          if (
+            stored.title !== shoot.title ||
+            stored.shootBrief !== shoot.shootBrief ||
+            JSON.stringify(stored.reelBrief) !== JSON.stringify(shoot.reelBrief)
+          )
             throw new SuggestionIdTaken();
           return stored;
         }
@@ -288,6 +296,7 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
             title: shoot.title,
             purpose: shoot.purpose,
             shootBrief: shoot.shootBrief,
+            reelBrief: shoot.reelBrief,
             createdBy: userId,
           })
           .onConflictDoNothing()

@@ -7,7 +7,7 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { filterIdeas, tooClose, type IdeaFilterContext } from '../ideas';
+import { filterIdeas, guardFaultOf, textsGuardFault, tooClose, type IdeaFilterContext } from '../ideas';
 
 /** A creator invented for the tests (ADR 0010): her limits, nothing else. */
 const LIMITS: PersonaLimits = {
@@ -31,6 +31,7 @@ const idea = (values: Partial<ContentIdeaDraft> = {}): ContentIdeaDraft => ({
   signalId: live,
   reason: 'Le format monte cette semaine.',
   shootMinutes: 20,
+  reelBrief: null,
   ...values,
 });
 
@@ -54,7 +55,7 @@ describe('the code’s filters on the morning ideas (ADR 0060 § 4)', () => {
   it('drops an idea that touches one of her limits, and says which', () => {
     const touching = idea({ toShoot: 'Gros plan sur les pieds au réveil.' });
     expect(filterIdeas([touching], context()).dropped).toEqual([
-      { idea: touching, drop: { reason: 'limit', term: 'pieds' } },
+      { idea: touching, drop: { reason: 'limit', term: 'pieds', field: 'toShoot' } },
     ]);
     expect(reasons([idea({ title: 'Mon visage au réveil' })], context())).toEqual(['limit']);
   });
@@ -101,6 +102,58 @@ describe('the code’s filters on the morning ideas (ADR 0060 § 4)', () => {
     const { kept, dropped } = filterIdeas(four, context());
     expect(kept).toHaveLength(3);
     expect(dropped.map(({ drop }) => drop.reason)).toEqual(['over_daily_cap']);
+  });
+});
+
+describe('the reel sheet read by the guards like the rest of the idea (ADR 0082 § 3)', () => {
+  const sheet = {
+    hook: 'Devine ce que je prépare ce soir',
+    onScreen: 'Soirée miroir',
+    shots: ['Reflet dans le miroir', 'Tenue de soirée'],
+    ending: 'Retour au miroir du début',
+    seconds: 20,
+  };
+
+  it('names the field of the sheet at fault', () => {
+    const reel = (values: Partial<typeof sheet>) => idea({ reelBrief: { ...sheet, ...values } });
+    expect(guardFaultOf(reel({}), LIMITS, touches)).toBeNull();
+    expect(guardFaultOf(reel({ hook: 'Regarde mes pieds ce soir' }), LIMITS, touches)).toEqual({
+      reason: 'limit',
+      term: 'pieds',
+      field: 'hook',
+    });
+    expect(guardFaultOf(reel({ shots: ['Reflet', 'Photo topless de dos'] }), LIMITS, touches)).toMatchObject({
+      reason: 'nudity',
+      field: 'shots',
+    });
+    expect(guardFaultOf(reel({ ending: 'Le lien en bio pour le pack à 15 €' }), LIMITS, touches)).toEqual({
+      reason: 'instagram_guard',
+      field: 'ending',
+    });
+    expect(guardFaultOf(reel({ onScreen: 'Mon visage' }), LIMITS, touches)).toMatchObject({
+      field: 'onScreen',
+    });
+  });
+
+  it('drops a morning idea whose sheet breaks a guard', () => {
+    expect(reasons([idea({ reelBrief: { ...sheet, hook: 'Mon visage au réveil' } })], context())).toEqual([
+      'limit',
+    ]);
+  });
+
+  it('reads her limits before « jamais de nu », and finds no field without a persona', () => {
+    const texts = [
+      { field: 'title', text: 'Photo topless' },
+      { field: 'purpose', text: 'Pour mes pieds' },
+    ] as const;
+    expect(textsGuardFault(texts, 'instagram_reel', LIMITS, touches)).toMatchObject({
+      reason: 'limit',
+      field: 'purpose',
+    });
+    expect(textsGuardFault(texts, 'instagram_reel', null, touches)).toEqual({
+      reason: 'no_persona',
+      field: null,
+    });
   });
 });
 

@@ -330,7 +330,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   // Before the planning: her calendar link's feed reads her agenda (CR-05 lot c2).
   const notifications = wireNotifications(shared);
-  const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
+  const creatorTasks = wireCreatorTasks(shared, {
+    notifications: notifications.module,
+    persona: persona.module,
+  });
   const scheduling = wireScheduling(shared, {
     persona: persona.module,
     creatorTasks: creatorTasks.module,

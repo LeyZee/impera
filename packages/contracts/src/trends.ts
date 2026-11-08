@@ -1,7 +1,13 @@
 import { z } from 'zod';
 
-import { DropCategorySchema } from './content-drops';
-import { AgencySuggestionSchema, CreatorTaskTitleSchema } from './creator-tasks';
+import { IdeaDropCategorySchema, type IdeaDropCategory } from './content-drops';
+import {
+  AgencySuggestionSchema,
+  CreatorTaskTitleSchema,
+  REEL_DROP_CATEGORY,
+  ReelBriefSchema,
+  type ReelBrief,
+} from './creator-tasks';
 import {
   ContentIdeaIdSchema,
   CreatorIdSchema,
@@ -214,14 +220,6 @@ export type ContentIdeaState = z.infer<typeof ContentIdeaStateSchema>;
 /** The morning job's ceiling, per creator and day (ADR 0060 § 4). */
 export const CONTENT_IDEAS_PER_DAY_MAX = 3;
 
-/**
- * The categories an idea may ask (ADR 0060 § 4): every drop category but `script`. A script is asked with a structure
- * of the library and its frozen version (ADR 0056), chosen by the team: an idea, written by the model or corrected by
- * the agency, never asks one.
- */
-export const IdeaDropCategorySchema = DropCategorySchema.exclude(['script']);
-export type IdeaDropCategory = z.infer<typeof IdeaDropCategorySchema>;
-
 /** What an idea says, as the model writes it and the agency corrects it (ADR 0060 § 4). */
 export const ContentIdeaDraftSchema = z.strictObject({
   /** Her agenda's title (80 at most): a validated idea becomes a suggestion under it, never cut. */
@@ -231,8 +229,18 @@ export const ContentIdeaDraftSchema = z.strictObject({
   signalId: TrendSignalIdSchema,
   reason: z.string().trim().min(1).max(200),
   shootMinutes: z.number().int().min(1).max(600),
+  /** Its reel sheet (ADR 0082 § 3), only for a Reel Insta (`reelBriefFits`); `null` for none. */
+  reelBrief: ReelBriefSchema.nullable().default(null),
 });
 export type ContentIdeaDraft = z.infer<typeof ContentIdeaDraftSchema>;
+
+/** Whether an idea's reel sheet goes with its category: none, or a Reel Insta's (ADR 0082 § 3). */
+export function reelBriefFits(idea: {
+  readonly category: IdeaDropCategory;
+  readonly reelBrief: ReelBrief | null;
+}): boolean {
+  return idea.reelBrief === null || idea.category === REEL_DROP_CATEGORY;
+}
 
 /** An idea as the module reads it (`content_ideas`). */
 export const ContentIdeaSchema = ContentIdeaDraftSchema.extend({
@@ -387,9 +395,17 @@ export type ContentIdeaCorrection = z.infer<typeof ContentIdeaCorrectionSchema>;
  * the idea as it leaves again (her limits, « jamais de nu » for a public output, the Instagram guard): a correction that
  * breaks one is refused (422), never sent. Replayed, the same gesture changes nothing and its correction is not read.
  */
-export const ValidateContentIdeaBodySchema = z.strictObject({
-  correction: ContentIdeaCorrectionSchema.nullable().default(null),
-});
+export const ValidateContentIdeaBodySchema = z
+  .strictObject({
+    correction: ContentIdeaCorrectionSchema.nullable().default(null),
+  })
+  .refine(
+    ({ correction }) =>
+      correction?.category === undefined ||
+      correction.reelBrief === undefined ||
+      reelBriefFits({ category: correction.category, reelBrief: correction.reelBrief }),
+    { message: 'Une fiche reel va seulement avec un Reel Insta', path: ['correction', 'reelBrief'] },
+  );
 export type ValidateContentIdeaBody = z.infer<typeof ValidateContentIdeaBodySchema>;
 
 /** The answer of a validation: the idea, and the suggestion it became (undated when no dispo of hers had room). */
@@ -412,3 +428,5 @@ export const CONTENT_IDEA_FORBIDDEN = 'content_idea_forbidden';
 export const CONTENT_IDEA_DECIDED_CONFLICT = 'content_idea_decided_conflict';
 /** The idea, as corrected, touches one of her limits or breaks a guard of its output: corrected again, or refused. */
 export const CONTENT_IDEA_GUARD_UNPROCESSABLE = 'content_idea_guard_unprocessable';
+/** The idea, as corrected, keeps a reel sheet under another category than Reel Insta (ADR 0082 § 3). */
+export const CONTENT_IDEA_REEL_BRIEF_INVALID = 'content_idea_reel_brief_invalid';

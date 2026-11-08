@@ -12,6 +12,7 @@ const idea = (toShoot: string): ContentIdeaDraft => ({
   signalId: signal,
   reason: 'Le format monte.',
   shootMinutes: 15,
+  reelBrief: null,
 });
 
 describe('the day’s ideas read her limits as the agent’s guards do (ADR 0056 § 1)', () => {
@@ -26,7 +27,7 @@ describe('the day’s ideas read her limits as the agent’s guards do (ADR 0056
         liveSignals: new Set([signal]),
       },
     );
-    expect(dropped.map(({ drop }) => drop)).toEqual([{ reason: 'limit', term: 'pied' }]);
+    expect(dropped.map(({ drop }) => drop)).toEqual([{ reason: 'limit', term: 'pied', field: 'toShoot' }]);
     expect(kept.map((one) => one.toShoot)).toEqual(['Un café en terrasse.']);
   });
 });

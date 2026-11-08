@@ -176,6 +176,49 @@ describe('Idées du jour', () => {
     });
   });
 
+  it('writes a reel sheet for a Reel Insta idea, and names the field a guard refused (VEI-08)', async () => {
+    const reel = { ...PROPOSED, category: 'instagram_reel' };
+    const calls = serve({
+      [IDEAS]: list([reel]),
+      [`POST /creators/${CREATOR}/ideas/${PROPOSED.id}/validate`]: () => ({
+        status: 422,
+        body: {
+          error: {
+            code: 'content_idea_guard_unprocessable',
+            message: 'Cette idée enfreint la garde Instagram : corrige-la ou refuse-la',
+            details: { reason: 'instagram_guard', field: 'hook' },
+            requestId: 'r1',
+          },
+        },
+      }),
+    });
+    show();
+    const item = await card('Transition miroir');
+    fireEvent.click(within(item).getByRole('button', { name: 'Corriger' }));
+    fireEvent.change(within(item).getByLabelText(/Première phrase/u), {
+      target: { value: 'Devine ce que je prépare' },
+    });
+    fireEvent.change(within(item).getByLabelText('Plan 1'), { target: { value: 'Reflet dans le miroir' } });
+    fireEvent.change(within(item).getByLabelText('Plan 2'), { target: { value: 'Tenue de soirée' } });
+    fireEvent.click(within(item).getByRole('button', { name: 'Valider avec ces corrections' }));
+    expect(
+      await within(item).findByText(
+        'Cette idée enfreint la garde Instagram : corrige-la ou refuse-la (Première phrase).',
+      ),
+    ).toBeTruthy();
+    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({
+      correction: {
+        reelBrief: {
+          hook: 'Devine ce que je prépare',
+          onScreen: null,
+          shots: ['Reflet dans le miroir', 'Tenue de soirée'],
+          ending: null,
+          seconds: 20,
+        },
+      },
+    });
+  });
+
   it('refuses an idea with an optional reason', async () => {
     const calls = serve({
       [IDEAS]: list([PROPOSED]),
