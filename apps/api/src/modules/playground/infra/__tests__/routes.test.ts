@@ -85,6 +85,7 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
+    readCard: () => Promise.reject(new Error('not used')),
     brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
     voice: async () => {
       await control.hold;

@@ -9,7 +9,7 @@ import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { desireBandOf } from '@impera/contracts';
+import { desireBandOf, MessageIdSchema, newId } from '@impera/contracts';
 import {
   brainAlertId,
   createInMemoryCallLog,
@@ -28,7 +28,9 @@ import {
   measureDesire,
   readPersonaFile,
 } from '../modules/agent/index';
+import { proposalsOfRead } from '../modules/fans/index';
 
+import { checkCardScenario, readCardScenario, type CardScenario } from './evals/card-scenario';
 import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './evals/check';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
@@ -36,6 +38,8 @@ import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario'
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const EVALS = resolve(ROOT, 'evals');
 const SUITES = ['scenarios', 'adversarial', 'regression'] as const;
+/** His card read in his messages (ADR 0085 § 7): its own scenarios, checked without the judge. */
+const CARD_SUITE = 'card';
 const HOUR_MS = 3_600_000;
 
 const { values } = parseArgs({
@@ -54,7 +58,7 @@ const tier = ThresholdsSchema.parse(JSON.parse(readFileSync(resolve(EVALS, 'thre
 
 const files =
   values.file === undefined
-    ? SUITES.flatMap((suite) => {
+    ? [CARD_SUITE, ...SUITES].flatMap((suite) => {
         let names: string[];
         try {
           names = readdirSync(resolve(EVALS, suite));
@@ -87,6 +91,29 @@ console.log(
       : ' (même fournisseur que la voix : notes à lire avec ce biais, voir evals/README.md)'),
 );
 const criteria = JudgeCriterionSchema.options;
+
+/** A card scenario, on the path a real read takes: the read, then the code's checks (§ 3, § 8). */
+async function readCard(scenario: CardScenario): Promise<{ failures: string[]; values: string[] }> {
+  const messages = [
+    ...scenario.history.map((turn) => ({ ...turn, isNew: false })),
+    ...scenario.inbound.map((text) => ({ from: 'fan' as const, text, isNew: true })),
+  ].map((message, index) => ({ ...message, number: index + 1 }));
+  const result = await gateway.readCard({ card: scenario.card, messages });
+  if (!result.ok) return { failures: [`lecture refusée : ${result.error.code}`], values: [] };
+  const at = new Date(`${today}T20:00:00+01:00`);
+  const sources = messages
+    .filter((message) => message.isNew)
+    .map((message) => ({ number: message.number, messageId: newId(MessageIdSchema), at }));
+  const proposals = proposalsOfRead(result.value.output, sources).map((p) => ({
+    field: p.key,
+    kind: p.kind,
+    value: p.value,
+  }));
+  return {
+    failures: checkCardScenario(scenario, { proposals }),
+    values: proposals.map((p) => `${p.field} : ${p.value} (${p.kind})`),
+  };
+}
 
 /** One scenario, on the path a real fan's message takes; nothing leaves. */
 async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Record<string, number> }> {
@@ -205,6 +232,26 @@ for (const path of files) {
   if (gateway.health().budget.state === 'reached') {
     isCapReached = true;
     break;
+  }
+  if (file.startsWith(`${CARD_SUITE}/`)) {
+    let card: CardScenario;
+    try {
+      card = readCardScenario(readFileSync(path, 'utf8'));
+    } catch (error) {
+      results.push({
+        file,
+        failures: [`fichier illisible : ${error instanceof Error ? error.message : 'erreur'}`],
+        scores: {},
+      });
+      continue;
+    }
+    if (card.tier === 'full' && !values.full && values.file === undefined) continue;
+    const { failures, values: read } = await readCard(card);
+    results.push({ file, failures, scores: {} });
+    console.log(`${failures.length === 0 ? 'ok ' : 'KO '} ${file}`);
+    for (const line of read) console.log(`      ${line}`);
+    for (const failure of failures) console.log(`      ✗ ${failure}`);
+    continue;
   }
   let scenario: Scenario;
   try {

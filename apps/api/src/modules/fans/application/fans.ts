@@ -4,6 +4,7 @@ import {
   type CreatorId,
   type ClearableFanFlagName,
   type FanCardField,
+  type FanCardRead,
   type FanFlags,
   type FanId,
   type KycSlot,
@@ -12,6 +13,7 @@ import {
 } from '@impera/contracts';
 
 import { cardOf, planCardEdit, type Card, type CardEdit } from '../domain/card';
+import { cardLinesOf, proposalsOfRead, type ReadSource } from '../domain/card-read';
 import { FanNotFound } from '../domain/errors';
 import {
   kycSlotsToLearn,
@@ -74,6 +76,18 @@ export interface FansService {
     edit: CardEdit,
     author: UserId,
   ): Promise<Card>;
+  /** His card as the AI's read gets it (ADR 0085 § 7): one line per field it shows, with where it comes from. */
+  cardLines(creatorId: CreatorId, fanId: FanId): Promise<string[]>;
+  /**
+   * What the AI read in his new messages (§ 7), checked field by field (§ 3, § 8) against his card read under the
+   * fan's lock, then written like any proposal (§ 6: a chatter's note stands). Returns the facts written.
+   */
+  proposeRead(
+    creatorId: CreatorId,
+    fanId: FanId,
+    read: FanCardRead,
+    sources: readonly ReadSource[],
+  ): Promise<StoredFact[]>;
   /** His limits (`fans.flags`), read by the policy before any offer. */
   flags(creatorId: CreatorId, fanId: FanId): Promise<FanFlags>;
   /**
@@ -131,6 +145,15 @@ export function createFansService(
     getFan: (creatorId, id) => store.get(creatorId, id),
     proposeFacts: (creatorId, fanId, proposals) =>
       facts.write(creatorId, fanId, (current, pending) => planFacts(current, proposals, now(), pending)),
+    cardLines: async (creatorId, fanId) => {
+      const { active, pending } = await facts.card(creatorId, fanId);
+      return cardLinesOf(cardOf(active, pending, now()));
+    },
+    proposeRead: (creatorId, fanId, read, sources) =>
+      facts.write(creatorId, fanId, (current, pending) => {
+        const at = now();
+        return planFacts(current, proposalsOfRead(read, sources, cardOf(current, pending, at)), at, pending);
+      }),
     card: async (creatorId, fanId) => {
       if ((await store.get(creatorId, fanId)) === null) throw new FanNotFound();
       const { active, pending, names } = await facts.card(creatorId, fanId);

@@ -5,6 +5,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createConversationCommands, type ConversationCommands } from './application/commands';
 import { createFollowUpJob } from './application/jobs/follow-up';
+import { createReadCardJob } from './application/jobs/read-card';
 import { createRecordFactsJob } from './application/jobs/record-facts';
 import { createReleaseUnavailableJob } from './application/jobs/release-unavailable';
 import { createReopenJob } from './application/jobs/reopen';
@@ -13,6 +14,7 @@ import { createSendJob } from './application/jobs/send';
 import type {
   AlertNames,
   BubbleGuard,
+  CardReader,
   Clock,
   DraftComposer,
   DraftVoice,
@@ -37,6 +39,7 @@ import { createConversationRoutes, type RequireRole } from './infra/http/routes'
 export { SendRefused } from './domain/errors';
 export type {
   BubbleGuard,
+  CardReader,
   Clock,
   DraftComposer,
   FollowUpContext,
@@ -79,6 +82,8 @@ export interface ConversationsModule extends ConversationCommands {
     respond(payload: JobPayload<'conversation.respond'>, logger: JobLogger): Promise<void>;
     send(payload: JobPayload<'conversation.send'>, logger: JobLogger, attempt: number): Promise<void>;
     recordFacts(payload: JobPayload<'conversation.record_facts'>, logger: JobLogger): Promise<void>;
+    /** `fans.read_card` (ADR 0085 § 7): his new messages read for his card, whoever answers him. */
+    readCard(payload: JobPayload<'fans.read_card'>, logger: JobLogger): Promise<void>;
     followUp(payload: JobPayload<'conversation.follow_up'>, logger: JobLogger): Promise<void>;
     reopen(payload: JobPayload<'conversation.reopen'>, logger: JobLogger): Promise<void>;
     /** Each minute: what members who are no longer `active` still held is handed back (EQ-13). */
@@ -103,6 +108,8 @@ export interface ConversationsDeps {
   readonly guard: BubbleGuard;
   /** The engine (agent module's adapter); without it drafts stay empty for the operator to write. */
   readonly composer?: DraftComposer;
+  /** His card read in his messages (ADR 0085 § 7, agent module's adapter); without it, the card waits for a chatter. */
+  readonly cardReader?: CardReader;
   /** Her follow-up delays (P3-10, agent module's adapter); without it, no follow-up is scheduled. */
   readonly followUps?: FollowUpPlan;
   /** Her hours (P3-14, `persona`); without them she is always open and quiet from 23:00 to 9:00, as before. */
@@ -185,6 +192,13 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         ...(deps.followUps === undefined ? {} : { followUps: deps.followUps }),
       }),
       recordFacts: createRecordFactsJob({ uow, clock, fans: deps.fans }),
+      readCard:
+        deps.cardReader === undefined
+          ? (_payload, logger) => {
+              logger.info({}, 'read_card: no reader, the card waits for a chatter');
+              return Promise.resolve();
+            }
+          : createReadCardJob({ uow, clock, fans: deps.fans, reader: deps.cardReader }),
       followUp: createFollowUpJob({
         uow,
         clock,

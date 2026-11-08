@@ -1,5 +1,6 @@
 import type {
   DropMediaDescription,
+  FanCardRead,
   LlmPurpose,
   MediaDescription,
   Result,
@@ -203,6 +204,27 @@ export interface ScriptSummaryInput {
   readonly trace?: CallTrace;
 }
 
+/** A message of the conversation the card is read in, numbered from 1 in the order they were written. */
+export interface FanCardReadMessage {
+  readonly number: number;
+  readonly from: 'fan' | 'creator';
+  readonly text: string;
+  /** His messages not read yet: the only ones a value may rest on; the others are context. */
+  readonly isNew: boolean;
+}
+
+/**
+ * His card read again in his new messages (ADR 0085 § 7, role `brain`, prompt `brain/fan-card`): the card as it is,
+ * one line per known field, then the conversation. Both come from him, read as data. The call counts in the
+ * « chatting » budget and is refused from the alert on (§ 7: it stops before a fan's answer would).
+ */
+export interface FanCardReadInput {
+  /** `code : valeur (source)`, one line per field the card knows. */
+  readonly card: readonly string[];
+  readonly messages: readonly FanCardReadMessage[];
+  readonly trace?: CallTrace;
+}
+
 export type ChannelPostResult =
   ({ readonly kind: 'post' } & ChannelPostOutput) | ({ readonly kind: 'poll' } & ChannelPollOutput);
 
@@ -261,6 +283,11 @@ export interface LlmGateway {
   channelPost(input: ChannelPostInput): Promise<Result<LlmSuccess<ChannelPostResult>, LlmFailure>>;
   /** A sent script's steps and synthesis (ADR 0083 § 6, prompt `brain/script-summary`), under the daily cap. */
   summarizeScript(input: ScriptSummaryInput): Promise<Result<LlmSuccess<ScriptDropSummary>, LlmFailure>>;
+  /**
+   * What his new messages teach about him, field by field (ADR 0085 § 7). `budget_reached` as soon as the day's
+   * spend is at its alert, so the card never takes what a fan's answer needs.
+   */
+  readCard(input: FanCardReadInput): Promise<Result<LlmSuccess<FanCardRead>, LlmFailure>>;
   health(): HealthReport;
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */
@@ -289,6 +316,7 @@ export interface LlmGatewayDeps {
     readonly creatorDrop?: PromptTemplate;
     readonly channelPost?: PromptTemplate;
     readonly scriptSummary?: PromptTemplate;
+    readonly fanCard?: PromptTemplate;
   };
   /** Secret written in every system prompt: an output that contains it has leaked the prompt. */
   readonly canary?: string;

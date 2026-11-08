@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 
 import {
   err,
+  FanCardReadSchema,
   MEDIA_VOCABULARY_VERSION,
   ok,
   ScriptDropSummarySchema,
@@ -17,6 +18,7 @@ import type { ProviderId } from './config';
 import { alertsBlock, describeBrief, notesBlock, toMessages } from './conversation-messages';
 import type {
   ChannelPostInput,
+  FanCardReadInput,
   LlmFailure,
   LlmGateway,
   LlmGatewayDeps,
@@ -52,6 +54,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   const creatorDropPrompt = prompts.creatorDrop ?? loadPrompt('sense', 'creator-drop');
   const channelPostPrompt = prompts.channelPost ?? loadPrompt('voice', 'telegram-channel');
   const scriptSummaryPrompt = prompts.scriptSummary ?? loadPrompt('brain', 'script-summary');
+  const fanCardPrompt = prompts.fanCard ?? loadPrompt('brain', 'fan-card');
   const canary = deps.canary ?? `nv-${randomBytes(6).toString('hex')}`;
 
   const reportRefusal = (provider: ProviderId, status: 401 | 403): void => {
@@ -368,6 +371,23 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       );
     },
 
+    async readCard(input) {
+      // § 7: the card stops before a fan's answer would, from the day's alert on.
+      const current = status();
+      announce(current);
+      if (current.state !== 'ok') return err({ code: 'budget_reached', attempts: [] });
+      const system = renderPrompt(fanCardPrompt, { canary });
+      const content = fanCardRequest(input);
+      return run(
+        'brain',
+        fanCardPrompt,
+        system,
+        () => Promise.resolve([{ role: 'user', content }]),
+        FanCardReadSchema,
+        input.trace,
+      );
+    },
+
     health() {
       return computeHealth(deps.config, deps.credentials, deps.log, now(), status(), trendWatchStatus());
     },
@@ -454,5 +474,21 @@ function scriptSummaryRequest(input: ScriptSummaryInput): string {
     `Écris la fiche de ce script${moment} : chacune de ses ${String(input.steps.length)} étapes, dans cet ordre, puis le contexte du tournage.`,
     '',
     wrapUntrusted('script_steps', [`# Script « ${input.scriptName} »`, ...steps].join('\n\n')),
+  ].join('\n');
+}
+
+/** The card as it is, then the conversation numbered, his new messages marked: two data blocks. */
+function fanCardRequest(input: FanCardReadInput): string {
+  const card = input.card.length === 0 ? 'Rien de connu.' : input.card.join('\n');
+  const lines = input.messages.map((message) => {
+    const who = message.from === 'fan' ? (message.isNew ? 'Lui, nouveau' : 'Lui') : 'Elle';
+    return `[${String(message.number)}] ${who} : ${message.text}`;
+  });
+  return [
+    'Lis ses nouveaux messages et propose ce qu’ils apprennent de lui, case par case.',
+    '',
+    wrapUntrusted('fan_notes', card),
+    '',
+    wrapUntrusted('fan_message', lines.join('\n')),
   ].join('\n');
 }

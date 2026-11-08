@@ -876,6 +876,13 @@
       "when": 1794163760333,
       "tag": "0149_copilot_live_calibration",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1794171785093,
+      "tag": "0151_fan_card_read",
+      "breakpoints": true
     }
   ]
 }

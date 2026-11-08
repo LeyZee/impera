@@ -50,6 +50,8 @@ export {
   type ConversationTurn,
   type DropContext,
   type DropSenseInput,
+  type FanCardReadInput,
+  type FanCardReadMessage,
   type LlmFailure,
   type LlmGateway,
   type ScriptSummaryInput,
