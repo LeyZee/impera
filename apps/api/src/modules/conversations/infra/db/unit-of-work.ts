@@ -217,7 +217,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
       },
       async rateLive(id, verdict, at) {
         // The version is the draft's own (ADR 0019): a draft written by no model has none, and no rating. Its bubbles
-        // are hers; the fan's words are never copied here (migration 0143).
+        // are hers; the fan's words are never copied here (migration 0146).
         const rows = await tx.execute(sql`
           insert into calibration_ratings
             (id, creator_id, source, draft_id, rated_at, voice_prompt, voice_model, verdict_kind, verdict, bubbles)

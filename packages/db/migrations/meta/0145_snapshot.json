@@ -1,5 +1,5 @@
 {
-  "id": "3364ca25-fe52-4e85-975d-594ac1657c5e",
+  "id": "948cce28-013b-4cc1-9052-2195b19e3610",
   "prevId": "8795ed26-09eb-40e5-a79f-b9ea427d3bef",
   "version": "7",
   "dialect": "postgresql",
@@ -924,20 +924,7 @@
           "name": "session_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'playground'"
-        },
-        "draft_id": {
-          "name": "draft_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "rated_at": {
           "name": "rated_at",
@@ -979,7 +966,7 @@
           "name": "fan_message",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "bubbles": {
           "name": "bubbles",
@@ -1008,22 +995,6 @@
         }
       },
       "indexes": {
-        "calibration_ratings_draft_unique": {
-          "name": "calibration_ratings_draft_unique",
-          "columns": [
-            {
-              "expression": "draft_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"calibration_ratings\".\"draft_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "calibration_ratings_creator_at_idx": {
           "name": "calibration_ratings_creator_at_idx",
           "columns": [
@@ -1088,15 +1059,6 @@
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "calibration_ratings_draft_id_drafts_id_fk": {
-          "name": "calibration_ratings_draft_id_drafts_id_fk",
-          "tableFrom": "calibration_ratings",
-          "tableTo": "drafts",
-          "columnsFrom": ["draft_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1127,13 +1089,9 @@
           "name": "calibration_ratings_destination_check",
           "value": "\"calibration_ratings\".\"destination\" in ('voice_example', 'rule', 'test')"
         },
-        "calibration_ratings_source_check": {
-          "name": "calibration_ratings_source_check",
-          "value": "\"calibration_ratings\".\"source\" in ('playground', 'live')"
-        },
-        "calibration_ratings_source_shape_check": {
-          "name": "calibration_ratings_source_shape_check",
-          "value": "(\"calibration_ratings\".\"source\" = 'playground' and \"calibration_ratings\".\"session_id\" is not null and \"calibration_ratings\".\"draft_id\" is null and \"calibration_ratings\".\"fan_message\" is not null and (\"calibration_ratings\".\"moment\" is null) = (\"calibration_ratings\".\"moment_purged_at\" is not null))\n        or (\"calibration_ratings\".\"source\" = 'live' and \"calibration_ratings\".\"draft_id\" is not null and \"calibration_ratings\".\"session_id\" is null and \"calibration_ratings\".\"fan_message\" is null and \"calibration_ratings\".\"moment\" is null and \"calibration_ratings\".\"moment_purged_at\" is null)"
+        "calibration_ratings_moment_purge_check": {
+          "name": "calibration_ratings_moment_purge_check",
+          "value": "(\"calibration_ratings\".\"moment\" is null) = (\"calibration_ratings\".\"moment_purged_at\" is not null)"
         }
       },
       "isRLSEnabled": false
@@ -2027,6 +1985,158 @@
       },
       "isRLSEnabled": false
     },
+    "public.script_drop_summaries": {
+      "name": "script_drop_summaries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "drop_id": {
+          "name": "drop_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "media_hash": {
+          "name": "media_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "review_reasons": {
+          "name": "review_reasons",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt_hash": {
+          "name": "prompt_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "script_drop_summaries_unique": {
+          "name": "script_drop_summaries_unique",
+          "columns": [
+            {
+              "expression": "drop_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "media_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "prompt_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "script_drop_summaries_creator_idx": {
+          "name": "script_drop_summaries_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "script_drop_summaries_creator_id_creators_id_fk": {
+          "name": "script_drop_summaries_creator_id_creators_id_fk",
+          "tableFrom": "script_drop_summaries",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "script_drop_summaries_drop_fk": {
+          "name": "script_drop_summaries_drop_fk",
+          "tableFrom": "script_drop_summaries",
+          "tableTo": "content_drops",
+          "columnsFrom": ["drop_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "script_drop_summaries_review_reasons_check": {
+          "name": "script_drop_summaries_review_reasons_check",
+          "value": "\"script_drop_summaries\".\"review_reasons\" <@ array['price']::text[]"
+        },
+        "script_drop_summaries_media_hash_check": {
+          "name": "script_drop_summaries_media_hash_check",
+          "value": "\"script_drop_summaries\".\"media_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "script_drop_summaries_content_check": {
+          "name": "script_drop_summaries_content_check",
+          "value": "jsonb_typeof(\"script_drop_summaries\".\"content\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.blind_tests": {
       "name": "blind_tests",
       "schema": "",
@@ -2671,18 +2781,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "placed_by": {
-          "name": "placed_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "placed_at": {
-          "name": "placed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "idempotency_key": {
           "name": "idempotency_key",
           "type": "text",
@@ -2747,15 +2845,6 @@
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "drafts_placed_by_user_id_fk": {
-          "name": "drafts_placed_by_user_id_fk",
-          "tableFrom": "drafts",
-          "tableTo": "user",
-          "columnsFrom": ["placed_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2787,10 +2876,6 @@
         "drafts_status_check": {
           "name": "drafts_status_check",
           "value": "\"drafts\".\"status\" in ('pending', 'approved', 'edited', 'rejected', 'sent', 'failed', 'expired')"
-        },
-        "drafts_placed_check": {
-          "name": "drafts_placed_check",
-          "value": "(\"drafts\".\"placed_by\" is null) = (\"drafts\".\"placed_at\" is null)"
         }
       },
       "isRLSEnabled": false

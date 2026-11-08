@@ -183,6 +183,8 @@ export interface AppOptions {
   readonly trendVision?: Pick<LlmGateway, 'describeTrendCaptures'>;
   /** Tests plug a vision with a fixed description here, for her dropped media (ADR 0083); the app's gateway otherwise. */
   readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe'>;
+  /** Tests plug a brain with a fixed synthesis here, for her sent scripts (ADR 0083 § 6); the app's gateway otherwise. */
+  readonly scriptBrain?: Pick<LlmGateway, 'summarizeScript'>;
   /** Tests plug a voice with a fixed post here, for her channel's posts (ADR 0080 § 5); the app's gateway otherwise. */
   readonly channelVoice?: Pick<LlmGateway, 'channelPost'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
@@ -345,6 +347,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
     },
     vision: options.dropVision ?? llm.gateway,
+    brain: options.scriptBrain ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
   });
   const scripts = wireScripts(shared, {

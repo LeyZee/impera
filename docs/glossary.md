@@ -49,6 +49,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Fait (mémoire) | `fan_fact` | Une information mémorisée sur un fan, avec source, date, confiance, `kind: declared | inferred`. |
 | Qui sont tes fans | `fanInsights`, `GET /v1/creator-space/fan-insights` | Le panneau de la créatrice en tête de Ventes : des parts sur l'ensemble de ses fans, jamais un nombre par case ni un fan seul, tirées de leurs faits déclarés, arrêtées à minuit, et une case ne s'affiche qu'au-delà du seuil (ADR 0065, ADR 0074). |
 | Famille de métiers | `jobFamily` | La case dans laquelle se range un métier dit par un fan, par des mots-clés écrits dans le code (Santé et soin, Étudiant…) ; ce qui ne se reconnaît pas va dans « Autres » (ADR 0074 § 5). |
+| Panneau copilote | `side_panel` de l'extension, `/v1/copilot/*` | Le panneau latéral de l'extension Impera, ouvert à côté de Reveal pendant le shift : où en est le fan, sa fiche, puis le brouillon de l'agent ; le chatteur envoie lui-même dans Reveal, et ce qui est parti fait le verdict (ADR 0086). |
+| Fiche du fan | `FanCardFieldSchema`, `fans.read_card` | Les cases fermées de ce que l'agence sait d'un fan (lui, ce qu'il aime chez elle, l'intime), remplies par l'IA en lisant ses messages et corrigées par un chatteur ; chaque case dit sa source (dit par lui, deviné, noté par un chatteur) et sa date. Jamais vue par la créatrice (ADR 0085). |
 | Note du chatteur | `operator_note` | Ce qu'un chatteur veut qu'elle retienne d'un fan, laissé en rendant la main ; gardé comme un fait de cette catégorie, jamais proposé par un modèle. |
 | Résumé fan | `fan_summary` | Résumé opérationnel régénéré. |
 | Slot KYC | `kyc_slot` | Une information qu'on cherche à apprendre : une ligne du canevas de notes de Reveal (Prénom, Localisation, Âge, Métier, Passions, Envies, Situation), liste fermée `KycSlotSchema`. |
@@ -95,6 +97,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Description de média | `media_description` | La sortie du rôle sens, au vocabulaire Impera. |
 | Description détaillée | `detailed` | La description complète d'un média qu'elle dépose (physique, tenue, pièce, action, son, paroles dans l'ordre), écrite seule par la vision ; s'ajoute à la phrase courte et aux étiquettes (ADR 0083). |
 | Raison de relecture | `review_reason` | Ce que le code lit dans une description qui la fait regarder d'abord par l'agence : renvoi à un autre média, autre personne, doute, drapeau (ADR 0083). |
+| Synthèse du script | `ScriptDropSummary` | Ce que le rôle `brain` écrit d'un script envoyé une fois tous ses médias décrits : la description générale et le résumé de chaque étape, puis le contexte du tournage ; jamais un prix, la grille de l'agence les donne (ADR 0083 § 6). |
 | Offre | `offer` | Une proposition commerciale (média + prix + plancher). Phase 6. |
 | Budget nul | `hasNoBudget` | Drapeau posé par le code quand le fan dit ne pas pouvoir payer : plus aucune offre ni bouderie ni relance de vente tant qu'il ne revient pas de lui-même vers le payant. |
 | Délai entre deux scripts | `cooldownHours` | Temps minimum entre deux scripts proposés à un même fan, lu dans la persona (`strategies.script_launch.cooldown_hours`, réglable par créatrice) ; après, un script ne part que si le fan sexualise de nouveau (`offerDecision`). |

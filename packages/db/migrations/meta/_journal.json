@@ -859,8 +859,15 @@
     {
       "idx": 122,
       "version": "7",
-      "when": 1794160090262,
-      "tag": "0143_copilot_live_calibration",
+      "when": 1794160164499,
+      "tag": "0145_script_drop_summaries",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1794161804454,
+      "tag": "0146_copilot_live_calibration",
       "breakpoints": true
     }
   ]

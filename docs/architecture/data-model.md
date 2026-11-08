@@ -67,7 +67,7 @@ drafts               id, creator_id, conversation_id, status (pending|approved|e
                      decided_by (nullable user_id), decided_at, placed_by (nullable user_id), placed_at (nullable),
                      idempotency_key, created_at
                      placed_by / placed_at : le chatteur l'a mis dans le champ de la plateforme depuis le panneau copilote
-                     (ADR 0086 § 4, migration 0143), les deux ensemble ; le statut ne bouge pas, ce qui part décide (§ 5).
+                     (ADR 0086 § 4, migration 0146), les deux ensemble ; le statut ne bouge pas, ce qui part décide (§ 5).
 blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_id (nullable), rate_per_mille (0 à 1000, 800 = 80 %), recorded_by,
                      recorded_at      (append-only : ni UPDATE ni DELETE pour nirvana_app)
                      Le test à l'aveugle d'une version de la voix et de la persona active (ADR 0019, 0022) ; le dernier
@@ -151,7 +151,7 @@ calibration_ratings   id, creator_id, source (playground|live), session_id (play
                       (voice_example|rule|test, nullable), fan_message (playground), bubbles jsonb, moment jsonb
                       (RatedMoment, opaque, nullable une fois purgé), moment_purged_at, created_at
   Append-only (trigger) : seule la purge de `moment` après 90 jours est permise, le verdict et la version restent.
-  `live` (ADR 0086 § 5, migration 0143) : un vrai brouillon jugé par le panneau copilote, une note par brouillon, la
+  `live` (ADR 0086 § 5, migration 0146) : un vrai brouillon jugé par le panneau copilote, une note par brouillon, la
   version prise sur le brouillon (`prompt_hashes`) ; ni message du fan ni moment (ses mots restent dans la conversation,
   sous leur propre conservation). Un brouillon écrit sans modèle n'a pas de note. Le taux de l'Automatique reste lu sur
   `drafts` (ADR 0019).

@@ -1,6 +1,6 @@
 # 2026-11-08 — Panneau copilote, lot (a) API (ADR 0086)
 
-**Session** : Bilan · **Branche** : `claude/project-thread-a8l1w6` · **Ordre** : lot (a) de l'ADR 0086 (« ok 0086 » de Charles, 08/11, 17 h 11), routes et migration 0143 attribuées par le coordinateur
+**Session** : Bilan · **Branche** : `claude/project-thread-a8l1w6` · **Ordre** : lot (a) de l'ADR 0086 (« ok 0086 » de Charles, 08/11, 17 h 11), routes et migration 0146 attribuées par le coordinateur
 
 ## Fait
 
@@ -9,7 +9,7 @@
 - `POST /v1/copilot/drafts/:draftId/verdict` : liaison par personne (`x-extension-link`), jamais le cookie ; une fois par brouillon (le même geste renvoyé ne crée rien) ; `placed` marque `drafts.placed_by/placed_at` sans changer le statut ; `rejected` passe par la commande de rejet existante et écrit la note `live` dans la même transaction.
 - La liaison de l'extension s'ouvre aux chatteurs actifs, pour ces écritures seulement : les portes de la veille leur répondent 403 `trend_watch_forbidden` (ADR 0060 § 2 inchangé).
 - Interrupteurs `GET/PUT /v1/creators/:id/copilot` (propriétaire, audités), rangés dans `creators.settings.copilot` : fiche allumée, brouillons éteints par défaut.
-- Migration 0143 : `calibration_ratings` gagne `source` et `draft_id` (unique), une note `live` ne garde ni message du fan ni moment ; `drafts` gagne `placed_by`, `placed_at`.
+- Migration 0146 : `calibration_ratings` gagne `source` et `draft_id` (unique), une note `live` ne garde ni message du fan ni moment ; `drafts` gagne `placed_by`, `placed_at`.
 
 ## Reste
 
