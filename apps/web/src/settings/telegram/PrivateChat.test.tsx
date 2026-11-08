@@ -78,8 +78,9 @@ describe('« Mon chat privé » (SEC-05 lot 2)', () => {
 
     vi.mocked(fetchPrivateLink).mockResolvedValue(LINKED);
     comeBack();
-    expect(await screen.findByText('@demo_bot')).toBeTruthy();
-    expect(screen.getByText('06/11/2026')).toBeTruthy();
+    // The linked state itself: « @demo_bot » is on the code's line too, before the bot links the chat.
+    expect(await screen.findByText('06/11/2026')).toBeTruthy();
+    expect(screen.getByText('@demo_bot')).toBeTruthy();
     expect(screen.queryByText('/start ABCDEFGH23')).toBeNull();
   });
 
