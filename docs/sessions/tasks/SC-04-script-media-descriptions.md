@@ -8,7 +8,7 @@ Branche : task/sc-04-script-descriptions
 Chaque média d'un script et de chaque dépôt est décrit par le rôle `sense` ; l'agence valide étape par étape en quelques minutes ; l'identité du script est calculée.
 
 ## Contexte à lire
-ADR 0056 § 6, ADR 0030 § 3, `docs/reference/media-vocabulary.md`, module `media`, PROPOSED-media-library (écran de la médiathèque).
+ADR 0083 (tout dépôt décrit en détail, seul, règle solo, étapes et synthèse), ADR 0056 § 6, ADR 0030 § 3, `docs/reference/media-vocabulary.md`, module `media`, PROPOSED-media-library (écran de la médiathèque).
 
 ## À faire
 - [ ] Description à la réception de chaque média déposé (dépôts de l'ADR 0055 et scripts), une fois par empreinte et par version du descripteur.
