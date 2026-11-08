@@ -48,6 +48,9 @@ describe('prompts', () => {
     const captures = loadPrompt('sense', 'trend-captures');
     expect(captures.header).toMatchObject({ role: 'sense', output_schema: 'TrendCaptureDescription' });
     expect(captures.variables).toEqual(['canary']);
+    const channel = loadPrompt('voice', 'telegram-channel');
+    expect(channel.header.role).toBe('voice');
+    expect(channel.variables).toEqual(['creator_name', 'persona_sheet', 'canary', 'examples']);
   });
 
   it('puts what changes at each message last, so the stable head is cached', () => {

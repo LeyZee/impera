@@ -60,3 +60,10 @@ export class TelegramChannelsUnavailable extends DomainError {
     super('service_unavailable', 'Les canaux Telegram ne sont pas disponibles sur ce serveur');
   }
 }
+
+/** ADR 0080 § 7: the server has no voice wired for her channel's posts (no LLM in this process). */
+export class TelegramChannelWriterUnavailable extends DomainError {
+  constructor() {
+    super('service_unavailable', 'L’écriture des posts du canal n’est pas disponible sur ce serveur');
+  }
+}

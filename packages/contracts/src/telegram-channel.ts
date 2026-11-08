@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { IsoDaySchema } from './agent-hours';
 import { refusalBodySchema } from './errors';
+import { GuardCodeSchema } from './guards';
 import { CreatorIdSchema } from './ids';
 import { MinuteOfDaySchema } from './scheduling';
 import { TelegramChatIdSchema, TelegramMembershipSchema } from './telegram';
@@ -25,11 +26,22 @@ export const CHANNEL_PREVIEW_MAX = 240;
 export const REDIRECT_URL_MAX = 2048;
 
 /**
+ * What a slot's post is for (ADR 0080 § 1.5): the main post, a media and the link that leads to her platform, one a
+ * day at most; or a post of engagement, a question, a moment or a poll, without a link.
+ */
+export const ChannelSlotRoleSchema = z.enum(['main', 'engagement']);
+export type ChannelSlotRole = z.infer<typeof ChannelSlotRoleSchema>;
+
+/** The main post's hour (Charles, 08/11/2026): a slot stored before roles existed is the main one at 19 h. */
+export const CHANNEL_MAIN_MINUTE = 19 * 60;
+
+/**
  * A slot: an hour on her clock and the days it goes out (ADR 0080 § 1.1), switched off without being deleted. The
  * days are kept sorted and distinct.
  */
 export const ChannelSlotSchema = z.object({
   minute: MinuteOfDaySchema,
+  role: ChannelSlotRoleSchema,
   days: z
     .array(IsoDaySchema)
     .min(1, 'Choisis au moins un jour')
@@ -64,11 +76,22 @@ export const RedirectUrlSchema = z
   .trim()
   .refine(isRedirectUrl, 'Une adresse complète qui commence par https://, sans espace');
 
-/** A redirect link of hers (ADR 0080 § 4.1): a name the agency gives it and its address. */
+export const LINK_DESTINATION_MAX = 120;
+
+/**
+ * A redirect link of hers (ADR 0080 § 4): a name the agency gives it, its address, and where it leads in a few words
+ * (« mon live TikTok ce soir 21 h ») for the post to speak of that place (§ 4.5). Empty: the post names no place.
+ */
 export const RedirectLinkSchema = z.object({
   id: RedirectLinkIdSchema,
   name: z.string().trim().min(1, 'Donne-lui un nom').max(60),
   url: RedirectUrlSchema,
+  destination: z
+    .string()
+    .trim()
+    .max(LINK_DESTINATION_MAX)
+    .refine((text) => !labelHasAddress(text), 'Où il mène se dit sans adresse')
+    .default(''),
 });
 export type RedirectLink = z.infer<typeof RedirectLinkSchema>;
 
@@ -77,8 +100,19 @@ export type RedirectLink = z.infer<typeof RedirectLinkSchema>;
  * or `t.me`. The address of a post is the code's, never the text's.
  */
 export function labelHasAddress(text: string): boolean {
-  return /https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,}(?:\/|$|\s)/iu.test(text);
+  // A domain ends where letters and digits stop (« tiktok.com, », « (t.me) », « café.fr »). Its ending is in lower case
+  // as people type one: « Reveal.Viens », « St.Valentin » are sentences, « mon Reveal.me » is an address.
+  return /[Hh][Tt][Tt][Pp][Ss]?:\/\/|[Ww][Ww][Ww]\.|[\p{L}\p{N}-]+\.[a-z]{2,}(?![\p{L}\p{N}-])/u.test(text);
 }
+
+/** ADR 0080 § 5.5: the agency's example posts the prompt reads, ten at most, each a Telegram caption at most. */
+export const CHANNEL_EXAMPLES_MAX = 10;
+export const CHANNEL_EXAMPLE_MAX = 1000;
+export const ChannelExampleSchema = z
+  .string()
+  .trim()
+  .min(1, 'Un exemple vide')
+  .max(CHANNEL_EXAMPLE_MAX, `${String(CHANNEL_EXAMPLE_MAX)} caractères au plus`);
 
 /** ADR 0080 § 4.3: a short text that carries the link, or the bare address. */
 export const ChannelLinkFormSchema = z.enum(['label', 'bare']);
@@ -104,6 +138,11 @@ export const TelegramChannelConfigSchema = z
     links: z.array(RedirectLinkSchema).max(REDIRECT_LINKS_MAX),
     /** The link of the channel, one of `links`; null: no post goes out (ADR 0080 § 4.4). */
     channelLinkId: RedirectLinkIdSchema.nullable(),
+    /**
+     * Her channel's posts the agency chose as examples (ADR 0080 § 5.5), real text kept in the base only, never in the
+     * repository. Absent from a setting saved before: none.
+     */
+    examples: z.array(ChannelExampleSchema).max(CHANNEL_EXAMPLES_MAX).default([]),
   })
   .superRefine((config, ctx) => {
     if (config.linkForm === 'label' && config.linkLabel === '') {
@@ -121,13 +160,14 @@ export type TelegramChannelConfig = z.infer<typeof TelegramChannelConfigSchema>;
 /** 19 h every day, shown an hour before, out on its own (Charles, 07/11/2026 12h26). */
 export const DEFAULT_TELEGRAM_CHANNEL_CONFIG: TelegramChannelConfig = {
   chatId: null,
-  slots: [{ minute: 19 * 60, days: [1, 2, 3, 4, 5, 6, 7], enabled: true }],
+  slots: [{ minute: CHANNEL_MAIN_MINUTE, role: 'main', days: [1, 2, 3, 4, 5, 6, 7], enabled: true }],
   previewMinutes: 60,
   publishWithoutValidation: true,
   linkForm: 'label',
   linkLabel: 'Viens me parler ✨',
   links: [],
   channelLinkId: null,
+  examples: [],
 };
 
 /** A channel the agency's bot sits in, as the screen offers it. */
@@ -172,6 +212,7 @@ export type SaveTelegramChannelBody = z.infer<typeof SaveTelegramChannelBodySche
 export const ChannelRefusalKindSchema = z.enum([
   'too_many_posts',
   'slots_too_close',
+  'two_main_posts',
   'link_name_taken',
   'link_url_taken',
   'channel_link_unknown',
@@ -188,3 +229,79 @@ export type ChannelRefusal = z.infer<typeof ChannelRefusalSchema>;
 /** `PUT` refused (400), in the common body (MOT-13). */
 export const TELEGRAM_CHANNEL_INVALID = 'telegram_channel_invalid';
 export const TelegramChannelRefusalBodySchema = refusalBodySchema(ChannelRefusalKindSchema);
+
+/**
+ * A post of her channel tried in the playground (ADR 0080 § 7, mode « Post du canal »): the main post (§ 5.8), a post
+ * of engagement, or a poll (§ 5.7), written by the same path as production, never sent.
+ * `POST /v1/creators/:creatorId/telegram-channel/try`.
+ */
+export const ChannelPostKindSchema = z.enum(['main', 'engagement', 'poll']);
+export type ChannelPostKind = z.infer<typeof ChannelPostKindSchema>;
+
+export const CHANNEL_MEDIA_TEXT_MAX = 600;
+export const CHANNEL_ADVICE_MAX = 500;
+/** Telegram: a poll's question holds 300 characters, an answer 100; kept shorter, as she would write them. */
+export const CHANNEL_POLL_QUESTION_MAX = 200;
+export const CHANNEL_POLL_OPTION_MAX = 60;
+export const CHANNEL_POLL_OPTIONS_MIN = 2;
+export const CHANNEL_POLL_OPTIONS_MAX = 4;
+
+export const TryChannelPostBodySchema = z.object({
+  kind: ChannelPostKindSchema,
+  /** The media the post goes with, described in words; null: a text alone. */
+  media: z.string().trim().min(1).max(CHANNEL_MEDIA_TEXT_MAX).nullable(),
+  /** The agency's advice (§ 2.3), a subject, an angle, a piece of news; null: none. */
+  advice: z.string().trim().min(1).max(CHANNEL_ADVICE_MAX).nullable(),
+  /** One of her links for this post only (§ 4.6); null: the channel's link. Only the main post carries one. */
+  linkId: RedirectLinkIdSchema.nullable(),
+});
+export type TryChannelPostBody = z.infer<typeof TryChannelPostBodySchema>;
+
+/** A piece of a post's text as Telegram shows it: the voice marks bold and underline, the code renders them. */
+export const ChannelTextSegmentSchema = z.object({
+  text: z.string(),
+  style: z.enum(['plain', 'bold', 'underline']),
+});
+export type ChannelTextSegment = z.infer<typeof ChannelTextSegmentSchema>;
+
+export const ChannelPostDraftSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('post'),
+    segments: z.array(ChannelTextSegmentSchema),
+    /** The link the code adds at the end, as it reads; null when the channel has none. */
+    link: z.object({ text: z.string().min(1), url: z.string().min(1), name: z.string().min(1) }).nullable(),
+    /** The message as sent to Telegram (`parse_mode` HTML), escaped by the code. */
+    html: z.string(),
+  }),
+  z.object({
+    kind: z.literal('poll'),
+    question: z.string().min(1).max(CHANNEL_POLL_QUESTION_MAX),
+    options: z
+      .array(z.string().min(1).max(CHANNEL_POLL_OPTION_MAX))
+      .min(CHANNEL_POLL_OPTIONS_MIN)
+      .max(CHANNEL_POLL_OPTIONS_MAX),
+  }),
+]);
+export type ChannelPostDraft = z.infer<typeof ChannelPostDraftSchema>;
+
+/** A guard the draft meets (§ 5.4): a blocking one keeps it from going out. */
+export const ChannelPostViolationSchema = z.object({
+  code: GuardCodeSchema,
+  blocking: z.boolean(),
+  match: z.string().nullable(),
+});
+export type ChannelPostViolation = z.infer<typeof ChannelPostViolationSchema>;
+
+export const TriedChannelPostSchema = z.object({
+  draft: ChannelPostDraftSchema,
+  violations: z.array(ChannelPostViolationSchema),
+  /** Her persona version that wrote it, as the playground names it. */
+  personaVersion: z.string().min(1),
+});
+export type TriedChannelPost = z.infer<typeof TriedChannelPostSchema>;
+
+/** Why a try is refused (400). */
+export const ChannelTryRefusalKindSchema = z.enum(['no_persona', 'link_unknown', 'llm_unavailable']);
+export type ChannelTryRefusalKind = z.infer<typeof ChannelTryRefusalKindSchema>;
+export const TELEGRAM_CHANNEL_TRY_REFUSED = 'telegram_channel_try_invalid';
+export const ChannelTryRefusalBodySchema = refusalBodySchema(ChannelTryRefusalKindSchema);

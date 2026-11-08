@@ -1,6 +1,10 @@
 import {
+  ChannelTryRefusalBodySchema,
   CreatorIdSchema,
   RefusalError,
+  TELEGRAM_CHANNEL_TRY_REFUSED,
+  TriedChannelPostSchema,
+  TryChannelPostBodySchema,
   SaveTelegramChannelBodySchema,
   TELEGRAM_CHANNEL_INVALID,
   TelegramChannelRefusalBodySchema,
@@ -20,6 +24,7 @@ import {
   TelegramSalesSettingsSchema,
   TelegramTestResultSchema,
   TelegramTopicSchema,
+  type ChannelTryRefusalKind,
 } from '@impera/contracts';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -46,6 +51,12 @@ export interface TelegramRoutesOptions {
 const BotParamsSchema = z.object({ id: TelegramBotIdSchema });
 const ChatParamsSchema = z.object({ id: TelegramChatIdSchema });
 const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
+
+const TRY_REFUSALS: Readonly<Record<ChannelTryRefusalKind, string>> = {
+  no_persona: 'Elle n’a pas de persona active : active une version dans Créatrices › Persona.',
+  link_unknown: 'Ce lien n’existe plus dans son canal : choisis-en un autre.',
+  llm_unavailable: 'Aucun modèle n’a répondu, ou le budget du jour est atteint. Réessaie plus tard.',
+};
 
 /**
  * `/v1/settings/telegram` (task P3-07). No answer ever carries a token; the request body is redacted from the logs
@@ -226,6 +237,30 @@ export function createTelegramRoutes(
         );
         if (result === null) throw new TelegramChannelCreatorNotFound();
         if (!result.ok) throw new RefusalError(TELEGRAM_CHANNEL_INVALID, result.error);
+        return result.value;
+      },
+    );
+
+    // ADR 0080 § 7: the playground's « Post du canal », written as production will and never sent. A model call each
+    // time, journaled against her under the daily cap.
+    app.post(
+      '/creators/:creatorId/telegram-channel/try',
+      {
+        schema: {
+          params: CreatorParamsSchema,
+          body: TryChannelPostBodySchema,
+          response: { 200: TriedChannelPostSchema, 400: ChannelTryRefusalBodySchema },
+        },
+      },
+      async (request) => {
+        const result = await telegram.tryChannelPost(request.params.creatorId, request.body);
+        if (result === null) throw new TelegramChannelCreatorNotFound();
+        if (!result.ok) {
+          throw new RefusalError(TELEGRAM_CHANNEL_TRY_REFUSED, {
+            kind: result.error,
+            message: TRY_REFUSALS[result.error],
+          });
+        }
         return result.value;
       },
     );

@@ -1,11 +1,15 @@
 import {
   ApiErrorSchema,
+  ChannelTryRefusalBodySchema,
   REAUTHENTICATION_ERROR_CODE,
   TelegramChannelRefusalBodySchema,
   TelegramChannelViewSchema,
+  TriedChannelPostSchema,
   refusalOf,
   type TelegramChannelConfig,
   type TelegramChannelView,
+  type TriedChannelPost,
+  type TryChannelPostBody,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
@@ -103,3 +107,38 @@ export const saveTelegramChannel = (
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ config }),
   });
+
+/**
+ * A post of her channel written as production will, never sent (ADR 0080 § 7, Entraîner › Post du canal). A refusal
+ * (no persona, a link gone, no model) is a `ChannelRefused` with its sentence.
+ */
+export async function tryChannelPost(creatorId: string, body: TryChannelPostBody): Promise<TriedChannelPost> {
+  const what = 'POST telegram-channel/try';
+  let response: Response;
+  try {
+    response = await fetch(`${path(creatorId)}/try`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new ChannelError('unavailable', `${what}: réseau`);
+  }
+  const detail = `${what}: ${String(response.status)}`;
+  const answer: unknown = await response.json().catch(() => null);
+  if (response.ok) {
+    const tried = TriedChannelPostSchema.safeParse(answer);
+    if (tried.success) return tried.data;
+    throw new ChannelError('unavailable', `${detail}, réponse inattendue`);
+  }
+  if (response.status === 400) {
+    const refused = ChannelTryRefusalBodySchema.safeParse(answer);
+    if (refused.success) throw new ChannelRefused(refusalOf(refused.data).message);
+    throw new ChannelError('rejected', detail);
+  }
+  if (response.status === 401) throw new ChannelError('session_expired', detail);
+  if (response.status === 403) throw new ChannelError('forbidden', detail);
+  if (response.status === 404) throw new ChannelError('not_found', detail);
+  throw new ChannelError('unavailable', detail);
+}

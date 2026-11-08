@@ -1,5 +1,6 @@
 import type {
   ChannelRefusal,
+  ChannelTryRefusalKind,
   CreatorId,
   Result,
   TelegramBot,
@@ -15,6 +16,8 @@ import type {
   TelegramSaleSettingsEntry,
   TelegramSalesSettings,
   TelegramTopic,
+  TriedChannelPost,
+  TryChannelPostBody,
 } from '@impera/contracts';
 
 /** What the routes and other modules (the Dashboard) use; the jobs are separate (index.ts). */
@@ -49,4 +52,12 @@ export interface TelegramApi {
     config: TelegramChannelConfig,
     userId: string,
   ): Promise<Result<TelegramChannelView, ChannelRefusal> | null>;
+  /**
+   * A post of her channel written as production will, never sent (ADR 0080 § 7, « Post du canal »); null when she
+   * does not exist or is archived.
+   */
+  tryChannelPost(
+    creatorId: CreatorId,
+    body: TryChannelPostBody,
+  ): Promise<Result<TriedChannelPost, ChannelTryRefusalKind> | null>;
 }
