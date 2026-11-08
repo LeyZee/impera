@@ -13,6 +13,8 @@ import type {
   CreatorTicksBody,
   CreatorTicksResult,
   DeclineSuggestionBody,
+  IdeaDropCategory,
+  ReelBrief,
   UpdateCreatorTaskBody,
 } from '@impera/contracts';
 
@@ -35,7 +37,17 @@ export interface CreatorAgendaStore {
 
 /** The agency's side (`withTenantMember`): the owner and an active manager suggest and read what she did. */
 export interface AgencySuggestionStore {
-  create(creatorId: string, userId: string, body: CreateSuggestionBody, now: Date): Promise<AgencySuggestion>;
+  /**
+   * `check` runs once the member may suggest and before anything is written: the guards of a shoot for a drop category
+   * (ADR 0082 § 3), which throw to refuse it. A replay of a suggestion already written is not read again.
+   */
+  create(
+    creatorId: string,
+    userId: string,
+    body: CreateSuggestionBody,
+    now: Date,
+    check: () => Promise<void>,
+  ): Promise<AgencySuggestion>;
   list(creatorId: string, userId: string, week: string): Promise<AgencySuggestionList>;
   /** A shoot of hers with its sheet, in the first room of her dispos or undated (VEI-01 d). */
   suggestShoot(
@@ -55,6 +67,8 @@ export interface ShootSuggestion {
   readonly title: string;
   readonly purpose: string | null;
   readonly shootBrief: string;
+  /** Its reel sheet, for a Reel Insta (ADR 0082 § 3). */
+  readonly reelBrief: ReelBrief | null;
   readonly minutes: number;
 }
 
@@ -67,3 +81,24 @@ export interface ReminderSource {
     readonly accounts: readonly string[];
   } | null>;
 }
+
+/** A shoot the agency suggests by hand for a drop category, as the guards read it (ADR 0082 § 3). */
+export interface GuardedShoot {
+  readonly title: string;
+  readonly purpose: string | null;
+  readonly dropCategory: IdeaDropCategory;
+  readonly reelBrief: ReelBrief | null;
+}
+
+/** What such a shoot breaks: the reading of the trend watch's guards, with the field at fault. */
+export interface ShootGuardFault {
+  readonly reason: 'no_persona' | 'limit' | 'nudity' | 'instagram_guard';
+  /** `title`, `purpose`, `hook`, `onScreen`, `shots` or `ending`; `null` without a persona. */
+  readonly field: string | null;
+}
+
+/**
+ * The guards of an idea, handed by the composition root (`trends` reads them, with her persona's limits): the agenda
+ * imports no other module.
+ */
+export type ShootGuard = (creatorId: string, shoot: GuardedShoot) => Promise<ShootGuardFault | null>;

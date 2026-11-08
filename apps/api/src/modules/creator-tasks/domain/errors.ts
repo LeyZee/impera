@@ -6,6 +6,7 @@ import {
   CREATOR_TICK_LATE_UNPROCESSABLE,
   DomainError,
   SUGGESTION_DECLINED_RECENTLY_CONFLICT,
+  SUGGESTION_GUARD_UNPROCESSABLE,
   SUGGESTION_ID_CONFLICT,
   SUGGESTION_KIND_UNPROCESSABLE,
   SUGGESTION_NOT_FOUND,
@@ -13,6 +14,8 @@ import {
   SUGGESTION_PAST_UNPROCESSABLE,
   SUGGESTION_UNDATED_UNPROCESSABLE,
 } from '@impera/contracts';
+
+import type { ShootGuardFault } from './ports';
 
 /** Her agenda's refusals (contracts `creator-tasks.ts`), in her words. */
 
@@ -115,5 +118,23 @@ export class SuggestionKindChanged extends DomainError {
 export class SuggestionIdTaken extends DomainError {
   constructor() {
     super(SUGGESTION_ID_CONFLICT, 'Cet identifiant de suggestion sert déjà : recharge la page');
+  }
+}
+
+/**
+ * A shoot suggested by hand for a drop category that touches one of her limits or breaks a guard of that output
+ * (ADR 0082 § 3): corrected, or not suggested. `field` names the field at fault, `null` without a persona.
+ */
+export class SuggestionGuarded extends DomainError {
+  constructor(fault: ShootGuardFault) {
+    const messages = {
+      no_persona: 'Sans persona active, aucun tournage pour une sortie ne part chez elle',
+      limit: 'Ce tournage touche une de ses limites : corrige-le',
+      nudity: 'Ce tournage parle de nu pour une sortie publique : corrige-le',
+      instagram_guard: 'Ce tournage enfreint la garde Instagram : corrige-le',
+    };
+    super(SUGGESTION_GUARD_UNPROCESSABLE, messages[fault.reason], {
+      details: { reason: fault.reason, field: fault.field },
+    });
   }
 }

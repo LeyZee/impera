@@ -212,6 +212,8 @@ export const contentIdeas = pgTable(
     toShoot: text('to_shoot').notNull(),
     reason: text('reason').notNull(),
     shootMinutes: integer('shoot_minutes').notNull(),
+    /** Its reel sheet (`ReelBriefSchema`, ADR 0082 § 3), only for a Reel Insta; parsed on write and on read. */
+    reelBrief: jsonb('reel_brief'),
     state: enumText('state').notNull().default('proposed'),
     /** The day it was proposed, in her time zone. */
     proposedOn: date('proposed_on').notNull(),
@@ -241,6 +243,10 @@ export const contentIdeas = pgTable(
       sql`char_length(${t.title}) between 1 and 80 and char_length(${t.toShoot}) between 1 and 600 and char_length(${t.reason}) between 1 and 200`,
     ),
     check('content_ideas_shoot_minutes_check', sql`${t.shootMinutes} between 1 and 600`),
+    check(
+      'content_ideas_reel_brief_check',
+      sql`${t.reelBrief} is null or (jsonb_typeof(${t.reelBrief}) = 'object' and ${t.category} = 'instagram_reel')`,
+    ),
     check(
       'content_ideas_refusal_check',
       sql`${t.refusalReason} is null or (${t.state} = 'refused' and char_length(${t.refusalReason}) between 1 and 280)`,

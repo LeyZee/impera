@@ -7,6 +7,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { ContentDropsModule, IdeaContentRequest } from '../content-drops';
 import type { CreatorTasksModule } from '../creator-tasks';
 
+export { shootGuardFault } from './application/decide';
 import { followDecision, followDeposit } from './application/follow';
 import { createDrizzleIdeaFollowStore, createDrizzleIdeaStore } from './infra/db/idea-store';
 import { createDrizzleExtensionLinkStore } from './infra/db/link-store';
@@ -14,7 +15,6 @@ import { createDrizzleReadingStore } from './infra/db/reading-store';
 import { createDrizzleSignalStore } from './infra/db/signal-store';
 import { createTrendRoutes, type RequireRole } from './infra/http/routes';
 import { createGatewayCaptureVision } from './infra/vision';
-
 export interface TrendsModule {
   readonly name: 'trends';
   /**

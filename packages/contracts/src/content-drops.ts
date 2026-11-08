@@ -31,6 +31,14 @@ export const DropCategorySchema = z.enum(DROP_CATEGORIES);
 export type DropCategory = z.infer<typeof DropCategorySchema>;
 
 /**
+ * The categories an idea or a shoot suggestion may ask (ADR 0060 § 4): every drop category but `script`. A script is
+ * asked with a structure of the library and its frozen version (ADR 0056), chosen by the team: an idea, written by the
+ * model or corrected by the agency, never asks one, and neither does a shoot the agency suggests by hand.
+ */
+export const IdeaDropCategorySchema = DropCategorySchema.exclude(['script']);
+export type IdeaDropCategory = z.infer<typeof IdeaDropCategorySchema>;
+
+/**
  * The categories that leave for a public output (ADR 0055 § 1: feed, stories, Instagram, Telegram), where « jamais de
  * nu » holds. A script and a relance go to one fan, behind a payment or in a conversation.
  */

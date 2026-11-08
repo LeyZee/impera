@@ -28,7 +28,8 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import type { AgencySuggestionStore, CreatorAgendaStore } from '../../domain/ports';
+import { suggestTask } from '../../application/suggest';
+import type { AgencySuggestionStore, CreatorAgendaStore, ShootGuard } from '../../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -67,6 +68,7 @@ const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
 export function createCreatorTaskRoutes(
   agenda: CreatorAgendaStore,
   agency: AgencySuggestionStore,
+  guard: ShootGuard,
   requireRole: RequireRole,
   clock: () => Date = () => new Date(),
 ): FastifyPluginAsyncZod {
@@ -185,7 +187,14 @@ export function createCreatorTaskRoutes(
           response: { 200: AgencySuggestionSchema },
         },
       },
-      (request) => agency.create(request.params.creatorId, signedIn(request.user), request.body, clock()),
+      (request) =>
+        suggestTask(
+          { store: agency, guard },
+          request.params.creatorId,
+          signedIn(request.user),
+          request.body,
+          clock(),
+        ),
     );
 
     app.get(

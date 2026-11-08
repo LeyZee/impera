@@ -1,10 +1,13 @@
-import { JOB_PAYLOADS } from '@impera/contracts';
+import { CreatorIdSchema, JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
 import { createCreatorTasksModule, type CreatorTasksModule } from '../modules/creator-tasks';
 import type { NotificationsModule } from '../modules/notifications';
+import type { PersonaModule } from '../modules/persona';
+import { shootGuardFault } from '../modules/trends';
 
 import type { Routes, Shared, TasksNamed } from './shared';
+import { personaLimitsOf } from './trends';
 
 export interface WiredCreatorTasks {
   readonly module: CreatorTasksModule;
@@ -15,16 +18,21 @@ export interface WiredCreatorTasks {
 
 /**
  * Her agenda (CR-05): the time helpers come from `scheduling/pure.ts`; her reminders ring through the `notifications`
- * module's `notify` (lot b3).
+ * module's `notify` (lot b3); a shoot suggested by hand for a drop category reads the trend watch's guards with her
+ * persona's limits (ADR 0082 § 3).
  */
 export function wireCreatorTasks(
   shared: Shared,
-  deps: { readonly notifications: NotificationsModule },
+  deps: { readonly notifications: NotificationsModule; readonly persona: PersonaModule },
 ): WiredCreatorTasks {
+  const limitsOf = personaLimitsOf(deps.persona);
   const module = createCreatorTasksModule({
     db: shared.db,
     adminDb: shared.adminDb,
     requireRole: shared.requireRole,
+    // A shoot suggested by hand for a drop category reads the guards of an idea (ADR 0082 § 3).
+    guardShoot: async (creatorId, shoot) =>
+      shootGuardFault(shoot, await limitsOf(CreatorIdSchema.parse(creatorId))),
     notify: deps.notifications.notify,
   });
   return {

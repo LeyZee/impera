@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { IsoDaySchema } from './agent-hours';
+import { IdeaDropCategorySchema, type IdeaDropCategory } from './content-drops';
 import { AvailabilityIdSchema, CreatorTaskIdSchema, SuggestionIdSchema } from './ids';
 import { MinuteOfDaySchema } from './scheduling';
 import { CalendarDaySchema } from './team-members';
@@ -60,6 +61,67 @@ export const CreatorTaskPurposeSchema = z.string().trim().min(1).max(160);
  */
 export const ShootBriefSchema = z.string().trim().min(1).max(600);
 
+/*
+ * Her reel sheet (ADR 0082 § 3, VEI-08): beside the shooting sheet of a shoot for an Instagram Reel, what she draws a
+ * reel from rather than reads it from a paragraph. Its bounds are here, once: they hold for the model, for the
+ * agency's correction and for a sheet written by hand, and the agency's form counts with the same functions.
+ */
+
+/** Her first sentence, said or read in the first three seconds. */
+export const REEL_HOOK_WORDS_MAX = 8;
+/** The text on screen, optional. */
+export const REEL_ON_SCREEN_WORDS_MAX = 6;
+export const REEL_SHOTS_MIN = 2;
+export const REEL_SHOTS_MAX = 6;
+/** A line of the sheet: a shot, the ending, and the most a first sentence or a text on screen may be long. */
+export const REEL_LINE_MAX = 80;
+export const REEL_SECONDS_MIN = 5;
+export const REEL_SECONDS_MAX = 90;
+
+/**
+ * A word: letters or digits in a row, an apostrophe or a hyphen inside one never cutting it (« j'ai » and « peut-être »
+ * are one word each). An emoji and punctuation count for nothing.
+ */
+const WORD = /[\p{L}\p{N}][\p{L}\p{N}\p{M}]*(?:['’‐-][\p{L}\p{N}][\p{L}\p{N}\p{M}]*)*/gu;
+
+/** How many words a text has: the one count of the schema and of the form's counters, so they never disagree. */
+export function countWords(text: string): number {
+  return text.match(WORD)?.length ?? 0;
+}
+
+/**
+ * The text kept to its first `max` words, ending where the last kept word ends: what a field that takes no word more
+ * keeps of a keystroke or a paste. A text within its bound is answered as it is.
+ */
+export function keepWords(text: string, max: number): string {
+  let kept = 0;
+  for (const match of text.matchAll(WORD)) {
+    kept += 1;
+    if (kept === max) return countWords(text) > max ? text.slice(0, match.index + match[0].length) : text;
+  }
+  return text;
+}
+
+const reelLine = z.string().trim().min(1).max(REEL_LINE_MAX);
+const atMostWords = (max: number) =>
+  reelLine.refine((text) => countWords(text) >= 1 && countWords(text) <= max, {
+    message: `De 1 à ${String(max)} mots`,
+  });
+
+export const ReelBriefSchema = z.strictObject({
+  hook: atMostWords(REEL_HOOK_WORDS_MAX),
+  onScreen: atMostWords(REEL_ON_SCREEN_WORDS_MAX).nullable(),
+  /** In the order she shoots them, a line each. */
+  shots: z.array(reelLine).min(REEL_SHOTS_MIN).max(REEL_SHOTS_MAX),
+  /** What brings the end back to the start, so that the reel is watched again. */
+  ending: reelLine.nullable(),
+  seconds: z.number().int().min(REEL_SECONDS_MIN).max(REEL_SECONDS_MAX),
+});
+export type ReelBrief = z.infer<typeof ReelBriefSchema>;
+
+/** The one drop category a reel sheet goes with (ADR 0055 § 1). */
+export const REEL_DROP_CATEGORY = 'instagram_reel' satisfies IdeaDropCategory;
+
 /** The longest a timed task or a dispo lasts: a day. */
 export const CREATOR_TASK_MAX_MINUTES = 24 * 60;
 
@@ -115,6 +177,8 @@ export const CreatorTaskSchema = z.strictObject({
   purpose: CreatorTaskPurposeSchema.nullable(),
   /** Her shooting sheet, copied from the suggestion she accepted; `null` for any other task, and for an agenda kept on her phone from before it existed. */
   shootBrief: ShootBriefSchema.nullable().default(null),
+  /** Her reel sheet, copied with it (ADR 0082 § 3); `null` for any other task. */
+  reelBrief: ReelBriefSchema.nullable().default(null),
   essential: z.boolean(),
   /** Minutes before a timed task she wants a reminder, `null` for none. */
   reminderMinutes: z.number().int().min(0).max(1440).nullable(),
@@ -221,6 +285,8 @@ export const CreatorSuggestionSchema = z.strictObject({
   purpose: CreatorTaskPurposeSchema.nullable(),
   /** The shooting sheet she reads before she accepts (an idea's « à tourner »), `null` for none. */
   shootBrief: ShootBriefSchema.nullable().default(null),
+  /** The reel sheet beside it, for a shoot of an Instagram Reel (ADR 0082 § 3), `null` for none. */
+  reelBrief: ReelBriefSchema.nullable().default(null),
   essential: z.boolean(),
 });
 export type CreatorSuggestion = z.infer<typeof CreatorSuggestionSchema>;
@@ -288,13 +354,29 @@ export const SuggestionOriginSchema = z.enum(SUGGESTION_ORIGINS);
  * stays undated, in « Ma semaine » of its week. A routine suggestion is essential once she accepts it. A task she
  * declined that week or the week before answers 409 `creator_suggestion_declined_recently_conflict`.
  */
-export const CreateSuggestionBodySchema = z.strictObject({
-  id: SuggestionIdSchema,
-  when: PlannedWhenSchema,
-  category: CreatorTaskCategorySchema,
-  title: CreatorTaskTitleSchema,
-  purpose: CreatorTaskPurposeSchema.nullable().default(null),
-});
+export const CreateSuggestionBodySchema = z
+  .strictObject({
+    id: SuggestionIdSchema,
+    when: PlannedWhenSchema,
+    category: CreatorTaskCategorySchema,
+    title: CreatorTaskTitleSchema,
+    purpose: CreatorTaskPurposeSchema.nullable().default(null),
+    /**
+     * What a shoot is for (ADR 0082 § 3): a drop category, its label her « À quoi ça sert » when none is written. Set,
+     * the suggestion is read against her limits and the guards of that output before it enters her agenda.
+     */
+    dropCategory: IdeaDropCategorySchema.nullable().default(null),
+    /** The reel sheet the agency writes by hand, only for a shoot of an Instagram Reel. */
+    reelBrief: ReelBriefSchema.nullable().default(null),
+  })
+  .refine((body) => body.dropCategory === null || body.category === 'shoot', {
+    message: 'Seul un tournage a une catégorie de dépôt',
+    path: ['dropCategory'],
+  })
+  .refine((body) => body.reelBrief === null || body.dropCategory === REEL_DROP_CATEGORY, {
+    message: 'Une fiche reel va seulement avec un Reel Insta',
+    path: ['reelBrief'],
+  });
 export type CreateSuggestionBody = z.infer<typeof CreateSuggestionBodySchema>;
 
 /**
@@ -341,6 +423,11 @@ export const SUGGESTION_ID_CONFLICT = 'creator_suggestion_id_conflict';
 export const SUGGESTION_DECLINED_RECENTLY_CONFLICT = 'creator_suggestion_declined_recently_conflict';
 /** The same task already waits for her answer that week, at the same moment or undated (CREA-16). */
 export const SUGGESTION_OPEN_CONFLICT = 'creator_suggestion_open_conflict';
+/**
+ * A shoot suggested by hand for a drop category that touches one of her limits or breaks a guard of its output
+ * (ADR 0082 § 3): `details.reason` and `details.field`, the field at fault.
+ */
+export const SUGGESTION_GUARD_UNPROCESSABLE = 'creator_suggestion_guard_unprocessable';
 
 /** The answer of `POST /v1/creator-space/ticks`: how many ticks were new, and her streak now. */
 export const CreatorTicksResultSchema = z.strictObject({

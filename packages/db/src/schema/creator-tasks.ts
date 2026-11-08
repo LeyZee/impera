@@ -12,6 +12,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgPolicy,
   pgTable,
   text,
@@ -74,6 +75,8 @@ export const creatorTasks = pgTable(
     purpose: text('purpose'),
     /** Her shooting sheet, copied once from the suggestion she accepted (VEI-01 d); out of her UPDATE grant. */
     shootBrief: text('shoot_brief'),
+    /** Her reel sheet (`ReelBriefSchema`, ADR 0082 § 3), copied with it; parsed on write and on read. */
+    reelBrief: jsonb('reel_brief'),
     startsAt: timestampTz('starts_at'),
     endsAt: timestampTz('ends_at'),
     day: date('day', { mode: 'string' }),
@@ -102,6 +105,10 @@ export const creatorTasks = pgTable(
     check(
       'creator_tasks_shoot_brief_check',
       sql`${t.shootBrief} is null or char_length(${t.shootBrief}) between 1 and 600`,
+    ),
+    check(
+      'creator_tasks_reel_brief_check',
+      sql`${t.reelBrief} is null or jsonb_typeof(${t.reelBrief}) = 'object'`,
     ),
     check(
       'creator_tasks_reminder_check',
@@ -232,6 +239,8 @@ export const creatorSuggestions = pgTable(
     purpose: text('purpose'),
     /** The shooting sheet the agency wrote (an idea's « à tourner », VEI-01 d). */
     shootBrief: text('shoot_brief'),
+    /** The reel sheet beside it (`ReelBriefSchema`, ADR 0082 § 3); parsed on write and on read. */
+    reelBrief: jsonb('reel_brief'),
     startsAt: timestampTz('starts_at'),
     endsAt: timestampTz('ends_at'),
     day: date('day', { mode: 'string' }),
@@ -269,6 +278,10 @@ export const creatorSuggestions = pgTable(
     check(
       'creator_suggestions_shoot_brief_check',
       sql`${t.shootBrief} is null or char_length(${t.shootBrief}) between 1 and 600`,
+    ),
+    check(
+      'creator_suggestions_reel_brief_check',
+      sql`${t.reelBrief} is null or jsonb_typeof(${t.reelBrief}) = 'object'`,
     ),
     check(
       'creator_suggestions_reason_check',
