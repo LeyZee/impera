@@ -14,7 +14,7 @@ const VERDICT_KINDS = ['validated', 'corrected', 'rejected'] as const satisfies 
  * was) may be purged after 90 days, by setting it to null with `moment_purged_at`; the verdict and the version are kept
  * for good (migration 0005). A `live` rating is a real draft judged through the copilot panel (ADR 0086 § 5): it names
  * the draft, one rating per draft, and keeps neither the fan's message nor a moment, his words staying in the
- * conversation under their own retention (migration 0146).
+ * conversation under their own retention (migration 0149).
  */
 export const calibrationRatings = pgTable(
   'calibration_ratings',

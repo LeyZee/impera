@@ -1,4 +1,4 @@
-import type { CreatorId, FanId, JobPayload, UserId } from '@impera/contracts';
+import type { CreatorId, FanId, JobPayload, MessageId, UserId } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -63,8 +63,17 @@ export interface ConversationsModule extends ConversationCommands {
   traceFanOpening(
     creatorId: CreatorId,
     fanId: FanId,
-    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' },
+    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' | 'card' },
   ): Promise<void>;
+  /**
+   * The text of those of these messages the fan sent (ADR 0085 § 5): the `fans` routes quote the sentence a value of
+   * his card was read in. Read under her tenant; anything else is left out.
+   */
+  fanMessageTexts(
+    creatorId: CreatorId,
+    fanId: FanId,
+    messageIds: readonly MessageId[],
+  ): Promise<ReadonlyMap<string, string>>;
   /** Handlers of the module's jobs; the composition root registers them with Graphile Worker. */
   readonly jobs: {
     respond(payload: JobPayload<'conversation.respond'>, logger: JobLogger): Promise<void>;
@@ -136,6 +145,7 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
     ...commands,
     isFanHeldBy: (creatorId, fanId, userId) => reader.isFanHeldBy(creatorId, fanId, userId),
     traceFanOpening: (creatorId, fanId, trace) => reader.traceFanOpening(creatorId, fanId, trace),
+    fanMessageTexts: (creatorId, fanId, messageIds) => reader.fanMessageTexts(creatorId, fanId, messageIds),
     routes: async (app, options) => {
       await createConversationRoutes(reader, commands, {
         requireRole: deps.requireRole,

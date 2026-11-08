@@ -1,4 +1,4 @@
-import { FactCategorySchema, FactKindSchema } from '@impera/contracts';
+import { FactCategorySchema, StoredFactKindSchema } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import {
   check,
@@ -12,6 +12,7 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
+import { user } from './auth';
 import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { messages } from './conversations';
 import { fans } from './fans';
@@ -39,11 +40,15 @@ export const fanFacts = pgTable(
     observedAt: timestampTz('observed_at').notNull(),
     expiresAt: timestampTz('expires_at'),
     supersededBy: uuid('superseded_by').references((): AnyPgColumn => fanFacts.id),
+    /** The chatter who wrote a `noted` value on the fan's card (ADR 0085 § 5); null for every other kind. */
+    notedBy: text('noted_by').references(() => user.id),
     createdAt: createdAt(),
   },
   (t) => [
     enumCheck('fan_facts', t.category, FactCategorySchema.options),
-    enumCheck('fan_facts', t.kind, FactKindSchema.options),
+    enumCheck('fan_facts', t.kind, StoredFactKindSchema.options),
+    // A chatter's value names its author, and no other value does (ADR 0085 § 5, § 12).
+    check('fan_facts_noted_by_check', sql`(${t.kind} = 'noted') = (${t.notedBy} is not null)`),
     check('fan_facts_confidence_check', sql`${t.confidence} between 0 and 1`),
     index('fan_facts_active_idx')
       .on(t.fanId)
