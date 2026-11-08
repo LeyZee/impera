@@ -7,7 +7,14 @@ import type { ApiKeys, LlmConfig, ProviderId } from './config';
 import type { HealthReport } from './health';
 import type { PromptTemplate } from './prompts';
 import type { ModelResolver } from './providers';
-import type { Brief, JudgeCriterion, JudgeOutput, VoiceOutput } from './schemas';
+import type {
+  Brief,
+  ChannelPollOutput,
+  ChannelPostOutput,
+  JudgeCriterion,
+  JudgeOutput,
+  VoiceOutput,
+} from './schemas';
 
 /** A media exchanged in the conversation, already described by `sense`. */
 export interface TurnMedia {
@@ -112,6 +119,30 @@ export interface TrendCapturesInput {
   readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
+/**
+ * A post of her Telegram channel (ADR 0080 § 5), written in her voice for everyone who reads the channel: the main post
+ * that reacts to its media and leads to her link (§ 5.8), a post of engagement without a link, or a poll (§ 5.7). The
+ * examples, where her link leads and the advice are the agency's words, read as data.
+ */
+export interface ChannelPostInput {
+  readonly kind: 'main' | 'engagement' | 'poll';
+  readonly creatorName: string;
+  /** Her persona sheet, rendered as text, as the voice reads it. */
+  readonly personaSheet: string;
+  /** Her channel's posts chosen as examples (§ 5.5); empty: none. */
+  readonly examples: readonly string[];
+  /** The media the post goes with, described in words; null: a text alone. */
+  readonly media: string | null;
+  /** Where the link of the main post leads (§ 4.5); null or empty: no place is named. Ignored for another kind. */
+  readonly destination: string | null;
+  /** The agency's advice for this post (§ 2.3); null: none. */
+  readonly advice: string | null;
+  readonly trace?: CallTrace;
+}
+
+export type ChannelPostResult =
+  ({ readonly kind: 'post' } & ChannelPostOutput) | ({ readonly kind: 'poll' } & ChannelPollOutput);
+
 export interface CallMeta {
   readonly provider: ProviderId;
   readonly model: string;
@@ -161,6 +192,8 @@ export interface LlmGateway {
   describeTrendCaptures(
     input: TrendCapturesInput,
   ): Promise<Result<LlmSuccess<TrendCaptureDescription>, LlmFailure>>;
+  /** A post or a poll of her Telegram channel (ADR 0080 § 5, role `voice`). */
+  channelPost(input: ChannelPostInput): Promise<Result<LlmSuccess<ChannelPostResult>, LlmFailure>>;
   health(): HealthReport;
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */
@@ -186,6 +219,7 @@ export interface LlmGatewayDeps {
     readonly sense: PromptTemplate;
     readonly judge?: PromptTemplate;
     readonly trendCaptures?: PromptTemplate;
+    readonly channelPost?: PromptTemplate;
   };
   /** Secret written in every system prompt: an output that contains it has leaked the prompt. */
   readonly canary?: string;

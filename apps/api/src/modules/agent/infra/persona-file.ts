@@ -77,13 +77,17 @@ const LANGUAGE_LABELS = new Map<string, string>(PERSONA_OPTIONS.languages.map((o
  * in the sheet's order. Left out: what she left empty or as a placeholder, and the time zone, which is the creator's
  * own; the birth date gives way to her age on `today`.
  */
-function sheetForModels(sheet: PersonaSheet, today: string): Record<string, unknown> {
+function sheetForModels(
+  sheet: PersonaSheet,
+  today: string,
+  omitted: ReadonlySet<string> = new Set(),
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const section of PERSONA_SHEET) {
     const answers = sectionAnswers(sheet, section.key);
     const shown: Record<string, unknown> = {};
     for (const question of section.questions) {
-      if (question.key === 'timezone') continue;
+      if (question.key === 'timezone' || omitted.has(question.key)) continue;
       const value = answers[question.key];
       if (value === null || value === undefined) continue;
       if (question.key === 'birth_date' && typeof value === 'string') {
@@ -119,6 +123,8 @@ export function personaForModels(
   stored: StoredPersona,
   fallbackName: string,
   today: string,
+  /** Answers of the sheet left out of what the model reads (a public post reads none of her intimacy). */
+  omitted: ReadonlySet<string> = new Set(),
 ): PersonaForModels {
   const { sheet, agent } = asPersonaV2(stored);
   const name = sheet.identity.nickname;
@@ -126,7 +132,7 @@ export function personaForModels(
   const rules = agent.rules;
   const kycSlots = agent.strategies.kyc.collect ?? KycSlotSchema.options;
   const forModels = {
-    ...sheetForModels(sheet, today),
+    ...sheetForModels(sheet, today, omitted),
     // Réglages de l'agent the prompts name by key: code applies them, the model is told them so as not to go against.
     behavior: {
       split_messages: agent.behavior.split_messages,

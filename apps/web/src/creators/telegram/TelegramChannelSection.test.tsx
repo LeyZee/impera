@@ -156,8 +156,8 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     const sent = SaveTelegramChannelBodySchema.parse(puts[0]).config;
     expect(sent.chatId).toBe(CHANNEL);
     expect(sent.slots).toEqual([
-      { minute: 1140, days: [1, 2, 3, 4, 5, 6, 7], enabled: true },
-      { minute: 1320, days: [1, 2, 3, 4, 5], enabled: true },
+      { minute: 1140, role: 'main', days: [1, 2, 3, 4, 5, 6, 7], enabled: true },
+      { minute: 1320, role: 'engagement', days: [1, 2, 3, 4, 5], enabled: true },
     ]);
     expect(sent.links).toEqual([
       {
@@ -168,6 +168,34 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
       },
     ]);
     expect(await screen.findByText('Enregistré : les posts partiront à ces créneaux.')).toBeDefined();
+  });
+
+  it('saves her example posts trimmed, and keeps the save shut on an empty line', async () => {
+    const puts = serve({ put: (body) => ({ status: 200, body: echo(body) }) });
+    renderSection();
+    choose(await screen.findByRole('combobox', { name: 'Son canal' }), /Canal de Nora/u);
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter un exemple/u }));
+    expect(screen.getByText('Colle le post, ou retire la ligne.')).toBeDefined();
+    expect(save()).toHaveProperty('disabled', true);
+    fireEvent.change(screen.getByLabelText('Exemple 1'), { target: { value: ' Ce soir je suis là ✨ ' } });
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter un exemple/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer l’exemple 2' }));
+    fireEvent.click(save());
+    await waitFor(() => {
+      expect(puts).toHaveLength(1);
+    });
+    expect(SaveTelegramChannelBodySchema.parse(puts[0]).config.examples).toEqual(['Ce soir je suis là ✨']);
+  });
+
+  it('makes a new slot an engagement post, and refuses a second main post on a day', async () => {
+    serve({});
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /Ajouter un créneau/u }));
+    const role = screen.getByRole('combobox', { name: /^Rôle du créneau de 22/u });
+    expect(role.textContent).toContain('Engagement');
+    choose(role, 'Principal');
+    expect(screen.getByText('Un seul post principal par jour.')).toBeDefined();
+    expect(save()).toHaveProperty('disabled', true);
   });
 
   it('keeps the save shut on an address that is not https, and says why', async () => {

@@ -9,7 +9,7 @@ import {
   type SheetQuestion,
   type SheetSection,
 } from '@impera/contracts';
-import { useContext, useId, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
+import { useContext, useId, useState, type JSX, type ReactNode } from 'react';
 
 import { Field, FormContext, NumberInput, Picker } from './fields';
 import {
@@ -24,6 +24,7 @@ import {
   type SheetDraft,
 } from './model';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { DayField } from '@/scheduling/DayField';
 import { cityOf } from '@/scheduling/time';
 
@@ -388,9 +389,6 @@ function Question({
   }
 }
 
-/** Whether the browser grows a text field with its text by itself (Chromium, Edge, Safari 18+). */
-const SIZED_BY_CONTENT = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
-
 /**
  * A free answer: never cut, it grows with what is written (Desirali's one-line fields hold paragraphs, recette
  * persona 06/11). A long answer starts on three lines and counts its characters; a short one starts on one line and
@@ -407,17 +405,10 @@ function FreeAnswer({
   long: boolean;
   onChange: (value: string) => void;
 }): JSX.Element {
-  const ref = useRef<HTMLTextAreaElement>(null);
   const shown = isPlaceholder(value) ? '' : value;
   const max = long ? SHEET_LONG_MAX : SHEET_SHORT_MAX;
-  useLayoutEffect(() => {
-    const area = ref.current;
-    // The browser sizes it to its text (`field-sizing: content`), even in a panel opened later. Elsewhere it is
-    // measured here; a folded panel has no height to measure, and the field keeps its rows until it is typed in.
-    if (area === null || SIZED_BY_CONTENT) return;
-    area.style.height = '';
-    if (area.scrollHeight > 0) area.style.height = `${String(area.scrollHeight + 2)}px`;
-  }, [shown]);
+  // A folded panel has no height to measure: where the browser does not size it, the field keeps its rows until typed in.
+  const ref = useGrowingArea(shown);
   const near = shown.length > max * 0.9;
   return (
     <div className="ps-area" data-long={long ? 'true' : undefined}>

@@ -22,6 +22,7 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   discount: 'une remise ou une négociation',
   off_platform_payment: 'un paiement hors de la plateforme',
   price_outside_offer: 'un prix écrit hors offre',
+  false_scarcity: 'une fausse urgence (« dernière chance », « plus que 3 places »)',
   explicit_before_age: 'du contenu explicite avant l’âge confirmé',
   guilt_trip: 'de la culpabilisation',
   pet_name: 'un petit nom qu’elle n’emploie pas',

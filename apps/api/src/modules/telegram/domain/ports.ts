@@ -1,4 +1,6 @@
 import type {
+  ChannelPostKind,
+  ChannelPostViolation,
   CreatorId,
   SalesFeedReading,
   SalesRefunds,
@@ -393,3 +395,33 @@ export interface ChannelsStore {
     userId: string,
   ): Promise<'saved' | 'chat_taken'>;
 }
+
+/**
+ * ADR 0080 § 5: who she is for the post, from her active persona version, and her guards on the words of a post (the
+ * agent's, plus nothing explicit on a public channel). Wired from the `agent` module, matched by shape.
+ */
+interface ChannelWriterPersona {
+  /** Her version, as the playground names it (« 2.0.0 »). */
+  readonly version: string;
+  readonly creatorName: string;
+  readonly personaSheet: string;
+  check(texts: readonly string[]): readonly ChannelPostViolation[];
+}
+/** Null when she has no active version: nothing is written for her. */
+export type ChannelPersonaSource = (creatorId: CreatorId) => Promise<ChannelWriterPersona | null>;
+
+interface ChannelVoiceInput {
+  readonly creatorId: CreatorId;
+  readonly kind: ChannelPostKind;
+  readonly creatorName: string;
+  readonly personaSheet: string;
+  readonly examples: readonly string[];
+  readonly media: string | null;
+  readonly destination: string | null;
+  readonly advice: string | null;
+}
+type ChannelVoiceOutput =
+  | { readonly kind: 'post'; readonly text: string }
+  | { readonly kind: 'poll'; readonly question: string; readonly options: readonly string[] };
+/** The voice of the gateway (role `voice`, prompt `voice/telegram-channel`); null when no model answered. */
+export type ChannelVoice = (input: ChannelVoiceInput) => Promise<ChannelVoiceOutput | null>;
