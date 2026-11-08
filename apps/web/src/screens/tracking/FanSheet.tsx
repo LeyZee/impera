@@ -5,6 +5,9 @@ import { DesireSheet } from './Desire';
 import { FanLimits, useFanFlags } from './FanLimits';
 import { FanToLearn, useFanKyc } from './FanToLearn';
 import { FanFlagsRefused } from './api';
+import { FanCard } from './card/FanCard';
+import { useFanCard } from './card/api';
+import { toCheckCount } from './card/model';
 import { alertsOf, sheetSummary, type SheetFacts } from './flags-model';
 import { DESIRE_BAND_EMOJIS } from './view';
 
@@ -35,11 +38,13 @@ export function FanSheet({
 }): JSX.Element {
   const flags = useFanFlags(creatorId, fanId);
   const kyc = useFanKyc(creatorId, fanId, canDecide);
+  const card = useFanCard(creatorId, fanId, canDecide);
   const facts: SheetFacts = {
     flags:
       flags.data?.flags ??
       (flags.error instanceof FanFlagsRefused ? 'refused' : flags.isError ? 'down' : 'loading'),
     toLearn: canDecide ? (kyc.data?.length ?? null) : null,
+    ...(canDecide && card.data !== undefined ? { toCheck: toCheckCount(card.data.fields) } : {}),
     band:
       desire === null
         ? null
@@ -79,6 +84,7 @@ export function FanSheet({
         <div className="tr-sheet__body">
           <FanLimits creatorId={creatorId} fanId={fanId} canDecide={canSetLimits} />
           {canDecide ? <FanToLearn creatorId={creatorId} fanId={fanId} /> : null}
+          {canDecide ? <FanCard creatorId={creatorId} fanId={fanId} /> : null}
           <DesireSheet creatorId={creatorId} conversationId={conversationId} desire={desire} />
         </div>
       </details>
