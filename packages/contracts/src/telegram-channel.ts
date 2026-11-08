@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { IsoDaySchema } from './agent-hours';
 import { refusalBodySchema } from './errors';
+import { GuardCodeSchema } from './guards';
 import { CreatorIdSchema } from './ids';
 import { MinuteOfDaySchema } from './scheduling';
 import { TelegramChatIdSchema, TelegramMembershipSchema } from './telegram';
@@ -93,6 +94,15 @@ export function labelHasAddress(text: string): boolean {
   return /[Hh][Tt][Tt][Pp][Ss]?:\/\/|[Ww][Ww][Ww]\.|[\p{L}\p{N}-]+\.[a-z]{2,}(?![\p{L}\p{N}-])/u.test(text);
 }
 
+/** ADR 0080 § 5.5: the agency's example posts the prompt reads, ten at most, each a Telegram caption at most. */
+export const CHANNEL_EXAMPLES_MAX = 10;
+export const CHANNEL_EXAMPLE_MAX = 1000;
+export const ChannelExampleSchema = z
+  .string()
+  .trim()
+  .min(1, 'Un exemple vide')
+  .max(CHANNEL_EXAMPLE_MAX, `${String(CHANNEL_EXAMPLE_MAX)} caractères au plus`);
+
 /** ADR 0080 § 4.3: a short text that carries the link, or the bare address. */
 export const ChannelLinkFormSchema = z.enum(['label', 'bare']);
 export type ChannelLinkForm = z.infer<typeof ChannelLinkFormSchema>;
@@ -117,6 +127,11 @@ export const TelegramChannelConfigSchema = z
     links: z.array(RedirectLinkSchema).max(REDIRECT_LINKS_MAX),
     /** The link of the channel, one of `links`; null: no post goes out (ADR 0080 § 4.4). */
     channelLinkId: RedirectLinkIdSchema.nullable(),
+    /**
+     * Her channel's posts the agency chose as examples (ADR 0080 § 5.5), real text kept in the base only, never in the
+     * repository. Absent from a setting saved before: none.
+     */
+    examples: z.array(ChannelExampleSchema).max(CHANNEL_EXAMPLES_MAX).default([]),
   })
   .superRefine((config, ctx) => {
     if (config.linkForm === 'label' && config.linkLabel === '') {
@@ -141,6 +156,7 @@ export const DEFAULT_TELEGRAM_CHANNEL_CONFIG: TelegramChannelConfig = {
   linkLabel: 'Viens me parler ✨',
   links: [],
   channelLinkId: null,
+  examples: [],
 };
 
 /** A channel the agency's bot sits in, as the screen offers it. */
@@ -201,3 +217,78 @@ export type ChannelRefusal = z.infer<typeof ChannelRefusalSchema>;
 /** `PUT` refused (400), in the common body (MOT-13). */
 export const TELEGRAM_CHANNEL_INVALID = 'telegram_channel_invalid';
 export const TelegramChannelRefusalBodySchema = refusalBodySchema(ChannelRefusalKindSchema);
+
+/**
+ * A post of her channel tried in the playground (ADR 0080 § 7, mode « Post du canal »): a post or a poll (§ 5.7),
+ * written by the same path as production, never sent. `POST /v1/creators/:creatorId/telegram-channel/try`.
+ */
+export const ChannelPostKindSchema = z.enum(['post', 'poll']);
+export type ChannelPostKind = z.infer<typeof ChannelPostKindSchema>;
+
+export const CHANNEL_MEDIA_TEXT_MAX = 600;
+export const CHANNEL_ADVICE_MAX = 500;
+/** Telegram: a poll's question holds 300 characters, an answer 100; kept shorter, as she would write them. */
+export const CHANNEL_POLL_QUESTION_MAX = 200;
+export const CHANNEL_POLL_OPTION_MAX = 60;
+export const CHANNEL_POLL_OPTIONS_MIN = 2;
+export const CHANNEL_POLL_OPTIONS_MAX = 4;
+
+export const TryChannelPostBodySchema = z.object({
+  kind: ChannelPostKindSchema,
+  /** The media the post goes with, described in words; null: a text alone. */
+  media: z.string().trim().min(1).max(CHANNEL_MEDIA_TEXT_MAX).nullable(),
+  /** The agency's advice (§ 2.3), a subject, an angle, a piece of news; null: none. */
+  advice: z.string().trim().min(1).max(CHANNEL_ADVICE_MAX).nullable(),
+  /** One of her links for this post only (§ 4.6); null: the channel's link. A poll carries none. */
+  linkId: RedirectLinkIdSchema.nullable(),
+});
+export type TryChannelPostBody = z.infer<typeof TryChannelPostBodySchema>;
+
+/** A piece of a post's text as Telegram shows it: the voice marks bold and underline, the code renders them. */
+export const ChannelTextSegmentSchema = z.object({
+  text: z.string(),
+  style: z.enum(['plain', 'bold', 'underline']),
+});
+export type ChannelTextSegment = z.infer<typeof ChannelTextSegmentSchema>;
+
+export const ChannelPostDraftSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('post'),
+    segments: z.array(ChannelTextSegmentSchema),
+    /** The link the code adds at the end, as it reads; null when the channel has none. */
+    link: z.object({ text: z.string().min(1), url: z.string().min(1), name: z.string().min(1) }).nullable(),
+    /** The message as sent to Telegram (`parse_mode` HTML), escaped by the code. */
+    html: z.string(),
+  }),
+  z.object({
+    kind: z.literal('poll'),
+    question: z.string().min(1).max(CHANNEL_POLL_QUESTION_MAX),
+    options: z
+      .array(z.string().min(1).max(CHANNEL_POLL_OPTION_MAX))
+      .min(CHANNEL_POLL_OPTIONS_MIN)
+      .max(CHANNEL_POLL_OPTIONS_MAX),
+  }),
+]);
+export type ChannelPostDraft = z.infer<typeof ChannelPostDraftSchema>;
+
+/** A guard the draft meets (§ 5.4): a blocking one keeps it from going out. */
+export const ChannelPostViolationSchema = z.object({
+  code: GuardCodeSchema,
+  blocking: z.boolean(),
+  match: z.string().nullable(),
+});
+export type ChannelPostViolation = z.infer<typeof ChannelPostViolationSchema>;
+
+export const TriedChannelPostSchema = z.object({
+  draft: ChannelPostDraftSchema,
+  violations: z.array(ChannelPostViolationSchema),
+  /** Her persona version that wrote it, as the playground names it. */
+  personaVersion: z.string().min(1),
+});
+export type TriedChannelPost = z.infer<typeof TriedChannelPostSchema>;
+
+/** Why a try is refused (400). */
+export const ChannelTryRefusalKindSchema = z.enum(['no_persona', 'link_unknown', 'llm_unavailable']);
+export type ChannelTryRefusalKind = z.infer<typeof ChannelTryRefusalKindSchema>;
+export const TELEGRAM_CHANNEL_TRY_REFUSED = 'telegram_channel_try_invalid';
+export const ChannelTryRefusalBodySchema = refusalBodySchema(ChannelTryRefusalKindSchema);

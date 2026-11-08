@@ -1,7 +1,7 @@
 import { DEFAULT_TELEGRAM_CHANNEL_CONFIG, RedirectLinkIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { daysWords, issuesOf, nextSlot, postsPerDay, rhythmWords } from './model';
+import { daysWords, issuesOf, nextSlot, postsPerDay, rhythmWords, trimmed } from './model';
 
 const linkId = RedirectLinkIdSchema.parse('0192f3a0-0000-7000-8000-0000000000e1');
 
@@ -73,5 +73,12 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
     });
     expect(issues.has(`link:${linkId}:name`)).toBe(true);
     expect(issues.has(`link:${linkId}:url`)).toBe(true);
+  });
+
+  it('marks an empty example, and saves the others trimmed', () => {
+    const config = { ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, examples: [' Coucou ✨ ', '  '] };
+    expect(issuesOf(config).get('example:1')).toBe('Colle le post, ou retire la ligne.');
+    expect(issuesOf(config).has('example:0')).toBe(false);
+    expect(trimmed(config).examples).toEqual(['Coucou ✨', '']);
   });
 });

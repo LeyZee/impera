@@ -1,4 +1,5 @@
 import {
+  CHANNEL_EXAMPLES_MAX,
   CHANNEL_POSTS_PER_DAY_MAX,
   CHANNEL_SLOT_GAP_MINUTES,
   CHANNEL_SLOTS_MAX,
@@ -92,6 +93,7 @@ export function nextSlot(slots: readonly ChannelSlot[]): ChannelSlot | null {
 /** The rule of her slots, the lead of the block. */
 export const SLOTS_RULE = `${String(CHANNEL_POSTS_PER_DAY_MAX)} posts par jour au plus, à ${String(CHANNEL_SLOT_GAP_MINUTES / 60)}${NBSP}h d’écart.`;
 export const SLOTS_FULL = `${String(CHANNEL_SLOTS_MAX)} créneaux au plus.`;
+export const EXAMPLES_FULL = `${String(CHANNEL_EXAMPLES_MAX)} exemples au plus.`;
 export const LINKS_FULL = `${String(REDIRECT_LINKS_MAX)} liens au plus.`;
 export const TOO_MANY = `${String(CHANNEL_POSTS_PER_DAY_MAX)} posts par jour au plus.`;
 
@@ -122,6 +124,9 @@ export function issuesOf(config: TelegramChannelConfig): Map<string, string> {
       );
     }
   }
+  config.examples.forEach((example, rank) => {
+    if (example.trim() === '') issues.set(`example:${String(rank)}`, 'Colle le post, ou retire la ligne.');
+  });
   const label = config.linkLabel.trim();
   if (config.linkForm === 'label' && label === '') issues.set('label', 'Écris le texte du lien.');
   else if (labelHasAddress(label)) issues.set('label', 'Le texte du lien ne contient pas d’adresse.');
@@ -133,6 +138,7 @@ export function trimmed(config: TelegramChannelConfig): TelegramChannelConfig {
   return {
     ...config,
     linkLabel: config.linkLabel.trim(),
+    examples: config.examples.map((example) => example.trim()),
     links: config.links.map((link) => ({
       ...link,
       name: link.name.trim(),

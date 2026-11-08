@@ -73,6 +73,7 @@ import { SuiviNav } from './screens/tracking/SuiviNav';
 import { TrackingPage } from './screens/tracking/TrackingPage';
 import { AlertHistoryPage } from './screens/tracking/history/AlertHistoryPage';
 import { parseTrackingSearch } from './screens/tracking/view';
+import { ChannelPostPage } from './screens/train/ChannelPostPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
@@ -773,6 +774,11 @@ const playground = createRoute({
   path: '/playground',
   component: PlaygroundPage,
 });
+const channelPost = createRoute({
+  getParentRoute: () => train,
+  path: '/canal',
+  component: ChannelPostPage,
+});
 /*
  * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
  * to an « à venir » page under its header (recette 05/11, PRO-25). Each comes back with its screen.
@@ -979,7 +985,7 @@ const routeTree = rootRoute.addChildren([
   dashboard,
   creators,
   scriptStructures,
-  train.addChildren([trainIndex, playground, corrections, tests]),
+  train.addChildren([trainIndex, playground, channelPost, corrections, tests]),
   tracking,
   trackingAlerts,
   today,

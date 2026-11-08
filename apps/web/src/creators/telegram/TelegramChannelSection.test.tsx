@@ -170,6 +170,23 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     expect(await screen.findByText('Enregistré : les posts partiront à ces créneaux.')).toBeDefined();
   });
 
+  it('saves her example posts trimmed, and keeps the save shut on an empty line', async () => {
+    const puts = serve({ put: (body) => ({ status: 200, body: echo(body) }) });
+    renderSection();
+    choose(await screen.findByRole('combobox', { name: 'Son canal' }), /Canal de Nora/u);
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter un exemple/u }));
+    expect(screen.getByText('Colle le post, ou retire la ligne.')).toBeDefined();
+    expect(save()).toHaveProperty('disabled', true);
+    fireEvent.change(screen.getByLabelText('Exemple 1'), { target: { value: ' Ce soir je suis là ✨ ' } });
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter un exemple/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer l’exemple 2' }));
+    fireEvent.click(save());
+    await waitFor(() => {
+      expect(puts).toHaveLength(1);
+    });
+    expect(SaveTelegramChannelBodySchema.parse(puts[0]).config.examples).toEqual(['Ce soir je suis là ✨']);
+  });
+
   it('keeps the save shut on an address that is not https, and says why', async () => {
     serve({});
     renderSection();

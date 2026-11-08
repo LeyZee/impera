@@ -1,4 +1,6 @@
 import {
+  CHANNEL_EXAMPLE_MAX,
+  CHANNEL_EXAMPLES_MAX,
   LINK_DESTINATION_MAX,
   type ChannelSlot,
   type RedirectLink,
@@ -23,6 +25,7 @@ import {
 import {
   DAY_NAMES,
   DAY_SHORT,
+  EXAMPLES_FULL,
   LINKS_FULL,
   SLOTS_FULL,
   SLOTS_RULE,
@@ -471,6 +474,49 @@ function ChannelForm({
           </div>
         </section>
       </div>
+
+      <div className="nv-plate ps-panel">
+        <section className="ps-block" aria-labelledby="tc-examples">
+          <h3 className="ps-block__title" id="tc-examples">
+            Exemples
+          </h3>
+          <p className="ps-lead">
+            Des posts de son canal qui ont marché : l’IA prend leur ton, jamais leurs phrases.
+          </p>
+          {draft.examples.length === 0 ? null : (
+            <ol className="tc-examples" aria-label="Exemples">
+              {draft.examples.map((example, rank) => (
+                <ExampleLine
+                  // The rank is the line: an example has no id, and lines are never reordered while edited.
+                  key={rank}
+                  rank={rank}
+                  value={example}
+                  issue={issues.get(`example:${String(rank)}`) ?? null}
+                  onChange={(next) => {
+                    edit({ ...draft, examples: draft.examples.map((one, i) => (i === rank ? next : one)) });
+                  }}
+                  onRemove={() => {
+                    edit({ ...draft, examples: draft.examples.filter((_, i) => i !== rank) });
+                  }}
+                />
+              ))}
+            </ol>
+          )}
+          {draft.examples.length >= CHANNEL_EXAMPLES_MAX ? (
+            <p className="ps-hint">{EXAMPLES_FULL}</p>
+          ) : (
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm ps-self-start"
+              onClick={() => {
+                edit({ ...draft, examples: [...draft.examples, ''] });
+              }}
+            >
+              <span aria-hidden="true">+</span> Ajouter un exemple
+            </button>
+          )}
+        </section>
+      </div>
       <SaveBar
         show={dirty && !headOnScreen}
         warn={blocked}
@@ -761,5 +807,62 @@ function DestinationArea({
         onChange(event.target.value.replace(/\s*[\r\n]+\s*/gu, ' '));
       }}
     />
+  );
+}
+
+/** One of her example posts: a field that grows with the text, a count near its end, a cross. */
+function ExampleLine({
+  rank,
+  value,
+  issue,
+  onChange,
+  onRemove,
+}: {
+  rank: number;
+  value: string;
+  issue: string | null;
+  onChange: (value: string) => void;
+  onRemove: () => void;
+}): JSX.Element {
+  const id = useId();
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const area = ref.current;
+    if (area === null || SIZED_BY_CONTENT) return;
+    area.style.height = '';
+    if (area.scrollHeight > 0) area.style.height = `${String(area.scrollHeight + 2)}px`;
+  }, [value]);
+  const left = CHANNEL_EXAMPLE_MAX - value.length;
+  return (
+    <li className="tc-example">
+      <label className="sr-only" htmlFor={id}>
+        Exemple {rank + 1}
+      </label>
+      <textarea
+        ref={ref}
+        id={id}
+        rows={2}
+        className="nv-field__control nv-glass tc-example__area"
+        value={value}
+        maxLength={CHANNEL_EXAMPLE_MAX}
+        placeholder="Colle ici un post de son canal…"
+        aria-invalid={issue === null ? undefined : true}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+      <span className="tc-example__end">
+        {left < 100 ? <span className="ps-hint">{left}</span> : null}
+        <button
+          type="button"
+          className="ps-entry__remove"
+          aria-label={`Retirer l’exemple ${String(rank + 1)}`}
+          onClick={onRemove}
+        >
+          ×
+        </button>
+      </span>
+      {issue === null ? null : <p className="ps-error">{issue}</p>}
+    </li>
   );
 }

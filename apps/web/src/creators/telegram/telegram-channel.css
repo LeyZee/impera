@@ -179,6 +179,40 @@
   font-size: var(--nv-text-footnote);
 }
 
+/* Her example posts: a field that grows with the post, the cross beside it. */
+.tc-examples {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tc-example {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px 10px;
+}
+.tc-example > .ps-error {
+  grid-column: 1 / -1;
+}
+.tc-example__area.nv-field__control {
+  display: block;
+  width: 100%;
+  min-height: calc(2 * 22px + 22px);
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+  line-height: 22px;
+}
+.tc-example__end {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* A phone: the hour and the switch on one line, the days under them; a link's fields full width. */
 @media (max-width: 560px) {
   /* Her head: the title, then the state, then the button, not the button between them. */

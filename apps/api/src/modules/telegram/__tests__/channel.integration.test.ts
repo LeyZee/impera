@@ -8,13 +8,17 @@ import {
   TelegramChannelConfigSchema,
   TelegramChannelViewSchema,
   TelegramChatIdSchema,
+  TriedChannelPostSchema,
+  err,
   newId,
+  ok,
   type CreatorId,
   type TelegramChannelConfig,
   type TelegramChatId,
 } from '@impera/contracts';
 import { eq, parseEncryptionKeys, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
+import type { ChannelPostInput, ChannelPostResult, LlmGateway } from '@impera/llm';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -40,6 +44,25 @@ describe('the creator’s Telegram channel on Postgres', () => {
   let channelB: TelegramChatId;
   let group: TelegramChatId;
   const telegram = new FakeTelegram();
+  const voiceCalls: ChannelPostInput[] = [];
+  let voiceAnswer: ChannelPostResult | null = { kind: 'post', text: 'Ce soir **live** <3 bisous' };
+  const voice: LlmGateway['channelPost'] = (input) => {
+    voiceCalls.push(input);
+    return Promise.resolve(
+      voiceAnswer === null
+        ? err({ code: 'all_models_failed', attempts: [] })
+        : ok({
+            output: voiceAnswer,
+            meta: {
+              provider: 'xai',
+              model: 'grok-4.7',
+              isFallback: false,
+              latencyMs: 1,
+              promptHash: 'test',
+            },
+          }),
+    );
+  };
   const config = testConfig();
   const headers = { 'x-test-role': 'owner', origin: config.WEB_ORIGIN };
 
@@ -95,6 +118,24 @@ describe('the creator’s Telegram channel on Postgres', () => {
       channels: createPostgresChannelsStore(test.admin.db),
       channel: telegram,
       webOrigin: 'https://crm.example.test',
+      channelWriter: {
+        // Nora has an active persona, no one else.
+        persona: (creatorId) =>
+          Promise.resolve(
+            creatorId === nora
+              ? {
+                  version: '2.0.0',
+                  creatorName: 'Nora',
+                  personaSheet: 'identity:\n  first_name: Nora',
+                  check: (texts) =>
+                    texts.some((text) => text.includes('bisous'))
+                      ? [{ code: 'forbidden_term', blocking: true, match: 'bisous' }]
+                      : [],
+                }
+              : null,
+          ),
+        gateway: { channelPost: voice },
+      },
     });
     telegram.addBot(FAKE_TOKEN, 'agence_bot');
     const added = await module.addBot(FAKE_TOKEN);
@@ -323,5 +364,122 @@ describe('the creator’s Telegram channel on Postgres', () => {
     expect(holders).toHaveLength(1);
     const loser = results[0] === 'saved' ? two : one;
     expect(await store.findChannel(loser)).toBeNull();
+  });
+
+  describe('the playground’s « Post du canal » (ADR 0080 § 7)', () => {
+    const live = newId(RedirectLinkIdSchema);
+    const reveal = newId(RedirectLinkIdSchema);
+    const tryUrl = (creatorId: string) => `${url(creatorId)}/try`;
+    const tryPost = (creatorId: string, payload: Record<string, unknown>) =>
+      server.inject({ method: 'POST', url: tryUrl(creatorId), headers, payload });
+    const body = { kind: 'post', media: 'Une photo au miroir', advice: 'Parle du live', linkId: null };
+
+    beforeAll(async () => {
+      const saved = await put(nora, {
+        ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
+        // The channel itself does not matter to a try: earlier tests removed theirs.
+        chatId: null,
+        links: [
+          {
+            id: reveal,
+            name: 'Reveal',
+            url: 'https://redirect.example.test/nora',
+            destination: 'mon Reveal',
+          },
+          {
+            id: live,
+            name: 'Live',
+            url: 'https://redirect.example.test/live?a=1&b=2',
+            destination: 'mon live TikTok ce soir 21 h',
+          },
+        ],
+        channelLinkId: reveal,
+        examples: ['Ce soir je réponds à tout le monde ✨'],
+      });
+      expect(saved.json()).toMatchObject({ saved: true });
+    });
+
+    it('writes a post with her persona, her examples and where the channel’s link leads, escaped, never sent', async () => {
+      voiceCalls.length = 0;
+      const sent = telegram.sent.length;
+      expect((await server.inject({ method: 'POST', url: tryUrl(nora), payload: body })).statusCode).toBe(
+        403,
+      );
+
+      const response = await tryPost(nora, body);
+
+      expect(response.statusCode).toBe(200);
+      const tried = TriedChannelPostSchema.parse(response.json());
+      expect(tried.personaVersion).toBe('2.0.0');
+      expect(tried.draft).toEqual({
+        kind: 'post',
+        segments: [
+          { text: 'Ce soir ', style: 'plain' },
+          { text: 'live', style: 'bold' },
+          { text: ' <3 bisous', style: 'plain' },
+        ],
+        link: { text: 'Viens me parler ✨', url: 'https://redirect.example.test/nora', name: 'Reveal' },
+        html: 'Ce soir <b>live</b> &lt;3 bisous\n\n<a href="https://redirect.example.test/nora">Viens me parler ✨</a>',
+      });
+      expect(tried.violations).toEqual([{ code: 'forbidden_term', blocking: true, match: 'bisous' }]);
+      expect(voiceCalls).toEqual([
+        expect.objectContaining({
+          kind: 'post',
+          creatorName: 'Nora',
+          examples: ['Ce soir je réponds à tout le monde ✨'],
+          media: 'Une photo au miroir',
+          destination: 'mon Reveal',
+          advice: 'Parle du live',
+          trace: { creatorId: nora },
+        }),
+      ]);
+      expect(telegram.sent.length).toBe(sent);
+    });
+
+    it('takes another of her links for this post only, and refuses one she does not have', async () => {
+      voiceCalls.length = 0;
+      const response = await tryPost(nora, { ...body, linkId: live });
+      const tried = TriedChannelPostSchema.parse(response.json());
+      expect(tried.draft.kind === 'post' && tried.draft.html).toContain(
+        '<a href="https://redirect.example.test/live?a=1&amp;b=2">',
+      );
+      expect(voiceCalls[0]?.destination).toBe('mon live TikTok ce soir 21 h');
+
+      const unknown = await tryPost(nora, { ...body, linkId: newId(RedirectLinkIdSchema) });
+      expect(unknown.statusCode).toBe(400);
+      expect(unknown.json()).toMatchObject({ error: { details: { kind: 'link_unknown' } } });
+    });
+
+    it('writes a poll without a link, nor a media, nor a place', async () => {
+      voiceCalls.length = 0;
+      voiceAnswer = { kind: 'poll', question: 'Ce soir, je fais quoi ?', options: ['Un live', 'Une story'] };
+      const response = await tryPost(nora, { ...body, kind: 'poll' });
+      voiceAnswer = { kind: 'post', text: 'Ce soir **live** <3 bisous' };
+
+      expect(TriedChannelPostSchema.parse(response.json()).draft).toEqual({
+        kind: 'poll',
+        question: 'Ce soir, je fais quoi ?',
+        options: ['Un live', 'Une story'],
+      });
+      expect(voiceCalls[0]).toMatchObject({ kind: 'poll', media: null, destination: null });
+    });
+
+    it('says why nothing was written: no persona, no model, no creator', async () => {
+      // Léa was archived above: a creator of her own, without a persona.
+      const zoe = newId(CreatorIdSchema);
+      await test.admin.db
+        .insert(schema.creators)
+        .values({ id: zoe, nameKey: zoe, displayName: 'Zoé', timezone: 'Europe/Paris' });
+      const none = await tryPost(zoe, body);
+      expect(none.statusCode).toBe(400);
+      expect(none.json()).toMatchObject({ error: { details: { kind: 'no_persona' } } });
+
+      voiceAnswer = null;
+      const failed = await tryPost(nora, body);
+      voiceAnswer = { kind: 'post', text: 'Ce soir **live** <3 bisous' };
+      expect(failed.json()).toMatchObject({ error: { details: { kind: 'llm_unavailable' } } });
+
+      expect((await tryPost(newId(CreatorIdSchema), body)).statusCode).toBe(404);
+    });
   });
 });
