@@ -8,6 +8,7 @@ import type {
   UserId,
 } from '@impera/contracts';
 
+import type { MemberNames } from './card';
 import type { FactWrite, StoredFact } from './facts';
 import type { FlagAuthor } from './flags';
 
@@ -42,11 +43,22 @@ export interface FanStore {
 export interface FactStore {
   /** Facts not superseded yet; the caller filters what has expired. */
   current(creatorId: CreatorId, fanId: FanId): Promise<StoredFact[]>;
-  /** Plans and writes in one transaction, the fan locked so two writers never supersede the same fact twice. */
+  /**
+   * His card's facts (ADR 0085): the active ones, those waiting « à vérifier » under a chatter's note, and the display
+   * names of the chatters who noted them (§ 5).
+   */
+  card(
+    creatorId: CreatorId,
+    fanId: FanId,
+  ): Promise<{ active: readonly StoredFact[]; pending: readonly StoredFact[]; names: MemberNames }>;
+  /**
+   * Plans and writes in one transaction, the fan locked so two writers never supersede the same fact twice; `plan`
+   * gets the active facts and those waiting « à vérifier ».
+   */
   write(
     creatorId: CreatorId,
     fanId: FanId,
-    plan: (current: readonly StoredFact[]) => readonly FactWrite[],
+    plan: (current: readonly StoredFact[], pending: readonly StoredFact[]) => readonly FactWrite[],
   ): Promise<StoredFact[]>;
 }
 

@@ -866,7 +866,14 @@
     {
       "idx": 123,
       "version": "7",
-      "when": 1794160224499,
+      "when": 1794161910755,
+      "tag": "0147_fan_card_noted",
+      "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1794161970755,
       "tag": "0148_reel_brief",
       "breakpoints": true
     }

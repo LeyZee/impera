@@ -1,6 +1,6 @@
 {
   "id": "802283f2-f9de-4047-a10f-aeaa424790e3",
-  "prevId": "948cce28-013b-4cc1-9052-2195b19e3610",
+  "prevId": "6ad9c772-f757-4394-bfc3-bd2aecbdad5f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7457,6 +7457,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "noted_by": {
+          "name": "noted_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7519,6 +7525,15 @@
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "fan_facts_noted_by_user_id_fk": {
+          "name": "fan_facts_noted_by_user_id_fk",
+          "tableFrom": "fan_facts",
+          "tableTo": "user",
+          "columnsFrom": ["noted_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7561,7 +7576,11 @@
         },
         "fan_facts_kind_check": {
           "name": "fan_facts_kind_check",
-          "value": "\"fan_facts\".\"kind\" in ('declared', 'inferred')"
+          "value": "\"fan_facts\".\"kind\" in ('declared', 'inferred', 'noted')"
+        },
+        "fan_facts_noted_by_check": {
+          "name": "fan_facts_noted_by_check",
+          "value": "(\"fan_facts\".\"kind\" = 'noted') = (\"fan_facts\".\"noted_by\" is not null)"
         },
         "fan_facts_confidence_check": {
           "name": "fan_facts_confidence_check",
