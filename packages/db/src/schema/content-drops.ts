@@ -6,7 +6,9 @@ import {
   DROP_MEDIA_KINDS,
   DROP_MIME_TYPES,
   DROP_STATES,
+  SCRIPT_SUMMARY_REVIEW_REASONS,
   SHOT_MOMENTS,
+  type ScriptDropSummary,
 } from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -16,6 +18,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgPolicy,
   pgTable,
   smallint,
@@ -366,5 +369,47 @@ export const contentDropFiles = pgTable(
         select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId} and d.state = 'uploading'
       )`,
     }),
+  ],
+);
+
+/**
+ * A sent script told step by step and its synthesis (ADR 0083 § 6), written by `content_drops.summarize_script` once
+ * each of its media is described: once per set of media (`media_hash`, its slots and their media) and per prompt. The
+ * agency reads it beside the grid's prices and validates it (lot c); only a job writes it, nothing deletes it.
+ */
+export const scriptDropSummaries = pgTable(
+  'script_drop_summaries',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    dropId: uuid('drop_id').notNull(),
+    /** sha256 of its slots and their media, in order: a slot whose file changed tells the script again. */
+    mediaHash: text('media_hash').notNull(),
+    content: jsonb('content').$type<ScriptDropSummary>().notNull(),
+    reviewReasons: text('review_reasons')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    model: text('model').notNull(),
+    promptHash: text('prompt_hash').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check(
+      'script_drop_summaries_review_reasons_check',
+      sql`${t.reviewReasons} <@ array[${sql.raw(SCRIPT_SUMMARY_REVIEW_REASONS.map((r) => `'${r}'`).join(', '))}]::text[]`,
+    ),
+    check('script_drop_summaries_media_hash_check', sql`${t.mediaHash} ~ '^[0-9a-f]{64}$'`),
+    check('script_drop_summaries_content_check', sql`jsonb_typeof(${t.content}) = 'object'`),
+    foreignKey({
+      name: 'script_drop_summaries_drop_fk',
+      columns: [t.dropId, t.creatorId],
+      foreignColumns: [contentDrops.id, contentDrops.creatorId],
+    }),
+    uniqueIndex('script_drop_summaries_unique').on(t.dropId, t.mediaHash, t.promptHash),
+    index('script_drop_summaries_creator_idx').on(t.creatorId),
+    pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
   ],
 );

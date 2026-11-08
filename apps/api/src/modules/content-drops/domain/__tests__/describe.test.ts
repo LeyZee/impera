@@ -1,7 +1,7 @@
-import type { ScriptSegment } from '@impera/contracts';
+import type { ScriptDropSummary, ScriptSegment } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { dropContextOf } from '../describe';
+import { dropContextOf, mentionsPrice, orderedSummary, scriptStepsOf } from '../describe';
 
 /** Invented: a stage with an outfit and two media, a bridge with a teaser photo, a stage with two series. */
 const segments: ScriptSegment[] = [
@@ -89,5 +89,94 @@ describe('what the drop says of a media (ADR 0083 § 5)', () => {
       category: 'Script',
       step: null,
     });
+  });
+});
+
+describe('the steps of her sent script (ADR 0083 § 6)', () => {
+  const file = (slotKey: string, mediaAssetId: string) => ({ slotKey, mediaAssetId });
+
+  it('groups the filled slots by step, in the script’s order, each series apart', () => {
+    const steps = scriptStepsOf(segments, [
+      file('chambre:B:0', 'm5'),
+      file('salon::1', 'm2'),
+      file('salon::0', 'm1'),
+      file('vers-chambre::0', 'm3'),
+      file('chambre:A:0', 'm4'),
+    ]);
+
+    expect(steps).toEqual([
+      {
+        step: 'salon:',
+        code: 'E1',
+        name: 'Le salon',
+        card: 'Elle se dévoile un peu. Joueuse. Tenue : Robe rouge. Lieu : Canapé.',
+        media: [file('salon::0', 'm1'), file('salon::1', 'm2')],
+      },
+      {
+        step: 'vers-chambre:',
+        code: 'P12',
+        name: 'Pont vers l’étape 2',
+        card: 'La suite arrive.',
+        media: [file('vers-chambre::0', 'm3')],
+      },
+      {
+        step: 'chambre:A',
+        code: 'E2A',
+        name: 'La chambre',
+        card: 'Elle se dévoile plus. Série A : Lumière tamisée.',
+        media: [file('chambre:A:0', 'm4')],
+      },
+      {
+        step: 'chambre:B',
+        code: 'E2B',
+        name: 'La chambre',
+        card: 'Elle se dévoile plus. Série B : Plein jour.',
+        media: [file('chambre:B:0', 'm5')],
+      },
+    ]);
+  });
+
+  it('tells no step without media, and leaves out a slot the version does not have', () => {
+    const steps = scriptStepsOf(segments, [file('salon::0', 'm1'), file('cuisine::0', 'm9')]);
+
+    expect(steps.map((step) => [step.step, step.media.length])).toEqual([['salon:', 1]]);
+  });
+});
+
+describe('the brain’s answer, held by the code (ADR 0083 § 6, ADR 0056 § 6)', () => {
+  const told = (step: string) => ({
+    step,
+    overview: `Ce que montre ${step}.`,
+    summary: `Résumé de ${step}.`,
+  });
+  const summary: ScriptDropSummary = {
+    shootingContext: 'Un soir chez elle.',
+    steps: [told('vers-chambre:'), told('salon:')],
+  };
+
+  it('puts the steps back in the script’s order', () => {
+    expect(orderedSummary(['salon:', 'vers-chambre:'], summary)?.steps.map((one) => one.step)).toEqual([
+      'salon:',
+      'vers-chambre:',
+    ]);
+  });
+
+  it('refuses a step missing, added or told twice', () => {
+    expect(orderedSummary(['salon:', 'vers-chambre:', 'chambre:A'], summary)).toBeNull();
+    expect(orderedSummary(['salon:'], summary)).toBeNull();
+    expect(
+      orderedSummary(['salon:', 'vers-chambre:'], { ...summary, steps: [told('salon:'), told('salon:')] }),
+    ).toBeNull();
+  });
+
+  it('sees a sum or a currency anywhere, never a number alone', () => {
+    expect(mentionsPrice(summary)).toBe(false);
+    expect(mentionsPrice({ ...summary, shootingContext: 'Trois tenues, deux pièces, 12 vidéos.' })).toBe(
+      false,
+    );
+    for (const text of ['Vendue 15 €.', 'Pour 20 euros.', 'Prix : 9,99 EUR.', 'À 30 balles.', '$12'])
+      expect(
+        mentionsPrice({ ...summary, steps: [told('salon:'), { ...told('vers-chambre:'), summary: text }] }),
+      ).toBe(true);
   });
 });

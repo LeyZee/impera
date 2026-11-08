@@ -95,6 +95,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Description de média | `media_description` | La sortie du rôle sens, au vocabulaire Impera. |
 | Description détaillée | `detailed` | La description complète d'un média qu'elle dépose (physique, tenue, pièce, action, son, paroles dans l'ordre), écrite seule par la vision ; s'ajoute à la phrase courte et aux étiquettes (ADR 0083). |
 | Raison de relecture | `review_reason` | Ce que le code lit dans une description qui la fait regarder d'abord par l'agence : renvoi à un autre média, autre personne, doute, drapeau (ADR 0083). |
+| Synthèse du script | `ScriptDropSummary` | Ce que le rôle `brain` écrit d'un script envoyé une fois tous ses médias décrits : la description générale et le résumé de chaque étape, puis le contexte du tournage ; jamais un prix, la grille de l'agence les donne (ADR 0083 § 6). |
 | Offre | `offer` | Une proposition commerciale (média + prix + plancher). Phase 6. |
 | Budget nul | `hasNoBudget` | Drapeau posé par le code quand le fan dit ne pas pouvoir payer : plus aucune offre ni bouderie ni relance de vente tant qu'il ne revient pas de lui-même vers le payant. |
 | Délai entre deux scripts | `cooldownHours` | Temps minimum entre deux scripts proposés à un même fan, lu dans la persona (`strategies.script_launch.cooldown_hours`, réglable par créatrice) ; après, un script ne part que si le fan sexualise de nouveau (`offerDecision`). |

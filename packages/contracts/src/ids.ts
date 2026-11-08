@@ -231,6 +231,10 @@ export type SuggestionId = z.infer<typeof SuggestionIdSchema>;
 export const ContentDropIdSchema = uuid.brand<'ContentDropId'>();
 export type ContentDropId = z.infer<typeof ContentDropIdSchema>;
 
+/** A sent script's synthesis (ADR 0083 § 6). */
+export const ScriptDropSummaryIdSchema = uuid.brand<'ScriptDropSummaryId'>();
+export type ScriptDropSummaryId = z.infer<typeof ScriptDropSummaryIdSchema>;
+
 /** One file of a drop (`content_drop_files`), drawn by her phone with the drop. */
 export const ContentDropFileIdSchema = uuid.brand<'ContentDropFileId'>();
 export type ContentDropFileId = z.infer<typeof ContentDropFileIdSchema>;
