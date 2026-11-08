@@ -121,3 +121,230 @@
     flex: 1 1 auto;
   }
 }
+
+/*
+ * The review of a sent script (SC-04 lot c3): the synthesis first, then each step and its media. A medium is a quiet
+ * tile (no picture of hers on this screen yet), its description beside it; what the code holds back reads in amber,
+ * a safety alert in red. Never a coloured edge.
+ */
+.sx-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}
+.sx-review__standing {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+
+.sx-synth {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-fill-soft);
+}
+.sx-synth__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.sx-synth__title {
+  margin: 0;
+  font-weight: 650;
+}
+.sx-synth__context,
+.sx-synth__text,
+.sx-medium__text {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  overflow-wrap: anywhere;
+}
+.sx-synth__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.sx-synth__step {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.sx-price {
+  color: var(--nv-ink-muted);
+}
+
+.sx-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.sx-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.sx-step__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.sx-step__code {
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.sx-step__name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sx-step__head > .sx-step__all {
+  margin-left: auto;
+}
+
+.sx-media {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.sx-medium {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: var(--nv-space-3);
+  align-items: start;
+}
+.sx-thumb {
+  width: 56px;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  display: grid;
+  place-items: center;
+}
+.sx-thumb::after {
+  font-size: 20px;
+  opacity: 0.7;
+}
+.sx-thumb[data-kind='image']::after {
+  content: '📷';
+}
+.sx-thumb[data-kind='video']::after {
+  content: '🎬';
+}
+.sx-thumb[data-kind='audio']::after {
+  content: '🎙️';
+}
+.sx-medium__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.sx-medium__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.sx-medium__kind {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sx-medium__note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  font-style: italic;
+}
+.sx-review .aa-pill[data-tone='ok']::before {
+  background: var(--nv-success);
+}
+.sx-review .aa-pill[data-tone='todo'] {
+  color: var(--nv-ink);
+}
+.sx-review .aa-pill[data-tone='todo']::before {
+  background: var(--nv-ink);
+}
+
+.sx-reasons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.sx-reason {
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+.sx-reason[data-tone='alert'] {
+  color: var(--nv-danger);
+}
+
+.sx-correct {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.sx-correct__area {
+  resize: none;
+  min-height: 84px;
+}
+
+/* Her switch: one card, one line of help, the owner's alone (ADR 0083 § 9). */
+.sx-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-4);
+  padding: 16px 22px;
+  border-radius: var(--nv-radius-xl);
+}
+.sx-switch__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sx-switch__title {
+  margin: 0;
+  font-weight: 650;
+}
+
+@media (max-width: 520px) {
+  .sx-synth__step {
+    grid-template-columns: auto 1fr;
+  }
+  .sx-synth__step .sx-price {
+    grid-column: 2;
+    justify-self: start;
+    margin: 0;
+  }
+  .sx-switch {
+    padding: 16px;
+  }
+  /* In the review, a lone « Corriger » stays a small button at the end of its row, never a full-width bar. */
+  .sx-review .sx-actions > .nv-btn {
+    flex: none;
+  }
+}

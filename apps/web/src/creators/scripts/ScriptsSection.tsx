@@ -2,6 +2,7 @@ import type { CreatorId } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX } from 'react';
 
+import { ScriptReview } from './ScriptReview';
 import { archiveHref, confirmCopied, contentKey, useCreatorContent } from './api';
 import {
   BLOCKER_TEXTS,
@@ -12,6 +13,7 @@ import {
   sentScripts,
   type SentScriptRow,
 } from './model';
+import { SWITCH_FAILED, setDescribeSwitch, switchKey, useDescribeSwitch } from './review-api';
 import './scripts.css';
 
 import { useStructures } from '@/scripts/api';
@@ -27,10 +29,13 @@ export function ScriptsSection({
   creatorId,
   creatorName,
   timezone,
+  isOwner = false,
 }: {
   creatorId: CreatorId;
   creatorName: string;
   timezone: string;
+  /** Her switch of the descriptions is the owner's alone (ADR 0083 § 9). */
+  isOwner?: boolean;
 }): JSX.Element {
   const content = useCreatorContent(creatorId);
   const structures = useStructures();
@@ -112,6 +117,7 @@ export function ScriptsSection({
           </div>
         </div>
       </div>
+      {isOwner ? <DescribeSwitch creatorId={creatorId} creatorName={creatorName} /> : null}
       {list()}
       {confirming === null ? null : (
         <ConfirmCopy
@@ -154,6 +160,7 @@ function ScriptCard({
 }): JSX.Element {
   const id = useId();
   const state = stateOf(row);
+  const [reviewing, setReviewing] = useState(false);
   return (
     <li
       className="nv-plate sx-card nv-enter"
@@ -191,24 +198,42 @@ function ScriptCard({
           {BLOCKER_TEXTS[row.blocker]}
         </p>
       )}
-      {row.blocker === null ? (
-        <div className="sx-actions">
-          <a
-            className={`nv-btn nv-btn--sm ${row.exportedAt === null ? 'nv-btn--soft' : 'nv-btn--plain'}`}
-            href={archiveHref(creatorId, row.dropId)}
-            download
-          >
-            {row.exportedAt === null ? 'Télécharger l’archive' : 'Télécharger à nouveau'}
-          </a>
-          {row.exportedAt === null ? (
-            <button
-              type="button"
-              className={`nv-btn nv-btn--sm ${leading ? 'nv-btn--neon' : 'nv-btn--soft'}`}
-              onClick={onConfirm}
+      <div className="sx-actions">
+        <button
+          type="button"
+          className="nv-btn nv-btn--sm nv-btn--plain"
+          aria-expanded={reviewing}
+          aria-controls={`${id}-review`}
+          onClick={() => {
+            setReviewing((open) => !open);
+          }}
+        >
+          {reviewing ? 'Fermer les descriptions' : 'Relire les descriptions'}
+        </button>
+        {row.blocker === null ? (
+          <>
+            <a
+              className={`nv-btn nv-btn--sm ${row.exportedAt === null ? 'nv-btn--soft' : 'nv-btn--plain'}`}
+              href={archiveHref(creatorId, row.dropId)}
+              download
             >
-              Copié dans Reveal
-            </button>
-          ) : null}
+              {row.exportedAt === null ? 'Télécharger l’archive' : 'Télécharger à nouveau'}
+            </a>
+            {row.exportedAt === null ? (
+              <button
+                type="button"
+                className={`nv-btn nv-btn--sm ${leading ? 'nv-btn--neon' : 'nv-btn--soft'}`}
+                onClick={onConfirm}
+              >
+                Copié dans Reveal
+              </button>
+            ) : null}
+          </>
+        ) : null}
+      </div>
+      {reviewing ? (
+        <div id={`${id}-review`}>
+          <ScriptReview creatorId={creatorId} dropId={row.dropId} code={row.code} />
         </div>
       ) : null}
     </li>
@@ -284,5 +309,67 @@ function ConfirmCopy({
         </div>
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * Her switch of the descriptions (ADR 0083 § 9), the owner's: on, each photo and video she drops is described by the
+ * vision AI, then read again here before any use; what she dropped while it was off is described at once.
+ */
+function DescribeSwitch({
+  creatorId,
+  creatorName,
+}: {
+  creatorId: CreatorId;
+  creatorName: string;
+}): JSX.Element {
+  const id = useId();
+  const client = useQueryClient();
+  const current = useDescribeSwitch(creatorId, true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const turn = async (on: boolean): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    const answer = await setDescribeSwitch(creatorId, on);
+    setBusy(false);
+    if (answer === null) {
+      setError(SWITCH_FAILED);
+      return;
+    }
+    client.setQueryData(switchKey(creatorId), answer);
+  };
+
+  return (
+    <div className="nv-plate sx-switch">
+      <div className="sx-switch__text">
+        <label className="sx-switch__title" htmlFor={id}>
+          Descriptions par l’IA
+        </label>
+        <p className="ps-muted">
+          {current.data === true
+            ? `Chaque photo et vidéo de ${creatorName} est décrite à son arrivée, puis relue ici avant tout usage.`
+            : `Éteint : ses médias ne sont pas décrits. Allumé, ce qu’elle a déjà déposé l’est aussi.`}
+        </p>
+        {error === null ? null : (
+          <p className="sx-error nv-swap" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+      <input
+        id={id}
+        type="checkbox"
+        role="switch"
+        className="nv-switch"
+        checked={current.data === true}
+        disabled={busy || current.data === undefined}
+        aria-busy={busy}
+        onChange={(event) => {
+          void turn(event.target.checked);
+        }}
+      />
+    </div>
   );
 }

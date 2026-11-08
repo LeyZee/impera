@@ -1,7 +1,16 @@
 import type { ScriptDropSummary, ScriptSegment } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { dropContextOf, mentionsPrice, orderedSummary, scriptStepsOf } from '../describe';
+import {
+  dropContextOf,
+  mediaHashOf,
+  mentionsPrice,
+  orderedSummary,
+  scriptStepsOf,
+  shownRow,
+  validationRefusal,
+  type ReviewedRow,
+} from '../describe';
 
 /** Invented: a stage with an outfit and two media, a bridge with a teaser photo, a stage with two series. */
 const segments: ScriptSegment[] = [
@@ -178,5 +187,66 @@ describe('the brain’s answer, held by the code (ADR 0083 § 6, ADR 0056 § 6)'
       expect(
         mentionsPrice({ ...summary, steps: [told('salon:'), { ...told('vers-chambre:'), summary: text }] }),
       ).toBe(true);
+  });
+});
+
+describe('the row a media is shown with, and what can be validated (ADR 0030 § 3)', () => {
+  const at = (minute: number) => new Date(Date.UTC(2026, 10, 8, 20, minute));
+  const row = (
+    id: string,
+    created: number,
+    validated: number | null,
+    reasons: string[] = [],
+  ): ReviewedRow => ({
+    id,
+    mediaAssetId: 'm1',
+    reviewReasons: reasons,
+    validatedAt: validated === null ? null : at(validated),
+    createdAt: at(created),
+  });
+
+  it('shows the latest validated by its validation, else the latest written', () => {
+    expect(shownRow([])).toBeNull();
+    expect(shownRow([row('a', 1, null), row('b', 2, null)])?.id).toBe('b');
+    // An older row validated wins over a newer one not validated.
+    expect(shownRow([row('a', 1, 5), row('b', 2, null)])?.id).toBe('a');
+    // Two validated: the latest validation, whatever was written first.
+    expect(shownRow([row('a', 1, 9), row('b', 2, 6)])?.id).toBe('a');
+    // Same instants: the greater id, as the base orders it.
+    expect(shownRow([row('a', 1, null), row('b', 1, null)])?.id).toBe('b');
+  });
+
+  it('validates only the rows shown, and a row waiting for a human alone', () => {
+    const shown = new Map<string, ReviewedRow>([
+      ['m1', { ...row('a', 1, null, ['unsure']), mediaAssetId: 'm1' }],
+      ['m2', { ...row('b', 1, null), mediaAssetId: 'm2' }],
+    ]);
+    const of = (id: string) => shown.get(id) ?? null;
+    const a = shown.get('m1');
+    const b = shown.get('m2');
+    if (a === undefined || b === undefined) throw new Error('rows');
+    expect(validationRefusal([b], of)).toBeNull();
+    expect(validationRefusal([a], of)).toBeNull();
+    expect(validationRefusal([a, b], of)).toBe('alone');
+    expect(validationRefusal([{ ...b, id: 'older' }], of)).toBe('not_shown');
+    // Already validated, its reasons no longer hold a batch.
+    const settled = { ...a, validatedAt: at(3) };
+    shown.set('m1', settled);
+    expect(validationRefusal([settled, b], of)).toBeNull();
+  });
+
+  it('hashes a script by its slots, their media and the row each is told with, in any order', () => {
+    const files = [
+      { slotKey: 'salon::0', mediaAssetId: 'm1' },
+      { slotKey: 'chambre:A:0', mediaAssetId: 'm2' },
+    ];
+    const told = new Map([
+      ['m1', { descriptionId: 'd1' }],
+      ['m2', { descriptionId: 'd2' }],
+    ]);
+    const hash = mediaHashOf(files, told);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(mediaHashOf([...files].reverse(), told)).toBe(hash);
+    expect(mediaHashOf(files, new Map([...told, ['m2', { descriptionId: 'd3' }]]))).not.toBe(hash);
   });
 });

@@ -40,6 +40,16 @@ const bodiesFor = (
   'POST /v1/conversations/:id/mode': { mode: 'auto' },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
+  'POST /v1/creators/:creatorId/drops/:id/descriptions/validate': {
+    descriptionIds: ['00000000-0000-4000-8000-000000000000'],
+  },
+  'POST /v1/creators/:creatorId/drops/:id/descriptions/correct': {
+    descriptionId: '00000000-0000-4000-8000-000000000000',
+    detailed: 'Description inventée',
+  },
+  'POST /v1/creators/:creatorId/drops/:id/summary/validate': {
+    summaryId: '00000000-0000-4000-8000-000000000000',
+  },
   'PATCH /v1/scheduling/shift-reports/:shiftReportId': { version: 1, amountMinor: 1 },
   'POST /v1/scheduling/shift-reports/:shiftReportId/reject': { version: 1, note: 'Note inventée' },
   'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },

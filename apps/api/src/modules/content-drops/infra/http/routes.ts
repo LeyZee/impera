@@ -6,6 +6,7 @@ import {
   ContentRequestIdSchema,
   ContentRequestSchema,
   CorrectDropCategoryBodySchema,
+  CorrectDropDescriptionBodySchema,
   CreateContentDropBodySchema,
   CreateContentRequestBodySchema,
   CreatorContentSchema,
@@ -19,8 +20,11 @@ import {
   ScriptDropCardQuerySchema,
   ScriptDropSchema,
   ScriptSlotParamsSchema,
+  DropDescriptionsReviewSchema,
   DropDescriptionsSwitchSchema,
   StartScriptDropBodySchema,
+  ValidateDropDescriptionsBodySchema,
+  ValidateScriptSummaryBodySchema,
   type UserRole,
 } from '@impera/contracts';
 import { NotACreatorAccount } from '@impera/db';
@@ -43,6 +47,7 @@ import type {
   AgencyContentStore,
   CreatorContentStore,
   DescribeSwitch,
+  DescriptionReview,
   DropStorage,
 } from '../../domain/ports';
 
@@ -94,6 +99,7 @@ export function createContentDropRoutes(
   storage: DropStorage,
   scripts: ScriptDropDeps,
   describeSwitch: DescribeSwitch,
+  review: DescriptionReview,
   requireRole: RequireRole,
   clock: () => Date = () => new Date(),
 ): FastifyPluginAsyncZod {
@@ -377,6 +383,80 @@ export function createContentDropRoutes(
         await agency.cancel(request.params.creatorId, signedIn(request.user), request.params.id, clock());
         return reply.code(204).send();
       },
+    );
+
+    // The review of a drop's descriptions and of a script's synthesis (ADR 0030 § 3, ADR 0083 § 7): each write stamped
+    // with the account that makes it, each answering the drop's review as it now stands.
+    app.get(
+      '/creators/:creatorId/drops/:id/descriptions',
+      {
+        ...team,
+        schema: { params: CreatorDropParamsSchema, response: { 200: DropDescriptionsReviewSchema } },
+      },
+      (request) => review.read(request.params.creatorId, signedIn(request.user), request.params.id),
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/descriptions/validate',
+      {
+        ...team,
+        schema: {
+          params: CreatorDropParamsSchema,
+          body: ValidateDropDescriptionsBodySchema,
+          response: { 200: DropDescriptionsReviewSchema },
+        },
+      },
+      (request) =>
+        review.validate(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.body.descriptionIds,
+          clock(),
+          request.id,
+        ),
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/descriptions/correct',
+      {
+        ...team,
+        schema: {
+          params: CreatorDropParamsSchema,
+          body: CorrectDropDescriptionBodySchema,
+          response: { 200: DropDescriptionsReviewSchema },
+        },
+      },
+      (request) =>
+        review.correct(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.body.descriptionId,
+          request.body.detailed,
+          clock(),
+          request.id,
+        ),
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/summary/validate',
+      {
+        ...team,
+        schema: {
+          params: CreatorDropParamsSchema,
+          body: ValidateScriptSummaryBodySchema,
+          response: { 200: DropDescriptionsReviewSchema },
+        },
+      },
+      (request) =>
+        review.validateSummary(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.body.summaryId,
+          clock(),
+        ),
     );
 
     // Her switch (ADR 0083 § 9): the owner's alone, turned on once the vision model is checked on her real media.
