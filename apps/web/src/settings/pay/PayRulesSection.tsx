@@ -10,6 +10,7 @@ import {
   type Currency,
   type EarningsSource,
   type PayPeriod,
+  type Platform,
   type PlanningAccount,
 } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
@@ -41,13 +42,21 @@ type Entry = AccountPayRulesList['accounts'][number];
 const CURRENCY_NAMES: Readonly<Record<Currency, string>> = { EUR: 'Euros', USD: 'Dollars' };
 
 /** « Euros · TVA 20 % · plateforme 20 % · rapports de fin de shift »: rules in one line. */
-const rulesLine = (rules: AccountPayRules): string =>
-  [
-    CURRENCY_NAMES[rules.currency],
-    `TVA ${percentText(rules.vatBps)}`,
-    `plateforme ${percentText(rules.platformFeeBps)}`,
-    SOURCE_LABELS[rules.earningsSource].toLowerCase(),
-  ].join(' · ');
+/** On the platform's net (ADR 0050 § 8), the VAT and the commission go unused: the line leaves them out. */
+const rulesLine = (rules: AccountPayRules, platform: Platform): string =>
+  (earningsBaseOf(platform, rules.earningsSource) === 'platform_net'
+    ? [
+        CURRENCY_NAMES[rules.currency],
+        SOURCE_LABELS[rules.earningsSource].toLowerCase(),
+        'net de la plateforme',
+      ]
+    : [
+        CURRENCY_NAMES[rules.currency],
+        `TVA ${percentText(rules.vatBps)}`,
+        `plateforme ${percentText(rules.platformFeeBps)}`,
+        SOURCE_LABELS[rules.earningsSource].toLowerCase(),
+      ]
+  ).join(' · ');
 
 /**
  * The periods new rules of an account may start with (EQ-03, ADR 0084): those that have not begun (the current one too
@@ -205,7 +214,7 @@ function AccountRules({
       ) : (
         <div className="rp-account__now">
           <span className="rp-chip rp-chip--ok">En vigueur</span>
-          <p className="rp-account__rules nv-num">{rulesLine(inForce)}</p>
+          <p className="rp-account__rules nv-num">{rulesLine(inForce, entry.account.platform)}</p>
           <p className="rp-account__since">
             depuis la quinzaine {periodLineFrom(inForce.fromPeriod, currentPeriod)}
           </p>
@@ -223,7 +232,7 @@ function AccountRules({
       {coming.map((rules) => (
         <div key={rules.id} className="rp-account__next">
           <span className="rp-chip">À venir</span>
-          <p className="rp-account__rules nv-num">{rulesLine(rules)}</p>
+          <p className="rp-account__rules nv-num">{rulesLine(rules, entry.account.platform)}</p>
           <p className="rp-account__since">
             à partir de la quinzaine {periodLineFrom(rules.fromPeriod, currentPeriod)}
           </p>
@@ -240,7 +249,7 @@ function AccountRules({
           <ul className="nv-disclosure__body rp-lines">
             {past.map((rules) => (
               <li key={rules.id} className="rp-account__old">
-                <span className="nv-num">{rulesLine(rules)}</span>
+                <span className="nv-num">{rulesLine(rules, entry.account.platform)}</span>
                 <span className="rp-account__since">
                   dès la quinzaine {periodLineFrom(rules.fromPeriod, currentPeriod)}
                 </span>
@@ -289,8 +298,10 @@ function RulesPanel({
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<ReportRefusal | null>(null);
 
-  const vatBps = parsePercent(vat);
-  const feeBps = parsePercent(fee);
+  // On the platform's net the VAT and the commission go unused: not asked, the rules keep the account's last ones.
+  const netOnly = hasNet && source === 'detected';
+  const vatBps = netOnly ? (base?.vatBps ?? 0) : parsePercent(vat);
+  const feeBps = netOnly ? (base?.platformFeeBps ?? 0) : parsePercent(fee);
   const ready = fromPeriod !== null && vatBps !== null && feeBps !== null;
 
   const send = async (): Promise<void> => {
@@ -333,14 +344,23 @@ function RulesPanel({
                 <dt>Devise</dt>
                 <dd>{CURRENCY_NAMES[currency]}</dd>
               </div>
-              <div>
-                <dt>TVA</dt>
-                <dd className="nv-num">{percentText(vatBps)}</dd>
-              </div>
-              <div>
-                <dt>Commission de la plateforme</dt>
-                <dd className="nv-num">{percentText(feeBps)}</dd>
-              </div>
+              {netOnly ? (
+                <div>
+                  <dt>TVA et commission</dt>
+                  <dd>Sans effet</dd>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <dt>TVA</dt>
+                    <dd className="nv-num">{percentText(vatBps)}</dd>
+                  </div>
+                  <div>
+                    <dt>Commission de la plateforme</dt>
+                    <dd className="nv-num">{percentText(feeBps)}</dd>
+                  </div>
+                </>
+              )}
               <div>
                 <dt>Source des ventes</dt>
                 <dd>{SOURCE_LABELS[source]}</dd>
@@ -419,7 +439,7 @@ function RulesPanel({
                 ? 'Cette plateforme ne donne pas de net : la paie de ce compte lit les rapports validés.'
                 : source === 'declared'
                   ? 'La paie lit les rapports de fin de shift validés.'
-                  : 'La paie lit les ventes relevées chez la plateforme, à son net, chacune pour le chatteur relié qui était en poste. Le chatteur ne déclare plus ses ventes.'}
+                  : 'La paie lit les ventes relevées chez la plateforme, à son net : ni TVA ni commission à retirer. Chacune va au chatteur relié qui était en poste, qui ne déclare plus ses ventes.'}
             </p>
           </div>
 
@@ -483,32 +503,26 @@ function RulesPanel({
             </div>
           </div>
 
-          <div className="tm-pair">
-            <Percent
-              id={`${id}-vat`}
-              label="TVA"
-              hint={
-                source === 'detected'
-                  ? 'Sans effet en ventes relevées : la plateforme donne déjà le net.'
-                  : 'Retirée du brut, après la conversion en euros.'
-              }
-              value={vat}
-              invalid={touched && vatBps === null}
-              onChange={setVat}
-            />
-            <Percent
-              id={`${id}-fee`}
-              label="Commission de la plateforme"
-              hint={
-                source === 'detected'
-                  ? 'Sans effet en ventes relevées : la plateforme donne déjà le net.'
-                  : 'Ce que la plateforme garde sur le hors-taxe.'
-              }
-              value={fee}
-              invalid={touched && feeBps === null}
-              onChange={setFee}
-            />
-          </div>
+          {netOnly ? null : (
+            <div className="tm-pair">
+              <Percent
+                id={`${id}-vat`}
+                label="TVA"
+                hint="Retirée du brut, après la conversion en euros."
+                value={vat}
+                invalid={touched && vatBps === null}
+                onChange={setVat}
+              />
+              <Percent
+                id={`${id}-fee`}
+                label="Commission de la plateforme"
+                hint="Ce que la plateforme garde sur le hors-taxe."
+                value={fee}
+                invalid={touched && feeBps === null}
+                onChange={setFee}
+              />
+            </div>
+          )}
 
           {refusal === null ? null : (
             <p className="tm-warn sc-refusal nv-swap" role="alert">

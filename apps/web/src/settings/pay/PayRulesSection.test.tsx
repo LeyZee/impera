@@ -424,11 +424,13 @@ describe('Réglages › Règles de paie', () => {
     expect(valuesOf(from).slice(0, 2)).toEqual(['2026-10-01', '2026-10-16']);
     // Until the owner picks another, the earliest the source allows: the checked fortnight.
     expect(plain(from.textContent)).toContain('1er au 15 octobre');
-    fireEvent.change(within(dialog).getByLabelText('TVA'), { target: { value: '20' } });
-    fireEvent.change(within(dialog).getByLabelText('Commission de la plateforme'), {
-      target: { value: '20' },
-    });
+    // The platform gives the net: neither VAT nor commission is asked, the recap says they go unused.
+    expect(within(dialog).queryByLabelText('TVA')).toBeNull();
+    expect(within(dialog).queryByLabelText('Commission de la plateforme')).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(plain(within(dialog).getByText('TVA et commission').nextElementSibling?.textContent)).toBe(
+      'Sans effet',
+    );
 
     expect(plain(within(dialog).getByText(/^Cette quinzaine a déjà commencé/u).textContent)).toBe(
       'Cette quinzaine a déjà commencé : ses relevés en brouillon seront recalculés sur les ventes relevées, et les ventes déclarées dans ses rapports ne compteront plus.',
@@ -439,8 +441,31 @@ describe('Réglages › Règles de paie', () => {
     expect(writes).toHaveLength(1);
     expect(writes[0]).toMatchObject({
       path: '/v1/team/pay-rules',
-      body: { platformAccountId: id(12), fromPeriod: '2026-10-01', earningsSource: 'detected' },
+      body: {
+        platformAccountId: id(12),
+        fromPeriod: '2026-10-01',
+        earningsSource: 'detected',
+        vatBps: 0,
+        platformFeeBps: 0,
+      },
     });
+  });
+
+  it('leaves the VAT and the commission out of rules on the platform’s net (ADR 0084)', async () => {
+    accounts = [
+      {
+        account: account(2, 'Inès Moreau', 'ines'),
+        rules: [rules(9, 2, '2026-10-01', { earningsSource: 'detected' })],
+        checkedPeriod: null,
+      },
+    ];
+    renderSection();
+    const card = (await screen.findByText('Inès Moreau')).closest<HTMLElement>('.rp-account');
+    if (card === null) throw new Error('No card');
+    expect(plain(card.textContent)).toContain(
+      'Euros · ventes relevées par le connecteur · net de la plateforme',
+    );
+    expect(plain(card.textContent)).not.toContain('TVA');
   });
 
   it('takes the checked fortnight back with the reports, and keeps « Ventes relevées » shut on a platform without a net', async () => {
@@ -495,10 +520,6 @@ describe('Réglages › Règles de paie', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Poser les règles' }));
     const dialog = screen.getByRole('dialog', { name: 'Poser les règles de paie' });
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Ventes relevées par le connecteur' }));
-    fireEvent.change(within(dialog).getByLabelText('TVA'), { target: { value: '20' } });
-    fireEvent.change(within(dialog).getByLabelText('Commission de la plateforme'), {
-      target: { value: '20' },
-    });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
     expect((await within(dialog).findByRole('alert')).textContent).toBe(

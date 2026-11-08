@@ -14,6 +14,7 @@ Fait :
 - Écran Réglages › Règles de paie :
   - « Ventes relevées » est ouvert pour une plateforme qui donne un net, et la source vient en premier dans la fenêtre ;
   - la quinzaine vérifiée est proposée (« vérifiée ») et choisie d'office avec « Ventes relevées », tant que le propriétaire n'en prend pas une autre ;
+  - en « Ventes relevées », la TVA et la commission ne sont plus demandées (la plateforme donne le net) : les règles gardent celles du compte, le récapitulatif dit « Sans effet » et la carte écrit « net de la plateforme » (relecture Extension) ;
   - le récapitulatif prévient du recalcul ;
   - la carte du compte dit « Ventes vérifiées » ; la colonne des pastilles s'élargit sur cette carte pour que la pastille ne mange pas la phrase (vu en capture).
 - Tests :
