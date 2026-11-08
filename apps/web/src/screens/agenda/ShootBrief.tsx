@@ -21,7 +21,15 @@ export function ShootBrief({
   const content = (
     <>
       {reel === null ? null : <ReelBrief brief={reel} />}
-      {brief === null ? null : <p className="ag-brief__text">{brief}</p>}
+      {brief === null ? null : reel === null ? (
+        <p className="ag-brief__text">{brief}</p>
+      ) : (
+        // Beside a reel sheet, the free text is what is left to know: said so, under its own title.
+        <section className="ag-brief__more" aria-label="À savoir aussi">
+          <span className="ag-brief__more-title">À savoir aussi</span>
+          <p className="ag-brief__text">{brief}</p>
+        </section>
+      )}
     </>
   );
   if (!folded)

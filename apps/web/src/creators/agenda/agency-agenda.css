@@ -158,9 +158,9 @@
   }
 }
 
-/* « Proposer » for a Reel Insta (VEI-08): wide enough for its reel sheet and, beside it, what she will see. */
+/* « Proposer » for a Reel Insta (VEI-08): wide enough for its reel sheet and, beside it, what she will see with her reel on a phone. */
 .tm-dialog.aa-dialog--reel {
-  max-width: 880px;
+  max-width: 1120px;
   transition: max-width var(--nv-dur-base) var(--nv-ease-spring-smooth);
 }
 @media (prefers-reduced-motion: reduce) {

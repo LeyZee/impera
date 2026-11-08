@@ -10,14 +10,3 @@ export const REEL_ZONES = {
   bottom: 0.35,
   right: 0.12,
 } as const;
-
-/** The drawn frame, in the units of its SVG: 9 by 16. */
-export const REEL_FRAME = { width: 90, height: 160 } as const;
-
-/** The clear part of the frame, in its units: where her text on screen goes. */
-export const REEL_CLEAR = {
-  x: 0,
-  y: REEL_FRAME.height * REEL_ZONES.top,
-  width: REEL_FRAME.width * (1 - REEL_ZONES.right),
-  height: REEL_FRAME.height * (1 - REEL_ZONES.top - REEL_ZONES.bottom),
-} as const;

@@ -132,9 +132,10 @@ describe('Créatrices › Agenda (CR-05 lot c)', () => {
     fireEvent.change(within(dialog).getByLabelText('Plan 2'), { target: { value: 'Elle sourit' } });
     const preview = within(within(dialog).getByRole('group', { name: 'Ce qu’elle verra' }));
     expect(preview.getByText('Trois secondes pour te convaincre')).toBeDefined();
-    expect(preview.getAllByRole('listitem').map((shot) => shot.textContent)).toEqual([
-      '1Gros plan sur la tasse',
-      '2Elle sourit',
+    const filmed = within(preview.getByRole('region', { name: 'Puis filme, dans l’ordre' }));
+    expect(filmed.getAllByRole('listitem').map((shot) => shot.textContent)).toEqual([
+      'Gros plan sur la tasse',
+      'Elle sourit',
     ]);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Proposer' }));
     expect(await screen.findByText(/^Proposée sans heure/u)).toBeDefined();

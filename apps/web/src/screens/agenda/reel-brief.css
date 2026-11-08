@@ -1,106 +1,122 @@
-/* ── Her reel sheet (VEI-08, ADR 0082 § 3): drawn rather than read; the same in the agency's preview ─────────────── */
+/* ── Her reel sheet (VEI-08, ADR 0082 § 3): the steps in the order she shoots, beside her reel on a phone ──────── */
 .ag-reel {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-3);
-  padding-top: var(--nv-space-1);
+  gap: var(--nv-space-4);
+  padding-top: var(--nv-space-2);
 }
-.ag-reel__label {
-  display: block;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  letter-spacing: var(--nv-text-caption-tracking);
+.ag-reel__sum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+  margin: 0;
+}
+.ag-reel__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-ink) 7%, transparent);
+  font-size: var(--nv-text-footnote);
   font-weight: 600;
-  color: var(--nv-ink-faint);
+  color: var(--nv-ink);
 }
-.ag-reel__hook {
+/* Phone first: the steps, then her reel. Wide enough, side by side, the phone on the left like a mirror. */
+.ag-reel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-5);
+}
+@container (min-width: 520px) {
+  .ag-reel__body {
+    flex-direction: row-reverse;
+    align-items: flex-start;
+  }
+  .ag-reel__steps {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+.ag-reel__steps {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ag-reel__step {
+  position: relative;
+  display: flex;
+  gap: var(--nv-space-3);
+  padding-bottom: var(--nv-space-4);
+}
+.ag-reel__step:last-child {
+  padding-bottom: 0;
+}
+/* The thread between two steps: a quiet line from one number to the next. */
+.ag-reel__step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 30px;
+  bottom: 2px;
+  width: 1.5px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--nv-ink) 10%, transparent);
+}
+.ag-reel__n {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink);
+  color: var(--nv-surface-raised);
+  font-size: var(--nv-text-footnote);
+  font-weight: 700;
+}
+.ag-reel__what {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-1);
+  padding-top: 3px;
 }
-/* Her first sentence, what she says first: the largest words of the sheet, in the serif of a spoken line. */
+.ag-reel__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+  margin: 0;
+  font-size: var(--nv-text-body);
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.ag-reel__aside {
+  flex: none;
+  font-size: var(--nv-text-footnote);
+  font-weight: 500;
+  color: var(--nv-ink-muted);
+}
+/* What she says first: the largest words of the sheet, in the serif of a spoken line. */
 .ag-reel__quote {
   font-family: var(--nv-font-serif);
   font-size: var(--nv-text-whisper);
   line-height: var(--nv-text-whisper-leading);
   color: var(--nv-ink);
   overflow-wrap: anywhere;
-  quotes: '« ' ' »';
-}
-.ag-reel__body {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--nv-space-4);
-}
-.ag-reel__figure {
-  flex: 0 0 120px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-2);
-  margin: 0;
-}
-.ag-reel__frame {
-  position: relative;
-  width: 120px;
-  aspect-ratio: 9 / 16;
-}
-.ag-reel__frame svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.ag-reel__screen {
-  fill: color-mix(in srgb, var(--nv-ink) 3%, var(--nv-surface-raised));
-}
-.ag-reel__covered {
-  fill: color-mix(in srgb, var(--nv-ink) 14%, transparent);
-}
-.ag-reel__hatch {
-  stroke: color-mix(in srgb, var(--nv-ink) 10%, transparent);
-  stroke-width: 1.2;
-}
-.ag-reel__edge {
-  fill: none;
-  stroke: color-mix(in srgb, var(--nv-ink) 22%, transparent);
-  stroke-width: 1;
-}
-.ag-reel__clear {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--nv-space-1);
-}
-.ag-reel__onscreen {
-  max-width: 100%;
-  padding: 2px 6px;
-  border-radius: var(--nv-radius-xs);
-  background: var(--nv-ink);
-  color: var(--nv-surface-raised);
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-weight: 600;
-  text-align: center;
-  overflow-wrap: anywhere;
-}
-.ag-reel__caption {
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink-muted);
-}
-.ag-reel__plan {
-  flex: 1 1 160px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-3);
+  quotes: '«\00a0' '\00a0»';
 }
 .ag-reel__shots {
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-2);
-  margin: var(--nv-space-1) 0 0;
+  gap: 6px;
+  margin: 2px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -108,35 +124,254 @@
   display: flex;
   align-items: baseline;
   gap: var(--nv-space-2);
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
+  font-size: var(--nv-text-body);
+  line-height: 21px;
   color: var(--nv-ink);
   overflow-wrap: anywhere;
 }
-.ag-reel__n {
+.ag-reel__dot {
   flex: none;
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 6px;
+  height: 6px;
   border-radius: var(--nv-radius-full);
-  background: color-mix(in srgb, var(--nv-ink) 8%, transparent);
-  font-size: var(--nv-text-caption);
-  font-weight: 600;
+  background: var(--nv-ink-faint);
+  transform: translateY(-2px);
+}
+.ag-reel__line {
+  margin: 0;
+  font-size: var(--nv-text-body);
+  line-height: 21px;
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+}
+/* Her text on screen, in the white-on-black label a reel's text takes. */
+.ag-reel__overlay {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 7px;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nv-ink) 12%, transparent);
+  font-weight: 700;
+}
+.ag-reel__help {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
-.ag-reel__ending {
-  margin: var(--nv-space-1) 0 0;
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-  color: var(--nv-ink);
+.ag-reel__figure {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+}
+
+/* ── Her reel on a phone: always the dark of a reel, whatever the page's theme ─────────────────────────────────── */
+.ag-phone {
+  width: min(230px, 72cqw);
+  padding: 7px;
+  border-radius: 34px;
+  background: #0d0d0f;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nv-ink) 16%, transparent),
+    0 18px 40px -18px rgba(0, 0, 0, 0.55);
+}
+.ag-phone__screen {
+  container-type: inline-size;
+  position: relative;
+  aspect-ratio: 9 / 19.5;
+  overflow: hidden;
+  border-radius: 27px;
+  color: #fff;
+  font-family: var(--nv-font-sans);
+}
+.ag-phone__screen svg {
+  width: 7.6cqw;
+  height: 7.6cqw;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+/* The video: a warm evening light, darker at the bottom where the white texts sit. */
+.ag-phone__video {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.35) 0%,
+      transparent 16%,
+      transparent 52%,
+      rgba(0, 0, 0, 0.7) 100%
+    ),
+    radial-gradient(120% 70% at 30% 35%, #b77a5a 0%, #6c4256 45%, #2b2236 100%);
+}
+.ag-phone__top {
+  position: absolute;
+  top: 6.5%;
+  left: 6%;
+  right: 6%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ag-phone__title {
+  font-size: 8.4cqw;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+/* Where her text is safe: outlined, so she sees where it may go. */
+.ag-phone__clear {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3cqw;
+  border: 1.5px dashed rgba(255, 255, 255, 0.55);
+  border-radius: 3cqw;
+}
+.ag-phone__text {
+  max-width: 100%;
+  padding: 1.2cqw 3.2cqw;
+  border-radius: 2.4cqw;
+  background: #fff;
+  color: #000;
+  font-size: 6cqw;
+  line-height: 1.2;
+  font-weight: 700;
+  text-align: center;
   overflow-wrap: anywhere;
 }
-.ag-reel__length {
-  margin: 0;
+.ag-phone__rail {
+  position: absolute;
+  right: 1.5%;
+  width: 10%;
+  bottom: 15%;
   display: flex;
-  align-items: baseline;
-  gap: var(--nv-space-2);
-  font-size: var(--nv-text-callout);
+  flex-direction: column;
+  align-items: center;
+  gap: 4.4cqw;
+}
+.ag-phone__action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6cqw;
+}
+.ag-phone__action small {
+  font-size: 3.2cqw;
+  white-space: nowrap;
+  font-weight: 600;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+.ag-phone__disc {
+  width: 7.4cqw;
+  height: 7.4cqw;
+  border-radius: 1.8cqw;
+  border: 1.5px solid #fff;
+  background: linear-gradient(135deg, #b77a5a, #2b2236);
+}
+.ag-phone__bottom {
+  position: absolute;
+  left: 4.5%;
+  right: 17%;
+  bottom: 12%;
+  display: flex;
+  flex-direction: column;
+  gap: 2cqw;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+.ag-phone__who {
+  display: flex;
+  align-items: center;
+  gap: 2.4cqw;
+}
+.ag-phone__avatar {
+  width: 8.4cqw;
+  height: 8.4cqw;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  background: linear-gradient(135deg, #e9b9a0, #8a5468);
+}
+.ag-phone__name {
+  font-size: 4.6cqw;
+  font-weight: 700;
+}
+.ag-phone__follow {
+  padding: 0.8cqw 2.6cqw;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 1.8cqw;
+  font-size: 3.8cqw;
+  font-weight: 600;
+}
+/* Her caption: where it shows, cut after its first line by the app. */
+.ag-phone__legend {
+  margin: 0;
+  font-size: 4.2cqw;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ag-phone__plus {
+  color: rgba(255, 255, 255, 0.7);
+}
+.ag-phone__sound {
+  display: flex;
+  align-items: center;
+  gap: 1.4cqw;
+  margin: 0;
+  font-size: 3.8cqw;
+}
+.ag-phone__sound svg {
+  width: 4.2cqw;
+  height: 4.2cqw;
+}
+.ag-phone__nav {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 9.5%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-around;
+  padding-top: 2.4cqw;
+  background: #000;
+}
+.ag-phone__nav svg {
+  width: 7cqw;
+  height: 7cqw;
+  filter: none;
+}
+.ag-phone__me {
+  width: 7cqw;
+  height: 7cqw;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e9b9a0, #8a5468);
+}
+
+/* Her task with a reel sheet: wide enough on a computer for the steps and, beside them, her reel on a phone. */
+.tm-dialog.ag-dialog--reel {
+  max-width: 760px;
+}
+
+/* Beside a reel sheet, the free text of her shooting sheet: what is left to know, under a title. */
+.ag-brief__more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}
+.ag-brief__more-title {
+  font-size: var(--nv-text-body);
+  font-weight: 600;
   color: var(--nv-ink);
 }

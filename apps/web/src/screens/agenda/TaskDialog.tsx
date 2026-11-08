@@ -51,7 +51,7 @@ export function TaskDialog({
   };
   return (
     <Dialog
-      className="ag-scope"
+      className={task.reelBrief === null || mode === 'move' ? 'ag-scope' : 'ag-scope ag-dialog--reel'}
       title={task.title}
       lead={`${CREATOR_TASK_CATEGORY_LABELS[task.category]} · ${whenWords(task.when, agenda.timeZone)}`}
       busy={busy}

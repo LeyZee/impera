@@ -38,7 +38,7 @@
   gap: var(--nv-space-3);
 }
 .rb__preview {
-  flex: 1 1 260px;
+  flex: 1.4 1 300px;
   min-width: 0;
   display: flex;
   flex-direction: column;
