@@ -19,6 +19,7 @@ import {
   ScriptDropCardQuerySchema,
   ScriptDropSchema,
   ScriptSlotParamsSchema,
+  DropDescriptionsSwitchSchema,
   StartScriptDropBodySchema,
   type UserRole,
 } from '@impera/contracts';
@@ -37,7 +38,13 @@ import {
 } from '../../application/script-drops';
 import { exportScript } from '../../application/script-export';
 import { finishUpload, uploadOf } from '../../application/uploads';
-import type { AgencyContentStore, CreatorContentStore, DropStorage } from '../../domain/ports';
+import { DropDescriptionsCreatorNotFound } from '../../domain/errors';
+import type {
+  AgencyContentStore,
+  CreatorContentStore,
+  DescribeSwitch,
+  DropStorage,
+} from '../../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -86,12 +93,14 @@ export function createContentDropRoutes(
   agency: AgencyContentStore,
   storage: DropStorage,
   scripts: ScriptDropDeps,
+  describeSwitch: DescribeSwitch,
   requireRole: RequireRole,
   clock: () => Date = () => new Date(),
 ): FastifyPluginAsyncZod {
   return (app) => {
     const creatorOnly = { preValidation: requireRole('creator') };
     const team = { preValidation: requireRole('owner', 'operator') };
+    const owner = { preValidation: requireRole('owner') };
 
     app.get(
       '/creator-space/content',
@@ -367,6 +376,39 @@ export function createContentDropRoutes(
       async (request, reply) => {
         await agency.cancel(request.params.creatorId, signedIn(request.user), request.params.id, clock());
         return reply.code(204).send();
+      },
+    );
+
+    // Her switch (ADR 0083 § 9): the owner's alone, turned on once the vision model is checked on her real media.
+    // Turned on, what she dropped meanwhile is described and her sent scripts told.
+    app.get(
+      '/creators/:creatorId/drop-descriptions',
+      { ...owner, schema: { params: CreatorParamsSchema, response: { 200: DropDescriptionsSwitchSchema } } },
+      async (request) => {
+        const on = await describeSwitch.read(request.params.creatorId);
+        if (on === null) throw new DropDescriptionsCreatorNotFound();
+        return { on };
+      },
+    );
+
+    app.put(
+      '/creators/:creatorId/drop-descriptions',
+      {
+        ...owner,
+        schema: {
+          params: CreatorParamsSchema,
+          body: DropDescriptionsSwitchSchema,
+          response: { 200: DropDescriptionsSwitchSchema },
+        },
+      },
+      async (request) => {
+        const on = await describeSwitch.set(
+          request.params.creatorId,
+          request.body.on,
+          signedIn(request.user),
+        );
+        if (on === null) throw new DropDescriptionsCreatorNotFound();
+        return { on };
       },
     );
 

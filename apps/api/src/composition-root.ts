@@ -181,9 +181,9 @@ export interface AppOptions {
   /** Tests plug a vision with a fixed description here, for a marked post's captures; the app's gateway otherwise. */
   readonly trendVision?: Pick<LlmGateway, 'describeTrendCaptures'>;
   /** Tests plug a vision with a fixed description here, for her dropped media (ADR 0083); the app's gateway otherwise. */
-  readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe'>;
+  readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'>;
   /** Tests plug a brain with a fixed synthesis here, for her sent scripts (ADR 0083 § 6); the app's gateway otherwise. */
-  readonly scriptBrain?: Pick<LlmGateway, 'summarizeScript'>;
+  readonly scriptBrain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
   /** Tests plug a voice with a fixed post here, for her channel's posts (ADR 0080 § 5); the app's gateway otherwise. */
   readonly channelVoice?: Pick<LlmGateway, 'channelPost'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */

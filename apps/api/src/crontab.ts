@@ -111,6 +111,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '20 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['content_drops.erase_originals'] },
   },
+  // What waits for the vision or the brain (ADR 0083 § 2, § 9): media dropped while her switch was off or described with
+  // an older prompt, scripts whose synthesis is older than a description. No backfill: the next run finds them.
+  {
+    task: 'content_drops.describe_backlog',
+    match: '35 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['content_drops.describe_backlog'] },
+  },
   // Her scripts (SC-02, ADR 0056 § 2): each creator's next one asked a week before it is due, in her own day; one
   // request per due day, so a replay or a missed hour asks nothing twice. No backfill: the next run catches up.
   {

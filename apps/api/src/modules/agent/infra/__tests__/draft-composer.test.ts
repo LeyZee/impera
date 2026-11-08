@@ -114,6 +114,7 @@ function gateway(script: Script, seen: Seen): LlmGateway {
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
+    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
     brain: (input) => {
       seen.traces.push(input.trace);
       seen.brainInputs?.push(input);

@@ -398,9 +398,14 @@ export interface DescriptionQueue {
 
 /** The media module's description of a dropped media, seen from here (ADR 0083). */
 export interface DropDescriber {
+  /** The version of the describing prompt now (ADR 0083 § 2): a medium described with another is described again. */
+  readonly promptHash: string;
+  /** Whether the medium needs no new description: a human's, or the vision AI's with the prompt of now. */
   described(mediaAssetId: string): Promise<boolean>;
-  /** The latest detailed description of each of these media that has one, by medium (ADR 0083 § 2). */
-  detailed(mediaAssetIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
+  /** The latest detailed description of each of these media that has one, by medium, with its row (ADR 0083 § 2). */
+  detailed(
+    mediaAssetIds: readonly string[],
+  ): Promise<ReadonlyMap<string, { readonly descriptionId: string; readonly detailed: string }>>;
   /**
    * Described and kept, or why not: `budget`, the day's cap spent, asked again later; `failed`, every model failed;
    * `unreadable`, the file did not open.
@@ -446,8 +451,8 @@ export interface SummarizedScript {
 export interface ScriptSummaryStore {
   /** `null` for a drop that is not a script, is withdrawn, or is still being filled. */
   target(dropId: string): Promise<ScriptToSummarize | null>;
-  /** Whether this set of media of the script was already told, whatever the prompt. */
-  summarized(dropId: string, mediaHash: string): Promise<boolean>;
+  /** Whether this set of media and descriptions of the script was already told with this version of the prompt. */
+  summarized(dropId: string, mediaHash: string, promptHash: string): Promise<boolean>;
   save(creatorId: string, dropId: string, summary: SummarizedScript): Promise<void>;
   /** The job again at `runAt` (budget spent), keyed by the drop. */
   later(creatorId: string, dropId: string, correlationId: string, runAt: Date): Promise<void>;
@@ -457,6 +462,8 @@ export interface ScriptSummaryStore {
 
 /** The brain that tells a script (ADR 0083 § 6), seen from here: never a price, from the cards and descriptions. */
 export interface ScriptSummarizer {
+  /** The version of the prompt it tells with now: a script told with another is told again. */
+  readonly promptHash: string;
   summarize(input: {
     readonly creatorId: string;
     readonly scriptName: string;
@@ -482,4 +489,28 @@ export interface ScriptSummarizer {
     | { readonly kind: 'budget' }
     | { readonly kind: 'failed' }
   >;
+}
+
+/**
+ * What waits for the vision or the brain, enqueued again (ADR 0083 § 2, § 6, § 9): for each creator whose switch is on
+ * (or the one named), each medium of a live drop with no description of now, each sent script with no synthesis of now
+ * or older than a description of its media. A job already waiting keeps its time (a spent budget's hour).
+ */
+export interface DescriptionBacklog {
+  enqueue(
+    creatorId: string | null,
+    prompts: { readonly describe: string; readonly summarize: string },
+    correlationId: string,
+  ): Promise<{ readonly media: number; readonly scripts: number }>;
+}
+
+/** Her switch (`CreatorSettings.describeDrops`, ADR 0083 § 9), read and set by the owner. */
+export interface DescribeSwitch {
+  /** `null` for a creator that does not exist. */
+  read(creatorId: string): Promise<boolean | null>;
+  /**
+   * Set and audited; turned on, the backlog of this creator is enqueued in the same transaction (her drops described
+   * while it was off). `null` for a creator that does not exist.
+   */
+  set(creatorId: string, on: boolean, userId: string): Promise<boolean | null>;
 }
