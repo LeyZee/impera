@@ -1,7 +1,7 @@
-# Fiche reel : la créatrice tourne un reel depuis un dessin, pas depuis un paragraphe
-Statut : proposed (attend l'acceptation de l'ADR 0082 ; ID proposé : VEI-08)
+# VEI-08 Fiche reel : la créatrice tourne un reel depuis un dessin, pas depuis un paragraphe
+Statut : todo
 Phase : veille (ADR 0060 § 4 et § 5, ADR 0082 § 3) et agenda de la créatrice (ADR 0042 § 4)
-Dépend de : ADR 0082 acceptée ; VEI-01 (fait : idée → suggestion → tâche) ; l'agenda tel qu'il existe (`apps/web/src/screens/agenda`, `apps/web/src/creators/agenda`)
+Dépend de : ADR 0082 (acceptée le 08/11/2026) ; VEI-01 (fait : idée → suggestion → tâche) ; l'agenda tel qu'il existe (`apps/web/src/screens/agenda`, `apps/web/src/creators/agenda`)
 Branche : task/vei-08-reel-brief
 Propriétaire proposé : Bilan (lot a : contrats, base, modules `trends` et `creator-tasks`) ; Extension (lot b : formulaire de l'agence et écran de la créatrice)
 

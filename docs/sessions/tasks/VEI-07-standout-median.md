@@ -1,7 +1,7 @@
-# Veille : les relevés deviennent des signaux, sur la médiane du compte, et l'agence voit l'écart
-Statut : proposed (attend l'acceptation de l'ADR 0082 ; ID proposé : VEI-07)
+# VEI-07 Veille : les relevés deviennent des signaux, sur la médiane du compte, et l'agence voit l'écart
+Statut : todo
 Phase : veille (ADR 0060, ADR 0082 § 1)
-Dépend de : VEI-01 (lots a à d, faits), VEI-02 (fait), ADR 0082 acceptée
+Dépend de : VEI-01 (lots a à d, faits), VEI-02 (fait), ADR 0082 (acceptée le 08/11/2026)
 Branche : task/vei-07-standout-median
 Propriétaire proposé : Bilan (contrats, base, module, job) ; Extension (la ligne de l'écran « Idées du jour »)
 
