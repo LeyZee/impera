@@ -144,6 +144,8 @@ export interface SheetFacts {
   readonly toLearn: number | null;
   /** The band of his desire score in a word, null before a first score. */
   readonly band: string | null;
+  /** How many fields of his card wait for a chatter (ADR 0085 § 6); none when not read (a creator). */
+  readonly toCheck?: number;
 }
 
 /**
@@ -156,11 +158,20 @@ export function sheetSummary(facts: SheetFacts): { readonly urgent: string | nul
   const { flags } = facts;
   if (facts.toLearn !== null && facts.toLearn > 0) rest.push(`${String(facts.toLearn)} à apprendre`);
   if (facts.band !== null) rest.push(`désir ${facts.band}`);
-  if (flags === 'refused') return { urgent: 'Limites non lisibles', rest: rest.join(' · ') };
-  if (flags === 'down') return { urgent: 'Limites non lues', rest: rest.join(' · ') };
-  if (flags === 'loading') return { urgent: null, rest: rest.length === 0 ? '…' : rest.join(' · ') };
-  if (rest.length > 0) return { urgent: null, rest: rest.join(' · ') };
-  return { urgent: null, rest: hasAnyLimit(flags) ? 'Ses limites sont en tête' : 'Rien à signaler' };
+  // What his card waits for is said in amber even folded: a chatter who never opens the sheet still sees it.
+  const check =
+    facts.toCheck !== undefined && facts.toCheck > 0 ? `${String(facts.toCheck)} à vérifier` : null;
+  const urgent = (limits: string | null): string | null => {
+    const parts = [limits, check].filter((part): part is string => part !== null);
+    return parts.length === 0 ? null : parts.join(' · ');
+  };
+  if (flags === 'refused') return { urgent: urgent('Limites non lisibles'), rest: rest.join(' · ') };
+  if (flags === 'down') return { urgent: urgent('Limites non lues'), rest: rest.join(' · ') };
+  if (flags === 'loading')
+    return { urgent: urgent(null), rest: rest.length === 0 && check === null ? '…' : rest.join(' · ') };
+  if (rest.length > 0) return { urgent: urgent(null), rest: rest.join(' · ') };
+  if (hasAnyLimit(flags)) return { urgent: urgent(null), rest: 'Ses limites sont en tête' };
+  return { urgent: urgent(null), rest: check === null ? 'Rien à signaler' : '' };
 }
 
 const hasAnyLimit = (flags: FanFlags): boolean =>
