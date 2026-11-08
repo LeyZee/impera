@@ -37,6 +37,7 @@ Commandes : `pnpm db:generate` (depuis le schéma), `pnpm db:migrate` (avec `DAT
   - compléter de nouveau le SQL à la main si besoin, puis renommer comme ci-dessus.
 - Un numéro plus petit que le plus grand déjà dans `main` ne peut plus servir : `check-drift` lirait l'ancien snapshot. La PR prend alors le prochain numéro libre, et l'ancien reste un trou (0086 et 0087 en sont, 03/11).
 - On n'édite jamais le journal à la main pour réordonner. `check-drift` compare au plus grand snapshot par nom, et Drizzle saute en silence une entrée dont le `when` est plus ancien que la dernière appliquée.
+- `src/migrations-order.test.ts` (`pnpm test`, donc le hook pre-push et la CI) le vérifie avant la fusion. Il contrôle que les numéros et les `when` du journal sont strictement croissants, qu'un fichier SQL et un snapshot existent par entrée, que les `prevId` s'enchaînent et que le plus grand snapshot est celui de la dernière entrée. Le snapshot de 0124 manque depuis #581 : la chaîne reprend après lui.
 
 ## Tests d'intégration
 
