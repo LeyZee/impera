@@ -1,6 +1,7 @@
 import {
   AuditEntryIdSchema,
   CreatorIdSchema,
+  CHANNEL_MAIN_MINUTE,
   TelegramChannelConfigSchema,
   TelegramChatIdSchema,
   newId,
@@ -33,6 +34,24 @@ interface ChannelRow {
 }
 
 /**
+ * A slot stored before slots had a role (ADR 0080 § 1.5, 08/11/2026) reads as the main post at 19 h, an engagement post
+ * otherwise; the next save stores the role.
+ */
+function withSlotRoles(config: unknown): unknown {
+  if (typeof config !== 'object' || config === null || !('slots' in config) || !Array.isArray(config.slots))
+    return config;
+  const slots: unknown[] = config.slots;
+  return {
+    ...config,
+    slots: slots.map((slot) =>
+      typeof slot === 'object' && slot !== null && !('role' in slot)
+        ? { ...slot, role: 'minute' in slot && slot.minute === CHANNEL_MAIN_MINUTE ? 'main' : 'engagement' }
+        : slot,
+    ),
+  };
+}
+
+/**
  * A row as the domain reads it. The column holds the chat: when the chat was removed (`ON DELETE SET NULL`), the
  * setting is brought back to no channel; a setting that no longer reads keeps its chat counted all the same.
  */
@@ -41,7 +60,7 @@ function toRecord(row: ChannelRow): ChannelRecord | null {
   if (!creatorId.success) return null;
   const chat = TelegramChatIdSchema.safeParse(row.chatId);
   const chatId = chat.success ? chat.data : null;
-  const config = TelegramChannelConfigSchema.safeParse(row.config);
+  const config = TelegramChannelConfigSchema.safeParse(withSlotRoles(row.config));
   return {
     creatorId: creatorId.data,
     chatId,

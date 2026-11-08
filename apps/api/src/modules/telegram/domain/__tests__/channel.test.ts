@@ -8,6 +8,7 @@ import {
   newId,
   type TelegramChannelConfig,
   type TelegramChatId,
+  type ChannelSlotRole,
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -19,6 +20,10 @@ import {
   type ChannelContext,
 } from '../channel';
 import type { ChatRecord } from '../ports';
+
+/** A slot of engagement: the rules of hours and days hold whatever the slot is for. */
+const ENGAGEMENT: ChannelSlotRole = 'engagement';
+const MAIN: ChannelSlotRole = 'main';
 
 const botId = newId(TelegramBotIdSchema);
 
@@ -58,19 +63,37 @@ describe('the slots of the channel (ADR 0080 § 1)', () => {
   });
 
   it('refuses a fifth post on one day, switched-off slots not counted', () => {
-    const slots = [8, 12, 16, 20, 23].map((hour) => ({ minute: hour * 60, days: [3], enabled: true }));
+    const slots = [8, 12, 16, 20, 23].map((hour) => ({
+      minute: hour * 60,
+      role: ENGAGEMENT,
+      days: [3],
+      enabled: true,
+    }));
     expect(channelRefusal(config({ slots }), context([]))?.kind).toBe('too_many_posts');
     const fourOn = slots.map((slot, rank) => ({ ...slot, enabled: rank !== 1 }));
     // 8 h, 16 h, 20 h, 23 h: four, but 20 h and 23 h are three hours apart exactly, which passes.
     expect(channelRefusal(config({ slots: fourOn }), context([]))).toBeNull();
   });
 
+  it('refuses two main posts on one day, and names them; a switched-off one does not count', () => {
+    const slots = [
+      { minute: 12 * 60, role: MAIN, days: [1, 2], enabled: true },
+      { minute: 19 * 60, role: MAIN, days: [2, 3], enabled: true },
+    ];
+    expect(channelRefusal(config({ slots }), context([]))).toEqual({
+      kind: 'two_main_posts',
+      message: 'Le mardi, 12\u00a0h et 19\u00a0h sont tous deux le post principal : un seul par jour.',
+    });
+    const oneOff = slots.map((slot, rank) => ({ ...slot, enabled: rank === 1 }));
+    expect(channelRefusal(config({ slots: oneOff }), context([]))).toBeNull();
+  });
+
   it('refuses two posts of one day under three hours apart, and names them', () => {
     const refusal = channelRefusal(
       config({
         slots: [
-          { minute: 19 * 60, days: everyDay, enabled: true },
-          { minute: 21 * 60, days: [5], enabled: true },
+          { minute: 19 * 60, role: ENGAGEMENT, days: everyDay, enabled: true },
+          { minute: 21 * 60, role: ENGAGEMENT, days: [5], enabled: true },
         ],
       }),
       context([]),
@@ -80,8 +103,8 @@ describe('the slots of the channel (ADR 0080 § 1)', () => {
   });
 
   it('counts the gap across midnight, Sunday to Monday too', () => {
-    const late = { minute: 23 * 60, days: [7], enabled: true };
-    const early = { minute: 60, days: [1], enabled: true };
+    const late = { minute: 23 * 60, role: ENGAGEMENT, days: [7], enabled: true };
+    const early = { minute: 60, role: ENGAGEMENT, days: [1], enabled: true };
     expect(channelRefusal(config({ slots: [late, early] }), context([]))?.kind).toBe('slots_too_close');
     expect(channelRefusal(config({ slots: [late, { ...early, minute: 2 * 60 }] }), context([]))).toBeNull();
   });
@@ -90,8 +113,8 @@ describe('the slots of the channel (ADR 0080 § 1)', () => {
     const stored = normalizedConfig(
       config({
         slots: [
-          { minute: 20 * 60, days: [7, 1], enabled: true },
-          { minute: 9 * 60, days: [2], enabled: false },
+          { minute: 20 * 60, role: ENGAGEMENT, days: [7, 1], enabled: true },
+          { minute: 9 * 60, role: ENGAGEMENT, days: [2], enabled: false },
         ],
       }),
     );
@@ -198,7 +221,11 @@ describe('what keeps her posts in (ADR 0080 § 4.4)', () => {
     expect(channelWarnings(config({ ...base, chatId: mute.id }), [mute], true)).toEqual(['bot_cannot_post']);
     expect(
       channelWarnings(
-        config({ ...base, chatId: mute.id, slots: [{ minute: 0, days: [1], enabled: false }] }),
+        config({
+          ...base,
+          chatId: mute.id,
+          slots: [{ minute: 0, role: ENGAGEMENT, days: [1], enabled: false }],
+        }),
         [{ ...mute, canPost: true }],
         true,
       ),

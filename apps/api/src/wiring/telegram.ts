@@ -1,13 +1,15 @@
-import { JOB_PAYLOADS } from '@impera/contracts';
+import { JOB_PAYLOADS, type StoredPersona } from '@impera/contracts';
 import { withAdmin } from '@impera/db';
+import type { LlmGateway } from '@impera/llm';
 
 import { secretOrNull } from '../config';
 import { defineTask } from '../jobs';
 import type { Logger } from '../logger';
+import { channelWriterPersona } from '../modules/agent';
 import type { AlertsModule } from '../modules/alerts';
 import { salesFeedTotals } from '../modules/connectors';
 import { latestRateOf } from '../modules/payroll';
-import { startTelegramModule, type TelegramModule } from '../modules/telegram';
+import { startTelegramModule, type ChannelPersonaSource, type TelegramModule } from '../modules/telegram';
 
 import type { Routes, Shared, TasksOf } from './shared';
 
@@ -26,9 +28,35 @@ export interface WiredTelegram {
   readonly routes: readonly Routes[];
 }
 
+/** Her active persona version as the `persona` module stores it (`versions.active`), matched by shape. */
+type ActiveVersion = (creatorId: string) => Promise<{
+  readonly id: string;
+  readonly version: string;
+  readonly creatorName: string;
+  readonly persona: StoredPersona;
+} | null>;
+
+/**
+ * Who she is for her channel's posts (ADR 0080 § 5): her active version, with the agent's guards and nothing explicit
+ * on a public channel; none without an active version.
+ */
+function channelPersonaOf(active: ActiveVersion): ChannelPersonaSource {
+  return async (creatorId) => {
+    const stored = await active(creatorId);
+    return stored === null ? null : channelWriterPersona(stored, new Date());
+  };
+}
+
 export async function wireTelegram(
   shared: Shared,
-  deps: { readonly alerts: AlertsModule },
+  deps: {
+    readonly alerts: AlertsModule;
+    /** ADR 0080 § 5: the app's gateway and her active persona write her channel's posts. */
+    readonly channelWriter?: {
+      readonly gateway: Pick<LlmGateway, 'channelPost'>;
+      readonly activePersona: ActiveVersion;
+    };
+  },
 ): Promise<WiredTelegram> {
   const { config, adminDb, logger, requireRole, recentLogin } = shared;
   const credentialKeys = secretOrNull(config.CREDENTIALS_ENCRYPTION_KEYS);
@@ -67,6 +95,12 @@ export async function wireTelegram(
               return (await withAdmin(adminDb, (tx) => latestRateOf(tx, 'USD', day)))?.rateMicros ?? null;
             },
           },
+          ...(deps.channelWriter !== undefined && {
+            channelWriter: {
+              gateway: deps.channelWriter.gateway,
+              persona: channelPersonaOf(deps.channelWriter.activePersona),
+            },
+          }),
         });
   if (module === null) logger.warn('Telegram notifications off: CREDENTIALS_ENCRYPTION_KEYS is not set');
 

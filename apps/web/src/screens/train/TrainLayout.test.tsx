@@ -2,7 +2,7 @@
 import type { Me } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createAppRouter } from '@/router';
@@ -46,7 +46,7 @@ afterEach(() => {
 });
 
 describe('Entraîner header', () => {
-  it('shows no tab bar while the Playground is its only screen (ADR 0024)', async () => {
+  it('shows the two modes, Chatting and the post of her channel, as tabs, and no tab for screens to come (ADR 0024)', async () => {
     const router = createAppRouter(
       { user: owner, onSignOut: () => undefined },
       createMemoryHistory({ initialEntries: ['/entrainer/playground'] }),
@@ -57,7 +57,9 @@ describe('Entraîner header', () => {
       </QueryClientProvider>,
     );
     expect(await screen.findByRole('heading', { name: 'Entraîner' })).toBeTruthy();
-    expect(screen.queryByRole('navigation', { name: 'Entraîner' })).toBeNull();
+    const tabs = screen.getByRole('navigation', { name: 'Entraîner' });
+    expect(within(tabs).getByRole('link', { name: 'Chatting' })).toBeTruthy();
+    expect(within(tabs).getByRole('link', { name: 'Post du canal' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Corrections' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Tests' })).toBeNull();
   });

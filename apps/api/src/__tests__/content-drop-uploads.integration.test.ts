@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import {
+  ok,
+  type DropMediaDescription,
   ContentDropFileIdSchema,
   ContentDropIdSchema,
   ContentDropSchema,
@@ -21,6 +23,7 @@ import {
 } from '@impera/contracts';
 import { eq, inArray, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
+import type { DropSenseInput, LlmGateway } from '@impera/llm';
 import { AwsClient } from 'aws4fetch';
 import { runOnce } from 'graphile-worker';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
@@ -100,6 +103,50 @@ function jpegOf(bytes: number, width = 30, height = 40, seed = 0x11): Uint8Array
 }
 const sha = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
+/**
+ * The vision AI of her drops (ADR 0083), with a fixed answer: invented, and another person seen, which the code must
+ * hold back whatever the model says.
+ */
+const DESCRIBED: DropMediaDescription = {
+  vocabularyVersion: '1.0.0',
+  kind: 'image',
+  detailed:
+    'Photo inventée : une silhouette debout près d’une fenêtre, une seconde personne au fond de la pièce.',
+  factualDescription: 'Une silhouette près d’une fenêtre.',
+  durationS: null,
+  segments: [],
+  intensity: 'soft',
+  anatomyVisible: [],
+  castMode: 'duo',
+  mood: [],
+  setting: null,
+  audio: null,
+  textVisible: null,
+  quality: 'good',
+  confidenceLow: false,
+  notVisible: false,
+  flags: [],
+};
+const seen: DropSenseInput[] = [];
+const dropVision: Pick<LlmGateway, 'describeDrop' | 'transcribe'> = {
+  describeDrop: (input) => {
+    seen.push(input);
+    return Promise.resolve(
+      ok({
+        output: DESCRIBED,
+        meta: {
+          provider: 'google',
+          model: 'vision-test',
+          isFallback: false,
+          latencyMs: 1,
+          promptHash: 'drop-v1',
+        },
+      }),
+    );
+  },
+  transcribe: () => Promise.reject(new Error('a photo has no sound')),
+};
+
 describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () => {
   let container: StartedTestContainer | undefined;
   let endpoint = process.env['IMPERA_TEST_S3_URL'] ?? '';
@@ -156,7 +203,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
       S3_ACCESS_KEY_ID: USER,
       S3_SECRET_ACCESS_KEY: PASSWORD,
     });
-    app = await createApp(config, createLogger(config));
+    app = await createApp(config, createLogger(config), { dropVision });
     server = await buildServer({
       config,
       logger: createLogger(config),
@@ -481,6 +528,82 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     expect((await rows(renamed.dropId)).files).toEqual([
       { state: 'refused', refusal: 'Ce fichier n’est pas ce qu’il annonce : renvoie-le depuis ta galerie' },
     ]);
+  });
+
+  it('describes a new photo of hers once her switch is on, once, and holds back another person (ADR 0083)', async () => {
+    const one = await dropOne('nora', jpegOf(MB, 30, 40, 0x5a));
+    await sendWhole(one);
+    await receive();
+    const [file] = await test.admin.db
+      .select({ mediaAssetId: schema.contentDropFiles.mediaAssetId })
+      .from(schema.contentDropFiles)
+      .where(eq(schema.contentDropFiles.id, one.fileId));
+    const mediaAssetId = file?.mediaAssetId ?? '';
+    // Enqueued with the medium it kept, once, under its key.
+    const queued = await test.admin.db.execute(sql`
+      select j.payload from graphile_worker._private_jobs j
+        join graphile_worker._private_tasks t on t.id = j.task_id
+       where t.identifier = 'content_drops.describe_file' and j.key = ${`content_drops.describe_file:${mediaAssetId}`}`);
+    expect(
+      z.array(z.object({ payload: JOB_PAYLOADS['content_drops.describe_file'] })).parse(queued.rows),
+    ).toMatchObject([{ payload: { creatorId: nora, mediaAssetId } }]);
+    const describe = () =>
+      runOnce({
+        pgPool: test.admin.pool,
+        taskList: { 'content_drops.describe_file': app.tasks['content_drops.describe_file'] },
+      });
+    const again = () =>
+      test.admin.db.execute(sql`select public.enqueue_job(
+        task => 'content_drops.describe_file',
+        payload => ${JSON.stringify({ creatorId: nora, mediaAssetId, correlationId: 'test' })}::jsonb
+      )`);
+    const descriptions = () =>
+      test.admin.db
+        .select({
+          author: schema.mediaDescriptions.author,
+          content: schema.mediaDescriptions.content,
+          model: schema.mediaDescriptions.model,
+          reviewReasons: schema.mediaDescriptions.reviewReasons,
+        })
+        .from(schema.mediaDescriptions)
+        .where(eq(schema.mediaDescriptions.mediaAssetId, mediaAssetId));
+
+    // Her switch off (ADR 0083 § 9): the vision AI is never called.
+    seen.length = 0;
+    await describe();
+    expect(seen).toEqual([]);
+    expect(await descriptions()).toEqual([]);
+
+    await test.admin.db
+      .update(schema.creators)
+      .set({ settings: { describeDrops: true } })
+      .where(eq(schema.creators.id, nora));
+    await again();
+    await describe();
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.context).toEqual({ category: 'Feed · Séance boudoir', step: null });
+    expect(seen[0]?.trace).toEqual({ creatorId: nora });
+    expect(seen[0]?.media).toMatchObject({ kind: 'image', mediaType: 'image/jpeg' });
+    // Kept for the agency, held back: she always shoots alone (§ 4).
+    expect(await descriptions()).toEqual([
+      {
+        author: 'sense',
+        content: DESCRIBED,
+        model: 'vision-test',
+        reviewReasons: ['not_alone'],
+      },
+    ]);
+
+    // Replayed, and given again in another drop: nothing called, nothing written twice.
+    await again();
+    await describe();
+    const twice = await dropOne('nora', one.bytes);
+    await sendWhole(twice);
+    await receive();
+    await describe();
+    expect(seen).toHaveLength(1);
+    expect(await descriptions()).toHaveLength(1);
+    await test.admin.db.update(schema.creators).set({ settings: {} }).where(eq(schema.creators.id, nora));
   });
 
   it('takes no more bytes once her drop is withdrawn, and the job erases what had arrived', async () => {

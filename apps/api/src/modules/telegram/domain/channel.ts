@@ -49,8 +49,25 @@ function minutesByDay(slots: readonly ChannelSlot[]): Map<number, number[]> {
   return byDay;
 }
 
+/** ADR 0080 § 1.5: one main post a day at most, the others are engagement. */
+function mainRefusal(slots: readonly ChannelSlot[]): ChannelRefusal | null {
+  for (let day = 1; day <= 7; day += 1) {
+    const mains = slots.filter((slot) => slot.enabled && slot.role === 'main' && slot.days.includes(day));
+    const [first, second] = mains;
+    if (first !== undefined && second !== undefined) {
+      return {
+        kind: 'two_main_posts',
+        message: `Le ${dayName(day)}, ${clockWords(first.minute)} et ${clockWords(second.minute)} sont tous deux le post principal : un seul par jour.`,
+      };
+    }
+  }
+  return null;
+}
+
 /** ADR 0080 § 1.1 and § 1.3: four posts a day at most, three hours apart at least, across midnight too. */
 function slotRefusal(slots: readonly ChannelSlot[]): ChannelRefusal | null {
+  const main = mainRefusal(slots);
+  if (main !== null) return main;
   const byDay = minutesByDay(slots);
   for (const [day, minutes] of byDay) {
     if (minutes.length > CHANNEL_POSTS_PER_DAY_MAX) {

@@ -180,6 +180,10 @@ export interface AppOptions {
   readonly composer?: DraftComposer;
   /** Tests plug a vision with a fixed description here, for a marked post's captures; the app's gateway otherwise. */
   readonly trendVision?: Pick<LlmGateway, 'describeTrendCaptures'>;
+  /** Tests plug a vision with a fixed description here, for her dropped media (ADR 0083); the app's gateway otherwise. */
+  readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe'>;
+  /** Tests plug a voice with a fixed post here, for her channel's posts (ADR 0080 § 5); the app's gateway otherwise. */
+  readonly channelVoice?: Pick<LlmGateway, 'channelPost'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
   readonly withPlayground?: boolean;
   /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
@@ -293,7 +297,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const providers = await wireProviders(shared);
   const alerts = wireAlerts(shared);
-  const telegram = await wireTelegram(shared, { alerts: alerts.module });
   const media = await wireMedia(shared);
   const llmCalls = createDrizzleLlmCallStore(adminDb.db);
   // The day's calls of both processes, reloaded every 30 s: one daily cap for the API and the worker.
@@ -313,6 +316,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
+  const telegram = await wireTelegram(shared, {
+    alerts: alerts.module,
+    channelWriter: { gateway: options.channelVoice ?? llm.gateway, activePersona: persona.activePersona },
+  });
   const team = wireTeam(shared, {
     persona: persona.module,
     connectors: connectors.module,
@@ -339,6 +346,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         scripts.module.frozenFolderCard(versionId, segmentKey, variant, moment),
       freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
     },
+    vision: options.dropVision ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
   });
   const scripts = wireScripts(shared, {

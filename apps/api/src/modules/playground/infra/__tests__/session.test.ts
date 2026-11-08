@@ -40,6 +40,8 @@ function fakeGateway(
     sense: () => Promise.reject(new Error('not used')),
     transcribe: () => Promise.reject(new Error('not used')),
     describeTrendCaptures: () => Promise.reject(new Error('not used')),
+    describeDrop: () => Promise.reject(new Error('not used')),
+    channelPost: () => Promise.reject(new Error('not used')),
     brain: (input) => {
       brainInputs.push(input);
       return Promise.resolve({ ok: true, value: { output: brief, meta: META } });

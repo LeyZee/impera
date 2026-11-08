@@ -1,6 +1,11 @@
 import {
   BriefIntentSchema,
+  CHANNEL_POLL_OPTION_MAX,
+  CHANNEL_POLL_OPTIONS_MAX,
+  CHANNEL_POLL_OPTIONS_MIN,
+  CHANNEL_POLL_QUESTION_MAX,
   DESIRE_BRAIN_SIGNALS,
+  DropMediaDescriptionSchema,
   MediaDescriptionSchema,
   TrendCaptureDescriptionSchema,
 } from '@impera/contracts';
@@ -72,6 +77,13 @@ export const SenseOutputSchema = MediaDescriptionSchema.omit({
   durationS: true,
 });
 
+/** A drop's media described in detail (ADR 0083): the senses' output and `detailed`. */
+export const DropSenseOutputSchema = DropMediaDescriptionSchema.omit({
+  vocabularyVersion: true,
+  kind: true,
+  durationS: true,
+});
+
 /** What the judge scores a reply on (`evals/rubrics`, `evals/thresholds.json`). */
 export const JudgeCriterionSchema = z.enum([
   'naturalness',
@@ -102,3 +114,23 @@ export type JudgeOutput = z.infer<typeof JudgeOutputSchema>;
 
 /** The vision's reading of a marked post's captures (ADR 0060 § 2): the contract's fields, extra ones dropped. */
 export const TrendCapturesOutputSchema = z.object(TrendCaptureDescriptionSchema.shape);
+
+/** Telegram holds a media's caption to 1 024 characters, the link included: the text keeps room for it. */
+export const CHANNEL_POST_TEXT_MAX = 800;
+
+/**
+ * A post of her channel (ADR 0080 § 5): her text, with `**bold**` and `__underline__` marked as Telegram shows them;
+ * the code escapes it, renders the marks and adds the link.
+ */
+export const ChannelPostOutputSchema = z.object({ text: z.string().min(1).max(CHANNEL_POST_TEXT_MAX) });
+export type ChannelPostOutput = z.infer<typeof ChannelPostOutputSchema>;
+
+/** A poll of her channel (ADR 0080 § 5.7): a question and two to four answers, in her voice. */
+export const ChannelPollOutputSchema = z.object({
+  question: z.string().min(1).max(CHANNEL_POLL_QUESTION_MAX),
+  options: z
+    .array(z.string().min(1).max(CHANNEL_POLL_OPTION_MAX))
+    .min(CHANNEL_POLL_OPTIONS_MIN)
+    .max(CHANNEL_POLL_OPTIONS_MAX),
+});
+export type ChannelPollOutput = z.infer<typeof ChannelPollOutputSchema>;

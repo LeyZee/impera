@@ -1,6 +1,7 @@
 import { err, ok, type MediaDescription } from '@impera/contracts';
 import type { LlmGateway } from '@impera/llm';
 
+import type { DropSenser } from '../application/describe-drop';
 import type { MediaDescriptionStore, Senser, Transcriber } from '../application/describe-media';
 
 /** The gateway's `sense` role behind this module's port. */
@@ -44,5 +45,33 @@ export function createInMemoryDescriptionStore(): MediaDescriptionStore {
       descriptions.set(key, description);
       return Promise.resolve();
     },
+  };
+}
+
+/** The gateway's description of a dropped media (ADR 0083) behind this module's port. */
+export function createGatewayDropSenser(gateway: Pick<LlmGateway, 'describeDrop'>): DropSenser {
+  return async (request) => {
+    const result = await gateway.describeDrop({
+      context: request.context,
+      trace: { creatorId: request.creatorId },
+      media:
+        request.kind === 'image'
+          ? { kind: 'image', mediaType: request.mediaType, data: request.data }
+          : {
+              kind: 'video',
+              durationS: request.durationS,
+              mediaType: request.mediaType,
+              data: request.data,
+              keyframes: request.keyframes,
+            },
+    });
+    if (result.ok) {
+      return ok({
+        description: result.value.output,
+        model: result.value.meta.model,
+        promptHash: result.value.meta.promptHash,
+      });
+    }
+    return err(result.error.code === 'all_models_failed' ? 'failed' : 'budget');
   };
 }

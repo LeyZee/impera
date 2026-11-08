@@ -1,5 +1,5 @@
 {
-  "id": "802283f2-f9de-4047-a10f-aeaa424790e3",
+  "id": "8795ed26-09eb-40e5-a79f-b9ea427d3bef",
   "prevId": "ee966d79-d852-43c8-84a1-abfed21d9765",
   "version": "7",
   "dialect": "postgresql",
@@ -3160,12 +3160,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "reel_brief": {
-          "name": "reel_brief",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "starts_at": {
           "name": "starts_at",
           "type": "timestamp with time zone",
@@ -3382,10 +3376,6 @@
           "name": "creator_suggestions_shoot_brief_check",
           "value": "\"creator_suggestions\".\"shoot_brief\" is null or char_length(\"creator_suggestions\".\"shoot_brief\") between 1 and 600"
         },
-        "creator_suggestions_reel_brief_check": {
-          "name": "creator_suggestions_reel_brief_check",
-          "value": "\"creator_suggestions\".\"reel_brief\" is null or jsonb_typeof(\"creator_suggestions\".\"reel_brief\") = 'object'"
-        },
         "creator_suggestions_reason_check": {
           "name": "creator_suggestions_reason_check",
           "value": "\"creator_suggestions\".\"reason\" is null or (\"creator_suggestions\".\"state\" = 'declined' and char_length(\"creator_suggestions\".\"reason\") between 1 and 200)"
@@ -3583,12 +3573,6 @@
         "shoot_brief": {
           "name": "shoot_brief",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reel_brief": {
-          "name": "reel_brief",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -3803,10 +3787,6 @@
         "creator_tasks_shoot_brief_check": {
           "name": "creator_tasks_shoot_brief_check",
           "value": "\"creator_tasks\".\"shoot_brief\" is null or char_length(\"creator_tasks\".\"shoot_brief\") between 1 and 600"
-        },
-        "creator_tasks_reel_brief_check": {
-          "name": "creator_tasks_reel_brief_check",
-          "value": "\"creator_tasks\".\"reel_brief\" is null or jsonb_typeof(\"creator_tasks\".\"reel_brief\") = 'object'"
         },
         "creator_tasks_reminder_check": {
           "name": "creator_tasks_reminder_check",
@@ -6923,6 +6903,26 @@
           "primaryKey": false,
           "notNull": true
         },
+        "author": {
+          "name": "author",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'sense'"
+        },
+        "creator_note": {
+          "name": "creator_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_reasons": {
+          "name": "review_reasons",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -6943,6 +6943,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "media_descriptions_drop_unique": {
+          "name": "media_descriptions_drop_unique",
+          "columns": [
+            {
+              "expression": "media_asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "prompt_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"media_descriptions\".\"author\" = 'sense' and \"media_descriptions\".\"content\" ? 'detailed'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -7001,7 +7023,16 @@
           "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
-      "checkConstraints": {},
+      "checkConstraints": {
+        "media_descriptions_author_check": {
+          "name": "media_descriptions_author_check",
+          "value": "\"media_descriptions\".\"author\" in ('sense', 'human')"
+        },
+        "media_descriptions_review_reasons_check": {
+          "name": "media_descriptions_review_reasons_check",
+          "value": "\"media_descriptions\".\"review_reasons\" <@ array['back_reference', 'not_alone', 'unsure', 'flagged']::text[]"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.media_sends": {
@@ -18004,12 +18035,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "reel_brief": {
-          "name": "reel_brief",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "state": {
           "name": "state",
           "type": "text",
@@ -18156,10 +18181,6 @@
         "content_ideas_shoot_minutes_check": {
           "name": "content_ideas_shoot_minutes_check",
           "value": "\"content_ideas\".\"shoot_minutes\" between 1 and 600"
-        },
-        "content_ideas_reel_brief_check": {
-          "name": "content_ideas_reel_brief_check",
-          "value": "\"content_ideas\".\"reel_brief\" is null or (jsonb_typeof(\"content_ideas\".\"reel_brief\") = 'object' and \"content_ideas\".\"category\" = 'instagram_reel')"
         },
         "content_ideas_refusal_check": {
           "name": "content_ideas_refusal_check",
