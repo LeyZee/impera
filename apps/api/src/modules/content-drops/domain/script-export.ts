@@ -21,6 +21,8 @@ export interface ExportedFile {
   readonly mime: string;
   readonly bytes: number;
   readonly storageKey: string;
+  /** Its validated description (SC-04 lot c4), for the sheet; `null` while none is validated. */
+  readonly description: string | null;
 }
 
 type ExportSource =
@@ -77,8 +79,9 @@ const ACCESS: Readonly<Record<'free' | 'paid', string>> = { free: 'GRATUIT', pai
 
 /**
  * The sheet to copy, step by step: each segment with its code, its name and what it sells (or the bridge's teaser),
- * each series' hint, and the files in their order. The texts and the prices are not in it yet: they come with the
- * sales texts (SC-05) and the agency's price grid (P6-01), never invented here.
+ * each series' hint, and the files in their order, each medium with its validated description (SC-04 lot c4) or a word
+ * that it waits for one. The texts and the prices are not in it yet: they come with the sales texts (SC-05) and the
+ * agency's price grid (P6-01), never invented here.
  */
 const SHEET_MOMENTS: Readonly<Record<ShotMoment, string>> = { day: 'Jour', night: 'Nuit' };
 
@@ -91,6 +94,8 @@ function sheetOf(
     readonly segmentKey: string;
     readonly variant: ScriptVariantLetter | null;
     readonly name: string;
+    /** A medium's validated description, `null` while none is; `undefined` for a card. */
+    readonly description?: string | null;
   }[],
 ): string {
   const lines = [
@@ -124,8 +129,13 @@ function sheetOf(
           ? segment.variants.find((one) => one.letter === variant)?.hint
           : undefined;
       if (hint !== undefined) lines.push(`   Série ${variant ?? ''} : ${hint}`);
-      for (const one of paths)
-        if (one.segmentKey === segment.key && one.variant === variant) lines.push(`     ${one.name}`);
+      for (const one of paths) {
+        if (one.segmentKey !== segment.key || one.variant !== variant) continue;
+        lines.push(`     ${one.name}`);
+        if (one.description === null) lines.push('       Description à valider dans le CRM.');
+        else if (one.description !== undefined)
+          lines.push(`       ${one.description.replace(/\s+/gu, ' ').trim()}`);
+      }
     }
     lines.push('');
   });
@@ -148,7 +158,12 @@ export function scriptExportPlan(input: {
   const folder = scriptFolderName(input.number, input.moment, input.version.name);
   const bySlot = new Map(input.files.map((file) => [file.slotKey, file]));
   const entries: ExportEntry[] = [];
-  const named: { segmentKey: string; variant: ScriptVariantLetter | null; name: string }[] = [];
+  const named: {
+    segmentKey: string;
+    variant: ScriptVariantLetter | null;
+    name: string;
+    description?: string | null;
+  }[] = [];
   for (const entry of scriptFolderEntries(input.version.segments, { cards: input.cards })) {
     if (entry.slotKey === null) {
       const name = scriptFileName(entry, 'png');
@@ -166,7 +181,12 @@ export function scriptExportPlan(input: {
       path: `${folder}/${name}`,
       source: { kind: 'file', storageKey: file.storageKey, bytes: file.bytes },
     });
-    named.push({ segmentKey: entry.segmentKey, variant: entry.variant, name });
+    named.push({
+      segmentKey: entry.segmentKey,
+      variant: entry.variant,
+      name,
+      description: file.description,
+    });
   }
   const sheetPath = `${folder}/00-fiche.txt`;
   return {

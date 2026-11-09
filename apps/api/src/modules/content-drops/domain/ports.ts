@@ -247,9 +247,13 @@ export interface DropStorage {
   /**
    * The object at `key`, read as it comes, for an archive the response pulls (SC-03); `null` when there is none. A cut
    * stream, or a storage silent for 30 s while a chunk is awaited, throws `ContentDropStorageUnavailable`; the reader
-   * stopped early closes the connection.
+   * stopped early closes the connection. With `range`, only its bytes, both ends included (a video played from the
+   * screen, SC-04 lot c4).
    */
-  read(key: string): Promise<AsyncIterable<Uint8Array> | null>;
+  read(
+    key: string,
+    range?: { readonly start: number; readonly end: number },
+  ): Promise<AsyncIterable<Uint8Array> | null>;
   /** The local file `path` written at `key`, signed with its fingerprint, in parts when it is large. */
   upload(key: string, path: string, mime: DropMime, sha256: string): Promise<void>;
 }
@@ -550,4 +554,50 @@ export interface DescriptionReview {
     summaryId: string,
     now: Date,
   ): Promise<DropDescriptionsReview>;
+  /**
+   * A live file of the drop and where its medium's bytes are (SC-04 lot c4): its original while it is held, its reduced
+   * picture once made; `null` when the drop or the file is not a live one of hers. A chatter is refused.
+   */
+  file(creatorId: string, userId: string, dropId: string, fileId: string): Promise<ReviewedFile | null>;
+  /** Who opened which medium, once per opening (SC-04 lot c4): an intimate file seen by the agency leaves a trace. */
+  opened(creatorId: string, userId: string, file: ReviewedFile, correlationId: string): Promise<void>;
+}
+
+export interface ReviewedFile {
+  readonly fileId: string;
+  readonly mediaAssetId: string;
+  readonly kind: 'image' | 'video' | 'audio';
+  readonly mime: string;
+  readonly bytes: number;
+  /** `null` once the original left the storage (ADR 0044 § 2). */
+  readonly originalKey: string | null;
+  readonly thumbnailKey: string | null;
+}
+
+/** A medium of her library whose reduced picture is to be made, as `content_drops.make_thumbnail` reads it. */
+export interface MediaToThumbnail {
+  readonly creatorId: string;
+  readonly kind: 'image' | 'video' | 'audio';
+  readonly bytes: number;
+  readonly storageKey: string;
+  readonly sha256: string;
+  readonly erased: boolean;
+  /** Tried already, made or not: never twice. */
+  readonly tried: boolean;
+}
+
+/** `content_drops.make_thumbnail`'s reads and writes, and the hourly backlog, as the owner role (SC-04 lot c4). */
+export interface ThumbnailQueue {
+  target(mediaAssetId: string): Promise<MediaToThumbnail | null>;
+  /** Tried: its picture's key, or `null` when the file did not give one. Once: a medium already tried stays. */
+  settle(mediaAssetId: string, thumbnailKey: string | null, now: Date): Promise<void>;
+  /** The job again at `runAt` (disk short), keyed by the medium. */
+  later(creatorId: string, mediaAssetId: string, correlationId: string, runAt: Date): Promise<void>;
+  /** Each photo and video of a live drop never tried, its original held, enqueued; how many. */
+  backlog(correlationId: string): Promise<number>;
+}
+
+/** A reduced JPEG of a photo or a video on disk (ffmpeg); `false` when the file gives none (a format it cannot read). */
+export interface Thumbnailer {
+  make(path: string, kind: 'image' | 'video', out: string): Promise<boolean>;
 }

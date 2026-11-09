@@ -1,3 +1,5 @@
+import { readFile, writeFile } from 'node:fs/promises';
+
 import {
   ApiErrorSchema,
   ContentDropFileIdSchema,
@@ -57,11 +59,19 @@ const storage: DropStorage = {
   completeUpload: unexpected('completeUpload'),
   sizeOf: unexpected('sizeOf'),
   remove: unexpected('remove'),
-  download: unexpected('download'),
-  upload: unexpected('upload'),
-  read: (key) => {
+  download: async (key, path) => {
     const bytes = STORED.get(key);
-    return Promise.resolve(bytes === undefined ? null : toAsync(bytes));
+    if (bytes === undefined) return false;
+    await writeFile(path, bytes);
+    return true;
+  },
+  upload: async (key, path) => {
+    STORED.set(key, new Uint8Array(await readFile(path)));
+  },
+  read: (key, range) => {
+    const bytes = STORED.get(key);
+    const part = range === undefined ? bytes : bytes?.subarray(range.start, range.end + 1);
+    return Promise.resolve(part === undefined ? null : toAsync(part));
   },
 };
 async function* toAsync(bytes: Uint8Array): AsyncGenerator<Uint8Array> {
@@ -1058,5 +1068,116 @@ describe('/v1/creator-space/content/script-drops', () => {
         test.app.db.execute(sql`update media_descriptions set model = 'x' where id = ${first ?? ''}`),
       ),
     ).toBeInstanceOf(Error);
+  });
+
+  it('gives her team each medium’s picture and the medium itself in parts, each opening audited (SC-04 lot c4)', async () => {
+    const url = `/v1/creators/${nora}/drops/${dropId}`;
+    const review = async () => {
+      const answer = await call('GET', `${url}/descriptions`, 'owner');
+      expect(answer.statusCode, answer.body).toBe(200);
+      return DropDescriptionsReviewSchema.parse(answer.json());
+    };
+    const get = (path: string, range?: string) =>
+      server.inject({
+        method: 'GET',
+        url: `${url}${path}`,
+        headers: {
+          cookie: cookies.owner,
+          origin: DASHBOARD_ORIGIN,
+          ...(range === undefined ? {} : { range }),
+        },
+      });
+    let state = await review();
+    const [first, second] = state.media;
+    if (first === undefined || second === undefined) throw new Error('her script holds three media');
+    expect(state.media.map((one) => [one.thumbnail, one.original])).toEqual([
+      [false, true],
+      [false, true],
+      [false, true],
+    ]);
+
+    // Each hour, the media never tried get their picture's job; invented bytes give none, tried once all the same.
+    const [asset] = await test.admin.db
+      .select({ key: schema.mediaAssets.storageKey })
+      .from(schema.mediaAssets)
+      .where(eq(schema.mediaAssets.id, first.mediaAssetId));
+    STORED.set(asset?.key ?? '', new TextEncoder().encode('0123456789'));
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ bytes: 10 })
+      .where(eq(schema.mediaAssets.id, first.mediaAssetId));
+    const queued = async (task: string) => {
+      const rows = await test.admin.db.execute(sql`
+        select j.key from graphile_worker._private_jobs j
+          join graphile_worker._private_tasks t on t.id = j.task_id
+         where t.identifier = ${task} and j.locked_at is null`);
+      return z.array(z.object({ key: z.string().nullable() })).parse(rows.rows);
+    };
+    const run = (task: 'content_drops.thumbnail_backlog' | 'content_drops.make_thumbnail') =>
+      runOnce({ pgPool: test.admin.pool, taskList: { [task]: app.tasks[task] } });
+    await test.admin.db.execute(
+      sql`select public.enqueue_job(task => 'content_drops.thumbnail_backlog', payload => '{}'::jsonb)`,
+    );
+    await run('content_drops.thumbnail_backlog');
+    expect(await queued('content_drops.make_thumbnail')).toHaveLength(3);
+    await run('content_drops.make_thumbnail');
+    const [tried] = await test.admin.db
+      .select({ key: schema.mediaAssets.thumbnailKey, at: schema.mediaAssets.thumbnailedAt })
+      .from(schema.mediaAssets)
+      .where(eq(schema.mediaAssets.id, first.mediaAssetId));
+    expect(tried?.key).toBeNull();
+    expect(tried?.at).not.toBeNull();
+
+    // A picture made: the screen says so, and its bytes come from our own origin, to her team only.
+    STORED.set(`thumbnails/${nora}/second.jpg`, new TextEncoder().encode('jpeg-bytes'));
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ thumbnailKey: `thumbnails/${nora}/second.jpg`, thumbnailedAt: new Date() })
+      .where(eq(schema.mediaAssets.id, second.mediaAssetId));
+    state = await review();
+    expect(state.media[1]?.thumbnail).toBe(true);
+    const picture = await get(`/files/${second.fileId}/thumbnail`);
+    expect([picture.statusCode, picture.headers['content-type'], picture.body]).toEqual([
+      200,
+      'image/jpeg',
+      'jpeg-bytes',
+    ]);
+    expect((await get(`/files/${first.fileId}/thumbnail`)).statusCode).toBe(404);
+    const hers = await call('GET', `${url}/files/${second.fileId}/thumbnail`, 'nora');
+    expect(hers.statusCode).toBe(403);
+
+    // The medium itself: whole, then the parts a player asks; past its end, refused.
+    const whole = await get(`/files/${first.fileId}/media`);
+    expect([whole.statusCode, whole.headers['accept-ranges'], whole.body]).toEqual([
+      200,
+      'bytes',
+      '0123456789',
+    ]);
+    const part = await get(`/files/${first.fileId}/media`, 'bytes=2-5');
+    expect([part.statusCode, part.headers['content-range'], part.body]).toEqual([
+      206,
+      'bytes 2-5/10',
+      '2345',
+    ]);
+    const past = await get(`/files/${first.fileId}/media`, 'bytes=10-');
+    expect([past.statusCode, past.headers['content-range']]).toEqual([416, 'bytes */10']);
+    await get(`/files/${first.fileId}/media`, 'bytes=0-');
+    const opened = await test.admin.db
+      .select({ by: schema.auditLog.userId })
+      .from(schema.auditLog)
+      .where(
+        and(eq(schema.auditLog.action, 'media.opened'), eq(schema.auditLog.entityId, first.mediaAssetId)),
+      );
+    expect(opened).toHaveLength(2);
+
+    // Its original erased: the picture stays, the medium is no longer served.
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ erasedAt: new Date() })
+      .where(eq(schema.mediaAssets.id, second.mediaAssetId));
+    state = await review();
+    expect([state.media[1]?.thumbnail, state.media[1]?.original]).toEqual([true, false]);
+    expect((await get(`/files/${second.fileId}/media`)).statusCode).toBe(404);
+    expect((await get(`/files/${second.fileId}/thumbnail`)).statusCode).toBe(200);
   });
 });

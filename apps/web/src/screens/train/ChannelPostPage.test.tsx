@@ -6,7 +6,7 @@ import {
   type TelegramChannelConfig,
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChannelPostPage } from './ChannelPostPage';
@@ -107,7 +107,12 @@ describe('Entraîner › Post du canal (ADR 0080 § 7)', () => {
     const asked = serve(() => ({ status: 200, body: post }));
     renderPage();
     expect(await screen.findByText(/Rien n’est publié/u)).toBeDefined();
-    choose(await screen.findByRole('combobox', { name: 'Lien' }), 'Boutique');
+    // The page is there before the channel's links: the list opens once they are read.
+    const link = await screen.findByRole('combobox', { name: 'Lien' });
+    await waitFor(() => {
+      expect(link.getAttribute('aria-disabled')).toBeNull();
+    });
+    choose(link, 'Boutique');
     fireEvent.change(screen.getByLabelText('Le média'), { target: { value: ' selfie au miroir ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Écrire' }));
     const bubble = await screen.findByRole('article', { name: 'Le post' });

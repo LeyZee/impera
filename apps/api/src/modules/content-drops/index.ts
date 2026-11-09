@@ -9,6 +9,7 @@ import { describeBacklog } from './application/backlog';
 import { describeFile, type DescribeOutcome } from './application/describe';
 import { eraseOriginals, type RetentionRun } from './application/retention';
 import { summarizeScript, type SummarizeOutcome } from './application/summarize';
+import { makeThumbnail, type ThumbnailOutcome } from './application/thumbnail';
 import { NO_STORAGE, receiveFile } from './application/uploads';
 import type {
   AskedScript,
@@ -20,6 +21,7 @@ import type {
 } from './domain/ports';
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
+import { createThumbnailer } from './infra/cleaning/thumbnail';
 import { createDrizzleDescribeSwitch, createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
 import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
@@ -35,6 +37,7 @@ import {
   requestFromIdea,
   requestScript,
 } from './infra/db/store';
+import { createDrizzleThumbnailQueue } from './infra/db/thumbnail-queue';
 import { createContentDropRoutes, type RequireRole } from './infra/http/routes';
 import { createGatewayScriptSummarizer } from './infra/script-summarizer';
 import { createS3DropStorage, type MediaBucketConfig } from './infra/storage/s3';
@@ -71,6 +74,13 @@ export interface ContentDropsModule {
       creatorId: string | null,
       correlationId: string,
     ): Promise<{ readonly media: number; readonly scripts: number }>;
+    /**
+     * `content_drops.make_thumbnail` (ADR 0030 § 4, SC-04 lot c4): a photo or a video of her library gets its reduced
+     * picture for the agency's screen. What happened, for the log.
+     */
+    makeThumbnail(mediaAssetId: string, correlationId: string): Promise<ThumbnailOutcome>;
+    /** `content_drops.thumbnail_backlog`, each hour: the media never tried enqueued. How many. */
+    thumbnailBacklog(correlationId: string): Promise<number>;
   };
   /**
    * The content request of a shoot she accepted from an idea (VEI-01 d2), written by the trend watch's job: origin
@@ -118,6 +128,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const scratchDir = deps.scratchDir ?? tmpdir();
   const receipt = { storage, receipts, cleaner, scratchDir, room: createScratchRoom(scratchDir) };
   const summaries = createDrizzleScriptSummaryStore(deps.adminDb);
+  const thumbnails = createDrizzleThumbnailQueue(deps.adminDb);
   return {
     name: 'content-drops',
     routes: createContentDropRoutes(
@@ -177,6 +188,14 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
               creatorId,
               correlationId,
             ),
+      makeThumbnail: (mediaAssetId, correlationId) =>
+        makeThumbnail(
+          { storage, queue: thumbnails, thumbnailer: createThumbnailer(), scratchDir, room: receipt.room },
+          mediaAssetId,
+          clock(),
+          correlationId,
+        ),
+      thumbnailBacklog: (correlationId) => thumbnails.backlog(correlationId),
       eraseOriginals: (correlationId) =>
         eraseOriginals(
           { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb) },

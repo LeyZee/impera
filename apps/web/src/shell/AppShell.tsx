@@ -15,8 +15,10 @@ import { createPortal } from 'react-dom';
 
 import { AgentPill } from './AgentPill';
 import { AppearanceChoice } from './AppearanceChoice';
+import { MediaBlurToggle } from './MediaBlurToggle';
 import { NavIcon } from './NavIcon';
 import { keepTabInside } from './focus';
+import { seesHerMedia } from './media-blur';
 import {
   documentTitle,
   FAMILY_LABELS,
@@ -51,6 +53,8 @@ export interface Account {
   readonly security: string;
   /** The extension's guide (ADR 0067), for the team: a creator has no use for it. */
   readonly extension: boolean;
+  /** « Flou des médias » (SC-04 lot c4), for those who see her media: the owner and an active manager. */
+  readonly media: boolean;
 }
 
 export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
@@ -61,6 +65,7 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
       role: roleLabel(user),
       security: securityPathOf(user),
       extension: user.role !== 'creator',
+      media: seesHerMedia(user),
     }),
     [user],
   );
@@ -328,6 +333,7 @@ export function RailNav({
       <span className="nv-rail__sp" />
       {/* On the Dashboard the mode's own control is on screen: the pill would say it twice (NAV-07). */}
       {rail.items.some(({ to }) => to === '/') && current !== '/' ? <AgentPill /> : null}
+      {account?.media === true ? <MediaBlurToggle variant="rail" /> : null}
       {rail.settings === null ? null : link(rail.settings)}
       {/* No « Plus » when the tabs fit and Moi › Préférences holds the rest (D-03). */}
       {more.length === 0 && (onSignOut === undefined || !rail.phoneMenu) ? null : (
@@ -445,11 +451,16 @@ export function MoreSheet({
             <AppearanceChoice />
           </div>
         )}
+        {account?.media === true ? (
+          <div className="nv-enter" style={{ '--nv-i': items.length + 3 }}>
+            <MediaBlurToggle variant="sheet" />
+          </div>
+        ) : null}
         {account === undefined ? null : (
           <Link
             to="/notifications"
             className="nv-more__item nv-enter"
-            style={{ '--nv-i': items.length + 3 }}
+            style={{ '--nv-i': items.length + 4 }}
             onClick={onClose}
           >
             <NavIcon name="bell" />
@@ -460,7 +471,7 @@ export function MoreSheet({
           <Link
             to={account.security}
             className="nv-more__item nv-enter"
-            style={{ '--nv-i': items.length + 4 }}
+            style={{ '--nv-i': items.length + 5 }}
             onClick={onClose}
           >
             <NavIcon name="shield" />
@@ -471,7 +482,7 @@ export function MoreSheet({
           <button
             type="button"
             className="nv-more__item nv-more__out nv-enter"
-            style={{ '--nv-i': items.length + 5 }}
+            style={{ '--nv-i': items.length + 6 }}
             onClick={onSignOut}
           >
             Se déconnecter

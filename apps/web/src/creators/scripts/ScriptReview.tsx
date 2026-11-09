@@ -18,7 +18,9 @@ import {
 } from './review';
 import {
   correctDescription,
+  mediaUrl,
   reviewKey,
+  thumbnailUrl,
   useDropReview,
   validateDescriptions,
   validateSummary,
@@ -26,6 +28,9 @@ import {
 } from './review-api';
 
 import { useGrowingArea } from '@/lib/growing-area';
+import { Dialog } from '@/shell/Dialog';
+import { NavIcon } from '@/shell/NavIcon';
+import { useMediaBlur } from '@/shell/media-blur';
 
 /**
  * The review of a sent script (SC-04 lot c3, ADR 0030 § 3, ADR 0083 § 7), under its card: the synthesis first, each
@@ -121,6 +126,11 @@ export function ScriptReview({
                 <MediaRow
                   key={media.fileId}
                   media={media}
+                  code={step.code}
+                  urls={{
+                    thumbnail: thumbnailUrl(creatorId, dropId, media.fileId),
+                    media: mediaUrl(creatorId, dropId, media.fileId),
+                  }}
                   busy={busy !== null}
                   onValidate={(id) => void run(id, () => validateDescriptions(creatorId, dropId, [id]))}
                   onCorrect={(id, detailed) =>
@@ -204,135 +214,303 @@ function Synthesis({
   );
 }
 
+interface MediaActions {
+  readonly busy: boolean;
+  readonly onValidate: (id: MediaDescriptionId) => void;
+  readonly onCorrect: (id: MediaDescriptionId, detailed: string) => Promise<boolean>;
+}
+
+interface MediaUrls {
+  readonly thumbnail: string;
+  readonly media: string;
+}
+
 function MediaRow({
   media,
-  busy,
-  onValidate,
-  onCorrect,
-}: {
-  media: DropMediaReview;
-  busy: boolean;
-  onValidate: (id: MediaDescriptionId) => void;
-  onCorrect: (id: MediaDescriptionId, detailed: string) => Promise<boolean>;
-}): JSX.Element {
+  code,
+  urls,
+  ...actions
+}: MediaActions & { media: DropMediaReview; code: string; urls: MediaUrls }): JSX.Element {
   const id = useId();
-  const [draft, setDraft] = useState<string | null>(null);
-  const area = useGrowingArea(draft ?? '');
+  const [viewing, setViewing] = useState(false);
+  const [broken, setBroken] = useState(false);
   const description = media.description;
-  const flagged = description?.reviewReasons.includes('flagged') === true;
+  const picture = media.thumbnail && !broken;
+  const opens = describable(media) && (media.thumbnail || media.original);
+
+  const thumb = picture ? (
+    <img
+      className="sx-thumb__img nv-blurrable"
+      src={urls.thumbnail}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        setBroken(true);
+      }}
+    />
+  ) : null;
 
   return (
     <li className="sx-medium" aria-labelledby={`${id}-kind`}>
-      <span className="sx-thumb" data-kind={media.kind} aria-hidden="true" />
+      {opens ? (
+        <button
+          type="button"
+          className="sx-thumb sx-thumb--open"
+          data-kind={media.kind}
+          data-picture={picture}
+          aria-label={`Voir ${media.kind === 'video' ? 'la vidéo' : 'la photo'} en grand`}
+          onClick={() => {
+            setViewing(true);
+          }}
+        >
+          {thumb}
+        </button>
+      ) : (
+        <span className="sx-thumb" data-kind={media.kind} data-picture={picture} aria-hidden="true">
+          {thumb}
+        </span>
+      )}
       <div className="sx-medium__body">
         <div className="sx-medium__top">
           <span id={`${id}-kind`} className="sx-medium__kind">
             {KIND_LABELS[media.kind]}
           </span>
-          {description === null ? null : description.validatedAt !== null ? (
-            <span className="aa-pill" data-tone="ok">
-              {description.author === 'human' ? 'Corrigée' : 'Validée'}
-            </span>
-          ) : (
-            <span className="aa-pill" data-tone="todo">
-              À valider
-            </span>
-          )}
+          <DescriptionPill media={media} />
         </div>
-        {!describable(media) ? (
-          <p className="ps-muted sx-medium__text">Une note vocale n’est pas décrite.</p>
-        ) : description === null ? (
-          <p className="ps-muted sx-medium__text">Pas encore décrite.</p>
-        ) : draft !== null ? (
-          <form
-            className="nv-field sx-correct"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const text = draft.trim();
-              if (text === '') return;
-              void onCorrect(description.id, text).then((done) => {
-                if (done) setDraft(null);
-              });
-            }}
-          >
-            <label className="nv-field__label" htmlFor={`${id}-text`}>
-              Ce que montre le média
-            </label>
-            <textarea
-              id={`${id}-text`}
-              ref={area}
-              className="nv-field__control sx-correct__area"
-              value={draft}
-              maxLength={6000}
-              rows={3}
-              data-autofocus
-              onChange={(event) => {
-                setDraft(event.target.value);
-              }}
-            />
-            <div className="sx-actions">
-              <button
-                type="button"
-                className="nv-btn nv-btn--sm nv-btn--plain"
-                disabled={busy}
-                onClick={() => {
-                  setDraft(null);
-                }}
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                className="nv-btn nv-btn--sm nv-btn--soft"
-                disabled={busy || draft.trim() === ''}
-              >
-                Enregistrer et valider
-              </button>
-            </div>
-          </form>
+        {description === null || !describable(media) ? (
+          <p className="ps-muted sx-medium__text">
+            {describable(media) ? 'Pas encore décrite.' : 'Une note vocale n’est pas décrite.'}
+          </p>
         ) : (
-          <>
-            <p className="sx-medium__text">{description.detailed}</p>
-            {description.reviewReasons.length === 0 ? null : (
-              <ul className="sx-reasons" aria-label="À vérifier">
-                {description.reviewReasons.map((reason) => (
-                  <li key={reason} className="sx-reason" data-tone={reason === 'flagged' ? 'alert' : 'warn'}>
-                    {REASON_LABELS[reason]}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {description.creatorNote === null ? null : (
-              <p className="sx-medium__note">Son ressenti : {description.creatorNote}</p>
-            )}
-            <div className="sx-actions">
-              <button
-                type="button"
-                className="nv-btn nv-btn--sm nv-btn--plain"
-                disabled={busy}
-                onClick={() => {
-                  setDraft(description.detailed);
-                }}
-              >
-                Corriger
-              </button>
-              {/* Held by the code: validated alone, after it is read; never under « Tout valider ». */}
-              {description.validatedAt === null && description.reviewReasons.length > 0 ? (
-                <button
-                  type="button"
-                  className={`nv-btn nv-btn--sm ${flagged ? 'nv-btn--plain' : 'nv-btn--soft'}`}
-                  disabled={busy}
-                  onClick={() => {
-                    onValidate(description.id);
-                  }}
-                >
-                  Valider celle-ci
-                </button>
-              ) : null}
-            </div>
-          </>
+          <DescriptionBlock description={description} {...actions} />
         )}
       </div>
+      {viewing ? (
+        <MediaViewer
+          media={media}
+          code={code}
+          urls={urls}
+          {...actions}
+          onClose={() => {
+            setViewing(false);
+          }}
+        />
+      ) : null}
     </li>
+  );
+}
+
+function DescriptionPill({ media }: { media: DropMediaReview }): JSX.Element | null {
+  const description = media.description;
+  if (description === null) return null;
+  return description.validatedAt !== null ? (
+    <span className="aa-pill" data-tone="ok">
+      {description.author === 'human' ? 'Corrigée' : 'Validée'}
+    </span>
+  ) : (
+    <span className="aa-pill" data-tone="todo">
+      À valider
+    </span>
+  );
+}
+
+/** A description as the agency reads it: its words, what holds it back, her feeling, « Corriger » and « Valider ». */
+function DescriptionBlock({
+  description,
+  busy,
+  onValidate,
+  onCorrect,
+}: MediaActions & { description: NonNullable<DropMediaReview['description']> }): JSX.Element {
+  const id = useId();
+  const [draft, setDraft] = useState<string | null>(null);
+  const area = useGrowingArea(draft ?? '');
+  const flagged = description.reviewReasons.includes('flagged');
+
+  if (draft !== null)
+    return (
+      <form
+        className="nv-field sx-correct"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const text = draft.trim();
+          if (text === '') return;
+          void onCorrect(description.id, text).then((done) => {
+            if (done) setDraft(null);
+          });
+        }}
+      >
+        <label className="nv-field__label" htmlFor={`${id}-text`}>
+          Ce que montre le média
+        </label>
+        <textarea
+          id={`${id}-text`}
+          ref={area}
+          className="nv-field__control sx-correct__area"
+          value={draft}
+          maxLength={6000}
+          rows={3}
+          data-autofocus
+          onChange={(event) => {
+            setDraft(event.target.value);
+          }}
+        />
+        <div className="sx-actions">
+          <button
+            type="button"
+            className="nv-btn nv-btn--sm nv-btn--plain"
+            disabled={busy}
+            onClick={() => {
+              setDraft(null);
+            }}
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="nv-btn nv-btn--sm nv-btn--soft"
+            disabled={busy || draft.trim() === ''}
+          >
+            Enregistrer et valider
+          </button>
+        </div>
+      </form>
+    );
+
+  return (
+    <>
+      <p className="sx-medium__text">{description.detailed}</p>
+      {description.reviewReasons.length === 0 ? null : (
+        <ul className="sx-reasons" aria-label="À vérifier">
+          {description.reviewReasons.map((reason) => (
+            <li key={reason} className="sx-reason" data-tone={reason === 'flagged' ? 'alert' : 'warn'}>
+              {REASON_LABELS[reason]}
+            </li>
+          ))}
+        </ul>
+      )}
+      {description.creatorNote === null ? null : (
+        <p className="sx-medium__note">Son ressenti : {description.creatorNote}</p>
+      )}
+      <div className="sx-actions">
+        <button
+          type="button"
+          className="nv-btn nv-btn--sm nv-btn--plain"
+          disabled={busy}
+          onClick={() => {
+            setDraft(description.detailed);
+          }}
+        >
+          Corriger
+        </button>
+        {/* Held by the code: validated alone, after it is read; never under « Tout valider ». */}
+        {description.validatedAt === null && description.reviewReasons.length > 0 ? (
+          <button
+            type="button"
+            className={`nv-btn nv-btn--sm ${flagged ? 'nv-btn--plain' : 'nv-btn--soft'}`}
+            disabled={busy}
+            onClick={() => {
+              onValidate(description.id);
+            }}
+          >
+            Valider celle-ci
+          </button>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Her medium in large (SC-04 lot c4), its description beside it: the original while it is held (a video plays in the
+ * parts it asks), its reduced picture once the original is gone or when the browser cannot show it (a HEIC photo).
+ * Under « Flou des médias » it opens blurred, a video without its controls (blurred and cropped with it otherwise);
+ * « Voir net » shows this one alone, its controls with it, for as long as it is open.
+ */
+function MediaViewer({
+  media,
+  code,
+  urls,
+  onClose,
+  ...actions
+}: MediaActions & {
+  media: DropMediaReview;
+  code: string;
+  urls: MediaUrls;
+  onClose: () => void;
+}): JSX.Element {
+  const blurred = useMediaBlur();
+  const [revealed, setRevealed] = useState(false);
+  const [fallback, setFallback] = useState(!media.original);
+  const description = media.description;
+  const shown = blurred && !revealed ? 'false' : 'true';
+  const frame =
+    media.kind === 'video' && !fallback ? (
+      <video
+        className="sx-viewer__media nv-blurrable"
+        data-revealed={shown}
+        src={urls.media}
+        poster={media.thumbnail ? urls.thumbnail : undefined}
+        controls={shown === 'true'}
+        playsInline
+        preload="metadata"
+        onError={() => {
+          setFallback(true);
+        }}
+      />
+    ) : fallback && !media.thumbnail ? (
+      <p className="ps-muted sx-viewer__empty">Ce média ne s’affiche pas ici : son original est effacé.</p>
+    ) : (
+      <img
+        className="sx-viewer__media nv-blurrable"
+        data-revealed={shown}
+        src={fallback ? urls.thumbnail : urls.media}
+        alt={description?.detailed ?? KIND_LABELS[media.kind]}
+        onError={() => {
+          setFallback(true);
+        }}
+      />
+    );
+  return (
+    <Dialog
+      title={`${KIND_LABELS[media.kind]} · ${code}`}
+      lead={
+        fallback && media.thumbnail
+          ? 'Sa vignette : l’original est effacé ou ne s’affiche pas dans le navigateur.'
+          : undefined
+      }
+      className="sx-viewer"
+      busy={actions.busy}
+      onClose={onClose}
+    >
+      <div className="tm-dialog__body sx-viewer__body">
+        <div className="sx-viewer__frame">
+          {frame}
+          {blurred && !revealed ? (
+            <button
+              type="button"
+              className="nv-btn nv-btn--sm nv-btn--soft sx-viewer__reveal"
+              onClick={() => {
+                setRevealed(true);
+              }}
+            >
+              <NavIcon name="eye" />
+              Voir net
+            </button>
+          ) : null}
+        </div>
+        <div className="sx-viewer__side">
+          <div className="sx-medium__top">
+            <span className="sx-medium__kind">Sa description</span>
+            <DescriptionPill media={media} />
+          </div>
+          {description === null ? (
+            <p className="ps-muted sx-medium__text">Pas encore décrite.</p>
+          ) : (
+            <DescriptionBlock description={description} {...actions} />
+          )}
+        </div>
+      </div>
+    </Dialog>
   );
 }

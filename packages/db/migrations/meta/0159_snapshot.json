@@ -1,6 +1,6 @@
 {
-  "id": "3b090044-433d-47d1-8c73-2a0dcd80733c",
-  "prevId": "802283f2-f9de-4047-a10f-aeaa424790e3",
+  "id": "d09b6980-d397-485a-b570-539fbba46869",
+  "prevId": "fa22e728-c102-4bca-be03-3c4be41b497d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7066,6 +7066,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "thumbnail_key": {
+          "name": "thumbnail_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "thumbnailed_at": {
+          "name": "thumbnailed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7159,6 +7171,10 @@
         "media_assets_origin_check": {
           "name": "media_assets_origin_check",
           "value": "\"media_assets\".\"origin\" in ('creator', 'fan')"
+        },
+        "media_assets_thumbnail_check": {
+          "name": "media_assets_thumbnail_check",
+          "value": "\"media_assets\".\"thumbnail_key\" is null or (\"media_assets\".\"thumbnailed_at\" is not null and \"media_assets\".\"kind\" <> 'audio')"
         }
       },
       "isRLSEnabled": false

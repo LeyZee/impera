@@ -72,6 +72,7 @@ import { keptUntil } from '../../domain/retention';
 import { shotMoment } from '../../domain/shot-moment';
 
 import { enqueueDescription } from './description-queue';
+import { enqueueThumbnail } from './thumbnail-queue';
 
 const { auditLog, contentDropFiles, contentDrops, contentRequests } = schema;
 
@@ -426,6 +427,13 @@ async function sentScriptIn(tx: Transaction, dropId: string): Promise<SentScript
       mime: schema.mediaAssets.mime,
       bytes: schema.mediaAssets.bytes,
       erasedAt: schema.mediaAssets.erasedAt,
+      // Its validated description for the sheet (SC-04 lot c4): never one a human has not read (ADR 0030 § 3).
+      description: sql<string | null>`(
+        select md.content->>'detailed' from media_descriptions md
+         where md.media_asset_id = ${schema.mediaAssets.id} and md.validated_at is not null
+           and md.content ? 'detailed'
+         order by md.validated_at desc, md.created_at desc, md.id desc
+         limit 1)`,
     })
     .from(contentDropFiles)
     .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, contentDropFiles.mediaAssetId))
@@ -446,7 +454,15 @@ async function sentScriptIn(tx: Transaction, dropId: string): Promise<SentScript
     files: files.flatMap((file) =>
       file.slotKey === null
         ? []
-        : [{ slotKey: file.slotKey, storageKey: file.storageKey, mime: file.mime, bytes: file.bytes }],
+        : [
+            {
+              slotKey: file.slotKey,
+              storageKey: file.storageKey,
+              mime: file.mime,
+              bytes: file.bytes,
+              description: file.description,
+            },
+          ],
     ),
   };
 }
@@ -927,13 +943,13 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
                 ...(revived ? { erasedAt: null, storageKey: media.storageKey } : {}),
               })
               .where(eq(schema.mediaAssets.id, known.id));
-          // A new medium of hers is described once (ADR 0083 § 1); a voice note has its transcription elsewhere.
-          if (inserted.length > 0 && media.kind !== 'audio')
-            await enqueueDescription(
-              tx,
-              { creatorId: drop.creatorId, mediaAssetId: known.id, correlationId },
-              null,
-            );
+          // A new medium of hers is described once (ADR 0083 § 1); a voice note has its transcription elsewhere. Each
+          // photo and video gets its reduced picture for the agency's screen (SC-04 lot c4), whatever her switch.
+          if (inserted.length > 0 && media.kind !== 'audio') {
+            const job = { creatorId: drop.creatorId, mediaAssetId: known.id, correlationId };
+            await enqueueDescription(tx, job, null);
+            await enqueueThumbnail(tx, job, null);
+          }
           await tx
             .update(contentDropFiles)
             .set({

@@ -5,13 +5,16 @@ import type { JSX } from 'react';
 import { MeNav } from './MeNav';
 
 import { AppearanceChoice } from '@/shell/AppearanceChoice';
+import { MediaBlurToggle } from '@/shell/MediaBlurToggle';
 import { NavIcon } from '@/shell/NavIcon';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { seesHerMedia } from '@/shell/media-blur';
 import './me.css';
 
 /**
  * Moi › Préférences (D-03): what « Plus » held on the phone for a rail whose tabs all fit on the bar, the appearance of
- * this browser, what rings on this device, and the way out. The bar keeps its tabs only; nothing lives twice.
+ * this browser, her media blurred or not for those who see them (SC-04 lot c4), what rings on this device, and the way
+ * out. The bar keeps its tabs only; nothing lives twice.
  */
 export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
   return (
@@ -27,6 +30,16 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
             <AppearanceChoice />
           </div>
         </Panel>
+        {seesHerMedia(user) ? (
+          <Panel className="nv-enter" eyebrow="Ce navigateur" title="Flou des médias">
+            <div className="me-prefs__body">
+              <p className="me-prefs__text">
+                Ses photos et vidéos, floutées ou nettes sur les écrans de l’agence.
+              </p>
+              <MediaBlurToggle variant="sheet" />
+            </div>
+          </Panel>
+        ) : null}
         <Panel className="nv-enter" eyebrow="Cet appareil" title="Notifications">
           <div className="me-prefs__body">
             <p className="me-prefs__text">Ce qui sonne, et les heures où ça se tait.</p>
