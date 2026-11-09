@@ -13,7 +13,7 @@ Fait :
 
 Captures Nuit/Jour, PC et téléphone vues ; défauts corrigés : « Rien à signaler » et le titre répétés à côté de la proposition, délai « 0 min ».
 
-Pas fait : les seuils attendent « ok fragile » de Charles.
+Seuils acceptés par Charles (« ok fragile », 09/11, 14 h 47).
 
 Décisions :
 - Rien n'est stocké pour une proposition : elle se recalcule à chaque lecture, seul l'écart est un événement. Aucune table nouvelle.
