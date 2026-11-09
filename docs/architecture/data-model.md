@@ -48,6 +48,8 @@ D'où viennent les faits (P3-02) : les `factsProposed` du brief restent sur le b
 
 La fiche du fan se remplit aussi sans brouillon (ADR 0085 § 7) : chaque message du fan met en file `fans.read_card` (clé par conversation, remplacée), qui part cinq minutes après son dernier message, ou tout de suite après dix messages non lus, jamais moins de dix minutes après la lecture précédente. Le job donne au rôle `brain` la fiche telle qu'elle est et ses messages non lus avec ce qui les précède, puis le module `fans` vérifie chaque case (forme, valeurs fermées, ce que la fiche ne garde jamais) et l'écrit comme toute proposition : la note d'un chatteur reste, ce qui la contredit attend « à vérifier ». Jusqu'où ses messages ont été lus est sur la conversation (`card_read_at`, `card_read_through`, l'heure d'arrivée du dernier lu) ; une lecture refusée (budget à son alerte, aucun modèle) ne marque rien, et le message suivant les relit.
 
+Quand sa fiche dit un attachement fort avec de la détresse ou des dépenses qui montent vite, « À traiter » propose de le marquer fragile (ADR 0085 § 9, `fragileProposal`) : rien n'est stocké pour la proposition, elle se calcule à la lecture. « Marquer fragile » pose le drapeau `fragile` par `PUT /v1/fans/:id/flags` ; « Écarter » écrit `fan_fragile_dismissed` dans `domain_events` (la personne en auteur), lu par un index partiel sur `payload->>'fanId'`.
+
 ## Conversations (module `conversations`)
 
 ```

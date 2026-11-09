@@ -132,6 +132,15 @@ export interface FansService {
     flag: ClearableFanFlagName,
     command: FlagCommand,
   ): Promise<FlagsAfter>;
+  /**
+   * A person sets aside the AI's proposal to mark him « fragile » (ADR 0085 § 9, lot b2): « À traiter » no longer shows
+   * it for 30 days, unless a new sign of distress comes (`supervision`, `fragileProposal`). Returns when.
+   */
+  dismissFragile(
+    creatorId: CreatorId,
+    fanId: FanId,
+    command: { readonly author: `human:${string}`; readonly correlationId: string },
+  ): Promise<Date>;
 }
 
 export function createFansService(
@@ -217,5 +226,6 @@ export function createFansService(
         .change(creatorId, fanId, apply, { type: 'fan_flag_cleared', flag, ...command })
         .then(after);
     },
+    dismissFragile: (creatorId, fanId, command) => flagStore.dismissFragile(creatorId, fanId, command),
   };
 }

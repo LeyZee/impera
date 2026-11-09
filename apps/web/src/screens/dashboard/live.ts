@@ -27,6 +27,7 @@ const KIND_LABEL: Readonly<Record<DashboardTodo['kind'], string>> = {
   awaiting_approval: 'À valider dans Suivi',
   send_failed: 'Envoi échoué',
   unanswered: 'Sans réponse',
+  fragile_proposed: 'Le marquer fragile ?',
 };
 
 const plural = (n: number, one: string, many: string): string => `${String(n)} ${n > 1 ? many : one}`;

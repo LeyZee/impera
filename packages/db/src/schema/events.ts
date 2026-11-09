@@ -57,6 +57,11 @@ export const domainEvents = pgTable(
     index('domain_events_connection_state_idx')
       .on(sql`(${t.payload}->>'service')`, t.createdAt)
       .where(sql`${t.type} = 'connection_state_changed'`),
+    // « Set aside lately? » of each fan the AI could propose « fragile » (ADR 0085 § 9, lot b2), at each read of
+    // « À traiter »: through this index rather than across the whole outbox.
+    index('domain_events_fragile_dismissed_idx')
+      .on(sql`(${t.payload}->>'fanId')`, t.createdAt)
+      .where(sql`${t.type} = 'fan_fragile_dismissed'`),
     tenantPolicy(t.creatorId),
     // `sale_detected` names who sold: her own account never reads the outbox, and still adds to it (CRM-04 lot d).
     hiddenFromCreator(),

@@ -4,6 +4,7 @@ import {
   FanFlagsViewSchema,
   FanIdSchema,
   FanKycViewSchema,
+  FragileDismissalSchema,
   SetFanFlagBodySchema,
   UserIdSchema,
   type CreatorId,
@@ -155,6 +156,30 @@ export function createFlagRoutes(
           ? await fans.setFlag(creatorId, fanId, requestedChange(body, now()), command)
           : await fans.clearFlag(creatorId, fanId, body.flag, command);
         return { fanId, ...written };
+      },
+    );
+
+    // « Écarter » on the AI's proposal to mark him « fragile » (ADR 0085 § 9, lot b2): who may change his limits may
+    // set it aside; « Marquer fragile » is the `PUT` above.
+    app.post(
+      '/fans/:id/fragile/dismiss',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: FanParamsSchema,
+          querystring: CreatorQuerySchema,
+          response: { 200: FragileDismissalSchema },
+        },
+      },
+      async (request) => {
+        const { creatorId } = request.query;
+        const fanId = request.params.id;
+        const actor = actorFor(request, creatorId);
+        const at = await fans.dismissFragile(creatorId, fanId, {
+          author: `human:${actor}`,
+          correlationId: request.id,
+        });
+        return { fanId, dismissedAt: at.toISOString() };
       },
     );
     return Promise.resolve();

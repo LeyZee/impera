@@ -56,6 +56,7 @@ const WHY: Readonly<Record<WaitingConversation['kind'], string>> = {
   awaiting_approval: 'Un brouillon attend d’être validé depuis plus de 10 minutes.',
   send_failed: 'Un message n’a pas pu partir. L’agent ne réessaie plus, un humain doit le renvoyer.',
   unanswered: 'Son dernier message attend depuis plus de 30 minutes, sans brouillon ni réponse en cours.',
+  fragile_proposed: 'L’IA propose de le marquer fragile : à toi d’accepter ou d’écarter.',
 };
 
 /** A fan the platform gives no name (an empty pseudonym): the same words as Suivi, never an empty title. */
@@ -133,7 +134,7 @@ export function todos(
       tone: GRAVE.has(w.kind) ? 'bad' : 'warn',
       kind: w.kind,
       title: fanNameOf(w.fanName),
-      why: WHY[w.kind],
+      why: w.why ?? WHY[w.kind],
       at: w.since.toISOString(),
       waitingMinutes: Math.max(0, Math.floor((now.getTime() - w.since.getTime()) / MINUTE_MS)),
       conversationId: ConversationIdSchema.parse(w.conversationId),

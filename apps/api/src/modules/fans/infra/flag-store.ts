@@ -74,5 +74,23 @@ export function createDrizzleFlagStore(db: Database): FlagStore {
         });
         return { flags: after, scope };
       }),
+    dismissFragile: (creatorId, fanId, event) =>
+      inScope(creatorId, personOf(event.author), async (tx) => {
+        await readFlags(tx, creatorId, fanId, false);
+        const payload: EventPayload<'fan_fragile_dismissed'> = { fanId };
+        const [row] = await tx
+          .insert(schema.domainEvents)
+          .values({
+            id: newId(EventIdSchema),
+            creatorId,
+            type: 'fan_fragile_dismissed',
+            payload,
+            actor: event.author,
+            correlationId: event.correlationId,
+          })
+          .returning({ at: schema.domainEvents.createdAt });
+        if (row === undefined) throw new Error('fan_fragile_dismissed was not written');
+        return row.at;
+      }),
   };
 }

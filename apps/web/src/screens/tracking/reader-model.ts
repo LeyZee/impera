@@ -28,6 +28,7 @@ export function todoLabel(todo: DashboardTodo): string {
   if (todo.kind === 'awaiting_approval') return 'Brouillon à valider';
   if (todo.kind === 'send_failed') return 'Envoi échoué';
   if (todo.kind === 'unanswered') return 'Sans réponse';
+  if (todo.kind === 'fragile_proposed') return 'Le marquer fragile ?';
   return CAUSE_LABELS[todo.kind];
 }
 

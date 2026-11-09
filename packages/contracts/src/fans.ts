@@ -135,3 +135,10 @@ export const SetFanFlagBodySchema = z.union([
   z.object({ flag: ClearableFanFlagNameSchema, set: z.literal(false), reason: flagReason }),
 ]);
 export type SetFanFlagBody = z.infer<typeof SetFanFlagBodySchema>;
+
+/**
+ * `POST /v1/fans/:id/fragile/dismiss`: a human sets aside the AI's proposal to mark him « fragile » (ADR 0085 § 9, lot
+ * b2). « Marquer fragile » is `PUT /v1/fans/:id/flags` like any limit; setting it aside asks for nothing else.
+ */
+export const FragileDismissalSchema = z.object({ fanId: FanIdSchema, dismissedAt: z.iso.datetime() });
+export type FragileDismissal = z.infer<typeof FragileDismissalSchema>;

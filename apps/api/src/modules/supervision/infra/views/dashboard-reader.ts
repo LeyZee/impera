@@ -12,7 +12,8 @@ import { z } from 'zod';
 
 import { unansweredSince } from '../../domain/dashboard';
 import type { DashboardFacts, DashboardReader, DashboardWindow } from '../../domain/dashboard-ports';
-import { rankFans, type UsdRate } from '../../domain/fan-ranking';
+import { rankFans, usdToEurMinor, type UsdRate } from '../../domain/fan-ranking';
+import { FRAGILE_PROPOSAL, fragileProposal, fragileWhy } from '../../domain/fragile';
 
 /**
  * The Dashboard's SQL views (docs/architecture/modules.md: read only, aggregates, the documented exception to
@@ -62,6 +63,108 @@ async function decided(
         order by decided_at desc, id desc limit ${LIVE_WINDOW}`,
   );
   return list.map((row) => ({ asIs: row.as_is }));
+}
+
+/**
+ * The fans the AI proposes to mark « fragile » (ADR 0085 § 9, lot b2), each in his latest conversation: those with an
+ * attachment on their card and no « fragile » yet, with what the rule reads (`fragileProposal`). His card's values
+ * never leave this function: the line says only which signs.
+ */
+async function fragileWaiting(
+  tx: Transaction,
+  now: Date,
+  usdRate: UsdRate | null,
+): Promise<DashboardFacts['waiting']> {
+  const recentFrom = new Date(now.getTime() - FRAGILE_PROPOSAL.recentDays * DAY_MS);
+  const baselineFrom = new Date(recentFrom.getTime() - FRAGILE_PROPOSAL.baselineWeeks * 7 * DAY_MS);
+  const active = (key: string) => sql`
+    select value, observed_at from fan_facts ff
+    where ff.fan_id = f.id and ff.key = ${key} and ff.superseded_by is null and ff.value <> ''
+      and (ff.expires_at is null or ff.expires_at > ${now}::timestamptz)
+    order by ff.observed_at desc limit 1`;
+  const candidates = await rows(
+    tx,
+    z.object({
+      fan_id: z.string(),
+      fan_name: z.string(),
+      conversation_id: z.string(),
+      attachment: z.string(),
+      attachment_at: timestamp,
+      moods: z.string().nullable(),
+      moods_at: timestamp.nullable(),
+      distress_at: timestamp.nullable(),
+      dismissed_at: timestamp.nullable(),
+      recent_eur: int,
+      recent_usd: int,
+      last_spent_at: timestamp.nullable(),
+      baseline_eur: int,
+      baseline_usd: int,
+    }),
+    sql`select f.id as fan_id, f.display_name as fan_name, c.id as conversation_id,
+               a.value as attachment, a.observed_at as attachment_at,
+               m.value as moods, m.observed_at as moods_at,
+               (select max(e.created_at) from conversation_events e
+                join conversations ec on ec.id = e.conversation_id
+                where ec.fan_id = f.id and e.type = 'handoff_requested' and e.payload->>'cause' = 'distress')
+                 as distress_at,
+               (select max(d.created_at) from domain_events d
+                where d.type = 'fan_fragile_dismissed' and d.payload->>'fanId' = f.id::text) as dismissed_at,
+               coalesce(s.recent_eur, 0) as recent_eur, coalesce(s.recent_usd, 0) as recent_usd, s.last_spent_at,
+               coalesce(s.baseline_eur, 0) as baseline_eur, coalesce(s.baseline_usd, 0) as baseline_usd
+        from fans f
+        join lateral (${active('attachment')}) a on true
+        left join lateral (${active('moods')}) m on true
+        join lateral (
+          select id from conversations lc where lc.fan_id = f.id
+          order by lc.last_inbound_at desc nulls last, lc.id desc limit 1) c on true
+        left join lateral (
+          select
+            sum(pm.price_minor) filter (where pm.currency = 'EUR' and pm.platform_created_at >= ${recentFrom}::timestamptz)
+              as recent_eur,
+            sum(pm.price_minor) filter (where pm.currency = 'USD' and pm.platform_created_at >= ${recentFrom}::timestamptz)
+              as recent_usd,
+            max(pm.platform_created_at) filter (where pm.platform_created_at >= ${recentFrom}::timestamptz)
+              as last_spent_at,
+            sum(pm.price_minor) filter (where pm.currency = 'EUR' and pm.platform_created_at < ${recentFrom}::timestamptz)
+              as baseline_eur,
+            sum(pm.price_minor) filter (where pm.currency = 'USD' and pm.platform_created_at < ${recentFrom}::timestamptz)
+              as baseline_usd
+          from messages pm
+          join conversations pc on pc.id = pm.conversation_id
+          where pc.fan_id = f.id and pm.direction = 'outbound' and pm.is_paid and pm.price_minor > 0
+            and pm.platform_created_at >= ${baselineFrom}::timestamptz
+            and pm.platform_created_at < ${now}::timestamptz) s on true
+        where f.flags->>'fragile' is null`,
+  );
+  // His dollars at the last ECB rate known, as the ranking converts them; without a rate they do not count.
+  const inEuros = (eur: number, usd: number): number =>
+    eur + (usdRate === null || usd === 0 ? 0 : usdToEurMinor(usd, usdRate.rateMicros));
+  return candidates.flatMap((fan) => {
+    const proposal = fragileProposal(
+      {
+        attachment: { value: fan.attachment, at: fan.attachment_at },
+        moods: fan.moods === null || fan.moods_at === null ? null : { value: fan.moods, at: fan.moods_at },
+        distressAt: fan.distress_at,
+        spentRecentMinor: inEuros(fan.recent_eur, fan.recent_usd),
+        lastSpentAt: fan.last_spent_at,
+        spentBaselineMinor: inEuros(fan.baseline_eur, fan.baseline_usd),
+        dismissedAt: fan.dismissed_at,
+      },
+      now,
+    );
+    return proposal === null
+      ? []
+      : [
+          {
+            conversationId: fan.conversation_id,
+            fanId: fan.fan_id,
+            fanName: fan.fan_name,
+            kind: 'fragile_proposed' as const,
+            since: proposal.since,
+            why: fragileWhy(proposal.signs),
+          },
+        ];
+  });
 }
 
 async function facts(
@@ -318,6 +421,7 @@ async function facts(
         kind: 'send_failed' as const,
         since: f.since,
       })),
+      ...(await fragileWaiting(tx, window.now, usdRate)),
       // Out of her reply slots the net is silent; from her opening it counts again (P3-14).
       ...(quiet ? [] : unanswered).flatMap((u) => {
         const since = unansweredSince(u.since, window.now, her);

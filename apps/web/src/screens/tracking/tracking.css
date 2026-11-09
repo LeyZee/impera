@@ -717,6 +717,14 @@
   color: var(--_c);
   font-weight: 700;
 }
+/* « Le marquer fragile ? » (ADR 0085 § 9, lot b2): its two answers on their own line, under the sentence. */
+.tr-fragile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+  flex-basis: 100%;
+  margin-top: var(--nv-space-1);
+}
 
 /* « Récents · Chauds d'abord » (P3-12): above the list, quiet, the list's own width. */
 .tr-order {
