@@ -56,6 +56,8 @@ Pendant la navigation, note sur papier ce que tu as fait et l'heure (ex. « 14h3
 
 ## 4. Anonymiser (5 min)
 
+Avant tout, écris dans `.scratch/inbox/.forbid`, une par ligne, les valeurs qui ne doivent jamais sortir (le pseudo du fan test, le code d'affiliation de l'agence). Le fichier reste sur le PC ; si l'un de ces mots survit, quel que soit le champ, le script refuse d'écrire.
+
 Dans un terminal, à la racine du dépôt :
 
 ```

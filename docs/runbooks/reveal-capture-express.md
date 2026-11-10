@@ -28,10 +28,11 @@ Pour Charles, sur son PC. Version courte de `reveal-recording.md`, qui reste la 
 **Exporter et nettoyer (10 min)**
 
 1. Dans l'onglet Réseau, clique sur l'icône de téléchargement, puis sur **Export HAR (sanitized)**. Jamais la version « with sensitive data ». Enregistre le fichier dans `.scratch\inbox\` du projet, sous le nom `reveal-AAAA-MM-JJ-a.har`.
-2. Dans un terminal, à la racine du projet, lance :
+2. Dans `.scratch\inbox\`, crée un fichier texte `.forbid` et écris-y, une par ligne, les valeurs qui ne doivent jamais sortir : le pseudo du fan test, le code d'affiliation de l'agence. Ce fichier reste sur ton PC. Si l'un de ces mots survit, le script refuse d'écrire et dit lequel par son numéro de ligne.
+3. Dans un terminal, à la racine du projet, lance :
    `node scripts/anonymize-har.mjs .scratch/inbox/reveal-AAAA-MM-JJ-a.har`
-3. Relis la liste « mots gardés » que le script affiche. Si un pseudo de fan y apparaît, arrête-toi et dis-le.
-4. Supprime le fichier `.har` brut. Garde seulement le fichier `.anon.json`.
-5. Écris **« capture déposée »** dans le chat du projet, avec ta feuille d'heures et ce que le bot ne voyait pas.
+4. Relis la liste « mots gardés » que le script affiche. Si un pseudo de fan y apparaît, arrête-toi et dis-le.
+5. Supprime le fichier `.har` brut. Garde seulement le fichier `.anon.json`.
+6. Écris **« capture déposée »** dans le chat du projet, avec ta feuille d'heures et ce que le bot ne voyait pas.
 
 **Jamais** : n'envoie le fichier brut à personne, ne le colle pas dans le chat, ne le mets pas sur GitHub. Si un cookie a pu fuiter, déconnecte-toi de Reveal sur tous les appareils, puis préviens dans le chat.

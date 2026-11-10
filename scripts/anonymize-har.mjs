@@ -16,10 +16,10 @@ const SECRET_KEY =
   /token|secret|passw|auth(?!or(s|id|_id)?$)|session|cookie|csrf|xsrf|signature|^sig$|key|jwt|bearer|otp|nonce|affiliat|referr|invit|promo|coupon|voucher/i;
 // Matched on the end of the key: `lastMessage` is free text, `messageType` is an enum.
 const PERSONAL_KEY =
-  /(name|user|login|handle|nick|pseudo|mail|phone|tel|city|ville|address|bio|text|message|body|content|caption|note|notes|description|comment|title|subject|preview|search|query|^q)$/i;
+  /(name|user|login|handle|nick|pseudo|slug|^to|^from|^fan|participants?|recipients?|mail|phone|tel|city|ville|address|bio|text|message|body|content|caption|note|notes|description|comment|title|subject|preview|search|query|^q|^s)$/i;
 // Anywhere in the key: what a person typed to find someone (`searchParticipants`, `searchValue`, `q`) is free text,
 // even when it looks like an enum (a fan's pseudo is one lowercase word).
-const TYPED_KEY = /search|query|keyword|term|^q$|filter(text|value)/i;
+const TYPED_KEY = /search|query|keyword|term|^q$|^s$|filter(text|value)/i;
 const TIME_KEY = /(at|time|date|ts|timestamp|created|updated|expires?|since|until|before|after)$/i;
 const ID_KEY = /(^id$|_id$|Id$|^uuid$|_uuid$|Uuid$|^ref$|_ref$)/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,7 +27,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 // Not inside a number: the `00` of `875.8200123` is not the start of a phone number.
 const PHONE = /(?<![\w.])(\+|00)\d[\d .-]{7,}\d/g;
-// An upper-case code with digits (`G2FGZVSMH2`): an affiliation or invitation code, not an enum like `FR` or `PPV_SENT`.
+// An upper-case code with digits (`Q7KX2MZP4T`, invented): an affiliation or invitation code, not an enum like `FR` or `PPV_SENT`.
 const OPAQUE_CODE = /^(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{6,}$/;
 const ENUM_LIKE = /^([a-z][a-z0-9]*([_.:-][a-z0-9]+)*|[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$/;
 const SHORT_NUMBER = /^-?\d{1,5}([.,]\d{1,2})?$/;
@@ -223,8 +223,17 @@ export function createAnonymizer(salt) {
   return { anonymizeHar, scrubValue, scrubUrl, scrubBody, stats };
 }
 
-export function findLeaks(serialized) {
-  return LEAKS.filter(([, pattern]) => pattern.test(serialized)).map(([name]) => name);
+// `forbidden`: words that must never come out, whatever field carries them (the fan test's pseudo, the agency's
+// codes), given on the PC only. A hit names the word's position in the list, never the word.
+export function findLeaks(serialized, forbidden = []) {
+  const lower = serialized.toLowerCase();
+  return [
+    ...LEAKS.filter(([, pattern]) => pattern.test(serialized)).map(([name]) => name),
+    ...forbidden
+      .map((word, i) => [word.trim().toLowerCase(), i + 1])
+      .filter(([word]) => word.length >= 3 && lower.includes(word))
+      .map(([, i]) => `forbidden word #${i}`),
+  ];
 }
 
 // Masks emails and phone numbers that slipped into a value kept as is (header values, enums). It walks the
@@ -275,10 +284,11 @@ function main(argv) {
   };
   const outArg = option('--out');
   const saltArg = option('--salt-file');
+  const forbidArg = option('--forbid-file');
   const [input] = args;
   if (!input) {
     console.error(
-      'Usage : node scripts/anonymize-har.mjs <fichier.har> [--out <fichier>] [--salt-file <fichier>]',
+      'Usage : node scripts/anonymize-har.mjs <fichier.har> [--out <fichier>] [--salt-file <fichier>] [--forbid-file <fichier>]',
     );
     return 2;
   }
@@ -288,6 +298,19 @@ function main(argv) {
     writeFileSync(saltFile, randomBytes(32).toString('hex'), { mode: 0o600 });
   }
   const salt = readFileSync(saltFile, 'utf8').trim();
+  // One word per line, on the PC only, never shared: the fan test's pseudo, the agency's affiliation code.
+  const forbidFile = resolve(forbidArg ?? '.scratch/inbox/.forbid');
+  const forbidden = existsSync(forbidFile)
+    ? readFileSync(forbidFile, 'utf8')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line !== '' && !line.startsWith('#'))
+    : [];
+  if (forbidden.length === 0) {
+    console.error(
+      `Attention : aucun mot interdit (${forbidFile}). Mets-y le pseudo du fan test, un par ligne.`,
+    );
+  }
   const out = resolve(outArg ?? input.replace(/\.har$/i, '') + '.anon.json');
   if (out === resolve(input)) {
     console.error('Refus : la sortie écraserait le fichier brut.');
@@ -307,7 +330,7 @@ function main(argv) {
   }
   const anonymized = anonymizeHar(har);
   const serialized = JSON.stringify(maskContacts(anonymized), null, 1);
-  const leaks = findLeaks(serialized);
+  const leaks = findLeaks(serialized, forbidden);
   if (leaks.length > 0) {
     console.error(`Refus : motif sensible encore présent (${leaks.join(', ')}). Rien n'a été écrit.`);
     return 1;

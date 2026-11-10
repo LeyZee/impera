@@ -12,3 +12,7 @@ Fait :
 Découvertes : Reveal n'a pas de WebSocket ; le temps réel du dashboard est un sondage (`GET conversations/:id/messages`, `conversations/model/count`, `typing`). À écrire dans `reveal-api-observed.md` à l'analyse (P1-02).
 
 Candidats à suppression : aucun.
+
+Relecture (Agent) : le pseudo d'un fan peut aussi passer par `slug`, `to`, `fan`, `participants`, `?s=` ou un segment de chemin. Ajouts : ces clés sont du texte, et `.scratch/inbox/.forbid` (sur le PC, jamais partagé) liste les mots qui ne doivent jamais sortir ; le script refuse d'écrire s'il en reste un, en ne donnant que son numéro. Runbooks mis à jour.
+
+Incident : le premier commit de cette branche citait en exemple le vrai code d'affiliation de l'agence, relevé dans la capture. Remplacé par un code inventé ; il reste dans l'historique de la branche et de la PR.

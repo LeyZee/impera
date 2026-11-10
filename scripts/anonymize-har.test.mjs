@@ -202,14 +202,32 @@ test('masks what was typed in a search, in the URL, the :path header, the Refere
 test('hashes an affiliation or invitation code, keeps upper-case enums', () => {
   const { scrubValue } = createAnonymizer('salt');
   const out = scrubValue('', {
-    agency: { affiliationCode: 'G2FGZVSMH2' },
+    agency: { affiliationCode: 'Q7KX2MZP4T' },
     inviteCode: 'ABC12345',
     code: 'Z9Y8X7W6',
     country: 'FR',
     status: 'PPV_SENT',
   });
   const json = JSON.stringify(out);
-  for (const code of ['G2FGZVSMH2', 'ABC12345', 'Z9Y8X7W6']) assert.ok(!json.includes(code), json);
+  for (const code of ['Q7KX2MZP4T', 'ABC12345', 'Z9Y8X7W6']) assert.ok(!json.includes(code), json);
   assert.equal(out.country, 'FR');
   assert.equal(out.status, 'PPV_SENT');
+});
+
+test('masks a pseudo in a slug, a recipient or a participants list', () => {
+  const { scrubValue } = createAnonymizer('salt');
+  const out = scrubValue('', {
+    slug: 'kevindu75',
+    to: 'kevindu75',
+    fan: 'kevindu75',
+    participants: ['kevindu75'],
+  });
+  assert.ok(!JSON.stringify(out).includes('kevindu75'), JSON.stringify(out));
+});
+
+test('refuses a forbidden word wherever it survives, without naming it', () => {
+  const serialized = JSON.stringify({ url: 'https://x.test/u/KevinDu75/profile' });
+  assert.deepEqual(findLeaks(serialized, ['kevindu75']), ['forbidden word #1']);
+  assert.deepEqual(findLeaks(serialized, ['# comment', '']), []);
+  assert.deepEqual(findLeaks(serialized), []);
 });
