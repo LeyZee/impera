@@ -164,4 +164,52 @@ test('leak check catches what scrubbing must never let through', () => {
   assert.deepEqual(findLeaks('{"a":"Bearer abcdefghijkl"}'), ['bearer']);
   assert.deepEqual(findLeaks(`{"a":"${FAKE_JWT}"}`), ['jwt']);
   assert.equal(maskContacts('appelle le +33 6 12 34 56 78 ou a@b.fr'), 'appelle le <phone> ou <email>');
+  assert.deepEqual(maskContacts(['a@b.fr', 42]), ['<email>', 42]);
+});
+
+test('never touches a number: a timing with 00 in its decimals stays a number', () => {
+  const masked = maskContacts({
+    time: 875.8200123456789,
+    wait: 0.0012345678,
+    note: 'appelle le 0033612345678',
+  });
+  assert.equal(masked.time, 875.8200123456789);
+  assert.equal(masked.wait, 0.0012345678);
+  assert.equal(masked.note, 'appelle le <phone>');
+  assert.doesNotThrow(() => JSON.parse(JSON.stringify(masked)));
+});
+
+test('masks what was typed in a search, in the URL, the :path header, the Referer and a server action body', () => {
+  const { scrubUrl, scrubBody } = createAnonymizer('salt');
+  const typed = 'https://api.example-reveal.test/conversations/model?searchParticipants=kevindu75&take=20';
+  for (const url of [
+    typed,
+    'https://dashboard.example-reveal.test/models/123456/conversations?searchValue=kevindu75',
+    '/conversations/model?q=kevindu75',
+  ]) {
+    const out = scrubUrl(url);
+    assert.ok(!out.includes('kevindu75'), out);
+  }
+  assert.match(scrubUrl(typed), /take=20/);
+  const body = scrubBody(
+    JSON.stringify([{ DOMIdentifiers: { url: `${typed}&filter=unread` } }]),
+    'text/plain',
+  );
+  assert.ok(!body.includes('kevindu75'), body);
+  assert.ok(body.includes('filter=unread'), body);
+});
+
+test('hashes an affiliation or invitation code, keeps upper-case enums', () => {
+  const { scrubValue } = createAnonymizer('salt');
+  const out = scrubValue('', {
+    agency: { affiliationCode: 'G2FGZVSMH2' },
+    inviteCode: 'ABC12345',
+    code: 'Z9Y8X7W6',
+    country: 'FR',
+    status: 'PPV_SENT',
+  });
+  const json = JSON.stringify(out);
+  for (const code of ['G2FGZVSMH2', 'ABC12345', 'Z9Y8X7W6']) assert.ok(!json.includes(code), json);
+  assert.equal(out.country, 'FR');
+  assert.equal(out.status, 'PPV_SENT');
 });
