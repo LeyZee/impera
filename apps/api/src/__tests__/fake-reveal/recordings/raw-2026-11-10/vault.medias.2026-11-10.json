@@ -1,0 +1,46 @@
+{
+  "endpoint": "vault.medias",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/models/:uuid_44f2010ff2/medias?take=10&vaultFolderId=uuid_d226cc5449&mediaType=texte_100&memberId=uuid_792c856ecf"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": [
+        {
+          "id": "uuid_c6f1061af2",
+          "blurhash": "texte_101",
+          "isHls": true,
+          "createdAt": "2025-06-12T11:02:38.984Z",
+          "updatedAt": "2026-11-10T16:51:15.111Z",
+          "url": "https://media.example.test/46d17940cd",
+          "smallUrl": "https://media.example.test/46d17940cd",
+          "mediumUrl": "https://media.example.test/46d17940cd",
+          "largeUrl": "https://media.example.test/46d17940cd",
+          "thumbnailUrl": "https://media.example.test/2b3dfda933",
+          "type": "video",
+          "isArchived": false,
+          "moderationStatus": "approved",
+          "modelId": "uuid_44f2010ff2",
+          "name": null,
+          "durationSeconds": 99,
+          "status": ["paid", "paid"],
+          "sentForFree": false,
+          "description": null,
+          "suggestedMinPrice": null,
+          "suggestedMaxPrice": null,
+          "tags": []
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "uuid_c6f1061af2"
+      },
+      "totalCount": 1,
+      "totalImage": 0,
+      "totalVideo": 1
+    }
+  }
+}

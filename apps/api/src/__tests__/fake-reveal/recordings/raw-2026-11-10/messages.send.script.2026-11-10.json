@@ -1,0 +1,35 @@
+{
+  "endpoint": "messages.send",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "POST",
+    "path": "/conversations/:uuid_45a4157c63/messages",
+    "body": {
+      "scriptId": "uuid_dadb479798",
+      "message": {
+        "content": "texte_65",
+        "isUnread": true
+      },
+      "bundle": {
+        "type": "media",
+        "price": 2000,
+        "mediaIds": ["uuid_dc4364b351", "uuid_901f891750"],
+        "files": [],
+        "teasingMediaIds": ["uuid_bc10191e43"],
+        "teasingFiles": []
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "id": "uuid_f0042c7258",
+      "bundleId": "uuid_4f79e688c5",
+      "createdAt": "2026-11-10T17:35:21.878Z",
+      "updatedAt": "2026-11-10T17:35:21.878Z",
+      "isUnread": true,
+      "content": "texte_66",
+      "type": "default"
+    }
+  }
+}

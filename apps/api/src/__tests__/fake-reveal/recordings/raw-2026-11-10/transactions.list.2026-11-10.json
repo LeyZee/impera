@@ -1,0 +1,74 @@
+{
+  "endpoint": "transactions.list",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/transactions/model/:uuid_44f2010ff2?take=10&status[0]=paid&status[1]=refunded&status[2]=refund_asked"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": [
+        {
+          "id": "uuid_56cec887d6",
+          "createdAt": "2026-11-10T17:29:41.922Z",
+          "updatedAt": "2026-11-10T17:29:51.570Z",
+          "amount": 300,
+          "status": "paid",
+          "type": "texte_108",
+          "modelId": "uuid_44f2010ff2",
+          "memberId": "uuid_792c856ecf",
+          "agencyMemberId": "uuid_20dbcb4da6",
+          "platformFee": 45,
+          "platformPercentage": 18,
+          "platformRevenue": 16,
+          "agencyFee": 92,
+          "agencyPercentage": 45,
+          "processorFee": 29,
+          "vatFee": 50,
+          "vatPercentage": 20,
+          "modelRevenue": 113,
+          "isProcessedSuccessfully": true,
+          "uid": "code_masque",
+          "providerTransactionId": "code_masque",
+          "countryCode": "FR",
+          "member": {
+            "userName": "texte_109"
+          }
+        },
+        {
+          "id": "uuid_32f3f21e89",
+          "createdAt": "2026-11-10T16:44:48.722Z",
+          "updatedAt": "2026-11-10T16:45:03.254Z",
+          "amount": 300,
+          "status": "paid",
+          "type": "texte_110",
+          "modelId": "uuid_44f2010ff2",
+          "memberId": "uuid_792c856ecf",
+          "agencyMemberId": "uuid_20dbcb4da6",
+          "platformFee": 45,
+          "platformPercentage": 18,
+          "platformRevenue": 16,
+          "agencyFee": 92,
+          "agencyPercentage": 45,
+          "processorFee": 29,
+          "vatFee": 50,
+          "vatPercentage": 20,
+          "modelRevenue": 113,
+          "isProcessedSuccessfully": true,
+          "uid": "code_masque",
+          "providerTransactionId": "code_masque",
+          "countryCode": "FR",
+          "member": {
+            "userName": "texte_111"
+          }
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "uuid_9ee76ce34b"
+      },
+      "totalCount": 3893
+    }
+  }
+}

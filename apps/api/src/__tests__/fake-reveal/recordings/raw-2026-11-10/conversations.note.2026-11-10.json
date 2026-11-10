@@ -1,0 +1,33 @@
+{
+  "endpoint": "conversations.note",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "PATCH",
+    "path": "/conversations/:uuid_45a4157c63/note",
+    "body": {
+      "note": "texte_71"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "id": "uuid_45a4157c63",
+      "modelIsUnread": false,
+      "memberIsUnread": false,
+      "memberLastReadAt": "2026-11-10T17:29:39.234Z",
+      "isBlockedByModel": false,
+      "isPinned": false,
+      "isExcludedFromMassDM": false,
+      "isTeamPinned": false,
+      "assignedInbox": 1,
+      "lastMessageAt": "2026-11-10T17:29:57.837Z",
+      "createdAt": "2024-07-05T13:05:42.269Z",
+      "updatedAt": "2026-11-10T17:30:23.673Z",
+      "lastMessageId": "uuid_9af43e7fbe",
+      "memberId": "uuid_792c856ecf",
+      "modelId": "uuid_44f2010ff2",
+      "note": "texte_72",
+      "memberFirstname": "texte_73"
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "endpoint": "conversations.get",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/conversations/:uuid_45a4157c63"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "conversation": {
+        "id": "uuid_45a4157c63",
+        "modelIsUnread": false,
+        "memberIsUnread": true,
+        "memberLastReadAt": "2026-11-10T17:29:39.234Z",
+        "isBlockedByModel": false,
+        "isPinned": false,
+        "isExcludedFromMassDM": false,
+        "isTeamPinned": false,
+        "assignedInbox": 1,
+        "lastMessageAt": "2026-11-10T17:35:21.878Z",
+        "createdAt": "2024-07-05T13:05:42.269Z",
+        "updatedAt": "2026-11-10T17:35:22.110Z",
+        "lastMessageId": "uuid_f0042c7258",
+        "memberId": "uuid_792c856ecf",
+        "modelId": "uuid_44f2010ff2",
+        "note": "texte_33",
+        "memberFirstname": "texte_34"
+      },
+      "lastMessageAuthor": {},
+      "lastMessage": {
+        "id": "uuid_f0042c7258",
+        "bundleId": "uuid_4f79e688c5",
+        "createdAt": "2026-11-10T17:35:21.878Z",
+        "updatedAt": "2026-11-10T17:35:21.878Z",
+        "isUnread": true,
+        "content": "texte_35",
+        "type": "default"
+      },
+      "lastMessageHasMedia": false,
+      "member": {
+        "id": "uuid_792c856ecf",
+        "authorMessageId": "secret_masque",
+        "createdAt": "2024-05-28T07:56:55.098Z",
+        "updatedAt": "2026-11-10T17:29:39.256Z",
+        "vipUntil": null,
+        "userName": "texte_36",
+        "avatarUrl": "https://media.example.test/881e7d6bef",
+        "userId": "uuid_2e03215700",
+        "cardVerifiedAt": "2026-02-18T12:44:23.443Z"
+      },
+      "model": {
+        "id": "uuid_44f2010ff2",
+        "avatarUrl": "https://media.example.test/bb0181299e",
+        "bannerUrl": "https://media.example.test/a5cc44b089",
+        "avatarThumbUrl": "https://media.example.test/b1634cc69c",
+        "bannerPreviewUrl": "https://media.example.test/33d1be76be",
+        "displayName": "texte_37",
+        "description": "texte_38",
+        "userName": "texte_39",
+        "incomingMediaPrice": 0,
+        "isVisible": true,
+        "engagementPopupMessage": "texte_40",
+        "isAI": false,
+        "requireCardVerificationForFreeSubscription": false,
+        "isOfficialAccount": false
+      },
+      "memberTotalSpent": 1899,
+      "memberLastSeenAt": "2026-11-10T17:29:49.221Z",
+      "modelCreatorNote": "texte_41",
+      "isExcludedFromMassDM": false
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "endpoint": "conversations.count",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/conversations/model/count?modelId=uuid_44f2010ff2&filter=online"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "count": 26
+    }
+  }
+}

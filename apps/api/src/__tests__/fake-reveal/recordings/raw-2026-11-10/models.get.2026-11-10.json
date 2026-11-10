@@ -1,0 +1,48 @@
+{
+  "endpoint": "models.get",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/models/:uuid_44f2010ff2"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "id": "uuid_44f2010ff2",
+      "authorMessageId": "secret_masque",
+      "createdAt": "2024-05-28T07:38:25.507Z",
+      "updatedAt": "2026-10-24T11:29:33.148Z",
+      "avatarUrl": "https://media.example.test/bb0181299e",
+      "bannerUrl": "https://media.example.test/a5cc44b089",
+      "displayName": "texte_77",
+      "description": "texte_78",
+      "commission": 45,
+      "welcomeMessage": "texte_79",
+      "welcomeMessageDelaySeconds": 0,
+      "welcomeSkipIfFanWritesFirst": true,
+      "agencyId": "uuid_58f7ee0d81",
+      "userId": "uuid_51e253d82f",
+      "userName": "texte_80",
+      "status": "validated",
+      "incomingMediaPrice": 0,
+      "isVisible": true,
+      "affiliationCode": "code_masque",
+      "age": 0,
+      "mym": "texte_81",
+      "currentRevenue": 3000,
+      "engagementPopupMessage": "texte_82",
+      "termsSignatureLink": "secret_masque",
+      "termsAcceptedAt": "2024-05-28T10:10:41.928Z",
+      "isAI": false,
+      "isWhitelistedForMediaVerification": true,
+      "isSuggested": false,
+      "payoutOnHold": false,
+      "requireCardVerificationForFreeSubscription": false,
+      "inboxCount": 1,
+      "selectedInboxes": [],
+      "creatorNote": "texte_83",
+      "expirationReminderMessage": "texte_84",
+      "expirationReminderDaysBefore": 2
+    }
+  }
+}

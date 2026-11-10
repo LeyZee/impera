@@ -1,0 +1,12 @@
+{
+  "endpoint": "media.uploadUrl",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/medias/get-upload-url?name=texte_102&type=texte_103&size=48843"
+  },
+  "response": {
+    "status": 200,
+    "body": "https://media.example.test/0000000000"
+  }
+}
