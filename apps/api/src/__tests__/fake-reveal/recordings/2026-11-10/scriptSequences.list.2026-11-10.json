@@ -1,0 +1,22 @@
+{
+  "endpoint": "scriptSequences.list",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/script-sequences/model/:uuid_44f2010ff2"
+  },
+  "response": {
+    "status": 200,
+    "body": [
+      {
+        "sequence": {
+          "id": "uuid_4f2a89e1c6",
+          "name": "texte_97",
+          "createdAt": "2026-11-10T17:36:05.358Z",
+          "updatedAt": "2026-11-10T17:36:05.358Z"
+        },
+        "steps": []
+      }
+    ]
+  }
+}

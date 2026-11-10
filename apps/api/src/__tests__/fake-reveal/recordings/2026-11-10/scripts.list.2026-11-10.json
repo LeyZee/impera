@@ -1,0 +1,88 @@
+{
+  "endpoint": "scripts.list",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/scripts/model/:uuid_44f2010ff2?take=20&withConversations=false"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": [
+        {
+          "script": {
+            "id": "uuid_cb58a6a85e",
+            "createdAt": "2026-05-16T10:37:52.307Z",
+            "updatedAt": "2026-05-16T10:41:48.347Z",
+            "name": "texte_85",
+            "content": "texte_86"
+          },
+          "tags": [],
+          "medias": [
+            {
+              "id": "uuid_1fe6d30b4d",
+              "blurhash": "texte_87",
+              "isHls": true,
+              "createdAt": "2025-06-01T08:00:00.000Z",
+              "updatedAt": "2026-09-15T14:27:03.639Z",
+              "url": "https://media.example.test/6ab51fd920",
+              "smallUrl": "https://media.example.test/6ab51fd920",
+              "mediumUrl": "https://media.example.test/6ab51fd920",
+              "largeUrl": "https://media.example.test/6ab51fd920",
+              "thumbnailUrl": "https://media.example.test/458f14d33b",
+              "type": "video",
+              "isArchived": false,
+              "modelId": "uuid_44f2010ff2",
+              "name": null,
+              "durationSeconds": 33
+            }
+          ],
+          "teasingMedias": [],
+          "conversations": [],
+          "sentCount": 10,
+          "paidBundlesCount": 0,
+          "paidBundlesTotalAmount": 0
+        },
+        {
+          "script": {
+            "id": "uuid_160400e9ed",
+            "createdAt": "2026-05-16T10:30:33.370Z",
+            "updatedAt": "2026-11-10T14:41:25.751Z",
+            "name": "texte_88",
+            "content": "texte_89"
+          },
+          "tags": [],
+          "medias": [
+            {
+              "id": "uuid_c14af22765",
+              "blurhash": "texte_90",
+              "createdAt": "2025-06-01T08:00:00.000Z",
+              "updatedAt": "2025-06-01T08:00:00.000Z",
+              "url": "https://media.example.test/27b6dd9b89",
+              "smallUrl": "https://media.example.test/d95d211967",
+              "mediumUrl": "https://media.example.test/d95d211967",
+              "largeUrl": "https://media.example.test/d95d211967",
+              "thumbnailUrl": "https://media.example.test/0b5dc80415",
+              "type": "video",
+              "isArchived": false,
+              "moderationStatus": "approved",
+              "modelId": "uuid_44f2010ff2",
+              "name": null,
+              "durationSeconds": 32
+            }
+          ],
+          "teasingMedias": [],
+          "conversations": [],
+          "sentCount": 12,
+          "paidBundlesCount": 0,
+          "paidBundlesTotalAmount": 0
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "uuid_caec39f4a7"
+      },
+      "totalCount": 631
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # FakeReveal : spécification
 
-Dernière revue : 2026-10-27. Statut : **codé, routes provisoires**. Le serveur, l'état, les scénarios et le test de fidélité existent (`apps/api/src/__tests__/fake-reveal/`). Les chemins et les formes de réponse sous `/api` sont **inventés** tant qu'aucune capture n'existe (`model.ts`, `OBSERVED_ON` vide) ; ils seront réécrits d'après `docs/reference/reveal-api-observed.md`, rempli à partir des captures anonymisées (`docs/runbooks/reveal-recording.md`). Ce document fixe ce que FakeReveal doit savoir simuler, aligné sur `docs/reference/reveal-connector-inventory.md`.
+Dernière revue : 2026-11-10. Statut : **codé sur les routes observées**. Le serveur, l'état, les scénarios et le test de fidélité existent (`apps/api/src/__tests__/fake-reveal/`). Les chemins, paramètres, ordres et formes de réponse suivent `docs/reference/reveal-api-observed.md`, rempli à partir des captures anonymisées du 10/11 ; chaque route a son enregistrement dans `recordings/2026-11-10/`. Ce que les captures n'ont pas montré est marqué « PROVISIONAL » dans `server.ts` : réponse d'erreur et de session invalide, liens de fichiers, clé d'import, types de notification, remplacement de `%NAME%`. Ce document fixe ce que FakeReveal doit savoir simuler, aligné sur `docs/reference/reveal-connector-inventory.md`.
 
 ## Rôle
 
@@ -20,16 +20,17 @@ Tout est inventé et évidemment faux (pseudos `fan_test_01`, textes « Message 
 | Session | `valid`, `expiresAt`, compteur d'appels (rate limit) |
 | Fan | `ref`, pseudo, `subscribedAt`, statut d'abonnement, `totalSpentCents`, listes ou étiquettes, âge vérifié (si Reveal l'expose) |
 | Conversation | `ref`, `fanRef`, `unreadCount`, `lastMessageAt`, messages |
-| Message | `ref`, `direction`, `kind` (texte, média, bundle, vocal, tip, système, masse), texte, `lockedMediaRefs`, `teaserMediaRefs` (≤ 10), `priceCents` TTC, `discountedPriceCents?`, `unlockedAt`, `createdAt`, auteur côté équipe (membre), `deletedAt?` (visible des admins seulement), nonce client, `scriptRef` et `stepIndex` si envoyé par script |
-| Note client | `fanRef`, texte, `updatedAt` ; canevas du compte (lignes « Clé : ») ; prénom du membre (source de `%NAME%`) |
-| Notes du modèle | portée (compte ou conversation, d'après la capture), texte, `updatedAt` |
+| Message | `ref`, `direction`, texte, médias joints (photo, vidéo, vocal), bundle facultatif (médias vendus, aperçu ≤ 10, prix TTC, `paidAt`, `transactionId`), `createdAt`, nom affiché de l'auteur côté équipe, `scriptId` si envoyé depuis une étape. Les types tip, système, masse et supprimé n'ont pas encore été vus |
+| Note client | un texte libre par conversation (`conversation.note`), remplacé en entier ; prénom du membre (`memberFirstname`, source de `%NAME%`) |
+| Note du modèle | une par modèle (`creatorNote`), recopiée dans chaque conversation |
 | Statistiques PPV | dérivées des messages PPV et des transactions du fan, avec les champs de l'onglet PPV |
 | Média du coffre | `ref`, `kind` (photo, vidéo, audio), dossier |
-| Script natif | `ref`, nom, dossier, étapes (nom, texte avec `%NAME%` possible, `mediaRefs`, `priceCents` ou gratuit, délai) |
-| Envoi de script | `fanRef`, `scriptRef`, `stepIndex`, `messageRef`, `sentAt` |
+| Script natif | une **étape** pour Reveal : `ref`, nom, texte avec `%NAME%` possible, médias vendus, aperçu, prix facultatif |
+| Séquence | nom, étapes dans l'ordre |
+| Envoi de script | le message porte `scriptId` ; l'indicateur « déjà envoyé » se calcule par conversation à partir des messages |
 | Transaction | `ref`, `fanRef`, type (PPV, tip, abonnement), `amountCents`, `messageRef`, `createdAt` |
 
-Fixtures de départ (`fixtures.ts`, `default` et `empty`) : 1 créatrice, 12 fans dont 3 payeurs et 1 sans aucun message, 1 conversation de plus de 300 messages (pagination), 15 médias en 3 dossiers, 4 scripts de 3 étapes aux prix 5, 15 et 30 $, dont 1 déjà envoyé en entier à un fan et 1 envoyé jusqu'à l'étape 2 à un autre.
+Fixtures de départ (`fixtures.ts`, `default` et `empty`) : 1 créatrice, 12 fans dont 3 payeurs et 1 sans aucun message, 1 conversation de 320 messages (pagination), 15 médias en 3 dossiers du coffre, 4 séquences de 3 étapes aux prix 5, 15 et 30 €, dont 1 envoyée en entière à un fan (2 étapes achetées) et 1 envoyée jusqu'à l'étape 2 à un autre.
 
 ## Comportements
 
@@ -38,7 +39,7 @@ Fixtures de départ (`fixtures.ts`, `default` et `empty`) : 1 créatrice, 12 fan
 | L1 | Réponse de démarrage ; 401 ou redirection de connexion (forme observée) quand la session est invalide |
 | L2 | Pagination et tri observés ; non-lus et aperçu ; filtres |
 | L3 | Pagination vers le passé jusqu'au premier message ; tous les types de messages ; PPV verrouillé ou acheté |
-| L4 | Même mécanisme que Reveal (WebSocket ou polling) ; événements « nouveau message » et « achat » |
+| L4 | Pas de WebSocket (comme Reveal) : un nouveau message ou un achat se voit au sondage suivant, et une notification est créée |
 | L5, L6 | Profil, total dépensé et transactions cohérents avec les messages achetés |
 | L7, E4 | Lecture et écriture de la note ; écriture concurrente (un « chatteur » écrit entre la lecture et l'écriture du connecteur) selon la sémantique observée |
 | L11, L13 | Notes du modèle ; onglet PPV calculé à partir de l'état (jamais stocké à part, pour rester cohérent) |
@@ -47,7 +48,7 @@ Fixtures de départ (`fixtures.ts`, `default` et `empty`) : 1 créatrice, 12 fan
 | L10 | Coffre paginé |
 | L14 | Sert de vrais fichiers de test (image et vidéo minuscules, générées) derrière des URL signées qui expirent ; une URL expirée répond comme Reveal |
 | E1, E2 | Envoi : nouvel identifiant, message visible à la relecture ; bornes de prix (rejet hors bornes, code observé) ; bundle refusé sans média vendu ou avec plus de 10 médias d'aperçu ; `%NAME%` remplacé par le prénom du membre |
-| E5 | Un envoi rejoué avec le même nonce ne crée pas de doublon si Reveal le garantit ; sinon le doublon apparaît et `verifySent` doit l'éviter en amont |
+| E5 | Reveal ne prend pas de nonce : un envoi rejoué crée un doublon, et `verifySent` doit l'éviter en amont |
 | E6 | Accepte `markRead` et la frappe, remet `unreadCount` à zéro |
 
 ## Scénarios pilotables
@@ -71,7 +72,6 @@ API de contrôle, absente du vrai Reveal, préfixée `/__` :
 | `script_changed` | Un script change d'étapes ou de prix entre deux lectures |
 | `shape_changed` | Un champ renommé ou ajouté dans une réponse : le connecteur doit lever une erreur typée, pas avaler la donnée (schémas Zod stricts aux frontières) |
 | `challenge` | Page anti-bot (403 avec HTML) à la place du JSON |
-| `ws_drop` | Coupure du temps réel ; le connecteur reprend par polling (pas encore codé : la capture dira si Reveal a du temps réel) |
 
 ## API CRM (ADR 0050 § 9)
 

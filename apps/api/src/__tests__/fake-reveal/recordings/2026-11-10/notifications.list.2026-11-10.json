@@ -1,0 +1,32 @@
+{
+  "endpoint": "notifications.list",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/users/:uuid_dde4066b77/notifications?take=5&since=2026-11-10T17%3A29%3A07.686Z"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": [
+        {
+          "id": "uuid_8f43490e41",
+          "createdAt": "2026-11-10T17:29:51.659Z",
+          "updatedAt": "2026-11-10T17:29:51.659Z",
+          "content": "texte_105",
+          "isRead": false,
+          "title": "texte_106",
+          "type": "texte_107",
+          "userId": "uuid_dde4066b77",
+          "modelId": "uuid_44f2010ff2",
+          "conversationId": "uuid_45a4157c63"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "uuid_8f43490e41"
+      },
+      "totalCount": 1
+    }
+  }
+}
