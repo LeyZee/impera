@@ -1,0 +1,76 @@
+{
+  "endpoint": "conversations.ppvHistory",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/conversations/:uuid_45a4157c63/ppv-history?take=10&kind=paid"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "buyRate": {
+        "purchased": 3,
+        "total": 23,
+        "percentage": 13
+      },
+      "highestPrice": 5000,
+      "lowestPrice": 300,
+      "bundles": [
+        {
+          "id": "uuid_5ffcedfc85",
+          "price": 300,
+          "isPaid": true,
+          "createdAt": "2026-01-05T13:12:00.000Z",
+          "massDMId": null,
+          "medias": [
+            {
+              "id": "uuid_c6f1061af2",
+              "blurhash": "texte_74",
+              "isHls": true,
+              "createdAt": "2026-01-05T09:00:00.000Z",
+              "updatedAt": "2026-01-05T12:37:00.000Z",
+              "url": "https://media.example.test/46d17940cd",
+              "smallUrl": "https://media.example.test/46d17940cd",
+              "mediumUrl": "https://media.example.test/46d17940cd",
+              "largeUrl": "https://media.example.test/46d17940cd",
+              "thumbnailUrl": "https://media.example.test/2b3dfda933",
+              "type": "video",
+              "isArchived": false,
+              "moderationStatus": "approved",
+              "modelId": "uuid_44f2010ff2"
+            }
+          ]
+        },
+        {
+          "id": "uuid_46327f1c12",
+          "price": 300,
+          "isPaid": true,
+          "createdAt": "2026-01-05T11:55:00.000Z",
+          "massDMId": null,
+          "medias": [
+            {
+              "id": "uuid_c6f1061af2",
+              "blurhash": "texte_75",
+              "isHls": true,
+              "createdAt": "2026-01-05T09:00:00.000Z",
+              "updatedAt": "2026-01-05T12:37:00.000Z",
+              "url": "https://media.example.test/46d17940cd",
+              "smallUrl": "https://media.example.test/46d17940cd",
+              "mediumUrl": "https://media.example.test/46d17940cd",
+              "largeUrl": "https://media.example.test/46d17940cd",
+              "thumbnailUrl": "https://media.example.test/2b3dfda933",
+              "type": "video",
+              "isArchived": false,
+              "moderationStatus": "approved",
+              "modelId": "uuid_44f2010ff2"
+            }
+          ]
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "uuid_7d9859fe7d"
+      }
+    }
+  }
+}

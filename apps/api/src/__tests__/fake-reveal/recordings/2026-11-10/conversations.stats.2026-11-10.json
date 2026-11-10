@@ -1,0 +1,34 @@
+{
+  "endpoint": "conversations.stats",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/conversations/:uuid_45a4157c63/stats"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "memberCreatedAt": "2026-01-05T09:00:00.000Z",
+      "firstSubscriptionAt": "2026-01-05T09:00:00.000Z",
+      "tipsTotal": 0,
+      "messagesTotal": 90,
+      "totalSpent": 1500,
+      "boudoirItemTotal": 0,
+      "incomingMessageTotal": 0,
+      "lastPaidAt": "2026-01-05T13:33:00.000Z",
+      "highestPurchase": 500,
+      "subscriptionPeriodicity": "texte_76",
+      "subscriptionExpireAt": "2026-01-05T15:11:00.000Z",
+      "autoRenew": false,
+      "buyingRate": {
+        "purchased": 3,
+        "total": 24,
+        "percentage": 13
+      },
+      "paidMediaRates": {
+        "imageCount": 0,
+        "videoCount": 3
+      }
+    }
+  }
+}

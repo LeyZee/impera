@@ -1,0 +1,35 @@
+{
+  "endpoint": "vault.folders",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/models/:uuid_44f2010ff2/vault-folders"
+  },
+  "response": {
+    "status": 200,
+    "body": [
+      {
+        "id": "uuid_d226cc5449",
+        "imageCount": 0,
+        "videoCount": 1,
+        "mediaUrl": "https://media.example.test/42e4a1c089",
+        "isSharedForSfs": false,
+        "createdAt": "2026-01-05T09:00:00.000Z",
+        "updatedAt": "2026-01-05T09:00:00.000Z",
+        "name": "texte_98",
+        "modelId": "uuid_44f2010ff2"
+      },
+      {
+        "id": "uuid_c145928a08",
+        "imageCount": 32,
+        "videoCount": 12,
+        "mediaUrl": "https://media.example.test/262aa4688f",
+        "isSharedForSfs": false,
+        "createdAt": "2026-01-05T09:00:00.000Z",
+        "updatedAt": "2026-01-05T09:00:00.000Z",
+        "name": "texte_99",
+        "modelId": "uuid_44f2010ff2"
+      }
+    ]
+  }
+}

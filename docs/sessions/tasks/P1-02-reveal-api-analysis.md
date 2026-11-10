@@ -1,6 +1,6 @@
 # P1-02 Analyse de l'API Reveal et FakeReveal
 
-Statut : blocked (capture de Charles : `docs/runbooks/reveal-recording.md`)
+Statut : review (PR ouverte le 2026-11-10)
 Phase : 1
 Dépend de : P1-01 (ou une capture HAR anonymisée, voir `docs/runbooks/reveal-recording.md`)
 Branche : task/p1-02-reveal-api-analysis
@@ -28,3 +28,7 @@ Répondre aux 14 questions de `connectors.md` dans `docs/reference/reveal-api-ob
 Le connecteur de production (P2).
 
 ## Notes de session
+
+2026-11-10 (Bilan) : trois captures HAR du même jour, anonymisées sur le PC de Charles. `reveal-api-observed.md` répond aux 14 questions ; FakeReveal sert les 19 routes observées (`model.ts`, `server.ts`), avec un enregistrement par route dans `recordings/2026-11-10/` et un parcours liste → conversation → envoi → relecture par `fetch` (undici) sur un vrai port. `REVEAL_EXPECTED_CAPABILITIES` fixe les capacités attendues (temps réel : non).
+
+Reste (liste « Ce qui reste ouvert » de `reveal-api-observed.md`) : session invalide (L1), premier message et types de messages rares, énumérations masquées, `%NAME%`, séquence remplie, bornes et erreurs, liens de médias (L14, L15), et une capture un autre jour pour la stabilité. Une capture courte suffira, avec l'anonymiseur ajusté (garder les énumérations, signaler `%NAME%` sans le texte).

@@ -11,56 +11,55 @@ import { createFakeReveal } from './server';
  * Fidelity (fake-reveal.md § Fidélité): FakeReveal must answer every endpoint with the shape Reveal really sends.
  *
  * - Every endpoint has a sample request, and FakeReveal's answer to it passes the endpoint's shape.
- * - Every recording in `recordings/` (a response cut out of an anonymised capture, reviewed before commit) passes
- *   the shape of the endpoint it names, and that endpoint is marked observed on the recording's date.
+ * - Every recording in `recordings/<date>/` (a response cut out of an anonymised capture, reviewed before commit)
+ *   passes the shape of the endpoint it names, on the same method, and that endpoint is marked observed on the
+ *   recording's date.
  *
- * Until the capture, `recordings/` holds no JSON and every shape is provisional; the second part then has nothing
- * to check. A recording that does not fit means the shape (and FakeReveal) must change in the same PR.
+ * A recording that does not fit means the shape (and FakeReveal) must change in the same PR.
  */
 
 const RecordingSchema = z.object({
   endpoint: EndpointNameSchema,
   /** Date of the capture the response comes from (YYYY-MM-DD). */
   capturedOn: z.iso.date(),
-  /** As Reveal called it, identifiers hashed by scripts/anonymize-har.mjs. */
-  request: z.object({ method: z.string(), path: z.string() }),
+  /** As Reveal was called, identifiers hashed by scripts/anonymize-har.mjs. */
+  request: z.object({ method: z.string(), path: z.string(), body: z.unknown().optional() }),
   response: z.object({ status: z.number().int(), body: z.unknown() }),
 });
 
-const SAMPLES: Record<EndpointName, { method: 'GET' | 'POST' | 'PUT'; url: string; body?: object }> = {
-  'session.me': { method: 'GET', url: '/api/me' },
-  'conversations.list': { method: 'GET', url: '/api/conversations' },
-  'messages.list': { method: 'GET', url: '/api/conversations/conv_02/messages' },
+type Method = 'GET' | 'POST' | 'PATCH';
+
+const SAMPLES: Record<EndpointName, { method: Method; url: string; body?: object }> = {
+  'conversations.list': { method: 'GET', url: '/conversations/model?take=20&modelId=model_test&filter=all' },
+  'conversations.count': {
+    method: 'GET',
+    url: '/conversations/model/count?modelId=model_test&isUnread=true',
+  },
+  'conversations.get': { method: 'GET', url: '/conversations/conv_02' },
+  'messages.list': { method: 'GET', url: '/conversations/conv_02/messages?take=10' },
   'messages.send': {
     method: 'POST',
-    url: '/api/conversations/conv_02/messages',
-    body: { text: 'x', nonce: 'f-1' },
+    url: '/conversations/conv_02/messages',
+    body: { message: { content: 'x', isUnread: true }, mediaIds: [], files: [] },
   },
-  'bundles.send': {
-    method: 'POST',
-    url: '/api/conversations/conv_02/bundles',
-    body: { text: 'x', mediaIds: ['media_01'], priceCents: 500, nonce: 'f-2' },
-  },
-  'conversations.read': { method: 'POST', url: '/api/conversations/conv_02/read' },
-  'fans.get': { method: 'GET', url: '/api/fans/fan_02' },
-  'fans.note.get': { method: 'GET', url: '/api/fans/fan_02/note' },
-  'fans.note.put': { method: 'PUT', url: '/api/fans/fan_02/note', body: { text: 'x' } },
-  'fans.ppvStats': { method: 'GET', url: '/api/fans/fan_02/ppv-stats' },
-  'fans.scriptHistory': { method: 'GET', url: '/api/fans/fan_02/script-history' },
-  'creatorNote.get': { method: 'GET', url: '/api/creator-note' },
-  'scripts.list': { method: 'GET', url: '/api/scripts' },
-  'scripts.sendStep': {
-    method: 'POST',
-    url: '/api/conversations/conv_04/script-steps',
-    body: { scriptId: 'script_4', stepIndex: 0, nonce: 'f-3' },
-  },
-  'transactions.list': { method: 'GET', url: '/api/transactions' },
-  'vault.list': { method: 'GET', url: '/api/vault' },
-  'media.link': { method: 'GET', url: '/api/media/media_01/link' },
+  'conversations.read': { method: 'PATCH', url: '/conversations/conv_02/read' },
+  'conversations.typing': { method: 'POST', url: '/conversations/conv_02/typing' },
+  'conversations.typing.get': { method: 'GET', url: '/conversations/conv_02/typing' },
+  'conversations.note': { method: 'PATCH', url: '/conversations/conv_02/note', body: { note: 'x' } },
+  'conversations.ppvHistory': { method: 'GET', url: '/conversations/conv_02/ppv-history?take=10&kind=paid' },
+  'conversations.stats': { method: 'GET', url: '/conversations/conv_02/stats' },
+  'models.get': { method: 'GET', url: '/models/model_test' },
+  'scripts.list': { method: 'GET', url: '/scripts/model/model_test?take=20&withConversations=false' },
+  'scriptSequences.list': { method: 'GET', url: '/script-sequences/model/model_test' },
+  'vault.folders': { method: 'GET', url: '/models/model_test/vault-folders' },
+  'vault.medias': { method: 'GET', url: '/models/model_test/medias?take=10&vaultFolderId=folder_1' },
+  'transactions.list': { method: 'GET', url: '/transactions/model/model_test?take=10' },
+  'notifications.list': { method: 'GET', url: '/users/user_bot/notifications?take=5' },
+  'media.uploadUrl': { method: 'GET', url: '/medias/get-upload-url?name=a.mp3&type=audio&size=100' },
 };
 
 const RECORDINGS_DIR = join(import.meta.dirname, 'recordings');
-const recordings = readdirSync(RECORDINGS_DIR)
+const recordings = readdirSync(RECORDINGS_DIR, { recursive: true, encoding: 'utf8' })
   .filter((file) => file.endsWith('.json'))
   .map((file) => ({
     file,
@@ -77,20 +76,27 @@ describe('FakeReveal fidelity', () => {
     const response = await fake.app.inject({
       method: sample.method,
       url: sample.url,
-      headers: { cookie: fake.sessionCookie },
+      headers: { authorization: fake.authorization },
       ...(sample.body === undefined ? {} : { payload: sample.body }),
     });
     expect(response.statusCode).toBe(200);
-    const parsed = ENDPOINTS[endpoint].shape.safeParse(response.json());
+    const body: unknown = endpoint === 'media.uploadUrl' ? response.body : response.json();
+    const parsed = ENDPOINTS[endpoint].shape.safeParse(body);
     expect(parsed.error).toBeUndefined();
   });
 
-  it.runIf(recordings.length > 0).each(recordings)(
-    '$file fits the shape of its endpoint',
-    ({ recording }) => {
-      const parsed = ENDPOINTS[recording.endpoint].shape.safeParse(recording.response.body);
-      expect(parsed.error).toBeUndefined();
-      expect(OBSERVED_ON[recording.endpoint]).toBe(recording.capturedOn);
-    },
-  );
+  it('has a recording for every endpoint', () => {
+    const recorded = new Set(recordings.map(({ recording }) => recording.endpoint));
+    expect(Object.keys(ENDPOINTS).filter((name) => !recorded.has(EndpointNameSchema.parse(name)))).toEqual(
+      [],
+    );
+  });
+
+  it.each(recordings)('$file fits the shape of its endpoint', ({ recording }) => {
+    expect(recording.request.method).toBe(ENDPOINTS[recording.endpoint].method);
+    expect(recording.response.status).toBe(200);
+    const parsed = ENDPOINTS[recording.endpoint].shape.safeParse(recording.response.body);
+    expect(parsed.error).toBeUndefined();
+    expect(OBSERVED_ON[recording.endpoint]).toBe(recording.capturedOn);
+  });
 });

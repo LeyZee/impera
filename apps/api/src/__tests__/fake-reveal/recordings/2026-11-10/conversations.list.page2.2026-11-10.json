@@ -1,0 +1,136 @@
+{
+  "endpoint": "conversations.list",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/conversations/model?take=20&cursor=uuid_212f61d58a&modelId=uuid_44f2010ff2&filter=all"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": [
+        {
+          "conversation": {
+            "id": "uuid_c79733e6ae",
+            "modelIsUnread": false,
+            "memberIsUnread": true,
+            "memberLastReadAt": "2026-01-05T10:45:00.000Z",
+            "isBlockedByModel": false,
+            "isPinned": false,
+            "isExcludedFromMassDM": false,
+            "isTeamPinned": false,
+            "assignedInbox": 1,
+            "lastMessageAt": "2026-01-05T10:52:00.000Z",
+            "createdAt": "2026-01-05T10:31:00.000Z",
+            "updatedAt": "2026-01-05T10:59:00.000Z",
+            "lastMessageId": "uuid_d22abdb442",
+            "memberId": "uuid_8b13bfb730",
+            "modelId": "uuid_44f2010ff2"
+          },
+          "lastMessageAuthor": {},
+          "lastMessage": {
+            "id": "uuid_d22abdb442",
+            "createdAt": "2026-01-05T10:52:00.000Z",
+            "updatedAt": "2026-01-05T10:52:00.000Z",
+            "isUnread": true,
+            "content": "texte_19",
+            "type": "default"
+          },
+          "lastMessageHasMedia": false,
+          "member": {
+            "id": "uuid_8b13bfb730",
+            "authorMessageId": "secret_masque",
+            "createdAt": "2026-01-05T10:17:00.000Z",
+            "updatedAt": "2026-01-05T11:06:00.000Z",
+            "vipUntil": null,
+            "userName": "texte_20",
+            "userId": "uuid_d97f0e7143",
+            "cardVerifiedAt": "2026-01-05T10:24:00.000Z"
+          },
+          "model": {
+            "id": "uuid_44f2010ff2",
+            "avatarUrl": "https://media.example.test/bb0181299e",
+            "bannerUrl": "https://media.example.test/a5cc44b089",
+            "avatarThumbUrl": "https://media.example.test/b1634cc69c",
+            "bannerPreviewUrl": "https://media.example.test/33d1be76be",
+            "displayName": "texte_21",
+            "description": "texte_22",
+            "userName": "texte_23",
+            "incomingMediaPrice": 0,
+            "isVisible": true,
+            "engagementPopupMessage": "texte_24",
+            "isAI": false,
+            "requireCardVerificationForFreeSubscription": false,
+            "isOfficialAccount": false
+          },
+          "memberTotalSpent": 0,
+          "memberLastSeenAt": "2026-01-05T11:13:00.000Z",
+          "modelCreatorNote": "texte_25",
+          "isExcludedFromMassDM": false
+        },
+        {
+          "conversation": {
+            "id": "uuid_b796710988",
+            "modelIsUnread": false,
+            "memberIsUnread": false,
+            "memberLastReadAt": "2026-01-05T11:20:00.000Z",
+            "isBlockedByModel": false,
+            "isPinned": false,
+            "isExcludedFromMassDM": false,
+            "isTeamPinned": false,
+            "assignedInbox": 1,
+            "lastMessageAt": "2026-01-05T10:38:00.000Z",
+            "createdAt": "2026-01-05T10:10:00.000Z",
+            "updatedAt": "2026-01-05T11:27:00.000Z",
+            "lastMessageId": "uuid_c538dbfe41",
+            "memberId": "uuid_916167f016",
+            "modelId": "uuid_44f2010ff2"
+          },
+          "lastMessageAuthor": {},
+          "lastMessage": {
+            "id": "uuid_c538dbfe41",
+            "createdAt": "2026-01-05T10:38:00.000Z",
+            "updatedAt": "2026-01-05T10:38:00.000Z",
+            "isUnread": true,
+            "content": "texte_26",
+            "type": "default"
+          },
+          "lastMessageHasMedia": false,
+          "member": {
+            "id": "uuid_916167f016",
+            "authorMessageId": "secret_masque",
+            "createdAt": "2026-01-05T10:03:00.000Z",
+            "updatedAt": "2026-01-05T11:41:00.000Z",
+            "vipUntil": null,
+            "userName": "texte_27",
+            "userId": "uuid_a56923b04f"
+          },
+          "model": {
+            "id": "uuid_44f2010ff2",
+            "avatarUrl": "https://media.example.test/bb0181299e",
+            "bannerUrl": "https://media.example.test/a5cc44b089",
+            "avatarThumbUrl": "https://media.example.test/b1634cc69c",
+            "bannerPreviewUrl": "https://media.example.test/33d1be76be",
+            "displayName": "texte_28",
+            "description": "texte_29",
+            "userName": "texte_30",
+            "incomingMediaPrice": 0,
+            "isVisible": true,
+            "engagementPopupMessage": "texte_31",
+            "isAI": false,
+            "requireCardVerificationForFreeSubscription": false,
+            "isOfficialAccount": false
+          },
+          "memberTotalSpent": 0,
+          "memberLastSeenAt": "2026-01-05T11:34:00.000Z",
+          "modelCreatorNote": "texte_32",
+          "isExcludedFromMassDM": false
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "uuid_45ee057240"
+      }
+    }
+  }
+}

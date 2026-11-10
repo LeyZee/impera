@@ -1,0 +1,14 @@
+{
+  "endpoint": "conversations.typing.get",
+  "capturedOn": "2026-11-10",
+  "request": {
+    "method": "GET",
+    "path": "/conversations/:uuid_45a4157c63/typing"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "isTyping": false
+    }
+  }
+}
