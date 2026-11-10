@@ -277,3 +277,12 @@ test('decodes a JSON answer exported in base64 instead of dropping it, and hashe
   assert.equal(json.encoding, undefined);
   assert.equal(image.text, undefined);
 });
+
+test('hashes a malformed URL segment instead of crashing', () => {
+  const { scrubUrl } = createAnonymizer('salt');
+  assert.match(scrubUrl('https://x.test/files/caf%E9/a'), /^https:\/\/x\.test\/files\/:id_[0-9a-f]{10}\/a$/);
+});
+
+test('finds a forbidden word written URL-encoded', () => {
+  assert.deepEqual(findLeaks('{"u":"/u/k%C3%A9vin"}', ['kévin']), ['forbidden word #1']);
+});

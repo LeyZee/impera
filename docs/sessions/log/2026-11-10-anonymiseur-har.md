@@ -17,3 +17,5 @@ Candidats à suppression : aucun.
 Relecture (Agent) : le pseudo d'un fan peut aussi passer par `slug`, `to`, `fan`, `participants`, `?s=` ou un segment de chemin. Ajouts : ces clés sont du texte, et `.scratch/inbox/.forbid` (sur le PC, jamais partagé) liste les mots qui ne doivent jamais sortir ; le script refuse d'écrire s'il en reste un, en ne donnant que son numéro. Runbooks mis à jour.
 
 Incident : une première version de ce correctif (#676) citait en exemple le vrai code d'affiliation de l'agence, relevé dans la capture. Les exemples sont désormais inventés ; le sort de #676 est décidé par Charles.
+
+Suite (même jour, branche `claude/anonymizer-har-uri`) : un segment d'URL mal encodé (`%E9` seul) faisait planter le script sur la deuxième capture ; il est désormais haché. Un mot interdit est aussi cherché sous sa forme encodée en URL (remarque d'Agent sur #677).
