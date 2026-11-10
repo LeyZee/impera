@@ -164,4 +164,116 @@ test('leak check catches what scrubbing must never let through', () => {
   assert.deepEqual(findLeaks('{"a":"Bearer abcdefghijkl"}'), ['bearer']);
   assert.deepEqual(findLeaks(`{"a":"${FAKE_JWT}"}`), ['jwt']);
   assert.equal(maskContacts('appelle le +33 6 12 34 56 78 ou a@b.fr'), 'appelle le <phone> ou <email>');
+  assert.deepEqual(maskContacts(['a@b.fr', 42]), ['<email>', 42]);
+});
+
+test('never touches a number: a timing with 00 in its decimals stays a number', () => {
+  const masked = maskContacts({
+    time: 875.8200123456789,
+    wait: 0.0012345678,
+    note: 'appelle le 0033612345678',
+  });
+  assert.equal(masked.time, 875.8200123456789);
+  assert.equal(masked.wait, 0.0012345678);
+  assert.equal(masked.note, 'appelle le <phone>');
+  assert.doesNotThrow(() => JSON.parse(JSON.stringify(masked)));
+});
+
+test('masks what was typed in a search, in the URL, the :path header, the Referer and a server action body', () => {
+  const { scrubUrl, scrubBody } = createAnonymizer('salt');
+  const typed = 'https://api.example-reveal.test/conversations/model?searchParticipants=kevindu75&take=20';
+  for (const url of [
+    typed,
+    'https://dashboard.example-reveal.test/models/123456/conversations?searchValue=kevindu75',
+    '/conversations/model?q=kevindu75',
+  ]) {
+    const out = scrubUrl(url);
+    assert.ok(!out.includes('kevindu75'), out);
+  }
+  assert.match(scrubUrl(typed), /take=20/);
+  const body = scrubBody(
+    JSON.stringify([{ DOMIdentifiers: { url: `${typed}&filter=unread` } }]),
+    'text/plain',
+  );
+  assert.ok(!body.includes('kevindu75'), body);
+  assert.ok(body.includes('filter=unread'), body);
+});
+
+test('hashes an affiliation or invitation code, keeps upper-case enums', () => {
+  const { scrubValue } = createAnonymizer('salt');
+  const out = scrubValue('', {
+    agency: { affiliationCode: 'Q7KX2MZP4T' },
+    inviteCode: 'ABC12345',
+    code: 'Z9Y8X7W6',
+    country: 'FR',
+    status: 'PPV_SENT',
+  });
+  const json = JSON.stringify(out);
+  for (const code of ['Q7KX2MZP4T', 'ABC12345', 'Z9Y8X7W6']) assert.ok(!json.includes(code), json);
+  assert.equal(out.country, 'FR');
+  assert.equal(out.status, 'PPV_SENT');
+});
+
+test('masks a pseudo in a slug, a recipient or a participants list', () => {
+  const { scrubValue } = createAnonymizer('salt');
+  const out = scrubValue('', {
+    slug: 'kevindu75',
+    to: 'kevindu75',
+    fan: 'kevindu75',
+    participants: ['kevindu75'],
+  });
+  assert.ok(!JSON.stringify(out).includes('kevindu75'), JSON.stringify(out));
+});
+
+test('refuses a forbidden word wherever it survives, without naming it', () => {
+  const serialized = JSON.stringify({ url: 'https://x.test/u/KevinDu75/profile' });
+  assert.deepEqual(findLeaks(serialized, ['kevindu75']), ['forbidden word #1']);
+  assert.deepEqual(findLeaks(serialized, ['# comment', '']), []);
+  assert.deepEqual(findLeaks(serialized), []);
+});
+
+test('decodes a JSON answer exported in base64 instead of dropping it, and hashes identifier keys', () => {
+  const { anonymizeHar } = createAnonymizer('salt');
+  const body = {
+    counts: { 'a3f1c2d4-5b6e-4f70-8a9b-0c1d2e3f4a5b': 3 },
+    data: [{ content: 'Coucou Kevin', type: 'default' }],
+  };
+  const har = {
+    log: {
+      entries: [
+        {
+          request: {
+            method: 'GET',
+            url: 'https://api.example-reveal.test/conversations/x/messages',
+            headers: [],
+          },
+          response: {
+            status: 200,
+            headers: [],
+            content: {
+              mimeType: 'application/json',
+              encoding: 'base64',
+              text: Buffer.from(JSON.stringify(body)).toString('base64'),
+            },
+          },
+        },
+        {
+          request: { method: 'GET', url: 'https://cdn.example-reveal.test/a.jpg', headers: [] },
+          response: {
+            status: 200,
+            headers: [],
+            content: { mimeType: 'image/jpeg', encoding: 'base64', text: 'AAAA' },
+          },
+        },
+      ],
+    },
+  };
+  const [json, image] = anonymizeHar(har).log.entries.map((e) => e.response.content);
+  const parsed = JSON.parse(json.text);
+  assert.equal(parsed.data[0].type, 'default');
+  assert.equal(parsed.data[0].content, '<txt:12>');
+  assert.deepEqual(Object.values(parsed.counts), [3]);
+  assert.match(Object.keys(parsed.counts)[0], /^uuid_[0-9a-f]{10}$/);
+  assert.equal(json.encoding, undefined);
+  assert.equal(image.text, undefined);
 });
