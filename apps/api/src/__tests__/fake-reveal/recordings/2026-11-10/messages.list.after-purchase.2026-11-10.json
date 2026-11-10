@@ -13,8 +13,8 @@
           "message": {
             "id": "uuid_6a573d0c08",
             "bundleId": "uuid_5ffcedfc85",
-            "createdAt": "2026-11-10T17:29:33.695Z",
-            "updatedAt": "2026-11-10T17:29:33.695Z",
+            "createdAt": "2026-01-05T13:12:00.000Z",
+            "updatedAt": "2026-01-05T13:12:00.000Z",
             "isUnread": true,
             "content": "texte_56",
             "type": "default"
@@ -23,8 +23,8 @@
           "bundleWithMedias": {
             "bundle": {
               "id": "uuid_5ffcedfc85",
-              "createdAt": "2026-11-10T17:29:33.695Z",
-              "updatedAt": "2026-11-10T17:29:50.931Z",
+              "createdAt": "2026-01-05T13:12:00.000Z",
+              "updatedAt": "2026-01-05T13:47:00.000Z",
               "price": 300,
               "type": "media",
               "isPaid": true,
@@ -37,8 +37,8 @@
                 "id": "uuid_c6f1061af2",
                 "blurhash": "texte_57",
                 "isHls": true,
-                "createdAt": "2025-06-01T08:00:00.000Z",
-                "updatedAt": "2026-11-10T16:51:15.111Z",
+                "createdAt": "2026-01-05T09:00:00.000Z",
+                "updatedAt": "2026-01-05T12:37:00.000Z",
                 "url": "https://media.example.test/46d17940cd",
                 "smallUrl": "https://media.example.test/46d17940cd",
                 "mediumUrl": "https://media.example.test/46d17940cd",
@@ -64,8 +64,8 @@
         {
           "message": {
             "id": "uuid_9af43e7fbe",
-            "createdAt": "2026-11-10T17:29:57.837Z",
-            "updatedAt": "2026-11-10T17:29:57.837Z",
+            "createdAt": "2026-01-05T14:08:00.000Z",
+            "updatedAt": "2026-01-05T14:08:00.000Z",
             "isUnread": true,
             "content": "texte_59",
             "type": "default"
@@ -85,7 +85,7 @@
         "endCursor": "uuid_4b830c2610"
       },
       "totalCount": 0,
-      "memberLastReadAt": "2026-11-10T17:29:39.234Z"
+      "memberLastReadAt": "2026-01-05T13:19:00.000Z"
     }
   }
 }

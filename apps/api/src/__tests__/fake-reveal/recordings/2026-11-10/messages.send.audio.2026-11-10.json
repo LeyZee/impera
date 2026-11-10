@@ -22,8 +22,8 @@
     "status": 200,
     "body": {
       "id": "uuid_a3644c71b5",
-      "createdAt": "2026-11-10T17:35:35.528Z",
-      "updatedAt": "2026-11-10T17:35:35.528Z",
+      "createdAt": "2026-01-05T14:57:00.000Z",
+      "updatedAt": "2026-01-05T14:57:00.000Z",
       "isUnread": true,
       "content": "texte_68",
       "type": "default"

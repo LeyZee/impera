@@ -691,6 +691,7 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
       })
       .parse(request.query);
     world.checkModel(query.modelId);
+    // PROVISIONAL: « priority » and « online » are not modelled, so they always count 0.
     const count = world.state.conversations.filter(
       (c) =>
         !c.gone &&

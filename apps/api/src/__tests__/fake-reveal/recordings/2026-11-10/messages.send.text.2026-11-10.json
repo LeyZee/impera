@@ -17,8 +17,8 @@
     "status": 200,
     "body": {
       "id": "uuid_55e6fbaddc",
-      "createdAt": "2026-11-10T17:28:44.421Z",
-      "updatedAt": "2026-11-10T17:28:44.421Z",
+      "createdAt": "2026-01-05T13:05:00.000Z",
+      "updatedAt": "2026-01-05T13:05:00.000Z",
       "isUnread": true,
       "content": "texte_62",
       "type": "default"

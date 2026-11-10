@@ -14,15 +14,15 @@
             "id": "uuid_45a4157c63",
             "modelIsUnread": false,
             "memberIsUnread": false,
-            "memberLastReadAt": "2026-11-10T17:29:39.234Z",
+            "memberLastReadAt": "2026-01-05T13:19:00.000Z",
             "isBlockedByModel": false,
             "isPinned": false,
             "isExcludedFromMassDM": false,
             "isTeamPinned": false,
             "assignedInbox": 1,
-            "lastMessageAt": "2026-11-10T17:29:57.837Z",
-            "createdAt": "2025-06-01T08:00:00.000Z",
-            "updatedAt": "2026-11-10T17:30:23.673Z",
+            "lastMessageAt": "2026-01-05T14:08:00.000Z",
+            "createdAt": "2026-01-05T09:00:00.000Z",
+            "updatedAt": "2026-01-05T14:22:00.000Z",
             "lastMessageId": "uuid_9af43e7fbe",
             "memberId": "uuid_792c856ecf",
             "modelId": "uuid_44f2010ff2",
@@ -33,19 +33,19 @@
             "member": {
               "id": "uuid_792c856ecf",
               "authorMessageId": "secret_masque",
-              "createdAt": "2025-06-01T08:00:00.000Z",
-              "updatedAt": "2026-11-10T17:29:39.256Z",
+              "createdAt": "2026-01-05T09:00:00.000Z",
+              "updatedAt": "2026-01-05T13:26:00.000Z",
               "vipUntil": null,
               "userName": "texte_3",
               "avatarUrl": "https://media.example.test/881e7d6bef",
               "userId": "uuid_2e03215700",
-              "cardVerifiedAt": "2026-02-18T12:44:23.443Z"
+              "cardVerifiedAt": "2026-01-05T09:07:00.000Z"
             }
           },
           "lastMessage": {
             "id": "uuid_9af43e7fbe",
-            "createdAt": "2026-11-10T17:29:57.837Z",
-            "updatedAt": "2026-11-10T17:29:57.837Z",
+            "createdAt": "2026-01-05T14:08:00.000Z",
+            "updatedAt": "2026-01-05T14:08:00.000Z",
             "isUnread": true,
             "content": "texte_4",
             "type": "default"
@@ -54,13 +54,13 @@
           "member": {
             "id": "uuid_792c856ecf",
             "authorMessageId": "secret_masque",
-            "createdAt": "2025-06-01T08:00:00.000Z",
-            "updatedAt": "2026-11-10T17:29:39.256Z",
+            "createdAt": "2026-01-05T09:00:00.000Z",
+            "updatedAt": "2026-01-05T13:26:00.000Z",
             "vipUntil": null,
             "userName": "texte_5",
             "avatarUrl": "https://media.example.test/881e7d6bef",
             "userId": "uuid_2e03215700",
-            "cardVerifiedAt": "2026-02-18T12:44:23.443Z"
+            "cardVerifiedAt": "2026-01-05T09:07:00.000Z"
           },
           "model": {
             "id": "uuid_44f2010ff2",
@@ -79,7 +79,7 @@
             "isOfficialAccount": false
           },
           "memberTotalSpent": 1500,
-          "memberLastSeenAt": "2026-11-10T17:29:49.221Z",
+          "memberLastSeenAt": "2026-01-05T13:40:00.000Z",
           "modelCreatorNote": "texte_10",
           "isExcludedFromMassDM": false
         },
@@ -88,15 +88,15 @@
             "id": "uuid_296f411570",
             "modelIsUnread": true,
             "memberIsUnread": false,
-            "memberLastReadAt": "2026-11-10T17:22:39.495Z",
+            "memberLastReadAt": "2026-01-05T12:44:00.000Z",
             "isBlockedByModel": false,
             "isPinned": false,
             "isExcludedFromMassDM": false,
             "isTeamPinned": false,
             "assignedInbox": 1,
-            "lastMessageAt": "2026-11-10T17:22:49.800Z",
-            "createdAt": "2026-11-09T07:30:36.239Z",
-            "updatedAt": "2026-11-10T17:22:49.925Z",
+            "lastMessageAt": "2026-01-05T12:51:00.000Z",
+            "createdAt": "2026-01-05T09:56:00.000Z",
+            "updatedAt": "2026-01-05T12:58:00.000Z",
             "lastMessageId": "uuid_0d4110a770",
             "memberId": "uuid_0ab6c708dc",
             "modelId": "uuid_44f2010ff2"
@@ -105,8 +105,8 @@
             "member": {
               "id": "uuid_0ab6c708dc",
               "authorMessageId": "secret_masque",
-              "createdAt": "2026-10-27T18:00:24.879Z",
-              "updatedAt": "2026-11-10T17:32:06.998Z",
+              "createdAt": "2026-01-05T09:49:00.000Z",
+              "updatedAt": "2026-01-05T14:29:00.000Z",
               "vipUntil": null,
               "userName": "texte_11",
               "userId": "uuid_8376b5d3c6"
@@ -114,8 +114,8 @@
           },
           "lastMessage": {
             "id": "uuid_0d4110a770",
-            "createdAt": "2026-11-10T17:22:49.800Z",
-            "updatedAt": "2026-11-10T17:22:49.800Z",
+            "createdAt": "2026-01-05T12:51:00.000Z",
+            "updatedAt": "2026-01-05T12:51:00.000Z",
             "isUnread": true,
             "content": "texte_12",
             "type": "default"
@@ -124,8 +124,8 @@
           "member": {
             "id": "uuid_0ab6c708dc",
             "authorMessageId": "secret_masque",
-            "createdAt": "2026-10-27T18:00:24.879Z",
-            "updatedAt": "2026-11-10T17:32:06.998Z",
+            "createdAt": "2026-01-05T09:49:00.000Z",
+            "updatedAt": "2026-01-05T14:29:00.000Z",
             "vipUntil": null,
             "userName": "texte_13",
             "userId": "uuid_8376b5d3c6"
@@ -147,7 +147,7 @@
             "isOfficialAccount": false
           },
           "memberTotalSpent": 0,
-          "memberLastSeenAt": "2026-11-10T17:32:14.959Z",
+          "memberLastSeenAt": "2026-01-05T14:36:00.000Z",
           "modelCreatorNote": "texte_18",
           "isExcludedFromMassDM": false
         }

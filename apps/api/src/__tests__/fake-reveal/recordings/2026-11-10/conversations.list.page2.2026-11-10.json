@@ -14,15 +14,15 @@
             "id": "uuid_c79733e6ae",
             "modelIsUnread": false,
             "memberIsUnread": true,
-            "memberLastReadAt": "2026-11-10T12:18:06.000Z",
+            "memberLastReadAt": "2026-01-05T10:45:00.000Z",
             "isBlockedByModel": false,
             "isPinned": false,
             "isExcludedFromMassDM": false,
             "isTeamPinned": false,
             "assignedInbox": 1,
-            "lastMessageAt": "2026-11-10T12:19:18.234Z",
-            "createdAt": "2026-11-10T12:09:58.092Z",
-            "updatedAt": "2026-11-10T12:19:18.372Z",
+            "lastMessageAt": "2026-01-05T10:52:00.000Z",
+            "createdAt": "2026-01-05T10:31:00.000Z",
+            "updatedAt": "2026-01-05T10:59:00.000Z",
             "lastMessageId": "uuid_d22abdb442",
             "memberId": "uuid_8b13bfb730",
             "modelId": "uuid_44f2010ff2"
@@ -30,8 +30,8 @@
           "lastMessageAuthor": {},
           "lastMessage": {
             "id": "uuid_d22abdb442",
-            "createdAt": "2026-11-10T12:19:18.234Z",
-            "updatedAt": "2026-11-10T12:19:18.234Z",
+            "createdAt": "2026-01-05T10:52:00.000Z",
+            "updatedAt": "2026-01-05T10:52:00.000Z",
             "isUnread": true,
             "content": "texte_19",
             "type": "default"
@@ -40,12 +40,12 @@
           "member": {
             "id": "uuid_8b13bfb730",
             "authorMessageId": "secret_masque",
-            "createdAt": "2026-11-10T10:04:25.186Z",
-            "updatedAt": "2026-11-10T12:24:16.835Z",
+            "createdAt": "2026-01-05T10:17:00.000Z",
+            "updatedAt": "2026-01-05T11:06:00.000Z",
             "vipUntil": null,
             "userName": "texte_20",
             "userId": "uuid_d97f0e7143",
-            "cardVerifiedAt": "2026-11-10T10:05:58.198Z"
+            "cardVerifiedAt": "2026-01-05T10:24:00.000Z"
           },
           "model": {
             "id": "uuid_44f2010ff2",
@@ -64,7 +64,7 @@
             "isOfficialAccount": false
           },
           "memberTotalSpent": 0,
-          "memberLastSeenAt": "2026-11-10T12:24:55.078Z",
+          "memberLastSeenAt": "2026-01-05T11:13:00.000Z",
           "modelCreatorNote": "texte_25",
           "isExcludedFromMassDM": false
         },
@@ -73,15 +73,15 @@
             "id": "uuid_b796710988",
             "modelIsUnread": false,
             "memberIsUnread": false,
-            "memberLastReadAt": "2026-11-10T12:40:59.273Z",
+            "memberLastReadAt": "2026-01-05T11:20:00.000Z",
             "isBlockedByModel": false,
             "isPinned": false,
             "isExcludedFromMassDM": false,
             "isTeamPinned": false,
             "assignedInbox": 1,
-            "lastMessageAt": "2026-11-10T12:16:58.271Z",
-            "createdAt": "2026-11-09T13:26:07.909Z",
-            "updatedAt": "2026-11-10T12:40:59.274Z",
+            "lastMessageAt": "2026-01-05T10:38:00.000Z",
+            "createdAt": "2026-01-05T10:10:00.000Z",
+            "updatedAt": "2026-01-05T11:27:00.000Z",
             "lastMessageId": "uuid_c538dbfe41",
             "memberId": "uuid_916167f016",
             "modelId": "uuid_44f2010ff2"
@@ -89,8 +89,8 @@
           "lastMessageAuthor": {},
           "lastMessage": {
             "id": "uuid_c538dbfe41",
-            "createdAt": "2026-11-10T12:16:58.271Z",
-            "updatedAt": "2026-11-10T12:16:58.271Z",
+            "createdAt": "2026-01-05T10:38:00.000Z",
+            "updatedAt": "2026-01-05T10:38:00.000Z",
             "isUnread": true,
             "content": "texte_26",
             "type": "default"
@@ -99,8 +99,8 @@
           "member": {
             "id": "uuid_916167f016",
             "authorMessageId": "secret_masque",
-            "createdAt": "2026-11-09T12:51:10.682Z",
-            "updatedAt": "2026-11-10T12:41:08.383Z",
+            "createdAt": "2026-01-05T10:03:00.000Z",
+            "updatedAt": "2026-01-05T11:41:00.000Z",
             "vipUntil": null,
             "userName": "texte_27",
             "userId": "uuid_a56923b04f"
@@ -122,7 +122,7 @@
             "isOfficialAccount": false
           },
           "memberTotalSpent": 0,
-          "memberLastSeenAt": "2026-11-10T12:41:06.377Z",
+          "memberLastSeenAt": "2026-01-05T11:34:00.000Z",
           "modelCreatorNote": "texte_32",
           "isExcludedFromMassDM": false
         }

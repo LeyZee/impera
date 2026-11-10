@@ -13,8 +13,8 @@
           "message": {
             "id": "uuid_f0042c7258",
             "bundleId": "uuid_4f79e688c5",
-            "createdAt": "2026-11-10T17:35:21.878Z",
-            "updatedAt": "2026-11-10T17:35:21.878Z",
+            "createdAt": "2026-01-05T14:43:00.000Z",
+            "updatedAt": "2026-01-05T14:43:00.000Z",
             "isUnread": true,
             "content": "texte_47",
             "type": "default"
@@ -23,8 +23,8 @@
           "bundleWithMedias": {
             "bundle": {
               "id": "uuid_4f79e688c5",
-              "createdAt": "2026-11-10T17:35:21.878Z",
-              "updatedAt": "2026-11-10T17:35:21.878Z",
+              "createdAt": "2026-01-05T14:43:00.000Z",
+              "updatedAt": "2026-01-05T14:43:00.000Z",
               "price": 2000,
               "type": "media",
               "modelId": "uuid_44f2010ff2",
@@ -34,8 +34,8 @@
               {
                 "id": "uuid_dc4364b351",
                 "blurhash": "texte_48",
-                "createdAt": "2025-06-01T08:00:00.000Z",
-                "updatedAt": "2025-06-01T08:00:00.000Z",
+                "createdAt": "2026-01-05T09:00:00.000Z",
+                "updatedAt": "2026-01-05T09:00:00.000Z",
                 "url": "https://media.example.test/b87ac4e001",
                 "smallUrl": "https://media.example.test/7c0116edf0",
                 "mediumUrl": "https://media.example.test/3d61c4a4a5",
@@ -49,8 +49,8 @@
               {
                 "id": "uuid_901f891750",
                 "blurhash": "texte_49",
-                "createdAt": "2025-06-01T08:00:00.000Z",
-                "updatedAt": "2025-06-01T08:00:00.000Z",
+                "createdAt": "2026-01-05T09:00:00.000Z",
+                "updatedAt": "2026-01-05T09:00:00.000Z",
                 "url": "https://media.example.test/2088362bbc",
                 "smallUrl": "https://media.example.test/ea1383d7f3",
                 "mediumUrl": "https://media.example.test/5fb1e3db53",
@@ -65,8 +65,8 @@
             "teasingMedia": {
               "id": "uuid_bc10191e43",
               "blurhash": "texte_50",
-              "createdAt": "2025-06-01T08:00:00.000Z",
-              "updatedAt": "2025-06-01T08:00:00.000Z",
+              "createdAt": "2026-01-05T09:00:00.000Z",
+              "updatedAt": "2026-01-05T09:00:00.000Z",
               "url": "https://media.example.test/9c11bdde31",
               "smallUrl": "https://media.example.test/4b8439dae9",
               "mediumUrl": "https://media.example.test/f984f82e33",
@@ -81,8 +81,8 @@
               {
                 "id": "uuid_bc10191e43",
                 "blurhash": "texte_51",
-                "createdAt": "2025-06-01T08:00:00.000Z",
-                "updatedAt": "2025-06-01T08:00:00.000Z",
+                "createdAt": "2026-01-05T09:00:00.000Z",
+                "updatedAt": "2026-01-05T09:00:00.000Z",
                 "url": "https://media.example.test/9c11bdde31",
                 "smallUrl": "https://media.example.test/4b8439dae9",
                 "mediumUrl": "https://media.example.test/f984f82e33",
@@ -106,8 +106,8 @@
           "message": {
             "id": "uuid_6a573d0c08",
             "bundleId": "uuid_5ffcedfc85",
-            "createdAt": "2026-11-10T17:29:33.695Z",
-            "updatedAt": "2026-11-10T17:29:33.695Z",
+            "createdAt": "2026-01-05T13:12:00.000Z",
+            "updatedAt": "2026-01-05T13:12:00.000Z",
             "isUnread": true,
             "content": "texte_53",
             "type": "default"
@@ -116,8 +116,8 @@
           "bundleWithMedias": {
             "bundle": {
               "id": "uuid_5ffcedfc85",
-              "createdAt": "2026-11-10T17:29:33.695Z",
-              "updatedAt": "2026-11-10T17:29:50.931Z",
+              "createdAt": "2026-01-05T13:12:00.000Z",
+              "updatedAt": "2026-01-05T13:47:00.000Z",
               "price": 300,
               "type": "media",
               "isPaid": true,
@@ -130,8 +130,8 @@
                 "id": "uuid_c6f1061af2",
                 "blurhash": "texte_54",
                 "isHls": true,
-                "createdAt": "2025-06-01T08:00:00.000Z",
-                "updatedAt": "2026-11-10T16:51:15.111Z",
+                "createdAt": "2026-01-05T09:00:00.000Z",
+                "updatedAt": "2026-01-05T12:37:00.000Z",
                 "url": "https://media.example.test/46d17940cd",
                 "smallUrl": "https://media.example.test/46d17940cd",
                 "mediumUrl": "https://media.example.test/46d17940cd",
@@ -160,7 +160,7 @@
         "endCursor": "uuid_9ade4dd92b"
       },
       "totalCount": 0,
-      "memberLastReadAt": "2026-11-10T17:29:39.234Z"
+      "memberLastReadAt": "2026-01-05T13:19:00.000Z"
     }
   }
 }

@@ -12,15 +12,15 @@
         "id": "uuid_45a4157c63",
         "modelIsUnread": false,
         "memberIsUnread": true,
-        "memberLastReadAt": "2026-11-10T17:29:39.234Z",
+        "memberLastReadAt": "2026-01-05T13:19:00.000Z",
         "isBlockedByModel": false,
         "isPinned": false,
         "isExcludedFromMassDM": false,
         "isTeamPinned": false,
         "assignedInbox": 1,
-        "lastMessageAt": "2026-11-10T17:35:21.878Z",
-        "createdAt": "2025-06-01T08:00:00.000Z",
-        "updatedAt": "2026-11-10T17:35:22.110Z",
+        "lastMessageAt": "2026-01-05T14:43:00.000Z",
+        "createdAt": "2026-01-05T09:00:00.000Z",
+        "updatedAt": "2026-01-05T14:50:00.000Z",
         "lastMessageId": "uuid_f0042c7258",
         "memberId": "uuid_792c856ecf",
         "modelId": "uuid_44f2010ff2",
@@ -31,8 +31,8 @@
       "lastMessage": {
         "id": "uuid_f0042c7258",
         "bundleId": "uuid_4f79e688c5",
-        "createdAt": "2026-11-10T17:35:21.878Z",
-        "updatedAt": "2026-11-10T17:35:21.878Z",
+        "createdAt": "2026-01-05T14:43:00.000Z",
+        "updatedAt": "2026-01-05T14:43:00.000Z",
         "isUnread": true,
         "content": "texte_35",
         "type": "default"
@@ -41,13 +41,13 @@
       "member": {
         "id": "uuid_792c856ecf",
         "authorMessageId": "secret_masque",
-        "createdAt": "2025-06-01T08:00:00.000Z",
-        "updatedAt": "2026-11-10T17:29:39.256Z",
+        "createdAt": "2026-01-05T09:00:00.000Z",
+        "updatedAt": "2026-01-05T13:26:00.000Z",
         "vipUntil": null,
         "userName": "texte_36",
         "avatarUrl": "https://media.example.test/881e7d6bef",
         "userId": "uuid_2e03215700",
-        "cardVerifiedAt": "2026-02-18T12:44:23.443Z"
+        "cardVerifiedAt": "2026-01-05T09:07:00.000Z"
       },
       "model": {
         "id": "uuid_44f2010ff2",
@@ -66,7 +66,7 @@
         "isOfficialAccount": false
       },
       "memberTotalSpent": 1500,
-      "memberLastSeenAt": "2026-11-10T17:29:49.221Z",
+      "memberLastSeenAt": "2026-01-05T13:40:00.000Z",
       "modelCreatorNote": "texte_41",
       "isExcludedFromMassDM": false
     }

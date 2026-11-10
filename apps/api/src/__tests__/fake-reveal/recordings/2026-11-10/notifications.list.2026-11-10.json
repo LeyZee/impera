@@ -3,7 +3,7 @@
   "capturedOn": "2026-11-10",
   "request": {
     "method": "GET",
-    "path": "/users/:uuid_dde4066b77/notifications?take=5&since=2026-11-10T17%3A29%3A07.686Z"
+    "path": "/users/:uuid_dde4066b77/notifications?take=5&since=2026-01-05T09%3A00%3A00.000Z"
   },
   "response": {
     "status": 200,
@@ -11,8 +11,8 @@
       "data": [
         {
           "id": "uuid_8f43490e41",
-          "createdAt": "2026-11-10T17:29:51.659Z",
-          "updatedAt": "2026-11-10T17:29:51.659Z",
+          "createdAt": "2026-01-05T14:01:00.000Z",
+          "updatedAt": "2026-01-05T14:01:00.000Z",
           "content": "texte_105",
           "isRead": false,
           "title": "texte_106",

@@ -12,8 +12,8 @@
         {
           "message": {
             "id": "uuid_645d802cf5",
-            "createdAt": "2026-11-10T16:45:47.390Z",
-            "updatedAt": "2026-11-10T16:45:47.390Z",
+            "createdAt": "2026-01-05T12:16:00.000Z",
+            "updatedAt": "2026-01-05T12:16:00.000Z",
             "isUnread": true,
             "content": "texte_42",
             "type": "default"
@@ -30,8 +30,8 @@
         {
           "message": {
             "id": "uuid_1e54794b74",
-            "createdAt": "2026-11-10T16:46:28.732Z",
-            "updatedAt": "2026-11-10T16:46:28.732Z",
+            "createdAt": "2026-01-05T12:23:00.000Z",
+            "updatedAt": "2026-01-05T12:23:00.000Z",
             "isUnread": true,
             "content": "texte_44",
             "type": "default"
@@ -41,8 +41,8 @@
               "id": "uuid_1fe6d30b4d",
               "blurhash": "texte_45",
               "isHls": true,
-              "createdAt": "2025-06-01T08:00:00.000Z",
-              "updatedAt": "2026-09-15T14:27:03.639Z",
+              "createdAt": "2026-01-05T09:00:00.000Z",
+              "updatedAt": "2026-01-05T09:35:00.000Z",
               "url": "https://media.example.test/6ab51fd920",
               "smallUrl": "https://media.example.test/6ab51fd920",
               "mediumUrl": "https://media.example.test/6ab51fd920",
@@ -68,7 +68,7 @@
         "endCursor": "uuid_464855f402"
       },
       "totalCount": 0,
-      "memberLastReadAt": "2026-11-10T16:47:46.711Z"
+      "memberLastReadAt": "2026-01-05T12:30:00.000Z"
     }
   }
 }

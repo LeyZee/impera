@@ -8,17 +8,17 @@
   "response": {
     "status": 200,
     "body": {
-      "memberCreatedAt": "2025-06-01T08:00:00.000Z",
-      "firstSubscriptionAt": "2025-06-01T08:00:00.000Z",
+      "memberCreatedAt": "2026-01-05T09:00:00.000Z",
+      "firstSubscriptionAt": "2026-01-05T09:00:00.000Z",
       "tipsTotal": 0,
       "messagesTotal": 90,
       "totalSpent": 1500,
       "boudoirItemTotal": 0,
       "incomingMessageTotal": 0,
-      "lastPaidAt": "2026-11-10T17:29:41.922Z",
+      "lastPaidAt": "2026-01-05T13:33:00.000Z",
       "highestPurchase": 500,
       "subscriptionPeriodicity": "texte_76",
-      "subscriptionExpireAt": "2099-12-31T23:59:59.000Z",
+      "subscriptionExpireAt": "2026-01-05T15:11:00.000Z",
       "autoRenew": false,
       "buyingRate": {
         "purchased": 3,
