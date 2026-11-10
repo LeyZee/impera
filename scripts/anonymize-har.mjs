@@ -121,7 +121,13 @@ export function createAnonymizer(salt) {
     const path = url.pathname
       .split('/')
       .map((segment) => {
-        const decoded = decodeURIComponent(segment);
+        let decoded;
+        try {
+          decoded = decodeURIComponent(segment);
+        } catch {
+          // A malformed escape (`%E9` alone): opaque, hashed like an identifier rather than crashing the run.
+          return `:${hashId(segment)}`;
+        }
         if (decoded === '' || !isIdSegment(decoded)) return segment;
         return `:${hashId(decoded)}`;
       })
@@ -239,7 +245,11 @@ export function findLeaks(serialized, forbidden = []) {
     ...LEAKS.filter(([, pattern]) => pattern.test(serialized)).map(([name]) => name),
     ...forbidden
       .map((word, i) => [word.trim().toLowerCase(), i + 1])
-      .filter(([word]) => word.length >= 3 && lower.includes(word))
+      .filter(
+        ([word]) =>
+          word.length >= 3 &&
+          (lower.includes(word) || lower.includes(encodeURIComponent(word).toLowerCase())),
+      )
       .map(([, i]) => `forbidden word #${i}`),
   ];
 }
