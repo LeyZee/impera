@@ -1070,6 +1070,116 @@ describe('/v1/creator-space/content/script-drops', () => {
     ).toBeInstanceOf(Error);
   });
 
+  it('lets her team correct her script’s synthesis by hand: steps kept, no price, validated as written (SC-04 lot c5)', async () => {
+    const url = `/v1/creators/${nora}/drops/${dropId}`;
+    const send = (who: 'owner' | 'nora', path: string, body?: object) =>
+      call(body === undefined ? 'GET' : 'POST', `${url}${path}`, who, body);
+    const summarize = () =>
+      runOnce({
+        pgPool: test.admin.pool,
+        taskList: { 'content_drops.summarize_script': app.tasks['content_drops.summarize_script'] },
+      });
+    const read = async () => {
+      const answer = await send('owner', '/descriptions');
+      expect(answer.statusCode, answer.body).toBe(200);
+      return DropDescriptionsReviewSchema.parse(answer.json());
+    };
+    let state = await read();
+    const shown = state.summary;
+    expect([shown?.author, shown?.current]).toEqual(['brain', true]);
+    const steps = (shown?.content.steps ?? []).map((one) => ({
+      step: one.step,
+      overview: `${one.overview} Repris à la main.`,
+      summary: `${one.summary} Repris.`,
+    }));
+    const written = {
+      summaryId: shown?.id,
+      shootingContext: 'Une soirée inventée, lumière chaude, tenue noire.',
+      steps,
+    };
+    const refusal = async (who: 'owner' | 'nora', body: object) => {
+      const answer = await send(who, '/summary/correct', body);
+      return [answer.statusCode, answer.statusCode === 403 ? null : codeOf(answer.body).details] as const;
+    };
+
+    // The agency's screen, never hers.
+    expect((await refusal('nora', written))[0]).toBe(403);
+    // Her script's steps, each once: one left out, or one it does not have, is refused.
+    expect(await refusal('owner', { ...written, steps: steps.slice(1) })).toEqual([422, { reason: 'steps' }]);
+    expect(
+      await refusal('owner', {
+        ...written,
+        steps: steps.map((one, index) => (index === 0 ? { ...one, step: 'cuisine:' } : one)),
+      }),
+    ).toEqual([422, { reason: 'steps' }]);
+    // A price comes from the grid, never from words (ADR 0056 § 6).
+    expect(
+      await refusal('owner', {
+        ...written,
+        steps: steps.map((one, index) => (index === 0 ? { ...one, summary: 'Le bundle à 25 €.' } : one)),
+      }),
+    ).toEqual([422, { reason: 'price' }]);
+    // A synthesis that is not the one shown.
+    expect(await refusal('owner', { ...written, summaryId: crypto.randomUUID() })).toEqual([
+      409,
+      { reason: 'summary_stale' },
+    ]);
+
+    // Written: a new row, validated by whoever wrote it, shown in place of the brain's.
+    // Sent in another order, kept in her script's.
+    const answer = await send('owner', '/summary/correct', { ...written, steps: [...steps].reverse() });
+    expect(answer.statusCode, answer.body).toBe(200);
+    state = DropDescriptionsReviewSchema.parse(answer.json());
+    expect(state.summary).toMatchObject({
+      author: 'human',
+      current: true,
+      reviewReasons: [],
+      content: { shootingContext: written.shootingContext, steps },
+    });
+    expect(state.summary?.id).not.toBe(shown?.id);
+    expect(state.summary?.validatedAt).not.toBeNull();
+    // The one it replaced is no longer shown: correcting it again is refused.
+    expect(await refusal('owner', written)).toEqual([409, { reason: 'summary_stale' }]);
+
+    // The brain does not tell the same media again over her words, under this prompt nor a newer one.
+    const asked = told.length;
+    await test.admin.db.execute(sql`select public.enqueue_job(
+      task => 'content_drops.summarize_script',
+      payload => ${JSON.stringify({ creatorId: nora, dropId, correlationId: 'test' })}::jsonb
+    )`);
+    await summarize();
+    expect(told.length).toBe(asked);
+    expect((await read()).summary?.id).toBe(state.summary?.id);
+
+    const [audited] = await test.admin.db
+      .select({ details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(
+        and(eq(schema.auditLog.entityId, dropId), eq(schema.auditLog.action, 'script_summary.corrected')),
+      );
+    expect(audited?.details).toEqual({ from: shown?.id, to: state.summary?.id });
+
+    // Written by hand means validated as written, with no reason to look again.
+    const [row] = await test.admin.db
+      .select()
+      .from(schema.scriptDropSummaries)
+      .where(eq(schema.scriptDropSummaries.id, state.summary?.id ?? ''));
+    if (row === undefined) throw new Error('the corrected synthesis is not stored');
+    const insert = (values: Partial<typeof schema.scriptDropSummaries.$inferInsert>) =>
+      test.admin.db
+        .insert(schema.scriptDropSummaries)
+        .values({ ...row, id: crypto.randomUUID(), ...values })
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+    const store = createDrizzleScriptSummaryStore(test.admin.db);
+    expect(await store.summarized(dropId, row.mediaHash, 'summary-v2')).toBe(true);
+    expect(await store.summarized(dropId, 'other-media', 'summary-v2')).toBe(false);
+    expect(await insert({ validatedBy: null, validatedAt: null })).toBeInstanceOf(Error);
+    expect(await insert({ reviewReasons: ['price'] })).toBeInstanceOf(Error);
+  });
+
   it('gives her team each medium’s picture and the medium itself in parts, each opening audited (SC-04 lot c4)', async () => {
     const url = `/v1/creators/${nora}/drops/${dropId}`;
     const review = async () => {

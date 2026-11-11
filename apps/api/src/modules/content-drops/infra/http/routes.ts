@@ -27,6 +27,7 @@ import {
   StartScriptDropBodySchema,
   ValidateDropDescriptionsBodySchema,
   ValidateScriptSummaryBodySchema,
+  CorrectScriptSummaryBodySchema,
   type UserRole,
 } from '@impera/contracts';
 import { NotACreatorAccount } from '@impera/db';
@@ -516,6 +517,27 @@ export function createContentDropRoutes(
           signedIn(request.user),
           request.params.id,
           request.body.summaryId,
+          clock(),
+        ),
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/summary/correct',
+      {
+        ...team,
+        schema: {
+          params: CreatorDropParamsSchema,
+          body: CorrectScriptSummaryBodySchema,
+          response: { 200: DropDescriptionsReviewSchema },
+        },
+      },
+      (request) =>
+        review.correctSummary(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.body.summaryId,
+          { shootingContext: request.body.shootingContext, steps: request.body.steps },
           clock(),
         ),
     );

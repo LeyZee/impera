@@ -27,4 +27,4 @@ export { MIGRATIONS_FOLDER, migrationStatus, runMigrations, type MigrationStatus
 export * as schema from './schema';
 export { removePasskeys, resetSecondFactor, revokeSignIns } from './sign-ins';
 /** Query operators, re-exported so that every package uses this package's single copy of Drizzle. */
-export { and, eq, inArray, sql } from 'drizzle-orm';
+export { and, eq, inArray, or, sql } from 'drizzle-orm';

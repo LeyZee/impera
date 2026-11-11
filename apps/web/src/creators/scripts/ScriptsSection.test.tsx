@@ -28,7 +28,7 @@ interface Reply {
 }
 
 /** A fake `/v1`: each `METHOD path` answered by its route, every call kept. */
-function serve(routes: Record<string, () => Reply>): { method: string; path: string }[] {
+function serve(routes: Record<string, (body: unknown) => Reply>): { method: string; path: string }[] {
   const calls: { method: string; path: string }[] = [];
   vi.stubGlobal(
     'fetch',
@@ -36,7 +36,8 @@ function serve(routes: Record<string, () => Reply>): { method: string; path: str
       const method = init?.method ?? 'GET';
       const path = url.replace(/^\/v1/u, '');
       calls.push({ method, path });
-      const reply = routes[`${method} ${path}`]?.() ?? { status: 404 };
+      const body: unknown = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+      const reply = routes[`${method} ${path}`]?.(body) ?? { status: 404 };
       return Promise.resolve(
         new Response(reply.body === undefined ? null : JSON.stringify(reply.body), { status: reply.status }),
       );
@@ -389,5 +390,82 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     expect(await within(region).findByText('Une silhouette inventée, assise.')).toBeDefined();
     expect(within(region).getByText('Corrigée')).toBeDefined();
     expect(within(region).queryByRole('textbox')).toBeNull();
+  });
+  it('corrects the synthesis by hand, step by step, and says why the server refuses a price (SC-04 lot c5)', async () => {
+    const sent: unknown[] = [];
+    serve({
+      ...base,
+      [`GET ${REVIEW}`]: () => ({ status: 200, body: reviewOf(SENT.id, FILES, { summary: 'current' }) }),
+      [`POST /creators/${CREATOR}/drops/${SENT.id}/summary/correct`]: (body) => {
+        sent.push(body);
+        if (sent.length === 1)
+          return {
+            status: 422,
+            body: {
+              error: {
+                code: 'script_summary_correction_unprocessable',
+                message: 'Pas de prix dans la synthèse : il vient de la grille de l’agence',
+                details: { reason: 'price' },
+                requestId: 'r1',
+              },
+            },
+          };
+        const fixed = reviewOf(SENT.id, FILES, { summary: 'human' });
+        return {
+          status: 200,
+          body: {
+            ...fixed,
+            summary:
+              fixed.summary === null
+                ? null
+                : {
+                    ...fixed.summary,
+                    content: { ...fixed.summary.content, shootingContext: 'Un soir repris.' },
+                  },
+          },
+        };
+      },
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Relire les descriptions' }));
+    const region = await screen.findByRole('region', { name: 'Descriptions de S012' });
+    const synthesis = within(region).getByRole('region', { name: 'Synthèse du script' });
+    fireEvent.click(within(synthesis).getByRole('button', { name: 'Corriger' }));
+    // Its context, then each step's line and its unfolding, as the brain told them.
+    expect(within(synthesis).getAllByRole('textbox')).toHaveLength(7);
+    expect(within(synthesis).getAllByRole('textbox', { name: 'En une ligne' })[1]).toHaveProperty(
+      'value',
+      'Résumé inventé 2.',
+    );
+    fireEvent.change(within(synthesis).getByRole('textbox', { name: 'Le tournage' }), {
+      target: { value: '  Un soir repris.  ' },
+    });
+    fireEvent.change(within(synthesis).getAllByRole('textbox', { name: 'En une ligne' })[0]!, {
+      target: { value: '' },
+    });
+    // A text left empty: nothing to save.
+    expect(within(synthesis).getByRole('button', { name: 'Enregistrer et valider' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    fireEvent.change(within(synthesis).getAllByRole('textbox', { name: 'En une ligne' })[0]!, {
+      target: { value: 'Le bundle à 25 €.' },
+    });
+    fireEvent.click(within(synthesis).getByRole('button', { name: 'Enregistrer et valider' }));
+    expect((await within(region).findByRole('alert')).textContent).toBe(
+      'Pas de prix dans la synthèse : il vient de la grille de l’agence.',
+    );
+    expect(sent[0]).toMatchObject({
+      summaryId: '0192f3a0-0000-7000-8000-00000000c001',
+      shootingContext: 'Un soir repris.',
+    });
+    fireEvent.change(within(synthesis).getAllByRole('textbox', { name: 'En une ligne' })[0]!, {
+      target: { value: 'Le salon, repris.' },
+    });
+    fireEvent.click(within(synthesis).getByRole('button', { name: 'Enregistrer et valider' }));
+    expect(await within(region).findByText('Corrigée à la main')).toBeDefined();
+    expect(within(region).getByText('Un soir repris.')).toBeDefined();
+    expect(within(region).queryByRole('textbox')).toBeNull();
+    expect(within(region).queryByRole('button', { name: 'Valider la synthèse' })).toBeNull();
   });
 });

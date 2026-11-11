@@ -7,7 +7,7 @@ import {
   ScriptSlotKeySchema,
   ShotMomentSchema,
 } from '@impera/contracts';
-import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
+import { and, eq, inArray, or, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import type { ScriptSummaryStore } from '../../domain/ports';
 
@@ -95,7 +95,8 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
             and(
               eq(scriptDropSummaries.dropId, dropId),
               eq(scriptDropSummaries.mediaHash, mediaHash),
-              eq(scriptDropSummaries.promptHash, promptHash),
+              // A synthesis corrected by hand stands for these media whatever the prompt (SC-04 lot c5).
+              or(eq(scriptDropSummaries.promptHash, promptHash), eq(scriptDropSummaries.author, 'human')),
             ),
           )
           .limit(1);
