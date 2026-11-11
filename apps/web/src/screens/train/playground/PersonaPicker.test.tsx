@@ -53,6 +53,7 @@ function serve(
   activate: { status: number; body: unknown } = { status: 200, body: {} },
   more = 0,
   miaInForce = true,
+  miaFails = false,
 ): unknown[] {
   const asked: unknown[] = [];
   let active: string | null = miaInForce ? LIVE : null;
@@ -70,6 +71,8 @@ function serve(
         });
       }
       if (url === `/v1/creators/${MIA}/persona`) {
+        if (miaFails)
+          return json({ error: { code: 'internal', message: '', details: {}, requestId: 'x' } }, 500);
         return json({
           creatorId: MIA,
           latest: null,
@@ -102,7 +105,7 @@ function serve(
 }
 
 /** The playground as the screen holds it: each choice answers the state the server would. */
-function show(state: PlaygroundState): { chosen: PlaygroundPersonaBody[] } {
+function show(state: PlaygroundState, runs = true): { chosen: PlaygroundPersonaBody[] } {
   const chosen: PlaygroundPersonaBody[] = [];
   let current = state;
   const choosePersona = (body: PlaygroundPersonaBody): Promise<PlaygroundState> => {
@@ -134,9 +137,10 @@ function show(state: PlaygroundState): { chosen: PlaygroundPersonaBody[] } {
     isLoading: false,
     busy: false,
     error: undefined,
+    // `runs` false: the server refuses the scene, as `pg.run` says when its call fails.
     run: async (call) => {
       await call({ ...stubClient(), ...client });
-      return true;
+      return runs;
     },
     fail: () => undefined,
     retry: () => undefined,
@@ -231,6 +235,29 @@ describe('PersonaPicker (PRO-21, Charles 11/11)', () => {
       ),
     ).toBeDefined();
     expect(chosen).toEqual([]);
+  });
+
+  it('never says « no persona in force » when her versions did not load (relecture #705)', async () => {
+    serve(undefined, 0, true, true);
+    const { chosen } = show(BASE);
+    expect(
+      await screen.findByText('Les personas ne se chargent pas. Choisis une créatrice pour réessayer.'),
+    ).toBeDefined();
+    expect(screen.queryByText(/Aucune créatrice n’a de persona en vigueur/u)).toBeNull();
+    expect(chosen).toEqual([]);
+  });
+
+  it('says so when following the version put in force fails, the scene staying on the old one (relecture #705)', async () => {
+    serve();
+    const { chosen } = show(
+      { ...BASE, persona: { name: 'Mia', played: { creatorId: MIA, versionId: DRAFT, version: '0.0.3' } } },
+      false,
+    );
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Sa nouvelle version en vigueur ne se charge pas : la conversation reste sur l’ancienne. Réessaie dans un instant.',
+    );
+    // Tried once for this read of her versions, never in a loop.
+    expect(chosen).toHaveLength(1);
   });
 
   it('moves with the arrows without starting over, and sends one choice for two quick clicks', async () => {

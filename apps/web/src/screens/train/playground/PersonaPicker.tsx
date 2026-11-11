@@ -20,6 +20,10 @@ import { useCreators } from '@/creators/api';
 import { fetchPersonaOverview } from '@/creators/persona/source';
 import { Select } from '@/shell/Select';
 
+const LOAD_FAILED = 'Ses versions ne se chargent pas. Réessaie dans un instant.';
+const FOLLOW_FAILED =
+  'Sa nouvelle version en vigueur ne se charge pas : la conversation reste sur l’ancienne. Réessaie dans un instant.';
+
 const overviewKey = (creatorId: CreatorId): readonly unknown[] => ['playground-persona', creatorId];
 
 /** Arrow keys of a radio group and the way they move. */
@@ -163,17 +167,20 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
       }
     };
 
-  /** Plays her version in force; says why not when she has none. */
-  const pickCreator = async (value: string, quiet = false): Promise<boolean> => {
+  /**
+   * Plays her version in force; says why not when she has none. `failed`: her versions or the scene did not load,
+   * which is never told as « no version in force » (relecture #705).
+   */
+  const playCreator = async (value: string, quiet = false): Promise<'played' | 'none' | 'failed'> => {
     if (!quiet) setProblem(null);
     const creator = creators.data?.find((c) => c.id === value);
-    if (creator === undefined) return false;
+    if (creator === undefined) return 'none';
     const hers = await client
       .query({ queryKey: overviewKey(creator.id), queryFn: () => fetchPersonaOverview(creator.id) })
       .catch(() => null);
     if (hers === null) {
-      if (!quiet) setProblem('Ses versions ne se chargent pas. Réessaie dans un instant.');
-      return false;
+      if (!quiet) setProblem(LOAD_FAILED);
+      return 'failed';
     }
     const version = inForce(hers);
     if (version === null) {
@@ -181,37 +188,49 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
         setProblem(
           `${creator.displayName} n’a pas de persona en vigueur : active-en une dans Créatrices › Persona.`,
         );
-      return false;
+      return 'none';
     }
-    await pg.run((c) => c.choosePersona({ kind: 'version', creatorId: creator.id, versionId: version.id }));
-    return true;
+    const ran = await pg.run((c) =>
+      c.choosePersona({ kind: 'version', creatorId: creator.id, versionId: version.id }),
+    );
+    return ran ? 'played' : 'failed';
   };
+  const pickCreator = async (value: string): Promise<boolean> => (await playCreator(value)) === 'played';
 
   // A scene that opens on the invented persona plays the first creator with a version in force instead.
   const opened = useRef(false);
-  const [noneInForce, setNoneInForce] = useState(false);
+  const [opening, setOpening] = useState<'none' | 'failed' | null>(null);
   useEffect(() => {
     if (opened.current || played !== null || pg.client.isDemo || creators.data === undefined) return;
     opened.current = true;
     const list = creators.data;
     void once(async () => {
-      for (const creator of list) if (await pickCreator(creator.id, true)) return true;
-      setNoneInForce(true);
+      let failed = false;
+      for (const creator of list) {
+        const outcome = await playCreator(creator.id, true);
+        if (outcome === 'played') return true;
+        if (outcome === 'failed') failed = true;
+      }
+      // A creator whose versions did not load may well have one in force: never say there is none.
+      setOpening(failed ? 'failed' : 'none');
       return false;
     })();
   });
 
-  // Another version was put in force since the scene began: the playground follows it, never an old one, once.
-  const followed = useRef<PersonaVersionId | null>(null);
+  // Another version was put in force since the scene began: the playground follows it, never an old one, once per
+  // read of her versions: failed, it is tried again at their next read, never in a loop (relecture #705).
+  const followed = useRef<string | null>(null);
   useEffect(() => {
     if (played === null || active === null || active.id === played.versionId || pending.current) return;
-    if (followed.current === active.id) return;
-    followed.current = active.id;
+    const attempt = `${active.id}@${String(overview.dataUpdatedAt)}`;
+    if (followed.current === attempt) return;
+    followed.current = attempt;
     void once(async () => {
-      await pg.run((c) =>
+      const ran = await pg.run((c) =>
         c.choosePersona({ kind: 'version', creatorId: played.creatorId, versionId: active.id }),
       );
-      return true;
+      if (!ran) setProblem(FOLLOW_FAILED);
+      return ran;
     })();
   });
 
@@ -219,9 +238,11 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
     ? 'En démonstration, sans serveur, l’agent parle avec une persona inventée.'
     : played !== null
       ? 'Sa version en vigueur, celle que lisent ses fans. Tes notes vont à cette créatrice ; changer recommence la conversation.'
-      : noneInForce
+      : opening === 'none'
         ? 'Aucune créatrice n’a de persona en vigueur : active-en une dans Créatrices › Persona.'
-        : null;
+        : opening === 'failed'
+          ? 'Les personas ne se chargent pas. Choisis une créatrice pour réessayer.'
+          : null;
 
   return (
     <section className="pg-who" aria-label="Elle">
