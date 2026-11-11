@@ -11,6 +11,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { fanKycKey } from '../api';
+
 import { FanCard } from './FanCard';
 
 /* An invented fan and creator (ADR 0010). */
@@ -165,7 +167,7 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
     fireEvent.change(input, { target: { value: 'Grenoble' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(await within(row).findByText('Grenoble')).toBeTruthy();
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['fan-kyc', creatorId, fanId] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: fanKycKey(creatorId, fanId) });
   });
 
   it('writes a list one item per line, and keeps the save shut on an empty field', async () => {

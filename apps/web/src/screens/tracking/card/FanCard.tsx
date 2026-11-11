@@ -8,6 +8,8 @@ import type {
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
+import { fanKycKey } from '../api';
+
 import { FanCardRefused, fanCardKey, setFanCardField, useFanCard } from './api';
 import {
   CARD_GROUPS,
@@ -63,7 +65,7 @@ export function FanCard({ creatorId, fanId }: { creatorId: string; fanId: string
     if (change.ok) {
       client.setQueryData(fanCardKey(creatorId, fanId), change.view);
       // What is left to learn is its own read: it follows the case just filled, not 30 s later (recette 11/11).
-      void client.invalidateQueries({ queryKey: ['fan-kyc', creatorId, fanId] });
+      void client.invalidateQueries({ queryKey: fanKycKey(creatorId, fanId) });
       return true;
     }
     setRefusal({ field, message: change.message });
