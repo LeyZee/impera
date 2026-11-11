@@ -2,14 +2,17 @@
  * `pnpm evals`: every scenario of `evals/` through the production path (brain, policy, voice, hard guards), then the
  * judge on what she wrote. Fails unless every scenario passes its own checks and each criterion reaches its
  * threshold (`evals/thresholds.json`). Nothing is sent, the persona is the fictional demo one (ADR 0010).
- * Usage: `pnpm evals [--full] [--file evals/adversarial/asks-if-bot.yaml]` (the path from the repository root) (LLM_XAI_API_KEY in the environment).
+ * Usage: `pnpm evals [--full] [--file evals/adversarial/asks-if-bot.yaml]` (the path from the repository root), with
+ * LLM_XAI_API_KEY in the environment, or `--key-from-crm`: the keys saved in Réglages › Modèles IA of the database
+ * DATABASE_ADMIN_URL names, opened with CREDENTIALS_ENCRYPTION_KEYS (`readSavedProviderKeys`), kept in memory only.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { desireBandOf, MessageIdSchema, newId } from '@impera/contracts';
+import { AiProviderSchema, desireBandOf, MessageIdSchema, newId } from '@impera/contracts';
+import { createDbClient, parseEncryptionKeys } from '@impera/db';
 import {
   brainAlertId,
   createInMemoryCallLog,
@@ -17,10 +20,13 @@ import {
   createModelResolver,
   DEFAULT_LLM_CONFIG,
   JudgeCriterionSchema,
+  PROVIDERS,
   readProviderCredentials,
   type ConversationTurn,
 } from '@impera/llm';
+import { z } from 'zod';
 
+import { READ_ONLY_POOL_OPTIONS } from '../key-check';
 import {
   composeTurn,
   guardSettingsOf,
@@ -29,6 +35,7 @@ import {
   readPersonaFile,
 } from '../modules/agent/index';
 import { proposalsOfRead } from '../modules/fans/index';
+import { readSavedProviderKeys } from '../modules/providers/index';
 
 import { checkCardScenario, readCardScenario, type CardScenario } from './evals/card-scenario';
 import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './evals/check';
@@ -45,11 +52,54 @@ const HOUR_MS = 3_600_000;
 const { values } = parseArgs({
   // pnpm forwards a bare `--` through each script hop.
   args: process.argv.slice(2).filter((arg) => arg !== '--'),
-  options: { full: { type: 'boolean', default: false }, file: { type: 'string' } },
+  options: {
+    full: { type: 'boolean', default: false },
+    file: { type: 'string' },
+    'key-from-crm': { type: 'boolean', default: false },
+  },
 });
-const credentials = readProviderCredentials(process.env);
+
+/**
+ * The keys saved in the CRM, under the names the gateway reads (`LLM_XAI_API_KEY`…): read once on a read-only
+ * connection, never shown. Only the services found are said, by name.
+ */
+async function crmKeys(): Promise<Record<string, string>> {
+  const adminUrl = z.url({ protocol: /^postgres(ql)?$/ }).safeParse(process.env['DATABASE_ADMIN_URL']);
+  const sealing = process.env['CREDENTIALS_ENCRYPTION_KEYS'];
+  if (!adminUrl.success || sealing === undefined || sealing === '') {
+    console.error(
+      'evals --key-from-crm : DATABASE_ADMIN_URL ou CREDENTIALS_ENCRYPTION_KEYS manque dans .env.',
+    );
+    process.exit(1);
+  }
+  const admin = createDbClient(adminUrl.data, READ_ONLY_POOL_OPTIONS);
+  try {
+    const saved = await readSavedProviderKeys(
+      admin.db,
+      parseEncryptionKeys(sealing, 'CREDENTIALS_ENCRYPTION_KEYS'),
+    );
+    const found = PROVIDERS.flatMap((provider) => {
+      const id = AiProviderSchema.safeParse(provider.id);
+      const key = id.success ? saved[id.data] : undefined;
+      return key === undefined ? [] : [{ provider, key }];
+    });
+    const names = found.map(({ provider }) => provider.label).join(', ');
+    console.log(`Clés lues dans le CRM : ${names === '' ? 'aucune' : names}`);
+    return Object.fromEntries(found.map(({ provider, key }) => [provider.apiKeyEnv, key]));
+  } finally {
+    await admin.close();
+  }
+}
+
+const credentials = readProviderCredentials(
+  values['key-from-crm'] ? { ...process.env, ...(await crmKeys()) } : process.env,
+);
 if (credentials.LLM_XAI_API_KEY === undefined) {
-  console.error('evals: no LLM_XAI_API_KEY in the environment, nothing can be measured.');
+  console.error(
+    values['key-from-crm']
+      ? 'evals: no xAI key saved in Réglages › Modèles IA, nothing can be measured.'
+      : 'evals: no LLM_XAI_API_KEY in the environment, nothing can be measured.',
+  );
   process.exit(1);
 }
 const tier = ThresholdsSchema.parse(JSON.parse(readFileSync(resolve(EVALS, 'thresholds.json'), 'utf8')))[
