@@ -70,6 +70,7 @@ export {
   type VideoFrame,
   type VideoKeyframes,
   type JudgeInput,
+  type JudgeSituation,
   type VoiceInput,
 } from './gateway';
 export type { HealthReport, HealthState, ProviderHealth, RoleHealth } from './health';
