@@ -318,6 +318,9 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       tone: 'idle',
       headline: 'Reveal n’est **pas encore relié**',
       lead: `L’agent commencera à lire les conversations dès que la session Reveal sera capturée depuis l’extension.${alsoVoice}`,
+      // The way to do it exists: its guide, offered to the owner, who alone captures the session (ADM-18).
+      action: 'Comment relier Reveal',
+      actionTo: '/aide/reveal',
       foldTitle: 'Rien ne tourne encore',
     };
   }
@@ -329,6 +332,8 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       headline: 'Reveal est **déconnecté**',
       // Since when, in the sentence itself, not only in the fold (DASH-18).
       lead: `${lastRead === null ? '' : `Dernière lecture ${lastRead}. `}L’agent ne lit plus les conversations. Reconnecte la session Reveal depuis l’extension.${alsoVoice}`,
+      action: 'Reconnecter Reveal',
+      actionTo: '/aide/reveal',
       foldTitle: 'Quelque chose ne va pas',
     };
   }

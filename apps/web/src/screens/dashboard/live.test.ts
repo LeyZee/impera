@@ -229,7 +229,13 @@ describe('fromApi', () => {
         voice: { ok: false, keyMissing: false, medianWriteMs: null, outagesLast7d: 0 },
       }),
     );
-    expect(unlinked.agent).toMatchObject({ tone: 'idle', headline: 'Reveal n’est **pas encore relié**' });
+    // Its guide is one click away (ADM-18).
+    expect(unlinked.agent).toMatchObject({
+      tone: 'idle',
+      headline: 'Reveal n’est **pas encore relié**',
+      action: 'Comment relier Reveal',
+      actionTo: '/aide/reveal',
+    });
     expect(card('reveal', unlinked)).toMatchObject({ tone: 'idle', value: 'Pas encore reliée' });
     expect(unlinked.agent.foldSummary).toContain('Reveal pas encore relié');
     // Reveal speaks first, the voice is said in the same lead, not only in the fold.
@@ -347,7 +353,12 @@ describe('fromApi', () => {
     const offline = apiDashboard({
       reveal: { connected: false, lastReadAt: '2026-10-19T11:00:00Z', late: false, conversations: 0 },
     });
-    expect(fromApi(offline).agent).toMatchObject({ tone: 'bad', headline: 'Reveal est **déconnecté**' });
+    expect(fromApi(offline).agent).toMatchObject({
+      tone: 'bad',
+      headline: 'Reveal est **déconnecté**',
+      action: 'Reconnecter Reveal',
+      actionTo: '/aide/reveal',
+    });
     const mute = apiDashboard({
       voice: { ok: false, keyMissing: false, medianWriteMs: null, outagesLast7d: 3 },
     });

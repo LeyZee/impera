@@ -19,6 +19,8 @@ import {
   deltaText,
   euros,
   heatOf,
+  hourLabel,
+  hoursLabel,
   kindSlices,
   OTHER,
   OTHER_KINDS_NOTE,
@@ -114,7 +116,10 @@ export function AgencyPeriodControl({
   );
 }
 
-/** « +18 % » in the colour of better or worse; nothing when there is nothing to compare with. */
+/**
+ * « +18 % » in the colour of better or worse; nothing when there is nothing to compare with, nor when nothing then and
+ * nothing now: a « 0 % » next to a zero is noise (recette 11/11, ADM-07).
+ */
 function Delta({
   current,
   previous,
@@ -124,8 +129,8 @@ function Delta({
   previous: number;
   lowerIsBetter?: boolean;
 }): JSX.Element | null {
-  // Nothing then and nothing now is no change: « 0 % », as every other tile shows its pill.
-  const change = current === 0 && previous === 0 ? 0 : changeOf(current, previous);
+  if (current === 0 && previous === 0) return null;
+  const change = changeOf(current, previous);
   if (change === null) return null;
   const better = lowerIsBetter ? change < 0 : change > 0;
   const tone = change === 0 ? ' ins-delta-flat' : better ? ' nv-delta--better' : ' nv-delta--worse';
@@ -189,7 +194,9 @@ function Figures({ insights, period }: { insights: AgencyInsights; period: Agenc
               note:
                 fans.paying === 0
                   ? 'aucun sur la période'
-                  : `dont ${fans.newPaying.toLocaleString('fr-FR')} pour la première fois`,
+                  : fans.newPaying === fans.paying
+                    ? 'tous pour la première fois'
+                    : `dont ${fans.newPaying.toLocaleString('fr-FR')} pour la première fois`,
               delta: [fans.paying, fans.previousPaying],
             },
             {
@@ -210,7 +217,9 @@ function Figures({ insights, period }: { insights: AgencyInsights; period: Agenc
               note:
                 current.sales === 0
                   ? 'aucune vente sur la période'
-                  : `${String(shareOf(current.refunds, current.sales))} % des ventes`,
+                  : current.refunds === 0
+                    ? 'aucun remboursement'
+                    : `${String(shareOf(current.refunds, current.sales))} % des ventes`,
               delta: [current.refunds, previous.refunds],
               lowerIsBetter: true,
             },
@@ -246,8 +255,8 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   const days = today
     ? insights.hourly.map((hour) => ({
         key: String(hour.hour),
-        label: `${String(hour.hour)}h`,
-        title: `${String(hour.hour)}h–${String((hour.hour + 1) % 24)}h`,
+        label: hourLabel(hour.hour),
+        title: hoursLabel(hour.hour),
         parts: dayStacks(hour),
         total: hour.revenueMinor,
       }))
@@ -371,17 +380,23 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   );
 }
 
-/** A ring and its legend: a slice lit on hover, focus or touch shows in the middle and in the legend. */
+/**
+ * A ring and its legend: a slice lit on hover, focus or touch shows in the middle and in the legend. At rest the middle
+ * says the total in euros, what the ring cuts (ADM-05); a legend row that needs a word says it in the screen's tip,
+ * never in the browser's title (ADM-06).
+ */
 function Ring({
   title,
   slices,
   notes,
   tipFor,
+  tip,
 }: {
   title: string;
   slices: readonly Slice[];
   notes?: Readonly<Record<string, string>>;
   tipFor?: string;
+  tip: FloatingTip;
 }): JSX.Element {
   const [lit, setLit] = useState<number | null>(null);
   // The pointer that pressed a legend row: its focus and its click are that pointer's, not the keyboard's.
@@ -396,10 +411,7 @@ function Ring({
   const litSlice = lit === null ? null : shown[lit];
   return (
     <article className="nv-plate ins-ring-card">
-      <h3 className="ins-card__title">
-        {title}
-        {total > 0 ? <span className="ins-card__total">{euros(total)}</span> : null}
-      </h3>
+      <h3 className="ins-card__title">{title}</h3>
       {total <= 0 ? (
         <p className="ins-empty">Aucune vente sur la période.</p>
       ) : (
@@ -436,10 +448,10 @@ function Ring({
             <span className="ins-ring__middle" aria-hidden="true">
               {litSlice === null || litSlice === undefined ? (
                 <>
-                  <b className="ins-ring__value">
-                    {slices.reduce((sum, one) => sum + one.sales, 0).toLocaleString('fr-FR')}
+                  <b className={euros(total).length > 7 ? 'ins-ring__value is-long' : 'ins-ring__value'}>
+                    {euros(total)}
                   </b>
-                  <span className="ins-ring__sub">ventes</span>
+                  <span className="ins-ring__sub">au total</span>
                 </>
               ) : (
                 <>
@@ -450,45 +462,55 @@ function Ring({
             </span>
           </div>
           <ul className="ins-legend">
-            {shown.map((slice, i) => (
-              <li key={slice.key}>
-                <button
-                  type="button"
-                  className={lit === i ? 'ins-legend__row is-on' : 'ins-legend__row'}
-                  title={slice.key === tipFor ? OTHER_KINDS_NOTE : notes?.[slice.key]}
-                  // A mouse lights on entering and leaving puts out; a finger's tap lights or puts out (`onClick`);
-                  // the keyboard lights on focus. A tap's own entering and focus would light before its click undoes it.
-                  onPointerEnter={(event) => {
-                    if (event.pointerType === 'mouse') setLit(i);
-                  }}
-                  onPointerLeave={(event) => {
-                    if (event.pointerType === 'mouse') setLit(null);
-                  }}
-                  onPointerDown={(event) => {
-                    pressedBy.current = event.pointerType;
-                  }}
-                  onFocus={() => {
-                    if (pressedBy.current === null) setLit(i);
-                  }}
-                  onBlur={() => {
-                    pressedBy.current = null;
-                    setLit(null);
-                  }}
-                  onClick={() => {
-                    const by = pressedBy.current;
-                    pressedBy.current = null;
-                    if (by === 'mouse') setLit(i);
-                    else setLit(lit === i ? null : i);
-                  }}
-                >
-                  <span className="ins-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
-                  <span className="ins-legend__label">{slice.label}</span>
-                  <span className="ins-legend__value">{euros(slice.cents)}</span>
-                  <span className="ins-legend__share">{String(shareOf(slice.cents, total))}&nbsp;%</span>
-                  <Delta current={slice.cents} previous={slice.previousCents} />
-                </button>
-              </li>
-            ))}
+            {shown.map((slice, i) => {
+              const help = slice.key === tipFor ? OTHER_KINDS_NOTE : notes?.[slice.key];
+              const told = help === undefined ? null : tip.bind({ title: slice.label, text: help });
+              return (
+                <li key={slice.key}>
+                  <button
+                    type="button"
+                    className={lit === i ? 'ins-legend__row is-on' : 'ins-legend__row'}
+                    // A mouse lights on entering and leaving puts out; a finger's tap lights or puts out (`onClick`);
+                    // the keyboard lights on focus. A tap's own entering and focus would light before its click undoes it.
+                    onPointerEnter={(event) => {
+                      if (event.pointerType === 'mouse') setLit(i);
+                    }}
+                    onPointerMove={told?.onPointerMove}
+                    onPointerLeave={(event) => {
+                      told?.onPointerLeave(event);
+                      if (event.pointerType === 'mouse') setLit(null);
+                    }}
+                    onPointerDown={(event) => {
+                      told?.onPointerDown(event);
+                      pressedBy.current = event.pointerType;
+                    }}
+                    onFocus={(event) => {
+                      if (pressedBy.current === null) {
+                        told?.onFocus(event);
+                        setLit(i);
+                      }
+                    }}
+                    onBlur={() => {
+                      told?.onBlur();
+                      pressedBy.current = null;
+                      setLit(null);
+                    }}
+                    onClick={() => {
+                      const by = pressedBy.current;
+                      pressedBy.current = null;
+                      if (by === 'mouse') setLit(i);
+                      else setLit(lit === i ? null : i);
+                    }}
+                  >
+                    <span className="ins-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
+                    <span className="ins-legend__label">{slice.label}</span>
+                    <span className="ins-legend__value">{euros(slice.cents)}</span>
+                    <span className="ins-legend__share">{String(shareOf(slice.cents, total))}&nbsp;%</span>
+                    <Delta current={slice.cents} previous={slice.previousCents} />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -567,6 +589,18 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
               {euros(one.revenueMinor)}
               <Delta current={one.revenueMinor} previous={one.previousRevenueMinor} />
             </span>
+            {/* A configuration gap, not a seller: said under its line, with the way to close it (ADM-06). */}
+            {one.seller.kind === 'unlinked' ? (
+              <span className="ins-rank__fix">
+                <span>
+                  {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''} d’un compte Reveal que
+                  personne n’a relié à un membre.
+                </span>
+                <Link to="/equipe/reveal" className="nv-btn nv-btn--soft nv-btn--sm">
+                  Relier
+                </Link>
+              </span>
+            ) : null}
           </li>
         );
       })}
@@ -630,32 +664,62 @@ function Creators({
   );
 }
 
-/** « Quand ça vend »: a day-of-the-week by hour map, darker where the money comes in. */
+/**
+ * « Quand ça vend »: a day-of-the-week by hour map, darker where the money comes in. One stop for the keyboard, as the
+ * chart's columns: the arrows walk the hours and the days, each cell says its hour and its amount (ADM-09).
+ */
 function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
   const max = Math.max(0, ...insights.hours.flat());
+  const all = insights.hours.flat().reduce((sum, cents) => sum + cents, 0);
   const peak = busiest(insights.hours);
   const slot = bestSlot(insights.hours);
+  const grid = useRef<HTMLDivElement>(null);
+  const [focus, setFocus] = useState<{ day: number; hour: number } | null>(null);
   if (peak === null || slot === null)
     return <p className="nv-plate ins-empty">Aucune vente sur la période.</p>;
+  const at = focus ?? { day: peak.day, hour: peak.hour };
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const moves: Readonly<Record<string, readonly [number, number]>> = {
+      ArrowRight: [0, 1],
+      ArrowLeft: [0, -1],
+      ArrowDown: [1, 0],
+      ArrowUp: [-1, 0],
+      Home: [0, -24],
+      End: [0, 24],
+    };
+    const move = moves[event.key];
+    if (move === undefined) return;
+    event.preventDefault();
+    const next = {
+      day: Math.min(Math.max(0, at.day + move[0]), insights.hours.length - 1),
+      hour: Math.min(Math.max(0, at.hour + move[1]), 23),
+    };
+    setFocus(next);
+    grid.current
+      ?.querySelector<HTMLButtonElement>(`[data-cell="${String(next.day)}-${String(next.hour)}"]`)
+      ?.focus();
+  };
   return (
     <div className="nv-plate ins-hours">
       <p className="ins-hours__lead">
         Le créneau qui rapporte le plus : <b>{slotLabel(slot.from)}</b>, {String(slot.share)}&nbsp;% du
         chiffre d’affaires. Le pic :{' '}
-        <b>
-          {WEEKDAYS[peak.day]?.toLowerCase()} {String(peak.hour)}h
+        <b className="ins-nowrap">
+          {WEEKDAYS[peak.day]?.toLowerCase()}, {hourLabel(peak.hour)}
         </b>
         .
       </p>
       <div
         className="ins-heat"
-        role="img"
-        aria-label="Chiffre d’affaires par jour de la semaine et par heure"
+        role="group"
+        aria-label="Chiffre d’affaires par jour de la semaine et par heure : flèches pour passer d’une case à l’autre"
+        ref={grid}
+        onKeyDown={onKeyDown}
       >
         <span aria-hidden="true" />
         {Array.from({ length: 24 }, (_, hour) => (
           <span key={hour} className="ins-heat__hour" aria-hidden="true">
-            {hour % 3 === 0 ? `${String(hour)}h` : ''}
+            {hour % 3 === 0 ? hourLabel(hour) : ''}
           </span>
         ))}
         {insights.hours.map((row, day) => (
@@ -663,28 +727,32 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
             <span className="ins-heat__day" aria-hidden="true">
               {WEEKDAYS_SHORT[day]}
             </span>
-            {row.map((cents, hour) => (
-              <span
-                key={hour}
-                className="ins-heat__cell"
-                style={{ '--_h': heatOf(cents, max) }}
-                {...tip.bind({
-                  title: `${WEEKDAYS[day] ?? ''}, ${String(hour)}h–${String((hour + 1) % 24)}h`,
-                  rows: [
-                    ['Chiffre d’affaires', euros(cents)],
-                    [
-                      'Part de la période',
-                      `${String(
-                        shareOf(
-                          cents,
-                          insights.hours.flat().reduce((s, c) => s + c, 0),
-                        ),
-                      )} %`,
-                    ],
-                  ],
-                })}
-              />
-            ))}
+            {row.map((cents, hour) => {
+              const when = `${WEEKDAYS[day] ?? ''}, ${hoursLabel(hour)}`;
+              const bound = tip.bind({
+                title: when,
+                rows: [
+                  ['Chiffre d’affaires', euros(cents)],
+                  ['Part de la période', `${String(shareOf(cents, all))} %`],
+                ],
+              });
+              return (
+                <button
+                  type="button"
+                  key={hour}
+                  className="ins-heat__cell"
+                  style={{ '--_h': heatOf(cents, max) }}
+                  data-cell={`${String(day)}-${String(hour)}`}
+                  tabIndex={day === at.day && hour === at.hour ? 0 : -1}
+                  aria-label={`${when} : ${euros(cents)}`}
+                  {...bound}
+                  onFocus={(event) => {
+                    setFocus({ day, hour });
+                    bound.onFocus(event);
+                  }}
+                />
+              );
+            })}
           </div>
         ))}
       </div>
@@ -1073,11 +1141,15 @@ export function AgencyInsightsPanel({
             onRetry={() => void query.refetch()}
           />
         ) : (
-          <div
-            className="db-loading nv-plate ins-loading"
-            aria-label="Chargement des chiffres"
-            role="status"
-          />
+          // The shape of the figures, a large tile and six small ones, so nothing jumps when they come (ADM-21).
+          <div className="ins-figures" aria-label="Chargement des chiffres" role="status" aria-busy="true">
+            <div className="db-loading nv-plate ins-lead ins-loading" />
+            <div className="ins-tiles">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="db-loading nv-plate ins-tile ins-loading--tile" />
+              ))}
+            </div>
+          </div>
         )}
       </Section>
     );
@@ -1152,8 +1224,8 @@ export function AgencyInsightsPanel({
       </Section>
 
       <div className="ins-pair nv-enter" style={{ '--nv-i': next() }}>
-        <Ring title="D’où vient l’argent" slices={kinds} tipFor="other" />
-        <Ring title="Qui vend" slices={sellers} notes={SELLER_NOTES} />
+        <Ring title="D’où vient l’argent" slices={kinds} tipFor="other" tip={tip} />
+        <Ring title="Qui vend" slices={sellers} notes={SELLER_NOTES} tip={tip} />
       </div>
 
       <Section

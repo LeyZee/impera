@@ -7,7 +7,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFloatingTip } from '../parts';
@@ -30,14 +30,17 @@ function serve(status: number, body: unknown): void {
 function Panel({ creatorId, canOpenSettings }: { creatorId: string | null; canOpenSettings: boolean }) {
   const tip = useFloatingTip();
   return (
-    <AgencyInsightsPanel
-      period="week"
-      onPeriod={() => undefined}
-      creatorId={creatorId}
-      creatorName="Lina Test"
-      canOpenSettings={canOpenSettings}
-      tip={tip}
-    />
+    <>
+      <AgencyInsightsPanel
+        period="week"
+        onPeriod={() => undefined}
+        creatorId={creatorId}
+        creatorName="Lina Test"
+        canOpenSettings={canOpenSettings}
+        tip={tip}
+      />
+      {tip.element}
+    </>
   );
 }
 
@@ -97,7 +100,79 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(within(ranking).getByText('Théo')).toBeTruthy();
     expect(within(ranking).getByText('Agent IA')).toBeTruthy();
     expect(screen.getByText(/Les 10 fans qui dépensent le plus/u).textContent).toContain('58');
-    expect(screen.getByText(/21h–0h/u)).toBeTruthy();
+    // The hours as the rest of the CRM writes them (ADM-08).
+    const slot = screen.getByText(/^21\sh\s–\s0\sh$/u, { selector: 'b' });
+    expect(slot.textContent).toBe('21\u00a0h\u00a0–\u00a00\u00a0h');
+  });
+
+  it('says in a ring’s middle the euros it cuts, not a count of sales (ADM-05)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const card = (await screen.findByRole('heading', { name: /D’où vient l’argent/u })).closest('article');
+    if (card === null) throw new Error('card');
+    expect(card.querySelector('.ins-ring__value')?.textContent).toMatch(/€$/u);
+    expect(card.querySelector('.ins-ring__sub')?.textContent).toBe('au total');
+    expect(within(card).queryByText('ventes')).toBeNull();
+  });
+
+  it('says a chatter nobody linked under his line, in the screen’s tip, and leads to Équipe › Reveal (ADM-06)', async () => {
+    const unlinked = {
+      seller: { kind: 'unlinked' },
+      revenueMinor: 37_200,
+      netMinor: 29_760,
+      agencyMinor: 11_160,
+      creatorMinor: 18_600,
+      sales: 11,
+      refunds: 0,
+      previousRevenueMinor: 0,
+    };
+    serve(200, { ...AGENCY_WEEK, sellers: [...AGENCY_WEEK.sellers, unlinked] });
+    show();
+    const ranking = await screen.findByRole('list', { name: 'Classement de qui a vendu' });
+    expect(within(ranking).getByText(/11 ventes d’un compte Reveal que personne n’a relié/u)).toBeTruthy();
+    expect(within(ranking).getByRole('link', { name: 'Relier' }).getAttribute('href')).toBe('/equipe/reveal');
+    const card = screen.getByRole('heading', { name: /Qui vend/u }).closest('article');
+    if (card === null) throw new Error('card');
+    const row = within(card).getByRole('button', { name: /Chatteur non relié/u });
+    // No title of the browser: the tip of the screen says it, to the keyboard too.
+    expect(row.getAttribute('title')).toBeNull();
+    act(() => {
+      row.focus();
+    });
+    expect(screen.getByRole('tooltip').textContent).toContain('Équipe › Reveal');
+  });
+
+  it('shows no « 0 % » next to a zero that was already zero, and says there was no refund (ADM-07)', async () => {
+    const totals = {
+      current: { ...AGENCY_WEEK.totals.current, refunds: 0 },
+      previous: { ...AGENCY_WEEK.totals.previous, refunds: 0 },
+    };
+    serve(200, { ...AGENCY_WEEK, totals });
+    show();
+    const label = await screen.findByText('Remboursements', { selector: 'dt' });
+    const tile = label.closest<HTMLElement>('.ins-tile');
+    if (tile === null) throw new Error('tile');
+    expect(tile.querySelector('.nv-delta')).toBeNull();
+    expect(within(tile).getByText('aucun remboursement')).toBeTruthy();
+  });
+
+  it('walks the map of the hours with the arrows, one stop, each cell saying its hour and its amount (ADM-09)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const map = await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
+    const cells = within(map).getAllByRole('button');
+    expect(cells).toHaveLength(7 * 24);
+    const stops = cells.filter((cell) => cell.tabIndex === 0);
+    expect(stops).toHaveLength(1);
+    const stop = stops[0];
+    if (stop === undefined) throw new Error('no stop');
+    // The peak of the fixture: Sunday, 0 h.
+    expect(stop.getAttribute('aria-label')).toBe('Dimanche, 0\u00a0h\u00a0–\u00a01\u00a0h : 27\u00a0€');
+    stop.focus();
+    fireEvent.keyDown(stop, { key: 'ArrowRight' });
+    expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^Dimanche, 1\u00a0h/u);
+    fireEvent.keyDown(document.activeElement ?? stop, { key: 'ArrowUp' });
+    expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^Samedi, 1\u00a0h/u);
   });
 
   it('reads one creator alone, without the creators side by side', async () => {
