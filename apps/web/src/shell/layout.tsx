@@ -127,6 +127,53 @@ const SAME_GESTURE_MS = 1_000;
 /** Which edges of a scrolling sub-nav hide tabs. */
 type SubNavMore = 'none' | 'start' | 'end' | 'both';
 
+/**
+ * The room a chevron takes on its edge of a scrolling sub-nav: its 44 px touch target, then the end of the edge's fade
+ * (shell.css), so that a tab placed past it shows its label whole.
+ */
+const CHEVRON_ROOM = 52;
+
+/**
+ * How far a chevron scrolls the sub-nav: the first tab cut or hidden past the chevron comes to start just after the
+ * other one, or ends just before it going back. Without tabs measured (no layout), seven tenths of the bar.
+ */
+function pageTarget(nav: HTMLElement, side: 'start' | 'end'): number {
+  const step = Math.max(120, nav.clientWidth * 0.7);
+  const tabs = [...nav.querySelectorAll<HTMLElement>('.nv-subnav__item')];
+  if (side === 'end') {
+    const edge = nav.scrollLeft + nav.clientWidth - CHEVRON_ROOM;
+    const next = tabs.find((tab) => tab.offsetWidth > 0 && tab.offsetLeft + tab.offsetWidth > edge);
+    const by = next === undefined ? 0 : next.offsetLeft - CHEVRON_ROOM - nav.scrollLeft;
+    return by > 0 ? by : step;
+  }
+  const edge = nav.scrollLeft + CHEVRON_ROOM;
+  const previous = tabs.findLast((tab) => tab.offsetWidth > 0 && tab.offsetLeft < edge);
+  const by =
+    previous === undefined
+      ? 0
+      : previous.offsetLeft + previous.offsetWidth + CHEVRON_ROOM - nav.clientWidth - nav.scrollLeft;
+  return by < 0 ? by : -step;
+}
+
+/**
+ * Where a scrolling sub-nav starts so that its lit tab is in the middle, moved so that no label is cut under the start
+ * chevron: the tab there shows whole if the lit one still fits, or goes behind the chevron (GES-16, opened directly on
+ * Paie › Factures).
+ */
+function centeredStart(nav: HTMLElement, active: HTMLElement): number {
+  const end = nav.scrollWidth - nav.clientWidth;
+  const centered = Math.min(end, Math.max(0, active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2));
+  const edge = centered + CHEVRON_ROOM;
+  const cut = [...nav.querySelectorAll<HTMLElement>('.nv-subnav__item')].find(
+    (tab) => tab.offsetLeft < edge && tab.offsetLeft + tab.offsetWidth > edge,
+  );
+  if (centered <= 0 || cut === undefined) return centered;
+  const whole = cut.offsetLeft - CHEVRON_ROOM;
+  if (whole <= 0) return 0;
+  const fits = active.offsetLeft + active.offsetWidth <= whole + nav.clientWidth - CHEVRON_ROOM;
+  return Math.min(end, fits ? whole : cut.offsetLeft + cut.offsetWidth - CHEVRON_ROOM);
+}
+
 const reducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -164,7 +211,9 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     }
     placeStill(nav, from, thumb);
     placeTabBarLens(nav, active, thumb);
-  }, [pathname, lit, label]);
+    // `tabs` too: a tab that arrives after the server's answer (Équipe › Reveal) can be the lit one, and the glass is
+    // placed once it is there (recette 11/11, GES-04).
+  }, [pathname, lit, label, tabs]);
 
   // Leaving: say where the glass was, for the sub-nav the next screen draws. A layout effect: its cleanup runs before
   // the new sub-nav's first placing, where a passive one would run after it and leave nothing to slide from.
@@ -191,8 +240,9 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     const nav = navRef.current;
     const active = nav?.querySelector('[aria-current="page"]');
     if (nav === null || !(active instanceof HTMLElement) || nav.scrollWidth <= nav.clientWidth) return;
-    nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
-  }, [pathname]);
+    nav.scrollLeft = centeredStart(nav, active);
+    // Again when a count arrives and widens a tab (Paie's « Quinzaine 5 »): the label it pushes under the chevron.
+  }, [pathname, counts, tabs]);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -233,12 +283,13 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
   }, [tabs]);
 
   // A finger sees the fade, not that the bar scrolls: a chevron on each edge that hides tabs pages to them, as the
-  // persona's own tabs do (recette 07/11).
+  // persona's own tabs do (recette 07/11). The page ends on a whole tab beside the chevron, never on a label cut under
+  // it (« rimes et malus », recette 11/11, GES-16).
   const page = (side: 'start' | 'end'): void => {
     const nav = navRef.current;
     if (nav === null || typeof nav.scrollBy !== 'function') return;
-    const step = Math.max(120, nav.clientWidth * 0.7);
-    nav.scrollBy({ left: side === 'end' ? step : -step, behavior: reducedMotion() ? 'auto' : 'smooth' });
+    const left = pageTarget(nav, side);
+    nav.scrollBy({ left, behavior: reducedMotion() ? 'auto' : 'smooth' });
   };
   const chevron = (side: 'start' | 'end'): JSX.Element => (
     <button

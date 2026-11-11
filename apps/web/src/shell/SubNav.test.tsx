@@ -126,6 +126,55 @@ describe('SubNav', () => {
     expect(screen.queryByRole('button', { name: 'Onglets suivants' })).toBeNull();
   });
 
+  // Recette 11/11 (GES-16): a chevron's page ended anywhere, and the round sat on a label cut in two.
+  it('pages to the first tab past the chevron, whole beside the other one, and back to the one hidden behind', async () => {
+    renderNav([
+      { to: '/paie/quinzaine', label: 'Quinzaine' },
+      { to: '/paie/releves', label: 'Relevés' },
+      { to: '/paie/objectifs', label: 'Objectifs' },
+    ]);
+    await screen.findByRole('link', { name: 'Quinzaine' });
+    const nav = screen.getByRole('navigation', { name: 'Paie' });
+    const scrollBy = vi.fn();
+    Object.defineProperty(nav, 'scrollBy', { configurable: true, value: scrollBy });
+    Object.defineProperty(nav, 'clientWidth', { configurable: true, value: 300 });
+    Object.defineProperty(nav, 'scrollWidth', { configurable: true, value: 420 });
+    const place = (name: string, left: number, width: number): void => {
+      const tab = screen.getByRole('link', { name });
+      Object.defineProperty(tab, 'offsetLeft', { configurable: true, value: left });
+      Object.defineProperty(tab, 'offsetWidth', { configurable: true, value: width });
+    };
+    place('Quinzaine', 4, 130);
+    place('Relevés', 136, 130);
+    place('Objectifs', 268, 148);
+    act(() => {
+      resized([]);
+    });
+    // « Relevés » ends at 266, past 300 - 52 (the chevron and its fade): it comes to start just past the start one.
+    fireEvent.click(screen.getByRole('button', { name: 'Onglets suivants' }));
+    expect(scrollBy).toHaveBeenLastCalledWith(expect.objectContaining({ left: 136 - 52 }));
+    nav.scrollLeft = 120;
+    fireEvent.scroll(nav);
+    // From there, « Relevés » starts under the start chevron (136 < 120 + 52): it comes back whole before the end one.
+    fireEvent.click(screen.getByRole('button', { name: 'Onglets précédents' }));
+    expect(scrollBy).toHaveBeenLastCalledWith(expect.objectContaining({ left: 136 + 130 + 52 - 300 - 120 }));
+  });
+
+  // Recette 11/11 (GES-04): Équipe › Reveal's tab comes with the server's answer; opened directly, it had no glass.
+  it('puts its glass under the lit tab when that tab arrives after the others', async () => {
+    const releves: SubNavItem = { to: '/paie/releves', label: 'Relevés' };
+    renderNav([releves]);
+    await screen.findByRole('link', { name: 'Relevés' });
+    expect(placeTabBarLens).not.toHaveBeenCalled();
+    act(() => {
+      setItems([releves, { to: '/paie/quinzaine', label: 'Quinzaine' }]);
+    });
+    expect(placeTabBarLens).toHaveBeenCalledWith(
+      screen.getByRole('navigation', { name: 'Paie' }),
+      screen.getByRole('link', { name: 'Quinzaine' }),
+    );
+  });
+
   // Relecture des captures (#569): the font once loaded, or a count drawn outside the list, widened a tab and the
   // glass stayed where the lit tab had been.
   it('puts its glass back under the lit tab when a tab changes width, not at its first size', async () => {
