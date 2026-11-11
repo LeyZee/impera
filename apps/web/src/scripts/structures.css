@@ -905,6 +905,21 @@
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+/* No control of the system (ADM-16): the browser's arrows of a number field are hidden, as on the persona's numbers. */
+.st-seconds {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.st-seconds::-webkit-inner-spin-button,
+.st-seconds::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* A sentence grows with its text, no handle (ADM-16). */
+.ps-area__input.st-area {
+  resize: none;
+  field-sizing: content;
+}
 /* A pressed pill: « Facultative » on or off. */
 .st-pill {
   appearance: none;

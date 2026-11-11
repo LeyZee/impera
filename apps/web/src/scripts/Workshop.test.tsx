@@ -96,6 +96,21 @@ describe('the workshop of a structure', () => {
     });
   });
 
+  it('grows a sentence with its text and names the card’s arrows, no control of the system (ADM-16)', async () => {
+    serve();
+    renderWorkshop();
+    expect(await screen.findByLabelText('Intention')).toHaveProperty(
+      'className',
+      expect.stringContaining('st-area'),
+    );
+    expect(screen.getByRole('button', { name: 'Carton précédent' }).getAttribute('title')).toBe(
+      'Carton précédent',
+    );
+    expect(screen.getByRole('button', { name: 'Carton suivant' }).getAttribute('title')).toBe(
+      'Carton suivant',
+    );
+  });
+
   it('shuts the save while a field is empty, and says so', () => {
     serve();
     renderWorkshop();

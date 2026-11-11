@@ -16,7 +16,8 @@ import { useId, type JSX } from 'react';
 import { ScIcon } from './icons';
 import { nextLetter, photo, slotsSummary, video, voice } from './model';
 
-import { Field, Segment, TextArea, TextInput } from '@/creators/persona/fields';
+import { Field, Segment, TextInput } from '@/creators/persona/fields';
+import { useGrowingArea } from '@/lib/growing-area';
 
 const KIND_LABELS = { image: 'Photo', video: 'Vidéo', audio: 'Vocal' } as const;
 const PLACEHOLDERS = {
@@ -82,7 +83,7 @@ export function SegmentEditor({
           </p>
         </header>
         <Field label="Teaser" id={`${id}-teaser`} hint="Ce que le pont fait attendre, en une phrase.">
-          <TextArea
+          <GrowingArea
             id={`${id}-teaser`}
             value={segment.teaser}
             maxLength={SCRIPT_SENTENCE_MAX}
@@ -140,7 +141,7 @@ export function SegmentEditor({
         id={`${id}-intention`}
         hint="Ce que l’étape fait comprendre au fan, en une phrase."
       >
-        <TextArea
+        <GrowingArea
           id={`${id}-intention`}
           value={segment.intention}
           maxLength={SCRIPT_SENTENCE_MAX}
@@ -329,6 +330,47 @@ function Slots({
         ) : null}
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * A sentence of a card: a field that grows with its text, no handle (ADM-16), its count under its end like every long
+ * field of the sheets.
+ */
+function GrowingArea({
+  id,
+  value,
+  maxLength,
+  rows,
+  invalid = false,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  maxLength: number;
+  rows: number;
+  invalid?: boolean;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  const ref = useGrowingArea(value);
+  return (
+    <div className="ps-area">
+      <textarea
+        ref={ref}
+        id={id}
+        className="nv-glass nv-field__control ps-input ps-area__input st-area"
+        value={value}
+        rows={rows}
+        maxLength={maxLength}
+        aria-invalid={invalid ? true : undefined}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+      <span className="ps-area__count" data-near={value.length > maxLength * 0.9 ? 'true' : undefined}>
+        {value.length.toLocaleString('fr-FR')} / {maxLength.toLocaleString('fr-FR')}
+      </span>
+    </div>
   );
 }
 
