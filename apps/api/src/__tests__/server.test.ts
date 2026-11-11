@@ -425,6 +425,22 @@ describe('HTTP protections (security.md §6)', () => {
     expect(limited.json<{ error: { code: string } }>().error.code).toBe('rate_limited');
   });
 
+  it('counts the addresses of one IPv6 /64 as one client, another /64 apart (audit du 11/11)', async () => {
+    const app = await server({ env: { RATE_LIMIT_PER_MINUTE: '2' } });
+    const from = (remoteAddress: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/probe',
+        payload: { name: 'a', count: 1 },
+        headers: ORIGIN,
+        remoteAddress,
+      });
+    await from('2001:db8:1:2::1');
+    await from('2001:db8:1:2::2');
+    expect((await from('2001:db8:1:2:aaaa:bbbb:cccc:dddd')).statusCode).toBe(429);
+    expect((await from('2001:db8:1:3::1')).statusCode).not.toBe(429);
+  });
+
   it('refuses a body over the size limit', async () => {
     const response = await (
       await server()
@@ -460,6 +476,12 @@ describe('logger', () => {
 describe('loadConfig', () => {
   it('rejects an invalid port', () => {
     expect(() => testConfig({ PORT: 'not-a-port' })).toThrow(/PORT/);
+  });
+
+  it('listens on this machine alone unless told otherwise (audit du 11/11)', () => {
+    expect(testConfig({}).HOST).toBe('localhost');
+    expect(testConfig({ HOST: '' }).HOST).toBe('localhost');
+    expect(testConfig({ HOST: '0.0.0.0' }).HOST).toBe('0.0.0.0');
   });
 
   it('stops on a variable still under the old name, and gives its new name', () => {

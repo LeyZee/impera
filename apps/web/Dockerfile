@@ -2,9 +2,10 @@
 # Dashboard image (ADR 0027, docs/runbooks/deploy.md): the built SPA served by nginx, which also forwards /v1 to
 # the API so that the session cookie stays first-party (same origin, as the Vite proxy does in development).
 # Build from the repository root: docker build -f apps/web/Dockerfile .
-# Same Node as .nvmrc.
-ARG NODE_IMAGE=node:22.22.0-alpine3.23
-ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.29-alpine
+# Same Node as .nvmrc. Pinned by digest (security.md §5): the tag names it, the digest is what is pulled; Dependabot
+# moves both.
+ARG NODE_IMAGE=node:22.22.0-alpine3.23@sha256:e4bf2a82ad0a4037d28035ae71529873c069b13eb0455466ae0bc13363826e34
+ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6
 
 FROM ${NODE_IMAGE} AS build
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=1

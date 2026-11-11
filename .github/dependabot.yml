@@ -21,3 +21,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # The base images, pinned by digest in the Dockerfiles (security.md §5): one PR when a tag moves to a new digest.
+  - package-ecosystem: docker
+    directories:
+      - /apps/api
+      - /apps/web
+      - /ops/db-export
+    schedule:
+      interval: weekly

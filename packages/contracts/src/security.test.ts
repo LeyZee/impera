@@ -2,7 +2,31 @@ import { describe, expect, it } from 'vitest';
 
 import { REAUTHENTICATION_ERROR_CODE } from './auth';
 import { EVENT_PAYLOADS } from './events';
-import { deviceOf, networkOf, SECURITY_SETTINGS_ERROR_CODES, SecurityAlertPayloadSchema } from './security';
+import {
+  deviceOf,
+  limitKeyOf,
+  networkOf,
+  SECURITY_SETTINGS_ERROR_CODES,
+  SecurityAlertPayloadSchema,
+} from './security';
+
+describe('limitKeyOf', () => {
+  it('counts an IPv4 address as it is, mapped or not', () => {
+    expect(limitKeyOf('203.0.113.42')).toBe('203.0.113.42');
+    expect(limitKeyOf('::ffff:203.0.113.42')).toBe('203.0.113.42');
+  });
+
+  it('counts every address of one IPv6 /64 as the same client', () => {
+    expect(limitKeyOf('2001:db8:1:2:aaaa:bbbb:cccc:dddd')).toBe('2001:db8:1:2::/64');
+    expect(limitKeyOf('2001:0DB8:0001:0002::1')).toBe('2001:db8:1:2::/64');
+    expect(limitKeyOf('2001:db8:1:3::1')).toBe('2001:db8:1:3::/64');
+    expect(limitKeyOf('::1')).toBe('0:0:0:0::/64');
+  });
+
+  it('counts what is not an address as written', () => {
+    expect(limitKeyOf('unknown')).toBe('unknown');
+  });
+});
 
 describe('networkOf', () => {
   it('keeps the first three bytes of an IPv4', () => {
