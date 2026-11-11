@@ -221,8 +221,28 @@ describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
     ).toBeTruthy();
     expect(within(panel).getByText('Aucun jour en écart')).toBeTruthy();
     expect(
-      within(panel).getByText('Sans export, le registre n’est comparé qu’aux statistiques.'),
+      within(panel).getByText(
+        'Sans export, le registre est comparé aux statistiques seules : l’export est facultatif.',
+      ),
     ).toBeTruthy();
+    expect(
+      within(panel).getByText(
+        'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre. Aucun export n’a été joint : il est facultatif.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('says the export is optional, the statistics enough for the switch (ADR 0050 § 8, amended 11/11/2026)', async () => {
+    page(ok(report()));
+    const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });
+    expect(within(panel).getByText('facultatif')).toBeTruthy();
+    expect(within(panel).getByText(/et avec l’export de son dashboard si tu en as un\./u)).toBeTruthy();
+    expect(
+      within(panel).getByText(
+        /Sans lui, le registre est comparé aux statistiques seules, et cela suffit à la bascule/u,
+      ),
+    ).toBeTruthy();
+    expect(within(panel).queryByText(/trois sources/u)).toBeNull();
   });
 
   it('shows each gap: the day, the model, the figure and how far it is from the register', async () => {

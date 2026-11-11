@@ -382,7 +382,7 @@ export const SOURCE_REFUSAL_TEXTS: Readonly<Record<PayRulesSourceRefusal, string
   check_missing:
     'Les ventes de cette plateforme n’ont jamais été vérifiées : lance la vérification de fiabilité dans Réglages › Ventes, sur une quinzaine entière déjà finie.',
   check_not_clean:
-    'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, avec l’export, où tout concorde et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
+    'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
   check_not_before:
     'La dernière vérification ne porte ni sur cette quinzaine ni sur une quinzaine qui finit avant elle : fais partir ces règles de la quinzaine vérifiée ou d’une plus tardive.',
   period_closed:

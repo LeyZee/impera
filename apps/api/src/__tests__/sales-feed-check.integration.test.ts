@@ -174,8 +174,9 @@ describe('sales feed reliability check (CRM-02)', () => {
     const answer = await check({ ...DAYS, export: null });
     expect(answer.statusCode).toBe(200);
     const report = SalesFeedCheckReportSchema.parse(answer.json());
+    // No export: the register and the statistics agreeing are a match (ADR 0050 § 8, amended 11/11/2026).
     expect(report).toMatchObject({
-      verdict: 'incomplete',
+      verdict: 'match',
       timeZone: 'Europe/Paris',
       total: { export: null },
     });
@@ -219,11 +220,11 @@ describe('sales feed reliability check (CRM-02)', () => {
       kind: 'bot_not_linked_to_agent',
       platformChatterId: 'bot_test_01',
     });
-    // The report is kept as the owner saw it, by whom; not clean, as nothing would switch on it.
+    // The report is kept as the owner saw it, by whom; not clean, as a few days are not a whole fortnight.
     const kept = (await lastCheck()).body?.last;
     expect(kept).toMatchObject({
       clean: false,
-      report: { verdict: 'incomplete', generatedAt: report.generatedAt },
+      report: { verdict: 'match', generatedAt: report.generatedAt },
     });
     expect(kept?.report).toEqual(report);
     expect(kept?.checkedBy).not.toBeNull();
@@ -300,8 +301,9 @@ describe('sales feed reliability check (CRM-02)', () => {
     expect(report.chatters.find((one) => one.platformChatterId === 'chatter_test_01')?.differs).toBe(true);
 
     await read();
+    // Read again, the register has Reveal's sale; without the export that was off, the statistics agree.
     const again = SalesFeedCheckReportSchema.parse((await check({ ...DAYS, export: null })).json());
-    expect(again.verdict).toBe('incomplete');
+    expect(again.verdict).toBe('match');
   });
 
   it('refuses an export it cannot read, naming the column, never a cell', async () => {

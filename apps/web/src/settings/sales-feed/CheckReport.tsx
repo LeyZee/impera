@@ -91,7 +91,7 @@ export function CheckReport({
   chatters: readonly SalesFeedChatterLink[];
   now: Date;
 }): JSX.Element {
-  const verdict = verdictOf(report.verdict);
+  const verdict = verdictOf(report.verdict, report.total.export !== null);
   const toSwitch = switchLine(report, clean);
   const hasMembers = chatters.some((chatter) => chatter.link?.kind === 'member');
   const members = useMembers(hasMembers);
@@ -167,7 +167,9 @@ export function CheckReport({
           </table>
         </div>
         {report.total.export === null ? (
-          <p className="sv-muted sf-small">Sans export, le registre n’est comparé qu’aux statistiques.</p>
+          <p className="sv-muted sf-small">
+            Sans export, le registre est comparé aux statistiques seules : l’export est facultatif.
+          </p>
         ) : null}
       </section>
 
