@@ -366,7 +366,9 @@ function Loaded({
               <span className={`nv-status ${situation.pill}`}>
                 <span className="nv-status__dot" />
                 {/* The reader has room for what to do about a send that failed (#537, CHAT-12). */}
-                {drafts.state === 'error' ? READER_STATE_LABELS.error : situation.label}
+                <span className="tr-reader__state-label">
+                  {drafts.state === 'error' ? READER_STATE_LABELS.error : situation.label}
+                </span>
               </span>
               <span className="nv-meta">{MODE_LABELS[detail.mode]}</span>
             </span>
@@ -727,7 +729,7 @@ function DraftPanel({
           </button>
         </div>
       ) : (
-        <div className="nv-draft-panel__actions">
+        <div className={`nv-draft-panel__actions${step === 'editing' ? ' tr-draft__actions--editing' : ''}`}>
           <button
             type="button"
             className="nv-btn nv-btn--neon"

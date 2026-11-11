@@ -62,6 +62,8 @@ export function FanCard({ creatorId, fanId }: { creatorId: string; fanId: string
     setPending(null);
     if (change.ok) {
       client.setQueryData(fanCardKey(creatorId, fanId), change.view);
+      // What is left to learn is its own read: it follows the case just filled, not 30 s later (recette 11/11).
+      void client.invalidateQueries({ queryKey: ['fan-kyc', creatorId, fanId] });
       return true;
     }
     setRefusal({ field, message: change.message });

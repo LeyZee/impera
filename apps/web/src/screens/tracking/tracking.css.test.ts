@@ -25,3 +25,19 @@ describe('a conversation in a narrow list (recette 07/11, EXT-02)', () => {
     );
   });
 });
+
+describe('the reader and the draft never put words over each other (recette 11/11)', () => {
+  it('lets the mode go under a long state rather than under « Reprendre la main »', () => {
+    expect(css).toMatch(/\.tr-reader__state \{[^}]*flex-wrap: wrap;/u);
+  });
+
+  it('cuts a long state inside its pill on a phone rather than under « Reprendre la main »', () => {
+    expect(css).toMatch(/\.tr-reader__state > \.nv-status \{\s*min-width: 0;\s*max-width: 100%;/u);
+    expect(css).toMatch(/\.tr-reader__state-label \{[^}]*text-overflow: ellipsis;/u);
+  });
+
+  it('gives « Envoyer la retouche » its own row while retouching', () => {
+    expect(css).toMatch(/\.tr-draft__actions--editing \{\s*flex-wrap: wrap;/u);
+    expect(css).toMatch(/\.tr-draft__actions--editing > \.nv-btn--neon \{\s*flex-basis: 100%;/u);
+  });
+});
