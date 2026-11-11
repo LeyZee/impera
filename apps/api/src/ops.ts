@@ -19,6 +19,7 @@ import {
   eq,
   keyVersionOf,
   resetSecondFactor,
+  revokeExtensionLinks,
   revokeSignIns,
   schema,
   sql,
@@ -160,7 +161,9 @@ async function accountOf(tx: Transaction, email: string): Promise<string> {
  */
 export function revokeDashboardSessions(adminDb: Database, email: string | null): Promise<number> {
   return withAdmin(adminDb, async (tx) => {
-    const revoked = await revokeSignIns(tx, email === null ? null : await accountOf(tx, email));
+    const account = email === null ? null : await accountOf(tx, email);
+    const revoked = await revokeSignIns(tx, account);
+    await revokeExtensionLinks(tx, account);
     await tx.insert(schema.auditLog).values({
       id: newId(AuditEntryIdSchema),
       userId: null,
@@ -189,6 +192,7 @@ export function resetAccountSecondFactor(
   return withAdmin(adminDb, async (tx) => {
     const userId = await accountOf(tx, email);
     const reset = await resetSecondFactor(tx, userId);
+    await revokeExtensionLinks(tx, userId);
     await tx.insert(schema.auditLog).values({
       id: newId(AuditEntryIdSchema),
       userId: null,
