@@ -10,18 +10,21 @@ import {
   type PayAdjustment,
   type Penalty,
   type ShiftReportId,
+  PayPeriodSchema,
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { periodsToRecompute } from '../../application/recalculation';
 import { canonicalJson, sha256Of } from '../canonical';
 import {
+  closePeriod,
   planPeriod,
   reportsCounted,
   type MemberForPay,
   type PeriodPlan,
   type StatementDraft,
 } from '../recalculation';
+import { NO_SALES, type SalesSnapshot } from '../sales';
 
 import { member, OWNER, P1, P2, P3, report, snapshot, USD } from './fixtures';
 
@@ -86,6 +89,93 @@ describe('the reports a period counts (ADR 0032)', () => {
     expect(ids(reportsCounted(snapshot({ period: P1, reports, registered: new Map() })))).toEqual(
       ids([counted, late]),
     );
+  });
+});
+
+describe('a period switched to the platform’s net after the fact (ADR 0084 § 3)', () => {
+  const theo = member();
+  const own = report(theo, P2, 5_000);
+  const earlier = report(theo, P1, 2_000);
+  const reveal = (fromPeriod: typeof P1): SalesSnapshot => ({
+    ...NO_SALES,
+    sources: [
+      {
+        platformAccountId: own.platformAccountId,
+        platform: 'reveal',
+        fromPeriod: PayPeriodSchema.parse('2025-01-01'),
+        earningsSource: 'declared',
+      },
+      {
+        platformAccountId: own.platformAccountId,
+        platform: 'reveal',
+        fromPeriod,
+        earningsSource: 'detected',
+      },
+    ],
+  });
+
+  it('no longer counts the reports of a period its account reads on the platform’s net', () => {
+    expect(ids(reportsCounted(snapshot({ period: P2, reports: [own], sales: reveal(P2) })))).toEqual([]);
+    // Before the switch, the same report pays as it did.
+    expect(ids(reportsCounted(snapshot({ period: P2, reports: [own], sales: reveal(P3) })))).toEqual(
+      ids([own]),
+    );
+    // A late report keeps its own period's rules: declared there, it still counts in the first open period.
+    const firstOpen = snapshot({
+      period: P2,
+      lastClosed: P1,
+      firstClosed: P1,
+      reports: [earlier, own],
+      sales: reveal(P2),
+    });
+    expect(ids(reportsCounted(firstOpen))).toEqual(ids([earlier]));
+  });
+
+  it('never brings back as late, after the switched period closed, a report it did not count', () => {
+    const switched = report(theo, P1, 3_000);
+    const next = snapshot({
+      period: P2,
+      lastClosed: P1,
+      firstClosed: P1,
+      reports: [switched, own],
+      sales: reveal(P1),
+    });
+    expect(ids(reportsCounted(next))).toEqual([]);
+  });
+
+  it('leaves a closed period counting exactly what its closing registered', () => {
+    const closed = snapshot({
+      period: P2,
+      closing: { teamNetMinor: 0, collective: null, exchangeRates: [] },
+      lastClosed: P2,
+      firstClosed: P2,
+      reports: [own],
+      registered: new Map([[own.id, P2]]),
+      sales: reveal(P2),
+    });
+    expect(ids(reportsCounted(closed))).toEqual(ids([own]));
+  });
+
+  it('takes the declared sales off a draft computed before the switch, at its next revision', () => {
+    const before = planPeriod(snapshot({ members: [theo], reports: [own], sales: reveal(P3) }));
+    expect(draftOf(before, theo).content).toMatchObject({ netMinor: 4_000 });
+    const after = planPeriod(
+      snapshot({ members: [theo], reports: [own], sales: reveal(P2), statements: storedAfter(before) }),
+    );
+    const { updates } = written(after);
+    expect(updates.map((draft) => draft.content.memberId)).toEqual([theo.id]);
+    expect(draftOf(after, theo).content).toMatchObject({ netMinor: 0, commissionMinor: 0 });
+  });
+
+  it('closes a period without waiting for an earlier report that pay no longer counts', () => {
+    const switched = report(theo, P1, 3_000);
+    const sales = reveal(P1);
+    expect(() =>
+      closePeriod(snapshot({ period: P2, members: [theo], reports: [switched, own], sales })),
+    ).not.toThrow();
+    expect(() =>
+      closePeriod(snapshot({ period: P2, members: [theo], reports: [earlier, own], sales: reveal(P3) })),
+    ).toThrow('An earlier period than');
   });
 });
 

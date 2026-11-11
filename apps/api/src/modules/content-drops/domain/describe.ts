@@ -7,6 +7,7 @@ import {
   type DropCategory,
   type ScriptDropSummary,
   type ScriptSegment,
+  type ScriptStageAccess,
 } from '@impera/contracts';
 
 /**
@@ -110,6 +111,8 @@ export interface ScriptStepToTell<F extends SlotFile = SlotFile> {
   /** `E1A`, `P12`, as her cards say. */
   readonly code: string;
   readonly name: string;
+  /** Offered or paid, as its card says (ADR 0064 § 3): a bridge is always offered. Never a price. */
+  readonly access: ScriptStageAccess;
   readonly card: string | null;
   /** Its filled slots' files, in their order. */
   readonly media: readonly F[];
@@ -137,7 +140,14 @@ export function scriptStepsOf<F extends SlotFile>(
     const segment = segments.find((one) => one.key === slot.segmentKey);
     if (segment === undefined) continue;
     const card = stepCardOf(segments, segment, slot.variant);
-    steps.push({ step: key, code: slot.code, name: card.name, card: textOf(card.lines), media: [file] });
+    steps.push({
+      step: key,
+      code: slot.code,
+      name: card.name,
+      access: segment.kind === 'bridge' ? 'free' : segment.access,
+      card: textOf(card.lines),
+      media: [file],
+    });
   }
   return steps;
 }

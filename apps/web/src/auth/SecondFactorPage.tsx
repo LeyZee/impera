@@ -190,7 +190,7 @@ export function SecondFactorPage({
               <span className="nv-field__label">Clé</span>
               <code
                 ref={keyRef}
-                className="nv-glass rounded-[var(--nv-radius-md)] px-3 py-2 font-mono text-sm break-all select-all"
+                className="nv-glass rounded-[var(--nv-radius-md)] px-3 py-2 font-mono text-sm break-words select-all"
                 aria-label="Clé à recopier dans l’application"
               >
                 {keyOf(setup.totpURI)}
