@@ -5,17 +5,20 @@ import {
   type PlaygroundState,
 } from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type JSX,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 
 import type { Playground } from './usePlayground';
 
 import { useCreators } from '@/creators/api';
-import { activateVersion, fetchPersonaOverview } from '@/creators/persona/source';
-import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
+import { fetchPersonaOverview } from '@/creators/persona/source';
 import { Select } from '@/shell/Select';
-
-/** The value of the invented persona in the creators' list: no creator has an empty id. */
-const INVENTED = '';
 
 const overviewKey = (creatorId: CreatorId): readonly unknown[] => ['playground-persona', creatorId];
 
@@ -121,177 +124,129 @@ function Chips({
   );
 }
 
-/** Her version in force, else her newest: the one a trainer most likely wants to hear first. */
-const firstOf = (overview: PersonaOverview): PersonaVersionId | null =>
-  (overview.versions.find((v) => v.isActive) ?? overview.versions[0])?.id ?? null;
+/** Her version in force: the only one the playground plays (Charles, 11/11), the one her fans read. */
+const inForce = (overview: PersonaOverview): { id: PersonaVersionId; version: string } | null =>
+  overview.versions.find((v) => v.isActive) ?? null;
 
 /**
- * Elle, at the head of the scene (recette PRO-21): whom the answers speak as, the invented persona or a creator's
- * version, the inactive ones included, so that a version is heard before it speaks to her fans. A version not yet
- * active is activated from here once it convinces, with the password asked again as in Créatrices. Changing her
- * starts the conversation over.
+ * Elle, at the head of the scene (recette PRO-21): whom the answers speak as, a creator's version in force and no
+ * other (Charles, 11/11: no invented persona on screen, no old version). The invented persona stays in the code for
+ * the evals and the sandbox, and for a scene opened before any creator has a version in force: the screen then says
+ * so. Changing her starts the conversation over.
  */
 export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playground }): JSX.Element {
   const client = useQueryClient();
   const creators = useCreators();
   const { played } = state.persona;
   const [problem, setProblem] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-  const [reauth, setReauth] = useState(false);
   const overview = useQuery({
     queryKey: played === null ? ['playground-persona', 'none'] : overviewKey(played.creatorId),
     queryFn: () => (played === null ? Promise.resolve(null) : fetchPersonaOverview(played.creatorId)),
     enabled: played !== null,
   });
-  const versions = overview.data?.versions ?? [];
-  const current = played === null ? undefined : versions.find((v) => v.id === played.versionId);
+  const active = overview.data === undefined || overview.data === null ? null : inForce(overview.data);
   // One choice at a time, her versions' read included: a second click or key waits for the first to land.
   const pending = useRef(false);
   const [choosing, setChoosing] = useState(false);
   const disabled = pg.busy || pg.client.isDemo || choosing;
   const once =
-    <A extends unknown[]>(choose: (...args: A) => Promise<void>) =>
-    async (...args: A): Promise<void> => {
-      if (pending.current) return;
+    <A extends unknown[]>(choose: (...args: A) => Promise<boolean>) =>
+    async (...args: A): Promise<boolean> => {
+      if (pending.current) return false;
       pending.current = true;
       setChoosing(true);
       try {
-        await choose(...args);
+        return await choose(...args);
       } finally {
         pending.current = false;
         setChoosing(false);
       }
     };
 
-  const play = async (creatorId: CreatorId, versionId: PersonaVersionId): Promise<void> => {
-    setDone(null);
-    await pg.run((c) => c.choosePersona({ kind: 'version', creatorId, versionId }));
-  };
-
-  const pickCreator = async (value: string): Promise<void> => {
-    setProblem(null);
-    setDone(null);
-    if (value === INVENTED) {
-      await pg.run((c) => c.choosePersona({ kind: 'invented' }));
-      return;
-    }
+  /** Plays her version in force; says why not when she has none. */
+  const pickCreator = async (value: string, quiet = false): Promise<boolean> => {
+    if (!quiet) setProblem(null);
     const creator = creators.data?.find((c) => c.id === value);
-    if (creator === undefined) return;
+    if (creator === undefined) return false;
     const hers = await client
       .query({ queryKey: overviewKey(creator.id), queryFn: () => fetchPersonaOverview(creator.id) })
       .catch(() => null);
     if (hers === null) {
-      setProblem('Ses versions ne se chargent pas. Réessaie dans un instant.');
-      return;
+      if (!quiet) setProblem('Ses versions ne se chargent pas. Réessaie dans un instant.');
+      return false;
     }
-    const first = firstOf(hers);
-    if (first === null) {
-      setProblem(`${creator.displayName} n’a pas encore de persona : écris-la dans Créatrices.`);
-      return;
+    const version = inForce(hers);
+    if (version === null) {
+      if (!quiet)
+        setProblem(
+          `${creator.displayName} n’a pas de persona en vigueur : active-en une dans Créatrices › Persona.`,
+        );
+      return false;
     }
-    await play(creator.id, first);
+    await pg.run((c) => c.choosePersona({ kind: 'version', creatorId: creator.id, versionId: version.id }));
+    return true;
   };
 
-  const activate = async (): Promise<void> => {
-    if (played === null || current === undefined) return;
-    setProblem(null);
-    const expectedActive = versions.find((v) => v.isActive)?.id ?? null;
-    const result = await activateVersion(played.creatorId, played.versionId, expectedActive).catch(
-      () => 'failed' as const,
-    );
-    if (result === 'activated') {
-      setDone(`Version ${current.version} activée : ses prochains brouillons l’écrivent avec elle.`);
-      // The screen says it at once: the version heard is now the one in force, before the list is read again.
-      const activated = played.versionId;
-      client.setQueryData<PersonaOverview>(overviewKey(played.creatorId), (old) =>
-        old === undefined
-          ? old
-          : { ...old, versions: old.versions.map((v) => ({ ...v, isActive: v.id === activated })) },
+  // A scene that opens on the invented persona plays the first creator with a version in force instead.
+  const opened = useRef(false);
+  const [noneInForce, setNoneInForce] = useState(false);
+  useEffect(() => {
+    if (opened.current || played !== null || pg.client.isDemo || creators.data === undefined) return;
+    opened.current = true;
+    const list = creators.data;
+    void once(async () => {
+      for (const creator of list) if (await pickCreator(creator.id, true)) return true;
+      setNoneInForce(true);
+      return false;
+    })();
+  });
+
+  // Another version was put in force since the scene began: the playground follows it, never an old one, once.
+  const followed = useRef<PersonaVersionId | null>(null);
+  useEffect(() => {
+    if (played === null || active === null || active.id === played.versionId || pending.current) return;
+    if (followed.current === active.id) return;
+    followed.current = active.id;
+    void once(async () => {
+      await pg.run((c) =>
+        c.choosePersona({ kind: 'version', creatorId: played.creatorId, versionId: active.id }),
       );
-      await client.invalidateQueries({ queryKey: overviewKey(played.creatorId) });
-    } else if (result === 'reauth') setReauth(true);
-    else if (result === 'conflict') {
-      setProblem('Une autre version est devenue active entre-temps : rien n’a changé.');
-      await client.invalidateQueries({ queryKey: overviewKey(played.creatorId) });
-    } else {
-      setProblem(
-        result === 'forbidden'
-          ? 'Seul le propriétaire active une persona.'
-          : 'Rien n’a été activé : Impera ne répond pas. Réessaie dans un instant.',
-      );
-    }
-  };
+      return true;
+    })();
+  });
+
+  const hint = pg.client.isDemo
+    ? 'En démonstration, sans serveur, l’agent parle avec une persona inventée.'
+    : played !== null
+      ? 'Sa version en vigueur, celle que lisent ses fans. Tes notes vont à cette créatrice ; changer recommence la conversation.'
+      : noneInForce
+        ? 'Aucune créatrice n’a de persona en vigueur : active-en une dans Créatrices › Persona.'
+        : null;
 
   return (
     <section className="pg-who" aria-label="Elle">
       <p className="nv-eyebrow">Elle</p>
-      <Chips
-        label="Persona"
-        value={played?.creatorId ?? INVENTED}
-        disabled={disabled}
-        onChange={(value) => void once(pickCreator)(value)}
-        options={[
-          { value: INVENTED, label: played === null ? `Fictive (${state.persona.name})` : 'Fictive' },
-          ...(creators.data ?? []).map((creator) => ({ value: creator.id, label: creator.displayName })),
-        ]}
-      />
-      {played === null ? null : (
+      {(creators.data ?? []).length === 0 ? null : (
         <Chips
-          label="Version"
-          value={played.versionId}
-          disabled={disabled || versions.length === 0}
-          onChange={(value) => {
-            const chosen = versions.find((v) => v.id === value);
-            if (chosen !== undefined) void once(play)(played.creatorId, chosen.id);
-          }}
-          options={
-            versions.length === 0
-              ? [{ value: played.versionId, label: played.version }]
-              : versions.map((version) => ({
-                  value: version.id,
-                  label: version.version,
-                  ...(version.isActive ? { hint: 'en vigueur' } : {}),
-                }))
-          }
+          label="Persona"
+          value={played?.creatorId ?? ''}
+          disabled={disabled}
+          onChange={(value) => void once(pickCreator)(value)}
+          options={(creators.data ?? []).map((creator) => ({
+            value: creator.id,
+            label: creator.displayName,
+          }))}
         />
       )}
-      <p className="pg-hint">
-        {played === null
-          ? 'Choisis une créatrice pour entendre sa persona avant ses fans. Changer recommence la conversation.'
-          : current?.isActive === true
-            ? 'La version que lisent ses fans. Tes notes vont à cette créatrice.'
-            : 'Pas encore active : ses fans ne la lisent pas. Tes notes vont à cette créatrice.'}
-      </p>
-      {played !== null && current !== undefined && !current.isActive ? (
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft nv-btn--sm pg-who__activate"
-          disabled={pg.busy}
-          onClick={() => void activate()}
-        >
-          Activer cette version
-        </button>
-      ) : null}
-      {reauth ? (
-        <PasswordPrompt
-          lead="Cette version parlera à tous ses fans : pour l’activer, confirme ton mot de passe et ton code."
-          onConfirmed={() => {
-            setReauth(false);
-            void activate();
-          }}
-          onCancel={() => {
-            setReauth(false);
-          }}
-        />
-      ) : null}
+      {played === null ? null : (
+        <p className="pg-who__version">
+          Version {played.version} <span className="pg-who__in-force">· en vigueur</span>
+        </p>
+      )}
+      {hint === null ? null : <p className="pg-hint">{hint}</p>}
       {problem === null ? null : (
         <p className="pg-error is-warn" role="alert">
           {problem}
-        </p>
-      )}
-      {done === null ? null : (
-        <p className="pg-hint" role="status">
-          {done}
         </p>
       )}
     </section>
