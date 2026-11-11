@@ -487,6 +487,7 @@ export function MoreSheet({
             style={{ '--nv-i': items.length + 6 }}
             onClick={onSignOut}
           >
+            <NavIcon name="sign-out" />
             Se déconnecter
           </button>
         )}
@@ -557,6 +558,7 @@ function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => v
               setOpen(false);
             }}
           >
+            <NavIcon name="bell" />
             Notifications
           </Link>
           <Link
@@ -566,6 +568,7 @@ function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => v
               setOpen(false);
             }}
           >
+            <NavIcon name="shield" />
             Sécurité
           </Link>
           {account.extension ? (
@@ -576,10 +579,12 @@ function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => v
                 setOpen(false);
               }}
             >
+              <NavIcon name="puzzle" />
               Extension
             </Link>
           ) : null}
           <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onSignOut}>
+            <NavIcon name="sign-out" />
             Se déconnecter
           </button>
         </div>

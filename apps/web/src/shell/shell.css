@@ -733,8 +733,22 @@
   justify-content: flex-start;
   width: 100%;
 }
+/* Each line has its icon, as the phone's « Plus » sheet (recette 11/11, GES-23). */
+.nv-user__menu .nv-btn svg {
+  width: 16px;
+  height: 16px;
+}
 .nv-user__menu .nv-appearance {
   padding: 6px 6px 8px;
+}
+/* The rail is narrow: the segment takes the menu's whole width, so « Appareil » keeps air before its edge (recette
+   11/11, CHA-28). The label and the hint stay in line with the menu's lines. */
+.nv-user__menu .nv-appearance__seg {
+  width: calc(100% + 12px);
+  margin-inline: -6px;
+}
+.nv-user__menu .nv-seg__opt {
+  font-size: 12px;
 }
 
 /* Nuit, Jour, Appareil: the browser's own choice, in the account's menu and the phone's sheet (NAV-03). */
