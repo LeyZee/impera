@@ -524,7 +524,6 @@ describe('loadConfig', () => {
       NODE_ENV: 'production',
       CREDENTIALS_ENCRYPTION_KEYS: 'k1:' + 'a'.repeat(44),
       SESSION_ENCRYPTION_KEYS: 'k1:' + 'b'.repeat(44),
-      EXTENSION_DEVICE_TOKEN: 'c'.repeat(48),
     };
 
     it('takes both buckets whole, or none outside production, never half of one', () => {
@@ -617,7 +616,6 @@ describe('loadConfig', () => {
           NODE_ENV: 'production',
           CREDENTIALS_ENCRYPTION_KEYS: 'k1:' + 'a'.repeat(44),
           SESSION_ENCRYPTION_KEYS: 'k1:' + 'b'.repeat(44),
-          EXTENSION_DEVICE_TOKEN: 'c'.repeat(48),
           ...MEDIA,
           S3_ENDPOINT: 'http://fsn1.objects.example.test',
         }),

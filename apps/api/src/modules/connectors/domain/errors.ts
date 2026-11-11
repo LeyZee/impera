@@ -1,4 +1,10 @@
-import { DomainError, type ConnectorErrorCode } from '@impera/contracts';
+import {
+  CONNECTOR_LINK_FORBIDDEN,
+  CONNECTOR_SESSION_CONFLICT,
+  CONNECTOR_SESSION_UNPROCESSABLE,
+  DomainError,
+  type ConnectorErrorCode,
+} from '@impera/contracts';
 
 export class PlatformAccountNotFound extends DomainError {
   constructor() {
@@ -20,9 +26,31 @@ export class SessionVaultMissing extends DomainError {
   }
 }
 
-export class DeviceUnauthenticated extends DomainError {
+/** No extension link, or one that names nobody (ADR 0066 § 7): 401. */
+export class ConnectorLinkUnauthenticated extends DomainError {
   constructor() {
-    super('device_unauthenticated', 'Appareil non reconnu');
+    super('connector_link_unauthenticated', 'Extension non reliée : relie-la depuis le CRM');
+  }
+}
+
+/** A link that is not the owner's: only she syncs a platform session (ADR 0066 § 7): 403. */
+export class ConnectorLinkForbidden extends DomainError {
+  constructor() {
+    super(CONNECTOR_LINK_FORBIDDEN, 'Seul le propriétaire synchronise une session');
+  }
+}
+
+/** Not a session of the account's platform (wrong shape, or a platform that takes none): 422. */
+export class SessionShapeUnprocessable extends DomainError {
+  constructor() {
+    super(CONNECTOR_SESSION_UNPROCESSABLE, 'Cette session ne correspond pas à la plateforme du compte');
+  }
+}
+
+/** A session of another creator than the one already stored on the account: 409. */
+export class SessionOwnerConflict extends DomainError {
+  constructor() {
+    super(CONNECTOR_SESSION_CONFLICT, 'Cette session est celle d’une autre créatrice que ce compte');
   }
 }
 

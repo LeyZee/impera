@@ -75,10 +75,42 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
     creatorOf: (id) =>
       withAdmin(adminDb, async (tx) => {
         const [row] = await tx
-          .select({ creatorId: schema.platformAccounts.creatorId })
+          .select({
+            creatorId: schema.platformAccounts.creatorId,
+            platform: schema.platformAccounts.platform,
+          })
           .from(schema.platformAccounts)
           .where(byId(id));
-        return row === undefined ? null : CreatorIdSchema.parse(row.creatorId);
+        return row === undefined
+          ? null
+          : { creatorId: CreatorIdSchema.parse(row.creatorId), platform: PlatformSchema.parse(row.platform) };
+      }),
+
+    listSyncable: (platform) =>
+      withAdmin(adminDb, async (tx) => {
+        const rows = await tx
+          .select({
+            id: schema.platformAccounts.id,
+            platform: schema.platformAccounts.platform,
+            handle: schema.platformAccounts.handle,
+            creatorName: schema.creators.displayName,
+            sessionState: schema.platformAccounts.sessionState,
+            sessionUpdatedAt: schema.platformAccounts.sessionUpdatedAt,
+          })
+          .from(schema.platformAccounts)
+          .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
+          .where(
+            and(eq(schema.platformAccounts.platform, platform), sql`${schema.creators.archivedAt} is null`),
+          )
+          .orderBy(schema.creators.displayName, schema.platformAccounts.handle);
+        return rows.map((row) => ({
+          id: PlatformAccountIdSchema.parse(row.id),
+          platform: PlatformSchema.parse(row.platform),
+          handle: row.handle,
+          creatorName: row.creatorName,
+          sessionState: SessionStateSchema.parse(row.sessionState),
+          sessionUpdatedAt: row.sessionUpdatedAt,
+        }));
       }),
 
     get: (creatorId, id) =>

@@ -11,7 +11,7 @@
 - `domain/platform-connector.ts` : le port et `ConnectorError` ; `domain/rhythm.ts` : rythme des relèves et coupe-circuit.
 - `application/` : jobs `dispatch`, `poll`, `reconcile` ; `sessions` ; `outbound-sender` (port `OutboundSender` de `conversations`).
 - `infra/fake/FakeConnector.ts` : plateforme en mémoire à scénarios. `infra/__tests__/contract.test.ts` : la suite que tout adaptateur doit passer.
-- `infra/http/routes.ts` : `POST /v1/connector/sessions`, la « Sync » de l'extension, authentifiée par le jeton d'appareil (`x-extension-token`) vérifié dès l'arrivée de la requête : sans jeton valide, 401 `device_unauthenticated` avant toute lecture du corps (jamais un 400 qui listerait les champs attendus).
+- `infra/http/routes.ts` : la « Sync » de l'extension (P2-01) : `GET /v1/connector/accounts?platform=` (les comptes à synchroniser) et `POST /v1/connector/sessions`, authentifiées par la liaison de l'extension du propriétaire (`x-extension-link`, ADR 0066 § 7), vérifiée dès l'arrivée de la requête : sans liaison valide, 401 `connector_link_unauthenticated` avant toute lecture du corps ; liaison d'un autre rôle, 403 `connector_link_forbidden`. La session est lue par le lecteur de sa plateforme (`infra/reveal/session.ts`) : forme inconnue, 422 ; session d'une autre créatrice que celle déjà gardée, 409.
 - Un adaptateur se branche par le registre (`ConnectorRegistry`, une fabrique par plateforme) passé à `createApp` ; registre vide = aucun compte relevé.
 
 ## Flux de ventes (CRM-01, ADR 0050)

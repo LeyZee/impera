@@ -1,4 +1,5 @@
 import {
+  CONNECTOR_LINK_FORBIDDEN,
   CreatorIdSchema,
   WatchSessionIdSchema,
   type CreatorId,
@@ -8,6 +9,9 @@ import { browser, type Browser } from 'wxt/browser';
 
 import { FromPanelSchema, sendVerdict, type VerdictSent } from '../lib/copilot/verdict';
 import { crmOriginOf, DEFAULT_CRM_ADDRESS } from '../lib/crm-address';
+import { fetchSyncableAccounts, sendSession } from '../lib/reveal/api';
+import { REVEAL_API_PATTERN } from '../lib/reveal/capture';
+import { captureSession, syncReveal, type RequestTap, type SeenRequest } from '../lib/reveal/sync';
 import { placeOf } from '../lib/tab';
 import { fetchMarkableCreators, sendCaptures, sendReadings } from '../lib/watch/api';
 import { captureMarked } from '../lib/watch/captures';
@@ -23,6 +27,8 @@ import {
   type MarkableCreators,
   type Marked,
   type OnScreen,
+  type RevealAccounts,
+  type RevealSynced,
   type SeenPost,
   type ToReader,
   type WatchStatus,
@@ -318,6 +324,64 @@ export default defineBackground(() => {
     return { state: 'unreachable', items: [] };
   }
 
+  /* ---- The owner's « Sync » of a Reveal session (P2-01) ---- */
+
+  async function revealAccounts(): Promise<RevealAccounts> {
+    const token = await readLink();
+    if (token === null) return { state: 'none', accounts: [] };
+    const answer = await fetchSyncableAccounts(await crmOrigin(), token);
+    switch (answer.kind) {
+      case 'ok':
+        return {
+          state: 'ok',
+          accounts: answer.value.accounts.map(
+            ({ id, handle, creatorName, sessionState, sessionUpdatedAt }) => ({
+              id,
+              handle,
+              creatorName,
+              sessionState,
+              sessionUpdatedAt,
+            }),
+          ),
+        };
+      case 'revoked':
+        await markRevoked();
+        return { state: 'revoked', accounts: [] };
+      case 'refused':
+        return {
+          state: answer.code === CONNECTOR_LINK_FORBIDDEN ? 'not-owner' : 'unreachable',
+          accounts: [],
+        };
+      case 'unreachable':
+        return { state: 'unreachable', accounts: [] };
+    }
+  }
+
+  /** The Reveal tab's requests, heard only while a « Sync » waits; the listener is removed as soon as it ends. */
+  type Heard = Parameters<typeof browser.webRequest.onBeforeSendHeaders.addListener>[0];
+  const heard = new Map<(request: SeenRequest) => void, Heard>();
+  const revealTap: RequestTap = {
+    listen: (tabId, listener) => {
+      const registered: Heard = (details) => {
+        listener({ url: details.url, requestHeaders: details.requestHeaders ?? [] });
+        return undefined;
+      };
+      heard.set(listener, registered);
+      browser.webRequest.onBeforeSendHeaders.addListener(registered, { urls: [REVEAL_API_PATTERN], tabId }, [
+        'requestHeaders',
+        'extraHeaders',
+      ]);
+    },
+    stop: (listener) => {
+      const registered = heard.get(listener);
+      heard.delete(listener);
+      if (registered !== undefined) browser.webRequest.onBeforeSendHeaders.removeListener(registered);
+    },
+    reload: (tabId) => {
+      void browser.tabs.reload(tabId).catch(() => undefined);
+    },
+  };
+
   async function fromPopup(message: FromPopup): Promise<unknown> {
     switch (message.type) {
       case 'popup/status': {
@@ -364,6 +428,27 @@ export default defineBackground(() => {
       case 'popup/unlink':
         await forgetLink();
         return { ok: true };
+      case 'popup/reveal-accounts':
+        return revealAccounts();
+      case 'popup/reveal-sync': {
+        const tab = await browser.tabs.get(message.tabId).catch(() => null);
+        // Only from a Reveal tab: its requests are the ones read.
+        if (placeOf(tab?.url, '') !== 'reveal') return { state: 'no-session' } satisfies RevealSynced;
+        return syncReveal(
+          {
+            readLink,
+            markRevoked,
+            origin: crmOrigin,
+            capture: () =>
+              captureSession(revealTap, message.tabId, {
+                userAgent: navigator.userAgent,
+                now: () => new Date(),
+              }),
+            send: sendSession,
+          },
+          message.accountId,
+        );
+      }
     }
   }
 

@@ -81,7 +81,6 @@ Toutes dans Coolify → Environment Variables, marquées « secret » quand c'es
 | `CREDENTIALS_ENCRYPTION_KEYS` | `v1:` + une **autre** sortie de `openssl rand -base64 32` |
 | `AUTH_SECRET` | `openssl rand -base64 32` |
 | `AUTH_BASE_URL`, `WEB_ORIGIN` | l'URL publique du dashboard, la même pour les deux (`https://app.<domaine>`). Son domaine est celui des clés d'accès (ADR 0053) : le changer rend toutes les clés inutilisables ; chacun se reconnecte avec son mot de passe et son code, puis ajoute une nouvelle clé |
-| `EXTENSION_DEVICE_TOKEN` | `openssl rand -hex 24` (48 caractères) |
 | `TRUST_PROXY_HOPS` | `2` (le proxy de Coolify, puis le nginx de `web`) ; défaut du compose |
 | `PLAYGROUND_PERSONA_PATH` | facultatif : chemin **dans le conteneur** de la persona du playground (§ 1.5) ; démo sans lui. Les brouillons, les gardes et « À apprendre » ne le lisent pas |
 | `BACKUP_*` | § 4.1 ; sans elles, l'export de la nuit échoue et l'alerte le signale |

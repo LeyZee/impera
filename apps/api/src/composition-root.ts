@@ -293,6 +293,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     // The member made by `team`, the account linked by this module's own write, in one transaction (ADR 0076 § 3).
     invite: (actor, input) =>
       team.module.invites(connectors.module.invitationChatterLinks).fromPlatform(actor, input),
+    // The extension's « Sync » (ADR 0066 § 7): the person the link names, read as a session would read him.
+    linkUser: async (token) => {
+      const holder = await trends.module.linkHolder(token);
+      return holder === null ? null : currentUserById(db.db, shiftCreators, holder.userId);
+    },
     registry: options.connectorRegistry ?? {},
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),

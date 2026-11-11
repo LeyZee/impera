@@ -1,11 +1,14 @@
 import { randomBytes } from 'node:crypto';
 
 import {
+  ConnectorAccountsSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   DraftIdSchema,
+  ExtensionLinkCreatedSchema,
   newId,
   PlatformAccountIdSchema,
+  TeamMemberIdSchema,
   UserIdSchema,
   type CreatorId,
   type PlatformAccountId,
@@ -16,6 +19,7 @@ import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
+import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
 import { FakeConnector } from '../modules/connectors';
@@ -25,11 +29,12 @@ import { fixedComposer } from './support/composer';
 import { testConfig } from './support/config';
 import { LogSink } from './support/log-sink';
 import { activateDemoPersona } from './support/persona';
+import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const NO_LOG = { info: () => undefined, warn: () => undefined };
 const USER = UserIdSchema.parse('0199f2a0-0000-7000-8000-000000000001');
 const SESSION_KEYS = `v1:${randomBytes(32).toString('base64')}`;
-const DEVICE_TOKEN = randomBytes(32).toString('base64');
+const PASSWORD = 'correct horse battery';
 
 const JobRowSchema = z.object({ queue_name: z.string().nullable(), key: z.string().nullable() });
 
@@ -42,6 +47,9 @@ describe('connectors module (P0-06)', () => {
   /** One fake platform per account; the registry hands the right one to the resolver. */
   const fakes = new Map<string, FakeConnector>();
   const sessionsSeen = new Map<string, string | null>();
+  let ownerId: string;
+  let ownerLink: string;
+  let chatterLink: string;
 
   async function account(
     handle: string,
@@ -95,7 +103,6 @@ describe('connectors module (P0-06)', () => {
       DATABASE_URL: test.appUrl,
       DATABASE_ADMIN_URL: test.adminUrl,
       SESSION_ENCRYPTION_KEYS: SESSION_KEYS,
-      EXTENSION_DEVICE_TOKEN: DEVICE_TOKEN,
     });
     const logger = createLogger(config, sink);
     app = await createApp(config, logger, {
@@ -113,6 +120,38 @@ describe('connectors module (P0-06)', () => {
       .insert(schema.creators)
       .values({ id: creatorId, nameKey: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
     await activateDemoPersona(app, creatorId);
+    // The extension's links (ADR 0066 § 7): the owner's, and a chatter's that names someone but may not sync.
+    const linkOf = async (cookie: string): Promise<string> => {
+      const created = await server.inject({
+        method: 'POST',
+        url: '/v1/trends/extension-links',
+        headers: { cookie, origin: DASHBOARD_ORIGIN },
+        payload: { label: 'Popup' },
+      });
+      expect(created.statusCode, created.body).toBe(201);
+      return ExtensionLinkCreatedSchema.parse(created.json()).token;
+    };
+    const owner = { email: 'owner@example.test', name: 'Owner', password: PASSWORD };
+    ownerId = (await createOwner(app.auth, app.db.db, owner)).userId;
+    ownerLink = await linkOf(await signIn(server, owner.email, PASSWORD));
+    const chatter = { email: 'chatter@example.test', name: 'Chatter', password: PASSWORD };
+    const { userId: chatterId } = await createOwner(app.auth, app.db.db, chatter);
+    await test.admin.db
+      .update(schema.user)
+      .set({ role: 'operator', creatorIds: [creatorId] })
+      .where(eq(schema.user.id, chatterId));
+    await test.admin.db.insert(schema.teamMembers).values({
+      id: newId(TeamMemberIdSchema),
+      userId: chatterId,
+      teamRole: 'chatter',
+      firstName: 'Prénom',
+      lastName: 'Inventé',
+      displayName: 'chatter test',
+      country: 'BJ',
+      timeZone: 'Africa/Porto-Novo',
+      joinedOn: '2026-10-01',
+    });
+    chatterLink = await linkOf(await signIn(server, chatter.email, PASSWORD));
   });
 
   afterAll(async () => {
@@ -273,45 +312,70 @@ describe('connectors module (P0-06)', () => {
     expect(polls.map((job) => job.key)).not.toContain(`poll:${paused[0]?.id ?? ''}`);
   });
 
-  it("stores the extension's session encrypted, unreadable without the key, and never logs it", async () => {
-    const id = await account('sync', 'none');
-    const secret = `reveal-session-${randomBytes(12).toString('hex')}`;
-    const refused = await server.inject({
+  /** A Reveal session of the shape the extension sends (reveal-connector-spec.md § 2), all invented. */
+  const revealSession = (bearer: string, modelId = 'model-test-a'): string =>
+    JSON.stringify({
+      v: 1,
+      bearer,
+      userId: 'user-bot-test',
+      modelId,
+      userAgent: 'Mozilla/5.0 (test)',
+      capturedAt: '2026-11-11T10:00:00.000Z',
+    });
+
+  const sync = (platformAccountId: PlatformAccountId, session: string, link: string | null = ownerLink) =>
+    server.inject({
       method: 'POST',
       url: '/v1/connector/sessions',
-      headers: { 'x-extension-token': 'wrong' },
-      payload: { platformAccountId: id, session: secret },
+      headers: {
+        origin: 'chrome-extension://abcdef',
+        ...(link === null ? {} : { 'x-extension-link': link }),
+      },
+      payload: { platformAccountId, session },
     });
+
+  it("stores the extension's session encrypted, unreadable without the key, and never logs it", async () => {
+    const id = await account('sync', 'none');
+    const secret = revealSession(`reveal-bearer-${randomBytes(12).toString('hex')}`);
+    const refused = await sync(id, secret, 'A'.repeat(43));
     expect(refused.statusCode).toBe(401);
-    expect(refused.json()).toMatchObject({ error: { code: 'device_unauthenticated' } });
-    // The token before the body (recette 28/10): without it, a body that does not validate, or is not even JSON,
+    expect(refused.json()).toMatchObject({ error: { code: 'connector_link_unauthenticated' } });
+    // The link before the body (recette 28/10): without it, a body that does not validate, or is not even JSON,
     // gets the same 401, never a 400 listing the fields.
     for (const attempt of [
       { headers: {}, payload: { platformAccountId: 'nope' } },
-      { headers: { 'x-extension-token': 'wrong' }, payload: {} },
+      { headers: { 'x-extension-link': 'wrong' }, payload: {} },
       { headers: { 'content-type': 'application/json' }, payload: '{"session":' },
     ]) {
       const early = await server.inject({ method: 'POST', url: '/v1/connector/sessions', ...attempt });
       expect([early.statusCode, early.json<{ error: { code: string } }>().error.code]).toEqual([
         401,
-        'device_unauthenticated',
+        'connector_link_unauthenticated',
       ]);
     }
+    // A chatter's link names someone, but only the owner syncs (ADR 0066 § 7).
+    const byChatter = await sync(id, secret, chatterLink);
+    expect([byChatter.statusCode, byChatter.json<{ error: { code: string } }>().error.code]).toEqual([
+      403,
+      'connector_link_forbidden',
+    ]);
+    // Not a Reveal session: refused before anything is stored.
+    const shapeless = await sync(id, 'reveal-session-in-the-old-shape');
+    expect([shapeless.statusCode, shapeless.json<{ error: { code: string } }>().error.code]).toEqual([
+      422,
+      'connector_session_unprocessable',
+    ]);
+    expect((await accountRow(id)).sessionCiphertext).toBeNull();
 
-    const stored = await server.inject({
-      method: 'POST',
-      url: '/v1/connector/sessions',
-      headers: { 'x-extension-token': DEVICE_TOKEN, origin: 'chrome-extension://abcdef' },
-      payload: { platformAccountId: id, session: secret },
-    });
+    const stored = await sync(id, secret);
     expect(stored.statusCode, stored.body).toBe(204);
 
     const row = await accountRow(id);
     expect(row.sessionState).toBe('valid');
     const ciphertext = row.sessionCiphertext;
     if (ciphertext === null) throw new Error('no ciphertext');
-    expect(ciphertext.toString('utf8')).not.toContain(secret);
-    expect(ciphertext.toString('latin1')).not.toContain(secret);
+    expect(ciphertext.toString('utf8')).not.toContain('reveal-bearer-');
+    expect(ciphertext.toString('latin1')).not.toContain('reveal-bearer-');
     expect(decryptSecret(ciphertext, parseEncryptionKeys(SESSION_KEYS), id)).toBe(secret);
     const otherKey = parseEncryptionKeys(`v1:${randomBytes(32).toString('base64')}`);
     expect(() => decryptSecret(ciphertext, otherKey, id)).toThrow();
@@ -324,21 +388,51 @@ describe('connectors module (P0-06)', () => {
       .select()
       .from(schema.auditLog)
       .where(eq(schema.auditLog.action, 'connector.session_stored'));
-    expect(audit.map((entry) => entry.entityId)).toEqual([id]);
+    expect(audit.map((entry) => [entry.entityId, entry.userId])).toEqual([[id, ownerId]]);
     expect(sink.lines.length).toBeGreaterThan(0);
-    expect(JSON.stringify(sink.lines)).not.toContain(secret);
-    expect(JSON.stringify(sink.lines)).not.toContain(DEVICE_TOKEN);
+    const logged = JSON.stringify(sink.lines);
+    expect(logged).not.toContain('reveal-bearer-');
+    expect(logged).not.toContain(ownerLink);
+  });
+
+  it('refuses a session of another creator than the one the account already holds', async () => {
+    const id = await account('other-model', 'none');
+    expect((await sync(id, revealSession('reveal-bearer-first-aaaa', 'model-test-a'))).statusCode).toBe(204);
+    const other = await sync(id, revealSession('reveal-bearer-second-bbb', 'model-test-b'));
+    expect([other.statusCode, other.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'connector_session_conflict',
+    ]);
+    // The same creator, a new token: a re-sync, taken.
+    expect((await sync(id, revealSession('reveal-bearer-third-cccc', 'model-test-a'))).statusCode).toBe(204);
+  });
+
+  it("lists the accounts to sync for the owner's link only, never a session", async () => {
+    const id = await account('listed', 'none');
+    const list = (link: string | null) =>
+      server.inject({
+        method: 'GET',
+        url: '/v1/connector/accounts?platform=reveal',
+        headers: link === null ? {} : { 'x-extension-link': link },
+      });
+    expect((await list(null)).statusCode).toBe(401);
+    expect((await list(chatterLink)).statusCode).toBe(403);
+    const listed = await list(ownerLink);
+    expect(listed.statusCode, listed.body).toBe(200);
+    const { accounts } = ConnectorAccountsSchema.parse(listed.json());
+    expect(accounts.find((entry) => entry.id === id)).toMatchObject({
+      handle: 'listed',
+      creatorName: 'Test',
+      sessionState: 'none',
+      sessionUpdatedAt: null,
+    });
+    expect(listed.body).not.toContain('reveal-bearer-');
   });
 
   it('dates the session only when it is new: the same one sent again does not hide a late read (recette 28/10)', async () => {
     const id = await account('resent', 'none');
     const send = async (session: string) => {
-      const sent = await server.inject({
-        method: 'POST',
-        url: '/v1/connector/sessions',
-        headers: { 'x-extension-token': DEVICE_TOKEN, origin: 'chrome-extension://abcdef' },
-        payload: { platformAccountId: id, session },
-      });
+      const sent = await sync(id, revealSession(session));
       expect(sent.statusCode, sent.body).toBe(204);
     };
     const longAgo = new Date('2026-01-01T00:00:00.000Z');
@@ -385,7 +479,8 @@ describe('connectors module (P0-06)', () => {
         creatorId,
         payload: {
           reason: 'platform_session_replaced',
-          userId: null,
+          // Who synced it: the owner whose link sent it.
+          userId: ownerId,
           platformAccountId: id,
           platform: 'reveal',
         },

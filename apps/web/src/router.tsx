@@ -16,6 +16,7 @@ import { parsePaySearch } from './payroll/model';
 import { ExtensionPage } from './pwa/ExtensionPage';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
+import { RevealHelpPage } from './pwa/RevealHelpPage';
 import { parseCalendarSearch } from './scheduling/calendar';
 import { myAwayOf } from './scheduling/model';
 import { AgendaPage } from './screens/agenda/AgendaPage';
@@ -967,6 +968,18 @@ const extensionHelp = createRoute({
     return <ExtensionPage watches={user.role === 'owner' || user.teamScope === 'agency'} />;
   },
 });
+/** /aide/reveal (P2-01): reconnect Reveal with the extension's « Sync », the owner's alone like the button itself. */
+const revealHelp = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/aide/reveal',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: railOf(context.user).home, replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: RevealHelpPage,
+});
 /** /notifications (CR-01): every role, from the account's menu; this device and the account's quiet hours. */
 const notifications = createRoute({
   getParentRoute: () => rootRoute,
@@ -981,6 +994,7 @@ const notifications = createRoute({
 const routeTree = rootRoute.addChildren([
   installHelp,
   extensionHelp,
+  revealHelp,
   notifications,
   dashboard,
   creators,
