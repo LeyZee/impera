@@ -12,5 +12,6 @@ Documents de fond, lus au besoin. Ils ne décident rien (les ADR décident) ; il
 | `reveal-connector-inventory.md` | Ce que le connecteur Reveal doit savoir faire, et ce que la capture doit montrer |
 | `fake-reveal.md` | Spécification de FakeReveal, le double de Reveal pour les tests |
 | `reveal-api-observed.md` | Journal d'observation de l'API privée de Reveal (rempli en phase 1) |
+| `reveal-connector-spec.md` | Spécification du connecteur Reveal (session, client, mappage, écritures, risques, fiches P2) |
 | `llm-providers.md` | État des fournisseurs : capacités, politiques, prix, dates de vérification |
 | `residence-certificate-benin.md` | Le guide d'écran de l'attestation de domiciliation fiscale du chatteur béninois (EQ-06 lot 8b), validé par Charles le 02/11 ; tout changement repasse par lui |

@@ -32,7 +32,7 @@ Date : AAAA-MM-JJ
 | 0005 | Postgres + Drizzle + RLS par `creator_id` | accepted |
 | 0006 | Graphile Worker, une file série par conversation | accepted |
 | 0007 | Journal d'événements de conversation comme source de vérité | accepted |
-| 0008 | Port `PlatformConnector` ; Reveal via session capturée et client API serveur | accepted (complétée par 0050 : l'API CRM pour les ventes et les chiffres) |
+| 0008 | Port `PlatformConnector` ; Reveal via session capturée et client API serveur | accepted (complétée par 0050 : l'API CRM pour les ventes et les chiffres ; B confirmée par P1-03 le 11/11, `reveal-connector-spec.md` § 1) |
 | 0009 | Passerelle LLM unique, trois rôles, règles métier dans le code | accepted |
 | 0010 | Persona = donnée versionnée (YAML + schéma Zod), pas du code | accepted |
 | 0011 | Argent en unités mineures entières ; identifiants UUID v7 typés | accepted |

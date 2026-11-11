@@ -41,8 +41,14 @@ Branche : task/<id>-<slug>
 | P0-07b | CI, scripts ops, bout en bout phase 0 | 0 | todo | P0-06, P0-07a |
 | P0-08 | Schéma de persona calqué sur OnlyChat | 0 | done | P0-01 |
 | P1-01 | Extension : enregistreur d'API | 1 | todo | P0-01 |
-| P1-02 | Analyse de l'API Reveal et FakeReveal | 1 | blocked (capture de Charles) | P1-01 ou capture HAR |
-| P1-03 | Décision B/C et spécification du connecteur Reveal | 1 | todo | P1-02 |
+| P1-02 | Analyse de l'API Reveal et FakeReveal | 1 | done | P1-01 ou capture HAR |
+| P1-03 | Décision B/C et spécification du connecteur Reveal | 1 | done | P1-02 |
+| P2-01 | Capture de la session Reveal et vérifications V1, V2 | 2 | todo | P1-03 |
+| P2-02 | `RevealApiConnector` en lecture | 2 | todo | P2-01 (V1 réussie) |
+| P2-03 | `RevealApiConnector` : envois et note client | 2 | todo | P2-02 |
+| P2-04 | Réconciliation Reveal : envois perdus, ventes, historique | 2 | todo | P2-02 |
+| P2-05 | Runbooks Reveal testés sur le compte de test | 2 | todo | P2-03 |
+| P2-06 | Déploiement du connecteur Reveal | 2 | todo | P2-05 |
 | P3-01 | Passerelle LLM multi-fournisseurs, Grok 4.7 et playground en terminal | 3 | in_progress | P0-01 |
 | P3-02 | Mémoire par fan : coder le module `fans` | 3 | todo | P0-03, P0-05, P0-08, P1-02 |
 | P3-03 | Connecter Grok, Gemini et ElevenLabs depuis le dashboard | 3 | todo | P0-03, P0-04, P0-07a, P3-01, D-01 |

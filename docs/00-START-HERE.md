@@ -17,7 +17,7 @@ Ce dépôt est conçu pour être travaillé par des sessions d'agents codeurs (C
 | La base, les entités, les migrations | `docs/architecture/data-model.md`, `docs/architecture/jsonb.md`, ADR 0005, 0007, 0011, `docker-compose.yml` |
 | L'ingestion, les drafts, l'envoi | `docs/architecture/message-flow.md`, ADR 0006, 0007 |
 | Une route HTTP, l'API du dashboard | `docs/conventions/api.md`, `docs/conventions/security.md` §6 |
-| Un connecteur (Reveal, Fake, plateforme propre) | `docs/architecture/connectors.md`, ADR 0008, `docs/reference/reveal-api-observed.md`, `docs/playbooks/add-a-connector.md` |
+| Un connecteur (Reveal, Fake, plateforme propre) | `docs/architecture/connectors.md`, ADR 0008, `docs/reference/reveal-api-observed.md`, `docs/reference/reveal-connector-spec.md`, `docs/playbooks/add-a-connector.md` |
 | Le moteur IA, les prompts, un fournisseur | `docs/architecture/ai-engine.md`, ADR 0009, 0012, `docs/playbooks/add-an-llm-provider.md`, `docs/reference/media-vocabulary.md`, `docs/reference/llm-providers.md` |
 | La persona | `docs/reference/persona-schema.md`, ADR 0010, `docs/playbooks/edit-the-persona.md` |
 | La qualité conversationnelle, les évals | `docs/playbooks/write-an-eval.md`, `evals/README.md` |

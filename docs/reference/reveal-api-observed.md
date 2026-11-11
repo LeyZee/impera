@@ -95,6 +95,21 @@ Prix en centimes TTC (`price: 300` = 3 €).
 7. Durée de validité des liens de médias (L14) et téléchargement des originaux (L15).
 8. Stabilité sur deux jours différents : les trois captures sont du même jour.
 
+## Juridique
+
+Lu le 2026-11-11 (P1-03) sur les pages publiques : `https://reveal.me/cgu` (« CGU / CGV », version 3, en vigueur au 25/07/2026), la politique anti-spam (en vigueur au 07/10/2026) et les pages `crm`, `agences`, `anonymat`. Le texte des CGU lu s'arrête dans l'article 10b.8 : les articles 11 à 13 (dont 12.5, cité par 6.3.3) **restent à lire**. Résumé, pas un avis juridique.
+
+| Sujet | Ce que disent les textes | Pour nous |
+|---|---|---|
+| Agence qui écrit pour la créatrice | Art. 5.1 et 5.3 : une « Agence Partenaire mandatée par le Créateur » gère le profil et « est autorisé[e] à échanger via le Chat avec l'Utilisateur au nom et pour le compte du Créateur » | L'agence écrit légitimement ; le membre « bot » est un membre de l'équipe de l'agence |
+| Logiciel tiers, rétro-ingénierie | Art. 9 : interdit d'« utiliser tout logiciel activant ou comprenant tout ou partie de la Plateforme », de la « décompiler, désosser », de « tenter de découvrir tout code source » | **Le risque principal** : un client qui appelle l'API privée peut être lu comme un tel logiciel. Rien ne vise expressément les API, les robots ou le scraping |
+| Envois en masse, robots | Art. 9 et anti-spam : interdits les messages « envoyés en masse » non sollicités et les « comptes automatisés ou robots » pour promouvoir un profil | Vise la prospection hors de Reveal ; l'agent ne répond qu'à des fans abonnés, un par un, au rythme d'un chatteur |
+| IA | Art. 10 bis : contenus IA reproduisant une personne réelle sans son autorisation interdits (deepfakes), et tout contenu IA sexuel représentant un mineur | Rien sur une IA qui converse ni sur une information des fans. La voix clonée exige l'autorisation écrite de la créatrice |
+| Identifiants | Art. 4.2 : « personnels et confidentiels » ; pages `crm` et `anonymat` : chaque membre a son accès, sans partager le compte de la créatrice | Le membre « bot » a son propre accès : on ne partage pas le compte de Messa |
+| Sanctions | Art. 9 : suspension « à son entière discrétion », « sans préavis », temporaire ou définitive ; anti-spam : gains du trafic de spam retenus | Le pire cas est la suspension du compte de la créatrice : d'où le rythme humain, le coupe-circuit et le kill switch |
+
+**Décision de Charles** (2026-11-11, fil Bilan, carte « Continuer le connecteur Reveal par leur API privée, malgré l'article 9 des CGU ? ») : **continuer**. Parades : membre « bot » à part, rythme humain, coupe-circuit, kill switch, aucune écriture réelle sans son accord.
+
 ## Journal des changements observés
 
 | Date | Changement | Impact | Action |
