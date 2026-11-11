@@ -19,6 +19,7 @@ import {
   type Passkeys,
   type RemovedPasskeys,
   type SecuritySettingsErrorCode,
+  limitKeyOf,
 } from '@impera/contracts';
 import {
   and,
@@ -235,7 +236,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
     const perAccount = app.createRateLimit({
       max: BACKUP_CODES_PER_ACCOUNT,
       timeWindow: BACKUP_CODES_ACCOUNT_WINDOW,
-      keyGenerator: (request) => `backup-codes:${request.user?.id ?? request.ip}`,
+      keyGenerator: (request) => `backup-codes:${request.user?.id ?? limitKeyOf(request.ip)}`,
       skipOnError: false,
     });
     app.post(
