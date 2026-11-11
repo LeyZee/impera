@@ -20,9 +20,31 @@ export class SessionVaultMissing extends DomainError {
   }
 }
 
-export class DeviceUnauthenticated extends DomainError {
+/** No extension link, or one that names nobody (ADR 0066 § 7): 401. */
+export class ConnectorLinkUnauthenticated extends DomainError {
   constructor() {
-    super('device_unauthenticated', 'Appareil non reconnu');
+    super('connector_link_unauthenticated', 'Extension non reliée : relie-la depuis le CRM');
+  }
+}
+
+/** A link that is not the owner's: only she syncs a platform session (ADR 0066 § 7): 403. */
+export class ConnectorLinkForbidden extends DomainError {
+  constructor() {
+    super('connector_link_forbidden', 'Seul le propriétaire synchronise une session');
+  }
+}
+
+/** Not a session of the account's platform (wrong shape, or a platform that takes none): 422. */
+export class SessionShapeUnprocessable extends DomainError {
+  constructor() {
+    super('connector_session_unprocessable', 'Cette session ne correspond pas à la plateforme du compte');
+  }
+}
+
+/** A session of another creator than the one already stored on the account: 409. */
+export class SessionOwnerConflict extends DomainError {
+  constructor() {
+    super('connector_session_conflict', 'Cette session est celle d’une autre créatrice que ce compte');
   }
 }
 

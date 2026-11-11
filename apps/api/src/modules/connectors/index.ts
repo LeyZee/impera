@@ -41,6 +41,7 @@ import {
   createSalesFeedTeamRoutes,
   type SalesFeedTeamRoutesOptions,
 } from './infra/http/sales-feed-team-routes';
+import { revealSessionShape } from './infra/reveal/session';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
 import { createSessionVault } from './infra/session-vault';
@@ -187,8 +188,11 @@ export interface ConnectorsDeps {
   readonly registry: ConnectorRegistry;
   /** `SESSION_ENCRYPTION_KEYS`; without them sessions can be neither stored nor read. */
   readonly sessionKeys: readonly EncryptionKey[] | null;
-  /** `EXTENSION_DEVICE_TOKEN`; without it the extension's route refuses everything. */
-  readonly deviceToken: string | null;
+  /**
+   * The person an extension link names (ADR 0066 § 7), late bound by the composition root to `trends`' link holder;
+   * `null` for a link that names nobody. Only the owner's syncs a session.
+   */
+  readonly linkUser: (token: string) => Promise<{ readonly id: string; readonly role: string } | null>;
   /**
    * CREDENTIALS_ENCRYPTION_KEYS, the AI keys' (ADR 0050 § 4); without them no sales feed key can be kept and nothing is
    * read.
@@ -237,7 +241,12 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const accounts = createDrizzleAccountStore(deps.db, deps.adminDb);
   const vault = deps.sessionKeys === null ? null : createSessionVault(deps.sessionKeys);
   const resolver = createConnectorResolver({ accounts, vault, registry: deps.registry });
-  const sessions = createConnectorSessions({ accounts, vault, clock });
+  const sessions = createConnectorSessions({
+    accounts,
+    vault,
+    clock,
+    shapes: { reveal: revealSessionShape },
+  });
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
   const avatars: AvatarPorts | null =
     deps.avatars == null ? null : { ...deps.avatars, records: createAvatarRecords(deps.adminDb) };
@@ -265,7 +274,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     name: 'connectors',
     outboundSender: createOutboundSender({ accounts, resolver, clock }),
     sessions,
-    routes: createConnectorRoutes(sessions, deps.deviceToken),
+    routes: createConnectorRoutes({ sessions, accounts, linkUser: deps.linkUser }),
     jobs: {
       dispatch: createDispatchJob({
         accounts,

@@ -80,8 +80,6 @@ const configSchema = z
     SPEECH_ELEVENLABS_API_KEY: optionalValue,
     /** AES-256-GCM keys of the platform sessions, `v2:<base64>,v1:<base64>` newest first (security.md). */
     SESSION_ENCRYPTION_KEYS: z.string().optional(),
-    /** Device token of the extension's « Sync » (`POST /v1/connector/sessions`); `openssl rand -base64 32`. */
-    EXTENSION_DEVICE_TOKEN: z.string().optional(),
     /** Entraîner > Playground: the persona YAML to train on; the fictional demo persona when absent (ADR 0010). */
     PLAYGROUND_PERSONA_PATH: optionalValue,
     /** Where the playground ratings are kept, out of the repository; `.scratch/training` when absent. */
@@ -166,14 +164,6 @@ const configSchema = z
     {
       message: 'SESSION_ENCRYPTION_KEYS is missing or still holds the .env.example placeholder',
       path: ['SESSION_ENCRYPTION_KEYS'],
-    },
-  )
-  .refine(
-    (config) =>
-      config.NODE_ENV !== 'production' || (secretOrNull(config.EXTENSION_DEVICE_TOKEN)?.length ?? 0) >= 32,
-    {
-      message: 'EXTENSION_DEVICE_TOKEN is missing, too short or still holds the .env.example placeholder',
-      path: ['EXTENSION_DEVICE_TOKEN'],
     },
   )
   .superRefine((config, context) => {

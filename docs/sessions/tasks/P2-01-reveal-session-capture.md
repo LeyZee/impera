@@ -1,6 +1,6 @@
 # P2-01 Capture de la session Reveal et vérifications V1, V2
 
-Statut : todo
+Statut : in_progress
 Phase : 2
 Dépend de : P1-03
 Branche : task/p2-01-reveal-session-capture

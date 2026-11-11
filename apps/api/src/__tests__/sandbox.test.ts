@@ -45,7 +45,6 @@ describe('the sandbox configuration', () => {
         AUTH_SECRET: 'a-real-secret-a-real-secret-a-real-secret',
         CREDENTIALS_ENCRYPTION_KEYS: 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
         SESSION_ENCRYPTION_KEYS: 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
-        EXTENSION_DEVICE_TOKEN: 'a-device-token-a-device-token-a-device',
       }),
     ).toThrow(/IMPERA_SANDBOX is for development only/);
   });

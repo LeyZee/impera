@@ -35,6 +35,8 @@ export function wireConnectors(
     readonly ingest: ConnectorsDeps['ingest'];
     /** `team`'s invitation from a link proposal (ADR 0076 § 3), late bound: `team` is wired after this module. */
     readonly invite: InviteFromPlatform;
+    /** The person an extension link names (ADR 0066 § 7), late bound: `trends` holds the links and is wired later. */
+    readonly linkUser: ConnectorsDeps['linkUser'];
     /** Reveal's adapter arrives with phase 1 (ADR 0008); until then no account is polled. */
     readonly registry: ConnectorRegistry;
     /** Reveal's CRM API (ADR 0050) by default; FakeReveal's in the tests. */
@@ -58,7 +60,7 @@ export function wireConnectors(
     ingest: deps.ingest,
     registry: deps.registry,
     sessionKeys: sessionKeys === null ? null : parseEncryptionKeys(sessionKeys, 'SESSION_ENCRYPTION_KEYS'),
-    deviceToken: secretOrNull(config.EXTENSION_DEVICE_TOKEN),
+    linkUser: deps.linkUser,
     // The AI keys' encryption (ADR 0050 § 4): without it no sales feed key is kept, nothing is read.
     credentialKeys:
       credentialKeys === null ? null : parseEncryptionKeys(credentialKeys, 'CREDENTIALS_ENCRYPTION_KEYS'),
