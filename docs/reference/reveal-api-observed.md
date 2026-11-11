@@ -108,7 +108,7 @@ Lu le 2026-11-11 (P1-03) sur les pages publiques : `https://reveal.me/cgu` (« C
 | Identifiants | Art. 4.2 : « personnels et confidentiels » ; pages `crm` et `anonymat` : chaque membre a son accès, sans partager le compte de la créatrice | Le membre « bot » a son propre accès : on ne partage pas le compte de Messa |
 | Sanctions | Art. 9 : suspension « à son entière discrétion », « sans préavis », temporaire ou définitive ; anti-spam : gains du trafic de spam retenus | Le pire cas est la suspension du compte de la créatrice : d'où le rythme humain, le coupe-circuit et le kill switch |
 
-**Décision de Charles** : en attente (fiche P1-03).
+**Décision de Charles** (2026-11-11, fil Bilan, carte « Continuer le connecteur Reveal par leur API privée, malgré l'article 9 des CGU ? ») : **continuer**. Parades : membre « bot » à part, rythme humain, coupe-circuit, kill switch, aucune écriture réelle sans son accord.
 
 ## Journal des changements observés
 
