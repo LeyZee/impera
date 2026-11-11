@@ -8,9 +8,9 @@ import { startWorker } from './worker-runner';
 /** Worker entry point (`node dist/worker.js`): same composition root as the API, no HTTP. */
 const config = loadConfig();
 const logger = createLogger(config);
-// Before anything starts: a SIGTERM during the start is kept for the stop below (`shutdown.ts`).
 // An error nobody caught is written to the log before Node exits (`crash.ts`).
 logCrashes(logger);
+// Before anything starts: a SIGTERM during the start is kept for the stop below (`shutdown.ts`).
 const graceful = exitGracefully(logger);
 const app = await createApp(config, logger, { withPlayground: false });
 const worker = await startWorker(app, {

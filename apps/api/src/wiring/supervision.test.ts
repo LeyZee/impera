@@ -7,7 +7,7 @@ const voice = (patch: Partial<RoleHealth>): RoleHealth => ({
   role: 'voice',
   state: 'ok',
   active: { provider: 'xai', model: 'grok-4.7', label: 'Grok 4.7' },
-  fallback: { provider: 'mistral', model: 'mistral-large-latest', label: 'Mistral Large', hasKey: true },
+  fallback: { provider: 'mistral', model: 'mistral-large-4-0', label: 'Mistral Large', hasKey: true },
   hasKey: true,
   isOnFallback: false,
   callsLastHour: 0,
@@ -37,7 +37,7 @@ describe('voiceHealthOf (recette AGT 06/11)', () => {
           hasKey: false,
           fallback: {
             provider: 'mistral',
-            model: 'mistral-large-latest',
+            model: 'mistral-large-4-0',
             label: 'Mistral Large',
             hasKey: false,
           },

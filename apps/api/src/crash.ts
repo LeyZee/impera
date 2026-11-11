@@ -18,6 +18,8 @@ const NODE_PROCESS: CrashSource = {
  * container and the orphaned locks are released by the next worker. Nothing is stopped gracefully here: after such an
  * error the state of the process is unknown, and carrying on could send or write something twice. The serializer of
  * `err` keeps the name, the code and the stack, never a value (`logger.ts`).
+ * The line is written because pino's default destination is synchronous: with an asynchronous transport, it would have
+ * to be flushed here before Node exits.
  */
 export function logCrashes(logger: Logger, source: CrashSource = NODE_PROCESS): void {
   source.on('uncaughtExceptionMonitor', (error, origin) => {
