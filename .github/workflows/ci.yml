@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: { fetch-depth: 0 }
       # Pinned to the commit of v3.0.0 (30/05/2026) and to gitleaks 8.24.2, not to a moving tag or `latest`: a new
       # version enters after its 14 days of quarantine. The hooks take the contributor's own binary, 8.19 or later
@@ -37,9 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with: { node-version-file: .nvmrc, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
@@ -49,9 +49,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with: { node-version-file: .nvmrc, cache: pnpm }
       # The media module cuts videos with ffmpeg; its tests run the real binary on synthetic clips. The apt mirror has
       # hung the job and timed out three tries in a row: the .deb files apt downloads are cached per runner image, so
@@ -62,7 +62,7 @@ jobs:
         run: echo "key=ffmpeg-debs-$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
       - name: Restore ffmpeg packages
         id: ffmpeg-debs
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/ffmpeg-debs
           key: ${{ steps.image.outputs.key }}
@@ -95,7 +95,7 @@ jobs:
       # Saved right away, not at the end of the job: a red test must not lose the packages.
       - name: Save ffmpeg packages
         if: steps.ffmpeg.outputs.fresh == 'true' && steps.ffmpeg-debs.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/ffmpeg-debs
           key: ${{ steps.image.outputs.key }}
@@ -114,9 +114,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with: { node-version-file: .nvmrc, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --audit-level high
@@ -127,9 +127,9 @@ jobs:
     timeout-minutes: 15
     needs: [check, test]
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with: { node-version-file: .nvmrc, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
@@ -142,7 +142,7 @@ jobs:
     env:
       COMPOSE: docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # The production stack of docker-compose.prod.yml (ADR 0027) against the development Postgres, with throwaway
       # secrets generated for this run only.
       - name: Throwaway settings
@@ -223,9 +223,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with: { node-version-file: .nvmrc, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
@@ -248,11 +248,11 @@ jobs:
           echo "::warning title=Évaluations sautées::Clé xAI absente : pnpm probe et pnpm evals n'ont pas tourné cette nuit."
           echo "### Évaluations sautées, clé absente" >> "$GITHUB_STEP_SUMMARY"
           echo "Le secret \`LLM_XAI_API_KEY\` n'est pas posé : \`pnpm probe\` et \`pnpm evals\` n'ont pas tourné, rien n'a été mesuré." >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: env.HAS_XAI_KEY == 'true'
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         if: env.HAS_XAI_KEY == 'true'
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         if: env.HAS_XAI_KEY == 'true'
         with: { node-version-file: .nvmrc, cache: pnpm }
       - run: pnpm install --frozen-lockfile
