@@ -2,6 +2,7 @@ import type {
   DescriptionReviewReason,
   DropDescriptionsReview,
   DropMediaReview,
+  HandIntensity,
   MediaDescriptionId,
   ScriptStageAccess,
 } from '@impera/contracts';
@@ -24,6 +25,14 @@ export const KIND_LABELS: Readonly<Record<DropMediaReview['kind'], string>> = {
   image: 'Photo',
   video: 'Vidéo',
   audio: 'Note vocale',
+};
+
+/** The levels the agency picks when it writes a description by hand, gentlest first, as the screen says them. */
+export const HAND_INTENSITY_LABELS: Readonly<Record<HandIntensity, string>> = {
+  soft: 'Doux',
+  suggestive: 'Suggestif',
+  explicit: 'Explicite',
+  hardcore: 'Hard',
 };
 
 export interface ReviewStep {
@@ -74,6 +83,8 @@ export interface ReviewStanding {
   /** Descriptions still to validate, the ones waiting for a human included. */
   readonly open: number;
   readonly undescribed: number;
+  /** Of those, the ones the AI gave up on: they wait for the agency, not for the AI. */
+  readonly failed: number;
   /** Every photo and video described and validated, and the synthesis of now validated. */
   readonly done: boolean;
 }
@@ -82,15 +93,21 @@ export function reviewStanding(review: DropDescriptionsReview): ReviewStanding {
   const seen = review.media.filter(describable);
   const open = seen.filter((one) => one.description !== null && one.description.validatedAt === null).length;
   const undescribed = seen.filter((one) => one.description === null).length;
+  const failed = seen.filter((one) => one.description === null && one.describeFailed).length;
   const summaryDone =
     review.summary !== null && review.summary.current && review.summary.validatedAt !== null;
-  return { open, undescribed, done: open === 0 && undescribed === 0 && summaryDone };
+  return { open, undescribed, failed, done: open === 0 && undescribed === 0 && summaryDone };
 }
 
 /** « 2 descriptions à valider », « Synthèse à valider », « Tout est validé »: one line on where the script stands. */
 export function standingLine(review: DropDescriptionsReview): string {
-  const { open, undescribed, done } = reviewStanding(review);
+  const { open, undescribed, failed, done } = reviewStanding(review);
   if (done) return 'Tout est validé';
+  // Given up by the AI: nothing comes by itself, the line says what is the agency's to do.
+  if (failed > 0)
+    return failed === 1
+      ? 'L’IA n’a pas pu décrire 1 média : à toi de le relancer'
+      : `L’IA n’a pas pu décrire ${String(failed)} médias : à toi de les relancer`;
   if (undescribed > 0)
     return undescribed === 1
       ? '1 média attend sa description'

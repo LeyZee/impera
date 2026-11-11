@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CreatorIdSchema } from '@impera/contracts';
+import { CreatorIdSchema, type DropDescriptionsReview } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -393,6 +393,72 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     expect(within(region).getByText('Corrigée')).toBeDefined();
     expect(within(region).queryByRole('textbox')).toBeNull();
   });
+  it('asks the AI again on a medium it gave up, or takes it written by hand with its level (recette créatrice 2)', async () => {
+    const given = (): DropDescriptionsReview => {
+      const one = reviewOf(SENT.id, FILES, { validated: [false, true, true] });
+      return {
+        ...one,
+        media: one.media.map((medium, index) =>
+          index === 0 ? { ...medium, description: null, describeFailed: true } : medium,
+        ),
+      };
+    };
+    const sent: unknown[] = [];
+    const calls = serve({
+      ...base,
+      [`GET ${REVIEW}`]: () => ({ status: 200, body: given() }),
+      [`POST /creators/${CREATOR}/drops/${SENT.id}/files/${FILES[0]}/describe`]: () => ({
+        status: 200,
+        body: given(),
+      }),
+      [`POST /creators/${CREATOR}/drops/${SENT.id}/files/${FILES[0]}/description`]: (body) => {
+        sent.push(body);
+        const one = reviewOf(SENT.id, FILES, { validated: [true, true, true] });
+        return {
+          status: 200,
+          body: {
+            ...one,
+            media: one.media.map((medium, index) =>
+              index === 0 && medium.description !== null
+                ? {
+                    ...medium,
+                    description: { ...medium.description, author: 'hand', detailed: 'Assise, inventée.' },
+                  }
+                : medium,
+            ),
+          },
+        };
+      },
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Relire les descriptions' }));
+    const region = await screen.findByRole('region', { name: 'Descriptions de S012' });
+    expect(within(region).getByText('L’IA n’a pas pu décrire 1 média : à toi de le relancer')).toBeDefined();
+    expect(within(region).getByText(/Elle ne réessaie plus d’elle-même/u)).toBeDefined();
+    fireEvent.click(within(region).getByRole('button', { name: 'Réessayer' }));
+    await waitFor(() => {
+      expect(calls.some((call) => call.path.endsWith('/describe'))).toBe(true);
+    });
+
+    fireEvent.click(within(region).getByRole('button', { name: 'Décrire à la main' }));
+    const save = within(region).getByRole('button', { name: 'Enregistrer et valider' });
+    if (!(save instanceof HTMLButtonElement)) throw new Error('a button');
+    fireEvent.change(within(region).getByRole('textbox', { name: 'Ce que montre la photo' }), {
+      target: { value: ' Assise, inventée. ' },
+    });
+    // Its level is asked too: never guessed.
+    expect(save.disabled).toBe(true);
+    fireEvent.click(within(region).getByRole('radio', { name: 'Suggestif' }));
+    expect(save.disabled).toBe(false);
+    expect(within(region).getByText(/sera marqué « non vu »/u)).toBeDefined();
+    fireEvent.click(save);
+    expect(await within(region).findByText('Assise, inventée.')).toBeDefined();
+    expect(sent).toEqual([{ detailed: 'Assise, inventée.', intensity: 'suggestive' }]);
+    expect(within(region).getByText('Écrite à la main')).toBeDefined();
+    expect(within(region).queryByRole('textbox')).toBeNull();
+    expect(within(region).getByText('La synthèse s’écrit')).toBeDefined();
+  });
+
   it('corrects the synthesis by hand, step by step, and says why the server refuses a price (SC-04 lot c5)', async () => {
     const sent: unknown[] = [];
     serve({

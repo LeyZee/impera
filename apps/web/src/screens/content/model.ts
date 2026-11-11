@@ -4,6 +4,7 @@ import {
   DROP_MIME_TYPES,
   WITHDRAWABLE_DROP_STATES,
   kindOfMime,
+  scriptDropCode,
   type ContentDrop,
   type ContentDropFile,
   type ContentRequest,
@@ -130,14 +131,36 @@ export function openRequests(requests: readonly ContentRequest[]): ContentReques
     .toSorted((a, b) => a.dueOn.localeCompare(b.dueOn) || a.createdAt.localeCompare(b.createdAt));
 }
 
+/** Out of her hands: published, or a script her team copied into Reveal (SC-03 c, recette créatrice 8). */
+const isOut = (drop: ContentDrop): boolean => drop.state === 'published' || drop.exportedAt !== null;
+
 /** « En route »: what she dropped and is not out yet, newest first; a withdrawn drop leaves her screen. */
 export function onTheirWay(drops: readonly ContentDrop[]): ContentDrop[] {
-  return drops.filter((drop) => drop.state !== 'withdrawn' && drop.state !== 'published');
+  return drops.filter((drop) => drop.state !== 'withdrawn' && !isOut(drop));
 }
 
-/** « Publié »: what went out, newest first. */
+/** « Publié »: what went out, newest first: a script copied into Reveal with it, where her fans will buy it. */
 export function published(drops: readonly ContentDrop[]): ContentDrop[] {
-  return drops.filter((drop) => drop.state === 'published');
+  return drops.filter((drop) => drop.state !== 'withdrawn' && isOut(drop));
+}
+
+/** « Script S014 » for her sent script, by the number its folder and cards carry; else the category's name. */
+export function dropName(drop: ContentDrop): string {
+  const label = DROP_CATEGORY_LABELS[drop.category];
+  return drop.category === 'script' && drop.scriptNumber !== null
+    ? `${label} ${scriptDropCode(drop.scriptNumber)}`
+    : label;
+}
+
+/** What a drop out of her hands says: what it held, and when it went (« 4 photos · dans Reveal depuis hier »). */
+export function outLine(drop: ContentDrop, today: string, zone: string): string {
+  const what = contentsOf(drop.files);
+  if (drop.exportedAt === null || drop.state === 'published')
+    return `${what} · ${droppedOn(drop.createdAt, today, zone)}`;
+  const when = droppedOn(drop.exportedAt, today, zone);
+  // « Aujourd’hui », « Hier », « Lundi » read in the sentence lowercased; « 12 nov. » takes its « le ».
+  const said = /^\d/u.test(when) ? `le ${when}` : when.toLowerCase();
+  return `${what} · dans Reveal depuis ${said}`;
 }
 
 /** How a drop's state reads (ADR 0055 § 6). */

@@ -433,6 +433,14 @@
   flex-direction: column;
   gap: var(--nv-space-2);
 }
+.sx-hand {
+  gap: var(--nv-space-3);
+}
+.sx-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
 .sx-correct__area {
   resize: none;
   field-sizing: content;

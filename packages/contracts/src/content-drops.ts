@@ -357,6 +357,9 @@ export const ContentDropSchema = z.strictObject({
 });
 export type ContentDrop = z.infer<typeof ContentDropSchema>;
 
+/** « S014 »: a sent script's number as its folder, its cards and both screens say it (SC-03). */
+export const scriptDropCode = (number: number): string => `S${String(number).padStart(3, '0')}`;
+
 export const DeclaredDropFileSchema = z.strictObject({
   id: ContentDropFileIdSchema,
   mime: DropMimeSchema,
@@ -689,8 +692,11 @@ const Instant = z.iso.datetime({ offset: true });
 /** A description of one of her media as the agency reviews it: the latest validated, else the latest written. */
 export const DropDescriptionViewSchema = z.strictObject({
   id: MediaDescriptionIdSchema,
-  /** `sense`, the vision AI; `human`, a correction. */
-  author: z.enum(['sense', 'human']),
+  /**
+   * `sense`, the vision AI; `human`, a correction of it; `hand`, written by hand where the AI gave up (recette
+   * créatrice 2), with no row of the vision under it.
+   */
+  author: z.enum(['sense', 'human', 'hand']),
   detailed: z.string().min(1).max(6000),
   reviewReasons: z.array(DescriptionReviewReasonSchema),
   /** Her own word on the media (P6-01). */
@@ -714,6 +720,11 @@ export const DropMediaReviewSchema = z.strictObject({
   thumbnail: z.boolean(),
   /** Its original is still held (ADR 0044 § 2): `GET …/files/:fileId/media` plays it, in parts for a video. */
   original: z.boolean(),
+  /**
+   * The vision AI failed at each of its tries (`DESCRIPTION_TRIES`, recette créatrice 2): no longer asked by itself,
+   * the agency asks again (`POST …/files/:fileId/describe`) or writes it.
+   */
+  describeFailed: z.boolean(),
 });
 export type DropMediaReview = z.infer<typeof DropMediaReviewSchema>;
 
@@ -768,6 +779,24 @@ export const CorrectDropDescriptionBodySchema = z.strictObject({
   detailed: z.string().trim().min(1).max(6000),
 });
 export type CorrectDropDescriptionBody = z.infer<typeof CorrectDropDescriptionBodySchema>;
+
+/**
+ * The levels the agency picks when it writes a description by hand (recette créatrice 2): the vision's, but « not
+ * visible », which a human who saw the medium never says.
+ */
+export const HAND_INTENSITIES = ['soft', 'suggestive', 'explicit', 'hardcore'] as const;
+export const HandIntensitySchema = z.enum(HAND_INTENSITIES);
+export type HandIntensity = z.infer<typeof HandIntensitySchema>;
+
+/**
+ * `POST …/files/:fileId/description`: a medium the AI did not describe, written by hand (recette créatrice 2), its
+ * words and its level; the vision's other labels are said « not seen ». Validated by whoever writes it.
+ */
+export const WriteDropDescriptionBodySchema = z.strictObject({
+  detailed: z.string().trim().min(1).max(6000),
+  intensity: HandIntensitySchema,
+});
+export type WriteDropDescriptionBody = z.infer<typeof WriteDropDescriptionBodySchema>;
 
 /** `POST …/summary/validate`: the script's current synthesis, validated as it is. */
 export const ValidateScriptSummaryBodySchema = z.strictObject({ summaryId: ScriptDropSummaryIdSchema });

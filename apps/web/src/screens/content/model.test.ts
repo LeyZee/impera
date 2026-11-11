@@ -1,3 +1,4 @@
+import { DROP_CATEGORY_LABELS } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { dropOf, fileOf, requestOf } from './fixtures';
@@ -5,12 +6,14 @@ import {
   acceptOf,
   contentsOf,
   droppedOn,
+  dropName,
   dueOf,
   fileLine,
   mimeOf,
   moved,
   onTheirWay,
   openRequests,
+  outLine,
   published,
   mayWithdrawHere,
   refusedOf,
@@ -52,6 +55,26 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     ];
     expect(onTheirWay(drops).map((d) => d.state)).toEqual(['uploading', 'blocked']);
     expect(published(drops).map((d) => d.state)).toEqual(['published']);
+  });
+
+  it('takes a script copied into Reveal out of « En route », by its number (recette créatrice 8)', () => {
+    const copied = dropOf({
+      category: 'script',
+      state: 'ready',
+      scriptNumber: 1,
+      files: [fileOf({ kind: 'image' }), fileOf({ kind: 'video' })],
+      createdAt: '2026-11-09T10:00:00.000Z',
+      exportedAt: '2026-11-10T15:00:00.000Z',
+    });
+    const sent = { ...copied, exportedAt: null };
+    expect(onTheirWay([copied, sent])).toEqual([sent]);
+    expect(published([copied, sent])).toEqual([copied]);
+    expect(dropName(copied)).toBe('Script S001');
+    expect(dropName(dropOf({ category: 'feed_shoot' }))).toBe(DROP_CATEGORY_LABELS.feed_shoot);
+    expect(outLine(copied, '2026-11-11', 'Europe/Paris')).toBe('1 photo · 1 vidéo · dans Reveal depuis hier');
+    expect(outLine({ ...copied, exportedAt: '2026-10-20T15:00:00.000Z' }, '2026-11-11', 'Europe/Paris')).toBe(
+      '1 photo · 1 vidéo · dans Reveal depuis le 20 oct.',
+    );
   });
 
   it('turns amber only a blocked drop: she has something to do', () => {

@@ -1,15 +1,19 @@
-import type {
-  ContentDropId,
-  CreatorId,
-  DropDescriptionsReview,
-  DropMediaReview,
-  MediaDescriptionId,
-  ScriptDropSummary,
+import {
+  HAND_INTENSITIES,
+  type ContentDropFileId,
+  type ContentDropId,
+  type CreatorId,
+  type DropDescriptionsReview,
+  type DropMediaReview,
+  type HandIntensity,
+  type MediaDescriptionId,
+  type ScriptDropSummary,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX } from 'react';
 
 import {
+  HAND_INTENSITY_LABELS,
   KIND_LABELS,
   REASON_LABELS,
   describable,
@@ -21,11 +25,13 @@ import {
   correctDescription,
   correctSummary,
   mediaUrl,
+  retryDescription,
   reviewKey,
   thumbnailUrl,
   useDropReview,
   validateDescriptions,
   validateSummary,
+  writeDescription,
   type ReviewOutcome,
 } from './review-api';
 
@@ -139,6 +145,10 @@ export function ScriptReview({
                     media: mediaUrl(creatorId, dropId, media.fileId),
                   }}
                   busy={busy !== null}
+                  onRetry={(fileId) => void run(fileId, () => retryDescription(creatorId, dropId, fileId))}
+                  onWrite={(fileId, detailed, intensity) =>
+                    run(fileId, () => writeDescription(creatorId, dropId, fileId, detailed, intensity))
+                  }
                   onValidate={(id) => void run(id, () => validateDescriptions(creatorId, dropId, [id]))}
                   onCorrect={(id, detailed) =>
                     run(id, () => correctDescription(creatorId, dropId, id, detailed))
@@ -396,6 +406,14 @@ function GrowingField({
 
 interface MediaActions {
   readonly busy: boolean;
+  /** The AI asked again on a medium it gave up (recette créatrice 2). */
+  readonly onRetry: (fileId: ContentDropFileId) => void;
+  /** Written by hand when the AI gave up: her team's words and the level it picks, the rest « non vu ». */
+  readonly onWrite: (
+    fileId: ContentDropFileId,
+    detailed: string,
+    intensity: HandIntensity,
+  ) => Promise<boolean>;
   readonly onValidate: (id: MediaDescriptionId) => void;
   readonly onCorrect: (id: MediaDescriptionId, detailed: string) => Promise<boolean>;
 }
@@ -458,10 +476,10 @@ function MediaRow({
           </span>
           <DescriptionPill media={media} />
         </div>
-        {description === null || !describable(media) ? (
-          <p className="ps-muted sx-medium__text">
-            {describable(media) ? 'Pas encore décrite.' : 'Une note vocale n’est pas décrite.'}
-          </p>
+        {!describable(media) ? (
+          <p className="ps-muted sx-medium__text">Une note vocale n’est pas décrite.</p>
+        ) : description === null ? (
+          <Undescribed media={media} {...actions} />
         ) : (
           <DescriptionBlock description={description} {...actions} />
         )}
@@ -486,12 +504,147 @@ function DescriptionPill({ media }: { media: DropMediaReview }): JSX.Element | n
   if (description === null) return null;
   return description.validatedAt !== null ? (
     <span className="aa-pill" data-tone="ok">
-      {description.author === 'human' ? 'Corrigée' : 'Validée'}
+      {description.author === 'hand'
+        ? 'Écrite à la main'
+        : description.author === 'human'
+          ? 'Corrigée'
+          : 'Validée'}
     </span>
   ) : (
     <span className="aa-pill" data-tone="todo">
       À valider
     </span>
+  );
+}
+
+/**
+ * A photo or a video with no description: on its way, or given up by the AI after each of its tries (recette
+ * créatrice 2), said in amber with « Réessayer », which asks it again, and « Décrire à la main », her team's words and
+ * the level it picks; the other labels are said « non vu ».
+ */
+function Undescribed({
+  media,
+  busy,
+  onRetry,
+  onWrite,
+}: Pick<MediaActions, 'busy' | 'onRetry' | 'onWrite'> & { media: DropMediaReview }): JSX.Element {
+  const [writing, setWriting] = useState(false);
+  if (!media.describeFailed) return <p className="ps-muted sx-medium__text">Pas encore décrite.</p>;
+  if (writing)
+    return (
+      <HandForm
+        media={media}
+        busy={busy}
+        onWrite={onWrite}
+        onClose={() => {
+          setWriting(false);
+        }}
+      />
+    );
+  return (
+    <>
+      <p className="sx-note" data-tone="warn">
+        L’IA n’a pas pu la décrire, après plusieurs essais. Elle ne réessaie plus d’elle-même.
+      </p>
+      <div className="sx-actions">
+        <button
+          type="button"
+          className="nv-btn nv-btn--sm nv-btn--plain"
+          disabled={busy}
+          onClick={() => {
+            onRetry(media.fileId);
+          }}
+        >
+          Réessayer
+        </button>
+        <button
+          type="button"
+          className="nv-btn nv-btn--sm nv-btn--soft"
+          disabled={busy}
+          onClick={() => {
+            setWriting(true);
+          }}
+        >
+          Décrire à la main
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** What the medium shows and its level, both asked: validated as it is written. */
+function HandForm({
+  media,
+  busy,
+  onWrite,
+  onClose,
+}: Pick<MediaActions, 'busy' | 'onWrite'> & { media: DropMediaReview; onClose: () => void }): JSX.Element {
+  const id = useId();
+  const [text, setText] = useState('');
+  const [level, setLevel] = useState<HandIntensity | null>(null);
+  const area = useGrowingArea(text);
+  const ready = text.trim() !== '' && level !== null;
+  return (
+    <form
+      className="sx-correct sx-hand"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!ready) return;
+        void onWrite(media.fileId, text.trim(), level).then((done) => {
+          if (done) onClose();
+        });
+      }}
+    >
+      <div className="nv-field">
+        <label className="nv-field__label" htmlFor={`${id}-text`}>
+          Ce que montre {media.kind === 'video' ? 'la vidéo' : 'la photo'}
+        </label>
+        <textarea
+          id={`${id}-text`}
+          ref={area}
+          className="nv-field__control sx-correct__area"
+          value={text}
+          maxLength={6000}
+          rows={3}
+          data-autofocus
+          onChange={(event) => {
+            setText(event.target.value);
+          }}
+        />
+      </div>
+      <div className="nv-field">
+        <span className="nv-field__label" id={`${id}-level`}>
+          Niveau
+        </span>
+        <div className="sx-levels" role="radiogroup" aria-labelledby={`${id}-level`}>
+          {HAND_INTENSITIES.map((one) => (
+            <button
+              key={one}
+              type="button"
+              role="radio"
+              className="nv-chip"
+              aria-checked={level === one}
+              onClick={() => {
+                setLevel(one);
+              }}
+            >
+              {HAND_INTENSITY_LABELS[one]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="sx-meta">
+        Le reste (corps visible, ambiance, lieu, texte à l’écran) sera marqué « non vu ».
+      </p>
+      <div className="sx-actions">
+        <button type="button" className="nv-btn nv-btn--sm nv-btn--plain" disabled={busy} onClick={onClose}>
+          Annuler
+        </button>
+        <button type="submit" className="nv-btn nv-btn--sm nv-btn--soft" disabled={busy || !ready}>
+          Enregistrer et valider
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -685,7 +838,7 @@ function MediaViewer({
             <DescriptionPill media={media} />
           </div>
           {description === null ? (
-            <p className="ps-muted sx-medium__text">Pas encore décrite.</p>
+            <Undescribed media={media} {...actions} />
           ) : (
             <DescriptionBlock description={description} {...actions} />
           )}
