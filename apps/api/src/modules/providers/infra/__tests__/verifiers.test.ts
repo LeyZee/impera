@@ -209,7 +209,7 @@ describe('Mistral', () => {
   it('accepts a key that sees Mistral Large, the writing fallback', async () => {
     replies.set('/v1/models', {
       status: 200,
-      body: { object: 'list', data: [{ id: 'mistral-small-latest' }, { id: 'mistral-large-4-0' }] },
+      body: { object: 'list', data: [{ id: 'mistral-small-latest' }, { id: 'mistral-large-4' }] },
     });
     expect(await verifier().verify('FAKEmistralFAKEmistralFAKE00', {})).toMatchObject({
       ok: true,

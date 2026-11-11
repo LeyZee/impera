@@ -37,7 +37,7 @@ describe('createAppLlm', () => {
 });
 
 describe('the writing fallback', () => {
-  it('is one pinned version, the one a Mistral key is verified against, never an alias that moves', () => {
+  it('is one pinned model, the one a Mistral key is verified against, never an alias that moves', () => {
     expect(MISTRAL_WRITING_FALLBACK).toBe(MISTRAL_FALLBACK_MODEL);
     expect(DEFAULT_LLM_CONFIG.roles.voice.fallback?.model).toBe(MISTRAL_FALLBACK_MODEL);
     expect(DEFAULT_LLM_CONFIG.roles.brain.fallback?.model).toBe(MISTRAL_FALLBACK_MODEL);

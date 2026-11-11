@@ -49,10 +49,11 @@ export const LlmConfigSchema = z.object({
 export type LlmConfig = z.infer<typeof LlmConfigSchema>;
 
 /**
- * Pinned to a version, never `mistral-large-latest`: an alias moves when Mistral ships, and the model that writes to
- * a fan would change without evals. Moving it is a change of default like any other.
+ * Pinned to one model, never `mistral-large-latest`: that alias moves to the next Large when Mistral ships, and the
+ * model that writes to a fan would change without evals. `mistral-large-4` is the id Mistral documents for Large 4:
+ * it names the model, not a dated build (none is published). Moving it is a change of default like any other.
  */
-export const MISTRAL_FALLBACK_MODEL = 'mistral-large-4-0';
+export const MISTRAL_FALLBACK_MODEL = 'mistral-large-4';
 const MISTRAL_FALLBACK: ModelRef = { provider: 'mistral', model: MISTRAL_FALLBACK_MODEL };
 
 /** Defaults (ADR 0009); per-creator overrides arrive with CreatorSettings.llm. Changing a default needs evals first. */

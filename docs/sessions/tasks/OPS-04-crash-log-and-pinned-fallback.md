@@ -16,7 +16,7 @@ Appliquer, sans changer le métier, les points de l'audit d'architecture et de f
 ## À faire (liste vérifiable)
 
 - [x] Une erreur non attrapée ou une promesse rejetée sans suite est écrite dans le journal structuré avant l'arrêt du processus, dans l'API et dans le worker.
-- [x] Le modèle de repli de la voix et du cerveau est une version précise, plus un alias ; la vérification d'une clé Mistral demande ce modèle ; le juge des évals et le bac à sable suivent.
+- [x] Le modèle de repli de la voix et du cerveau est un modèle précis (`mistral-large-4`), plus l'alias mobile ; la vérification d'une clé Mistral demande ce modèle ; le juge des évals et le bac à sable suivent.
 - [x] Les prix de Grok 4.7 et de Mistral Large 4 sont relus sur les pages des fournisseurs, avec le palier « long contexte » de xAI.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)

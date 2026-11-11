@@ -5,11 +5,11 @@ import type { ProviderVerifier, VerificationOutcome } from '../domain/verificati
 import { getJson, isProviderTrouble, unreachableFrom, type FetchLike } from './http';
 
 /**
- * `GET /v1/models` lists what the key can call. The writing fallback is pinned to this version (packages/llm,
+ * `GET /v1/models` lists what the key can call. The writing fallback is pinned to this model (packages/llm,
  * `MISTRAL_FALLBACK_MODEL`; `llm.test.ts` keeps the two equal): a key that sees another Mistral Large only would be
  * accepted here and refused at the first relay.
  */
-export const MISTRAL_WRITING_FALLBACK = 'mistral-large-4-0';
+export const MISTRAL_WRITING_FALLBACK = 'mistral-large-4';
 const ModelsSchema = z.object({ data: z.array(z.object({ id: z.string() })) });
 
 export interface MistralVerifierOptions {

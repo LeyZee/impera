@@ -171,8 +171,7 @@ async function server(
     store,
     records,
     gateway: gateway(options.voice ?? { bubbles: ['Coucou toi ✨'] }, options.control),
-    gatewayForVoice: (model) =>
-      model === 'mistral-large-4-0' ? gateway({ bubbles: ['Hey toi'] }) : undefined,
+    gatewayForVoice: (model) => (model === 'mistral-large-4' ? gateway({ bubbles: ['Hey toi'] }) : undefined),
     now: () => new Date('2026-10-17T10:00:00Z'),
     ...(options.creatorId !== undefined && { creatorId: () => Promise.resolve(options.creatorId ?? null) }),
   });
@@ -350,7 +349,7 @@ describe('/v1/playground', () => {
   it('compares with another voice model without touching the conversation', async () => {
     const { post } = await server();
     await post('/messages', { text: 'Salut' });
-    const comparison = await post('/compare', { voiceModel: 'mistral-large-4-0' });
+    const comparison = await post('/compare', { voiceModel: 'mistral-large-4' });
     expect(comparison.json()).toMatchObject({ bubbles: ['Hey toi'], isBlocked: false });
     expect(codeOf(await post('/compare', { voiceModel: 'gpt-x' }))).toBe('voice_model_invalid');
   });
@@ -395,7 +394,7 @@ describe('/v1/playground', () => {
       text: 'Regarde',
       media: [{ kind: 'image', factualDescription: 'Un selfie.', flags: ['possible_minor'] }],
     });
-    const comparison = await post('/compare', { voiceModel: 'mistral-large-4-0' });
+    const comparison = await post('/compare', { voiceModel: 'mistral-large-4' });
     expect(codeOf(comparison)).toBe('nothing_to_compare_conflict');
   });
 });
