@@ -12,9 +12,9 @@ export function debounceFor(persona?: { readonly debounceSeconds?: number }): nu
 }
 
 /** Her answers to one fan in an hour at her usual pace; past them she slows down, and never stops. */
-export const REPLIES_PER_HOUR_BEFORE_SLOWING = 60;
+const REPLIES_PER_HOUR_BEFORE_SLOWING = 60;
 /** Slowed down: one answer every three minutes. */
-export const SLOWED_REPLY_SECONDS = 180;
+const SLOWED_REPLY_SECONDS = 180;
 
 /**
  * When the answer to his message is written: after the usual wait, so that a burst gets one answer; and, once she has
@@ -34,7 +34,7 @@ export function respondAt(input: {
 }
 
 /** What one fan message keeps of its words and of its media: beyond, it is cut, never refused. */
-export const FAN_TEXT_MAX_CHARS = 4_000;
+const FAN_TEXT_MAX_CHARS = 4_000;
 export const FAN_MEDIA_MAX = 20;
 
 /** His words, cut at 4 000 characters without splitting a character in two. */
