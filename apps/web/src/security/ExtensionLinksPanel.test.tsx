@@ -159,6 +159,8 @@ describe('Relier l’extension', () => {
       await screen.findByText('Pour relier ce navigateur, confirme ton mot de passe et ton code.'),
     ).toBeTruthy();
     expect(screen.getByLabelText('Mot de passe')).toBeTruthy();
+    // One pair of buttons at a time: the prompt's own.
+    expect(screen.queryByRole('button', { name: 'Relier' })).toBeNull();
     // Nothing was linked, and the refusal is not shown as an error.
     expect(screen.queryByText('Ce compte ne peut pas relier d’extension.')).toBeNull();
     expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);

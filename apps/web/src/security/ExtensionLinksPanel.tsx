@@ -230,34 +230,32 @@ export function ExtensionLinksPanel(): JSX.Element {
                       autoComplete="off"
                       aria-invalid={problem !== null}
                       aria-describedby={`${labelId}-hint`}
-                      readOnly={busy}
+                      readOnly={busy || reauth}
                       onChange={(event) => {
                         setLabel(event.target.value);
                         setProblem(null);
                       }}
                     />
                   </label>
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      className="nv-btn nv-btn--neon nv-btn--sm"
-                      disabled={busy || reauth}
-                    >
-                      {busy ? 'Liaison…' : 'Relier'}
-                    </button>
-                    <button
-                      type="button"
-                      className="nv-btn nv-btn--plain nv-btn--sm"
-                      disabled={busy}
-                      onClick={() => {
-                        setStep('idle');
-                        setProblem(null);
-                        setReauth(false);
-                      }}
-                    >
-                      Annuler
-                    </button>
-                  </div>
+                  {reauth ? null : (
+                    <div className="flex gap-2">
+                      <button type="submit" className="nv-btn nv-btn--neon nv-btn--sm" disabled={busy}>
+                        {busy ? 'Liaison…' : 'Relier'}
+                      </button>
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--plain nv-btn--sm"
+                        disabled={busy}
+                        onClick={() => {
+                          setStep('idle');
+                          setProblem(null);
+                          setReauth(false);
+                        }}
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <p
                   id={`${labelId}-hint`}
