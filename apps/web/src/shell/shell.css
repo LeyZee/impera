@@ -569,6 +569,11 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Never taller than the room above the tab bar: on a small phone (iPhone SE) the owner's sheet ran off the top and
+     Entraîner, Créatrices were out of reach (recette 11/11, SOC-01). It scrolls inside instead. */
+  max-height: calc(100dvh - var(--nv-above-tabbar) - 10px - max(14px, env(safe-area-inset-top, 0px)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 8px;
   border-radius: var(--nv-radius-xl);
   box-shadow: var(--nv-shadow-float);
