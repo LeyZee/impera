@@ -1441,6 +1441,11 @@
   align-self: start;
   max-width: 720px;
 }
+/* The orb's warning ring grows to 1.35 times the orb: the orb keeps that room on its left, so the ring stays inside
+   the page's column instead of passing its edge (recette 11/11, lot A2). */
+.nv-silent > .nv-orb {
+  margin-inline-start: 8px;
+}
 .nv-silent__body {
   min-width: 0;
 }

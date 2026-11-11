@@ -1,7 +1,16 @@
 import type { Me } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { canOpen, documentTitle, layoutRail, railKindOf, railOf, sectionOf, type Section } from './nav';
+import {
+  canOpen,
+  documentTitle,
+  layoutRail,
+  offRailSectionOf,
+  railKindOf,
+  railOf,
+  sectionOf,
+  type Section,
+} from './nav';
 
 const base = {
   id: 'u1',
@@ -179,5 +188,22 @@ describe('documentTitle', () => {
     expect(documentTitle('/equipe/membres/01a1b1e4-e32c-710b-9f7b-bf6216754750/dossier', '/equipe')).toBe(
       'Dossier · Équipe · Impera',
     );
+  });
+});
+
+// Recette 11/11 (CHA-26, CRE-28): Notifications and the guides lit no tab; Moi › Préférences leads to them.
+describe('offRailSectionOf', () => {
+  it.each(['/notifications', '/aide/installer', '/aide/extension', '/notifications/'])(
+    'lights Moi on %s for an account whose rail holds it',
+    (path) => {
+      for (const me of [chatter, manager, creator]) expect(offRailSectionOf(path, railOf(me))).toBe('/moi');
+    },
+  );
+
+  it('lights nothing for an account without Moi, nor on other pages', () => {
+    for (const me of [owner, operator]) expect(offRailSectionOf('/notifications', railOf(me))).toBeNull();
+    expect(offRailSectionOf('/aide/reveal', railOf(chatter))).toBeNull();
+    expect(offRailSectionOf('/compte/securite', railOf(chatter))).toBeNull();
+    expect(offRailSectionOf('/nulle-part', railOf(chatter))).toBeNull();
   });
 });
