@@ -968,6 +968,11 @@
   font-weight: 600;
   color: var(--nv-ink-faint);
 }
+/* A way back in the eyebrow (« ← Créatrices », « ← Moi › Préférences ») is a plain button: its padding is pulled back so
+   its text starts on the same line as the title below, the padding staying as the pressed and hovered surface. */
+.nv-eyebrow > .nv-btn--plain {
+  margin-inline-start: calc(-1 * var(--nv-space-4));
+}
 
 /* ── Panels: content plates, not glass ── */
 .nv-panel {
