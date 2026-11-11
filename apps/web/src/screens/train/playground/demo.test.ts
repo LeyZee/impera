@@ -10,7 +10,7 @@ describe('demo client', () => {
     const state = PlaygroundStateSchema.parse(await client.send('Salut toi', []));
     expect(state.pending?.bubbles.length).toBeGreaterThan(0);
     expect(state.history.at(-1)?.from).toBe('creator');
-    PlaygroundComparisonSchema.parse(await client.compare('mistral-large-latest'));
+    PlaygroundComparisonSchema.parse(await client.compare('mistral-large-4'));
     PlaygroundStateSchema.parse(
       await client.send('Regarde', [{ kind: 'image', factualDescription: 'Un chien sur un canapé' }]),
     );

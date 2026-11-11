@@ -51,7 +51,11 @@ describe('SecondFactorPage', () => {
     render(<SecondFactorPage onActivated={onActivated} onSignOut={() => undefined} />);
     await givePassword();
     expect(screen.getByRole('link', { name: 'Ouvrir dans l’application' }).getAttribute('href')).toBe(URI);
-    expect(screen.getByLabelText('Clé à recopier dans l’application').textContent).toBe(keyOf(URI));
+    const key = screen.getByLabelText('Clé à recopier dans l’application');
+    expect(key.textContent).toBe(keyOf(URI));
+    // A narrow screen wraps the key between its groups, never inside one (recette 11/11, SOC-02).
+    expect(key.className).toContain('break-words');
+    expect(key.className).not.toContain('break-all');
     const code = screen.getByLabelText('Code affiché par l’application');
     fireEvent.change(code, { target: { value: '123456' } });
     fireEvent.submit(code.closest('form') ?? document.body);

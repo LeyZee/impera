@@ -546,6 +546,18 @@ export interface DescriptionReview {
     now: Date,
     correlationId: string,
   ): Promise<DropDescriptionsReview>;
+  /**
+   * The script's current synthesis rewritten by hand (SC-04 lot c5): a new row, its steps the shown one's in their
+   * order, validated by whoever writes it; a sum or a currency refused.
+   */
+  correctSummary(
+    creatorId: string,
+    userId: string,
+    dropId: string,
+    summaryId: string,
+    content: ScriptDropSummary,
+    now: Date,
+  ): Promise<DropDescriptionsReview>;
   /** The script's current synthesis validated as it is. */
   validateSummary(
     creatorId: string,
