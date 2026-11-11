@@ -1,6 +1,7 @@
 # PROPOSED Connecteur Reveal : lecture, scripts natifs, notes client, envoi
 
 Statut : proposed (écrite le 2026-10-17 par le fil Connexion Reveal ; ID à attribuer par Charles)
+Reprise par : P2-02 (lecture) et P2-03 (écritures), créées par P1-03 le 2026-11-11 ; cette fiche reste pour l'historique et pour les dépendances qui la citent.
 Phase : 2 (avancée par la revue du cap du 17/10 : chantier 8, « connecteur Reveal en lecture + copilote »)
 Dépend de : P0-06 (port `PlatformConnector`, `FakeConnector`, test de contrat), P1-02 (capture analysée, `reveal-api-observed.md` rempli, FakeReveal)
 Branche : task/<id>-reveal-connector

@@ -70,7 +70,7 @@ Décision : **B**. L'extension garde deux rôles : **enregistreur** (découverte
 13. Notes client : lecture, écriture, format, concurrence avec un chatteur.
 14. Âge des fans : Reveal vérifie-t-il l'âge, et l'expose-t-il.
 
-Ce que le connecteur doit savoir faire, capacité par capacité : `docs/reference/reveal-connector-inventory.md`. Comment Charles capture une session : `docs/runbooks/reveal-recording.md`.
+Ce que le connecteur doit savoir faire, capacité par capacité : `docs/reference/reveal-connector-inventory.md`. Réponses aux 14 questions : `docs/reference/reveal-api-observed.md` (10/11). Spécification qui en découle (session, mappage, idempotence, risques, fiches P2) : `docs/reference/reveal-connector-spec.md`. Comment Charles capture une session : `docs/runbooks/reveal-recording.md`.
 
 ### Règles de bonne conduite du connecteur Reveal
 
