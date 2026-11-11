@@ -7,6 +7,12 @@ packages:
 overrides:
   # eslint-plugin-boundaries pins handlebars 4.7.9 (GHSA-8r5x-fm3f-whwj, GHSA-p8wg-vrv2-v86f, ...). 4.7.10 is a patch release.
   handlebars: 4.7.10
+  # Fastify's validator takes fast-uri 3 and 4 (GHSA-333x-w4r6-6crp and its siblings); both fixes are of 19/10/2026,
+  # past the 14 days of quarantine. Remove once fastify's own tree asks for them.
+  'fast-uri@>=3.0.0 <3.1.9': 3.1.9
+  'fast-uri@>=4.0.0 <4.2.3': 4.2.3
+  # TanStack Router's core takes seroval 1.6.9; 1.6.11 (18/10/2026) carries the fixes and has passed the quarantine.
+  'seroval@>=1.5.5 <1.6.11': 1.6.11
   # Quarantine (14 days) for the passkey plugin's tree (ADR 0053): @simplewebauthn/server takes ^2.6 of these, whose
   # 2.11.1 is from 25/10/2026; 2.11.0 (12/10) has passed it. Remove once 2.11.1 is 14 days old.
   '@peculiar/asn1-android': 2.11.0

@@ -97,6 +97,18 @@ export function networkOf(ip: string | null | undefined): string | null {
   return groups === null ? null : `${groups.slice(0, 3).join(':')}::/48`;
 }
 
+/**
+ * What a limit by address counts against (security.md §6): an IPv4 address as it is, an IPv6 address by its `/64`.
+ * One IPv6 subscriber holds a whole `/64`: counted address by address, each request could come from a new one and no
+ * limit would ever be reached. Anything that is not an address is counted as written.
+ */
+export function limitKeyOf(ip: string): string {
+  const address = ip.trim().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/iu, '');
+  if (IPV4.test(address)) return address;
+  const groups = ipv6Groups(address);
+  return groups === null ? address : `${groups.slice(0, 4).join(':')}::/64`;
+}
+
 /** The eight groups of an IPv6 address, lowercase and without leading zeros; null if it is not one. */
 function ipv6Groups(address: string): string[] | null {
   const halves = address.toLowerCase().split('::');

@@ -32,7 +32,7 @@ Pour essayer le dashboard sur son PC (Windows, macOS ou Linux), avec une base Po
 
    Les clés d'IA (`LLM_XAI_API_KEY`, `LLM_GOOGLE_API_KEY`, `SPEECH_ELEVENLABS_API_KEY`) peuvent rester vides : le service correspondant est alors simplement non configuré, et on peut coller sa clé plus tard dans Réglages › Modèles IA › Services.
 
-   Les autres valeurs de l'exemple conviennent en local. Les mots de passe `change-me` sont ceux de la base Docker. `WEB_ORIGIN` et `AUTH_BASE_URL` pointent sur le dashboard (`http://localhost:5173`).
+   Les autres valeurs de l'exemple conviennent en local. Les mots de passe `change-me` sont ceux de la base Docker, qui n'est publiée que sur cette machine (`127.0.0.1:5432`) : ces mots de passe sont publics, la base ne doit jamais répondre au réseau local. L'API n'écoute elle aussi que sur cette machine (`HOST`, vide = `localhost`). `WEB_ORIGIN` et `AUTH_BASE_URL` pointent sur le dashboard (`http://localhost:5173`).
 
 4. Démarrer Postgres et créer les tables :
 
