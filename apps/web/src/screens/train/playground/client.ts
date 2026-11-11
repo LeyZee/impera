@@ -41,7 +41,7 @@ export interface PlaygroundClient {
 }
 
 /** The voice the comparison asks for: the fallback of the voice role (ADR 0017), to see if it holds up. */
-export const COMPARE_MODEL = 'mistral-large-latest';
+export const COMPARE_MODEL = 'mistral-large-4';
 
 export type PlaygroundErrorCode =
   'llm_unavailable' | 'not_deployed' | 'still_writing' | 'forbidden' | 'failed';
