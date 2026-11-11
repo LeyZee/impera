@@ -115,8 +115,8 @@ async function linkIn(
   if (refusal !== null) return { ok: false, kind: refusal };
   if (link?.kind === 'member') {
     if (!TeamMemberIdSchema.safeParse(link.memberId).success) return { ok: false, kind: 'member_unknown' };
-    // A member who left may be linked: his sales from before his departure go on his final statement, the pay module
-    // counts none after it (ADR 0072).
+    // A member who left may be linked: his sales from before his departure go on his final statement (ADR 0072). One
+    // after it finds no shift of his and waits for a decision (« hors poste »); pay holds the rule, not this link.
     const [member] = await tx
       .select({ id: schema.teamMembers.id })
       .from(schema.teamMembers)
