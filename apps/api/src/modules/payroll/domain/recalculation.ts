@@ -2,8 +2,10 @@ import {
   bonusTiersFor,
   canonicalExchangeRates,
   collectiveGoalFor,
+  earningsBaseOf,
   nextPayPeriod,
   payPeriodLastDay,
+  payRulesFor,
   penaltyApplies,
   type Bonus,
   type BonusTier,
@@ -242,6 +244,20 @@ export function firstOpenPeriod(lastClosed: PayPeriod | null): PayPeriod | null 
   return lastClosed === null ? null : nextPayPeriod(lastClosed);
 }
 
+/**
+ * Whether pay counts a validated report at all (ADR 0084 § 3): not when its account's rules for the report's period read
+ * the platform's net. A period switched after the fact keeps its reports, but pays the sales read instead of what they
+ * declared; such a report is never counted, registered nor waited for. A closed period is not concerned: its registry
+ * says what it counted.
+ */
+export function reportCountsOnPay(sales: Pick<SalesSnapshot, 'sources'>, report: ReportForPay): boolean {
+  const rule = payRulesFor(
+    sales.sources.filter((one) => one.platformAccountId === report.platformAccountId),
+    report.period,
+  );
+  return rule === null || earningsBaseOf(rule.platform, rule.earningsSource) !== 'platform_net';
+}
+
 /** The reports `snapshot.period` counts (see above). */
 export function reportsCounted(snapshot: PeriodSnapshot): ReportForPay[] {
   const { period } = snapshot;
@@ -252,7 +268,8 @@ export function reportsCounted(snapshot: PeriodSnapshot): ReportForPay[] {
   return snapshot.reports.filter(
     (report) =>
       !snapshot.registered.has(report.id) &&
-      (report.period === period || (firstOpen === period && report.period < period)),
+      (report.period === period || (firstOpen === period && report.period < period)) &&
+      reportCountsOnPay(snapshot.sales, report),
   );
 }
 
@@ -609,7 +626,12 @@ export function closePeriod(snapshot: PeriodSnapshot): {
   // Before any closing, a period counts its own reports: one still waiting from earlier would be left behind.
   if (
     firstOpen === null &&
-    snapshot.reports.some((report) => report.period < period && !snapshot.registered.has(report.id))
+    snapshot.reports.some(
+      (report) =>
+        report.period < period &&
+        !snapshot.registered.has(report.id) &&
+        reportCountsOnPay(snapshot.sales, report),
+    )
   ) {
     throw new Error(`An earlier period than ${period} must close first`);
   }
