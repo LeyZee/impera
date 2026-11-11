@@ -78,6 +78,8 @@ const member = (n: number, displayName: string, status: TeamMember['status'] = '
     invitationExpiresAt: null,
   });
 
+const PERSON = { isBot: false, isExternal: false };
+
 describe('sectionsOf', () => {
   it('puts the rows to confirm, the rows linked, and the set aside with the bots in the fold', () => {
     const rows = [
@@ -132,14 +134,14 @@ describe('a choice', () => {
   });
 
   it('says why each proposal was made', () => {
-    expect(matchLine({ kind: 'member', memberId: mid(1), memberDisplayName: 'Léa', match: 'email' })).toBe(
-      'Même e-mail',
-    );
-    expect(matchLine({ kind: 'member', memberId: mid(1), memberDisplayName: 'Léa', match: 'name' })).toBe(
-      'Mêmes prénom et nom',
-    );
-    expect(matchLine({ kind: 'agent', match: 'name' })).toBe('Nommé « bot »');
-    expect(matchLine({ kind: 'invite' })).toBe('Personne de l’équipe Impera avec cet e-mail');
+    expect(
+      matchLine({ kind: 'member', memberId: mid(1), memberDisplayName: 'Léa', match: 'email' }, PERSON),
+    ).toBe('Même e-mail');
+    expect(
+      matchLine({ kind: 'member', memberId: mid(1), memberDisplayName: 'Léa', match: 'name' }, PERSON),
+    ).toBe('Mêmes prénom et nom');
+    expect(matchLine({ kind: 'agent', match: 'name' }, PERSON)).toBe('Nommé « bot »');
+    expect(matchLine({ kind: 'invite' }, PERSON)).toBe('Personne de l’équipe Impera avec cet e-mail');
     expect(matchLine({ kind: 'none' }, { isBot: true, isExternal: false })).toBe('Bot d’une clé d’API');
     expect(matchLine({ kind: 'none' }, { isBot: false, isExternal: true })).toBe(
       'Compte d’un prestataire : jamais invité',
@@ -147,7 +149,7 @@ describe('a choice', () => {
     expect(matchLine({ kind: 'none' }, { isBot: false, isExternal: false })).toBe(
       'Sans e-mail : rien à proposer',
     );
-    expect(matchLine(null)).toBeNull();
+    expect(matchLine(null, PERSON)).toBeNull();
   });
 });
 

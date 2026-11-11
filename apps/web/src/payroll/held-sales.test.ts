@@ -48,27 +48,24 @@ describe('held sales (CRM-03 lot b4b)', () => {
     expect(plain(saleAmount(heldSaleOf({ netMinor: -4_200 })))).toBe('−42,00 €');
   });
 
-  it('says why a line waits, what the owner or a manager can do about it, and nothing for a paid line', () => {
-    expect(heldReasonText(heldSaleOf(), THEO, true)).toBe(
+  it('says why a line waits, what the owner or a manager links to count it, and nothing for a paid line', () => {
+    expect(heldReasonText(heldSaleOf(), THEO)).toBe(
       'Théo n’était ni en poste ni dans sa marge d’accès à l’heure de la vente.',
     );
     const unlinked = heldSaleOf({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
-    expect(heldReasonText(unlinked, null, true)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Équipe › Reveal et la vente compte seule. Sinon, écarte-la.',
+    expect(heldReasonText(unlinked, null)).toBe(
+      'Son chatteur sur Reveal n’est relié à aucun membre\u00a0: relie-le dans Équipe › Reveal et la vente compte seule. Sinon, écarte-la.',
     );
-    expect(heldReasonText(unlinked, null, false)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire ou un manager le relie dans Équipe › Reveal. Sinon, écarte-la.',
-    );
-    expect(heldReasonText(heldSaleOf({ reason: 'status_unknown' }), THEO, true)).toBe(
+    expect(heldReasonText(heldSaleOf({ reason: 'status_unknown' }), THEO)).toBe(
       'Reveal lui donne un statut qu’Impera ne connaît pas encore.',
     );
-    expect(heldReasonText(heldSaleOf({ reason: 'refund_before_register' }), THEO, true)).toBe(
+    expect(heldReasonText(heldSaleOf({ reason: 'refund_before_register' }), THEO)).toBe(
       'Remboursement d’une vente plus ancienne que le registre des ventes : il n’est retiré à personne.',
     );
-    expect(heldReasonText(heldSaleOf({ reason: 'refund_before_base' }), THEO, true)).toBe(
+    expect(heldReasonText(heldSaleOf({ reason: 'refund_before_base' }), THEO)).toBe(
       'Remboursement d’une vente payée sur les rapports, avant le passage au net : il n’est pas retiré du net.',
     );
-    expect(heldReasonText(heldSaleOf({ reason: null }), THEO, true)).toBeNull();
+    expect(heldReasonText(heldSaleOf({ reason: null }), THEO)).toBeNull();
   });
 
   it('names the decision in force and each gesture, the member a count goes to', () => {
@@ -138,11 +135,8 @@ describe('held sales (CRM-03 lot b4b)', () => {
       'Le remboursement suit de nouveau les règles : il se déduit des ventes de Théo.',
     );
     const unlinked = refund({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
-    expect(heldReasonText(unlinked, null, true)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Équipe › Reveal et le remboursement se déduit seul. Sinon, écarte-le.',
-    );
-    expect(heldReasonText(unlinked, null, false)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire ou un manager le relie dans Équipe › Reveal. Sinon, écarte-le.',
+    expect(heldReasonText(unlinked, null)).toBe(
+      'Son chatteur sur Reveal n’est relié à aucun membre\u00a0: relie-le dans Équipe › Reveal et le remboursement se déduit seul. Sinon, écarte-le.',
     );
   });
 

@@ -1099,6 +1099,8 @@ describe('a member’s row', () => {
     expect(plain(carryLine(statement(second), false) ?? '')).toBe(
       'Sous le minimum de 15,00 € à ce jour : 13,00 € iraient sur la quinzaine suivante, si la quinzaine finit ainsi. Ce serait le deuxième report de suite : la quinzaine suivante verserait ce montant, même sous le minimum.',
     );
+    // A colon never starts a line: it is held to the word before it (recette paie, 11/11).
+    expect(carryLine(statement(second), false)).not.toMatch(/ [:;]/u);
     // After a negative carry-over, the count starts again: a first carry-over, said plainly.
     const afterNegative = { ...second, carryOversIn: [carriedIn(-500, 1)] };
     expect(plain(carryLine(statement({ ...afterNegative, status: 'validated' }), true) ?? '')).toBe(

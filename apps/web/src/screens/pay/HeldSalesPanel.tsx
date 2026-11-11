@@ -48,13 +48,11 @@ export function HeldSalesPanel({
   period,
   names,
   me,
-  owner,
   reads,
 }: {
   period: PayPeriod;
   names: PayNames;
   me: { readonly id: string };
-  owner: boolean;
   /** The owner or an active manager: the only readers of the list. */
   reads: boolean;
 }): JSX.Element | null {
@@ -107,7 +105,7 @@ export function HeldSalesPanel({
             // Each gesture names its sale to a screen reader, out of the list too.
             const about = (part: string): string => `${uid}-${String(index)}-${part}`;
             const account = names.account(sale.platformAccountId);
-            const reason = heldReasonText(sale, member, owner);
+            const reason = heldReasonText(sale, member);
             const signalled = signalText(sale, member);
             const decided = decisionText(sale, member);
             return (

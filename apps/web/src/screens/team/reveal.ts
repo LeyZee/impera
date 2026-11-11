@@ -90,7 +90,7 @@ export function optionsOf(row: TeamImportRow, members: readonly TeamMember[]): C
 /** Why the proposal was made, after its name: the reader checks it before ticking. */
 export function matchLine(
   suggestion: TeamImportSuggestion | null,
-  chatter: { readonly isBot: boolean; readonly isExternal: boolean } = { isBot: true, isExternal: false },
+  chatter: { readonly isBot: boolean; readonly isExternal: boolean },
 ): string | null {
   if (suggestion === null) return null;
   switch (suggestion.kind) {

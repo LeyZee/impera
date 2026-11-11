@@ -51,7 +51,6 @@ export const saleAmount = (sale: HeldSale): string => signedAmountText(sale.netM
 export function heldReasonText(
   sale: Pick<HeldSale, 'platform' | 'reason' | 'event'>,
   member: SaleMember | null,
-  owner: boolean,
 ): string | null {
   const reason: SaleHeldReason | null = sale.reason;
   const refund = sale.event === 'refund';
@@ -61,11 +60,11 @@ export function heldReasonText(
     case 'chatter_unlinked': {
       const unlinked = `Son chatteur sur ${platformName(sale.platform)} n’est relié à aucun membre`;
       const otherwise = refund ? 'Sinon, écarte-le.' : 'Sinon, écarte-la.';
-      if (!owner)
-        return `${unlinked} : le propriétaire ou un manager le relie dans Équipe › Reveal. ${otherwise}`;
+      // Only the owner and an active manager read this list, and both link in Équipe (ADR 0076).
+      const where = `Équipe › ${platformName(sale.platform)}`;
       return refund
-        ? `${unlinked} : relie-le dans Équipe › Reveal et le remboursement se déduit seul. ${otherwise}`
-        : `${unlinked} : relie-le dans Équipe › Reveal et la vente compte seule. ${otherwise}`;
+        ? `${unlinked}\u00a0: relie-le dans ${where} et le remboursement se déduit seul. ${otherwise}`
+        : `${unlinked}\u00a0: relie-le dans ${where} et la vente compte seule. ${otherwise}`;
     }
     case 'off_shift':
       return `${member?.name ?? 'Son chatteur'} n’était ni en poste ni dans sa marge d’accès à l’heure de la vente.`;

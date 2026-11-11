@@ -521,7 +521,6 @@ function PeriodView({
           period={data.period}
           names={names}
           me={me}
-          owner={owner}
           reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
         />
       </div>
