@@ -1,7 +1,8 @@
-import { and, eq, like, ne } from 'drizzle-orm';
+import { and, eq, isNull, like, ne, sql } from 'drizzle-orm';
 
 import type { Transaction } from './client';
 import { passkey, session, twoFactor, user, verification } from './schema/auth';
+import { extensionLinks } from './schema/trends';
 
 /**
  * Better Auth's `two-factor` plugin keeps each trusted device (ADR 0046 § 3) as a `verification` row whose identifier
@@ -77,4 +78,25 @@ export async function resetSecondFactor(
     .returning({ id: twoFactor.id });
   await tx.update(user).set({ twoFactorEnabled: false }).where(eq(user.id, userId));
   return { ...revoked, hadSecondFactor: erased.length > 0, passkeys };
+}
+
+/**
+ * Revokes every live extension link of an account (`null`: of every account), with the sign-ins they outlive otherwise
+ * (audit du 11/11): a link is a way in that asks for no password and no code, so whatever signs an account out
+ * everywhere (a new password, a reset of its code, « fermer les autres sessions », the owner closing an account's
+ * sessions, `ops:revoke-sessions`) takes its links too, and the person links the browser again. On the admin
+ * connection only: `extension_links` is closed to the application role (migration 0100). A departure needs no call,
+ * a link of a member who left names nobody. Returns how many went.
+ */
+export async function revokeExtensionLinks(tx: Transaction, userId: string | null): Promise<number> {
+  const revoked = await tx
+    .update(extensionLinks)
+    .set({ revokedAt: sql`now()` })
+    .where(
+      userId === null
+        ? isNull(extensionLinks.revokedAt)
+        : and(eq(extensionLinks.userId, userId), isNull(extensionLinks.revokedAt)),
+    )
+    .returning({ id: extensionLinks.id });
+  return revoked.length;
 }

@@ -25,6 +25,7 @@ import {
   and,
   eq,
   removePasskeys,
+  revokeExtensionLinks,
   revokeSignIns,
   schema,
   sql,
@@ -220,12 +221,19 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
             keepSessionId: sessionId,
             ...(thisDevice !== undefined && { keepTrustedDevice: thisDevice }),
           });
+          // The browsers linked to the extension go too: a link asks for no password, it must not outlive this.
+          const extensionLinks = await revokeExtensionLinks(tx, userId);
           await audit(tx, {
             userId,
             action: 'auth.sessions_revoked',
             entityId: userId,
             ip: request.ip,
-            details: { scope: 'others', revoked: closed.sessions, trustedDevices: closed.trustedDevices },
+            details: {
+              scope: 'others',
+              revoked: closed.sessions,
+              trustedDevices: closed.trustedDevices,
+              extensionLinks,
+            },
           });
           return { sessions: closed.sessions, trustedDevices: closed.trustedDevices };
         });
@@ -373,6 +381,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
             .where(eq(schema.user.id, target));
           if (account === undefined) throw new AccountNotFound();
           const closed = await revokeSignIns(tx, target);
+          await revokeExtensionLinks(tx, target);
           await audit(tx, {
             userId: ownerId,
             action: 'auth.sessions_revoked',

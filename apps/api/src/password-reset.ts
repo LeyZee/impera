@@ -15,7 +15,17 @@ import {
   RequestPasswordResetBodySchema,
   type PasswordResetPreview,
 } from '@impera/contracts';
-import { and, eq, revokeSignIns, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
+import {
+  and,
+  eq,
+  revokeExtensionLinks,
+  revokeSignIns,
+  schema,
+  sql,
+  withAdmin,
+  type Database,
+  type Transaction,
+} from '@impera/db';
 import type { FastifyBaseLogger } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -228,6 +238,7 @@ async function redeem(
     // An account of the agency always has a password: without one, the link opens nothing.
     if (changed.length === 0) throw new PasswordResetLinkNotFound();
     const ended = await revokeSignIns(tx, link.userId);
+    await revokeExtensionLinks(tx, link.userId);
     await audit(tx, {
       userId: link.userId,
       action: 'password_reset.redeem',
