@@ -12,6 +12,7 @@ import {
   ContentDropFileIdSchema,
   ContentDropIdSchema,
   ContentDropSchema,
+  CreatorContentSchema,
   ContentRequestIdSchema,
   CreatorIdSchema,
   DROP_PART_BYTES,
@@ -28,6 +29,7 @@ import { eq, inArray, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { DropSenseInput, LlmGateway } from '@impera/llm';
 import { AwsClient } from 'aws4fetch';
+import { strFromU8, unzipSync } from 'fflate';
 import { runOnce } from 'graphile-worker';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -761,6 +763,64 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
       'manager',
     );
     expect(DropDescriptionsReviewSchema.parse(retried.json()).media[0]?.description?.author).toBe('hand');
+  });
+
+  it('gives the agency her feed drop as a ZIP, then takes « Publié » once: her originals go 30 days later (recette créatrice, anomaly 1)', async () => {
+    const one = await dropOne('nora', jpegOf(MB, 30, 40, 0x7d));
+    const url = `/v1/creators/${nora}/drops/${one.dropId}/export`;
+    // Still being sent: not yet.
+    const early = await call('GET', url, 'manager');
+    expect(early.statusCode, early.body).toBe(422);
+    expect(early.json()).toMatchObject({ error: { details: { reason: 'not_ready' } } });
+    await sendWhole(one);
+    await receive();
+
+    // Her team's alone.
+    expect((await call('GET', url, 'chatter')).statusCode).toBe(403);
+    expect((await call('GET', url, 'nora')).statusCode).toBe(403);
+    expect((await call('POST', `${url}/confirm`, 'chatter')).statusCode).toBe(403);
+    const archive = await call('GET', url, 'manager');
+    expect(archive.statusCode, archive.body).toBe(200);
+    expect(archive.headers['content-type']).toBe('application/zip');
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: PARIS }).format(new Date());
+    const folder = `feed-seance-${day}`;
+    expect(archive.headers['content-disposition']).toBe(`attachment; filename="${folder}.zip"`);
+    const entries = unzipSync(new Uint8Array(archive.rawPayload));
+    expect(Object.keys(entries)).toEqual([`${folder}/00-fiche.txt`, `${folder}/01-photo.jpg`]);
+    const sheet = strFromU8(entries[`${folder}/00-fiche.txt`] ?? new Uint8Array());
+    expect(sheet.split('\n').slice(0, 4)).toEqual([
+      `Feed · Séance boudoir du ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: PARIS }).format(new Date())}`,
+      '',
+      'À publier sur son feed Reveal, en une seule publication, dans cet ordre.',
+      '',
+    ]);
+    expect(sheet).toContain('01-photo.jpg');
+
+    const before = Date.now();
+    const confirmed = await call('POST', `${url}/confirm`, 'manager');
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    const drop = ContentDropSchema.parse(confirmed.json());
+    expect(drop.exportedAt).not.toBeNull();
+    const [kept] = await test.admin.db
+      .select({ expiresAt: schema.mediaAssets.expiresAt })
+      .from(schema.contentDropFiles)
+      .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.contentDropFiles.mediaAssetId))
+      .where(eq(schema.contentDropFiles.id, one.fileId));
+    const days30 = 30 * 86_400_000;
+    expect(kept?.expiresAt?.getTime()).toBeGreaterThanOrEqual(before + days30 - 1000);
+    expect(kept?.expiresAt?.getTime()).toBeLessThanOrEqual(Date.now() + days30 + 1000);
+    // Replayed: the same date, one audit line; she reads it out.
+    const again = ContentDropSchema.parse((await call('POST', `${url}/confirm`, 'manager')).json());
+    expect(again.exportedAt).toBe(drop.exportedAt);
+    const audit = await test.admin.db
+      .select({ details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, one.dropId));
+    expect(audit.map((line) => line.details)).toEqual([
+      expect.objectContaining({ category: 'feed_shoot', originals: 1 }),
+    ]);
+    const hers = CreatorContentSchema.parse((await call('GET', '/v1/creator-space/content', 'nora')).json());
+    expect(hers.drops.find((mine) => mine.id === one.dropId)?.exportedAt).toBe(drop.exportedAt);
   });
 
   it('takes no more bytes once her drop is withdrawn, and the job erases what had arrived', async () => {

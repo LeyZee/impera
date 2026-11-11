@@ -549,6 +549,8 @@ export const CONTENT_DROP_CARD_NOT_FOUND = 'content_drop_card_not_found';
 export const CONTENT_DROP_EXPORT_UNPROCESSABLE = 'content_drop_export_unprocessable';
 export const SCRIPT_EXPORT_REFUSALS = [
   'not_a_script',
+  // A script asked by the archive of any other drop (recette créatrice 1): its own archive is in Scripts.
+  'a_script',
   'not_ready',
   'original_erased',
   'moment_unknown',

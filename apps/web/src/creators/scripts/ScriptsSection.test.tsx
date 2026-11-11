@@ -190,36 +190,18 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
   };
 
-  it('gives the owner alone her switch; turned on, it says so', async () => {
-    let on = false;
-    const calls = serve({
-      ...base,
-      [`GET ${SWITCH}`]: () => ({ status: 200, body: { on } }),
-      [`PUT ${SWITCH}`]: () => {
-        on = true;
-        return { status: 200, body: { on } };
-      },
-    });
+  it('no longer holds her switch: it tells the owner it stands in Contenu (recette créatrice 6)', async () => {
+    const calls = serve(base);
     show(true);
-    const toggle = await screen.findByRole('switch', { name: 'Descriptions par l’IA' });
-    if (!(toggle instanceof HTMLInputElement)) throw new Error('the switch is an input');
-    await waitFor(() => {
-      expect(toggle.disabled).toBe(false);
-    });
-    expect(toggle.checked).toBe(false);
-    expect(screen.getByText(/Éteint : ses médias ne sont pas décrits/u)).toBeDefined();
-    fireEvent.click(toggle);
-    await waitFor(() => {
-      expect(toggle.checked).toBe(true);
-    });
-    expect(screen.getByText(/Chaque photo et vidéo de Lina est décrite/u)).toBeDefined();
-    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
-    cleanup();
-    const asManager = serve(base);
-    show(false);
     await screen.findByRole('listitem', { name: 'Soirée inventée' });
     expect(screen.queryByRole('switch')).toBeNull();
-    expect(asManager.some((call) => call.path === SWITCH)).toBe(false);
+    expect(screen.getByText(/Les descriptions par l’IA s’allument dans l’onglet Contenu/u)).toBeDefined();
+    expect(calls.some((call) => call.path === SWITCH)).toBe(false);
+    cleanup();
+    serve(base);
+    show(false);
+    await screen.findByRole('listitem', { name: 'Soirée inventée' });
+    expect(screen.queryByText(/onglet Contenu/u)).toBeNull();
   });
 
   it('reads a script step by step, the synthesis with « prix à fixer », and validates a step at once', async () => {

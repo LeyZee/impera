@@ -160,8 +160,21 @@ export function outLine(drop: ContentDrop, today: string, zone: string): string 
   const when = droppedOn(drop.exportedAt, today, zone);
   // « Aujourd’hui », « Hier », « Lundi » read in the sentence lowercased; « 12 nov. » takes its « le ».
   const said = /^\d/u.test(when) ? `le ${when}` : when.toLowerCase();
-  return `${what} · dans Reveal depuis ${said}`;
+  return `${what} · ${OUT_WHERE[drop.category]} depuis ${said}`;
 }
+
+/** Where a drop went out, as her line says it: Reveal, unless it was for Instagram or Telegram (recette créatrice 1). */
+const OUT_WHERE: Readonly<Record<ContentDrop['category'], string>> = {
+  script: 'dans Reveal',
+  feed_shoot: 'dans Reveal',
+  feed_video: 'dans Reveal',
+  mass_dm: 'dans Reveal',
+  reveal_story: 'dans Reveal',
+  instagram_story: 'sur Instagram',
+  instagram_reel: 'sur Instagram',
+  instagram_post: 'sur Instagram',
+  telegram_post: 'sur Telegram',
+};
 
 /** How a drop's state reads (ADR 0055 § 6). */
 export const STATE_WORDS: Readonly<Record<DropState, string>> = {

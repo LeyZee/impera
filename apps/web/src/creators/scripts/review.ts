@@ -57,7 +57,20 @@ export const describable = (media: DropMediaReview): boolean => media.kind !== '
 /** Her script's steps in its order, each with its media; a file of no step (a slot the version lost) is left out. */
 export function reviewSteps(review: DropDescriptionsReview): readonly ReviewStep[] {
   const byFile = new Map(review.media.map((media) => [media.fileId, media]));
-  return review.steps.map((step) => {
+  // Any other drop than a script has no steps (recette créatrice 1): its media, in her order, as one.
+  const steps =
+    review.steps.length === 0 && review.media.length > 0
+      ? [
+          {
+            step: 'drop',
+            code: '',
+            name: '',
+            access: 'free' as const,
+            fileIds: review.media.map((media) => media.fileId),
+          },
+        ]
+      : review.steps;
+  return steps.map((step) => {
     const media = step.fileIds.flatMap((id) => {
       const one = byFile.get(id);
       return one === undefined ? [] : [one];
@@ -94,12 +107,14 @@ export function reviewStanding(review: DropDescriptionsReview): ReviewStanding {
   const open = seen.filter((one) => one.description !== null && one.description.validatedAt === null).length;
   const undescribed = seen.filter((one) => one.description === null).length;
   const failed = seen.filter((one) => one.description === null && one.describeFailed).length;
+  // A drop that is not a script has no synthesis (recette créatrice 1): its descriptions are the whole of it.
   const summaryDone =
-    review.summary !== null && review.summary.current && review.summary.validatedAt !== null;
+    review.steps.length === 0 ||
+    (review.summary !== null && review.summary.current && review.summary.validatedAt !== null);
   return { open, undescribed, failed, done: open === 0 && undescribed === 0 && summaryDone };
 }
 
-/** « 2 descriptions à valider », « Synthèse à valider », « Tout est validé »: one line on where the script stands. */
+/** « 2 descriptions à valider », « Synthèse à valider », « Tout est validé »: one line on where the drop stands. */
 export function standingLine(review: DropDescriptionsReview): string {
   const { open, undescribed, failed, done } = reviewStanding(review);
   if (done) return 'Tout est validé';

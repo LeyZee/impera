@@ -75,6 +75,14 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     expect(outLine({ ...copied, exportedAt: '2026-10-20T15:00:00.000Z' }, '2026-11-11', 'Europe/Paris')).toBe(
       '1 photo · 1 vidéo · dans Reveal depuis le 20 oct.',
     );
+    // Put out by the agency elsewhere than Reveal (recette créatrice 1): her line says where.
+    const reel = dropOf({
+      category: 'instagram_reel',
+      files: [fileOf({ kind: 'video' })],
+      exportedAt: copied.exportedAt,
+    });
+    expect(published([reel])).toEqual([reel]);
+    expect(outLine(reel, '2026-11-11', 'Europe/Paris')).toBe('1 vidéo · sur Instagram depuis hier');
   });
 
   it('turns amber only a blocked drop: she has something to do', () => {

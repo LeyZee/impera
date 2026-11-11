@@ -25,6 +25,7 @@ import type {
 } from '@impera/contracts';
 
 import type { DropMediaContext } from './describe';
+import type { SentDrop } from './drop-export';
 import type { ExportedFile } from './script-export';
 import type { FileFamily } from './sniff';
 import type { StoredPart } from './upload';
@@ -339,6 +340,17 @@ export interface AgencyContentStore {
    * never later than it already went. Refused like `sentScript`.
    */
   confirmExport(creatorId: string, userId: string, dropId: string, now: Date): Promise<ContentDrop>;
+  /**
+   * Any other drop of hers as its archive reads it (recette créatrice 1): its category, her word, her day, each live kept
+   * file in her order. Refused (`ContentDropExportUnprocessable`) for a script, a drop not `ready`, `scheduled` or
+   * `published` yet, or one whose original is already erased.
+   */
+  sentDrop(creatorId: string, userId: string, dropId: string): Promise<SentDrop>;
+  /**
+   * The team says it put her drop out by hand (ADR 0044: published by hand until the connector does): said once, with
+   * its audit line; her originals of it go 30 days later (ADR 0044 § 2). Refused like `sentDrop`.
+   */
+  confirmDropExport(creatorId: string, userId: string, dropId: string, now: Date): Promise<ContentDrop>;
 }
 
 /** A sent script's facts for its archive (SC-03 c). */

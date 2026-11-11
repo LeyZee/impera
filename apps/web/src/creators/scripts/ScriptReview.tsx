@@ -97,6 +97,8 @@ export function ScriptReview({
 
   const data = review.data;
   const steps = reviewSteps(data);
+  // Any other drop than a script (recette créatrice 1): its media as one list, and no synthesis.
+  const flat = data.steps.length === 0;
   return (
     <div className="sx-review nv-swap" aria-label={`Descriptions de ${code}`} role="region">
       <p className="sx-review__standing nv-num">{standingLine(data)}</p>
@@ -105,22 +107,28 @@ export function ScriptReview({
           {error.message}
         </p>
       )}
-      <Synthesis
-        review={data}
-        steps={steps}
-        busy={busy !== null}
-        error={error?.what === 'summary' ? error.message : null}
-        onValidate={(summaryId) => void run('summary', () => validateSummary(creatorId, dropId, summaryId))}
-        onCorrect={(summaryId, content) =>
-          run('summary', () => correctSummary(creatorId, dropId, summaryId, content))
-        }
-      />
+      {flat ? null : (
+        <Synthesis
+          review={data}
+          steps={steps}
+          busy={busy !== null}
+          error={error?.what === 'summary' ? error.message : null}
+          onValidate={(summaryId) => void run('summary', () => validateSummary(creatorId, dropId, summaryId))}
+          onCorrect={(summaryId, content) =>
+            run('summary', () => correctSummary(creatorId, dropId, summaryId, content))
+          }
+        />
+      )}
       <ol className="sx-steps">
         {steps.map((step) => (
           <li key={step.key} className="sx-step">
             <div className="sx-step__head">
-              <span className="sx-step__code nv-num">{step.code}</span>
-              <span className="sx-step__name">{step.name}</span>
+              {flat ? null : (
+                <>
+                  <span className="sx-step__code nv-num">{step.code}</span>
+                  <span className="sx-step__name">{step.name}</span>
+                </>
+              )}
               {step.batch.length > 0 ? (
                 <button
                   type="button"
@@ -139,7 +147,7 @@ export function ScriptReview({
                 <MediaRow
                   key={media.fileId}
                   media={media}
-                  code={step.code}
+                  code={flat ? code : step.code}
                   urls={{
                     thumbnail: thumbnailUrl(creatorId, dropId, media.fileId),
                     media: mediaUrl(creatorId, dropId, media.fileId),

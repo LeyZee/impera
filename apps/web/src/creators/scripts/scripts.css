@@ -215,6 +215,10 @@
 .sx-step__head > .sx-step__all {
   margin-left: auto;
 }
+/* A drop that is not a script has no step to name: its head holds « Tout valider » alone, or nothing. */
+.sx-step__head:empty {
+  display: none;
+}
 
 .sx-media {
   margin: 0;

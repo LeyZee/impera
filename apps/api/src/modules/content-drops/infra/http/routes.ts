@@ -36,6 +36,7 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { exportDrop } from '../../application/drop-export';
 import {
   fillScriptSlot,
   readScriptDrop,
@@ -358,6 +359,40 @@ export function createContentDropRoutes(
       { ...team, schema: { params: CreatorDropParamsSchema, response: { 200: ContentDropSchema } } },
       (request) =>
         agency.confirmExport(request.params.creatorId, signedIn(request.user), request.params.id, clock()),
+    );
+
+    // Any other drop of hers as a ZIP (recette créatrice 1): her media in her order and the sheet, streamed as zipped.
+    app.get(
+      '/creators/:creatorId/drops/:id/export',
+      { ...team, schema: { params: CreatorDropParamsSchema } },
+      async (request, reply) => {
+        const archive = await exportDrop(
+          { agency, storage },
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          clock(),
+        );
+        return reply
+          .header('content-type', SCRIPT_EXPORT_MEDIA_TYPE)
+          .header('content-disposition', `attachment; filename="${archive.fileName}"`)
+          .header('cache-control', 'no-store')
+          .header('x-content-type-options', 'nosniff')
+          .send(archive.stream);
+      },
+    );
+
+    // Put out by hand (ADR 0044, recette créatrice 1): her originals of the drop go 30 days later.
+    app.post(
+      '/creators/:creatorId/drops/:id/export/confirm',
+      { ...team, schema: { params: CreatorDropParamsSchema, response: { 200: ContentDropSchema } } },
+      (request) =>
+        agency.confirmDropExport(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          clock(),
+        ),
     );
 
     app.post(
