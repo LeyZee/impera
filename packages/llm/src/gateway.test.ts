@@ -125,6 +125,50 @@ describe('LlmGateway', () => {
     expect(refusals).toEqual([{ provider: 'xai', status: 403 }]);
   });
 
+  it('asks Grok once more when its reasoning ends with no answer, then falls back (11/11)', async () => {
+    let calls = 0;
+    const emptyThen = (answers: number) =>
+      new MockLanguageModelV4({
+        doGenerate: () => {
+          calls += 1;
+          return Promise.resolve({
+            content: calls > answers ? [{ type: 'text' as const, text: BUBBLES }] : [],
+            finishReason: {
+              unified: calls > answers ? ('stop' as const) : ('other' as const),
+              raw: 'completed',
+            },
+            usage: USAGE,
+            warnings: [],
+          });
+        },
+      });
+
+    const once = emptyThen(1);
+    const { gateway, log } = setup({ xai: once, mistral: scripted([{ text: BUBBLES }]) });
+    const first = await gateway.voice(INPUT);
+    expect(first.ok && first.value.meta.provider).toBe('xai');
+    expect(once.doGenerateCalls).toHaveLength(2);
+    expect(log.since(new Date(0)).map((r) => r.outcome)).toEqual(['invalid_output', 'ok']);
+
+    calls = 0;
+    const twice = emptyThen(2);
+    const mistral = scripted([{ text: BUBBLES }]);
+    const second = setup({ xai: twice, mistral });
+    const result = await second.gateway.voice(INPUT);
+    // Asked once more, never twice: the fallback answers.
+    expect(result.ok && result.value.meta.provider).toBe('mistral');
+    expect(twice.doGenerateCalls).toHaveLength(2);
+    expect(second.log.since(new Date(0)).map((r) => r.outcome)).toEqual(['invalid_output', 'refused', 'ok']);
+  });
+
+  it('never asks again a content filter', async () => {
+    const xai = scripted([{ text: '', finish: 'content-filter' }]);
+    const { gateway } = setup({ xai, mistral: scripted([{ text: BUBBLES }]) });
+    const result = await gateway.voice(INPUT);
+    expect(result.ok && result.value.meta.provider).toBe('mistral');
+    expect(xai.doGenerateCalls).toHaveLength(1);
+  });
+
   it('goes on when reporting the refusal fails', async () => {
     const { gateway } = setup(
       { xai: scripted([{ status: 401 }]), mistral: scripted([{ text: BUBBLES }]) },
