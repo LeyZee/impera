@@ -118,7 +118,14 @@ export interface Line {
   readonly creatorName: string;
 }
 
-/** Every creator's conversations in one list, the most recently changed first. */
+/**
+ * When a line was last written in, as « Il y a … » says it: his last message, else ours, else the conversation's
+ * change (a fan who never wrote). Never its change alone: a background job touching a conversation would lift it.
+ */
+const lastMessageAt = ({ lastInboundAt, lastOutboundAt, updatedAt }: ConversationSummary): number =>
+  Date.parse(lastInboundAt ?? lastOutboundAt ?? updatedAt);
+
+/** Every creator's conversations in one list, the most recent message first, as the time under each pseudo reads. */
 export function mergeConversations(
   lists: readonly {
     readonly creatorId: string;
@@ -130,7 +137,7 @@ export function mergeConversations(
     .flatMap(({ creatorId, creatorName, items }) =>
       items.map((conversation) => ({ conversation, creatorId, creatorName })),
     )
-    .sort((a, b) => Date.parse(b.conversation.updatedAt) - Date.parse(a.conversation.updatedAt));
+    .sort((a, b) => lastMessageAt(b.conversation) - lastMessageAt(a.conversation));
 }
 
 /** « 5 min », « 3 h », « 2 j »: past a day, days, as everywhere in Suivi. */
