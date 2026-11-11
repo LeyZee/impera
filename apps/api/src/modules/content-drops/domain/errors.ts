@@ -222,7 +222,6 @@ export class DropDescriptionsCreatorNotFound extends DomainError {
   }
 }
 
-/** A row named that is no longer the one shown (a newer came), or a row to see alone sent in a batch. */
 /** A synthesis corrected by hand that names a price (they come from the grid, ADR 0056 § 6), or other steps. */
 export class ScriptSummaryCorrectionUnprocessable extends DomainError {
   constructor(reason: 'price' | 'steps') {
@@ -230,12 +229,13 @@ export class ScriptSummaryCorrectionUnprocessable extends DomainError {
       SCRIPT_SUMMARY_CORRECTION_UNPROCESSABLE,
       reason === 'price'
         ? 'Pas de prix dans la synthèse : il vient de la grille de l’agence'
-        : 'La synthèse garde les étapes du script, dans leur ordre',
+        : 'La synthèse garde chaque étape du script, une fois chacune',
       { details: { reason } },
     );
   }
 }
 
+/** A row named that is no longer the one shown (a newer came), or a row to see alone sent in a batch. */
 export class DropDescriptionReviewConflict extends DomainError {
   constructor(reason: 'not_shown' | 'alone' | 'summary_stale') {
     super(

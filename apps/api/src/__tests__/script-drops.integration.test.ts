@@ -21,7 +21,7 @@ import {
   type CreatorId,
   type DropMediaDescription,
 } from '@impera/contracts';
-import { and, eq, schema, sql } from '@impera/db';
+import { and, eq, schema, sql, withTenantMember } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LlmGateway, ScriptSummaryInput } from '@impera/llm';
 import { unzipSync } from 'fflate';
@@ -1178,6 +1178,26 @@ describe('/v1/creator-space/content/script-drops', () => {
     expect(await store.summarized(dropId, 'other-media', 'summary-v2')).toBe(false);
     expect(await insert({ validatedBy: null, validatedAt: null })).toBeInstanceOf(Error);
     expect(await insert({ reviewReasons: ['price'] })).toBeInstanceOf(Error);
+
+    // The application's role, by the policy alone: her team writes a human synthesis, stamped by whoever writes it.
+    const accounts = await test.admin.db
+      .select({ id: schema.user.id, email: schema.user.email })
+      .from(schema.user)
+      .where(sql`${schema.user.email} in ('owner@example.test', 'nora@example.test')`);
+    const ownerId = accounts.find((one) => one.email === 'owner@example.test')?.id ?? '';
+    const noraId = accounts.find((one) => one.email === 'nora@example.test')?.id ?? '';
+    const asOwner = (values: Partial<typeof schema.scriptDropSummaries.$inferInsert>) =>
+      withTenantMember(app.db.db, nora, ownerId, (tx) =>
+        tx.insert(schema.scriptDropSummaries).values({ ...row, id: crypto.randomUUID(), ...values }),
+      ).then(
+        () => null,
+        (error: unknown) => error,
+      );
+    expect(
+      await asOwner({ author: 'brain', model: 'brain-test', validatedBy: null, validatedAt: null }),
+    ).toBeInstanceOf(Error);
+    expect(await asOwner({ validatedBy: noraId })).toBeInstanceOf(Error);
+    expect(await asOwner({ validatedBy: ownerId })).toBeNull();
   });
 
   it('gives her team each medium’s picture and the medium itself in parts, each opening audited (SC-04 lot c4)', async () => {
