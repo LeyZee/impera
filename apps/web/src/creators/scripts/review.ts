@@ -3,6 +3,7 @@ import type {
   DropDescriptionsReview,
   DropMediaReview,
   MediaDescriptionId,
+  ScriptStageAccess,
 } from '@impera/contracts';
 
 /**
@@ -30,6 +31,8 @@ export interface ReviewStep {
   /** « E2A », as her cards say. */
   readonly code: string;
   readonly name: string;
+  /** Offered or paid, as its card says: an offered step shows « Offert », never a price to fix. */
+  readonly access: ScriptStageAccess;
   readonly media: readonly DropMediaReview[];
   /** What « Tout valider » validates: each description still open with nothing holding it back. */
   readonly batch: readonly MediaDescriptionId[];
@@ -58,6 +61,7 @@ export function reviewSteps(review: DropDescriptionsReview): readonly ReviewStep
       key: step.step,
       code: step.code,
       name: step.name,
+      access: step.access,
       media,
       batch: open.filter((description) => description.reviewReasons.length === 0).map((d) => d.id),
       alone: open.filter((description) => description.reviewReasons.length > 0).length,

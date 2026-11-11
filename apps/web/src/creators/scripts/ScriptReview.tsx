@@ -4,6 +4,7 @@ import type {
   DropDescriptionsReview,
   DropMediaReview,
   MediaDescriptionId,
+  ScriptDropSummary,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX } from 'react';
@@ -18,6 +19,7 @@ import {
 } from './review';
 import {
   correctDescription,
+  correctSummary,
   mediaUrl,
   reviewKey,
   thumbnailUrl,
@@ -50,7 +52,8 @@ export function ScriptReview({
   const client = useQueryClient();
   const review = useDropReview(creatorId, dropId, true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // The refusal, and what it answers: one of the synthesis is said in its form, beside « Enregistrer et valider ».
+  const [error, setError] = useState<{ readonly what: string; readonly message: string } | null>(null);
 
   const run = async (what: string, call: () => Promise<ReviewOutcome>): Promise<boolean> => {
     setBusy(what);
@@ -61,7 +64,7 @@ export function ScriptReview({
       client.setQueryData(reviewKey(creatorId, dropId), outcome.review);
       return true;
     }
-    setError(outcome.message);
+    setError({ what, message: outcome.message });
     // A newer row or synthesis came meanwhile: the review is read again, so that the screen shows it.
     await client.invalidateQueries({ queryKey: reviewKey(creatorId, dropId) });
     return false;
@@ -91,16 +94,20 @@ export function ScriptReview({
   return (
     <div className="sx-review nv-swap" aria-label={`Descriptions de ${code}`} role="region">
       <p className="sx-review__standing nv-num">{standingLine(data)}</p>
-      {error === null ? null : (
+      {error === null || error.what === 'summary' ? null : (
         <p className="sx-error nv-swap" role="alert">
-          {error}
+          {error.message}
         </p>
       )}
       <Synthesis
         review={data}
         steps={steps}
         busy={busy !== null}
+        error={error?.what === 'summary' ? error.message : null}
         onValidate={(summaryId) => void run('summary', () => validateSummary(creatorId, dropId, summaryId))}
+        onCorrect={(summaryId, content) =>
+          run('summary', () => correctSummary(creatorId, dropId, summaryId, content))
+        }
       />
       <ol className="sx-steps">
         {steps.map((step) => (
@@ -146,17 +153,29 @@ export function ScriptReview({
   );
 }
 
+type SummaryId = NonNullable<DropDescriptionsReview['summary']>['id'];
+
+/**
+ * Her script's synthesis: what the brain told, or what the agency wrote over it (SC-04 lot c5). « Corriger » opens its
+ * context and each step's two texts; what is written is validated as it is saved. The steps stay hers, in their order,
+ * and a price never enters it: the server refuses one and says why.
+ */
 function Synthesis({
   review,
   steps,
   busy,
+  error,
   onValidate,
+  onCorrect,
 }: {
   review: DropDescriptionsReview;
   steps: readonly ReviewStep[];
   busy: boolean;
-  onValidate: (summaryId: NonNullable<DropDescriptionsReview['summary']>['id']) => void;
+  error: string | null;
+  onValidate: (summaryId: SummaryId) => void;
+  onCorrect: (summaryId: SummaryId, content: ScriptDropSummary) => Promise<boolean>;
 }): JSX.Element {
+  const [draft, setDraft] = useState<ScriptDropSummary | null>(null);
   const summary = review.summary;
   if (!summary?.current)
     return (
@@ -167,14 +186,120 @@ function Synthesis({
             ? 'Elle s’écrit quand chaque photo et chaque vidéo du script est décrite.'
             : 'Une description a changé : elle se réécrit, puis revient ici.'}
         </p>
+        {error === null ? null : (
+          <p className="sx-error nv-swap" role="alert">
+            {error}
+          </p>
+        )}
       </section>
     );
   const names = new Map(steps.map((step) => [step.key, step]));
+  const codeOf = (step: string) => names.get(step)?.code ?? step;
+
+  if (draft !== null) {
+    const filled =
+      draft.shootingContext.trim() !== '' &&
+      draft.steps.every((one) => one.overview.trim() !== '' && one.summary.trim() !== '');
+    const setStep = (index: number, field: 'overview' | 'summary', text: string) => {
+      setDraft({
+        ...draft,
+        steps: draft.steps.map((one, at) => (at === index ? { ...one, [field]: text } : one)),
+      });
+    };
+    return (
+      <section className="sx-synth" aria-label="Synthèse du script">
+        <p className="sx-synth__title">Corriger la synthèse</p>
+        <p className="ps-muted">
+          Ce que tu écris remplace la synthèse et vaut validation. Pas de prix ici : ils viennent de la
+          grille.
+        </p>
+        <form
+          className="sx-correct"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!filled) return;
+            const written: ScriptDropSummary = {
+              shootingContext: draft.shootingContext.trim(),
+              steps: draft.steps.map((one) => ({
+                step: one.step,
+                overview: one.overview.trim(),
+                summary: one.summary.trim(),
+              })),
+            };
+            void onCorrect(summary.id, written).then((done) => {
+              if (done) setDraft(null);
+            });
+          }}
+        >
+          <GrowingField
+            label="Le tournage"
+            value={draft.shootingContext}
+            maxLength={2000}
+            autofocus
+            onChange={(text) => {
+              setDraft({ ...draft, shootingContext: text });
+            }}
+          />
+          <ol className="sx-synth__edit">
+            {draft.steps.map((one, index) => (
+              <li key={one.step} className="sx-synth__edit-step">
+                <p className="sx-synth__edit-head">
+                  <span className="sx-step__code nv-num">{codeOf(one.step)}</span>
+                  <span className="sx-step__name">{names.get(one.step)?.name}</span>
+                </p>
+                <GrowingField
+                  label="En une ligne"
+                  value={one.summary}
+                  maxLength={400}
+                  onChange={(text) => {
+                    setStep(index, 'summary', text);
+                  }}
+                />
+                <GrowingField
+                  label="Le déroulé"
+                  value={one.overview}
+                  maxLength={2000}
+                  onChange={(text) => {
+                    setStep(index, 'overview', text);
+                  }}
+                />
+              </li>
+            ))}
+          </ol>
+          {error === null ? null : (
+            <p className="sx-error nv-swap" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="sx-actions">
+            <button
+              type="button"
+              className="nv-btn nv-btn--sm nv-btn--plain"
+              disabled={busy}
+              onClick={() => {
+                setDraft(null);
+              }}
+            >
+              Annuler
+            </button>
+            <button type="submit" className="nv-btn nv-btn--sm nv-btn--soft" disabled={busy || !filled}>
+              Enregistrer et valider
+            </button>
+          </div>
+        </form>
+      </section>
+    );
+  }
+
   return (
     <section className="sx-synth" aria-label="Synthèse du script">
       <div className="sx-synth__head">
         <p className="sx-synth__title">Synthèse</p>
-        {summary.validatedAt === null ? null : (
+        {summary.author === 'human' ? (
+          <span className="aa-pill" data-tone="ok">
+            Corrigée à la main
+          </span>
+        ) : summary.validatedAt === null ? null : (
           <span className="aa-pill" data-tone="ok">
             Validée
           </span>
@@ -189,15 +314,33 @@ function Synthesis({
       <ol className="sx-synth__steps">
         {summary.content.steps.map((one) => (
           <li key={one.step} className="sx-synth__step">
-            <span className="sx-step__code nv-num">{names.get(one.step)?.code ?? one.step}</span>
+            <span className="sx-step__code nv-num">{codeOf(one.step)}</span>
             <span className="sx-synth__text">{one.summary}</span>
-            {/* The grid of prices does not exist yet (P6-01): never a price from the model (ADR 0056 § 6). */}
-            <span className="aa-pill sx-price">Prix à fixer</span>
+            {/* Offered, as its card says (ADR 0064 § 3); paid, the grid gives its price, which does not exist yet
+                (P6-01): never a price from the model (ADR 0056 § 6). */}
+            <span className="aa-pill sx-price">
+              {names.get(one.step)?.access === 'free' ? 'Offert' : 'Prix à fixer'}
+            </span>
           </li>
         ))}
       </ol>
-      {summary.validatedAt === null ? (
-        <div className="sx-actions">
+      {error === null ? null : (
+        <p className="sx-error nv-swap" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="sx-actions">
+        <button
+          type="button"
+          className="nv-btn nv-btn--sm nv-btn--plain"
+          disabled={busy}
+          onClick={() => {
+            setDraft(summary.content);
+          }}
+        >
+          Corriger
+        </button>
+        {summary.validatedAt === null ? (
           <button
             type="button"
             className="nv-btn nv-btn--sm nv-btn--soft"
@@ -208,9 +351,46 @@ function Synthesis({
           >
             Valider la synthèse
           </button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </section>
+  );
+}
+
+/** A labelled text field that grows with its text (useGrowingArea), one per text of the synthesis. */
+function GrowingField({
+  label,
+  value,
+  maxLength,
+  autofocus = false,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  maxLength: number;
+  autofocus?: boolean;
+  onChange: (text: string) => void;
+}): JSX.Element {
+  const id = useId();
+  const area = useGrowingArea(value);
+  return (
+    <div className="nv-field">
+      <label className="nv-field__label" htmlFor={id}>
+        {label}
+      </label>
+      <textarea
+        id={id}
+        ref={area}
+        className="nv-field__control sx-correct__area"
+        value={value}
+        maxLength={maxLength}
+        rows={2}
+        data-autofocus={autofocus ? true : undefined}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </div>
   );
 }
 
