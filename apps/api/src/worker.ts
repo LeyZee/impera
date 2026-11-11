@@ -1,5 +1,6 @@
 import { createApp } from './composition-root';
 import { loadConfig } from './config';
+import { logCrashes } from './crash';
 import { createLogger } from './logger';
 import { exitGracefully } from './shutdown';
 import { startWorker } from './worker-runner';
@@ -8,6 +9,8 @@ import { startWorker } from './worker-runner';
 const config = loadConfig();
 const logger = createLogger(config);
 // Before anything starts: a SIGTERM during the start is kept for the stop below (`shutdown.ts`).
+// An error nobody caught is written to the log before Node exits (`crash.ts`).
+logCrashes(logger);
 const graceful = exitGracefully(logger);
 const app = await createApp(config, logger, { withPlayground: false });
 const worker = await startWorker(app, {
