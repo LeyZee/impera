@@ -231,7 +231,7 @@ export function createWorld(
     if (trouble(reply, result) !== null) return reply;
     if (result === 'refused') return reply.code(401).send({ message: 'Unauthorized' });
     if (result === 'no_credit') return reply.code(402).send({ message: 'Payment required' });
-    return { data: [{ id: 'mistral-large-latest' }, { id: 'mistral-small-latest' }] };
+    return { data: [{ id: 'mistral-large-4-0' }, { id: 'mistral-small-latest' }] };
   });
 
   // ElevenLabs: the month's characters (almost spent for `credit`) and the voices, one named after Messa.

@@ -209,7 +209,7 @@ describe('Mistral', () => {
   it('accepts a key that sees Mistral Large, the writing fallback', async () => {
     replies.set('/v1/models', {
       status: 200,
-      body: { object: 'list', data: [{ id: 'mistral-small-latest' }, { id: 'mistral-large-latest' }] },
+      body: { object: 'list', data: [{ id: 'mistral-small-latest' }, { id: 'mistral-large-4-0' }] },
     });
     expect(await verifier().verify('FAKEmistralFAKEmistralFAKE00', {})).toMatchObject({
       ok: true,
@@ -222,6 +222,9 @@ describe('Mistral', () => {
     replies.set('/v1/models', { status: 401, body: { message: 'Unauthorized' } });
     expect(await verifier().verify('FAKE', {})).toEqual({ ok: false, kind: 'unauthorized' });
     replies.set('/v1/models', { status: 200, body: { data: [{ id: 'mistral-small-latest' }] } });
+    expect(await verifier().verify('FAKE', {})).toEqual({ ok: false, kind: 'model_not_allowed' });
+    // Another Mistral Large than the pinned one: the relay would be refused, so the key is not kept.
+    replies.set('/v1/models', { status: 200, body: { data: [{ id: 'mistral-large-latest' }] } });
     expect(await verifier().verify('FAKE', {})).toEqual({ ok: false, kind: 'model_not_allowed' });
     replies.set('/v1/models', { status: 402, body: { message: 'Payment required' } });
     expect(await verifier().verify('FAKE', {})).toEqual({ ok: false, kind: 'no_credit' });

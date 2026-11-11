@@ -1,11 +1,11 @@
-import type { LlmConfig, ModelRef, ProviderCredentials } from '@impera/llm';
+import { MISTRAL_FALLBACK_MODEL, type LlmConfig, type ModelRef, type ProviderCredentials } from '@impera/llm';
 
 /** A run of the evals never spends more than this, on top of and apart from the agent's daily cap. */
 export const EVALS_CAP_EUR = 3;
 
 // Another family than the voice's: a model scoring its own words is too kind to them.
 const INDEPENDENT_JUDGES: readonly (readonly [keyof ProviderCredentials, ModelRef])[] = [
-  ['LLM_MISTRAL_API_KEY', { provider: 'mistral', model: 'mistral-large-latest' }],
+  ['LLM_MISTRAL_API_KEY', { provider: 'mistral', model: MISTRAL_FALLBACK_MODEL }],
   ['LLM_GOOGLE_API_KEY', { provider: 'google', model: 'gemini-3.8-flash' }],
 ];
 
