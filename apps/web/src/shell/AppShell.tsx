@@ -147,7 +147,6 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
           <Stage key={current ?? 'none'} pathname={pathname} stage={main} />
-          <InstallNudge />
           {/* Both regions are always there, empty when silent: a screen reader announces what comes into a region it
               already knows. */}
           <div className="nv-offline-region" role="status">
@@ -190,6 +189,9 @@ function Stage({ pathname, stage }: { pathname: string; stage: RefObject<HTMLEle
   if (!within && pathname !== first) setWithin(true);
   return (
     <main className="nv-stage" id="contenu" tabIndex={-1} ref={stage} data-within={within ? '' : undefined}>
+      {/* On a phone the install card heads the page, in its flow: it never covers what the page shows (recette 11/11,
+          SOC-14). A computer keeps it in its corner. */}
+      <InstallNudge />
       <Outlet />
     </main>
   );
