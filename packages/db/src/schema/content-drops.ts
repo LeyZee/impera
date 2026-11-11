@@ -6,6 +6,7 @@ import {
   DROP_MEDIA_KINDS,
   DROP_MIME_TYPES,
   DROP_STATES,
+  SCRIPT_SUMMARY_AUTHORS,
   SCRIPT_SUMMARY_REVIEW_REASONS,
   SHOT_MOMENTS,
   type ScriptDropSummary,
@@ -394,6 +395,11 @@ export const scriptDropSummaries = pgTable(
       .default(sql`'{}'::text[]`),
     model: text('model').notNull(),
     promptHash: text('prompt_hash').notNull(),
+    /**
+     * `brain`, or `human` (SC-04 lot c5): corrected by hand from the row it shows, a new row validated by its writer,
+     * with the brain's prompt it corrects; the brain tells the same media again only once they change.
+     */
+    author: enumText('author').notNull().default('brain'),
     /** Who validated it (ADR 0030 § 3): an account, set once with `validated_at` (`script_drop_summaries_kept`). */
     validatedBy: text('validated_by').references(() => user.id),
     validatedAt: timestampTz('validated_at'),
@@ -415,7 +421,16 @@ export const scriptDropSummaries = pgTable(
       columns: [t.dropId, t.creatorId],
       foreignColumns: [contentDrops.id, contentDrops.creatorId],
     }),
-    uniqueIndex('script_drop_summaries_unique').on(t.dropId, t.mediaHash, t.promptHash),
+    enumCheck('script_drop_summaries', t.author, SCRIPT_SUMMARY_AUTHORS),
+    // Written by hand: validated by its writer, nothing left to look at.
+    check(
+      'script_drop_summaries_human_check',
+      sql`${t.author} <> 'human' or (${t.validatedAt} is not null and ${t.reviewReasons} = '{}'::text[])`,
+    ),
+    // One telling by the brain per media and prompt; a hand may correct it as often as it likes.
+    uniqueIndex('script_drop_summaries_unique')
+      .on(t.dropId, t.mediaHash, t.promptHash)
+      .where(sql`${t.author} = 'brain'`),
     index('script_drop_summaries_creator_idx').on(t.creatorId),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
     // Her team validates a synthesis; only the two columns of the stamp are granted (migration 0152).
@@ -423,6 +438,11 @@ export const scriptDropSummaries = pgTable(
       for: 'update',
       using: ofHerTeam(t.creatorId),
       withCheck: ofHerTeam(t.creatorId),
+    }),
+    // Her team corrects a synthesis by hand (SC-04 lot c5): a row of its own, validated by the one who writes it.
+    pgPolicy('team_correct', {
+      for: 'insert',
+      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.author} = 'human' and ${t.validatedBy} = ${currentUser}`,
     }),
   ],
 );
