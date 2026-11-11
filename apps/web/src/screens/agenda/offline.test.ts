@@ -2,7 +2,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { agendaOf, post, WEDNESDAY } from './fixtures';
-import { dropGestures, keepGesture, keepSnapshot, pendingGestures, snapshotOf, withPending } from './offline';
+import {
+  dropGestures,
+  keepGesture,
+  keepSnapshot,
+  pendingGestures,
+  snapshotAtOf,
+  snapshotOf,
+  withPending,
+} from './offline';
 
 afterEach(() => {
   localStorage.clear();
@@ -19,6 +27,16 @@ describe('her agenda off the network (ADR 0042 § 8)', () => {
     for (const week of ['a', 'b', 'c', 'd', 'e']) keepSnapshot(week, agendaOf({ today: WEDNESDAY }));
     expect(snapshotOf('e')).toEqual(agendaOf());
     expect(snapshotOf('a')).toBeUndefined();
+  });
+
+  it('keeps when the server answered each read, to say how old a copy is (CRE-02)', () => {
+    keepSnapshot('w', agendaOf(), 1_000);
+    expect(snapshotAtOf('w')).toBe(1_000);
+    expect(snapshotAtOf('never')).toBeUndefined();
+    // A copy kept before it knew the time still opens: only its age is unknown.
+    localStorage.setItem('impera.agenda.snapshots', JSON.stringify([{ range: 'old', agenda: agendaOf() }]));
+    expect(snapshotOf('old')).toEqual(agendaOf());
+    expect(snapshotAtOf('old')).toBeUndefined();
   });
 
   it('keeps the last gesture on a task and day: a tick then an untick is an untick', () => {
