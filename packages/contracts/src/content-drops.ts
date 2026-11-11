@@ -13,6 +13,7 @@ import {
   ScriptSegmentKeySchema,
   ScriptSegmentSchema,
   ScriptSlotKeySchema,
+  ScriptStageAccessSchema,
   ScriptStructureIdSchema,
   ScriptStructureVersionIdSchema,
   ShotMomentSchema,
@@ -660,6 +661,14 @@ export type ScriptDropSummary = z.infer<typeof ScriptDropSummarySchema>;
  * or a currency, still after one more try, when prices come from the agency's grid alone (ADR 0056 § 6).
  */
 export const SCRIPT_SUMMARY_REVIEW_REASONS = ['price'] as const;
+
+/**
+ * Who wrote a script's synthesis (SC-04 lot c5): the brain (`content_drops.summarize_script`), or the agency, by hand,
+ * from the one it shows (`POST …/summary/correct`): a new row, validated by whoever writes it.
+ */
+export const SCRIPT_SUMMARY_AUTHORS = ['brain', 'human'] as const;
+export const ScriptSummaryAuthorSchema = z.enum(SCRIPT_SUMMARY_AUTHORS);
+export type ScriptSummaryAuthor = z.infer<typeof ScriptSummaryAuthorSchema>;
 export const ScriptSummaryReviewReasonSchema = z.enum(SCRIPT_SUMMARY_REVIEW_REASONS);
 export type ScriptSummaryReviewReason = z.infer<typeof ScriptSummaryReviewReasonSchema>;
 
@@ -713,6 +722,8 @@ export const ScriptSummaryViewSchema = z.strictObject({
   id: ScriptDropSummaryIdSchema,
   content: ScriptDropSummarySchema,
   reviewReasons: z.array(ScriptSummaryReviewReasonSchema),
+  /** `human` once her team corrected it by hand (SC-04 lot c5). */
+  author: ScriptSummaryAuthorSchema,
   current: z.boolean(),
   validatedAt: Instant.nullable(),
   createdAt: Instant,
@@ -725,6 +736,8 @@ export const ScriptReviewStepSchema = z.strictObject({
   /** `E1`, `E2A`, as her cards say. */
   code: z.string().min(1).max(16),
   name: z.string().min(1).max(200),
+  /** Offered or paid, as its card says (ADR 0064 § 3): an offered step has no price to fix. */
+  access: ScriptStageAccessSchema,
   fileIds: z.array(ContentDropFileIdSchema).min(1),
 });
 export type ScriptReviewStep = z.infer<typeof ScriptReviewStepSchema>;
@@ -759,6 +772,29 @@ export type CorrectDropDescriptionBody = z.infer<typeof CorrectDropDescriptionBo
 /** `POST …/summary/validate`: the script's current synthesis, validated as it is. */
 export const ValidateScriptSummaryBodySchema = z.strictObject({ summaryId: ScriptDropSummaryIdSchema });
 export type ValidateScriptSummaryBody = z.infer<typeof ValidateScriptSummaryBodySchema>;
+
+/**
+ * `POST …/summary/correct` (SC-04 lot c5): the script's current synthesis rewritten by hand, its steps the same ones in
+ * the same order; a new row, validated by whoever writes it. Never a sum nor a currency: prices come from the grid.
+ */
+export const CorrectScriptSummaryBodySchema = z.strictObject({
+  summaryId: ScriptDropSummaryIdSchema,
+  shootingContext: z.string().trim().min(1).max(2000),
+  steps: z
+    .array(
+      z.strictObject({
+        step: ScriptStepKeySchema,
+        overview: z.string().trim().min(1).max(2000),
+        summary: z.string().trim().min(1).max(400),
+      }),
+    )
+    .min(1)
+    .max(60),
+});
+export type CorrectScriptSummaryBody = z.infer<typeof CorrectScriptSummaryBodySchema>;
+
+/** A hand-written synthesis that names a sum or a currency, or other steps than the script's. */
+export const SCRIPT_SUMMARY_CORRECTION_UNPROCESSABLE = 'script_summary_correction_unprocessable';
 
 /** A row named that is not this drop's latest (a newer one came meanwhile), or a batch holding a row to see alone. */
 export const DROP_DESCRIPTION_REVIEW_CONFLICT = 'drop_description_review_conflict';
