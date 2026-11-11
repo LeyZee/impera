@@ -1,6 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { DESCRIPTION_TRIES } from '@impera/contracts';
+
 import { dropContextOf, type DropMediaContext } from '../domain/describe';
 import { DropDescriptionFailed } from '../domain/errors';
 import type {
@@ -30,7 +32,7 @@ const BUDGET_DELAY_MS = 60 * 60_000;
 const SHORT_OF_DISK_DELAY_MS = 15 * 60_000;
 
 export type DescribeOutcome =
-  'described' | 'already' | 'off' | 'not_described' | 'gone' | 'unreadable' | 'later';
+  'described' | 'already' | 'off' | 'not_described' | 'gone' | 'unreadable' | 'later' | 'given_up';
 
 async function contextOf(deps: DescribeDeps, target: MediaToDescribe): Promise<DropMediaContext> {
   if (target.script === null) return dropContextOf(target.category, null);
@@ -47,6 +49,7 @@ async function contextOf(deps: DescribeDeps, target: MediaToDescribe): Promise<D
  * transcription is elsewhere), a medium no live drop holds, an original already erased, or a creator whose switch is off
  * (§ 9). Replayable: a medium already described is left alone, and the description is written once. Described, each
  * sent script holding it is asked to be told (`content_drops.summarize_script`), which waits for its other media.
+ * Every model failing is counted on the medium: retried until `DESCRIPTION_TRIES`, then given up, for the agency.
  */
 export async function describeFile(
   deps: DescribeDeps,
@@ -85,7 +88,12 @@ export async function describeFile(
       context: await contextOf(deps, target),
     });
     if (outcome === 'budget') return await later(BUDGET_DELAY_MS);
-    if (outcome === 'failed') throw new DropDescriptionFailed(`media ${mediaAssetId}: every model failed`);
+    if (outcome === 'failed') {
+      // Counted on the medium, so that neither the job nor the hourly backlog asks it forever (recette créatrice, 2):
+      // at the last try it is left to the agency, who asks again or writes it.
+      if ((await deps.queue.failed(mediaAssetId)) >= DESCRIPTION_TRIES) return 'given_up';
+      throw new DropDescriptionFailed(`media ${mediaAssetId}: every model failed`);
+    }
     if (outcome === 'described') await deps.summaries.enqueueFor(mediaAssetId, correlationId);
     return outcome;
   } finally {
