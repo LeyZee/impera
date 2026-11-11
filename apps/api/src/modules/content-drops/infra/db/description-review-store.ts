@@ -181,6 +181,7 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
         step: step.step,
         code: step.code,
         name: step.name,
+        access: step.access,
         fileIds: step.media.map((file) => ContentDropFileIdSchema.parse(file.id)),
       }));
     }

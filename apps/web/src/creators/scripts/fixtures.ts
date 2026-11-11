@@ -63,9 +63,9 @@ export const reviewOf = (
       original: fields.original ?? true,
     })),
     steps: [
-      { step: 'salon:', code: 'E1', name: 'Le salon', fileIds: [fileIds[0]] },
-      { step: 'chambre:A', code: 'E2A', name: 'La chambre', fileIds: [fileIds[1]] },
-      { step: 'chambre:B', code: 'E2B', name: 'La chambre', fileIds: [fileIds[2]] },
+      { step: 'salon:', code: 'E1', name: 'Le salon', access: 'free', fileIds: [fileIds[0]] },
+      { step: 'chambre:A', code: 'E2A', name: 'La chambre', access: 'paid', fileIds: [fileIds[1]] },
+      { step: 'chambre:B', code: 'E2B', name: 'La chambre', access: 'paid', fileIds: [fileIds[2]] },
     ],
     summary:
       fields.summary === undefined || fields.summary === 'none'

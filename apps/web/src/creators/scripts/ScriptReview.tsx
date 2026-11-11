@@ -316,8 +316,11 @@ function Synthesis({
           <li key={one.step} className="sx-synth__step">
             <span className="sx-step__code nv-num">{codeOf(one.step)}</span>
             <span className="sx-synth__text">{one.summary}</span>
-            {/* The grid of prices does not exist yet (P6-01): never a price from the model (ADR 0056 § 6). */}
-            <span className="aa-pill sx-price">Prix à fixer</span>
+            {/* Offered, as its card says (ADR 0064 § 3); paid, the grid gives its price, which does not exist yet
+                (P6-01): never a price from the model (ADR 0056 § 6). */}
+            <span className="aa-pill sx-price">
+              {names.get(one.step)?.access === 'free' ? 'Offert' : 'Prix à fixer'}
+            </span>
           </li>
         ))}
       </ol>

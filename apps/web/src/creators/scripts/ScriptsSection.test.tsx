@@ -246,7 +246,9 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Relire les descriptions' }));
     const region = await screen.findByRole('region', { name: 'Descriptions de S012' });
     expect(within(region).getByText('3 descriptions à valider')).toBeDefined();
-    expect(within(region).getAllByText('Prix à fixer')).toHaveLength(3);
+    // E1 offered, as its card says: no price to fix; E2A and E2B paid, their price from the grid.
+    expect(within(region).getAllByText('Prix à fixer')).toHaveLength(2);
+    expect(within(region).getByText('Offert')).toBeDefined();
     expect(within(region).getByText(/Elle cite un montant/u)).toBeDefined();
     expect(within(region).getByText('Son ressenti : Ma préférée')).toBeDefined();
     expect(within(region).getByText('L’IA n’est pas sûre')).toBeDefined();

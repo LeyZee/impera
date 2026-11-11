@@ -951,6 +951,8 @@ describe('/v1/creator-space/content/script-drops', () => {
     expect(state.steps.map((step) => [step.code, step.fileIds])).toEqual(
       state.media.map((one, index) => [['E1', 'E2A', 'E2B'][index], [one.fileId]]),
     );
+    // Offered or paid, as her cards say: an offered step has no price to fix.
+    expect(state.steps.map((step) => step.access)).toEqual(['free', 'paid', 'paid']);
     expect(state.summary?.current).toBe(false);
     await summarize();
     state = await review('GET', '/descriptions');

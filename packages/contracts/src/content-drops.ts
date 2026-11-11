@@ -13,6 +13,7 @@ import {
   ScriptSegmentKeySchema,
   ScriptSegmentSchema,
   ScriptSlotKeySchema,
+  ScriptStageAccessSchema,
   ScriptStructureIdSchema,
   ScriptStructureVersionIdSchema,
   ShotMomentSchema,
@@ -735,6 +736,8 @@ export const ScriptReviewStepSchema = z.strictObject({
   /** `E1`, `E2A`, as her cards say. */
   code: z.string().min(1).max(16),
   name: z.string().min(1).max(200),
+  /** Offered or paid, as its card says (ADR 0064 § 3): an offered step has no price to fix. */
+  access: ScriptStageAccessSchema,
   fileIds: z.array(ContentDropFileIdSchema).min(1),
 });
 export type ScriptReviewStep = z.infer<typeof ScriptReviewStepSchema>;
