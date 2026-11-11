@@ -24,3 +24,7 @@ ADR 0063, 0065, 0074 ; `packages/contracts/src/fans.ts` (`KycSlotSchema`) ; `app
 ## Hors périmètre
 - Une vue des mêmes chiffres pour le propriétaire.
 - Une photo quotidienne en table (ADR 0074, conséquences).
+
+## Notes de session
+
+- 2026-11-11 (Agent, recette créatrice) : « t'ont écrit cette semaine » et l'activité ne comptent plus que les fans vus avant minuit, comme « en tout ». Sans ça, un import Reveal du jour avec l'historique de la semaine affichait plus de fans qui écrivent que de fans en tout.
