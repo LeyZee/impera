@@ -15,6 +15,7 @@ import {
   SalesFeedRefusalBodySchema,
   SalesFeedStatusSchema,
   SaveSalesFeedKeyBodySchema,
+  limitKeyOf,
 } from '@impera/contracts';
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -82,7 +83,7 @@ export function createSalesFeedRoutes(
           max,
           timeWindow: '1 minute',
           keyGenerator: (request) =>
-            `sales-feed:${request.routeOptions.url ?? ''}:${request.user?.id ?? ''}:${request.ip}`,
+            `sales-feed:${request.routeOptions.url ?? ''}:${request.user?.id ?? ''}:${limitKeyOf(request.ip)}`,
         });
       limiters.set(max, limit);
       return async (request, reply) => {

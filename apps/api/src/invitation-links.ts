@@ -31,6 +31,7 @@ import {
   eq,
   inArray,
   resetSecondFactor,
+  revokeExtensionLinks,
   schema,
   sql,
   withAdmin,
@@ -610,6 +611,7 @@ async function redeemLinkUnscoped(
         .where(eq(schema.account.id, account.id));
     }
     const reset = await resetSecondFactor(tx, link.userId);
+    await revokeExtensionLinks(tx, link.userId);
     await audit(tx, {
       userId: link.userId,
       action: 'invitation_link.redeem',
