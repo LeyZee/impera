@@ -32,6 +32,8 @@ La session envoyée à `POST /v1/connector/sessions` (champ `session`, opaque po
 - `modelId` : la créatrice du compte plateforme. Si le membre voit plusieurs modèles, l'extension demande laquelle ; un compte plateforme = une modèle.
 - `userAgent` : celui du navigateur qui a capturé, rejoué tel quel (`connectors.md`, règles de bonne conduite).
 
+**Qui envoie** : le bouton n'est proposé qu'au propriétaire, et l'envoi passe par la liaison de l'extension de VEI-01 (`x-extension-link`, jeton haché, révocable), comme le copilote, jamais par le cookie du CRM ni par un secret collé à la main (ADR 0066 § 7). Le jeton d'appareil `EXTENSION_DEVICE_TOKEN` de P0-06 est remplacé par cette liaison dans P2-01.
+
 Le compte plateforme et la session ne font jamais apparaître le jeton ailleurs que chiffré en base (AES-256-GCM, P0-06). La route refuse une session dont `modelId` ne correspond pas au compte déjà relié.
 
 **Santé (`health`)** : `GET /models/:modelId`. 200 → `valid` ; 401 ou 403 → `expired` ; si `exp` est lisible, `warning` 24 h avant.
