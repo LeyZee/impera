@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import {
   AuditEntryIdSchema,
+  EXTENSION_LINK_IDLE_DAYS,
   EXTENSION_LINKS_LIVE_MAX,
   ExtensionLinkIdSchema,
   newId,
@@ -21,6 +22,9 @@ type Condition = ReturnType<typeof eq>;
 
 /** 256 random bits, base64url: 43 characters (`ExtensionLinkTokenSchema`). */
 const TOKEN_BYTES = 32;
+
+/** A link still in use: not revoked, and used (or made) within `EXTENSION_LINK_IDLE_DAYS`. */
+const isLive = sql`${extensionLinks.revokedAt} is null and coalesce(${extensionLinks.lastUsedAt}, ${extensionLinks.createdAt}) > now() - interval '${sql.raw(String(EXTENSION_LINK_IDLE_DAYS))} days'`;
 
 /** Only the SHA-256 of a token is stored or compared. */
 const hashOf = (token: string): string => createHash('sha256').update(token).digest('base64url');
@@ -104,7 +108,7 @@ export function createDrizzleExtensionLinkStore(adminDb: Database): ExtensionLin
             lastUsedAt: extensionLinks.lastUsedAt,
           })
           .from(extensionLinks)
-          .where(and(eq(extensionLinks.userId, userId), sql`${extensionLinks.revokedAt} is null`))
+          .where(and(eq(extensionLinks.userId, userId), isLive))
           .orderBy(sql`${extensionLinks.createdAt} asc, ${extensionLinks.id} asc`);
         return rows.map((row) => ({
           id: ExtensionLinkIdSchema.parse(row.id),
@@ -122,7 +126,7 @@ export function createDrizzleExtensionLinkStore(adminDb: Database): ExtensionLin
         const [live] = await tx
           .select({ count: sql<number>`count(*)::int` })
           .from(extensionLinks)
-          .where(and(eq(extensionLinks.userId, actor.userId), sql`${extensionLinks.revokedAt} is null`));
+          .where(and(eq(extensionLinks.userId, actor.userId), isLive));
         if ((live?.count ?? 0) >= EXTENSION_LINKS_LIVE_MAX) return 'full';
         const token = randomBytes(TOKEN_BYTES).toString('base64url');
         const id = newId(ExtensionLinkIdSchema);
@@ -148,7 +152,7 @@ export function createDrizzleExtensionLinkStore(adminDb: Database): ExtensionLin
             userId: extensionLinks.userId,
           })
           .from(extensionLinks)
-          .where(and(eq(extensionLinks.tokenHash, hash), sql`${extensionLinks.revokedAt} is null`));
+          .where(and(eq(extensionLinks.tokenHash, hash), isLive));
         if (row === undefined || !sameHash(row.tokenHash, hash)) return null;
         // Read again at each batch: a member who left, an account gone, and the link no longer names anyone.
         const holder = await holderOf(tx, row.userId, false);
