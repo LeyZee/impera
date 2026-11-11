@@ -15,6 +15,7 @@ Mis à jour le 2026-10-17. À re-vérifier à chaque changement de fournisseur (
 
 ## Ce que cela implique
 
+- **Réflexion de Grok 4.7** : c'est un modèle qui réfléchit avant de répondre, et l'API ne permet pas de couper cette réflexion (docs.x.ai, « Reasoning cannot be disabled », 11/11). Par défaut (`high`), le cerveau a mis environ 56 s sur le PC le 11/11, alors que son délai est de 30 s. Chaque rôle règle donc `reasoningEffort` (`packages/llm/src/config.ts`) : `low` pour `brain`, `voice` et la bascule de `sense`, `medium` pour `judge`. La valeur n'est envoyée qu'à xAI. `max_completion_tokens` ne compte que la sortie visible, pas la réflexion.
 - **Grok 4.7 d'abord** pour `brain` et `voice`, évalué en P3 ; Mistral comme challenger ; Venice comme repli sans filtre. **Vision : Gemini 3.8 Flash**, bascule automatique sur Grok 4.7 en images clés + transcription, puis Qwen3-VL (OpenRouter, pas encore branché). Taux de refus de Gemini mesuré par `pnpm probe:vision`, puis en production (journal des appels, `refused`).
 - La contrainte de transparence de xAI est connue et acceptée par Charles (ADR 0012, redit le 17/10 : il prend le risque) ; elle motive un repli fonctionnel (Venice ou Mistral) prêt à prendre `voice` si xAI coupait l'accès.
 - Pas de dépendance à un seul fournisseur : la passerelle (ADR 0009) et les évals rendent le changement peu coûteux.
