@@ -1,6 +1,6 @@
 import type { LanguageModelUsage } from 'ai';
 
-import type { ModelRef, ProviderId } from './config';
+import { MISTRAL_FALLBACK_MODEL, type ModelRef, type ProviderId } from './config';
 
 export type InputKind = 'text' | 'image' | 'video' | 'audio';
 
@@ -15,6 +15,13 @@ export interface ModelInfo extends ModelRef {
     readonly input: number;
     readonly cachedInput: number;
     readonly output: number;
+    /** Rates for the whole request once its prompt holds this many tokens, when the provider has such a tier. */
+    readonly longContext?: {
+      readonly fromInputTokens: number;
+      readonly input: number;
+      readonly cachedInput: number;
+      readonly output: number;
+    };
     readonly checkedOn: string;
     readonly source: string;
   };
@@ -47,8 +54,10 @@ export const MODELS: readonly ModelInfo[] = [
       input: 2,
       cachedInput: 0.5,
       output: 6,
-      checkedOn: '2026-10-17',
-      source: 'third-party listings',
+      // xAI bills every token of a request at these rates once its prompt reaches the threshold.
+      longContext: { fromInputTokens: 200_000, input: 4, cachedInput: 1, output: 12 },
+      checkedOn: '2026-11-11',
+      source: 'docs.x.ai/developers/pricing',
     },
   },
   {
@@ -60,10 +69,11 @@ export const MODELS: readonly ModelInfo[] = [
     contextTokens: 1_000_000,
     pricing: {
       input: 1.25,
-      cachedInput: 1.25,
+      cachedInput: 0.2,
       output: 2.5,
-      checkedOn: '2026-10-16',
-      source: 'third-party listings',
+      longContext: { fromInputTokens: 200_000, input: 2.5, cachedInput: 0.4, output: 5 },
+      checkedOn: '2026-11-11',
+      source: 'docs.x.ai/developers/pricing',
     },
   },
   {
@@ -78,6 +88,7 @@ export const MODELS: readonly ModelInfo[] = [
       cachedInput: 0.75,
       output: 3.75,
       checkedOn: '2026-10-17',
+      // Not on ai.google.dev's pricing page on 2026-11-11 (it stops at 3.5 Flash): still the 17/10 reading.
       source: 'ai.google.dev pricing, via /mnt/project-files/modeles-ia/comparatif-modeles.md',
     },
   },
@@ -94,17 +105,24 @@ export const MODELS: readonly ModelInfo[] = [
       cachedInput: 2,
       output: 10,
       checkedOn: '2026-10-17',
+      // Not on ai.google.dev's pricing page on 2026-11-11 (it stops at 3.5 Flash): still the 17/10 reading.
       source: 'ai.google.dev pricing, via /mnt/project-files/modeles-ia/comparatif-modeles.md',
     },
   },
   {
     provider: 'mistral',
-    model: 'mistral-large-latest',
-    label: 'Mistral Large',
+    model: MISTRAL_FALLBACK_MODEL,
+    label: 'Mistral Large 4',
     inputs: ['text', 'image'],
     unconfirmedInputs: [],
-    contextTokens: 128_000,
-    pricing: { input: 2, cachedInput: 2, output: 6, checkedOn: '2026-10-17', source: 'third-party listings' },
+    contextTokens: 1_000_000,
+    pricing: {
+      input: 0.7,
+      cachedInput: 0.07,
+      output: 2.1,
+      checkedOn: '2026-11-11',
+      source: 'docs.mistral.ai/models/mistral-large-4-0',
+    },
   },
 ];
 
@@ -121,16 +139,19 @@ export const TRANSCRIPTION_MODEL = {
   provider: 'xai',
   model: 'grok-voice-transcribe-2.0',
   usdPerAudioHour: 0.1,
-  checkedOn: '2026-10-17',
-  source: 'docs.x.ai pricing, via /mnt/project-files/modeles-ia/comparatif-modeles.md',
+  checkedOn: '2026-11-11',
+  source: 'docs.x.ai/developers/models/speech-to-text (REST)',
 } as const satisfies ModelRef & Record<string, unknown>;
 
 /** Cost of one call in USD, or undefined when the model has no known price. */
 export function costUsd(ref: ModelRef, usage: LanguageModelUsage): number | undefined {
   const pricing = findModel(ref)?.pricing;
   if (pricing === undefined) return undefined;
+  const input = usage.inputTokens ?? 0;
+  const long = pricing.longContext;
+  const rates = long !== undefined && input >= long.fromInputTokens ? long : pricing;
   const cached = usage.inputTokenDetails.cacheReadTokens ?? 0;
-  const uncached = Math.max(0, (usage.inputTokens ?? 0) - cached);
+  const uncached = Math.max(0, input - cached);
   const output = usage.outputTokens ?? 0;
-  return (uncached * pricing.input + cached * pricing.cachedInput + output * pricing.output) / 1_000_000;
+  return (uncached * rates.input + cached * rates.cachedInput + output * rates.output) / 1_000_000;
 }

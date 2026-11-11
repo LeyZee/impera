@@ -7,6 +7,7 @@ import {
   type CreatorId,
   type DropDescriptionsReview,
   type MediaDescriptionId,
+  type ScriptDropSummary,
   type ScriptDropSummaryId,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -96,7 +97,7 @@ export const REVIEW_ERRORS = {
   failed: 'Le serveur ne répond pas. Réessaie dans un instant : rien n’a changé.',
 } as const;
 
-/** The conflict's sentence (a newer row came, a row to see alone, a synthesis no longer the last) is said as it is. */
+/** The refusal's sentence (a newer row came, a row to see alone, a synthesis no longer the last) is said as it is. */
 async function post(url: string, body: object): Promise<ReviewOutcome> {
   let response: Response;
   try {
@@ -117,7 +118,8 @@ async function post(url: string, body: object): Promise<ReviewOutcome> {
       : { kind: 'refused', message: REVIEW_ERRORS.failed };
   }
   const refusal = ApiErrorSchema.safeParse(json);
-  if (response.status === 409 && refusal.success)
+  // A newer row (409), or a synthesis that names a price or leaves a step out (422): its sentence, as it is.
+  if ((response.status === 409 || response.status === 422) && refusal.success)
     return { kind: 'refused', message: `${refusal.data.error.message}.` };
   if (response.status === 403 || response.status === 404)
     return { kind: 'refused', message: REVIEW_ERRORS.forbidden };
@@ -144,3 +146,12 @@ export const validateSummary = (
   dropId: ContentDropId,
   summaryId: ScriptDropSummaryId,
 ): Promise<ReviewOutcome> => post(`${reviewUrl(creatorId, dropId)}/summary/validate`, { summaryId });
+
+/** Her script's synthesis written by hand over the one shown (SC-04 lot c5): validated as it is written. */
+export const correctSummary = (
+  creatorId: CreatorId,
+  dropId: ContentDropId,
+  summaryId: ScriptDropSummaryId,
+  content: ScriptDropSummary,
+): Promise<ReviewOutcome> =>
+  post(`${reviewUrl(creatorId, dropId)}/summary/correct`, { summaryId, ...content });

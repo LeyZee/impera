@@ -21,6 +21,7 @@ import {
   CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE,
   DROP_DESCRIPTION_REVIEW_CONFLICT,
   DomainError,
+  SCRIPT_SUMMARY_CORRECTION_UNPROCESSABLE,
   type ScriptExportRefusal,
 } from '@impera/contracts';
 
@@ -218,6 +219,19 @@ export class ContentRequestDueUnprocessable extends DomainError {
 export class DropDescriptionsCreatorNotFound extends DomainError {
   constructor() {
     super('creator_not_found', 'Créatrice introuvable');
+  }
+}
+
+/** A synthesis corrected by hand that names a price (they come from the grid, ADR 0056 § 6), or other steps. */
+export class ScriptSummaryCorrectionUnprocessable extends DomainError {
+  constructor(reason: 'price' | 'steps') {
+    super(
+      SCRIPT_SUMMARY_CORRECTION_UNPROCESSABLE,
+      reason === 'price'
+        ? 'Pas de prix dans la synthèse : il vient de la grille de l’agence'
+        : 'La synthèse garde chaque étape du script, une fois chacune',
+      { details: { reason } },
+    );
   }
 }
 

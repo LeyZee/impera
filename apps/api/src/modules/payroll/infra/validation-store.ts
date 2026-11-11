@@ -44,6 +44,7 @@ import {
   closePeriod,
   paysMember,
   periodIsEmpty,
+  reportCountsOnPay,
   salesCountedIn,
   statementOf,
   type ClosingPlan,
@@ -303,7 +304,9 @@ async function closeUpTo(
     ]);
     const blocking = periodBeforeFirstClosing(period, [
       await earliestEntriesBefore(tx, period),
-      ...reports.map((report) => report.period),
+      ...reports
+        .filter((report) => reportCountsOnPay(target.snapshot.sales, report))
+        .map((report) => report.period),
       ...before.map((one) => one.salePeriod),
     ]);
     if (blocking !== null) throw new PayPeriodOrder(blocking);
