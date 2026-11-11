@@ -12,9 +12,11 @@ import {
   ScriptDropSummarySchema,
   ScriptSegmentSchema,
   ScriptSlotKeySchema,
+  ScriptSummaryAuthorSchema,
   ScriptSummaryReviewReasonSchema,
   type DropDescriptionsReview,
   type DropMediaReview,
+  type ScriptDropSummary,
   type ScriptReviewStep,
   type ScriptSummaryView,
 } from '@impera/contracts';
@@ -22,6 +24,8 @@ import { and, eq, inArray, schema, sql, withTenantMember, type Database, type Tr
 
 import {
   mediaHashOf,
+  mentionsPrice,
+  orderedSummary,
   scriptStepsOf,
   shownRow,
   validationRefusal,
@@ -31,6 +35,7 @@ import {
   ContentDropForbidden,
   ContentDropNotFound,
   DropDescriptionReviewConflict,
+  ScriptSummaryCorrectionUnprocessable,
 } from '../../domain/errors';
 import type { DescriptionReview, ReviewedFile } from '../../domain/ports';
 
@@ -62,6 +67,8 @@ interface DropState {
   readonly isScript: boolean;
   readonly rows: readonly DescriptionRow[];
   readonly shown: ReadonlyMap<string, DescriptionRow>;
+  /** What the shown synthesis was written for: a correction keeps its media and its prompt. */
+  readonly told: { readonly mediaHash: string; readonly promptHash: string } | null;
 }
 
 /**
@@ -156,6 +163,7 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
 
   const isScript = drop.category === 'script' && drop.state !== 'filling';
   let summary: ScriptSummaryView | null = null;
+  let told: DropState['told'] = null;
   let steps: ScriptReviewStep[] = [];
   if (isScript) {
     // The version she shot, frozen: its steps, as her cards name them, each with its files.
@@ -173,6 +181,7 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
         step: step.step,
         code: step.code,
         name: step.name,
+        access: step.access,
         fileIds: step.media.map((file) => ContentDropFileIdSchema.parse(file.id)),
       }));
     }
@@ -182,6 +191,8 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
         content: scriptDropSummaries.content,
         reviewReasons: scriptDropSummaries.reviewReasons,
         mediaHash: scriptDropSummaries.mediaHash,
+        promptHash: scriptDropSummaries.promptHash,
+        author: scriptDropSummaries.author,
         validatedAt: scriptDropSummaries.validatedAt,
         createdAt: scriptDropSummaries.createdAt,
       })
@@ -193,14 +204,16 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
       const slots = withMedium.flatMap((file) =>
         file.slotKey === null ? [] : [{ slotKey: file.slotKey, mediaAssetId: file.mediaAssetId }],
       );
-      const told = new Map(
+      const described = new Map(
         [...shown].map(([mediaAssetId, row]) => [mediaAssetId, { descriptionId: row.id }]),
       );
+      told = { mediaHash: latest.mediaHash, promptHash: latest.promptHash };
       summary = {
         id: ScriptDropSummaryIdSchema.parse(latest.id),
         content: ScriptDropSummarySchema.parse(latest.content),
         reviewReasons: latest.reviewReasons.map((reason) => ScriptSummaryReviewReasonSchema.parse(reason)),
-        current: latest.mediaHash === mediaHashOf(slots, told),
+        author: ScriptSummaryAuthorSchema.parse(latest.author),
+        current: latest.mediaHash === mediaHashOf(slots, described),
         validatedAt: latest.validatedAt?.toISOString() ?? null,
         createdAt: latest.createdAt.toISOString(),
       };
@@ -212,6 +225,7 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
     isScript,
     rows,
     shown,
+    told,
   };
 }
 
@@ -237,6 +251,17 @@ function namedRows(state: DropState, ids: readonly string[]): DescriptionRow[] {
   const named = [...new Set(ids)].map((id) => state.rows.find((row) => row.id === id));
   if (named.some((row) => row === undefined)) throw new ContentDropNotFound();
   return named.filter((row): row is DescriptionRow => row !== undefined);
+}
+
+/** The words written by hand over the shown synthesis: its steps, in their order, and never a price (ADR 0056 § 6). */
+function correctedSummary(shown: ScriptDropSummary, written: ScriptDropSummary): ScriptDropSummary {
+  const ordered = orderedSummary(
+    shown.steps.map((one) => one.step),
+    written,
+  );
+  if (ordered === null) throw new ScriptSummaryCorrectionUnprocessable('steps');
+  if (mentionsPrice(ordered)) throw new ScriptSummaryCorrectionUnprocessable('price');
+  return ordered;
 }
 
 /** `withTenantMember` for the owner and an active manager (ADR 0030 § 3): a chatter is refused before any read. */
@@ -294,6 +319,32 @@ export function createDrizzleDescriptionReview(db: Database): DescriptionReview 
         });
         await audit(tx, userId, 'media_description.corrected', dropId, { from: base.id, to: id });
         if (state.isScript) await enqueueSummary(tx, { creatorId, dropId, correlationId }, null);
+        return (await stateOf(tx, dropId)).review;
+      }),
+
+    correctSummary: (creatorId, userId, dropId, summaryId, content, now) =>
+      asTeam(creatorId, userId, async (tx) => {
+        const state = await stateOf(tx, dropId);
+        const summary = state.review.summary;
+        if (summary?.id !== summaryId || !summary.current || state.told === null)
+          throw new DropDescriptionReviewConflict('summary_stale');
+        const corrected = correctedSummary(summary.content, content);
+        const id = newId(ScriptDropSummaryIdSchema);
+        // A new row (written once, validated once): the media and the prompt it corrects kept, the words rewritten.
+        await tx.insert(scriptDropSummaries).values({
+          id,
+          creatorId,
+          dropId,
+          mediaHash: state.told.mediaHash,
+          content: corrected,
+          reviewReasons: [],
+          model: 'human',
+          promptHash: state.told.promptHash,
+          author: 'human',
+          validatedBy: userId,
+          validatedAt: now,
+        });
+        await audit(tx, userId, 'script_summary.corrected', dropId, { from: summaryId, to: id });
         return (await stateOf(tx, dropId)).review;
       }),
 
