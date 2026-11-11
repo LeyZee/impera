@@ -4,6 +4,7 @@ import type { JSX } from 'react';
 
 import { MeNav } from './MeNav';
 
+import { isStandalone } from '@/pwa/install';
 import { AppearanceChoice } from '@/shell/AppearanceChoice';
 import { MediaBlurToggle } from '@/shell/MediaBlurToggle';
 import { NavIcon } from '@/shell/NavIcon';
@@ -49,6 +50,22 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
             </Link>
           </div>
         </Panel>
+        {/* The guide stays found once the card « Impera sur ton écran d’accueil » is set aside (recette 11/11, CRE-29);
+            not in the installed app, which has nothing left to install. */}
+        {isStandalone() ? null : (
+          <Panel className="nv-enter" eyebrow="Cet appareil" title="Application">
+            <div className="me-prefs__body">
+              <p className="me-prefs__text">
+                Impera sur l’écran d’accueil de ton téléphone : ouverture en un geste, plein écran, et les
+                notifications.
+              </p>
+              <Link to="/aide/installer" className="nv-btn nv-btn--soft nv-btn--sm me-prefs__go">
+                <NavIcon name="phone" />
+                Installer Impera
+              </Link>
+            </div>
+          </Panel>
+        )}
         <Panel className="nv-enter" eyebrow={user.name} title="Compte">
           <div className="me-prefs__body">
             <button type="button" className="nv-btn nv-btn--soft nv-btn--sm me-prefs__go" onClick={onSignOut}>
