@@ -42,6 +42,13 @@ import '@/creators/agenda/agency-agenda.css';
  * agenda; refused, it is never proposed again. Nothing leaves for her without this page. « Coller un lien » adds a post
  * seen on Instagram to her trends (§ 2, source 4): the server keeps its address and never opens it.
  */
+/**
+ * The morning job that writes her ideas (VEI-03) is not coded yet: the empty day says so, never a promise of 7 a.m.
+ * (Charles, 11/11, recette créatrice). Back to the promise when the job runs.
+ */
+export const IDEAS_NOT_MADE_YET =
+  'Les idées du matin ne sont pas encore produites. En attendant, colle ici les posts et reels vus sur Instagram : ils nourrissent ses tendances.';
+
 export function IdeasSection({
   creatorId,
   creatorName,
@@ -80,11 +87,7 @@ export function IdeasSection({
       return (
         <div className="nv-plate aa-empty">
           <p className="aa-empty__title">Pas d’idée {day === today ? 'aujourd’hui' : 'ce jour-là'}</p>
-          <p className="ps-muted">
-            Chaque matin à 7 h, dans son fuseau, jusqu’à trois idées naissent de ses tendances vivantes. Une
-            idée qui touche une de ses limites, ressemble à une idée récente ou ne cite aucune tendance est
-            retirée avant d’arriver ici.
-          </p>
+          <p className="ps-muted">{IDEAS_NOT_MADE_YET}</p>
         </div>
       );
     const waiting = items.filter((idea) => idea.state === 'proposed').length;

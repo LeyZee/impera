@@ -1,8 +1,10 @@
 /*
  * The save of a long sheet, pinned to the bottom of the screen while its head has scrolled away (CREA-20). It floats
  * over the content, so it is glass; it holds the one neon of the screen while the head's is out of sight.
+ * `.nv-glass` sets `position: relative`: the bar names both classes so that `sticky` wins, else `bottom` only lifts it
+ * over the last line of the sheet (recette 11/11, « Ajouter un exemple » hidden on a phone).
  */
-.cr-savebar {
+.nv-glass.cr-savebar {
   --_radius: var(--nv-radius-full);
   position: sticky;
   bottom: 16px;
@@ -33,7 +35,7 @@
 
 /* A phone: above the floating capsule of tabs. */
 @media (max-width: 820px) {
-  .cr-savebar {
+  .nv-glass.cr-savebar {
     bottom: calc(14px + 64px + 10px + env(safe-area-inset-bottom, 0px));
     padding-left: 14px;
   }
