@@ -88,7 +88,10 @@ export function optionsOf(row: TeamImportRow, members: readonly TeamMember[]): C
 }
 
 /** Why the proposal was made, after its name: the reader checks it before ticking. */
-export function matchLine(suggestion: TeamImportSuggestion | null): string | null {
+export function matchLine(
+  suggestion: TeamImportSuggestion | null,
+  chatter: { readonly isBot: boolean; readonly isExternal: boolean } = { isBot: true, isExternal: false },
+): string | null {
   if (suggestion === null) return null;
   switch (suggestion.kind) {
     case 'member':
@@ -98,7 +101,9 @@ export function matchLine(suggestion: TeamImportSuggestion | null): string | nul
     case 'invite':
       return 'Personne de l’équipe Impera avec cet e-mail';
     case 'none':
-      return 'Bot d’une clé d’API';
+      // « Personne » is proposed for the key's bot, a provider's account (never invited) and one without an e-mail.
+      if (chatter.isBot) return 'Bot d’une clé d’API';
+      return chatter.isExternal ? 'Compte d’un prestataire : jamais invité' : 'Sans e-mail : rien à proposer';
   }
 }
 

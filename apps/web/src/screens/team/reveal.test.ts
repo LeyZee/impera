@@ -140,6 +140,13 @@ describe('a choice', () => {
     );
     expect(matchLine({ kind: 'agent', match: 'name' })).toBe('Nommé « bot »');
     expect(matchLine({ kind: 'invite' })).toBe('Personne de l’équipe Impera avec cet e-mail');
+    expect(matchLine({ kind: 'none' }, { isBot: true, isExternal: false })).toBe('Bot d’une clé d’API');
+    expect(matchLine({ kind: 'none' }, { isBot: false, isExternal: true })).toBe(
+      'Compte d’un prestataire : jamais invité',
+    );
+    expect(matchLine({ kind: 'none' }, { isBot: false, isExternal: false })).toBe(
+      'Sans e-mail : rien à proposer',
+    );
     expect(matchLine(null)).toBeNull();
   });
 });

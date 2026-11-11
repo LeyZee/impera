@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   decisionText,
   heldCountText,
+  heldInOrder,
   heldReasonText,
   outcomeLabel,
   outcomeWords,
@@ -53,10 +54,10 @@ describe('held sales (CRM-03 lot b4b)', () => {
     );
     const unlinked = heldSaleOf({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
     expect(heldReasonText(unlinked, null, true)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Réglages › Ventes et la vente compte seule. Sinon, écarte-la.',
+      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Équipe › Reveal et la vente compte seule. Sinon, écarte-la.',
     );
     expect(heldReasonText(unlinked, null, false)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Réglages › Ventes. Sinon, écarte-la.',
+      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire ou un manager le relie dans Équipe › Reveal. Sinon, écarte-la.',
     );
     expect(heldReasonText(heldSaleOf({ reason: 'status_unknown' }), THEO, true)).toBe(
       'Reveal lui donne un statut qu’Impera ne connaît pas encore.',
@@ -138,10 +139,10 @@ describe('held sales (CRM-03 lot b4b)', () => {
     );
     const unlinked = refund({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
     expect(heldReasonText(unlinked, null, true)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Réglages › Ventes et le remboursement se déduit seul. Sinon, écarte-le.',
+      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Équipe › Reveal et le remboursement se déduit seul. Sinon, écarte-le.',
     );
     expect(heldReasonText(unlinked, null, false)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Réglages › Ventes. Sinon, écarte-le.',
+      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire ou un manager le relie dans Équipe › Reveal. Sinon, écarte-le.',
     );
   });
 
@@ -177,5 +178,21 @@ describe('held sales (CRM-03 lot b4b)', () => {
     });
     expect(signalText(refund, THEO)).toBe('Signalé par Théo : ce n’est pas son remboursement.');
     expect(signalChipText(refund)).toBe('Signalé');
+  });
+});
+
+describe('heldInOrder', () => {
+  it('reads the lines by their own instant, the oldest first, whatever their keys', () => {
+    const at = (platformSaleId: string, occurredAt: string) => ({
+      platformSaleId,
+      occurredAt,
+      event: 'sale' as const,
+    });
+    const sorted = heldInOrder([
+      at('A', '2026-10-28T14:30:00.000Z'),
+      at('B', '2026-10-16T06:00:00.000Z'),
+      at('C', '2026-10-28T14:30:00.000Z'),
+    ]);
+    expect(sorted.map((one) => one.platformSaleId)).toEqual(['B', 'A', 'C']);
   });
 });

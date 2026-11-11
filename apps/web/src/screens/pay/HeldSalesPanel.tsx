@@ -14,6 +14,7 @@ import { decideSale, useHeldSales, useRefreshPayroll, type PayRefusal } from '@/
 import {
   decisionText,
   heldCountText,
+  heldInOrder,
   heldReasonText,
   outcomeLabel,
   outcomeWords,
@@ -65,7 +66,7 @@ export function HeldSalesPanel({
     readonly outcome: SaleDecisionOutcome;
   } | null>(null);
   const read = held.data?.period === period ? held.data : undefined;
-  const sales = read?.sales ?? [];
+  const sales = heldInOrder(read?.sales ?? []);
   const zone = settings.data?.timeZone ?? null;
   if (reads && read === undefined && held.isError)
     return (

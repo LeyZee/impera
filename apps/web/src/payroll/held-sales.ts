@@ -29,6 +29,21 @@ export function saleWhen(sale: HeldSale, timeZone: string): string {
   return `Remboursement du ${momentAt(sale.occurredAt, timeZone)}${of}`;
 }
 
+/**
+ * The lines in the order the validator reads them: by their own instant, the oldest first, then by key. The server
+ * gives them in key order, which reads as no order at all (recette paie, 11/11).
+ */
+export function heldInOrder<T extends Pick<HeldSale, 'occurredAt' | 'platformSaleId' | 'event'>>(
+  sales: readonly T[],
+): T[] {
+  return [...sales].sort(
+    (a, b) =>
+      Date.parse(a.occurredAt) - Date.parse(b.occurredAt) ||
+      a.platformSaleId.localeCompare(b.platformSaleId) ||
+      a.event.localeCompare(b.event),
+  );
+}
+
 /** The line's net, signed: a refund takes off. */
 export const saleAmount = (sale: HeldSale): string => signedAmountText(sale.netMinor, sale.currency);
 
@@ -46,10 +61,11 @@ export function heldReasonText(
     case 'chatter_unlinked': {
       const unlinked = `Son chatteur sur ${platformName(sale.platform)} n’est relié à aucun membre`;
       const otherwise = refund ? 'Sinon, écarte-le.' : 'Sinon, écarte-la.';
-      if (!owner) return `${unlinked} : le propriétaire le relie dans Réglages › Ventes. ${otherwise}`;
+      if (!owner)
+        return `${unlinked} : le propriétaire ou un manager le relie dans Équipe › Reveal. ${otherwise}`;
       return refund
-        ? `${unlinked} : relie-le dans Réglages › Ventes et le remboursement se déduit seul. ${otherwise}`
-        : `${unlinked} : relie-le dans Réglages › Ventes et la vente compte seule. ${otherwise}`;
+        ? `${unlinked} : relie-le dans Équipe › Reveal et le remboursement se déduit seul. ${otherwise}`
+        : `${unlinked} : relie-le dans Équipe › Reveal et la vente compte seule. ${otherwise}`;
     }
     case 'off_shift':
       return `${member?.name ?? 'Son chatteur'} n’était ni en poste ni dans sa marge d’accès à l’heure de la vente.`;

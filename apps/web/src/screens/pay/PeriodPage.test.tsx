@@ -1167,6 +1167,29 @@ describe('Paie › Quinzaine', () => {
     expect(screen.queryByRole('button', { name: /^Valider/u })).toBeNull();
   });
 
+  it('says a running period follows the sales read once a statement counts them, the reports alone otherwise (recette paie)', async () => {
+    vi.setSystemTime(new Date('2026-11-05T23:00:00Z'));
+    periods[NOV1] = periodOf(NOV1, [statementOf(THEO, NOV1, { netMinor: 50_000 })]);
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${NOV1}`);
+    expect(await screen.findByText(/^Les relevés se calculent à chaque rapport validé\./u)).toBeTruthy();
+    cleanup();
+    const onNet = euroLine({
+      vatBps: 0,
+      platformFeeBps: 0,
+      grossMinor: 8_500,
+      grossEurMinor: 8_500,
+      exclVatMinor: 8_500,
+      shiftReportIds: [],
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 1, late: 0, lateNetMinor: 0 },
+    });
+    periods[NOV1] = periodOf(NOV1, [statementOf(THEO, NOV1, { lines: [onNet] })]);
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${NOV1}`);
+    expect(
+      await screen.findByText(/^Les relevés se calculent à chaque vente lue et à chaque rapport validé\./u),
+    ).toBeTruthy();
+  });
+
   it('reads the share of the goal and where it heads from the server, never from the net', async () => {
     vi.setSystemTime(new Date('2026-11-05T23:00:00Z'));
     // The server's shares on a 1 500 € goal: 33 % reached, 100 % forecast; the screen recomputes neither.

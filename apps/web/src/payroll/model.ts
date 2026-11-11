@@ -497,7 +497,13 @@ export function flowOf(
       : [
           {
             label: platformNetName(platform),
-            op: plural(line.countedSales?.sales ?? 0, 'vente lue', 'ventes lues'),
+            // A refund counted with the sales says so: « 1 vente lue » alone read wrong before a net below zero.
+            op: [
+              plural(line.countedSales?.sales ?? 0, 'vente lue', 'ventes lues'),
+              (line.countedSales?.refunds ?? 0) === 0
+                ? ''
+                : `, ${plural(line.countedSales?.refunds ?? 0, 'remboursement', 'remboursements')}`,
+            ].join(''),
             amount: amountText(line.grossMinor, line.currency),
           },
         ];
