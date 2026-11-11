@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { HeldSale, Me, PayrollPeriod, TeamMember } from '@impera/contracts';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -1323,6 +1323,48 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
       await vi.advanceTimersByTimeAsync(50);
     });
     expect(text(list)).toContain('Vente du mercredi 28 octobre à 22 h · compte Reveal non relié');
+  });
+
+  it('reads the Reveal team once to name an account, not again on each return to the tab (relecture Équipe de #695)', async () => {
+    held[OCT2] = [
+      heldSaleOf({
+        platformSaleId: 'vente-2',
+        memberId: null,
+        platformChatterId: 'chatter-new',
+        reason: 'chatter_unlinked',
+        outcomes: ['exclude'],
+      }),
+    ];
+    revealTeam = [{ platformChatterId: 'chatter-new', firstName: 'Camille', lastName: 'Essai' }];
+    const teamReads = () =>
+      vi
+        .mocked(fetch)
+        .mock.calls.filter(
+          ([input]) => typeof input === 'string' && input.includes('/v1/settings/sales-feeds/reveal/team'),
+        ).length;
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    await waitFor(() => {
+      expect(text(list)).toContain('chatteur non relié · Camille Essai');
+    });
+    expect(teamReads()).toBe(1);
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(teamReads()).toBe(1);
+    focusManager.setFocused(undefined);
+  });
+
+  it('says the day a member left on a sale made after it, which still waits for a decision (Charles, 11/11)', async () => {
+    held[OCT2] = [heldSaleOf({ memberLeftOn: '2026-10-26' })];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    const departed = card(list, /^Théo a quitté l’équipe le lundi 26 octobre, avant cette vente/u);
+    expect(text(departed)).toContain('Comptée, elle va sur son relevé final, sans minimum de versement.');
+    expect(within(departed).getByRole('button', { name: 'Compter pour Théo' })).toBeTruthy();
+    expect(within(departed).getByRole('button', { name: 'Écarter' })).toBeTruthy();
   });
 
   it('counts a sale for its member after reading it again, with a note, then reads the list again', async () => {

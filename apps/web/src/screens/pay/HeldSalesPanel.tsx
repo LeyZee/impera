@@ -38,6 +38,13 @@ import { Panel } from '@/shell/layout';
 /** The longest note pay keeps on a decision (`PayReasonSchema`). */
 const NOTE_MAX = 500;
 
+/**
+ * How long the platform's team, read only to name a chatter not linked, is taken as it is: the route reads the platform
+ * live (ADR 0076), under the rate the sales feed shares, so the pay screen must not read it again at each visit. A name
+ * read ten minutes ago is good enough, and pay never depends on it: without it the line says « compte Reveal non relié ».
+ */
+const TEAM_NAMES_STALE_MS = 10 * 60_000;
+
 /** A refusal that says the list moved under the reader: it is read again. */
 const MOVED: ReadonlySet<string> = new Set(['pay_sale_not_found', 'pay_sale_outcome_conflict']);
 
@@ -85,6 +92,7 @@ export function HeldSalesPanel({
       queryKey: teamImportKey(platform),
       queryFn: () => fetchTeamImport(platform),
       retry: false,
+      staleTime: TEAM_NAMES_STALE_MS,
     })),
   });
   const teamOf = (platform: Platform): TeamImportOverview | undefined =>
@@ -128,7 +136,7 @@ export function HeldSalesPanel({
             // Each gesture names its sale to a screen reader, out of the list too.
             const about = (part: string): string => `${uid}-${String(index)}-${part}`;
             const account = names.account(sale.platformAccountId);
-            const reason = heldReasonText(sale, member, owner);
+            const reason = heldReasonText(sale, member, owner, zone);
             const signalled = signalText(sale, member);
             const decided = decisionText(sale, member);
             const chatter = lineChatter(sale, member, teamOf(sale.platform));

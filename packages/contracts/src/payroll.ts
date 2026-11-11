@@ -1042,6 +1042,11 @@ export const HeldSaleSchema = z.object({
   netMinor: z.number().int(),
   memberId: TeamMemberIdSchema.nullable(),
   /**
+   * The day `memberId` left the team (ADR 0072), `null` while he has not or without a member: a sale made after it
+   * waits for the validator, and goes on a final statement once counted (Charles, 11/11/2026).
+   */
+  memberLeftOn: CalendarDaySchema.nullable(),
+  /**
    * The platform's account that made the line (a refund's is its sale's), linked or not: the validator names a chatter
    * not linked by it, from the platform's team. `null` for a line made by nobody, such as a subscription.
    */

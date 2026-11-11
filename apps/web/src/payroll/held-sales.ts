@@ -4,6 +4,7 @@ import { momentAt } from './model';
 
 import { signedAmountText } from '@/reports/model';
 import { platformName } from '@/scheduling/model';
+import { dayOf, longDay } from '@/scheduling/time';
 
 /**
  * The validator's screen of the sales a period holds or a decision settles (CRM-03 lot b4b, ADR 0050 §§ 3, 5, 7),
@@ -58,11 +59,33 @@ export function saleWhen(sale: HeldSale, timeZone: string): string {
 /** The line's net, signed: a refund takes off. */
 export const saleAmount = (sale: HeldSale): string => signedAmountText(sale.netMinor, sale.currency);
 
-/** Why a line waits for a decision, as the validator reads it; `null` for a line a member would be paid for. */
+/**
+ * A line off shift of a member who left (ADR 0072, Charles, 11/11/2026): the day he left, as the pay screens write a
+ * day, and, for a sale made after it, that it waits for the validator and goes on his final statement once counted.
+ */
+function departedText(
+  sale: Pick<HeldSale, 'event' | 'memberLeftOn' | 'saleOccurredAt'>,
+  name: string,
+  leftOn: string,
+  timeZone: string,
+): string {
+  const left = `${name} a quitté l’équipe le ${longDay(leftOn)}`;
+  const after = sale.saleOccurredAt !== null && dayOf(sale.saleOccurredAt, timeZone) > leftOn;
+  if (!after) return `${name} n’était ni en poste ni dans sa marge d’accès à l’heure de la vente. ${left}.`;
+  return sale.event === 'sale'
+    ? `${left}, avant cette vente. Comptée, elle va sur son relevé final, sans minimum de versement.`
+    : `${left}, avant la vente de ce remboursement. Compté, sa vente va sur son relevé final et il s’en déduit.`;
+}
+
+/**
+ * Why a line waits for a decision, as the validator reads it; `null` for a line a member would be paid for. A line off
+ * shift of a member who left says the day he left (`departedText`), read in the agency's zone.
+ */
 export function heldReasonText(
-  sale: Pick<HeldSale, 'platform' | 'reason' | 'event'>,
+  sale: Pick<HeldSale, 'platform' | 'reason' | 'event' | 'memberLeftOn' | 'saleOccurredAt'>,
   member: SaleMember | null,
   owner: boolean,
+  timeZone: string,
 ): string | null {
   const reason: SaleHeldReason | null = sale.reason;
   const refund = sale.event === 'refund';
@@ -79,6 +102,8 @@ export function heldReasonText(
         : `${unlinked} : relie-le dans ${where} et la vente compte seule. ${otherwise}`;
     }
     case 'off_shift':
+      if (member !== null && sale.memberLeftOn !== null)
+        return departedText(sale, member.name, sale.memberLeftOn, timeZone);
       return `${member?.name ?? 'Son chatteur'} n’était ni en poste ni dans sa marge d’accès à l’heure de la vente.`;
     case 'status_unknown':
       return `${platformName(sale.platform)} lui donne un statut qu’Impera ne connaît pas encore.`;
