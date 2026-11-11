@@ -51,7 +51,7 @@ function plural(count: number, one: string, many: string): string {
 
 type Pill = 'sent' | 'idle' | 'awaiting-approval';
 
-function pill(kind: Pill, label: string): HTMLElement {
+export function pill(kind: Pill, label: string): HTMLElement {
   return h(
     'span',
     { class: `nv-status nv-status--${kind} pp-pill`, role: 'status' },
@@ -68,7 +68,7 @@ function stateOf(status: WatchStatus): { pill: Pill; label: string } {
   return { pill: 'sent', label: 'Relève' };
 }
 
-function button(
+export function button(
   label: string,
   onClick: () => void,
   variant: 'neon' | 'soft' | 'plain',
@@ -89,11 +89,11 @@ function button(
   return element;
 }
 
-function text(content: string): HTMLElement {
+export function text(content: string): HTMLElement {
   return h('p', { class: 'pp-watch__text' }, content);
 }
 
-function notice(content: WatchNotice | null): HTMLElement | null {
+export function notice(content: WatchNotice | null): HTMLElement | null {
   if (content === null) return null;
   return h(
     'p',
@@ -102,7 +102,19 @@ function notice(content: WatchNotice | null): HTMLElement | null {
   );
 }
 
-function linkForm(view: WatchView, actions: WatchActions): readonly HTMLElement[] {
+/** The « Relier » form, shared by the watch and the Reveal « Sync »: one link per extension (ADR 0066 § 7). */
+export interface LinkFormView {
+  readonly draft: string;
+  readonly notice: WatchNotice | null;
+  readonly busy: boolean;
+  readonly revoked: boolean;
+}
+
+export function linkForm(
+  view: LinkFormView,
+  actions: Pick<WatchActions, 'link' | 'openSecurity'>,
+  intro: string,
+): readonly HTMLElement[] {
   const input = h('input', {
     class: 'nv-field__control pp-input',
     id: 'watch-link',
@@ -141,7 +153,7 @@ function linkForm(view: WatchView, actions: WatchActions): readonly HTMLElement[
     actions.link(input.value);
   });
   return [
-    ...(view.status.link === 'revoked'
+    ...(view.revoked
       ? [
           h(
             'p',
@@ -149,7 +161,7 @@ function linkForm(view: WatchView, actions: WatchActions): readonly HTMLElement[
             'Cette liaison a été retirée dans le CRM : colle un nouveau code.',
           ),
         ]
-      : [text('Colle une fois le code de « Relier l’extension » : tes relevés arrivent alors à ton nom.')]),
+      : [text(intro)]),
     form,
   ];
 }
@@ -239,7 +251,16 @@ export function watchCard(view: WatchView, actions: WatchActions): HTMLElement {
   const state = stateOf(view.status);
   const body: readonly HTMLElement[] =
     view.status.link !== 'linked'
-      ? linkForm(view, actions)
+      ? linkForm(
+          {
+            draft: view.draft,
+            notice: view.notice,
+            busy: view.busy,
+            revoked: view.status.link === 'revoked',
+          },
+          actions,
+          'Colle une fois le code de « Relier l’extension » : tes relevés arrivent alors à ton nom.',
+        )
       : !view.status.allowed
         ? [
             text('Le navigateur doit laisser Impera lire instagram.com, et seulement ce site.'),

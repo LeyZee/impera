@@ -28,3 +28,5 @@ Le bouton « Sync » de l'extension envoie la session du membre « bot » au ser
 Le client Reveal (P2-02), tout envoi.
 
 ## Notes de session
+- 2026-11-11 (Bilan) : fait dans la première PR. Serveur : `RevealSessionSchema` (`infra/reveal/session.ts`), refus 422 d'une session illisible et 409 d'une autre modèle que celle déjà reliée, `GET /v1/connector/accounts` et `POST /v1/connector/sessions` par la liaison d'un propriétaire (401 sans liaison, 403 pour un autre rôle) ; `EXTENSION_DEVICE_TOKEN` retiré. Extension : le jeton est lu dans l'en-tête `Authorization` des requêtes de l'onglet Reveal (`webRequest`, le temps du clic) plutôt que dans le stockage du tableau de bord, ce qui rend inutile le repérage de la clé ; bouton « Synchroniser » par compte dans le popup, propriétaire seul ; rien gardé. Aide `/aide/reveal`. Captures Nuit/Jour du popup et de l'aide (PC, téléphone) jointes dans le fil Bilan.
+- Reste : V1 et V2, à la demande écrite de Charles seulement (essai réel sur son PC : recharger l'extension, cliquer « Synchroniser » sur un onglet Reveal du membre « bot »). La fiche reste `in_progress` jusque-là.

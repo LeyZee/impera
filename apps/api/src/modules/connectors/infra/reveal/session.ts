@@ -7,7 +7,7 @@ import type { SessionShape } from '../../domain/ports';
  * from the dashboard's own calls to api.reveal.me, with who it is and for which creator. Opaque to the core; only this
  * adapter reads it. Never logged.
  */
-export const RevealSessionSchema = z.strictObject({
+const RevealSessionSchema = z.strictObject({
   v: z.literal(1),
   bearer: z.string().min(16).max(8_192),
   /** The team member the token belongs to (the « bot » member). */
@@ -18,7 +18,6 @@ export const RevealSessionSchema = z.strictObject({
   userAgent: z.string().min(1).max(512),
   capturedAt: z.iso.datetime(),
 });
-export type RevealSession = z.infer<typeof RevealSessionSchema>;
 
 /** `null` for anything that is not a Reveal session of this shape: the route refuses it before storing. */
 export const revealSessionShape: SessionShape = (raw) => {

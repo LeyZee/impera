@@ -646,3 +646,57 @@ body {
 .pp-watch .nv-chip:disabled {
   cursor: progress;
 }
+
+/* ───────────── The owner's « Sync » of the Reveal session (P2-01) ───────────── */
+
+.pp-sync {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-3);
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-sync__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.pp-sync__title {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.pp-sync__account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.pp-sync__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--nv-space-2);
+  min-width: 0;
+}
+.pp-sync__name {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+.pp-sync__handle {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-sync__who .pp-hint {
+  flex-basis: 100%;
+}
+.pp-sync__account .pp-btn {
+  flex: none;
+}

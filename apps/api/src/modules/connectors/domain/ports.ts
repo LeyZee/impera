@@ -84,7 +84,7 @@ export type SessionShape = (raw: string) => { readonly owner: string } | null;
 export type SessionShapes = Partial<Record<Platform, SessionShape>>;
 
 /** An account the extension may sync, as the owner's popup lists it. */
-export interface SyncableAccount {
+interface SyncableAccount {
   readonly id: PlatformAccountId;
   readonly platform: Platform;
   readonly handle: string;

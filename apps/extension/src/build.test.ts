@@ -64,6 +64,16 @@ describe('the built manifest', () => {
     expect(JSON.stringify(manifest['web_accessible_resources'] ?? [])).not.toContain('reveal');
   });
 
+  it('reads Reveal’s requests for the « Sync », and no other site’s (P2-01)', () => {
+    expect(manifest['permissions']).toContain('webRequest');
+    expect(manifest['permissions']).not.toContain('webRequestBlocking');
+    expect(manifest['host_permissions']).toEqual([
+      'https://*.reveal.me/*',
+      'http://localhost/*',
+      'http://127.0.0.1/*',
+    ]);
+  });
+
   it('exposes no file of the extension to Instagram', () => {
     expect(mentionsInstagram(manifest['web_accessible_resources'])).toBe(false);
     const resources = JSON.stringify(manifest['web_accessible_resources'] ?? []);

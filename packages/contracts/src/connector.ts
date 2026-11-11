@@ -164,3 +164,8 @@ export const ConnectorAccountsQuerySchema = z.object({ platform: PlatformSchema 
 
 export const ConnectorAccountsSchema = z.object({ accounts: z.array(ConnectorAccountChoiceSchema) });
 export type ConnectorAccounts = z.infer<typeof ConnectorAccountsSchema>;
+
+/** The « Sync » refusals the extension tells apart (`/v1/connector/sessions`). */
+export const CONNECTOR_LINK_FORBIDDEN = 'connector_link_forbidden';
+export const CONNECTOR_SESSION_UNPROCESSABLE = 'connector_session_unprocessable';
+export const CONNECTOR_SESSION_CONFLICT = 'connector_session_conflict';
