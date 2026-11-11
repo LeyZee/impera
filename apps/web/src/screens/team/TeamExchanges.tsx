@@ -1,6 +1,7 @@
 import type { LeaveRequest, LeaveRequestList, ShiftSwapList, ShiftSwapRequest } from '@impera/contracts';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import {
   decideLeave,
   endLeave,
@@ -148,6 +149,7 @@ function PendingLeave({
   const { busy, problem, run } = useWrite();
   const [refusing, setRefusing] = useState(false);
   const [note, setNote] = useState('');
+  const noteArea = useGrowingArea(note);
   const [inTheWay, setInTheWay] = useState<readonly string[]>([]);
   // The planning of the leave's days (a leave lasts up to 31 days): the member's shifts still in it are said before
   // Valider, and when they start once the server named them.
@@ -247,8 +249,9 @@ function PendingLeave({
               Un mot pour {name} <span className="sc-optional">facultatif</span>
             </label>
             <textarea
+              ref={noteArea}
               id={`${id}-note`}
-              className="nv-field__control nv-glass sc-note"
+              className="nv-field__control nv-glass sc-note grow-area"
               rows={2}
               maxLength={500}
               value={note}

@@ -553,7 +553,6 @@
 .tm-note-input {
   width: 100%;
   min-height: 64px;
-  resize: vertical;
 }
 
 .tm-steps {
