@@ -356,7 +356,7 @@ function Loaded({
     <>
       <div className="tr-reader__top">
         {back}
-        <header className="tr-reader__head">
+        <header className={`tr-reader__head${drafts.state === 'error' ? ' tr-reader__head--long' : ''}`}>
           <span className="nv-avatar" aria-hidden="true">
             {initialOf(name)}
           </span>

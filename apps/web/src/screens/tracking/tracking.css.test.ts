@@ -36,6 +36,10 @@ describe('the reader and the draft never put words over each other (recette 11/1
     expect(css).toMatch(/\.tr-reader__state-label \{[^}]*text-overflow: ellipsis;/u);
   });
 
+  it('gives the hand its own line on a phone when a send failed, so the state is read whole', () => {
+    expect(css).toMatch(/\.tr-reader__top \.tr-reader__head--long \{\s*flex-wrap: wrap;/u);
+  });
+
   it('gives « Envoyer la retouche » its own row while retouching', () => {
     expect(css).toMatch(/\.tr-draft__actions--editing \{\s*flex-wrap: wrap;/u);
     expect(css).toMatch(/\.tr-draft__actions--editing > \.nv-btn--neon \{\s*flex-basis: 100%;/u);

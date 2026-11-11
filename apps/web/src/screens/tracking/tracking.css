@@ -858,6 +858,19 @@
   max-width: 380px;
 }
 
+/* The long state of a send that failed is read whole, on a phone as on a computer: the hand goes to its own line
+ * under it (recette 11/11, relecture de #690). */
+.tr-reader__head--long .tr-reader__who {
+  flex-basis: calc(100% - 44px - var(--nv-space-3));
+}
+.tr-reader__head--long > .nv-btn {
+  margin-left: calc(44px + var(--nv-space-3));
+}
+.tr-reader__head--long .tr-reader__state-label {
+  overflow: visible;
+  white-space: normal;
+}
+
 /* On a phone, reading takes the screen: the page's title and sub-tabs step aside, and the way back, the fan's name,
  * his state and the hand stay at the top while the thread scrolls. */
 @media (max-width: 899px) {
@@ -879,6 +892,9 @@
   }
   .tr-reader__top .tr-reader__head {
     flex-wrap: nowrap;
+  }
+  .tr-reader__top .tr-reader__head--long {
+    flex-wrap: wrap;
   }
   .tr-reader__top .tr-reader__who h2 {
     overflow: hidden;
