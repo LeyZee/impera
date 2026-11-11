@@ -7,7 +7,7 @@
  * DATABASE_ADMIN_URL names, opened with CREDENTIALS_ENCRYPTION_KEYS (`readSavedProviderKeys`), kept in memory only.
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -278,7 +278,8 @@ const results: ScenarioResult[] = [];
 const minima = new Map<string, Readonly<Record<string, number>>>();
 let isCapReached = false;
 for (const path of files) {
-  const file = relative(EVALS, path);
+  // Always with `/`: Windows writes `card\…`, and the card suite is told by its prefix.
+  const file = relative(EVALS, path).split(sep).join('/');
   if (gateway.health().budget.state === 'reached') {
     isCapReached = true;
     break;
