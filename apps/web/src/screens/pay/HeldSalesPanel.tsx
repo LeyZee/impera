@@ -3,8 +3,11 @@ import {
   PaySaleDecisionIdSchema,
   type HeldSale,
   type PayPeriod,
+  type Platform,
   type SaleDecisionOutcome,
+  type TeamImportOverview,
 } from '@impera/contracts';
+import { useQueries } from '@tanstack/react-query';
 import { useId, useState, type JSX } from 'react';
 
 import type { PayNames } from './data';
@@ -15,6 +18,7 @@ import {
   decisionText,
   heldCountText,
   heldReasonText,
+  lineChatter,
   outcomeLabel,
   outcomeWords,
   ownLineText,
@@ -27,6 +31,7 @@ import {
 import { payRefusalText } from '@/payroll/model';
 import { useSchedulingSettings } from '@/reports/api';
 import { accountLine } from '@/scheduling/model';
+import { fetchTeamImport, teamImportKey } from '@/settings/sales-feed/api';
 import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
 
@@ -67,6 +72,23 @@ export function HeldSalesPanel({
   const read = held.data?.period === period ? held.data : undefined;
   const sales = read?.sales ?? [];
   const zone = settings.data?.timeZone ?? null;
+  // The platform's team names a chatter not linked (ADR 0076): read only for a line that needs it, by the same readers.
+  const unnamed: Platform[] = [
+    ...new Set(
+      sales.flatMap((sale) =>
+        sale.memberId === null && sale.platformChatterId !== null ? [sale.platform] : [],
+      ),
+    ),
+  ];
+  const teams = useQueries({
+    queries: unnamed.map((platform) => ({
+      queryKey: teamImportKey(platform),
+      queryFn: () => fetchTeamImport(platform),
+      retry: false,
+    })),
+  });
+  const teamOf = (platform: Platform): TeamImportOverview | undefined =>
+    teams[unnamed.indexOf(platform)]?.data;
   if (reads && read === undefined && held.isError)
     return (
       <Panel className="nv-enter py-held" eyebrow="Ventes en attente">
@@ -109,6 +131,7 @@ export function HeldSalesPanel({
             const reason = heldReasonText(sale, member, owner);
             const signalled = signalText(sale, member);
             const decided = decisionText(sale, member);
+            const chatter = lineChatter(sale, member, teamOf(sale.platform));
             return (
               <li key={`${sale.platform}:${sale.platformSaleId}:${sale.event}`} className="py-held__row">
                 <div className="py-held__main">
@@ -119,8 +142,9 @@ export function HeldSalesPanel({
                     </span>
                   </p>
                   <p className="py-member__line nv-num" id={about('when')}>
-                    {saleWhen(sale, zone)} · chatteur{'\u00a0'}
-                    <b>{member === null ? 'non relié' : member.name}</b>
+                    {saleWhen(sale, zone)} · {chatter.lead}
+                    {'\u00a0'}
+                    <b>{chatter.name}</b>
                   </p>
                 </div>
                 <div className="py-held__side">

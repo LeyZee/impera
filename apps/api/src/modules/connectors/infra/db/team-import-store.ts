@@ -115,11 +115,13 @@ async function linkIn(
   if (refusal !== null) return { ok: false, kind: refusal };
   if (link?.kind === 'member') {
     if (!TeamMemberIdSchema.safeParse(link.memberId).success) return { ok: false, kind: 'member_unknown' };
+    // A member who left may be linked: his sales from before his departure go on his final statement, the pay module
+    // counts none after it (ADR 0072).
     const [member] = await tx
-      .select({ status: schema.teamMembers.status })
+      .select({ id: schema.teamMembers.id })
       .from(schema.teamMembers)
       .where(eq(schema.teamMembers.id, link.memberId));
-    if (member === undefined || member.status === 'left') return { ok: false, kind: 'member_unknown' };
+    if (member === undefined) return { ok: false, kind: 'member_unknown' };
   }
   if (link === null) await tx.delete(chatters).where(key);
   else {
@@ -211,7 +213,7 @@ export function createDrizzleTeamImportStore(db: Database): TeamImportStore {
             firstName: schema.teamMembers.firstName,
             lastName: schema.teamMembers.lastName,
             displayName: schema.teamMembers.displayName,
-            status: schema.teamMembers.status,
+            leftOn: schema.teamMembers.leftOn,
             email: schema.user.email,
             creatorIds: schema.user.creatorIds,
           })
@@ -244,7 +246,7 @@ export function createDrizzleTeamImportStore(db: Database): TeamImportStore {
             firstName: row.firstName,
             lastName: row.lastName,
             email: row.email,
-            active: row.status !== 'left',
+            leftOn: row.leftOn,
             creatorIds: row.creatorIds.map((id) => CreatorIdSchema.parse(id)),
           })),
           links: new Map(

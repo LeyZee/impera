@@ -1,9 +1,11 @@
+import { TeamImportOverviewSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
   decisionText,
   heldCountText,
   heldReasonText,
+  lineChatter,
   outcomeLabel,
   outcomeWords,
   ownLineText,
@@ -53,10 +55,10 @@ describe('held sales (CRM-03 lot b4b)', () => {
     );
     const unlinked = heldSaleOf({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
     expect(heldReasonText(unlinked, null, true)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Réglages › Ventes et la vente compte seule. Sinon, écarte-la.',
+      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Équipe › Reveal et la vente compte seule. Sinon, écarte-la.',
     );
     expect(heldReasonText(unlinked, null, false)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Réglages › Ventes. Sinon, écarte-la.',
+      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Équipe › Reveal. Sinon, écarte-la.',
     );
     expect(heldReasonText(heldSaleOf({ reason: 'status_unknown' }), THEO, true)).toBe(
       'Reveal lui donne un statut qu’Impera ne connaît pas encore.',
@@ -138,10 +140,10 @@ describe('held sales (CRM-03 lot b4b)', () => {
     );
     const unlinked = refund({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
     expect(heldReasonText(unlinked, null, true)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Réglages › Ventes et le remboursement se déduit seul. Sinon, écarte-le.',
+      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Équipe › Reveal et le remboursement se déduit seul. Sinon, écarte-le.',
     );
     expect(heldReasonText(unlinked, null, false)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Réglages › Ventes. Sinon, écarte-le.',
+      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Équipe › Reveal. Sinon, écarte-le.',
     );
   });
 
@@ -177,5 +179,53 @@ describe('held sales (CRM-03 lot b4b)', () => {
     });
     expect(signalText(refund, THEO)).toBe('Signalé par Théo : ce n’est pas son remboursement.');
     expect(signalChipText(refund)).toBe('Signalé');
+  });
+
+  it('names who made a line: its member, else the Reveal account from the team, else the account as one', () => {
+    const team = TeamImportOverviewSchema.parse({
+      rows: [
+        {
+          chatter: {
+            platformChatterId: 'chatter-new',
+            firstName: 'Camille',
+            lastName: 'Essai',
+            email: null,
+            role: 'chatter',
+            isBot: false,
+            isExternal: false,
+            removedAt: null,
+            platformModelIds: [],
+          },
+          link: null,
+          dismissedAt: null,
+          suggestion: null,
+          preselected: false,
+          actions: [],
+          models: [],
+          modelGap: { inImperaOnly: [], onPlatformOnly: [] },
+          removal: null,
+        },
+      ],
+      newCount: 1,
+      removalCount: 0,
+      abnormalRead: false,
+      listError: null,
+    });
+    const unlinked = (platformChatterId: string | null) =>
+      heldSaleOf({ memberId: null, platformChatterId, reason: 'chatter_unlinked' });
+    expect(lineChatter(heldSaleOf(), THEO, team)).toEqual({ lead: 'chatteur', name: 'Théo' });
+    expect(lineChatter(unlinked('chatter-new'), null, team)).toEqual({
+      lead: 'chatteur',
+      name: 'non relié · Camille Essai',
+    });
+    expect(lineChatter(unlinked('chatter-other'), null, team)).toEqual({
+      lead: 'compte Reveal',
+      name: 'non relié',
+    });
+    expect(lineChatter(unlinked('chatter-new'), null, undefined)).toEqual({
+      lead: 'compte Reveal',
+      name: 'non relié',
+    });
+    expect(lineChatter(unlinked(null), null, team)).toEqual({ lead: 'chatteur', name: 'non relié' });
   });
 });

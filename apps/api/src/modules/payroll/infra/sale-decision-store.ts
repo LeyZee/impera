@@ -77,6 +77,7 @@ const heldSaleOf = (one: SaleToDecide): HeldSales['sales'][number] => ({
   currency: one.line.currency,
   netMinor: one.line.netMinor,
   memberId: one.line.author.kind === 'member' ? one.line.author.memberId : null,
+  platformChatterId: one.line.platformChatterId,
   reason: one.reason,
   decision: one.decision,
   outcomes: [...one.outcomes],

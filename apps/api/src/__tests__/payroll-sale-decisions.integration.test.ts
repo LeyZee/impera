@@ -26,6 +26,7 @@ const HeldListSchema = z.object({
       platformSaleId: z.string(),
       event: z.string(),
       memberId: z.string().nullable(),
+      platformChatterId: z.string().nullable(),
       reason: z.string().nullable(),
       decision: z.string().nullable(),
       outcomes: z.array(z.string()),
@@ -196,6 +197,21 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
     const refused = await team.call('GET', `/payroll/periods/${P1}/held-sales`, leaCookie);
     expect(refused.statusCode).toBe(403);
     expect(team.refusal(refused).code).toBe('payroll_forbidden');
+  });
+
+  it('names the platform account of each line held, linked or not, for the validator to know who made it', async () => {
+    const response = await team.call('GET', `/payroll/periods/${P1}/held-sales`, team.owner);
+    expect(
+      HeldListSchema.parse(response.json()).sales.map((one) => [
+        one.platformSaleId,
+        one.memberId,
+        one.platformChatterId,
+      ]),
+    ).toEqual([
+      ['sale_new', null, 'chatter_new'],
+      ['sale_odd', theo.id, 'chatter_theo'],
+      ['sale_off', theo.id, 'chatter_theo'],
+    ]);
   });
 
   it('refuses a decision on one’s own sale, an outcome the sale does not offer, and a sale it does not hold', async () => {

@@ -1,0 +1,7 @@
+# 2026-11-11 — REC-PAIE-01 Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis — done
+Fait : anomalie 5, `HeldSaleSchema.platformChatterId` lu de `platform_sales` jusqu'au panneau « Ventes en attente », qui nomme le compte d'après la liste d'Équipe › Reveal (« chatteur non relié · Prénom Nom », sinon « compte Reveal non relié ») ; anomalie 6, « Équipe › Reveal » pour relier un chatteur (ventes en attente, rapports, Dashboard) ; anomalie 8, un compte retiré de Reveal reste listé sans compter, sans proposition, sans « Inviter » (refusé aussi par la route, 422) et dit « Retiré de Reveal le … » ; anomalie 4, un membre parti se relie : proposé sur son e-mail, décoché, « parti le … », « Nom (parti) » dans la liste, lien accepté par `team-import-store`.
+Pas fait : rien de la fiche.
+Décisions : décisions de Charles du 11/11 (compte retiré, membre parti) ; pas d'ADR, pas de migration (aucune politique ni contrainte de la base ne refusait un membre parti).
+Découvertes : `scripts/check-repo.mjs` ne lit que les ID de la forme `ABC-12` : la fiche `REC-PAIE-01` n'est pas vérifiée contre l'index. La paie ne coupe pas les ventes d'un membre parti par sa date de départ : c'est l'absence de shift qui les met « hors poste », et le valideur peut encore les compter.
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, pnpm test ✓ ; tests d'intégration (paie, connecteurs) écrits mais non lancés : pas de Docker dans ce conteneur.
