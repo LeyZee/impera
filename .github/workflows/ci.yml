@@ -155,7 +155,6 @@ jobs:
             echo "AUTH_SECRET=$(openssl rand -base64 32)"
             echo "AUTH_BASE_URL=http://127.0.0.1:8080"
             echo "WEB_ORIGIN=http://127.0.0.1:8080"
-            echo "EXTENSION_DEVICE_TOKEN=$(openssl rand -hex 24)"
             # The invoices' buckets (ADR 0037), required in production at two https hosts: nothing is issued in this
             # run, so none is reached (`.invalid` never resolves); the boot only checks them.
             for bucket in INVOICES_S3:primary INVOICES_COPY_S3:copy; do
