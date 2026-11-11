@@ -19,7 +19,7 @@ Le connecteur lit la boîte de réception, les messages, les profils, les notes,
 
 ## Critères d'acceptation
 - Suite de contrat verte contre `FakeConnector` et contre `RevealApiConnector` + FakeReveal, scénarios `session_expired`, `rate_limited`, `shape_changed` compris.
-- Tests unitaires du mappage : texte entrant et sortant, bundle verrouillé et acheté, étape de script, message du membre « bot » reconnu, moment ☀️ / 🌙 / aucun, étape déjà envoyée et achetée.
+- Tests unitaires du mappage : texte entrant et sortant, bundle verrouillé et acheté, étape de script, message du membre « bot » reconnu (par id d'abord, nom affiché en repli), message écrit par la modèle elle-même ou un chatteur (sortant, pas le nôtre), moment ☀️ / 🌙 / aucun, étape déjà envoyée et achetée.
 - Test d'intégration : un poll sur FakeReveal ingère les messages sans doublon, puis une session expirée arrête le compte.
 - Aucun jeton dans les logs (test).
 

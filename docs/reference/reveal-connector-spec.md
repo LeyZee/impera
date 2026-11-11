@@ -65,9 +65,9 @@ Le compte plateforme et la session ne font jamais apparaître le jeton ailleurs 
 
 `fanRef` → conversation : Reveal a une conversation par fan et par modèle. L'adaptateur garde la correspondance relevée par `listConversations` ; une méthode appelée avec un fan inconnu relit la liste (`searchParticipants`), puis lève `not_found`.
 
-**Notre propre message** : un sortant qui porte `authorMessage.displayName` du membre « bot » est le nôtre ; c'est ce qui permet à `verifySent` et à la paie (ADR 0050 § 5) de le reconnaître. Le nom affiché du membre « bot » ne doit pas changer dans Reveal (`session-expired.md`).
+**Notre propre message** : d'abord par son id, gardé dans `connector_sends` à l'envoi (§ 5) ; en repli seulement (envoi dont la réponse s'est perdue), par `authorMessage.displayName` du membre « bot » et l'empreinte. La paie, elle, lit l'auteur dans l'API CRM (ADR 0050 § 5). Le nom affiché du membre « bot » ne doit pas changer dans Reveal (`session-expired.md`). Un sortant écrit par la modèle elle-même ou par un chatteur porte un autre nom : il est sortant, mais pas le nôtre.
 
-**Sondage** : `connector.poll` (P0-06) appelle `listConversations(since = last_poll_at − 60 s)` puis `fetchMessages` sur chaque conversation bougée. Intervalle par défaut 60 s ± 20 s, au-dessus du client officiel (12 s) : on reste moins bavard qu'un chatteur.
+**Sondage** : `connector.poll` (P0-06) appelle `listConversations(since = last_poll_at − 60 s)` puis `fetchMessages` sur chaque conversation bougée. Intervalle par défaut 60 s ± 20 s, au-dessus du client officiel (12 s) : on reste moins bavard qu'un chatteur. Latence attendue entre le message d'un fan et la réponse de l'agent : 2 à 3 minutes (relève, puis délai de frappe et de lecture).
 
 ## 5. Écriture
 
@@ -78,7 +78,7 @@ Toutes passent par la garde `writes` (ADR 0018 § 3) avant l'appel réseau.
 | `sendText` | `POST /conversations/:id/messages { message: { content, isUnread: true }, mediaIds: [], files: [] }` | |
 | `sendScriptStep(ref, scriptRef, stepIndex, key)` | même route, `+ scriptId` (l'étape) et le bundle de l'étape tel que `scripts.list` le donne | relit `getScriptHistory` juste avant : étape déjà envoyée → refus définitif (ADR 0018 § 5) |
 | `sendMedia` (vocal seulement) | `GET /medias/get-upload-url`, `PUT`, puis `files: [{ type: "audio", key }]` | le bot n'envoie jamais de média libre (inventaire, 17/10) ; le vocal est la seule exception |
-| `setFanNote(fanRef, text, key)` | `GET /conversations/:id` puis `PATCH /conversations/:id/note { note }` | remplace tout : l'adaptateur relit, remplace seulement le bloc de l'agence (canevas), garde le reste mot pour mot |
+| `setFanNote(fanRef, text, key)` | `GET /conversations/:id` puis `PATCH /conversations/:id/note { note }` | remplace tout : l'adaptateur relit juste avant le `PATCH`, remplace seulement le bloc de l'agence (canevas) et garde le reste mot pour mot ; si la note a changé entre la lecture qui a servi au texte et cette relecture (un chatteur vient d'écrire), il recompose sur la version relue, jamais sur l'ancienne |
 | `markRead`, `setTyping` | `PATCH /conversations/:id/read`, `POST /conversations/:id/typing` | `typing` répété toutes les 3 s pendant le délai de frappe, comme le client officiel |
 
 **Limite d'envoi** : 60 par minute et par jeton chez Reveal ; l'adaptateur s'impose 20 par minute et par compte, et jamais deux envois dans la même conversation à moins de 2 s.
