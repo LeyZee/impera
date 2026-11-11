@@ -29,7 +29,7 @@ graceful.stopWith(async () => {
 });
 
 try {
-  await server.listen({ port: config.PORT, host: '0.0.0.0' });
+  await server.listen({ port: config.PORT, host: config.HOST });
 } catch (error) {
   logger.fatal({ err: error }, 'cannot listen');
   process.exit(1);
