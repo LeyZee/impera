@@ -1,0 +1,6 @@
+# 2026-11-11 — Vignettes d'une créatrice archivée effacées après 90 jours (ADR 0089, Médias) — in_progress
+
+Fait : ADR 0089 écrite (proposed), après le choix de Charles « ok vignettes 90 jours ». Le job horaire `content_drops.erase_originals` gagne une étape : chaque vignette d'une créatrice archivée depuis plus de 90 jours est effacée du stockage, média par média sous le verrou de sa ligne, puis sa clé vidée (`thumbnailed_at` reste : jamais refaite). Un stockage qui refuse laisse la vignette pour l'heure suivante ; rejoué, rien n'est effacé deux fois ; une ligne d'audit `media.thumbnails_erased` par créatrice et par passage (le nombre, jamais une clé). Constante `ARCHIVED_THUMBNAIL_DAYS` dans les contrats. Écran : « Archivées » dit « vignettes gardées jusqu'au … » puis « vignettes effacées » ; la confirmation d'archivage le dit avant, et ne dit plus « Rien n'est supprimé ». Tests : domaine (date limite), application (étape, échec du stockage), intégration (archivée il y a 91 jours effacée, il y a 89 jours gardée, audit, rejeu), écran (ligne et confirmation).
+Pas fait : attend « ok 0089 » de Charles avant fusion ; captures de la ligne « Archivées » et de la confirmation.
+Décisions : pas de migration (colonnes existantes, la contrainte accepte une clé vide) ; le délai est une constante, pas un réglage.
+Découvertes : rien.

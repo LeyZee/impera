@@ -1,3 +1,4 @@
+import { archivedThumbnailsUntil } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type JSX } from 'react';
 
@@ -45,6 +46,11 @@ export function ArchivePanel({
   const [reauth, setReauth] = useState(false);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [planned, setPlanned] = useState<string | null>(null);
+  const thumbnailsDay = new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(archivedThumbnailsUntil(new Date()));
 
   async function archive(): Promise<void> {
     if (sending.current) return;
@@ -70,8 +76,9 @@ export function ArchivePanel({
   return (
     <div className="ps-stack">
       <p className="ps-muted">
-        Archivée, elle sort des listes, des Alertes et de Telegram, et son agent s’arrête. Rien n’est supprimé
-        : ses conversations, ventes, paies et scripts restent.
+        Archivée, elle sort des listes, des Alertes et de Telegram, et son agent s’arrête. Ses conversations,
+        ventes, paies, scripts et descriptions restent ; seules les vignettes de ses médias partent 90
+        {'\u00a0'}jours après.
       </p>
       {asking ? (
         <div className="ps-stack cr-archive-confirm" role="group" aria-label={`Archiver ${creatorName}`}>
@@ -79,6 +86,10 @@ export function ArchivePanel({
           <ul className="ps-muted cr-archive-list">
             <li>Son agent s’arrête : aucun brouillon, aucun envoi, aucune relance.</li>
             <li>Son espace se ferme : son lien est révoqué et elle ne peut plus se connecter.</li>
+            <li>
+              Ses vignettes sont effacées dans 90{'\u00a0'}jours, le {thumbnailsDay}. Rouverte avant, rien ne
+              part.
+            </li>
             <li>Tu pourras la rouvrir depuis Créatrices › Archivées. Son agent restera à l’arrêt.</li>
           </ul>
           {planned === null ? null : (
