@@ -72,12 +72,42 @@
   margin-bottom: var(--nv-space-4);
 }
 .ag-views {
-  min-width: 220px;
+  min-width: 150px;
+}
+@media (min-width: 900px) {
+  .ag-views {
+    min-width: 220px;
+  }
 }
 .ag-nav {
   display: flex;
   align-items: center;
   gap: var(--nv-space-2);
+}
+/* « Aujourd’hui » keeps its place on today, unseen: the arrows stay where her thumb is (CRE-20). */
+.ag-today:not([data-away]) {
+  visibility: hidden;
+}
+/* On a phone the views, « Aujourd’hui » and the arrows hold on one line (CRE-20). */
+@media (max-width: 420px) {
+  .ag-nav {
+    gap: var(--nv-space-1);
+  }
+  .ag-nav .ag-today {
+    padding: 0 var(--nv-space-2);
+  }
+}
+/* « Mise à jour… »: her kept copy is being read again (CRE-02). Quiet, under the bar. */
+.ag-updating {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0 0 var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+.ag-updating .nv-dot {
+  --_c: var(--nv-ink-faint);
 }
 /* Quiet arrows: the one loud button of the screen is « Ajouter ». */
 .ag-arrow {
@@ -215,8 +245,18 @@
   font-size: var(--nv-text-callout);
   font-weight: 650;
 }
-.ag-strip__day[data-today] .ag-strip__num {
-  color: var(--nv-neon-ink);
+/* Today, the same mark in every view (CRE-21): a full disc, its number on it. */
+.ag-strip__num {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+.ag-strip__day[data-today] .ag-strip__num,
+.ag-wday[data-today] .ag-wday__date b {
+  color: var(--nv-on-neon);
+  background: var(--nv-neon-solid);
 }
 .ag-strip__dots {
   display: flex;
@@ -747,12 +787,15 @@
   font-size: var(--nv-text-caption);
 }
 .ag-wday__date b {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   font-size: var(--nv-text-title-2);
   color: var(--nv-ink);
 }
-.ag-wday[data-today] .ag-wday__date b {
-  color: var(--nv-neon-ink);
-}
+
 .ag-wday__items {
   grid-area: items;
   display: flex;
@@ -889,6 +932,13 @@
 .ag-weekdays .nv-chip {
   justify-content: center;
   min-height: 40px;
+}
+/* A text field that grows with her text (`useGrowingArea`), without the browser's handle (CRE-30). */
+.ag-area {
+  resize: none;
+  field-sizing: content;
+  min-height: 72px;
+  max-height: 240px;
 }
 .ag-optional {
   margin-left: 6px;
@@ -1348,8 +1398,8 @@
   color: var(--nv-ink);
 }
 .ag-wk__day[data-today] b {
-  color: #fff;
-  background: var(--nv-neon);
+  color: var(--nv-on-neon);
+  background: var(--nv-neon-solid);
   box-shadow: 0 6px 18px -8px var(--nv-neon);
 }
 .ag-wk__routine {
@@ -1631,8 +1681,8 @@
   color: var(--nv-ink-faint);
 }
 .ag-month__cell[data-today] .ag-month__num {
-  color: #fff;
-  background: var(--nv-neon);
+  color: var(--nv-on-neon);
+  background: var(--nv-neon-solid);
 }
 .ag-month__cell .ag-mini {
   cursor: inherit;
@@ -1718,9 +1768,23 @@ summary.ag-brief__title:focus-visible {
   color: var(--nv-ink-muted);
 }
 
-/* Her task's three buttons on a phone: they go to the next line rather than past the edge of the dialog. */
+/* Her task's three buttons on a phone: they go to the next line rather than past the edge of the dialog. « Retirer »
+   stands apart on the left (CRE-23). */
 .ag-task-foot {
   flex-wrap: wrap;
+}
+.ag-task-foot__remove {
+  margin-right: auto;
+}
+/* On a phone the three do not hold on a line: one under the other, « C’est fait » first, « Retirer » last. */
+@media (max-width: 520px) {
+  .ag-task-foot {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .ag-task-foot__remove {
+    margin-right: 0;
+  }
 }
 
 /* « Dans mon téléphone » (lot c2): a quiet line under her agenda, and its dialog's column. */
@@ -1731,12 +1795,13 @@ summary.ag-brief__title:focus-visible {
   gap: var(--nv-space-2);
   margin: var(--nv-space-4) 0 0;
 }
-.ag-phone {
+/* `ag-callink`, not `ag-phone`: that one is the reel's phone frame (reel-brief.css), which boxed this dialog (CRE-17). */
+.ag-callink {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
 }
-.ag-phone__shifts {
+.ag-callink__shifts {
   padding-top: var(--nv-space-3);
   border-top: 1px solid var(--nv-hairline);
 }
