@@ -166,7 +166,7 @@ export function CheckReport({
             </tbody>
           </table>
         </div>
-        {report.total.export === null ? (
+        {report.total.export === null && report.total.stats !== null ? (
           <p className="sv-muted sf-small">
             Sans export, le registre est comparé aux statistiques seules : l’export est facultatif.
           </p>
@@ -181,9 +181,13 @@ export function CheckReport({
         </h5>
         {inGap.length === 0 ? (
           <p className="sv-muted sf-small">
-            {report.days.length === 0
-              ? 'Aucune vente sur ces jours, dans aucune source.'
-              : `Sur ${plural(report.days.length, 'jour', 'jours')} de ventes par modèle, chaque source dit le chiffre du registre.`}
+            {report.total.stats === null && report.total.export === null
+              ? 'Rien n’a pu être comparé : sans les statistiques ni export, le registre est seul.'
+              : report.days.length === 0
+                ? 'Aucune vente sur ces jours, dans aucune source.'
+                : report.total.stats === null
+                  ? `Sur ${plural(report.days.length, 'jour', 'jours')} de ventes par modèle, l’export dit le chiffre du registre.`
+                  : `Sur ${plural(report.days.length, 'jour', 'jours')} de ventes par modèle, chaque source dit le chiffre du registre.`}
           </p>
         ) : (
           <ul className="sf-gaps">
