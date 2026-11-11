@@ -18,7 +18,7 @@ const TROUBLES: readonly { readonly title: string; readonly text: string }[] = [
   },
   {
     title: 'Une autre créatrice que ce compte',
-    text: 'L’onglet montre une autre modèle que celle du compte : choisis la bonne dans Reveal, puis réessaie.',
+    text: 'L’onglet montre une autre créatrice que celle du compte : choisis la bonne dans Reveal, puis réessaie.',
   },
   {
     title: 'La session expire sans arrêt',
