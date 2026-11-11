@@ -48,7 +48,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cr-savebar {
+  .nv-glass.cr-savebar {
     animation: none;
   }
 }

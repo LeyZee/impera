@@ -12,4 +12,10 @@ describe('the save bar of a long sheet (recette 11/11)', () => {
   it('sits above the tab capsule on a phone, with the same weight', () => {
     expect(css).toMatch(/@media \(max-width: 820px\) \{\s*\.nv-glass\.cr-savebar \{[^}]*bottom: calc\(/u);
   });
+
+  it('stays still under reduced motion, with the same weight as the rule that animates it', () => {
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.nv-glass\.cr-savebar \{\s*animation: none;/u,
+    );
+  });
 });

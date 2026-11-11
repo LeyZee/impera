@@ -37,18 +37,18 @@ import { Select } from '@/shell/Select';
 import '@/creators/agenda/agency-agenda.css';
 
 /**
- * Créatrices › Idées du jour (VEI-02, ADR 0060 § 5), the owner's and an active manager's: the morning's ideas for her,
- * each with the trend it cites. Validated as it is or corrected on the spot, it becomes a shooting suggestion in her
- * agenda; refused, it is never proposed again. Nothing leaves for her without this page. « Coller un lien » adds a post
- * seen on Instagram to her trends (§ 2, source 4): the server keeps its address and never opens it.
- */
-/**
  * The morning job that writes her ideas (VEI-03) is not coded yet: the empty day says so, never a promise of 7 a.m.
  * (Charles, 11/11, recette créatrice). Back to the promise when the job runs.
  */
 export const IDEAS_NOT_MADE_YET =
   'Les idées du matin ne sont pas encore produites. En attendant, colle ici les posts et reels vus sur Instagram : ils nourrissent ses tendances.';
 
+/**
+ * Créatrices › Idées du jour (VEI-02, ADR 0060 § 5), the owner's and an active manager's: the morning's ideas for her,
+ * each with the trend it cites. Validated as it is or corrected on the spot, it becomes a shooting suggestion in her
+ * agenda; refused, it is never proposed again. Nothing leaves for her without this page. « Coller un lien » adds a post
+ * seen on Instagram to her trends (§ 2, source 4): the server keeps its address and never opens it.
+ */
 export function IdeasSection({
   creatorId,
   creatorName,
