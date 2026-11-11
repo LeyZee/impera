@@ -184,7 +184,7 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(within(anna).getByText(/^Théo jusqu’à/u)).toBeDefined();
     expect(within(anna).getByText('🎬 Feed · Vidéo short')).toBeDefined();
     expect(within(anna).getByText(/^En retard depuis .* · 1 autre attendu$/u)).toBeDefined();
-    expect(within(anna).getByText('3 à traiter, dont 1 urgent')).toBeDefined();
+    expect(within(anna).getByText('3, dont 1 urgent')).toBeDefined();
 
     fireEvent.click(within(anna).getByRole('link', { name: 'Anna' }));
     await picked('Anna');
@@ -229,7 +229,7 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(within(anna).queryByText('Chiffre d’affaires')).toBeNull();
     expect(within(anna).queryByText('En poste')).toBeNull();
     expect(within(anna).queryByText('Contenu attendu')).toBeNull();
-    expect(within(anna).getByText('Rien à traiter')).toBeDefined();
+    expect(within(anna).getByText('Rien')).toBeDefined();
     expect(within(anna).queryByText('À configurer')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ajouter une créatrice' })).toBeNull();
     fireEvent.click(within(anna).getByRole('link', { name: 'Anna' }));

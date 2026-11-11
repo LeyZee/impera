@@ -156,11 +156,15 @@ export function groupsOf(items: readonly AgencySuggestion[]): {
   };
 }
 
-/** « 4 proposées · 2 acceptées · 1 faite · 1 refusée », only the counts there are. */
-export function summaryOf(items: readonly AgencySuggestion[], zone: string): string {
+/**
+ * « 4 proposées · 2 acceptées · 1 faite · 1 refusée », only the counts there are; `null` while every proposal stands
+ * the same, which its group's title already counts (« En attente de sa réponse 4 », recette 11/11, ADM-25).
+ */
+export function summaryOf(items: readonly AgencySuggestion[], zone: string): string | null {
   const count = (n: number, one: string, many: string): string | null =>
     n === 0 ? null : `${String(n)} ${n === 1 ? one : many}`;
   const followed = items.map((one) => followedOf(one, zone).standing);
+  if (new Set(followed).size < 2) return null;
   return [
     count(items.length, 'proposée', 'proposées'),
     count(items.filter((one) => one.state === 'accepted').length, 'acceptée', 'acceptées'),
