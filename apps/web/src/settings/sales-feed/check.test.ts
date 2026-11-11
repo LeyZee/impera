@@ -100,7 +100,7 @@ describe('what a report says of the switch (CRM-03)', () => {
 
   it('names the export in a match only when one was given, as it is optional', () => {
     expect(verdictOf('match', false).line).toBe(
-      'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre. Aucun export n’a été joint : il est facultatif.',
+      'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre.',
     );
     expect(verdictOf('match', true).line).toMatch(/^Le registre, les statistiques et l’export disent/u);
     expect(verdictOf('incomplete', false).line).toBe(

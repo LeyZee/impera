@@ -180,7 +180,7 @@ export function verdictOf(verdict: SalesFeedCheckVerdict, withExport: boolean): 
         title: 'Les chiffres concordent au centime',
         line: withExport
           ? 'Le registre, les statistiques et l’export disent la même chose, jour par jour, et membre par membre face aux statistiques.'
-          : 'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre. Aucun export n’a été joint : il est facultatif.',
+          : 'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre.',
       };
     case 'mismatch':
       return {

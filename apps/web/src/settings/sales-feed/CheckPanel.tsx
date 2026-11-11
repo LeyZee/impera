@@ -272,7 +272,7 @@ export function CheckPanel({
 
         <div className="nv-field">
           <span className="nv-field__label" id={`${id}-file-label`}>
-            Export du dashboard <span className="sf-faint">facultatif</span>
+            Export du dashboard
           </span>
           {/* The browser's own file button speaks its language, not the page's: a pill of ours over the input. */}
           <label

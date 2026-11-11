@@ -227,7 +227,7 @@ describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
     ).toBeTruthy();
     expect(
       within(panel).getByText(
-        'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre. Aucun export n’a été joint : il est facultatif.',
+        'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre.',
       ),
     ).toBeTruthy();
   });
@@ -235,7 +235,8 @@ describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
   it('says the export is optional, the statistics enough for the switch (ADR 0050 § 8, amended 11/11/2026)', async () => {
     page(ok(report()));
     const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });
-    expect(within(panel).getByText('facultatif')).toBeTruthy();
+    // « facultatif » once, under the totals: neither the file's label nor the verdict repeats it (recette crm-14).
+    expect(within(panel).queryByText('facultatif')).toBeNull();
     expect(within(panel).getByText(/et avec l’export de son dashboard si tu en as un\./u)).toBeTruthy();
     expect(
       within(panel).getByText(

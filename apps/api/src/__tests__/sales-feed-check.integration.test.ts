@@ -1,7 +1,12 @@
 import {
+  AccountPayRulesIdSchema,
+  AccountPayRulesSchema,
   CreatorIdSchema,
   newId,
+  payPeriodLastDay,
+  payPeriodOfDay,
   PlatformAccountIdSchema,
+  previousPayPeriod,
   SalesFeedCheckReportSchema,
   SalesFeedLastCheckSchema,
 } from '@impera/contracts';
@@ -18,6 +23,7 @@ import { buildServer, type Server } from '../server';
 import { createFakeCrm, FAKE_CRM_BASE_URL, FAKE_CRM_KEY, type FakeCrm } from './fake-reveal/crm';
 import { testConfig } from './support/config';
 import { LogSink } from './support/log-sink';
+import { parisDay } from './support/paris';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
@@ -304,6 +310,42 @@ describe('sales feed reliability check (CRM-02)', () => {
     // Read again, the register has Reveal's sale; without the export that was off, the statistics agree.
     const again = SalesFeedCheckReportSchema.parse((await check({ ...DAYS, export: null })).json());
     expect(again.verdict).toBe('match');
+  });
+
+  it('opens the switch to the platform’s net on a whole past fortnight checked without an export (CRM-14)', async () => {
+    // Charles's path on 16/11: the check over the fortnight just over, no export, then the switch from that fortnight.
+    const checked = previousPayPeriod(payPeriodOfDay(parisDay(0)));
+    crm.sell({ id: 'sale_check_fortnight', createdAt: `${checked}T10:00:00.000Z` });
+    await read();
+    const answer = await check({ from: checked, to: payPeriodLastDay(checked), export: null });
+    expect(answer.statusCode, answer.body).toBe(200);
+    const report = SalesFeedCheckReportSchema.parse(answer.json());
+    expect(report).toMatchObject({ verdict: 'match', total: { export: null } });
+    expect((await lastCheck()).body?.last).toMatchObject({ clean: true, report: { verdict: 'match' } });
+
+    const [account] = await test.admin.db
+      .select({ id: schema.platformAccounts.id })
+      .from(schema.platformAccounts)
+      .where(eq(schema.platformAccounts.handle, 'creatrice_test'));
+    const switched = await server.inject({
+      method: 'POST',
+      url: '/v1/team/pay-rules',
+      headers: { cookie: owner, origin: DASHBOARD_ORIGIN },
+      payload: {
+        id: newId(AccountPayRulesIdSchema),
+        platformAccountId: account?.id,
+        fromPeriod: checked,
+        currency: 'EUR',
+        vatBps: 2000,
+        platformFeeBps: 2000,
+        earningsSource: 'detected',
+      },
+    });
+    expect(switched.statusCode, switched.body).toBe(201);
+    expect(AccountPayRulesSchema.parse(switched.json())).toMatchObject({
+      fromPeriod: checked,
+      earningsSource: 'detected',
+    });
   });
 
   it('refuses an export it cannot read, naming the column, never a cell', async () => {
