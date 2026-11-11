@@ -17,8 +17,11 @@ const PROBLEMS: Record<Problem, string> = {
   failed: 'Elle n’est pas rouverte : Impera ne répond pas. Réessaie dans un instant.',
 };
 
+/** « 5 novembre 2026 », never broken across lines. */
 const dayOf = (iso: string): string =>
-  new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
+  new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    .format(new Date(iso))
+    .replaceAll(' ', '\u00a0');
 
 /** « vignettes gardées jusqu’au 3 février 2027 », then « vignettes effacées » once they went (ADR 0089). */
 export function thumbnailsLine(archivedAt: string, now: Date): string {

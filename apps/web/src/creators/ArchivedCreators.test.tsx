@@ -64,7 +64,7 @@ describe('ArchivedCreators (ADR 0071 § 2)', () => {
   it('says until when her reduced pictures stay, then that they went (ADR 0089)', () => {
     const archivedAt = '2026-11-05T20:00:00.000Z';
     expect(thumbnailsLine(archivedAt, new Date('2026-11-11T12:00:00.000Z'))).toBe(
-      'vignettes gardées jusqu’au 3 février 2027',
+      'vignettes gardées jusqu’au 3\u00a0février\u00a02027',
     );
     expect(thumbnailsLine(archivedAt, new Date('2027-02-03T20:00:00.000Z'))).toBe('vignettes effacées');
   });

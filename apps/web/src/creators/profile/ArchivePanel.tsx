@@ -50,7 +50,9 @@ export function ArchivePanel({
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(archivedThumbnailsUntil(new Date()));
+  })
+    .format(archivedThumbnailsUntil(new Date()))
+    .replaceAll(' ', '\u00a0');
 
   async function archive(): Promise<void> {
     if (sending.current) return;
