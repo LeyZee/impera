@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit, { type FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { DomainError, type ApiError } from '@impera/contracts';
+import { DomainError, limitKeyOf, type ApiError } from '@impera/contracts';
 import Fastify, {
   LogController,
   type FastifyError,
@@ -172,6 +172,8 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
   await server.register(rateLimit, {
     max: config.RATE_LIMIT_PER_MINUTE,
     timeWindow: '1 minute',
+    // Every limit by address, a route's own included, counts an IPv6 client by its /64 (`limitKeyOf`).
+    keyGenerator: (request) => limitKeyOf(request.ip),
     ...(deps.rateLimitStore === undefined ? {} : { store: deps.rateLimitStore }),
     // Fail-open (security.md): a Postgres down already stops most of the API, the limiter must not add to it. The
     // store logs each failure; sign-in fails closed on its own limiters (auth.ts).
