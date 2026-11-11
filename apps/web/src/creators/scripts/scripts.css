@@ -435,6 +435,8 @@
 }
 .sx-correct__area {
   resize: none;
+  field-sizing: content;
+  overflow: hidden;
   min-height: 84px;
 }
 /* The synthesis corrected by hand (SC-04 lot c5): its context, then each step's line and its unfolding. */

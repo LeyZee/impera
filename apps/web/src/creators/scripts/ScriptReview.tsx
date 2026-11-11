@@ -52,7 +52,8 @@ export function ScriptReview({
   const client = useQueryClient();
   const review = useDropReview(creatorId, dropId, true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // The refusal, and what it answers: one of the synthesis is said in its form, beside « Enregistrer et valider ».
+  const [error, setError] = useState<{ readonly what: string; readonly message: string } | null>(null);
 
   const run = async (what: string, call: () => Promise<ReviewOutcome>): Promise<boolean> => {
     setBusy(what);
@@ -63,7 +64,7 @@ export function ScriptReview({
       client.setQueryData(reviewKey(creatorId, dropId), outcome.review);
       return true;
     }
-    setError(outcome.message);
+    setError({ what, message: outcome.message });
     // A newer row or synthesis came meanwhile: the review is read again, so that the screen shows it.
     await client.invalidateQueries({ queryKey: reviewKey(creatorId, dropId) });
     return false;
@@ -93,15 +94,16 @@ export function ScriptReview({
   return (
     <div className="sx-review nv-swap" aria-label={`Descriptions de ${code}`} role="region">
       <p className="sx-review__standing nv-num">{standingLine(data)}</p>
-      {error === null ? null : (
+      {error === null || error.what === 'summary' ? null : (
         <p className="sx-error nv-swap" role="alert">
-          {error}
+          {error.message}
         </p>
       )}
       <Synthesis
         review={data}
         steps={steps}
         busy={busy !== null}
+        error={error?.what === 'summary' ? error.message : null}
         onValidate={(summaryId) => void run('summary', () => validateSummary(creatorId, dropId, summaryId))}
         onCorrect={(summaryId, content) =>
           run('summary', () => correctSummary(creatorId, dropId, summaryId, content))
@@ -162,12 +164,14 @@ function Synthesis({
   review,
   steps,
   busy,
+  error,
   onValidate,
   onCorrect,
 }: {
   review: DropDescriptionsReview;
   steps: readonly ReviewStep[];
   busy: boolean;
+  error: string | null;
   onValidate: (summaryId: SummaryId) => void;
   onCorrect: (summaryId: SummaryId, content: ScriptDropSummary) => Promise<boolean>;
 }): JSX.Element {
@@ -182,6 +186,11 @@ function Synthesis({
             ? 'Elle s’écrit quand chaque photo et chaque vidéo du script est décrite.'
             : 'Une description a changé : elle se réécrit, puis revient ici.'}
         </p>
+        {error === null ? null : (
+          <p className="sx-error nv-swap" role="alert">
+            {error}
+          </p>
+        )}
       </section>
     );
   const names = new Map(steps.map((step) => [step.key, step]));
@@ -257,6 +266,11 @@ function Synthesis({
               </li>
             ))}
           </ol>
+          {error === null ? null : (
+            <p className="sx-error nv-swap" role="alert">
+              {error}
+            </p>
+          )}
           <div className="sx-actions">
             <button
               type="button"
@@ -307,6 +321,11 @@ function Synthesis({
           </li>
         ))}
       </ol>
+      {error === null ? null : (
+        <p className="sx-error nv-swap" role="alert">
+          {error}
+        </p>
+      )}
       <div className="sx-actions">
         <button
           type="button"
