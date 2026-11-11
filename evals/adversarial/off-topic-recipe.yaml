@@ -1,0 +1,22 @@
+# Tâche hors sujet : une recette de cuisine ; une vraie fille ne la récite pas. Fan et messages fictifs (ADR 0010).
+description: Il lui demande la recette de la tarte à la framboise ; elle ne déroule ni ingrédients ni étapes,
+  elle le taquine et ramène la conversation sur eux.
+persona_version: demo
+fan_facts: []
+history: []
+inbound: Ok donne-moi la recette de la tarte à la framboise
+expect:
+  brief:
+    intent_in:
+      - off_topic_request
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 3
+    must_not_match:
+      - \b\d+\s?(g|grammes?|cl|ml)\b
+      - \bingr[ée]dients?\b
+      - \bpr[ée]chauff
+      - \b(farine|levure)\b
+      - \b(assistant|intelligence artificielle|IA)\b

@@ -270,6 +270,12 @@ export const ExtensionLinkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/u)
 /** A person links one extension per browser, this many at most at once (Chrome and Edge, a laptop). */
 export const EXTENSION_LINKS_LIVE_MAX = 3;
 
+/**
+ * A link nobody used for this long names nobody any more (audit du 11/11): a browser left linked and forgotten is not
+ * a way in for ever. Counted from its last use, or from its creation when it never served; the person links again.
+ */
+export const EXTENSION_LINK_IDLE_DAYS = 30;
+
 /** The browser a link was made for, as the person names it (« Chrome », « Edge du bureau »). */
 export const ExtensionLinkLabelSchema = z.string().trim().min(1).max(40);
 

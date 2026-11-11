@@ -27,6 +27,7 @@ import {
   type PasskeyErrorCode,
   type SecondFactorCode,
   type UserRole,
+  limitKeyOf,
 } from '@impera/contracts';
 import { and, eq, schema, sql, withMember, type Database } from '@impera/db';
 import { betterAuth } from 'better-auth';
@@ -464,7 +465,9 @@ const SessionTokenSchema = z.object({ token: z.string().min(1) });
 /** The account a sign-in targets, for its own limits; a body without an email counts against the IP. */
 function signInAccountKey(request: FastifyRequest): string {
   const parsed = SignInBodySchema.safeParse(request.body);
-  return parsed.success ? `sign-in:${parsed.data.email.trim().toLowerCase()}` : `ip:${request.ip}`;
+  return parsed.success
+    ? `sign-in:${parsed.data.email.trim().toLowerCase()}`
+    : `ip:${limitKeyOf(request.ip)}`;
 }
 
 /**
@@ -863,11 +866,12 @@ export function createAuthRoutes(
     // Their own counters: the per-IP limiter has already run on this request, `rateLimit()` would stand down. Each
     // request names the account it counts against (`limitKeys`): the e-mail of a sign-in, the account of a code step.
     const limitKeys = new WeakMap<FastifyRequest, string>();
-    const accountKeyOf = (request: FastifyRequest) => limitKeys.get(request) ?? `ip:${request.ip}`;
+    const accountKeyOf = (request: FastifyRequest) =>
+      limitKeys.get(request) ?? `ip:${limitKeyOf(request.ip)}`;
     const perAccountAddress = app.createRateLimit({
       max: SIGN_IN_PER_ACCOUNT_ADDRESS,
       timeWindow: SIGN_IN_ACCOUNT_WINDOW,
-      keyGenerator: (request) => `${accountKeyOf(request)}@${request.ip}`,
+      keyGenerator: (request) => `${accountKeyOf(request)}@${limitKeyOf(request.ip)}`,
       skipOnError: false,
     });
     const perAccount = app.createRateLimit({
@@ -887,7 +891,7 @@ export function createAuthRoutes(
         await forgetCount(
           db,
           { max: SIGN_IN_PER_ACCOUNT_ADDRESS, timeWindowMs: SIGN_IN_ACCOUNT_WINDOW_MS },
-          `${accountKeyOf(request)}@${request.ip}`,
+          `${accountKeyOf(request)}@${limitKeyOf(request.ip)}`,
         );
       } catch (error) {
         logger.warn({ err: error }, 'sign-in tries not forgotten');
@@ -952,7 +956,7 @@ export function createAuthRoutes(
       return row?.userId ?? null;
     };
     const codeAccountKey = (request: FastifyRequest, account: string | null): string =>
-      account === null ? `ip:${request.ip}` : `code:${account}`;
+      account === null ? `ip:${limitKeyOf(request.ip)}` : `code:${account}`;
 
     /**
      * A refusal counted for the security alerts (ADR 0046 § 8): never a condition of the answer, which stays the
@@ -1114,7 +1118,12 @@ export function createAuthRoutes(
       preValidation: async (request, reply) => {
         const account = await passkeyOwnerOf(db, credentialIdOf(request.body));
         if (
-          await exceeded(request, reply, account === null ? `ip:${request.ip}` : `passkey:${account}`, false)
+          await exceeded(
+            request,
+            reply,
+            account === null ? `ip:${limitKeyOf(request.ip)}` : `passkey:${account}`,
+            false,
+          )
         ) {
           throw new SignInLimited();
         }
@@ -1311,7 +1320,7 @@ export function createAuthRoutes(
     const perAccountConfirmation = app.createRateLimit({
       max: REAUTHENTICATE_PER_ACCOUNT,
       timeWindow: REAUTHENTICATE_ACCOUNT_WINDOW,
-      keyGenerator: (request) => `reauthenticate:${request.user?.id ?? request.ip}`,
+      keyGenerator: (request) => `reauthenticate:${request.user?.id ?? limitKeyOf(request.ip)}`,
       skipOnError: false,
     });
     app.post(

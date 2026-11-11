@@ -7,6 +7,7 @@ import {
   type Platform,
 } from '@impera/contracts';
 import {
+  and,
   decryptSecret,
   encryptSecret,
   eq,
@@ -124,7 +125,16 @@ export function createSalesFeedWebhookStore(
 
     async reject(platform, at) {
       await withAdmin(adminDb, (tx) =>
-        tx.update(webhooks).set({ lastRejectedAt: at }).where(eq(webhooks.platform, platform)),
+        // At most one write a minute: a burst of forged deliveries reads the row and writes nothing more.
+        tx
+          .update(webhooks)
+          .set({ lastRejectedAt: at })
+          .where(
+            and(
+              eq(webhooks.platform, platform),
+              sql`(${webhooks.lastRejectedAt} is null or ${webhooks.lastRejectedAt} < ${at.toISOString()}::timestamptz - interval '1 minute')`,
+            ),
+          ),
       );
     },
 
