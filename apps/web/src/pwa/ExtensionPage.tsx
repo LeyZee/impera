@@ -1,5 +1,6 @@
 import { useState, type JSX } from 'react';
 
+import { OffRailBack } from '../shell/OffRailBack';
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
 
 import { browserOf, EXTENSION_ZIP, isLocalCrm, type Browser } from './extension';
@@ -105,6 +106,7 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
   return (
     <Page>
       <PageHeader
+        eyebrow={<OffRailBack />}
         title="Installer l’extension"
         lead="Deux minutes, une seule fois : Impera s’ouvre ensuite d’un clic dans la barre de ton navigateur, déjà connectée."
       />
