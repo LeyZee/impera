@@ -933,8 +933,9 @@
   justify-content: center;
   min-height: 40px;
 }
-/* A text field that grows with her text (`useGrowingArea`), without the browser's handle (CRE-30). */
-.ag-area {
+/* A text field that grows with her text (`useGrowingArea`), without the browser's handle (CRE-30). Doubled class: the
+   design system's `.nv-field__control` is declared later and would otherwise win the starting height. */
+.nv-field__control.ag-area {
   resize: none;
   field-sizing: content;
   min-height: 72px;
