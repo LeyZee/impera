@@ -37,6 +37,12 @@ const configSchema = z
     /** Commit SHA of the running image (Sentry release, worker heartbeat); `dev` locally. */
     RELEASE: z.string().min(1).default('dev'),
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
+    /**
+     * The interface the API listens on. `localhost` (this machine alone, IPv4 and IPv6) unless set: a developer's
+     * computer never serves the API to its local network. The production image sets `0.0.0.0`, reached by the
+     * deployment's private network only (docker-compose.prod.yml publishes no port for it).
+     */
+    HOST: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).default('localhost')),
     /** Application role: RLS applies, every tenant access goes through `withTenant`. */
     DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
     /** Owner role (BYPASSRLS): Graphile Worker's own schema, unscoped jobs, migration status for `/ready`. */

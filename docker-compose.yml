@@ -9,7 +9,8 @@ services:
       POSTGRES_USER: nirvana_admin
       POSTGRES_PASSWORD: change-me
     ports:
-      - '5432:5432'
+      # This machine only: the example password is public, the base must never answer to the local network.
+      - '127.0.0.1:5432:5432'
     volumes:
       - impera-pgdata:/var/lib/postgresql/data
       - ./packages/db/docker/init.sql:/docker-entrypoint-initdb.d/10-roles.sql:ro

@@ -6,6 +6,15 @@ server {
     root /usr/share/nginx/html;
     server_tokens off;
 
+    # A client that sends its request or reads its answer too slowly lets go of its connection: without these, a few
+    # thousand idle connections would hold the proxy (the read of the API's answer keeps its own, longer limit below).
+    client_header_timeout 15s;
+    client_body_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 30s;
+    # The session cookie and a few headers: far under this. Anything larger is refused (400/414) before the API.
+    large_client_header_buffers 4 8k;
+
     # Docker's embedded DNS, read at each request: nginx starts even while the API is still booting.
     resolver 127.0.0.11 valid=10s ipv6=off;
     set $api http://${API_UPSTREAM};

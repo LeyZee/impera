@@ -7,6 +7,7 @@ Ce qu'on protège, par ordre d'importance : (1) les médias et conversations int
 - **Le dashboard est public, mais un mot de passe ne suffit jamais à y entrer** (ADR 0046) : chaque compte a un deuxième facteur (code d'une application d'authentification), les sessions ont une durée absolue, et les connexions inhabituelles déclenchent une alerte. Cloudflare Access reste possible en plus, côté exploitation. Tant que le lot (a) de l'ADR 0046 n'est pas en production, le mot de passe est la seule barrière : ne pas ouvrir le dashboard à l'équipe avant.
 - L'API n'écoute que sur l'interface privée du VPS (Docker network) ; seul le reverse proxy (Caddy/Traefik via Coolify) la publie, en HTTPS, avec HSTS.
 - Les endpoints que l'extension appelle (capture de session, relevés, copilote) sont authentifiés par la **liaison de l'extension** de la personne (jeton haché, révocable dans le CRM, ADR 0066 § 7), limités par débit ; la capture de session n'accepte que la liaison du propriétaire.
+- En local, la base Docker et l'API n'écoutent que sur la machine elle-même (`127.0.0.1:5432`, `HOST` vide = `localhost`) : les mots de passe de l'exemple sont publics, rien ne doit répondre au réseau local.
 - Postgres n'est jamais joignable depuis Internet (Neon : IP allowlist ; self-host : réseau Docker uniquement).
 - Aucun bucket de médias public. Accès par URL signée courte (≤ 15 min).
 
