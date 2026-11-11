@@ -8,6 +8,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  smallint,
   text,
   unique,
   uniqueIndex,
@@ -56,6 +57,11 @@ export const mediaAssets = pgTable(
     thumbnailKey: text('thumbnail_key'),
     /** When its reduced picture was tried, made or not: a medium is tried once. */
     thumbnailedAt: timestampTz('thumbnailed_at'),
+    /**
+     * The vision AI's tries that failed to describe it (recette créatrice, anomaly 2): at the job's attempts, it is no
+     * longer asked, by the job nor by the hourly backlog, until the agency asks again (« Réessayer ») or writes it.
+     */
+    descriptionFailures: smallint('description_failures').notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [
@@ -65,6 +71,7 @@ export const mediaAssets = pgTable(
       'media_assets_thumbnail_check',
       sql`${t.thumbnailKey} is null or (${t.thumbnailedAt} is not null and ${t.kind} <> 'audio')`,
     ),
+    check('media_assets_description_failures_check', sql`${t.descriptionFailures} >= 0`),
     unique('media_assets_creator_sha256_unique').on(t.creatorId, t.sha256),
     // The originals still held with a date (CR-06 c): `content_drops.erase_originals` reads them each hour.
     index('media_assets_due_idx')
