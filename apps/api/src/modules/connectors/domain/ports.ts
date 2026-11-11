@@ -41,8 +41,12 @@ export interface EventMeta {
 export interface AccountStore {
   /** Every account the dispatcher may poll, all creators (owner role). */
   listPollable(platforms: readonly Platform[]): Promise<ConnectorAccount[]>;
-  /** Unscoped lookup of an account's creator, for the device-token route (owner role). */
-  creatorOf(id: PlatformAccountId): Promise<CreatorId | null>;
+  /** Unscoped lookup of an account's creator and platform, for the extension's route (owner role). */
+  creatorOf(
+    id: PlatformAccountId,
+  ): Promise<{ readonly creatorId: CreatorId; readonly platform: Platform } | null>;
+  /** Every account of a platform, all creators, with her name: the owner's « Sync » list (owner role). */
+  listSyncable(platform: Platform): Promise<SyncableAccount[]>;
   get(creatorId: CreatorId, id: PlatformAccountId): Promise<ConnectorAccount | null>;
   /** The encrypted session, or `null`. */
   sessionOf(creatorId: CreatorId, id: PlatformAccountId): Promise<Buffer | null>;
@@ -68,6 +72,25 @@ export interface AccountStore {
     meta: EventMeta & { readonly userId: string | null },
   ): Promise<void>;
   publish(creatorId: CreatorId, body: EventBody, meta: EventMeta): Promise<void>;
+}
+
+/**
+ * Reads a captured session's shape, platform by platform: `null` when the text is not a session of this platform, else
+ * whose it is (`owner`: on Reveal, the creator's model id). Two sessions of one account must have the same owner.
+ */
+export type SessionShape = (raw: string) => { readonly owner: string } | null;
+
+/** One reader per platform whose sessions the extension captures; a platform without one takes no session. */
+export type SessionShapes = Partial<Record<Platform, SessionShape>>;
+
+/** An account the extension may sync, as the owner's popup lists it. */
+interface SyncableAccount {
+  readonly id: PlatformAccountId;
+  readonly platform: Platform;
+  readonly handle: string;
+  readonly creatorName: string;
+  readonly sessionState: SessionState;
+  readonly sessionUpdatedAt: Date | null;
 }
 
 /** Owner-role enqueue for jobs that start outside any business transaction (the dispatcher). */

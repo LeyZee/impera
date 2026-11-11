@@ -20,7 +20,7 @@ Ce que le connecteur fait, capacité par capacité : `reveal-connector-inventory
 
 ## 2. La session
 
-**Ce que l'extension capture** (P2-01) : le jeton Bearer du membre d'équipe « bot », là où le tableau de bord le garde (à repérer dans P2-01 : stockage local, cookie du tableau de bord ou mémoire de la page). L'extension lit, envoie, puis oublie : rien n'est gardé dans l'extension (ADR 0008).
+**Ce que l'extension capture** (P2-01) : le jeton Bearer du membre d'équipe « bot », lu dans l'en-tête `Authorization` des requêtes que l'onglet Reveal ouvert fait à `api.reveal.me` (permission `webRequest`, écoute posée au clic sur « Synchroniser » et retirée dès la session composée, 30 s au plus ; l'onglet est rechargé une fois s'il reste muet 4 s). Le modèle vient des routes qui le nomment (`modelId=`, `/models/:id`, `/<sorte>/model/:id`), le membre de `/users/:id/…`. On n'a donc pas besoin de savoir où le tableau de bord range son jeton. L'extension lit, envoie, puis oublie : rien n'est gardé dans l'extension (ADR 0008), ni renvoyé au popup.
 
 La session envoyée à `POST /v1/connector/sessions` (champ `session`, opaque pour le cœur) est un JSON propre à l'adaptateur, lu par un schéma Zod dans `infra/reveal/` :
 

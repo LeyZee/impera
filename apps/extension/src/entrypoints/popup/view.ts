@@ -6,6 +6,7 @@ import { icon, type IconName } from '../../lib/icons';
 import type { Place } from '../../lib/tab';
 import { firstNameOf, initialsOf, kindLabel, kindOf, shortcutsFor, type Shortcut } from '../../lib/who';
 
+import { syncCard, syncWanted, type SyncActions, type SyncView } from './reveal-view';
 import { watchCard, type WatchActions, type WatchView } from './watch-view';
 
 /** One screen of the popup (ADR 0066 § 6). Pure: the same state draws the same nodes; main.ts does the browser side. */
@@ -24,6 +25,8 @@ export type Screen =
       readonly place: Place;
       /** The watch card on an Instagram tab, for the owner and the managers; null elsewhere. */
       readonly watch: WatchView | null;
+      /** The « Sync » of the Reveal session on a Reveal tab, for the owner alone (P2-01); null elsewhere. */
+      readonly sync: SyncView | null;
     }
   | { readonly kind: 'address'; readonly draft: string; readonly error: string | null };
 
@@ -39,6 +42,7 @@ export interface Actions {
   readonly resetAddress: () => void;
   readonly cancelAddress: () => void;
   readonly watch: WatchActions;
+  readonly sync: SyncActions;
 }
 
 export interface Frame {
@@ -184,11 +188,16 @@ const PLACES: Partial<Record<Place, { icon: IconName; title: string; text: strin
   reveal: {
     icon: 'message',
     title: 'Reveal',
-    text: 'Le copilote s’ouvre sur le côté et suit la conversation ouverte. Rien n’est envoyé depuis l’extension.',
+    text: 'Le copilote s’ouvre sur le côté et suit la conversation ouverte. Aucun message n’est envoyé depuis l’extension.',
   },
 };
 
-function placeCard(place: Place, openPanel: () => void): HTMLElement | null {
+function placeCard(
+  place: Place,
+  openPanel: () => void,
+  sync: SyncView | null,
+  syncActions: SyncActions,
+): HTMLElement | null {
   const card = PLACES[place];
   if (card === undefined) return null;
   // ADR 0086 § 1: the popup closes at the first click in the page; the copilot lives in the side panel.
@@ -211,6 +220,7 @@ function placeCard(place: Place, openPanel: () => void): HTMLElement | null {
       ),
       h('span', { class: 'pp-place__text' }, card.text),
       open,
+      place === 'reveal' && sync !== null ? syncCard(sync, syncActions) : null,
     ),
   );
 }
@@ -233,6 +243,7 @@ function signedIn(
   me: Me,
   place: Place,
   watch: WatchView | null,
+  sync: SyncView | null,
   frame: Frame,
   actions: Actions,
 ): readonly HTMLElement[] {
@@ -250,9 +261,9 @@ function signedIn(
     account(me, () => {
       actions.open(accountPathOf(me));
     }),
-    ...[showsWatch ? watchCard(watch, actions.watch) : placeCard(place, actions.openPanel)].filter(
-      (card): card is HTMLElement => card !== null,
-    ),
+    ...[
+      showsWatch ? watchCard(watch, actions.watch) : placeCard(place, actions.openPanel, sync, actions.sync),
+    ].filter((card): card is HTMLElement => card !== null),
     h(
       'nav',
       { class: 'pp-tiles', 'aria-label': 'Raccourcis du CRM', 'data-count': String(shortcuts.length) },
@@ -266,8 +277,8 @@ function signedIn(
         () => {
           actions.open('/');
         },
-        // One neon per screen: on a watch, its action is the one; « Ouvrir le CRM » steps back.
-        { variant: showsWatch ? 'soft' : 'neon', icon: 'arrowUpRight', wide: true },
+        // One neon per screen: on a watch or a session to sync, its action is the one; « Ouvrir le CRM » steps back.
+        { variant: showsWatch || syncWanted(sync) ? 'soft' : 'neon', icon: 'arrowUpRight', wide: true },
       ),
     ),
   ];
@@ -341,7 +352,7 @@ function body(screen: Screen, frame: Frame, actions: Actions): readonly HTMLElem
     case 'signed_out':
       return [signedOut(actions)];
     case 'signed_in':
-      return signedIn(screen.me, screen.place, screen.watch, frame, actions);
+      return signedIn(screen.me, screen.place, screen.watch, screen.sync, frame, actions);
     case 'unreachable':
       return [
         notice(

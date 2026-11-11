@@ -202,7 +202,6 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Lecture anormale | `sales_feed_team_readings.abnormal` | Une lecture de l'équipe de la plateforme revenue vide, ou qui a perdu plus de la moitié de ses comptes d'un coup : une seule alerte, et aucun compte n'est cru parti sur sa foi (ADR 0076 § 5). |
 | Signal du flux de ventes | `sales_feed_signal` | Événement d'agence levé par la lecture des ventes : clé à reconnecter, valeur inconnue, modèle non relié, ligne changée, réponse inattendue. Jamais un montant ni un fan. |
 | Session (plateforme) | `platform_session` | Les jetons/cookies capturés qui permettent au connecteur d'agir. |
-| Jeton d'appareil | `device token` | Secret de l'extension pour déposer une session (`POST /v1/connector/sessions`, `EXTENSION_DEVICE_TOKEN`). |
 | Composeur | `DraftComposer` | Le port par lequel `conversation.respond` demande un brouillon au moteur ; il rend des bulles ou une retenue (`held`) avec sa raison. |
 | Coupe-circuit | `breaker` | Pause d'un compte plateforme après N relèves ratées d'affilée (`connector_config`), avec un événement `error`. |
 | Garde d'écriture | `writes` | Réglage d'un compte plateforme (`connector_config.writes`, fermé par défaut) : fermé, aucun envoi ne part, seule la lecture continue. |

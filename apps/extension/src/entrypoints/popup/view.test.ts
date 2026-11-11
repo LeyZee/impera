@@ -38,6 +38,7 @@ function draw(screen: Screen): { root: HTMLElement; actions: Actions } {
       mark: vi.fn(),
       openSecurity: vi.fn(),
     },
+    sync: { link: vi.fn(), sync: vi.fn(), retry: vi.fn(), openSecurity: vi.fn() },
   };
   const root = document.createElement('div');
   render(root, screen, frame, actions);
@@ -67,14 +68,20 @@ describe('popup', () => {
   });
 
   it('writes the name as text, never as markup', () => {
-    const { root } = draw({ kind: 'signed_in', me: ME, place: 'elsewhere', watch: null });
+    const { root } = draw({ kind: 'signed_in', me: ME, place: 'elsewhere', watch: null, sync: null });
     expect(root.querySelector('b')).toBeNull();
     expect(root.querySelector('.pp-account__name')?.textContent).toBe('Alex <b>Morel</b>');
     expect(root.querySelector('.pp-whisper')?.textContent).toBe('Bonsoir, Alex.');
   });
 
   it('opens the shortcuts and the account page in the CRM', () => {
-    const { root, actions } = draw({ kind: 'signed_in', me: ME, place: 'elsewhere', watch: null });
+    const { root, actions } = draw({
+      kind: 'signed_in',
+      me: ME,
+      place: 'elsewhere',
+      watch: null,
+      sync: null,
+    });
     buttonNamed(root, 'Suivi').click();
     root.querySelector<HTMLButtonElement>('.pp-account')?.click();
     expect(actions.open).toHaveBeenNthCalledWith(1, '/suivi');
@@ -83,17 +90,19 @@ describe('popup', () => {
 
   it('shows the Reveal card only on Reveal', () => {
     expect(
-      draw({ kind: 'signed_in', me: ME, place: 'reveal', watch: null }).root.querySelector(
+      draw({ kind: 'signed_in', me: ME, place: 'reveal', watch: null, sync: null }).root.querySelector(
         '[data-place="reveal"]',
       ),
     ).not.toBeNull();
     expect(
-      draw({ kind: 'signed_in', me: ME, place: 'crm', watch: null }).root.querySelector('.pp-place'),
+      draw({ kind: 'signed_in', me: ME, place: 'crm', watch: null, sync: null }).root.querySelector(
+        '.pp-place',
+      ),
     ).toBeNull();
   });
 
   it('opens the copilot beside a Reveal tab in one click (ADR 0086 § 1)', () => {
-    const { root, actions } = draw({ kind: 'signed_in', me: ME, place: 'reveal', watch: null });
+    const { root, actions } = draw({ kind: 'signed_in', me: ME, place: 'reveal', watch: null, sync: null });
     const open = [...root.querySelectorAll('button')].find((one) => one.textContent === 'Ouvrir le copilote');
     open?.click();
     expect(actions.openPanel).toHaveBeenCalledOnce();
@@ -108,14 +117,14 @@ describe('popup', () => {
       now: new Date(),
       draft: '',
     };
-    const { root } = draw({ kind: 'signed_in', me: ME, place: 'instagram', watch });
+    const { root } = draw({ kind: 'signed_in', me: ME, place: 'instagram', watch, sync: null });
     expect(root.querySelector('[data-place="instagram"]')).not.toBeNull();
     expect(root.querySelectorAll('.nv-btn--neon')).toHaveLength(1);
     expect(buttonNamed(root, 'Ouvrir le CRM').className).toContain('nv-btn--soft');
   });
 
   it('shows no Instagram card to someone the watch is not for', () => {
-    const { root } = draw({ kind: 'signed_in', me: ME, place: 'instagram', watch: null });
+    const { root } = draw({ kind: 'signed_in', me: ME, place: 'instagram', watch: null, sync: null });
     expect(root.querySelector('[data-place="instagram"]')).toBeNull();
     expect(root.textContent).not.toContain('Bientôt');
   });

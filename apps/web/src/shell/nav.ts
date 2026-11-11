@@ -218,10 +218,11 @@ export const screenLabel = (to: ScreenPath): string => SCREENS[to];
 
 const SCREEN_TITLES: ReadonlyMap<string, string> = new Map(Object.entries(SCREENS));
 
-/** Pages open to every role outside the rail: help and the account's notifications (CR-01), its security (SEC-04). */
+/** Pages outside the rail: help and the account's notifications (CR-01), its security (SEC-04). */
 const OFF_RAIL_TITLES: ReadonlyMap<string, string> = new Map([
   ['/aide/installer', 'Installer Impera'],
   ['/aide/extension', 'Installer l’extension'],
+  ['/aide/reveal', 'Reconnecter Reveal'],
   ['/notifications', 'Notifications'],
   [ACCOUNT_SECURITY, 'Sécurité'],
 ]);

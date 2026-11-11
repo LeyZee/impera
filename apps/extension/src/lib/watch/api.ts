@@ -30,7 +30,7 @@ export type Sent<T> =
   | { readonly kind: 'refused'; readonly code: string | null }
   | { readonly kind: 'unreachable' };
 
-async function call<T>(
+export async function call<T>(
   fetchFn: Fetch,
   url: string,
   token: string,

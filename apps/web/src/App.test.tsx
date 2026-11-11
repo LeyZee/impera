@@ -568,6 +568,22 @@ describe('App on the screens of a contractor’s file', () => {
     expect(window.location.pathname).toBe('/paie/exports');
   });
 
+  it('keeps « Reconnecter Reveal » to the owner, like the extension’s « Sync » (P2-01)', async () => {
+    serveAs(member('manager'));
+    window.history.replaceState(null, '', '/aide/reveal');
+    render(<App />);
+    await vi.waitFor(() => {
+      expect(window.location.pathname).not.toBe('/aide/reveal');
+    });
+    expect(screen.queryByRole('heading', { name: 'Reconnecter Reveal' })).toBeNull();
+    cleanup();
+    serveAs(OWNER);
+    window.history.replaceState(null, '', '/aide/reveal');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Reconnecter Reveal' })).toBeDefined();
+    expect(screen.getByText(/membre d’équipe « bot »/u)).toBeDefined();
+  });
+
   it('keeps the extension’s guide to the team: a creator who opens its address is sent home (CREA-13)', async () => {
     serveAs({
       ...member('chatter'),

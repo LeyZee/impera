@@ -136,11 +136,36 @@ export const ConnectorConfigSchema = z.object({
 export type ConnectorConfig = z.infer<typeof ConnectorConfigSchema>;
 
 /**
- * `POST /v1/connector/sessions`: the extension's « Sync » button sends the platform session it read. The
- * session is opaque to the core, stored encrypted, never logged and never sent back.
+ * `POST /v1/connector/sessions`: the extension's « Sync » button sends the platform session it read, with the owner's
+ * extension link (ADR 0066 § 7). The session is opaque to the core (each adapter reads its own shape), stored
+ * encrypted, never logged and never sent back.
  */
 export const ConnectorSessionBodySchema = z.object({
   platformAccountId: PlatformAccountIdSchema,
   session: z.string().min(1).max(65_536),
 });
 export type ConnectorSessionBody = z.infer<typeof ConnectorSessionBodySchema>;
+
+/**
+ * `GET /v1/connector/accounts?platform=`: the accounts the extension may sync, for the owner's link only (ADR 0066 § 7).
+ * Never the session itself, only its state and when it last changed.
+ */
+export const ConnectorAccountChoiceSchema = z.object({
+  id: PlatformAccountIdSchema,
+  platform: PlatformSchema,
+  handle: z.string(),
+  creatorName: z.string(),
+  sessionState: SessionStateSchema,
+  sessionUpdatedAt: z.iso.datetime().nullable(),
+});
+export type ConnectorAccountChoice = z.infer<typeof ConnectorAccountChoiceSchema>;
+
+export const ConnectorAccountsQuerySchema = z.object({ platform: PlatformSchema });
+
+export const ConnectorAccountsSchema = z.object({ accounts: z.array(ConnectorAccountChoiceSchema) });
+export type ConnectorAccounts = z.infer<typeof ConnectorAccountsSchema>;
+
+/** The « Sync » refusals the extension tells apart (`/v1/connector/sessions`). */
+export const CONNECTOR_LINK_FORBIDDEN = 'connector_link_forbidden';
+export const CONNECTOR_SESSION_UNPROCESSABLE = 'connector_session_unprocessable';
+export const CONNECTOR_SESSION_CONFLICT = 'connector_session_conflict';

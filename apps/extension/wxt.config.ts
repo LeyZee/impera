@@ -21,8 +21,9 @@ export default defineConfig({
     // § 5): chrome.storage survives a move. The private half was never kept: an unpacked extension does not need it.
     key: manifestKey(),
     // alarms: the watch's timers; scripting: its reader, registered once Instagram is allowed; contextMenus: « Marquer
-    // ce post pour… » on a post's link (VEI-02).
-    permissions: ['storage', 'activeTab', 'alarms', 'scripting', 'contextMenus'],
+    // ce post pour… » on a post's link (VEI-02); webRequest: the owner's « Sync » reads the bearer of the open Reveal
+    // tab's requests to api.reveal.me, only while it waits (P2-01), never the body nor any other site.
+    permissions: ['storage', 'activeTab', 'alarms', 'scripting', 'contextMenus', 'webRequest'],
     host_permissions: ['https://*.reveal.me/*', 'http://localhost/*', 'http://127.0.0.1/*'],
     // Instagram is asked at the first « Veille », never at the install (ADR 0060 § 1); `https://*/*` is a deployed CRM.
     optional_host_permissions: ['https://www.instagram.com/*', 'https://*/*'],

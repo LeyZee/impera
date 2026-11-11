@@ -16,13 +16,17 @@ import {
   LinkSavedSchema,
   MarkableCreatorsSchema,
   MarkedSchema,
+  RevealAccountsSchema,
+  RevealSyncedSchema,
   WatchStatusSchema,
   type FromPopup,
   type MarkableCreators,
+  type RevealSynced,
 } from '../../lib/watch/protocol';
 import { INSTAGRAM_PATTERN } from '../../lib/watch/watch-script';
 import { kindOf, watchesInstagram } from '../../lib/who';
 
+import type { SyncView } from './reveal-view';
 import { accountPathOf, render, type Actions, type Screen } from './view';
 import type { WatchNotice, WatchView } from './watch-view';
 
@@ -135,6 +139,50 @@ async function beginWatch(): Promise<WatchNotice | null> {
   return started ? null : { tone: 'amber', text: 'La veille ne démarre que sur un onglet instagram.com.' };
 }
 
+/* ---- The owner's « Sync » of the Reveal session (P2-01): the service worker reads, sends and forgets it. ---- */
+
+let syncNotice: WatchNotice | null = null;
+let syncDraft = '';
+
+async function syncViewFor(): Promise<SyncView> {
+  const parsed = RevealAccountsSchema.safeParse(await ask({ type: 'popup/reveal-accounts' }));
+  return {
+    accounts: parsed.success ? parsed.data : { state: 'unreachable', accounts: [] },
+    notice: syncNotice,
+    busy,
+    draft: syncDraft,
+    now: new Date(),
+  };
+}
+
+async function redrawSync(): Promise<void> {
+  if (screen.kind !== 'signed_in' || screen.sync === null) return;
+  const sync = await syncViewFor();
+  const now = currentScreen();
+  if (now.kind === 'signed_in') show({ ...now, sync });
+}
+
+async function syncGesture(run: () => Promise<WatchNotice | null>): Promise<void> {
+  busy = true;
+  syncNotice = null;
+  const now = currentScreen();
+  if (now.kind === 'signed_in' && now.sync !== null)
+    show({ ...now, sync: { ...now.sync, busy: true, notice: null } });
+  syncNotice = await run().catch(() => ({ tone: 'amber' as const, text: 'Ça n’a pas marché : réessaie.' }));
+  busy = false;
+  await redrawSync();
+}
+
+const SYNC_NOTICES: Readonly<Record<Exclude<RevealSynced['state'], 'synced'>, string>> = {
+  'no-session': 'Aucune session lue : ouvre la messagerie de Reveal dans cet onglet, puis réessaie.',
+  unlinked: 'Relie d’abord l’extension avec le code de Sécurité.',
+  revoked: 'Cette liaison a été retirée dans le CRM : colle un nouveau code.',
+  'not-owner': 'Seul le propriétaire synchronise une session.',
+  'other-model': 'Cet onglet montre une autre créatrice que ce compte : ouvre la bonne dans Reveal.',
+  refused: 'Le CRM a refusé cette session : vérifie que l’onglet est bien connecté à Reveal.',
+  unreachable: 'Le CRM ne répond pas : réessaie dans un instant.',
+};
+
 async function refresh(): Promise<void> {
   show({ kind: 'loading' });
   if (!(await allowed(origin))) {
@@ -149,7 +197,15 @@ async function refresh(): Promise<void> {
       const kind = kindOf(session.me);
       // The watch is the owner's and the active managers' (ADR 0060 § 2): never a chatter's, nor a creator's here.
       const watched = place === 'instagram' && watchesInstagram(kind);
-      show({ kind: 'signed_in', me: session.me, place, watch: watched ? await watchViewFor() : null });
+      // The « Sync » is the owner's alone (reveal-connector-spec.md § 2).
+      const syncs = place === 'reveal' && kind === 'owner';
+      show({
+        kind: 'signed_in',
+        me: session.me,
+        place,
+        watch: watched ? await watchViewFor() : null,
+        sync: syncs ? await syncViewFor() : null,
+      });
       return;
     }
     case 'signed_out':
@@ -299,6 +355,33 @@ const actions: Actions = {
         return { tone: 'quiet', text: `Marqué pour ${name}. Les captures partent en arrière-plan.` };
       });
     },
+    openSecurity: () => {
+      if (screen.kind === 'signed_in') void openCrm(accountPathOf(screen.me));
+    },
+  },
+  sync: {
+    link: (code) => {
+      syncDraft = code;
+      void syncGesture(async () => {
+        const saved = LinkSavedSchema.safeParse(await ask({ type: 'popup/link', token: code }));
+        if (!saved.success) return { tone: 'amber', text: LINK_NOTICES.unreachable };
+        if (saved.data.state !== 'linked') return { tone: 'amber', text: LINK_NOTICES[saved.data.state] };
+        syncDraft = '';
+        return { tone: 'quiet', text: 'Extension reliée : tu peux synchroniser.' };
+      });
+    },
+    sync: (accountId) => {
+      void syncGesture(async () => {
+        if (tabId === undefined) return { tone: 'amber', text: SYNC_NOTICES['no-session'] };
+        const synced = RevealSyncedSchema.safeParse(
+          await ask({ type: 'popup/reveal-sync', tabId, accountId }),
+        );
+        if (!synced.success) return { tone: 'amber', text: SYNC_NOTICES.unreachable };
+        if (synced.data.state === 'synced') return { tone: 'quiet', text: 'Session envoyée au CRM.' };
+        return { tone: 'amber', text: SYNC_NOTICES[synced.data.state] };
+      });
+    },
+    retry: () => void redrawSync(),
     openSecurity: () => {
       if (screen.kind === 'signed_in') void openCrm(accountPathOf(screen.me));
     },

@@ -2,6 +2,8 @@ import {
   CreatorIdSchema,
   InstagramHandleSchema,
   InstagramPostCodeSchema,
+  PlatformAccountIdSchema,
+  SessionStateSchema,
   TREND_CAPTION_MAX,
   TREND_HASHTAGS_MAX,
   TrendMetricsSchema,
@@ -102,6 +104,36 @@ export const MarkedSchema = z.strictObject({
 });
 export type Marked = z.infer<typeof MarkedSchema>;
 
+/** The Reveal accounts the owner's « Sync » may fill (P2-01); `not-owner`: the link is a manager's or a chatter's. */
+export const RevealAccountsSchema = z.strictObject({
+  state: z.enum(['ok', 'none', 'revoked', 'not-owner', 'unreachable']),
+  accounts: z.array(
+    z.strictObject({
+      id: PlatformAccountIdSchema,
+      handle: z.string(),
+      creatorName: z.string(),
+      sessionState: SessionStateSchema,
+      sessionUpdatedAt: z.iso.datetime().nullable(),
+    }),
+  ),
+});
+export type RevealAccounts = z.infer<typeof RevealAccountsSchema>;
+
+/** What became of a « Sync ». `no-session`: the Reveal tab made no request to read in time. */
+export const RevealSyncedSchema = z.strictObject({
+  state: z.enum([
+    'synced',
+    'no-session',
+    'unlinked',
+    'revoked',
+    'not-owner',
+    'other-model',
+    'refused',
+    'unreachable',
+  ]),
+});
+export type RevealSynced = z.infer<typeof RevealSyncedSchema>;
+
 /** Popup → service worker. The tab is always the one open when the popup opened. */
 export const FromPopupSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('popup/status'), tabId: z.number().int() }),
@@ -112,5 +144,12 @@ export const FromPopupSchema = z.discriminatedUnion('type', [
   /** The code pasted in « Relier »; it goes to the service worker and never comes back to the popup. */
   z.strictObject({ type: z.literal('popup/link'), token: z.string().max(200) }),
   z.strictObject({ type: z.literal('popup/unlink') }),
+  z.strictObject({ type: z.literal('popup/reveal-accounts') }),
+  /** The session is read from that Reveal tab's requests, sent, then forgotten: it never comes back to the popup. */
+  z.strictObject({
+    type: z.literal('popup/reveal-sync'),
+    tabId: z.number().int(),
+    accountId: PlatformAccountIdSchema,
+  }),
 ]);
 export type FromPopup = z.infer<typeof FromPopupSchema>;
