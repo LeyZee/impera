@@ -462,6 +462,12 @@ describe('loadConfig', () => {
     expect(() => testConfig({ PORT: 'not-a-port' })).toThrow(/PORT/);
   });
 
+  it('listens on this machine alone unless told otherwise (audit du 11/11)', () => {
+    expect(testConfig({}).HOST).toBe('localhost');
+    expect(testConfig({ HOST: '' }).HOST).toBe('localhost');
+    expect(testConfig({ HOST: '0.0.0.0' }).HOST).toBe('0.0.0.0');
+  });
+
   it('stops on a variable still under the old name, and gives its new name', () => {
     const old = 'NIRVANA_INLINE_WORKER'; // ADR 0062
     expect(() => testConfig({ [old]: '1' })).toThrow(`${old} to IMPERA_INLINE_WORKER`);

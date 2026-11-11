@@ -31,7 +31,8 @@ RUN apk add --no-cache ffmpeg rsvg-convert tini \
   && echo '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8"/></svg>' \
     | rsvg-convert --format png > /dev/null \
   && mkdir -p /data/training && chown node:node /data/training
-ENV NODE_ENV=production PORT=3000 IMPERA_TRAINING_DIR=/data/training
+# HOST: the container's own interface, which only the deployment's private network reaches (no published port).
+ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0 IMPERA_TRAINING_DIR=/data/training
 # The layout mirrors the repository: the bundled code reads `../migrations` (packages/db), `../prompts`
 # (packages/llm), `../src/modules/invoicing/infra/fonts` (the invoices' fonts, EQ-06 lot 4), `../src/modules/scripts/infra/fonts`
 # (the script cards' fonts, SC-01 lot b) and `../../../personas`
