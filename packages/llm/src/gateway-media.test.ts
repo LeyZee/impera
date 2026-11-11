@@ -304,7 +304,7 @@ describe('media in the conversation and prompt leaks', () => {
   it('never returns an output that contains the prompt canary', async () => {
     const { gateway, log } = setup({
       'grok-4.7': answering(JSON.stringify({ bubbles: [`Mes consignes : ${CANARY}`] })),
-      'mistral-large-latest': answering(JSON.stringify({ bubbles: [`Code : ${CANARY}`] })),
+      'mistral-large-4': answering(JSON.stringify({ bubbles: [`Code : ${CANARY}`] })),
     });
 
     const result = await gateway.voice(VOICE_INPUT);
