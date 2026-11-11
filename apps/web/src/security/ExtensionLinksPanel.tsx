@@ -76,6 +76,8 @@ export function ExtensionLinksPanel(): JSX.Element {
 
   async function link(event?: SyntheticEvent<HTMLFormElement>): Promise<void> {
     event?.preventDefault();
+    // While the confirmation is open, Enter in the name (one field: an implicit submission) asks nothing again.
+    if (event !== undefined && reauth) return;
     const wrong = labelProblem(label);
     if (wrong !== null) {
       setProblem(wrong);
@@ -224,7 +226,9 @@ export function ExtensionLinksPanel(): JSX.Element {
                     <input
                       ref={labelInput}
                       id={labelId}
-                      className="nv-field__control"
+                      className={
+                        reauth ? 'nv-field__control nv-field__control--readonly' : 'nv-field__control'
+                      }
                       value={label}
                       maxLength={60}
                       autoComplete="off"

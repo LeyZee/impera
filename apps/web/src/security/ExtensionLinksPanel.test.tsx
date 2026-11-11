@@ -161,6 +161,9 @@ describe('Relier l’extension', () => {
     expect(screen.getByLabelText('Mot de passe')).toBeTruthy();
     // One pair of buttons at a time: the prompt's own.
     expect(screen.queryByRole('button', { name: 'Relier' })).toBeNull();
+    // Enter in the name, read-only meanwhile, sends nothing more.
+    const form = screen.getByLabelText('Nom de ce navigateur').closest('form');
+    if (form !== null) fireEvent.submit(form);
     // Nothing was linked, and the refusal is not shown as an error.
     expect(screen.queryByText('Ce compte ne peut pas relier d’extension.')).toBeNull();
     expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
