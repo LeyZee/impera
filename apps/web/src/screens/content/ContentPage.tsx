@@ -8,10 +8,10 @@ import {
   type DropCategory,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
 import { DropSheet } from './DropSheet';
-import { CONTENT_KEY, refuseRequest, startScriptDrop, useContent, withdrawDrop } from './api';
+import { CONTENT_KEY, refuseRequest, startScriptDrop, useContent, useScriptDrop, withdrawDrop } from './api';
 import {
   CATEGORY_EMOJIS,
   CATEGORY_HINTS,
@@ -22,18 +22,23 @@ import {
   droppedOn,
   dueOf,
   fileLine,
+  isInterrupted,
+  matchResumed,
   onTheirWay,
-  openRequests,
   outLine,
   published,
   mayWithdrawHere,
   refusedOf,
+  routeFirst,
   shotMomentOf,
   stateTone,
+  toShoot,
   type LiveSend,
 } from './model';
-import { isSending, queueSend, useLiveSends } from './sends';
+import { progressOf, scriptCards } from './script-model';
+import { holds, isSending, queueSend, retryNow, sendAgain, useLiveSends } from './sends';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
@@ -66,6 +71,8 @@ export function ContentPage({
   const today = dayOf(now, zone);
   const [opened, setOpened] = useState<Opened | null>(null);
   const [refusing, setRefusing] = useState<ContentRequest | null>(null);
+  /** The drop she just sent from the sheet: the page goes to it, so that she sees it leave (recette CRE-09). */
+  const [landed, setLanded] = useState<ContentDropId | null>(null);
 
   // A send under way survives neither a reload nor leaving the page: the browser asks before.
   useEffect(() => {
@@ -82,9 +89,30 @@ export function ContentPage({
     void client.invalidateQueries({ queryKey: CONTENT_KEY });
   };
 
-  const requests = content.data === undefined ? [] : openRequests(content.data.requests);
+  const asked = content.data === undefined ? [] : toShoot(content.data.requests, content.data.drops);
   const moving = content.data === undefined ? [] : onTheirWay(content.data.drops);
   const out = content.data === undefined ? [] : published(content.data.drops);
+
+  const onTheWay =
+    moving.length === 0 ? null : (
+      <section className="ct-section" aria-labelledby="ct-moving">
+        <h2 id="ct-moving" className="ct-section__title">
+          En route
+        </h2>
+        <ul className="ct-list">
+          {moving.map((drop) => (
+            <DropCard
+              key={drop.id}
+              drop={drop}
+              sends={sends}
+              landed={drop.id === landed}
+              when={droppedOn(drop.createdAt, today, zone)}
+              onSettled={reread}
+            />
+          ))}
+        </ul>
+      </section>
+    );
 
   return (
     <Page className="ct-page">
@@ -104,29 +132,43 @@ export function ContentPage({
         </div>
       ) : (
         <div className="ct-sections nv-enter">
-          {requests.length === 0 ? null : (
+          {asked.length === 0 ? null : (
             <section className="ct-section" aria-labelledby="ct-asked">
               <h2 id="ct-asked" className="ct-section__title">
                 À tourner
               </h2>
               <ul className="ct-list">
-                {requests.map((request) => (
-                  <RequestCard
-                    key={request.id}
-                    request={request}
-                    today={today}
-                    onDrop={() => {
-                      setOpened({ category: request.category, request });
-                    }}
-                    onOpenScript={onOpenScript}
-                    onRefuse={() => {
-                      setRefusing(request);
-                    }}
-                  />
-                ))}
+                {asked.map((item) =>
+                  item.kind === 'script' ? (
+                    <StartedScriptCard
+                      key={item.drop.id}
+                      drop={item.drop}
+                      request={item.request}
+                      today={today}
+                      sends={sends}
+                      onOpenScript={onOpenScript}
+                    />
+                  ) : (
+                    <RequestCard
+                      key={item.request.id}
+                      request={item.request}
+                      today={today}
+                      onDrop={() => {
+                        setOpened({ category: item.request.category, request: item.request });
+                      }}
+                      onOpenScript={onOpenScript}
+                      onRefuse={() => {
+                        setRefusing(item.request);
+                      }}
+                    />
+                  ),
+                )}
               </ul>
             </section>
           )}
+
+          {/* While a file of it is still to go up, « En route » comes before « Déposer » (recette CRE-09). */}
+          {routeFirst(moving) ? onTheWay : null}
 
           <section className="ct-section" aria-labelledby="ct-drop">
             <h2 id="ct-drop" className="ct-section__title">
@@ -157,25 +199,7 @@ export function ContentPage({
             ))}
           </section>
 
-          {moving.length === 0 ? null : (
-            <section className="ct-section" aria-labelledby="ct-moving">
-              <h2 id="ct-moving" className="ct-section__title">
-                En route
-              </h2>
-              <ul className="ct-list">
-                {moving.map((drop) => (
-                  <DropCard
-                    key={drop.id}
-                    drop={drop}
-                    sends={sends}
-                    when={droppedOn(drop.createdAt, today, zone)}
-                    onSettled={reread}
-                    onOpenScript={onOpenScript}
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
+          {routeFirst(moving) ? null : onTheWay}
 
           {out.length === 0 ? null : (
             <section className="ct-section" aria-labelledby="ct-out">
@@ -205,6 +229,7 @@ export function ContentPage({
           }}
           onDropped={(drop, files) => {
             setOpened(null);
+            setLanded(drop.id);
             client.setQueryData(CONTENT_KEY, (old: typeof content.data) =>
               old === undefined
                 ? old
@@ -309,22 +334,105 @@ function RequestCard({
   );
 }
 
-function DropCard({
+/**
+ * A script she began and has not sent (recette CRE-12): it keeps its place in « À tourner », with its name, its day,
+ * how far she is and « Continuer ». « Retirer » lives in the script itself, away from « Continuer ».
+ */
+function StartedScriptCard({
   drop,
+  request,
+  today,
   sends,
-  when,
-  onSettled,
   onOpenScript,
 }: {
   drop: ContentDrop;
+  request: ContentRequest | null;
+  today: string;
   sends: ReadonlyMap<string, LiveSend>;
-  when: string;
-  onSettled: () => void;
   onOpenScript: (dropId: ContentDropId) => void;
 }): JSX.Element {
+  const script = useScriptDrop(drop.id);
+  const segments = script.data?.segments;
+  const cards = useMemo(() => (segments === undefined ? [] : scriptCards(segments)), [segments]);
+  const progress = script.data === undefined ? null : progressOf(cards, script.data.drop.files, sends);
+  const due = request === null ? null : dueOf(request.dueOn, today);
+  const moment = request === null ? null : shotMomentOf(request);
+  const percent =
+    progress === null || progress.required === 0
+      ? 0
+      : Math.round((100 * progress.filled) / progress.required);
+  return (
+    <li className="nv-plate ct-card">
+      <div className="ct-card__head">
+        <span className="ct-card__emoji" aria-hidden="true">
+          {CATEGORY_EMOJIS[drop.category]}
+        </span>
+        <span className="ct-card__titles">
+          <span className="ct-card__name">
+            {script.data === undefined
+              ? DROP_CATEGORY_LABELS[drop.category]
+              : `${DROP_CATEGORY_LABELS[drop.category]} · ${script.data.name}`}
+          </span>
+          {due === null ? null : (
+            <span className={due.late ? 'ct-due ct-due--late' : 'ct-due'}>
+              {moment === null ? due.text : `${due.text} · ${moment}`}
+            </span>
+          )}
+        </span>
+        <span className="ct-state ct-state--calm">Commencé</span>
+      </div>
+      {progress === null ? null : (
+        <div className="ct-begun">
+          <span className="ct-begun__count nv-num">
+            {progress.filled} / {progress.required} médias
+          </span>
+          <div
+            className="nv-gauge"
+            role="progressbar"
+            aria-label="Médias de ton script"
+            aria-valuemin={0}
+            aria-valuemax={progress.required}
+            aria-valuenow={progress.filled}
+          >
+            <span className="nv-gauge__fill" style={{ '--nv-gauge-value': `${String(percent)}%` }} />
+          </div>
+        </div>
+      )}
+      <div className="ct-card__foot">
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm"
+          onClick={() => {
+            onOpenScript(drop.id);
+          }}
+        >
+          Continuer
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function DropCard({
+  drop,
+  sends,
+  landed,
+  when,
+  onSettled,
+}: {
+  drop: ContentDrop;
+  sends: ReadonlyMap<string, LiveSend>;
+  /** Just sent from the sheet: the page goes to it once (recette CRE-09). */
+  landed: boolean;
+  when: string;
+  onSettled: () => void;
+}): JSX.Element {
+  const card = useRef<HTMLLIElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const [unmatched, setUnmatched] = useState(0);
   const tone = stateTone(drop);
   const refused = refusedOf(drop);
   const sending = drop.files.some((file) => {
@@ -333,8 +441,18 @@ function DropCard({
       file.state === 'awaiting' && live !== undefined && live.phase !== 'done' && live.phase !== 'failed'
     );
   });
+  const interrupted = drop.files.filter((file) => isInterrupted(file, sends.get(file.id)));
+  // Cut while this page was open: the phone still holds every file, « Réessayer » sends them again.
+  const allHeld = interrupted.length > 0 && interrupted.every((file) => holds(file.id));
+
+  useEffect(() => {
+    if (!landed) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    card.current?.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+  }, [landed]);
+
   return (
-    <li className="nv-plate ct-card">
+    <li ref={card} className="nv-plate ct-card">
       <div className="ct-card__head">
         <span className="ct-card__emoji" aria-hidden="true">
           {CATEGORY_EMOJIS[drop.category]}
@@ -345,6 +463,55 @@ function DropCard({
       <p className="ct-card__meta nv-num">
         {when} · {drop.files.length === 0 ? 'Rien d’ajouté encore' : contentsOf(drop.files)}
       </p>
+      {/* Said while it goes up, to her and to a screen reader: leaving the app stops the send. */}
+      <p className="ct-card__live" role="status">
+        {sending ? 'Envoi en cours : garde l’appli ouverte jusqu’à la fin.' : ''}
+      </p>
+      {interrupted.length === 0 || sending ? null : (
+        <div className="ct-resume">
+          <p className="ct-resume__text">
+            {allHeld
+              ? 'L’envoi s’est arrêté.'
+              : 'L’envoi s’est arrêté. Rechoisis les mêmes fichiers dans ta galerie : il reprend où il en était.'}
+          </p>
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            onClick={() => {
+              if (allHeld) {
+                sendAgain(
+                  interrupted.map((file) => file.id),
+                  onSettled,
+                );
+                return;
+              }
+              picker.current?.click();
+            }}
+          >
+            {allHeld ? 'Réessayer' : 'Reprendre l’envoi'}
+          </button>
+          <input
+            ref={picker}
+            type="file"
+            multiple
+            hidden
+            onChange={(event) => {
+              const picked = [...(event.target.files ?? [])];
+              event.target.value = '';
+              const { pairs, unmatched: left } = matchResumed(interrupted, picked);
+              setUnmatched(left);
+              for (const pair of pairs) void queueSend(drop.id, pair.fileId, pair.file, onSettled);
+            }}
+          />
+          {unmatched === 0 ? null : (
+            <p className="ct-file__hint">
+              {unmatched === 1
+                ? 'Un fichier choisi n’est pas de ce dépôt : choisis ceux que tu avais envoyés.'
+                : `${String(unmatched)} fichiers choisis ne sont pas de ce dépôt : choisis ceux que tu avais envoyés.`}
+            </p>
+          )}
+        </div>
+      )}
       {drop.state === 'blocked' && drop.blockedReason !== null ? (
         <p className="ct-card__blocked">{drop.blockedReason}</p>
       ) : null}
@@ -352,7 +519,7 @@ function DropCard({
       {drop.state === 'uploading' || drop.state === 'received' ? (
         <ul className="ct-files">
           {drop.files.map((file) => (
-            <FileLine key={file.id} drop={drop} file={file} live={sends.get(file.id)} onSettled={onSettled} />
+            <FileLine key={file.id} file={file} live={sends.get(file.id)} />
           ))}
         </ul>
       ) : refused.length > 0 ? (
@@ -360,34 +527,11 @@ function DropCard({
         // never only « Aucun fichier n'a pu être gardé » (recette MED-03).
         <ul className="ct-files">
           {refused.map((file) => (
-            <FileLine key={file.id} drop={drop} file={file} live={undefined} onSettled={onSettled} />
+            <FileLine key={file.id} file={file} live={undefined} />
           ))}
         </ul>
       ) : null}
-      {drop.state === 'filling' && !confirming ? (
-        <div className="ct-card__foot">
-          {sending ? null : (
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm"
-              onClick={() => {
-                setConfirming(true);
-              }}
-            >
-              Retirer
-            </button>
-          )}
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            onClick={() => {
-              onOpenScript(drop.id);
-            }}
-          >
-            Continuer
-          </button>
-        </div>
-      ) : mayWithdrawHere(drop) && !sending ? (
+      {mayWithdrawHere(drop) && !sending ? (
         <div className="ct-card__actions">
           {confirming ? (
             <>
@@ -445,74 +589,41 @@ function DropCard({
   );
 }
 
-/** A file's line: its progress while it goes up here, « Reprendre » when its send was cut (the same file again). */
-function FileLine({
-  drop,
-  file,
-  live,
-  onSettled,
-}: {
-  drop: ContentDrop;
-  file: ContentDropFile;
-  live: LiveSend | undefined;
-  onSettled: () => void;
-}): JSX.Element {
-  const picker = useRef<HTMLInputElement>(null);
-  const [wrong, setWrong] = useState(false);
+/**
+ * A file's line: its progress while it goes up here; when the server keeps answering with an error, it says so in
+ * amber with « Réessayer » (recette CRE-10). A cut send is resumed once, at the head of its card.
+ */
+function FileLine({ file, live }: { file: ContentDropFile; live: LiveSend | undefined }): JSX.Element {
   const line = fileLine(file, live);
   const percent =
     live === undefined || live.total === 0 ? 0 : Math.min(100, Math.floor((100 * live.sent) / live.total));
   const showsBar =
-    file.state === 'awaiting' && live !== undefined && (live.phase === 'sending' || live.phase === 'waiting');
-  const interrupted = file.state === 'awaiting' && (live === undefined || live.phase === 'failed');
+    file.state === 'awaiting' &&
+    live !== undefined &&
+    (live.phase === 'sending' || live.phase === 'waiting' || live.phase === 'stalled');
+  const stalled = file.state === 'awaiting' && live?.phase === 'stalled';
+  const warn = file.state === 'refused' || stalled || isInterrupted(file, live);
   const label = `${file.kind === 'image' ? 'Photo' : file.kind === 'video' ? 'Vidéo' : 'Vocal'} ${String(file.position + 1)}`;
   return (
     <li className="ct-file">
       <div className="ct-file__row">
         <span className="ct-file__name">{label}</span>
-        <span
-          className={
-            file.state === 'refused' || interrupted
-              ? 'ct-file__line ct-file__line--warn'
-              : 'ct-file__line nv-num'
-          }
-        >
-          {line}
-        </span>
-        {interrupted ? (
-          <>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                picker.current?.click();
-              }}
-            >
-              Reprendre
-            </button>
-            <input
-              ref={picker}
-              type="file"
-              hidden
-              onChange={(event) => {
-                const chosen = event.target.files?.[0];
-                event.target.value = '';
-                if (chosen === undefined) return;
-                // The same file, picked again: its weight says so (the server checks its bytes anyway).
-                if (chosen.size !== file.bytes) {
-                  setWrong(true);
-                  return;
-                }
-                setWrong(false);
-                void queueSend(drop.id, file.id, chosen, onSettled);
-              }}
-            />
-          </>
+        <span className={warn ? 'ct-file__line ct-file__line--warn' : 'ct-file__line nv-num'}>{line}</span>
+        {stalled ? (
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            onClick={() => {
+              retryNow(file.id);
+            }}
+          >
+            Réessayer
+          </button>
         ) : null}
       </div>
       {showsBar ? (
         <div
-          className={live.phase === 'waiting' ? 'nv-gauge nv-gauge--amber' : 'nv-gauge'}
+          className={live.phase === 'sending' ? 'nv-gauge' : 'nv-gauge nv-gauge--amber'}
           role="progressbar"
           aria-label={`Envoi de ${label}`}
           aria-valuemin={0}
@@ -522,7 +633,6 @@ function FileLine({
           <span className="nv-gauge__fill" style={{ '--nv-gauge-value': `${String(percent)}%` }} />
         </div>
       ) : null}
-      {wrong ? <p className="ct-file__hint">Ce n’est pas le même fichier : choisis celui du dépôt.</p> : null}
     </li>
   );
 }
@@ -539,6 +649,7 @@ function RefuseDialog({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const area = useGrowingArea(reason);
   return (
     <Dialog
       title="Tu ne peux pas le tourner ?"
@@ -566,7 +677,8 @@ function RefuseDialog({
         <label className="nv-field">
           <span className="nv-field__label">Dis-nous pourquoi, si tu veux</span>
           <textarea
-            className="nv-field__control"
+            ref={area}
+            className="nv-field__control ct-reason"
             rows={3}
             maxLength={200}
             value={reason}
