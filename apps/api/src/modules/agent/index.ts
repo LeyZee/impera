@@ -30,6 +30,8 @@ export type { TrapAssessment } from './domain/traps';
 /** @public The policy, read by `pnpm evals` on the same path as a real fan (and by the composer at P6-01). */
 export { holdDecision } from './domain/hold';
 export { withoutOrders } from './domain/injection';
+/** The safety net in code, read by `conversation.respond` to answer a fan in distress out of her hours (ADR 0088). */
+export { safetySigns } from './domain/safety-net';
 /** @public */
 export { offerDecision, offerSignals, type OfferContext, type OfferLimits } from './domain/policy';
 export type { SexualizationLimits } from './domain/sexualization';

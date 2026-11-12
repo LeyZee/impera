@@ -14,6 +14,7 @@ import {
   type JobPayload,
 } from '@impera/contracts';
 
+import { safetySigns } from '../../../agent';
 import type {
   Clock,
   ComposeInput,
@@ -190,6 +191,19 @@ async function stillPending(
 }
 
 /**
+ * Care is not deferred (ADR 0088, relecture Agent du 12/11): out of her hours, a fan in distress is still answered,
+ * when the code already knows it, an episode open or dark thoughts written plainly since her last reply. Nothing
+ * leaves without a human, so deferring would only delay the moment someone sees it. A sign only the brain reads waits
+ * for her opening.
+ */
+async function answersOutOfHours(tx: Transaction, conversation: Conversation): Promise<boolean> {
+  if (conversation.careSince !== null) return true;
+  const history = await tx.messages.history(conversation.id, HISTORY_LIMIT);
+  const lastReply = history.findLastIndex((message) => message.author !== 'fan');
+  return history.slice(lastReply + 1).some((message) => safetySigns(message.text).includes('self_harm'));
+}
+
+/**
  * No draft out of her hours (P3-14): the conversation stays `pending`, his message waits, and her next opening answers
  * it. Every deferral of hers points at one `conversation.reopen` job (its key), which answers all the fans who
  * wrote, the longest wait first. A wait she chose (P3-11) leaves the conversation at rest, so it keeps its own job,
@@ -260,7 +274,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
     const read = await uow.inTenant(payload.creatorId, async (tx) => {
       const conversation = await tx.conversations.lock(payload.conversationId);
       if (conversation === null || !(await stillPending(tx, conversation, logger, waitedFor))) return null;
-      if (until !== null) {
+      if (until !== null && !(await answersOutOfHours(tx, conversation))) {
         await deferReply(tx, conversation, until, payload, clock.now());
         logger.info({ until: until.toISOString() }, 'respond: out of her hours, deferred');
         return null;
