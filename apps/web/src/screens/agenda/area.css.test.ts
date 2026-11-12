@@ -17,3 +17,11 @@ describe('the growing text field of the agenda (recette design 11/11, CRE-30)', 
     expect(rule).toMatch(/resize: none;/u);
   });
 });
+
+describe('the preview of what is being added (recette design 12/11)', () => {
+  it('sits on the same plate as the tiles under it, so its frame shows by day as by night', () => {
+    const preview = /\.ag-preview \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(preview).toMatch(/background: var\(--nv-plate\);/u);
+    expect(preview).toMatch(/box-shadow: inset 0 0 0 1px var\(--nv-plate-edge\);/u);
+  });
+});
