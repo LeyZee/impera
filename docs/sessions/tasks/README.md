@@ -140,6 +140,8 @@ Branche : task/<id>-<slug>
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
 | OPS-04 | Plantage journalisé, repli d'écriture épinglé, prix relus | exploitation | done | — |
+| OPS-05 | Les évaluations lisent la clé posée dans le CRM | exploitation | done | ADR 0016, P3-03 |
+| OPS-06 | Grok 4.7 réfléchit moins longtemps que ses délais | exploitation | done | ADR 0009, OPS-05 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -157,3 +159,4 @@ Branche : task/<id>-<slug>
 | ARC-06 | Les factures et avoirs sortis de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-05 |
 | ARC-07 | Une table lue par son seul propriétaire, un job par tâche | exploitation | done | ADR 0047, ARC-06 |
 | ARC-08 | Ordre des virements écartés du journal et relance d'émission par son index | exploitation | done | ARC-07 |
+| REC-PAIE-01 | Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis | exploitation | done | CRM-03, ADR 0076, ADR 0072 |

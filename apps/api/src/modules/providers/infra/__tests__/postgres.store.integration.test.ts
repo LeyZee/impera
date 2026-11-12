@@ -5,6 +5,7 @@ import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import type { NewCredential } from '../../domain/credential';
+import { readSavedProviderKeys } from '../../index';
 import { createPostgresCredentialStore, keyFingerprint, resealProviderCredentials } from '../postgres.store';
 
 const FAKE_KEY = 'sk_FAKEFAKEFAKEFAKEFAKEFAKE0000';
@@ -176,5 +177,29 @@ describe('Postgres credential store (ADR 0016)', () => {
       await createPostgresCredentialStore({ adminDb: test.admin.db, keys: lost }).find('elevenlabs'),
     ).toMatchObject({ key: FAKE_KEY });
     await createPostgresCredentialStore({ adminDb: test.admin.db, keys: lost }).remove('elevenlabs');
+  });
+  it('gives `pnpm evals --key-from-crm` the keys these encryption keys open, and leaves out one they do not', async () => {
+    const current = newKey('v1');
+    const xaiKey = 'xai-FAKEFAKEFAKEFAKEFAKEFAKE0000';
+    await createPostgresCredentialStore({ adminDb: test.admin.db, keys: current }).save({
+      ...elevenlabs,
+      provider: 'xai',
+      key: xaiKey,
+      settings: {},
+      voices: [],
+      charactersLeft: null,
+    });
+    await createPostgresCredentialStore({ adminDb: test.admin.db, keys: newKey('v9') }).save({
+      ...elevenlabs,
+      provider: 'mistral',
+      settings: {},
+      voices: [],
+      charactersLeft: null,
+    });
+
+    const keys = await readSavedProviderKeys(test.admin.db, current);
+
+    expect(keys.xai).toBe(xaiKey);
+    expect(keys.mistral).toBeUndefined();
   });
 });

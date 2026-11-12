@@ -465,7 +465,7 @@ export function uncheckedText(reason: ShiftReportCheckReason, platform: string, 
         : `Ce compte n’est pas encore comparé aux ventes de ${platform} : l’agence relit ton rapport.`;
     case 'chatter_unlinked':
       return agency
-        ? `Ce membre n’est relié à aucun chatteur de ${platform} : relie-le dans Réglages › Ventes pour comparer ses rapports.`
+        ? `Ce membre n’est relié à aucun chatteur de ${platform} : relie-le dans Équipe › ${platform} pour comparer ses rapports.`
         : `Ton compte de chatteur sur ${platform} n’est pas encore relié : l’agence relit ton rapport.`;
   }
 }

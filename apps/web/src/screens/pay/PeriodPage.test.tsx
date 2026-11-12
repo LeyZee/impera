@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { HeldSale, Me, PayrollPeriod, TeamMember } from '@impera/contracts';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -68,6 +68,8 @@ let gate: Promise<void> | null;
 /** The agency's settings answer a server error (recette EQP-05). */
 let settingsDown: boolean;
 let team: readonly TeamMember[];
+/** The platform's team as Équipe › Reveal reads it (ADR 0076); `'down'` answers a refused list. */
+let revealTeam: { platformChatterId: string; firstName: string; lastName: string }[] | 'down';
 
 function serve(): void {
   vi.stubGlobal(
@@ -96,6 +98,34 @@ function serve(): void {
           return json(found ?? periodOf(period, [], { window: null }));
         };
         return gate === null ? reply() : gate.then(reply);
+      }
+      if (url.pathname === '/v1/settings/sales-feeds/reveal/team') {
+        if (revealTeam === 'down') return json({ error: { code: 'internal', message: 'down' } }, 500);
+        return json({
+          rows: revealTeam.map((chatter) => ({
+            chatter: {
+              ...chatter,
+              email: null,
+              role: 'chatter',
+              isBot: false,
+              isExternal: false,
+              removedAt: null,
+              platformModelIds: [],
+            },
+            link: null,
+            dismissedAt: null,
+            suggestion: null,
+            preselected: false,
+            actions: [],
+            models: [],
+            modelGap: { inImperaOnly: [], onPlatformOnly: [] },
+            removal: null,
+          })),
+          newCount: revealTeam.length,
+          removalCount: 0,
+          abnormalRead: false,
+          listError: null,
+        });
       }
       switch (url.pathname) {
         case '/v1/scheduling/settings':
@@ -223,6 +253,7 @@ beforeEach(() => {
   gate = null;
   settingsDown = false;
   team = MEMBERS;
+  revealTeam = [];
   reports = [];
   held = {};
   rules = PAY_RULES;
@@ -1167,6 +1198,29 @@ describe('Paie › Quinzaine', () => {
     expect(screen.queryByRole('button', { name: /^Valider/u })).toBeNull();
   });
 
+  it('says a running period follows the sales read once a statement counts them, the reports alone otherwise (recette paie)', async () => {
+    vi.setSystemTime(new Date('2026-11-05T23:00:00Z'));
+    periods[NOV1] = periodOf(NOV1, [statementOf(THEO, NOV1, { netMinor: 50_000 })]);
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${NOV1}`);
+    expect(await screen.findByText(/^Les relevés se calculent à chaque rapport validé\./u)).toBeTruthy();
+    cleanup();
+    const onNet = euroLine({
+      vatBps: 0,
+      platformFeeBps: 0,
+      grossMinor: 8_500,
+      grossEurMinor: 8_500,
+      exclVatMinor: 8_500,
+      shiftReportIds: [],
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 1, late: 0, lateNetMinor: 0 },
+    });
+    periods[NOV1] = periodOf(NOV1, [statementOf(THEO, NOV1, { lines: [onNet] })]);
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${NOV1}`);
+    expect(
+      await screen.findByText(/^Les relevés se calculent à chaque vente lue et à chaque rapport validé\./u),
+    ).toBeTruthy();
+  });
+
   it('reads the share of the goal and where it heads from the server, never from the net', async () => {
     vi.setSystemTime(new Date('2026-11-05T23:00:00Z'));
     // The server's shares on a 1 500 € goal: 33 % reached, 100 % forecast; the screen recomputes neither.
@@ -1214,12 +1268,14 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
       heldSaleOf({
         platformSaleId: 'vente-2',
         memberId: null,
+        platformChatterId: 'chatter-new',
         reason: 'chatter_unlinked',
         outcomes: ['exclude'],
         netMinor: 2_500,
       }),
       heldSaleOf({ platformSaleId: 'vente-3', reason: null, decision: 'exclude', outcomes: ['withdraw'] }),
     ];
+    revealTeam = [{ platformChatterId: 'chatter-new', firstName: 'Camille', lastName: 'Essai' }];
     renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
     const list = await panel();
     expect(text(list)).toContain('2 attendent une décision · 1 décidée');
@@ -1234,11 +1290,104 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     expect(within(offShift).getByRole('button', { name: 'Écarter' })).toBeTruthy();
 
     const unlinked = card(list, /^Son chatteur sur Reveal n’est relié à aucun membre/u);
-    expect(text(unlinked)).toContain('chatteur non relié');
+    await waitFor(() => {
+      expect(text(unlinked)).toContain(
+        'Vente du mercredi 28 octobre à 22 h · chatteur non relié · Camille Essai',
+      );
+    });
+    expect(text(unlinked)).toContain('relie-le dans Équipe › Reveal');
     expect(within(unlinked).queryByRole('button', { name: /^Compter/u })).toBeNull();
 
     const excluded = card(list, /^Écartée$/u);
     expect(within(excluded).getByRole('button', { name: 'Retirer la décision' })).toBeTruthy();
+  });
+
+  it('says the Reveal account of a sale not linked when the team does not name it, and no account for none', async () => {
+    held[OCT2] = [
+      heldSaleOf({
+        platformSaleId: 'vente-2',
+        memberId: null,
+        platformChatterId: 'chatter-gone',
+        reason: 'chatter_unlinked',
+        outcomes: ['exclude'],
+      }),
+      heldSaleOf({
+        platformSaleId: 'vente-4',
+        memberId: null,
+        platformChatterId: null,
+        reason: 'chatter_unlinked',
+        outcomes: ['exclude'],
+      }),
+    ];
+    revealTeam = [{ platformChatterId: 'chatter-new', firstName: 'Camille', lastName: 'Essai' }];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    await waitFor(() => {
+      expect(text(list)).toContain('· compte Reveal non relié');
+    });
+    expect(text(list)).toContain('· chatteur non relié');
+    expect(text(list)).not.toContain('Camille Essai');
+  });
+
+  it('says the Reveal account of a sale not linked when the team list is refused', async () => {
+    held[OCT2] = [
+      heldSaleOf({
+        platformSaleId: 'vente-2',
+        memberId: null,
+        platformChatterId: 'chatter-new',
+        reason: 'chatter_unlinked',
+        outcomes: ['exclude'],
+      }),
+    ];
+    revealTeam = 'down';
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(text(list)).toContain('Vente du mercredi 28 octobre à 22 h · compte Reveal non relié');
+  });
+
+  it('reads the Reveal team once to name an account, not again on each return to the tab (relecture Équipe de #695)', async () => {
+    held[OCT2] = [
+      heldSaleOf({
+        platformSaleId: 'vente-2',
+        memberId: null,
+        platformChatterId: 'chatter-new',
+        reason: 'chatter_unlinked',
+        outcomes: ['exclude'],
+      }),
+    ];
+    revealTeam = [{ platformChatterId: 'chatter-new', firstName: 'Camille', lastName: 'Essai' }];
+    const teamReads = () =>
+      vi
+        .mocked(fetch)
+        .mock.calls.filter(
+          ([input]) => typeof input === 'string' && input.includes('/v1/settings/sales-feeds/reveal/team'),
+        ).length;
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    await waitFor(() => {
+      expect(text(list)).toContain('chatteur non relié · Camille Essai');
+    });
+    expect(teamReads()).toBe(1);
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(teamReads()).toBe(1);
+    focusManager.setFocused(undefined);
+  });
+
+  it('says the day a member left on a sale made after it, which still waits for a decision (Charles, 11/11)', async () => {
+    held[OCT2] = [heldSaleOf({ memberLeftOn: '2026-10-26' })];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    const departed = card(list, /^Théo a quitté l’équipe le lundi 26 octobre, avant cette vente/u);
+    expect(text(departed)).toContain('Comptée, elle va sur son relevé final, sans minimum de versement.');
+    expect(within(departed).getByRole('button', { name: 'Compter pour Théo' })).toBeTruthy();
+    expect(within(departed).getByRole('button', { name: 'Écarter' })).toBeTruthy();
   });
 
   it('counts a sale for its member after reading it again, with a note, then reads the list again', async () => {
