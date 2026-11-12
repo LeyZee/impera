@@ -5,7 +5,7 @@ import { readMigrationFiles } from 'drizzle-orm/migrator';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { runMigrations as runJobQueueMigrations } from 'graphile-worker';
 
-import { createDbClient, type Database, type DbClient } from './client';
+import type { Database, DbClient } from './client';
 
 /** Folder of the reviewed SQL migrations, shipped with the package. */
 export const MIGRATIONS_FOLDER = fileURLToPath(new URL('../migrations', import.meta.url));
@@ -14,7 +14,8 @@ export const MIGRATIONS_FOLDER = fileURLToPath(new URL('../migrations', import.m
 const SERVICE_ROLE = 'impera_service';
 
 /**
- * What the service role may do in the job queue's own schema: add, take and finish jobs, nothing on its structure.
+ * What the service role may do in the job queue's own schema: add, take and finish jobs, nothing on its structure,
+ * and it only reads the queue's own list of migrations.
  * Said again at every run, since a new version of Graphile Worker may add a table or a function.
  */
 const JOB_QUEUE_GRANTS = sql.raw(`
@@ -22,6 +23,7 @@ const JOB_QUEUE_GRANTS = sql.raw(`
   grant select, insert, update, delete on all tables in schema graphile_worker to ${SERVICE_ROLE};
   grant usage, select on all sequences in schema graphile_worker to ${SERVICE_ROLE};
   grant execute on all functions in schema graphile_worker to ${SERVICE_ROLE};
+  revoke insert, update, delete on graphile_worker.migrations from ${SERVICE_ROLE};
 `);
 
 /**
@@ -35,38 +37,26 @@ export async function runMigrations(admin: DbClient): Promise<void> {
   await admin.db.execute(JOB_QUEUE_GRANTS);
 }
 
-/** Postgres' own codes for « wrong password » and « this role may not log in ». */
-const LOGIN_REFUSED = new Set(['28P01', '28000']);
-
-/** The Postgres code of a failed query; Drizzle wraps the driver's error as `cause`. */
-function codeOf(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null) return null;
-  if ('code' in error && typeof error.code === 'string') return error.code;
-  return 'cause' in error ? codeOf(error.cause) : null;
-}
-
 /**
- * Lets the service role log in with the password of `serviceUrl` (DATABASE_SERVICE_URL), when it cannot yet: the
+ * Lets the service role log in with the password of `serviceUrl` (DATABASE_SERVICE_URL), the first time only: the
  * migration creates it without a login, so that no password lives in the repository. Run as the owner, after the
- * migrations; a role that already logs in with this password is left alone. `false` when nothing was changed.
+ * migrations. A role that can already log in is left alone, whatever its password: a password changed in the
+ * database is never put back from the environment. `false` when nothing was changed.
  */
 export async function ensureServiceLogin(admin: DbClient, serviceUrl: string): Promise<boolean> {
   const url = new URL(serviceUrl);
   if (decodeURIComponent(url.username) !== SERVICE_ROLE) {
     throw new Error(`DATABASE_SERVICE_URL must connect as ${SERVICE_ROLE} (ADR 0087).`);
   }
-  const probe = createDbClient(serviceUrl, { max: 1 });
-  try {
-    await probe.db.execute(sql`select 1`);
-    return false;
-  } catch (error) {
-    if (!LOGIN_REFUSED.has(codeOf(error) ?? '')) throw error;
-  } finally {
-    await probe.close();
-  }
+  const password = decodeURIComponent(url.password);
+  if (password === '') throw new Error('DATABASE_SERVICE_URL must carry a password (ADR 0087).');
+  const role = await admin.db.execute<{ canLogin: boolean }>(
+    sql`select rolcanlogin as "canLogin" from pg_roles where rolname = ${SERVICE_ROLE}`,
+  );
+  if (role.rows[0]?.canLogin !== false) return false;
   // `alter role` takes no parameter: the password goes in as a literal, quoted by Postgres itself.
   const quoted = await admin.db.execute<{ statement: string }>(
-    sql`select format('alter role %I login password %L', ${SERVICE_ROLE}::text, ${decodeURIComponent(url.password)}::text) as statement`,
+    sql`select format('alter role %I login password %L', ${SERVICE_ROLE}::text, ${password}::text) as statement`,
   );
   const statement = quoted.rows[0]?.statement;
   if (statement === undefined) throw new Error('ensureServiceLogin: no statement');

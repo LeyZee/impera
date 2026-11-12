@@ -221,5 +221,25 @@ describe('the service role (ADR 0087): rows only, where a migration opened them'
     await expect(ensureServiceLogin(test.admin, test.appUrl)).rejects.toThrow(
       /DATABASE_SERVICE_URL must connect as impera_service/,
     );
+    const noPassword = new URL(test.serviceUrl);
+    noPassword.password = '';
+    await expect(ensureServiceLogin(test.admin, noPassword.toString())).rejects.toThrow(
+      /must carry a password/,
+    );
+  });
+
+  it("may use every sequence of the public schema, and only reads the job queue's list of migrations", async () => {
+    const sequences = await test.admin.db.execute<{ name: string; usable: boolean }>(sql`
+      select c.relname as name, has_sequence_privilege('impera_service', c.oid, 'USAGE') as usable
+        from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relkind = 'S'`);
+    expect(
+      sequences.rows.filter((row) => !row.usable).map((row) => row.name),
+      'a sequence the service role cannot use: its migration grants USAGE, SELECT to impera_service',
+    ).toEqual([]);
+    const { rows } = await test.admin.db.execute<{ reads: boolean; writes: boolean }>(sql`
+      select has_table_privilege('impera_service', 'graphile_worker.migrations', 'SELECT') as reads,
+             has_table_privilege('impera_service', 'graphile_worker.migrations', 'INSERT, UPDATE, DELETE') as writes`);
+    expect(rows[0]).toEqual({ reads: true, writes: false });
   });
 });

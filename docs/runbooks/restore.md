@@ -21,7 +21,7 @@ L'export (ADR 0028, service `backup`) est un tar chiffré par `age` : le dump `p
 3. Sur le PC où se trouve la clé privée, récupérer le dernier export du bucket (clé d'accès en lecture seule), puis :
    `sh ops/db-export/restore-check.sh impera-<date>.tar.age impera-backup.key "<DATABASE_ADMIN_URL de la nouvelle base>"`.
    Le script déchiffre, restaure (`pg_restore --no-owner --single-transaction`), **vide la file `graphile_worker`** (aucun job d'avant le sinistre ne repart) et compare les comptes de lignes au manifeste.
-4. Recréer `nirvana_app` et `impera_service` sur la nouvelle base (`deploy.md` § 1.1), puis mettre `DATABASE_URL`, `DATABASE_SERVICE_URL` et `DATABASE_ADMIN_URL` à jour dans Coolify, avec les **mêmes** `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` qu'avant (copie gardée avec la clé privée), redéployer, `/ready`.
+4. Le script a créé `nirvana_app` et `impera_service` sans connexion : leur donner un mot de passe neuf, dans l'éditeur SQL (`ALTER ROLE nirvana_app LOGIN PASSWORD '<mot de passe>';` puis `ALTER ROLE impera_service LOGIN PASSWORD '<un autre>' BYPASSRLS;`, et le `GRANT CONNECT` de `deploy.md` § 1.1), puis mettre `DATABASE_URL`, `DATABASE_SERVICE_URL` et `DATABASE_ADMIN_URL` à jour dans Coolify, avec les **mêmes** `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` qu'avant (copie gardée avec la clé privée), redéployer, `/ready`.
 5. Tout le monde se reconnecte (les sessions ne sont pas dans l'export). Étapes A.6 et A.7.
 
 ## C. Essai trimestriel (ADR 0028 § 6)

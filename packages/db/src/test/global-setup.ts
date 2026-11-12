@@ -49,22 +49,25 @@ export default async function setup(project: TestProject): Promise<() => Promise
     end $$;
   `);
   await client.end();
-  // Roles left by another use of this server may have another password: say so once, before any test makes a database.
-  const asAdmin = new URL(url);
-  asAdmin.username = 'nirvana_admin';
-  asAdmin.password = password;
-  const probe = new Client({ connectionString: asAdmin.toString() });
-  try {
-    await probe.connect();
-  } catch (error) {
-    await container?.stop();
-    throw new Error(
-      'Les rôles nirvana_admin et nirvana_app existent déjà sur ce Postgres avec un autre mot de passe : ' +
-        'donne-le dans IMPERA_TEST_ROLE_PASSWORD, ou utilise un Postgres jetable (testing.md).',
-      { cause: error },
-    );
-  } finally {
-    await probe.end().catch(() => undefined);
+  // Roles left by another use of this server may have another password, or no login: say so once, before any test
+  // makes a database.
+  for (const role of ['nirvana_admin', 'impera_service']) {
+    const asRole = new URL(url);
+    asRole.username = role;
+    asRole.password = password;
+    const probe = new Client({ connectionString: asRole.toString() });
+    try {
+      await probe.connect();
+    } catch (error) {
+      await container?.stop();
+      throw new Error(
+        `Le rôle ${role} existe déjà sur ce Postgres avec un autre mot de passe, ou sans connexion : ` +
+          'donne le mot de passe des rôles dans IMPERA_TEST_ROLE_PASSWORD, ou utilise un Postgres jetable (testing.md).',
+        { cause: error },
+      );
+    } finally {
+      await probe.end().catch(() => undefined);
+    }
   }
   project.provide('pgSuperuserUrl', url);
   return async () => {

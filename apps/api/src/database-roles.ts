@@ -20,7 +20,7 @@ async function connectedRole(db: Database): Promise<Role> {
                (select count(*)::int
                   from pg_class c join pg_namespace n on n.oid = c.relnamespace
                  where n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
-                   and pg_has_role(current_user, c.relowner, 'USAGE')) as owned
+                   and pg_has_role(current_user, c.relowner, 'MEMBER')) as owned
         from pg_roles r where r.rolname = current_user`,
   );
   return RoleSchema.parse(result.rows[0]);
