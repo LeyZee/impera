@@ -1317,7 +1317,7 @@
     --_blur: var(--nv-blur-thick);
     background:
       linear-gradient(180deg, var(--nv-glass-fill-strong) 0%, transparent 46%),
-      color-mix(in srgb, var(--nv-void) 90%, transparent);
+      color-mix(in srgb, var(--nv-void) 96%, transparent);
   }
   .nv-rail__brand,
   .nv-rail__sp,
