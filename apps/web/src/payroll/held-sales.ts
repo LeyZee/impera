@@ -1,9 +1,10 @@
-import type { HeldSale, SaleDecisionOutcome, SaleHeldReason } from '@impera/contracts';
+import type { HeldSale, SaleDecisionOutcome, SaleHeldReason, TeamImportOverview } from '@impera/contracts';
 
 import { momentAt } from './model';
 
 import { signedAmountText } from '@/reports/model';
 import { platformName } from '@/scheduling/model';
+import { dayOf, longDay } from '@/scheduling/time';
 
 /**
  * The validator's screen of the sales a period holds or a decision settles (CRM-03 lot b4b, ADR 0050 §§ 3, 5, 7),
@@ -17,6 +18,32 @@ const NBSP = ' ';
 export interface SaleMember {
   readonly name: string;
   readonly own: boolean;
+}
+
+/** Who made a line, as its line says it: `lead` then, in bold, `name` (« chatteur Théo », « chatteur non relié »). */
+export interface LineChatter {
+  readonly lead: string;
+  readonly name: string;
+}
+
+/**
+ * Who made a line (CRM-03 lot b4b): the member its chatter is linked to; else the platform's
+ * account named from the platform's team as it lists it now (« chatteur non relié · Camille Durand »); else, when the
+ * team cannot be read or does not list it, the account said as one (« compte Reveal non relié »). A line made by
+ * nobody (a subscription) stays « chatteur non relié ».
+ */
+export function lineChatter(
+  sale: Pick<HeldSale, 'platform' | 'platformChatterId'>,
+  member: SaleMember | null,
+  team: TeamImportOverview | undefined,
+): LineChatter {
+  if (member !== null) return { lead: 'chatteur', name: member.name };
+  if (sale.platformChatterId === null) return { lead: 'chatteur', name: 'non relié' };
+  const row = team?.rows.find((one) => one.chatter.platformChatterId === sale.platformChatterId);
+  const person = row === undefined ? '' : `${row.chatter.firstName} ${row.chatter.lastName}`.trim();
+  return person === ''
+    ? { lead: `compte ${platformName(sale.platform)}`, name: 'non relié' }
+    : { lead: 'chatteur', name: `non relié · ${person}` };
 }
 
 /** « Vente du lundi 2 novembre à 14 h 05 », « Remboursement du … (vente du …) ». */
@@ -47,10 +74,32 @@ export function heldInOrder<T extends Pick<HeldSale, 'occurredAt' | 'platformSal
 /** The line's net, signed: a refund takes off. */
 export const saleAmount = (sale: HeldSale): string => signedAmountText(sale.netMinor, sale.currency);
 
-/** Why a line waits for a decision, as the validator reads it; `null` for a line a member would be paid for. */
+/**
+ * A line off shift of a member who left (ADR 0072, Charles, 11/11/2026): the day he left, as the pay screens write a
+ * day, and, for a sale made after it, that it waits for the validator and goes on his final statement once counted.
+ */
+function departedText(
+  sale: Pick<HeldSale, 'event' | 'memberLeftOn' | 'saleOccurredAt'>,
+  name: string,
+  leftOn: string,
+  timeZone: string,
+): string {
+  const left = `${name} a quitté l’équipe le ${longDay(leftOn)}`;
+  const after = sale.saleOccurredAt !== null && dayOf(sale.saleOccurredAt, timeZone) > leftOn;
+  if (!after) return `${name} n’était ni en poste ni dans sa marge d’accès à l’heure de la vente. ${left}.`;
+  return sale.event === 'sale'
+    ? `${left}, avant cette vente. Comptée, elle va sur son relevé final, sans minimum de versement.`
+    : `${left}, avant la vente de ce remboursement. Compté, sa vente va sur son relevé final et il s’en déduit.`;
+}
+
+/**
+ * Why a line waits for a decision, as the validator reads it; `null` for a line a member would be paid for. A line off
+ * shift of a member who left says the day he left (`departedText`), read in the agency's zone.
+ */
 export function heldReasonText(
-  sale: Pick<HeldSale, 'platform' | 'reason' | 'event'>,
+  sale: Pick<HeldSale, 'platform' | 'reason' | 'event' | 'memberLeftOn' | 'saleOccurredAt'>,
   member: SaleMember | null,
+  timeZone: string,
 ): string | null {
   const reason: SaleHeldReason | null = sale.reason;
   const refund = sale.event === 'refund';
@@ -67,6 +116,8 @@ export function heldReasonText(
         : `${unlinked}\u00a0: relie-le dans ${where} et la vente compte seule. ${otherwise}`;
     }
     case 'off_shift':
+      if (member !== null && sale.memberLeftOn !== null)
+        return departedText(sale, member.name, sale.memberLeftOn, timeZone);
       return `${member?.name ?? 'Son chatteur'} n’était ni en poste ni dans sa marge d’accès à l’heure de la vente.`;
     case 'status_unknown':
       return `${platformName(sale.platform)} lui donne un statut qu’Impera ne connaît pas encore.`;

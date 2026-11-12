@@ -14,7 +14,7 @@ import './today.css';
 import { urgencies } from '@/agent/queue';
 import { MyReportsCard, useMyReports, type MyReports } from '@/reports/MyReports';
 import { ReportPanel } from '@/reports/ReportPanel';
-import { MEMBER_STATUS, reportOf, STATUS_TONES } from '@/reports/model';
+import { MEMBER_STATUS, reportOf, toneOf, WITHOUT_PAY_EFFECT, withoutPayEffect } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
@@ -300,8 +300,10 @@ function Hero({
           </Link>
           {report.kind === 'made' ? (
             <button type="button" className="rp-hero__made nv-tap" onClick={onReport}>
-              <span className={`rp-chip rp-chip--${STATUS_TONES[report.report.status]}`}>
-                Rapport {MEMBER_STATUS[report.report.status].toLowerCase()}
+              <span className={`rp-chip rp-chip--${toneOf(report.report)}`}>
+                {withoutPayEffect(report.report)
+                  ? WITHOUT_PAY_EFFECT
+                  : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
               </span>
               <span className="rp-hero__see">Voir</span>
             </button>

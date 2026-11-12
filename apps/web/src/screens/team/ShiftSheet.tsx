@@ -13,15 +13,17 @@ import { AWAY_WORDS } from './model';
 
 import {
   AGENCY_STATUS,
+  agencyStatusOf,
   amountText,
   GAP_TO_EXPLAIN,
   gapWaits,
   hasGap,
-  MEMBER_STATUS,
+  memberStatusOf,
   periodAt,
   reportOf,
-  STATUS_TONES,
+  toneOf,
   validatedTotal,
+  withoutPayEffect,
 } from '@/reports/model';
 import '@/reports/reports.css';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
@@ -285,11 +287,11 @@ export function ShiftSheet({
                   </span>
                   <button
                     type="button"
-                    className={`rp-chip rp-chip--${explain ? 'warn' : STATUS_TONES[report.status]} nv-tap`}
-                    aria-label={`Mon rapport : ${explain ? 'écart à expliquer' : MEMBER_STATUS[report.status]}`}
+                    className={`rp-chip rp-chip--${explain ? 'warn' : toneOf(report)} nv-tap`}
+                    aria-label={`Mon rapport : ${explain ? 'écart à expliquer' : memberStatusOf(report)}`}
                     onClick={onReport}
                   >
-                    {explain ? GAP_TO_EXPLAIN : MEMBER_STATUS[report.status]}
+                    {explain ? GAP_TO_EXPLAIN : memberStatusOf(report)}
                   </button>
                 </span>
               )}
@@ -302,12 +304,10 @@ export function ShiftSheet({
                   {amountText(report.amount.amountMinor, report.amount.currency)}
                 </span>
                 {/* A gap with the platform still to decide is said in amber (ADR 0073 § 5). */}
-                {report.status === 'submitted' && hasGap(report) ? (
+                {report.status === 'submitted' && hasGap(report) && !withoutPayEffect(report) ? (
                   <span className="rp-chip rp-chip--warn">Écart · {AGENCY_STATUS.submitted}</span>
                 ) : (
-                  <span className={`rp-chip rp-chip--${STATUS_TONES[report.status]}`}>
-                    {AGENCY_STATUS[report.status]}
-                  </span>
+                  <span className={`rp-chip rp-chip--${toneOf(report)}`}>{agencyStatusOf(report)}</span>
                 )}
               </Link>
             </li>

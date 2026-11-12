@@ -160,6 +160,28 @@ describe('GET /v1/creator-space/fan-insights', () => {
       .update(schema.fans)
       .set({ firstSeenAt: longAgo })
       .where(eq(schema.fans.creatorId, nora));
+    // Seven fans first seen today (an import) with yesterday's history: counted from tomorrow, in every figure, or
+    // « t'ont écrit cette semaine » (20) would outnumber « en tout » (10).
+    for (let i = 13; i < 20; i += 1)
+      await app.modules.conversations.ingestMessage({
+        creatorId: nora,
+        platformAccountId: a.accountId,
+        platformConversationId: `c-${String(i)}`,
+        platformFanId: `f-${String(i)}`,
+        fanDisplayName: `Fan inventé ${String(i)}`,
+        message: {
+          ref: { platform: 'reveal', id: `in-${String(i)}` },
+          conversationRef: { platform: 'reveal', id: `c-${String(i)}` },
+          direction: 'inbound',
+          text: 'Coucou',
+          media: [],
+          priceMinor: null,
+          currency: null,
+          isPaid: false,
+          createdAt: yesterday.toISOString(),
+        },
+        correlationId: 'seed',
+      });
     const fan = (i: number) => {
       const id = fans[i];
       if (id === undefined) throw new Error('missing fan');

@@ -3,8 +3,11 @@ import {
   PaySaleDecisionIdSchema,
   type HeldSale,
   type PayPeriod,
+  type Platform,
   type SaleDecisionOutcome,
+  type TeamImportOverview,
 } from '@impera/contracts';
+import { useQueries } from '@tanstack/react-query';
 import { useId, useState, type JSX } from 'react';
 
 import type { PayNames } from './data';
@@ -16,6 +19,7 @@ import {
   heldCountText,
   heldInOrder,
   heldReasonText,
+  lineChatter,
   outcomeLabel,
   outcomeWords,
   ownLineText,
@@ -28,11 +32,19 @@ import {
 import { payRefusalText } from '@/payroll/model';
 import { useSchedulingSettings } from '@/reports/api';
 import { accountLine } from '@/scheduling/model';
+import { fetchTeamImport, teamImportKey } from '@/settings/sales-feed/api';
 import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
 
 /** The longest note pay keeps on a decision (`PayReasonSchema`). */
 const NOTE_MAX = 500;
+
+/**
+ * How long the platform's team, read only to name a chatter not linked, is taken as it is: the route reads the platform
+ * live (ADR 0076), under the rate the sales feed shares, so the pay screen must not read it again at each visit. A name
+ * read ten minutes ago is good enough, and pay never depends on it: without it the line says « compte Reveal non relié ».
+ */
+const TEAM_NAMES_STALE_MS = 10 * 60_000;
 
 /** A refusal that says the list moved under the reader: it is read again. */
 const MOVED: ReadonlySet<string> = new Set(['pay_sale_not_found', 'pay_sale_outcome_conflict']);
@@ -66,6 +78,24 @@ export function HeldSalesPanel({
   const read = held.data?.period === period ? held.data : undefined;
   const sales = heldInOrder(read?.sales ?? []);
   const zone = settings.data?.timeZone ?? null;
+  // The platform's team names a chatter not linked (ADR 0076): read only for a line that needs it, by the same readers.
+  const unnamed: Platform[] = [
+    ...new Set(
+      sales.flatMap((sale) =>
+        sale.memberId === null && sale.platformChatterId !== null ? [sale.platform] : [],
+      ),
+    ),
+  ];
+  const teams = useQueries({
+    queries: unnamed.map((platform) => ({
+      queryKey: teamImportKey(platform),
+      queryFn: () => fetchTeamImport(platform),
+      retry: false,
+      staleTime: TEAM_NAMES_STALE_MS,
+    })),
+  });
+  const teamOf = (platform: Platform): TeamImportOverview | undefined =>
+    teams[unnamed.indexOf(platform)]?.data;
   if (reads && read === undefined && held.isError)
     return (
       <Panel className="nv-enter py-held" eyebrow="Ventes en attente">
@@ -105,9 +135,10 @@ export function HeldSalesPanel({
             // Each gesture names its sale to a screen reader, out of the list too.
             const about = (part: string): string => `${uid}-${String(index)}-${part}`;
             const account = names.account(sale.platformAccountId);
-            const reason = heldReasonText(sale, member);
+            const reason = heldReasonText(sale, member, zone);
             const signalled = signalText(sale, member);
             const decided = decisionText(sale, member);
+            const chatter = lineChatter(sale, member, teamOf(sale.platform));
             return (
               <li key={`${sale.platform}:${sale.platformSaleId}:${sale.event}`} className="py-held__row">
                 <div className="py-held__main">
@@ -118,8 +149,9 @@ export function HeldSalesPanel({
                     </span>
                   </p>
                   <p className="py-member__line nv-num" id={about('when')}>
-                    {saleWhen(sale, zone)} · chatteur{'\u00a0'}
-                    <b>{member === null ? 'non relié' : member.name}</b>
+                    {saleWhen(sale, zone)} · {chatter.lead}
+                    {'\u00a0'}
+                    <b>{chatter.name}</b>
                   </p>
                 </div>
                 <div className="py-held__side">

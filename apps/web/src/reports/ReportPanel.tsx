@@ -36,6 +36,8 @@ import {
   STATUS_TONES,
   uncheckedText,
   validatedTotal,
+  WITHOUT_PAY_EFFECT,
+  withoutPayEffect,
 } from './model';
 import { useReopen, type ReportDraft, type ReportScreen } from './reopen';
 
@@ -147,7 +149,7 @@ function titleOf(
   if (correcting) return 'Corriger mon rapport';
   const report = data === undefined ? null : reportOf(data.reports, data.shift.id);
   if (report === null) return 'Faire mon rapport';
-  if (report.status === 'validated') return 'Mon rapport';
+  if (report.status === 'validated' || withoutPayEffect(report)) return 'Mon rapport';
   if (report.status === 'rejected') return 'Reprendre mon rapport';
   return 'Modifier mon rapport';
 }
@@ -207,6 +209,17 @@ function Body({
     );
   }
   if (data.rules.earningsSource === 'detected') {
+    // Made before its fortnight switched to the sales read: it stays, without effect and with nothing to do (ADR 0084 § 3).
+    if (report !== null) {
+      return (
+        <Notice tone="info" onClose={onClose} title={WITHOUT_PAY_EFFECT}>
+          Ce rapport de{' '}
+          <span className="nv-num">{amountText(report.amount.amountMinor, report.amount.currency)}</span>{' '}
+          reste, mais sur la quinzaine {periodLine(data.period)}, la paie de ce compte lit les ventes relevées
+          par le connecteur&nbsp;: il n’y a plus rien à faire dessus.
+        </Notice>
+      );
+    }
     return (
       <Notice tone="info" onClose={onClose} title="Rien à déclarer">
         Sur la quinzaine {periodLine(data.period)}, la paie de ce compte lit les ventes relevées par le

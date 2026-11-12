@@ -61,6 +61,7 @@ export const reviewOf = (
       },
       thumbnail: fields.thumbnails ?? false,
       original: fields.original ?? true,
+      describeFailed: false,
     })),
     steps: [
       { step: 'salon:', code: 'E1', name: 'Le salon', access: 'free', fileIds: [fileIds[0]] },

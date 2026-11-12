@@ -11,6 +11,40 @@ export function debounceFor(persona?: { readonly debounceSeconds?: number }): nu
   return Math.min(MAX_DEBOUNCE_SECONDS, Math.max(MIN_DEBOUNCE_SECONDS, wanted));
 }
 
+/** Her answers to one fan in an hour at her usual pace; past them she slows down, and never stops. */
+const REPLIES_PER_HOUR_BEFORE_SLOWING = 60;
+/** Slowed down: one answer every three minutes. */
+const SLOWED_REPLY_SECONDS = 180;
+
+/**
+ * When the answer to his message is written: after the usual wait, so that a burst gets one answer; and, once she has
+ * answered him 60 times within the hour, not before three minutes after her last answer. The slow pace is counted
+ * from her last answer, not from his last message: a fan who never stops writing still gets his answer.
+ */
+export function respondAt(input: {
+  readonly now: Date;
+  readonly repliesLastHour: number;
+  readonly lastReplyAt: Date | null;
+}): Date {
+  const usual = input.now.getTime() + debounceFor() * 1_000;
+  if (input.repliesLastHour < REPLIES_PER_HOUR_BEFORE_SLOWING || input.lastReplyAt === null) {
+    return new Date(usual);
+  }
+  return new Date(Math.max(usual, input.lastReplyAt.getTime() + SLOWED_REPLY_SECONDS * 1_000));
+}
+
+/** What one fan message keeps of its words and of its media: beyond, it is cut, never refused. */
+const FAN_TEXT_MAX_CHARS = 4_000;
+export const FAN_MEDIA_MAX = 20;
+
+/** His words, cut at 4 000 characters without splitting a character in two. */
+export function boundFanText(text: string): string {
+  if (text.length <= FAN_TEXT_MAX_CHARS) return text;
+  const cut = text.slice(0, FAN_TEXT_MAX_CHARS);
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+}
+
 export interface SendCheck {
   readonly draftStatus: DraftStatus;
   readonly draftCreatedAt: Date;

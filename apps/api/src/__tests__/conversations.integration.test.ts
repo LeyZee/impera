@@ -272,6 +272,52 @@ describe('conversations module (P0-05)', () => {
     });
   });
 
+  it('slows down to one answer every three minutes past 60 answers in the hour, and still answers', async () => {
+    const { conversationId } = await ingest('c-pace');
+    const [row] = await test.admin.db
+      .select({ creatorId: schema.conversations.creatorId })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.id, conversationId));
+    const lastReplyAt = new Date(clock.now().getTime() - 20_000);
+    await test.admin.db.insert(schema.drafts).values(
+      Array.from({ length: 60 }, (_, index) => ({
+        id: newId(DraftIdSchema),
+        creatorId: row!.creatorId,
+        conversationId,
+        status: 'sent',
+        idempotencyKey: `pace:${String(index)}`,
+        createdAt: new Date(lastReplyAt.getTime() - index * 30_000),
+      })),
+    );
+    await ingest('c-pace');
+    const pending = (await jobs('conversation.respond')).filter((job) => job.key?.endsWith(conversationId));
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.run_at.toISOString()).toBe(new Date(lastReplyAt.getTime() + 180_000).toISOString());
+
+    // An hour later the count is back under 60: her usual pace.
+    clock.advance(3_600);
+    await ingest('c-pace');
+    const after = (await jobs('conversation.respond')).filter((job) => job.key?.endsWith(conversationId));
+    expect(after[0]!.run_at.toISOString()).toBe(new Date(clock.now().getTime() + 45_000).toISOString());
+  });
+
+  it('keeps 4 000 characters and 20 media of a fan message, and still takes it', async () => {
+    const media = Array.from({ length: 25 }, (_, index) => ({
+      ref: { platform: 'reveal' as const, id: `m-${String(index)}` },
+      kind: 'image' as const,
+      isLocked: false,
+    }));
+    const message = { ...fanMessage('c-long', 'a'.repeat(9_000)), media };
+    const { conversationId, isNew } = await ingest('c-long', message);
+    expect(isNew).toBe(true);
+    const [stored] = await test.admin.db
+      .select({ text: schema.messages.text, media: schema.messages.platformMedia })
+      .from(schema.messages)
+      .where(eq(schema.messages.conversationId, conversationId));
+    expect(stored?.text).toHaveLength(4_000);
+    expect(stored?.media).toHaveLength(20);
+  });
+
   it('refuses a forbidden transition without writing anything', async () => {
     const { conversationId } = await ingest('c-forbidden');
     const draftId = await respond(conversationId);
