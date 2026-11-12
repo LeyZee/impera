@@ -1,7 +1,7 @@
 # Coffre Reveal : importer les scripts existants et les relier aux médias du coffre
 Statut : proposed (ID à donner ; ADR 0099 temps 2, P6-01 ; propriétaire proposé : Médias pour le module `scripts`, Bilan pour la lecture Reveal déjà dans P2-02)
 Phase : 6
-Dépend de : P2-02 (`listScripts`), `PROPOSED-vault-sync.md`, P6-01, SC-04 c8 (identité de script)
+Dépend de : P2-02 (`listScripts`), `PROPOSED-vault-sync.md`, P6-01, SC-04 c8 (identité de script, rattachable à un script de toute origine)
 Branche : task/<id>-vault-import-scripts
 
 ## Objectif
@@ -11,8 +11,10 @@ Les séquences de scripts déjà dans Reveal deviennent des scripts d'Impera, re
 ADR 0099 (§ 1, § 3), ADR 0098 (déroulé et clés de segment), P6-01, `docs/reference/reveal-connector-spec.md` § 6, fiche SC-04 (lot c8).
 
 ## À faire
+- [ ] Table des scripts importés nommée dans la fiche à son démarrage, `creator_id` sous FORCE RLS, migration dont le numéro est demandé au coordinateur.
 - [ ] Import des séquences et de leurs étapes dans l'ordre de `stepIndex` ; un script disparu de Reveal est désactivé, jamais supprimé.
-- [ ] Prix de chaque étape lu dans la séquence Reveal, repris tel quel par la synthèse (remarque Médias, point 5) ; avertissement à l'import pour un palier plus du double ou au-dessus de 40 $ (P6-01).
+- [ ] Prix de chaque étape lu dans la séquence Reveal, repris tel quel par la synthèse (remarque Médias, point 5). Le prix Reveal est facultatif et lu en centimes TTC en euros ; le plafond « 40 $ » de P6-01 doit fixer son unité avant le code. Avertissement à l'import pour un palier plus du double ou au-dessus du plafond.
+- [ ] Un média d'étape absent du coffre rend l'étape incomplète, donc le script non proposable.
 - [ ] Un script importé garde le nom de Reveal.
 - [ ] « Proposable » = chaque média a une description validée **et** l'identité du script (schéma c8, unique) est validée (remarque Médias, point 6).
 

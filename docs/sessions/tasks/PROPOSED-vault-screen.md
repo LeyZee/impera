@@ -11,8 +11,11 @@ L'agence voit le coffre de chaque créatrice rangé comme dans Reveal, valide le
 ADR 0099, ADR 0100, ADR 0083, ADR 0086 (forme de la mesure), `PROPOSED-media-library.md` (§ Écran, déjà détaillé), règles DESIGN du projet (aucun contrôle natif, `Select` partagé, une carte par sujet, rouge urgences, ambre avertissements).
 
 ## À faire
+Trois lots, une PR chacun : (a) médiathèque, (b) composition, (c) relecture IA, interrupteur et mesure.
+- [ ] Nom de l'onglet à soumettre à Charles : « Médias » se confond avec « Contenu ».
+- [ ] Routes de validation par média au harnais d'isolation.
 - [ ] Créatrices › Médias : grille par dossier dans l'ordre de Reveal, « décrits / à décrire » par dossier, vignettes floutées par défaut, fiche du média avec correction et « Valider ».
-- [ ] Composer un script : choisir des médias synchronisés et décrits, ordre par défaut celui de Reveal, prix depuis la grille de l'agence ; nom d'un script composé fixé à part des `S0NN` des scripts tournés (remarque Médias, point 6).
+- [ ] Composer un script : choisir des médias synchronisés et décrits, ordre par défaut celui de Reveal, prix depuis la grille de l'agence, « Prix à fixer » tant qu'elle n'existe pas ; nom d'un script composé fixé à part des `S0NN` des scripts tournés (remarque Médias, point 6).
 - [ ] Relire un script écrit par l'IA : garder, retoucher, refuser ; « Créer dans Reveal ».
 - [ ] Interrupteur « création sans relecture » par créatrice, propriétaire seul, dans Créatrices › Scripts, avec la mesure gardé / retouché / refusé à la manière de 0086 (remarque Médias sur 0100, point 5).
 - [ ] Rien pour une créatrice archivée.
