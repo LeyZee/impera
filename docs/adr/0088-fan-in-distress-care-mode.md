@@ -15,7 +15,7 @@ Le chatteur ne sait pas quoi faire. Et Charles ne veut pas que ce soit un chatte
 
 ## Décision
 
-1. **Ce qui ouvre le mode soin.** Les risques `distress`, `self_harm` et `real_abuse` (le récit d'un abus réel), lus par le cerveau ou par le filet en code. Rien d'autre : un mineur possible garde sa passation (aucune réponse de l'agent), et le harcèlement, la demande dangereuse et l'arme gardent « Ne plus lui écrire ».
+1. **Ce qui ouvre le mode soin.** Les risques `distress` (y compris le récit d'un abus qu'il a subi) et `self_harm`, lus par le cerveau ou par le filet en code. Rien d'autre : un mineur possible garde sa passation (aucune réponse de l'agent), et le harcèlement, la demande dangereuse, l'arme et `real_abuse` (un abus qu'il a commis) gardent « Ne plus lui écrire ».
 
 2. **Ce que le code pose sur le fan.** Plus de « Ne plus lui écrire » pour ces trois risques. À la place :
    - **ventes gelées** (`salesFrozen`, raison `distress`) : aucune offre, aucun script, aucun média payant, aucun chouinage, aucune relance commerciale. La politique le vérifie avant tout appel au modèle, comme aujourd'hui ;
@@ -28,7 +28,7 @@ Le chatteur ne sait pas quoi faire. Et Charles ne veut pas que ce soit un chatte
 
 5. **Toujours validé par un humain.** En mode soin, chaque réponse de l'agent est un brouillon qui attend un humain, même si la créatrice est en Automatique (ADR 0019). Valident : le chatteur en poste sur la créatrice, un manager ou le propriétaire. **Valider** et **Retoucher** passent par la garde `care` : une retouche qui ajoute un prix, un lien, un média ou un mot sexuel est refusée avec la raison. **Refuser** ne laisse pas le chatteur seul : l'agent propose une autre réponse, trois fois au plus par message du fan ; ensuite, la ligne rouge dit « Réponds-lui toi-même ». Un nouveau message du fan remplace le brouillon en attente, il ne s'empile pas. La réponse soin se valide dans le lecteur du Suivi ; le panneau copilote la montre aussi, même quand ses brouillons sont éteints (ADR 0086). Jamais d'envoi sans validation : si personne ne valide, rien ne part, même après une heure ; la ligne rouge reste et l'alerte Telegram urgente est renvoyée une fois au bout d'une heure. Tant que le connecteur de messagerie Reveal n'envoie pas (P2-02 à P2-06), « Valider » ne peut rien envoyer : l'humain copie la réponse validée dans Reveal (décision de Charles du 11/11 : « Copier le texte »), et la garde `care` ne protège que ce qui passe par le CRM.
 
-5 bis. **Quand l'IA ne répond pas.** Si le modèle refuse, répond par son propre texte de sécurité (arrêté par `ai_disclosure`), tombe en panne, ou si le budget du jour est atteint, aucune réponse n'est proposée : la ligne rouge devient « L'IA n'a pas pu lui répondre : réponds-lui toi-même », jamais le silence. Même repli quand `distress` ou `real_abuse` ne peuvent pas être lus faute de modèle : le filet en code ne voit que les idées noires et le mineur, le reste dépend du cerveau.
+5 bis. **Quand l'IA ne répond pas.** Si le modèle refuse, répond par son propre texte de sécurité (arrêté par `ai_disclosure`), tombe en panne, ou si le budget du jour est atteint, aucune réponse n'est proposée : la ligne rouge devient « L'IA n'a pas pu lui répondre : réponds-lui toi-même », jamais le silence. Même repli quand `distress` ne peut pas être lu faute de modèle : le filet en code ne voit que les idées noires et le mineur, le reste dépend du cerveau.
 
 6. **Ce que voit l'équipe.**
    - « À traiter » : ligne rouge « Détresse : l'agent lui répond avec douceur, valide sa réponse », qui reste rouge tant qu'une réponse attend.
@@ -45,7 +45,7 @@ Le chatteur ne sait pas quoi faire. Et Charles ne veut pas que ce soit un chatte
 
 - Le fan en détresse reçoit une réponse rapide, humaine dans le ton, sans vente possible : c'est le code qui la bloque, pas la bonne volonté du chatteur.
 - Un humain lit chaque mot avant qu'il parte : le modèle ne parle jamais seul à quelqu'un qui parle d'en finir.
-- Code (relecture du fil Agent, 11/11) : `holdDecision` gagne un cas `care` à part de `handoff` ; `protectionFor` sort `distress`, `self_harm` et `real_abuse` de `STOP_SIGNS` vers une liste `CARE_SIGNS` (ventes gelées, raison `distress`, et `noExplicit`), reprise par `protectionWhileAnswering`.
+- Code (relecture du fil Agent, 11/11) : `holdDecision` gagne un cas `care` à part de `handoff` ; `protectionFor` sort `distress` et `self_harm` de `STOP_SIGNS` vers une liste `CARE_SIGNS` (ventes gelées, raison `distress`, et `noExplicit`), reprise par `protectionWhileAnswering`.
 - Coût : un prompt « voix · soin » versionné, une garde `care`, un état de conversation (mode soin) et une migration pour l'enregistrer (numéro à demander), des textes d'écran, et des évals sur des messages inventés (`evals/`), jamais de vrai message de fan.
 - Risque connu : le chatteur peut toujours écrire lui-même dans Reveal. Le CRM ne peut pas l'empêcher, mais les ventes gelées coupent toute vente proposée par l'agent, et l'équipe voit le bandeau rouge.
 
@@ -53,7 +53,7 @@ Le chatteur ne sait pas quoi faire. Et Charles ne veut pas que ce soit un chatte
 
 Par Charles le 11/11/2026 à 17 h 39 (« Je suis d'accord avec toutes tes recos. Applique tes recos. ») :
 
-1. Le récit d'un abus réel (`real_abuse`) entre en mode soin.
+1. Le récit d'un abus réel qu'il a subi entre en mode soin (précisé le 12/11 : victime seulement, pas l'auteur).
 2. Après la sortie, les ventes restent gelées 30 jours.
 3. Sur les idées noires, la bulle fixe du 3114 part une fois par épisode.
 4. Sans validation, rien ne part, même après une heure.
@@ -61,5 +61,5 @@ Par Charles le 11/11/2026 à 17 h 39 (« Je suis d'accord avec toutes tes recos.
 ## Mise en œuvre
 
 - Lot 1 (serveur, 12/11) : `agent/domain/hold.ts` (`CARE_RISKS`, `holdDecision` → `care`, `Protection.care`), `agent/domain/care.ts` (consignes de la voix en soin, garde `care_breach`, bulle d'aide), le composeur (`settleCare`), les événements `care_opened` et `care_closed`, la migration 0166 (`conversations.care_since`, `care_help_at`, `care_closed_at`) et `POST /v1/conversations/:id/care/close` (propriétaire ou manager). Les consignes de la voix en soin sont une consigne écrite par le code, comme les autres consignes fixées par le code (`compose.ts`), versionnée avec lui.
-- Question rouverte le 12/11 : `real_abuse` couvre aussi le fan qui raconte un abus qu'il a commis (corpus L28). Tant que le cerveau ne distingue pas la victime de l'auteur, `real_abuse` garde la passation et « Ne plus lui écrire » ; carte posée à Charles.
+- Tranché par Charles le 12/11 (« victime seulement ») : le mode soin couvre le fan qui raconte un abus qu'il a subi, lu comme `distress` ; `real_abuse` ne nomme plus que l'abus qu'il a commis (corpus L28) et garde la passation et « Ne plus lui écrire ». Le prompt du cerveau le dit ainsi.
 - Lots suivants : les écrans (bandeau, ligne rouge d'« À traiter », fiche, « Il va mieux »), la réponse proposée de nouveau après un refus (trois fois au plus), le rappel Telegram au bout d'une heure, la levée des ventes gelées 30 jours après la sortie.
