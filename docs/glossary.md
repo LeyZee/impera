@@ -112,6 +112,9 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Vente | `sale` | Une transaction détectée sur la plateforme. Montant en centimes + devise. |
 | Script | `script` | Séquence d'étapes de vente (structure). Phase 6. |
 | Étape | `script_step` | Une étape d'un script (message, médias, prix, pacing). |
+| Déroulé de script | `script_run` | Un script du catalogue proposé à un fan, suivi étape par étape par le code : l'étape en cours, ce qui est parti, ouvert, acheté ou refusé, et son état (`open`, `bought_out`, `refused`, `stalled`, `closed_by_human`). Au plus un ouvert par fan ; un script ne se rejoue jamais au même fan ; un déroulé ne reprend jamais une autre session chaude (ADR 0098). |
+| Étape offerte | `free` | Une étape de script qui part sans prix (le teasing, en séries A, B ou C) ; elle ne compte pas comme une offre pour le délai entre deux scripts, sauf la première, qui ouvre le script (ADR 0098). |
+| Étape payante | `paid` | Une étape de script vendue au prix du catalogue ; la seule qui compte comme une offre (`offer_made`, `lastOfferAt`). Ignorée par le fan deux messages de suite, elle compte comme refusée (ADR 0098). |
 | Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript, dans la couleur du script (ADR 0064). |
 | Couleur du script | `script_color` | Les trois tons d'une structure, qui colorent tous ses cartons pour qu'on retrouve le script d'un coup d'œil (ADR 0064). |
 | Structure | `script_structure` | Ossature d'un script, tenue par l'agence : segments ordonnés (étapes et ponts), emplacements attendus, intention, moment ; versionnée, figée dès qu'elle est demandée (ADR 0056). |
