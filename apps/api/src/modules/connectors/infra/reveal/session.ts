@@ -19,8 +19,10 @@ const RevealSessionSchema = z.strictObject({
   capturedAt: z.iso.datetime(),
 });
 
-/** `null` for anything that is not a Reveal session of this shape: the route refuses it before storing. */
-export const revealSessionShape: SessionShape = (raw) => {
+export type RevealSession = z.infer<typeof RevealSessionSchema>;
+
+/** The session, or `null` for anything that is not a Reveal session of this shape. Never logs what it read. */
+export function parseRevealSession(raw: string): RevealSession | null {
   let json: unknown;
   try {
     json = JSON.parse(raw);
@@ -28,5 +30,11 @@ export const revealSessionShape: SessionShape = (raw) => {
     return null;
   }
   const parsed = RevealSessionSchema.safeParse(json);
-  return parsed.success ? { owner: parsed.data.modelId } : null;
+  return parsed.success ? parsed.data : null;
+}
+
+/** `null` for anything that is not a Reveal session of this shape: the route refuses it before storing. */
+export const revealSessionShape: SessionShape = (raw) => {
+  const session = parseRevealSession(raw);
+  return session === null ? null : { owner: session.modelId };
 };

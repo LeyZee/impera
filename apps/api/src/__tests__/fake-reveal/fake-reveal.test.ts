@@ -490,5 +490,12 @@ it('declares the capabilities a Reveal connector can claim', () => {
     markRead: true,
     typing: true,
     realtime: false,
+    fanProfile: true,
+    fanNoteRead: true,
+    creatorNotes: true,
+    ppvStats: true,
+    scripts: true,
+    scriptHistory: true,
+    vault: true,
   });
 });

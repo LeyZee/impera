@@ -76,6 +76,16 @@ export { dailyStatsOf, type DailyStatsDay } from './infra/db/daily-stats-store';
 /** @public Which totals a read gives (CRM-04). */
 export type { SalesRefundsQuery, SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';
+/** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
+export { revealApiConnectors } from './infra/reveal/connector';
+export type { RevealFetch } from './infra/reveal/client';
+/** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */
+export {
+  REVEAL_ENDPOINTS,
+  RevealMediaTypeSchema,
+  type RevealWireMedia,
+  type RevealWireMessageItem,
+} from './infra/reveal/wire';
 
 function bothReports(keys: ResealReport, webhooks: ResealReport): ResealReport {
   return {
