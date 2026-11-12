@@ -56,6 +56,21 @@ export function saleWhen(sale: HeldSale, timeZone: string): string {
   return `Remboursement du ${momentAt(sale.occurredAt, timeZone)}${of}`;
 }
 
+/**
+ * The lines in the order the validator reads them: by their own instant, the oldest first, then by key. The server
+ * gives them in key order, which reads as no order at all (recette paie, 11/11).
+ */
+export function heldInOrder<T extends Pick<HeldSale, 'occurredAt' | 'platformSaleId' | 'event'>>(
+  sales: readonly T[],
+): T[] {
+  return [...sales].sort(
+    (a, b) =>
+      Date.parse(a.occurredAt) - Date.parse(b.occurredAt) ||
+      a.platformSaleId.localeCompare(b.platformSaleId) ||
+      a.event.localeCompare(b.event),
+  );
+}
+
 /** The line's net, signed: a refund takes off. */
 export const saleAmount = (sale: HeldSale): string => signedAmountText(sale.netMinor, sale.currency);
 
@@ -84,7 +99,6 @@ function departedText(
 export function heldReasonText(
   sale: Pick<HeldSale, 'platform' | 'reason' | 'event' | 'memberLeftOn' | 'saleOccurredAt'>,
   member: SaleMember | null,
-  owner: boolean,
   timeZone: string,
 ): string | null {
   const reason: SaleHeldReason | null = sale.reason;
@@ -95,11 +109,11 @@ export function heldReasonText(
     case 'chatter_unlinked': {
       const unlinked = `Son chatteur sur ${platformName(sale.platform)} n’est relié à aucun membre`;
       const otherwise = refund ? 'Sinon, écarte-le.' : 'Sinon, écarte-la.';
+      // Only the owner and an active manager read this list, and both link in Équipe (ADR 0076).
       const where = `Équipe › ${platformName(sale.platform)}`;
-      if (!owner) return `${unlinked} : le propriétaire le relie dans ${where}. ${otherwise}`;
       return refund
-        ? `${unlinked} : relie-le dans ${where} et le remboursement se déduit seul. ${otherwise}`
-        : `${unlinked} : relie-le dans ${where} et la vente compte seule. ${otherwise}`;
+        ? `${unlinked}\u00a0: relie-le dans ${where} et le remboursement se déduit seul. ${otherwise}`
+        : `${unlinked}\u00a0: relie-le dans ${where} et la vente compte seule. ${otherwise}`;
     }
     case 'off_shift':
       if (member !== null && sale.memberLeftOn !== null)
