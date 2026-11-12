@@ -142,7 +142,7 @@ Branche : task/<id>-<slug>
 | OPS-04 | Plantage journalisé, repli d'écriture épinglé, prix relus | exploitation | done | — |
 | OPS-05 | Les évaluations lisent la clé posée dans le CRM | exploitation | done | ADR 0016, P3-03 |
 | OPS-06 | Grok 4.7 réfléchit moins longtemps que ses délais | exploitation | done | ADR 0009, OPS-05 |
-| OPS-07 | Le juge des évaluations lit le moment que l'agent a vu | exploitation | in_progress | ADR 0009, OPS-06 |
+| OPS-07 | Le juge des évaluations lit le moment que l'agent a vu | exploitation | done | ADR 0009, OPS-06 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
