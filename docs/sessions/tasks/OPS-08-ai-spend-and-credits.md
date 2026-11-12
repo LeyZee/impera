@@ -1,4 +1,4 @@
-# OPS-06 La consommation IA et les crédits prépayés dans le CRM
+# OPS-08 La consommation IA et les crédits prépayés dans le CRM
 Statut : review (demande de Charles du 11/11/2026, 18 h 37 ; choix et seuils : ADR 0091)
 Phase : exploitation
 Dépend de : `llm_calls` (P3-03), plafond du jour (`packages/llm`), alertes Telegram (P3-07)

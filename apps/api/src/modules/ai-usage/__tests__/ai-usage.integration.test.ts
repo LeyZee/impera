@@ -146,6 +146,12 @@ describe('/v1/settings/ai-usage', () => {
       headers: { cookie: owner, origin: DASHBOARD_ORIGIN },
     });
     expect(removed.statusCode).toBe(204);
+    // Taken back like it was written: one audit line each way.
+    const removal = await test.admin.db
+      .select({ details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, 'ai_credit.remove'), eq(schema.auditLog.entityId, id)));
+    expect(removal).toHaveLength(1);
     const again = await server.inject({
       method: 'DELETE',
       url: `/v1/settings/ai-usage/credits/${id}`,
