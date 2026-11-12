@@ -1,6 +1,6 @@
 # 0099. Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser
 
-Statut : proposed
+Statut : accepted (« ok 0099 » de Charles le 12/11/2026, 23 h 27, fil « Synchroniser le Vault Reveal », après son choix du 12/11 à 23 h 25 : scripts composés dans le CRM puis créés dans Reveal ; § 3 sur sa demande de 23 h 26)
 Date : 2026-11-12
 Précise : l'ADR 0030 (médiathèque, le coffre fait foi), l'ADR 0018 (port étendu, garde d'écriture), l'ADR 0083 (description détaillée, validée avant usage) et la fiche P6-01 (catalogue = index des scripts Reveal). Ne remplace rien.
 
