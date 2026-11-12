@@ -136,8 +136,8 @@ export function profileOf(item: ConversationItem, stats: Answer<'conversations.s
 }
 
 /**
- * `getFanPpvStats`: the buy rate and the price range of the priced bundles (`kind=paid`), and every bundle, priced
- * and free, newest first.
+ * `getFanPpvStats`: the buy rate, the price range and the last offer of the priced bundles (`kind=paid`), and every
+ * bundle, priced and free, newest first.
  */
 export function ppvStatsOf(
   paid: { readonly first: Answer<'conversations.ppvHistory'>; readonly bundles: readonly PpvBundle[] },
@@ -149,6 +149,11 @@ export function ppvStatsOf(
     highestPriceMinor: paid.first.highestPrice,
     lowestPriceMinor: paid.first.lowestPrice,
     currency: REVEAL_CURRENCY,
+    // The newest `createdAt` of the priced bundles (`kind=paid`): Reveal gives no field of its own for it.
+    lastOfferAt: paid.bundles.reduce<string | null>(
+      (last, bundle) => (last === null || bundle.createdAt > last ? bundle.createdAt : last),
+      null,
+    ),
     bundles: [...paid.bundles, ...free]
       .map((bundle) => ({
         ref: ref(bundle.id),

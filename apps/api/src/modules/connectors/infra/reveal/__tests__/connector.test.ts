@@ -256,6 +256,9 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     expect(await connector.getCreatorNotes()).toEqual([{ text: 'Note du modèle de test' }]);
     const ppv = await connector.getFanPpvStats(fan('fan_02'));
     expect(ppv).toMatchObject({ purchased: 2, offered: 3, highestPriceMinor: 3_000, lowestPriceMinor: 500 });
+    // Sequence 1's last step, sent to fan 02 at minute 2 240 of the world, never bought.
+    expect(ppv.lastOfferAt).toBe('2026-10-02T23:20:00.000Z');
+    expect((await connector.getFanPpvStats(fan('fan_04'))).lastOfferAt).toBeNull();
     expect(ppv.bundles.map((b) => [b.priceMinor, b.isPaid])).toEqual([
       [3_000, false],
       [1_500, true],

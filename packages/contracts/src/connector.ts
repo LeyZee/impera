@@ -141,6 +141,8 @@ export const FanPpvStatsSchema = z.object({
   highestPriceMinor: z.number().int().min(0).nullable(),
   lowestPriceMinor: z.number().int().min(0).nullable(),
   currency: CurrencySchema,
+  /** When the last priced bundle was sent to him, bought or not; `null` when none was. */
+  lastOfferAt: z.iso.datetime().nullable(),
   /** Newest first, priced and free. */
   bundles: z.array(PpvOfferSchema),
 });
