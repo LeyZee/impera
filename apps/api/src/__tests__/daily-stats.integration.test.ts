@@ -219,23 +219,53 @@ describe('daily statistics of the platform (ADR 0081)', () => {
     expect(await counted()).toBe(6);
   });
 
-  it('keeps the days by account when those by chatter come back changed, and says so once', async () => {
+  it('keeps the days by account and leaves the feed alone when the call by chatter alone fails', async () => {
     const signals = async () => {
       const result = await test.admin.db.execute(
-        sql`select count(*)::int as n from domain_events where type = 'sales_feed_signal' and payload->'signal'->>'kind' = 'unexpected_answer'`,
+        sql`select count(*)::int as n from domain_events where type = 'sales_feed_signal'`,
       );
       return z.array(z.object({ n: z.number() })).parse(result.rows)[0]?.n ?? 0;
     };
+    const pausedUntil = async () =>
+      (
+        await test.admin.db
+          .select({ pausedUntil: schema.salesFeedCursors.pausedUntil })
+          .from(schema.salesFeedCursors)
+          .where(eq(schema.salesFeedCursors.platform, 'reveal'))
+      )[0]?.pausedUntil ?? null;
+    const feedState = async (): Promise<unknown> => {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/v1/settings/sales-feeds',
+        headers: { cookie: owner, origin: DASHBOARD_ORIGIN },
+      });
+      const body: unknown = response.json();
+      return body;
+    };
+    const [signalsBefore, stateBefore] = [await signals(), await feedState()];
     const before = await chatterPhoto();
+
+    // A changed shape: the days by account are written, nothing by chatter, no alert, the feed's state unchanged.
     crm.sell({ id: 'sale_stats_07', createdAt: at(today) });
     crm.breakChatterStatsShape(1);
     await run();
     expect((await photo()).find((row) => row.day === today)?.ppvPurchased).toBe(3);
     expect(await chatterPhoto()).toEqual(before);
     expect(await counted()).toBe(8);
-    expect(await signals()).toBe(1);
+    expect(await signals()).toBe(signalsBefore);
+    expect(await feedState()).toEqual(stateBefore);
+
+    // A 429 on this call alone: the sales reading is not paused.
+    crm.rateLimitChatterStats(1, 120);
+    await run();
+    expect(await pausedUntil()).toBeNull();
+    expect(await chatterPhoto()).toEqual(before);
+    expect(await feedState()).toEqual(stateBefore);
+
+    // The next hour reads the same days again.
     await run();
     expect((await chatterPhoto()).find((row) => row.day === today)?.ppvPurchased).toBe(3);
+    expect(await counted()).toBe(12);
   });
 
   it('calls no more once fewer than 100 of the day’s 500 calls are left', async () => {

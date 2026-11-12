@@ -392,7 +392,23 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     await store.countCall(platform, day);
     const byChatter = await feed.chatterDailyStats(range);
     if (!byChatter.ok) {
-      await onFailure(platform, stored, byChatter.failure, logger, correlationId);
+      const { failure } = byChatter;
+      // The days by chatter only serve steering (ADR 0092 § 1): a refused key speaks for the whole feed, any other
+      // failure of this call alone leaves the feed, its cursor, its state and its alerts as they are. Paths only in the
+      // detail, never values (adapter); the next hour reads the same days again.
+      if (failure.kind === 'refused') {
+        await onFailure(platform, stored, failure, logger, correlationId);
+        return;
+      }
+      logger.warn(
+        {
+          platform,
+          reason: 'chatter_stats_unread',
+          kind: failure.kind,
+          ...(failure.kind === 'unexpected_answer' ? { detail: failure.detail } : {}),
+        },
+        'chatter statistics not read this time: the feed is left as it is',
+      );
       return;
     }
     const chatterRows = chatterStatsRows(platform, byChatter.value, links);
