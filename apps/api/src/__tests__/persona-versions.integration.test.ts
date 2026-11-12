@@ -8,6 +8,7 @@ import {
   newId,
   PersonaSampleReplyUnprocessableDetailsSchema,
   PersonaSchema,
+  PersonaV2Schema,
   PersonaVersionIdSchema,
   type CreatorId,
   type Persona,
@@ -390,5 +391,28 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     expect(list.json<{ creators: { displayName: string }[] }>().creators.map((c) => c.displayName)).toContain(
       'Cleo',
     );
+  });
+
+  it('lets only the owner read her objection replies, a chatter reads her versions without them (ADR 0090 § B)', async () => {
+    const banked = PersonaV2Schema.parse(
+      parse(
+        readFileSync(
+          fileURLToPath(new URL('../../../../personas/demo/v0.4.0.yaml', import.meta.url)),
+          'utf8',
+        ),
+      ),
+    );
+    const stored = await post(anna, owner, {
+      persona: { ...banked, meta: { ...banked.meta, version: '9.0.0' } },
+      basedOn: (await get(anna, owner)).json<PersonaOverview>().latest?.summary.contentHash ?? null,
+    });
+    expect(stored.statusCode).toBe(201);
+    const bank = banked.agent.objection_replies;
+    expect(Object.keys(bank)).not.toHaveLength(0);
+    const asOwner = (await get(anna, owner)).json<PersonaOverview>().latest;
+    expect(asOwner?.draft.agent.objection_replies).toEqual(bank);
+    const asChatter = (await get(anna, operator)).json<PersonaOverview>().latest;
+    expect(asChatter?.draft.agent.objection_replies).toEqual({});
+    expect(JSON.stringify(asChatter)).not.toContain('Réplique de test');
   });
 });

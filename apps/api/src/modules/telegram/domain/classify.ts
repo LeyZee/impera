@@ -86,6 +86,7 @@ const CAUSE_TEXT: Readonly<Record<HandoffCause, string>> = {
   custom_alert: 'Une alerte personnalisée a sonné.',
   identity_doubt: 'Le fan doute de parler vraiment à la créatrice.',
   persona_inactive: 'La créatrice n’a pas de persona active : l’agent n’écrit rien.',
+  custom_order: 'Le fan demande quelque chose fait pour lui : un humain prend la commande.',
 };
 
 /**

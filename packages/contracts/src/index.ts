@@ -35,6 +35,7 @@ export * from './jobs';
 export * from './media';
 export * from './money';
 export * from './normalise';
+export * from './objections';
 export * from './notifications';
 export * from './pasted-secret';
 export * from './pay-periods';

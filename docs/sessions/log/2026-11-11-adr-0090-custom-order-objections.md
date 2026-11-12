@@ -1,0 +1,7 @@
+# 2026-11-11 — ADR 0090 : demande sur mesure et répliques aux objections — done
+Fait : ADR 0090 écrite acceptée (« ok 0090 », Charles, 17h59) ; décision `customOrderDecision` et garde `no_commitment` ; choix `pickObjectionReply` et bloc `<objection_reply>` ; événements `custom_order_opened` et `objection_reply_used` (migration 0165) ; cause de passation `custom_order`, ligne « Demande sur mesure » dans « À traiter » ; banque `agent.objection_replies` éditée et lue par le propriétaire seul, contrôlée par les gardes dures à l'enregistrement ; deux questions de plus dans « Style de conversation » (61) ; persona de démo v0.4.0 ; prompts cerveau 1.12.0 et voix 1.7.0 ; sept scénarios d'évals ; glossaire et `persona-schema.md`.
+Pas fait : les évals sur le vrai modèle (passage à lancer avec la clé xAI) ; le routage personnel de la passation au chatteur en poste (EQ-08).
+Décisions : toutes les répliques d'un type déjà reçues, ou le type `other` : la voix répond seule ; une réplique compte comme reçue dès son brouillon, même refusé ; ses limites inconnues (playground) : réponse d'attente sans commande ouverte.
+Découvertes : `evals/README.md` dit « smoke ≤ 30 » mais la suite smoke compte déjà plus de 30 scénarios et rien ne l'impose ; les nouveaux scénarios sont `tier: full` sauf deux.
+Candidats à suppression : aucun.
+Vérifié : pnpm check, pnpm test, tests d'intégration touchés (voir PR).

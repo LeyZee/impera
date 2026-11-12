@@ -17,6 +17,7 @@ import {
 import {
   and,
   eq,
+  inArray,
   schema,
   sql,
   withTenant,
@@ -352,6 +353,30 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         return rows
           .map(toStoredEvent)
           .flatMap(({ body }) => (body.type === 'alert_triggered' ? [body.payload.trigger] : []));
+      },
+      async salesState(conversationId) {
+        const rows = await tx
+          .select()
+          .from(schema.conversationEvents)
+          .where(
+            and(
+              eq(schema.conversationEvents.conversationId, conversationId),
+              inArray(schema.conversationEvents.type, [
+                'custom_order_opened',
+                'objection_reply_used',
+                'takeover_started',
+              ]),
+            ),
+          )
+          .orderBy(schema.conversationEvents.seq);
+        let customOrderOpen = false;
+        const usedObjectionReplies: string[] = [];
+        for (const { body } of rows.map(toStoredEvent)) {
+          if (body.type === 'custom_order_opened') customOrderOpen = true;
+          if (body.type === 'takeover_started') customOrderOpen = false;
+          if (body.type === 'objection_reply_used') usedObjectionReplies.push(body.payload.replyId);
+        }
+        return { customOrderOpen, usedObjectionReplies };
       },
       async list(conversationId) {
         const rows = await tx

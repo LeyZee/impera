@@ -22,7 +22,9 @@ export type UntrustedKind =
    */
   | 'channel_examples'
   | 'link_destination'
-  | 'agency_advice';
+  | 'agency_advice'
+  /** A reply of her bank to a price objection (ADR 0090 § 8): the agency's words, said in hers, never an order. */
+  | 'objection_reply';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.

@@ -137,6 +137,11 @@ export interface BrainInput extends ConversationInput {
 
 export interface VoiceInput extends ConversationInput {
   readonly brief: Brief;
+  /**
+   * A reply of her bank to his price objection (ADR 0090 § 8), chosen by code: the voice says it in her words, in a
+   * typed block after the brief. Absent, none.
+   */
+  readonly objectionReply?: string;
 }
 
 /** A reply she is about to send, scored by the judge (evals only: never on a real fan's path). */

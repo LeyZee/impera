@@ -71,7 +71,7 @@ const files =
 
 const today = '2026-11-06';
 const persona = readPersonaFile(
-  readFileSync(resolve(ROOT, 'personas/demo/v0.3.0.yaml'), 'utf8'),
+  readFileSync(resolve(ROOT, 'personas/demo/v0.4.0.yaml'), 'utf8'),
   'Elena',
   today,
 );
@@ -184,12 +184,28 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         counted: false,
       },
       skipVoice: (brief) => brief === undefined || holdDecision(brief).kind !== 'answer',
+      customOrder: {
+        chatterOnShift: situation.chatter_on_shift,
+        orderOpen: situation.custom_order_open,
+        flags: {
+          ...(situation.age_confirmed && { ageConfirmedAt: '2026-10-01T10:00:00.000Z' }),
+          ...(situation.sales_frozen && {
+            salesFrozen: { reason: 'operator', since: '2026-10-10T10:00:00.000Z' },
+          }),
+        },
+      },
+      objections: {
+        bank: persona.objectionReplies,
+        usedReplyIds: new Set(situation.objection_replies_used),
+      },
       ...(alerts.length > 0 && { alerts: alerts.map(({ id, phrase }) => ({ id, phrase })) }),
     },
   );
   const { brief } = composed;
   const handoff =
-    composed.handoff !== undefined || (brief !== undefined && holdDecision(brief).kind === 'handoff');
+    composed.handoff !== undefined ||
+    composed.customOrder?.kind === 'handoff' ||
+    (brief !== undefined && holdDecision(brief).kind === 'handoff');
   const offer = composed.voiceBrief?.action === 'offer';
   const blocking = composed.violations.filter((v) => v.severity === 'blocking').map((v) => v.code);
   const bubbles = handoff || composed.isBlocked ? [] : composed.bubbles;
@@ -200,12 +216,15 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         risks: brief.risks,
         action: brief.action,
         ...(brief.desireSignals !== undefined && { desireSignals: brief.desireSignals }),
+        ...(brief.objection !== undefined && { objection: brief.objection }),
         alertsSeen: alerts.filter((a) => brief.alertsSeen?.includes(a.id) === true).map((a) => a.name),
       },
     }),
     handoff,
     offer,
     desireBand: desireBandOf(composed.desire?.score ?? situation.desire),
+    customOrder: composed.customOrder?.kind ?? 'none',
+    objectionReply: composed.objectionReply?.replyId ?? null,
     bubbles: composed.bubbles,
     blocking,
   };

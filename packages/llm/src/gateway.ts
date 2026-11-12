@@ -208,7 +208,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         persona_sheet: input.personaSheet,
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
-        brief: describeBrief(input.brief),
+        brief: describeBrief(input.brief, input.objectionReply),
         canary,
       });
       return run(

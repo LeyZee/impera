@@ -390,7 +390,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     llm,
     persona: persona.module,
     activePersona: persona.activePersona,
-    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.3.0.yaml'),
+    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.4.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
   });

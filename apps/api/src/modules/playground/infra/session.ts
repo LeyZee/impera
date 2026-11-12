@@ -1,4 +1,10 @@
-import { desireBandOf, type DesireBand, type DesireSignal, type MediaDescription } from '@impera/contracts';
+import {
+  desireBandOf,
+  type DesireBand,
+  type DesireSignal,
+  type MediaDescription,
+  type ObjectionReplies,
+} from '@impera/contracts';
 import type { Brief, ConversationTurn, LlmFailure, LlmGateway, VoiceInput } from '@impera/llm';
 
 import {
@@ -113,6 +119,8 @@ export interface PlaygroundDeps {
   readonly sexualizationLimits?: SexualizationLimits;
   /** Her follow-ups (`PersonaForModels.followUps`): without them, she never follows up. */
   readonly followUps?: { readonly delaysHours: readonly number[]; readonly spirit: string | null };
+  /** Her replies to a price objection (ADR 0090 § B): picked as for a real fan, never twice in a session. */
+  readonly objectionReplies?: ObjectionReplies;
 }
 
 /** Why nothing was written, for the trace: the daily cap, or each model that failed. */
@@ -142,6 +150,9 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   let lastOfferAt: Date | null = null;
   // His age, unknown until he states an adult one, as for a real fan (P3-09).
   let ageConfirmedAt: Date | null = null;
+  // ADR 0090: an order of his waits once she answered it; the replies of her bank he already received.
+  let customOrderOpen = false;
+  const usedObjectionReplies: string[] = [];
   // His last message on the simulated clock, and the follow-ups she wrote since: the next step is their count.
   let lastFanAt: Date | null = null;
   let followUpsSince = 0;
@@ -321,6 +332,15 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           fanNotes: moment.fanNotes,
           situation,
           ...(offer !== undefined && { offer }),
+          // No chatter in the playground: a custom order is answered committing to nothing, as with nobody on shift.
+          customOrder: {
+            chatterOnShift: false,
+            orderOpen: customOrderOpen,
+            flags: ageConfirmedAt === null ? {} : { ageConfirmedAt: ageConfirmedAt.toISOString() },
+          },
+          ...(deps.objectionReplies !== undefined && {
+            objections: { bank: deps.objectionReplies, usedReplyIds: new Set(usedObjectionReplies) },
+          }),
           ...(deps.sexualizationLimits !== undefined && {
             sexualization: {
               limits: deps.sexualizationLimits,
@@ -343,6 +363,9 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         },
       );
       if (composed.desire !== undefined) desire = { score: composed.desire.score, at: situation.now };
+      if (composed.customOrder?.kind === 'reply' && composed.customOrder.opens) customOrderOpen = true;
+      if (composed.objectionReply !== undefined && !composed.isBlocked)
+        usedObjectionReplies.push(composed.objectionReply.replyId);
       if (composed.ageDeclared !== undefined && ageConfirmedAt === null) ageConfirmedAt = situation.now;
       if (composed.voiceBrief?.action === 'offer' && !composed.isBlocked) {
         lastOfferAt = situation.now;

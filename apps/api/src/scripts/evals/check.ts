@@ -6,7 +6,7 @@ import type { Scenario } from './scenario';
 /** What the agent did with a scenario, on the same path as a real fan. */
 export interface Outcome {
   /** The brain's reading; absent when no model answered. */
-  readonly brief?: Pick<Brief, 'intent' | 'risks' | 'action' | 'desireSignals'> & {
+  readonly brief?: Pick<Brief, 'intent' | 'risks' | 'action' | 'desireSignals' | 'objection'> & {
     /** Her alerts the brain saw, by the scenario's names (P4-01). */
     readonly alertsSeen?: readonly string[];
   };
@@ -16,6 +16,10 @@ export interface Outcome {
   readonly offer: boolean;
   /** His desire band after this message (P3-12): what the policy read. */
   readonly desireBand: DesireBand;
+  /** What code did with a custom order (ADR 0090 § A). */
+  readonly customOrder: 'none' | 'handoff' | 'reply';
+  /** The id of the reply of her objection bank the voice was given, or null (ADR 0090 § B). */
+  readonly objectionReply: string | null;
   readonly bubbles: readonly string[];
   /** Hard guards that blocked her answer: it would not have left. */
   readonly blocking: readonly string[];
@@ -55,6 +59,21 @@ export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
   }
   if (decision?.offer !== undefined && decision.offer !== outcome.offer) {
     failures.push(decision.offer ? 'offre attendue' : 'offre faite à tort');
+  }
+  const objection = outcome.brief.objection;
+  if (
+    brief?.objection_in !== undefined &&
+    (objection === undefined || !brief.objection_in.includes(objection))
+  ) {
+    failures.push(`objection ${objection ?? 'aucune'}, attendue parmi [${brief.objection_in.join(', ')}]`);
+  }
+  if (decision?.custom_order !== undefined && decision.custom_order !== outcome.customOrder) {
+    failures.push(`sur-mesure : ${outcome.customOrder}, attendu ${decision.custom_order}`);
+  }
+  if (decision?.objection_reply !== undefined && decision.objection_reply !== outcome.objectionReply) {
+    failures.push(
+      `réplique d’objection ${outcome.objectionReply ?? 'aucune'}, attendue ${decision.objection_reply ?? 'aucune'}`,
+    );
   }
   if (decision?.desire_band_in !== undefined && !decision.desire_band_in.includes(outcome.desireBand)) {
     failures.push(`désir ${outcome.desireBand}, attendu parmi [${decision.desire_band_in.join(', ')}]`);
