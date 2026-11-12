@@ -27,6 +27,7 @@ import {
   newcomersLine,
   optionsOf,
   removalsLine,
+  removedLine,
   sectionsOf,
   tickedCount,
   type Choice,
@@ -487,6 +488,7 @@ function Who({
 }): JSX.Element {
   const models = modelsLine(row, platform);
   const gap = row.link?.kind === 'member' ? gapLine(row, platform) : null;
+  const removed = removedLine(row, platform);
   const member = row.removal === null ? undefined : team.find((one) => one.id === row.removal?.memberId);
   return (
     <div className="sf-imp__who">
@@ -497,6 +499,7 @@ function Who({
       </span>
       {models === null ? null : <span className="sf-imp__meta">{models}</span>}
       {gap === null ? null : <span className="sf-imp__meta">{gap}</span>}
+      {removed === null ? null : <span className="sf-imp__meta">{removed}</span>}
       {row.removal === null ? null : (
         <span className="sf-imp__meta rv-warn">
           {removalLine(

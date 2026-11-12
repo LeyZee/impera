@@ -20,6 +20,7 @@ import {
   newcomersLine,
   optionsOf,
   removalsLine,
+  removedLine,
   sectionsOf,
   tickedCount,
 } from './reveal';
@@ -98,9 +99,15 @@ describe('sectionsOf', () => {
 
 describe('a choice', () => {
   it('starts on the proposal, and an invitation never goes in the batch', () => {
-    expect(choiceOf({ kind: 'member', memberId: mid(1), memberDisplayName: 'Léa', match: 'email' })).toBe(
-      `member:${id(1)}`,
-    );
+    expect(
+      choiceOf({
+        kind: 'member',
+        memberId: mid(1),
+        memberDisplayName: 'Léa',
+        match: 'email',
+        departedOn: null,
+      }),
+    ).toBe(`member:${id(1)}`);
     expect(choiceOf({ kind: 'agent', match: 'session' })).toBe('agent');
     expect(choiceOf(null)).toBe('none');
     expect(linkOf(`member:${id(1)}`)).toEqual({ kind: 'member', memberId: mid(1) });
@@ -114,6 +121,7 @@ describe('a choice', () => {
     expect(optionsOf(row(), team).map((option) => option.label)).toEqual([
       'Léa',
       'Zoé',
+      'Parti (parti)',
       'L’agent',
       'Inviter dans l’équipe',
       'Personne',
@@ -126,18 +134,58 @@ describe('a choice', () => {
 
   it('keeps the member the server named, even when the team cannot be read', () => {
     const named = row({
-      suggestion: { kind: 'member', memberId: mid(7), memberDisplayName: 'Nora', match: 'name' },
+      suggestion: {
+        kind: 'member',
+        memberId: mid(7),
+        memberDisplayName: 'Nora',
+        match: 'name',
+        departedOn: null,
+      },
     });
     expect(optionsOf(named, [])[0]).toEqual({ value: `member:${id(7)}`, label: 'Nora' });
   });
 
+  it('keeps a departed member the server named, marked as departed, even when the team cannot be read', () => {
+    const named = row({
+      suggestion: {
+        kind: 'member',
+        memberId: mid(7),
+        memberDisplayName: 'Nora',
+        match: 'email',
+        departedOn: '2026-11-01',
+      },
+    });
+    expect(optionsOf(named, [])[0]).toEqual({ value: `member:${id(7)}`, label: 'Nora (parti)' });
+  });
+
   it('says why each proposal was made', () => {
-    expect(matchLine({ kind: 'member', memberId: mid(1), memberDisplayName: 'Léa', match: 'email' })).toBe(
-      'Même e-mail',
-    );
-    expect(matchLine({ kind: 'member', memberId: mid(1), memberDisplayName: 'Léa', match: 'name' })).toBe(
-      'Mêmes prénom et nom',
-    );
+    expect(
+      matchLine({
+        kind: 'member',
+        memberId: mid(1),
+        memberDisplayName: 'Léa',
+        match: 'email',
+        departedOn: '2026-11-01',
+      }),
+    ).toBe('Même e-mail · parti le 1er novembre 2026');
+    expect(
+      matchLine({
+        kind: 'member',
+        memberId: mid(1),
+        memberDisplayName: 'Léa',
+        match: 'email',
+        departedOn: null,
+      }),
+    ).toBe('Même e-mail');
+    expect(
+      matchLine({
+        kind: 'member',
+        memberId: mid(1),
+        memberDisplayName: 'Léa',
+        match: 'name',
+        departedOn: null,
+      }),
+    ).toBe('Mêmes prénom et nom');
     expect(matchLine({ kind: 'agent', match: 'name' })).toBe('Nommé « bot »');
     expect(matchLine({ kind: 'invite' })).toBe('Personne de l’équipe Impera avec cet e-mail');
     expect(matchLine(null)).toBeNull();
@@ -149,7 +197,13 @@ describe('the batch', () => {
     const rows = [
       row(
         {
-          suggestion: { kind: 'member', memberId: mid(1), memberDisplayName: 'Léa', match: 'email' },
+          suggestion: {
+            kind: 'member',
+            memberId: mid(1),
+            memberDisplayName: 'Léa',
+            match: 'email',
+            departedOn: null,
+          },
           preselected: true,
         },
         { platformChatterId: 'a' },
@@ -217,5 +271,23 @@ describe('what a row says', () => {
       creatorIds: [id(11)],
     });
     expect(invitePrefill(row({ models }), []).creatorIds).toEqual([]);
+  });
+});
+
+describe('an account removed from the platform', () => {
+  it('says it on a row without a member to alert about, and nothing on an account still there', () => {
+    expect(removedLine(row({}, { removedAt: '2026-11-05T12:00:00.000Z' }), 'Reveal')).toBe(
+      'Retiré de Reveal le 5 nov.',
+    );
+    expect(removedLine(row(), 'Reveal')).toBeNull();
+    expect(
+      removedLine(
+        row(
+          { removal: { memberId: mid(2), removedAt: '2026-11-05T12:00:00.000Z', absent: false } },
+          { removedAt: '2026-11-05T12:00:00.000Z' },
+        ),
+        'Reveal',
+      ),
+    ).toBeNull();
   });
 });

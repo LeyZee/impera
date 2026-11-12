@@ -508,4 +508,72 @@ describe('team imported from the platform after review (ADR 0076)', () => {
     await overviewAs(owner);
     expect((await counts()).removalCount).toBe(0);
   });
+
+  it('proposes a departed member on his e-mail and links him, and never invites an account removed from Reveal', async () => {
+    const hugoUser = 'user_test_hugo';
+    await test.admin.db
+      .insert(schema.user)
+      .values({ id: hugoUser, name: 'Hugo', email: 'hugo@recette.test', role: 'operator' });
+    const hugo = await member(hugoUser, 'chatter', 'Hugo');
+    await test.admin.db
+      .update(schema.teamMembers)
+      .set({ status: 'left', leftOn: '2026-11-01' })
+      .where(eq(schema.teamMembers.id, hugo));
+    listed = [
+      ...TEAM,
+      account('chatter_hugo', { firstName: 'Hugo', lastName: 'Test', email: 'hugo@recette.test' }),
+      account('chatter_out', {
+        firstName: 'Sorti',
+        lastName: 'Test',
+        email: 'sorti@recette.test',
+        removedAt: '2026-11-05T09:00:00.000Z',
+      }),
+    ];
+    try {
+      const overview = await overviewAs(manager);
+      expect(rowOf(overview, 'chatter_hugo')).toMatchObject({
+        suggestion: { kind: 'member', memberId: hugo, match: 'email', departedOn: '2026-11-01' },
+        preselected: false,
+      });
+      expect(rowOf(overview, 'chatter_hugo')?.actions).not.toContain('invite');
+      expect(rowOf(overview, 'chatter_out')).toMatchObject({ suggestion: null, preselected: false });
+      expect(rowOf(overview, 'chatter_out')?.actions).toEqual([
+        'link_member',
+        'link_agent',
+        'link_none',
+        'dismiss',
+      ]);
+      const out = await api('POST', '/team/chatter_out/invitation', owner, {
+        email: 'sorti@recette.test',
+        firstName: 'Sorti',
+        lastName: 'Test',
+        displayName: 'Sorti',
+        teamRole: 'chatter',
+        country: 'MG',
+        timeZone: 'Indian/Antananarivo',
+        color: null,
+        joinedOn: '2026-10-01',
+        creatorIds: [],
+        commission: { rateBps: 1_000 },
+        teamShareBps: null,
+      });
+      expect(out.statusCode, out.body).toBe(422);
+      expect(out.json()).toMatchObject({ error: { code: 'sales_feed_chatter_unprocessable' } });
+
+      const linked = await api('POST', '/team/links', manager, {
+        items: [{ platformChatterId: 'chatter_hugo', link: { kind: 'member', memberId: hugo } }],
+      });
+      expect(linked.statusCode, linked.body).toBe(200);
+      expect(TeamImportLinksResultSchema.parse(linked.json()).results).toEqual([
+        { platformChatterId: 'chatter_hugo', ok: true },
+      ]);
+      const [link] = await test.admin.db
+        .select({ kind: schema.salesFeedChatters.kind, memberId: schema.salesFeedChatters.memberId })
+        .from(schema.salesFeedChatters)
+        .where(eq(schema.salesFeedChatters.platformChatterId, 'chatter_hugo'));
+      expect(link).toEqual({ kind: 'member', memberId: hugo });
+    } finally {
+      listed = [...TEAM];
+    }
+  });
 });

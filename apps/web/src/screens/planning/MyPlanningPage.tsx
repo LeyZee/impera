@@ -17,7 +17,17 @@ import { SwapPanel } from './SwapPanel';
 
 import { ReportPanel } from '@/reports/ReportPanel';
 import { useReportsOf } from '@/reports/api';
-import { GAP_TO_EXPLAIN, gapWaits, MEMBER_STATUS, periodAt, reportOf, STATUS_TONES } from '@/reports/model';
+import {
+  GAP_TO_EXPLAIN,
+  gapWaits,
+  MEMBER_STATUS,
+  memberStatusOf,
+  periodAt,
+  reportOf,
+  toneOf,
+  WITHOUT_PAY_EFFECT,
+  withoutPayEffect,
+} from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
@@ -646,17 +656,19 @@ function MyShiftRow({
       ) : (
         <button
           type="button"
-          className={`rp-chip rp-chip--${explain ? 'warn' : STATUS_TONES[report.report.status]} nv-tap sc-mine__report`}
-          aria-label={`Rapport du ${day} : ${explain ? 'écart à expliquer' : MEMBER_STATUS[report.report.status]}`}
+          className={`rp-chip rp-chip--${explain ? 'warn' : toneOf(report.report)} nv-tap sc-mine__report`}
+          aria-label={`Rapport du ${day} : ${explain ? 'écart à expliquer' : memberStatusOf(report.report)}`}
           onClick={() => {
             onReport(shift.id);
           }}
         >
-          {report.report.status === 'rejected'
-            ? 'Renvoyé · Reprendre'
-            : explain
-              ? GAP_TO_EXPLAIN
-              : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
+          {withoutPayEffect(report.report)
+            ? WITHOUT_PAY_EFFECT
+            : report.report.status === 'rejected'
+              ? 'Renvoyé · Reprendre'
+              : explain
+                ? GAP_TO_EXPLAIN
+                : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
         </button>
       )}
       {phase === 'later' ? (

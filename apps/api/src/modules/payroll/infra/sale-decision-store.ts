@@ -1,6 +1,7 @@
 import {
   HeldSalesSchema,
   nextPayPeriod,
+  payPeriodLastDay,
   PaySaleDecisionSchema,
   PlatformSchema,
   SaleEventSchema,
@@ -64,8 +65,14 @@ const decisionOfRow = (row: typeof paySaleDecisions.$inferSelect): PaySaleDecisi
     createdAt: row.createdAt.toISOString(),
   });
 
-/** A line to decide as the owner and an active manager read it, with the decision in force and what may be decided. */
-const heldSaleOf = (one: SaleToDecide): HeldSales['sales'][number] => ({
+/**
+ * A line to decide as the owner and an active manager read it, with the decision in force and what may be decided, and
+ * the day its member left (`leftOn`, by member).
+ */
+const heldSaleOf = (
+  one: SaleToDecide,
+  leftOn: ReadonlyMap<TeamMemberId, string | null>,
+): HeldSales['sales'][number] => ({
   platform: one.line.platform,
   platformSaleId: one.line.platformSaleId,
   event: one.line.event,
@@ -77,6 +84,8 @@ const heldSaleOf = (one: SaleToDecide): HeldSales['sales'][number] => ({
   currency: one.line.currency,
   netMinor: one.line.netMinor,
   memberId: one.line.author.kind === 'member' ? one.line.author.memberId : null,
+  memberLeftOn: one.line.author.kind === 'member' ? (leftOn.get(one.line.author.memberId) ?? null) : null,
+  platformChatterId: one.line.platformChatterId,
   reason: one.reason,
   decision: one.decision,
   outcomes: [...one.outcomes],
@@ -197,9 +206,11 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
         if (scope === 'self') throw new PayrollForbidden();
         const { sales, place } = await periodSalesOf(tx, reads, period);
         const signals = place.closed ? new Map() : await signalsIn(tx, period);
+        const members = await reads.members(tx, payPeriodLastDay(period));
+        const leftOn = new Map(members.map((member) => [member.id, member.leftOn]));
         return HeldSalesSchema.parse({
           period,
-          sales: salesToDecide(sales, place, signals).map(heldSaleOf),
+          sales: salesToDecide(sales, place, signals).map((one) => heldSaleOf(one, leftOn)),
         });
       }),
 
