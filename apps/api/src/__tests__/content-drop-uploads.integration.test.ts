@@ -205,7 +205,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       S3_ENDPOINT: endpoint,
       S3_REGION: REGION,
       S3_BUCKET: bucket,
@@ -986,8 +986,8 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
    * step called by hand where the jobs would interleave: the storage holds the key whenever the row says held.
    */
   it('never leaves a medium held without its bytes when she gives it again while it is erased', async () => {
-    const receipts = createDrizzleReceiptStore(test.admin.db);
-    const retention = createDrizzleRetentionStore(test.admin.db);
+    const receipts = createDrizzleReceiptStore(test.service.db);
+    const retention = createDrizzleRetentionStore(test.service.db);
     const removeRaw = (key: string) =>
       s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'DELETE' }).then(() => undefined);
     const keptAgain = async (fileId: string, medium: Awaited<ReturnType<typeof mediumOf>>) => {

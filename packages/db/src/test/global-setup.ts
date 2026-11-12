@@ -13,8 +13,9 @@ declare module 'vitest' {
 
 /**
  * One Postgres per run (testing.md): a Testcontainers Postgres 16, or the server named by
- * `IMPERA_TEST_PG_URL` (a superuser URL) where Docker is not available. Creates the two roles the way production
- * has them: the owner with BYPASSRLS but not superuser, the app role with neither.
+ * `IMPERA_TEST_PG_URL` (a superuser URL) where Docker is not available. Creates the three roles the way production
+ * has them (ADR 0087): the owner with BYPASSRLS but not superuser, the service role with BYPASSRLS and nothing else,
+ * the app role with neither.
  */
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   let container: StartedPostgreSqlContainer | undefined;
@@ -41,6 +42,9 @@ export default async function setup(project: TestProject): Promise<() => Promise
       end if;
       if not exists (select from pg_roles where rolname = 'nirvana_app') then
         create role nirvana_app login password ${quoted} nosuperuser nocreatedb nobypassrls;
+      end if;
+      if not exists (select from pg_roles where rolname = 'impera_service') then
+        create role impera_service login password ${quoted} nosuperuser nocreatedb nocreaterole bypassrls;
       end if;
     end $$;
   `);

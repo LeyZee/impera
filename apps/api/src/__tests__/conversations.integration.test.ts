@@ -201,8 +201,8 @@ describe('conversations module (P0-05)', () => {
     sender = new FakeSender();
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender,
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),
@@ -374,8 +374,8 @@ describe('conversations module (P0-05)', () => {
     const creators: string[] = [];
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender,
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),
@@ -409,8 +409,8 @@ describe('conversations module (P0-05)', () => {
   it('approves nothing for a creator without an active persona: her guards cannot be read (fail closed)', async () => {
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender,
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),
@@ -427,8 +427,8 @@ describe('conversations module (P0-05)', () => {
     expect(draft).toMatchObject({ status: 'pending', finalBubbles: null });
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender,
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),

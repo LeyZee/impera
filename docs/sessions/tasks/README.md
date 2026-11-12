@@ -151,6 +151,7 @@ Branche : task/<id>-<slug>
 | SEC-07 | Durcissement : liens d'extension, limites par adresse, appels sortants | exploitation | done | SEC-06 |
 | SEC-08 | Lien d'extension : mot de passe et code redemandés à la création ; ADR 0087 proposée | exploitation | done | SEC-07, ADR 0046 |
 | SEC-09 | Message de fan borné, rythme ralenti passé 60 réponses dans l'heure | exploitation | done | SEC-07 |
+| SEC-10 | Rôle de service de la base : l'API et le worker ne se connectent plus en propriétaire (ADR 0087, lot a) | exploitation | done | SEC-08, ADR 0087 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
 | ARC-03 | Le dossier du prestataire sorti de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-02 |

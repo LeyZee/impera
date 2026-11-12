@@ -79,7 +79,7 @@ describe('a member invited from a link proposal (ADR 0076 § 3)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config), { passwordBreaches: () => Promise.resolve(false) });
     const { userId } = await createOwner(app.auth, app.db.db, OWNER);
     owner = { userId: UserIdSchema.parse(userId), ip: null };

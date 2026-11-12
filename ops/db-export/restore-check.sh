@@ -22,10 +22,12 @@ echo "export sha256: $(sha256sum "$export_file" | cut -d ' ' -f 1)"
 
 age -d -i "$identity" "$export_file" | tar -C "$work" -xf -
 
-# The grants of the dump name nirvana_app: the role must exist, without login, on a throwaway server.
+# The grants of the dump name nirvana_app and impera_service: the roles must exist, without login, on a throwaway
+# server.
 sql <<'SQL'
 do $$ begin
   if not exists (select from pg_roles where rolname = 'nirvana_app') then create role nirvana_app nologin; end if;
+  if not exists (select from pg_roles where rolname = 'impera_service') then create role impera_service nologin; end if;
 end $$;
 SQL
 

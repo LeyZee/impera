@@ -35,7 +35,7 @@ describe('worker (Graphile, ADR 0006)', () => {
     const config = testConfig({
       LOG_LEVEL: 'info',
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
     });
     const logger = createLogger(config, sink);
     app = await createApp(config, logger, { composer: fixedComposer });
@@ -72,7 +72,7 @@ describe('worker (Graphile, ADR 0006)', () => {
   });
 
   it('carries the request id from the route to the job logs', async () => {
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     const server = await buildServer({
       config,
       logger: createLogger(config),

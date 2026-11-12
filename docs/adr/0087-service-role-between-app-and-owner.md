@@ -1,6 +1,6 @@
 # 0087. Un rôle de service entre le rôle applicatif et le rôle propriétaire de la base
 
-Statut : proposed (demande de Charles du 11/11/2026, fil « Corriger les failles de l'audit sécurité » : tout combler, même le mineur ; numéro attribué par le coordinateur)
+Statut : accepted (« ok 0087 » de Charles le 12/11/2026 ; demande du 11/11/2026, fil « Corriger les failles de l'audit sécurité » : tout combler, même le mineur ; numéro attribué par le coordinateur)
 Date : 2026-11-11
 Précise : l'ADR 0005 (Postgres, Drizzle, RLS par `creator_id`) et l'ADR 0027 (déploiement). Ne remplace rien.
 

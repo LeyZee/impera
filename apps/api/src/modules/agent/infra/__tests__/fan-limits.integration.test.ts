@@ -18,7 +18,7 @@ describe('fan limits set by the policy, through the fans module', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    limits = createFanLimits(createFansModule({ db: test.app.db, adminDb: test.admin.db }));
+    limits = createFanLimits(createFansModule({ db: test.app.db, adminDb: test.service.db }));
     // One invented creator and fan (ADR 0010), already confirmed an adult.
     const accountId = newId(PlatformAccountIdSchema);
     await withAdmin(test.admin.db, async (tx) => {
@@ -107,7 +107,7 @@ describe('fan limits set by the policy, through the fans module', () => {
   });
 
   it('never confirms again an age taken back, by a sign of a minor or by a human, until a human decides', async () => {
-    const fans = createFansModule({ db: test.app.db, adminDb: test.admin.db });
+    const fans = createFansModule({ db: test.app.db, adminDb: test.service.db });
     // Taken back by the policy (fan-1, a sign of a minor above): « j'ai 19 ans » next does not confirm it.
     await limits.confirmAge(creatorId, fanId, 'correlation-7', AT);
     expect((await limits.flags(creatorId, fanId)).ageConfirmedAt).toBeUndefined();
