@@ -113,3 +113,4 @@ Date : AAAA-MM-JJ
 | 0087 | Un rôle de service entre le rôle applicatif et le rôle propriétaire de la base | proposed (précise 0005 et 0027) |
 | 0099 | Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser | accepted (précise 0030, 0018, 0083 et P6-01) |
 | 0100 | Une IA écrit les scripts à partir des médias du coffre, le code tient la vente | accepted (précise 0099, 0083, 0009, 0010, 0021) |
+| 0104 | Le chatteur voit ses propres chiffres, et un jeu fait de faits réels l'accompagne | accepted (précise 0043 § 7, 0050 § 10 et 0092 § 1) |
