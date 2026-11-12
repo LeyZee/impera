@@ -22,7 +22,8 @@ Une seule liste « Mise en route » sur la fiche d'une créatrice et sur celle d
 - [x] Bloc « Mise en route » en tête de la fiche d'une créatrice et sur la fiche d'un membre, plié sur la prochaine étape.
 - [x] Relecture Équipe : étape « Facturation prête » d'un membre payé, invitation expirée à refaire, créatrices archivées hors compte.
 - [x] Manager actif : la mise en route des chatteurs, sans leur facturation (« ok manager mise en route », 12/11).
-- [ ] Captures Nuit/Jour, PC/téléphone validées par Charles.
+- [x] Retouches du lot 2 : lien expiré en avertissement ambre avec « Nouveau lien » (en tête de la prochaine étape) ; « Facturation prête » dit aussi un versement que bloquerait l'attestation de résidence sous convention (ADR 0041).
+- [ ] Captures du lot 3 validées par Charles.
 
 ## Critères d'acceptation
 

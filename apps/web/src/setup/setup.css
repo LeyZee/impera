@@ -113,3 +113,10 @@
     transition: none;
   }
 }
+/* A link that died unused: an avertissement, amber (red is kept for urgencies). */
+.su-step--warning .su-mark {
+  stroke: var(--nv-warning);
+}
+.su-step--warning .su-step__hint {
+  color: var(--nv-warning);
+}

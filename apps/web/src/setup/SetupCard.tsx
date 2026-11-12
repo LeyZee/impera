@@ -82,16 +82,17 @@ export function SetupCard({ lines, label }: { lines: readonly SetupLine[]; label
 }
 
 const STATE_WORDS = { done: 'Fait', todo: 'À faire', waiting: 'En attente' } as const;
+const WARNING_WORD = 'À refaire';
 
 function Step({ line, lead = false }: { line: SetupLine; lead?: boolean }): JSX.Element {
   return (
-    <li className={`su-step su-step--${line.state}`}>
-      <Mark state={line.state} />
+    <li className={`su-step su-step--${line.state}${line.warning ? ' su-step--warning' : ''}`}>
+      <Mark state={line.state} warning={line.warning} />
       <div className="su-step__text">
         {lead ? <span className="nv-meta">Prochaine étape</span> : null}
         <span className="su-step__label">
           {line.label}
-          <span className="su-sr"> · {STATE_WORDS[line.state]}</span>
+          <span className="su-sr"> · {line.warning ? WARNING_WORD : STATE_WORDS[line.state]}</span>
         </span>
         {line.hint === null ? null : <span className="su-step__hint">{line.hint}</span>}
       </div>
@@ -100,13 +101,14 @@ function Step({ line, lead = false }: { line: SetupLine; lead?: boolean }): JSX.
   );
 }
 
-/** A tick, a ring to fill, or a clock: the word is read out beside it, never the colour alone. */
-function Mark({ state }: { state: SetupLine['state'] }): JSX.Element {
+/** A tick, a ring to fill, a clock, or an exclamation: the word is read out beside it, never the colour alone. */
+function Mark({ state, warning }: { state: SetupLine['state']; warning: boolean }): JSX.Element {
   return (
     <svg className="su-mark" viewBox="0 0 20 20" aria-hidden="true">
       <circle cx="10" cy="10" r="8.25" />
       {state === 'done' ? <path d="m6.5 10.2 2.4 2.4 4.6-5" /> : null}
       {state === 'waiting' ? <path d="M10 6.2V10l2.6 1.6" /> : null}
+      {warning ? <path d="M10 6v4.6M10 13.6v.1" /> : null}
     </svg>
   );
 }
@@ -170,6 +172,21 @@ export function SetupLink({
         >
           {children}
         </Link>
+      );
+    case 'anchor':
+      return (
+        <button
+          type="button"
+          className={className}
+          aria-label={label}
+          onClick={() => {
+            const block = document.getElementById(target.id);
+            block?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            block?.focus({ preventScroll: true });
+          }}
+        >
+          {children}
+        </button>
       );
     case 'page':
       return (

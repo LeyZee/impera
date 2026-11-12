@@ -63,6 +63,14 @@ describe('« Mise en route » words', () => {
     expect(nextOf(lines)?.key).toBe('creators');
   });
 
+  it('puts a link that died unused first', () => {
+    const lines = memberLines(THEO, [
+      { key: 'second_factor', state: 'todo', note: null },
+      { key: 'invitation', state: 'todo', note: { kind: 'invitation_expired' } },
+    ]);
+    expect(nextOf(lines)?.key).toBe('invitation');
+  });
+
   it('says what holds his first invoice and where it is settled', () => {
     const [file, agency] = memberLines(THEO, [
       { key: 'billing', state: 'todo', note: { kind: 'billing', reason: 'no_mandate' } },
@@ -73,16 +81,32 @@ describe('« Mise en route » words', () => {
     );
     expect(file?.target).toEqual({ kind: 'file', memberId: THEO });
     expect(agency?.target).toEqual({ kind: 'page', to: '/reglages/facturation' });
+    const [residence] = memberLines(THEO, [
+      { key: 'billing', state: 'todo', note: { kind: 'billing', reason: 'tax_residence_missing' } },
+    ]);
+    expect(residence?.hint).toBe(
+      'Son premier versement serait bloqué : son attestation de résidence fiscale manque.',
+    );
+    expect(residence?.target).toEqual({ kind: 'file', memberId: THEO });
   });
 
   it('asks a new link once an invitation died unused', () => {
     const [member] = memberLines(THEO, [
       { key: 'invitation', state: 'todo', note: { kind: 'invitation_expired' } },
     ]);
-    expect(member?.hint).toContain('expiré');
+    expect(member).toMatchObject({
+      hint: 'Son lien a expiré sans être ouvert.',
+      verb: 'Nouveau lien',
+      warning: true,
+      target: { kind: 'anchor', id: `acces-${THEO}` },
+    });
     const [creator] = creatorLines(ANNA, [
       { key: 'access', state: 'todo', note: { kind: 'invitation_expired' } },
     ]);
-    expect(creator?.hint).toBe('Son lien a expiré sans être ouvert : crée-lui un nouveau lien.');
+    expect(creator).toMatchObject({
+      verb: 'Nouveau lien',
+      warning: true,
+      target: { kind: 'sheet', sheet: 'access', creatorId: ANNA },
+    });
   });
 });

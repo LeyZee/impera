@@ -21,6 +21,8 @@ export type SetupTarget =
   | { readonly kind: 'sheet'; readonly sheet: CreatorSheet; readonly creatorId: CreatorId }
   | { readonly kind: 'dashboard'; readonly creatorId: CreatorId }
   | { readonly kind: 'file'; readonly memberId: TeamMemberId }
+  /** A block of the sheet the card sits on, reached by scrolling to its id. */
+  | { readonly kind: 'anchor'; readonly id: string }
   | {
       readonly kind: 'page';
       readonly to:
@@ -41,7 +43,9 @@ export interface SetupLine {
   readonly hint: string | null;
   readonly target: SetupTarget | null;
   /** What the step's button says while it is left: « Régler » unless the step asks for another verb. */
-  readonly verb: 'Régler' | 'Lancer' | 'Le guide';
+  readonly verb: 'Régler' | 'Lancer' | 'Le guide' | 'Nouveau lien';
+  /** An avertissement (amber): something that went wrong and waits on the agency, such as a link that died unused. */
+  readonly warning: boolean;
 }
 
 const MODES: Readonly<Record<AgentMode, string>> = {
@@ -64,7 +68,7 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
       hint: string | null,
       target: SetupTarget | null,
       verb: SetupLine['verb'] = 'Régler',
-    ): SetupLine => ({ key, state, label, hint, target, verb });
+    ): SetupLine => ({ key, state, label, hint, target, verb, warning: false });
     switch (key) {
       case 'platform_account':
         return line(
@@ -85,15 +89,24 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
           sheet('rate'),
         );
       case 'access':
+        if (note?.kind === 'invitation_expired') {
+          return {
+            ...line(
+              'Son accès à son espace',
+              'Son lien a expiré sans être ouvert.',
+              sheet('access'),
+              'Nouveau lien',
+            ),
+            warning: true,
+          };
+        }
         return line(
           'Son accès à son espace',
           state === 'waiting'
             ? 'Invitation envoyée, pas encore ouverte.'
-            : note?.kind === 'invitation_expired'
-              ? 'Son lien a expiré sans être ouvert : crée-lui un nouveau lien.'
-              : done
-                ? null
-                : 'À créer : son lien d’invitation.',
+            : done
+              ? null
+              : 'À créer : son lien d’invitation.',
           sheet('access'),
         );
       case 'pay_rules':
@@ -161,16 +174,23 @@ export function memberLines(memberId: TeamMemberId, steps: readonly MemberSetupS
       hint: string | null,
       target: SetupTarget | null,
       verb: SetupLine['verb'] = 'Régler',
-    ): SetupLine => ({ key, state, label, hint, target, verb });
+    ): SetupLine => ({ key, state, label, hint, target, verb, warning: false });
     switch (key) {
       case 'invitation':
+        if (note?.kind === 'invitation_expired') {
+          return {
+            ...line(
+              'Invitation ouverte',
+              'Son lien a expiré sans être ouvert.',
+              { kind: 'anchor', id: memberAccessId(memberId) },
+              'Nouveau lien',
+            ),
+            warning: true,
+          };
+        }
         return line(
           'Invitation ouverte',
-          note?.kind === 'invitation_expired'
-            ? 'Son lien a expiré sans être ouvert : crée-lui un nouveau lien plus bas, avec son accès.'
-            : done
-              ? null
-              : 'Son lien n’est pas encore ouvert : il se gère plus bas, avec son accès.',
+          done ? null : 'Son lien n’est pas encore ouvert : il se gère plus bas, avec son accès.',
           null,
         );
       case 'second_factor':
@@ -205,7 +225,12 @@ export function memberLines(memberId: TeamMemberId, steps: readonly MemberSetupS
         const place = notIssuedPlace(reason);
         return line(
           'Facturation prête',
-          reason === null ? null : `Sa première facture ne partirait pas : ${notIssuedForOwner(reason)}.`,
+          reason === null
+            ? null
+            : // Under a tax treaty the invoice goes out: it is the transfer that waits (ADR 0041).
+              reason === 'tax_residence_missing' || reason === 'tax_residence_unverified'
+              ? `Son premier versement serait bloqué : ${notIssuedForOwner(reason)}.`
+              : `Sa première facture ne partirait pas : ${notIssuedForOwner(reason)}.`,
           place === 'billing'
             ? { kind: 'page', to: '/reglages/facturation' }
             : place === 'file'
@@ -217,12 +242,20 @@ export function memberLines(memberId: TeamMemberId, steps: readonly MemberSetupS
   });
 }
 
+/** The id of the « Accès » block of a member's sheet, where his link is made. */
+export const memberAccessId = (memberId: TeamMemberId): string => `acces-${memberId}`;
+
 /** « 7 sur 10 » : what is done, never what is left. */
 export const progressOf = (lines: readonly SetupLine[]): { done: number; total: number } => ({
   done: lines.filter((line) => line.state === 'done').length,
   total: lines.length,
 });
 
-/** The step to do first: one to do before one that waits on someone else; none once all are done. */
+/**
+ * The step to do first: an avertissement (a link that died unused), then one to do, then one that waits on someone
+ * else; none once all are done.
+ */
 export const nextOf = (lines: readonly SetupLine[]): SetupLine | undefined =>
-  lines.find((line) => line.state === 'todo') ?? lines.find((line) => line.state === 'waiting');
+  lines.find((line) => line.warning) ??
+  lines.find((line) => line.state === 'todo') ??
+  lines.find((line) => line.state === 'waiting');

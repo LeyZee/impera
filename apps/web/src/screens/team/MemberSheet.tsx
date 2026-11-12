@@ -25,6 +25,7 @@ import { countryFlag, countryName } from '@/lib/country';
 import { cityOf } from '@/scheduling/time';
 import { useAgencyToday } from '@/screens/pay/data';
 import { MemberSetupBlock } from '@/setup/SetupBlocks';
+import { memberAccessId } from '@/setup/model';
 import '@/shell/dialog.css';
 
 /** Arrived less than this many days ago: the « Nouveau » badge of Imperium. */
@@ -243,7 +244,13 @@ export function MemberSheet({
       </nav>
 
       {gone ? null : (
-        <section className="tm-block nv-enter" style={{ '--nv-i': 5 }} aria-label="Accès">
+        <section
+          className="tm-block nv-enter"
+          style={{ '--nv-i': 5 }}
+          aria-label="Accès"
+          id={memberAccessId(member.id)}
+          tabIndex={-1}
+        >
           <h3>Accès</h3>
           <p className="tm-hint">
             {access.kind === 'signed-in'

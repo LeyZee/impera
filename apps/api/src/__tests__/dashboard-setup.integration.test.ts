@@ -1,6 +1,10 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import {
+  BillingRegimeIdSchema,
+  ContractAcceptanceIdSchema,
+  ContractorRegimeIdSchema,
+  ContractTextIdSchema,
   CreatorIdSchema,
   CreatorSetupListSchema,
   MemberSetupListSchema,
@@ -248,6 +252,99 @@ describe('GET /v1/dashboard/setup/creators and /members, « Mise en route »', (
     });
     const billing = members.find((m) => m.memberId === theo)?.steps.find((s) => s.key === 'billing');
     expect(billing?.note?.kind).toBe('billing');
+  });
+
+  it('says a transfer under a tax treaty would wait for the residence certificate', async () => {
+    const admin = test.admin.db;
+    // Everything an invoice needs, all invented (ADR 0010): the agency, a treaty regime of his country, his mandate,
+    // his file checked by the owner. The invoice could go out; the transfer would wait (ADR 0041).
+    await admin.insert(schema.billingSettings).values({
+      id: 1,
+      agency: {
+        legalName: 'Agence Exemple SAS',
+        address: '1 place Fictive, 69000 Lyon',
+        siren: '123456789',
+        vatNumber: 'FR12123456789',
+      },
+      paymentTerms: 'Conditions inventées pour le test.',
+      dueDays: 60,
+      serviceDescription: 'Prestation inventée pour le test.',
+      logoSha256: null,
+      documentReminderDays: 30,
+      accounts: null,
+      updatedBy: ownerId,
+    });
+    const regimeId = newId(BillingRegimeIdSchema);
+    await admin.insert(schema.billingRegimes).values({
+      id: regimeId,
+      name: 'Bénin (texte inventé)',
+      countries: ['BJ'],
+      vatTreatment: 'reverse_charge',
+      vatRateBps: 2_000,
+      withholding: 'treaty_exempt',
+      mentions: ['Autofacturation'],
+      documents: ['tax_residence'],
+      taxIdRequired: true,
+      createdBy: ownerId,
+    });
+    await admin
+      .insert(schema.billingRegimeValidations)
+      .values({ regimeId, validatedOn: '2025-01-01', recordedBy: ownerId });
+    const body = 'Mandat de facturation (texte inventé pour le test).';
+    const sha = createHash('sha256').update(body, 'utf8').digest('hex');
+    const textId = newId(ContractTextIdSchema);
+    await admin.insert(schema.contractTexts).values({
+      id: textId,
+      kind: 'billing_mandate',
+      version: 1,
+      body,
+      sha256: sha,
+      contestDelayDays: 7,
+      createdBy: ownerId,
+    });
+    const theoUser = (
+      await admin
+        .select({ userId: schema.teamMembers.userId })
+        .from(schema.teamMembers)
+        .where(eq(schema.teamMembers.id, theo))
+    )[0]?.userId;
+    if (theoUser === undefined) throw new Error('Théo introuvable');
+    await admin.insert(schema.contractAcceptances).values({
+      id: newId(ContractAcceptanceIdSchema),
+      memberId: theo,
+      textId,
+      textSha256: sha,
+      acceptedBy: theoUser,
+    });
+    await admin.insert(schema.contractorRegimes).values({
+      id: newId(ContractorRegimeIdSchema),
+      memberId: theo,
+      regimeId,
+      effectiveFrom: '2025-01-01',
+      createdBy: ownerId,
+    });
+    await admin.insert(schema.contractorProfiles).values({
+      memberId: theo,
+      legalName: 'Prestataire Inventé',
+      address: '3 rue Imaginaire, Cotonou',
+      taxId: '0000000000000',
+      email: 'theo@example.test',
+      invoicePrefix: 'THEO',
+      updatedBy: theoUser,
+    });
+    await admin
+      .update(schema.contractorProfiles)
+      .set({ verifiedAt: new Date(), verifiedBy: ownerId, updatedBy: ownerId })
+      .where(eq(schema.contractorProfiles.memberId, theo));
+    const answer = await get('owner', 'members');
+    const billing = MemberSetupListSchema.parse(answer.json())
+      .members.find((m) => m.memberId === theo)
+      ?.steps.find((s) => s.key === 'billing');
+    expect(billing).toEqual({
+      key: 'billing',
+      state: 'todo',
+      note: { kind: 'billing', reason: 'tax_residence_missing' },
+    });
   });
 
   it('shows an active manager the chatters alone, without their invoicing', async () => {
