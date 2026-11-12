@@ -1,6 +1,6 @@
 # 0100. Une IA écrit les scripts à partir des médias du coffre, le code tient la vente
 
-Statut : proposed
+Statut : accepted (« ok 0100 » de Charles le 12/11/2026, 23 h 34, fil « Synchroniser le Vault Reveal », après son choix du 12/11 à 23 h 34 : relecture par défaut, automatique réglable par créatrice ; relu par Agent)
 Date : 2026-11-12
 Précise : l'ADR 0099 (scripts composés dans le CRM et créés dans Reveal, ordre de Reveal gardé), l'ADR 0083 (description validée avant usage), l'ADR 0009 (règles métier dans le code), l'ADR 0010 (persona = donnée versionnée) et l'ADR 0021 (le bot ne dit jamais qu'il est une IA) et l'ADR 0098 (déroulé de script par fan). Ne remplace rien.
 
