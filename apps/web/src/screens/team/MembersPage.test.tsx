@@ -286,7 +286,7 @@ describe('Équipe › Membres', () => {
           memberId: THEO.id,
           teamRole: 'chatter',
           steps: [
-            step('invitation', 'done'),
+            step('invitation', 'waiting'),
             step('second_factor', 'done'),
             step('extension', 'todo'),
             step('platform_account', 'done'),
@@ -303,7 +303,7 @@ describe('Équipe › Membres', () => {
     });
     renderPage(`/equipe/membres?membre=${THEO.id}`);
     const card = await screen.findByRole('region', { name: 'Mise en route du membre' });
-    expect(within(card).getByText('4 sur 6')).toBeDefined();
+    expect(within(card).getByText('3 sur 6')).toBeDefined();
     expect(within(card).getByText('Extension reliée')).toBeDefined();
     expect(within(card).getByRole('link', { name: 'Le guide : Extension reliée' }).getAttribute('href')).toBe(
       '/aide/extension',
@@ -312,6 +312,10 @@ describe('Équipe › Membres', () => {
     expect(within(card).getByRole('link', { name: 'Régler : Premier shift' }).getAttribute('href')).toBe(
       '/equipe/planning',
     );
+    // His invitation waits on him: nothing for the agency to set, its line only says so.
+    expect(
+      within(card).getByText('Son lien n’est pas encore ouvert : il se gère plus bas, avec son accès.'),
+    ).toBeDefined();
     cleanup();
 
     renderPage(`/equipe/membres?onglet=managers&membre=${INES.id}`);

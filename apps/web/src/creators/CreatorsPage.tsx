@@ -329,7 +329,9 @@ export function CreatorsPage({
       <div className="ps-sheet">
         {leaving ? <LeaveConfirm onLeave={leave} onStay={stay} /> : null}
         {/* Her « Mise en route » (pilotage plan W1) above whichever sheet is open, until all is done. */}
-        {isOwner && current !== undefined && !showForm ? <CreatorSetupBlock creatorId={current.id} /> : null}
+        {isOwner && current !== undefined && !showForm ? (
+          <CreatorSetupBlock key={`${current.id}:${shown}`} creatorId={current.id} />
+        ) : null}
         {body()}
         {/* The archived creators, folded at the foot of the list, the owner's alone (ADR 0071 § 2). */}
         {isOwner && listing && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}

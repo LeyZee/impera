@@ -23,6 +23,13 @@ describe('« Mise en route » words', () => {
     });
   });
 
+  it('asks to launch the reliability check, and to follow the guide for the extension', () => {
+    const [check] = creatorLines(ANNA, [{ key: 'reliability_check', state: 'todo', note: null }]);
+    expect(check?.verb).toBe('Lancer');
+    const [extension] = memberLines([{ key: 'extension', state: 'todo', note: null }]);
+    expect(extension?.verb).toBe('Le guide');
+  });
+
   it('says the mode in force, and Telegram off', () => {
     const [mode, telegram] = creatorLines(ANNA, [
       { key: 'agent_mode', state: 'done', note: { kind: 'agent_mode', mode: 'copilot' } },

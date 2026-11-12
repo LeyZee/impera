@@ -549,6 +549,9 @@ describe('Créatrices, her « Mise en route » (pilotage plan W1)', () => {
     expect(within(card).getByText('9 sur 10')).toBeDefined();
     expect(within(card).getByText('Les règles de paie de ses comptes')).toBeDefined();
     expect(
+      within(card).getByRole('link', { name: 'Régler : Les règles de paie de ses comptes' }),
+    ).toBeDefined();
+    expect(
       within(card).getByText('1 compte sur 2 · Sans elles, les rapports de fin de shift sont refusés.'),
     ).toBeDefined();
     fireEvent.click(within(card).getByRole('button', { name: 'Tout voir' }));

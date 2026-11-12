@@ -88,16 +88,14 @@ function Step({ line, lead = false }: { line: SetupLine; lead?: boolean }): JSX.
     <li className={`su-step su-step--${line.state}`}>
       <Mark state={line.state} />
       <div className="su-step__text">
-        {lead ? <span className="su-step__eyebrow">Prochaine étape</span> : null}
+        {lead ? <span className="nv-meta">Prochaine étape</span> : null}
         <span className="su-step__label">
           {line.label}
           <span className="su-sr"> · {STATE_WORDS[line.state]}</span>
         </span>
         {line.hint === null ? null : <span className="su-step__hint">{line.hint}</span>}
       </div>
-      {line.target === null ? null : (
-        <Go target={line.target} done={line.state === 'done'} label={line.label} />
-      )}
+      {line.target === null ? null : <Go target={line.target} line={line} />}
     </li>
   );
 }
@@ -113,17 +111,14 @@ function Mark({ state }: { state: SetupLine['state'] }): JSX.Element {
   );
 }
 
-function Go({ target, done, label }: { target: SetupTarget; done: boolean; label: string }): JSX.Element {
-  const text = done
-    ? 'Voir'
-    : target.kind === 'page' && target.to === '/aide/extension'
-      ? 'Le guide'
-      : 'Régler';
+function Go({ target, line }: { target: SetupTarget; line: SetupLine }): JSX.Element {
+  // What waits on someone else asks nothing of the agency: it is only looked at.
+  const text = line.state === 'todo' ? line.verb : 'Voir';
   return (
     <SetupLink
       target={target}
-      className={`nv-btn ${done ? 'nv-btn--plain' : 'nv-btn--soft'} nv-btn--sm su-go`}
-      label={`${text} : ${label}`}
+      className={`nv-btn ${line.state === 'todo' ? 'nv-btn--soft' : 'nv-btn--plain'} nv-btn--sm su-go`}
+      label={`${text} : ${line.label}`}
     >
       {text}
     </SetupLink>

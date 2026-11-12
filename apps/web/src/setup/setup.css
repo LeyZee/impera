@@ -7,13 +7,13 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: 16px;
+  padding: var(--nv-space-4);
 }
 .su-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--nv-space-3);
 }
 .su-title {
   margin: 0;
@@ -54,8 +54,8 @@
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  padding: 10px 0;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-3) 0;
 }
 .su-mark {
   width: 20px;
@@ -75,7 +75,7 @@
 .su-step__text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--nv-space-1);
   min-width: 0;
 }
 .su-step__label {
@@ -93,12 +93,6 @@
 }
 .su-step--waiting .su-step__hint {
   color: var(--nv-warning);
-}
-.su-step__eyebrow {
-  color: var(--nv-ink-faint);
-  font-size: var(--nv-text-caption);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 .su-go {
   white-space: nowrap;

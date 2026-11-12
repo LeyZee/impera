@@ -36,6 +36,8 @@ export interface SetupLine {
   /** One sentence: why it matters when it is left, or what stands when it is done. */
   readonly hint: string | null;
   readonly target: SetupTarget | null;
+  /** What the step's button says while it is left: « Régler » unless the step asks for another verb. */
+  readonly verb: 'Régler' | 'Lancer' | 'Le guide';
 }
 
 const MODES: Readonly<Record<AgentMode, string>> = {
@@ -53,13 +55,12 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
   const sheet = (name: CreatorSheet): SetupTarget => ({ kind: 'sheet', sheet: name, creatorId });
   return steps.map(({ key, state, note }): SetupLine => {
     const done = state === 'done';
-    const line = (label: string, hint: string | null, target: SetupTarget | null): SetupLine => ({
-      key,
-      state,
-      label,
-      hint,
-      target,
-    });
+    const line = (
+      label: string,
+      hint: string | null,
+      target: SetupTarget | null,
+      verb: SetupLine['verb'] = 'Régler',
+    ): SetupLine => ({ key, state, label, hint, target, verb });
     switch (key) {
       case 'platform_account':
         return line(
@@ -140,6 +141,7 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
               ? null
               : 'À lancer sur une quinzaine finie où son compte était relié.',
           { kind: 'page', to: '/reglages/ventes' },
+          'Lancer',
         );
     }
   });
@@ -148,13 +150,12 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
 export function memberLines(steps: readonly MemberSetupStep[]): SetupLine[] {
   return steps.map(({ key, state }): SetupLine => {
     const done = state === 'done';
-    const line = (label: string, hint: string | null, target: SetupTarget | null): SetupLine => ({
-      key,
-      state,
-      label,
-      hint,
-      target,
-    });
+    const line = (
+      label: string,
+      hint: string | null,
+      target: SetupTarget | null,
+      verb: SetupLine['verb'] = 'Régler',
+    ): SetupLine => ({ key, state, label, hint, target, verb });
     switch (key) {
       case 'invitation':
         return line(
@@ -173,6 +174,7 @@ export function memberLines(steps: readonly MemberSetupStep[]): SetupLine[] {
           'Extension reliée',
           done ? null : 'À relier depuis son navigateur, en suivant le guide.',
           { kind: 'page', to: '/aide/extension' },
+          'Le guide',
         );
       case 'platform_account':
         return line(
