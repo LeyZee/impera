@@ -78,6 +78,21 @@ export function assertDeclarable(rules: readonly RulesRow[], period: PayPeriod, 
   if (inForce.currency !== currency) throw new ShiftReportCurrency();
 }
 
+/**
+ * Where pay reads the account's amounts for `period`, `null` without rules for it. `detected`: pay reads the sales, and
+ * a report of the period has no effect on pay, even one made before the rules switched (ADR 0084 § 3).
+ */
+export const earningsSourceFor = (rules: readonly RulesRow[], period: PayPeriod): EarningsSource | null =>
+  payRulesFor(rules, period)?.earningsSource ?? null;
+
+/**
+ * A report is decided, validated or sent back, only while pay reads the reports for its period: one whose period
+ * reads the sales stays as it is, « sans effet sur la paie » (ADR 0084 § 3).
+ */
+export function assertDecidable(rules: readonly RulesRow[], period: PayPeriod): void {
+  if (earningsSourceFor(rules, period) === 'detected') throw new ShiftReportDetected();
+}
+
 /** The rows of a shift as the totals read them. */
 export interface ReportAmount {
   readonly id: string;

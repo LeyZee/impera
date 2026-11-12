@@ -613,10 +613,8 @@ describe('Équipe › Rapports de fin de shift (/v1/scheduling, EQ-03, ADR 0023)
 
     const basiles = await list(basileCookie, payPeriodOfDay(parisDay(-1)));
     expect(basiles.reports).toEqual([]);
-    if (payPeriodOfDay(parisDay(-2)) === payPeriodOfDay(parisDay(-1))) {
-      // A « Sans rapport » line for each shift, on both creators.
-      expect(new Set(basiles.shifts.map((one) => one.id))).toEqual(new Set([basileSecond, basileInes]));
-    }
+    // A « Sans rapport » line for the shift on declared sales; the one on read sales takes the mini feedback.
+    expect(basiles.shifts.map((one) => one.id)).toEqual([basileSecond]);
 
     const open = await list(noraCookie);
     expect(open.reports.every((one) => one.status === 'submitted' || one.status === 'rejected')).toBe(true);
@@ -917,6 +915,95 @@ describe('Équipe › Rapports de fin de shift (/v1/scheduling, EQ-03, ADR 0023)
       ]);
       // It has rules from that fortnight now: nothing more to offer.
       expect(await checkedOf(owner, annaThird)).toBeNull();
+    });
+
+    it('leaves the waiting reports of a switched fortnight without effect: never to decide, never holding a closing (ADR 0084 § 3)', async () => {
+      const checked = previousPayPeriod(currentPeriod());
+      const annaFourth = newId(PlatformAccountIdSchema);
+      await test.admin.db
+        .insert(schema.platformAccounts)
+        .values({ id: annaFourth, creatorId: anna, platform: 'reveal', handle: 'anna-quater-invente' });
+      await rulesFor(annaFourth, anna, 'declared');
+      // On the checked fortnight's first day: two reported shifts, one sent back, and one without a report.
+      const sent = await shiftOn(
+        theo,
+        anna,
+        annaFourth,
+        parisInstant(checked, 600),
+        parisInstant(checked, 720),
+      );
+      const back = await shiftOn(
+        theo,
+        anna,
+        annaFourth,
+        parisInstant(checked, 840),
+        parisInstant(checked, 960),
+      );
+      const none = await shiftOn(
+        theo,
+        anna,
+        annaFourth,
+        parisInstant(checked, 1080),
+        parisInstant(checked, 1200),
+      );
+      const waiting = reportOf(await make(theoCookie, sent, 1500));
+      const made = reportOf(await make(theoCookie, back, 900));
+      const rejected = reportOf(
+        await call('POST', `/scheduling/shift-reports/${made.id}/reject`, owner, {
+          version: made.version,
+          note: 'Revois le montant',
+        }),
+        200,
+      );
+      expect(rejected.status).toBe('rejected');
+      const awaiting = () =>
+        test.admin.db.transaction((tx) =>
+          app.modules.scheduling.pay.reportsAwaitingReviewScoped(tx, [anna], null, checked),
+        );
+      const awaitingBefore = await awaiting();
+      expect((await list(owner)).reports.map((one) => one.id)).toEqual(
+        expect.arrayContaining([waiting.id, rejected.id]),
+      );
+      expect((await list(owner, checked)).shifts.map((one) => one.id)).toContain(none);
+
+      await linkModel(annaFourth, 'modele-invente-quater');
+      expect(await checkedOf(owner, annaFourth)).toBe(checked);
+      const switched = await add(owner, { ...rulesBody(annaFourth, checked), earningsSource: 'detected' });
+      expect(switched.statusCode, switched.body).toBe(201);
+
+      // Out of what the agency has to decide, and out of the closing's count.
+      const open = await list(owner);
+      expect(open.reports.map((one) => one.id)).not.toContain(waiting.id);
+      expect(open.reports.map((one) => one.id)).not.toContain(rejected.id);
+      expect(await awaiting()).toBe(awaitingBefore - 1);
+      // Still shown in its fortnight, without effect on pay and with nothing to decide; no « Sans rapport » line.
+      const period = await list(owner, checked);
+      expect(
+        period.reports
+          .filter((one) => one.platformAccountId === annaFourth)
+          .map((one) => ({ id: one.id, earningsSource: one.earningsSource, canReview: one.canReview })),
+      ).toEqual([
+        { id: waiting.id, earningsSource: 'detected', canReview: false },
+        { id: rejected.id, earningsSource: 'detected', canReview: false },
+      ]);
+      expect(period.shifts.map((one) => one.id)).toEqual(expect.arrayContaining([sent, back]));
+      expect(period.shifts.map((one) => one.id)).not.toContain(none);
+      const mine = await list(theoCookie, checked);
+      expect(mine.reports.find((one) => one.id === rejected.id)?.earningsSource).toBe('detected');
+
+      // Neither validated nor sent back, and its member no longer sends it again.
+      expect(outcomes(await validate(owner, [waiting]))).toEqual([
+        { refused: waiting.id, code: 'shift_report_detected_conflict' },
+      ]);
+      const reject = await call('POST', `/scheduling/shift-reports/${waiting.id}/reject`, owner, {
+        version: waiting.version,
+        note: 'Revois le montant',
+      });
+      expect([reject.statusCode, codeOf(reject)]).toEqual([409, 'shift_report_detected_conflict']);
+      const again = await call('PATCH', `/scheduling/shift-reports/${rejected.id}`, theoCookie, {
+        version: rejected.version,
+      });
+      expect([again.statusCode, codeOf(again)]).toEqual([409, 'shift_report_detected_conflict']);
     });
 
     it('never switches from the checked fortnight once pay closed it, even by a closing that crosses the switch (ADR 0084 § 2)', async () => {

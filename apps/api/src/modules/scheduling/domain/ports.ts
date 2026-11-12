@@ -478,6 +478,8 @@ export interface StoredShiftReport {
    * for a correction and when its account's sales are not read.
    */
   readonly check: ShiftReportCheck | null;
+  /** Where pay reads its account's amounts for its period (`earningsSourceFor`), `null` without rules for it. */
+  readonly earningsSource: EarningsSource | null;
   readonly createdAt: Date;
 }
 
