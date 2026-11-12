@@ -310,12 +310,12 @@ describe('Équipe › Membres', () => {
     renderPage(`/equipe/membres?membre=${THEO.id}`);
     const card = await screen.findByRole('region', { name: 'Mise en route du membre' });
     expect(within(card).getByText('3 sur 6')).toBeDefined();
-    expect(within(card).getByText('Extension reliée')).toBeDefined();
-    expect(within(card).getByRole('link', { name: 'Le guide : Extension reliée' }).getAttribute('href')).toBe(
+    expect(within(card).getByText('Son extension')).toBeDefined();
+    expect(within(card).getByRole('link', { name: 'Le guide : Son extension' }).getAttribute('href')).toBe(
       '/aide/extension',
     );
     fireEvent.click(within(card).getByRole('button', { name: 'Tout voir' }));
-    expect(within(card).getByRole('link', { name: 'Régler : Premier shift' }).getAttribute('href')).toBe(
+    expect(within(card).getByRole('link', { name: 'Régler : Son premier shift' }).getAttribute('href')).toBe(
       '/equipe/planning',
     );
     // His invitation waits on him: nothing for the agency to set, its line only says so.

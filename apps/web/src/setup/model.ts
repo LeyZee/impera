@@ -180,7 +180,7 @@ export function memberLines(memberId: TeamMemberId, steps: readonly MemberSetupS
         if (note?.kind === 'invitation_expired') {
           return {
             ...line(
-              'Invitation ouverte',
+              'Son invitation',
               'Son lien a expiré sans être ouvert.',
               { kind: 'anchor', id: memberAccessId(memberId) },
               'Nouveau lien',
@@ -189,33 +189,33 @@ export function memberLines(memberId: TeamMemberId, steps: readonly MemberSetupS
           };
         }
         return line(
-          'Invitation ouverte',
+          'Son invitation',
           done ? null : 'Son lien n’est pas encore ouvert : il se gère plus bas, avec son accès.',
           null,
         );
       case 'second_factor':
         return line(
-          'Double authentification',
+          'Sa double authentification',
           done ? null : 'À activer de son côté, dans Moi › Sécurité.',
           null,
         );
       case 'extension':
         return line(
-          'Extension reliée',
+          'Son extension',
           done ? null : 'À relier depuis son navigateur, en suivant le guide.',
           { kind: 'page', to: '/aide/extension' },
           'Le guide',
         );
       case 'platform_account':
         return line(
-          'Compte Reveal relié',
+          'Son compte Reveal',
           done ? null : 'Ses ventes ne lui sont attribuées qu’une fois son compte chatteur relié.',
           { kind: 'page', to: '/equipe/reveal' },
         );
       case 'creators':
         return line('Ses créatrices', done ? null : 'À choisir avec « Modifier ».', null);
       case 'first_shift':
-        return line('Premier shift', done ? null : 'À poser au planning.', {
+        return line('Son premier shift', done ? null : 'À poser au planning.', {
           kind: 'page',
           to: '/equipe/planning',
         });
@@ -224,7 +224,7 @@ export function memberLines(memberId: TeamMemberId, steps: readonly MemberSetupS
         const reason = note?.kind === 'billing' ? note.reason : null;
         const place = notIssuedPlace(reason);
         return line(
-          'Facturation prête',
+          'Sa facturation',
           reason === null
             ? null
             : // Under a tax treaty the invoice goes out: it is the transfer that waits (ADR 0041).
