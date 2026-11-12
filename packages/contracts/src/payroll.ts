@@ -1041,6 +1041,16 @@ export const HeldSaleSchema = z.object({
   /** The platform's net in minor units of `currency`, signed: a refund is negative. */
   netMinor: z.number().int(),
   memberId: TeamMemberIdSchema.nullable(),
+  /**
+   * The day `memberId` left the team (ADR 0072), `null` while he has not or without a member: a sale made after it
+   * waits for the validator, and goes on a final statement once counted (Charles, 11/11/2026).
+   */
+  memberLeftOn: CalendarDaySchema.nullable(),
+  /**
+   * The platform's account that made the line (a refund's is its sale's), linked or not: the validator names a chatter
+   * not linked by it, from the platform's team. `null` for a line made by nobody, such as a subscription.
+   */
+  platformChatterId: z.string().min(1).nullable(),
   /** Why the line is held without a decision, `null` for a line a member would be paid for. */
   reason: SaleHeldReasonSchema.nullable(),
   /** The decision in force on its sale, `null` for none. */

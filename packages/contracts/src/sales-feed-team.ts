@@ -7,7 +7,7 @@ import {
   PlatformChatterSchema,
   SalesFeedErrorKindSchema,
 } from './sales-feed';
-import { CreateTeamMemberBodySchema, TeamMemberSchema } from './team-members';
+import { CalendarDaySchema, CreateTeamMemberBodySchema, TeamMemberSchema } from './team-members';
 
 /**
  * The team imported from a platform after review (ADR 0076): each account of the platform's team with an action
@@ -22,12 +22,20 @@ export const TeamImportSuggestionSchema = z.discriminatedUnion('kind', [
     memberId: TeamMemberIdSchema,
     memberDisplayName: z.string(),
     match: z.enum(['email', 'name']),
+    /**
+     * The day the member left the team (ADR 0072), `null` while he is in it. Only an e-mail match proposes a member
+     * who left, unticked: his sales from before that day count on his final statement, none after.
+     */
+    departedOn: CalendarDaySchema.nullable(),
   }),
   /** The agent: the account of the captured session's « bot » member, else an account named « bot » (unticked). */
   z.object({ kind: z.literal('agent'), match: z.enum(['session', 'name']) }),
   /** Nobody: an API key's bot (`isBot`), kept in the folded list. */
   z.object({ kind: z.literal('none') }),
-  /** An agency member with an e-mail nothing matches: an invitation, one row at a time (§ 3). */
+  /**
+   * An agency member with an e-mail nothing matches, the team's members who left included: an invitation, one row at
+   * a time (§ 3). Never for an account the platform removed.
+   */
   z.object({ kind: z.literal('invite') }),
 ]);
 export type TeamImportSuggestion = z.infer<typeof TeamImportSuggestionSchema>;
@@ -84,7 +92,10 @@ export const TeamImportRowSchema = z.object({
     .nullable(),
   /** Dismissed from the review: it does not come back, and can be taken back (§ 1). */
   dismissedAt: z.iso.datetime().nullable(),
-  /** The proposal, for a row without a link and not dismissed; `null` otherwise. */
+  /**
+   * The proposal, for a row without a link and not dismissed; `null` otherwise, and for an account the platform
+   * removed whose e-mail is no member's.
+   */
   suggestion: TeamImportSuggestionSchema.nullable(),
   /** Ticked in advance in the batch: a unique e-mail or name match, the captured session's bot, an API key's bot. */
   preselected: z.boolean(),
@@ -103,7 +114,11 @@ export type TeamImportRow = z.infer<typeof TeamImportRowSchema>;
 /** `GET /v1/settings/sales-feeds/:platform/team` (owner, active manager). */
 export const TeamImportOverviewSchema = z.object({
   rows: z.array(TeamImportRowSchema),
-  /** Accounts without a link, not dismissed and not an API key's bot: the « N nouveaux chatteurs » badge (§ 6). */
+  /**
+   * Accounts without a link, not dismissed, not an API key's bot and not removed from the platform: the « N nouveaux
+   * chatteurs » badge (§ 6). A removed account stays listed, to be linked or dismissed, but is no newcomer: it is
+   * never proposed for an invitation.
+   */
   newCount: z.number().int().min(0),
   /** Accounts linked to an active member and removed or gone on the platform (§ 5). */
   removalCount: z.number().int().min(0),
@@ -171,7 +186,7 @@ export type TeamImportDismissalBody = z.infer<typeof TeamImportDismissalBodySche
  * his own list only, else 403 `role_forbidden`. 201 with the member (played again: the same member); 409
  * `member_conflict` for an e-mail taken by another member, or an account already linked to another member. The
  * account is read live first: 403 `sales_feed_external_invite_forbidden` for a provider's (§ 2), 422
- * `sales_feed_chatter_unprocessable` for one the platform no longer lists, 503 `sales_feed_list_unavailable` while
+ * `sales_feed_chatter_unprocessable` for one the platform no longer lists or removed, 503 `sales_feed_list_unavailable` while
  * the list does not answer. Checked by `connectors`, made by `team` (ADR 0076 § 3).
  */
 export const TeamImportInvitationBodySchema = CreateTeamMemberBodySchema;

@@ -157,3 +157,4 @@ Branche : task/<id>-<slug>
 | ARC-06 | Les factures et avoirs sortis de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-05 |
 | ARC-07 | Une table lue par son seul propriétaire, un job par tâche | exploitation | done | ADR 0047, ARC-06 |
 | ARC-08 | Ordre des virements écartés du journal et relance d'émission par son index | exploitation | done | ARC-07 |
+| REC-PAIE-01 | Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis | exploitation | done | CRM-03, ADR 0076, ADR 0072 |
