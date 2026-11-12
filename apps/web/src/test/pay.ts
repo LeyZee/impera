@@ -447,6 +447,8 @@ export function heldSaleOf(patch: Partial<HeldSale> = {}): HeldSale {
     currency: 'EUR',
     netMinor: 4_200,
     memberId: THEO.id,
+    memberLeftOn: null,
+    platformChatterId: 'chatter-theo',
     reason: 'off_shift',
     decision: null,
     outcomes: ['count', 'exclude'],

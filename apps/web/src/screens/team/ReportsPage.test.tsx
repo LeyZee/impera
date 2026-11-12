@@ -718,7 +718,7 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
       'Reveal a lu 40,00 € pour l’instant : la comparaison se fait un quart d’heure après la fin du shift.',
     );
     expect(text(unlinked)).toContain(
-      'Ce membre n’est relié à aucun chatteur de Reveal : relie-le dans Réglages › Ventes pour comparer ses rapports.',
+      'Ce membre n’est relié à aucun chatteur de Reveal : relie-le dans Équipe › Reveal pour comparer ses rapports.',
     );
     // Nothing the comparison cannot say holds a validation back.
     fireEvent.click(screen.getByLabelText('Tout sélectionner'));

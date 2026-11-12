@@ -1,5 +1,5 @@
 # OPS-08 La consommation IA et les crédits prépayés dans le CRM
-Statut : review (demande de Charles du 11/11/2026, 18 h 37 ; choix et seuils : ADR 0091)
+Statut : done (demande de Charles du 11/11/2026, 18 h 37 ; choix et seuils : ADR 0091)
 Phase : exploitation
 Dépend de : `llm_calls` (P3-03), plafond du jour (`packages/llm`), alertes Telegram (P3-07)
 Branche : claude/project-thread-md4sab
@@ -16,8 +16,8 @@ ADR 0091, ADR 0016, `packages/llm/src/budget.ts`, `apps/api/src/modules/backups`
 - [x] Module api `ai-usage` : domaine pur testé (dépense, rythme, projection, décompte), lecture Postgres, saisie idempotente auditée, vérification horaire dédoublonnée, routes propriétaire.
 - [x] Telegram : `ai_credits_low` en « important » ou « urgent », lien vers l'écran.
 - [x] Écran Réglages › Consommation IA : jour en cours face au plafond, cartes de crédits, barres empilées 30 jours / aujourd'hui, anneaux par modèle et par usage, fenêtre « Noter une recharge ».
-- [ ] Captures Nuit et Jour, PC et téléphone, validées par Charles (« ok captures »).
-- [ ] Tests d'intégration joués sur Postgres (CI).
+- [x] Captures Nuit et Jour, PC et téléphone, validées par Charles (« ok captures conso-ia », 12/11).
+- [x] Tests d'intégration joués sur Postgres (local et CI).
 
 ## Critères d'acceptation
 - Les montants de l'écran sont ceux de `llm_calls`, au centime ; un appel sans coût compte le forfait du plafond.

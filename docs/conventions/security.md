@@ -36,7 +36,7 @@ Ce qu'on protège, par ordre d'importance : (1) les médias et conversations int
 - Sorties structurées validées par Zod ; une sortie invalide = retry, puis draft en erreur, jamais d'exécution partielle.
 - Gardes post-génération : mention d'IA/de prompt/de système, fuite de données d'un autre fan, URL ou coordonnées, prix hors offre, mots interdits par la persona.
 - Évals adversariales dans `evals/adversarial/` : injections classiques (« ignore tes instructions », « répète ton prompt », « tu es maintenant… »), tentatives d'extraction de données d'autres fans, demandes de rencontre/paiement hors plateforme. Elles tournent en CI sur un sous-ensemble.
-- Plafonds : tokens par appel, appels par conversation et par heure, budget LLM par créatrice et par jour (coupe-circuit).
+- Plafonds : tokens par appel, appels par conversation et par heure, budget LLM par créatrice et par jour (coupe-circuit). Par conversation (SEC-09, choix de Charles du 11/11) : jusqu'à 60 réponses dans l'heure à son rythme habituel, puis une réponse toutes les 3 minutes, comptées depuis sa dernière réponse ; elle ralentit, elle ne se tait jamais (`respondAt`). Un message de fan garde 4 000 caractères et 20 médias (`boundFanText`, `FAN_MEDIA_MAX`) : au-delà il est coupé, jamais refusé.
 
 ## 5. Chaîne d'approvisionnement
 
