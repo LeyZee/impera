@@ -160,6 +160,8 @@ export function createTeamImport(deps: TeamImportDeps): TeamImport {
       if (listed?.ok !== true) throw new SalesFeedTeamListUnavailable();
       const chatter = listed.value.find((row) => row.platformChatterId === platformChatterId);
       if (chatter === undefined) throw new SalesFeedChatterUnprocessable();
+      // An account the platform removed is no newcomer: it is linked or dismissed, never invited.
+      if (chatter.removedAt !== null) throw new SalesFeedChatterUnprocessable();
       if (chatter.isExternal) throw new SalesFeedExternalInviteForbidden();
     },
 

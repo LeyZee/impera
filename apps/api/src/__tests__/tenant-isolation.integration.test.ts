@@ -47,6 +47,10 @@ const bodiesFor = (
     descriptionId: '00000000-0000-4000-8000-000000000000',
     detailed: 'Description inventée',
   },
+  'POST /v1/creators/:creatorId/drops/:id/files/:fileId/description': {
+    detailed: 'Description inventée',
+    intensity: 'soft',
+  },
   'POST /v1/creators/:creatorId/drops/:id/summary/correct': {
     summaryId: '00000000-0000-4000-8000-000000000000',
     shootingContext: 'Contexte inventé',

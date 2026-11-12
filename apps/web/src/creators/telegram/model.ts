@@ -154,6 +154,48 @@ export function issuesOf(config: TelegramChannelConfig): Map<string, string> {
   return issues;
 }
 
+/** The line an issue is on, as she reads the screen: a link's name, address and place are one line. */
+export const issueLine = (key: string): string =>
+  key.startsWith('link:') ? key.split(':', 2).join(':') : key;
+
+/**
+ * The lines she just added and has not written in yet (recette créatrice 10): a link with no name, address nor place,
+ * an empty example. They are « à compléter », said without red until she writes in them; they still hold the save.
+ */
+export function blankLines(config: TelegramChannelConfig): ReadonlySet<string> {
+  const blank = new Set<string>();
+  for (const link of config.links)
+    if (link.name.trim() === '' && link.url.trim() === '' && link.destination.trim() === '')
+      blank.add(`link:${link.id}`);
+  config.examples.forEach((example, rank) => {
+    if (example.trim() === '') blank.add(`example:${String(rank)}`);
+  });
+  return blank;
+}
+
+/** Where the setting stands before it is saved: the lines to correct, else the lines to complete; `null` when none. */
+export function pendingLines(
+  issues: ReadonlyMap<string, string>,
+  blank: ReadonlySet<string>,
+): { readonly shown: ReadonlyMap<string, string>; readonly text: string | null; readonly wrong: boolean } {
+  const shown = new Map([...issues].filter(([key]) => !blank.has(issueLine(key))));
+  const wrong = new Set([...shown.keys()].map(issueLine)).size;
+  const open = [...blank].filter((line) => [...issues.keys()].some((key) => issueLine(key) === line)).length;
+  if (wrong > 0)
+    return {
+      shown,
+      wrong: true,
+      text: wrong > 1 ? `${String(wrong)} lignes à corriger` : 'Une ligne à corriger',
+    };
+  if (open > 0)
+    return {
+      shown,
+      wrong: false,
+      text: open > 1 ? `${String(open)} lignes à compléter` : 'Une ligne à compléter',
+    };
+  return { shown, wrong: false, text: null };
+}
+
 /** The setting as it is sent: names, addresses and the text of the link trimmed. */
 export function trimmed(config: TelegramChannelConfig): TelegramChannelConfig {
   return {

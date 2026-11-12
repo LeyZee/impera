@@ -10,9 +10,11 @@ const count = z.coerce.number().int().nonnegative();
  * The rows of « Qui sont tes fans » (CR-15), read in her own transaction (`withCreatorAccount`, RLS on her creator),
  * then ranked by the `fans` module: no value a fan wrote leaves the server, only shares (ADR 0074 § 7 and § 8).
  *
- * Everything stops at the last midnight before `now` in her time zone (§ 2): the fans first seen before it, and the
- * facts active then, written before it, not superseded by a fact written before it, not expired at it (§ 1). Only
- * declared facts, never a chatter's note nor a commercial fact, and the filter is in the query itself (Bilan, #605).
+ * Everything stops at the last midnight before `now` in her time zone (§ 2): the fans first seen before it, their
+ * messages included (a fan imported today with last week's history waits for tomorrow, or « t'ont écrit » would
+ * outnumber « en tout »), and the facts active then, written before it, not superseded by a fact written before it,
+ * not expired at it (§ 1). Only declared facts, never a chatter's note nor a commercial fact, and the filter is in the
+ * query itself (Bilan, #605).
  */
 export async function readFanInsights(
   tx: Transaction,
@@ -35,6 +37,7 @@ export async function readFanInsights(
                count(*) filter (where f.first_seen_at >= ${at}::timestamptz - interval '30 days') as new_30,
                (select count(distinct c.fan_id) from messages m
                   join conversations c on c.id = m.conversation_id
+                  join fans seen on seen.id = c.fan_id and seen.first_seen_at < ${at}::timestamptz
                   where m.direction = 'inbound'
                     and m.platform_created_at >= ${at}::timestamptz - interval '7 days'
                     and m.platform_created_at < ${at}::timestamptz) as wrote_7
@@ -86,6 +89,7 @@ export async function readFanInsights(
                count(*) as messages
         from messages m
         join conversations c on c.id = m.conversation_id
+        join fans seen on seen.id = c.fan_id and seen.first_seen_at < ${at}::timestamptz
         where m.direction = 'inbound'
           and m.platform_created_at >= ${at}::timestamptz - interval '30 days'
           and m.platform_created_at < ${at}::timestamptz
@@ -96,6 +100,7 @@ export async function readFanInsights(
     sql`select count(distinct c.fan_id) as fans
         from messages m
         join conversations c on c.id = m.conversation_id
+        join fans seen on seen.id = c.fan_id and seen.first_seen_at < ${at}::timestamptz
         where m.direction = 'inbound'
           and m.platform_created_at >= ${at}::timestamptz - interval '30 days'
           and m.platform_created_at < ${at}::timestamptz`,
