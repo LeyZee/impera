@@ -111,3 +111,4 @@ Date : AAAA-MM-JJ
 | 0085 | La fiche du fan : vingt cases fermées que l'IA remplit en lisant la conversation, et que le chatteur corrige | accepted (précise P3-02, 0018 § 1 et 0063) |
 | 0086 | Le panneau copilote : à côté de la conversation Reveal, la fiche du fan d'abord, le brouillon de l'agent ensuite, et c'est le chatteur qui envoie | accepted (précise 0025, 0019, 0066 § 7 et 0085) |
 | 0087 | Un rôle de service entre le rôle applicatif et le rôle propriétaire de la base | proposed (précise 0005 et 0027) |
+| 0092 | Piloter l'agence : la valeur de chaque chatteur, ce qui a changé chez une créatrice, les fans qui comptent | accepted (précise 0078, 0081, 0024 et 0043 § 7 ; amende 0078 « jamais nommé ici » et 0024 pour Entraîner) |

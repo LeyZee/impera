@@ -12,7 +12,13 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
-import { dailyStatsOf, revealSalesFeed, type DailyStatsDay } from '../modules/connectors';
+import {
+  chatterStatsOf,
+  dailyStatsOf,
+  revealSalesFeed,
+  type ChatterStatsDay,
+  type DailyStatsDay,
+} from '../modules/connectors';
 import { addDays } from '../modules/connectors/domain/daily-stats';
 import { buildServer, type Server } from '../server';
 
@@ -24,8 +30,9 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
 
 /**
- * The daily photo of Reveal's statistics (ADR 0081) through the real app: the hourly job against FakeReveal, the
- * calls counted and the reserve kept, and who reads the photo. Everything is invented (ADR 0010).
+ * The daily photo of Reveal's statistics (ADR 0081), by account and by chatter (ADR 0092 § 1), through the real app:
+ * the hourly job against FakeReveal, the calls counted and the reserve kept, and who reads the photos. Everything is
+ * invented (ADR 0010).
  */
 describe('daily statistics of the platform (ADR 0081)', () => {
   let test: TestDb;
@@ -48,6 +55,7 @@ describe('daily statistics of the platform (ADR 0081)', () => {
 
   const run = () => app.modules.connectors.jobs.readDailyStats(jobLogger, 'job:test');
   const statsCalls = () => crm.calls.filter((call) => call.path === '/v1/stats/daily').length;
+  const chatterCalls = () => crm.calls.filter((call) => call.path === '/v1/stats/chatters/daily').length;
   const counted = async () =>
     (
       await test.admin.db
@@ -59,6 +67,11 @@ describe('daily statistics of the platform (ADR 0081)', () => {
     )[0]?.calls ?? 0;
   const photo = () =>
     test.admin.db.select().from(schema.platformDailyStats).orderBy(schema.platformDailyStats.day);
+  const chatterPhoto = () =>
+    test.admin.db
+      .select()
+      .from(schema.platformChatterDailyStats)
+      .orderBy(schema.platformChatterDailyStats.day, schema.platformChatterDailyStats.platformChatterId);
   const at = (day: string) => `${day}T10:00:00.000Z`;
 
   beforeAll(async () => {
@@ -138,7 +151,9 @@ describe('daily statistics of the platform (ADR 0081)', () => {
     const before = statsCalls();
     await run();
     expect(statsCalls()).toBe(before + 1);
-    expect(await counted()).toBe(1);
+    // The days by chatter are one more call, counted with the first (ADR 0092 § 1).
+    expect(chatterCalls()).toBe(1);
+    expect(await counted()).toBe(2);
     const rows = await photo();
     expect(rows.map((row) => row.day)).toEqual([addDays(today, -10), today]);
     expect(rows[1]).toMatchObject({
@@ -159,13 +174,34 @@ describe('daily statistics of the platform (ADR 0081)', () => {
     expect(cursor?.at).toBeInstanceOf(Date);
   });
 
+  it('keeps the same days by chatter: the linked models alone, PPV and messages, never an amount (ADR 0092 § 1)', async () => {
+    const rows = await chatterPhoto();
+    expect(rows.map((row) => [row.day, row.platformChatterId])).toEqual([
+      [addDays(today, -10), 'chatter_test_01'],
+      [today, 'chatter_test_01'],
+    ]);
+    expect(rows[1]).toMatchObject({
+      platform: 'reveal',
+      platformAccountId: noraAccount,
+      creatorId: nora,
+      ppvPurchased: 1,
+    });
+    expect(rows[1]?.ppvSent).toEqual(expect.any(Number));
+    expect(rows[1]?.messagesSent).toEqual(expect.any(Number));
+    expect(Object.keys(rows[1] ?? {}).filter((key) => /revenue|amount|minor|fan/iu.test(key))).toEqual([]);
+  });
+
   it('reads today and yesterday after that, each day written over', async () => {
     crm.sell({ id: 'sale_stats_05', createdAt: at(today) });
     crm.sell({ id: 'sale_stats_06', createdAt: at(addDays(today, -10)) });
     await run();
-    expect(await counted()).toBe(2);
+    expect(await counted()).toBe(4);
     const rows = await photo();
     expect(rows.map((row) => [row.day, row.ppvPurchased])).toEqual([
+      [addDays(today, -10), 1],
+      [today, 2],
+    ]);
+    expect((await chatterPhoto()).map((row) => [row.day, row.ppvPurchased])).toEqual([
       [addDays(today, -10), 1],
       [today, 2],
     ]);
@@ -179,10 +215,21 @@ describe('daily statistics of the platform (ADR 0081)', () => {
       payload: { from: addDays(today, -2), to: addDays(today, -1), export: null },
     });
     expect(checked.statusCode).toBe(200);
-    expect(await counted()).toBe(4);
+    expect(await counted()).toBe(6);
   });
 
   it('calls no more once fewer than 100 of the day’s 500 calls are left', async () => {
+    // One call left before the reserve: the days by account are read, those by chatter wait for the next day.
+    await test.admin.db
+      .update(schema.salesFeedStatsCalls)
+      .set({ calls: 399 })
+      .where(
+        and(eq(schema.salesFeedStatsCalls.platform, 'reveal'), eq(schema.salesFeedStatsCalls.day, today)),
+      );
+    const [daily, byChatter] = [statsCalls(), chatterCalls()];
+    await run();
+    expect([statsCalls(), chatterCalls()]).toEqual([daily + 1, byChatter]);
+    expect(await counted()).toBe(400);
     await test.admin.db
       .update(schema.salesFeedStatsCalls)
       .set({ calls: 400 })
@@ -206,10 +253,30 @@ describe('daily statistics of the platform (ADR 0081)', () => {
     expect(await read(users.creator)).toEqual([]);
   });
 
+  it('shows the days by chatter to the owner and to a manager whose list has her, never to a chatter', async () => {
+    const range = { from: addDays(today, -30), to: today };
+    const read = (userId: string): Promise<ChatterStatsDay[]> =>
+      withTenantMember(app.db.db, nora, userId, (tx) => chatterStatsOf(tx, range));
+    expect((await read(ownerId)).map((row) => row.platformChatterId)).toEqual([
+      'chatter_test_01',
+      'chatter_test_01',
+    ]);
+    expect(await read(users.manager)).toHaveLength(2);
+    expect(await read(users.outsideManager)).toEqual([]);
+    // A chatter reads none, his own days included (ADR 0043 § 7).
+    expect(await read(users.chatter)).toEqual([]);
+    expect(await read(users.creator)).toEqual([]);
+  });
+
   it('lets the app write neither table, even as the owner', async () => {
     await expect(
       withTenantMember(app.db.db, nora, ownerId, (tx) =>
         tx.execute(sql`update platform_daily_stats set ppv_purchased = 9`),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      withTenantMember(app.db.db, nora, ownerId, (tx) =>
+        tx.execute(sql`update platform_chatter_daily_stats set ppv_purchased = 9`),
       ),
     ).rejects.toThrow();
     await expect(
@@ -222,11 +289,13 @@ describe('daily statistics of the platform (ADR 0081)', () => {
   it('leaves an archived creator out of the reading', async () => {
     await test.admin.db.delete(schema.salesFeedStatsCalls);
     await test.admin.db.delete(schema.platformDailyStats);
+    await test.admin.db.delete(schema.platformChatterDailyStats);
     await test.admin.db
       .update(schema.creators)
       .set({ archivedAt: new Date() })
       .where(eq(schema.creators.id, nora));
     await run();
     expect(await photo()).toEqual([]);
+    expect(await chatterPhoto()).toEqual([]);
   });
 });

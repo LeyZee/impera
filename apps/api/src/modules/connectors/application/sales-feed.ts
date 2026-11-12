@@ -30,6 +30,7 @@ import { fortnightBefore, mismatchDays, type CheckedAccount } from '../domain/au
 import type { AvatarPorts } from '../domain/avatar';
 import { isLastingOutage, nextUnreachableRun, type UnreachableRun } from '../domain/connection-outage';
 import {
+  chatterStatsRows,
   dailyStatsRange,
   dailyStatsRows,
   statsCallAllowed,
@@ -377,9 +378,29 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       await onFailure(platform, stored, read.failure, logger, correlationId);
       return;
     }
-    const rows = dailyStatsRows(platform, read.value, await store.links(platform));
+    const links = await store.links(platform);
+    const rows = dailyStatsRows(platform, read.value, links);
     await store.record(platform, rows, clock.now(), range.full);
     logger.info({ platform, from: range.from, to: range.to, rows: rows.length }, 'daily statistics read');
+
+    // The same days by member of the platform's team (ADR 0092 § 1): one more call, counted and kept under the same
+    // reserve. Missed, the days by account stay; the next hour reads today and yesterday again, the night the 31 days.
+    if (!statsCallAllowed(await store.callsOn(platform, day))) {
+      logger.warn({ platform, day }, 'chatter statistics not read: the day’s reserve of calls is reached');
+      return;
+    }
+    await store.countCall(platform, day);
+    const byChatter = await feed.chatterDailyStats(range);
+    if (!byChatter.ok) {
+      await onFailure(platform, stored, byChatter.failure, logger, correlationId);
+      return;
+    }
+    const chatterRows = chatterStatsRows(platform, byChatter.value, links);
+    await store.recordChatters(chatterRows, clock.now());
+    logger.info(
+      { platform, from: range.from, to: range.to, rows: chatterRows.length },
+      'chatter statistics read',
+    );
   }
 
   /** The feed of the saved key, or `null` when there is none that works. */
