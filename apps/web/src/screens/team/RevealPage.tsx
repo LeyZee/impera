@@ -546,7 +546,7 @@ function ToConfirmRow({
 }): JSX.Element {
   const label = chatterName(row.chatter);
   const options = optionsOf(row, team);
-  const why = edit.choice === choiceOf(row.suggestion) ? matchLine(row.suggestion) : null;
+  const why = edit.choice === choiceOf(row.suggestion) ? matchLine(row.suggestion, row.chatter) : null;
   const isInvite = edit.choice === 'invite';
   const canAct = row.actions.length > 0;
   return (
