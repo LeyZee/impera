@@ -387,6 +387,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Accès d'agent | `mcp_grant` | Ce qu'un agent connecté a le droit de faire : au nom de quelle personne, pour quelle créatrice (une au plus), avec quelles capacités, jusqu'à quand. Créé et révoqué dans Réglages › Agents connectés. |
 | Jeton d'agent | `mcp_token` | Le secret d'un accès d'agent, montré une seule fois à la création, stocké haché. Jamais dans l'extension, le dépôt ni un fil de discussion. |
 | Capacité | `mcp_capability` | Un droit nommé d'un accès d'agent (`read:status`, `read:conversation_content`, `write:brakes`…), liste fermée en code. |
+| Action préparée | `prepared_action` | Un geste qu'un agent connecté dépose sans effet (d'abord : inviter un membre) et qu'un humain relit, complète et confirme dans le CRM avec son second facteur, ou refuse ; elle expire au bout de 72 heures (ADR 0105). À ne pas confondre avec la proposition (`draft`), qui est une réponse à un fan. |
 
 ## Noms à ne pas utiliser
 
