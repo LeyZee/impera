@@ -58,6 +58,8 @@ function agencyWith(sent: SentScript): AgencyContentStore {
     markSent: refuse('markSent'),
     sentScript: () => Promise.resolve(sent),
     confirmExport: refuse('confirmExport'),
+    sentDrop: refuse('sentDrop'),
+    confirmDropExport: refuse('confirmDropExport'),
   };
 }
 

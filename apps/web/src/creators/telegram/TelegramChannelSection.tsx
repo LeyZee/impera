@@ -35,7 +35,9 @@ import {
   choiceHint,
   clockWords,
   daysWords,
+  blankLines,
   issuesOf,
+  pendingLines,
   newLink,
   nextSlot,
   rhythmWords,
@@ -136,9 +138,11 @@ function ChannelForm({
   const [notice, setNotice] = useState<string | null>(null);
   const times = useUnreadableTimes();
 
-  const issues = issuesOf(draft);
+  const pending = pendingLines(issuesOf(draft), blankLines(draft));
+  // A line just added and still blank is said « à compléter », in no red: only what she wrote wrong is flagged.
+  const issues = pending.shown;
   const changed = !sameConfig(draft, stored.config);
-  const blocked = issues.size > 0 || times.unreadable;
+  const blocked = pending.text !== null || times.unreadable;
   const dirty = changed || times.unreadable;
   useEffect(() => {
     onDirty(dirty);
@@ -190,11 +194,8 @@ function ChannelForm({
   const state =
     problem !== null
       ? { dot: 'warn', text: problem.text }
-      : blocked
-        ? {
-            dot: 'warn',
-            text: issues.size > 1 ? `${String(issues.size)} lignes à corriger` : 'Une ligne à corriger',
-          }
+      : pending.text !== null
+        ? { dot: pending.wrong ? 'warn' : 'idle', text: pending.text }
         : changed
           ? { dot: 'ok', text: 'Modifié, prêt à enregistrer' }
           : notice !== null
@@ -522,11 +523,17 @@ function ChannelForm({
       </div>
       <SaveBar
         show={dirty && !headOnScreen}
-        warn={blocked}
+        warn={pending.wrong || times.unreadable}
         text={state.text}
         saveLabel="Enregistrer"
         saving={saving}
-        blocked={blocked ? 'Corrige d’abord les lignes signalées.' : null}
+        blocked={
+          !blocked
+            ? null
+            : pending.wrong || times.unreadable
+              ? 'Corrige d’abord les lignes signalées.'
+              : 'Complète d’abord les lignes ajoutées, ou retire-les.'
+        }
         onReset={undo}
         onSave={() => void save()}
       />

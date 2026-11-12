@@ -19,7 +19,7 @@ Plateforme ──(poll toutes les N s, ou WebSocket)──▶ Connector.listConv
                                      • la relance en attente ne partira pas : son ancre (son dernier message) a bougé
 ```
 
-Le debounce (30 à 90 s, selon la persona et l'heure) fait qu'un fan qui envoie trois messages d'affilée obtient une seule réponse qui les prend tous en compte. Le `queueName` garantit qu'aucun autre job ne touche la conversation en même temps.
+Le debounce (30 à 90 s, selon la persona et l'heure) fait qu'un fan qui envoie trois messages d'affilée obtient une seule réponse qui les prend tous en compte. Le `queueName` garantit qu'aucun autre job ne touche la conversation en même temps. Passé 60 réponses à un même fan dans l'heure, la réponse suivante n'est écrite que 3 minutes après la précédente (`respondAt`) : le rythme ralentit, la conversation continue.
 
 ## 2. Le job `conversation.respond`
 

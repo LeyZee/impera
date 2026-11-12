@@ -1,9 +1,11 @@
+import { TeamImportOverviewSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
   decisionText,
   heldCountText,
   heldReasonText,
+  lineChatter,
   outcomeLabel,
   outcomeWords,
   ownLineText,
@@ -18,6 +20,7 @@ import { heldSaleOf, THEO as THEO_MEMBER } from '@/test/pay';
 const NBSP = /[\u00a0\u202f]/gu;
 const plain = (text: string | null): string | null => (text === null ? null : text.replace(NBSP, ' '));
 const THEO = { name: 'Théo', own: false };
+const ZONE = 'Europe/Paris';
 
 describe('held sales (CRM-03 lot b4b)', () => {
   it('says when a sale and a refund were made, the refund with its sale', () => {
@@ -48,26 +51,62 @@ describe('held sales (CRM-03 lot b4b)', () => {
   });
 
   it('says why a line waits, what the owner or a manager can do about it, and nothing for a paid line', () => {
-    expect(heldReasonText(heldSaleOf(), THEO, true)).toBe(
+    expect(heldReasonText(heldSaleOf(), THEO, true, ZONE)).toBe(
       'Théo n’était ni en poste ni dans sa marge d’accès à l’heure de la vente.',
     );
     const unlinked = heldSaleOf({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
-    expect(heldReasonText(unlinked, null, true)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Réglages › Ventes et la vente compte seule. Sinon, écarte-la.',
+    expect(heldReasonText(unlinked, null, true, ZONE)).toBe(
+      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Équipe › Reveal et la vente compte seule. Sinon, écarte-la.',
     );
-    expect(heldReasonText(unlinked, null, false)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Réglages › Ventes. Sinon, écarte-la.',
+    expect(heldReasonText(unlinked, null, false, ZONE)).toBe(
+      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Équipe › Reveal. Sinon, écarte-la.',
     );
-    expect(heldReasonText(heldSaleOf({ reason: 'status_unknown' }), THEO, true)).toBe(
+    expect(heldReasonText(heldSaleOf({ reason: 'status_unknown' }), THEO, true, ZONE)).toBe(
       'Reveal lui donne un statut qu’Impera ne connaît pas encore.',
     );
-    expect(heldReasonText(heldSaleOf({ reason: 'refund_before_register' }), THEO, true)).toBe(
+    expect(heldReasonText(heldSaleOf({ reason: 'refund_before_register' }), THEO, true, ZONE)).toBe(
       'Remboursement d’une vente plus ancienne que le registre des ventes : il n’est retiré à personne.',
     );
-    expect(heldReasonText(heldSaleOf({ reason: 'refund_before_base' }), THEO, true)).toBe(
+    expect(heldReasonText(heldSaleOf({ reason: 'refund_before_base' }), THEO, true, ZONE)).toBe(
       'Remboursement d’une vente payée sur les rapports, avant le passage au net : il n’est pas retiré du net.',
     );
-    expect(heldReasonText(heldSaleOf({ reason: null }), THEO, true)).toBeNull();
+    expect(heldReasonText(heldSaleOf({ reason: null }), THEO, true, ZONE)).toBeNull();
+  });
+
+  it('says the day a member left, and that a sale after it waits for a decision and goes on his final statement (ADR 0072, 11/11)', () => {
+    // The sale of the fixture is on Wednesday 28 October at 22 h in Paris.
+    expect(heldReasonText(heldSaleOf({ memberLeftOn: '2026-10-26' }), THEO, true, ZONE)).toBe(
+      'Théo a quitté l’équipe le lundi 26 octobre, avant cette vente. Comptée, elle va sur son relevé final, sans minimum de versement.',
+    );
+    expect(
+      heldReasonText(
+        heldSaleOf({ event: 'refund', netMinor: -4_200, memberLeftOn: '2026-10-26' }),
+        THEO,
+        true,
+        ZONE,
+      ),
+    ).toBe(
+      'Théo a quitté l’équipe le lundi 26 octobre, avant la vente de ce remboursement. Compté, sa vente va sur son relevé final et il s’en déduit.',
+    );
+    // Made off shift on the day he left, or before: only the day is added.
+    expect(heldReasonText(heldSaleOf({ memberLeftOn: '2026-10-28' }), THEO, true, ZONE)).toBe(
+      'Théo n’était ni en poste ni dans sa marge d’accès à l’heure de la vente. Théo a quitté l’équipe le mercredi 28 octobre.',
+    );
+    // The day of the sale is the agency's: 23 h 30 UTC on the 31st is already the 1st in Paris, after he left.
+    expect(
+      heldReasonText(
+        heldSaleOf({
+          occurredAt: '2026-10-31T23:30:00.000Z',
+          saleOccurredAt: '2026-10-31T23:30:00.000Z',
+          memberLeftOn: '2026-10-31',
+        }),
+        THEO,
+        true,
+        ZONE,
+      ),
+    ).toBe(
+      'Théo a quitté l’équipe le samedi 31 octobre, avant cette vente. Comptée, elle va sur son relevé final, sans minimum de versement.',
+    );
   });
 
   it('names the decision in force and each gesture, the member a count goes to', () => {
@@ -137,11 +176,11 @@ describe('held sales (CRM-03 lot b4b)', () => {
       'Le remboursement suit de nouveau les règles : il se déduit des ventes de Théo.',
     );
     const unlinked = refund({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
-    expect(heldReasonText(unlinked, null, true)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Réglages › Ventes et le remboursement se déduit seul. Sinon, écarte-le.',
+    expect(heldReasonText(unlinked, null, true, ZONE)).toBe(
+      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Équipe › Reveal et le remboursement se déduit seul. Sinon, écarte-le.',
     );
-    expect(heldReasonText(unlinked, null, false)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Réglages › Ventes. Sinon, écarte-le.',
+    expect(heldReasonText(unlinked, null, false, ZONE)).toBe(
+      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Équipe › Reveal. Sinon, écarte-le.',
     );
   });
 
@@ -177,5 +216,53 @@ describe('held sales (CRM-03 lot b4b)', () => {
     });
     expect(signalText(refund, THEO)).toBe('Signalé par Théo : ce n’est pas son remboursement.');
     expect(signalChipText(refund)).toBe('Signalé');
+  });
+
+  it('names who made a line: its member, else the Reveal account from the team, else the account as one', () => {
+    const team = TeamImportOverviewSchema.parse({
+      rows: [
+        {
+          chatter: {
+            platformChatterId: 'chatter-new',
+            firstName: 'Camille',
+            lastName: 'Essai',
+            email: null,
+            role: 'chatter',
+            isBot: false,
+            isExternal: false,
+            removedAt: null,
+            platformModelIds: [],
+          },
+          link: null,
+          dismissedAt: null,
+          suggestion: null,
+          preselected: false,
+          actions: [],
+          models: [],
+          modelGap: { inImperaOnly: [], onPlatformOnly: [] },
+          removal: null,
+        },
+      ],
+      newCount: 1,
+      removalCount: 0,
+      abnormalRead: false,
+      listError: null,
+    });
+    const unlinked = (platformChatterId: string | null) =>
+      heldSaleOf({ memberId: null, platformChatterId, reason: 'chatter_unlinked' });
+    expect(lineChatter(heldSaleOf(), THEO, team)).toEqual({ lead: 'chatteur', name: 'Théo' });
+    expect(lineChatter(unlinked('chatter-new'), null, team)).toEqual({
+      lead: 'chatteur',
+      name: 'non relié · Camille Essai',
+    });
+    expect(lineChatter(unlinked('chatter-other'), null, team)).toEqual({
+      lead: 'compte Reveal',
+      name: 'non relié',
+    });
+    expect(lineChatter(unlinked('chatter-new'), null, undefined)).toEqual({
+      lead: 'compte Reveal',
+      name: 'non relié',
+    });
+    expect(lineChatter(unlinked(null), null, team)).toEqual({ lead: 'chatteur', name: 'non relié' });
   });
 });
