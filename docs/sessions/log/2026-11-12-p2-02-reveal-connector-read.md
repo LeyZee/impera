@@ -6,3 +6,4 @@ Découvertes : le nom affiché du membre « bot » n'est nulle part (la session 
 Candidats à suppression : aucun.
 Vérifié : pnpm check ✓, pnpm test ✓, pnpm test:integration ✓ (Docker local), hygiène ✓.
 Ajout du 12/11 au soir (Bilan) : le membre « bot » est épinglé à la première « Sync » (`SessionShape.member`), une session d'un autre membre est refusée en 409 `connector_session_member_conflict`, et l'extension le dit (« other-member »), suite à la relecture d'Agent sur #681.
+Ajout du 12/11 au soir, suite à Agent : un message rattrapé (premier relevé du compte, ou lu plus de 6 h après son envoi) est ingéré sans lecture de fiche ni réponse en file, pour qu'une première synchro sur l'historique de Messa ne coûte pas un appel aux modèles par fan. Le test du premier relevé suit ; les synchronisations du test d'intégration viennent chacune de leur adresse (limite de 10 par minute).

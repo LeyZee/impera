@@ -107,6 +107,11 @@ export type IngestMessage = (input: {
   platformFanId: string;
   fanDisplayName: string;
   message: ExternalMessage;
+  /**
+   * A message caught up rather than just received (the account's first poll, or one older than `CATCH_UP_AFTER_HOURS`):
+   * stored, never answered nor read by the models on its own. The next fresh message of his starts both (P2-02).
+   */
+  catchUp: boolean;
   correlationId: string;
 }) => Promise<{ isNew: boolean }>;
 
