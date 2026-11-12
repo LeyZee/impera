@@ -48,9 +48,10 @@ Les outils de 0026 § 5 restent, sous des noms et une adresse Impera (`impera://
 | Fiche du fan remplie par l'IA (champ `untrusted`) | `read:fans` |
 | Shifts, qui est en poste, rapports de shift, équipe importée de la plateforme | `read:team` |
 | Relevés de commission de la quinzaine | `read:payroll` |
-| Dépôts et scripts : titres, étapes, statuts, jamais un média ni son URL | `read:media` (nouvelle) |
+| Dépôts et scripts : titres, nombre d'étapes, statuts, jamais un média ni son URL | `read:media` (nouvelle) |
+| Texte des étapes d'un script | `read:script_content` (nouvelle) |
 
-Les deux capacités nouvelles sont, comme les autres, jamais cochées d'office.
+Les capacités nouvelles sont, comme les autres, jamais cochées d'office. `read:script_content` ne se coche que sur un accès au nom du propriétaire : avec elle, la méthode de l'agence part chez le fournisseur du modèle de l'agent, et l'écran le dit en une phrase au moment de la cocher, comme pour `read:conversation_content` (choix de Charles, 13/11/2026, 0 h 52, contre l'avis de Sécurité qui préférait titres et statuts seuls).
 
 Chaque message lu porte son auteur (chatteur nommé, agent de chatting ou créatrice) : l'agent connecté peut juger le travail d'un chatteur et le respect de la stratégie, mais il n'écrit jamais au chatteur ni dans ses notes.
 
