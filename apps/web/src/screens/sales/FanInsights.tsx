@@ -256,7 +256,7 @@ function SpendingCard({
   // Nobody unlocked yet: one sentence, not a ring at 0 % beside a bar « Rien débloqué » at 100 % (recette CRE-04).
   if (spending.payingShare === 0)
     return (
-      <article className="fi-card fi-card--wide nv-enter" style={{ '--nv-i': index }}>
+      <article className="fi-card fi-card--full nv-enter" style={{ '--nv-i': index }}>
         <h3 className="fi-card__title">Ce qu’ils débloquent</h3>
         <p className="fi-none">Aucun de tes fans n’a encore débloqué de message.</p>
       </article>

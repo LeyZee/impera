@@ -127,7 +127,9 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
       },
     });
     show();
-    expect(await screen.findByText('Aucun de tes fans n’a encore débloqué de message.')).toBeDefined();
+    const none = await screen.findByText('Aucun de tes fans n’a encore débloqué de message.');
+    // One sentence fills its row: no half-empty line beside a short card.
+    expect(none.closest('article')?.className).toContain('fi-card--full');
     expect(screen.queryByText('ont déjà débloqué')).toBeNull();
     expect(screen.queryByText('Rien débloqué')).toBeNull();
     expect(screen.queryByText('Panier moyen sur 30 jours')).toBeNull();
