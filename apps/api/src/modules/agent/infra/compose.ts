@@ -199,6 +199,8 @@ export interface ComposedTurn {
   readonly sexualization?: SexualizationDecision;
   /** His desire score after this message, only when it changed: the worker writes it (P3-12). */
   readonly desire?: DesireReading;
+  /** His desire score read on this message, moved or not: the playground shows it to calibrate the counting. */
+  readonly desireRead?: DesireReading;
   /** An adult age he stated himself in this message (`declaredAdultAge`): the composer may confirm his age. */
   readonly ageDeclared?: number;
   /** The brain suggested an offer and the policy refused it: the voice wrote a plain answer. */
@@ -409,6 +411,7 @@ export async function composeTurn(
       ...(!brain.ok && { briefFailure: brain.error }),
       ...(sexualization !== undefined && { sexualization }),
       ...(desire !== undefined && desireMoved(desire) && { desire }),
+      ...(desire !== undefined && { desireRead: desire }),
       ...(ageDeclared !== null && { ageDeclared }),
       ...(offerRefused !== undefined && { offerRefused }),
       bubbles: [],
@@ -436,6 +439,7 @@ export async function composeTurn(
     ...(!brain.ok && { briefFailure: brain.error }),
     ...(sexualization !== undefined && { sexualization }),
     ...(desire !== undefined && desireMoved(desire) && { desire }),
+    ...(desire !== undefined && { desireRead: desire }),
     ...(ageDeclared !== null && { ageDeclared }),
     ...(offerRefused !== undefined && { offerRefused }),
     voiceBrief,

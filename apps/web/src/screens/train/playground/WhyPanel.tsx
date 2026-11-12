@@ -1,6 +1,7 @@
 import type { PlaygroundAnswer, PlaygroundState } from '@impera/contracts';
 import type { JSX, ReactNode } from 'react';
 
+import { DesireGauge } from './Desire';
 import { euros, needsAttention } from './logic';
 import {
   actionLabel,
@@ -114,6 +115,19 @@ export function WhyPanel({
               </Sec>
             </>
           )}
+          {answer.offerRefused === undefined ? null : (
+            <Sec label="Offre refusée">
+              <p className="pg-why__refused">
+                Le cerveau voulait proposer un script, la règle a dit non : {answer.offerRefused.label}.
+              </p>
+            </Sec>
+          )}
+          {answer.cursor === undefined ? null : <Sec label="Curseur">{answer.cursor.label}</Sec>}
+          {answer.desire === undefined ? null : (
+            <Sec label="Désir du fan">
+              <DesireGauge desire={answer.desire} thresholds={state.desireThresholds} />
+            </Sec>
+          )}
           {risks.length > 0 ? (
             <Sec label="Risques">
               <ul className="pg-list">
@@ -166,6 +180,12 @@ export function WhyPanel({
                 </dd>
                 <dt>Voix</dt>
                 <dd className="pg-mono">{state.version.voicePrompt}</dd>
+                {answer.desire === undefined ? null : (
+                  <>
+                    <dt>Poids du désir</dt>
+                    <dd className="pg-mono">{answer.desire.weightsVersion}</dd>
+                  </>
+                )}
                 <dt>Latence</dt>
                 <dd>{(answer.latencyMs / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} s</dd>
                 <dt>Coût</dt>

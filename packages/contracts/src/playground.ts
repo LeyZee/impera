@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { BriefIntentSchema } from './brief';
+import { DESIRE_SIGNALS_MAX, DesireBandSchema, DesireScoreSchema, DesireSignalSchema } from './desire';
 import { CreatorIdSchema, PersonaVersionIdSchema } from './ids';
 import { MediaDescriptionSchema } from './media';
 
@@ -62,11 +63,30 @@ export const PlaygroundSituationSchema = z.object({
 });
 export type PlaygroundSituation = z.infer<typeof PlaygroundSituationSchema>;
 
+/**
+ * His desire score as it stood after one message of his (P3-12, glossary « Note de désir »), shown to calibrate it:
+ * the score before and after, and each signal with what it weighed in the counting `weightsVersion`. A signal that
+ * resets or freezes the score instead of counting has `points: null`. Computed by the server, never by the screen.
+ */
+export const PlaygroundDesireSchema = z.object({
+  /** His score cooled to this message, before it counted; `null` before his first score. */
+  before: DesireScoreSchema.nullable(),
+  score: DesireScoreSchema,
+  band: DesireBandSchema,
+  signals: z
+    .array(z.object({ signal: DesireSignalSchema, points: z.number().int().nullable() }))
+    .max(DESIRE_SIGNALS_MAX),
+  weightsVersion: z.string(),
+});
+export type PlaygroundDesire = z.infer<typeof PlaygroundDesireSchema>;
+
 export const PlaygroundTurnSchema = z.object({
   index: z.number().int().nonnegative(),
   from: z.enum(['fan', 'creator']),
   text: z.string(),
   media: z.array(z.object({ description: MediaDescriptionSchema, isLocked: z.boolean() })).exactOptional(),
+  /** On his messages the brain read: his desire score after it. */
+  desire: PlaygroundDesireSchema.exactOptional(),
 });
 
 export const GuardViolationSchema = z.object({
@@ -108,6 +128,12 @@ export const PlaygroundAnswerSchema = z.object({
       kycMissing: z.array(z.string()),
     })
     .exactOptional(),
+  /** His desire score after this message, when the brain read it. */
+  desire: PlaygroundDesireSchema.exactOptional(),
+  /** What the cursor decided on going sexual (P3-09), in French; absent when the brain did not read the moment. */
+  cursor: z.object({ kind: z.string(), label: z.string() }).exactOptional(),
+  /** The brain wanted to offer a script and the policy said no: why, in French. She wrote a plain answer. */
+  offerRefused: z.object({ code: z.string(), label: z.string() }).exactOptional(),
   model: z.string().exactOptional(),
   latencyMs: z.number().nonnegative(),
   /** The cost in euros, at the daily budget's rate (ADR 0011); the journal keeps dollars. */
@@ -148,6 +174,11 @@ export const PlaygroundStateSchema = z.object({
   }),
   presets: z.array(PlaygroundPresetSchema),
   presetId: z.string().nullable(),
+  /**
+   * Her two desire thresholds, from her persona: under `open` she never opens the intimate herself, under `script` no
+   * script goes out unless he asks for paid content himself.
+   */
+  desireThresholds: z.object({ open: DesireScoreSchema, script: DesireScoreSchema }),
   situation: PlaygroundSituationSchema,
   fanNotes: z.array(z.string()),
   history: z.array(PlaygroundTurnSchema),

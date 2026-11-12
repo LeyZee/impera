@@ -439,12 +439,53 @@ describe('playground session, the offer policy and the cursor', () => {
       'Tu me rends fou',
       'J’ai envie de toi',
       'Montre-moi',
-    ])
+    ]) {
+      // Three minutes between messages: neither a quick nor a slow reply, only what he says counts here.
+      playground.advance(3 * 60_000);
       scores.push((await playground.handleFanMessage(text)).desire?.score ?? -1);
+    }
     expect(scores.every((score, i) => i === 0 || score > (scores[i - 1] ?? 0))).toBe(true);
     expect(scores.at(-2)).toBeLessThan(70);
     expect(scores.at(-1)).toBeGreaterThanOrEqual(70);
     expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply', 'reply', 'offer']);
+  });
+
+  it('counts his reply speed on the simulated clock, as production does (P3-12)', async () => {
+    const quick = session([], true);
+    await quick.handleFanMessage('Salut toi');
+    const fast = await quick.handleFanMessage('Je suis là');
+    expect(fast.desire?.signals).toContain('quick_reply');
+
+    const slow = session([], true);
+    await slow.handleFanMessage('Salut toi');
+    slow.advance(2 * 3_600_000);
+    const late = await slow.handleFanMessage('Je suis là');
+    expect(late.desire?.signals).toContain('slow_reply');
+    expect(late.desire?.signals).not.toContain('quick_reply');
+  });
+
+  it('keeps the score each of his messages left, and a branch cuts it back', async () => {
+    const playground = session([], true);
+    await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
+    await playground.handleFanMessage('Tu me rends fou');
+    expect(playground.desireTrail).toHaveLength(2);
+    expect(playground.desireTrail[0]?.before).toBeNull();
+    expect(playground.desireTrail[1]?.before).not.toBeNull();
+    expect(playground.desireTrail[1]?.weightsVersion).toMatch(/^desire-/);
+    playground.branchAt(2);
+    expect(playground.desireTrail).toHaveLength(1);
+  });
+
+  it('says why the policy refused an offer, and what the cursor decided', async () => {
+    const playground = session([], true, 70);
+    const first = await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
+    // His age is confirmed only from his next message: the cursor slows her down before any offer.
+    expect(first.cursor).toEqual({ kind: 'steer_back', reason: 'age_unconfirmed' });
+    playground.advance(3 * 60_000);
+    const second = await playground.handleFanMessage('Tu me rends fou');
+    // The brain offers, his score is still under her 70: the policy says no, and why.
+    expect(second.desire?.score).toBeLessThan(70);
+    expect(second.offerRefused).toBe('low_desire');
   });
 
   it('offers nothing without her pace of scripts', async () => {
