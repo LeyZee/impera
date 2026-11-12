@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  boundFanText,
   bubbleIdempotencyKey,
   canSend,
   debounceFor,
@@ -10,12 +11,30 @@ import {
   followUpIdempotencyKey,
   followUpRetry,
   nextFollowUp,
+  respondAt,
 } from '../rules';
 
 const AT = new Date('2026-10-17T20:00:00Z');
 const later = (seconds: number) => new Date(AT.getTime() + seconds * 1_000);
 
 describe('conversation rules', () => {
+  it('answers at her usual pace up to 60 answers in the hour, then every three minutes, and never stops', () => {
+    expect(respondAt({ now: AT, repliesLastHour: 59, lastReplyAt: later(-5) })).toEqual(later(45));
+    // Slowed down: three minutes after her last answer, whatever he writes meanwhile.
+    expect(respondAt({ now: AT, repliesLastHour: 60, lastReplyAt: later(-5) })).toEqual(later(175));
+    expect(respondAt({ now: later(60), repliesLastHour: 60, lastReplyAt: later(-5) })).toEqual(later(175));
+    // Her last answer is far enough: the usual wait, never sooner.
+    expect(respondAt({ now: AT, repliesLastHour: 80, lastReplyAt: later(-600) })).toEqual(later(45));
+    expect(respondAt({ now: AT, repliesLastHour: 0, lastReplyAt: null })).toEqual(later(45));
+  });
+
+  it('cuts a fan message at 4 000 characters without splitting a character', () => {
+    expect(boundFanText('coucou')).toBe('coucou');
+    expect(boundFanText('a'.repeat(5_000))).toHaveLength(4_000);
+    const cut = boundFanText(`${'a'.repeat(3_999)}😘 et la suite`);
+    expect(cut).toBe('a'.repeat(3_999));
+  });
+
   it('waits 45 s by default and keeps a persona pace between 30 and 90 s', () => {
     expect(debounceFor()).toBe(DEFAULT_DEBOUNCE_SECONDS);
     expect(debounceFor({ debounceSeconds: 5 })).toBe(30);

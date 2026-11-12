@@ -9,6 +9,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  agencyStatusOf,
   amountInput,
   amountText,
   incidentsOf,
@@ -19,6 +20,7 @@ import {
   hasGap,
   lateFor,
   MEMBER_STATUS,
+  memberStatusOf,
   parseAmount,
   parsePercent,
   percentText,
@@ -34,8 +36,11 @@ import {
   startablePeriods,
   thresholdText,
   toDoOf,
+  toneOf,
   uncheckedText,
   validatedTotal,
+  WITHOUT_PAY_EFFECT,
+  withoutPayEffect,
 } from './model';
 
 const period = (day: string) => PayPeriodSchema.parse(day);
@@ -78,6 +83,7 @@ const report = (
     version: 1,
     byAgency: false,
     reviewKind: null,
+    earningsSource: 'declared',
     explanation: null,
     check: null,
     canReview: false,
@@ -349,6 +355,45 @@ describe('a report against its platform (ADR 0073)', () => {
     expect(toDoOf(list)).toEqual([]);
     expect(toDoOf(list, BEFORE).map((one) => one.report?.id)).toEqual([made.id]);
     expect(toDoOf(list, AT)).toEqual([]);
+  });
+
+  it('asks nothing of a report whose fortnight switched to the sales read, and leaves it out of the figures (ADR 0084 § 3)', () => {
+    const switched = (one: ShiftReport): ShiftReport => ({ ...one, earningsSource: 'detected' });
+    const back = report('01a17ff2-0000-7000-8000-0000000000d2', ofShift.id, 9_000, 'rejected');
+    const kept = report('01a17ff2-0000-7000-8000-0000000000d3', ofShift.id, 4_000, 'validated');
+    // Not to decide, not to explain, not to redo.
+    expect(awaitsDecision({ ...switched(made), canReview: true }, BEFORE)).toBe(false);
+    expect(gapWaits(switched(gap()), BEFORE)).toBe(false);
+    const list = { reports: [switched(back)], shifts: [ofShift], accounts: [], members: [] };
+    expect(toDoOf(list, BEFORE)).toEqual([]);
+    expect(toDoOf({ ...list, reports: [back] }, BEFORE).map((one) => one.report?.id)).toEqual([back.id]);
+    // Out of every figure: only what pays is summed.
+    expect(periodSums([switched(made), switched(back), kept])).toEqual([
+      {
+        currency: 'EUR',
+        validatedMinor: 4_000,
+        validated: 1,
+        waitingMinor: 0,
+        waiting: 0,
+        sentBackMinor: 0,
+        sentBack: 0,
+      },
+    ]);
+    // Said the same way to its member and to the agency, in grey.
+    for (const one of [switched(made), switched(back), switched(kept)]) {
+      expect([memberStatusOf(one), agencyStatusOf(one), toneOf(one)]).toEqual([
+        WITHOUT_PAY_EFFECT,
+        WITHOUT_PAY_EFFECT,
+        'neutral',
+      ]);
+    }
+    expect([memberStatusOf(back), agencyStatusOf(back), toneOf(back)]).toEqual([
+      'Renvoyé',
+      'Renvoyé au membre',
+      'warn',
+    ]);
+    expect(withoutPayEffect(made)).toBe(false);
+    expect(withoutPayEffect({ ...made, earningsSource: null })).toBe(false);
   });
 
   it('says the threshold and why nothing is compared, to the agency or to the member', () => {

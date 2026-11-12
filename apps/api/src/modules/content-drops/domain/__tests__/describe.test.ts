@@ -1,8 +1,9 @@
-import type { ScriptDropSummary, ScriptSegment } from '@impera/contracts';
+import { DropMediaDescriptionSchema, type ScriptDropSummary, type ScriptSegment } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
   dropContextOf,
+  handDescription,
   mediaHashOf,
   mentionsPrice,
   orderedSummary,
@@ -118,6 +119,7 @@ describe('the steps of her sent script (ADR 0083 § 6)', () => {
         step: 'salon:',
         code: 'E1',
         name: 'Le salon',
+        access: 'free',
         card: 'Elle se dévoile un peu. Joueuse. Tenue : Robe rouge. Lieu : Canapé.',
         media: [file('salon::0', 'm1'), file('salon::1', 'm2')],
       },
@@ -125,6 +127,7 @@ describe('the steps of her sent script (ADR 0083 § 6)', () => {
         step: 'vers-chambre:',
         code: 'P12',
         name: 'Pont vers l’étape 2',
+        access: 'free',
         card: 'La suite arrive.',
         media: [file('vers-chambre::0', 'm3')],
       },
@@ -132,6 +135,7 @@ describe('the steps of her sent script (ADR 0083 § 6)', () => {
         step: 'chambre:A',
         code: 'E2A',
         name: 'La chambre',
+        access: 'paid',
         card: 'Elle se dévoile plus. Série A : Lumière tamisée.',
         media: [file('chambre:A:0', 'm4')],
       },
@@ -139,6 +143,7 @@ describe('the steps of her sent script (ADR 0083 § 6)', () => {
         step: 'chambre:B',
         code: 'E2B',
         name: 'La chambre',
+        access: 'paid',
         card: 'Elle se dévoile plus. Série B : Plein jour.',
         media: [file('chambre:B:0', 'm5')],
       },
@@ -248,5 +253,41 @@ describe('the row a media is shown with, and what can be validated (ADR 0030 § 
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
     expect(mediaHashOf([...files].reverse(), told)).toBe(hash);
     expect(mediaHashOf(files, new Map([...told, ['m2', { descriptionId: 'd3' }]]))).not.toBe(hash);
+  });
+});
+
+describe('handDescription (recette créatrice 2)', () => {
+  it('keeps her team’s words and level, and says every other label « not seen »', () => {
+    const written = handDescription(
+      { kind: 'video', durationMs: 6400 },
+      '  Elle danse devant le miroir. ',
+      'explicit',
+    );
+    expect(DropMediaDescriptionSchema.parse(written)).toEqual(written);
+    expect(written).toMatchObject({
+      kind: 'video',
+      detailed: 'Elle danse devant le miroir.',
+      factualDescription: 'Elle danse devant le miroir.',
+      durationS: 6,
+      intensity: 'explicit',
+      castMode: 'not_visible',
+      anatomyVisible: [],
+      mood: [],
+      setting: null,
+      audio: null,
+      flags: [],
+      segments: [],
+    });
+  });
+
+  it('cuts a long text to the short sentence’s length, at a space', () => {
+    const long = `${'Elle sourit doucement. '.repeat(60)}Fin.`;
+    const written = handDescription({ kind: 'image', durationMs: null }, long, 'soft');
+    expect(written.factualDescription.length).toBeLessThanOrEqual(800);
+    expect(written.factualDescription.endsWith('…')).toBe(true);
+    expect(written.factualDescription).not.toMatch(/ …$/u);
+    expect(written.detailed).toBe(long.trim());
+    expect(written.durationS).toBeNull();
+    expect(DropMediaDescriptionSchema.safeParse(written).success).toBe(true);
   });
 });

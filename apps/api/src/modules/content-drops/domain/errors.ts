@@ -21,6 +21,7 @@ import {
   CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE,
   DROP_DESCRIPTION_REVIEW_CONFLICT,
   DomainError,
+  SCRIPT_SUMMARY_CORRECTION_UNPROCESSABLE,
   type ScriptExportRefusal,
 } from '@impera/contracts';
 
@@ -190,6 +191,7 @@ export class ContentDropCardNotFound extends DomainError {
 
 const EXPORT_SENTENCES: Readonly<Record<ScriptExportRefusal, string>> = {
   not_a_script: 'Seul un script envoyé s’exporte',
+  a_script: 'Un script s’exporte depuis l’onglet Scripts',
   not_ready: 'Ce script n’est pas encore prêt : ses fichiers sont encore en cours de traitement',
   original_erased: 'Un original de ce script a déjà été effacé : l’archive serait incomplète',
   moment_unknown:
@@ -218,6 +220,19 @@ export class ContentRequestDueUnprocessable extends DomainError {
 export class DropDescriptionsCreatorNotFound extends DomainError {
   constructor() {
     super('creator_not_found', 'Créatrice introuvable');
+  }
+}
+
+/** A synthesis corrected by hand that names a price (they come from the grid, ADR 0056 § 6), or other steps. */
+export class ScriptSummaryCorrectionUnprocessable extends DomainError {
+  constructor(reason: 'price' | 'steps') {
+    super(
+      SCRIPT_SUMMARY_CORRECTION_UNPROCESSABLE,
+      reason === 'price'
+        ? 'Pas de prix dans la synthèse : il vient de la grille de l’agence'
+        : 'La synthèse garde chaque étape du script, une fois chacune',
+      { details: { reason } },
+    );
   }
 }
 

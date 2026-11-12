@@ -6,7 +6,16 @@ import { CreatorIdSchema, type CreatorId, type Me } from '@impera/contracts';
  */
 export interface CreatorsSearch {
   readonly onglet?:
-    'heures' | 'acces' | 'pourcentage' | 'agenda' | 'idees' | 'demandes' | 'scripts' | 'telegram' | 'profil';
+    | 'heures'
+    | 'acces'
+    | 'pourcentage'
+    | 'agenda'
+    | 'idees'
+    | 'demandes'
+    | 'scripts'
+    | 'contenu'
+    | 'telegram'
+    | 'profil';
   readonly creatrice?: CreatorId;
 }
 
@@ -20,6 +29,7 @@ export type CreatorSheet =
   | 'ideas'
   | 'requests'
   | 'scripts'
+  | 'content'
   | 'telegram'
   | 'profile';
 
@@ -31,6 +41,7 @@ const SLUGS = {
   ideas: 'idees',
   requests: 'demandes',
   scripts: 'scripts',
+  content: 'contenu',
   telegram: 'telegram',
   profile: 'profil',
 } as const;
@@ -42,6 +53,7 @@ const SHEETS = {
   idees: 'ideas',
   demandes: 'requests',
   scripts: 'scripts',
+  contenu: 'content',
   telegram: 'telegram',
   profil: 'profile',
 } as const;
@@ -55,6 +67,7 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
   'ideas',
   'requests',
   'scripts',
+  'content',
   'telegram',
   'profile',
 ];
@@ -62,11 +75,11 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
 /**
  * The sheets a member opens: all of them for the owner; her agenda alone for an active manager (CR-05 lot c, Charles,
  * 05/11 17h22: « Ouvrir aux managers », the other sheets stay the owner's) and her ideas of the day (VEI-02, ADR 0060
- * § 5: the owner's and the managers') and what the agency asks of her (MED-09, the same) and her sent scripts (SC-03 c2b, the same); the persona alone for anyone else. The first one is where Créatrices opens.
+ * § 5: the owner's and the managers') and what the agency asks of her (MED-09, the same) and her sent scripts (SC-03 c2b, the same) and her other drops (recette créatrice 1, the same); the persona alone for anyone else. The first one is where Créatrices opens.
  */
 export function sheetsFor(user: Pick<Me, 'role' | 'teamScope'>): readonly CreatorSheet[] {
   if (user.role === 'owner') return ALL_SHEETS;
-  return user.teamScope === 'agency' ? ['agenda', 'ideas', 'requests', 'scripts'] : ['persona'];
+  return user.teamScope === 'agency' ? ['agenda', 'ideas', 'requests', 'scripts', 'content'] : ['persona'];
 }
 
 /** Anything but a known tab reads as the persona; anything but a creator id, as no creator picked. */
@@ -81,6 +94,7 @@ export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSe
     tab === SLUGS.ideas ||
     tab === SLUGS.requests ||
     tab === SLUGS.scripts ||
+    tab === SLUGS.content ||
     tab === SLUGS.telegram ||
     tab === SLUGS.profile
       ? { onglet: tab }

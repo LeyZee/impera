@@ -14,7 +14,7 @@ import {
   type CreatorId,
   type TrendCaptureDescription,
 } from '@impera/contracts';
-import { and, eq, schema } from '@impera/db';
+import { and, eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LlmGateway } from '@impera/llm';
 import { afterAll, afterEach, beforeAll, describe, expect, inject, it, vi } from 'vitest';
@@ -347,6 +347,68 @@ describe('/v1/trends', () => {
     expect(agency.map((creator) => creator.displayName)).toEqual(['Ines', 'Nora']);
     const without = await server.inject({ method: 'GET', url: '/v1/trends/readings/creators' });
     expect(without.statusCode).toBe(401);
+  });
+
+  it('forgets a link nobody used for 30 days, counted from its last use (audit du 11/11)', async () => {
+    const statusOf = async (token: string) =>
+      (
+        await server.inject({
+          method: 'GET',
+          url: '/v1/trends/readings/creators',
+          headers: { 'x-extension-link': token },
+        })
+      ).statusCode;
+    const days = (count: number) => new Date(Date.now() - count * 24 * 3_600_000);
+    const idle = await newLink(cookies.manager, 'Oublié');
+    const used = await newLink(cookies.manager, 'Servi');
+    const links = schema.extensionLinks;
+    await test.admin.db
+      .update(links)
+      .set({ createdAt: days(31) })
+      .where(eq(links.id, idle.id));
+    await test.admin.db
+      .update(links)
+      .set({ createdAt: days(90), lastUsedAt: days(29) })
+      .where(eq(links.id, used.id));
+    expect(await statusOf(idle.token)).toBe(401);
+    expect(await statusOf(used.token)).toBe(200);
+    const listed = (await liveLinks(cookies.manager)).map((one) => one.label);
+    expect(listed).toContain('Servi');
+    expect(listed).not.toContain('Oublié');
+    await call('DELETE', `/v1/trends/extension-links/${used.id}`, cookies.manager);
+  });
+
+  it('asks for the password and a code again before a new link, once the sign-in is over 10 minutes old', async () => {
+    const stale = sql`now() - interval '11 minutes'`;
+    await test.admin.db.update(schema.session).set({ reauthenticatedAt: stale });
+    try {
+      const refused = await call('POST', '/v1/trends/extension-links', cookies.manager, { label: 'Tardif' });
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json()).toMatchObject({ error: { code: 'reauthentication_forbidden' } });
+      expect((await liveLinks(cookies.manager)).map((item) => item.label)).not.toContain('Tardif');
+      // Seeing and unlinking stay open: closing a door never waits for a confirmation.
+      expect((await call('GET', '/v1/trends/extension-links', cookies.manager)).statusCode).toBe(200);
+    } finally {
+      await test.admin.db.update(schema.session).set({ reauthenticatedAt: sql`now()` });
+    }
+  });
+
+  it('takes a person’s links with the other sessions she closes (audit du 11/11)', async () => {
+    const token = await newToken(cookies.manager, 'Avant');
+    expect(await readingsCreators(token)).not.toHaveLength(0);
+    const closed = await call('POST', '/v1/auth/sessions/close-others', cookies.manager);
+    expect(closed.statusCode).toBe(200);
+    const refused = await server.inject({
+      method: 'GET',
+      url: '/v1/trends/readings/creators',
+      headers: { 'x-extension-link': token },
+    });
+    expect(refused.statusCode).toBe(401);
+    expect(await liveLinks(cookies.manager)).toEqual([]);
+    // Her session is the one she closed the others from: it stays, and she links her browser again.
+    expect(await readingsCreators(await newToken(cookies.manager, 'Après'))).not.toHaveLength(0);
+    for (const one of await liveLinks(cookies.manager))
+      await call('DELETE', `/v1/trends/extension-links/${one.id}`, cookies.manager);
   });
 
   it('refuses a batch without a live link before reading its body', async () => {

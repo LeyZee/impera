@@ -28,6 +28,7 @@ export {
 export {
   DEFAULT_LLM_CONFIG,
   LlmConfigSchema,
+  MISTRAL_FALLBACK_MODEL,
   readProviderCredentials,
   type ApiKeys,
   type ApiKeySource,

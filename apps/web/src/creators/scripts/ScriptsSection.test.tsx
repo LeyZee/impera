@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CreatorIdSchema } from '@impera/contracts';
+import { CreatorIdSchema, type DropDescriptionsReview } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -28,7 +28,7 @@ interface Reply {
 }
 
 /** A fake `/v1`: each `METHOD path` answered by its route, every call kept. */
-function serve(routes: Record<string, () => Reply>): { method: string; path: string }[] {
+function serve(routes: Record<string, (body: unknown) => Reply>): { method: string; path: string }[] {
   const calls: { method: string; path: string }[] = [];
   vi.stubGlobal(
     'fetch',
@@ -36,7 +36,8 @@ function serve(routes: Record<string, () => Reply>): { method: string; path: str
       const method = init?.method ?? 'GET';
       const path = url.replace(/^\/v1/u, '');
       calls.push({ method, path });
-      const reply = routes[`${method} ${path}`]?.() ?? { status: 404 };
+      const body: unknown = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+      const reply = routes[`${method} ${path}`]?.(body) ?? { status: 404 };
       return Promise.resolve(
         new Response(reply.body === undefined ? null : JSON.stringify(reply.body), { status: reply.status }),
       );
@@ -189,36 +190,18 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
   };
 
-  it('gives the owner alone her switch; turned on, it says so', async () => {
-    let on = false;
-    const calls = serve({
-      ...base,
-      [`GET ${SWITCH}`]: () => ({ status: 200, body: { on } }),
-      [`PUT ${SWITCH}`]: () => {
-        on = true;
-        return { status: 200, body: { on } };
-      },
-    });
+  it('no longer holds her switch: it tells the owner it stands in Contenu (recette créatrice 6)', async () => {
+    const calls = serve(base);
     show(true);
-    const toggle = await screen.findByRole('switch', { name: 'Descriptions par l’IA' });
-    if (!(toggle instanceof HTMLInputElement)) throw new Error('the switch is an input');
-    await waitFor(() => {
-      expect(toggle.disabled).toBe(false);
-    });
-    expect(toggle.checked).toBe(false);
-    expect(screen.getByText(/Éteint : ses médias ne sont pas décrits/u)).toBeDefined();
-    fireEvent.click(toggle);
-    await waitFor(() => {
-      expect(toggle.checked).toBe(true);
-    });
-    expect(screen.getByText(/Chaque photo et vidéo de Lina est décrite/u)).toBeDefined();
-    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
-    cleanup();
-    const asManager = serve(base);
-    show(false);
     await screen.findByRole('listitem', { name: 'Soirée inventée' });
     expect(screen.queryByRole('switch')).toBeNull();
-    expect(asManager.some((call) => call.path === SWITCH)).toBe(false);
+    expect(screen.getByText(/Les descriptions par l’IA s’allument dans l’onglet Contenu/u)).toBeDefined();
+    expect(calls.some((call) => call.path === SWITCH)).toBe(false);
+    cleanup();
+    serve(base);
+    show(false);
+    await screen.findByRole('listitem', { name: 'Soirée inventée' });
+    expect(screen.queryByText(/onglet Contenu/u)).toBeNull();
   });
 
   it('reads a script step by step, the synthesis with « prix à fixer », and validates a step at once', async () => {
@@ -245,7 +228,9 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Relire les descriptions' }));
     const region = await screen.findByRole('region', { name: 'Descriptions de S012' });
     expect(within(region).getByText('3 descriptions à valider')).toBeDefined();
-    expect(within(region).getAllByText('Prix à fixer')).toHaveLength(3);
+    // E1 offered, as its card says: no price to fix; E2A and E2B paid, their price from the grid.
+    expect(within(region).getAllByText('Prix à fixer')).toHaveLength(2);
+    expect(within(region).getByText('Offert')).toBeDefined();
     expect(within(region).getByText(/Elle cite un montant/u)).toBeDefined();
     expect(within(region).getByText('Son ressenti : Ma préférée')).toBeDefined();
     expect(within(region).getByText('L’IA n’est pas sûre')).toBeDefined();
@@ -389,5 +374,148 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     expect(await within(region).findByText('Une silhouette inventée, assise.')).toBeDefined();
     expect(within(region).getByText('Corrigée')).toBeDefined();
     expect(within(region).queryByRole('textbox')).toBeNull();
+  });
+  it('asks the AI again on a medium it gave up, or takes it written by hand with its level (recette créatrice 2)', async () => {
+    const given = (): DropDescriptionsReview => {
+      const one = reviewOf(SENT.id, FILES, { validated: [false, true, true] });
+      return {
+        ...one,
+        media: one.media.map((medium, index) =>
+          index === 0 ? { ...medium, description: null, describeFailed: true } : medium,
+        ),
+      };
+    };
+    const sent: unknown[] = [];
+    const calls = serve({
+      ...base,
+      [`GET ${REVIEW}`]: () => ({ status: 200, body: given() }),
+      [`POST /creators/${CREATOR}/drops/${SENT.id}/files/${FILES[0]}/describe`]: () => ({
+        status: 200,
+        body: given(),
+      }),
+      [`POST /creators/${CREATOR}/drops/${SENT.id}/files/${FILES[0]}/description`]: (body) => {
+        sent.push(body);
+        const one = reviewOf(SENT.id, FILES, { validated: [true, true, true] });
+        return {
+          status: 200,
+          body: {
+            ...one,
+            media: one.media.map((medium, index) =>
+              index === 0 && medium.description !== null
+                ? {
+                    ...medium,
+                    description: { ...medium.description, author: 'hand', detailed: 'Assise, inventée.' },
+                  }
+                : medium,
+            ),
+          },
+        };
+      },
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Relire les descriptions' }));
+    const region = await screen.findByRole('region', { name: 'Descriptions de S012' });
+    expect(within(region).getByText('L’IA n’a pas pu décrire 1 média : à toi de le relancer')).toBeDefined();
+    expect(within(region).getByText(/Elle ne réessaie plus d’elle-même/u)).toBeDefined();
+    fireEvent.click(within(region).getByRole('button', { name: 'Réessayer' }));
+    await waitFor(() => {
+      expect(calls.some((call) => call.path.endsWith('/describe'))).toBe(true);
+    });
+
+    fireEvent.click(within(region).getByRole('button', { name: 'Décrire à la main' }));
+    const save = within(region).getByRole('button', { name: 'Enregistrer et valider' });
+    if (!(save instanceof HTMLButtonElement)) throw new Error('a button');
+    fireEvent.change(within(region).getByRole('textbox', { name: 'Ce que montre la photo' }), {
+      target: { value: ' Assise, inventée. ' },
+    });
+    // Its level is asked too: never guessed.
+    expect(save.disabled).toBe(true);
+    fireEvent.click(within(region).getByRole('radio', { name: 'Suggestif' }));
+    expect(save.disabled).toBe(false);
+    expect(within(region).getByText(/sera marqué « non vu »/u)).toBeDefined();
+    fireEvent.click(save);
+    expect(await within(region).findByText('Assise, inventée.')).toBeDefined();
+    expect(sent).toEqual([{ detailed: 'Assise, inventée.', intensity: 'suggestive' }]);
+    expect(within(region).getByText('Écrite à la main')).toBeDefined();
+    expect(within(region).queryByRole('textbox')).toBeNull();
+    expect(within(region).getByText('La synthèse s’écrit')).toBeDefined();
+  });
+
+  it('corrects the synthesis by hand, step by step, and says why the server refuses a price (SC-04 lot c5)', async () => {
+    const sent: unknown[] = [];
+    serve({
+      ...base,
+      [`GET ${REVIEW}`]: () => ({ status: 200, body: reviewOf(SENT.id, FILES, { summary: 'current' }) }),
+      [`POST /creators/${CREATOR}/drops/${SENT.id}/summary/correct`]: (body) => {
+        sent.push(body);
+        if (sent.length === 1)
+          return {
+            status: 422,
+            body: {
+              error: {
+                code: 'script_summary_correction_unprocessable',
+                message: 'Pas de prix dans la synthèse : il vient de la grille de l’agence',
+                details: { reason: 'price' },
+                requestId: 'r1',
+              },
+            },
+          };
+        const fixed = reviewOf(SENT.id, FILES, { summary: 'human' });
+        return {
+          status: 200,
+          body: {
+            ...fixed,
+            summary:
+              fixed.summary === null
+                ? null
+                : {
+                    ...fixed.summary,
+                    content: { ...fixed.summary.content, shootingContext: 'Un soir repris.' },
+                  },
+          },
+        };
+      },
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Relire les descriptions' }));
+    const region = await screen.findByRole('region', { name: 'Descriptions de S012' });
+    const synthesis = within(region).getByRole('region', { name: 'Synthèse du script' });
+    fireEvent.click(within(synthesis).getByRole('button', { name: 'Corriger' }));
+    // Its context, then each step's line and its unfolding, as the brain told them.
+    expect(within(synthesis).getAllByRole('textbox')).toHaveLength(7);
+    expect(within(synthesis).getAllByRole('textbox', { name: 'En une ligne' })[1]).toHaveProperty(
+      'value',
+      'Résumé inventé 2.',
+    );
+    fireEvent.change(within(synthesis).getByRole('textbox', { name: 'Le tournage' }), {
+      target: { value: '  Un soir repris.  ' },
+    });
+    fireEvent.change(within(synthesis).getAllByRole('textbox', { name: 'En une ligne' })[0]!, {
+      target: { value: '' },
+    });
+    // A text left empty: nothing to save.
+    expect(within(synthesis).getByRole('button', { name: 'Enregistrer et valider' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    fireEvent.change(within(synthesis).getAllByRole('textbox', { name: 'En une ligne' })[0]!, {
+      target: { value: 'Le bundle à 25 €.' },
+    });
+    fireEvent.click(within(synthesis).getByRole('button', { name: 'Enregistrer et valider' }));
+    expect((await within(region).findByRole('alert')).textContent).toBe(
+      'Pas de prix dans la synthèse : il vient de la grille de l’agence.',
+    );
+    expect(sent[0]).toMatchObject({
+      summaryId: '0192f3a0-0000-7000-8000-00000000c001',
+      shootingContext: 'Un soir repris.',
+    });
+    fireEvent.change(within(synthesis).getAllByRole('textbox', { name: 'En une ligne' })[0]!, {
+      target: { value: 'Le salon, repris.' },
+    });
+    fireEvent.click(within(synthesis).getByRole('button', { name: 'Enregistrer et valider' }));
+    expect(await within(region).findByText('Corrigée à la main')).toBeDefined();
+    expect(within(region).getByText('Un soir repris.')).toBeDefined();
+    expect(within(region).queryByRole('textbox')).toBeNull();
+    expect(within(region).queryByRole('button', { name: 'Valider la synthèse' })).toBeNull();
   });
 });

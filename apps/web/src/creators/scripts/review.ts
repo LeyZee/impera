@@ -2,7 +2,9 @@ import type {
   DescriptionReviewReason,
   DropDescriptionsReview,
   DropMediaReview,
+  HandIntensity,
   MediaDescriptionId,
+  ScriptStageAccess,
 } from '@impera/contracts';
 
 /**
@@ -25,11 +27,21 @@ export const KIND_LABELS: Readonly<Record<DropMediaReview['kind'], string>> = {
   audio: 'Note vocale',
 };
 
+/** The levels the agency picks when it writes a description by hand, gentlest first, as the screen says them. */
+export const HAND_INTENSITY_LABELS: Readonly<Record<HandIntensity, string>> = {
+  soft: 'Doux',
+  suggestive: 'Suggestif',
+  explicit: 'Explicite',
+  hardcore: 'Hard',
+};
+
 export interface ReviewStep {
   readonly key: string;
   /** « E2A », as her cards say. */
   readonly code: string;
   readonly name: string;
+  /** Offered or paid, as its card says: an offered step shows « Offert », never a price to fix. */
+  readonly access: ScriptStageAccess;
   readonly media: readonly DropMediaReview[];
   /** What « Tout valider » validates: each description still open with nothing holding it back. */
   readonly batch: readonly MediaDescriptionId[];
@@ -45,7 +57,20 @@ export const describable = (media: DropMediaReview): boolean => media.kind !== '
 /** Her script's steps in its order, each with its media; a file of no step (a slot the version lost) is left out. */
 export function reviewSteps(review: DropDescriptionsReview): readonly ReviewStep[] {
   const byFile = new Map(review.media.map((media) => [media.fileId, media]));
-  return review.steps.map((step) => {
+  // Any other drop than a script has no steps (recette créatrice 1): its media, in her order, as one.
+  const steps =
+    review.steps.length === 0 && review.media.length > 0
+      ? [
+          {
+            step: 'drop',
+            code: '',
+            name: '',
+            access: 'free' as const,
+            fileIds: review.media.map((media) => media.fileId),
+          },
+        ]
+      : review.steps;
+  return steps.map((step) => {
     const media = step.fileIds.flatMap((id) => {
       const one = byFile.get(id);
       return one === undefined ? [] : [one];
@@ -58,6 +83,7 @@ export function reviewSteps(review: DropDescriptionsReview): readonly ReviewStep
       key: step.step,
       code: step.code,
       name: step.name,
+      access: step.access,
       media,
       batch: open.filter((description) => description.reviewReasons.length === 0).map((d) => d.id),
       alone: open.filter((description) => description.reviewReasons.length > 0).length,
@@ -70,6 +96,8 @@ export interface ReviewStanding {
   /** Descriptions still to validate, the ones waiting for a human included. */
   readonly open: number;
   readonly undescribed: number;
+  /** Of those, the ones the AI gave up on: they wait for the agency, not for the AI. */
+  readonly failed: number;
   /** Every photo and video described and validated, and the synthesis of now validated. */
   readonly done: boolean;
 }
@@ -78,15 +106,23 @@ export function reviewStanding(review: DropDescriptionsReview): ReviewStanding {
   const seen = review.media.filter(describable);
   const open = seen.filter((one) => one.description !== null && one.description.validatedAt === null).length;
   const undescribed = seen.filter((one) => one.description === null).length;
+  const failed = seen.filter((one) => one.description === null && one.describeFailed).length;
+  // A drop that is not a script has no synthesis (recette créatrice 1): its descriptions are the whole of it.
   const summaryDone =
-    review.summary !== null && review.summary.current && review.summary.validatedAt !== null;
-  return { open, undescribed, done: open === 0 && undescribed === 0 && summaryDone };
+    review.steps.length === 0 ||
+    (review.summary !== null && review.summary.current && review.summary.validatedAt !== null);
+  return { open, undescribed, failed, done: open === 0 && undescribed === 0 && summaryDone };
 }
 
-/** « 2 descriptions à valider », « Synthèse à valider », « Tout est validé »: one line on where the script stands. */
+/** « 2 descriptions à valider », « Synthèse à valider », « Tout est validé »: one line on where the drop stands. */
 export function standingLine(review: DropDescriptionsReview): string {
-  const { open, undescribed, done } = reviewStanding(review);
+  const { open, undescribed, failed, done } = reviewStanding(review);
   if (done) return 'Tout est validé';
+  // Given up by the AI: nothing comes by itself, the line says what is the agency's to do.
+  if (failed > 0)
+    return failed === 1
+      ? 'L’IA n’a pas pu décrire 1 média : à toi de le relancer'
+      : `L’IA n’a pas pu décrire ${String(failed)} médias : à toi de les relancer`;
   if (undescribed > 0)
     return undescribed === 1
       ? '1 média attend sa description'

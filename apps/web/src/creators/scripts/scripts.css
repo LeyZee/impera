@@ -215,6 +215,10 @@
 .sx-step__head > .sx-step__all {
   margin-left: auto;
 }
+/* A drop that is not a script has no step to name: its head holds « Tout valider » alone, or nothing. */
+.sx-step__head:empty {
+  display: none;
+}
 
 .sx-media {
   margin: 0;
@@ -433,9 +437,42 @@
   flex-direction: column;
   gap: var(--nv-space-2);
 }
+.sx-hand {
+  gap: var(--nv-space-3);
+}
+.sx-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
 .sx-correct__area {
   resize: none;
+  field-sizing: content;
+  overflow: hidden;
   min-height: 84px;
+}
+/* The synthesis corrected by hand (SC-04 lot c5): its context, then each step's line and its unfolding. */
+.sx-synth__edit {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.sx-synth__edit-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.sx-synth__edit-head {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+}
+.sx-synth .sx-correct__area {
+  min-height: 0;
 }
 
 /* Her switch: one card, one line of help, the owner's alone (ADR 0083 § 9). */

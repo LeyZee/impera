@@ -1,14 +1,19 @@
-import type {
-  ContentDropId,
-  CreatorId,
-  DropDescriptionsReview,
-  DropMediaReview,
-  MediaDescriptionId,
+import {
+  HAND_INTENSITIES,
+  type ContentDropFileId,
+  type ContentDropId,
+  type CreatorId,
+  type DropDescriptionsReview,
+  type DropMediaReview,
+  type HandIntensity,
+  type MediaDescriptionId,
+  type ScriptDropSummary,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX } from 'react';
 
 import {
+  HAND_INTENSITY_LABELS,
   KIND_LABELS,
   REASON_LABELS,
   describable,
@@ -18,12 +23,15 @@ import {
 } from './review';
 import {
   correctDescription,
+  correctSummary,
   mediaUrl,
+  retryDescription,
   reviewKey,
   thumbnailUrl,
   useDropReview,
   validateDescriptions,
   validateSummary,
+  writeDescription,
   type ReviewOutcome,
 } from './review-api';
 
@@ -50,7 +58,8 @@ export function ScriptReview({
   const client = useQueryClient();
   const review = useDropReview(creatorId, dropId, true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // The refusal, and what it answers: one of the synthesis is said in its form, beside « Enregistrer et valider ».
+  const [error, setError] = useState<{ readonly what: string; readonly message: string } | null>(null);
 
   const run = async (what: string, call: () => Promise<ReviewOutcome>): Promise<boolean> => {
     setBusy(what);
@@ -61,7 +70,7 @@ export function ScriptReview({
       client.setQueryData(reviewKey(creatorId, dropId), outcome.review);
       return true;
     }
-    setError(outcome.message);
+    setError({ what, message: outcome.message });
     // A newer row or synthesis came meanwhile: the review is read again, so that the screen shows it.
     await client.invalidateQueries({ queryKey: reviewKey(creatorId, dropId) });
     return false;
@@ -88,26 +97,38 @@ export function ScriptReview({
 
   const data = review.data;
   const steps = reviewSteps(data);
+  // Any other drop than a script (recette créatrice 1): its media as one list, and no synthesis.
+  const flat = data.steps.length === 0;
   return (
     <div className="sx-review nv-swap" aria-label={`Descriptions de ${code}`} role="region">
       <p className="sx-review__standing nv-num">{standingLine(data)}</p>
-      {error === null ? null : (
+      {error === null || error.what === 'summary' ? null : (
         <p className="sx-error nv-swap" role="alert">
-          {error}
+          {error.message}
         </p>
       )}
-      <Synthesis
-        review={data}
-        steps={steps}
-        busy={busy !== null}
-        onValidate={(summaryId) => void run('summary', () => validateSummary(creatorId, dropId, summaryId))}
-      />
+      {flat ? null : (
+        <Synthesis
+          review={data}
+          steps={steps}
+          busy={busy !== null}
+          error={error?.what === 'summary' ? error.message : null}
+          onValidate={(summaryId) => void run('summary', () => validateSummary(creatorId, dropId, summaryId))}
+          onCorrect={(summaryId, content) =>
+            run('summary', () => correctSummary(creatorId, dropId, summaryId, content))
+          }
+        />
+      )}
       <ol className="sx-steps">
         {steps.map((step) => (
           <li key={step.key} className="sx-step">
             <div className="sx-step__head">
-              <span className="sx-step__code nv-num">{step.code}</span>
-              <span className="sx-step__name">{step.name}</span>
+              {flat ? null : (
+                <>
+                  <span className="sx-step__code nv-num">{step.code}</span>
+                  <span className="sx-step__name">{step.name}</span>
+                </>
+              )}
               {step.batch.length > 0 ? (
                 <button
                   type="button"
@@ -126,12 +147,16 @@ export function ScriptReview({
                 <MediaRow
                   key={media.fileId}
                   media={media}
-                  code={step.code}
+                  code={flat ? code : step.code}
                   urls={{
                     thumbnail: thumbnailUrl(creatorId, dropId, media.fileId),
                     media: mediaUrl(creatorId, dropId, media.fileId),
                   }}
                   busy={busy !== null}
+                  onRetry={(fileId) => void run(fileId, () => retryDescription(creatorId, dropId, fileId))}
+                  onWrite={(fileId, detailed, intensity) =>
+                    run(fileId, () => writeDescription(creatorId, dropId, fileId, detailed, intensity))
+                  }
                   onValidate={(id) => void run(id, () => validateDescriptions(creatorId, dropId, [id]))}
                   onCorrect={(id, detailed) =>
                     run(id, () => correctDescription(creatorId, dropId, id, detailed))
@@ -146,17 +171,29 @@ export function ScriptReview({
   );
 }
 
+type SummaryId = NonNullable<DropDescriptionsReview['summary']>['id'];
+
+/**
+ * Her script's synthesis: what the brain told, or what the agency wrote over it (SC-04 lot c5). « Corriger » opens its
+ * context and each step's two texts; what is written is validated as it is saved. The steps stay hers, in their order,
+ * and a price never enters it: the server refuses one and says why.
+ */
 function Synthesis({
   review,
   steps,
   busy,
+  error,
   onValidate,
+  onCorrect,
 }: {
   review: DropDescriptionsReview;
   steps: readonly ReviewStep[];
   busy: boolean;
-  onValidate: (summaryId: NonNullable<DropDescriptionsReview['summary']>['id']) => void;
+  error: string | null;
+  onValidate: (summaryId: SummaryId) => void;
+  onCorrect: (summaryId: SummaryId, content: ScriptDropSummary) => Promise<boolean>;
 }): JSX.Element {
+  const [draft, setDraft] = useState<ScriptDropSummary | null>(null);
   const summary = review.summary;
   if (!summary?.current)
     return (
@@ -167,14 +204,120 @@ function Synthesis({
             ? 'Elle s’écrit quand chaque photo et chaque vidéo du script est décrite.'
             : 'Une description a changé : elle se réécrit, puis revient ici.'}
         </p>
+        {error === null ? null : (
+          <p className="sx-error nv-swap" role="alert">
+            {error}
+          </p>
+        )}
       </section>
     );
   const names = new Map(steps.map((step) => [step.key, step]));
+  const codeOf = (step: string) => names.get(step)?.code ?? step;
+
+  if (draft !== null) {
+    const filled =
+      draft.shootingContext.trim() !== '' &&
+      draft.steps.every((one) => one.overview.trim() !== '' && one.summary.trim() !== '');
+    const setStep = (index: number, field: 'overview' | 'summary', text: string) => {
+      setDraft({
+        ...draft,
+        steps: draft.steps.map((one, at) => (at === index ? { ...one, [field]: text } : one)),
+      });
+    };
+    return (
+      <section className="sx-synth" aria-label="Synthèse du script">
+        <p className="sx-synth__title">Corriger la synthèse</p>
+        <p className="ps-muted">
+          Ce que tu écris remplace la synthèse et vaut validation. Pas de prix ici : ils viennent de la
+          grille.
+        </p>
+        <form
+          className="sx-correct"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!filled) return;
+            const written: ScriptDropSummary = {
+              shootingContext: draft.shootingContext.trim(),
+              steps: draft.steps.map((one) => ({
+                step: one.step,
+                overview: one.overview.trim(),
+                summary: one.summary.trim(),
+              })),
+            };
+            void onCorrect(summary.id, written).then((done) => {
+              if (done) setDraft(null);
+            });
+          }}
+        >
+          <GrowingField
+            label="Le tournage"
+            value={draft.shootingContext}
+            maxLength={2000}
+            autofocus
+            onChange={(text) => {
+              setDraft({ ...draft, shootingContext: text });
+            }}
+          />
+          <ol className="sx-synth__edit">
+            {draft.steps.map((one, index) => (
+              <li key={one.step} className="sx-synth__edit-step">
+                <p className="sx-synth__edit-head">
+                  <span className="sx-step__code nv-num">{codeOf(one.step)}</span>
+                  <span className="sx-step__name">{names.get(one.step)?.name}</span>
+                </p>
+                <GrowingField
+                  label="En une ligne"
+                  value={one.summary}
+                  maxLength={400}
+                  onChange={(text) => {
+                    setStep(index, 'summary', text);
+                  }}
+                />
+                <GrowingField
+                  label="Le déroulé"
+                  value={one.overview}
+                  maxLength={2000}
+                  onChange={(text) => {
+                    setStep(index, 'overview', text);
+                  }}
+                />
+              </li>
+            ))}
+          </ol>
+          {error === null ? null : (
+            <p className="sx-error nv-swap" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="sx-actions">
+            <button
+              type="button"
+              className="nv-btn nv-btn--sm nv-btn--plain"
+              disabled={busy}
+              onClick={() => {
+                setDraft(null);
+              }}
+            >
+              Annuler
+            </button>
+            <button type="submit" className="nv-btn nv-btn--sm nv-btn--soft" disabled={busy || !filled}>
+              Enregistrer et valider
+            </button>
+          </div>
+        </form>
+      </section>
+    );
+  }
+
   return (
     <section className="sx-synth" aria-label="Synthèse du script">
       <div className="sx-synth__head">
         <p className="sx-synth__title">Synthèse</p>
-        {summary.validatedAt === null ? null : (
+        {summary.author === 'human' ? (
+          <span className="aa-pill" data-tone="ok">
+            Corrigée à la main
+          </span>
+        ) : summary.validatedAt === null ? null : (
           <span className="aa-pill" data-tone="ok">
             Validée
           </span>
@@ -189,15 +332,33 @@ function Synthesis({
       <ol className="sx-synth__steps">
         {summary.content.steps.map((one) => (
           <li key={one.step} className="sx-synth__step">
-            <span className="sx-step__code nv-num">{names.get(one.step)?.code ?? one.step}</span>
+            <span className="sx-step__code nv-num">{codeOf(one.step)}</span>
             <span className="sx-synth__text">{one.summary}</span>
-            {/* The grid of prices does not exist yet (P6-01): never a price from the model (ADR 0056 § 6). */}
-            <span className="aa-pill sx-price">Prix à fixer</span>
+            {/* Offered, as its card says (ADR 0064 § 3); paid, the grid gives its price, which does not exist yet
+                (P6-01): never a price from the model (ADR 0056 § 6). */}
+            <span className="aa-pill sx-price">
+              {names.get(one.step)?.access === 'free' ? 'Offert' : 'Prix à fixer'}
+            </span>
           </li>
         ))}
       </ol>
-      {summary.validatedAt === null ? (
-        <div className="sx-actions">
+      {error === null ? null : (
+        <p className="sx-error nv-swap" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="sx-actions">
+        <button
+          type="button"
+          className="nv-btn nv-btn--sm nv-btn--plain"
+          disabled={busy}
+          onClick={() => {
+            setDraft(summary.content);
+          }}
+        >
+          Corriger
+        </button>
+        {summary.validatedAt === null ? (
           <button
             type="button"
             className="nv-btn nv-btn--sm nv-btn--soft"
@@ -208,14 +369,59 @@ function Synthesis({
           >
             Valider la synthèse
           </button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </section>
+  );
+}
+
+/** A labelled text field that grows with its text (useGrowingArea), one per text of the synthesis. */
+function GrowingField({
+  label,
+  value,
+  maxLength,
+  autofocus = false,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  maxLength: number;
+  autofocus?: boolean;
+  onChange: (text: string) => void;
+}): JSX.Element {
+  const id = useId();
+  const area = useGrowingArea(value);
+  return (
+    <div className="nv-field">
+      <label className="nv-field__label" htmlFor={id}>
+        {label}
+      </label>
+      <textarea
+        id={id}
+        ref={area}
+        className="nv-field__control sx-correct__area"
+        value={value}
+        maxLength={maxLength}
+        rows={2}
+        data-autofocus={autofocus ? true : undefined}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </div>
   );
 }
 
 interface MediaActions {
   readonly busy: boolean;
+  /** The AI asked again on a medium it gave up (recette créatrice 2). */
+  readonly onRetry: (fileId: ContentDropFileId) => void;
+  /** Written by hand when the AI gave up: her team's words and the level it picks, the rest « non vu ». */
+  readonly onWrite: (
+    fileId: ContentDropFileId,
+    detailed: string,
+    intensity: HandIntensity,
+  ) => Promise<boolean>;
   readonly onValidate: (id: MediaDescriptionId) => void;
   readonly onCorrect: (id: MediaDescriptionId, detailed: string) => Promise<boolean>;
 }
@@ -278,10 +484,10 @@ function MediaRow({
           </span>
           <DescriptionPill media={media} />
         </div>
-        {description === null || !describable(media) ? (
-          <p className="ps-muted sx-medium__text">
-            {describable(media) ? 'Pas encore décrite.' : 'Une note vocale n’est pas décrite.'}
-          </p>
+        {!describable(media) ? (
+          <p className="ps-muted sx-medium__text">Une note vocale n’est pas décrite.</p>
+        ) : description === null ? (
+          <Undescribed media={media} {...actions} />
         ) : (
           <DescriptionBlock description={description} {...actions} />
         )}
@@ -306,12 +512,147 @@ function DescriptionPill({ media }: { media: DropMediaReview }): JSX.Element | n
   if (description === null) return null;
   return description.validatedAt !== null ? (
     <span className="aa-pill" data-tone="ok">
-      {description.author === 'human' ? 'Corrigée' : 'Validée'}
+      {description.author === 'hand'
+        ? 'Écrite à la main'
+        : description.author === 'human'
+          ? 'Corrigée'
+          : 'Validée'}
     </span>
   ) : (
     <span className="aa-pill" data-tone="todo">
       À valider
     </span>
+  );
+}
+
+/**
+ * A photo or a video with no description: on its way, or given up by the AI after each of its tries (recette
+ * créatrice 2), said in amber with « Réessayer », which asks it again, and « Décrire à la main », her team's words and
+ * the level it picks; the other labels are said « non vu ».
+ */
+function Undescribed({
+  media,
+  busy,
+  onRetry,
+  onWrite,
+}: Pick<MediaActions, 'busy' | 'onRetry' | 'onWrite'> & { media: DropMediaReview }): JSX.Element {
+  const [writing, setWriting] = useState(false);
+  if (!media.describeFailed) return <p className="ps-muted sx-medium__text">Pas encore décrite.</p>;
+  if (writing)
+    return (
+      <HandForm
+        media={media}
+        busy={busy}
+        onWrite={onWrite}
+        onClose={() => {
+          setWriting(false);
+        }}
+      />
+    );
+  return (
+    <>
+      <p className="sx-note" data-tone="warn">
+        L’IA n’a pas pu la décrire, après plusieurs essais. Elle ne réessaie plus d’elle-même.
+      </p>
+      <div className="sx-actions">
+        <button
+          type="button"
+          className="nv-btn nv-btn--sm nv-btn--plain"
+          disabled={busy}
+          onClick={() => {
+            onRetry(media.fileId);
+          }}
+        >
+          Réessayer
+        </button>
+        <button
+          type="button"
+          className="nv-btn nv-btn--sm nv-btn--soft"
+          disabled={busy}
+          onClick={() => {
+            setWriting(true);
+          }}
+        >
+          Décrire à la main
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** What the medium shows and its level, both asked: validated as it is written. */
+function HandForm({
+  media,
+  busy,
+  onWrite,
+  onClose,
+}: Pick<MediaActions, 'busy' | 'onWrite'> & { media: DropMediaReview; onClose: () => void }): JSX.Element {
+  const id = useId();
+  const [text, setText] = useState('');
+  const [level, setLevel] = useState<HandIntensity | null>(null);
+  const area = useGrowingArea(text);
+  const ready = text.trim() !== '' && level !== null;
+  return (
+    <form
+      className="sx-correct sx-hand"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!ready) return;
+        void onWrite(media.fileId, text.trim(), level).then((done) => {
+          if (done) onClose();
+        });
+      }}
+    >
+      <div className="nv-field">
+        <label className="nv-field__label" htmlFor={`${id}-text`}>
+          Ce que montre {media.kind === 'video' ? 'la vidéo' : 'la photo'}
+        </label>
+        <textarea
+          id={`${id}-text`}
+          ref={area}
+          className="nv-field__control sx-correct__area"
+          value={text}
+          maxLength={6000}
+          rows={3}
+          data-autofocus
+          onChange={(event) => {
+            setText(event.target.value);
+          }}
+        />
+      </div>
+      <div className="nv-field">
+        <span className="nv-field__label" id={`${id}-level`}>
+          Niveau
+        </span>
+        <div className="sx-levels" role="radiogroup" aria-labelledby={`${id}-level`}>
+          {HAND_INTENSITIES.map((one) => (
+            <button
+              key={one}
+              type="button"
+              role="radio"
+              className="nv-chip"
+              aria-checked={level === one}
+              onClick={() => {
+                setLevel(one);
+              }}
+            >
+              {HAND_INTENSITY_LABELS[one]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="sx-meta">
+        Le reste (corps visible, ambiance, lieu, texte à l’écran) sera marqué « non vu ».
+      </p>
+      <div className="sx-actions">
+        <button type="button" className="nv-btn nv-btn--sm nv-btn--plain" disabled={busy} onClick={onClose}>
+          Annuler
+        </button>
+        <button type="submit" className="nv-btn nv-btn--sm nv-btn--soft" disabled={busy || !ready}>
+          Enregistrer et valider
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -505,7 +846,7 @@ function MediaViewer({
             <DescriptionPill media={media} />
           </div>
           {description === null ? (
-            <p className="ps-muted sx-medium__text">Pas encore décrite.</p>
+            <Undescribed media={media} {...actions} />
           ) : (
             <DescriptionBlock description={description} {...actions} />
           )}

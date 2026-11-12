@@ -606,6 +606,12 @@ export const JOB_MAX_ATTEMPTS = {
   'telegram.purge': 1,
 } as const satisfies Record<JobName, number>;
 
+/**
+ * The vision AI's tries on a dropped medium (recette créatrice, anomaly 2): the describing job's attempts, counted on
+ * the medium (`media_assets.description_failures`); past them, it waits for the agency (« Réessayer », or written).
+ */
+export const DESCRIPTION_TRIES = JOB_MAX_ATTEMPTS['content_drops.describe_file'];
+
 /** Jobs debounced per conversation: a new one replaces the pending one (`jobKeyMode: 'replace'`). */
 export const DEBOUNCED_JOBS = [
   'conversation.respond',

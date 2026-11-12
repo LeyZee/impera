@@ -53,9 +53,14 @@ interface SaleLineRead extends SaleKey {
   readonly netMinor: number;
   /** Whose it is by the owner's link (a refund is its sale's); more fields may come with it, pay keeps these. */
   readonly author:
-    | { readonly kind: 'member'; readonly memberId: TeamMemberId; readonly linkVersion: string }
-    | { readonly kind: 'agent' }
-    | { readonly kind: 'unlinked' }
+    | {
+        readonly kind: 'member';
+        readonly memberId: TeamMemberId;
+        readonly platformChatterId: string;
+        readonly linkVersion: string;
+      }
+    | { readonly kind: 'agent'; readonly platformChatterId: string }
+    | { readonly kind: 'unlinked'; readonly platformChatterId: string }
     | { readonly kind: 'none' };
 }
 
@@ -152,6 +157,7 @@ function saleForPayOf(line: SaleLineRead, timeZone: string): SaleForPay {
     currency: line.currency,
     netMinor: line.netMinor,
     author: authorOf(line.author),
+    platformChatterId: line.author.kind === 'none' ? null : line.author.platformChatterId,
   };
 }
 

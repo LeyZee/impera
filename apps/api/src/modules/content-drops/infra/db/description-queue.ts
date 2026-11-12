@@ -82,5 +82,14 @@ export function createDrizzleDescriptionQueue(adminDb: Database): DescriptionQue
       }),
     later: (creatorId, mediaAssetId, correlationId, runAt) =>
       withAdmin(adminDb, (tx) => enqueueDescription(tx, { creatorId, mediaAssetId, correlationId }, runAt)),
+    failed: (mediaAssetId) =>
+      withAdmin(adminDb, async (tx) => {
+        const [row] = await tx
+          .update(mediaAssets)
+          .set({ descriptionFailures: sql`${mediaAssets.descriptionFailures} + 1` })
+          .where(eq(mediaAssets.id, mediaAssetId))
+          .returning({ failures: mediaAssets.descriptionFailures });
+        return row?.failures ?? 0;
+      }),
   };
 }

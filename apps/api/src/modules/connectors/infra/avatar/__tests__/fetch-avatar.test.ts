@@ -1,15 +1,17 @@
+import { createServer } from 'node:net';
+
 import { describe, expect, it } from 'vitest';
 
 import { AVATAR_MAX_BYTES } from '../../../domain/avatar';
-import { createAvatarFetch, isPrivateAddress } from '../fetch-avatar';
+import { createAvatarFetch, isPrivateAddress, pinnedGet } from '../fetch-avatar';
 
 const PUBLIC = [{ address: '203.0.113.7', family: 4 }];
 const publicLookup = () => Promise.resolve(PUBLIC);
 
 function serving(response: () => Response) {
-  const calls: { url: string; init: RequestInit }[] = [];
-  const fetchLike = (url: string, init: RequestInit) => {
-    calls.push({ url, init });
+  const calls: { url: string; init: RequestInit; pinned: { address: string; family: number } }[] = [];
+  const fetchLike = (url: string, init: RequestInit, pinned: { address: string; family: number }) => {
+    calls.push({ url, init, pinned });
     return Promise.resolve(response());
   };
   return { calls, fetchAvatar: createAvatarFetch(fetchLike, publicLookup) };
@@ -23,6 +25,8 @@ describe('the fetch of a creator photo (CRM-07 a2b)', () => {
       bytes: new Uint8Array([1, 2, 3]),
     });
     expect(calls[0]?.init.redirect).toBe('manual');
+    // Connected to the address that was checked, never to the name again (audit du 11/11).
+    expect(calls[0]?.pinned).toEqual({ address: '203.0.113.7', family: 4 });
   });
 
   it('refuses anything but HTTPS, credentials in the address, and private or local addresses', async () => {
@@ -87,5 +91,24 @@ describe('the fetch of a creator photo (CRM-07 a2b)', () => {
     ])
       expect(isPrivateAddress(address)).toBe(true);
     for (const address of ['203.0.113.7', '2001:db8::1']) expect(isPrivateAddress(address)).toBe(false);
+  });
+});
+
+describe('the request of a creator photo', () => {
+  it('connects to the address it was given, never to what the name resolves to (audit du 11/11)', async () => {
+    let connections = 0;
+    const server = createServer((socket) => {
+      connections += 1;
+      socket.destroy();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const bound = server.address();
+    const port = typeof bound === 'object' && bound !== null ? bound.port : 0;
+    // A name that resolves to nothing: only the pinned address can have been reached.
+    await expect(
+      pinnedGet(`https://photo.invalid:${String(port)}/a.jpg`, {}, { address: '127.0.0.1', family: 4 }),
+    ).rejects.toThrow();
+    expect(connections).toBe(1);
+    await new Promise((resolve) => server.close(resolve));
   });
 });

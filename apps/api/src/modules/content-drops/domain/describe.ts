@@ -2,11 +2,15 @@ import { createHash } from 'node:crypto';
 
 import {
   DROP_CATEGORY_LABELS,
+  MEDIA_VOCABULARY_VERSION,
   scriptSegmentCodes,
   scriptSlots,
   type DropCategory,
+  type DropMediaDescription,
+  type HandIntensity,
   type ScriptDropSummary,
   type ScriptSegment,
+  type ScriptStageAccess,
 } from '@impera/contracts';
 
 /**
@@ -110,6 +114,8 @@ export interface ScriptStepToTell<F extends SlotFile = SlotFile> {
   /** `E1A`, `P12`, as her cards say. */
   readonly code: string;
   readonly name: string;
+  /** Offered or paid, as its card says (ADR 0064 § 3): a bridge is always offered. Never a price. */
+  readonly access: ScriptStageAccess;
   readonly card: string | null;
   /** Its filled slots' files, in their order. */
   readonly media: readonly F[];
@@ -137,7 +143,14 @@ export function scriptStepsOf<F extends SlotFile>(
     const segment = segments.find((one) => one.key === slot.segmentKey);
     if (segment === undefined) continue;
     const card = stepCardOf(segments, segment, slot.variant);
-    steps.push({ step: key, code: slot.code, name: card.name, card: textOf(card.lines), media: [file] });
+    steps.push({
+      step: key,
+      code: slot.code,
+      name: card.name,
+      access: segment.kind === 'bridge' ? 'free' : segment.access,
+      card: textOf(card.lines),
+      media: [file],
+    });
   }
   return steps;
 }
@@ -228,4 +241,48 @@ export function validationRefusal(
   if (named.length > 1 && named.some((row) => row.reviewReasons.length > 0 && row.validatedAt === null))
     return 'alone';
   return null;
+}
+
+/** The short sentence's length in the closed vocabulary (`factualDescription`). */
+const FACTUAL_MAX = 800;
+
+/** Her words cut to the short sentence's length, at a space, with an ellipsis when cut. */
+function factualOf(detailed: string): string {
+  const text = detailed.replace(/\s+/gu, ' ').trim();
+  if (text.length <= FACTUAL_MAX) return text;
+  const cut = text.slice(0, FACTUAL_MAX - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > FACTUAL_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+/**
+ * A description written by hand on a medium the vision AI did not describe (recette créatrice 2): her team's words
+ * and the level it picked; every other label of the closed vocabulary is « not seen » (nothing told, no mood, no
+ * flag), so that nothing is read in it that a human did not write. Its length is the file's, never a guess.
+ */
+export function handDescription(
+  medium: { readonly kind: 'image' | 'video'; readonly durationMs: number | null },
+  detailed: string,
+  intensity: HandIntensity,
+): DropMediaDescription {
+  const text = detailed.trim();
+  return {
+    vocabularyVersion: MEDIA_VOCABULARY_VERSION,
+    kind: medium.kind,
+    factualDescription: factualOf(text),
+    durationS: medium.durationMs === null ? null : Math.round(medium.durationMs / 1000),
+    segments: [],
+    intensity,
+    anatomyVisible: [],
+    castMode: 'not_visible',
+    mood: [],
+    setting: null,
+    audio: null,
+    textVisible: null,
+    quality: 'acceptable',
+    confidenceLow: false,
+    notVisible: false,
+    flags: [],
+    detailed: text,
+  };
 }

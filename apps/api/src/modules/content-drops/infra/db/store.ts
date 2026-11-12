@@ -11,6 +11,8 @@ import {
   ContentRequestSchema,
   DropCategorySchema,
   DropFileStateSchema,
+  DropMediaKindSchema,
+  IdeaDropCategorySchema,
   DropMimeSchema,
   DropStateSchema,
   kindOfMime,
@@ -38,6 +40,7 @@ import {
   type Transaction,
 } from '@impera/db';
 
+import type { SentDrop } from '../../domain/drop-export';
 import { dropRefusals, mayWithdraw, needsRequest } from '../../domain/drops';
 import {
   ContentDropExportUnprocessable,
@@ -470,11 +473,7 @@ async function sentScriptIn(tx: Transaction, dropId: string): Promise<SentScript
 /** Her originals of a script go this long after its archive is confirmed copied into Reveal (ADR 0044 § 2). */
 const AFTER_EXPORT_DAYS = 30;
 
-/**
- * The export confirmed, once: who and when on the drop, its audit line, and each original the script kept, that no
- * other live drop of hers holds, brought forward to 30 days from now (never pushed back). Its job of the night takes
- * them as it takes the others (CR-06 c), with their notice before.
- */
+/** « Copié dans Reveal » for a sent script (SC-03 c). */
 async function confirmExportIn(
   tx: Transaction,
   userId: string,
@@ -482,6 +481,87 @@ async function confirmExportIn(
   now: Date,
 ): Promise<ContentDrop> {
   const sent = await sentScriptIn(tx, dropId);
+  return markExportedIn(tx, userId, dropId, now, { scriptNumber: sent.scriptNumber });
+}
+
+/**
+ * Any other drop of hers as its archive reads it (recette créatrice 1), by the team's policies: its category, her word,
+ * her day, and each live kept file in her order with its validated description. A script is refused (its archive is
+ * in Scripts), and so is a drop not settled yet or one whose original is already erased.
+ */
+async function sentDropIn(tx: Transaction, dropId: string): Promise<SentDrop> {
+  const row = await readDrop(tx, dropId);
+  if (row === undefined || row.state === 'withdrawn') throw new ContentDropNotFound();
+  if (row.category === 'script') throw new ContentDropExportUnprocessable('a_script');
+  if (!EXPORTABLE_STATES.has(row.state)) throw new ContentDropExportUnprocessable('not_ready');
+  const [creator] = await tx
+    .select({ timezone: schema.creators.timezone })
+    .from(schema.creators)
+    .where(eq(schema.creators.id, row.creatorId));
+  const files = await tx
+    .select({
+      kind: contentDropFiles.kind,
+      storageKey: schema.mediaAssets.storageKey,
+      mime: schema.mediaAssets.mime,
+      bytes: schema.mediaAssets.bytes,
+      erasedAt: schema.mediaAssets.erasedAt,
+      description: sql<string | null>`(
+        select md.content->>'detailed' from media_descriptions md
+         where md.media_asset_id = ${schema.mediaAssets.id} and md.validated_at is not null
+           and md.content ? 'detailed'
+         order by md.validated_at desc, md.created_at desc, md.id desc
+         limit 1)`,
+    })
+    .from(contentDropFiles)
+    .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, contentDropFiles.mediaAssetId))
+    .where(
+      and(
+        eq(contentDropFiles.dropId, dropId),
+        sql`${contentDropFiles.replacedAt} is null`,
+        inArray(contentDropFiles.state, ['kept', 'duplicate']),
+      ),
+    )
+    .orderBy(contentDropFiles.position, contentDropFiles.id);
+  if (files.some((file) => file.erasedAt !== null))
+    throw new ContentDropExportUnprocessable('original_erased');
+  return {
+    category: IdeaDropCategorySchema.parse(row.category),
+    createdAt: row.createdAt,
+    // Her row is read under the same policies: the drop would not be either without it.
+    timezone: creator?.timezone ?? 'UTC',
+    sentence: row.sentence,
+    files: files.map((file) => ({
+      kind: DropMediaKindSchema.parse(file.kind),
+      mime: file.mime,
+      bytes: file.bytes,
+      storageKey: file.storageKey,
+      description: file.description,
+    })),
+  };
+}
+
+async function confirmDropExportIn(
+  tx: Transaction,
+  userId: string,
+  dropId: string,
+  now: Date,
+): Promise<ContentDrop> {
+  const sent = await sentDropIn(tx, dropId);
+  return markExportedIn(tx, userId, dropId, now, { category: sent.category });
+}
+
+/**
+ * The export confirmed, once: who and when on the drop, its audit line, and each original the drop kept, that no
+ * other live drop of hers holds, brought forward to 30 days from now (never pushed back). Its job of the night takes
+ * them as it takes the others (CR-06 c), with their notice before.
+ */
+async function markExportedIn(
+  tx: Transaction,
+  userId: string,
+  dropId: string,
+  now: Date,
+  details: Readonly<Record<string, string | number>>,
+): Promise<ContentDrop> {
   const row = await readDrop(tx, dropId, true);
   if (row === undefined) throw new ContentDropSettled();
   if (row.exportedAt !== null) return viewOf(tx, row);
@@ -511,7 +591,7 @@ async function confirmExportIn(
     entity: 'content_drop',
     entityId: dropId,
     details: {
-      scriptNumber: sent.scriptNumber,
+      ...details,
       originalsUntil: until.toISOString(),
       originals: shortened.rows.length,
     },
@@ -672,6 +752,9 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
     sentScript: (creatorId, userId, dropId) => asTeam(creatorId, userId, (tx) => sentScriptIn(tx, dropId)),
     confirmExport: (creatorId, userId, dropId, now) =>
       asTeam(creatorId, userId, (tx) => confirmExportIn(tx, userId, dropId, now)),
+    sentDrop: (creatorId, userId, dropId) => asTeam(creatorId, userId, (tx) => sentDropIn(tx, dropId)),
+    confirmDropExport: (creatorId, userId, dropId, now) =>
+      asTeam(creatorId, userId, (tx) => confirmDropExportIn(tx, userId, dropId, now)),
   };
 }
 

@@ -175,7 +175,9 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     renderSection();
     choose(await screen.findByRole('combobox', { name: 'Son canal' }), /Canal de Nora/u);
     fireEvent.click(screen.getByRole('button', { name: /Ajouter un exemple/u }));
-    expect(screen.getByText('Colle le post, ou retire la ligne.')).toBeDefined();
+    // Just added and blank: « à compléter », never flagged in red before she writes (recette créatrice 10).
+    expect(screen.queryByText('Colle le post, ou retire la ligne.')).toBeNull();
+    expect(screen.getAllByText('Une ligne à compléter').length).toBeGreaterThan(0);
     expect(save()).toHaveProperty('disabled', true);
     fireEvent.change(screen.getByLabelText('Exemple 1'), { target: { value: ' Ce soir je suis là ✨ ' } });
     fireEvent.click(screen.getByRole('button', { name: /Ajouter un exemple/u }));
@@ -196,6 +198,20 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     choose(role, 'Principal');
     expect(screen.getByText('Un seul post principal par jour.')).toBeDefined();
     expect(save()).toHaveProperty('disabled', true);
+  });
+
+  it('says a link just added « à compléter », and flags its fields once she writes in it (recette créatrice 10)', async () => {
+    serve({});
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /Ajouter un lien/u }));
+    expect(screen.queryByText('Donne-lui un nom.')).toBeNull();
+    expect(screen.queryByText(/lignes à corriger/u)).toBeNull();
+    expect(screen.getAllByText('Une ligne à compléter').length).toBeGreaterThan(0);
+    expect(save()).toHaveProperty('disabled', true);
+    fireEvent.change(screen.getByLabelText('Nom de ce lien'), { target: { value: 'Telegram' } });
+    // One link is one line, its name and its address with it.
+    expect(screen.getAllByText('Une ligne à corriger').length).toBeGreaterThan(0);
+    expect(screen.getByText('Une adresse complète qui commence par https://, sans espace.')).toBeDefined();
   });
 
   it('keeps the save shut on an address that is not https, and says why', async () => {

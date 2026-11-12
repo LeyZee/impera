@@ -13,6 +13,7 @@ import {
   ScriptSegmentKeySchema,
   ScriptSegmentSchema,
   ScriptSlotKeySchema,
+  ScriptStageAccessSchema,
   ScriptStructureIdSchema,
   ScriptStructureVersionIdSchema,
   ShotMomentSchema,
@@ -356,6 +357,9 @@ export const ContentDropSchema = z.strictObject({
 });
 export type ContentDrop = z.infer<typeof ContentDropSchema>;
 
+/** « S014 »: a sent script's number as its folder, its cards and both screens say it (SC-03). */
+export const scriptDropCode = (number: number): string => `S${String(number).padStart(3, '0')}`;
+
 export const DeclaredDropFileSchema = z.strictObject({
   id: ContentDropFileIdSchema,
   mime: DropMimeSchema,
@@ -545,6 +549,8 @@ export const CONTENT_DROP_CARD_NOT_FOUND = 'content_drop_card_not_found';
 export const CONTENT_DROP_EXPORT_UNPROCESSABLE = 'content_drop_export_unprocessable';
 export const SCRIPT_EXPORT_REFUSALS = [
   'not_a_script',
+  // A script asked by the archive of any other drop (recette créatrice 1): its own archive is in Scripts.
+  'a_script',
   'not_ready',
   'original_erased',
   'moment_unknown',
@@ -660,6 +666,14 @@ export type ScriptDropSummary = z.infer<typeof ScriptDropSummarySchema>;
  * or a currency, still after one more try, when prices come from the agency's grid alone (ADR 0056 § 6).
  */
 export const SCRIPT_SUMMARY_REVIEW_REASONS = ['price'] as const;
+
+/**
+ * Who wrote a script's synthesis (SC-04 lot c5): the brain (`content_drops.summarize_script`), or the agency, by hand,
+ * from the one it shows (`POST …/summary/correct`): a new row, validated by whoever writes it.
+ */
+export const SCRIPT_SUMMARY_AUTHORS = ['brain', 'human'] as const;
+export const ScriptSummaryAuthorSchema = z.enum(SCRIPT_SUMMARY_AUTHORS);
+export type ScriptSummaryAuthor = z.infer<typeof ScriptSummaryAuthorSchema>;
 export const ScriptSummaryReviewReasonSchema = z.enum(SCRIPT_SUMMARY_REVIEW_REASONS);
 export type ScriptSummaryReviewReason = z.infer<typeof ScriptSummaryReviewReasonSchema>;
 
@@ -680,8 +694,11 @@ const Instant = z.iso.datetime({ offset: true });
 /** A description of one of her media as the agency reviews it: the latest validated, else the latest written. */
 export const DropDescriptionViewSchema = z.strictObject({
   id: MediaDescriptionIdSchema,
-  /** `sense`, the vision AI; `human`, a correction. */
-  author: z.enum(['sense', 'human']),
+  /**
+   * `sense`, the vision AI; `human`, a correction of it; `hand`, written by hand where the AI gave up (recette
+   * créatrice 2), with no row of the vision under it.
+   */
+  author: z.enum(['sense', 'human', 'hand']),
   detailed: z.string().min(1).max(6000),
   reviewReasons: z.array(DescriptionReviewReasonSchema),
   /** Her own word on the media (P6-01). */
@@ -705,6 +722,11 @@ export const DropMediaReviewSchema = z.strictObject({
   thumbnail: z.boolean(),
   /** Its original is still held (ADR 0044 § 2): `GET …/files/:fileId/media` plays it, in parts for a video. */
   original: z.boolean(),
+  /**
+   * The vision AI failed at each of its tries (`DESCRIPTION_TRIES`, recette créatrice 2): no longer asked by itself,
+   * the agency asks again (`POST …/files/:fileId/describe`) or writes it.
+   */
+  describeFailed: z.boolean(),
 });
 export type DropMediaReview = z.infer<typeof DropMediaReviewSchema>;
 
@@ -713,6 +735,8 @@ export const ScriptSummaryViewSchema = z.strictObject({
   id: ScriptDropSummaryIdSchema,
   content: ScriptDropSummarySchema,
   reviewReasons: z.array(ScriptSummaryReviewReasonSchema),
+  /** `human` once her team corrected it by hand (SC-04 lot c5). */
+  author: ScriptSummaryAuthorSchema,
   current: z.boolean(),
   validatedAt: Instant.nullable(),
   createdAt: Instant,
@@ -725,6 +749,8 @@ export const ScriptReviewStepSchema = z.strictObject({
   /** `E1`, `E2A`, as her cards say. */
   code: z.string().min(1).max(16),
   name: z.string().min(1).max(200),
+  /** Offered or paid, as its card says (ADR 0064 § 3): an offered step has no price to fix. */
+  access: ScriptStageAccessSchema,
   fileIds: z.array(ContentDropFileIdSchema).min(1),
 });
 export type ScriptReviewStep = z.infer<typeof ScriptReviewStepSchema>;
@@ -756,9 +782,50 @@ export const CorrectDropDescriptionBodySchema = z.strictObject({
 });
 export type CorrectDropDescriptionBody = z.infer<typeof CorrectDropDescriptionBodySchema>;
 
+/**
+ * The levels the agency picks when it writes a description by hand (recette créatrice 2): the vision's, but « not
+ * visible », which a human who saw the medium never says.
+ */
+export const HAND_INTENSITIES = ['soft', 'suggestive', 'explicit', 'hardcore'] as const;
+export const HandIntensitySchema = z.enum(HAND_INTENSITIES);
+export type HandIntensity = z.infer<typeof HandIntensitySchema>;
+
+/**
+ * `POST …/files/:fileId/description`: a medium the AI did not describe, written by hand (recette créatrice 2), its
+ * words and its level; the vision's other labels are said « not seen ». Validated by whoever writes it.
+ */
+export const WriteDropDescriptionBodySchema = z.strictObject({
+  detailed: z.string().trim().min(1).max(6000),
+  intensity: HandIntensitySchema,
+});
+export type WriteDropDescriptionBody = z.infer<typeof WriteDropDescriptionBodySchema>;
+
 /** `POST …/summary/validate`: the script's current synthesis, validated as it is. */
 export const ValidateScriptSummaryBodySchema = z.strictObject({ summaryId: ScriptDropSummaryIdSchema });
 export type ValidateScriptSummaryBody = z.infer<typeof ValidateScriptSummaryBodySchema>;
+
+/**
+ * `POST …/summary/correct` (SC-04 lot c5): the script's current synthesis rewritten by hand, its steps the same ones in
+ * the same order; a new row, validated by whoever writes it. Never a sum nor a currency: prices come from the grid.
+ */
+export const CorrectScriptSummaryBodySchema = z.strictObject({
+  summaryId: ScriptDropSummaryIdSchema,
+  shootingContext: z.string().trim().min(1).max(2000),
+  steps: z
+    .array(
+      z.strictObject({
+        step: ScriptStepKeySchema,
+        overview: z.string().trim().min(1).max(2000),
+        summary: z.string().trim().min(1).max(400),
+      }),
+    )
+    .min(1)
+    .max(60),
+});
+export type CorrectScriptSummaryBody = z.infer<typeof CorrectScriptSummaryBodySchema>;
+
+/** A hand-written synthesis that names a sum or a currency, or other steps than the script's. */
+export const SCRIPT_SUMMARY_CORRECTION_UNPROCESSABLE = 'script_summary_correction_unprocessable';
 
 /** A row named that is not this drop's latest (a newer one came meanwhile), or a batch holding a row to see alone. */
 export const DROP_DESCRIPTION_REVIEW_CONFLICT = 'drop_description_review_conflict';

@@ -34,7 +34,8 @@ export const reviewOf = (
   fields: {
     readonly validated?: readonly boolean[];
     readonly reasons?: readonly (readonly DescriptionReviewReason[])[];
-    readonly summary?: 'none' | 'current' | 'stale' | 'validated' | 'price';
+    /** `human`: written over by the agency (SC-04 lot c5), validated as it was saved. */
+    readonly summary?: 'none' | 'current' | 'stale' | 'validated' | 'price' | 'human';
     /** Its reduced picture made, its original still held (SC-04 lot c4). */
     readonly thumbnails?: boolean;
     readonly original?: boolean;
@@ -60,11 +61,12 @@ export const reviewOf = (
       },
       thumbnail: fields.thumbnails ?? false,
       original: fields.original ?? true,
+      describeFailed: false,
     })),
     steps: [
-      { step: 'salon:', code: 'E1', name: 'Le salon', fileIds: [fileIds[0]] },
-      { step: 'chambre:A', code: 'E2A', name: 'La chambre', fileIds: [fileIds[1]] },
-      { step: 'chambre:B', code: 'E2B', name: 'La chambre', fileIds: [fileIds[2]] },
+      { step: 'salon:', code: 'E1', name: 'Le salon', access: 'free', fileIds: [fileIds[0]] },
+      { step: 'chambre:A', code: 'E2A', name: 'La chambre', access: 'paid', fileIds: [fileIds[1]] },
+      { step: 'chambre:B', code: 'E2B', name: 'La chambre', access: 'paid', fileIds: [fileIds[2]] },
     ],
     summary:
       fields.summary === undefined || fields.summary === 'none'
@@ -80,8 +82,12 @@ export const reviewOf = (
               })),
             },
             reviewReasons: fields.summary === 'price' ? ['price'] : [],
+            author: fields.summary === 'human' ? 'human' : 'brain',
             current: fields.summary !== 'stale',
-            validatedAt: fields.summary === 'validated' ? '2026-11-08T20:30:00.000Z' : null,
+            validatedAt:
+              fields.summary === 'validated' || fields.summary === 'human'
+                ? '2026-11-08T20:30:00.000Z'
+                : null,
             createdAt: '2026-11-08T19:30:00.000Z',
           },
   });

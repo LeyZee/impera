@@ -17,6 +17,12 @@ const LlmRoleConfigSchema = ModelRefSchema.extend({
   maxOutputTokens: z.number().int().positive(),
   timeoutMs: z.number().int().positive(),
   fallback: ModelRefSchema.optional(),
+  /**
+   * How long an xAI model thinks before it answers, for every xAI model the role calls, its fallback included: Grok 4.7
+   * cannot stop thinking, and left at xAI's default (`high`) its answer took close to a minute on 11/11, past the
+   * role's timeout. Not sent to another provider.
+   */
+  reasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
 });
 export type LlmRoleConfig = z.infer<typeof LlmRoleConfigSchema>;
 
@@ -48,7 +54,13 @@ export const LlmConfigSchema = z.object({
 });
 export type LlmConfig = z.infer<typeof LlmConfigSchema>;
 
-const MISTRAL_FALLBACK: ModelRef = { provider: 'mistral', model: 'mistral-large-latest' };
+/**
+ * Pinned to one model, never `mistral-large-latest`: that alias moves to the next Large when Mistral ships, and the
+ * model that writes to a fan would change without evals. `mistral-large-4` is the id Mistral documents for Large 4:
+ * it names the model, not a dated build (none is published). Moving it is a change of default like any other.
+ */
+export const MISTRAL_FALLBACK_MODEL = 'mistral-large-4';
+const MISTRAL_FALLBACK: ModelRef = { provider: 'mistral', model: MISTRAL_FALLBACK_MODEL };
 
 /** Defaults (ADR 0009); per-creator overrides arrive with CreatorSettings.llm. Changing a default needs evals first. */
 export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
@@ -59,6 +71,7 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
       temperature: 0.9,
       maxOutputTokens: 400,
       timeoutMs: 30_000,
+      reasoningEffort: 'low',
       fallback: MISTRAL_FALLBACK,
     },
     brain: {
@@ -67,6 +80,7 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
       temperature: 0.3,
       maxOutputTokens: 800,
       timeoutMs: 30_000,
+      reasoningEffort: 'low',
       fallback: MISTRAL_FALLBACK,
     },
     // Gemini reads photo, video and sound natively (Charles, 17/10 18h20); when it refuses or blocks, Grok 4.7
@@ -78,8 +92,16 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
       maxOutputTokens: 1_200,
       timeoutMs: 90_000,
       fallback: { provider: 'xai', model: 'grok-4.7' },
+      reasoningEffort: 'low',
     },
-    judge: { provider: 'xai', model: 'grok-4.7', temperature: 0, maxOutputTokens: 600, timeoutMs: 60_000 },
+    judge: {
+      provider: 'xai',
+      model: 'grok-4.7',
+      temperature: 0,
+      maxOutputTokens: 600,
+      timeoutMs: 60_000,
+      reasoningEffort: 'medium',
+    },
   },
   maxTransientRetries: 2,
   dailyBudget: { capEur: 20, trendWatchCapEur: 1, alertRatio: 0.8, timeZone: 'Europe/Paris', usdPerEur: 1.1 },
