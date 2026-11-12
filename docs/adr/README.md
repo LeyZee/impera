@@ -112,3 +112,4 @@ Date : AAAA-MM-JJ
 | 0086 | Le panneau copilote : à côté de la conversation Reveal, la fiche du fan d'abord, le brouillon de l'agent ensuite, et c'est le chatteur qui envoie | accepted (précise 0025, 0019, 0066 § 7 et 0085) |
 | 0087 | Un rôle de service entre le rôle applicatif et le rôle propriétaire de la base | proposed (précise 0005 et 0027) |
 | 0099 | Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser | accepted (précise 0030, 0018, 0083 et P6-01) |
+| 0100 | Une IA écrit les scripts à partir des médias du coffre, le code tient la vente | proposed (précise 0099, 0083, 0009, 0010, 0021) |
