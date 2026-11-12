@@ -1,6 +1,6 @@
 # 0089. Les vignettes d'une créatrice archivée sont effacées 90 jours après son archivage
 
-Statut : proposed (choix de Charles sur la carte du fil Médias, 11/11/2026, 15 h 41 : « ok vignettes 90 jours » ; numéro attribué par le coordinateur ; texte à accepter par « ok 0089 »)
+Statut : accepted (Charles, 12/11/2026, 23 h 00, « ok 0089 » ; choix sur la carte du fil Médias, 11/11/2026, 15 h 41 : « ok vignettes 90 jours » ; numéro attribué par le coordinateur)
 Date : 2026-11-11
 Amende : l'ADR 0071 § 2 (« Rien n'est supprimé […] médias […] intacts »), pour les seules vignettes. Précise : l'ADR 0030 § 4 (on garde le minimum) et l'ADR 0044 § 2 (effacement des originaux). Ne remplace rien d'autre.
 
