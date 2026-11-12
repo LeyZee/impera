@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FanInsights } from './FanInsights';
 import { DEMO_INSIGHTS } from './insights-fixture';
-import { arcsOf, heatOf, slotLabel } from './insights-view';
+import { arcsOf, heatOf, slotLabel, waitingLine } from './insights-view';
 
 function serve(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -58,10 +58,9 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     const cell = screen.getByRole('button', { name: 'Vendredi, 18h–21h : 4\u00a0%' });
     fireEvent.focus(cell);
     expect(cell.getAttribute('aria-pressed')).toBe('true');
-    // A block under ten fans says so in words, with no ring and no number.
-    expect(screen.getByText('Leur situation').closest('article')?.textContent).toContain(
-      'Pas encore assez de fans pour le dire.',
-    );
+    // A block under ten fans is no empty card: one line names those that wait (recette CRE-04).
+    expect(screen.queryByText('Leur situation')).toBeNull();
+    expect(screen.getByText('Pas encore assez de fans pour dire leur situation.')).toBeDefined();
     expect(screen.getByText('Panier moyen sur 30 jours')).toBeDefined();
   });
 
@@ -70,6 +69,24 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     show();
     expect(await screen.findByText('fans en tout')).toBeDefined();
     expect(screen.getAllByText('moins de 10')).toHaveLength(2);
+  });
+
+  it('says it once, in one short card, when every block has too few fans (recette CRE-04)', async () => {
+    const few = { status: 'too_few' } as const;
+    serve(200, {
+      ...DEMO_INSIGHTS,
+      fans: { total: null, newLast30Days: null, wroteLast7Days: null },
+      age: few,
+      place: few,
+      situation: few,
+      job: few,
+      spending: few,
+      activity: few,
+    });
+    show();
+    expect(await screen.findByText(/Encore trop peu de fans pour le dire/u)).toBeDefined();
+    expect(screen.queryByText('moins de 10')).toBeNull();
+    expect(document.querySelectorAll('.fi-card')).toHaveLength(0);
   });
 
   it('says the figures do not load, with a way to try again', async () => {
@@ -87,6 +104,14 @@ describe('the geometry', () => {
     expect(arcs[1]?.offset).toBe(-half);
     expect(arcsOf([100], 10)[0]?.dash.startsWith(String(Math.round(2 * Math.PI * 10 * 100) / 100))).toBe(
       true,
+    );
+  });
+
+  it('names the blocks that wait for more fans in one sentence', () => {
+    expect(waitingLine([])).toBeNull();
+    expect(waitingLine(['job'])).toBe('Pas encore assez de fans pour dire leur métier.');
+    expect(waitingLine(['age', 'situation', 'job'])).toBe(
+      'Pas encore assez de fans pour dire leur âge, leur situation et leur métier.',
     );
   });
 

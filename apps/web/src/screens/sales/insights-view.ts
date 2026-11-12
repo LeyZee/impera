@@ -148,3 +148,27 @@ export function heatOf(share: number, busiest: number): number {
   if (busiest <= 0) return 0;
   return Math.round((share / busiest) * 100) / 100;
 }
+
+/** The blocks of « Qui sont tes fans », as a sentence names them when it says which ones wait for more fans. */
+export const BLOCK_WORDS = {
+  age: 'leur âge',
+  place: 'd’où ils t’écrivent',
+  situation: 'leur situation',
+  job: 'leur métier',
+  spending: 'ce qu’ils débloquent',
+  activity: 'quand ils t’écrivent',
+} as const;
+
+export type InsightBlock = keyof typeof BLOCK_WORDS;
+
+/**
+ * The blocks still under ten fans, in one line instead of one empty card each (recette CRE-04): « Pas encore assez de
+ * fans pour dire leur métier et leur situation. »; `null` when every block has enough.
+ */
+export function waitingLine(blocks: readonly InsightBlock[]): string | null {
+  const words = blocks.map((block) => BLOCK_WORDS[block]);
+  const last = words.at(-1);
+  if (last === undefined) return null;
+  const said = words.length === 1 ? last : `${words.slice(0, -1).join(', ')} et ${last}`;
+  return `Pas encore assez de fans pour dire ${said}.`;
+}

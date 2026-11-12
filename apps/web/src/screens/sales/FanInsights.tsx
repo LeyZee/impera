@@ -16,6 +16,8 @@ import {
   SITUATION_LABELS,
   slotLabel,
   TIER_LABELS,
+  waitingLine,
+  type InsightBlock,
 } from './insights-view';
 import './insights.css';
 
@@ -32,8 +34,6 @@ interface Case {
   readonly key: string;
   readonly share: number;
 }
-
-const TOO_FEW = 'Pas encore assez de fans pour le dire.';
 
 function Count({ value, format = String }: { value: number; format?: (n: number) => string }): JSX.Element {
   const ref = useRef<HTMLSpanElement>(null);
@@ -230,22 +230,6 @@ function BarsCard({
         ))}
       </ul>
       <p className="fi-card__foot">{aboutLine(aboutFans)}</p>
-    </article>
-  );
-}
-
-function EmptyCard({ title, index }: { title: string; index: number }): JSX.Element {
-  return (
-    <article className="fi-card fi-card--empty nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">{title}</h3>
-      <div className="fi-ring-row">
-        <div className="fi-ring fi-ring--empty" aria-hidden="true">
-          <svg viewBox="0 0 132 132">
-            <circle className="fi-ring__track" cx="66" cy="66" r={52} />
-          </svg>
-        </div>
-        <p className="fi-empty">{TOO_FEW}</p>
-      </div>
     </article>
   );
 }
@@ -471,9 +455,14 @@ function Stat({ value, label }: { value: number | null; label: string }): JSX.El
   );
 }
 
-/** The panel: three numbers, then a card per question, each one honest when it has too few fans. */
-export function FanInsights(): JSX.Element {
+/**
+ * The panel: three numbers, then a card per question that has enough fans, and one line for those that have too few
+ * (recette CRE-04). Under ten fans everywhere, one short sentence and nothing else. `silent`: the page says once that
+ * the server does not answer, when its fans do not load either (recette CRE-31).
+ */
+export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Element | null {
   const insights = useCreatorFanInsights();
+  if (insights.isError && insights.data === undefined && silent) return null;
   if (insights.isError && insights.data === undefined)
     return (
       <ServerSilent
@@ -497,6 +486,28 @@ export function FanInsights(): JSX.Element {
     );
   const data = insights.data;
   const age = data.age;
+  const waiting = (['age', 'place', 'situation', 'job', 'spending', 'activity'] as const).filter(
+    (block: InsightBlock) => data[block].status !== 'enough',
+  );
+  if (waiting.length === 6)
+    return (
+      <Panel
+        className="fi-panel nv-enter"
+        title={
+          <>
+            Qui sont <em className="fi-serif">tes fans</em>
+          </>
+        }
+      >
+        <PanelSection>
+          <p className="fi-few">
+            Encore trop peu de fans pour le dire. Ça s’affichera à partir de dix, pour qu’aucun ne s’y
+            reconnaisse.
+          </p>
+        </PanelSection>
+      </Panel>
+    );
+  const line = waitingLine(waiting);
   return (
     <Panel
       className="fi-panel nv-enter"
@@ -523,9 +534,7 @@ export function FanInsights(): JSX.Element {
               idle={{ value: `${String(age.averageAge)}\u00a0ans`, sub: 'en moyenne' }}
               index={0}
             />
-          ) : (
-            <EmptyCard title="Leur âge" index={0} />
-          )}
+          ) : null}
           {data.place.status === 'enough' ? (
             <RingCard
               title="D’où ils t’écrivent"
@@ -534,9 +543,7 @@ export function FanInsights(): JSX.Element {
               aboutFans={data.place.aboutFans}
               index={1}
             />
-          ) : (
-            <EmptyCard title="D’où ils t’écrivent" index={1} />
-          )}
+          ) : null}
           {data.situation.status === 'enough' ? (
             <RingCard
               title="Leur situation"
@@ -545,9 +552,7 @@ export function FanInsights(): JSX.Element {
               aboutFans={data.situation.aboutFans}
               index={2}
             />
-          ) : (
-            <EmptyCard title="Leur situation" index={2} />
-          )}
+          ) : null}
           {data.job.status === 'enough' ? (
             <BarsCard
               title="Leur métier"
@@ -556,20 +561,11 @@ export function FanInsights(): JSX.Element {
               aboutFans={data.job.aboutFans}
               index={3}
             />
-          ) : (
-            <EmptyCard title="Leur métier" index={3} />
-          )}
-          {data.spending.status === 'enough' ? (
-            <SpendingCard spending={data.spending} index={4} />
-          ) : (
-            <EmptyCard title="Ce qu’ils débloquent" index={4} />
-          )}
-          {data.activity.status === 'enough' ? (
-            <ActivityCard cells={data.activity.cells} index={5} />
-          ) : (
-            <EmptyCard title="Quand ils t’écrivent" index={5} />
-          )}
+          ) : null}
+          {data.spending.status === 'enough' ? <SpendingCard spending={data.spending} index={4} /> : null}
+          {data.activity.status === 'enough' ? <ActivityCard cells={data.activity.cells} index={5} /> : null}
         </div>
+        {line === null ? null : <p className="fi-waiting">{line}</p>}
         <p className="fi-note">
           Ce que tes fans ont dit eux-mêmes en conversation, arrêté chaque nuit à minuit. Une case ne
           s’affiche qu’à partir de dix fans, pour qu’aucun ne s’y reconnaisse.
