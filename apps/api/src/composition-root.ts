@@ -173,7 +173,7 @@ export const rateJobSince = (
 const POOL_OPTIONS = { connectionTimeoutMillis: 5_000, idleTimeoutMillis: 30_000 };
 
 export interface AppOptions {
-  /** Tests and local development plug a `FakeConnector` here; production gets the real adapters. */
+  /** Tests plug a `FakeConnector` or FakeReveal here; the real adapters otherwise (Reveal's private API, P2-02). */
   readonly connectorRegistry?: ConnectorRegistry;
   /** Tests plug FakeReveal's CRM API here; Reveal's own (`api.reveal.me`) otherwise. */
   readonly salesFeeds?: SalesFeedRegistry;
@@ -298,7 +298,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       const holder = await trends.module.linkHolder(token);
       return holder === null ? null : currentUserById(db.db, shiftCreators, holder.userId);
     },
-    registry: options.connectorRegistry ?? {},
+    ...(options.connectorRegistry !== undefined && { registry: options.connectorRegistry }),
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
     ...(options.creatorAvatars !== undefined && { avatars: options.creatorAvatars }),
