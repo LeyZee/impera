@@ -34,7 +34,7 @@ const plural = (n: number, one: string, many: string): string => `${String(n)} $
 
 /** « 7,40 € »: the AI spend is small, its cents matter. */
 const euroCents = (value: number): string =>
-  `${value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
+  `${value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
 /** « 1 min 40 » from minutes with a tenth; « 45 s » under a minute. */
 export function replyDelay(minutes: number): string {
@@ -159,7 +159,9 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         ['Conversations suivies', String(reveal.conversations)],
       ],
       alarm: late ? 'Reveal n’est plus lu' : 'Reveal est déconnecté',
-      brief: `Reveal ${late ? 'lu en retard' : reveal.connected ? 'connecté' : unlinked ? 'pas encore relié' : 'déconnecté'}`,
+      brief: unlinked
+        ? 'Messagerie Reveal pas encore reliée'
+        : `Reveal ${late ? 'lu en retard' : reveal.connected ? 'connecté' : 'déconnecté'}`,
     },
     {
       id: 'voice',
@@ -313,11 +315,14 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       ? ' L’IA qui écrit attend aussi sa clé.'
       : ' L’IA qui écrit ne répond pas non plus.';
   if (unlinked) {
+    // The sales key and the messaging session are two links: Réglages › Ventes may show Reveal linked while the
+    // agent reads nothing yet, so the page names the one missing (recette socle 11/11, point 4 ; choix de Charles 12/11).
+    const salesLinked = api.revealSales === null ? '' : 'Les ventes Reveal, elles, remontent déjà. ';
     return {
       ...base,
       tone: 'idle',
-      headline: 'Reveal n’est **pas encore relié**',
-      lead: `L’agent commencera à lire les conversations dès que la session Reveal sera capturée depuis l’extension.${alsoVoice}`,
+      headline: 'La messagerie Reveal n’est **pas encore reliée**',
+      lead: `${salesLinked}L’agent commencera à lire les conversations dès que la session Reveal sera capturée depuis l’extension.${alsoVoice}`,
       foldTitle: 'Rien ne tourne encore',
     };
   }
