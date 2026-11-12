@@ -85,7 +85,7 @@ describe('fromApi', () => {
     expect(card('budget')).toBeUndefined();
     expect(flat(fromApi(apiDashboard()).agency.budget?.value)).toBe('7,40 € sur 20 €');
     expect(fromApi(apiDashboard()).agency.budget?.gauge).toEqual({ value: 37, mark: 80 });
-    expect(card('live-rate')?.value).toBe('64,5 % sans retouche');
+    expect(card('live-rate')?.value).toBe('64,5 % sans retouche');
     expect(card('activity')?.value).toBe('1 min 42');
     expect(card('voice')?.rows[0]).toEqual(['Temps pour écrire', '3,1 s']);
     expect(card('reveal')?.rows[0]).toEqual(['Dernière lecture', 'il y a 14 s']);
@@ -229,11 +229,43 @@ describe('fromApi', () => {
         voice: { ok: false, keyMissing: false, medianWriteMs: null, outagesLast7d: 0 },
       }),
     );
-    expect(unlinked.agent).toMatchObject({ tone: 'idle', headline: 'Reveal n’est **pas encore relié**' });
+    expect(unlinked.agent).toMatchObject({
+      tone: 'idle',
+      headline: 'La messagerie Reveal n’est **pas encore reliée**',
+    });
     expect(card('reveal', unlinked)).toMatchObject({ tone: 'idle', value: 'Pas encore reliée' });
-    expect(unlinked.agent.foldSummary).toContain('Reveal pas encore relié');
+    expect(unlinked.agent.foldSummary).toContain('Messagerie Reveal pas encore reliée');
+    expect(unlinked.agent.lead).not.toContain('ventes');
     // Reveal speaks first, the voice is said in the same lead, not only in the fold.
     expect(unlinked.agent.lead).toContain('L’IA qui écrit ne répond pas non plus.');
+  });
+
+  it('says the sales already come in when only the messaging session is missing', () => {
+    const figures = {
+      sales: 1,
+      refunds: 0,
+      revenueMinor: 1000,
+      netMinor: 1000,
+      agencyMinor: 450,
+      creatorMinor: 550,
+    };
+    const salesOnly = fromApi(
+      apiDashboard({
+        reveal: { connected: false, lastReadAt: null, late: false, conversations: 0 },
+        revealSales: {
+          platforms: ['reveal'],
+          from: '2026-11-03',
+          to: '2026-11-03',
+          totals: figures,
+          bySeller: null,
+          usd: { seen: false, rate: null },
+          refundsWithoutSale: 0,
+          stopped: [],
+        },
+      }),
+    );
+    expect(salesOnly.agent.headline).toBe('La messagerie Reveal n’est **pas encore reliée**');
+    expect(salesOnly.agent.lead).toMatch(/^Les ventes Reveal, elles, remontent déjà\. L’agent commencera/u);
   });
 
   it('says a missing key is a step to take, in amber, and where the key goes', () => {
