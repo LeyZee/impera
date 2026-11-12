@@ -26,6 +26,8 @@ const HeldListSchema = z.object({
       platformSaleId: z.string(),
       event: z.string(),
       memberId: z.string().nullable(),
+      memberLeftOn: z.string().nullable(),
+      platformChatterId: z.string().nullable(),
       reason: z.string().nullable(),
       decision: z.string().nullable(),
       outcomes: z.array(z.string()),
@@ -34,6 +36,7 @@ const HeldListSchema = z.object({
 });
 const DecisionSchema = z.object({ id: z.string(), revision: z.number(), outcome: z.string() });
 const SaleEntrySchema = z.object({ platformSaleId: z.string(), lateFrom: z.string().optional() });
+const FinalRulesSchema = z.object({ final: z.boolean(), minimumPayoutMinor: z.number().int() });
 
 /** What the base said when it refused `write`: its SQLSTATE and its message. */
 async function refusalOf(write: () => PromiseLike<unknown>): Promise<{ code: string; message: string }> {
@@ -196,6 +199,21 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
     const refused = await team.call('GET', `/payroll/periods/${P1}/held-sales`, leaCookie);
     expect(refused.statusCode).toBe(403);
     expect(team.refusal(refused).code).toBe('payroll_forbidden');
+  });
+
+  it('names the platform account of each line held, linked or not, for the validator to know who made it', async () => {
+    const response = await team.call('GET', `/payroll/periods/${P1}/held-sales`, team.owner);
+    expect(
+      HeldListSchema.parse(response.json()).sales.map((one) => [
+        one.platformSaleId,
+        one.memberId,
+        one.platformChatterId,
+      ]),
+    ).toEqual([
+      ['sale_new', null, 'chatter_new'],
+      ['sale_odd', theo.id, 'chatter_theo'],
+      ['sale_off', theo.id, 'chatter_theo'],
+    ]);
   });
 
   it('refuses a decision on one’s own sale, an outcome the sale does not offer, and a sale it does not hold', async () => {
@@ -378,5 +396,210 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
     );
     await refused(() => db.delete(schema.payPeriodHeldSales), 'pay keeps its past');
     await refused(() => db.delete(schema.paySaleDecisions), 'pay keeps its past');
+  });
+});
+
+/**
+ * A member who left, linked to his platform account after his departure (REC-PAIE-01, relecture Équipe de #695), and a
+ * sale made after it (Charles, 11/11/2026): Marie and Jules leave on the 10th of May, in P1. A sale made on shift
+ * before the departure goes on a final statement once the link exists, whether P1 is still open (a) or closed with the
+ * sale left « chatteur non relié » (b). A sale made after the departure is never dismissed by itself: it waits « hors
+ * poste » and, counted, goes on a final statement of its fortnight (c), with no payout minimum (ADR 0072 § 2). The
+ * links are written as fixtures: `sales-feed-team.integration.test.ts` tests the route that writes them.
+ */
+describe('Équipe › Paie : les ventes d’un membre parti relié après son départ (REC-PAIE-01)', () => {
+  const LEFT_ON = '2025-05-10';
+  let team: PayrollTeam;
+  let marie: TeamMember;
+  let jules: TeamMember;
+  /** The team's clock: the system's, unless a member leaves on a day already past. */
+  let teamNow: Date | null = null;
+
+  const sale = (id: string, at: string, chatter: string, net: number) => ({
+    id: newId(SalesLineIdSchema),
+    creatorId: team.anna,
+    platformAccountId: team.annas,
+    platform: 'reveal',
+    platformSaleId: id,
+    event: 'sale',
+    saleType: 'ppv',
+    status: 'paid',
+    occurredAt: new Date(at),
+    platformModelId: 'model_test_01',
+    platformChatterId: chatter,
+    platformFanId: null,
+    currency: 'EUR',
+    grossInclVatMinor: net * 2,
+    grossExclVatMinor: net * 2,
+    netMinor: net,
+    agencyMinor: net,
+    creatorMinor: 0,
+    position: `${id}:sale`,
+    inputsHash: 'hash_test',
+    recordedAt: new Date(at),
+  });
+
+  const shift = (member: TeamMember, from: string, to: string) => ({
+    id: newId(ShiftIdSchema),
+    creatorId: team.anna,
+    platformAccountId: team.annas,
+    memberId: member.id,
+    startsAt: new Date(from),
+    endsAt: new Date(to),
+    createdBy: team.ownerId,
+    updatedBy: team.ownerId,
+  });
+
+  /** Links the platform's account to the member now, as Équipe › Reveal does once he has left. */
+  const link = async (chatter: string, member: TeamMember) => {
+    const now = new Date();
+    await team.test.admin.db.insert(schema.salesFeedChatters).values({
+      platform: 'reveal',
+      platformChatterId: chatter,
+      kind: 'member',
+      memberId: member.id,
+      linkVersionAt: now,
+      linkedAt: now,
+    });
+  };
+
+  const held = async (period: string) => {
+    const response = await team.call('GET', `/payroll/periods/${period}/held-sales`, team.owner);
+    expect(response.statusCode).toBe(200);
+    return HeldListSchema.parse(response.json()).sales.map((one) => [
+      one.platformSaleId,
+      one.memberLeftOn,
+      one.reason,
+      one.decision,
+      one.outcomes,
+    ]);
+  };
+
+  const salesOf = async (member: TeamMember, period: string) => {
+    const statement = await team.statementOf(member, PayPeriodSchema.parse(period));
+    const lines = await team.test.admin.db
+      .select({ sales: schema.commissionStatementLines.sales })
+      .from(schema.commissionStatementLines)
+      .where(
+        and(
+          eq(schema.commissionStatementLines.statementId, statement.id),
+          eq(schema.commissionStatementLines.revision, statement.revision),
+        ),
+      );
+    return lines
+      .flatMap((line) => z.array(SaleEntrySchema).parse(line.sales))
+      .map((one) => [one.platformSaleId, one.lateFrom ?? null]);
+  };
+
+  /** His statement of `period` is final and pays its whole total, carrying nothing: its total, and the minimum. */
+  const paidInFull = async (member: TeamMember, period: string) => {
+    const statement = await team.statementOf(member, PayPeriodSchema.parse(period));
+    const rules = FinalRulesSchema.parse(statement.rules);
+    expect(rules.final).toBe(true);
+    expect(statement.totalMinor).toBeGreaterThan(0);
+    expect(statement).toMatchObject({ carryOverOutMinor: 0, payableMinor: statement.totalMinor });
+    return { totalMinor: statement.totalMinor, minimumPayoutMinor: rules.minimumPayoutMinor };
+  };
+
+  /** A small sale on a final statement: paid although under the minimum (ADR 0072 § 2, ADR 0038). */
+  const underTheMinimum = ({
+    totalMinor,
+    minimumPayoutMinor,
+  }: {
+    totalMinor: number;
+    minimumPayoutMinor: number;
+  }) => totalMinor < minimumPayoutMinor;
+
+  beforeAll(async () => {
+    team = await startPayrollTeam(inject('pgSuperuserUrl'), { teamClock: () => teamNow ?? new Date() });
+    ({ member: marie } = await team.addMember('marie@example.test', 'Marie'));
+    ({ member: jules } = await team.addMember('jules@example.test', 'Jules'));
+    const db = team.test.admin.db;
+    await db.insert(schema.accountPayRules).values({
+      id: newId(AccountPayRulesIdSchema),
+      creatorId: team.anna,
+      platformAccountId: team.annas,
+      fromPeriod: P1,
+      currency: 'EUR',
+      vatBps: 0,
+      platformFeeBps: 0,
+      earningsSource: 'detected',
+      createdBy: team.ownerId,
+    });
+    await db
+      .insert(schema.shifts)
+      .values([
+        shift(marie, '2025-05-05T08:00:00Z', '2025-05-05T12:00:00Z'),
+        shift(jules, '2025-05-06T08:00:00Z', '2025-05-06T12:00:00Z'),
+      ]);
+    // Both accounts still to link; Marie's last sale is made after she left, in P2, with no shift of hers.
+    await db
+      .insert(schema.platformSales)
+      .values([
+        sale('sale_before_open', '2025-05-05T10:00:00Z', 'chatter_marie', 10_000),
+        sale('sale_before_closed', '2025-05-06T10:00:00Z', 'chatter_jules', 500),
+        sale('sale_after', '2025-05-20T10:00:00Z', 'chatter_marie', 500),
+      ]);
+    teamNow = new Date(`${LEFT_ON}T10:00:00Z`);
+    try {
+      for (const member of [marie, jules]) {
+        const left = await team.call('PUT', `/team/members/${member.id}/status`, team.owner, {
+          status: 'left',
+        });
+        expect(left.statusCode, left.body).toBe(200);
+      }
+    } finally {
+      teamNow = null;
+    }
+  });
+
+  afterAll(async () => {
+    await team.close();
+  });
+
+  it('(a) counts on her final statement a sale made on shift before she left, once linked, while her fortnight is open', async () => {
+    expect(await held(P1)).toEqual([
+      ['sale_before_closed', null, 'chatter_unlinked', null, ['exclude']],
+      ['sale_before_open', null, 'chatter_unlinked', null, ['exclude']],
+    ]);
+    await link('chatter_marie', marie);
+    await team.recalculate(P1);
+    expect(await salesOf(marie, P1)).toEqual([['sale_before_open', null]]);
+    await paidInFull(marie, P1);
+    expect(await held(P1)).toEqual([['sale_before_closed', null, 'chatter_unlinked', null, ['exclude']]]);
+  });
+
+  it('(b) counts on a final statement of the first open fortnight a sale the closing of his left « chatteur non relié »', async () => {
+    expect((await team.validate(team.owner, marie, P1)).statusCode).toBe(200);
+    expect(await team.closingOf(P1)).toBeDefined();
+    const left = await team.test.admin.db.select().from(schema.payPeriodHeldSales);
+    expect(left.map((one) => [one.platformSaleId, one.period, one.reason])).toEqual([
+      ['sale_before_closed', P1, 'chatter_unlinked'],
+    ]);
+
+    // Linked after the closing: his shift of the closed P1 is read again, and the sale is his without a decision.
+    await link('chatter_jules', jules);
+    expect((await held(P2)).map(([id]) => id)).not.toContain('sale_before_closed');
+    await team.recalculate(P2);
+    expect(await salesOf(jules, P2)).toEqual([['sale_before_closed', P1]]);
+    expect(underTheMinimum(await paidInFull(jules, P2))).toBe(true);
+  });
+
+  it('(c) never dismisses a sale made after she left: it waits « hors poste », and counted goes on a final statement of its fortnight', async () => {
+    expect(await held(P2)).toEqual([['sale_after', LEFT_ON, 'off_shift', null, ['count', 'exclude']]]);
+    await expect(team.statementOf(marie, P2)).rejects.toThrow('no statement');
+
+    const counted = await team.call('POST', '/payroll/sale-decisions', team.owner, {
+      id: newId(PaySaleDecisionIdSchema),
+      period: P2,
+      platform: 'reveal',
+      platformSaleId: 'sale_after',
+      outcome: 'count',
+      note: null,
+    });
+    expect(counted.statusCode, counted.body).toBe(201);
+    await team.recalculate(P2);
+    expect(await salesOf(marie, P2)).toEqual([['sale_after', null]]);
+    expect(underTheMinimum(await paidInFull(marie, P2))).toBe(true);
   });
 });

@@ -148,6 +148,8 @@ Branche : task/<id>-<slug>
 | SEC-05 | Mot de passe oublié (Telegram, puis e-mail) et QR code du deuxième facteur | exploitation | todo | ADR 0068, ADR 0046, ADR 0020 |
 | SEC-06 | Durcissement : écoute locale, proxy, chaîne d'approvisionnement | exploitation | done | SEC-01 |
 | SEC-07 | Durcissement : liens d'extension, limites par adresse, appels sortants | exploitation | done | SEC-06 |
+| SEC-08 | Lien d'extension : mot de passe et code redemandés à la création ; ADR 0087 proposée | exploitation | done | SEC-07, ADR 0046 |
+| SEC-09 | Message de fan borné, rythme ralenti passé 60 réponses dans l'heure | exploitation | done | SEC-07 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
 | ARC-03 | Le dossier du prestataire sorti de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-02 |
@@ -156,3 +158,4 @@ Branche : task/<id>-<slug>
 | ARC-06 | Les factures et avoirs sortis de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-05 |
 | ARC-07 | Une table lue par son seul propriétaire, un job par tâche | exploitation | done | ADR 0047, ARC-06 |
 | ARC-08 | Ordre des virements écartés du journal et relance d'émission par son index | exploitation | done | ARC-07 |
+| REC-PAIE-01 | Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis | exploitation | done | CRM-03, ADR 0076, ADR 0072 |

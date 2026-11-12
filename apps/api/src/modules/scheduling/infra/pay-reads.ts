@@ -19,6 +19,8 @@ import { z } from 'zod';
 
 import { DEFAULT_SCHEDULING_SETTINGS } from '../domain/shifts';
 
+import { reportSource } from './rows';
+
 /**
  * What pay reads of the planning (EQ-04, ADR 0023 § Paie), in pay's own transaction: the module owns the reports and
  * the accounts' rules, pay gets these functions through the module's `index.ts`, never the tables.
@@ -115,7 +117,8 @@ export async function validatedReportsScoped(
 /**
  * How many reports made for a period after `after` (any, when `null`) up to `upTo` wait for review, sent and neither
  * validated nor sent back, creator by creator as `validatedReportsScoped`: a closing would send them to the next
- * period unseen (ADR 0032).
+ * period unseen (ADR 0032). A report of a period whose pay reads the sales waits for nothing: it has no effect on pay
+ * and never holds a closing (ADR 0084 § 3).
  */
 export async function reportsAwaitingReviewScoped(
   tx: Transaction,
@@ -127,8 +130,10 @@ export async function reportsAwaitingReviewScoped(
   for (const creatorId of creatorIds) {
     await enterCreator(tx, creatorId, creatorIds);
     const result = await tx.execute(sql`
-      select count(*)::int as count from shift_reports
-      where status = 'submitted' and period <= ${upTo} and (${after}::date is null or period > ${after}::date)`);
+      select count(*)::int as count from ${schema.shiftReports}
+      where ${schema.shiftReports.status} = 'submitted' and ${schema.shiftReports.period} <= ${upTo}
+        and (${after}::date is null or ${schema.shiftReports.period} > ${after}::date)
+        and ${reportSource} is distinct from 'detected'`);
     waiting += z.object({ count: z.number().int() }).parse(result.rows[0]).count;
   }
   return waiting;
