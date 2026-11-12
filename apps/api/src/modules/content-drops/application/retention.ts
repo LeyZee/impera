@@ -1,5 +1,5 @@
 import { ContentDropStorageUnavailable } from '../domain/errors';
-import type { DropStorage, ReceiptStore, RetentionStore } from '../domain/ports';
+import type { DropStorage, DueThumbnail, ReceiptStore, RetentionStore } from '../domain/ports';
 import { abandonedBefore, ABANDONED, noticeUntil, thumbnailsArchivedBefore } from '../domain/retention';
 
 export interface RetentionDeps {
@@ -55,17 +55,30 @@ export async function eraseOriginals(
   const before = thumbnailsArchivedBefore(now);
   const gone = new Map<string, number>();
   let thumbnailsFailed = 0;
-  for (const thumbnail of await deps.retention.dueThumbnails(before)) {
+  const byCreator = new Map<string, DueThumbnail[]>();
+  for (const thumbnail of await deps.retention.dueThumbnails(before))
+    byCreator.set(thumbnail.creatorId, [...(byCreator.get(thumbnail.creatorId) ?? []), thumbnail]);
+  for (const [creatorId, due] of byCreator) {
+    let count = 0;
     try {
-      if (await deps.retention.eraseThumbnail(thumbnail, before, (key) => deps.storage.remove(key)))
-        gone.set(thumbnail.creatorId, (gone.get(thumbnail.creatorId) ?? 0) + 1);
-    } catch (error) {
-      if (!(error instanceof ContentDropStorageUnavailable)) throw error;
-      // Held: the next hour tries again. Nothing to tell the agency, she is gone.
-      thumbnailsFailed += 1;
+      for (const thumbnail of due) {
+        try {
+          if (await deps.retention.eraseThumbnail(thumbnail, before, (key) => deps.storage.remove(key)))
+            count += 1;
+        } catch (error) {
+          if (!(error instanceof ContentDropStorageUnavailable)) throw error;
+          // Held: the next hour tries again. Nothing to tell the agency, she is gone.
+          thumbnailsFailed += 1;
+        }
+      }
+    } finally {
+      // Said as soon as her pictures are done, and even when the pass stops on her: what went is never unsaid.
+      if (count > 0) {
+        gone.set(creatorId, count);
+        await deps.retention.thumbnailsErased(creatorId, count);
+      }
     }
   }
-  for (const [creatorId, count] of gone) await deps.retention.thumbnailsErased(creatorId, count);
   const thumbnails = [...gone.values()].reduce((total, count) => total + count, 0);
   return { abandoned: abandoned.length, announced, erased, failed, thumbnails, thumbnailsFailed };
 }

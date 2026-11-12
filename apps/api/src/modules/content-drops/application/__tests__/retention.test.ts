@@ -157,10 +157,27 @@ describe('content-drops › content_drops.erase_originals', () => {
       'thumbnails archived before 2026-08-07T16:20:00.000Z',
       'thumbnail t1',
       'thumbnail t3',
-      'thumbnail t4',
       'audit ana 2',
+      'thumbnail t4',
       'audit cleo 1',
     ]);
+  });
+
+  it('says what already went when the pass stops on her, never after the whole run (ADR 0089 § 5)', async () => {
+    const thumbnail = (id: string): DueThumbnail => ({
+      mediaAssetId: id,
+      creatorId: 'ana',
+      thumbnailKey: `thumbnails/ana/${id}`,
+    });
+    const { log, deps } = fakes([], [], [thumbnail('t1'), thumbnail('t2')]);
+    const broken = {
+      ...deps,
+      storage: {
+        remove: (key: string) => (key.endsWith('t2') ? Promise.reject(new Error('bug')) : Promise.resolve()),
+      },
+    };
+    await expect(eraseOriginals(broken, NOW, 'job:1')).rejects.toThrow('bug');
+    expect(log.slice(-2)).toEqual(['thumbnail t1', 'audit ana 1']);
   });
 
   it('stops on any other failure: the next run takes it again', async () => {
