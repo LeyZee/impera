@@ -34,7 +34,7 @@ const plural = (n: number, one: string, many: string): string => `${String(n)} $
 
 /** « 7,40 € »: the AI spend is small, its cents matter. */
 const euroCents = (value: number): string =>
-  `${value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\\u00a0€`;
+  [value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), '€'].join(' ');
 
 /** « 1 min 40 » from minutes with a tenth; « 45 s » under a minute. */
 export function replyDelay(minutes: number): string {
