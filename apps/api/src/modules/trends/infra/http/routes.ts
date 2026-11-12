@@ -90,6 +90,8 @@ export function createTrendRoutes(
   },
   decide: DecideDeps,
   requireRole: RequireRole,
+  /** `requireRecentLogin` (ADR 0046 § 3): a link is a lasting credential, its creation asks for the password and a code. */
+  recentLogin: preValidationAsyncHookHandler,
 ): FastifyPluginAsyncZod {
   return (app) => {
     const person = { preValidation: requireRole('owner', 'operator', 'creator') };
@@ -111,7 +113,7 @@ export function createTrendRoutes(
     app.post(
       '/trends/extension-links',
       {
-        ...person,
+        preValidation: [person.preValidation, recentLogin],
         schema: { body: CreateExtensionLinkBodySchema, response: { 201: ExtensionLinkCreatedSchema } },
       },
       async (request, reply) => {

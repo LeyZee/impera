@@ -14,7 +14,7 @@ import {
   type CreatorId,
   type TrendCaptureDescription,
 } from '@impera/contracts';
-import { and, eq, schema } from '@impera/db';
+import { and, eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LlmGateway } from '@impera/llm';
 import { afterAll, afterEach, beforeAll, describe, expect, inject, it, vi } from 'vitest';
@@ -376,6 +376,21 @@ describe('/v1/trends', () => {
     expect(listed).toContain('Servi');
     expect(listed).not.toContain('Oublié');
     await call('DELETE', `/v1/trends/extension-links/${used.id}`, cookies.manager);
+  });
+
+  it('asks for the password and a code again before a new link, once the sign-in is over 10 minutes old', async () => {
+    const stale = sql`now() - interval '11 minutes'`;
+    await test.admin.db.update(schema.session).set({ reauthenticatedAt: stale });
+    try {
+      const refused = await call('POST', '/v1/trends/extension-links', cookies.manager, { label: 'Tardif' });
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json()).toMatchObject({ error: { code: 'reauthentication_forbidden' } });
+      expect((await liveLinks(cookies.manager)).map((item) => item.label)).not.toContain('Tardif');
+      // Seeing and unlinking stay open: closing a door never waits for a confirmation.
+      expect((await call('GET', '/v1/trends/extension-links', cookies.manager)).statusCode).toBe(200);
+    } finally {
+      await test.admin.db.update(schema.session).set({ reauthenticatedAt: sql`now()` });
+    }
   });
 
   it('takes a person’s links with the other sessions she closes (audit du 11/11)', async () => {

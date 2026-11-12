@@ -6,15 +6,19 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import {
+  err,
   ok,
   type DropMediaDescription,
   ContentDropFileIdSchema,
   ContentDropIdSchema,
   ContentDropSchema,
+  CreatorContentSchema,
   ContentRequestIdSchema,
   CreatorIdSchema,
   DROP_PART_BYTES,
   DROP_KEPT_DAYS,
+  DESCRIPTION_TRIES,
+  DropDescriptionsReviewSchema,
   DropFileUploadSchema,
   JOB_PAYLOADS,
   newId,
@@ -25,6 +29,7 @@ import { eq, inArray, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { DropSenseInput, LlmGateway } from '@impera/llm';
 import { AwsClient } from 'aws4fetch';
+import { strFromU8, unzipSync } from 'fflate';
 import { runOnce } from 'graphile-worker';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -128,10 +133,13 @@ const DESCRIBED: DropMediaDescription = {
   flags: [],
 };
 const seen: DropSenseInput[] = [];
+const vision = { fails: false };
 const dropVision: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'> = {
   promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
   describeDrop: (input) => {
     seen.push(input);
+    // Every model failing (a refusal of adult content, an outage): the gateway's own error.
+    if (vision.fails) return Promise.resolve(err({ code: 'all_models_failed', attempts: [] }));
     return Promise.resolve(
       ok({
         output: DESCRIBED,
@@ -605,6 +613,214 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     expect(seen).toHaveLength(1);
     expect(await descriptions()).toHaveLength(1);
     await test.admin.db.update(schema.creators).set({ settings: {} }).where(eq(schema.creators.id, nora));
+  });
+
+  it('gives a medium up after the vision’s tries, until her team asks again (recette créatrice, anomaly 2)', async () => {
+    const one = await dropOne('nora', jpegOf(MB, 30, 40, 0x6b));
+    await sendWhole(one);
+    await receive();
+    const [file] = await test.admin.db
+      .select({ mediaAssetId: schema.contentDropFiles.mediaAssetId })
+      .from(schema.contentDropFiles)
+      .where(eq(schema.contentDropFiles.id, one.fileId));
+    const mediaAssetId = file?.mediaAssetId ?? '';
+    const failures = async () => {
+      const [row] = await test.admin.db
+        .select({ n: schema.mediaAssets.descriptionFailures })
+        .from(schema.mediaAssets)
+        .where(eq(schema.mediaAssets.id, mediaAssetId));
+      return row?.n;
+    };
+    const queued = async () => {
+      const rows = await test.admin.db.execute(sql`
+        select j.attempts from graphile_worker._private_jobs j
+          join graphile_worker._private_tasks t on t.id = j.task_id
+         where t.identifier = 'content_drops.describe_file' and j.key = ${`content_drops.describe_file:${mediaAssetId}`}`);
+      return rows.rows.length;
+    };
+    const describe = () =>
+      runOnce({
+        pgPool: test.admin.pool,
+        taskList: { 'content_drops.describe_file': app.tasks['content_drops.describe_file'] },
+      });
+    const backlog = async () => {
+      await test.admin.db.execute(
+        sql`select public.enqueue_job(task => 'content_drops.describe_backlog', payload => '{}'::jsonb)`,
+      );
+      await runOnce({
+        pgPool: test.admin.pool,
+        taskList: { 'content_drops.describe_backlog': app.tasks['content_drops.describe_backlog'] },
+      });
+    };
+    const review = async () => {
+      const answer = await call('GET', `/v1/creators/${nora}/drops/${one.dropId}/descriptions`, 'manager');
+      expect(answer.statusCode, answer.body).toBe(200);
+      return DropDescriptionsReviewSchema.parse(answer.json());
+    };
+    await test.admin.db
+      .update(schema.creators)
+      .set({ settings: { describeDrops: true } })
+      .where(eq(schema.creators.id, nora));
+    vision.fails = true;
+
+    // A failed try is counted on the medium, and the job is tried again.
+    await describe();
+    expect(await failures()).toBe(1);
+    expect(await queued()).toBe(1);
+    expect((await review()).media[0]?.describeFailed).toBe(false);
+
+    // The last try: given up, nothing waits any more, and the hourly backlog leaves it alone.
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ descriptionFailures: DESCRIPTION_TRIES - 1 })
+      .where(eq(schema.mediaAssets.id, mediaAssetId));
+    await test.admin.db.execute(sql`update graphile_worker._private_jobs set run_at = now()`);
+    await describe();
+    expect(await failures()).toBe(DESCRIPTION_TRIES);
+    expect(await queued()).toBe(0);
+    await backlog();
+    expect(await queued()).toBe(0);
+    expect((await review()).media[0]).toMatchObject({ description: null, describeFailed: true });
+
+    // Asked again by her team (a chatter and she cannot): counted from nothing, enqueued now, audited; described.
+    const retry = (who: 'manager' | 'chatter' | 'nora') =>
+      call('POST', `/v1/creators/${nora}/drops/${one.dropId}/files/${one.fileId}/describe`, who);
+    expect((await retry('chatter')).statusCode).toBe(403);
+    expect((await retry('nora')).statusCode).toBe(403);
+    const asked = await retry('manager');
+    expect(asked.statusCode, asked.body).toBe(200);
+    expect(DropDescriptionsReviewSchema.parse(asked.json()).media[0]?.describeFailed).toBe(false);
+    expect([await failures(), await queued()]).toEqual([0, 1]);
+    vision.fails = false;
+    await describe();
+    expect((await review()).media[0]?.description?.author).toBe('sense');
+    const [audited] = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'media_description.retried'));
+    expect(audited).toBeDefined();
+    await test.admin.db.update(schema.creators).set({ settings: {} }).where(eq(schema.creators.id, nora));
+  });
+
+  it('takes a description written by hand on a medium the AI gave up, its words and its level (recette créatrice, anomaly 2)', async () => {
+    const one = await dropOne('nora', jpegOf(MB, 30, 40, 0x6c));
+    await sendWhole(one);
+    await receive();
+    const [file] = await test.admin.db
+      .select({ mediaAssetId: schema.contentDropFiles.mediaAssetId })
+      .from(schema.contentDropFiles)
+      .where(eq(schema.contentDropFiles.id, one.fileId));
+    const mediaAssetId = file?.mediaAssetId ?? '';
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ descriptionFailures: DESCRIPTION_TRIES })
+      .where(eq(schema.mediaAssets.id, mediaAssetId));
+    const write = (who: 'manager' | 'chatter' | 'nora', body: object) =>
+      call('POST', `/v1/creators/${nora}/drops/${one.dropId}/files/${one.fileId}/description`, who, body);
+    const words = 'Elle est assise au bord du lit, en nuisette noire, et regarde l’objectif en souriant.';
+
+    // Her team's alone; a level a human who saw it never says is refused.
+    expect((await write('chatter', { detailed: words, intensity: 'soft' })).statusCode).toBe(403);
+    expect((await write('nora', { detailed: words, intensity: 'soft' })).statusCode).toBe(403);
+    expect((await write('manager', { detailed: words, intensity: 'not_visible' })).statusCode).toBe(400);
+    expect((await write('manager', { detailed: '   ', intensity: 'soft' })).statusCode).toBe(400);
+
+    const written = await write('manager', { detailed: `  ${words} `, intensity: 'suggestive' });
+    expect(written.statusCode, written.body).toBe(200);
+    const medium = DropDescriptionsReviewSchema.parse(written.json()).media[0];
+    expect(medium).toMatchObject({
+      describeFailed: false,
+      description: { author: 'hand', detailed: words },
+    });
+    expect(medium?.description?.validatedAt).not.toBeNull();
+
+    // The level picked, every other label « not seen »; written once, audited.
+    const [row] = await test.admin.db
+      .select({ content: schema.mediaDescriptions.content, by: schema.mediaDescriptions.validatedBy })
+      .from(schema.mediaDescriptions)
+      .where(eq(schema.mediaDescriptions.mediaAssetId, mediaAssetId));
+    expect(row?.by).not.toBeNull();
+    expect(row?.content).toMatchObject({
+      intensity: 'suggestive',
+      castMode: 'not_visible',
+      anatomyVisible: [],
+      mood: [],
+      flags: [],
+      factualDescription: words,
+    });
+    const again = await write('manager', { detailed: words, intensity: 'soft' });
+    expect(again.statusCode, again.body).toBe(409);
+    const [audited] = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'media_description.written'));
+    expect(audited).toBeDefined();
+
+    // « Réessayer » has nothing left to ask: the medium is described.
+    const retried = await call(
+      'POST',
+      `/v1/creators/${nora}/drops/${one.dropId}/files/${one.fileId}/describe`,
+      'manager',
+    );
+    expect(DropDescriptionsReviewSchema.parse(retried.json()).media[0]?.description?.author).toBe('hand');
+  });
+
+  it('gives the agency her feed drop as a ZIP, then takes « Publié » once: her originals go 30 days later (recette créatrice, anomaly 1)', async () => {
+    const one = await dropOne('nora', jpegOf(MB, 30, 40, 0x7d));
+    const url = `/v1/creators/${nora}/drops/${one.dropId}/export`;
+    // Still being sent: not yet.
+    const early = await call('GET', url, 'manager');
+    expect(early.statusCode, early.body).toBe(422);
+    expect(early.json()).toMatchObject({ error: { details: { reason: 'not_ready' } } });
+    await sendWhole(one);
+    await receive();
+
+    // Her team's alone.
+    expect((await call('GET', url, 'chatter')).statusCode).toBe(403);
+    expect((await call('GET', url, 'nora')).statusCode).toBe(403);
+    expect((await call('POST', `${url}/confirm`, 'chatter')).statusCode).toBe(403);
+    const archive = await call('GET', url, 'manager');
+    expect(archive.statusCode, archive.body).toBe(200);
+    expect(archive.headers['content-type']).toBe('application/zip');
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: PARIS }).format(new Date());
+    const folder = `feed-seance-${day}`;
+    expect(archive.headers['content-disposition']).toBe(`attachment; filename="${folder}.zip"`);
+    const entries = unzipSync(new Uint8Array(archive.rawPayload));
+    expect(Object.keys(entries)).toEqual([`${folder}/00-fiche.txt`, `${folder}/01-photo.jpg`]);
+    const sheet = strFromU8(entries[`${folder}/00-fiche.txt`] ?? new Uint8Array());
+    expect(sheet.split('\n').slice(0, 4)).toEqual([
+      `Feed · Séance boudoir du ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: PARIS }).format(new Date())}`,
+      '',
+      'À publier sur son feed Reveal, en une seule publication, dans cet ordre.',
+      '',
+    ]);
+    expect(sheet).toContain('01-photo.jpg');
+
+    const before = Date.now();
+    const confirmed = await call('POST', `${url}/confirm`, 'manager');
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    const drop = ContentDropSchema.parse(confirmed.json());
+    expect(drop.exportedAt).not.toBeNull();
+    const [kept] = await test.admin.db
+      .select({ expiresAt: schema.mediaAssets.expiresAt })
+      .from(schema.contentDropFiles)
+      .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.contentDropFiles.mediaAssetId))
+      .where(eq(schema.contentDropFiles.id, one.fileId));
+    const days30 = 30 * 86_400_000;
+    expect(kept?.expiresAt?.getTime()).toBeGreaterThanOrEqual(before + days30 - 1000);
+    expect(kept?.expiresAt?.getTime()).toBeLessThanOrEqual(Date.now() + days30 + 1000);
+    // Replayed: the same date, one audit line; she reads it out.
+    const again = ContentDropSchema.parse((await call('POST', `${url}/confirm`, 'manager')).json());
+    expect(again.exportedAt).toBe(drop.exportedAt);
+    const audit = await test.admin.db
+      .select({ details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, one.dropId));
+    expect(audit.map((line) => line.details)).toEqual([
+      expect.objectContaining({ category: 'feed_shoot', originals: 1 }),
+    ]);
+    const hers = CreatorContentSchema.parse((await call('GET', '/v1/creator-space/content', 'nora')).json());
+    expect(hers.drops.find((mine) => mine.id === one.dropId)?.exportedAt).toBe(drop.exportedAt);
   });
 
   it('takes no more bytes once her drop is withdrawn, and the job erases what had arrived', async () => {
