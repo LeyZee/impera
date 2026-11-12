@@ -453,8 +453,15 @@ describe('playground session, the offer policy and the cursor', () => {
   it('counts his reply speed on the simulated clock, as production does (P3-12)', async () => {
     const quick = session([], true);
     await quick.handleFanMessage('Salut toi');
+    quick.advance(60_000);
     const fast = await quick.handleFanMessage('Je suis là');
     expect(fast.desire?.signals).toContain('quick_reply');
+
+    // The clock did not move: his speed is not measured, or every message would count as a quick reply.
+    const still = session([], true);
+    await still.handleFanMessage('Salut toi');
+    const unmeasured = await still.handleFanMessage('Je suis là');
+    expect(unmeasured.desire?.signals).not.toContain('quick_reply');
 
     const slow = session([], true);
     await slow.handleFanMessage('Salut toi');

@@ -14,6 +14,7 @@ import {
   type GuardViolation,
   type FollowUpDecision,
   measureDesire,
+  type DesireMeasure,
   type DesireState,
   type OfferInput,
   type OfferLimits,
@@ -178,6 +179,22 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           flags: ageConfirmedAt === null ? {} : { ageConfirmedAt: ageConfirmedAt.toISOString() },
           limits: deps.offerLimits,
         };
+
+  /**
+   * What code measures of his heat, each turn at its time on the simulated clock. The clock moves only when the trainer
+   * advances it: a reply at the very time of hers says nothing of his speed (he would get `quick_reply` on every
+   * message), so his reply speed counts only once the clock moved between her message and his.
+   */
+  const measuredOnClock = (): DesireMeasure => {
+    const measured = measureDesire(
+      history.map((t) => ({
+        fromFan: t.from === 'fan',
+        text: t.text,
+        at: writtenAt.get(t) ?? situation.now,
+      })),
+    );
+    return measured.replySeconds === 0 ? { ...measured, replySeconds: null } : measured;
+  };
 
   return {
     history,
@@ -356,14 +373,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           }),
           desire: {
             ...(desire !== undefined && { previous: desire }),
-            // Each turn at its time on the simulated clock: advance it between messages to test a slow reply.
-            measured: measureDesire(
-              history.map((t) => ({
-                fromFan: t.from === 'fan',
-                text: t.text,
-                at: writtenAt.get(t) ?? situation.now,
-              })),
-            ),
+            measured: measuredOnClock(),
             ageDisputed: false,
             counted: false,
           },

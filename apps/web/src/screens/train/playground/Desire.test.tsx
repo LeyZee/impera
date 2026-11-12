@@ -25,6 +25,11 @@ describe('desire in the playground', () => {
     expect(screen.getAllByText('−30')).toHaveLength(2);
   });
 
+  it('says a first score in a word', () => {
+    render(<DesireTag desire={{ ...DESIRE, before: null, score: 0, signals: [] }} />);
+    expect(screen.getByRole('button').textContent).toBe('Désir 0première note');
+  });
+
   it('says when nothing moved, and gives no points to a reset', () => {
     render(<DesireTag desire={{ ...DESIRE, before: 40, signals: [] }} />);
     fireEvent.click(screen.getByRole('button'));

@@ -270,9 +270,11 @@ describe('/v1/playground', () => {
     const first = PlaygroundAnswerSchema.parse((await post('/messages', { text: 'Salut' })).json());
     expect(first.desire).toMatchObject({ before: null, score: 0, band: 'neutral', signals: [] });
     await post('/rating', { verdict: { kind: 'validated' } });
-    const answer = PlaygroundAnswerSchema.parse((await post('/messages', { text: 'Ça va ?' })).json());
-    // He answers her at once: the quick reply counts, with its points from the code.
-    expect(answer.desire?.signals).toContainEqual({ signal: 'quick_reply', points: 4 });
+    const answer = PlaygroundAnswerSchema.parse(
+      (await post('/messages', { text: 'Ça va ? Je sors à peine du travail, longue journée' })).json(),
+    );
+    // A message much longer than his first: the long reply counts, with its points from the code.
+    expect(answer.desire?.signals).toContainEqual({ signal: 'long_reply', points: 5 });
     const state = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
     expect(state.history.filter((turn) => turn.from === 'fan').map((turn) => turn.desire)).toEqual([
       first.desire,

@@ -62,7 +62,8 @@ export function DesireTag({ desire }: { desire: PlaygroundDesire }): JSX.Element
         }}
       >
         Désir <b>{desire.score}</b>
-        <span>{movementOf(desire)}</span>
+        {/* His first score has nothing to move from: said in a word, never « Première note : 0 » after the 0. */}
+        <span>{desire.before === null ? 'première note' : movementOf(desire)}</span>
       </button>
       {open ? (
         lines.length === 0 ? (

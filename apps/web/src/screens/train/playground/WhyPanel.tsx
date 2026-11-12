@@ -115,6 +115,11 @@ export function WhyPanel({
               </Sec>
             </>
           )}
+          {answer.desire === undefined ? null : (
+            <Sec label="Désir du fan">
+              <DesireGauge desire={answer.desire} thresholds={state.desireThresholds} />
+            </Sec>
+          )}
           {answer.offerRefused === undefined ? null : (
             <Sec label="Offre refusée">
               <p className="pg-why__refused">
@@ -123,11 +128,6 @@ export function WhyPanel({
             </Sec>
           )}
           {answer.cursor === undefined ? null : <Sec label="Curseur">{answer.cursor.label}</Sec>}
-          {answer.desire === undefined ? null : (
-            <Sec label="Désir du fan">
-              <DesireGauge desire={answer.desire} thresholds={state.desireThresholds} />
-            </Sec>
-          )}
           {risks.length > 0 ? (
             <Sec label="Risques">
               <ul className="pg-list">

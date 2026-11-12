@@ -358,7 +358,6 @@ function describe(media: PlaygroundMedia): MediaDescription {
 function demoDesire(history: readonly Omit<Turn, 'index'>[], text: string): PlaygroundDesire {
   const previous = history.findLast((t) => t.from === 'fan')?.desire;
   const signals: PlaygroundDesire['signals'] = [
-    ...(previous === undefined ? [] : [{ signal: 'quick_reply' as const, points: 4 }]),
     ...(/envie|chaud|bonne|excit/i.test(text) ? [{ signal: 'states_desire' as const, points: 12 }] : []),
     ...(/boulot|travail|occup/i.test(text) ? [{ signal: 'busy_now' as const, points: -30 }] : []),
   ];
