@@ -1,19 +1,18 @@
 -- ADR 0098: a script of her catalogue run with one fan, step by step (`script_runs`), written by the agent in her tenant
 -- (withTenant, nirvana_app) and never deleted; and the two events of a step, opened or refused. At most one open run per
--- conversation, and a script never runs twice with the same fan. `script_id` is the script's id as the scripts module
--- gives it today, one plain column so that it can follow the script identity Médias settles.
+-- conversation. Its decision state only: what was sent and bought to him is Reveal's history (ADR 0018 § 5), read before
+-- any decision. `script_ref` is the platform's script, one plain column so that it can follow the identity Médias settles.
 CREATE TABLE "script_runs" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"creator_id" uuid NOT NULL,
 	"conversation_id" uuid NOT NULL,
-	"script_id" text NOT NULL,
+	"script_ref" text NOT NULL,
 	"status" text DEFAULT 'open' NOT NULL,
 	"steps" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"ignored_messages" integer DEFAULT 0 NOT NULL,
 	"started_at" timestamp with time zone NOT NULL,
 	"ended_at" timestamp with time zone,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "script_runs_played_unique" UNIQUE("conversation_id","script_id"),
 	CONSTRAINT "script_runs_status_check" CHECK ("script_runs"."status" in ('open', 'bought_out', 'refused', 'stalled', 'closed_by_human')),
 	CONSTRAINT "script_runs_steps_check" CHECK (jsonb_typeof("script_runs"."steps") = 'array'),
 	CONSTRAINT "script_runs_ignored_messages_check" CHECK ("script_runs"."ignored_messages" >= 0),
@@ -22,7 +21,7 @@ CREATE TABLE "script_runs" (
 --> statement-breakpoint
 ALTER TABLE "script_runs" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "script_runs" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
--- Never deleted: a run is history (a script never replays to the same fan).
+-- Never deleted: an ended run is history.
 REVOKE ALL ON "script_runs" FROM nirvana_app;--> statement-breakpoint
 GRANT SELECT, INSERT, UPDATE ON "script_runs" TO nirvana_app;--> statement-breakpoint
 ALTER TABLE "conversation_events" DROP CONSTRAINT "conversation_events_type_check";--> statement-breakpoint

@@ -72,13 +72,14 @@ drafts               id, creator_id, conversation_id, status (pending|approved|e
                      idempotency_key, created_at
                      placed_by / placed_at : le chatteur l'a mis dans le champ de la plateforme depuis le panneau copilote
                      (ADR 0086 § 4, migration 0149), les deux ensemble ; le statut ne bouge pas, ce qui part décide (§ 5).
-script_runs          id, creator_id, conversation_id, script_id (le script, par l'id que le module scripts donne aujourd'hui,
-                     une colonne sans clé étrangère), status (open|bought_out|refused|stalled|closed_by_human),
-                     steps jsonb (les étapes parties, dans l'ordre : key, kind free|paid|bridge, outcome
-                     sent|opened|bought|refused, priceCents, sentAt, at), ignored_messages, started_at, ended_at (nul
+script_runs          id, creator_id, conversation_id, script_ref (le script de la plateforme, une colonne sans clé
+                     étrangère), status (open|bought_out|refused|stalled|closed_by_human),
+                     steps jsonb (l'état de décision par étape, dans l'ordre : stepIndex, kind free|paid|bridge, outcome
+                     sent|opened|bought|refused, priceMinor, sentAt, at), ignored_messages, started_at, ended_at (nul
                      tant qu'il est ouvert), updated_at
-                     UNIQUE (conversation_id, script_id) : un script ne se rejoue jamais au même fan ; un seul ouvert
-                     par conversation (index partiel). Jamais supprimé par nirvana_app (ADR 0098, migration 0171).
+                     L'état de décision seulement : ce qui est parti ou acheté se lit dans getScriptHistory (ADR 0018
+                     § 5), qui gagne à la réconciliation. Un seul ouvert par conversation (index partiel). Jamais
+                     supprimé par nirvana_app (ADR 0098, migration 0171).
 blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_id (nullable), rate_per_mille (0 à 1000, 800 = 80 %), recorded_by,
                      recorded_at      (append-only : ni UPDATE ni DELETE pour nirvana_app)
                      Le test à l'aveugle d'une version de la voix et de la persona active (ADR 0019, 0022) ; le dernier

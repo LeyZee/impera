@@ -6,66 +6,87 @@ import type { DayPart } from './situation';
 /**
  * The run of a script with one fan (ADR 0098): the code keeps where he is, chooses the next step and its price, and
  * the voice only says them. Pure: a run and an event give the next run; a run and the moment give one closed decision.
+ * What was already sent or bought to him is Reveal's to say (`getScriptHistory`, ADR 0018 § 5): a run holds only its
+ * decision state, and is reconciled with that history before any decision.
  */
 
-interface CatalogueStep {
-  /** Its segment key (ADR 0056): never changes, whatever its number. */
-  readonly key: string;
+/** A step of a platform script as the agent reads it: offered (no price), paid, or a bridge (offered). */
+interface PlatformScriptStepView {
   readonly kind: ScriptStepKind;
-  /** The catalogue's price, in cents, for a paid step only; `null` for an offered step or a bridge. */
-  readonly priceCents: number | null;
+  /** The platform's price in minor units, for a paid step only; `null` for an offered step or a bridge. */
+  readonly priceMinor: number | null;
 }
 
-/** A script of her catalogue (P6-01): what a run reads, never the workshop's structure alone (ADR 0098 § 13). */
-export interface CatalogueScript {
-  readonly id: string;
-  /** Jour, Nuit, or both, on her clock. */
-  readonly moment: DayPart | 'both';
+/**
+ * A script of her catalogue (`listPlatformScripts()`, ADR 0018 § 5, P6-01), as the agent reads it: a step is known by
+ * its index (`stepIndex`), what the platform sends by.
+ */
+export interface PlatformScriptView {
+  readonly scriptRef: string;
+  /** Jour or Nuit on her clock; `null`, either. */
+  readonly moment: DayPart | null;
   /** What the run is about, for the brain to pick the one that fits him (ADR 0098 § 6). */
   readonly description: string;
-  readonly steps: readonly CatalogueStep[];
+  readonly steps: readonly PlatformScriptStepView[];
   /** Every media of every step described and validated (ADR 0083). */
   readonly mediaValidated: boolean;
   /** Something in it touches a limit of her persona. */
   readonly touchesLimits: boolean;
 }
 
-export type CatalogueScriptFault =
-  | 'no_step'
-  | 'duplicate_key'
-  | 'paid_without_price'
-  | 'price_on_free_step'
-  | 'bridge_at_edge'
-  | 'starts_with_bridge';
+type PlatformScriptFault =
+  'no_step' | 'paid_without_price' | 'price_on_free_step' | 'bridge_at_edge' | 'starts_with_bridge';
 
-/** What makes a catalogue script unplayable: such a script is never offered. Empty: it is playable. */
-export function catalogueScriptFaults(script: CatalogueScript): CatalogueScriptFault[] {
-  const faults: CatalogueScriptFault[] = [];
+/** What makes a script unplayable: such a script is never offered. Empty: it is playable. */
+export function platformScriptFaults(script: PlatformScriptView): PlatformScriptFault[] {
+  const faults: PlatformScriptFault[] = [];
   const { steps } = script;
   if (steps.length === 0) return ['no_step'];
-  if (new Set(steps.map((step) => step.key)).size !== steps.length) faults.push('duplicate_key');
   for (const step of steps) {
-    if (step.kind === 'paid' && (step.priceCents === null || step.priceCents <= 0))
+    if (step.kind === 'paid' && (step.priceMinor === null || step.priceMinor <= 0))
       faults.push('paid_without_price');
-    if (step.kind !== 'paid' && step.priceCents !== null) faults.push('price_on_free_step');
+    if (step.kind !== 'paid' && step.priceMinor !== null) faults.push('price_on_free_step');
   }
   if (steps[0]?.kind === 'bridge') faults.push('starts_with_bridge');
   if (steps.at(-1)?.kind === 'bridge') faults.push('bridge_at_edge');
   return faults;
 }
 
+/**
+ * What Reveal says was sent to him and what he bought (`getScriptHistory(fanRef)`, ADR 0018 § 5), per script and step
+ * index: the only source of truth for « already sent ». Its exact shape follows the capture; this is what the agent
+ * needs of it.
+ */
+export interface ScriptHistoryView {
+  readonly scripts: readonly {
+    readonly scriptRef: string;
+    readonly sentStepIndexes: readonly number[];
+    readonly boughtStepIndexes: readonly number[];
+  }[];
+}
+
+/** Every script Reveal says was already sent to him, a step at least: never replayed (§ 1). */
+export function playedScriptRefs(history: ScriptHistoryView): ReadonlySet<string> {
+  return new Set(
+    history.scripts
+      .filter((script) => script.sentStepIndexes.length > 0 || script.boughtStepIndexes.length > 0)
+      .map((script) => script.scriptRef),
+  );
+}
+
 interface StepRecord {
-  readonly key: string;
+  readonly stepIndex: number;
   readonly kind: ScriptStepKind;
   readonly outcome: ScriptStepOutcome;
-  readonly priceCents: number | null;
+  /** The price the decision was taken at; checked against the platform's at sending (`stepPriceCheck`). */
+  readonly priceMinor: number | null;
   readonly sentAt: Date;
   /** When the outcome last changed. */
   readonly at: Date;
 }
 
 export interface ScriptRun {
-  readonly scriptId: string;
+  readonly scriptRef: string;
   readonly status: ScriptRunStatus;
   /** The steps sent, in order; the last one is the current step. */
   readonly steps: readonly StepRecord[];
@@ -76,9 +97,9 @@ export interface ScriptRun {
 }
 
 export type ScriptRunEvent =
-  | { readonly type: 'step_sent'; readonly key: string; readonly at: Date }
-  | { readonly type: 'step_opened'; readonly key: string; readonly at: Date }
-  | { readonly type: 'step_bought'; readonly key: string; readonly at: Date }
+  | { readonly type: 'step_sent'; readonly stepIndex: number; readonly at: Date }
+  | { readonly type: 'step_opened'; readonly stepIndex: number; readonly at: Date }
+  | { readonly type: 'step_bought'; readonly stepIndex: number; readonly at: Date }
   /** The brain read a clear refusal of the step waiting. */
   | { readonly type: 'refused'; readonly at: Date }
   /** One message of his; `aboutTheStep`: the brain read that it answers the step waiting. */
@@ -91,14 +112,14 @@ export type ScriptRunEvent =
 
 type ScriptRunFault = 'run_closed' | 'not_next_step' | 'unknown_step' | 'nothing_waiting' | 'not_paid';
 
-export type ScriptRunResult =
+type ScriptRunResult =
   { readonly ok: true; readonly run: ScriptRun } | { readonly ok: false; readonly fault: ScriptRunFault };
 
 const IGNORED_MESSAGES_FOR_REFUSAL = 2;
 
 /** A new run, its first step not sent yet. */
-export function openScriptRun(scriptId: string, at: Date): ScriptRun {
-  return { scriptId, status: 'open', steps: [], ignoredMessages: 0, startedAt: at, endedAt: null };
+export function openScriptRun(scriptRef: string, at: Date): ScriptRun {
+  return { scriptRef, status: 'open', steps: [], ignoredMessages: 0, startedAt: at, endedAt: null };
 }
 
 const current = (run: ScriptRun): StepRecord | undefined => run.steps.at(-1);
@@ -109,16 +130,14 @@ const paidWaiting = (run: ScriptRun): StepRecord | undefined => {
   return step?.kind === 'paid' && (step.outcome === 'sent' || step.outcome === 'opened') ? step : undefined;
 };
 
-/** The step that comes after what was sent, if the last one lets it go (§ 3, § 8). `undefined`: none may go now. */
-function nextStepOf(run: ScriptRun, script: CatalogueScript): CatalogueStep | 'done' | undefined {
+/** The index of the step that comes after what was sent, if the last one lets it go (§ 3, § 8). */
+function nextStepIndex(run: ScriptRun, script: PlatformScriptView): number | 'done' | undefined {
   const last = current(run);
-  if (last === undefined) return script.steps[0];
-  // A paid step goes on only once bought; an offered step or a bridge once sent (a bridge after an offered step too).
-  if (last.kind === 'paid' && last.outcome !== 'bought') return undefined;
+  if (last === undefined) return 0;
+  // A paid step goes on only once bought; an offered step or a bridge once sent.
   if (last.outcome === 'refused') return undefined;
-  const index = script.steps.findIndex((step) => step.key === last.key);
-  if (index < 0) return undefined;
-  return script.steps[index + 1] ?? 'done';
+  if (last.kind === 'paid' && last.outcome !== 'bought') return undefined;
+  return last.stepIndex + 1 < script.steps.length ? last.stepIndex + 1 : 'done';
 }
 
 const withLast = (run: ScriptRun, change: (step: StepRecord) => StepRecord): ScriptRun => {
@@ -137,20 +156,20 @@ const ended = (run: ScriptRun, status: Exclude<ScriptRunStatus, 'open'>, at: Dat
 /** The run after one event; a fault leaves it as it was (the caller logs it, never forces it). */
 export function applyScriptRunEvent(
   run: ScriptRun,
-  script: CatalogueScript,
+  script: PlatformScriptView,
   event: ScriptRunEvent,
 ): ScriptRunResult {
   if (run.status !== 'open') return { ok: false, fault: 'run_closed' };
   switch (event.type) {
     case 'step_sent': {
-      const next = nextStepOf(run, script);
-      if (next === undefined || next === 'done' || next.key !== event.key)
-        return { ok: false, fault: 'not_next_step' };
+      const next = nextStepIndex(run, script);
+      const step = typeof next === 'number' ? script.steps[next] : undefined;
+      if (step === undefined || next !== event.stepIndex) return { ok: false, fault: 'not_next_step' };
       const record: StepRecord = {
-        key: next.key,
-        kind: next.kind,
+        stepIndex: event.stepIndex,
+        kind: step.kind,
         outcome: 'sent',
-        priceCents: next.priceCents,
+        priceMinor: step.priceMinor,
         sentAt: event.at,
         at: event.at,
       };
@@ -158,20 +177,20 @@ export function applyScriptRunEvent(
     }
     case 'step_opened': {
       const last = current(run);
-      if (last?.key !== event.key) return { ok: false, fault: 'unknown_step' };
+      if (last?.stepIndex !== event.stepIndex) return { ok: false, fault: 'unknown_step' };
       if (last.outcome !== 'sent') return { ok: true, run };
       return { ok: true, run: withLast(run, (step) => ({ ...step, outcome: 'opened', at: event.at })) };
     }
     case 'step_bought': {
       const last = current(run);
-      if (last?.key !== event.key) return { ok: false, fault: 'unknown_step' };
+      if (last?.stepIndex !== event.stepIndex) return { ok: false, fault: 'unknown_step' };
       if (last.kind !== 'paid') return { ok: false, fault: 'not_paid' };
       if (last.outcome === 'bought') return { ok: true, run };
       const bought = withLast(run, (step) => ({ ...step, outcome: 'bought', at: event.at }));
       const after = { ...bought, ignoredMessages: 0 };
       return {
         ok: true,
-        run: nextStepOf(after, script) === 'done' ? ended(after, 'bought_out', event.at) : after,
+        run: nextStepIndex(after, script) === 'done' ? ended(after, 'bought_out', event.at) : after,
       };
     }
     case 'refused': {
@@ -202,40 +221,105 @@ function refuse(run: ScriptRun, at: Date): ScriptRun {
   );
 }
 
+/**
+ * The run as Reveal's history says it is, before any decision (ADR 0018 § 5): where they disagree on what was sent or
+ * bought, Reveal wins. A step Reveal says was sent and the run missed joins it (sent at `at`); one the run thinks sent
+ * and Reveal does not know leaves it, so that it is decided again and sent under the same idempotency key; a step
+ * Reveal says bought is bought. An ended run is left as it is: its refusal, stall or human's hand are its own, which
+ * Reveal does not know, and what was sent to him is read from the history itself (`playedScriptRefs`).
+ */
+export function reconcileScriptRun(
+  run: ScriptRun,
+  script: PlatformScriptView,
+  history: ScriptHistoryView,
+  at: Date,
+): ScriptRun {
+  if (run.status !== 'open') return run;
+  const seen = history.scripts.find((entry) => entry.scriptRef === run.scriptRef);
+  const bought = new Set(seen?.boughtStepIndexes ?? []);
+  const sent = new Set([...(seen?.sentStepIndexes ?? []), ...bought]);
+  const lastSent = Math.max(-1, ...[...sent].filter((index) => index < script.steps.length));
+  const byIndex = new Map(run.steps.map((step) => [step.stepIndex, step]));
+  const steps: StepRecord[] = [];
+  for (let index = 0; index <= lastSent; index += 1) {
+    const step = script.steps[index];
+    if (step === undefined) break;
+    const known = byIndex.get(index);
+    const outcome: ScriptStepOutcome =
+      bought.has(index) && step.kind === 'paid' ? 'bought' : (known?.outcome ?? 'sent');
+    steps.push({
+      stepIndex: index,
+      kind: step.kind,
+      outcome,
+      priceMinor: known?.priceMinor ?? step.priceMinor,
+      sentAt: known?.sentAt ?? at,
+      at: known?.outcome === outcome ? known.at : at,
+    });
+  }
+  const reconciled = { ...run, steps };
+  if (nextStepIndex(reconciled, script) === 'done' && current(reconciled)?.outcome === 'bought') {
+    return ended(reconciled, 'bought_out', at);
+  }
+  return reconciled;
+}
+
 /** Whether every step of an open run is held (§ 7): sales frozen, a fragile fan, one not to write to, or care mode. */
 export function scriptStepsHeld(flags: FanFlags, careMode: boolean): boolean {
   return careMode || flags.salesFrozen !== undefined || flags.fragile === true || flags.doNotContact === true;
 }
 
 /**
- * The scripts she may open with him (§ 6): of her moment on her clock, never played to him, every media validated,
- * nothing that touches her limits, and playable. The brain picks among these only.
+ * The scripts she may open with him (§ 6): of her moment on her clock, never sent to him by Reveal's history, every
+ * media validated, nothing that touches her limits, and playable. The brain picks among these only.
  */
 export function permittedScripts(
-  catalogue: readonly CatalogueScript[],
-  options: { readonly moment: DayPart; readonly playedScriptIds: ReadonlySet<string> },
-): CatalogueScript[] {
+  catalogue: readonly PlatformScriptView[],
+  options: { readonly moment: DayPart; readonly played: ReadonlySet<string> },
+): PlatformScriptView[] {
   return catalogue.filter(
     (script) =>
-      (script.moment === 'both' || script.moment === options.moment) &&
-      !options.playedScriptIds.has(script.id) &&
+      (script.moment === null || script.moment === options.moment) &&
+      !options.played.has(script.scriptRef) &&
       script.mediaValidated &&
       !script.touchesLimits &&
-      catalogueScriptFaults(script).length === 0,
+      platformScriptFaults(script).length === 0,
   );
+}
+
+/** What goes to `sendScriptStep(conversationRef, scriptRef, stepIndex, key)`, with the price it was decided at. */
+interface ScriptStepToSend {
+  readonly scriptRef: string;
+  readonly stepIndex: number;
+  readonly kind: ScriptStepKind;
+  readonly priceMinor: number | null;
+  /** One key per conversation, script and step: a replay never sends twice (ADR 0018 § 5). */
+  readonly idempotencyKey: string;
+}
+
+/**
+ * The price decided against the platform's at sending: a step whose price changed on Reveal is never sent, it is an
+ * alert for the team (ADR 0098 § 5).
+ */
+export function stepPriceCheck(
+  decided: Pick<ScriptStepToSend, 'priceMinor'>,
+  platform: PlatformScriptStepView,
+): 'send' | 'price_mismatch' {
+  return decided.priceMinor === platform.priceMinor ? 'send' : 'price_mismatch';
 }
 
 export interface NextScriptStepInput {
   readonly now: Date;
-  /** His latest run, open or ended, with its script; `null` when he never had one. */
-  readonly latest: { readonly run: ScriptRun; readonly script: CatalogueScript } | null;
-  readonly catalogue: readonly CatalogueScript[];
-  /** Every script ever run with him, whatever became of it: never replayed (§ 1). */
-  readonly playedScriptIds: ReadonlySet<string>;
+  /** The conversation on the platform: the idempotency key of a step names it. */
+  readonly conversationRef: string;
+  /** His latest run, open or ended, already reconciled with `history`, and its script; `null` when he never had one. */
+  readonly latest: { readonly run: ScriptRun; readonly script: PlatformScriptView } | null;
+  readonly catalogue: readonly PlatformScriptView[];
+  /** Reveal's history of his scripts; `null` when it could not be read: then nothing is sold (ADR 0018 § 5). */
+  readonly history: ScriptHistoryView | null;
   readonly moment: DayPart;
   /** His desire still at or above her opening score: the next step goes only in the same hot session (§ 12). */
   readonly hotSession: boolean;
-  /** The brain's pick among the permitted scripts, by its id; `null` when it picked none. */
+  /** The brain's pick among the permitted scripts, by its ref; `null` when it picked none. */
   readonly brainPick: string | null;
   /** The policy's context; `lastOfferAt` is her last paid step to him, whatever the run. */
   readonly offer: OfferContext;
@@ -243,12 +327,12 @@ export interface NextScriptStepInput {
   readonly careMode: boolean;
 }
 
-type NoScriptReason = OfferBlock | 'held' | 'no_script' | 'no_pick' | 'cold_session';
+type NoScriptReason = OfferBlock | 'held' | 'no_history' | 'no_script' | 'no_pick' | 'cold_session';
 
-export type ScriptStepDecision =
+type ScriptStepDecision =
   | { readonly kind: 'none'; readonly reason: NoScriptReason }
-  | { readonly kind: 'start'; readonly script: CatalogueScript; readonly step: CatalogueStep }
-  | { readonly kind: 'send_step'; readonly step: CatalogueStep }
+  | { readonly kind: 'start'; readonly script: PlatformScriptView; readonly step: ScriptStepToSend }
+  | { readonly kind: 'send_step'; readonly step: ScriptStepToSend }
   | { readonly kind: 'wait'; readonly step: StepRecord }
   | { readonly kind: 'after_refusal'; readonly step: StepRecord }
   | { readonly kind: 'end'; readonly status: Exclude<ScriptRunStatus, 'open' | 'refused'> };
@@ -259,14 +343,31 @@ const later = (a: Date | null, b: Date | null): Date | null => {
   return a.getTime() >= b.getTime() ? a : b;
 };
 
+function toSend(
+  conversationRef: string,
+  script: PlatformScriptView,
+  stepIndex: number,
+): ScriptStepToSend | null {
+  const step = script.steps[stepIndex];
+  if (step === undefined) return null;
+  return {
+    scriptRef: script.scriptRef,
+    stepIndex,
+    kind: step.kind,
+    priceMinor: step.priceMinor,
+    idempotencyKey: `script-step:${conversationRef}:${script.scriptRef}:${String(stepIndex)}`,
+  };
+}
+
 /**
  * What she does with scripts on his message (§ 4): one closed decision, from the run, the policy and the moment. A run
  * that ended at this very message says so once (`end`, or `after_refusal` after a refusal); after that, a new script
- * may open, through the policy like any first one.
+ * may open, through the policy like any first one. Without Reveal's history, nothing is sold.
  */
 export function nextScriptStep(input: NextScriptStepInput): ScriptStepDecision {
-  const { latest } = input;
-  if (latest === null) return startDecision(input);
+  const { history, latest } = input;
+  if (history === null) return { kind: 'none', reason: 'no_history' };
+  if (latest === null) return startDecision(input, history);
   const { run, script } = latest;
   const status = run.status;
   if (status === 'open') return nextInOpenRun(input, run, script);
@@ -275,33 +376,32 @@ export function nextScriptStep(input: NextScriptStepInput): ScriptStepDecision {
     if (status !== 'refused') return { kind: 'end', status };
     if (last !== undefined) return { kind: 'after_refusal', step: last };
   }
-  return startDecision(input);
+  return startDecision(input, history);
 }
 
 function nextInOpenRun(
   input: NextScriptStepInput,
   run: ScriptRun,
-  script: CatalogueScript,
+  script: PlatformScriptView,
 ): ScriptStepDecision {
   const last = current(run);
-  if (last !== undefined && (last.outcome === 'sent' || last.outcome === 'opened') && last.kind === 'paid') {
-    return { kind: 'wait', step: last };
-  }
-  const next = nextStepOf(run, script);
+  if (last !== undefined && paidWaiting(run) !== undefined) return { kind: 'wait', step: last };
+  const next = nextStepIndex(run, script);
   if (next === 'done') return { kind: 'end', status: 'bought_out' };
-  if (next === undefined)
-    return last === undefined ? { kind: 'none', reason: 'no_script' } : { kind: 'wait', step: last };
+  if (next === undefined) return { kind: 'none', reason: 'no_script' };
+  const step = toSend(input.conversationRef, script, next);
+  if (step === null) return { kind: 'none', reason: 'no_script' };
   if (!input.hotSession) return { kind: 'none', reason: 'cold_session' };
   if (scriptStepsHeld(input.offer.flags, input.careMode)) return { kind: 'none', reason: 'held' };
-  if (next.kind === 'paid') {
+  if (step.kind === 'paid') {
     // The cooldown is between two scripts, not between two steps of the same one: the staircase climbs in one session.
     const decision = offerDecision({ ...input.offer, lastOfferAt: null });
     if (!decision.allowed) return { kind: 'none', reason: decision.reason };
   }
-  return { kind: 'send_step', step: next };
+  return { kind: 'send_step', step };
 }
 
-function startDecision(input: NextScriptStepInput): ScriptStepDecision {
+function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): ScriptStepDecision {
   if (input.careMode) return { kind: 'none', reason: 'held' };
   // The teasing opens the script: it waits for the cooldown like a paid step (Charles, 12/11).
   const decision = offerDecision({
@@ -311,13 +411,33 @@ function startDecision(input: NextScriptStepInput): ScriptStepDecision {
   if (!decision.allowed) return { kind: 'none', reason: decision.reason };
   const permitted = permittedScripts(input.catalogue, {
     moment: input.moment,
-    playedScriptIds: input.playedScriptIds,
+    played: playedScriptRefs(history),
   });
   if (permitted.length === 0) return { kind: 'none', reason: 'no_script' };
   // The brain picks the one that fits him; the code checks it is one of them, or nothing opens (fail closed).
-  const script = permitted.find((candidate) => candidate.id === input.brainPick);
+  const script = permitted.find((candidate) => candidate.scriptRef === input.brainPick);
   if (script === undefined) return { kind: 'none', reason: 'no_pick' };
-  const first = script.steps[0];
-  if (first === undefined) return { kind: 'none', reason: 'no_script' };
-  return { kind: 'start', script, step: first };
+  const step = toSend(input.conversationRef, script, 0);
+  if (step === null) return { kind: 'none', reason: 'no_script' };
+  return { kind: 'start', script, step };
+}
+
+/** A run as it is stored: its id and the conversation it belongs to. */
+export interface ScriptRunRecord {
+  readonly id: string;
+  readonly conversationId: string;
+  readonly run: ScriptRun;
+}
+
+/**
+ * Where runs are kept (`script_runs`), under her tenant: their decision state only, never a history of what was sent,
+ * which is Reveal's (ADR 0018 § 5). A run is never deleted.
+ */
+export interface ScriptRunStore {
+  /** His latest run, open or ended; `null` when he never had one. */
+  latest(creatorId: string, conversationId: string): Promise<ScriptRunRecord | null>;
+  /** Opens a run; `null` when he already has one open. */
+  open(creatorId: string, conversationId: string, run: ScriptRun): Promise<ScriptRunRecord | null>;
+  /** Saves a run after an event or a reconciliation; `false` when it was no longer open (another turn closed it). */
+  save(creatorId: string, record: ScriptRunRecord): Promise<boolean>;
 }

@@ -112,7 +112,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Vente | `sale` | Une transaction détectée sur la plateforme. Montant en centimes + devise. |
 | Script | `script` | Séquence d'étapes de vente (structure). Phase 6. |
 | Étape | `script_step` | Une étape d'un script (message, médias, prix, pacing). |
-| Déroulé de script | `script_run` | Un script du catalogue proposé à un fan, suivi étape par étape par le code : l'étape en cours, ce qui est parti, ouvert, acheté ou refusé, et son état (`open`, `bought_out`, `refused`, `stalled`, `closed_by_human`). Au plus un ouvert par fan ; un script ne se rejoue jamais au même fan ; un déroulé ne reprend jamais une autre session chaude (ADR 0098). |
+| Déroulé de script | `script_run` | Un script du catalogue proposé à un fan, suivi étape par étape par le code : l'étape en cours, ce qui est parti, ouvert, acheté ou refusé, et son état (`open`, `bought_out`, `refused`, `stalled`, `closed_by_human`). Au plus un ouvert par fan ; un script ne se rejoue jamais au même fan (ce qui est parti se lit dans l'historique de Reveal, qui fait foi, ADR 0018 § 5) ; un déroulé ne reprend jamais une autre session chaude (ADR 0098). |
 | Étape offerte | `free` | Une étape de script qui part sans prix (le teasing, en séries A, B ou C) ; elle ne compte pas comme une offre pour le délai entre deux scripts, sauf la première, qui ouvre le script (ADR 0098). |
 | Étape payante | `paid` | Une étape de script vendue au prix du catalogue ; la seule qui compte comme une offre (`offer_made`, `lastOfferAt`). Ignorée par le fan deux messages de suite, elle compte comme refusée (ADR 0098). |
 | Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript, dans la couleur du script (ADR 0064). |

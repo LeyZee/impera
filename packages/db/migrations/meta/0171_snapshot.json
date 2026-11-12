@@ -3263,8 +3263,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "script_id": {
-          "name": "script_id",
+        "script_ref": {
+          "name": "script_ref",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -3370,13 +3370,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "script_runs_played_unique": {
-          "name": "script_runs_played_unique",
-          "nullsNotDistinct": false,
-          "columns": ["conversation_id", "script_id"]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {
         "tenant_isolation": {
           "name": "tenant_isolation",

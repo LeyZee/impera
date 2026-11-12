@@ -173,12 +173,12 @@ export const scriptRuns = pgTable(
       .notNull()
       .references(() => conversations.id),
     /**
-     * The script, by its id as the scripts module gives it today: one plain column, no foreign key, so that it follows
-     * the script identity Médias settles (PR #708).
+     * The platform's script (`scriptRef`, ADR 0018 § 5): one plain column, no foreign key, so that it follows the script
+     * identity Médias settles (PR #708). What was sent of it is Reveal's history, never this table's.
      */
-    scriptId: text('script_id').notNull(),
+    scriptRef: text('script_ref').notNull(),
     status: enumText('status').notNull().default('open'),
-    /** The steps sent, in order (`ScriptRunStepsSchema`); the last one is the current step. */
+    /** Its decision state per step (`ScriptRunStepsSchema`), reconciled with Reveal's history; the last is current. */
     steps: jsonb('steps').notNull().default([]),
     /** His messages in a row that ignore the paid step waiting: two make a refusal. */
     ignoredMessages: integer('ignored_messages').notNull().default(0),
@@ -191,7 +191,6 @@ export const scriptRuns = pgTable(
     check('script_runs_steps_check', sql`jsonb_typeof(${t.steps}) = 'array'`),
     check('script_runs_ignored_messages_check', sql`${t.ignoredMessages} >= 0`),
     check('script_runs_ended_check', sql`(${t.status} = 'open') = (${t.endedAt} is null)`),
-    unique('script_runs_played_unique').on(t.conversationId, t.scriptId),
     uniqueIndex('script_runs_open_unique')
       .on(t.conversationId)
       .where(sql`${t.status} = 'open'`),

@@ -87,7 +87,7 @@ async function seedCreator(admin: Database, label: string) {
       id: newId(MessageIdSchema),
       creatorId,
       conversationId,
-      scriptId: `script-${label}`,
+      scriptRef: `script-${label}`,
       startedAt: new Date('2026-11-12T21:00:00Z'),
     });
     await tx.insert(s.messages).values({

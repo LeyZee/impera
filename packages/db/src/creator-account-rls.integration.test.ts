@@ -181,6 +181,7 @@ const CREATOR_DECISIONS: Readonly<
   media_sends: 'readsOnly',
   platform_accounts: 'readsOnly',
   drafts: 'closed',
+  script_runs: 'closed',
   conversation_events: 'closed',
   llm_calls: 'closed',
   calibration_ratings: 'closed',
