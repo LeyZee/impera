@@ -45,8 +45,8 @@ import { REVEAL_ENDPOINTS, type RevealAnswer } from './wire';
 const TAKE = { conversations: 20, messages: 10, ppv: 10, scripts: 20, vault: 10, transactions: 10 } as const;
 /** A cursor that never ends is a bug or a changed API: stop rather than loop. */
 const MAX_PAGES = 500;
-/** `health` warns this long before a readable expiry (spec § 2). */
-const WARNING_BEFORE_MS = 24 * 3_600_000;
+/** `health` warns this long before a readable expiry (spec § 2): the token lives 24 h only (V1). */
+const WARNING_BEFORE_MS = 2 * 3_600_000;
 
 /**
  * What Reveal lets this adapter do (reveal-api-observed.md, Résumé), as far as P2-02 goes: every reading. Sends,
@@ -136,7 +136,7 @@ export class RevealApiConnector implements PlatformConnector {
           });
   }
 
-  /** `GET /models/:modelId` (spec § 2): refused → `expired`; a readable expiry less than a day away → `warning`. */
+  /** `GET /models/:modelId` (spec § 2): refused → `expired`; a readable expiry less than 2 h away → `warning`. */
   async health(): Promise<SessionState> {
     if (this.client === null) return 'none';
     try {

@@ -170,7 +170,7 @@ describe('RevealApiConnector: the client (spec § 3)', () => {
     expect(logged.map((entry) => entry.route)).toContain('messages.list');
   });
 
-  it('reads a JWT’s expiry: `warning` a day before it, `expired` once Reveal refuses it', async () => {
+  it('reads a JWT’s expiry: `warning` 2 h before it, `expired` once Reveal refuses it', async () => {
     const fake = world();
     const exp = Date.parse('2026-10-03T12:00:00.000Z') / 1_000;
     const jwt = ['e30', Buffer.from(JSON.stringify({ exp })).toString('base64url'), 'signature'].join('.');
@@ -184,10 +184,10 @@ describe('RevealApiConnector: the client (spec § 3)', () => {
         baseUrl: BASE,
         now: () => new Date(iso),
       });
-    expect(await at('2026-10-02T00:00:00.000Z').health()).toBe('valid');
-    expect(await at('2026-10-03T00:00:00.000Z').health()).toBe('warning');
+    expect(await at('2026-10-03T09:30:00.000Z').health()).toBe('valid');
+    expect(await at('2026-10-03T10:30:00.000Z').health()).toBe('warning');
     await scenario(fake, [{ type: 'session_expired' }]);
-    expect(await at('2026-10-03T00:00:00.000Z').health()).toBe('expired');
+    expect(await at('2026-10-03T10:30:00.000Z').health()).toBe('expired');
   });
 
   it('without a session, says `none` and calls nobody', async () => {
