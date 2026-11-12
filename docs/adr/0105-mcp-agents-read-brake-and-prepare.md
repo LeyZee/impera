@@ -1,6 +1,6 @@
 # 0105. Le MCP d'Impera remis à jour : un agent connecté lit, freine et prépare, un humain confirme
 
-Statut : accepted (Charles, 13/11/2026, 0 h 38, « ok 0105 » ; phrases de la vision de Charles (auteur des messages, script préparé, dépôts de l'agent d'une créatrice, liens de suivi) acceptées à 0 h 47 : « ok phrases 0105 » ; demande de Charles du 12/11/2026, fil « Mettre à jour le MCP du CRM » : « il faudrait le mettre à jour, le MCP, parce que le CRM a pas mal bougé » ; choix « Lire, freiner, préparer » sur la carte de décision du 12/11/2026, 23 h 35 ; numéro 0105 attribué par le coordinateur). **Amende l'ADR 0026, acceptée** (§ 2 à § 5, § 7 et § 9) ; ne touche pas l'ADR 0058.
+Statut : accepted (Charles, 13/11/2026, 0 h 38, « ok 0105 » ; phrases de la vision de Charles (auteur des messages, script préparé, dépôts de l'agent d'une créatrice, liens de suivi) acceptées à 0 h 47 : « ok phrases 0105 » ; précisions des relectures Bilan et Sécurité (rôle de service, droits relus, qui prépare, accès coupé, confirmation unique, texte brut) acceptées à 0 h 53 : « ok phrases 0105 » ; demande de Charles du 12/11/2026, fil « Mettre à jour le MCP du CRM » : « il faudrait le mettre à jour, le MCP, parce que le CRM a pas mal bougé » ; choix « Lire, freiner, préparer » sur la carte de décision du 12/11/2026, 23 h 35 ; numéro 0105 attribué par le coordinateur). **Amende l'ADR 0026, acceptée** (§ 2 à § 5, § 7 et § 9) ; ne touche pas l'ADR 0058.
 Date : 2026-11-12
 
 ## Contexte
@@ -21,6 +21,7 @@ Et Charles veut davantage que lire : qu'un agent fasse pour lui des gestes comme
 - Le compte au nom de qui l'agent agit doit avoir son second facteur actif ; sinon chaque appel est refusé, comme `requireRole` refuse la session.
 - Aucun outil n'appelle une commande que l'écran garde par une reconfirmation (mot de passe et code, ou passkey) : la route la protège par `recentLogin` ou demande l'identité dans son corps. Un test parcourt le catalogue et échoue si un outil mène à une telle commande autrement que par le § 2.
 - Créer, renouveler ou révoquer un accès d'agent reste derrière la reconfirmation (0026 § 3, inchangé).
+- Les capacités d'un accès sont croisées à chaque appel avec le rôle et l'état actuels de la personne : un membre marqué parti, qui perd une créatrice ou change de rôle, voit son accès perdre aussitôt ce qu'il n'a plus, sans attendre une révocation.
 
 ### 2. Préparer, puis un humain confirme
 
@@ -30,8 +31,11 @@ Une **action préparée** (`prepared_action`) est un geste que l'agent dépose s
 2. Elle apparaît dans « À traiter » de la personne de l'accès : ce qu'elle fera, en phrases, le nom de l'agent, la date. Le texte libre de l'agent y est montré comme une donnée, jamais comme un bouton.
 3. Confirmer ouvre l'écran normal du geste, pré-rempli : l'humain relit, peut tout changer, et confirme avec la reconfirmation que ce geste demande déjà (et au moins mot de passe et code de moins de 10 minutes s'il n'en demandait pas). La confirmation appelle la commande de la route, avec ses gardes, au nom de l'humain ; le journal garde l'`id` de l'action préparée et le `grantId`.
 4. Refuser est un clic. Une action préparée expire au bout de 72 heures. Elle ne s'exécute jamais par le temps qui passe, par un autre agent ni par un jeton.
-5. Seul le propriétaire confirme une action qui touche l'équipe ou l'argent, même si l'accès est au nom d'un manager.
-6. Liste fermée en code. Premier geste : **inviter un membre** (prénom, rôle, créatrices). L'e-mail, les identifiants de la plateforme et le taux ne passent jamais par l'agent : le propriétaire les saisit lui-même sur l'écran de confirmation. Viendront ensuite, chacun par une phrase acceptée de cette ADR : changer les créatrices d'un membre, le marquer parti. Un taux ne se prépare jamais : il se tape à l'écran. Deuxième geste : **un script** (étapes et médias, ADR 0100), sans aucun prix ; l'humain pose les prix à la confirmation. Au plus 20 actions en attente par accès.
+5. Seul le propriétaire confirme une action qui touche l'équipe ou l'argent : `prepare:team` ne se coche que sur un accès à son nom.
+6. Un accès coupé emporte ses actions en attente : révocation, expiration, suspension par le garde-fou (0026 § 8), interrupteur « Agents connectés », compte suspendu ou sans second facteur. Elles passent à « annulée » et ne sont plus confirmables.
+7. Confirmer est unique et atomique : la transition « en attente » vers « confirmée » se fait une fois, dans la même transaction que la commande, l'`id` de l'action servant de clé d'idempotence. Les arguments sont revalidés à ce moment par le schéma et les gardes du jour, sous l'identité de l'humain ; ce qui a changé entre-temps (créatrice archivée, rôle disparu) se refuse à l'écran.
+8. Tout texte de l'agent, prénom compris, est une donnée : il s'affiche en texte brut, sans lien ni mise en forme, n'est jamais recopié dans une alerte Telegram ni une notification (phrase fixe) et n'entre jamais dans un prompt.
+9. Liste fermée en code. Premier geste : **inviter un membre** (prénom, rôle, créatrices). L'e-mail, les identifiants de la plateforme et le taux ne passent jamais par l'agent : le propriétaire les saisit lui-même sur l'écran de confirmation. Viendront ensuite, chacun par une phrase acceptée de cette ADR : changer les créatrices d'un membre, le marquer parti. Un taux ne se prépare jamais : il se tape à l'écran. Deuxième geste : **un script** (étapes et médias, ADR 0100), sans aucun prix ; l'humain pose les prix à la confirmation. Au plus 20 actions en attente par accès.
 
 ### 3. Ce qui reste fermé, même préparé
 
@@ -65,7 +69,7 @@ Une écriture gardée de plus, capacité `write:drops` (jamais cochée d'office)
 
 - En recette, `/v1/mcp` sert le monde simulé de l'ADR 0075 : les tests du MCP s'y jouent, jamais sur des données réelles.
 - Tant que rien n'est déployé, l'agent est une session Claude Code sur le PC de l'agence, branchée sur `localhost`, son jeton collé dans sa configuration locale, jamais dans un fil. Claude.ai et ChatGPT viennent avec OAuth (lot 4), après le déploiement (0026 § 2, inchangé).
-- La recherche d'un accès par l'empreinte de son jeton passe par le rôle de service (ADR 0087), qui ne reçoit que la lecture de la table des accès.
+- Seule la recherche d'un accès par l'empreinte de son jeton se fait hors créatrice, par le rôle de service (ADR 0087), en lecture seule. Une fois l'accès trouvé, tout le reste de l'appel (lectures, journal, actions préparées) tourne sous l'identité de la personne et la créatrice de l'accès, comme une requête de l'écran.
 
 ### 6. Ordre des lots
 
