@@ -2,6 +2,7 @@
 import type { CreatorId, JobPayload, PersonaLimits } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { LlmGateway } from '@impera/llm';
+import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { ContentDropsModule, IdeaContentRequest } from '../content-drops';
@@ -42,6 +43,7 @@ export interface TrendsDeps {
   /** Owner role: `extension_links`, out of the application role's reach (migration 0100). */
   readonly adminDb: Database;
   readonly requireRole: RequireRole;
+  readonly recentLogin: preValidationAsyncHookHandler;
   /** The app's LLM gateway: the vision of a marked post's captures, a trend watch call (ADR 0060 § 7). */
   readonly gateway: Pick<LlmGateway, 'describeTrendCaptures'>;
   /** Her active persona's limits, null without one: what a corrected idea is read against (ADR 0056 § 1). */
@@ -74,6 +76,7 @@ export function createTrendsModule(deps: TrendsDeps): TrendsModule {
         suggestShoot: deps.agenda.suggestShoot,
       },
       deps.requireRole,
+      deps.recentLogin,
     ),
     jobs: {
       followDecision: (decision) => followDecision(follow, decision),
