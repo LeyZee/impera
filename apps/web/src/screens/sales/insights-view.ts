@@ -150,25 +150,44 @@ export function heatOf(share: number, busiest: number): number {
 }
 
 /** The blocks of « Qui sont tes fans », as a sentence names them when it says which ones wait for more fans. */
-export const BLOCK_WORDS = {
+export type InsightBlock = 'age' | 'place' | 'situation' | 'job' | 'spending' | 'activity';
+
+/** What a fan tells in conversation, block by block: the four blocks count the fans who told it (ADR 0074 § 8). */
+const TOLD_WORDS = {
   age: 'leur âge',
-  place: 'd’où ils t’écrivent',
+  place: 'd’où ils sont',
   situation: 'leur situation',
   job: 'leur métier',
-  spending: 'ce qu’ils débloquent',
-  activity: 'quand ils t’écrivent',
 } as const;
 
-export type InsightBlock = keyof typeof BLOCK_WORDS;
+const told = (block: InsightBlock): block is keyof typeof TOLD_WORDS => block in TOLD_WORDS;
+
+function listOf(words: readonly string[]): string {
+  const last = words.at(-1) ?? '';
+  return words.length < 2 ? last : `${words.slice(0, -1).join(', ')} et ${last}`;
+}
 
 /**
- * The blocks still under ten fans, in one line instead of one empty card each (recette CRE-04): « Pas encore assez de
- * fans pour dire leur métier et leur situation. »; `null` when every block has enough.
+ * Why each block under its threshold waits, in the words of what the server counts (recette CRE-04): the facts a fan
+ * told (each block counts the fans who told it, not all fans), the fans at all for what they unlock, the fans who
+ * wrote over 30 days for when they write. One sentence per reason, none when every block has enough.
  */
-export function waitingLine(blocks: readonly InsightBlock[]): string | null {
-  const words = blocks.map((block) => BLOCK_WORDS[block]);
-  const last = words.at(-1);
-  if (last === undefined) return null;
-  const said = words.length === 1 ? last : `${words.slice(0, -1).join(', ')} et ${last}`;
-  return `Pas encore assez de fans pour dire ${said}.`;
+export function waitingLines(blocks: readonly InsightBlock[]): string[] {
+  const lines: string[] = [];
+  const facts = blocks.filter(told).map((block) => TOLD_WORDS[block]);
+  if (facts.length > 0)
+    lines.push(
+      `Trop peu de fans t’ont encore dit ${listOf(facts)} : ${facts.length === 1 ? 'ce chiffre s’affichera' : 'chacun s’affichera'} dès que dix l’auront dit.`,
+    );
+  if (blocks.includes('spending')) lines.push('Ce qu’ils débloquent s’affichera à partir de dix fans.');
+  if (blocks.includes('activity'))
+    lines.push(
+      'Moins de dix fans t’ont écrit ces 30 derniers jours : leurs heures s’afficheront à partir de dix.',
+    );
+  return lines;
+}
+
+/** A share as the panel says it: a case the server rounds to 0 is still there, so « moins de 1 % », never « 0 % ». */
+export function shareText(share: number): string {
+  return share === 0 ? 'moins de 1\u00a0%' : `${String(share)}\u00a0%`;
 }

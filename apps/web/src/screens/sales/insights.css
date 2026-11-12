@@ -103,9 +103,24 @@
 .fi-note {
   margin-top: var(--nv-space-4);
 }
-/* The blocks still under ten fans, said in one line under those that show (recette CRE-04). */
+/* What the blocks under their threshold wait for, one line per reason, under those that show (recette CRE-04). */
 .fi-waiting {
+  display: grid;
+  gap: var(--nv-space-1);
   margin-top: var(--nv-space-4);
+  color: var(--nv-ink-muted);
+}
+.fi-waiting > p {
+  margin: 0;
+  text-wrap: pretty;
+}
+/* Nobody unlocked yet: one sentence in place of the ring and the bars (recette CRE-04). */
+.fi-none {
+  margin: 0;
+  font-family: var(--nv-font-serif);
+  font-style: italic;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
   color: var(--nv-ink-muted);
 }
 .fi-waiting + .fi-note {

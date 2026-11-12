@@ -15,8 +15,9 @@ import {
   PLACE_LABELS,
   SITUATION_LABELS,
   slotLabel,
+  shareText,
   TIER_LABELS,
-  waitingLine,
+  waitingLines,
   type InsightBlock,
 } from './insights-view';
 import './insights.css';
@@ -27,7 +28,7 @@ import { Panel, PanelSection } from '@/shell/layout';
 /*
  * « Qui sont tes fans » (CR-15, ADR 0065 § 2, ADR 0074 § 8): in front of Ventes, figures on all her fans, never one.
  * Rings and bars that draw in, a case lit on hover, focus or touch, its share in the middle of the ring. The server
- * sends shares only: no case says how many fans it holds, and a block under ten fans says so in words.
+ * sends shares only: no case says how many fans it holds, and a block under its threshold says in words what it waits for.
  */
 
 interface Case {
@@ -48,7 +49,12 @@ function Count({ value, format = String }: { value: number; format?: (n: number)
   return <span ref={ref} />;
 }
 
-const percent = (n: number) => `${String(n)}\u00a0%`;
+const percent = shareText;
+/**
+ * A share said as it is: for a number that counts up from 0 (`shareText` would say « moins de 1 % » on its first
+ * frame) and for a slot of « Quand ils t'écrivent », where 0 % is a slot nobody wrote in.
+ */
+const plain = (n: number) => `${String(n)}\u00a0%`;
 
 /** A ring of cases and its legend; the lit case shows in the middle, the legend lights with it. */
 function RingCard({
@@ -127,7 +133,7 @@ function RingCard({
             ) : first !== undefined ? (
               <>
                 <b className="fi-ring__value">
-                  <Count value={first.share} format={percent} />
+                  <Count value={first.share} format={first.share === 0 ? percent : plain} />
                 </b>
                 <span className="fi-ring__sub">{label(first.key)}</span>
               </>
@@ -247,6 +253,14 @@ function SpendingCard({
     );
   const radius = 52;
   const [arc] = arcsOf([spending.payingShare, 100 - spending.payingShare], radius, 0);
+  // Nobody unlocked yet: one sentence, not a ring at 0 % beside a bar « Rien débloqué » at 100 % (recette CRE-04).
+  if (spending.payingShare === 0)
+    return (
+      <article className="fi-card fi-card--wide nv-enter" style={{ '--nv-i': index }}>
+        <h3 className="fi-card__title">Ce qu’ils débloquent</h3>
+        <p className="fi-none">Aucun de tes fans n’a encore débloqué de message.</p>
+      </article>
+    );
   return (
     <article className="fi-card fi-card--wide nv-enter" style={{ '--nv-i': index }}>
       <h3 className="fi-card__title">Ce qu’ils débloquent</h3>
@@ -272,7 +286,7 @@ function SpendingCard({
             </svg>
             <span className="fi-ring__middle" aria-hidden="true">
               <b className="fi-ring__value">
-                <Count value={spending.payingShare} format={percent} />
+                <Count value={spending.payingShare} format={plain} />
               </b>
               <span className="fi-ring__sub">ont déjà débloqué</span>
             </span>
@@ -373,7 +387,7 @@ function ActivityCard({
           )
         ) : (
           <>
-            {say(lit)} : <b>{percent(lit.share)}</b> de leurs messages
+            {say(lit)} : <b>{plain(lit.share)}</b> de leurs messages
           </>
         )}
       </p>
@@ -405,7 +419,7 @@ function ActivityCard({
                     '--_h': heatOf(cell.share, busiest),
                     '--_i': d * 8 + slot,
                   }}
-                  aria-label={`${say(cell)} : ${percent(cell.share)}`}
+                  aria-label={`${say(cell)} : ${plain(cell.share)}`}
                   aria-pressed={on}
                   onPointerEnter={() => {
                     setLit(cell);
@@ -456,8 +470,8 @@ function Stat({ value, label }: { value: number | null; label: string }): JSX.El
 }
 
 /**
- * The panel: three numbers, then a card per question that has enough fans, and one line for those that have too few
- * (recette CRE-04). Under ten fans everywhere, one short sentence and nothing else. `silent`: the page says once that
+ * The panel: three numbers, then a card per question that has enough fans, and for those that wait, what they wait
+ * for (recette CRE-04). Under ten fans in all, one short sentence and nothing else. `silent`: the page says once that
  * the server does not answer, when its fans do not load either (recette CRE-31).
  */
 export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Element | null {
@@ -489,7 +503,9 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
   const waiting = (['age', 'place', 'situation', 'job', 'spending', 'activity'] as const).filter(
     (block: InsightBlock) => data[block].status !== 'enough',
   );
-  if (waiting.length === 6)
+  // Under ten fans in all, every block waits for the same reason: one short card. With more fans, the panel keeps
+  // its numbers and says block by block what is missing, since each block counts something else (recette CRE-04).
+  if (waiting.length === 6 && data.fans.total === null)
     return (
       <Panel
         className="fi-panel nv-enter"
@@ -507,7 +523,7 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
         </PanelSection>
       </Panel>
     );
-  const line = waitingLine(waiting);
+  const lines = waitingLines(waiting);
   return (
     <Panel
       className="fi-panel nv-enter"
@@ -565,7 +581,13 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
           {data.spending.status === 'enough' ? <SpendingCard spending={data.spending} index={4} /> : null}
           {data.activity.status === 'enough' ? <ActivityCard cells={data.activity.cells} index={5} /> : null}
         </div>
-        {line === null ? null : <p className="fi-waiting">{line}</p>}
+        {lines.length === 0 ? null : (
+          <div className="fi-waiting">
+            {lines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+        )}
         <p className="fi-note">
           Ce que tes fans ont dit eux-mêmes en conversation, arrêté chaque nuit à minuit. Une case ne
           s’affiche qu’à partir de dix fans, pour qu’aucun ne s’y reconnaisse.

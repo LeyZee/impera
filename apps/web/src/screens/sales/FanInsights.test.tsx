@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FanInsights } from './FanInsights';
 import { DEMO_INSIGHTS } from './insights-fixture';
-import { arcsOf, heatOf, slotLabel, waitingLine } from './insights-view';
+import { arcsOf, heatOf, shareText, slotLabel, waitingLines } from './insights-view';
 
 function serve(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -58,9 +58,13 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     const cell = screen.getByRole('button', { name: 'Vendredi, 18h–21h : 4\u00a0%' });
     fireEvent.focus(cell);
     expect(cell.getAttribute('aria-pressed')).toBe('true');
-    // A block under ten fans is no empty card: one line names those that wait (recette CRE-04).
+    // A block under its threshold is no empty card: one line says what it waits for (recette CRE-04).
     expect(screen.queryByText('Leur situation')).toBeNull();
-    expect(screen.getByText('Pas encore assez de fans pour dire leur situation.')).toBeDefined();
+    expect(
+      screen.getByText(
+        'Trop peu de fans t’ont encore dit leur situation : ce chiffre s’affichera dès que dix l’auront dit.',
+      ),
+    ).toBeDefined();
     expect(screen.getByText('Panier moyen sur 30 jours')).toBeDefined();
   });
 
@@ -89,6 +93,46 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     expect(document.querySelectorAll('.fi-card')).toHaveLength(0);
   });
 
+  it('with enough fans in all, never says there are too few fans: it names what is missing (recette CRE-04)', async () => {
+    const few = { status: 'too_few' } as const;
+    serve(200, {
+      ...DEMO_INSIGHTS,
+      fans: { total: 20, newLast30Days: 20, wroteLast7Days: null },
+      age: few,
+      place: few,
+      situation: few,
+      job: few,
+      spending: few,
+      activity: few,
+    });
+    show();
+    expect(await screen.findByText('fans en tout')).toBeDefined();
+    expect(screen.queryByText(/Encore trop peu de fans pour le dire/u)).toBeNull();
+    expect(
+      screen.getByText(
+        'Trop peu de fans t’ont encore dit leur âge, d’où ils sont, leur situation et leur métier : chacun s’affichera dès que dix l’auront dit.',
+      ),
+    ).toBeDefined();
+    expect(document.querySelectorAll('.fi-card')).toHaveLength(0);
+  });
+
+  it('says in one sentence that nobody unlocked yet, without a ring at 0 % nor a bar at 100 % (recette CRE-04)', async () => {
+    serve(200, {
+      ...DEMO_INSIGHTS,
+      spending: {
+        status: 'enough',
+        payingShare: 0,
+        averageBasketMinor: null,
+        cases: [{ key: 'none', share: 100 }],
+      },
+    });
+    show();
+    expect(await screen.findByText('Aucun de tes fans n’a encore débloqué de message.')).toBeDefined();
+    expect(screen.queryByText('ont déjà débloqué')).toBeNull();
+    expect(screen.queryByText('Rien débloqué')).toBeNull();
+    expect(screen.queryByText('Panier moyen sur 30 jours')).toBeNull();
+  });
+
   it('says the figures do not load, with a way to try again', async () => {
     serve(500, null);
     show();
@@ -107,12 +151,21 @@ describe('the geometry', () => {
     );
   });
 
-  it('names the blocks that wait for more fans in one sentence', () => {
-    expect(waitingLine([])).toBeNull();
-    expect(waitingLine(['job'])).toBe('Pas encore assez de fans pour dire leur métier.');
-    expect(waitingLine(['age', 'situation', 'job'])).toBe(
-      'Pas encore assez de fans pour dire leur âge, leur situation et leur métier.',
-    );
+  it('says what each waiting block counts: facts told, fans in all, fans who wrote', () => {
+    expect(waitingLines([])).toEqual([]);
+    expect(waitingLines(['job'])).toEqual([
+      'Trop peu de fans t’ont encore dit leur métier : ce chiffre s’affichera dès que dix l’auront dit.',
+    ]);
+    expect(waitingLines(['age', 'situation', 'spending', 'activity'])).toEqual([
+      'Trop peu de fans t’ont encore dit leur âge et leur situation : chacun s’affichera dès que dix l’auront dit.',
+      'Ce qu’ils débloquent s’affichera à partir de dix fans.',
+      'Moins de dix fans t’ont écrit ces 30 derniers jours : leurs heures s’afficheront à partir de dix.',
+    ]);
+  });
+
+  it('never says « 0 % » for a case that is there', () => {
+    expect(shareText(0)).toBe('moins de 1\u00a0%');
+    expect(shareText(12)).toBe('12\u00a0%');
   });
 
   it('says a slot and the strength of a cell', () => {
