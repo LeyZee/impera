@@ -44,7 +44,7 @@ Branche : task/<id>-<slug>
 | P1-02 | Analyse de l'API Reveal et FakeReveal | 1 | done | P1-01 ou capture HAR |
 | P1-03 | Décision B/C et spécification du connecteur Reveal | 1 | done | P1-02 |
 | P2-01 | Capture de la session Reveal et vérifications V1, V2 | 2 | in_progress | P1-03 |
-| P2-02 | `RevealApiConnector` en lecture | 2 | todo | P2-01 (V1 réussie) |
+| P2-02 | `RevealApiConnector` en lecture | 2 | in_progress | P2-01 (V1 réussie) |
 | P2-03 | `RevealApiConnector` : envois et note client | 2 | todo | P2-02 |
 | P2-04 | Réconciliation Reveal : envois perdus, ventes, historique | 2 | todo | P2-02 |
 | P2-05 | Runbooks Reveal testés sur le compte de test | 2 | todo | P2-03 |

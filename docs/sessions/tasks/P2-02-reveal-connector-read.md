@@ -1,6 +1,6 @@
 # P2-02 `RevealApiConnector` en lecture
 
-Statut : todo
+Statut : in_progress
 Phase : 2
 Dépend de : P2-01 (V1 réussie)
 Branche : task/p2-02-reveal-connector-read
