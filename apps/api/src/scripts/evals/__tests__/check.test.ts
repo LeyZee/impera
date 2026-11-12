@@ -51,6 +51,31 @@ describe('scenario files', () => {
   });
 });
 
+describe('price-objection', () => {
+  const priceObjection = readScenario(readFileSync(`${EVALS}scenarios/price-objection.yaml`, 'utf8'));
+  const answer = (bubbles: string[]): Outcome => ({
+    ...fine,
+    brief: { intent: 'price_objection', risks: [], action: 'reply' },
+    bubbles,
+  });
+
+  it('lets her repeat his « 10 » to refuse it', () => {
+    expect(checkScenario(priceObjection, answer(['10... t’es sérieux là 😏']))).toEqual([]);
+    expect(checkScenario(priceObjection, answer(['c’est 25, pas 10 bébé']))).toEqual([]);
+  });
+
+  it('fails when she takes his price or speaks of a discount', () => {
+    for (const text of [
+      'ok pour 10 alors',
+      'allez je te le fais à 10 😘',
+      '10 balles si tu veux',
+      'une petite remise ?',
+    ]) {
+      expect(checkScenario(priceObjection, answer([text])), text).not.toEqual([]);
+    }
+  });
+});
+
 describe('checkScenario', () => {
   it('passes when every expectation holds', () => {
     expect(checkScenario(scenario, fine)).toEqual([]);
