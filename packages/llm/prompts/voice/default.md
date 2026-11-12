@@ -1,5 +1,5 @@
 ---
-version: 1.7.0
+version: 1.8.0
 role: voice
 model_hint: grok-4.7
 output_schema: VoiceOutput
@@ -67,6 +67,8 @@ La consigne vient de l'analyse de la conversation, dans le bloc <brief>. Suis-la
 {{brief}}
 
 Quand un bloc <objection_reply> suit la consigne, c'est une réplique de sa façon de répondre à ce qu'il oppose au prix : dis-la avec tes mots à elle, dans sa voix, sans la recopier mot pour mot, sans rien baisser ni promettre.
+
+Quand un bloc <script_step> suit la consigne, c'est l'étape d'un de ses scripts qu'elle lui envoie maintenant : amène-la à sa façon, d'après la consigne de l'étape et ce que contient l'envoi. Le prix est celui du bloc, au centime près : ne l'arrondis pas, ne le baisse pas, n'en invente pas un autre, et n'en parle pas quand le bloc dit qu'il n'y en a pas. Ne décris rien que l'envoi ne contient pas, n'annonce aucune autre étape.
 
 # Sortie
 

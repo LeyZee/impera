@@ -42,6 +42,7 @@ export {
 export {
   createLlmGateway,
   type BrainAlert,
+  type BrainScript,
   type BrainInput,
   type CallMeta,
   type ChannelPostInput,
@@ -71,6 +72,7 @@ export {
   type VideoKeyframes,
   type JudgeInput,
   type VoiceInput,
+  type VoiceScriptStep,
 } from './gateway';
 export type { HealthReport, HealthState, ProviderHealth, RoleHealth } from './health';
 export { loadPrompt } from './prompts';
@@ -83,7 +85,10 @@ export {
 export {
   BRAIN_ALERTS_MAX,
   brainAlertId,
+  BRAIN_SCRIPTS_MAX,
+  brainScriptId,
   BriefSchema,
+  SCRIPT_REPLIES,
   CHANNEL_POST_TEXT_MAX,
   JudgeCriterionSchema,
   VoiceOutputSchema,
