@@ -27,6 +27,7 @@ import {
   StartScriptDropBodySchema,
   ValidateDropDescriptionsBodySchema,
   ValidateScriptSummaryBodySchema,
+  WriteDropDescriptionBodySchema,
   CorrectScriptSummaryBodySchema,
   type UserRole,
 } from '@impera/contracts';
@@ -35,6 +36,7 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { exportDrop } from '../../application/drop-export';
 import {
   fillScriptSlot,
   readScriptDrop,
@@ -359,6 +361,40 @@ export function createContentDropRoutes(
         agency.confirmExport(request.params.creatorId, signedIn(request.user), request.params.id, clock()),
     );
 
+    // Any other drop of hers as a ZIP (recette créatrice 1): her media in her order and the sheet, streamed as zipped.
+    app.get(
+      '/creators/:creatorId/drops/:id/export',
+      { ...team, schema: { params: CreatorDropParamsSchema } },
+      async (request, reply) => {
+        const archive = await exportDrop(
+          { agency, storage },
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          clock(),
+        );
+        return reply
+          .header('content-type', SCRIPT_EXPORT_MEDIA_TYPE)
+          .header('content-disposition', `attachment; filename="${archive.fileName}"`)
+          .header('cache-control', 'no-store')
+          .header('x-content-type-options', 'nosniff')
+          .send(archive.stream);
+      },
+    );
+
+    // Put out by hand (ADR 0044, recette créatrice 1): her originals of the drop go 30 days later.
+    app.post(
+      '/creators/:creatorId/drops/:id/export/confirm',
+      { ...team, schema: { params: CreatorDropParamsSchema, response: { 200: ContentDropSchema } } },
+      (request) =>
+        agency.confirmDropExport(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          clock(),
+        ),
+    );
+
     app.post(
       '/creators/:creatorId/content-requests',
       {
@@ -518,6 +554,46 @@ export function createContentDropRoutes(
           request.params.id,
           request.body.summaryId,
           clock(),
+        ),
+    );
+
+    // The vision AI asked again on a medium it gave up (recette créatrice 2): her team's, as each review.
+    app.post(
+      '/creators/:creatorId/drops/:id/files/:fileId/describe',
+      {
+        ...team,
+        schema: { params: CreatorFileParamsSchema, response: { 200: DropDescriptionsReviewSchema } },
+      },
+      (request) =>
+        review.retryDescription(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.params.fileId,
+          request.id,
+        ),
+    );
+
+    // A medium the AI did not describe, written by hand (recette créatrice 2): its words and its level.
+    app.post(
+      '/creators/:creatorId/drops/:id/files/:fileId/description',
+      {
+        ...team,
+        schema: {
+          params: CreatorFileParamsSchema,
+          body: WriteDropDescriptionBodySchema,
+          response: { 200: DropDescriptionsReviewSchema },
+        },
+      },
+      (request) =>
+        review.writeDescription(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.params.fileId,
+          { detailed: request.body.detailed, intensity: request.body.intensity },
+          clock(),
+          request.id,
         ),
     );
 

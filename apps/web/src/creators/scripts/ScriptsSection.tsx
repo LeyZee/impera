@@ -13,7 +13,6 @@ import {
   sentScripts,
   type SentScriptRow,
 } from './model';
-import { SWITCH_FAILED, setDescribeSwitch, switchKey, useDescribeSwitch } from './review-api';
 import './scripts.css';
 
 import { useStructures } from '@/scripts/api';
@@ -34,7 +33,7 @@ export function ScriptsSection({
   creatorId: CreatorId;
   creatorName: string;
   timezone: string;
-  /** Her switch of the descriptions is the owner's alone (ADR 0083 § 9). */
+  /** Her switch of the descriptions is the owner's alone (ADR 0083 § 9): the owner is told where it stands. */
   isOwner?: boolean;
 }): JSX.Element {
   const content = useCreatorContent(creatorId);
@@ -113,11 +112,12 @@ export function ScriptsSection({
             <p className="ps-muted">
               Les scripts envoyés par {creatorName}, le plus récent d’abord. Télécharge l’archive, recopie-la
               dans Reveal en suivant la fiche, puis confirme la copie.
+              {/* Her switch holds for every drop: it stands in Contenu (recette créatrice 6). */}
+              {isOwner ? ' Les descriptions par l’IA s’allument dans l’onglet Contenu.' : null}
             </p>
           </div>
         </div>
       </div>
-      {isOwner ? <DescribeSwitch creatorId={creatorId} creatorName={creatorName} /> : null}
       {list()}
       {confirming === null ? null : (
         <ConfirmCopy
@@ -309,67 +309,5 @@ function ConfirmCopy({
         </div>
       </div>
     </Dialog>
-  );
-}
-
-/**
- * Her switch of the descriptions (ADR 0083 § 9), the owner's: on, each photo and video she drops is described by the
- * vision AI, then read again here before any use; what she dropped while it was off is described at once.
- */
-function DescribeSwitch({
-  creatorId,
-  creatorName,
-}: {
-  creatorId: CreatorId;
-  creatorName: string;
-}): JSX.Element {
-  const id = useId();
-  const client = useQueryClient();
-  const current = useDescribeSwitch(creatorId, true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const turn = async (on: boolean): Promise<void> => {
-    setBusy(true);
-    setError(null);
-    const answer = await setDescribeSwitch(creatorId, on);
-    setBusy(false);
-    if (answer === null) {
-      setError(SWITCH_FAILED);
-      return;
-    }
-    client.setQueryData(switchKey(creatorId), answer);
-  };
-
-  return (
-    <div className="nv-plate sx-switch">
-      <div className="sx-switch__text">
-        <label className="sx-switch__title" htmlFor={id}>
-          Descriptions par l’IA
-        </label>
-        <p className="ps-muted">
-          {current.data === true
-            ? `Chaque photo et vidéo de ${creatorName} est décrite à son arrivée, puis relue ici avant tout usage.`
-            : `Éteint : ses médias ne sont pas décrits. Allumé, ce qu’elle a déjà déposé l’est aussi.`}
-        </p>
-        {error === null ? null : (
-          <p className="sx-error nv-swap" role="alert">
-            {error}
-          </p>
-        )}
-      </div>
-      <input
-        id={id}
-        type="checkbox"
-        role="switch"
-        className="nv-switch"
-        checked={current.data === true}
-        disabled={busy || current.data === undefined}
-        aria-busy={busy}
-        onChange={(event) => {
-          void turn(event.target.checked);
-        }}
-      />
-    </div>
   );
 }

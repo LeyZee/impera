@@ -115,7 +115,9 @@ describe('Créatrices › Demandes (MED-09)', () => {
       }),
     });
     show();
-    expect(await screen.findByText('Tous les 7 jours · le dernier pour le 3 nov.')).toBeDefined();
+    expect(
+      await screen.findByText('Tous les 7 jours · le dernier de la cadence pour le 3 nov.'),
+    ).toBeDefined();
     expect(
       screen.getByText('Aucune structure dans sa file : aucun script n’a été demandé.').dataset['tone'],
     ).toBe('warn');
@@ -125,14 +127,18 @@ describe('Créatrices › Demandes (MED-09)', () => {
     expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull();
     fireEvent.change(days, { target: { value: '10' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
-    expect(await screen.findByText('Tous les 10 jours · le dernier pour le 3 nov.')).toBeDefined();
+    expect(
+      await screen.findByText('Tous les 10 jours · le dernier de la cadence pour le 3 nov.'),
+    ).toBeDefined();
     expect(calls.find((call) => call.method === 'PUT')?.body).toEqual({ days: 10 });
   });
 
   it('lets a manager read the cadence, never change it', async () => {
     serve(base());
     show(false);
-    expect(await screen.findByText('Tous les 7 jours · le dernier pour le 3 nov.')).toBeDefined();
+    expect(
+      await screen.findByText('Tous les 7 jours · le dernier de la cadence pour le 3 nov.'),
+    ).toBeDefined();
     expect(screen.queryByLabelText('Un script tous les')).toBeNull();
   });
 
