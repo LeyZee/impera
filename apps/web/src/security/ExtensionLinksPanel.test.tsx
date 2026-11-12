@@ -140,6 +140,43 @@ describe('Relier l’extension', () => {
     ).toBeTruthy();
   });
 
+  it('asks for the password and a code when the sign-in is old, then links', async () => {
+    const calls = serve({
+      'GET ': [{ status: 200, body: { items: [] } }],
+      'POST ': [
+        { status: 403, body: apiError('reauthentication_forbidden') },
+        {
+          status: 201,
+          body: { id: LINK_A.id, label: LINK_A.label, createdAt: LINK_A.createdAt, token: TOKEN },
+        },
+      ],
+      'POST /v1/auth/reauthenticate': [{ status: 200, body: {} }],
+    });
+    render(<ExtensionLinksPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Relier un navigateur' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Relier' }));
+    expect(
+      await screen.findByText('Pour relier ce navigateur, confirme ton mot de passe et ton code.'),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Mot de passe')).toBeTruthy();
+    // One pair of buttons at a time: the prompt's own.
+    expect(screen.queryByRole('button', { name: 'Relier' })).toBeNull();
+    // Enter in the name, read-only meanwhile, sends nothing more.
+    const form = screen.getByLabelText('Nom de ce navigateur').closest('form');
+    if (form !== null) fireEvent.submit(form);
+    // Nothing was linked, and the refusal is not shown as an error.
+    expect(screen.queryByText('Ce compte ne peut pas relier d’extension.')).toBeNull();
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'un mot de passe inventé' } });
+    fireEvent.change(screen.getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
+    expect((await screen.findByLabelText('Code de liaison')).textContent).toBe(TOKEN);
+    expect(calls.filter((call) => call.method === 'POST' && call.path === '')).toHaveLength(2);
+    expect(screen.queryByLabelText('Mot de passe')).toBeNull();
+  });
+
   it('unlinks a browser after asking, and can keep it', async () => {
     const calls = serve({
       'GET ': [
