@@ -8,6 +8,7 @@ import {
 import { and, eq, schema, sql, withTenantMember } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { z } from 'zod';
 
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
@@ -216,6 +217,25 @@ describe('daily statistics of the platform (ADR 0081)', () => {
     });
     expect(checked.statusCode).toBe(200);
     expect(await counted()).toBe(6);
+  });
+
+  it('keeps the days by account when those by chatter come back changed, and says so once', async () => {
+    const signals = async () => {
+      const result = await test.admin.db.execute(
+        sql`select count(*)::int as n from domain_events where type = 'sales_feed_signal' and payload->'signal'->>'kind' = 'unexpected_answer'`,
+      );
+      return z.array(z.object({ n: z.number() })).parse(result.rows)[0]?.n ?? 0;
+    };
+    const before = await chatterPhoto();
+    crm.sell({ id: 'sale_stats_07', createdAt: at(today) });
+    crm.breakChatterStatsShape(1);
+    await run();
+    expect((await photo()).find((row) => row.day === today)?.ppvPurchased).toBe(3);
+    expect(await chatterPhoto()).toEqual(before);
+    expect(await counted()).toBe(8);
+    expect(await signals()).toBe(1);
+    await run();
+    expect((await chatterPhoto()).find((row) => row.day === today)?.ppvPurchased).toBe(3);
   });
 
   it('calls no more once fewer than 100 of the day’s 500 calls are left', async () => {

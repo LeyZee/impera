@@ -4,4 +4,5 @@ Pas fait : le calcul (chiffre par heure en poste, taux d'achat), les routes et l
 Décisions : aucune nouvelle ADR ; plan en trois PR validé par le coordinateur ; numéro de migration 0170 attribué par le coordinateur.
 Découvertes : le mode de l'agent n'a pas d'historique, donc les heures « IA seule » d'une période passée se comptent avec le mode et les créneaux d'aujourd'hui (écrit dans l'ADR 0092 § « À surveiller ») ; un historique du mode serait un chantier à part.
 Candidats à suppression : aucun.
+Relecture de Bilan avant la PR : statistiques par chatteur lues comme le reste (429, forme changée refusée et signalée une fois, photo du compte gardée), `breakChatterStatsShape` ajouté à `FakeReveal` ; une créatrice archivée n'est plus lue, rien n'est effacé.
 Vérifié : migrations-order ✓, daily-stats unitaire ✓, daily-stats + dashboard-agency + tenant-isolation en intégration ✓, rls et creator-account du paquet db ✓, sur un Postgres local.
