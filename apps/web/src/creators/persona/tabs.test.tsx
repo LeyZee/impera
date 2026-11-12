@@ -123,7 +123,7 @@ describe('recette 28/10', () => {
   it('reads a field of spaces only as not given, and an age only for a birth already past', () => {
     expect(orNull('   ')).toBeNull();
     expect(orNull(' Lyon ')).toBe(' Lyon ');
-    expect(ageLine('2000-10-28', '2026-10-28')).toBe('26 ans aujourd’hui');
+    expect(ageLine('2000-10-28', '2026-10-28')).toBe('26 ans');
     expect(ageLine('2030-01-01', '2026-10-28')).toBeUndefined();
     expect(ageLine('', '2026-10-28')).toBeUndefined();
   });
