@@ -114,7 +114,9 @@ export function CreatorSalesPage({
           </div>
           <div className="vt-side">
             {selected === null ? (
-              <p className="vt-hint">Choisis un fan pour lire sa conversation.</p>
+              <div className="nv-plate vt-hint">
+                <p>Choisis un fan pour lire sa conversation.</p>
+              </div>
             ) : (
               <CreatorReader
                 key={selected}
