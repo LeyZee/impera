@@ -1,6 +1,6 @@
 # 0105. Le MCP d'Impera remis à jour : un agent connecté lit, freine et prépare, un humain confirme
 
-Statut : accepted (Charles, 13/11/2026, 0 h 38, « ok 0105 » ; demande de Charles du 12/11/2026, fil « Mettre à jour le MCP du CRM » : « il faudrait le mettre à jour, le MCP, parce que le CRM a pas mal bougé » ; choix « Lire, freiner, préparer » sur la carte de décision du 12/11/2026, 23 h 35 ; numéro 0105 attribué par le coordinateur). **Amende l'ADR 0026, acceptée** (§ 2 à § 5, § 7 et § 9) ; ne touche pas l'ADR 0058.
+Statut : accepted (Charles, 13/11/2026, 0 h 38, « ok 0105 » ; phrases de la vision de Charles (auteur des messages, script préparé, dépôts de l'agent d'une créatrice, liens de suivi) acceptées à 0 h 47 : « ok phrases 0105 » ; demande de Charles du 12/11/2026, fil « Mettre à jour le MCP du CRM » : « il faudrait le mettre à jour, le MCP, parce que le CRM a pas mal bougé » ; choix « Lire, freiner, préparer » sur la carte de décision du 12/11/2026, 23 h 35 ; numéro 0105 attribué par le coordinateur). **Amende l'ADR 0026, acceptée** (§ 2 à § 5, § 7 et § 9) ; ne touche pas l'ADR 0058.
 Date : 2026-11-12
 
 ## Contexte
@@ -31,7 +31,7 @@ Une **action préparée** (`prepared_action`) est un geste que l'agent dépose s
 3. Confirmer ouvre l'écran normal du geste, pré-rempli : l'humain relit, peut tout changer, et confirme avec la reconfirmation que ce geste demande déjà (et au moins mot de passe et code de moins de 10 minutes s'il n'en demandait pas). La confirmation appelle la commande de la route, avec ses gardes, au nom de l'humain ; le journal garde l'`id` de l'action préparée et le `grantId`.
 4. Refuser est un clic. Une action préparée expire au bout de 72 heures. Elle ne s'exécute jamais par le temps qui passe, par un autre agent ni par un jeton.
 5. Seul le propriétaire confirme une action qui touche l'équipe ou l'argent, même si l'accès est au nom d'un manager.
-6. Liste fermée en code. Premier geste : **inviter un membre** (prénom, rôle, créatrices). L'e-mail, les identifiants de la plateforme et le taux ne passent jamais par l'agent : le propriétaire les saisit lui-même sur l'écran de confirmation. Viendront ensuite, chacun par une phrase acceptée de cette ADR : changer les créatrices d'un membre, le marquer parti. Un taux ne se prépare jamais : il se tape à l'écran. Au plus 20 actions en attente par accès.
+6. Liste fermée en code. Premier geste : **inviter un membre** (prénom, rôle, créatrices). L'e-mail, les identifiants de la plateforme et le taux ne passent jamais par l'agent : le propriétaire les saisit lui-même sur l'écran de confirmation. Viendront ensuite, chacun par une phrase acceptée de cette ADR : changer les créatrices d'un membre, le marquer parti. Un taux ne se prépare jamais : il se tape à l'écran. Deuxième geste : **un script** (étapes et médias, ADR 0100), sans aucun prix ; l'humain pose les prix à la confirmation. Au plus 20 actions en attente par accès.
 
 ### 3. Ce qui reste fermé, même préparé
 
@@ -52,6 +52,14 @@ Les outils de 0026 § 5 restent, sous des noms et une adresse Impera (`impera://
 
 Les deux capacités nouvelles sont, comme les autres, jamais cochées d'office.
 
+Chaque message lu porte son auteur (chatteur nommé, agent de chatting ou créatrice) : l'agent connecté peut juger le travail d'un chatteur et le respect de la stratégie, mais il n'écrit jamais au chatteur ni dans ses notes.
+
+Les liens de suivi de la plateforme (trafic) entrent au catalogue le jour où le CRM les lit, par une fiche à part ; le MCP suit le CRM, il ne le précède pas.
+
+### 4 bis. L'agent d'une créatrice dépose ses médias
+
+Une écriture gardée de plus, capacité `write:drops` (jamais cochée d'office) : l'agent d'un accès borné à une créatrice dépose des médias dans ses dépôts, par la même commande que l'écran de la créatrice. Ils arrivent « à valider » chez l'agence, comme les siens ; rien ne part vers la plateforme ni vers un fan, et la publication reste régie par l'ADR 0058.
+
 ### 5. Où il tourne
 
 - En recette, `/v1/mcp` sert le monde simulé de l'ADR 0075 : les tests du MCP s'y jouent, jamais sur des données réelles.
@@ -61,7 +69,7 @@ Les deux capacités nouvelles sont, comme les autres, jamais cochées d'office.
 ### 6. Ordre des lots
 
 1. Accès d'agent, journal, catalogue de lecture du § 4 (fusionne les lots 1 et 3 de 0026 : l'Équipe existe).
-2. Freins de 0026 (lot 2) et actions préparées, avec l'invitation d'un membre.
+2. Freins de 0026 (lot 2), dépôts de l'agent d'une créatrice, et actions préparées (invitation d'un membre, puis script).
 3. OAuth, après le déploiement.
 
 ## Conséquences
