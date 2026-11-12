@@ -291,8 +291,8 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
 
   it('reads the steps already sent to a fan, and which were bought (ADR 0018 § 5)', async () => {
     const connector = connect(world());
-    const ids = (steps: { stepRef: { id: string }; isPaid: boolean }[]) =>
-      steps.map((s) => [s.stepRef.id, s.isPaid]);
+    const ids = (steps: { stepRef: { id: string }; purchased: boolean }[]) =>
+      steps.map((s) => [s.stepRef.id, s.purchased]);
     expect(ids(await connector.getScriptHistory(fan('fan_02')))).toEqual([
       ['script_1_1', true],
       ['script_1_2', true],

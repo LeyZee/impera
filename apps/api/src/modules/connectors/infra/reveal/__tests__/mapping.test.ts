@@ -248,8 +248,8 @@ describe('sentStepsOf (spec § 6, ADR 0018 § 5)', () => {
       { ...sent([]), script: step('step_never') },
     ];
     expect(sentStepsOf(items)).toEqual([
-      { stepRef: { platform: 'reveal', id: 'step_bought' }, isPaid: true },
-      { stepRef: { platform: 'reveal', id: 'step_sent' }, isPaid: false },
+      { stepRef: { platform: 'reveal', id: 'step_bought' }, purchased: true },
+      { stepRef: { platform: 'reveal', id: 'step_sent' }, purchased: false },
     ]);
   });
 });

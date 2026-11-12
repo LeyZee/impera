@@ -59,7 +59,7 @@ Le compte plateforme et la session ne font jamais apparaître le jeton ailleurs 
 | `getCreatorNotes(ref)` | `creatorNote` de `GET /models/:modelId` | une valeur par modèle, pas par conversation |
 | `getFanPpvStats(fanRef)` | `GET /conversations/:id/ppv-history?kind=paid` (+ `free`) | taux d'achat, prix haut et bas, bundles ; `lastOfferAt` = le `createdAt` le plus récent des bundles `kind=paid` (Reveal n'a pas de champ à lui) |
 | `listPlatformScripts()` | `GET /script-sequences/model/:modelId` + `GET /scripts/model/:modelId?withConversations=false` (toutes les pages) | voir § 6 |
-| `getScriptHistory(fanRef)` | `GET /scripts/model/:modelId?conversationId=` (toutes les pages) | par étape : envoyée (`conversations[]` non vide), achetée (`isPaid`) |
+| `getScriptHistory(fanRef)` | `GET /scripts/model/:modelId?conversationId=` (toutes les pages) | par étape : envoyée (`conversations[]` non vide), achetée (`purchased`, lu du `isPaid` de Reveal) ; ni heure d’envoi ni script parent : `stepRef` est l’id Reveal de l’étape, unique sur le compte |
 | `listVaultMedia(opts)` | `GET /models/:modelId/vault-folders` + `GET /models/:modelId/medias?vaultFolderId=` | `VaultMedia` |
 | `fetchMedia(ref)` | URL du média (`url` ou HLS) | hors P2-02 : la durée de validité des liens est inconnue (ouvert n° 7) |
 

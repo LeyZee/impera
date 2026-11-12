@@ -247,7 +247,7 @@ export function sentStepsOf(items: readonly ScriptItem[]): SentScriptStep[] {
     .filter((item) => item.conversations.length > 0)
     .map((item) => ({
       stepRef: ref(item.script.id),
-      isPaid: item.conversations.some((conversation) => conversation.isPaid),
+      purchased: item.conversations.some((conversation) => conversation.isPaid),
     }));
 }
 

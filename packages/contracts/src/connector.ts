@@ -178,9 +178,11 @@ export type PlatformScript = z.infer<typeof PlatformScriptSchema>;
 
 /**
  * A step already sent to a fan, as the platform tells (`getScriptHistory`): the platform is the only source, a step
- * listed here never goes again (ADR 0018 § 5).
+ * listed here never goes again (ADR 0018 § 5). `purchased`: the fan bought it (its price is read in the catalogue,
+ * `listPlatformScripts`). `stepRef` is the platform's own id of the step, unique on the account. The platform gives no
+ * time of sending: the core reads it from its own record of the send.
  */
-export const SentScriptStepSchema = z.object({ stepRef: ExternalRefSchema, isPaid: z.boolean() });
+export const SentScriptStepSchema = z.object({ stepRef: ExternalRefSchema, purchased: z.boolean() });
 export type SentScriptStep = z.infer<typeof SentScriptStepSchema>;
 
 /** A media of the creator's vault on the platform (`listVaultMedia`), with its folder. */
