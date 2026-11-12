@@ -140,6 +140,7 @@ Branche : task/<id>-<slug>
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
 | OPS-04 | Plantage journalisé, repli d'écriture épinglé, prix relus | exploitation | done | — |
+| OPS-05 | Les évaluations lisent la clé posée dans le CRM | exploitation | done | ADR 0016, P3-03 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
