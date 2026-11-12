@@ -32,7 +32,7 @@ import { AwsClient } from 'aws4fetch';
 import { strFromU8, unzipSync } from 'fflate';
 import { runOnce } from 'graphile-worker';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { createOwner } from '../auth';
@@ -677,7 +677,10 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     await test.admin.db.execute(sql`update graphile_worker._private_jobs set run_at = now()`);
     await describe();
     expect(await failures()).toBe(DESCRIPTION_TRIES);
-    expect(await queued()).toBe(0);
+    // graphile-worker completes a job without awaiting it: runOnce can return before the row is deleted.
+    await vi.waitFor(async () => {
+      expect(await queued()).toBe(0);
+    });
     await backlog();
     expect(await queued()).toBe(0);
     expect((await review()).media[0]).toMatchObject({ description: null, describeFailed: true });
