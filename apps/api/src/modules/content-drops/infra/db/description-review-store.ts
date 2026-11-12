@@ -1,10 +1,12 @@
 import {
+  DESCRIPTION_TRIES,
   AuditEntryIdSchema,
   ContentDropFileIdSchema,
   ContentDropIdSchema,
   DescriptionReviewReasonSchema,
   DropMediaDescriptionSchema,
   DropMediaKindSchema,
+  MEDIA_VOCABULARY_VERSION,
   MediaAssetIdSchema,
   MediaDescriptionIdSchema,
   newId,
@@ -23,6 +25,7 @@ import {
 import { and, eq, inArray, schema, sql, withTenantMember, type Database, type Transaction } from '@impera/db';
 
 import {
+  handDescription,
   mediaHashOf,
   mentionsPrice,
   orderedSummary,
@@ -39,6 +42,7 @@ import {
 } from '../../domain/errors';
 import type { DescriptionReview, ReviewedFile } from '../../domain/ports';
 
+import { enqueueDescription } from './description-queue';
 import { enqueueSummary } from './script-summary-store';
 
 const {
@@ -52,6 +56,12 @@ const {
   scriptStructureVersions,
 } = schema;
 
+/**
+ * The `model` of a description written by hand where the AI gave up (recette créatrice 2), no prompt read; a
+ * correction of the vision's row is `human`.
+ */
+const BY_HAND = 'hand';
+
 const readsTeam = (scope: string): boolean => scope === 'owner' || scope === 'agency';
 
 interface DescriptionRow extends ReviewedRow {
@@ -60,6 +70,7 @@ interface DescriptionRow extends ReviewedRow {
   readonly creatorNote: string | null;
   readonly vocabularyVersion: string;
   readonly promptHash: string;
+  readonly model: string;
 }
 
 interface DropState {
@@ -90,6 +101,7 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
       kind: contentDropFiles.kind,
       thumbnailKey: mediaAssets.thumbnailKey,
       erasedAt: mediaAssets.erasedAt,
+      descriptionFailures: mediaAssets.descriptionFailures,
     })
     .from(contentDropFiles)
     .innerJoin(mediaAssets, eq(mediaAssets.id, contentDropFiles.mediaAssetId))
@@ -119,6 +131,7 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
             creatorNote: mediaDescriptions.creatorNote,
             vocabularyVersion: mediaDescriptions.vocabularyVersion,
             promptHash: mediaDescriptions.promptHash,
+            model: mediaDescriptions.model,
             validatedAt: mediaDescriptions.validatedAt,
             createdAt: mediaDescriptions.createdAt,
           })
@@ -149,7 +162,7 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
           ? null
           : {
               id: MediaDescriptionIdSchema.parse(row.id),
-              author: row.author === 'human' ? 'human' : 'sense',
+              author: row.author !== 'human' ? 'sense' : row.model === BY_HAND ? 'hand' : 'human',
               detailed: content.data.detailed,
               reviewReasons: row.reviewReasons.map((reason) => DescriptionReviewReasonSchema.parse(reason)),
               creatorNote: row.creatorNote,
@@ -158,6 +171,7 @@ async function stateOf(tx: Transaction, dropId: string): Promise<DropState> {
             },
       thumbnail: file.thumbnailKey !== null,
       original: file.erasedAt === null,
+      describeFailed: row === undefined && file.descriptionFailures >= DESCRIPTION_TRIES,
     };
   });
 
@@ -318,6 +332,61 @@ export function createDrizzleDescriptionReview(db: Database): DescriptionReview 
           validatedAt: now,
         });
         await audit(tx, userId, 'media_description.corrected', dropId, { from: base.id, to: id });
+        if (state.isScript) await enqueueSummary(tx, { creatorId, dropId, correlationId }, null);
+        return (await stateOf(tx, dropId)).review;
+      }),
+
+    retryDescription: (creatorId, userId, dropId, fileId, correlationId) =>
+      asTeam(creatorId, userId, async (tx) => {
+        const state = await stateOf(tx, dropId);
+        const medium = state.review.media.find((one) => one.fileId === fileId);
+        if (medium === undefined) throw new ContentDropNotFound();
+        if (!medium.describeFailed) return state.review;
+        await tx
+          .update(mediaAssets)
+          .set({ descriptionFailures: 0 })
+          .where(eq(mediaAssets.id, medium.mediaAssetId));
+        await enqueueDescription(tx, { creatorId, mediaAssetId: medium.mediaAssetId, correlationId }, null);
+        await audit(tx, userId, 'media_description.retried', dropId, { mediaAssetId: medium.mediaAssetId });
+        return (await stateOf(tx, dropId)).review;
+      }),
+
+    writeDescription: (creatorId, userId, dropId, fileId, written, now, correlationId) =>
+      asTeam(creatorId, userId, async (tx) => {
+        const state = await stateOf(tx, dropId);
+        const medium = state.review.media.find((one) => one.fileId === fileId);
+        if (medium === undefined) throw new ContentDropNotFound();
+        if (medium.description !== null) throw new DropDescriptionReviewConflict('not_shown');
+        const [asset] = await tx
+          .select({ kind: mediaAssets.kind, durationMs: mediaAssets.durationMs })
+          .from(mediaAssets)
+          .where(eq(mediaAssets.id, medium.mediaAssetId));
+        const kind = asset?.kind;
+        if (asset === undefined || (kind !== 'image' && kind !== 'video')) throw new ContentDropNotFound();
+        const id = newId(MediaDescriptionIdSchema);
+        // Written once, validated once: the vision's next run finds a human's row and leaves the medium alone.
+        await tx.insert(mediaDescriptions).values({
+          id,
+          creatorId,
+          mediaAssetId: medium.mediaAssetId,
+          vocabularyVersion: MEDIA_VOCABULARY_VERSION,
+          content: handDescription(
+            { kind, durationMs: asset.durationMs },
+            written.detailed,
+            written.intensity,
+          ),
+          model: BY_HAND,
+          promptHash: BY_HAND,
+          author: 'human',
+          creatorNote: null,
+          reviewReasons: [],
+          validatedBy: userId,
+          validatedAt: now,
+        });
+        await audit(tx, userId, 'media_description.written', dropId, {
+          mediaAssetId: medium.mediaAssetId,
+          to: id,
+        });
         if (state.isScript) await enqueueSummary(tx, { creatorId, dropId, correlationId }, null);
         return (await stateOf(tx, dropId)).review;
       }),

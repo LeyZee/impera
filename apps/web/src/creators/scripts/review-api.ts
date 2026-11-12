@@ -6,6 +6,7 @@ import {
   type ContentDropId,
   type CreatorId,
   type DropDescriptionsReview,
+  type HandIntensity,
   type MediaDescriptionId,
   type ScriptDropSummary,
   type ScriptDropSummaryId,
@@ -155,3 +156,20 @@ export const correctSummary = (
   content: ScriptDropSummary,
 ): Promise<ReviewOutcome> =>
   post(`${reviewUrl(creatorId, dropId)}/summary/correct`, { summaryId, ...content });
+
+/** The AI asked again on a medium it gave up after each of its tries (recette créatrice 2). */
+export const retryDescription = (
+  creatorId: CreatorId,
+  dropId: ContentDropId,
+  fileId: ContentDropFileId,
+): Promise<ReviewOutcome> => post(`${reviewUrl(creatorId, dropId)}/files/${fileId}/describe`, {});
+
+/** A medium the AI did not describe, written by hand (recette créatrice 2): its words and its level, validated so. */
+export const writeDescription = (
+  creatorId: CreatorId,
+  dropId: ContentDropId,
+  fileId: ContentDropFileId,
+  detailed: string,
+  intensity: HandIntensity,
+): Promise<ReviewOutcome> =>
+  post(`${reviewUrl(creatorId, dropId)}/files/${fileId}/description`, { detailed, intensity });

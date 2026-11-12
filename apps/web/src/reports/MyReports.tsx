@@ -8,14 +8,15 @@ import {
   GAP_TO_EXPLAIN,
   gapWaits,
   linesOf,
-  MEMBER_STATUS,
+  memberStatusOf,
   mergeLists,
   periodAt,
   periodLine,
   periodSums,
   previousPeriod,
-  STATUS_TONES,
   toDoOf,
+  toneOf,
+  withoutPayEffect,
   type ShiftLine,
 } from './model';
 
@@ -113,15 +114,23 @@ export function MyReportsCard({
   if (lines.length === 0 && sums.length === 0 && reportToDos(list, heroShiftId).length > 0) return null;
   // The folded list is shift by shift: its summary counts the reports, a correction waiting is said on its line.
   const made = ofPeriod.filter((one) => one.correctsId === null);
-  const count = (status: ShiftReportStatus): number => made.filter((one) => one.status === status).length;
+  const paying = made.filter((one) => !withoutPayEffect(one));
+  const count = (status: ShiftReportStatus): number => paying.filter((one) => one.status === status).length;
   const validated = count('validated');
   const waiting = count('submitted');
   const sentBack = count('rejected');
+  // His fortnight switched to the sales read after he reported: his reports stay, without effect (ADR 0084 § 3).
+  const without = made.length - paying.length;
 
   return (
     <Panel className="rp-mine nv-enter" eyebrow={`Mes rapports · quinzaine ${periodLine(period)}`}>
       <div className="rp-sec">
-        {sums.length === 0 ? (
+        {sums.length === 0 && without > 0 ? (
+          <p className="rp-mine__empty">
+            Cette quinzaine, ta paie suit les ventes relevées&nbsp;: tes rapports restent, sans effet sur la
+            paie.
+          </p>
+        ) : sums.length === 0 ? (
           <p className="rp-mine__empty">
             Pas encore de rapport cette quinzaine. Il se fait d’ici, à la fin de chaque shift.
           </p>
@@ -160,7 +169,7 @@ export function MyReportsCard({
           </div>
         )}
 
-        {sums.length === 0 ? null : (
+        {sums.length === 0 && without === 0 ? null : (
           // His commission is computed by the pay, from the net: Commissions says it, never an estimate here.
           <Link to="/commissions" className="rp-mine__pay">
             Ta commission est dans Commissions
@@ -179,6 +188,7 @@ export function MyReportsCard({
                   validated === 0 ? null : `${String(validated)} validé${validated > 1 ? 's' : ''}`,
                   waiting === 0 ? null : `${String(waiting)} en attente`,
                   sentBack === 0 ? null : `${String(sentBack)} renvoyé${sentBack > 1 ? 's' : ''}`,
+                  without === 0 ? null : `${String(without)} sans effet sur la paie`,
                 ]
                   .filter((part) => part !== null)
                   .join(' · ')}
@@ -218,7 +228,7 @@ function MyLine({
 }): JSX.Element | null {
   const { report } = line;
   if (report === null) return null;
-  const pending = line.corrections.some((one) => one.status !== 'validated');
+  const pending = !withoutPayEffect(report) && line.corrections.some((one) => one.status !== 'validated');
   const explain = gapWaits(report, now);
   return (
     <li>
@@ -238,8 +248,8 @@ function MyLine({
             report.amount.currency,
           )}
         </span>
-        <span className={`rp-chip rp-chip--${explain ? 'warn' : STATUS_TONES[report.status]}`}>
-          {explain ? GAP_TO_EXPLAIN : MEMBER_STATUS[report.status]}
+        <span className={`rp-chip rp-chip--${explain ? 'warn' : toneOf(report)}`}>
+          {explain ? GAP_TO_EXPLAIN : memberStatusOf(report)}
           {pending ? ' · correction en attente' : ''}
         </span>
       </button>

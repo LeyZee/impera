@@ -40,7 +40,7 @@ import type {
   UnitOfWork,
 } from '../domain/ports';
 import { rebuildProjection, type ConversationProjection } from '../domain/projection';
-import { debounceFor, fanAwaitsAnswer } from '../domain/rules';
+import { FAN_MEDIA_MAX, boundFanText, fanAwaitsAnswer, respondAt } from '../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../domain/state-machine';
 
 import { closeAutomaticIfLocked, readAutomaticGate, readAutomaticLock } from './automatic';
@@ -227,11 +227,12 @@ export function createConversationCommands({
           platformMessageId: message.ref.id,
           direction: message.direction,
           author,
-          text: message.text,
+          // A fan's message is cut, never refused: what he sent beyond is not kept, nor read by the agent.
+          text: isInbound ? boundFanText(message.text) : message.text,
           priceMinor: message.priceMinor,
           currency: message.currency,
           isPaid: message.isPaid,
-          platformMedia: message.media,
+          platformMedia: isInbound ? message.media.slice(0, FAN_MEDIA_MAX) : message.media,
           platformCreatedAt: new Date(message.createdAt),
           draftId: null,
         });
@@ -278,7 +279,9 @@ export function createConversationCommands({
             actor: 'system',
           });
           if (conversation.state === 'pending') {
-            // Debounce: each new message replaces the pending job, so a burst gets one answer (ADR 0006).
+            // Debounce: each new message replaces the pending job, so a burst gets one answer (ADR 0006). Past 60
+            // answers to him within the hour, she slows down to one every three minutes, and never stops.
+            const replies = await tx.drafts.paceSince(conversation.id, new Date(at.getTime() - 3_600_000));
             await tx.jobs.enqueue(
               'conversation.respond',
               {
@@ -289,7 +292,7 @@ export function createConversationCommands({
               {
                 queueName: queueNameFor(conversation.id),
                 jobKey: jobKeyFor('conversation.respond', conversation.id),
-                runAt: new Date(at.getTime() + debounceFor() * 1_000),
+                runAt: respondAt({ now: at, repliesLastHour: replies.count, lastReplyAt: replies.lastAt }),
               },
             );
           }

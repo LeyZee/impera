@@ -234,6 +234,10 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
             maxRetries: 0,
             abortSignal: AbortSignal.timeout(roleConfig.timeoutMs),
             ...(ref.provider === 'google' && { providerOptions: GOOGLE_SAFETY }),
+            ...(ref.provider === 'xai' &&
+              roleConfig.reasoningEffort !== undefined && {
+                providerOptions: { xai: { reasoningEffort: roleConfig.reasoningEffort } },
+              }),
           });
           const latencyMs = now().getTime() - startedAt;
           const cost = costUsd(ref, result.usage);

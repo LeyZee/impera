@@ -216,6 +216,17 @@ describe('LlmGateway', () => {
     expect(JSON.stringify(log.since(new Date(0)))).not.toContain('Salut');
   });
 
+  it('asks Grok to think briefly on the role it serves, and never sends that to another provider', async () => {
+    const xai = scripted([{ status: 500 }, { status: 500 }, { status: 500 }]);
+    const mistral = scripted([{ text: BUBBLES }]);
+    const { gateway } = setup({ xai, mistral });
+
+    await gateway.voice(INPUT);
+
+    expect(xai.doGenerateCalls[0]?.providerOptions).toEqual({ xai: { reasoningEffort: 'low' } });
+    expect(mistral.doGenerateCalls[0]?.providerOptions).toBeUndefined();
+  });
+
   it('asks once more when the output does not match the schema', async () => {
     const xai = scripted([{ text: 'Coucou toi' }, { text: BUBBLES }]);
     const { gateway, log } = setup({ xai });

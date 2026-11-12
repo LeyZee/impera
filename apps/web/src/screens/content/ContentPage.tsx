@@ -18,11 +18,13 @@ import {
   DROP_OUTPUTS,
   STATE_WORDS,
   contentsOf,
+  dropName,
   droppedOn,
   dueOf,
   fileLine,
   onTheirWay,
   openRequests,
+  outLine,
   published,
   mayWithdrawHere,
   refusedOf,
@@ -184,10 +186,8 @@ export function ContentPage({
                 {out.map((drop) => (
                   <li key={drop.id} className="ct-out">
                     <span aria-hidden="true">{CATEGORY_EMOJIS[drop.category]}</span>
-                    <span className="ct-out__name">{DROP_CATEGORY_LABELS[drop.category]}</span>
-                    <span className="ct-out__meta nv-num">
-                      {contentsOf(drop.files)} · {droppedOn(drop.createdAt, today, zone)}
-                    </span>
+                    <span className="ct-out__name">{dropName(drop)}</span>
+                    <span className="ct-out__meta nv-num">{outLine(drop, today, zone)}</span>
                   </li>
                 ))}
               </ul>
@@ -339,7 +339,7 @@ function DropCard({
         <span className="ct-card__emoji" aria-hidden="true">
           {CATEGORY_EMOJIS[drop.category]}
         </span>
-        <span className="ct-card__name">{DROP_CATEGORY_LABELS[drop.category]}</span>
+        <span className="ct-card__name">{dropName(drop)}</span>
         <span className={`ct-state ct-state--${tone}`}>{STATE_WORDS[drop.state]}</span>
       </div>
       <p className="ct-card__meta nv-num">
