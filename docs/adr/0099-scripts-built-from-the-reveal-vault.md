@@ -31,7 +31,9 @@ Ce qui n'est tranché nulle part : bâtir dans le CRM un script fait de médias 
 
 5. **Écrire dans Reveal passe par la garde d'écriture.** Créer une étape et une séquence sont deux nouvelles écritures du port (`createScriptStep`, `createScriptSequence`, drapeau `scriptWrite`), avec clé d'idempotence, derrière `run(…, writes: true)` (ADR 0018 § 3). Tant que Charles n'a pas ouvert l'écriture du compte, le script reste un brouillon du CRM. Un script créé par Impera est relu par la synchronisation suivante comme n'importe quel script Reveal : la plateforme fait foi, nous ne gardons pas de copie qui divergerait. On ne modifie ni ne supprime jamais un script dans Reveal depuis le CRM : on en crée un nouveau.
 
-6. **Données réelles.** Aucun média, nom de dossier, lien ou description réels dans le dépôt, les tests ou les docs ; `FakeReveal` porte un coffre fictif (dossiers, photos et vidéos générées, dont une vidéo en flux découpé). La vérification sur le vrai compte se fait sur le PC de Charles, en lecture seule pour les temps 1 et 2.
+6. **Qui livre quoi.** La lecture du coffre et des scripts est celle de P2-02 (`listVaultMedia`, `listScripts`, fil Bilan), réutilisée telle quelle. Le téléchargement des octets (`fetchMedia`) fait l'objet d'une fiche à part, après la première lecture réelle des liens de médias. Le job de synchronisation, ses tables et l'écran sont des fiches de cette ADR ; la création de scripts dans Reveal s'ajoute aux écritures de P2-03.
+
+7. **Données réelles.** Aucun média, nom de dossier, lien ou description réels dans le dépôt, les tests ou les docs ; `FakeReveal` porte un coffre fictif (dossiers, photos et vidéos générées, dont une vidéo en flux découpé). La vérification sur le vrai compte se fait sur le PC de Charles, en lecture seule pour les temps 1 et 2.
 
 ## Conséquences
 
