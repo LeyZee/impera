@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { MessageDirectionSchema, PlatformSchema, SessionStateSchema } from './enums';
+import { MessageAuthorSchema, MessageDirectionSchema, PlatformSchema, SessionStateSchema } from './enums';
 import { PlatformAccountIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
@@ -46,6 +46,11 @@ export const ExternalMessageSchema = z.object({
   isPaid: z.boolean(),
   /** Name of the team member who sent an outbound message, when the platform shows it. */
   senderLabel: z.string().optional(),
+  /**
+   * Who wrote it, when the adapter can tell: the fan, the account's own « bot » member (`ai`), or someone else on the
+   * creator's side (`human`: the creator herself or a chatter). Absent when the platform does not say.
+   */
+  author: MessageAuthorSchema.optional(),
   createdAt: z.iso.datetime(),
 });
 export type ExternalMessage = z.infer<typeof ExternalMessageSchema>;
@@ -84,7 +89,112 @@ export const VerifyResultSchema = z.discriminatedUnion('status', [
 ]);
 export type VerifyResult = z.infer<typeof VerifyResultSchema>;
 
-/** What a connector can do; the core adapts to it, never the other way round. */
+/* ---------------------------------------------------------------------------------------------------------------
+ * The readings of ADR 0018: what a chatter sees beside a conversation, the platform's scripts and its vault. In the
+ * glossary's words, with no platform's own field: each adapter translates in its infra.
+ * ------------------------------------------------------------------------------------------------------------ */
+
+/** A media as the platform lists it, without its file. */
+const PlatformMediaSchema = ExternalMediaSchema.pick({ ref: true, kind: true });
+export type PlatformMedia = z.infer<typeof PlatformMediaSchema>;
+
+/** The fan as the platform shows him beside the conversation (`getFanProfile`). Amounts in minor units. */
+export const FanProfileSchema = z.object({
+  fanRef: ExternalRefSchema,
+  /** When he joined the platform. */
+  joinedAt: z.iso.datetime(),
+  /** His first subscription to the creator, `null` when the platform does not know one. */
+  subscribedAt: z.iso.datetime().nullable(),
+  /** When the current subscription ends, and whether it renews by itself. */
+  subscriptionEndsAt: z.iso.datetime().nullable(),
+  autoRenew: z.boolean(),
+  totalSpentMinor: z.number().int().min(0),
+  currency: CurrencySchema,
+  lastPaidAt: z.iso.datetime().nullable(),
+  /** When his card was checked: the only age-related fact a platform may give; `null` when never. */
+  cardVerifiedAt: z.iso.datetime().nullable(),
+});
+export type FanProfile = z.infer<typeof FanProfileSchema>;
+
+/** « Note client » (`getFanNote`): read live, never stored nor logged by Impera (ADR 0018 § 1). Empty when none. */
+export const FanNoteSchema = z.object({ text: z.string() });
+export type FanNote = z.infer<typeof FanNoteSchema>;
+
+/** « Notes du modèle » (`getCreatorNotes`): what the platform shows about the creator beside a conversation. */
+export const CreatorNoteSchema = z.object({ text: z.string().min(1) });
+export type CreatorNote = z.infer<typeof CreatorNoteSchema>;
+
+/** One bundle the fan was offered in the conversation, bought or not. */
+const PpvOfferSchema = z.object({
+  ref: ExternalRefSchema,
+  /** 0 for a free bundle. */
+  priceMinor: z.number().int().min(0),
+  isPaid: z.boolean(),
+  sentAt: z.iso.datetime(),
+  media: z.array(PlatformMediaSchema),
+});
+
+/** The PPV tab of a fan (`getFanPpvStats`): how many priced bundles he bought, the price range, every bundle. */
+export const FanPpvStatsSchema = z.object({
+  purchased: z.number().int().min(0),
+  offered: z.number().int().min(0),
+  highestPriceMinor: z.number().int().min(0).nullable(),
+  lowestPriceMinor: z.number().int().min(0).nullable(),
+  currency: CurrencySchema,
+  /** Newest first, priced and free. */
+  bundles: z.array(PpvOfferSchema),
+});
+export type FanPpvStats = z.infer<typeof FanPpvStatsSchema>;
+
+/** A script's moment (☀️ / 🌙 in the platform's naming): the selling engine's « temps présent » rule reads it. */
+export const PlatformScriptMomentSchema = z.enum(['day', 'night']);
+
+/** One step of a platform script: its text, the media it sells, its previews and its price. */
+export const PlatformScriptStepSchema = z.object({
+  /** The step as the platform names it: what a send of this step refers to. */
+  ref: ExternalRefSchema,
+  /** Its place in the script, from 0. */
+  index: z.number().int().min(0),
+  name: z.string(),
+  text: z.string(),
+  media: z.array(PlatformMediaSchema),
+  previewMedia: z.array(PlatformMediaSchema),
+  /** Minor units, VAT included; 0 for a free step. */
+  priceMinor: z.number().int().min(0),
+  currency: CurrencySchema,
+});
+export type PlatformScriptStep = z.infer<typeof PlatformScriptStepSchema>;
+
+/** « Script natif » (`listPlatformScripts`): a selling script stored on the platform, its steps in order. */
+export const PlatformScriptSchema = z.object({
+  ref: ExternalRefSchema,
+  name: z.string(),
+  moment: PlatformScriptMomentSchema.nullable(),
+  steps: z.array(PlatformScriptStepSchema).min(1),
+});
+export type PlatformScript = z.infer<typeof PlatformScriptSchema>;
+
+/**
+ * A step already sent to a fan, as the platform tells (`getScriptHistory`): the platform is the only source, a step
+ * listed here never goes again (ADR 0018 § 5).
+ */
+export const SentScriptStepSchema = z.object({ stepRef: ExternalRefSchema, isPaid: z.boolean() });
+export type SentScriptStep = z.infer<typeof SentScriptStepSchema>;
+
+/** A media of the creator's vault on the platform (`listVaultMedia`), with its folder. */
+export const VaultMediaSchema = z.object({
+  ref: ExternalRefSchema,
+  kind: ExternalMediaSchema.shape.kind,
+  folder: z.object({ ref: ExternalRefSchema, name: z.string() }).nullable(),
+  durationSeconds: z.number().min(0).nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type VaultMedia = z.infer<typeof VaultMediaSchema>;
+
+/**
+ * What a connector can do; the core adapts to it, never the other way round. A reading of ADR 0018 is called only
+ * when its flag is true, never because the method exists.
+ */
 export const ConnectorCapabilitiesSchema = z.object({
   unreadWithoutOpen: z.boolean(),
   sendMedia: z.boolean(),
@@ -92,6 +202,20 @@ export const ConnectorCapabilitiesSchema = z.object({
   markRead: z.boolean(),
   typing: z.boolean(),
   realtime: z.boolean(),
+  /** `getFanProfile`. */
+  fanProfile: z.boolean(),
+  /** `getFanNote`. */
+  fanNoteRead: z.boolean(),
+  /** `getCreatorNotes`. */
+  creatorNotes: z.boolean(),
+  /** `getFanPpvStats`. */
+  ppvStats: z.boolean(),
+  /** `listPlatformScripts`. */
+  scripts: z.boolean(),
+  /** `getScriptHistory`. */
+  scriptHistory: z.boolean(),
+  /** `listVaultMedia`. */
+  vault: z.boolean(),
 });
 export type ConnectorCapabilities = z.infer<typeof ConnectorCapabilitiesSchema>;
 

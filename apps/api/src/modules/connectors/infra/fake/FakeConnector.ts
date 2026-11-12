@@ -45,6 +45,14 @@ export class FakeConnector implements PlatformConnector {
     markRead: false,
     typing: false,
     realtime: false,
+    // The readings of ADR 0018: none here; FakeReveal plays them for the contract.
+    fanProfile: false,
+    fanNoteRead: false,
+    creatorNotes: false,
+    ppvStats: false,
+    scripts: false,
+    scriptHistory: false,
+    vault: false,
   };
 
   readonly sent: FakeSent[] = [];
