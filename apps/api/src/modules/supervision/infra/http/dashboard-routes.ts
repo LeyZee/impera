@@ -42,7 +42,7 @@ import type {
   VoiceVersion,
 } from '../../domain/dashboard-ports';
 import { revealSalesPanel, salesDays } from '../../domain/reveal-sales';
-import { creatorSetup, memberSetup } from '../../domain/setup';
+import { creatorSetup, memberSetup, memberSetupSeenBy } from '../../domain/setup';
 import type { AgencyInsightsReader } from '../views/agency-insights-reader';
 import type { SetupReader } from '../views/setup-reader';
 
@@ -283,16 +283,30 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
         })),
       }),
     );
+    // The team's: the owner's, and an active manager's for the chatters, without their invoicing.
     app.get(
       '/dashboard/setup/members',
-      { preValidation: deps.requireRole('owner'), schema: { response: { 200: MemberSetupListSchema } } },
-      async () => ({
-        members: (await deps.setup.members()).map(({ memberId, teamRole, facts }) => ({
+      {
+        preValidation: deps.requireRole('owner', 'operator'),
+        schema: { response: { 200: MemberSetupListSchema } },
+      },
+      async (request) => {
+        const reader =
+          request.user?.role === 'owner'
+            ? 'owner'
+            : request.membership?.teamScope === 'agency'
+              ? 'manager'
+              : null;
+        if (reader === null) {
+          throw new DomainError('role_forbidden', 'Réservé au propriétaire et aux managers actifs');
+        }
+        const members = (await deps.setup.members()).map(({ memberId, teamRole, facts }) => ({
           memberId,
           teamRole,
           steps: memberSetup(facts),
-        })),
-      }),
+        }));
+        return { members: memberSetupSeenBy(reader, members) };
+      },
     );
     return Promise.resolve();
   };

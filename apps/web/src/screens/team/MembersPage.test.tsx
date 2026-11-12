@@ -149,7 +149,12 @@ function serve(
 }
 
 /** The page as the app mounts it: the tab and the open member live in the address. */
-function renderPage(at = '/equipe/membres', canManage = true, viewerId = id(99)): AnyRouter {
+function renderPage(
+  at = '/equipe/membres',
+  canManage = true,
+  viewerId = id(99),
+  seesSetup = canManage,
+): AnyRouter {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const root = createRootRoute();
   const team = createRoute({
@@ -164,6 +169,7 @@ function renderPage(at = '/equipe/membres', canManage = true, viewerId = id(99))
           tab={onglet === 'managers' ? 'manager' : 'chatter'}
           selected={membre ?? null}
           canManage={canManage}
+          seesSetup={seesSetup}
           viewerId={viewerId}
           onTab={(tab) =>
             void navigate({ search: (s) => ({ ...s, onglet: tab === 'manager' ? 'managers' : undefined }) })
@@ -319,6 +325,27 @@ describe('Équipe › Membres', () => {
     cleanup();
 
     renderPage(`/equipe/membres?onglet=managers&membre=${INES.id}`);
+    await screen.findByRole('region', { name: 'Inès' });
+    expect(screen.queryByRole('region', { name: 'Mise en route du membre' })).toBeNull();
+  });
+
+  it('gives an active manager a chatter’s « Mise en route », never a manager’s', async () => {
+    const step = (key: string, state: string) => ({ key, state, note: null });
+    serve({
+      setups: [
+        {
+          memberId: THEO.id,
+          teamRole: 'chatter',
+          steps: [step('invitation', 'done'), step('second_factor', 'todo'), step('creators', 'done')],
+        },
+      ],
+    });
+    renderPage(`/equipe/membres?membre=${THEO.id}`, false, id(99), true);
+    const card = await screen.findByRole('region', { name: 'Mise en route du membre' });
+    expect(within(card).getByText('2 sur 3')).toBeDefined();
+    cleanup();
+
+    renderPage(`/equipe/membres?onglet=managers&membre=${INES.id}`, false, id(99), true);
     await screen.findByRole('region', { name: 'Inès' });
     expect(screen.queryByRole('region', { name: 'Mise en route du membre' })).toBeNull();
   });

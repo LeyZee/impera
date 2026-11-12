@@ -156,10 +156,19 @@ export function payoutBlockPlace(
   reason: InvoiceNotIssuedReason | null,
 ): 'file' | 'billing' | null {
   if (block.reason !== 'documents_not_issued') return 'file';
+  return notIssuedPlace(reason);
+}
+
+/** Where the owner settles what holds an invoice back: the member's file, Réglages › Facturation, or nowhere. */
+export function notIssuedPlace(reason: InvoiceNotIssuedReason | null): 'file' | 'billing' | null {
   if (reason === 'agency_missing' || reason === 'mandate_unpublished' || reason === 'regime_not_validated')
     return 'billing';
   return reason === 'no_invoice_to_credit' ? null : 'file';
 }
+
+/** Why an invoice would be held back, as the owner reads it (« ta vérification »): one clause, no capital. */
+export const notIssuedForOwner = (reason: InvoiceNotIssuedReason): string =>
+  NOT_ISSUED_FOR_AGENCY[reason]('ta vérification');
 
 /** A transfer that waits, as the member reads it (recette EQP-04): why, and whether the next step is theirs. */
 export interface MyPayoutHold {

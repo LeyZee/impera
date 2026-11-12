@@ -10,10 +10,19 @@ import { sql, withAdmin, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import { modeOf } from '../../domain/dashboard';
-import type { CreatorSetupFacts, MemberSetupFacts } from '../../domain/setup';
+import type { CreatorSetupFacts, Invitation, MemberSetupFacts } from '../../domain/setup';
 
 /** Whether an urgent alert reaches a group for each creator (`telegram`'s coverage); `null` when Telegram is off. */
 export type TelegramReach = () => Promise<ReadonlyMap<CreatorId, boolean> | null>;
+
+/**
+ * What stops the first invoice of each member on `day` (invoicing's `invoiceReadiness`), `null` when it could go out.
+ * A port: supervision reads no invoicing table itself.
+ */
+export type BillingReadiness = (
+  memberIds: readonly TeamMemberId[],
+  day: string,
+) => Promise<ReadonlyMap<TeamMemberId, MemberSetupFacts['billing']>>;
 
 export interface SetupReader {
   /** Every creator not archived, the oldest first. */
@@ -33,20 +42,39 @@ const AccountRow = z.object({
   made_on: day,
 });
 const IdRow = z.object({ creator_id: CreatorIdSchema });
-const AccessRow = z.object({ creator_id: CreatorIdSchema.nullable(), active: z.boolean() });
+const InvitationSchema = z.enum(['none', 'pending', 'expired', 'used']) satisfies z.ZodType<Invitation>;
+const AccessRow = z.object({ creator_id: CreatorIdSchema.nullable(), invitation: InvitationSchema });
 const SwitchRow = z.object({ scope: z.string(), scope_id: z.string().nullable(), active: z.boolean() });
 const AutoRow = z.object({ creator_id: CreatorIdSchema, auto: count });
 const CheckRow = z.object({ platform: z.string(), clean: z.boolean(), to_day: day });
 const MemberRow = z.object({
   id: TeamMemberIdSchema,
   team_role: TeamRoleSchema,
-  invited: z.boolean(),
+  invitation: InvitationSchema,
   second_factor: z.boolean(),
   extension: z.boolean(),
   linked: z.boolean(),
   creators: count,
   shift: z.boolean(),
+  paid: z.boolean(),
 });
+const TodayRow = z.object({ today: day });
+
+/**
+ * An account's invitation, in SQL over `u` (the user): a password chosen, else a live link, else a link that died
+ * unused (expired or replaced), else none. `target` is the column of `invitation_links` that names the account.
+ */
+const invitationOf = (
+  target: 'member_id' | 'user_id',
+  id: ReturnType<typeof sql>,
+): ReturnType<typeof sql> => sql`
+  case
+    when exists (select 1 from account a where a.user_id = u.id and a.provider_id = 'credential') then 'used'
+    when exists (select 1 from invitation_links l where l.${sql.raw(target)} = ${id}
+                 and l.used_at is null and l.revoked_at is null and l.expires_at > now()) then 'pending'
+    when exists (select 1 from invitation_links l where l.${sql.raw(target)} = ${id}) then 'expired'
+    else 'none'
+  end`;
 
 /**
  * The facts of « Mise en route », read through the admin connection: her own account, the passwords, the passkeys and
@@ -56,6 +84,7 @@ const MemberRow = z.object({
 export function createSetupReader(
   adminDb: Database,
   telegramReach: TelegramReach,
+  billing: BillingReadiness,
   agencyTimeZone: string,
 ): SetupReader {
   return {
@@ -90,8 +119,7 @@ export function createSetupReader(
         // Her own account opens her alone (`user_creator_link_check`); a password set means her link was used.
         const access = await read(
           AccessRow,
-          sql`select u.creator_ids[1] as creator_id,
-                exists (select 1 from account a where a.user_id = u.id and a.provider_id = 'credential') as active
+          sql`select u.creator_ids[1] as creator_id, ${invitationOf('user_id', sql`u.id`)} as invitation
               from "user" u where u.role = 'creator'`,
         );
         const shifts = await read(
@@ -128,7 +156,7 @@ export function createSetupReader(
             accountsWithPayRules: hers.filter((a) => a.with_rules).length,
             hasActivePersona: withPersona.has(id),
             hasAgencyRate: withRate.has(id),
-            access: account === undefined ? 'none' : account.active ? 'active' : 'pending',
+            access: account?.invitation ?? 'none',
             telegramReachable: reach === null ? null : (reach.get(id) ?? false),
             hasOwnHours: own_hours,
             hasShifts: withShifts.has(id),
@@ -145,38 +173,59 @@ export function createSetupReader(
         });
       });
     },
-    members: () =>
-      withAdmin(adminDb, async (tx) => {
-        const rows = z.array(MemberRow).parse(
-          (
-            await tx.execute(
-              sql`select m.id, m.team_role,
-                    exists (select 1 from account a where a.user_id = u.id and a.provider_id = 'credential') as invited,
-                    (u.two_factor_enabled or exists (select 1 from passkey p where p.user_id = u.id)) as second_factor,
-                    exists (select 1 from extension_links l where l.user_id = u.id and l.revoked_at is null) as extension,
-                    exists (select 1 from sales_feed_chatters c where c.member_id = m.id) as linked,
-                    cardinality(u.creator_ids) as creators,
-                    exists (select 1 from shifts s where s.member_id = m.id and s.cancelled_at is null) as shift
-                  from team_members m join "user" u on u.id = m.user_id
-                  where m.status <> 'left'
-                  order by m.display_name, m.id`,
-            )
-          ).rows,
+    members: async () => {
+      const { today, rows } = await withAdmin(adminDb, async (tx) => {
+        const read = async <T extends z.ZodType>(
+          schema: T,
+          query: ReturnType<typeof sql>,
+        ): Promise<z.infer<T>[]> => z.array(schema).parse((await tx.execute(query)).rows);
+        const [{ today } = { today: '' }] = await read(
+          TodayRow,
+          sql`select (now() at time zone ${agencyTimeZone})::date as today`,
         );
-        return rows.map((row) => ({
-          memberId: row.id,
+        // An archived creator is off his list and her shifts no longer start him (recette Équipe 12/11).
+        const rows = await read(
+          MemberRow,
+          sql`select m.id, m.team_role, ${invitationOf('member_id', sql`m.id`)} as invitation,
+                (u.two_factor_enabled or exists (select 1 from passkey p where p.user_id = u.id)) as second_factor,
+                exists (select 1 from extension_links l where l.user_id = u.id and l.revoked_at is null) as extension,
+                exists (select 1 from sales_feed_chatters c where c.member_id = m.id) as linked,
+                (select count(*) from creators c where c.id = any(u.creator_ids) and c.archived_at is null)
+                  as creators,
+                exists (select 1 from shifts s join creators c on c.id = s.creator_id
+                        where s.member_id = m.id and s.cancelled_at is null and c.archived_at is null) as shift,
+                -- A chatter's pay is always invoiced; a manager's once a rate or a share of the team's net is in force.
+                (m.team_role = 'chatter' or coalesce((
+                  select r.rate_bps > 0 or coalesce(r.team_share_bps, 0) > 0 from member_commission_rates r
+                  where r.member_id = m.id and r.effective_from <= ${today}::date
+                  order by r.effective_from desc limit 1), false)) as paid
+              from team_members m join "user" u on u.id = m.user_id
+              where m.status <> 'left'
+              order by m.display_name, m.id`,
+        );
+        return { today, rows };
+      });
+      // Out of the transaction above: invoicing reads in its own.
+      const blocked = await billing(
+        rows.filter((row) => row.paid).map((row) => row.id),
+        today,
+      );
+      return rows.map((row) => ({
+        memberId: row.id,
+        teamRole: row.team_role,
+        facts: {
           teamRole: row.team_role,
-          facts: {
-            teamRole: row.team_role,
-            invitationUsed: row.invited,
-            secondFactor: row.second_factor,
-            extensionLinked: row.extension,
-            platformAccountLinked: row.linked,
-            creators: row.creators,
-            hasShift: row.shift,
-          },
-        }));
-      }),
+          invitation: row.invitation,
+          secondFactor: row.second_factor,
+          extensionLinked: row.extension,
+          platformAccountLinked: row.linked,
+          creators: row.creators,
+          hasShift: row.shift,
+          paid: row.paid,
+          billing: blocked.get(row.id) ?? null,
+        },
+      }));
+    },
   };
 }
 

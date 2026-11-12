@@ -127,13 +127,15 @@ describe('GET /v1/dashboard/setup/creators and /members, « Mise en route »', (
     await test.close();
   });
 
-  it('is the owner’s alone', async () => {
+  it('gives the creators’ to the owner alone, the team’s to the owner and an active manager', async () => {
     for (const path of ['creators', 'members']) {
       expect((await get(null, path)).statusCode).toBe(401);
-      for (const who of ['manager', 'chatter', 'creator'] as const) {
+      for (const who of ['chatter', 'creator'] as const) {
         expect((await get(who, path)).statusCode, `${who} ${path}`).toBe(403);
       }
     }
+    expect((await get('manager', 'creators')).statusCode).toBe(403);
+    expect((await get('manager', 'members')).statusCode).toBe(200);
   });
 
   it('reads what a creator has, and what she does not', async () => {
@@ -232,7 +234,8 @@ describe('GET /v1/dashboard/setup/creators and /members, « Mise en route »', (
       Object.fromEntries(
         (members.find((m) => m.teamRole === role)?.steps ?? []).map((s) => [s.key, s.state]),
       );
-    // Both signed in with their authenticator code (the test's sign-in sets one up).
+    // Both signed in with their authenticator code (the test's sign-in sets one up). The manager has no rate: not paid,
+    // no invoicing; the chatter's file is empty, so his first invoice could not go out.
     expect(of('manager')).toEqual({ invitation: 'done', second_factor: 'done', creators: 'done' });
     expect(of('chatter')).toEqual({
       invitation: 'done',
@@ -241,6 +244,73 @@ describe('GET /v1/dashboard/setup/creators and /members, « Mise en route »', (
       platform_account: 'done',
       creators: 'done',
       first_shift: 'done',
+      billing: 'todo',
     });
+    const billing = members.find((m) => m.memberId === theo)?.steps.find((s) => s.key === 'billing');
+    expect(billing?.note?.kind).toBe('billing');
+  });
+
+  it('shows an active manager the chatters alone, without their invoicing', async () => {
+    const answer = await get('manager', 'members');
+    expect(answer.statusCode, answer.body).toBe(200);
+    const members = MemberSetupListSchema.parse(answer.json()).members;
+    expect(members.every((m) => m.teamRole === 'chatter')).toBe(true);
+    expect(members.map((m) => m.memberId)).toContain(theo);
+    expect(members.flatMap((m) => m.steps.map((s) => s.key))).not.toContain('billing');
+  });
+
+  it('asks a new link for an invitation that died unused, and leaves archived creators out', async () => {
+    const gone = newId(CreatorIdSchema);
+    const goneAccount = newId(PlatformAccountIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: gone, nameKey: 'partie', displayName: 'Partie', timezone: 'Europe/Paris' });
+    await test.admin.db
+      .insert(schema.platformAccounts)
+      .values({ id: goneAccount, creatorId: gone, platform: 'reveal', handle: 'partie_test' });
+    // Never signed in: no password, a link made two weeks ago and dead since last week.
+    const userId = randomUUID();
+    await test.admin.db.insert(schema.user).values({
+      id: userId,
+      name: 'Nouveau',
+      email: 'nouveau@example.test',
+      role: 'operator',
+      creatorIds: [gone],
+    });
+    const late = await member(userId, 'chatter', 'Nouveau');
+    await test.admin.db.insert(schema.invitationLinks).values({
+      id: randomUUID(),
+      memberId: late,
+      purpose: 'invitation',
+      tokenHash: 'hash-inventé-pour-le-test',
+      createdBy: ownerId,
+      createdAt: new Date(Date.now() - 14 * 86_400_000),
+      expiresAt: new Date(Date.now() - 7 * 86_400_000),
+    });
+    const starts = new Date(Date.now() + 86_400_000);
+    starts.setUTCSeconds(0, 0);
+    await test.admin.db.insert(schema.shifts).values({
+      id: newId(ShiftIdSchema),
+      creatorId: gone,
+      platformAccountId: goneAccount,
+      memberId: late,
+      startsAt: starts,
+      endsAt: new Date(starts.getTime() + 4 * 3_600_000),
+      createdBy: ownerId,
+      updatedBy: ownerId,
+    });
+    await test.admin.db
+      .update(schema.creators)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.creators.id, gone));
+    const answer = await get('owner', 'members');
+    const steps = MemberSetupListSchema.parse(answer.json()).members.find((m) => m.memberId === late)?.steps;
+    expect(steps?.find((s) => s.key === 'invitation')).toEqual({
+      key: 'invitation',
+      state: 'todo',
+      note: { kind: 'invitation_expired' },
+    });
+    expect(steps?.find((s) => s.key === 'creators')?.state).toBe('todo');
+    expect(steps?.find((s) => s.key === 'first_shift')?.state).toBe('todo');
   });
 });

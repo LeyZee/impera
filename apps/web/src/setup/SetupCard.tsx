@@ -160,6 +160,17 @@ export function SetupLink({
           {children}
         </Link>
       );
+    case 'file':
+      return (
+        <Link
+          to="/equipe/membres/$memberId/dossier"
+          params={{ memberId: target.memberId }}
+          className={className}
+          aria-label={label}
+        >
+          {children}
+        </Link>
+      );
     case 'page':
       return (
         <Link to={target.to} className={className} aria-label={label}>

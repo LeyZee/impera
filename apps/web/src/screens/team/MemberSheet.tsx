@@ -41,6 +41,7 @@ export function MemberSheet({
   creators,
   removals,
   canManage,
+  seesSetup = canManage,
   isSelf,
   onClose,
 }: {
@@ -50,6 +51,8 @@ export function MemberSheet({
   /** His accounts removed from a platform while he is still here (ADR 0076 § 5). */
   removals: readonly TeamPlatformRemoval[];
   canManage: boolean;
+  /** His « Mise en route »: the owner sees everyone's, an active manager the chatters' (the server filters). */
+  seesSetup?: boolean;
   /** His own record: the notes about him are never his to read (the server answers 403). */
   isSelf: boolean;
   onClose: () => void;
@@ -144,7 +147,9 @@ export function MemberSheet({
       ) : null}
 
       {/* His « Mise en route » (pilotage plan W1): the owner's, until all is done; nothing for one who left. */}
-      {canManage && !gone ? <MemberSetupBlock memberId={member.id} /> : null}
+      {seesSetup && !gone && (canManage || member.teamRole === 'chatter') ? (
+        <MemberSetupBlock memberId={member.id} />
+      ) : null}
 
       <div className="tm-figures">
         <div className="tm-figure nv-enter" style={{ '--nv-i': 1 }}>

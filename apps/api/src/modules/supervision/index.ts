@@ -8,7 +8,7 @@ import { createAgencyInsightsReader, type DailyStatsOf } from './infra/views/age
 import { createCreatorsOverviewReader } from './infra/views/creators-overview-reader';
 import { createDashboardReader } from './infra/views/dashboard-reader';
 import { createRevealSalesReader, type SalesTotalsOf } from './infra/views/reveal-sales-reader';
-import { createSetupReader, type TelegramReach } from './infra/views/setup-reader';
+import { createSetupReader, type BillingReadiness, type TelegramReach } from './infra/views/setup-reader';
 
 export interface SupervisionModule {
   readonly name: 'supervision';
@@ -26,6 +26,8 @@ export interface SupervisionDeps extends Omit<
   readonly adminDb: Database;
   /** Whether an urgent alert reaches a group for each creator; `null` when Telegram is off. */
   readonly telegramReach: TelegramReach;
+  /** What stops each member's first invoice (invoicing's `invoiceReadiness`), for his « Facturation » step. */
+  readonly billingReadiness: BillingReadiness;
   /** The connectors' `salesFeedTotals.totalsOf` (CRM-04), for the sales panel. */
   readonly salesTotalsOf: SalesTotalsOf;
   /** The zone a platform counts its days in (the connectors'), `null` without a sales feed. */
@@ -46,6 +48,7 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
       setup: createSetupReader(
         deps.adminDb,
         deps.telegramReach,
+        deps.billingReadiness,
         deps.salesTimeZone('reveal') ?? 'Europe/Paris',
       ),
       overview: createCreatorsOverviewReader(deps.db),

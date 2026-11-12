@@ -20,18 +20,20 @@ Une seule liste « Mise en route » sur la fiche d'une créatrice et sur celle d
 - [x] Lecture `supervision/infra/views/setup-reader.ts` (connexion admin, propriétaire seul) et routes `GET /v1/dashboard/setup/creators` et `/members`, test d'intégration.
 - [x] Carte de la liste des Créatrices : « Mise en route · N sur M » et la prochaine étape, à la place de « À configurer ».
 - [x] Bloc « Mise en route » en tête de la fiche d'une créatrice et sur la fiche d'un membre, plié sur la prochaine étape.
+- [x] Relecture Équipe : étape « Facturation prête » d'un membre payé, invitation expirée à refaire, créatrices archivées hors compte.
+- [x] Manager actif : la mise en route des chatteurs, sans leur facturation (« ok manager mise en route », 12/11).
 - [ ] Captures Nuit/Jour, PC/téléphone validées par Charles.
 
 ## Critères d'acceptation
 
 - Aucune étape cochée par un clic : chacune vient de la base. Une étape faite ailleurs apparaît cochée à la réouverture de la fiche.
-- Un manager, un chatteur, une créatrice ou un opérateur reçoivent 403 ; le harnais d'isolation passe.
+- Créatrices : un manager, un chatteur, une créatrice ou un opérateur reçoivent 403. Membres : un chatteur, une créatrice ou un opérateur reçoivent 403 ; un manager actif ne reçoit que les chatteurs, sans « Facturation ». Le harnais d'isolation passe.
 - Aucune migration, aucune écriture.
 
 ## Hors périmètre
 
 - La liste « À faire » du Dashboard (W3), chez le fil design.
-- La « Mise en route » vue par un manager (il invite des chatteurs depuis l'ADR 0076) : à décider avec Charles.
+- « Ma mise en route » vue par le chatteur lui-même : découverte, pas faite ici.
 
 ## Notes de session
 

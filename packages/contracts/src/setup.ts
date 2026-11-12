@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { AgentModeSchema } from './dashboard';
 import { CreatorIdSchema, TeamMemberIdSchema } from './ids';
+import { InvoiceNotIssuedReasonSchema } from './invoices-vocabulary';
 import { TeamRoleSchema } from './team';
 
 /**
@@ -30,7 +31,10 @@ export const CREATOR_SETUP_STEPS = [
 export const CreatorSetupStepKeySchema = z.enum(CREATOR_SETUP_STEPS);
 export type CreatorSetupStepKey = z.infer<typeof CreatorSetupStepKeySchema>;
 
-/** A member's steps; a manager has no extension, platform account nor shift to set up. */
+/**
+ * A member's steps; a manager has no extension, platform account nor shift to set up, and « Facturation » is for a
+ * paid member only (a chatter, or a manager with a rate or a share of the team's net).
+ */
 export const MEMBER_SETUP_STEPS = [
   'invitation',
   'second_factor',
@@ -38,6 +42,7 @@ export const MEMBER_SETUP_STEPS = [
   'platform_account',
   'creators',
   'first_shift',
+  'billing',
 ] as const;
 export const MemberSetupStepKeySchema = z.enum(MEMBER_SETUP_STEPS);
 export type MemberSetupStepKey = z.infer<typeof MemberSetupStepKeySchema>;
@@ -56,6 +61,10 @@ export const SetupNoteSchema = z.discriminatedUnion('kind', [
   }),
   z.object({ kind: z.literal('telegram_off') }),
   z.object({ kind: z.literal('check_not_clean') }),
+  /** An invitation link was made, none is alive any more and no password was chosen: it has to be sent again. */
+  z.object({ kind: z.literal('invitation_expired') }),
+  /** What stops his first invoice today, the reason the validation would give (`invoice_not_issued`). */
+  z.object({ kind: z.literal('billing'), reason: InvoiceNotIssuedReasonSchema }),
 ]);
 export type SetupNote = z.infer<typeof SetupNoteSchema>;
 
@@ -82,7 +91,10 @@ export type CreatorSetup = z.infer<typeof CreatorSetupSchema>;
 export const CreatorSetupListSchema = z.object({ creators: z.array(CreatorSetupSchema) });
 export type CreatorSetupList = z.infer<typeof CreatorSetupListSchema>;
 
-/** `GET /v1/dashboard/setup/members`: every member who has not left, the owner's. */
+/**
+ * `GET /v1/dashboard/setup/members`: every member who has not left, for the owner; an active manager gets the chatters
+ * alone, without « Facturation » (he never reads another member's file).
+ */
 export const MemberSetupSchema = z.object({
   memberId: TeamMemberIdSchema,
   teamRole: TeamRoleSchema,

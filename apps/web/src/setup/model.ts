@@ -5,9 +5,11 @@ import type {
   MemberSetupStep,
   SetupNote,
   SetupState,
+  TeamMemberId,
 } from '@impera/contracts';
 
 import type { CreatorSheet } from '@/creators/search';
+import { notIssuedForOwner, notIssuedPlace } from '@/payroll/model';
 
 /*
  * « Mise en route » as the screen says it: each step's words and where it is done. Whether it is done is the server's
@@ -18,9 +20,11 @@ import type { CreatorSheet } from '@/creators/search';
 export type SetupTarget =
   | { readonly kind: 'sheet'; readonly sheet: CreatorSheet; readonly creatorId: CreatorId }
   | { readonly kind: 'dashboard'; readonly creatorId: CreatorId }
+  | { readonly kind: 'file'; readonly memberId: TeamMemberId }
   | {
       readonly kind: 'page';
       readonly to:
+        | '/reglages/facturation'
         | '/reglages/ventes'
         | '/reglages/regles-de-paie'
         | '/reglages/telegram'
@@ -85,9 +89,11 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
           'Son accès à son espace',
           state === 'waiting'
             ? 'Invitation envoyée, pas encore ouverte.'
-            : done
-              ? null
-              : 'À créer : son lien d’invitation.',
+            : note?.kind === 'invitation_expired'
+              ? 'Son lien a expiré sans être ouvert : crée-lui un nouveau lien.'
+              : done
+                ? null
+                : 'À créer : son lien d’invitation.',
           sheet('access'),
         );
       case 'pay_rules':
@@ -147,8 +153,8 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
   });
 }
 
-export function memberLines(steps: readonly MemberSetupStep[]): SetupLine[] {
-  return steps.map(({ key, state }): SetupLine => {
+export function memberLines(memberId: TeamMemberId, steps: readonly MemberSetupStep[]): SetupLine[] {
+  return steps.map(({ key, state, note }): SetupLine => {
     const done = state === 'done';
     const line = (
       label: string,
@@ -160,7 +166,11 @@ export function memberLines(steps: readonly MemberSetupStep[]): SetupLine[] {
       case 'invitation':
         return line(
           'Invitation ouverte',
-          done ? null : 'Son lien n’est pas encore ouvert : il se gère plus bas, avec son accès.',
+          note?.kind === 'invitation_expired'
+            ? 'Son lien a expiré sans être ouvert : crée-lui un nouveau lien plus bas, avec son accès.'
+            : done
+              ? null
+              : 'Son lien n’est pas encore ouvert : il se gère plus bas, avec son accès.',
           null,
         );
       case 'second_factor':
@@ -189,6 +199,20 @@ export function memberLines(steps: readonly MemberSetupStep[]): SetupLine[] {
           kind: 'page',
           to: '/equipe/planning',
         });
+      case 'billing': {
+        // Only the owner reads this step: the server leaves it out of a manager's list.
+        const reason = note?.kind === 'billing' ? note.reason : null;
+        const place = notIssuedPlace(reason);
+        return line(
+          'Facturation prête',
+          reason === null ? null : `Sa première facture ne partirait pas : ${notIssuedForOwner(reason)}.`,
+          place === 'billing'
+            ? { kind: 'page', to: '/reglages/facturation' }
+            : place === 'file'
+              ? { kind: 'file', memberId }
+              : null,
+        );
+      }
     }
   });
 }

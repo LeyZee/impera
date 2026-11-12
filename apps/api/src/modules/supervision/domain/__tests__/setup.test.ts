@@ -1,14 +1,20 @@
 import { isSetupComplete } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { creatorSetup, memberSetup, type CreatorSetupFacts, type MemberSetupFacts } from '../setup';
+import {
+  creatorSetup,
+  memberSetup,
+  memberSetupSeenBy,
+  type CreatorSetupFacts,
+  type MemberSetupFacts,
+} from '../setup';
 
 const ready: CreatorSetupFacts = {
   accounts: 1,
   accountsWithPayRules: 1,
   hasActivePersona: true,
   hasAgencyRate: true,
-  access: 'active',
+  access: 'used',
   telegramReachable: true,
   hasOwnHours: true,
   hasShifts: true,
@@ -58,8 +64,13 @@ describe('creatorSetup', () => {
     expect(isSetupComplete(steps)).toBe(false);
   });
 
-  it('waits on her while her invitation is not opened', () => {
+  it('waits on her while her invitation is not opened, and asks a new link once it died unused', () => {
     expect(stateOf(creatorSetup({ ...ready, access: 'pending' }), 'access')).toBe('waiting');
+    expect(creatorSetup({ ...ready, access: 'expired' }).find((step) => step.key === 'access')).toEqual({
+      key: 'access',
+      state: 'todo',
+      note: { kind: 'invitation_expired' },
+    });
   });
 
   it('asks pay rules on every account and counts them when she has several', () => {
@@ -93,18 +104,32 @@ describe('creatorSetup', () => {
   });
 });
 
+const readyMember: MemberSetupFacts = {
+  teamRole: 'chatter',
+  invitation: 'used',
+  secondFactor: true,
+  extensionLinked: true,
+  platformAccountLinked: true,
+  creators: 1,
+  hasShift: true,
+  paid: true,
+  billing: null,
+};
+
 describe('memberSetup', () => {
   const chatter: MemberSetupFacts = {
     teamRole: 'chatter',
-    invitationUsed: true,
+    invitation: 'used',
     secondFactor: true,
     extensionLinked: true,
     platformAccountLinked: true,
     creators: 2,
     hasShift: true,
+    paid: true,
+    billing: null,
   };
 
-  it('gives a chatter six steps', () => {
+  it('gives a chatter seven steps, his invoicing last', () => {
     const steps = memberSetup(chatter);
     expect(steps.map((step) => step.key)).toEqual([
       'invitation',
@@ -113,28 +138,82 @@ describe('memberSetup', () => {
       'platform_account',
       'creators',
       'first_shift',
+      'billing',
     ]);
     expect(isSetupComplete(steps)).toBe(true);
   });
 
-  it('gives a manager no extension, platform account nor shift', () => {
-    expect(memberSetup({ ...chatter, teamRole: 'manager' }).map((step) => step.key)).toEqual([
+  it('gives a manager no extension, platform account nor shift, and no invoicing while he is not paid', () => {
+    expect(memberSetup({ ...chatter, teamRole: 'manager', paid: false }).map((step) => step.key)).toEqual([
       'invitation',
       'second_factor',
       'creators',
     ]);
+    expect(memberSetup({ ...chatter, teamRole: 'manager' }).map((step) => step.key)).toContain('billing');
+  });
+
+  it('says what stops his first invoice', () => {
+    const billing = memberSetup({ ...chatter, billing: 'no_mandate' }).find((step) => step.key === 'billing');
+    expect(billing).toEqual({
+      key: 'billing',
+      state: 'todo',
+      note: { kind: 'billing', reason: 'no_mandate' },
+    });
+  });
+
+  it('asks a new link once his invitation died unused', () => {
+    expect(memberSetup({ ...chatter, invitation: 'expired' })[0]).toEqual({
+      key: 'invitation',
+      state: 'todo',
+      note: { kind: 'invitation_expired' },
+    });
   });
 
   it('waits on a newcomer and leaves the rest to do', () => {
     const steps = memberSetup({
       teamRole: 'chatter',
-      invitationUsed: false,
+      invitation: 'pending',
       secondFactor: false,
       extensionLinked: false,
       platformAccountLinked: false,
       creators: 0,
       hasShift: false,
+      paid: true,
+      billing: 'no_mandate',
     });
-    expect(steps.map((step) => step.state)).toEqual(['waiting', 'todo', 'todo', 'todo', 'todo', 'todo']);
+    expect(steps.map((step) => step.state)).toEqual([
+      'waiting',
+      'todo',
+      'todo',
+      'todo',
+      'todo',
+      'todo',
+      'todo',
+    ]);
+  });
+});
+
+describe('memberSetupSeenBy', () => {
+  const team = [
+    {
+      memberId: 'a',
+      teamRole: 'chatter' as const,
+      steps: memberSetup({ ...readyMember, teamRole: 'chatter' }),
+    },
+    {
+      memberId: 'b',
+      teamRole: 'manager' as const,
+      steps: memberSetup({ ...readyMember, teamRole: 'manager' }),
+    },
+  ];
+
+  it('shows the owner everyone, invoicing included', () => {
+    expect(memberSetupSeenBy('owner', team)).toEqual(team);
+  });
+
+  it('shows a manager the chatters alone, without their invoicing', () => {
+    const seen = memberSetupSeenBy('manager', team);
+    expect(seen.map((member) => member.memberId)).toEqual(['a']);
+    expect(seen[0]?.steps.map((step) => step.key)).not.toContain('billing');
   });
 });
