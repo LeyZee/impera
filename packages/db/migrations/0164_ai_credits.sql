@@ -26,3 +26,11 @@ ALTER TABLE "domain_events" ADD CONSTRAINT "domain_events_type_check" CHECK ("do
 CREATE POLICY "agency_only" ON "ai_credit_entries" AS PERMISSIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator') WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 ALTER TABLE "ai_credit_entries" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 GRANT SELECT, INSERT, DELETE ON "ai_credit_entries" TO nirvana_app;
+--> statement-breakpoint
+-- The Telegram trigger's list of event types (it mirrors SCANNED_EVENT_TYPES in the telegram module, a test compares
+-- them) takes `ai_credits_low` (ADR 0091 § 4). The function is unchanged; no row is touched.
+DROP TRIGGER IF EXISTS "domain_events_telegram_scan" ON "domain_events";--> statement-breakpoint
+CREATE TRIGGER "domain_events_telegram_scan" AFTER INSERT ON "domain_events"
+  FOR EACH ROW
+  WHEN (NEW.type IN ('handoff_requested', 'budget_threshold_crossed', 'session_state_changed', 'kill_switch_toggled', 'takeover_started', 'takeover_ended', 'sale_detected', 'alert_triggered', 'validation_requested', 'validation_resolved', 'automatic_closed', 'send_failed', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'contractor_document_expiring', 'invoice_due_soon', 'invoice_overdue', 'security_alert', 'sales_feed_mismatch', 'connection_state_changed', 'agency_share_mismatch', 'sales_feed_signal', 'ai_credits_low'))
+  EXECUTE FUNCTION "telegram_enqueue_scan"();

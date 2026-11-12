@@ -19,10 +19,14 @@ export interface CreditActor {
 
 export interface CreditLedger {
   list(): Promise<readonly AiCreditEntry[]>;
-  /** Idempotent on `id`: `created` false when the same line was already there; `conflict` with other values. */
+  /**
+   * Idempotent on `id`: `existing` when the same line was already there; `conflict` with other values. `datedByClient`
+   * false: the date is the server's moment of this request, so a replay is compared without it.
+   */
   add(
     entry: AiCreditEntry,
     actor: CreditActor,
+    datedByClient: boolean,
   ): Promise<
     { readonly kind: 'created' | 'existing'; readonly entry: AiCreditEntry } | { readonly kind: 'conflict' }
   >;

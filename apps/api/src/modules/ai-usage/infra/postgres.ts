@@ -25,7 +25,7 @@ const unbilled = sql.join(
   sql`, `,
 );
 const billedUsd = sql`coalesce(cost_micro_usd::numeric / 1000000,
-  case when status in (${unbilled}) then 0 else ${UNKNOWN_CALL_COST_USD} end)`;
+  case when status in (${unbilled}) then 0::numeric else ${UNKNOWN_CALL_COST_USD}::numeric end)`;
 
 const RowSchema = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
@@ -110,12 +110,12 @@ function toEntry(row: unknown): AiCreditEntry {
   return { ...parsed, at: parsed.at.toISOString() };
 }
 
-const sameEntry = (a: AiCreditEntry, b: AiCreditEntry): boolean =>
+const sameEntry = (a: AiCreditEntry, b: AiCreditEntry, withDate: boolean): boolean =>
   a.provider === b.provider &&
   a.kind === b.kind &&
   a.amountMinor === b.amountMinor &&
   a.currency === b.currency &&
-  Date.parse(a.at) === Date.parse(b.at);
+  (!withDate || Date.parse(a.at) === Date.parse(b.at));
 
 /**
  * `ai_credit_entries` with the owner role (the agency's rows, RLS forced, `agency_only`): each line added or taken back
@@ -127,7 +127,7 @@ export function createPostgresCreditLedger(adminDb: Database): CreditLedger {
       const rows = await adminDb.select(entryColumns).from(schema.aiCreditEntries);
       return rows.map(toEntry);
     },
-    add(entry, actor) {
+    add(entry, actor, datedByClient) {
       return withAdmin(adminDb, async (tx) => {
         const inserted = await tx
           .insert(schema.aiCreditEntries)
@@ -158,7 +158,7 @@ export function createPostgresCreditLedger(adminDb: Database): CreditLedger {
           .where(eq(schema.aiCreditEntries.id, entry.id));
         if (existing === undefined) return { kind: 'conflict' as const };
         const stored = toEntry(existing);
-        return sameEntry(stored, entry)
+        return sameEntry(stored, entry, datedByClient)
           ? { kind: 'existing' as const, entry: stored }
           : { kind: 'conflict' as const };
       });

@@ -120,5 +120,5 @@ export async function addCredit(
       'ai_credit_in_future_unprocessable',
       'Cette saisie est datée dans le futur : mets l’heure où l’argent est arrivé.',
     );
-  return deps.ledger.add({ ...body, at: at.toISOString() }, actor);
+  return deps.ledger.add({ ...body, at: at.toISOString() }, actor, body.at !== undefined);
 }
