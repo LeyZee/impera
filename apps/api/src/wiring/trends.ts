@@ -34,6 +34,7 @@ export function wireTrends(
     db: shared.db,
     adminDb: shared.adminDb,
     requireRole: shared.requireRole,
+    recentLogin: shared.recentLogin,
     gateway: deps.gateway,
     limitsOf: personaLimitsOf(deps.persona),
     agenda: deps.agenda,

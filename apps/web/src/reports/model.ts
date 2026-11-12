@@ -146,6 +146,27 @@ export const STATUS_TONES: Readonly<Record<ShiftReportStatus, ReportTone>> = {
   rejected: 'warn',
 };
 
+/**
+ * A report without effect on pay: its account's pay reads the sales for its period, even switched after it was made
+ * (ADR 0084 § 3). It stays in its fortnight, never to decide nor to redo, and out of the figures.
+ */
+export const withoutPayEffect = (report: ShiftReport): boolean => report.earningsSource === 'detected';
+
+/** What such a report says in place of its status, to its member and to the agency (Charles, 11/11). */
+export const WITHOUT_PAY_EFFECT = 'Sans effet sur la paie';
+
+/** The tone of a report's chip: its status's, or quiet grey once it has no effect on pay. */
+export const toneOf = (report: ShiftReport): ReportTone | 'neutral' =>
+  withoutPayEffect(report) ? 'neutral' : STATUS_TONES[report.status];
+
+/** A report's status as its member reads it, or « Sans effet sur la paie ». */
+export const memberStatusOf = (report: ShiftReport): string =>
+  withoutPayEffect(report) ? WITHOUT_PAY_EFFECT : MEMBER_STATUS[report.status];
+
+/** A report's status as the agency reads it, or « Sans effet sur la paie ». */
+export const agencyStatusOf = (report: ShiftReport): string =>
+  withoutPayEffect(report) ? WITHOUT_PAY_EFFECT : AGENCY_STATUS[report.status];
+
 export const SOURCE_LABELS: Readonly<Record<EarningsSource, string>> = {
   declared: 'Rapports de fin de shift',
   detected: 'Ventes relevées par le connecteur',
@@ -169,14 +190,17 @@ export interface ToDo {
 
 /**
  * What is left to do in a period's list: the reports to make, those sent back, and, given the hour, those whose gap
- * with the platform waits for their member (ADR 0073 § 5), oldest shift first.
+ * with the platform waits for their member (ADR 0073 § 5), oldest shift first. A report without effect on pay asks
+ * nothing more.
  */
 export function toDoOf(list: ShiftReportList, now?: Date): ToDo[] {
   return list.shifts
     .map((shift) => ({ shift, report: reportOf(list.reports, shift.id) }))
     .filter(
       ({ report }) =>
-        report === null || report.status === 'rejected' || (now !== undefined && gapWaits(report, now)),
+        report === null ||
+        (!withoutPayEffect(report) &&
+          (report.status === 'rejected' || (now !== undefined && gapWaits(report, now)))),
     )
     .toSorted((a, b) => a.shift.startsAt.localeCompare(b.shift.startsAt));
 }
@@ -261,7 +285,8 @@ export function nudgeText(
 
 /**
  * A period's figures per currency: what is validated, what still waits for the agency (sent, not yet read), and what
- * came back and waits for its member. Corrections count in each, as their amounts do.
+ * came back and waits for its member. Corrections count in each, as their amounts do; a report without effect on pay
+ * in none.
  */
 export interface PeriodSum {
   readonly currency: Currency;
@@ -276,7 +301,7 @@ export interface PeriodSum {
 
 export function periodSums(reports: readonly ShiftReport[]): PeriodSum[] {
   const sums = new Map<Currency, Omit<PeriodSum, 'currency'>>();
-  for (const report of reports) {
+  for (const report of reports.filter((one) => !withoutPayEffect(one))) {
     const sum = sums.get(report.amount.currency) ?? {
       validatedMinor: 0,
       validated: 0,
@@ -440,7 +465,7 @@ export function uncheckedText(reason: ShiftReportCheckReason, platform: string, 
         : `Ce compte n’est pas encore comparé aux ventes de ${platform} : l’agence relit ton rapport.`;
     case 'chatter_unlinked':
       return agency
-        ? `Ce membre n’est relié à aucun chatteur de ${platform} : relie-le dans Réglages › Ventes pour comparer ses rapports.`
+        ? `Ce membre n’est relié à aucun chatteur de ${platform} : relie-le dans Équipe › ${platform} pour comparer ses rapports.`
         : `Ton compte de chatteur sur ${platform} n’est pas encore relié : l’agence relit ton rapport.`;
   }
 }
@@ -452,6 +477,7 @@ export function uncheckedText(reason: ShiftReportCheckReason, platform: string, 
 export function gapWaits(report: ShiftReport, now: Date): boolean {
   const { check } = report;
   return (
+    !withoutPayEffect(report) &&
     check?.state === 'complete' &&
     check.verdict === 'gap' &&
     report.explanation === null &&
@@ -470,7 +496,14 @@ export const hasGap = (report: ShiftReport): boolean =>
  * and the tab Équipe › Rapports count, so that nothing stays in the queue unseen.
  */
 export function awaitsDecision(report: ShiftReport, now: Date): boolean {
-  if (report.status !== 'submitted' || !report.canReview || gapWaits(report, now)) return false;
+  if (
+    report.status !== 'submitted' ||
+    !report.canReview ||
+    withoutPayEffect(report) ||
+    gapWaits(report, now)
+  ) {
+    return false;
+  }
   return !(report.check?.state === 'complete' && report.check.verdict === 'within');
 }
 

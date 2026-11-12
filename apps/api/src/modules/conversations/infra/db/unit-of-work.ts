@@ -236,6 +236,22 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         const [row] = await tx.select().from(schema.drafts).where(eq(schema.drafts.id, id)).for('update');
         return row === undefined ? null : toDraft(row);
       },
+      async paceSince(conversationId, since) {
+        const [row] = await tx
+          .select({
+            count: sql<number>`count(*)::int`,
+            lastAt: sql<Date | null>`max(${schema.drafts.createdAt})`,
+          })
+          .from(schema.drafts)
+          .where(
+            and(
+              eq(schema.drafts.conversationId, conversationId),
+              sql`${schema.drafts.createdAt} >= ${since.toISOString()}::timestamptz`,
+            ),
+          );
+        const lastAt = row?.lastAt ?? null;
+        return { count: row?.count ?? 0, lastAt: lastAt === null ? null : new Date(lastAt) };
+      },
       async openFor(conversationId) {
         const rows = await tx
           .select()

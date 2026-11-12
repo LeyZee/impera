@@ -77,6 +77,11 @@ export interface SaleForPay extends SaleKey {
   /** The platform's net in minor units, signed: a refund is negative. */
   readonly netMinor: number;
   readonly author: SaleAuthorForPay;
+  /**
+   * The platform's account that made the line (a refund's is its sale's), linked or not, `null` for none (a
+   * subscription): what the validator reads of a chatter not linked.
+   */
+  readonly platformChatterId: string | null;
 }
 
 /** Where an account's sales come from from a period on, with its platform (`earningsBaseOf`). */
