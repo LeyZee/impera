@@ -1,4 +1,4 @@
-import type { FanFlags } from '@impera/contracts';
+import type { FanFlags, ScriptRunStatus, ScriptStepKind, ScriptStepOutcome } from '@impera/contracts';
 
 import { offerDecision, type OfferBlock, type OfferContext } from './policy';
 import type { DayPart } from './situation';
@@ -7,9 +7,6 @@ import type { DayPart } from './situation';
  * The run of a script with one fan (ADR 0098): the code keeps where he is, chooses the next step and its price, and
  * the voice only says them. Pure: a run and an event give the next run; a run and the moment give one closed decision.
  */
-
-/** A step of a sellable script: offered (no price), paid (a pack at the catalogue's price), or a bridge (offered). */
-type ScriptStepKind = 'free' | 'paid' | 'bridge';
 
 interface CatalogueStep {
   /** Its segment key (ADR 0056): never changes, whatever its number. */
@@ -57,20 +54,15 @@ export function catalogueScriptFaults(script: CatalogueScript): CatalogueScriptF
   return faults;
 }
 
-/** What became of a step sent to him. */
-type StepOutcome = 'sent' | 'opened' | 'bought' | 'refused';
-
 interface StepRecord {
   readonly key: string;
   readonly kind: ScriptStepKind;
-  readonly outcome: StepOutcome;
+  readonly outcome: ScriptStepOutcome;
   readonly priceCents: number | null;
   readonly sentAt: Date;
   /** When the outcome last changed. */
   readonly at: Date;
 }
-
-type ScriptRunStatus = 'open' | 'bought_out' | 'refused' | 'stalled' | 'closed_by_human';
 
 export interface ScriptRun {
   readonly scriptId: string;

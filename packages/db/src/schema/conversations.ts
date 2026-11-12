@@ -9,6 +9,7 @@ import {
   EVENT_TYPES,
   MessageAuthorSchema,
   MessageDirectionSchema,
+  SCRIPT_RUN_STATUSES,
   type ExternalMedia,
 } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
@@ -23,6 +24,7 @@ import {
   pgTable,
   text,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -151,6 +153,49 @@ export const drafts = pgTable(
     check('drafts_placed_check', sql`(${t.placedBy} is null) = (${t.placedAt} is null)`),
     unique('drafts_idempotency_key_unique').on(t.idempotencyKey),
     index('drafts_conversation_idx').on(t.conversationId, t.createdAt.desc()),
+    tenantPolicy(t.creatorId),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * A script of her catalogue run with one fan (ADR 0098): where he is, step by step. Written by the agent in her
+ * tenant; never deleted. At most one open per conversation, and a script never runs twice with the same fan.
+ */
+export const scriptRuns = pgTable(
+  'script_runs',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => conversations.id),
+    /**
+     * The script, by its id as the scripts module gives it today: one plain column, no foreign key, so that it follows
+     * the script identity Médias settles (PR #708).
+     */
+    scriptId: text('script_id').notNull(),
+    status: enumText('status').notNull().default('open'),
+    /** The steps sent, in order (`ScriptRunStepsSchema`); the last one is the current step. */
+    steps: jsonb('steps').notNull().default([]),
+    /** His messages in a row that ignore the paid step waiting: two make a refusal. */
+    ignoredMessages: integer('ignored_messages').notNull().default(0),
+    startedAt: timestampTz('started_at').notNull(),
+    endedAt: timestampTz('ended_at'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    enumCheck('script_runs', t.status, SCRIPT_RUN_STATUSES),
+    check('script_runs_steps_check', sql`jsonb_typeof(${t.steps}) = 'array'`),
+    check('script_runs_ignored_messages_check', sql`${t.ignoredMessages} >= 0`),
+    check('script_runs_ended_check', sql`(${t.status} = 'open') = (${t.endedAt} is null)`),
+    unique('script_runs_played_unique').on(t.conversationId, t.scriptId),
+    uniqueIndex('script_runs_open_unique')
+      .on(t.conversationId)
+      .where(sql`${t.status} = 'open'`),
+    index('script_runs_conversation_idx').on(t.conversationId, t.startedAt.desc()),
     tenantPolicy(t.creatorId),
     closedToCreator(),
   ],

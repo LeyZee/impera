@@ -72,6 +72,13 @@ drafts               id, creator_id, conversation_id, status (pending|approved|e
                      idempotency_key, created_at
                      placed_by / placed_at : le chatteur l'a mis dans le champ de la plateforme depuis le panneau copilote
                      (ADR 0086 § 4, migration 0149), les deux ensemble ; le statut ne bouge pas, ce qui part décide (§ 5).
+script_runs          id, creator_id, conversation_id, script_id (le script, par l'id que le module scripts donne aujourd'hui,
+                     une colonne sans clé étrangère), status (open|bought_out|refused|stalled|closed_by_human),
+                     steps jsonb (les étapes parties, dans l'ordre : key, kind free|paid|bridge, outcome
+                     sent|opened|bought|refused, priceCents, sentAt, at), ignored_messages, started_at, ended_at (nul
+                     tant qu'il est ouvert), updated_at
+                     UNIQUE (conversation_id, script_id) : un script ne se rejoue jamais au même fan ; un seul ouvert
+                     par conversation (index partiel). Jamais supprimé par nirvana_app (ADR 0098, migration 0171).
 blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_id (nullable), rate_per_mille (0 à 1000, 800 = 80 %), recorded_by,
                      recorded_at      (append-only : ni UPDATE ni DELETE pour nirvana_app)
                      Le test à l'aveugle d'une version de la voix et de la persona active (ADR 0019, 0022) ; le dernier
@@ -80,7 +87,7 @@ blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_
 
 `conversations.last_inbound_at` est l'heure où Impera a lu le dernier message du fan (ordre d'arrivée : debounce, brouillon périmé, relances). Ce que l'écran montre (« A écrit il y a… », `ConversationSummary.lastInboundAt`) est l'heure du message sur la plateforme, `max(messages.platform_created_at)` des messages entrants : une capture qui relit l'historique ne fait pas dire « à l'instant » d'un message de cinq heures.
 
-Types d'événements (liste fermée dans `packages/contracts/src/events.ts`) : `message_received`, `message_sent`, `send_attempted`, `send_failed`, `send_verified`, `media_described`, `draft_created`, `draft_approved`, `draft_edited`, `draft_rejected`, `draft_expired`, `fact_proposed`, `fact_confirmed`, `fact_rejected`, `summary_refreshed`, `handoff_requested`, `alert_triggered`, `takeover_started`, `takeover_ended`, `mode_changed`, `kill_switch_toggled`, `follow_up_scheduled`, `follow_up_cancelled`, `offer_made`, `sale_detected`, `script_started`, `script_step_sent`, `script_ended`, `session_state_changed`, `budget_threshold_crossed`, `connection_state_changed`, `automatic_closed`, `security_alert` (ADR 0046 § 8), `error`.
+Types d'événements (liste fermée dans `packages/contracts/src/events.ts`) : `message_received`, `message_sent`, `send_attempted`, `send_failed`, `send_verified`, `media_described`, `draft_created`, `draft_approved`, `draft_edited`, `draft_rejected`, `draft_expired`, `fact_proposed`, `fact_confirmed`, `fact_rejected`, `summary_refreshed`, `handoff_requested`, `alert_triggered`, `takeover_started`, `takeover_ended`, `mode_changed`, `kill_switch_toggled`, `follow_up_scheduled`, `follow_up_cancelled`, `offer_made`, `sale_detected`, `script_started`, `script_step_sent`, `script_step_opened`, `script_step_refused` (ADR 0098), `script_ended`, `session_state_changed`, `budget_threshold_crossed`, `connection_state_changed`, `automatic_closed`, `security_alert` (ADR 0046 § 8), `error`.
 
 Payload minimal par famille d'événement (clés en camelCase, jamais de contenu média, jamais de secret) :
 

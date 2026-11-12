@@ -83,6 +83,13 @@ async function seedCreator(admin: Database, label: string) {
       personaVersionId: personaId,
       idempotencyKey: `draft-${label}`,
     });
+    await tx.insert(s.scriptRuns).values({
+      id: newId(MessageIdSchema),
+      creatorId,
+      conversationId,
+      scriptId: `script-${label}`,
+      startedAt: new Date('2026-11-12T21:00:00Z'),
+    });
     await tx.insert(s.messages).values({
       id: messageId,
       creatorId,
@@ -222,6 +229,7 @@ const TENANT_TABLES = {
   conversation_events: s.conversationEvents,
   domain_events: s.domainEvents,
   drafts: s.drafts,
+  script_runs: s.scriptRuns,
   persona_versions: s.personaVersions,
   media_assets: s.mediaAssets,
   media_descriptions: s.mediaDescriptions,
