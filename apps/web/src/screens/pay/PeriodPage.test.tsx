@@ -1426,6 +1426,7 @@ function report(n: number, memberId: string) {
     version: 1,
     byAgency: false,
     reviewKind: null,
+    earningsSource: 'declared',
     explanation: null,
     check: null,
     canReview: true,

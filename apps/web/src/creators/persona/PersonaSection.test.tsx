@@ -336,7 +336,7 @@ describe('Créatrices › Persona, recette 28/10', () => {
     // Typed day first, never the browser's own order (recette 05/11, PRO-11).
     expect(birth.getAttribute('type')).toBe('text');
     expect(birth.getAttribute('placeholder')).toBe('jj/mm/aaaa');
-    expect(screen.queryByText(/ans aujourd’hui/u)).toBeNull();
+    expect(screen.queryByText(/^\d+ ans$/u)).toBeNull();
     expect(screen.queryByText(/^Version /u)).toBeNull();
     expect(screen.getByText('Jamais enregistrée')).toBeDefined();
   });

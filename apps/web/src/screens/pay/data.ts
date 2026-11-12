@@ -19,7 +19,7 @@ import {
   validatable,
 } from '@/payroll/model';
 import { usePayRules, useReports, useSchedulingSettings } from '@/reports/api';
-import { periodAt } from '@/reports/model';
+import { periodAt, withoutPayEffect } from '@/reports/model';
 import { useNow } from '@/scheduling/useNow';
 import { useMembers } from '@/screens/team/api';
 
@@ -86,7 +86,10 @@ export function usePeriodBlock(period: PayrollPeriod | undefined): PeriodBlock |
     open && period.statements.some((statement) => statement.lines.some((line) => line.currency !== 'EUR'));
   const rates = useExchangeRates(foreign);
   if (!open) return null;
-  const pending = (reports.data?.reports ?? []).filter((report) => report.status === 'submitted');
+  // A report without effect on pay never holds the closing (ADR 0084 § 3): the server does not wait for it either.
+  const pending = (reports.data?.reports ?? []).filter(
+    (report) => report.status === 'submitted' && !withoutPayEffect(report),
+  );
   if (pending.length > 0) {
     const members = new Map((reports.data?.members ?? []).map((member) => [member.id, member]));
     const shifts = new Map((reports.data?.shifts ?? []).map((shift) => [shift.id, shift]));
