@@ -36,5 +36,5 @@ export function parseRevealSession(raw: string): RevealSession | null {
 /** `null` for anything that is not a Reveal session of this shape: the route refuses it before storing. */
 export const revealSessionShape: SessionShape = (raw) => {
   const session = parseRevealSession(raw);
-  return session === null ? null : { owner: session.modelId };
+  return session === null ? null : { owner: session.modelId, member: session.userId };
 };

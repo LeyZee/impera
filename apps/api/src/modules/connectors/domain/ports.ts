@@ -78,7 +78,7 @@ export interface AccountStore {
  * Reads a captured session's shape, platform by platform: `null` when the text is not a session of this platform, else
  * whose it is (`owner`: on Reveal, the creator's model id). Two sessions of one account must have the same owner.
  */
-export type SessionShape = (raw: string) => { readonly owner: string } | null;
+export type SessionShape = (raw: string) => { readonly owner: string; readonly member?: string } | null;
 
 /** One reader per platform whose sessions the extension captures; a platform without one takes no session. */
 export type SessionShapes = Partial<Record<Platform, SessionShape>>;

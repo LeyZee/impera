@@ -313,11 +313,11 @@ describe('connectors module (P0-06)', () => {
   });
 
   /** A Reveal session of the shape the extension sends (reveal-connector-spec.md § 2), all invented. */
-  const revealSession = (bearer: string, modelId = 'model-test-a'): string =>
+  const revealSession = (bearer: string, modelId = 'model-test-a', userId = 'user-bot-test'): string =>
     JSON.stringify({
       v: 1,
       bearer,
-      userId: 'user-bot-test',
+      userId,
       modelId,
       userAgent: 'Mozilla/5.0 (test)',
       capturedAt: '2026-11-11T10:00:00.000Z',
@@ -405,6 +405,21 @@ describe('connectors module (P0-06)', () => {
     ]);
     // The same creator, a new token: a re-sync, taken.
     expect((await sync(id, revealSession('reveal-bearer-third-cccc', 'model-test-a'))).statusCode).toBe(204);
+  });
+
+  it('pins the « bot » member at the first sync and refuses another member’s session (P2-02)', async () => {
+    const id = await account('other-member', 'none');
+    expect((await sync(id, revealSession('reveal-bearer-first-dddd'))).statusCode).toBe(204);
+    const owner = await sync(
+      id,
+      revealSession('reveal-bearer-owner-eeee', 'model-test-a', 'user-owner-test'),
+    );
+    expect([owner.statusCode, owner.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'connector_session_member_conflict',
+    ]);
+    // The bot member again, a new token: a re-sync, taken.
+    expect((await sync(id, revealSession('reveal-bearer-again-ffff'))).statusCode).toBe(204);
   });
 
   it("lists the accounts to sync for the owner's link only, never a session", async () => {

@@ -2,6 +2,7 @@ import type { CreatorId, PlatformAccountId } from '@impera/contracts';
 
 import {
   PlatformAccountNotFound,
+  SessionMemberConflict,
   SessionOwnerConflict,
   SessionShapeUnprocessable,
   SessionVaultMissing,
@@ -11,7 +12,8 @@ import type { AccountStore, Clock, SessionShapes, SessionVault } from '../domain
 export interface ConnectorSessions {
   /**
    * Stores the session the extension captured, encrypted; the account becomes `valid` and its breaker closes. Refused
-   * when it is not a session of the account's platform, or when it belongs to another creator than the one stored.
+   * when it is not a session of the account's platform, when it belongs to another creator than the one stored, or to
+   * another team member than the one stored (the « bot » member, pinned at the first « Sync »).
    */
   store(input: {
     platformAccountId: PlatformAccountId;
@@ -52,8 +54,10 @@ export function createConnectorSessions(deps: {
       // A session of another creator would make this account speak for her: refused, whatever the state.
       const previous = await deps.accounts.sessionOf(creatorId, platformAccountId);
       const before = previous === null ? null : openOrNull(vault(), platformAccountId, previous);
-      const beforeOwner = before === null ? null : (shape(before)?.owner ?? null);
-      if (beforeOwner !== null && beforeOwner !== read.owner) throw new SessionOwnerConflict();
+      const stored = before === null ? null : shape(before);
+      if (stored !== null && stored.owner !== read.owner) throw new SessionOwnerConflict();
+      // The member is pinned at the first « Sync » (P2-02): the owner's or a chatter's session is never the bot's.
+      if (stored?.member !== undefined && stored.member !== read.member) throw new SessionMemberConflict();
       const sealed = vault().seal(platformAccountId, session);
       await deps.accounts.storeSession(
         creatorId,

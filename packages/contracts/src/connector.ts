@@ -295,3 +295,5 @@ export type ConnectorAccounts = z.infer<typeof ConnectorAccountsSchema>;
 export const CONNECTOR_LINK_FORBIDDEN = 'connector_link_forbidden';
 export const CONNECTOR_SESSION_UNPROCESSABLE = 'connector_session_unprocessable';
 export const CONNECTOR_SESSION_CONFLICT = 'connector_session_conflict';
+/** The session of another team member than the « bot » member the account was first synced with (P2-02). */
+export const CONNECTOR_SESSION_MEMBER_CONFLICT = 'connector_session_member_conflict';
