@@ -100,6 +100,7 @@ function serve(
     shifts?: readonly unknown[];
     planningDown?: boolean;
     removals?: readonly unknown[];
+    setups?: readonly unknown[];
   } = {},
 ): Posted[] {
   const posted: Posted[] = [];
@@ -136,6 +137,8 @@ function serve(
                   away: [],
                 },
               };
+      else if (path === '/v1/dashboard/setup/members' && routes.setups !== undefined)
+        reply = { status: 200, body: { members: routes.setups } };
       else if (path.endsWith('/notes')) reply = { status: 200, body: { notes: [] } };
       else if (path === `/v1/team/members/${THEO.id}`) reply = { status: 200, body: THEO };
       else reply = { status: 404 };
@@ -273,6 +276,47 @@ describe('Équipe › Membres', () => {
     await waitFor(() => {
       expect(screen.queryByRole('region', { name: 'Théo' })).toBeNull();
     });
+  });
+
+  it('gives the owner his « Mise en route », ticked by the server, gone once all is done', async () => {
+    const step = (key: string, state: string) => ({ key, state, note: null });
+    serve({
+      setups: [
+        {
+          memberId: THEO.id,
+          teamRole: 'chatter',
+          steps: [
+            step('invitation', 'done'),
+            step('second_factor', 'done'),
+            step('extension', 'todo'),
+            step('platform_account', 'done'),
+            step('creators', 'done'),
+            step('first_shift', 'todo'),
+          ],
+        },
+        {
+          memberId: INES.id,
+          teamRole: 'manager',
+          steps: [step('invitation', 'done'), step('second_factor', 'done'), step('creators', 'done')],
+        },
+      ],
+    });
+    renderPage(`/equipe/membres?membre=${THEO.id}`);
+    const card = await screen.findByRole('region', { name: 'Mise en route du membre' });
+    expect(within(card).getByText('4 sur 6')).toBeDefined();
+    expect(within(card).getByText('Extension reliée')).toBeDefined();
+    expect(within(card).getByRole('link', { name: 'Le guide : Extension reliée' }).getAttribute('href')).toBe(
+      '/aide/extension',
+    );
+    fireEvent.click(within(card).getByRole('button', { name: 'Tout voir' }));
+    expect(within(card).getByRole('link', { name: 'Régler : Premier shift' }).getAttribute('href')).toBe(
+      '/equipe/planning',
+    );
+    cleanup();
+
+    renderPage(`/equipe/membres?onglet=managers&membre=${INES.id}`);
+    await screen.findByRole('region', { name: 'Inès' });
+    expect(screen.queryByRole('region', { name: 'Mise en route du membre' })).toBeNull();
   });
 
   it('adds an internal note', async () => {

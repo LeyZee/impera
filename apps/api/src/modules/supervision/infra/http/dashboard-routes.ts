@@ -2,10 +2,12 @@ import {
   AgencyInsightsQuerySchema,
   AgencyInsightsSchema,
   CreatorIdSchema,
+  CreatorSetupListSchema,
   CreatorsOverviewSchema,
   DashboardQuerySchema,
   DashboardSchema,
   DomainError,
+  MemberSetupListSchema,
   TodosAcrossCreatorsSchema,
   type CreatorId,
   type DashboardPeriod,
@@ -40,7 +42,9 @@ import type {
   VoiceVersion,
 } from '../../domain/dashboard-ports';
 import { revealSalesPanel, salesDays } from '../../domain/reveal-sales';
+import { creatorSetup, memberSetup } from '../../domain/setup';
 import type { AgencyInsightsReader } from '../views/agency-insights-reader';
+import type { SetupReader } from '../views/setup-reader';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -74,6 +78,8 @@ export interface DashboardRouteDeps {
   readonly agency: AgencyInsightsReader;
   /** The zone the agency's days are counted in: the platforms' (Reveal's, Europe/Paris). */
   readonly agencyTimeZone: string;
+  /** « Mise en route » of the creators and the members (pilotage plan W1), the owner's alone. */
+  readonly setup: SetupReader;
   readonly now?: () => Date;
 }
 
@@ -264,6 +270,29 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
         }
         return { creators };
       },
+    );
+    // « Mise en route » (pilotage plan W1): each step ticked from the base, the owner's alone (her own account, the
+    // agency's percentage and his second factor are nobody else's to read).
+    app.get(
+      '/dashboard/setup/creators',
+      { preValidation: deps.requireRole('owner'), schema: { response: { 200: CreatorSetupListSchema } } },
+      async () => ({
+        creators: (await deps.setup.creators()).map(({ creatorId, facts }) => ({
+          creatorId,
+          steps: creatorSetup(facts),
+        })),
+      }),
+    );
+    app.get(
+      '/dashboard/setup/members',
+      { preValidation: deps.requireRole('owner'), schema: { response: { 200: MemberSetupListSchema } } },
+      async () => ({
+        members: (await deps.setup.members()).map(({ memberId, teamRole, facts }) => ({
+          memberId,
+          teamRole,
+          steps: memberSetup(facts),
+        })),
+      }),
     );
     return Promise.resolve();
   };

@@ -8,19 +8,24 @@ import { createAgencyInsightsReader, type DailyStatsOf } from './infra/views/age
 import { createCreatorsOverviewReader } from './infra/views/creators-overview-reader';
 import { createDashboardReader } from './infra/views/dashboard-reader';
 import { createRevealSalesReader, type SalesTotalsOf } from './infra/views/reveal-sales-reader';
+import { createSetupReader, type TelegramReach } from './infra/views/setup-reader';
 
 export interface SupervisionModule {
   readonly name: 'supervision';
-  /** `GET /v1/dashboard`, `/dashboard/todos`, `/dashboard/creators` and `/dashboard/agency`, mounted under `/v1` by the server. */
+  /** `GET /v1/dashboard`, `/dashboard/todos`, `/dashboard/creators`, `/dashboard/agency` and `/dashboard/setup/*`, mounted under `/v1` by the server. */
   readonly routes: FastifyPluginAsyncZod;
 }
 
 export interface SupervisionDeps extends Omit<
   DashboardRouteDeps,
-  'reader' | 'revealSales' | 'overview' | 'agency' | 'agencyTimeZone'
+  'reader' | 'revealSales' | 'overview' | 'agency' | 'agencyTimeZone' | 'setup'
 > {
   /** Application role: the Dashboard reads in tenant transactions (RLS). */
   readonly db: Database;
+  /** Admin role: « Mise en route » reads her account, passwords, passkeys and extension links (owner's routes only). */
+  readonly adminDb: Database;
+  /** Whether an urgent alert reaches a group for each creator; `null` when Telegram is off. */
+  readonly telegramReach: TelegramReach;
   /** The connectors' `salesFeedTotals.totalsOf` (CRM-04), for the sales panel. */
   readonly salesTotalsOf: SalesTotalsOf;
   /** The zone a platform counts its days in (the connectors'), `null` without a sales feed. */
@@ -38,6 +43,11 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
       revealSales: createRevealSalesReader(deps.db, deps.salesTotalsOf),
       agency: createAgencyInsightsReader(deps.db, deps.salesTotalsOf, deps.salesTimeZone, deps.dailyStatsOf),
       agencyTimeZone: deps.salesTimeZone('reveal') ?? 'Europe/Paris',
+      setup: createSetupReader(
+        deps.adminDb,
+        deps.telegramReach,
+        deps.salesTimeZone('reveal') ?? 'Europe/Paris',
+      ),
       overview: createCreatorsOverviewReader(deps.db),
     }),
   };

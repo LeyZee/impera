@@ -24,6 +24,7 @@ import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
 import { cityOf } from '@/scheduling/time';
 import { useAgencyToday } from '@/screens/pay/data';
+import { MemberSetupBlock } from '@/setup/SetupBlocks';
 import '@/shell/dialog.css';
 
 /** Arrived less than this many days ago: the « Nouveau » badge of Imperium. */
@@ -141,6 +142,9 @@ export function MemberSheet({
           </button>
         </div>
       ) : null}
+
+      {/* His « Mise en route » (pilotage plan W1): the owner's, until all is done; nothing for one who left. */}
+      {canManage && !gone ? <MemberSetupBlock memberId={member.id} /> : null}
 
       <div className="tm-figures">
         <div className="tm-figure nv-enter" style={{ '--nv-i': 1 }}>

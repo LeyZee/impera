@@ -43,6 +43,13 @@ export function wireSupervision(
   const { llm, conversations, payroll, telegram } = deps;
   const module = createSupervisionModule({
     db,
+    adminDb,
+    // « Mise en route »: the coverage Réglages › Telegram shows, per creator; nothing when Telegram is off.
+    telegramReach: async () => {
+      if (telegram === null) return null;
+      const { coverage } = await telegram.overview();
+      return new Map(coverage.map((c) => [c.creatorId, c.urgentReachable] as const));
+    },
     requireRole,
     budget: () => llm.gateway.health().budget,
     voiceHealth: () => voiceHealthOf(llm.gateway.health().roles.find((r) => r.role === 'voice')),
