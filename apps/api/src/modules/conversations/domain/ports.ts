@@ -503,6 +503,20 @@ export interface ComposeInput {
   readonly desire?: { readonly score: number; readonly at: Date };
   /** Her hours (P3-14) as stored; absent, the defaults. They set her night and when a follow-up may go out. */
   readonly hours?: AgentHours;
+  /**
+   * The care mode open on the conversation (ADR 0088): she answers him with care whatever he writes. `helpGiven`: the
+   * help bubble already went out in this episode.
+   */
+  readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+}
+
+/**
+ * The care mode the engine read with this result (ADR 0088): the signs that opened or kept it, and whether the draft
+ * closes on the help bubble. On a hold, the AI could not answer him with care and a human writes to him.
+ */
+interface ComposedCare {
+  readonly signs: readonly string[];
+  readonly help: boolean;
 }
 
 /**
@@ -544,6 +558,8 @@ export type ComposeResult =
       readonly desire?: ComposedDesire;
       /** Her alerts that went off on his message and only let a human know: one `alert_triggered` each (P4-01). */
       readonly alerts?: readonly ComposedAlert[];
+      /** Written in the care mode: a human validates it whatever the mode (ADR 0088 § 5). */
+      readonly care?: ComposedCare;
     }
   | {
       readonly kind: 'held';
@@ -563,6 +579,7 @@ export type ComposeResult =
       readonly retryAt?: Date;
       readonly desire?: ComposedDesire;
       readonly alerts?: readonly ComposedAlert[];
+      readonly care?: ComposedCare;
     };
 
 /** An alert of hers that went off and only lets a human know (P4-01): named, never with what the fan wrote. */

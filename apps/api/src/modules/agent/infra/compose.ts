@@ -9,6 +9,7 @@ import type {
   VoiceInput,
 } from '@impera/llm';
 
+import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
 import {
   desireMoved,
   desireScore,
@@ -100,6 +101,12 @@ export interface ComposeTurnInput {
   readonly skipVoice?: (brief: Brief | undefined) => boolean;
   /** Her alerts written as a phrase, for the brain to check his last message against (P4-01). */
   readonly alerts?: readonly BrainAlert[];
+  /**
+   * The care mode (ADR 0088): true when code already knows (an episode open, his words read by the safety net), or
+   * read on the brain's risks. In care, the voice writes the code's care brief, nothing is offered, nothing sexual, and
+   * the care guard reads what it wrote; a brain that failed does not stop it when code already knows.
+   */
+  readonly care?: boolean | ((brief: Brief | undefined) => boolean);
 }
 
 /** A follow-up as the voice writes it: how long he has been silent, and her own way of following up if she wrote one. */
@@ -176,6 +183,11 @@ function followUpBrief(followUp: FollowUpTurn): Brief {
 const CAME_BACK_BRIEF =
   'Il lui avait dit d’attendre un peu et n’a rien écrit depuis. Elle lui demande avec légèreté s’il est revenu, en une phrase, sans reproche, sans rien proposer de payant.';
 
+/** What the voice writes in the care mode: the code's brief, whatever the brain or a trap suggested (ADR 0088 § 3). */
+function careBrief(read: Brief): Brief {
+  return { ...read, action: 'reply', replyBrief: CARE_BRIEF, toneHints: [...CARE_TONE_HINTS] };
+}
+
 /** The brief as the cursor lets the voice write it. */
 function withinCursor(brief: Brief, decision: SexualizationDecision): Brief {
   if (decision.kind === 'steer_back')
@@ -216,6 +228,8 @@ export interface ComposedTurn {
   readonly isFallback: boolean;
   /** `skipVoice` stopped it: no voice call was made. */
   readonly isSkipped?: boolean;
+  /** Written in the care mode (ADR 0088): a human validates it, whatever her mode. */
+  readonly care?: true;
 }
 
 /** Answers the team corrected in the playground, given to the voice as her examples (they take precedence). */
@@ -397,8 +411,12 @@ export async function composeTurn(
       : within;
   // The brain may suggest an offer, only the policy decides (CLAUDE.md rule 3): refused, she just answers.
   const offerRefused = cursored.action === 'offer' ? offerRefusal(cursored, input.offer, heat) : undefined;
-  const voiceBrief: Brief =
-    offerRefused === undefined ? cursored : { ...cursored, action: 'reply', replyBrief: NO_OFFER_BRIEF };
+  const care = typeof input.care === 'function' ? input.care(brief) : input.care === true;
+  const voiceBrief: Brief = care
+    ? careBrief(read)
+    : offerRefused === undefined
+      ? cursored
+      : { ...cursored, action: 'reply', replyBrief: NO_OFFER_BRIEF };
   const brainCostUsd = brain.ok ? (brain.value.meta.costUsd ?? 0) : 0;
   const brainLatencyMs = brain.ok ? brain.value.meta.latencyMs : 0;
   if (input.skipVoice?.(brief) === true) {
@@ -426,7 +444,8 @@ export async function composeTurn(
   // Checked as written: the length and count guards read the voice's bubbles, not the joined message.
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
-    ...(ageConfirmed && !noExplicit ? [] : checkExplicit(written)),
+    ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
+    ...(care ? checkCare(written) : []),
   ];
   const bubbles = asSent(written, persona.splitMessages);
   return {
@@ -437,7 +456,8 @@ export async function composeTurn(
     ...(sexualization !== undefined && { sexualization }),
     ...(desire !== undefined && desireMoved(desire) && { desire }),
     ...(ageDeclared !== null && { ageDeclared }),
-    ...(offerRefused !== undefined && { offerRefused }),
+    ...(offerRefused !== undefined && !care && { offerRefused }),
+    ...(care && { care: true }),
     voiceBrief,
     voiceInput,
     bubbles,

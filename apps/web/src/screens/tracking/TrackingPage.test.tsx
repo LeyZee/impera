@@ -46,6 +46,7 @@ function conversation(id: string, patch: Partial<ConversationSummary> = {}): Con
     updatedAt: '2026-10-17T20:00:00Z',
     desire: null,
     heldBy: null,
+    careSince: null,
     ...patch,
   });
 }

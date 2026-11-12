@@ -293,6 +293,9 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         read.conversation.desireAt !== null && {
           desire: { score: read.conversation.desireScore, at: read.conversation.desireAt },
         }),
+      ...(read.conversation.careSince !== null && {
+        care: { since: read.conversation.careSince, helpGiven: read.conversation.careHelpAt !== null },
+      }),
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
 
@@ -331,6 +334,20 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           meta,
         );
       }
+      // The care mode opens on the first sign (ADR 0088), on a draft or on a hold alike: « À traiter » and the reader
+      // read it from the conversation, and only a manager or the owner closes it.
+      const careSigns = (result.care?.signs ?? []).filter((sign) => sign !== 'care_open');
+      if (result.care !== undefined && conversation.careSince === null && careSigns.length > 0) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          {
+            type: 'care_opened',
+            payload: { conversationId: conversation.id, signs: careSigns.slice(0, 10) },
+          },
+          meta,
+        );
+      }
       if (result.kind === 'draft') {
         await tx.drafts.insert({
           id: draftId,
@@ -347,7 +364,14 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         await appendEvent(
           tx,
           conversation,
-          { type: 'draft_created', payload: { draftId, status: 'pending' } },
+          {
+            type: 'draft_created',
+            payload: {
+              draftId,
+              status: 'pending',
+              ...(result.care !== undefined && { care: { help: result.care.help } }),
+            },
+          },
           meta,
         );
         logger.info(

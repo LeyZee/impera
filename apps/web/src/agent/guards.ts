@@ -33,4 +33,5 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   fake_emergency: 'une maladie, une dette ou une urgence pour vendre',
   repetition: 'une phrase déjà dite',
   closed_question_streak: 'trop de questions fermées d’affilée',
+  care_breach: 'une vente, une rencontre ou un mot sexuel dans une réponse de soin',
 };
