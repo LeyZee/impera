@@ -85,7 +85,7 @@ describe('fromApi', () => {
     expect(card('budget')).toBeUndefined();
     expect(flat(fromApi(apiDashboard()).agency.budget?.value)).toBe('7,40 € sur 20 €');
     expect(fromApi(apiDashboard()).agency.budget?.gauge).toEqual({ value: 37, mark: 80 });
-    expect(card('live-rate')?.value).toBe('64,5 % sans retouche');
+    expect(card('live-rate')?.value).toBe('64,5 % sans retouche');
     expect(card('activity')?.value).toBe('1 min 42');
     expect(card('voice')?.rows[0]).toEqual(['Temps pour écrire', '3,1 s']);
     expect(card('reveal')?.rows[0]).toEqual(['Dernière lecture', 'il y a 14 s']);
