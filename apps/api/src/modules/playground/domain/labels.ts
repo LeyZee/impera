@@ -1,3 +1,5 @@
+import { KYC_SLOT_LABELS, KycSlotSchema } from '@impera/contracts';
+
 /**
  * French labels the training screen shows as is (the screen does not translate codes). One sentence each, in
  * the team's words; an unknown code falls back to itself so a new guard never shows an empty line.
@@ -71,4 +73,10 @@ export function offerRefusalLabel(code: string): string {
 export function cursorLabel(kind: string, reason?: string): string {
   const code = reason === undefined ? kind : `${kind}:${reason}`;
   return CURSOR_LABELS[code] ?? code;
+}
+
+/** A canvas slot in her words (« Âge », « Localisation »), lower-cased inside a line; any other key as written. */
+export function kycSlotWords(key: string): string {
+  const slot = KycSlotSchema.safeParse(key);
+  return slot.success ? KYC_SLOT_LABELS[slot.data].toLocaleLowerCase('fr-FR') : key;
 }

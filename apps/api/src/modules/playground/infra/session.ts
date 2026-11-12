@@ -23,6 +23,7 @@ import {
   type Situation,
   type TrapAssessment,
 } from '../../agent/index';
+import { kycSlotWords } from '../domain/labels';
 
 export interface PlaygroundTurn {
   /** Safety flags on his media: a human would take over, nothing is written. */
@@ -126,6 +127,24 @@ export interface PlaygroundDeps {
   /** Her follow-ups (`PersonaForModels.followUps`): without them, she never follows up. */
   readonly followUps?: { readonly delaysHours: readonly number[]; readonly spirit: string | null };
 }
+
+/** A fact the brain proposed, as the screen and the brain read it back: in French, never a code (recette 12/11). */
+function fanNote(fact: Brief['factsProposed'][number]): string {
+  const category = FACT_CATEGORY_WORDS[fact.category] ?? fact.category;
+  const key = kycSlotWords(fact.key);
+  return `${category} / ${key} : ${fact.value} (${fact.kind === 'declared' ? 'dit par lui' : 'déduit'})`;
+}
+
+const FACT_CATEGORY_WORDS: Readonly<Record<string, string>> = {
+  identity: 'identité',
+  life: 'sa vie',
+  interests: 'centres d’intérêt',
+  preferences: 'goûts',
+  commercial: 'achats',
+  intimate: 'intime',
+  events: 'événements',
+  operator_note: 'note de l’équipe',
+};
 
 /** Why nothing was written, for the trace: the daily cap, or each model that failed. */
 const failure = (error: LlmFailure): string =>
@@ -385,8 +404,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         lastOfferAt = situation.now;
       }
       // In-memory fan notes until the fans module stores facts (P3-02).
-      for (const fact of withoutOrders(composed.brief?.factsProposed ?? []))
-        fanNotes.push(`${fact.category} / ${fact.key} : ${fact.value} (${fact.kind})`);
+      for (const fact of withoutOrders(composed.brief?.factsProposed ?? [])) fanNotes.push(fanNote(fact));
       if (!composed.isBlocked) push({ from: 'creator', text: composed.bubbles.join('\n') });
       const read = composed.desireRead;
       const reading: PlaygroundDesireReading | undefined =

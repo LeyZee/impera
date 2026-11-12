@@ -77,7 +77,7 @@ describe('playground session', () => {
     expect(turn.isBlocked).toBe(false);
     expect(turn.costUsd).toBeCloseTo(0.004);
     expect(session.history.map((t) => t.from)).toEqual(['fan', 'creator']);
-    expect(session.fanNotes).toEqual(['identity / first_name : Julien (declared)']);
+    expect(session.fanNotes).toEqual(['identité / prénom : Julien (dit par lui)']);
     session.reset();
     expect(session.history).toHaveLength(0);
   });

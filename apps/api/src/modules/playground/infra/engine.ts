@@ -38,7 +38,7 @@ import {
   type PlaygroundEngine,
 } from '../application/engine';
 import { FAN_PRESETS, findPreset } from '../domain/fan-presets';
-import { cursorLabel, guardLabel, offerRefusalLabel, trapLabel } from '../domain/labels';
+import { cursorLabel, guardLabel, kycSlotWords, offerRefusalLabel, trapLabel } from '../domain/labels';
 import { completeMedia } from '../domain/media';
 
 import { createPlaygroundSession, type PlaygroundDesireReading, type PlaygroundTurn } from './session';
@@ -133,7 +133,7 @@ function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
         risks: [...turn.brief.risks],
         action: turn.brief.action,
         replyBrief: turn.brief.replyBrief,
-        kycMissing: [...turn.brief.kycMissing],
+        kycMissing: turn.brief.kycMissing.map(kycSlotWords),
       },
     }),
     ...(turn.desire !== undefined && { desire: toDesire(turn.desire) }),

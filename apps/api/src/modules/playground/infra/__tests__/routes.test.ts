@@ -269,6 +269,8 @@ describe('/v1/playground', () => {
     const { app, headers, post } = await server();
     const first = PlaygroundAnswerSchema.parse((await post('/messages', { text: 'Salut' })).json());
     expect(first.desire).toMatchObject({ before: null, score: 0, band: 'neutral', signals: [] });
+    // What she still has to learn, in her words, never a slot's code.
+    expect(first.brief?.kycMissing).toEqual(['prénom']);
     await post('/rating', { verdict: { kind: 'validated' } });
     const answer = PlaygroundAnswerSchema.parse(
       (await post('/messages', { text: 'Ça va ? Je sors à peine du travail, longue journée' })).json(),
