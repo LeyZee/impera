@@ -137,13 +137,16 @@ Branche : task/<id>-<slug>
 | CRM-08 | Revue de l'équipe Reveal : l'écran (ADR 0076) | API CRM | done | CRM-01, routes de Bilan (#626, #643), EQ-20 |
 | CRM-14 | Vérification de fiabilité sur deux sources : l'export devient facultatif | API CRM | done | CRM-02, ADR 0050 § 8 amendé le 11/11/2026 |
 | DSH-01 | Le Dashboard de l'agence : insights des ventes | API CRM | done (lots A et B) | CRM-01, ADR 0078 |
+| DSH-02 | Le Dashboard de l'agence : l'argent sur des tuiles séparées, et la TVA des virements | API CRM | review | DSH-01, ADR 0106 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
 | OPS-04 | Plantage journalisé, repli d'écriture épinglé, prix relus | exploitation | done | — |
 | OPS-05 | Les évaluations lisent la clé posée dans le CRM | exploitation | done | ADR 0016, P3-03 |
 | OPS-06 | Grok 4.7 réfléchit moins longtemps que ses délais | exploitation | done | ADR 0009, OPS-05 |
+| OPS-07 | Le juge des évaluations lit le moment que l'agent a vu | exploitation | done | ADR 0009, OPS-06 |
 | OPS-08 | La consommation IA et les crédits prépayés dans le CRM | exploitation | done | ADR 0091 |
+| OPS-10 | Les images Docker ne se disputent plus le cache pnpm | exploitation | done | OPS-03 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -153,6 +156,7 @@ Branche : task/<id>-<slug>
 | SEC-07 | Durcissement : liens d'extension, limites par adresse, appels sortants | exploitation | done | SEC-06 |
 | SEC-08 | Lien d'extension : mot de passe et code redemandés à la création ; ADR 0087 proposée | exploitation | done | SEC-07, ADR 0046 |
 | SEC-09 | Message de fan borné, rythme ralenti passé 60 réponses dans l'heure | exploitation | done | SEC-07 |
+| REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
 | ARC-03 | Le dossier du prestataire sorti de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-02 |
