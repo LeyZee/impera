@@ -112,6 +112,7 @@ Date : AAAA-MM-JJ
 | 0086 | Le panneau copilote : à côté de la conversation Reveal, la fiche du fan d'abord, le brouillon de l'agent ensuite, et c'est le chatteur qui envoie | accepted (précise 0025, 0019, 0066 § 7 et 0085) |
 | 0087 | Un rôle de service entre le rôle applicatif et le rôle propriétaire de la base | proposed (précise 0005 et 0027) |
 | 0089 | Les vignettes d'une créatrice archivée sont effacées 90 jours après son archivage | accepted (amende 0071 § 2 pour les vignettes ; précise 0030 § 4 et 0044 § 2) |
+| 0090 | Une demande sur mesure passe à un chatteur qui prend la commande ; une objection de prix reçoit une réplique de la banque de l'agence | accepted (amende 0079 § 4 et § 6 ; précise P4-01 et 0023) |
 | 0091 | La consommation IA dans le CRM : la dépense lue dans `llm_calls`, les crédits prépayés décomptés depuis la saisie des recharges | accepted (précise 0016 et le plafond du jour) |
 | 0092 | Piloter l'agence : la valeur de chaque chatteur, ce qui a changé chez une créatrice, les fans qui comptent | accepted (précise 0078, 0081, 0024 et 0043 § 7 ; amende 0078 « jamais nommé ici » et 0024 pour Entraîner) |
 | 0099 | Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser | accepted (précise 0030, 0018, 0083 et P6-01) |

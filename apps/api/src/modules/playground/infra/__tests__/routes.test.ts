@@ -158,6 +158,7 @@ async function server(
       alertKeywords: [],
       forbiddenEmojis: [],
       kycSlots: [],
+      objectionReplies: {},
     },
     // « Tester » reads her active persona; none here: the words are read, the phrase needs no persona to be refused.
     activePersona: () => Promise.resolve(null),

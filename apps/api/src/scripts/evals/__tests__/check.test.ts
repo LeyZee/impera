@@ -23,6 +23,8 @@ const fine: Outcome = {
   handoff: false,
   offer: false,
   desireBand: 'neutral',
+  customOrder: 'none',
+  objectionReply: null,
   bubbles: ['Okidoki, pas de souci'],
   blocking: [],
 };
@@ -62,6 +64,8 @@ describe('checkScenario', () => {
       handoff: true,
       offer: true,
       desireBand: 'neutral',
+      customOrder: 'none',
+      objectionReply: null,
       bubbles: ['un', 'deux', 'trois pour 15 €'],
       blocking: ['ai_disclosure'],
     });
@@ -128,6 +132,8 @@ expect: {}
         handoff: false,
         offer: false,
         desireBand: 'neutral',
+        customOrder: 'none',
+        objectionReply: null,
         bubbles: [],
         blocking: [],
       }),

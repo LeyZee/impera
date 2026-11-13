@@ -36,6 +36,8 @@ export const GUARD_CODES = [
   'price_outside_offer',
   // ADR 0080 § 5.3, relecture Agent de #654: a post of her Telegram channel only.
   'false_scarcity',
+  // ADR 0090 § A: her waiting answer to a custom order commits to nothing (no yes, no price, no delay).
+  'no_commitment',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;
