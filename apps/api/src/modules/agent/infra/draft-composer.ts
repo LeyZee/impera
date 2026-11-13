@@ -5,6 +5,7 @@ import type {
   HandoffCause,
   MediaDescription,
   MediaFlag,
+  ObjectionReplies,
   Result,
 } from '@impera/contracts';
 import {
@@ -39,6 +40,7 @@ import {
   type HoldDecision,
 } from '../domain/hold';
 import { withoutOrders } from '../domain/injection';
+import type { PickedObjectionReply } from '../domain/objections';
 import type { OfferLimits } from '../domain/policy';
 import { safetySigns } from '../domain/safety-net';
 import type { SexualizationLimits } from '../domain/sexualization';
@@ -95,6 +97,10 @@ export interface AgentComposeInput {
     /** His last message: the silence it follows up on. */
     readonly silentSince: Date;
   };
+  /** A custom order of his already waits for the team (ADR 0090 § A): she does not open another. */
+  readonly customOrderOpen?: boolean;
+  /** The replies of her objection bank he already received (ADR 0090 § B): never twice. */
+  readonly usedObjectionReplies?: readonly string[];
   /**
    * The care mode open on this conversation (ADR 0088), as `conversations` stores it: she answers him with care
    * whatever he writes, until a manager or the owner closes it. `helpGiven`: the help bubble already went out in it.
@@ -174,6 +180,10 @@ type AgentComposeResult = (
   readonly care?: { readonly signs: readonly string[]; readonly help: boolean };
   /** Her alerts that went off on his message and only let a human know (`alert_triggered` each, P4-01). */
   readonly alerts?: readonly AlertNotice[];
+  /** He asked for a custom order and it now waits for the team (`custom_order_opened`, ADR 0090 § A). */
+  readonly customOrderOpened?: true;
+  /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
+  readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
 };
 
 export interface AgentDraftComposer {
@@ -187,6 +197,8 @@ export interface ComposerPersonaFields {
   readonly offerLimits: OfferLimits;
   readonly sexualizationLimits: SexualizationLimits;
   readonly alertKeywords: readonly string[];
+  /** Her replies to a price objection (ADR 0090 § B); absent, the voice answers alone. */
+  readonly objectionReplies?: ObjectionReplies;
   /** The version these fields were read from: the draft carries it, never the one active when it is saved. */
   readonly personaVersionId?: string;
 }
@@ -234,12 +246,17 @@ export interface DraftComposerDeps {
    * for him, before any model is called (P4-01). Without them, nothing is watched.
    */
   readonly alertKeywords?: readonly string[];
+  /** Her replies to a price objection (`ComposerPersonaFields.objectionReplies`). */
+  readonly objectionReplies?: ObjectionReplies;
   /**
    * Her own alerts that are on and the system's that are on for her (P4-01). Without it, only her persona's words are
    * watched; unreadable, a human answers him, as with his limits.
    */
   readonly alertsOf?: (creatorId: string) => Promise<AlertSettings>;
-  /** Whether a chatter is on shift on her accounts now: a doubt on who she is goes to them (P4-01). Unknown: no. */
+  /**
+   * Whether a chatter is on shift on her accounts now: a doubt on who she is (P4-01) and a custom order (ADR 0090)
+   * go to them. Unknown: no.
+   */
   readonly chatterOnShift?: (creatorId: string, at: Date) => Promise<boolean>;
   /** Lines of her notes kept out of the prompt for looking like an order: counted, never their text. */
   readonly onDroppedNotes?: (event: { readonly conversationId: string; readonly count: number }) => void;
@@ -525,9 +542,9 @@ async function alertSettings(
   }
 }
 
-/** Whether a chatter is on shift, read only when a doubt on who she is would go to them. */
-async function onShift(deps: DraftComposerDeps, input: AgentComposeInput, settings: AlertSettings) {
-  if (!settings.systemOn.has('identity_doubt') || deps.chatterOnShift === undefined) return false;
+/** Whether a chatter is on shift: a doubt on who she is and a custom order go to them. Unknown: no. */
+async function onShift(deps: DraftComposerDeps, input: AgentComposeInput) {
+  if (deps.chatterOnShift === undefined) return false;
   return deps.chatterOnShift(input.creatorId, input.now).catch(() => false);
 }
 
@@ -540,6 +557,24 @@ const firedWith = (
   chatter: boolean,
 ): FiredAlert[] =>
   brief === undefined ? [...coded] : [...coded, ...briefAlerts(brief, asked, settings.systemOn, chatter)];
+
+/**
+ * A result with what ADR 0090 journals: a custom order that now waits for the team (taken by a chatter, or answered
+ * without a commitment), and the objection reply given to a draft that goes to a human for approval.
+ */
+function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentComposeResult {
+  const order = composed.customOrder;
+  const opened =
+    (order?.kind === 'handoff' && result.kind === 'held' && result.cause === 'custom_order') ||
+    (order?.kind === 'reply' && order.opens);
+  const reply = composed.objectionReply;
+  return {
+    ...result,
+    ...(opened && { customOrderOpened: true }),
+    ...(reply !== undefined &&
+      result.kind === 'draft' && { objectionReply: { objection: reply.objection, replyId: reply.replyId } }),
+  };
+}
 
 /** A result with the notices of her alerts that went off, when there are any. */
 const withNotices = (result: AgentComposeResult, notices: readonly AlertNotice[]): AgentComposeResult =>
@@ -637,6 +672,9 @@ async function settle(
       detail: [alertPause.cause],
       costUsd,
     };
+  // A custom order with a chatter on shift (ADR 0090 § A): they take it, the voice did not write.
+  if (composed.customOrder?.kind === 'handoff')
+    return { ...HANDOFF, cause: 'custom_order', detail: ['custom_order'], costUsd };
   // He stated an adult age himself: confirmed for his next messages (Charles, 27/10), never once his age was
   // taken back. Not saved, his age stays unconfirmed and she keeps steering back, the safe side: counted.
   const his = flags;
@@ -737,7 +775,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           early.notices,
         );
       const asked = phraseAlerts(settings, coded, brainAlertId, BRAIN_ALERTS_MAX);
-      const chatter = await onShift(deps, input, settings);
+      const chatter = await onShift(deps, input);
       if (voiceUnavailable(deps.gateway)) {
         if (careForced) return careUnanswered(known.signs, ['no voice key'], 0);
         return { kind: 'held', reason: 'llm_unavailable', detail: ['no voice key'], costUsd: 0 };
@@ -797,6 +835,17 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           return settleAlerts(firedWith(coded, brief, asked, settings, chatter)).pause !== null;
         },
         ...(asked.length > 0 && { alerts: asked.map((a) => ({ id: a.brainId, phrase: a.alert.phrase })) }),
+        customOrder: {
+          chatterOnShift: chatter,
+          orderOpen: input.customOrderOpen === true,
+          flags: stop.flags,
+        },
+        ...(withHer.objectionReplies !== undefined && {
+          objections: {
+            bank: withHer.objectionReplies,
+            usedReplyIds: new Set(input.usedObjectionReplies ?? []),
+          },
+        }),
       });
       const fired = firedWith(coded, composed.brief, asked, settings, chatter);
       const alerts = settleAlerts(fired);
@@ -805,9 +854,9 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         composed.brief !== undefined && holdDecision(composed.brief, waited).kind === 'handoff';
       const pause = composed.handoff !== undefined || riskFirst ? null : alerts.pause;
       const notices = pause === null ? fired.map(noticeOf) : alerts.notices;
-      const settled = withNotices(
-        await settle(withHer, input, composed, stop.flags, waited, pause, known),
-        notices,
+      const settled = withSales(
+        withNotices(await settle(withHer, input, composed, stop.flags, waited, pause, known), notices),
+        composed,
       );
       if (composed.desire === undefined) return settled;
       const { before, score, signals, weightsVersion } = composed.desire;

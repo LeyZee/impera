@@ -1,5 +1,5 @@
 import { BriefSchema } from '@impera/llm';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 /**
@@ -13,6 +13,9 @@ import { z } from 'zod';
  * risk the brain reads in his message (a suspected minor, distress…), a
  * reply out of its schema (the gateway asks once more), or a 429 (the gateway waits and asks again). It uses no token:
  * every call is journaled at 0 $, so a long recette never reaches the daily cap by accident.
+ *
+ * xAI's speech to text (`POST /xai/v1/stt`, the sound of a video or a voice note) answers too, with one invented
+ * French sentence and a duration of 0 s, so that its call is journaled at 0 $ as well.
  */
 
 /** What the next generation answers; each one but `neutral` is used once, then the world is neutral again. */
@@ -163,6 +166,81 @@ export function instanceOf(schema: unknown): unknown {
 const propertiesOf = (schema: unknown): Readonly<Record<string, unknown>> =>
   NodeSchema.safeParse(schema).data?.properties ?? {};
 
+type KeyFate = 'ok' | 'refused' | 'no_credit' | 'rate_limited' | 'down';
+
+const bearerOf = (header: string | string[] | undefined): string =>
+  (typeof header === 'string' ? header : '').replace(/^Bearer\s+/iu, '');
+
+/** xAI's answer to a key that is not fine, as its verifier gets it; `null` for a fine one. */
+function refused(reply: FastifyReply, fate: KeyFate): FastifyReply | null {
+  if (fate === 'refused') return reply.code(401).send({ error: 'Incorrect API key provided' });
+  if (fate === 'no_credit') return reply.code(403).send({ error: 'Your team has run out of credits' });
+  if (fate === 'rate_limited')
+    return reply.code(429).header('retry-after', '30').send({ error: 'rate limited' });
+  if (fate === 'down') return reply.code(503).send({ error: 'service unavailable' });
+  return null;
+}
+
+/**
+ * The parts of a `multipart/form-data` body by their name, their bytes as sent (RFC 7578): enough for the two parts
+ * the world reads, without a dependency the API does not need.
+ */
+function formParts(body: Buffer, boundary: string): Map<string, Buffer> {
+  const parts = new Map<string, Buffer>();
+  const delimiter = Buffer.from(`--${boundary}`);
+  let at = body.indexOf(delimiter);
+  while (at !== -1) {
+    const start = at + delimiter.length;
+    const end = body.indexOf(delimiter, start);
+    if (end === -1) break;
+    const part = body.subarray(start, end);
+    const headersEnd = part.indexOf('\r\n\r\n');
+    if (headersEnd !== -1) {
+      const name = /name="([^"]*)"/u.exec(part.subarray(0, headersEnd).toString('utf8'))?.[1];
+      // The part's content, without the line break that comes before the next delimiter.
+      const content = part.subarray(headersEnd + 4, Math.max(headersEnd + 4, part.length - 2));
+      if (name !== undefined && !parts.has(name)) parts.set(name, content);
+    }
+    at = end;
+  }
+  return parts;
+}
+
+/**
+ * What a voice note or the sound of a video says in the sandbox: one calm, invented sentence (ADR 0010), always the
+ * same, so that a recette reads the same transcript every time.
+ */
+export const SANDBOX_TRANSCRIPT = 'coucou, c’est juste un petit vocal pour te dire bonne soirée';
+
+/**
+ * Registers xAI's speech to text (`POST /xai/v1/stt`), sent as `multipart/form-data` like xAI takes it: the model's
+ * name and the sound as a `file` part. Fastify knows no parser for it, so the world adds one that keeps the raw
+ * bytes, split into parts by `formParts`.
+ */
+export function registerTranscription(app: FastifyInstance, fateOf: (key: string) => KeyFate): void {
+  app.addContentTypeParser('multipart/form-data', { parseAs: 'buffer' }, (_request, body, done) => {
+    done(null, body);
+  });
+
+  app.post('/xai/v1/stt', (request, reply) => {
+    if (refused(reply, fateOf(bearerOf(request.headers.authorization))) !== null) return reply;
+    const type = request.headers['content-type'] ?? '';
+    const raw = request.body;
+    if (!type.startsWith('multipart/form-data') || !(raw instanceof Uint8Array)) {
+      return reply.code(415).send({ error: 'multipart/form-data expected' });
+    }
+    const boundary = /boundary="?([^";]+)"?/iu.exec(type)?.[1];
+    const parts = boundary === undefined ? new Map<string, Buffer>() : formParts(Buffer.from(raw), boundary);
+    const file = parts.get('file');
+    const model = parts.get('model')?.toString('utf8') ?? '';
+    if (file === undefined || file.length === 0 || model === '') {
+      return reply.code(400).send({ error: 'a model and a non-empty audio file are required' });
+    }
+    // The shape of xAI's answer; 0 s, so that the gateway prices the call at 0 $ (it reads this before ffprobe's).
+    return { text: SANDBOX_TRANSCRIPT, language: 'fr', duration: 0 };
+  });
+}
+
 /**
  * Registers the generation route of xAI (`POST /xai/v1/responses`) and its control route (`POST /__/ai/next`). Called
  * by `createWorld` before its catch-all of the AI services, which answers 503 to any route it does not know.
@@ -170,7 +248,7 @@ const propertiesOf = (schema: unknown): Readonly<Record<string, unknown>> =>
 export function registerGeneration(
   app: FastifyInstance,
   /** The fate of an xAI key, as the world decides it for the key verifier: its words, or the mode forced on xAI. */
-  fateOf: (key: string) => 'ok' | 'refused' | 'no_credit' | 'rate_limited' | 'down',
+  fateOf: (key: string) => KeyFate,
 ): void {
   let next: ScriptedReply = 'neutral';
   let risk: Risk = 'minor_suspected';
@@ -191,15 +269,7 @@ export function registerGeneration(
   app.get('/__/ai', () => ({ prochaine: next, appels: calls }));
 
   app.post('/xai/v1/responses', (request, reply) => {
-    const header = request.headers.authorization;
-    const key = (typeof header === 'string' ? header : '').replace(/^Bearer\s+/iu, '');
-    const result = fateOf(key);
-    if (result === 'refused') return reply.code(401).send({ error: 'Incorrect API key provided' });
-    if (result === 'no_credit') return reply.code(403).send({ error: 'Your team has run out of credits' });
-    if (result === 'rate_limited') {
-      return reply.code(429).header('retry-after', '30').send({ error: 'rate limited' });
-    }
-    if (result === 'down') return reply.code(503).send({ error: 'service unavailable' });
+    if (refused(reply, fateOf(bearerOf(request.headers.authorization))) !== null) return reply;
 
     const body = GenerationBodySchema.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error: 'not a generation request' });

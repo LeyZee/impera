@@ -283,6 +283,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
         stats: await tx.messages.fanStats(conversation.fanId),
+        sales: await tx.events.salesState(conversation.id),
         lastInbound: lastInboundKey(conversation),
       };
     });
@@ -309,6 +310,10 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         }),
       ...(read.conversation.careSince !== null && {
         care: { since: read.conversation.careSince, helpGiven: read.conversation.careHelpAt !== null },
+      }),
+      ...(read.sales.customOrderOpen && { customOrderOpen: true }),
+      ...(read.sales.usedObjectionReplies.length > 0 && {
+        usedObjectionReplies: read.sales.usedObjectionReplies,
       }),
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
@@ -362,7 +367,32 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           meta,
         );
       }
+      // His custom order now waits for the team (ADR 0090 § A), whatever the answer becomes.
+      if (result.customOrderOpened === true) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          { type: 'custom_order_opened', payload: { conversationId: conversation.id } },
+          meta,
+        );
+      }
       if (result.kind === 'draft') {
+        // The reply of her bank this draft was written with: never given to him again (ADR 0090 § B).
+        if (result.objectionReply !== undefined) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            {
+              type: 'objection_reply_used',
+              payload: {
+                conversationId: conversation.id,
+                objection: result.objectionReply.objection,
+                replyId: result.objectionReply.replyId,
+              },
+            },
+            meta,
+          );
+        }
         await tx.drafts.insert({
           id: draftId,
           conversationId: conversation.id,

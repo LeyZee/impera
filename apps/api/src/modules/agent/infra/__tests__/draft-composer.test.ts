@@ -1708,3 +1708,89 @@ describe('createDraftComposer, the care mode (ADR 0088)', () => {
     ).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['minor_suspected'] });
   });
 });
+
+describe('createDraftComposer, a custom order and a price objection (ADR 0090)', () => {
+  const ORDER: Brief = { ...BRIEF, intent: 'asks_for_service', replyBrief: 'Lui dire oui.' };
+  const adult: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00.000Z' };
+  const ordering = (options: { readonly chatter?: boolean; readonly voice?: VoiceOutput } = {}) => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    const draftComposer = createDraftComposer({
+      gateway: gateway({ brief: ORDER, ...(options.voice !== undefined && { voice: options.voice }) }, seen),
+      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+      limits: limitsOf(adult).limits,
+      ...(options.chatter !== undefined && {
+        chatterOnShift: () => Promise.resolve(options.chatter === true),
+      }),
+    });
+    return { draftComposer, seen };
+  };
+
+  it('hands a custom order to the chatter on shift, without the voice, and opens it', async () => {
+    const { draftComposer, seen } = ordering({ chatter: true });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'custom_order',
+      detail: ['custom_order'],
+      customOrderOpened: true,
+    });
+    expect(seen.voiceCalls).toBe(0);
+  });
+
+  it('with nobody on shift, answers from the code’s brief and opens the order', async () => {
+    const { draftComposer, seen } = ordering({ voice: { bubbles: ['oh j’adore l’idée 🙈', 'je te redis'] } });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft', customOrderOpened: true });
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('sans dire oui ni non');
+  });
+
+  it('holds an answer that commits to his order, and opens it all the same', async () => {
+    const { draftComposer } = ordering({ voice: { bubbles: ['ok je te fais ça demain 😘'] } });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'guard_blocked',
+      detail: ['no_commitment'],
+      customOrderOpened: true,
+    });
+  });
+
+  it('opens no second order while one waits', async () => {
+    const { draftComposer, seen } = ordering({
+      chatter: true,
+      voice: { bubbles: ['je l’ai pas oubliée 😌'] },
+    });
+    const result = await draftComposer.compose({ ...INPUT, customOrderOpen: true });
+    expect(result).toMatchObject({ kind: 'draft' });
+    expect(result).not.toHaveProperty('customOrderOpened');
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('déjà notée');
+  });
+
+  it('gives the voice the first reply of her bank he never received, and says which', async () => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    const draftComposer = createDraftComposer({
+      gateway: gateway({ brief: { ...BRIEF, intent: 'price_objection', objection: 'too_expensive' } }, seen),
+      personaOf: () =>
+        Promise.resolve({
+          persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+          followUpSpirit: null,
+          offerLimits: { cooldownHours: 10, minDesire: 70 },
+          sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },
+          alertKeywords: [],
+          objectionReplies: {
+            too_expensive: [
+              { id: 'testaaaaaaaa', text: 'Réplique de test A' },
+              { id: 'testbbbbbbbb', text: 'Réplique de test B' },
+            ],
+          },
+        }),
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+    });
+    expect(await draftComposer.compose({ ...INPUT, usedObjectionReplies: ['testaaaaaaaa'] })).toMatchObject({
+      kind: 'draft',
+      objectionReply: { objection: 'too_expensive', replyId: 'testbbbbbbbb' },
+    });
+    expect(seen.voiceInputs?.[0]?.objectionReply).toBe('Réplique de test B');
+  });
+});

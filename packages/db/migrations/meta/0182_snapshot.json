@@ -1,6 +1,6 @@
 {
-  "id": "abfcef4a-86f0-465a-b869-9bcdbccaaab7",
-  "prevId": "aad24a92-f479-4a2b-994f-617c7c5b412f",
+  "id": "891f6c1f-53b0-42b5-a047-3e5a4dc8cde4",
+  "prevId": "5700c780-f21a-4580-8c84-6bc0d40e2578",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2508,7 +2508,7 @@
       "checkConstraints": {
         "conversation_events_type_check": {
           "name": "conversation_events_type_check",
-          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'reply_skipped', 'reply_deferred', 'desire_scored', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -2625,24 +2625,6 @@
         },
         "card_read_through": {
           "name": "card_read_through",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "care_since": {
-          "name": "care_since",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "care_help_at": {
-          "name": "care_help_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "care_closed_at": {
-          "name": "care_closed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -4513,7 +4495,7 @@
       "checkConstraints": {
         "domain_events_type_check": {
           "name": "domain_events_type_check",
-          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'reply_skipped', 'reply_deferred', 'desire_scored', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -6816,6 +6798,126 @@
         "invoices_dates_check": {
           "name": "invoices_dates_check",
           "value": "\"invoices\".\"due_on\" >= \"invoices\".\"issued_on\" and \"invoices\".\"acceptance_deadline\" > \"invoices\".\"issued_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.ai_credit_entries": {
+      "name": "ai_credit_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ai_credit_entries_provider_at_idx": {
+          "name": "ai_credit_entries_provider_at_idx",
+          "columns": [
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ai_credit_entries_created_by_user_id_fk": {
+          "name": "ai_credit_entries_created_by_user_id_fk",
+          "tableFrom": "ai_credit_entries",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "agency_only": {
+          "name": "agency_only",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "ai_credit_entries_provider_check": {
+          "name": "ai_credit_entries_provider_check",
+          "value": "\"ai_credit_entries\".\"provider\" in ('xai', 'mistral', 'google')"
+        },
+        "ai_credit_entries_kind_check": {
+          "name": "ai_credit_entries_kind_check",
+          "value": "\"ai_credit_entries\".\"kind\" in ('topup', 'balance')"
+        },
+        "ai_credit_entries_currency_check": {
+          "name": "ai_credit_entries_currency_check",
+          "value": "\"ai_credit_entries\".\"currency\" in ('USD', 'EUR')"
+        },
+        "ai_credit_entries_amount_check": {
+          "name": "ai_credit_entries_amount_check",
+          "value": "\"ai_credit_entries\".\"amount_minor\" between 0 and 1000000 and (\"ai_credit_entries\".\"kind\" = 'balance' or \"ai_credit_entries\".\"amount_minor\" > 0)"
         }
       },
       "isRLSEnabled": false
@@ -10270,6 +10372,19 @@
           "primaryKey": false,
           "notNull": true
         },
+        "share_bp": {
+          "name": "share_bp",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 10000
+        },
+        "share_role": {
+          "name": "share_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -10333,7 +10448,7 @@
       "compositePrimaryKeys": {
         "pay_period_sales_pkey": {
           "name": "pay_period_sales_pkey",
-          "columns": ["platform", "platform_sale_id", "event"]
+          "columns": ["platform", "platform_sale_id", "event", "member_id"]
         }
       },
       "uniqueConstraints": {},
@@ -10366,6 +10481,10 @@
           "name": "pay_period_sales_currency_check",
           "value": "\"pay_period_sales\".\"currency\" in ('EUR', 'USD')"
         },
+        "pay_period_sales_share_role_check": {
+          "name": "pay_period_sales_share_role_check",
+          "value": "\"pay_period_sales\".\"share_role\" in ('author', 'recipient')"
+        },
         "pay_period_sales_sale_period_check": {
           "name": "pay_period_sales_sale_period_check",
           "value": "extract(day from \"pay_period_sales\".\"sale_period\") in (1, 16)"
@@ -10373,6 +10492,10 @@
         "pay_period_sales_net_check": {
           "name": "pay_period_sales_net_check",
           "value": "\"pay_period_sales\".\"sale_period\" <= \"pay_period_sales\".\"period\" and ((\"pay_period_sales\".\"event\" = 'sale' and \"pay_period_sales\".\"net_minor\" >= 0) or (\"pay_period_sales\".\"event\" = 'refund' and \"pay_period_sales\".\"net_minor\" <= 0))"
+        },
+        "pay_period_sales_share_check": {
+          "name": "pay_period_sales_share_check",
+          "value": "(\"pay_period_sales\".\"share_role\" is null and \"pay_period_sales\".\"share_bp\" = 10000) or (\"pay_period_sales\".\"share_role\" is not null and \"pay_period_sales\".\"share_bp\" between 1 and 9999)"
         }
       },
       "isRLSEnabled": false
@@ -10496,6 +10619,42 @@
           "primaryKey": false,
           "notNull": false
         },
+        "recipient_member_id": {
+          "name": "recipient_member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "share_bp": {
+          "name": "share_bp",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exclude_reason": {
+          "name": "exclude_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sale_currency": {
+          "name": "sale_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sale_net_minor": {
+          "name": "sale_net_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sale_occurred_at": {
+          "name": "sale_occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "note": {
           "name": "note",
           "type": "text",
@@ -10536,6 +10695,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "pay_sale_decisions_recipient_member_id_team_members_id_fk": {
+          "name": "pay_sale_decisions_recipient_member_id_team_members_id_fk",
+          "tableFrom": "pay_sale_decisions",
+          "tableTo": "team_members",
+          "columnsFrom": ["recipient_member_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "pay_sale_decisions_decided_by_user_id_fk": {
           "name": "pay_sale_decisions_decided_by_user_id_fk",
           "tableFrom": "pay_sale_decisions",
@@ -10560,14 +10728,14 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or (\"pay_sale_decisions\".\"author_member_id\" is not null and exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"author_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or (\"pay_sale_decisions\".\"author_member_id\" is not null and exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"author_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))) or (\"pay_sale_decisions\".\"recipient_member_id\" is not null and exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"recipient_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
         },
         "agency_insert": {
           "name": "agency_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"pay_sale_decisions\".\"decided_by\" = nullif(current_setting('app.user_id', true), '') and (\"pay_sale_decisions\".\"author_member_id\" is null or not exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"author_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"pay_sale_decisions\".\"decided_by\" = nullif(current_setting('app.user_id', true), '') and (\"pay_sale_decisions\".\"author_member_id\" is null or not exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"author_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))) and (\"pay_sale_decisions\".\"recipient_member_id\" is null or not exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"recipient_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
         }
       },
       "checkConstraints": {
@@ -10577,7 +10745,7 @@
         },
         "pay_sale_decisions_outcome_check": {
           "name": "pay_sale_decisions_outcome_check",
-          "value": "\"pay_sale_decisions\".\"outcome\" in ('count', 'exclude', 'withdraw')"
+          "value": "\"pay_sale_decisions\".\"outcome\" in ('count', 'exclude', 'give', 'withdraw')"
         },
         "pay_sale_decisions_reason_check": {
           "name": "pay_sale_decisions_reason_check",
@@ -10597,7 +10765,27 @@
         },
         "pay_sale_decisions_link_check": {
           "name": "pay_sale_decisions_link_check",
-          "value": "(\"pay_sale_decisions\".\"author_member_id\" is null) = (\"pay_sale_decisions\".\"link_version\" is null)"
+          "value": "\"pay_sale_decisions\".\"author_member_id\" is null or \"pay_sale_decisions\".\"link_version\" is not null"
+        },
+        "pay_sale_decisions_exclude_reason_check": {
+          "name": "pay_sale_decisions_exclude_reason_check",
+          "value": "\"pay_sale_decisions\".\"exclude_reason\" in ('agent_decisive', 'other')"
+        },
+        "pay_sale_decisions_sale_currency_check": {
+          "name": "pay_sale_decisions_sale_currency_check",
+          "value": "\"pay_sale_decisions\".\"sale_currency\" in ('EUR', 'USD')"
+        },
+        "pay_sale_decisions_give_check": {
+          "name": "pay_sale_decisions_give_check",
+          "value": "(\"pay_sale_decisions\".\"outcome\" = 'give') = (\"pay_sale_decisions\".\"recipient_member_id\" is not null) and (\"pay_sale_decisions\".\"outcome\" = 'give') = (\"pay_sale_decisions\".\"share_bp\" is not null) and (\"pay_sale_decisions\".\"outcome\" <> 'give' or (\"pay_sale_decisions\".\"note\" is not null and \"pay_sale_decisions\".\"link_version\" is not null and \"pay_sale_decisions\".\"sale_currency\" is not null and \"pay_sale_decisions\".\"sale_net_minor\" >= 0 and \"pay_sale_decisions\".\"sale_occurred_at\" is not null and \"pay_sale_decisions\".\"recipient_member_id\" is distinct from \"pay_sale_decisions\".\"author_member_id\" and \"pay_sale_decisions\".\"share_bp\" between 1000 and 10000 and \"pay_sale_decisions\".\"share_bp\" % 1000 = 0 and (\"pay_sale_decisions\".\"share_bp\" = 10000 or \"pay_sale_decisions\".\"author_member_id\" is not null)))"
+        },
+        "pay_sale_decisions_sale_check": {
+          "name": "pay_sale_decisions_sale_check",
+          "value": "(\"pay_sale_decisions\".\"outcome\" = 'give') = (\"pay_sale_decisions\".\"sale_currency\" is not null) and (\"pay_sale_decisions\".\"sale_currency\" is null) = (\"pay_sale_decisions\".\"sale_net_minor\" is null) and (\"pay_sale_decisions\".\"sale_currency\" is null) = (\"pay_sale_decisions\".\"sale_occurred_at\" is null)"
+        },
+        "pay_sale_decisions_exclude_outcome_check": {
+          "name": "pay_sale_decisions_exclude_outcome_check",
+          "value": "\"pay_sale_decisions\".\"exclude_reason\" is null or \"pay_sale_decisions\".\"outcome\" = 'exclude'"
         }
       },
       "isRLSEnabled": false
@@ -11493,6 +11681,136 @@
         }
       },
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.platform_chatter_daily_stats": {
+      "name": "platform_chatter_daily_stats",
+      "schema": "",
+      "columns": {
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_chatter_id": {
+          "name": "platform_chatter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ppv_sent": {
+          "name": "ppv_sent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ppv_purchased": {
+          "name": "ppv_purchased",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "messages_sent": {
+          "name": "messages_sent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "platform_chatter_daily_stats_creator_day_idx": {
+          "name": "platform_chatter_daily_stats_creator_day_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "platform_chatter_daily_stats_creator_id_creators_id_fk": {
+          "name": "platform_chatter_daily_stats_creator_id_creators_id_fk",
+          "tableFrom": "platform_chatter_daily_stats",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platform_chatter_daily_stats_account_creator_fk": {
+          "name": "platform_chatter_daily_stats_account_creator_fk",
+          "tableFrom": "platform_chatter_daily_stats",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "platform_chatter_daily_stats_pk": {
+          "name": "platform_chatter_daily_stats_pk",
+          "columns": ["platform_account_id", "platform_chatter_id", "day"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "chatter_stats_read": {
+          "name": "chatter_stats_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"platform_chatter_daily_stats\".\"creator_id\" = any(u.creator_ids))))"
+        }
+      },
+      "checkConstraints": {
+        "platform_chatter_daily_stats_platform_check": {
+          "name": "platform_chatter_daily_stats_platform_check",
+          "value": "\"platform_chatter_daily_stats\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        },
+        "platform_chatter_daily_stats_counts_check": {
+          "name": "platform_chatter_daily_stats_counts_check",
+          "value": "\"platform_chatter_daily_stats\".\"ppv_purchased\" >= 0 and coalesce(\"platform_chatter_daily_stats\".\"ppv_sent\", 0) >= 0 and coalesce(\"platform_chatter_daily_stats\".\"messages_sent\", 0) >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.platform_daily_stats": {

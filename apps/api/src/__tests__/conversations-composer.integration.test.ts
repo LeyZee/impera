@@ -340,6 +340,33 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     ]);
   });
 
+  it('journals his custom order and the objection reply, and gives them back on his next message (ADR 0090)', async () => {
+    const id = await fanWrites('c-order', 'Tu me ferais une vidéo rien que pour moi ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Oh j’adore l’idée 🙈'],
+      softViolations: [],
+      costUsd: 0,
+      customOrderOpened: true,
+      objectionReply: { objection: 'too_expensive', replyId: 'testaaaaaaaa' },
+    };
+    await respond(id);
+    expect((await events(id)).map((event) => event.type).slice(-3)).toEqual([
+      'custom_order_opened',
+      'objection_reply_used',
+      'draft_created',
+    ]);
+    expect(composer.inputs.at(-1)).not.toHaveProperty('customOrderOpen');
+
+    await fanWrites('c-order', 'Alors ?');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await respond(id);
+    expect(composer.inputs.at(-1)).toMatchObject({
+      customOrderOpen: true,
+      usedObjectionReplies: ['testaaaaaaaa'],
+    });
+  });
+
   it('writes nothing more to the fan while a human is awaited, whatever the fan sends', async () => {
     const id = await fanWrites('c-awaited', 'Je vais pas bien');
     composer.next = { kind: 'held', reason: 'handoff', cause: 'distress', detail: ['distress'], costUsd: 0 };

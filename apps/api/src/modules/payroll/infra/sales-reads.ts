@@ -7,8 +7,10 @@ import {
   PayPeriodSchema,
   PlatformAccountIdSchema,
   PlatformSchema,
+  SALE_WHOLE_BP,
   SaleDecisionOutcomeSchema,
   SaleEventSchema,
+  SaleExcludeReasonSchema,
   TeamMemberIdSchema,
   type Currency,
   type PayPeriod,
@@ -59,7 +61,7 @@ interface SaleLineRead extends SaleKey {
         readonly platformChatterId: string;
         readonly linkVersion: string;
       }
-    | { readonly kind: 'agent'; readonly platformChatterId: string }
+    | { readonly kind: 'agent'; readonly platformChatterId: string; readonly linkVersion: string }
     | { readonly kind: 'unlinked'; readonly platformChatterId: string }
     | { readonly kind: 'none' };
 }
@@ -137,10 +139,17 @@ function netAccounts(sources: readonly AccountSourceForPay[], period: PayPeriod)
   return [...accounts].sort();
 }
 
-const authorOf = (author: SaleLineRead['author']): SaleAuthorForPay =>
-  author.kind === 'member'
-    ? { kind: 'member', memberId: author.memberId, linkVersion: author.linkVersion }
-    : { kind: author.kind };
+function authorOf(author: SaleLineRead['author']): SaleAuthorForPay {
+  switch (author.kind) {
+    case 'member':
+      return { kind: 'member', memberId: author.memberId, linkVersion: author.linkVersion };
+    case 'agent':
+      return { kind: 'agent', linkVersion: author.linkVersion };
+    case 'unlinked':
+    case 'none':
+      return { kind: author.kind };
+  }
+}
 
 /** A line as the attribution reads it: the period of its own day and of its sale's, in the agency's zone. */
 function saleForPayOf(line: SaleLineRead, timeZone: string): SaleForPay {
@@ -172,6 +181,8 @@ const RegisteredRowSchema = z.object({
   currency: CurrencySchema,
   netMinor: z.number().int(),
   salePeriod: PayPeriodSchema,
+  shareBp: z.number().int(),
+  shareRole: z.enum(['author', 'recipient']).nullable(),
 });
 
 /** A registry row as the domain reads it, its key and what a statement takes from it. */
@@ -187,23 +198,30 @@ const registeredOfRow = (row: typeof payPeriodSales.$inferSelect): RegisteredSal
     salePeriod: one.salePeriod,
     memberId: one.memberId,
     linkVersion: one.linkVersion,
+    part: one.shareRole === null ? null : { shareBp: one.shareBp, role: one.shareRole },
     period: one.period,
   };
 };
 
-const byKeyOf = (rows: readonly (typeof payPeriodSales.$inferSelect)[]): Map<string, RegisteredSale> =>
-  new Map(
-    rows.map((row) => {
-      const one = registeredOfRow(row);
-      return [saleKeyOf(one), one];
-    }),
-  );
+/** The registry's rows by line: one for a line counted whole, two for a shared one (ADR 0101), by member. */
+function byKeyOf(rows: readonly (typeof payPeriodSales.$inferSelect)[]): Map<string, RegisteredSale[]> {
+  const byKey = new Map<string, RegisteredSale[]>();
+  for (const row of rows) {
+    const one = registeredOfRow(row);
+    const key = saleKeyOf(one);
+    byKey.set(
+      key,
+      [...(byKey.get(key) ?? []), one].sort((a, b) => a.memberId.localeCompare(b.memberId)),
+    );
+  }
+  return byKey;
+}
 
 /** The registry's entries of `lines`, and of the sale of each refund among them: both events of each sale read. */
 async function registeredAmong(
   tx: Transaction,
   lines: readonly SaleKey[],
-): Promise<Map<string, RegisteredSale>> {
+): Promise<Map<string, RegisteredSale[]>> {
   if (lines.length === 0) return new Map();
   const sales = [...new Map(lines.map((line) => [`${line.platform} ${line.platformSaleId}`, line])).values()];
   const rows = await tx
@@ -224,6 +242,10 @@ const DecisionRowSchema = z.object({
   outcome: SaleDecisionOutcomeSchema,
   authorMemberId: TeamMemberIdSchema.nullable(),
   linkVersion: z.string().nullable(),
+  recipientMemberId: TeamMemberIdSchema.nullable(),
+  shareBp: z.number().int().nullable(),
+  excludeReason: SaleExcludeReasonSchema.nullable(),
+  note: z.string().nullable(),
 });
 
 /** Sales named in one query at most: a longer list is read in several. */
@@ -250,6 +272,10 @@ async function decisionsAmong(
         outcome: paySaleDecisions.outcome,
         authorMemberId: paySaleDecisions.authorMemberId,
         linkVersion: paySaleDecisions.linkVersion,
+        recipientMemberId: paySaleDecisions.recipientMemberId,
+        shareBp: paySaleDecisions.shareBp,
+        excludeReason: paySaleDecisions.excludeReason,
+        note: paySaleDecisions.note,
       })
       .from(paySaleDecisions)
       .where(
@@ -266,7 +292,15 @@ async function decisionsAmong(
       decisions.set(saleIdOf(one), {
         outcome: one.outcome,
         linkVersion: one.linkVersion,
-        memberId: one.outcome === 'count' ? one.authorMemberId : null,
+        memberId:
+          one.outcome === 'count'
+            ? one.authorMemberId
+            : one.outcome === 'give'
+              ? one.recipientMemberId
+              : null,
+        shareBp: one.outcome === 'give' ? (one.shareBp ?? SALE_WHOLE_BP) : SALE_WHOLE_BP,
+        note: one.note,
+        excludeReason: one.excludeReason,
       });
     }
   }
@@ -312,7 +346,7 @@ async function pendingSales(
 }
 
 /** What the closing of `period` registered: a closed period counts it again without reading the register. */
-async function registeredIn(tx: Transaction, period: PayPeriod): Promise<Map<string, RegisteredSale>> {
+async function registeredIn(tx: Transaction, period: PayPeriod): Promise<Map<string, RegisteredSale[]>> {
   return byKeyOf(await tx.select().from(payPeriodSales).where(eq(payPeriodSales.period, period)));
 }
 

@@ -243,6 +243,35 @@ describe('classification (ADR 0020 §2)', () => {
     expect(reached?.kind === 'notice' ? reached.body : '').toContain('Plafond IA atteint (20 €)');
   });
 
+  it('says AI credits run low in their own currency, urgent once under two days or empty (ADR 0091 § 4)', () => {
+    const base = {
+      kind: 'ai_credits_low',
+      provider: 'xai',
+      currency: 'USD',
+      runsOutOn: '2026-11-15',
+    } as const;
+    expect(classify({ ...base, level: 'low', balanceMinor: 2340 })).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: null,
+      title: 'Important',
+      body: 'Crédits Grok (xAI) : moins de 5 jours au rythme actuel (23,4 $ restants, épuisés vers le 15 nov.). Pense à recharger.',
+      link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
+    });
+    expect(
+      classify({ ...base, level: 'critical', balanceMinor: 610, provider: 'mistral', currency: 'EUR' }),
+    ).toMatchObject({
+      topic: 'urgent',
+      fallbackTopic: 'important',
+      title: 'URGENT',
+      body: 'Crédits Mistral : moins de 2 jours au rythme actuel (6,1 € restants, épuisés vers le 15 nov.). Recharge maintenant.',
+    });
+    expect(classify({ ...base, level: 'empty', balanceMinor: -120, runsOutOn: null })).toMatchObject({
+      topic: 'urgent',
+      body: 'Crédits Grok (xAI) épuisés d’après le décompte du CRM : l’IA s’arrête sur ce service. Recharge, puis note-le dans Consommation IA.',
+    });
+  });
+
   it('says the database export is overdue, in Paris time, or has never succeeded', () => {
     expect(classify({ kind: 'backup_overdue', lastSucceededAt: new Date('2026-10-26T02:04:00Z') })).toEqual({
       kind: 'notice',

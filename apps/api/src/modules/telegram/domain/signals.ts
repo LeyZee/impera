@@ -77,6 +77,18 @@ export type Signal =
       readonly conversationId: ConversationId | null;
     }
   | {
+      /**
+       * A provider's AI credits, as the CRM's ledger counts them down (ADR 0091 § 4): under five days (`low`), under
+       * two (`critical`) or none left (`empty`). The amount is the agency's own spending, never a creator's figure.
+       */
+      readonly kind: 'ai_credits_low';
+      readonly provider: 'xai' | 'mistral' | 'google';
+      readonly level: 'low' | 'critical' | 'empty';
+      readonly balanceMinor: number;
+      readonly currency: 'EUR' | 'USD';
+      readonly runsOutOn: string | null;
+    }
+  | {
       /** No export of the database succeeded for 26 hours (ADR 0028 § 5); null when none ever did. */
       readonly kind: 'backup_overdue';
       readonly lastSucceededAt: Date | null;

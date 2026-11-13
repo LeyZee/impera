@@ -1,4 +1,4 @@
-import type { AgencyInsights, AgencyPeriod } from '@impera/contracts';
+import { AGENCY_TRANSFER_VAT_BPS, type AgencyInsights, type AgencyPeriod } from '@impera/contracts';
 import { chartPoints, linePath, niceTicks, placeSegmentThumb } from '@impera/design-system';
 import { Link } from '@tanstack/react-router';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
@@ -20,6 +20,10 @@ import {
   euros,
   heatOf,
   kindSlices,
+  moneyParts,
+  moneyShares,
+  moneyTip,
+  type MoneyPart,
   OTHER,
   OTHER_KINDS_NOTE,
   PERIOD_OPTIONS,
@@ -50,6 +54,8 @@ import { ServerSilent } from '@/shell/ServerSilent';
  */
 
 const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+/** « 20 % »: the transfers' VAT rate as the code holds it (ADR 0106 § 7), never written twice. */
+const VAT_RATE = `${(AGENCY_TRANSFER_VAT_BPS / 100).toLocaleString('fr-FR')}\u00a0%`;
 const formatEuros = (cents: number): string => euros(Math.round(cents));
 const formatCount = (n: number): string => Math.round(n).toLocaleString('fr-FR');
 
@@ -144,94 +150,296 @@ function Spark({ values }: { values: readonly number[] }): JSX.Element | null {
   );
 }
 
-function Figures({ insights, period }: { insights: AgencyInsights; period: AgencyPeriod }): JSX.Element {
+interface Tile {
+  readonly label: string;
+  readonly value: string;
+  readonly note: string;
+  readonly delta: readonly [number, number] | null;
+  readonly lowerIsBetter?: boolean;
+  /** A money tile's destination (ADR 0106 § 11): its colour's round key beside the title. */
+  readonly part?: MoneyPart['key'];
+  /** A money tile explains itself on hover, focus or a tap (ADR 0106 § 12). */
+  readonly tip?: ReturnType<typeof moneyTip>;
+}
+
+function Tiles({
+  tiles,
+  from,
+  label,
+  tip,
+}: {
+  tiles: readonly Tile[];
+  from: number;
+  label: string;
+  tip: FloatingTip;
+}): JSX.Element {
+  return (
+    <dl className="ins-tiles" aria-label={label}>
+      {tiles.map((tile, i) => (
+        <div
+          key={tile.label}
+          className="nv-plate ins-tile nv-enter"
+          style={{ '--nv-i': from + i }}
+          {...(tile.tip === undefined ? {} : { tabIndex: 0, ...tip.bind(tile.tip, { around: true }) })}
+        >
+          <dt>
+            {tile.part === undefined ? null : (
+              <span className="ins-tile__key" data-part={tile.part} aria-hidden="true" />
+            )}
+            {tile.label}
+          </dt>
+          <dd>
+            <span className="ins-tile__value">{tile.value}</span>
+            {tile.delta === null ? null : (
+              <Delta
+                current={tile.delta[0]}
+                previous={tile.delta[1]}
+                lowerIsBetter={tile.lowerIsBetter === true}
+              />
+            )}
+          </dd>
+          <dd className="ins-tile__note">{tile.note}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * « Où va l'argent » (ADR 0106 § 5, § 10 to § 13): the period's revenue as one tall segmented bar, the fans' VAT and
+ * the platform's commission first, then the net's two parts, each destination in its colour, the same as on the
+ * tiles. Every block and every line of the legend (the table) explains itself on hover, focus or a tap.
+ */
+function MoneySplit({
+  insights,
+  several,
+  tip,
+}: {
+  insights: AgencyInsights;
+  several: boolean;
+  tip: FloatingTip;
+}): JSX.Element {
+  const { current, previous } = insights.totals;
+  const parts = moneyParts(current, previous, several);
+  const whole = parts.reduce((sum, part) => sum + part.cents, 0);
+  // Shares are of the revenue the card's title shows, never of the blocks' sum, which a block brought to zero changes.
+  const revenue = current.revenueMinor;
+  // Rounded together, so the legend adds up to 100 % (largest remainder), the amounts untouched.
+  const shares = moneyShares(current);
+  const tipOf = (part: MoneyPart): ReturnType<typeof moneyTip> =>
+    moneyTip({
+      title: part.label,
+      cents: part.cents,
+      previousCents: part.previousCents,
+      revenueMinor: revenue,
+      netMinor: part.ofNet ? current.netMinor : null,
+      text: part.note,
+      revenueShare: shares.ofRevenue[part.key],
+      ...(part.key === 'creator' || part.key === 'agency' ? { netShare: shares.ofNet[part.key] } : {}),
+    });
+  return (
+    <article className="nv-plate ins-money nv-enter" style={{ '--nv-i': 6 }}>
+      <h3 className="ins-card__title">
+        Où va l’argent
+        {whole > 0 ? <span className="ins-card__total">{euros(revenue)}</span> : null}
+      </h3>
+      {whole <= 0 ? (
+        <p className="ins-empty">Aucune vente sur la période.</p>
+      ) : (
+        <>
+          <div
+            className="ins-money__bar"
+            role="img"
+            aria-label={`Où va l’argent : ${parts
+              .filter((part) => part.cents > 0)
+              .map((part) => `${part.label} ${euros(part.cents)}, ${String(shares.ofRevenue[part.key])} %`)
+              .join(' ; ')}`}
+          >
+            {parts.map((part) =>
+              part.cents <= 0 ? null : (
+                <span
+                  key={part.key}
+                  className="ins-money__part"
+                  data-part={part.key}
+                  style={{ flexGrow: part.cents }}
+                  {...tip.bind(tipOf(part), { above: true })}
+                />
+              ),
+            )}
+          </div>
+          <ul className="ins-money__legend">
+            {parts.map((part) => (
+              <li key={part.key} tabIndex={0} {...tip.bind(tipOf(part), { around: true })}>
+                <span className="ins-money__key" data-part={part.key} aria-hidden="true" />
+                <span className="ins-money__label">{part.label}</span>
+                <span className="ins-money__value">{euros(part.cents)}</span>
+                <span className="ins-money__share">{String(shares.ofRevenue[part.key])}&nbsp;%</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </article>
+  );
+}
+
+function Figures({
+  insights,
+  period,
+  several,
+  tip,
+}: {
+  insights: AgencyInsights;
+  period: AgencyPeriod;
+  several: boolean;
+  tip: FloatingTip;
+}): JSX.Element {
   const { current, previous } = insights.totals;
   const { fans } = insights;
+  const fansVat = current.revenueMinor - current.revenueExclVatMinor;
+  const commission = current.revenueExclVatMinor - current.netMinor;
+  // ADR 0106 § 4: the parts say their share of the net, the base a percentage agreed with a creator is set on.
+  // The two parts' shares of the net are rounded together, to 100 %, as in « Où va l'argent ».
+  const shares = moneyShares(current);
+  const ofNet = (key: 'creator' | 'agency'): string =>
+    current.netMinor > 0 ? `${String(shares.ofNet[key])} % du net` : 'aucun net sur la période';
+  const creatorLabel = several ? 'Part des créatrices' : 'Part de la créatrice';
+  const tipOf = (
+    title: string,
+    cents: number,
+    previousCents: number,
+    part: 'creator' | 'agency' | null,
+    text: string,
+  ): ReturnType<typeof moneyTip> =>
+    moneyTip({
+      title,
+      cents,
+      previousCents,
+      revenueMinor: current.revenueMinor,
+      netMinor: part === null ? null : current.netMinor,
+      text,
+      ...(part === null ? {} : { revenueShare: shares.ofRevenue[part], netShare: shares.ofNet[part] }),
+    });
+  const money: readonly Tile[] = [
+    {
+      label: 'Net',
+      value: euros(current.netMinor),
+      note: `après ${euros(fansVat)} de TVA des fans et ${euros(commission)} de commission de la plateforme`,
+      delta: [current.netMinor, previous.netMinor],
+      tip: tipOf(
+        'Net',
+        current.netMinor,
+        previous.netMinor,
+        null,
+        'Ce qui reste après la TVA des fans et la commission de la plateforme : la part de l’agence et celle des créatrices.',
+      ),
+    },
+    {
+      label: 'Part de l’agence',
+      value: euros(current.agencyMinor),
+      note: ofNet('agency'),
+      delta: [current.agencyMinor, previous.agencyMinor],
+      part: 'agency',
+      tip: tipOf(
+        'Part de l’agence',
+        current.agencyMinor,
+        previous.agencyMinor,
+        'agency',
+        'Ce que la plateforme verse à l’agence, son propre chiffre.',
+      ),
+    },
+    {
+      label: creatorLabel,
+      value: euros(current.creatorMinor),
+      note: ofNet('creator'),
+      delta: [current.creatorMinor, previous.creatorMinor],
+      part: 'creator',
+      tip: tipOf(
+        creatorLabel,
+        current.creatorMinor,
+        previous.creatorMinor,
+        'creator',
+        several
+          ? 'Ce que la plateforme leur verse, son propre chiffre.'
+          : 'Ce que la plateforme lui verse, son propre chiffre.',
+      ),
+    },
+    {
+      label: 'TVA en plus sur les virements',
+      value: euros(current.agencyTransferVatMinor),
+      note: `estimation, ${VAT_RATE} de la part de l’agence, à reverser à l’État`,
+      delta: null,
+      // Not a part of the revenue: no share of it (ADR 0106 § 6).
+      tip: moneyTip({
+        title: 'TVA en plus sur les virements',
+        cents: current.agencyTransferVatMinor,
+        previousCents: previous.agencyTransferVatMinor,
+        revenueMinor: 0,
+        netMinor: null,
+        text: `Une estimation : la plateforme ajoute ${VAT_RATE} de TVA à la part de l’agence sur chaque virement. Elle se reverse à l’État ; le montant exact est sur le relevé de virement.`,
+      }),
+    },
+  ];
+  const activity: readonly Tile[] = [
+    {
+      label: 'Fans qui ont payé',
+      value: fans.paying.toLocaleString('fr-FR'),
+      note:
+        fans.paying === 0
+          ? 'aucun sur la période'
+          : `dont ${fans.newPaying.toLocaleString('fr-FR')} pour la première fois`,
+      delta: [fans.paying, fans.previousPaying],
+    },
+    {
+      label: 'Dépense moyenne par fan',
+      value: fans.averagePerPayingMinor === null ? '—' : euros(fans.averagePerPayingMinor),
+      note: 'ce qu’un fan payeur a dépensé sur la période',
+      delta: null,
+    },
+    {
+      label: 'Ventes',
+      value: current.sales.toLocaleString('fr-FR'),
+      note: 'abonnements, PPV, tips… une ligne chacune',
+      delta: [current.sales, previous.sales],
+    },
+    {
+      label: 'Remboursements',
+      value: current.refunds.toLocaleString('fr-FR'),
+      note:
+        current.sales === 0
+          ? 'aucune vente sur la période'
+          : `${String(shareOf(current.refunds, current.sales))} % des ventes`,
+      delta: [current.refunds, previous.refunds],
+      lowerIsBetter: true,
+    },
+  ];
   return (
-    <div className="ins-figures">
-      <div className="nv-plate ins-lead nv-enter" style={{ '--nv-i': 1 }}>
-        <div className="nv-figure">
-          <span className="nv-figure__label">Chiffre d’affaires</span>
-          <CountUp
-            className="nv-figure__value ins-lead__value"
-            value={current.revenueMinor}
-            format={formatEuros}
-          />
-          <span className="nv-figure__note">
-            <Delta current={current.revenueMinor} previous={previous.revenueMinor} />
-            <span>
-              {changeOf(current.revenueMinor, previous.revenueMinor) === null
-                ? 'rien à comparer sur la période d’avant'
-                : `${AGAINST[period]} (${euros(previous.revenueMinor)})`}
+    <div className="ins-figures-stack">
+      <div className="ins-figures">
+        <div className="nv-plate ins-lead nv-enter" style={{ '--nv-i': 1 }}>
+          <div className="nv-figure">
+            <span className="nv-figure__label">Chiffre d’affaires</span>
+            <CountUp
+              className="nv-figure__value ins-lead__value"
+              value={current.revenueMinor}
+              format={formatEuros}
+            />
+            <span className="nv-figure__note">
+              <Delta current={current.revenueMinor} previous={previous.revenueMinor} />
+              <span>
+                {changeOf(current.revenueMinor, previous.revenueMinor) === null
+                  ? 'rien à comparer sur la période d’avant'
+                  : `${AGAINST[period]} (${euros(previous.revenueMinor)})`}
+              </span>
             </span>
-          </span>
-        </div>
-        <Spark values={insights.days.map((day) => day.revenueMinor)} />
-      </div>
-      <dl className="ins-tiles">
-        {(
-          [
-            {
-              label: 'Part de l’agence',
-              value: euros(current.agencyMinor),
-              note: `${String(shareOf(current.agencyMinor, current.revenueMinor))} % du chiffre d’affaires`,
-              delta: [current.agencyMinor, previous.agencyMinor],
-            },
-            {
-              label: 'Net',
-              value: euros(current.netMinor),
-              note: 'agence et créatrices, après la plateforme',
-              delta: [current.netMinor, previous.netMinor],
-            },
-            {
-              label: 'Fans qui ont payé',
-              value: fans.paying.toLocaleString('fr-FR'),
-              note:
-                fans.paying === 0
-                  ? 'aucun sur la période'
-                  : `dont ${fans.newPaying.toLocaleString('fr-FR')} pour la première fois`,
-              delta: [fans.paying, fans.previousPaying],
-            },
-            {
-              label: 'Dépense moyenne par fan',
-              value: fans.averagePerPayingMinor === null ? '—' : euros(fans.averagePerPayingMinor),
-              note: 'ce qu’un fan payeur a dépensé sur la période',
-              delta: null,
-            },
-            {
-              label: 'Ventes',
-              value: current.sales.toLocaleString('fr-FR'),
-              note: 'abonnements, PPV, tips… une ligne chacune',
-              delta: [current.sales, previous.sales],
-            },
-            {
-              label: 'Remboursements',
-              value: current.refunds.toLocaleString('fr-FR'),
-              note:
-                current.sales === 0
-                  ? 'aucune vente sur la période'
-                  : `${String(shareOf(current.refunds, current.sales))} % des ventes`,
-              delta: [current.refunds, previous.refunds],
-              lowerIsBetter: true,
-            },
-          ] as const
-        ).map((tile, i) => (
-          <div key={tile.label} className="nv-plate ins-tile nv-enter" style={{ '--nv-i': i + 2 }}>
-            <dt>{tile.label}</dt>
-            <dd>
-              <span className="ins-tile__value">{tile.value}</span>
-              {tile.delta === null ? null : (
-                <Delta
-                  current={tile.delta[0]}
-                  previous={tile.delta[1]}
-                  lowerIsBetter={'lowerIsBetter' in tile}
-                />
-              )}
-            </dd>
-            <dd className="ins-tile__note">{tile.note}</dd>
+            <span className="ins-lead__sub">ce que les fans ont payé, TVA comprise</span>
           </div>
-        ))}
-      </dl>
+          <Spark values={insights.days.map((day) => day.revenueMinor)} />
+        </div>
+        <Tiles tiles={money} from={2} label="L’argent" tip={tip} />
+      </div>
+      <MoneySplit insights={insights} several={several} tip={tip} />
+      <Tiles tiles={activity} from={7} label="Les fans et les ventes" tip={tip} />
     </div>
   );
 }
@@ -1119,7 +1327,7 @@ export function AgencyInsightsPanel({
         index={at}
         control={control}
       >
-        <Figures insights={insights} period={shown} />
+        <Figures insights={insights} period={shown} several={several} tip={tip} />
         {insights.dollarsLeftOut ? (
           <p className="ins-note" role="note">
             Des ventes en dollars sont laissées de côté : aucun taux de change n’est encore connu (Équipe ›

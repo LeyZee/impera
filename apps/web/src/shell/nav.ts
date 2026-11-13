@@ -194,6 +194,7 @@ const SCREENS = {
   '/moi/preferences': 'Préférences',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/ventes': 'Ventes',
+  '/reglages/consommation-ia': 'Consommation IA',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',

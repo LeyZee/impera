@@ -20,9 +20,11 @@ import { onSaleDays, sumsBy, type SaleDayLine } from './sale-days';
 import type { ChatterLink } from './sales-feed';
 
 /**
- * The reliability check of ADR 0050 § 8 (CRM-02): before any account switches to the platform's net, the register is
- * compared, to the cent, with the platform's daily statistics and with the dashboard's export, per model and day,
- * then per team member. Pure: the application gathers the three sources and this file says where they differ.
+ * The reliability check of ADR 0050 § 8 (CRM-02, amended by CRM-14): before any account switches to the platform's
+ * net, the register is compared, to the cent, with the platform's daily statistics and, when the owner gives one, with
+ * the dashboard's export, per model and day, then per team member. Reveal's dashboard offers no export (11/11/2026):
+ * the statistics are the one source a match needs. Pure: the application gathers the sources and this file says where
+ * they differ.
  */
 
 /** A line of the register (recorded or in quarantine), with no fan data. */
@@ -433,14 +435,15 @@ export function buildCheckReport(sources: CheckSources): SalesFeedCheckReport {
 
   const anyDifference =
     days.some((day) => day.differs.length > 0) || chatters.some((chatter) => chatter.differs);
-  // Something left uncompared (a source missing, a model of the export unknown, days before the register) is never
-  // a match: the switch of CRM-03 needs one.
+  // Something left uncompared (the statistics missing, a model of the export unknown, days before the register) is
+  // never a match: the switch of CRM-03 needs one. The export is optional (ADR 0050 § 8, amended 11/11/2026): without
+  // it, the register and the statistics agreeing is a match; given, it is compared and any difference is a mismatch.
   const uncompared = notes.some((note) =>
     ['stats_unavailable', 'export_unknown_model', 'register_starts_after'].includes(note.kind),
   );
   const verdict: SalesFeedCheckVerdict = anyDifference
     ? 'mismatch'
-    : sources.stats.ok && sources.exported !== null && !uncompared
+    : sources.stats.ok && !uncompared
       ? 'match'
       : 'incomplete';
 
