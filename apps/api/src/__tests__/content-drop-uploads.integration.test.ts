@@ -678,9 +678,12 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     await describe();
     expect(await failures()).toBe(DESCRIPTION_TRIES);
     // graphile-worker completes a job without awaiting it: runOnce can return before the row is deleted.
-    await vi.waitFor(async () => {
-      expect(await queued()).toBe(0);
-    });
+    await vi.waitFor(
+      async () => {
+        expect(await queued()).toBe(0);
+      },
+      { timeout: 5_000 },
+    );
     await backlog();
     expect(await queued()).toBe(0);
     expect((await review()).media[0]).toMatchObject({ description: null, describeFailed: true });
