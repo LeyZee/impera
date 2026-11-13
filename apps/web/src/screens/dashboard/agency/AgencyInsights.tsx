@@ -1343,11 +1343,25 @@ export function AgencyInsightsPanel({
             onRetry={() => void query.refetch()}
           />
         ) : (
-          // The shape of the figures, a large tile and six small ones, so nothing jumps when they come (ADM-21).
-          <div className="ins-figures" aria-label="Chargement des chiffres" role="status" aria-busy="true">
-            <div className="db-loading nv-plate ins-lead ins-loading" />
+          // The shape of the figures, so nothing jumps when they come (ADM-21): the lead and its four tiles of money,
+          // the card of where the money goes, the four tiles of fans and sales.
+          <div
+            className="ins-figures-stack"
+            aria-label="Chargement des chiffres"
+            role="status"
+            aria-busy="true"
+          >
+            <div className="ins-figures">
+              <div className="db-loading nv-plate ins-lead ins-loading" />
+              <div className="ins-tiles">
+                {Array.from({ length: 4 }, (_, i) => (
+                  <div key={i} className="db-loading nv-plate ins-tile ins-loading--tile" />
+                ))}
+              </div>
+            </div>
+            <div className="db-loading nv-plate ins-loading--split" />
             <div className="ins-tiles">
-              {Array.from({ length: 6 }, (_, i) => (
+              {Array.from({ length: 4 }, (_, i) => (
                 <div key={i} className="db-loading nv-plate ins-tile ins-loading--tile" />
               ))}
             </div>

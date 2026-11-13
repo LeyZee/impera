@@ -144,6 +144,21 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(screen.getByRole('tooltip').textContent).toContain('Équipe › Reveal');
   });
 
+  it('waits in the shape of what comes: four tiles of money, the card of the split, four of activity (ADM-21)', async () => {
+    // A server that never answers: the placeholders stay.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+    show();
+    const waiting = await screen.findByRole('status', { name: 'Chargement des chiffres' });
+    const rows = waiting.querySelectorAll('.ins-tiles');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.querySelectorAll('.ins-loading--tile')).toHaveLength(4);
+    expect(rows[1]?.querySelectorAll('.ins-loading--tile')).toHaveLength(4);
+    expect(waiting.querySelectorAll('.ins-loading--split')).toHaveLength(1);
+  });
+
   it('shows no « 0 % » next to a zero that was already zero, and says there was no refund (ADM-07)', async () => {
     const totals = {
       current: { ...AGENCY_WEEK.totals.current, refunds: 0 },
