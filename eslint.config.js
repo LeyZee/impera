@@ -25,6 +25,8 @@ const MODULE_DEPENDENCIES = {
   telegram: [],
   team: [],
   backups: [],
+  // ADR 0091: reads the gateway's journal and keeps the credits ledger; imports no module.
+  'ai-usage': [],
   scheduling: [],
   scripts: [],
   alerts: [],

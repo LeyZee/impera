@@ -150,6 +150,12 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '17 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['backups.check'] },
   },
+  // AI credits under five days, under two or empty alert the owner, once per level and line (ADR 0091 § 4).
+  {
+    task: 'ai_usage.check_credits',
+    match: '23 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['ai_usage.check_credits'] },
+  },
   // The running templates make their shifts four weeks ahead (EQ-02); each occurrence is made once, so the hour that
   // follows a failure, a member back from leave or a new day simply catches up.
   {
