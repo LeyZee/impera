@@ -91,6 +91,7 @@ Branche : task/<id>-<slug>
 | EQ-19 | « Voir comme » : l'écran exact d'un chatteur, en lecture seule | équipe | todo | EQ-10, EQ-11, EQ-15, EQ-18 |
 | EQ-20 | Inviter un chatteur depuis Reveal : la part d'Équipe de l'ADR 0076 | équipe | in_progress | ADR 0076, la route et la migration de Bilan, l'écran d'Extension |
 | EQ-21 | Rappel du rapport de fin de shift sur le téléphone du chatteur | équipe | in_progress | ADR 0077, CR-01, EQ-03 |
+| EQ-22 | Donner ou partager une vente avec le chatteur qui a été décisif | équipe | in_progress | ADR 0101, CRM-03, CRM-05 |
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |

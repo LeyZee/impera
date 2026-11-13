@@ -732,6 +732,9 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return `${member ?? 'Un membre'} n’a pas de taux de commission en vigueur.`;
     case 'pay_sale_outcome_conflict':
       return 'Cette décision n’est plus possible pour cette vente : la liste est relue.';
+    case 'pay_sale_recipient_conflict':
+      // ADR 0101: only a member on shift at the sale's instant receives it, and a sale of the agent is given whole.
+      return 'Cette vente ne peut pas aller à ce membre : seul un membre en poste au moment de la vente la reçoit, et une vente de l’IA se donne entière. La liste est relue.';
     case 'payroll_own_forbidden':
       return 'Personne ne décide de sa propre paie : un autre s’en charge.';
     case 'payroll_forbidden':
