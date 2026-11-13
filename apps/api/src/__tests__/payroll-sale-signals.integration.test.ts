@@ -238,6 +238,7 @@ describe('Équipe › Paie : le chatteur lit ses ventes et signale celle qui n�
     }
     expect((await team.call('GET', '/payroll/my-figures', '')).statusCode).toBe(401);
   });
+
   it('lets Théo signal a line of his statement once, with a note, and the validator sees it', async () => {
     await team.forgetJobs(P1);
     const id = newId(PaySaleSignalIdSchema);
