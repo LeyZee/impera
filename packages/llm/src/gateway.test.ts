@@ -139,6 +139,18 @@ describe('LlmGateway', () => {
     expect(refusals).toEqual([]);
   });
 
+  it('keeps a rate limit that speaks of credits transient, and one that says when to come back', async () => {
+    for (const step of [
+      { status: 429, body: '{"error":"Rate limit exceeded. Upgrade or buy credits for higher limits."}' },
+      { status: 429, retryAfter: '1', body: '{"error":"Resource has been exhausted (e.g. check quota)."}' },
+    ]) {
+      const { gateway, log } = setup({ xai: scripted([step, { text: BUBBLES }]) });
+      const result = await gateway.voice(INPUT);
+      expect(result.ok && result.value.meta.provider).toBe('xai');
+      expect(log.since(new Date(0)).map((r) => r.outcome)).toEqual(['rate_limited', 'ok']);
+    }
+  });
+
   it('goes on when reporting the refusal fails', async () => {
     const { gateway } = setup(
       { xai: scripted([{ status: 401 }]), mistral: scripted([{ text: BUBBLES }]) },

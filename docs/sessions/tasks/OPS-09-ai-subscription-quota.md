@@ -20,7 +20,7 @@ ADR 0091 (§ 6), `packages/llm/src/call-runner.ts` (classement des erreurs), `ap
 
 ## Critères d'acceptation
 - Une ligne `subscription` porte un montant nul ; une recharge ou un solde noté après reprend le décompte.
-- Un 403 ou 429 dont la réponse parle de crédits, de limite de dépense ou de quota n'est ni réessayé ni signalé comme clé refusée ; un 403 sans ces mots l'est toujours.
+- Un 403 ou 429 dont la réponse dit l'épuisement (quota insuffisant, crédits épuisés, limite de dépense atteinte) n'est ni réessayé ni signalé comme clé refusée ; un 403 sans ces mots l'est toujours, et un 429 avec `retry-after` ou qui ne dit pas l'épuisement reste un débit, réessayé.
 - Une seule alerte par épisode de refus ; une réponse du fournisseur clôt l'épisode.
 
 ## Hors périmètre
