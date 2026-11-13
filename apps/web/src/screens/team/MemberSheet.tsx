@@ -22,6 +22,7 @@ import { Avatar, StatusPill } from './parts';
 
 import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
+import { useGrowingArea } from '@/lib/growing-area';
 import { cityOf } from '@/scheduling/time';
 import { useAgencyToday } from '@/screens/pay/data';
 import '@/shell/dialog.css';
@@ -282,6 +283,7 @@ function Notes({ memberId, name }: { memberId: string; name: string }): JSX.Elem
   const client = useQueryClient();
   const notes = useNotes(memberId);
   const [draft, setDraft] = useState('');
+  const draftArea = useGrowingArea(draft);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -331,7 +333,8 @@ function Notes({ memberId, name }: { memberId: string; name: string }): JSX.Elem
         }}
       >
         <textarea
-          className="nv-field__control nv-glass tm-note-input"
+          ref={draftArea}
+          className="nv-field__control nv-glass tm-note-input grow-area"
           value={draft}
           rows={2}
           maxLength={2000}
