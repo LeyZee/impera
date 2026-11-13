@@ -3,20 +3,29 @@
  * and a ramp of one hue; never a status colour on a figure (§ 10). Every movement stops with « réduire les animations ».
  */
 
-.mf-board {
-  display: grid;
-  gap: var(--nv-space-4);
-  min-width: 0;
+/*
+ * One colour a nature of figure, on every card: what the member sells, the way to a tier, a record. Rose and blue are
+ * the Dashboard's validated series (colour-blind separation and 3:1 on the plate, Nuit and Jour); gold is the sale's.
+ * Never a status colour: a fall stays in ink (§ 10).
+ */
+.mf {
+  --mf-sales: var(--nv-series-3);
+  --mf-tier: var(--nv-series-2);
+  --mf-record: var(--nv-data-2);
 }
-@media (min-width: 1100px) {
-  .mf-board {
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-    align-items: start;
-  }
-  .mf-board > .mf-wide,
-  .mf-board > :only-child {
-    grid-column: 1 / -1;
-  }
+.mf-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--mf-sales);
+}
+.mf-dot[data-kind='tier'] {
+  background: var(--mf-tier);
+}
+.mf-dot[data-kind='record'] {
+  background: var(--mf-record);
 }
 .mf-sec {
   display: flex;
@@ -28,6 +37,58 @@
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
   white-space: nowrap;
+  border-radius: 6px;
+  outline: none;
+  cursor: default;
+  transition: color var(--nv-dur-fast);
+}
+.mf-total:hover,
+.mf-total:focus-visible {
+  color: var(--nv-ink);
+}
+.mf-total:focus-visible,
+.mf-card__lead:focus-visible,
+.mf-tier:focus-visible,
+.mf-record:focus-visible {
+  box-shadow: 0 0 0 2px var(--nv-focus);
+}
+.mf-arrow {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  fill: var(--nv-ink-faint);
+}
+.mf-arrow[data-up='true'] {
+  fill: var(--mf-sales);
+}
+/* The way to Commissions: a link, said by its chevron, never a second title. */
+.mf-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  text-decoration: none;
+  border-radius: 6px;
+  transition: color var(--nv-dur-fast);
+}
+.mf-more__chev {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--nv-dur-fast) var(--nv-ease-spring);
+}
+.mf-more:hover,
+.mf-more:focus-visible {
+  color: var(--nv-ink);
+}
+.mf-more:hover .mf-more__chev {
+  transform: translateX(3px);
+}
+.mf-more:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--nv-focus);
 }
 .mf-lead,
 .mf-change {
@@ -87,7 +148,7 @@
   max-width: 28px;
   height: max(3px, calc(var(--_h) * 100%));
   border-radius: 4px 4px 2px 2px;
-  background: color-mix(in srgb, var(--nv-data-1) 62%, transparent);
+  background: color-mix(in srgb, var(--mf-sales) 72%, transparent);
   transform-origin: bottom;
   animation: mf-grow var(--nv-dur-slow) var(--nv-ease-spring) both;
   animation-delay: calc(var(--nv-i, 0) * 28ms);
@@ -99,8 +160,12 @@
 .mf-bars[data-tall='true'] .mf-bar__fill {
   height: max(3px, calc(var(--_h) * (100% - 22px)));
 }
+.mf-bar[data-best='true'] .mf-bar__fill {
+  background: color-mix(in srgb, var(--mf-sales) 90%, transparent);
+}
 .mf-bar[data-today='true'] .mf-bar__fill {
-  background: var(--nv-data-1);
+  background: var(--mf-sales);
+  box-shadow: 0 0 18px -4px var(--mf-sales);
 }
 .mf-bar[data-ahead='true'] .mf-bar__fill {
   height: 3px;
@@ -109,7 +174,7 @@
 }
 .mf-bar:not([data-ahead='true']):hover .mf-bar__fill,
 .mf-bar:focus-visible .mf-bar__fill {
-  background: var(--nv-data-1);
+  background: var(--mf-sales);
   transform: scaleX(1.12);
 }
 .mf-bar:focus-visible {
@@ -155,6 +220,8 @@
 }
 .mf-card__lead {
   min-width: 0;
+  border-radius: 10px;
+  outline: none;
 }
 .mf-figure {
   display: block;
@@ -188,6 +255,12 @@
   align-items: center;
   gap: var(--nv-space-3);
   flex: 0 0 auto;
+  border-radius: 14px;
+  outline: none;
+  transition: transform var(--nv-dur-fast) var(--nv-ease-spring);
+}
+.mf-tier:hover {
+  transform: scale(1.04);
 }
 .mf-ring {
   width: 80px;
@@ -202,7 +275,7 @@
   stroke: var(--nv-fill-track);
 }
 .mf-ring__fill {
-  stroke: var(--nv-data-1);
+  stroke: var(--mf-tier);
   stroke-linecap: round;
   stroke-dasharray: var(--_len);
   stroke-dashoffset: var(--_gap);
@@ -243,6 +316,11 @@
   grid-template-columns: 36px repeat(24, minmax(0, 1fr));
   gap: 3px;
 }
+/* Eight slots of three hours where twenty-four columns would be cells nobody reads. */
+.mf-heat[data-by='3'] {
+  display: none;
+  grid-template-columns: 32px repeat(8, minmax(0, 1fr));
+}
 .mf-heat__row {
   display: contents;
 }
@@ -260,7 +338,7 @@
 .mf-heat__cell {
   height: 22px;
   border-radius: 3px;
-  background: color-mix(in srgb, var(--nv-data-1) calc(var(--_h) * 100%), var(--nv-fill-track));
+  background: color-mix(in srgb, var(--mf-sales) calc(var(--_h) * 100%), var(--nv-fill-track));
   transition:
     transform var(--nv-dur-fast) var(--nv-ease-spring),
     box-shadow var(--nv-dur-fast);
@@ -281,7 +359,7 @@
   width: 96px;
   height: 8px;
   border-radius: var(--nv-radius-full);
-  background: linear-gradient(90deg, var(--nv-fill-track), var(--nv-data-1));
+  background: linear-gradient(90deg, var(--nv-fill-track), var(--mf-sales));
 }
 
 /* ── « Mes records »: two figures side by side, the one being set now a little brighter. */
@@ -298,11 +376,20 @@
     transform var(--nv-dur-fast) var(--nv-ease-spring),
     background var(--nv-dur-fast);
 }
+.mf-record {
+  outline: none;
+  background: color-mix(in srgb, var(--mf-record) 12%, var(--nv-fill-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mf-record) 26%, transparent);
+}
 .mf-record:hover {
   transform: translateY(-2px);
+  background: color-mix(in srgb, var(--mf-record) 18%, var(--nv-fill-soft));
 }
 .mf-record[data-now='true'] {
-  background: color-mix(in srgb, var(--nv-data-1) 16%, var(--nv-fill-track));
+  background: color-mix(in srgb, var(--mf-record) 26%, var(--nv-fill-soft));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--mf-record) 60%, transparent),
+    0 0 24px -8px var(--mf-record);
 }
 .mf-record__label {
   margin: 0;
@@ -342,13 +429,16 @@
     height: 150px;
     gap: 3px;
   }
-  .mf-heat {
-    grid-template-columns: 28px repeat(24, minmax(0, 1fr));
-    gap: 2px;
+}
+@media (max-width: 720px) {
+  .mf-heat[data-by='1'] {
+    display: none;
+  }
+  .mf-heat[data-by='3'] {
+    display: grid;
   }
   .mf-heat__cell {
-    height: 14px;
-    border-radius: 2px;
+    height: 20px;
   }
 }
 
@@ -361,7 +451,9 @@
   }
   .mf-bar:hover .mf-bar__fill,
   .mf-heat__cell:hover,
-  .mf-record:hover {
+  .mf-record:hover,
+  .mf-tier:hover,
+  .mf-more:hover .mf-more__chev {
     transform: none;
   }
 }

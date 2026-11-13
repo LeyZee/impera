@@ -12,7 +12,15 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MyFiguresBoard, MyFortnightCard } from './MyFigures';
+import { MyDaysCard, MyFiguresAside, MyFortnightCard } from './MyFigures';
+
+/** The two columns of Commissions, as the page lays them. */
+const MyFiguresBoard = (): JSX.Element => (
+  <>
+    <MyDaysCard />
+    <MyFiguresAside />
+  </>
+);
 
 import { NOV1, periodOf, SCHEDULING_SETTINGS, statementOf, THEO, tierSetOf } from '@/test/pay';
 
@@ -107,7 +115,7 @@ describe('Commissions › Mes chiffres (CHF-01, ADR 0104 § A)', () => {
     await waitFor(() => {
       expect(screen.getByText('Ma quinzaine, jour par jour')).toBeTruthy();
     });
-    expect(text()).toContain('80,00 € · 3 ventes');
+    expect(text()).toContain('80,00 € de net · 3 ventes');
     // Fifteen days, the ten ahead as a floor nobody reads.
     const bars = document.querySelectorAll('.mf-bar');
     expect(bars).toHaveLength(15);
@@ -123,7 +131,7 @@ describe('Commissions › Mes chiffres (CHF-01, ADR 0104 § A)', () => {
   it('dit une baisse en encre neutre, sans rouge ni alerte (§ 10)', async () => {
     renderIn(MyFiguresBoard);
     await waitFor(() => {
-      expect(text()).toContain('20 % de moins qu’au même jour de ta quinzaine d’avant');
+      expect(text()).toContain('20 % de net vendu en moins qu’au même jour de ta quinzaine d’avant');
     });
     expect(document.querySelector('[data-tone="danger"], [data-tone="warn"], [role="alert"]')).toBeNull();
   });
@@ -154,7 +162,7 @@ describe('Commissions › Mes chiffres (CHF-01, ADR 0104 § A)', () => {
       expect(vi.mocked(fetch)).toHaveBeenCalled();
     });
     await vi.advanceTimersByTimeAsync(50);
-    expect(document.querySelector('.mf-board')).toBeNull();
+    expect(document.querySelector('.mf')).toBeNull();
   });
 
   it('fête le record du jour sans rien demander', async () => {
@@ -175,7 +183,7 @@ describe('Commissions › Mes chiffres (CHF-01, ADR 0104 § A)', () => {
 
 describe('Aujourd’hui › Ma quinzaine (CHF-01, ADR 0104 § 2 à § 4)', () => {
   it('donne son net tant qu’aucun relevé n’existe, et mène à Commissions', async () => {
-    renderIn(MyFortnightCard);
+    renderIn(() => <MyFortnightCard />);
     await waitFor(() => {
       expect(screen.getByText('Ma quinzaine')).toBeTruthy();
     });
@@ -193,9 +201,9 @@ describe('Aujourd’hui › Ma quinzaine (CHF-01, ADR 0104 § 2 à § 4)', () =>
       rules: { ...plain.rules, bonusTiers: tiers.tiers },
     });
     period = periodOf(NOV1, [statement], { bonusTiers: tiers });
-    renderIn(MyFortnightCard);
+    renderIn(() => <MyFortnightCard />);
     await waitFor(() => {
-      expect(text()).toContain('pour toi à ce jour, avant validation');
+      expect(text()).toContain('gagné à ce jour, avant validation');
     });
     expect(text()).toContain('Palier Argent');
     expect(text()).toContain('encore 250,00 € de net');
@@ -204,9 +212,42 @@ describe('Aujourd’hui › Ma quinzaine (CHF-01, ADR 0104 § 2 à § 4)', () =>
     );
   });
 
+  it('ne promet aucun palier à un manager : la paie ne lui en donne pas', async () => {
+    const tiers = tierSetOf(1, NOV1);
+    const plain = statementOf(THEO, NOV1);
+    const statement = statementOf(THEO, NOV1, {
+      netMinor: 75_000,
+      totalMinor: 30_000,
+      rules: { ...plain.rules, bonusTiers: tiers.tiers },
+    });
+    period = periodOf(NOV1, [statement], { bonusTiers: tiers });
+    renderIn(() => <MyFortnightCard manager />);
+    await waitFor(() => {
+      expect(text()).toContain('gagné à ce jour, avant validation');
+    });
+    expect(document.querySelector('.mf-ring')).toBeNull();
+    expect(text()).not.toContain('Palier');
+  });
+
+  it('sur un relevé payé sur rapports, dit que le jour par jour vient avec les ventes relevées, sans barres plates', async () => {
+    figures = figuresOf({
+      days: [],
+      nets: [],
+      previous: null,
+      hours: { since: '2026-09-10', sales: 0, enough: false, cells: [] },
+      records: { bestDay: null, bestPeriod: null },
+    });
+    period = periodOf(NOV1, [statementOf(THEO, NOV1, { netMinor: 75_000, totalMinor: 30_000 })]);
+    renderIn(() => <MyFortnightCard />);
+    await waitFor(() => {
+      expect(text()).toContain('Le jour par jour arrive avec les ventes relevées.');
+    });
+    expect(document.querySelector('.mf-bar')).toBeNull();
+  });
+
   it('ne s’affiche pas tant qu’il n’a rien sur la quinzaine', async () => {
     figures = figuresOf({ days: [], nets: [] });
-    renderIn(MyFortnightCard);
+    renderIn(() => <MyFortnightCard />);
     await waitFor(() => {
       expect(vi.mocked(fetch)).toHaveBeenCalled();
     });

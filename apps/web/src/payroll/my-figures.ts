@@ -84,11 +84,27 @@ export function fortnightChange(
 /** « 18 % », the size of a change: the words beside it say which way, never a sign and a word at once. */
 export const changeText = (change: number): string => `${String(Math.abs(change))}\u00a0%`;
 
-/** What the change says in words, never a judgement. */
+/**
+ * What the change says in words, never a judgement. It compares the net sold, and says so: read under what the member
+ * earns, a bare « de plus » would pass for a rise in pay.
+ */
 export function changeWords(change: number): string {
-  if (change > 0) return 'de plus qu’au même jour de ta quinzaine d’avant';
-  if (change < 0) return 'de moins qu’au même jour de ta quinzaine d’avant';
-  return 'Autant qu’au même jour de ta quinzaine d’avant';
+  if (change > 0) return 'de net vendu en plus qu’au même jour de ta quinzaine d’avant';
+  if (change < 0) return 'de net vendu en moins qu’au même jour de ta quinzaine d’avant';
+  return 'Autant de net vendu qu’au même jour de ta quinzaine d’avant';
+}
+
+/**
+ * Whether a day's bar may wear its figure: the best day always, today only when both its neighbours stand lower, or
+ * its label would run over the taller bar beside it. Never a figure on every bar.
+ */
+export function barLabelled(bars: readonly DayBar[], index: number): boolean {
+  const bar = bars[index];
+  if (bar === undefined || bar.netMinor <= 0) return false;
+  const max = Math.max(...bars.map((one) => one.netMinor));
+  if (index === bars.findIndex((one) => one.netMinor === max)) return true;
+  if (!bar.today) return false;
+  return [bars[index - 1], bars[index + 1]].every((one) => one === undefined || one.netMinor < bar.netMinor);
 }
 
 /** A cell of « Quand je vends »: the net and the sales of an hour of a weekday. */
@@ -108,6 +124,23 @@ export function heatGrid(cells: MyFigures['hours']['cells'], currency: Currency)
   }
   return grid;
 }
+
+/** The grid in eight slots of three hours a day, for a narrow screen: the sums of each three cells. */
+export function heatSlots(grid: readonly (readonly HeatCell[])[]): HeatCell[][] {
+  return grid.map((row) =>
+    Array.from({ length: 8 }, (_, slot) =>
+      row
+        .slice(slot * 3, slot * 3 + 3)
+        .reduce<HeatCell>(
+          (sum, cell) => ({ netMinor: sum.netMinor + cell.netMinor, sales: sum.sales + cell.sales }),
+          { netMinor: 0, sales: 0 },
+        ),
+    ),
+  );
+}
+
+/** « 21 h », the house's way to write an hour. */
+export const hourText = (hour: number): string => `${String(hour % 24)}\u00a0h`;
 
 /** The best three hours in a row of the week, by net: where the member sells the most. `null` on an empty grid. */
 export function bestSlot(

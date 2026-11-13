@@ -15,7 +15,7 @@ import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';
-import { MyFiguresBoard } from './MyFigures';
+import { MyDaysCard, MyFiguresAside } from './MyFigures';
 import { MySalesPanel } from './MySalesPanel';
 import { useAgencySettingsDown, useCfaFrancs, useCurrentPeriod, usePayNames } from './data';
 import { Chip, Empty, Gauge, GoalTicks, Loading, MoneyPath, Unreachable } from './parts';
@@ -254,6 +254,8 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
               ) : null}
             </>
           )}
+          <MyDaysCard />
+          {plain ? <MyFiguresAside /> : null}
         </div>
         {plain ? null : (
           <div className="py-me__col">
@@ -325,9 +327,9 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                 ) : null}
               </div>
             </Panel>
+            <MyFiguresAside />
           </div>
         )}
-        <MyFiguresBoard />
       </div>
       {opened === null ? null : (
         <MyStatementDialog

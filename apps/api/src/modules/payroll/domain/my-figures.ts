@@ -40,11 +40,20 @@ function netsOf(lines: readonly Pick<FigureLine, 'currency' | 'netMinor'>[]): Ne
 const dayOfLine = (line: FigureLine, timeZone: string): string | null =>
   line.occurredAt === null ? null : calendarDayAt(line.occurredAt, timeZone);
 
-/** The days of `lines` that have an instant, the oldest first. */
+/**
+ * The day a line counts on in the period that pays it: its own, or the period's first day when it came late (its own
+ * day is before the period), so the days of a period add up to the lines that have an instant.
+ */
+function paidDayOf(line: FigureLine, timeZone: string): string | null {
+  const day = dayOfLine(line, timeZone);
+  return day === null ? null : day < line.period ? line.period : day;
+}
+
+/** The days of `lines` that have an instant, the oldest first, a late line on its period's first day. */
 function daysOf(lines: readonly FigureLine[], timeZone: string): MyFiguresDay[] {
   const groups = new Map<string, FigureLine[]>();
   for (const line of lines) {
-    const day = dayOfLine(line, timeZone);
+    const day = paidDayOf(line, timeZone);
     if (day === null) continue;
     groups.set(day, [...(groups.get(day) ?? []), line]);
   }
@@ -120,7 +129,7 @@ export function myFigures(input: {
   const previous = lines.filter((line) => line.period === before);
   const sameDay = shiftDay(before, daysBetween(period, today));
   const toDate = previous.filter((line) => {
-    const day = dayOfLine(line, agencyZone);
+    const day = paidDayOf(line, agencyZone);
     return day !== null && day <= sameDay;
   });
 

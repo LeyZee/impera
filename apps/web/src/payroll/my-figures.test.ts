@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   barHeight,
+  barLabelled,
   bestSlot,
   changeText,
   changeWords,
@@ -11,6 +12,8 @@ import {
   fortnightChange,
   hasOtherCurrency,
   heatGrid,
+  heatSlots,
+  hourText,
   netIn,
   recordToday,
   slotWords,
@@ -107,7 +110,8 @@ describe('Mes chiffres, côté écran (ADR 0104 § A)', () => {
     ).toBeNull();
     expect(changeText(10)).toBe('10\u00a0%');
     expect(changeText(-4)).toBe('4\u00a0%');
-    expect(changeWords(-4)).toContain('de moins');
+    expect(changeWords(-4)).toContain('de net vendu en moins');
+    expect(changeWords(4)).toContain('de net vendu en plus');
   });
 
   it('pose les ventes sur sept jours de vingt-quatre heures et trouve le meilleur créneau de trois heures', () => {
@@ -126,6 +130,37 @@ describe('Mes chiffres, côté écran (ADR 0104 § A)', () => {
     expect(slot === null ? '' : slotWords(slot)).toBe('le mardi de 21\u00a0h à minuit');
     expect(slotWords({ weekday: 4, from: 9 })).toBe('le jeudi de 9\u00a0h à 12\u00a0h');
     expect(bestSlot(heatGrid([], 'EUR'))).toBeNull();
+  });
+
+  it('regroupe la grille en huit tranches de trois heures pour le téléphone', () => {
+    const slots = heatSlots(
+      heatGrid(
+        [
+          { weekday: 2, hour: 21, sales: 3, nets: [{ currency: 'EUR', netMinor: 9_000 }] },
+          { weekday: 2, hour: 23, sales: 1, nets: [{ currency: 'EUR', netMinor: 3_000 }] },
+        ],
+        'EUR',
+      ),
+    );
+    expect(slots[1]).toHaveLength(8);
+    expect(slots[1]?.[7]).toEqual({ netMinor: 12_000, sales: 4 });
+    expect(hourText(0)).toBe('0\u00a0h');
+    expect(hourText(24)).toBe('0\u00a0h');
+  });
+
+  it('n’étiquette que le meilleur jour, et aujourd’hui seulement si ses voisins sont plus bas', () => {
+    const bar = (netMinor: number, today = false) => ({
+      day: '2026-11-01',
+      netMinor,
+      sales: 1,
+      refunds: 0,
+      today,
+      ahead: false,
+    });
+    const bars = [bar(5_000), bar(9_000), bar(2_000), bar(8_200, true), bar(8_500)];
+    expect(bars.map((_, index) => barLabelled(bars, index))).toEqual([false, true, false, false, false]);
+    const free = [bar(9_000), bar(2_000), bar(8_200, true), bar(0)];
+    expect(free.map((_, index) => barLabelled(free, index))).toEqual([true, false, true, false]);
   });
 
   it('mesure le chemin vers le prochain palier entre 0 et 1', () => {

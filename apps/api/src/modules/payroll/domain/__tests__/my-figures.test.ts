@@ -47,6 +47,21 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
     expect(read.nets).toEqual([{ currency: 'EUR', netMinor: 3_000 }]);
   });
 
+  it('met une ligne venue en retard au premier jour de la quinzaine qui la paie : les jours font le total', () => {
+    const read = figures([
+      // Vendue le 28 octobre, remboursée le 30, payées toutes deux sur la quinzaine du 1er novembre.
+      line(P_NOV_1, '2026-10-28T10:00:00.000Z', 6_000),
+      line(P_NOV_1, '2026-10-30T10:00:00.000Z', -2_000),
+      line(P_NOV_1, '2026-11-01T10:00:00.000Z', 1_000),
+    ]);
+    expect(read.days).toEqual([
+      { day: '2026-11-01', sales: 2, refunds: 1, nets: [{ currency: 'EUR', netMinor: 5_000 }] },
+    ]);
+    expect(read.nets).toEqual([{ currency: 'EUR', netMinor: 5_000 }]);
+    // Le record garde le vrai jour de la vente.
+    expect(read.records.bestDay).toEqual({ day: '2026-10-28', currency: 'EUR', netMinor: 6_000 });
+  });
+
   it('arrête la quinzaine précédente au même jour : le 5 se compare au 20', () => {
     const read = figures([
       line(P_OCT_2, '2026-10-17T10:00:00.000Z', 1_000),

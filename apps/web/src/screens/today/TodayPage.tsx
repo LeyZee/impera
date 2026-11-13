@@ -162,7 +162,7 @@ function Day({
       )}
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}
-      {away === null ? <MyFortnightCard /> : null}
+      {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}
       <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
       {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
       <Link to="/planning" className="sc-more">
