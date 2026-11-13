@@ -1,6 +1,6 @@
 # 0106. Le Dashboard de l'agence sépare le chiffre d'affaires, le net, la part de la créatrice et celle de l'agence, et estime la TVA des virements
 
-Statut : accepted (« ok 0106 » de Charles le 13/11/2026, 0 h 52, fil « Afficher parts modèle, agence et TVA » ; numéro attribué par le coordinateur)
+Statut : accepted (« ok 0106 » de Charles le 13/11/2026, 0 h 52, fil « Afficher parts modèle, agence et TVA » ; numéro attribué par le coordinateur). Amendée : § 10 à § 14 (« ok phrases 0106 », 13/11/2026, 1 h 11, même fil), qui remplacent « une encre en quatre pas » du § 5.
 Date : 2026-11-13
 Précise : l'ADR 0078 (insights de l'agence lus dans le registre des ventes) et l'ADR 0054 § 2 (sur Reveal, la part de la créatrice est le chiffre de Reveal). Ne remplace rien.
 
@@ -29,6 +29,16 @@ Ce que le registre a déjà, vente par vente (connecteur Reveal) : le TTC, le HT
 7. **Le taux est une règle du code** (`AGENCY_TRANSFER_VAT_BPS = 2000`, le taux normal français), pas un réglage : il ne change que par une nouvelle ADR. Une part de l'agence nulle ou négative donne une TVA à zéro.
 8. **Mêmes droits de lecture que l'ADR 0078** : le propriétaire et un manager actif, sur son périmètre ; une créatrice ne voit jamais ces tuiles.
 9. **Calcul côté serveur**, dans le domaine `supervision`, livré par le contrat (`agencyTransferVatMinor`) : l'écran n'en refait aucun.
+
+## Amendement du 13/11/2026 : couleurs et survols
+
+À la recette du lot argent-tuiles-tva, Charles trouve que le Dashboard manque de repères par couleur et que « Où va l'argent » manque de survol avec des données précises.
+
+10. **Chaque destination de l'argent a sa couleur, toujours la même partout sur le Dashboard** : TVA payée par les fans en gris (elle n'est à personne), commission de la plateforme en gris hachuré, part de la créatrice en rose (`--nv-money-creator`), part de l'agence en doré (`--nv-money-agency`).
+11. **Où elles s'appliquent** : la barre « Où va l'argent », sa légende, et une pastille ronde à côté du titre des tuiles Part de l'agence et Part de la créatrice. Jamais de barre colorée sur le côté ; ni rouge ni ambre, réservés aux urgences et aux avertissements.
+12. **Une bulle de survol** sur chaque bloc de la barre, chaque ligne de la légende et chaque tuile d'argent : le montant au centime, le montant de la période d'avant avec l'évolution, la part du chiffre d'affaires, la part du net pour les parts, et une phrase d'explication en gris. La TVA des virements, qui n'est pas une part du chiffre d'affaires, n'en donne pas la part.
+13. **Au téléphone**, un appui ouvre la bulle et un second la ferme.
+14. **Les couleurs sont vérifiées** par l'outil de contraste du projet (séparation pour les daltoniens, 3:1 sur la plaque), en Nuit comme en Jour, puis montrées sur un nouveau lot de captures avant la fusion.
 
 ## Conséquences
 

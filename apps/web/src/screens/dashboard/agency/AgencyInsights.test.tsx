@@ -30,14 +30,17 @@ function serve(status: number, body: unknown): void {
 function Panel({ creatorId, canOpenSettings }: { creatorId: string | null; canOpenSettings: boolean }) {
   const tip = useFloatingTip();
   return (
-    <AgencyInsightsPanel
-      period="week"
-      onPeriod={() => undefined}
-      creatorId={creatorId}
-      creatorName="Lina Test"
-      canOpenSettings={canOpenSettings}
-      tip={tip}
-    />
+    <>
+      <AgencyInsightsPanel
+        period="week"
+        onPeriod={() => undefined}
+        creatorId={creatorId}
+        creatorName="Lina Test"
+        canOpenSettings={canOpenSettings}
+        tip={tip}
+      />
+      {tip.element}
+    </>
   );
 }
 
@@ -187,6 +190,26 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(row.className).toContain('is-on');
     tap();
     expect(row.className).not.toContain('is-on');
+  });
+
+  it("opens a money tile's tip on a tap, to the cent and beside the period before, and closes it on a second tap (ADR 0106 § 12, § 13)", async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const money = await screen.findByLabelText('L’argent');
+    const tile = within(money).getByText('Part de l’agence').closest('.ins-tile');
+    if (!(tile instanceof HTMLElement)) throw new Error('tile');
+    fireEvent.pointerDown(tile, { pointerType: 'touch' });
+    const tipText = (): string => document.querySelector('.nv-tip.is-on')?.textContent ?? '';
+    await vi.waitFor(() => {
+      expect(tipText()).toContain('Période d’avant');
+    });
+    expect(tipText()).toContain('590,72');
+    expect(tipText()).toContain('499,20');
+    expect(tipText()).toContain('Part du net');
+    fireEvent.pointerDown(tile, { pointerType: 'touch' });
+    await vi.waitFor(() => {
+      expect(tipText()).not.toContain('Période d’avant');
+    });
   });
 
   it('shows nothing to an account whose scope is its own', async () => {

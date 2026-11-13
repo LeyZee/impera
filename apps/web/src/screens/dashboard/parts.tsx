@@ -172,10 +172,19 @@ export function useFloatingTip(): FloatingTip {
   // A tip opened by a tap stays until the next tap: caught before the element's own handler, which may reopen it.
   // The page scrolls under a tip placed in viewport coordinates: any scroll, wherever it happens, hides it too.
   const shown = tip !== null;
+  // The title of the tip a tap just put out: a second tap on the same element closes it and leaves it closed.
+  const closedByTap = useRef<string | null>(null);
+  const openTitle = tip?.content.title ?? null;
   useEffect(() => {
     if (!shown) return undefined;
     const onDown = (event: PointerEvent): void => {
-      if (event.pointerType !== 'mouse') hide();
+      if (event.pointerType === 'mouse') return;
+      closedByTap.current = openTitle;
+      // Only for this tap: the element's own handler reads it in the same dispatch, anything later finds it empty.
+      setTimeout(() => {
+        closedByTap.current = null;
+      }, 0);
+      hide();
     };
     document.addEventListener('pointerdown', onDown, true);
     addEventListener('scroll', hide, { capture: true, passive: true });
@@ -183,7 +192,7 @@ export function useFloatingTip(): FloatingTip {
       document.removeEventListener('pointerdown', onDown, true);
       removeEventListener('scroll', hide, { capture: true });
     };
-  }, [shown, hide]);
+  }, [shown, hide, openTitle]);
   const bind = useCallback(
     (content: TipContent, options?: { readonly above?: boolean }) => ({
       onPointerMove: (event: React.PointerEvent) => {
@@ -202,6 +211,9 @@ export function useFloatingTip(): FloatingTip {
       // anywhere hides it.
       onPointerDown: (event: React.PointerEvent) => {
         if (event.pointerType === 'mouse') return;
+        const again = closedByTap.current === content.title;
+        closedByTap.current = null;
+        if (again) return;
         setTip(placedOn(content, event.currentTarget.getBoundingClientRect(), options));
       },
       onPointerLeave: (event: React.PointerEvent) => {

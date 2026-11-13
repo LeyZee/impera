@@ -21,6 +21,8 @@ import {
   heatOf,
   kindSlices,
   moneyParts,
+  moneyTip,
+  type MoneyPart,
   OTHER,
   OTHER_KINDS_NOTE,
   PERIOD_OPTIONS,
@@ -151,14 +153,38 @@ interface Tile {
   readonly note: string;
   readonly delta: readonly [number, number] | null;
   readonly lowerIsBetter?: boolean;
+  /** A money tile's destination (ADR 0106 § 11): its colour's round key beside the title. */
+  readonly part?: MoneyPart['key'];
+  /** A money tile explains itself on hover, focus or a tap (ADR 0106 § 12). */
+  readonly tip?: ReturnType<typeof moneyTip>;
 }
 
-function Tiles({ tiles, from, label }: { tiles: readonly Tile[]; from: number; label: string }): JSX.Element {
+function Tiles({
+  tiles,
+  from,
+  label,
+  tip,
+}: {
+  tiles: readonly Tile[];
+  from: number;
+  label: string;
+  tip: FloatingTip;
+}): JSX.Element {
   return (
     <dl className="ins-tiles" aria-label={label}>
       {tiles.map((tile, i) => (
-        <div key={tile.label} className="nv-plate ins-tile nv-enter" style={{ '--nv-i': from + i }}>
-          <dt>{tile.label}</dt>
+        <div
+          key={tile.label}
+          className="nv-plate ins-tile nv-enter"
+          style={{ '--nv-i': from + i }}
+          {...(tile.tip === undefined ? {} : { tabIndex: 0, ...tip.bind(tile.tip) })}
+        >
+          <dt>
+            {tile.part === undefined ? null : (
+              <span className="ins-tile__key" data-part={tile.part} aria-hidden="true" />
+            )}
+            {tile.label}
+          </dt>
           <dd>
             <span className="ins-tile__value">{tile.value}</span>
             {tile.delta === null ? null : (
@@ -177,9 +203,9 @@ function Tiles({ tiles, from, label }: { tiles: readonly Tile[]; from: number; l
 }
 
 /**
- * « Où va l'argent » (ADR 0106 § 5): the period's revenue as one tall segmented bar, the fans' VAT and the platform's
- * commission first, then the net's two parts. One ink in four steps, the agency's the fullest: the other blocks wear
- * the series' and the team's colours. The legend is the table: every amount and its share of the revenue.
+ * « Où va l'argent » (ADR 0106 § 5, § 10 to § 13): the period's revenue as one tall segmented bar, the fans' VAT and
+ * the platform's commission first, then the net's two parts, each destination in its colour, the same as on the
+ * tiles. Every block and every line of the legend (the table) explains itself on hover, focus or a tap.
  */
 function MoneySplit({
   insights,
@@ -190,14 +216,23 @@ function MoneySplit({
   several: boolean;
   tip: FloatingTip;
 }): JSX.Element {
-  const figures = insights.totals.current;
-  const parts = moneyParts(figures, several);
+  const { current, previous } = insights.totals;
+  const parts = moneyParts(current, previous, several);
   const whole = parts.reduce((sum, part) => sum + part.cents, 0);
+  const tipOf = (part: MoneyPart): ReturnType<typeof moneyTip> =>
+    moneyTip({
+      title: part.label,
+      cents: part.cents,
+      previousCents: part.previousCents,
+      revenueMinor: whole,
+      netMinor: part.ofNet ? current.netMinor : null,
+      text: part.note,
+    });
   return (
     <article className="nv-plate ins-money nv-enter" style={{ '--nv-i': 6 }}>
       <h3 className="ins-card__title">
         Où va l’argent
-        {whole > 0 ? <span className="ins-card__total">{euros(figures.revenueMinor)}</span> : null}
+        {whole > 0 ? <span className="ins-card__total">{euros(current.revenueMinor)}</span> : null}
       </h3>
       {whole <= 0 ? (
         <p className="ins-empty">Aucune vente sur la période.</p>
@@ -218,24 +253,14 @@ function MoneySplit({
                   className="ins-money__part"
                   data-part={part.key}
                   style={{ flexGrow: part.cents }}
-                  {...tip.bind(
-                    {
-                      title: part.label,
-                      rows: [
-                        ['Montant', euros(part.cents)],
-                        ['Part du chiffre d’affaires', `${String(shareOf(part.cents, whole))} %`],
-                      ],
-                      note: part.note,
-                    },
-                    { above: true },
-                  )}
+                  {...tip.bind(tipOf(part), { above: true })}
                 />
               ),
             )}
           </div>
           <ul className="ins-money__legend">
             {parts.map((part) => (
-              <li key={part.key}>
+              <li key={part.key} tabIndex={0} {...tip.bind(tipOf(part))}>
                 <span className="ins-money__key" data-part={part.key} aria-hidden="true" />
                 <span className="ins-money__label">{part.label}</span>
                 <span className="ins-money__value">{euros(part.cents)}</span>
@@ -269,30 +294,80 @@ function Figures({
     current.netMinor > 0
       ? `${String(shareOf(cents, current.netMinor))} % du net`
       : 'aucun net sur la période';
+  const creatorLabel = several ? 'Part des créatrices' : 'Part de la créatrice';
+  const tipOf = (
+    title: string,
+    cents: number,
+    previousCents: number,
+    ofTheNet: boolean,
+    text: string,
+  ): ReturnType<typeof moneyTip> =>
+    moneyTip({
+      title,
+      cents,
+      previousCents,
+      revenueMinor: current.revenueMinor,
+      netMinor: ofTheNet ? current.netMinor : null,
+      text,
+    });
   const money: readonly Tile[] = [
     {
       label: 'Net',
       value: euros(current.netMinor),
       note: `après ${euros(fansVat)} de TVA des fans et ${euros(commission)} de commission de la plateforme`,
       delta: [current.netMinor, previous.netMinor],
+      tip: tipOf(
+        'Net',
+        current.netMinor,
+        previous.netMinor,
+        false,
+        'Ce qui reste après la TVA des fans et la commission de la plateforme : la part de l’agence et celle des créatrices.',
+      ),
     },
     {
       label: 'Part de l’agence',
       value: euros(current.agencyMinor),
       note: ofNet(current.agencyMinor),
       delta: [current.agencyMinor, previous.agencyMinor],
+      part: 'agency',
+      tip: tipOf(
+        'Part de l’agence',
+        current.agencyMinor,
+        previous.agencyMinor,
+        true,
+        'Ce que la plateforme verse à l’agence, son propre chiffre.',
+      ),
     },
     {
-      label: several ? 'Part des créatrices' : 'Part de la créatrice',
+      label: creatorLabel,
       value: euros(current.creatorMinor),
       note: ofNet(current.creatorMinor),
       delta: [current.creatorMinor, previous.creatorMinor],
+      part: 'creator',
+      tip: tipOf(
+        creatorLabel,
+        current.creatorMinor,
+        previous.creatorMinor,
+        true,
+        several
+          ? 'Ce que la plateforme leur verse, son propre chiffre.'
+          : 'Ce que la plateforme lui verse, son propre chiffre.',
+      ),
     },
     {
       label: 'TVA en plus sur les virements',
       value: euros(current.agencyTransferVatMinor),
       note: 'estimation, 20 % de la part de l’agence, à reverser à l’État',
       delta: null,
+      // Not a part of the revenue: no share of it (ADR 0106 § 6).
+      tip: moneyTip({
+        title: 'TVA en plus sur les virements',
+        cents: current.agencyTransferVatMinor,
+        previousCents: previous.agencyTransferVatMinor,
+        revenueMinor: 0,
+        netMinor: null,
+        text: 'Une estimation : la plateforme ajoute 20 % de TVA à la part de l’agence sur chaque virement. Elle se reverse à l’État ; le montant exact est sur le relevé de virement.',
+      }),
     },
   ];
   const activity: readonly Tile[] = [
@@ -351,10 +426,10 @@ function Figures({
           </div>
           <Spark values={insights.days.map((day) => day.revenueMinor)} />
         </div>
-        <Tiles tiles={money} from={2} label="L’argent" />
+        <Tiles tiles={money} from={2} label="L’argent" tip={tip} />
       </div>
       <MoneySplit insights={insights} several={several} tip={tip} />
-      <Tiles tiles={activity} from={7} label="Les fans et les ventes" />
+      <Tiles tiles={activity} from={7} label="Les fans et les ventes" tip={tip} />
     </div>
   );
 }

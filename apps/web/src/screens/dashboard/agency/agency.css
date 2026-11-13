@@ -78,29 +78,63 @@
   color: var(--nv-ink-faint);
 }
 
-/* ── Où va l'argent (ADR 0106 § 5): a tall segmented bar, one ink in four steps, the platform's commission hatched so
-   that it never reads by its lightness alone; 2px between blocks, 4px corners, 28px high. */
+/* ── Où va l'argent (ADR 0106 § 5 and § 10): a tall segmented bar, one colour per destination of the money, the same
+   on the tiles' keys: the fans' VAT and the platform's commission the neutral fold (the second hatched, never read by
+   its colour alone), the creator's part rose, the agency's gold; 2px between blocks, 4px corners, 28px high. */
 .ins-money {
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding: 20px 22px 18px;
 }
-.ins-money [data-part='fansVat'] {
-  background: color-mix(in srgb, var(--nv-data-1) 18%, transparent);
+.ins-body [data-part='fansVat'] {
+  --_c: var(--nv-series-other);
 }
-.ins-money [data-part='commission'] {
-  background: repeating-linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--nv-data-1) 42%, transparent) 0 3px,
-    color-mix(in srgb, var(--nv-data-1) 14%, transparent) 3px 7px
-  );
+.ins-body [data-part='commission'] {
+  --_c: var(--nv-series-other);
 }
-.ins-money [data-part='creator'] {
-  background: color-mix(in srgb, var(--nv-data-1) 55%, transparent);
+.ins-body [data-part='creator'] {
+  --_c: var(--nv-money-creator);
 }
-.ins-money [data-part='agency'] {
-  background: var(--nv-data-1);
+.ins-body [data-part='agency'] {
+  --_c: var(--nv-money-agency);
+}
+.ins-money__part,
+.ins-money__key {
+  background: var(--_c);
+}
+.ins-money__part[data-part='commission'],
+.ins-money__key[data-part='commission'] {
+  background: repeating-linear-gradient(135deg, var(--_c) 0 3px, transparent 3px 6px);
+}
+.ins-money__part {
+  cursor: default;
+  outline-offset: 2px;
+}
+/* A money tile's key: a small round swatch beside its title, never a bar on its side. */
+.ins-tile dt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ins-tile__key {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c);
+}
+.ins-tile[tabindex] {
+  cursor: default;
+}
+.ins-tile[tabindex]:hover,
+.ins-tile[tabindex]:focus-visible {
+  background: var(--nv-plate-hover);
+}
+.ins-money__legend li[tabindex] {
+  cursor: default;
+  border-radius: 8px;
+  outline-offset: 4px;
 }
 .ins-money__bar {
   display: flex;
@@ -137,13 +171,16 @@
   grid-template-areas:
     'key label'
     '. value';
+  /* A label on two lines (a phone) grows the row, never its amount: amounts sit on the row's last line, aligned. */
+  grid-template-rows: minmax(0, 1fr) auto;
   column-gap: 8px;
   row-gap: 2px;
-  align-items: center;
+  align-items: start;
   min-width: 0;
 }
 .ins-money__key {
   grid-area: key;
+  margin-top: 5px;
   width: 10px;
   height: 10px;
   border-radius: 3px;
@@ -156,6 +193,7 @@
 }
 .ins-money__value {
   grid-area: value;
+  align-self: end;
   font-size: var(--nv-text-body);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -163,6 +201,7 @@
 }
 .ins-money__share {
   grid-area: value;
+  align-self: end;
   justify-self: end;
   font-size: var(--nv-text-footnote);
   font-variant-numeric: tabular-nums;
