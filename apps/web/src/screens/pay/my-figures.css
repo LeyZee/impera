@@ -13,6 +13,17 @@
   --mf-tier: var(--nv-series-2);
   --mf-record: var(--nv-data-2);
 }
+/* A tier's medal beside its name (ADR 0104, note « médailles »): on the gauge's ends and by the tier reached. */
+.py-gaugelabels__tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.py-left__title--medal {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
 /* The way to a tier wears its blue on Commissions' gauge as on Aujourd'hui's ring: one colour, both screens. */
 .py-left--tier .nv-gauge__fill {
   background: var(--nv-series-2);

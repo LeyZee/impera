@@ -32,6 +32,8 @@ import {
   type HeatCell,
 } from '@/payroll/my-figures';
 import { amountText, periodLine } from '@/reports/model';
+import { Medal } from '@/rewards/Medal';
+import { tierMedals } from '@/rewards/metals';
 import { dayNumber, longDay } from '@/scheduling/time';
 import { Chevron, CountUp, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
 import { Panel } from '@/shell/layout';
@@ -152,6 +154,8 @@ function TierRing({
   const radius = 34;
   const length = 2 * Math.PI * radius;
   const share = next === null ? 1 : tierShare(netMinor, reached?.thresholdMinor ?? 0, next.thresholdMinor);
+  // The medal of the tier in sight, grey until it is reached: the ring keeps its blue, the medal says which tier.
+  const medal = tierMedals(tiers).of((next ?? reached)?.thresholdMinor ?? 0);
   const label =
     next === null
       ? `Palier ${reached?.label ?? ''} atteint, le plus haut`
@@ -191,6 +195,7 @@ function TierRing({
           {String(Math.floor(share * 100))}&nbsp;%
         </text>
       </svg>
+      {medal === null ? null : <Medal medal={medal} earned={next === null} size={40} />}
       <div className="mf-tier__words">
         {next === null ? (
           <>
