@@ -165,6 +165,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     offerLimits: deps.persona.offerLimits,
     sexualizationLimits: deps.persona.sexualizationLimits,
     followUps: deps.persona.followUps,
+    objectionReplies: deps.persona.objectionReplies,
     ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
     ...(deps.now !== undefined && { now: deps.now }),
   });

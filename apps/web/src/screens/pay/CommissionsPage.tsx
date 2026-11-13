@@ -15,6 +15,7 @@ import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';
+import { MyDaysCard, MyFiguresAside } from './MyFigures';
 import { MySalesPanel } from './MySalesPanel';
 import { useAgencySettingsDown, useCfaFrancs, useCurrentPeriod, usePayNames } from './data';
 import { Chip, Empty, Gauge, GoalTicks, Loading, MoneyPath, Unreachable } from './parts';
@@ -253,6 +254,8 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
               ) : null}
             </>
           )}
+          <MyDaysCard />
+          {plain ? <MyFiguresAside /> : null}
         </div>
         {plain ? null : (
           <div className="py-me__col">
@@ -324,6 +327,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                 ) : null}
               </div>
             </Panel>
+            <MyFiguresAside />
           </div>
         )}
       </div>
@@ -480,7 +484,7 @@ function TierLeft({
   const line = statement === undefined ? null : mainLine(statement.lines);
   const where = line === null ? null : account(line.platformAccountId);
   return (
-    <div className="py-left">
+    <div className="py-left py-left--tier">
       <p className="py-left__title nv-num">
         Palier {next.label} : encore {amountText(left, 'EUR')} de net
       </p>

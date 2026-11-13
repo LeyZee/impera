@@ -116,6 +116,7 @@ function composerFields(persona: PersonaForModels): ComposerPersonaFields {
     sexualizationLimits: persona.sexualizationLimits,
     followUpSpirit: persona.followUps.spirit,
     alertKeywords: persona.alertKeywords,
+    objectionReplies: persona.objectionReplies,
     ...(persona.versionId !== undefined && { personaVersionId: persona.versionId }),
   };
 }

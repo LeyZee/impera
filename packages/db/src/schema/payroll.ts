@@ -15,7 +15,9 @@ import {
   PENALTY_KINDS,
   PlatformSchema,
   SALE_HELD_REASONS,
+  SALE_WHOLE_BP,
   SaleDecisionOutcomeSchema,
+  SaleExcludeReasonSchema,
   SaleEventSchema,
   SaleSignalKindSchema,
 } from '@impera/contracts';
@@ -704,7 +706,10 @@ export const payPeriodReports = pgTable(
  * The registry of counted sales (CRM-03, ADR 0050 §§ 5 and 7, on the model of `pay_period_reports`): a line of the
  * platform's register is counted once, in the period of the closing that wrote it, for the member and the link's
  * version that closing saw. It keeps what a statement takes from the line (account, currency, signed net, the sale's
- * period), so that a closed period counts it again without reading the register.
+ * period), so that a closed period counts it again without reading the register. A sale the validator shared (ADR 0101
+ * §§ 11–14) is counted as two rows, one per member, each with its share (`share_bp`) and its part of the net, the
+ * recipient's rounded once and the rest to the author (`share_role`): the parts sum to the line's net, and every part
+ * of a line is counted by the same closing. A refund after the closing is shared the same way.
  */
 export const payPeriodSales = pgTable(
   'pay_period_sales',
@@ -725,18 +730,28 @@ export const payPeriodSales = pgTable(
     currency: text('currency').notNull(),
     netMinor: integer('net_minor').notNull(),
     salePeriod: date('sale_period').notNull(),
+    shareBp: smallint('share_bp').notNull().default(SALE_WHOLE_BP),
+    shareRole: text('share_role'),
     createdAt: createdAt(),
   },
   (t) => [
-    primaryKey({ name: 'pay_period_sales_pkey', columns: [t.platform, t.platformSaleId, t.event] }),
+    primaryKey({
+      name: 'pay_period_sales_pkey',
+      columns: [t.platform, t.platformSaleId, t.event, t.memberId],
+    }),
     index('pay_period_sales_period_member_idx').on(t.period, t.memberId),
     enumCheck('pay_period_sales', t.platform, PlatformSchema.options),
     enumCheck('pay_period_sales', t.event, SaleEventSchema.options),
     enumCheck('pay_period_sales', t.currency, CurrencySchema.options),
+    enumCheck('pay_period_sales', t.shareRole, ['author', 'recipient']),
     periodCheck('pay_period_sales_sale_period_check', t.salePeriod),
     check(
       'pay_period_sales_net_check',
       sql`${t.salePeriod} <= ${t.period} and ((${t.event} = 'sale' and ${t.netMinor} >= 0) or (${t.event} = 'refund' and ${t.netMinor} <= 0))`,
+    ),
+    check(
+      'pay_period_sales_share_check',
+      sql`(${t.shareRole} is null and ${t.shareBp} = ${sql.raw(String(SALE_WHOLE_BP))}) or (${t.shareRole} is not null and ${t.shareBp} between 1 and ${sql.raw(String(SALE_WHOLE_BP - 1))})`,
     ),
     memberRead(t.memberId),
     pgPolicy('agency_insert', { for: 'insert', withCheck: readsTeam }),
@@ -775,12 +790,16 @@ export const payPeriodHeldSales = pgTable(
 );
 
 /**
- * The validator's decisions on sales (CRM-03 lot b3, ADR 0050 § 5): a sale counts for the member its chatter is linked
- * to (`count`), or for nobody (`exclude`), its refunds with it; `withdraw` takes back the decision in force. Added
- * only, numbered per sale from 1 without a gap: the latest counts, while the chatter's link keeps `link_version`
- * (`null` for a chatter not linked or none). Written by the owner or an active manager, never on a sale of their own
- * chatter (`author_member_id`, the member linked then), never on a sale a closing counted. The team's first open
- * period reads every decided sale no closing counted again, so that a decision can be taken back or lapse.
+ * The validator's decisions on sales (CRM-03 lot b3, ADR 0050 § 5, ADR 0101): a sale counts for the member its chatter
+ * is linked to (`count`), for nobody (`exclude`, with its reason since ADR 0101), or for another member who was
+ * decisive (`give`: `recipient_member_id`, their share `share_bp`, the whole sale or a share of a member's sale, a note
+ * always), its refunds with it; `withdraw` takes back the decision in force. Added only, numbered per sale from 1
+ * without a gap: the latest counts, while the chatter's link keeps `link_version` (`null` for a chatter not linked or
+ * none). Written by the owner or an active manager, never on a sale of their own chatter (`author_member_id`, the
+ * member linked then, `null` for the agent), never given to themselves, never on a sale a closing counted. A `give`
+ * keeps what the sale was in the register (currency, net, instant), which the trigger checks, so that its author reads
+ * it once it has left their statement. The team's first open period reads every decided sale no closing counted again,
+ * so that a decision can be taken back or lapse.
  */
 export const paySaleDecisions = pgTable(
   'pay_sale_decisions',
@@ -796,6 +815,12 @@ export const paySaleDecisions = pgTable(
     reason: text('reason'),
     authorMemberId: uuid('author_member_id').references(() => teamMembers.id),
     linkVersion: text('link_version'),
+    recipientMemberId: uuid('recipient_member_id').references(() => teamMembers.id),
+    shareBp: smallint('share_bp'),
+    excludeReason: text('exclude_reason'),
+    saleCurrency: text('sale_currency'),
+    saleNetMinor: integer('sale_net_minor'),
+    saleOccurredAt: timestampTz('sale_occurred_at'),
     note: text('note'),
     decidedBy: text('decided_by')
       .notNull()
@@ -819,14 +844,28 @@ export const paySaleDecisions = pgTable(
       'pay_sale_decisions_count_check',
       sql`${t.outcome} <> 'count' or (${t.authorMemberId} is not null and ${t.linkVersion} is not null and ${t.reason} in ('off_shift', 'status_unknown'))`,
     ),
-    check('pay_sale_decisions_link_check', sql`(${t.authorMemberId} is null) = (${t.linkVersion} is null)`),
+    check('pay_sale_decisions_link_check', sql`${t.authorMemberId} is null or ${t.linkVersion} is not null`),
+    enumCheck('pay_sale_decisions', t.excludeReason, SaleExcludeReasonSchema.options),
+    enumCheck('pay_sale_decisions', t.saleCurrency, CurrencySchema.options),
+    check(
+      'pay_sale_decisions_give_check',
+      sql`(${t.outcome} = 'give') = (${t.recipientMemberId} is not null) and (${t.outcome} = 'give') = (${t.shareBp} is not null) and (${t.outcome} <> 'give' or (${t.note} is not null and ${t.linkVersion} is not null and ${t.saleCurrency} is not null and ${t.saleNetMinor} >= 0 and ${t.saleOccurredAt} is not null and ${t.recipientMemberId} is distinct from ${t.authorMemberId} and ${t.shareBp} between 1000 and ${sql.raw(String(SALE_WHOLE_BP))} and ${t.shareBp} % 1000 = 0 and (${t.shareBp} = ${sql.raw(String(SALE_WHOLE_BP))} or ${t.authorMemberId} is not null)))`,
+    ),
+    check(
+      'pay_sale_decisions_sale_check',
+      sql`(${t.outcome} = 'give') = (${t.saleCurrency} is not null) and (${t.saleCurrency} is null) = (${t.saleNetMinor} is null) and (${t.saleCurrency} is null) = (${t.saleOccurredAt} is null)`,
+    ),
+    check(
+      'pay_sale_decisions_exclude_outcome_check',
+      sql`${t.excludeReason} is null or ${t.outcome} = 'exclude'`,
+    ),
     pgPolicy('member_read', {
       for: 'select',
-      using: sql`${readsTeam} or (${t.authorMemberId} is not null and ${isMine(t.authorMemberId)})`,
+      using: sql`${readsTeam} or (${t.authorMemberId} is not null and ${isMine(t.authorMemberId)}) or (${t.recipientMemberId} is not null and ${isMine(t.recipientMemberId)})`,
     }),
     pgPolicy('agency_insert', {
       for: 'insert',
-      withCheck: sql`${readsTeam} and ${t.decidedBy} = ${currentUser} and (${t.authorMemberId} is null or not ${isMine(t.authorMemberId)})`,
+      withCheck: sql`${readsTeam} and ${t.decidedBy} = ${currentUser} and (${t.authorMemberId} is null or not ${isMine(t.authorMemberId)}) and (${t.recipientMemberId} is null or not ${isMine(t.recipientMemberId)})`,
     }),
   ],
 );
