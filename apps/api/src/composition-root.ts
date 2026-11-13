@@ -49,6 +49,7 @@ import { payReadsForContractors, type PayrollModule } from './modules/payroll';
 import type { PersonaModule } from './modules/persona';
 import type { PlaygroundModule } from './modules/playground';
 import type { ProvidersModule } from './modules/providers';
+import type { RewardsModule } from './modules/rewards';
 import { createShiftAccessReader, type SchedulingModule } from './modules/scheduling';
 import type { ScriptsModule } from './modules/scripts';
 import type { SupervisionModule } from './modules/supervision';
@@ -93,6 +94,7 @@ import { wireTrends } from './wiring/trends';
 interface Modules {
   readonly alerts: AlertsModule;
   readonly backups: BackupsModule;
+  readonly rewards: RewardsModule;
   readonly connectors: ConnectorsModule;
   readonly conversations: ConversationsModule;
   readonly fans: FansModule;
@@ -446,6 +448,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const modules: Modules = {
     alerts: alerts.module,
     backups: backups.module,
+    rewards: rewards.module,
     connectors: connectors.module,
     conversations: conversations.module,
     fans: fans.module,
