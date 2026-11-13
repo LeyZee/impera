@@ -40,6 +40,8 @@ export function mySaleStateText(sale: Pick<MySale, 'state' | 'event'>): string {
       return ofSale ? 'Écartée' : 'Écarté';
     case 'removed':
       return ofSale ? 'Retirée du relevé' : 'Retiré du relevé';
+    case 'given':
+      return ofSale ? 'Donnée' : 'Sa vente est donnée';
   }
 }
 
@@ -70,6 +72,8 @@ function saleNote(sale: Pick<MySale, 'state' | 'open'>, closed: boolean): string
       return 'Tu l’as signalée et un valideur l’a écartée : elle ne compte pas pour toi.';
     case 'removed':
       return 'Tu l’avais signalée : elle n’est plus sur ton relevé.';
+    case 'given':
+      return 'Un valideur l’a donnée à un autre membre, décisif sur cette vente : elle ne compte pas pour toi.';
   }
 }
 
@@ -85,6 +89,8 @@ function refundNote(sale: Pick<MySale, 'state' | 'open'>, closed: boolean): stri
       return 'Tu l’as signalé et un valideur l’a écarté : il ne se déduit pas de tes ventes.';
     case 'removed':
       return 'Tu l’avais signalé : il n’est plus sur ton relevé.';
+    case 'given':
+      return 'Un valideur a donné sa vente à un autre membre : il ne se déduit pas de tes ventes.';
   }
 }
 

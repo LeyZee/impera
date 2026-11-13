@@ -3,6 +3,7 @@
 Statut : accepted (Charles, 06/11/2026 20h13, « ok 0079 », fil Agent)
 Date : 2026-11-06
 Précise : l'ADR 0010 (la persona est une donnée versionnée, hors dépôt pour les vraies créatrices).
+Amendée par : l'ADR 0090 (deux questions de plus dans « Conversation », 61 au total ; les répliques aux objections dans « Réglages de l'agent »).
 Remplace : les blocs P5-01 de la fiche (`lifestyle`, `tastes`, `intimate`, `writing_style`, `sample_replies`), `additional_info` et les listes fermées des détails, pour toute nouvelle version.
 
 ## Contexte

@@ -95,4 +95,19 @@ describe('sampleReplyFaults, « Réponses typiques » (ADR 0079 § 6)', () => {
   it('takes her forbidden words and emojis from the agent’s rules', () => {
     expect(sampleReplyFaults(withLines('Bonne nuit 😂')).map((f) => f.code)).toEqual(['forbidden_term']);
   });
+
+  it('reads each reply of her objection bank, named by its kind and its place (ADR 0090 § B)', () => {
+    const p = v2();
+    p.agent.objection_replies = {
+      too_expensive: [
+        { id: 'testaaaaaaaa', text: 'Réplique de test A' },
+        { id: 'testbbbbbbbb', text: 'Je te fais un petit prix' },
+      ],
+      asks_discount: [{ id: 'testcccccccc', text: '*sourit* non' }],
+    };
+    expect(sampleReplyFaults(p)).toEqual([
+      { index: 1, code: 'discount', objection: 'too_expensive' },
+      { index: 0, code: 'stage_direction', objection: 'asks_discount' },
+    ]);
+  });
 });

@@ -13,6 +13,7 @@ import {
   minutesOn,
   monthLabel,
   monthMarks,
+  monthMarksKey,
   nameFor,
   shownOn,
   slotLinesOf,
@@ -338,7 +339,9 @@ export function TeamMonth({
                     <span className="cal-day__marks" aria-hidden="true">
                       {marks.map(({ row, marks: list }) => (
                         <span key={row.creator.id} className="cal-day__line">
-                          <span className="cal-day__creator">{initialsOf(row.creator.name)}</span>
+                          <span className="cal-day__creator" title={row.creator.name}>
+                            {initialsOf(row.creator.name)}
+                          </span>
                           {list.map((mark, index) =>
                             mark.kind === 'shift' ? (
                               <i
@@ -434,12 +437,15 @@ export function CalendarLegend({
   focus,
   onFocus,
   fill = false,
+  marks = null,
 }: {
   calendar: Calendar;
   me: string | null;
   focus: string | null;
   onFocus: (memberId: string | null) => void;
   fill?: boolean;
+  /** The month only: what its marks stand for (`monthMarksKey`). */
+  marks?: string | null;
 }): JSX.Element {
   const members = calendar.members.toSorted((a, b) =>
     a.id === me ? -1 : b.id === me ? 1 : a.displayName.localeCompare(b.displayName, 'fr'),
@@ -488,6 +494,16 @@ export function CalendarLegend({
           />
           {fill ? 'À pourvoir' : 'Libre'}
         </span>
+        {marks === null ? null : (
+          <span className="cal-legend__key">
+            <span className="cal-marks-key" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            {marks}
+          </span>
+        )}
       </p>
     </div>
   );
@@ -534,6 +550,8 @@ export function MonthNav({
         type="button"
         className="sc-arrow"
         aria-label="Mois précédent"
+
+        title="Mois précédent"
         onClick={() => {
           onMonth(addMonths(month, -1));
         }}
@@ -549,6 +567,8 @@ export function MonthNav({
         type="button"
         className="sc-arrow"
         aria-label="Mois suivant"
+
+        title="Mois suivant"
         onClick={() => {
           onMonth(addMonths(month, 1));
         }}
@@ -659,7 +679,14 @@ export function TeamPanel({
           <TeamMonth {...props} month={month} />
         </>
       )}
-      <CalendarLegend calendar={data} me={me} focus={focus} onFocus={onFocus} fill={fill} />
+      <CalendarLegend
+        calendar={data}
+        me={me}
+        focus={focus}
+        onFocus={onFocus}
+        fill={fill}
+        marks={month === null ? null : monthMarksKey(data, days)}
+      />
     </Panel>
   );
 }

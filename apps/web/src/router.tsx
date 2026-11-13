@@ -477,6 +477,7 @@ const teamMembers = createRoute({
         tab={onglet === 'managers' ? 'manager' : 'chatter'}
         selected={membre ?? null}
         canManage={user.role === 'owner'}
+        seesSetup={user.role === 'owner' || user.teamScope === 'agency'}
         viewerId={user.id}
         onTab={(tab) =>
           void navigate({

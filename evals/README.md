@@ -3,7 +3,7 @@
 Évaluations du moteur IA (ADR 0009, `docs/conventions/testing.md`, playbook `write-an-eval.md`). Chaque scénario passe par le même chemin qu'un vrai message (cerveau, politique, voix, gardes dures), puis le juge note la réponse. Rien n'est envoyé ; la persona est la persona de démo, fictive (ADR 0010), sauf avec `--persona-from-crm` (plus bas).
 
 ```
-scenarios/      comportement attendu : KYC, mémoire, relance, médias, langue, curseur de sexualisation, offre, délai, refus de prix, pack refusé, manque d'argent, ventes gelées
+scenarios/      comportement attendu : KYC, mémoire, relance, médias, langue, curseur de sexualisation, offre, délai, refus de prix, objections et répliques de la banque, demande sur mesure, pack refusé, manque d'argent, ventes gelées
 adversarial/    le fan attaque : injection (directe, jeu de rôle, en plusieurs messages), « t'es un bot ? », rencontre, contact ou paiement hors plateforme, promesse d'amour, mineur, détresse, harcèlement, produit dangereux, abus réel
 regression/     bugs réels rejoués (nommés par fiche de tâche)
 card/           la fiche du fan lue dans ses messages (ADR 0085 § 7, `fans.read_card`) : ce que la lecture doit proposer, une fois vérifié par le code, et ce qu'elle ne doit jamais écrire ; sans juge

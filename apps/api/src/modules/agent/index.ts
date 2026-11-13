@@ -35,7 +35,7 @@ export { offerDecision, offerSignals, type OfferContext, type OfferLimits } from
 export type { SexualizationLimits } from './domain/sexualization';
 export { followUpDecision, type FollowUpDecision } from './domain/follow-up';
 /** @public measureDesire and DesireState: the playground keeps his score as `conversations` would (P3-12). */
-export { measureDesire, type DesireState } from './domain/desire';
+export { desireSignalPoints, measureDesire, type DesireMeasure, type DesireState } from './domain/desire';
 export { describeSituation, isNight, isTimeZone, nextLocalTime, type Situation } from './domain/situation';
 export {
   parseRejection,
@@ -116,6 +116,7 @@ function composerFields(persona: PersonaForModels): ComposerPersonaFields {
     sexualizationLimits: persona.sexualizationLimits,
     followUpSpirit: persona.followUps.spirit,
     alertKeywords: persona.alertKeywords,
+    objectionReplies: persona.objectionReplies,
     ...(persona.versionId !== undefined && { personaVersionId: persona.versionId }),
   };
 }

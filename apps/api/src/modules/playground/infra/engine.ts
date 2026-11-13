@@ -3,12 +3,14 @@ import type {
   Destination,
   MediaDescription,
   PlaygroundAnswer,
+  PlaygroundDesire,
   PlaygroundState,
   Verdict,
 } from '@impera/contracts';
 import type { LlmGateway } from '@impera/llm';
 
 import {
+  desireSignalPoints,
   guardSettingsOf,
   isNight,
   isTimeZone,
@@ -36,10 +38,10 @@ import {
   type PlaygroundEngine,
 } from '../application/engine';
 import { FAN_PRESETS, findPreset } from '../domain/fan-presets';
-import { guardLabel, trapLabel } from '../domain/labels';
+import { cursorLabel, guardLabel, kycSlotWords, offerRefusalLabel, trapLabel } from '../domain/labels';
 import { completeMedia } from '../domain/media';
 
-import { createPlaygroundSession, type PlaygroundTurn } from './session';
+import { createPlaygroundSession, type PlaygroundDesireReading, type PlaygroundTurn } from './session';
 
 const HOUR_MS = 3_600_000;
 
@@ -93,6 +95,17 @@ export function ratingRecord(input: {
   };
 }
 
+/** His score with what each signal weighed in the current counting: the screen adds nothing. */
+function toDesire(reading: PlaygroundDesireReading): PlaygroundDesire {
+  return {
+    before: reading.before,
+    score: reading.score,
+    band: reading.band,
+    signals: reading.signals.map((signal) => ({ signal, points: desireSignalPoints(signal) })),
+    weightsVersion: reading.weightsVersion,
+  };
+}
+
 function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
   return {
     bubbles: [...turn.bubbles],
@@ -120,8 +133,15 @@ function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
         risks: [...turn.brief.risks],
         action: turn.brief.action,
         replyBrief: turn.brief.replyBrief,
-        kycMissing: [...turn.brief.kycMissing],
+        kycMissing: turn.brief.kycMissing.map(kycSlotWords),
       },
+    }),
+    ...(turn.desire !== undefined && { desire: toDesire(turn.desire) }),
+    ...(turn.cursor !== undefined && {
+      cursor: { kind: turn.cursor.kind, label: cursorLabel(turn.cursor.kind, turn.cursor.reason) },
+    }),
+    ...(turn.offerRefused !== undefined && {
+      offerRefused: { code: turn.offerRefused, label: offerRefusalLabel(turn.offerRefused) },
     }),
     ...(turn.model !== undefined && { model: turn.model }),
     latencyMs: turn.latencyMs,
@@ -145,6 +165,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     offerLimits: deps.persona.offerLimits,
     sexualizationLimits: deps.persona.sexualizationLimits,
     followUps: deps.persona.followUps,
+    objectionReplies: deps.persona.objectionReplies,
     ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
     ...(deps.now !== undefined && { now: deps.now }),
   });
@@ -187,10 +208,15 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
 
   const state = (): PlaygroundState => {
     const { situation, lastExchange } = session;
+    let fanNumber = 0;
     return {
       persona: { name: deps.persona.creatorName, played: deps.played ?? null },
       presets: FAN_PRESETS.map((p) => ({ id: p.id, label: p.label, tests: p.tests, opening: p.opening })),
       presetId,
+      desireThresholds: {
+        open: deps.persona.sexualizationLimits.minDesireToOpen,
+        script: deps.persona.offerLimits.minDesire,
+      },
       situation: {
         now: situation.now.toISOString(),
         timeZone: situation.timeZone,
@@ -199,14 +225,19 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         isNight: isNight(situation),
       },
       fanNotes: [...session.fanNotes],
-      history: session.history.map((turn, index) => ({
-        index,
-        from: turn.from,
-        text: turn.text,
-        ...(turn.media !== undefined && {
-          media: turn.media.map((m) => ({ description: m.description, isLocked: m.isLocked ?? false })),
-        }),
-      })),
+      history: session.history.map((turn, index) => {
+        // His n-th message carries the score it left; hers carry none.
+        const reading = turn.from === 'fan' ? session.desireTrail[(fanNumber += 1) - 1] : undefined;
+        return {
+          index,
+          from: turn.from,
+          text: turn.text,
+          ...(turn.media !== undefined && {
+            media: turn.media.map((m) => ({ description: m.description, isLocked: m.isLocked ?? false })),
+          }),
+          ...(reading !== undefined && { desire: toDesire(reading) }),
+        };
+      }),
       rate: rate(),
       version: deps.version,
       rejectReasons: REJECT_REASONS.map((id) => ({ id, label: REJECT_REASON_LABELS[id] })),

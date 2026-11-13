@@ -21,6 +21,8 @@ import {
   type FieldIssue,
 } from './model';
 
+import { useGrowingArea } from '@/lib/growing-area';
+
 /** What an empty text field says, and what a placeholder of the example (`<à remplir>`) shows as. */
 const TO_FILL = 'À remplir';
 
@@ -189,9 +191,12 @@ export function TextArea({
   invalid?: boolean;
 }): JSX.Element {
   const shown = isPlaceholder(value) ? '' : value;
+  // Never cut: it grows with what is written, no handle (recette ADR 0090, a reply hidden under its count on a phone).
+  const ref = useGrowingArea(shown);
   return (
     <div className="ps-area">
       <textarea
+        ref={ref}
         id={id}
         className="nv-glass nv-field__control ps-input ps-area__input"
         value={shown}

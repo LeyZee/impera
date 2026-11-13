@@ -158,6 +158,7 @@ async function server(
       alertKeywords: [],
       forbiddenEmojis: [],
       kycSlots: [],
+      objectionReplies: {},
     },
     // « Tester » reads her active persona; none here: the words are read, the phrase needs no persona to be refused.
     activePersona: () => Promise.resolve(null),
@@ -263,6 +264,27 @@ describe('/v1/playground', () => {
     expect(again.statusCode).toBe(409);
     expect(codeOf(again)).toBe('nothing_to_rate_conflict');
     expect(stored[0]?.creatorId).toBeUndefined();
+  });
+
+  it('shows his desire score under his message, each signal with its points, and her two thresholds (P3-12)', async () => {
+    const { app, headers, post } = await server();
+    const first = PlaygroundAnswerSchema.parse((await post('/messages', { text: 'Salut' })).json());
+    expect(first.desire).toMatchObject({ before: null, score: 0, band: 'neutral', signals: [] });
+    // What she still has to learn, in her words, never a slot's code.
+    expect(first.brief?.kycMissing).toEqual(['prénom']);
+    await post('/rating', { verdict: { kind: 'validated' } });
+    const answer = PlaygroundAnswerSchema.parse(
+      (await post('/messages', { text: 'Ça va ? Je sors à peine du travail, longue journée' })).json(),
+    );
+    // A message much longer than his first: the long reply counts, with its points from the code.
+    expect(answer.desire?.signals).toContainEqual({ signal: 'long_reply', points: 5 });
+    const state = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(state.history.filter((turn) => turn.from === 'fan').map((turn) => turn.desire)).toEqual([
+      first.desire,
+      answer.desire,
+    ]);
+    expect(state.history.find((turn) => turn.from === 'creator')?.desire).toBeUndefined();
+    expect(state.desireThresholds.script).toBeGreaterThan(state.desireThresholds.open);
   });
 
   it('files the rating under the creator when there is one, and leaves it unassigned otherwise', async () => {

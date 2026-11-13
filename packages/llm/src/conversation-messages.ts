@@ -54,7 +54,8 @@ export function toMessages(history: readonly ConversationTurn[]): ModelMessage[]
   });
 }
 
-export function describeBrief(brief: Brief): string {
+/** The brief the voice follows; her objection reply, when code chose one, in its own typed block after it. */
+export function describeBrief(brief: Brief, objectionReply?: string): string {
   const lines = [
     `Intention du fan : ${brief.intent} (humeur : ${brief.sentiment}).`,
     `À dire : ${brief.replyBrief}`,
@@ -64,7 +65,10 @@ export function describeBrief(brief: Brief): string {
   ]
     .filter((line) => line !== '')
     .join('\n');
-  return wrapUntrusted('brief', lines);
+  const block = wrapUntrusted('brief', lines);
+  return objectionReply === undefined
+    ? block
+    : `${block}\n${wrapUntrusted('objection_reply', objectionReply)}`;
 }
 
 export function notesBlock(fanNotes: string): string {

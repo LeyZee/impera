@@ -4,6 +4,7 @@ import {
   type MediaDescription,
   type PlaygroundAnswer,
   type PlaygroundComparison,
+  type PlaygroundDesire,
   type PlaygroundMedia,
   type PlaygroundState,
   type Verdict,
@@ -350,6 +351,30 @@ function describe(media: PlaygroundMedia): MediaDescription {
   };
 }
 
+/**
+ * The demo's desire score: a few signals read on his words, with the server's points, so the screen shows what the
+ * real one does. Nothing here is the real counting (agent/domain/desire.ts).
+ */
+function demoDesire(history: readonly Omit<Turn, 'index'>[], text: string): PlaygroundDesire {
+  const previous = history.findLast((t) => t.from === 'fan')?.desire;
+  const signals: PlaygroundDesire['signals'] = [
+    ...(/envie|chaud|bonne|excit/i.test(text) ? [{ signal: 'states_desire' as const, points: 12 }] : []),
+    ...(/boulot|travail|occup/i.test(text) ? [{ signal: 'busy_now' as const, points: -30 }] : []),
+  ];
+  const before = previous?.score ?? null;
+  const score = Math.min(
+    100,
+    Math.max(0, (before ?? 0) + signals.reduce((sum, s) => sum + (s.points ?? 0), 0)),
+  );
+  return {
+    before,
+    score,
+    band: score >= 70 ? 'hot' : score >= 40 ? 'playful' : 'neutral',
+    signals,
+    weightsVersion: 'démo',
+  };
+}
+
 function hourIn(date: Date, timeZone: string): number {
   return Number(
     new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone }).format(date),
@@ -382,6 +407,7 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
       persona: { name: 'Elena', played: null },
       presets: [...PRESETS],
       presetId,
+      desireThresholds: { open: 40, script: 70 },
       situation: {
         now: now.toISOString(),
         timeZone,
@@ -484,14 +510,16 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
     choosePersona: () => later(() => (choose(presetId), snapshot())),
     send: (text, media) =>
       later(() => {
+        const desire = demoDesire(history, text);
         history.push({
           from: 'fan',
           text,
           ...(media.length > 0 && {
             media: media.map((m) => ({ description: describe(m), isLocked: false })),
           }),
+          desire,
         });
-        reply(answerFor(media));
+        reply({ ...answerFor(media), desire });
         return snapshot();
       }, 900),
     rate: (verdict: Verdict) => later(() => (rated(verdict), snapshot())),
