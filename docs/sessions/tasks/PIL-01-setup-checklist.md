@@ -1,5 +1,5 @@
 # PIL-01 « Mise en route » d'une créatrice et d'un membre, cochée par le serveur
-Statut : in_progress
+Statut : done
 Phase : exploitation
 Dépend de : CRM-07, plan de pilotage du 12/11/2026 (W1)
 Branche : claude/project-thread-nqhrm0
@@ -23,7 +23,7 @@ Une seule liste « Mise en route » sur la fiche d'une créatrice et sur celle d
 - [x] Relecture Équipe : étape « Facturation prête » d'un membre payé, invitation expirée à refaire, créatrices archivées hors compte.
 - [x] Manager actif : la mise en route des chatteurs, sans leur facturation (« ok manager mise en route », 12/11).
 - [x] Retouches du lot 2 : lien expiré en avertissement ambre avec « Nouveau lien » (en tête de la prochaine étape) ; « Sa facturation » dit aussi un versement que bloquerait l'attestation de résidence sous convention (ADR 0041) ; titres d’étape du membre en noms, comme ceux de la créatrice (relecture design 2).
-- [ ] Captures du lot 3 validées par Charles.
+- [x] Captures des lots 1, 2 et 3 validées par Charles.
 
 ## Critères d'acceptation
 
