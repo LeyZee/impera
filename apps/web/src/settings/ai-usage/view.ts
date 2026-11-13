@@ -211,6 +211,13 @@ export const CONSOLE_HINT: Readonly<Record<AiCreditProvider, string>> = {
   google: 'aistudio.google.com › Billing',
 };
 
+/** Where each provider shows the usage its subscription includes (ADR 0091 § 6). */
+export const USAGE_HINT: Readonly<Record<AiCreditProvider, string>> = {
+  xai: 'console.x.ai › Usage',
+  mistral: 'console.mistral.ai › Usage',
+  google: 'aistudio.google.com › Usage',
+};
+
 /** The tone of a card, as the rest of the CRM says it: amber a warning, red an urgency. */
 export const CREDIT_TONE: Readonly<Record<AiCreditState, 'ok' | 'warn' | 'bad' | 'idle'>> = {
   ok: 'ok',
@@ -218,6 +225,8 @@ export const CREDIT_TONE: Readonly<Record<AiCreditState, 'ok' | 'warn' | 'bad' |
   critical: 'bad',
   empty: 'bad',
   unknown_pace: 'idle',
+  included: 'ok',
+  quota_reached: 'bad',
 };
 
 const LONG_DAY = new Intl.DateTimeFormat('fr-FR', {
@@ -230,8 +239,24 @@ const LONG_DAY = new Intl.DateTimeFormat('fr-FR', {
 /** « samedi 14 novembre »: a calendar day in a sentence, never shifted by a zone. */
 export const longDay = (day: string): string => LONG_DAY.format(new Date(`${day}T12:00:00Z`));
 
-/** The card's headline about time: how long, and until when. */
+const REFUSED_AT = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** « jeudi 12 novembre à 23:35 »: when the provider first refused, in Paris time. */
+export const refusedText = (at: string): string => REFUSED_AT.format(new Date(at));
+
+/** The card's headline about time: how long, and until when; on a subscription, whether the quota holds. */
 export function runwayText(card: AiCredits): string {
+  if (card.state === 'quota_reached' && card.quotaRefusedAt !== null)
+    return `Quota épuisé depuis ${refusedText(card.quotaRefusedAt)} : l’agent répond avec son modèle de repli jusqu’à la remise à zéro.`;
+  if (card.mode === 'subscription')
+    return 'Les appels passent sur le quota de ton abonnement. S’il est épuisé, Telegram te prévient.';
   if (card.state === 'empty') return 'Épuisés d’après le décompte : recharge, puis note-le ici.';
   if (card.perDayMinor === 0) return 'Rien dépensé ces derniers jours : le solde ne baisse pas.';
   if (card.daysLeft === null || card.runsOutOn === null)
@@ -253,11 +278,14 @@ export const CREDIT_BADGE: Readonly<Record<AiCreditState, string>> = {
   critical: 'Recharger maintenant',
   empty: 'Épuisés',
   unknown_pace: 'Rythme à venir',
+  included: 'Abonnement',
+  quota_reached: 'Quota épuisé',
 };
 
 /** Share of a 30-day bar the runway fills: the card's little gauge (0 to 100). */
 export function runwayShare(card: AiCredits): number {
-  if (card.state === 'empty') return 0;
+  if (card.state === 'empty' || card.state === 'quota_reached') return 0;
+  if (card.mode === 'subscription') return 100;
   if (card.daysLeft === null) return 100;
   return Math.min(100, (card.daysLeft / 30) * 100);
 }

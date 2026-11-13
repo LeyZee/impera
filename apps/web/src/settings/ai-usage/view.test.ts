@@ -88,4 +88,16 @@ describe('Consommation IA, what the screen says (ADR 0091)', () => {
       'Pas encore de rythme',
     );
   });
+
+  it('tells a subscription holds its quota, or since when it is used up (ADR 0091 § 6)', () => {
+    const plan = usageFixture().credits.find((c) => c.mode === 'subscription');
+    if (plan === undefined) throw new Error('fixture has a subscription');
+    expect(runwayText(plan)).toContain('Les appels passent sur le quota de ton abonnement');
+    expect(runwayShare(plan)).toBe(100);
+    const reached = { ...plan, state: 'quota_reached', quotaRefusedAt: '2026-11-12T22:35:00.000Z' } as const;
+    expect(runwayText(reached)).toBe(
+      'Quota épuisé depuis jeudi 12 novembre à 23:35 : l’agent répond avec son modèle de repli jusqu’à la remise à zéro.',
+    );
+    expect(runwayShare(reached)).toBe(0);
+  });
 });

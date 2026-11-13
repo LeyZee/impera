@@ -74,6 +74,8 @@ describe('Réglages › Consommation IA (ADR 0091)', () => {
     expect(screen.getByText('Prévu fin du mois')).toBeTruthy();
     expect(screen.getByText('Recharger bientôt')).toBeTruthy();
     expect(screen.getByText(/Environ 3 jours au rythme actuel/u)).toBeTruthy();
+    expect(screen.getByText('Inclus dans l’abonnement')).toBeTruthy();
+    expect(screen.getByText(/Les appels passent sur le quota de ton abonnement/u)).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Par modèle, 30 jours/u })).toBeTruthy();
     expect(screen.getByRole('img', { name: /Par usage, 30 jours : Écrire les messages 54 %/u })).toBeTruthy();
   });
@@ -134,6 +136,27 @@ describe('Réglages › Consommation IA (ADR 0091)', () => {
     // The same line twice: one id, so the server writes it once.
     expect(second?.id).toBe(first?.id);
     expect(second).toMatchObject({ provider: 'xai', kind: 'topup', amountMinor: 5000, currency: 'USD' });
+  });
+
+  it('notes a service paid by the subscription without an amount (ADR 0091 § 6)', async () => {
+    const posted = serve({
+      post: (body) => ({
+        status: 201,
+        body: { ...z.record(z.string(), z.unknown()).parse(body), at: '2026-11-11T13:30:00.000Z' },
+      }),
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Noter une recharge' }));
+    const dialog = screen.getByRole('dialog', { name: 'Noter une recharge' });
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Payé par l’abonnement' }));
+    expect(within(dialog).queryByLabelText('Montant rechargé')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(posted).toEqual([
+      expect.objectContaining({ provider: 'xai', kind: 'subscription', amountMinor: 0, currency: 'USD' }),
+    ]);
   });
 
   it('says the server does not answer', async () => {

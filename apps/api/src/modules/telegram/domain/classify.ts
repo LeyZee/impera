@@ -39,6 +39,7 @@ export const SCANNED_EVENT_TYPES = [
   'handoff_requested',
   'budget_threshold_crossed',
   'ai_credits_low',
+  'ai_quota_exhausted',
   'session_state_changed',
   'kill_switch_toggled',
   'takeover_started',
@@ -616,6 +617,22 @@ export function classify(
             : signal.level === 'critical'
               ? `Crédits ${name} : moins de 2 jours au rythme actuel (${left} restants${when}). Recharge maintenant.`
               : `Crédits ${name} : moins de 5 jours au rythme actuel (${left} restants${when}). Pense à recharger.`,
+        link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
+      };
+    }
+    // Urgent: the agent answers with its fallback model until the provider takes calls again (ADR 0091 § 6).
+    case 'ai_quota_exhausted': {
+      const name = CREDIT_PROVIDER_NAME[signal.provider];
+      return {
+        kind: 'notice',
+        topic: 'urgent',
+        fallbackTopic: 'important',
+        threadKey: null,
+        title: 'URGENT',
+        body:
+          signal.mode === 'subscription'
+            ? `${name} refuse les appels : le quota de ton abonnement est épuisé. L’agent répond avec son modèle de repli jusqu’à la remise à zéro du quota.`
+            : `${name} refuse les appels faute de crédits. L’agent répond avec son modèle de repli : recharge, puis note-le dans Consommation IA.`,
         link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
       };
     }

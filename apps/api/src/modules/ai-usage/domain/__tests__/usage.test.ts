@@ -46,6 +46,7 @@ function input(overrides: Partial<UsageInput> = {}): UsageInput {
     usdPerEur: 1.1,
     entries: [],
     spentSinceUsd: {},
+    quotaRefusedAt: {},
     ...overrides,
   };
 }
@@ -198,6 +199,7 @@ function entry(overrides: Partial<AiCreditEntry> = {}): AiCreditEntry {
 const card = (overrides: Partial<Parameters<typeof creditsOf>[0]> = {}) =>
   creditsOf({
     provider: 'xai',
+    quotaRefusedAt: null,
     entries: [entry()],
     spentSinceUsd: 0,
     perDayUsd: null,
@@ -205,6 +207,48 @@ const card = (overrides: Partial<Parameters<typeof creditsOf>[0]> = {}) =>
     usdPerEur: 1.1,
     ...overrides,
   });
+
+describe('AI paid by a subscription (ADR 0091 § 6)', () => {
+  const plan = (at: string): AiCreditEntry =>
+    entry({ kind: 'subscription', amountMinor: 0, currency: 'USD', at });
+
+  it('counts nothing from a subscription line, and goes back to credits after a later top-up or reading', () => {
+    const topup = entry({ at: '2026-11-01T10:00:00.000Z' });
+    const subscribed = plan('2026-11-05T10:00:00.000Z');
+    const later = entry({ at: '2026-11-08T10:00:00.000Z', amountMinor: 2000 });
+    expect(countFrom([topup, subscribed])).toBe(subscribed);
+    // The top-up before the subscription is no longer counted.
+    expect(countFrom([topup, subscribed, later])).toBe(later);
+    expect(card({ entries: [topup, subscribed, later], spentSinceUsd: 5 })).toMatchObject({
+      mode: 'credits',
+      balanceMinor: 1500,
+    });
+  });
+
+  it('shows what the calls would have cost since, never a balance nor a runway', () => {
+    expect(
+      card({ entries: [entry(), plan('2026-11-10T11:00:00.000Z')], spentSinceUsd: 3.21, perDayUsd: 1.07 }),
+    ).toMatchObject({
+      mode: 'subscription',
+      balanceMinor: 0,
+      spentSinceMinor: 321,
+      perDayMinor: 107,
+      daysLeft: null,
+      runsOutOn: null,
+      state: 'included',
+      quotaRefusedAt: null,
+    });
+  });
+
+  it('says the quota is reached while the provider refuses, on a subscription or on credits', () => {
+    const at = new Date('2026-11-12T22:35:00.000Z');
+    expect(card({ entries: [plan('2026-11-10T11:00:00.000Z')], quotaRefusedAt: at })).toMatchObject({
+      state: 'quota_reached',
+      quotaRefusedAt: at.toISOString(),
+    });
+    expect(card({ quotaRefusedAt: at })).toMatchObject({ mode: 'credits', quotaRefusedAt: at.toISOString() });
+  });
+});
 
 describe('AI credits (ADR 0091 § 3)', () => {
   it('counts from the latest balance reading, else from the first top-up', () => {

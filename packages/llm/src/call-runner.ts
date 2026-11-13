@@ -41,6 +41,20 @@ function retryAfterMs(headers: Record<string, string> | undefined, now: number):
   return Number.isNaN(at) ? undefined : Math.max(0, at - now);
 }
 
+/**
+ * What a provider says when the account has nothing left to spend: prepaid credits run out, the monthly limit reached,
+ * or the usage included with a subscription used up (ADR 0091 § 6). Read in the answer's body, which is never kept: it
+ * names the team.
+ */
+const QUOTA_REFUSAL =
+  /\bcredits?\b|spending limit|usage limit|licen[cs]es?\b|resource has been exhausted|insufficient[_ ]quota/iu;
+
+/** A 402, or a 403 or 429 whose body says the account has nothing left: not a bad key, not worth asking again. */
+function isQuotaRefusal(status: number | undefined, body: string | undefined): boolean {
+  if (status === 402) return true;
+  return (status === 403 || status === 429) && body !== undefined && QUOTA_REFUSAL.test(body);
+}
+
 export function classify(error: unknown): Classified {
   if (NoObjectGeneratedError.isInstance(error)) {
     // A block the SDK only reports as a failed object (see the finish check in `run`).
@@ -63,6 +77,8 @@ export function classify(error: unknown): Classified {
   }
   if (APICallError.isInstance(error)) {
     const status = error.statusCode;
+    if (isQuotaRefusal(status, error.responseBody))
+      return { outcome: 'quota_exhausted', isTransient: false, message: `HTTP ${String(status)} quota` };
     if (status === 401 || status === 403)
       return {
         outcome: 'auth',

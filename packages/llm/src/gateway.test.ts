@@ -17,7 +17,9 @@ import {
 import type { ModelResolver } from './providers';
 import { BriefSchema } from './schemas';
 
-type Step = { text: string; finish?: 'stop' | 'content-filter' } | { status: number; retryAfter?: string };
+type Step =
+  | { text: string; finish?: 'stop' | 'content-filter' }
+  | { status: number; retryAfter?: string; body?: string };
 
 const USAGE = {
   inputTokens: { total: 1_000, noCache: 1_000, cacheRead: 0, cacheWrite: 0 },
@@ -39,6 +41,7 @@ function scripted(steps: Step[]): MockLanguageModelV4 {
             requestBodyValues: {},
             statusCode: step.status,
             ...(step.retryAfter !== undefined && { responseHeaders: { 'retry-after': step.retryAfter } }),
+            ...(step.body !== undefined && { responseBody: step.body }),
           }),
         );
       }
@@ -115,6 +118,25 @@ describe('LlmGateway', () => {
 
     expect(result.ok && result.value.meta.provider).toBe('mistral');
     expect(refusals).toEqual([{ provider: 'xai', status: 403 }]);
+  });
+
+  it('tells a refusal for lack of credits or quota from a refused key, never retries it nor keeps its body (ADR 0091 § 6)', async () => {
+    const refusals: KeyRefusal[] = [];
+    const body =
+      '{"error":"Your team team-invente has either used all available credits or reached its monthly spending limit."}';
+    for (const status of [403, 429]) {
+      const { gateway, log } = setup(
+        { xai: scripted([{ status, body }]), mistral: scripted([{ text: BUBBLES }]) },
+        ALL_KEYS,
+        (r) => refusals.push(r),
+      );
+      const result = await gateway.voice(INPUT);
+      expect(result.ok && result.value.meta.provider).toBe('mistral');
+      const xai = log.since(new Date(0)).filter((r) => r.provider === 'xai');
+      expect(xai.map((r) => r.outcome)).toEqual(['quota_exhausted']);
+      expect(xai[0]?.errorMessage).toBe(`HTTP ${String(status)} quota`);
+    }
+    expect(refusals).toEqual([]);
   });
 
   it('goes on when reporting the refusal fails', async () => {

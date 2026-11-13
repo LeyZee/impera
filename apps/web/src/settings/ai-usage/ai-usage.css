@@ -197,6 +197,12 @@
 .cia-credit[data-tone='bad'] .cia-credit__balance {
   color: var(--nv-danger);
 }
+/* A subscription has no balance: the plan's name in the headline's place, a step smaller (ADR 0091 § 6). */
+.cia-credit__balance--plan {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 600;
+}
 /* Thirty days of runway fill the bar: what is left, at a glance. */
 .cia-runway {
   position: relative;
@@ -239,6 +245,10 @@
   color: var(--nv-warning);
 }
 .cia-credit[data-tone='bad'] .cia-credit__runway {
+  color: var(--nv-danger);
+}
+/* A credits card whose provider refuses for lack of credits: an urgency, whatever the count says. */
+.cia-credit__refused {
   color: var(--nv-danger);
 }
 .cia-credit__detail {

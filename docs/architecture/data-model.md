@@ -480,7 +480,7 @@ Un régime ne change pas ; sa validation est une ligne à part. Un dossier garde
 worker_heartbeats   worker_id text PK, hostname, version, last_seen_at      (écrit toutes les 30 s par chaque worker, lu par /ready)
 rate_limit_counters key text PK (haché, ≤ 512), hits int > 0, window_ends_at   (limiteur partagé de l’API, ADR 0027 ; UNLOGGED, purgé 1 h après la fin de la fenêtre)
 backup_runs         id uuid PK (défaut en base), started_at, finished_at?, status (running|succeeded|failed), error? ≤ 500, object_key?, size_bytes?, sha256? unique, pg_dump_version?, row_counts? jsonb objet   (export quotidien, ADR 0028 ; écrit par le service backup seul, lu par l’app)
-ai_credit_entries   id uuid PK (choisi par l’écran, idempotence), provider (xai|mistral|google), kind (topup|balance), amount_minor int ≥ 0 (> 0 pour une recharge), currency (USD|EUR), at, created_by → user, created_at   (crédits IA notés par le propriétaire, ADR 0091 ; RLS forcée, politique agence ; nirvana_app : SELECT, INSERT, DELETE ; migration 0164)
+ai_credit_entries   id uuid PK (choisi par l’écran, idempotence), provider (xai|mistral|google), kind (topup|balance|subscription), amount_minor int ≥ 0 (> 0 pour une recharge, 0 pour un abonnement), currency (USD|EUR), at, created_by → user, created_at   (crédits IA notés par le propriétaire, ADR 0091 ; RLS forcée, politique agence ; nirvana_app : SELECT, INSERT, DELETE ; migration 0164, `subscription` en 0180, ADR 0091 § 6)
 restore_tests       id PK, backup_run_id FK, tested_at, duration_seconds > 0, row_count_mismatches ≥ 0, notes? ≤ 500, entered_by_user_id FK, created_at   (essai de restauration saisi par le propriétaire, ajout seul, ADR 0028 § 6)
 ```
 

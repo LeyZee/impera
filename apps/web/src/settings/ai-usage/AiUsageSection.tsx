@@ -18,10 +18,12 @@ import {
   modelSlices,
   PROVIDERS,
   providerLabel,
+  refusedText,
   runwayShare,
   runwayText,
   shareOf,
   sinceText,
+  USAGE_HINT,
   useSlices,
   type Column,
   type Slice,
@@ -126,6 +128,16 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
   );
 }
 
+/** The card's small print: the pace and what was spent since the line it counts from. */
+function creditDetail(card: AiCredits): string {
+  const spent = creditText(card.spentSinceMinor, card.currency);
+  if (card.mode === 'subscription')
+    return `${spent} de valeur consommée depuis le passage à l’abonnement, à titre indicatif · quota visible dans ${USAGE_HINT[card.provider]}`;
+  return card.perDayMinor === null || card.perDayMinor === 0
+    ? `${spent} dépensés depuis la dernière saisie`
+    : `${creditText(card.perDayMinor, card.currency)} par jour en moyenne · ${spent} dépensés depuis la dernière saisie`;
+}
+
 /** One provider's credits: what is left, how long it lasts, until when, and the lines it is counted from. */
 function CreditCard({ card, index }: { card: AiCredits; index: number }): JSX.Element {
   const tone = CREDIT_TONE[card.state];
@@ -136,19 +148,25 @@ function CreditCard({ card, index }: { card: AiCredits; index: number }): JSX.El
         <h3 className="cia-credit__name">{providerLabel(card.provider)}</h3>
         <span className={`cia-badge cia-badge--${tone}`}>{CREDIT_BADGE[card.state]}</span>
       </header>
-      <p className="cia-credit__balance nv-num">
-        {creditText(card.balanceMinor, card.currency)}
-        <span className="cia-credit__unit">restants</span>
-      </p>
+      {card.mode === 'subscription' ? (
+        <p className="cia-credit__balance cia-credit__balance--plan">Inclus dans l’abonnement</p>
+      ) : (
+        <p className="cia-credit__balance nv-num">
+          {creditText(card.balanceMinor, card.currency)}
+          <span className="cia-credit__unit">restants</span>
+        </p>
+      )}
       <div className="cia-runway" aria-hidden="true">
         <span className="cia-runway__fill" style={{ '--_w': `${String(runwayShare(card))}%` }} />
       </div>
       <p className="cia-credit__runway">{runwayText(card)}</p>
-      <p className="cia-credit__detail">
-        {card.perDayMinor === null || card.perDayMinor === 0
-          ? `${creditText(card.spentSinceMinor, card.currency)} dépensés depuis la dernière saisie`
-          : `${creditText(card.perDayMinor, card.currency)} par jour en moyenne · ${creditText(card.spentSinceMinor, card.currency)} dépensés depuis la dernière saisie`}
-      </p>
+      {card.mode === 'credits' && card.quotaRefusedAt !== null ? (
+        <p className="cia-credit__runway cia-credit__refused">
+          Le service refuse les appels faute de crédits depuis {refusedText(card.quotaRefusedAt)} : l’agent
+          répond avec son modèle de repli.
+        </p>
+      ) : null}
+      <p className="cia-credit__detail">{creditDetail(card)}</p>
       <button
         type="button"
         className="nv-btn nv-btn--plain nv-btn--sm cia-credit__more"
@@ -170,7 +188,8 @@ function Credits({ usage, onAdd }: { usage: AiUsage; onAdd: () => void }): JSX.E
       <div className="nv-plate cia-none nv-enter">
         <p>
           Aucun crédit noté pour l’instant. Note ta dernière recharge, ou le solde affiché dans la console du
-          service : le CRM décompte ensuite chaque appel et te dit quand recharger.
+          service : le CRM décompte ensuite chaque appel et te dit quand recharger. Un service payé par ton
+          abonnement se note aussi ici, sans montant.
         </p>
         <button type="button" className="nv-btn nv-btn--soft" onClick={onAdd}>
           Noter une recharge

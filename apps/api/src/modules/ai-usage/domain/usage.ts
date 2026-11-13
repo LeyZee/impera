@@ -60,6 +60,8 @@ export interface UsageInput {
   readonly entries: readonly AiCreditEntry[];
   /** What each provider's calls cost (USD) after its `countFrom`, read by the application once it knows it. */
   readonly spentSinceUsd: Readonly<Partial<Record<AiCreditProvider, number>>>;
+  /** Each provider's first refusal for lack of credits or quota since it last answered (`UsageReader.quotaRefusedAt`). */
+  readonly quotaRefusedAt: Readonly<Partial<Record<AiCreditProvider, Date | null>>>;
 }
 
 /** Full days the average spend is taken over, at most. */
@@ -101,12 +103,18 @@ const CREDIT_ENTRIES_SHOWN = 10;
 const byTime = (a: AiCreditEntry, b: AiCreditEntry): number => Date.parse(a.at) - Date.parse(b.at);
 
 /**
- * The line a provider's count starts from (ADR 0091 § 3): its latest balance reading, or its first top-up when it has
- * none. Null without any line.
+ * The line a provider's count starts from (ADR 0091 § 3): its latest subscription line when that is its latest line
+ * (§ 6, nothing to count, only what was spent since); otherwise, among the lines after its latest subscription line,
+ * the latest balance reading, or the first top-up when there is none. Null without any line.
  */
 export function countFrom(entries: readonly AiCreditEntry[]): AiCreditEntry | null {
   const sorted = [...entries].sort(byTime);
-  return sorted.filter((e) => e.kind === 'balance').at(-1) ?? sorted[0] ?? null;
+  const last = sorted.at(-1);
+  if (last === undefined || last.kind === 'subscription') return last ?? null;
+  const subscribedAt = sorted.filter((e) => e.kind === 'subscription').at(-1)?.at;
+  const counted =
+    subscribedAt === undefined ? sorted : sorted.filter((e) => Date.parse(e.at) > Date.parse(subscribedAt));
+  return counted.filter((e) => e.kind === 'balance').at(-1) ?? counted[0] ?? null;
 }
 
 /** An amount of cents in another currency, at the cap's rate (dollars per euro). */
@@ -125,6 +133,7 @@ export function creditState(balanceMinor: number, daysLeft: number | null): AiCr
 
 interface CreditsInput {
   readonly provider: AiCreditProvider;
+  readonly quotaRefusedAt: Date | null;
   readonly entries: readonly AiCreditEntry[];
   readonly spentSinceUsd: number;
   /** This provider's average a day in USD, null without a pace. */
@@ -140,6 +149,24 @@ export function creditsOf(input: CreditsInput): AiCredits | null {
   if (from === null || latest === undefined) return null;
   const { currency } = latest;
   const { usdPerEur } = input;
+  const quotaRefusedAt = input.quotaRefusedAt?.toISOString() ?? null;
+  const entries = [...input.entries].sort(byTime).reverse().slice(0, CREDIT_ENTRIES_SHOWN);
+  const toMinor = (usd: number): number => Math.round(convert(usd * 100, 'USD', currency, usdPerEur));
+  if (from.kind === 'subscription')
+    return {
+      provider: input.provider,
+      mode: 'subscription',
+      currency,
+      balanceMinor: 0,
+      countedFrom: from.at,
+      spentSinceMinor: toMinor(input.spentSinceUsd),
+      perDayMinor: input.perDayUsd === null ? null : toMinor(input.perDayUsd),
+      daysLeft: null,
+      runsOutOn: null,
+      state: quotaRefusedAt === null ? 'included' : 'quota_reached',
+      quotaRefusedAt,
+      entries,
+    };
   const fromAt = Date.parse(from.at);
   // A balance reading counts at its instant; the top-ups after it add up. Counted from a first top-up, it is one.
   const added = input.entries
@@ -157,6 +184,7 @@ export function creditsOf(input: CreditsInput): AiCredits | null {
   const daysLeft = perDayMinor === null || perDayMinor === 0 ? null : Math.max(0, balanceMinor) / perDayMinor;
   return {
     provider: input.provider,
+    mode: 'credits',
     currency,
     balanceMinor,
     countedFrom: new Date(fromAt).toISOString(),
@@ -166,7 +194,8 @@ export function creditsOf(input: CreditsInput): AiCredits | null {
     runsOutOn: daysLeft === null ? null : addDays(input.today, Math.floor(daysLeft)),
     // Nothing spent over the pace's days: the balance does not go down, nothing to recharge.
     state: perDayMinor === 0 && balanceMinor > 0 ? 'ok' : creditState(balanceMinor, daysLeft),
-    entries: [...input.entries].sort(byTime).reverse().slice(0, CREDIT_ENTRIES_SHOWN),
+    quotaRefusedAt,
+    entries,
   };
 }
 
@@ -241,6 +270,7 @@ export function aiUsage(input: UsageInput): AiUsage {
   const credits = AiCreditProviderSchema.options.flatMap((provider) => {
     const card = creditsOf({
       provider,
+      quotaRefusedAt: input.quotaRefusedAt[provider] ?? null,
       entries: input.entries.filter((e) => e.provider === provider),
       spentSinceUsd: input.spentSinceUsd[provider] ?? 0,
       perDayUsd:
