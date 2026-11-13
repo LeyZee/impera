@@ -11,6 +11,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
+import { DesireTag } from './Desire';
 import { MEDIA_KINDS } from './SetupPanel';
 import { bubblesOf } from './logic';
 import {
@@ -199,6 +200,7 @@ function TurnView({
           {line}
         </div>
       ))}
+      {turn.desire === undefined ? null : <DesireTag desire={turn.desire} />}
     </div>
   );
 }

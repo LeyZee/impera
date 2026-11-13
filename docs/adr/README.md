@@ -119,6 +119,8 @@ Date : AAAA-MM-JJ
 | 0099 | Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser | accepted (précise 0030, 0018, 0083 et P6-01) |
 | 0100 | Une IA écrit les scripts à partir des médias du coffre, le code tient la vente | accepted (précise 0099, 0083, 0009, 0010, 0021) |
 | 0101 | Une vente donnée, entière ou partagée, au chatteur qui a été décisif | accepted (amende 0050 § 5 ; précise 0025, 0043 § 7 et 0092 § 1) |
+| 0102 | Les réponses corrigées au playground deviennent la banque d'exemples de la créatrice, lue aussi par la prod | accepted (précise 0019 et 0022 ; dépend de 0103) |
+| 0103 | Le playground en base : conversations, notes, cas rejouables, taux par version, calibrage du désir | accepted (précise 0019 et 0022) |
 | 0104 | Le chatteur voit ses propres chiffres, et un jeu fait de faits réels l'accompagne | accepted (précise 0043 § 7, 0050 § 10 et 0092 § 1) |
 | 0105 | Le MCP d'Impera remis à jour : un agent connecté lit, freine et prépare, un humain confirme | accepted (amende 0026 § 2 à § 5, § 7 et § 9) |
 | 0106 | Le Dashboard de l'agence sépare chiffre d'affaires, net, part de la créatrice et part de l'agence, et estime la TVA des virements | accepted (précise 0078 et 0054 § 2) |

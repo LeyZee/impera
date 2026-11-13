@@ -191,6 +191,14 @@ function measuredSignals(measured: DesireMeasure): CountedSignal[] {
 const isCounted = (signal: string): signal is CountedSignal => Object.hasOwn(WEIGHTS, signal);
 
 /**
+ * What one signal is worth in the current counting, for a screen that shows why the score moved; `null` for the
+ * signals that reset or freeze it instead of counting.
+ */
+export function desireSignalPoints(signal: DesireSignal): number | null {
+  return isCounted(signal) ? WEIGHTS[signal] : null;
+}
+
+/**
  * His score after his new message: the stored one decayed to now, plus what this message moves, within 0 and 100.
  * A possible minor or a disputed age resets it to 0; a risk that stops any sale freezes it as it stands.
  */
