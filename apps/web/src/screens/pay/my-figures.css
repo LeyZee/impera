@@ -19,6 +19,7 @@
   align-items: center;
   gap: 6px;
 }
+.mf-tier__title--medal,
 .py-left__title--medal {
   display: flex;
   align-items: center;
@@ -435,6 +436,9 @@
     align-items: center;
     text-align: center;
     gap: 6px;
+  }
+  .mf-tier__title--medal {
+    justify-content: center;
   }
   .mf-ring {
     width: 68px;
