@@ -1,0 +1,423 @@
+/*
+ * « Mes trophées » (ADR 0108, maquette vitrine-trophees-planche-2 validée le 13/11/2026). How far along is blue
+ * (--nv-series-2, as on Commissions); gold and metal belong to what was earned. Page and shelf titles in Geist, the
+ * serif kept for the name on stage. Everything stands still under « réduire les animations ».
+ */
+.tc {
+  --tc-progress: var(--nv-series-2);
+  --tc-gold: var(--nv-data-2);
+  --tc-spot: rgba(255, 214, 150, 0.24);
+  display: grid;
+  gap: var(--nv-space-10);
+}
+[data-theme='light'] .tc {
+  --tc-spot: rgba(255, 190, 120, 0.22);
+}
+
+/* The next trophy */
+.tc-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 236px 1fr;
+  gap: var(--nv-space-8);
+  align-items: center;
+  padding: 30px 40px;
+  border-radius: 28px;
+  overflow: hidden;
+  background: var(--nv-plate);
+  box-shadow:
+    inset 0 0 0 1px var(--nv-plate-edge),
+    var(--nv-shadow-glass);
+}
+.tc-hero::before {
+  content: '';
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: 70%;
+  height: 180%;
+  background: radial-gradient(closest-side, var(--nv-aura-wine), transparent);
+  pointer-events: none;
+}
+.tc-hero__object {
+  position: relative;
+  width: 236px;
+  height: 236px;
+  display: grid;
+  place-items: center;
+  color: var(--nv-ink-faint);
+}
+.tc-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.tc-ring__track {
+  fill: none;
+  stroke: var(--nv-fill-track);
+}
+.tc-ring__arc {
+  fill: none;
+  stroke: var(--tc-progress);
+  stroke-linecap: round;
+  stroke-dasharray: var(--tc-c);
+  stroke-dashoffset: var(--tc-off);
+}
+.tc-hero__text {
+  position: relative;
+}
+.tc-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tc-gold);
+}
+.tc-hero__name {
+  margin: 6px 0 10px;
+  font:
+    400 46px/1.05 'Instrument Serif',
+    serif;
+}
+.tc-hero__pct {
+  display: block;
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.tc-hero__pct small {
+  margin-left: 2px;
+  font-size: 0.45em;
+  font-weight: 500;
+  color: var(--nv-ink-muted);
+}
+.tc-hero__left {
+  margin: 8px 0 0;
+  font-weight: 600;
+}
+.tc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tc-chips li {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  color: var(--nv-ink-muted);
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+.tc-chips b {
+  color: var(--nv-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.tc-level {
+  margin: 12px 0 0;
+  color: var(--nv-ink-faint);
+  font-size: 13px;
+}
+
+/* The shelves */
+.tc-shelf__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  margin: 0 4px 14px;
+}
+.tc-shelf__head h3 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.tc-shelf__count {
+  color: var(--nv-ink-faint);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.tc-all {
+  all: unset;
+  cursor: pointer;
+  margin-left: 6px;
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.tc-all::before {
+  content: '· ';
+  color: var(--nv-ink-faint);
+}
+.tc-case {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 30px 8px;
+  padding: 28px 20px 12px;
+  border-radius: 26px;
+  background: linear-gradient(180deg, var(--nv-plate), transparent 70%);
+  box-shadow:
+    inset 0 0 0 1px var(--nv-plate-edge),
+    inset 0 1px 0 var(--nv-hairline);
+}
+.tc-slot {
+  width: 172px;
+}
+.tc-cell {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px 10px;
+  border-radius: 18px;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.tc-cell:focus-visible {
+  box-shadow: var(--nv-shadow-focus);
+}
+.tc-stand {
+  position: relative;
+  width: var(--tc-s);
+  height: calc(var(--tc-s) * 1.18);
+  perspective: 600px;
+  color: var(--nv-ink-faint);
+}
+[data-theme='light'] .tc-stand {
+  color: var(--nv-ink-muted);
+}
+.tc-tilt {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--tc-s);
+  transform-style: preserve-3d;
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-out),
+    filter var(--nv-dur-slow) var(--nv-ease-out);
+}
+.tc-tilt > svg,
+.tc-mirror > svg {
+  width: 100%;
+  height: 100%;
+}
+.tc-mirror {
+  position: absolute;
+  inset: var(--tc-s) 0 auto;
+  height: var(--tc-s);
+  margin-top: 2px;
+  transform: scaleY(-1);
+  transform-origin: top;
+  opacity: 0.28;
+  pointer-events: none;
+  mask: linear-gradient(to top, #000 0, transparent 26%);
+}
+.tc-spot {
+  position: absolute;
+  left: 50%;
+  top: -24%;
+  width: 150%;
+  height: 150%;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side at 50% 40%, var(--tc-spot), transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--nv-dur-slow);
+}
+.tc-cell[data-earned='true'] .tc-spot {
+  opacity: 1;
+}
+.tc-cell__name {
+  margin-top: -6px;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+.tc-cell__sub {
+  color: var(--nv-ink-faint);
+  font-size: 13px;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+.tc-narrow {
+  display: none;
+}
+.tc-bar {
+  width: min(100%, 104px);
+  height: 4px;
+  margin: 3px 0 2px;
+  border-radius: 4px;
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+.tc-bar i {
+  display: block;
+  width: var(--tc-p);
+  height: 100%;
+  border-radius: 4px;
+  background: var(--tc-progress);
+  transform-origin: left;
+}
+.tc-new {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff0bd, #e8c37a);
+  color: #2a1a04;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 14px rgba(232, 195, 122, 0.35);
+}
+@media (hover: hover) {
+  .tc-cell:hover .tc-tilt {
+    transform: translateY(-8px) rotateX(var(--tc-rx, 0deg)) rotateY(var(--tc-ry, 0deg)) scale(1.06);
+    filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45)) brightness(1.08);
+  }
+  .tc-cell:hover .tc-spot {
+    opacity: 1;
+  }
+}
+
+/* The detail */
+.tc-detail__object {
+  display: grid;
+  place-items: center;
+  margin: 0 auto 6px;
+  color: var(--nv-ink-faint);
+}
+.tc-detail__meta {
+  margin: 0;
+  text-align: center;
+  color: var(--nv-ink-muted);
+}
+.tc-detail__how {
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  color: var(--nv-ink-muted);
+  font-size: 14px;
+}
+.tc-detail__how b {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.tc-detail__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+/* The entrance: once, on arriving (ADR 0108 § 10) */
+.tc:not([data-still='true']) :is(.tc-hero, .tc-shelf__head, .tc-cell) {
+  animation: tc-rise 0.7s var(--nv-ease-out) both;
+  animation-delay: calc(var(--tc-i, 0) * 45ms);
+}
+.tc:not([data-still='true']) .tc-ring__arc {
+  animation: tc-fill var(--nv-dur-data) var(--nv-ease-out) 0.25s both;
+}
+.tc:not([data-still='true']) .tc-bar i {
+  animation: tc-grow var(--nv-dur-data) var(--nv-ease-out) both;
+  animation-delay: calc(var(--tc-i, 0) * 45ms + 200ms);
+}
+.tc-cell[data-fresh='true'] .tc-tilt {
+  animation: tc-breathe 2.4s ease-in-out infinite;
+}
+@keyframes tc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+}
+@keyframes tc-fill {
+  from {
+    stroke-dashoffset: var(--tc-c);
+  }
+}
+@keyframes tc-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes tc-breathe {
+  50% {
+    filter: drop-shadow(0 0 12px var(--nv-aura-neon));
+  }
+}
+
+/* A phone: the earned objects and the next one, three to a row, the rest behind « Voir tout » */
+@media (max-width: 640px) {
+  .tc {
+    gap: var(--nv-space-8);
+  }
+  .tc-hero {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 14px;
+    padding: 22px 20px;
+    text-align: center;
+  }
+  .tc-hero__object {
+    width: 190px;
+    height: 190px;
+  }
+  .tc-hero__name {
+    font-size: 34px;
+  }
+  .tc-hero__pct {
+    font-size: 36px;
+  }
+  .tc-chips {
+    justify-content: center;
+    gap: 8px;
+  }
+  .tc-shelf__head h3 {
+    font-size: 19px;
+  }
+  .tc-case {
+    justify-content: flex-start;
+    gap: 22px 0;
+    padding: 20px 8px 10px;
+  }
+  .tc-slot {
+    width: 33.33%;
+  }
+  .tc-case:not([data-all='true']) .tc-slot[data-extra='true'] {
+    display: none;
+  }
+  .tc-stand {
+    --tc-s: 76px !important;
+  }
+  .tc-cell__name {
+    margin-top: -4px;
+    font-size: 13px;
+  }
+  .tc-wide {
+    display: none;
+  }
+  .tc-narrow {
+    display: inline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tc *,
+  .tc *::before,
+  .tc *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
