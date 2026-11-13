@@ -32,6 +32,8 @@ import {
   type HeatCell,
 } from '@/payroll/my-figures';
 import { amountText, periodLine } from '@/reports/model';
+import { Medal } from '@/rewards/Medal';
+import { tierMedals } from '@/rewards/metals';
 import { dayNumber, longDay } from '@/scheduling/time';
 import { Chevron, CountUp, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
 import { Panel } from '@/shell/layout';
@@ -152,6 +154,9 @@ function TierRing({
   const radius = 34;
   const length = 2 * Math.PI * radius;
   const share = next === null ? 1 : tierShare(netMinor, reached?.thresholdMinor ?? 0, next.thresholdMinor);
+  // The coin of the tier in sight before its name, hollow until it is reached; the full medal in its laurel once
+  // the highest is. The ring keeps its blue.
+  const medal = tierMedals(tiers).of((next ?? reached)?.thresholdMinor ?? 0);
   const label =
     next === null
       ? `Palier ${reached?.label ?? ''} atteint, le plus haut`
@@ -191,6 +196,7 @@ function TierRing({
           {String(Math.floor(share * 100))}&nbsp;%
         </text>
       </svg>
+      {medal === null || next !== null ? null : <Medal medal={medal} size={40} />}
       <div className="mf-tier__words">
         {next === null ? (
           <>
@@ -199,7 +205,10 @@ function TierRing({
           </>
         ) : (
           <>
-            <p className="mf-tier__title">Palier {next.label}</p>
+            <p className="mf-tier__title mf-tier__title--medal">
+              {medal === null ? null : <Medal medal={medal} earned={false} size={28} />}
+              Palier {next.label}
+            </p>
             <p className="mf-tier__sub">
               encore <b className="nv-num">{amountText(next.thresholdMinor - netMinor, 'EUR')}</b> de net
             </p>

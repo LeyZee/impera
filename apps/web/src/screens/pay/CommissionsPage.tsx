@@ -55,6 +55,8 @@ import {
   periodTitle,
   signedAmountText,
 } from '@/reports/model';
+import { Medal } from '@/rewards/Medal';
+import { tierMedals } from '@/rewards/metals';
 import { platformName } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import { longDay } from '@/scheduling/time';
@@ -453,6 +455,22 @@ function Performance({
   );
 }
 
+/** A tier's medal beside its name: gold, silver or bronze by its name, else from the top (ADR 0104, note). */
+function TierMedalMark({
+  tiers,
+  tier,
+  earned,
+  size,
+}: {
+  tiers: readonly BonusTier[];
+  tier: BonusTier;
+  earned: boolean;
+  size: number;
+}): JSX.Element | null {
+  const medal = tierMedals(tiers).of(tier.thresholdMinor);
+  return medal === null ? null : <Medal medal={medal} earned={earned} size={size} />;
+}
+
 function TierLeft({
   net,
   tiers,
@@ -469,8 +487,11 @@ function TierLeft({
   const { reached, next } = tierProgress(net, tiers);
   if (next === null && reached !== null)
     return (
-      <div className="py-left">
-        <p className="py-left__title">Palier {reached.label} atteint</p>
+      <div className="py-left py-left--tier">
+        <p className="py-left__title py-left__title--medal">
+          <TierMedalMark tiers={tiers} tier={reached} earned size={40} />
+          Palier {reached.label} atteint
+        </p>
         <Gauge value={100} mark={null} />
         <p className="py-left__text">
           Le plus haut : <b className="nv-num">{signedAmountText(reached.bonusMinor, 'EUR')}</b> sur ce
@@ -490,10 +511,12 @@ function TierLeft({
       </p>
       <Gauge value={gaugePercent(net - from, next.thresholdMinor - from)} mark={null} />
       <div className="py-gaugelabels nv-num">
-        <span>
+        <span className="py-gaugelabels__tier">
+          {reached === null ? null : <TierMedalMark tiers={tiers} tier={reached} earned size={24} />}
           {reached === null ? roundAmountText(0, 'EUR') : `${reached.label} ${roundAmountText(from, 'EUR')}`}
         </span>
-        <span>
+        <span className="py-gaugelabels__tier">
+          <TierMedalMark tiers={tiers} tier={next} earned={false} size={24} />
           {next.label} {roundAmountText(next.thresholdMinor, 'EUR')}
         </span>
       </div>
