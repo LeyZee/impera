@@ -26,10 +26,17 @@ Le chatteur lit ses propres chiffres dans le style du Dashboard de l'agence (gai
 - [x] Route au harnais d'isolation ; test « un chatteur ne lit pas les chiffres d'un autre ».
 - [x] **Aujourd'hui** : carte compacte « Ma quinzaine » sous le shift (§ 2, § 3).
 - [x] **Commissions › Ma performance** : barres par jour, anneau du prochain palier (§ 4), « Quand je vends » (§ 5), « Mes records » (§ 8). Écart négatif en encre neutre (§ 10).
-- [ ] Captures Nuit/Jour, PC/téléphone validées par Charles (lot `chiffres-chatteur-lot1`, montré le 13/11).
+- [x] Captures Nuit/Jour, PC/téléphone validées par Charles (lots `chiffres-chatteur-lot1-2` et `lot1-3`). Fusionné le 13/11 (#720).
+
+### Médailles : la pièce à côté du palier (sans migration, PR à part)
+
+- [x] `apps/web/src/rewards/` : `metals.ts` (métal d'un palier par son nom, sinon depuis le plus haut), `Medal.tsx`, `rewards.css` (Nuit et Jour).
+- [x] Pièce du palier visé devant son nom sur « Ma quinzaine » ; pièces aux deux bouts de la jauge et médaille au laurier quand le plus haut palier est atteint, sur Commissions.
+- [x] Captures validées par Charles (planche `medailles-planche-7`, écrans `medailles-ecran-lot1-2`).
 
 ### Lot 2 : le jeu (migration 0178 réservée)
 
+- [ ] Écussons de trophées, dévoilement d'un gain avec son (joué à l'arrivée sur Aujourd'hui ou Commissions, jamais sur une conversation), préférence « Sons » du compte.
 - [ ] Table des trophées gagnés, des défis de shift et des seuils de niveaux (FORCE RLS) ; job rejouable à la clôture d'un shift.
 - [ ] Palier vivant (§ 12), série (§ 13), défi du shift (§ 14), trophées (§ 15), niveaux (§ 16) ; lecture sur la fiche du membre pour le propriétaire et le manager (§ 20).
 - [ ] Tests : rien du jeu n'entre dans un relevé (§ 17) ; aucune notification hors shift (§ 18) ; mouvement réduit (§ 19).

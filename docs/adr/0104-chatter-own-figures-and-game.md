@@ -56,3 +56,7 @@ Un chatteur payé à la commission regarde trois choses : ce qu'il a gagné, ce 
 - Un classement, même anonyme : contraire à 0043 § 7, et transparent à trois personnes.
 - Des points d'expérience par action (message, connexion) : pousse au spam et ne vaut rien à ses yeux.
 - Coffres et récompenses au hasard : mécanique de dépendance, sans rapport avec son travail.
+
+## Notes
+
+- 13/11/2026, médailles (« go médailles » de Charles) : chaque palier individuel porte une médaille à côté de son nom (bronze, argent, or d'après son nom, sinon lue depuis le plus haut ; une étoile à partir du quatrième), et chaque trophée un écusson. C'est de l'affichage seul : ni seuil, ni prime, ni relevé n'en dépend (§ 17), la barre et l'anneau du palier gardent leur bleu.

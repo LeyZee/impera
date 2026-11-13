@@ -316,6 +316,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Record | `record` | Le meilleur jour et la meilleure quinzaine d'un chatteur, en net, avec leur date. Les siens seulement (ADR 0104 § 8). |
 | Série | `streak` | Le nombre de shifts qu'un chatteur a tenus d'affilée avec leur rapport rendu à l'heure, compté sur ses shifts prévus : un repos ne la casse pas, un rapport en retard la remet à zéro (ADR 0104 § 13). |
 | Défi du shift | `shift_challenge` | Un objectif par shift, calculé par le code depuis l'historique du chatteur lui-même, sans aucun effet sur la paie (ADR 0104 § 14). |
+| Médaille | `medal` | La pièce de métal (bronze, argent, or) dessinée à côté du nom d'un palier individuel : pleine quand le palier est atteint, en silhouette tant qu'il est visé. Le métal vient du nom du palier, sinon de sa place depuis le plus haut. Affichage seul : ni seuil ni prime n'en dépend (ADR 0104 § 17). |
 | Trophée | `trophy` | Une distinction d'une liste fermée, écrite dans le code et liée à un fait vérifiable ; un trophée gagné ne se perd pas (ADR 0104 § 15). |
 | Niveau | `level` | Le rang honorifique d'un chatteur, qui monte avec son net cumulé et ne redescend jamais ; il ne change ni taux, ni palier, ni droit (ADR 0104 § 16). |
 | Malus | `penalty` | Retenue fixe ou en pourcentage avec motif, plafonnée à la part du membre plus ses primes. Sur la facture, une ligne négative par malus (réfaction prévue au contrat) ; quand le plafond joue, une ligne « Plafond des réfactions » rend la différence (EQ-06). |
