@@ -5,7 +5,7 @@
  */
 
 /** The fewest comparable shifts a challenge is drawn from. */
-export const CHALLENGE_MIN_SHIFTS = 4;
+const CHALLENGE_MIN_SHIFTS = 4;
 
 /** The net to beat, in minor units, or `null` when the history is too thin or sold nothing. */
 export function challengeTarget(comparableNetsMinor: readonly number[]): number | null {

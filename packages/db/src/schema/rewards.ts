@@ -1,5 +1,5 @@
 import { sql, type SQL } from 'drizzle-orm';
-import { boolean, check, index, pgPolicy, pgTable, text, unique } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, pgPolicy, pgTable, text, unique } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
 import { id, timestampTz, updatedAt } from './columns';
@@ -88,6 +88,31 @@ export const rewardGains = pgTable(
       for: 'update',
       using: sql`${t.userId} = ${currentUser}`,
       withCheck: sql`${t.userId} = ${currentUser}`,
+    }),
+  ],
+);
+
+/**
+ * A chatter's streak as the job last counted it (§ 13): the shifts held in a row with their report on time, and the
+ * best they ever reached. One row an account, written by the job alone; the account reads its own, the owner and the
+ * managers the team's (§ 20).
+ */
+export const rewardStreaks = pgTable(
+  'reward_streaks',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => user.id),
+    current: integer('current').notNull(),
+    best: integer('best').notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check('reward_streaks_count_check', sql`${t.current} >= 0 and ${t.best} >= ${t.current}`),
+    pgPolicy('own_read', { for: 'select', using: sql`${t.userId} = ${currentUser}` }),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${notCreatorAccount} and ${currentScope} in ('owner', 'agency')`,
     }),
   ],
 );

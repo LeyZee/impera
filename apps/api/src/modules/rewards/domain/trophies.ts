@@ -23,7 +23,7 @@ export const STREAK_TROPHIES: Readonly<Record<'streak_5' | 'streak_10' | 'streak
 };
 
 /** How many paid media bought in one shift the trophy asks. */
-export const PPV_SHIFT_TARGET = 10;
+const PPV_SHIFT_TARGET = 10;
 
 export interface TrophyFacts {
   /** Sales read on the member's statements, ever. */

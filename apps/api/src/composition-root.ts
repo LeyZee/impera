@@ -80,6 +80,7 @@ import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
 import { wirePlayground } from './wiring/playground';
 import { wireProviders } from './wiring/providers';
+import { wireRewards } from './wiring/rewards';
 import { wireScheduling } from './wiring/scheduling';
 import { wireScripts } from './wiring/scripts';
 import type { JobWithTask, Shared } from './wiring/shared';
@@ -422,6 +423,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
   });
   const backups = wireBackups(shared);
+  const rewards = wireRewards(shared, { scheduling: scheduling.module });
   const aiUsage = wireAiUsage(shared, llm);
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
@@ -474,6 +476,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...telegram.tasks,
     ...fans.tasks,
     ...backups.tasks,
+    ...rewards.tasks,
     ...aiUsage.tasks,
     ...scheduling.tasks,
     ...team.tasks,
@@ -559,6 +562,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...invoicing.routes,
       ...accounting.routes,
       ...backups.routes,
+      ...rewards.routes,
       ...aiUsage.routes,
       ...providers.routes,
       ...connectors.routes,

@@ -63,3 +63,9 @@ export const owedReveals = (trophyCase: TrophyCase): TrophyCaseItem[] =>
   trophyCase.items
     .filter((item) => item.earnedAt !== null && item.revealedAt === null)
     .toSorted((a, b) => (a.earnedAt ?? '').localeCompare(b.earnedAt ?? ''));
+
+/** `POST /v1/rewards/my-trophy-case/reveals`: the objects whose reveal the account has just seen, by `kind`. */
+export const MarkRevealedBodySchema = z.strictObject({
+  kinds: z.array(TrophyCaseItemSchema.shape.kind).min(1).max(32),
+});
+export type MarkRevealedBody = z.infer<typeof MarkRevealedBodySchema>;
