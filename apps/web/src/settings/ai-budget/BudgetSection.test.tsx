@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BudgetSection } from './BudgetSection';
+import { todayOf } from './view';
 
 const BUDGET: AiBudget = {
   dailyCapMinor: 2000,
@@ -85,7 +86,7 @@ describe('BudgetSection', () => {
     const daily = screen.getByLabelText('Plafond du jour');
     fireEvent.change(daily, { target: { value: '5' } });
     expect(flat(screen.getByRole('status').textContent)).toBe(
-      '7,40 € sont déjà dépensés aujourd’hui : l’agent s’arrêtera dès l’enregistrement, jusqu’à minuit.',
+      '7,40 € sont déjà dépensés aujourd’hui : dès l’enregistrement, l’agent s’arrête et les chatteurs prennent le relais jusqu’à minuit.',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(await screen.findByText(/^Plafond du jour atteint/u)).toBeTruthy();
@@ -118,5 +119,12 @@ describe('BudgetSection', () => {
     fireEvent.change(screen.getByLabelText('Plafond du jour'), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(await screen.findByText(/confirme ton mot de passe et ton code/u)).toBeTruthy();
+  });
+});
+
+describe('todayOf', () => {
+  it('says the alert is passed, against the budget in force', () => {
+    const alert: AiBudget = { ...BUDGET, dailyCapMinor: 900, alertAtMinor: 720, state: 'alert' };
+    expect(flat(todayOf(alert))).toBe('Alerte passée : 7,40 € dépensés aujourd’hui sur 9 €.');
   });
 });

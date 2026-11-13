@@ -36,7 +36,10 @@ export function BudgetSection(): JSX.Element | null {
       <div className="aib-card__head">
         <div className="aib-card__text">
           <p className="sv-lead">Budget IA</p>
-          <p className="sv-muted">Pour toutes les créatrices. Au-delà, l’agent s’arrête jusqu’à minuit.</p>
+          <p className="sv-muted">
+            Pour toutes les créatrices. Au plafond, l’agent s’arrête et les chatteurs prennent le relais
+            jusqu’à minuit.
+          </p>
         </div>
         <button
           type="button"
@@ -175,7 +178,7 @@ function BudgetDialog({ budget, onClose }: { budget: AiBudget; onClose: () => vo
   return (
     <Dialog
       title="Budget IA"
-      lead="Ce que l’IA peut dépenser par jour, de minuit à minuit, pour toutes les créatrices. Au-delà, les conversations passent aux chatteurs."
+      lead="Ce que l’IA peut dépenser par jour, de minuit à minuit, pour toutes les créatrices. Au plafond, l’agent s’arrête et les chatteurs prennent le relais jusqu’à minuit."
       busy={busy}
       onClose={onClose}
     >
@@ -218,7 +221,7 @@ function BudgetDialog({ budget, onClose }: { budget: AiBudget; onClose: () => vo
             label="Plafond de veille"
             value={trendWatch}
             invalid={touched && trendWatchMinor === null}
-            hint={`${boundsText('trendWatch')}, compté dans le plafond du jour. Par défaut ${eurOf(budget.defaults.trendWatchCapMinor)}.`}
+            hint={`${boundsText('trendWatch')}, compté dans le plafond du jour. Au-delà, seule la veille s’arrête ; les réponses aux fans continuent. Par défaut ${eurOf(budget.defaults.trendWatchCapMinor)}.`}
             onChange={(next) => {
               setTrendWatch(next);
               setFailure(null);

@@ -57,7 +57,7 @@ export function consequenceOf(
   if (daily !== null && budget.spentTodayMinor >= daily) {
     return {
       tone: 'warn',
-      text: `${eurOf(budget.spentTodayMinor)} sont déjà dépensés aujourd’hui : l’agent s’arrêtera dès l’enregistrement, jusqu’à minuit.`,
+      text: `${eurOf(budget.spentTodayMinor)} sont déjà dépensés aujourd’hui : dès l’enregistrement, l’agent s’arrête et les chatteurs prennent le relais jusqu’à minuit.`,
     };
   }
   return null;
@@ -66,7 +66,10 @@ export function consequenceOf(
 /** The card's second line: the day's spend against the budget, or that it is reached. */
 export function todayOf(budget: AiBudget): string {
   if (budget.state === 'reached') {
-    return `Plafond du jour atteint (${eurOf(budget.spentTodayMinor)}) : l’agent ne propose plus rien jusqu’à minuit.`;
+    return `Plafond du jour atteint (${eurOf(budget.spentTodayMinor)}) : l’agent s’arrête et les chatteurs prennent le relais jusqu’à minuit.`;
+  }
+  if (budget.state === 'alert') {
+    return `Alerte passée : ${eurOf(budget.spentTodayMinor)} dépensés aujourd’hui sur ${eurOf(budget.dailyCapMinor)}.`;
   }
   return `Aujourd’hui : ${eurOf(budget.spentTodayMinor)} dépensés, alerte à ${eurOf(budget.alertAtMinor)}.`;
 }
