@@ -37,6 +37,7 @@ import {
   settlementText,
   type InvoiceChip,
 } from '@/invoices/model';
+import { useGrowingArea } from '@/lib/growing-area';
 import { dayMonthText } from '@/payroll/model';
 import { amountText, parseAmount } from '@/reports/model';
 import { Dialog } from '@/shell/Dialog';
@@ -231,14 +232,16 @@ function ReasonField({
   invalid: boolean;
   onChange: (value: string) => void;
 }): JSX.Element {
+  const area = useGrowingArea(value);
   return (
     <div className="nv-field tm-field" data-invalid={invalid ? 'true' : undefined}>
       <label className="nv-field__label" htmlFor={id}>
         {label}
       </label>
       <textarea
+        ref={area}
         id={id}
-        className="nv-field__control nv-glass sc-note"
+        className="nv-field__control nv-glass sc-note grow-area"
         rows={3}
         maxLength={INVOICE_REASON_MAX}
         value={value}

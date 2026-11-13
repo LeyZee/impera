@@ -1,7 +1,26 @@
-import { CurrencySchema, LlmPurposeSchema, LlmRoleSchema } from '@impera/contracts';
-import { bigint, boolean, char, index, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import {
+  AI_CREDIT_MAX_MINOR,
+  AiCreditCurrencySchema,
+  AiCreditEntryKindSchema,
+  AiCreditProviderSchema,
+  CurrencySchema,
+  LlmPurposeSchema,
+  LlmRoleSchema,
+} from '@impera/contracts';
+import { sql } from 'drizzle-orm';
+import { bigint, boolean, char, check, index, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
-import { closedToCreator, createdAt, enumCheck, enumText, id, tenantPolicy } from './columns';
+import { user } from './auth';
+import {
+  agencyOnly,
+  closedToCreator,
+  createdAt,
+  enumCheck,
+  enumText,
+  id,
+  tenantPolicy,
+  timestampTz,
+} from './columns';
 import { conversations } from './conversations';
 import { creators } from './tenancy';
 
@@ -56,5 +75,35 @@ export const llmCalls = pgTable(
     index('llm_calls_creator_created_idx').on(t.creatorId, t.createdAt),
     tenantPolicy(t.creatorId),
     closedToCreator(),
+  ],
+);
+
+/**
+ * The AI credits ledger (ADR 0091 § 3): each top-up the owner writes down, or the balance he reads in a provider's
+ * console. The agency's, out of tenancy: RLS forced, one permissive policy for every path but a creator's account.
+ * A line is added or taken back whole (a typo), never edited.
+ */
+export const aiCreditEntries = pgTable(
+  'ai_credit_entries',
+  {
+    id: id(),
+    provider: enumText('provider').notNull(),
+    kind: enumText('kind').notNull(),
+    amountMinor: integer('amount_minor').notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    at: timestampTz('at').notNull(),
+    createdBy: text('created_by').references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    enumCheck('ai_credit_entries', t.provider, AiCreditProviderSchema.options),
+    enumCheck('ai_credit_entries', t.kind, AiCreditEntryKindSchema.options),
+    enumCheck('ai_credit_entries', t.currency, AiCreditCurrencySchema.options),
+    check(
+      'ai_credit_entries_amount_check',
+      sql`${t.amountMinor} between 0 and ${sql.raw(String(AI_CREDIT_MAX_MINOR))} and (${t.kind} = 'balance' or ${t.amountMinor} > 0)`,
+    ),
+    index('ai_credit_entries_provider_at_idx').on(t.provider, t.at),
+    agencyOnly(),
   ],
 );
