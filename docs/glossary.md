@@ -210,7 +210,10 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Session (plateforme) | `platform_session` | Les jetons/cookies capturés qui permettent au connecteur d'agir. |
 | Composeur | `DraftComposer` | Le port par lequel `conversation.respond` demande un brouillon au moteur ; il rend des bulles ou une retenue (`held`) avec sa raison. |
 | Coupe-circuit | `breaker` | Pause d'un compte plateforme après N relèves ratées d'affilée (`connector_config`), avec un événement `error`. |
-| Garde d'écriture | `writes` | Réglage d'un compte plateforme (`connector_config.writes`, fermé par défaut) : fermé, aucun envoi ne part, seule la lecture continue. |
+| Garde d'écriture | `writes` | Réglage d'un compte plateforme (`connector_config.writes`, fermé par défaut) : fermé, aucune écriture ne part (envoi, étape de script, vocal, note client, lu, frappe), seule la lecture continue. |
+| Envoi du connecteur | `connector_sends` | Une tentative d'envoi du connecteur, gardée avant l'appel à la plateforme sous sa clé d'idempotence (compte, conversation, empreinte, début de tentative), puis l'id du message de la plateforme une fois connu (`pending`, puis `sent`). Un nouvel essai d'une tentative encore `pending` relit le fil (`verifySent`) avant tout renvoi (P2-03, spécification du connecteur § 5). Jamais le texte. |
+| Empreinte d'envoi | `connector_sends.fingerprint` | SHA-256 du texte, de l'étape de script (`scriptId`) et des médias d'un envoi : ce qui reconnaît le message dans le fil quand la réponse de la plateforme s'est perdue. Le texte d'une étape n'y entre pas (l'étape le nomme, et Reveal peut remplir son `%NAME%`). |
+| Bloc de l'agence | `withAgencyBlock` | Les lignes du canevas (Prénom… Situation) dans la note client : les seules que l'agent écrit ; toutes les autres lignes restent mot pour mot (P2-03). |
 | Interrupteur d'arrêt | `kill_switch` | Arrêt global, par créatrice ou par conversation. |
 | Chatteur | `operator` | Humain qui chatte ou supervise (vocabulaire Imperium : chatteur). |
 | Opérateur | rail `operator` (`railKindOf`) | Compte de l'agence sans fiche d'équipe (ni manager ni chatteur) : rail Dashboard, Suivi, Créatrices. Le menu du compte du CRM et le popup de l'extension l'écrivent ainsi. |

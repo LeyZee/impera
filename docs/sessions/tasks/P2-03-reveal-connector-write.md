@@ -1,6 +1,6 @@
 # P2-03 `RevealApiConnector` : envois et note client
 
-Statut : todo
+Statut : done
 Phase : 2
 Dépend de : P2-02
 Branche : task/p2-03-reveal-connector-write
@@ -27,3 +27,4 @@ Le connecteur envoie un texte, une étape de script et un vocal, et écrit la no
 Envoi au vrai Reveal (réservé au fan « test », sur demande de Charles, dans P2-05).
 
 ## Notes de session
+- 12/11 : fait sur la tête de P2-02 (#715, pas encore fusionnée), migration 0177 (numéro donné par le coordinateur). Tous les critères d'acceptation sont couverts contre FakeReveal (`connector-writes.test.ts`, `outbound-sender.test.ts`, `reveal-connector-write.integration.test.ts`). Écarts consignés dans la spécification § 5 et le journal : le vocal est un audio du coffre (le port ne porte pas de fichier, l'import reste à faire) ; l'empreinte d'une étape ignore son texte (`%NAME%`) ; `setFanNote` est idempotent sans ligne de `connector_sends` ; `setTyping(false)` n'appelle rien. Reste : aucun appelant de `ConnectorsModule.writes` (le moteur et la boucle de frappe l'appelleront) ; envoi réel dans P2-05.
