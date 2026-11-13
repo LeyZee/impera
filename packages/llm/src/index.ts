@@ -99,4 +99,5 @@ export {
   type JudgeOutput,
   type VoiceOutput,
 } from './schemas';
+export { INLINE_VIDEO_MAX_BYTES } from './sense-content';
 export { wrapUntrusted, type UntrustedKind } from './untrusted';
