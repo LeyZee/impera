@@ -11,6 +11,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { fanKycKey } from '../api';
+
 import { FanCard } from './FanCard';
 
 /* An invented fan and creator (ADR 0010). */
@@ -81,8 +83,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderCard(): void {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderCard(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })): void {
   render(
     <QueryClientProvider client={client}>
       <FanCard creatorId={creatorId} fanId={fanId} />
@@ -153,6 +154,20 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
       },
     ]);
     expect(within(row).getByText(/^Noté par un chatteur/u)).toBeTruthy();
+  });
+
+  it('reads again what is left to learn once a case is filled, not 30 s later (recette 11/11)', async () => {
+    view = card({});
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    renderCard(client);
+    const row = field(await essentials(), /^Sa ville ou sa région/u);
+    fireEvent.click(within(row).getByRole('button', { name: 'Ajouter' }));
+    const input = within(row).getByRole('textbox', { name: 'Sa ville ou sa région' });
+    fireEvent.change(input, { target: { value: 'Grenoble' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(await within(row).findByText('Grenoble')).toBeTruthy();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: fanKycKey(creatorId, fanId) });
   });
 
   it('writes a list one item per line, and keeps the save shut on an empty field', async () => {
