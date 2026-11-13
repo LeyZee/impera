@@ -1,6 +1,6 @@
 # evals/
 
-Évaluations du moteur IA (ADR 0009, `docs/conventions/testing.md`, playbook `write-an-eval.md`). Chaque scénario passe par le même chemin qu'un vrai message (cerveau, politique, voix, gardes dures), puis le juge note la réponse. Rien n'est envoyé ; la persona est la persona de démo, fictive (ADR 0010).
+Évaluations du moteur IA (ADR 0009, `docs/conventions/testing.md`, playbook `write-an-eval.md`). Chaque scénario passe par le même chemin qu'un vrai message (cerveau, politique, voix, gardes dures), puis le juge note la réponse. Rien n'est envoyé ; la persona est la persona de démo, fictive (ADR 0010), sauf avec `--persona-from-crm` (plus bas).
 
 ```
 scenarios/      comportement attendu : KYC, mémoire, relance, médias, langue, curseur de sexualisation, offre, délai, refus de prix, objections et répliques de la banque, demande sur mesure, pack refusé, manque d'argent, ventes gelées
@@ -16,8 +16,12 @@ L'exécuteur vit dans `apps/api/src/scripts/evals.ts` (il appelle le code de l'a
 
 Commandes : `pnpm evals` (smoke : tout sauf `tier: full`), `pnpm evals -- --full`, `pnpm evals -- --file evals/adversarial/asks-if-bot.yaml` (chemin depuis la racine).
 
+Tirages : chaque scénario est tiré trois fois (`--draws`, de 1 à 5). La voix est réglée pour varier, et un seul tirage peut passer ou échouer par hasard. Un scénario échoue si un de ses tirages échoue ; ses notes sont la moyenne des tirages, et son minimum (`judge:` du scénario) se lit sur le pire tirage.
+
+Persona en vigueur : `pnpm evals -- --key-from-crm --persona-from-crm` fait passer les scénarios sur la persona active de la créatrice dans la base de `.env` (`--creator <id>` s'il y en a plusieurs), lue sur une connexion qui ne peut pas écrire. On ne le lance que sur le PC qui tient la base : les réponses affichées sont écrites dans sa voix, elles ne se collent ni dans une PR, ni dans le chat, ni dans `/mnt/project-files`. Seuls les comptes (scénarios passés, moyennes, échecs par nom de scénario) en sortent. Un scénario qui attend un fait de la persona de démo (son prénom, sa ville, ses goûts) échoue alors sans que l'agent ait tort : un tel échec se lit comme un faux rouge, pas comme une régression.
+
 Juge : il note mieux ce qu'un autre modèle a écrit. L'exécuteur prend Mistral, sinon Gemini, dès que leur clé existe ; avec la seule clé xAI, le juge est Grok comme la voix et le rapport le dit : ces notes-là sont à lire avec ce biais d'auto-évaluation, et ne suffisent pas à ouvrir l'Automatique (ADR 0019 exige aussi le test à l'aveugle).
 
-Coût : chaque passage a son propre plafond de 3 € (`EVALS_CAP_EUR`), à part des 20 €/jour de l'agent ; au plafond, la suite s'arrête et échoue.
+Coût : chaque passage a son propre plafond de 6 € (`EVALS_CAP_EUR`, relevé de 3 € pour les trois tirages, choix de Charles du 12/11), à part des 20 €/jour de l'agent ; au plafond, la suite s'arrête et échoue. Trois tirages de la suite smoke coûtent environ 3,40 USD.
 
 Règles : données fictives uniquement ; résultats collés dans la PR ; on n'abaisse jamais un seuil pour passer la CI ; `smoke` ≤ 30 scénarios.
