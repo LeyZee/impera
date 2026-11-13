@@ -306,7 +306,7 @@ function SignalDialog({
   return (
     <Dialog className="py-dialog" title={words.title} lead={words.lead} busy={busy} onClose={onClose}>
       <div className="tm-dialog__body">
-        <dl className="py-lines nv-num">
+        <dl className="py-lines py-lines--recap nv-num">
           <div>
             <dt>
               {account === null ? 'Un compte' : `${account.creatorName} · ${accountLine(account)}`}

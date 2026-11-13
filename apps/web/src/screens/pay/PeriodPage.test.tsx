@@ -1718,10 +1718,12 @@ describe('Paie › Quinzaine › Donner une vente (ADR 0101)', () => {
     toGive[`${NOV1} 2026-11-02`] = [bot];
     renderPage(OWNER, `/paie/quinzaine?quinzaine=${NOV1}`);
     const panel = await panelNamed('Donner une vente');
-    expect(text(within(panel).getByText(/Aujourd’hui/u))).toBe('Aujourd’hui · Lundi 2 novembre');
+    expect(text(within(panel).getByText(/Aujourd’hui/u))).toBe('Aujourd’hui · lundi 2 novembre');
     expect(within(panel).getByRole('button', { name: 'Jour suivant' })).toHaveProperty('disabled', true);
     const card = await within(panel).findByText(/vendue par/u);
     expect(text(card)).toContain('vendue par l’IA');
+    // In a list of sales the gesture stays plain: red is for the one a held line waits for.
+    expect(within(panel).getByRole('button', { name: 'Donner à…' }).className).toContain('nv-btn--plain');
     fireEvent.click(within(panel).getByRole('button', { name: 'Donner à…' }));
     const dialog = await screen.findByRole('dialog');
     // Two members on shift: none is chosen for the validator; an agent's sale is never shared.

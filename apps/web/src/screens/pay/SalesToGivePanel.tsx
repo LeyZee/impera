@@ -16,6 +16,12 @@ import { Panel } from '@/shell/layout';
 const MONTH = new Intl.DateTimeFormat('fr-FR', { month: 'long', timeZone: 'UTC' });
 const monthName = (day: string): string => MONTH.format(new Date(`${day}T12:00:00Z`));
 
+/** « Aujourd’hui · jeudi 5 novembre », else « Mercredi 4 novembre »: the day's name keeps its capital only at the head. */
+function dayLabel(day: string, today: string): string {
+  const title = myDayTitle(day);
+  return day === today ? `Aujourd’hui · ${title.charAt(0).toLowerCase()}${title.slice(1)}` : title;
+}
+
 /**
  * Paie › Quinzaine, « Donner une vente » (ADR 0101 §§ 1, 2, 7, 17), for the owner and an active manager on an open
  * period: a chatter who convinced a fan says so to his manager, who finds the sale here by its day, a member's or the
@@ -83,8 +89,7 @@ export function SalesToGivePanel({
             </svg>
           </button>
           <span className="py-give__label nv-num" aria-live="polite">
-            {day === today ? 'Aujourd’hui · ' : ''}
-            {myDayTitle(day)}
+            {dayLabel(day, today)}
           </span>
           <button
             type="button"

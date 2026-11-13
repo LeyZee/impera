@@ -9,7 +9,7 @@ import {
   type TeamImportOverview,
 } from '@impera/contracts';
 import { useQueries } from '@tanstack/react-query';
-import { useId, useState, type JSX } from 'react';
+import { Fragment, useId, useState, type JSX } from 'react';
 
 import { GiveDialog } from './GiveDialog';
 import type { PayNames } from './data';
@@ -227,23 +227,28 @@ export function SaleCards({
                 <p className="py-held__own">{ownLineText(sale)}</p>
               ) : shown.length === 0 ? null : (
                 <div className="py-held__acts">
-                  {shown.map((outcome) => (
-                    <button
-                      key={outcome}
-                      type="button"
-                      aria-describedby={`${about('who')} ${about('when')} ${about('amount')}`}
-                      className={
-                        outcome === 'count' ||
-                        (outcome === 'give' && sale.reason === null && sale.decision === null)
-                          ? 'nv-btn nv-btn--neon nv-btn--sm'
-                          : 'nv-btn nv-btn--plain nv-btn--sm'
-                      }
-                      onClick={() => {
-                        setAsked({ sale, outcome });
-                      }}
-                    >
-                      {outcomeLabel(outcome, member)}
-                    </button>
+                  {shown.map((outcome, place) => (
+                    <Fragment key={outcome}>
+                      {/* On a phone, taking a decision back goes on its own line, under the other gestures. */}
+                      {outcome === 'withdraw' && place > 0 ? (
+                        <span className="py-held__break" aria-hidden="true" />
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-describedby={`${about('who')} ${about('when')} ${about('amount')}`}
+                        // Red is the one gesture a held line waits for; in a list of sales, « Donner à… » stays plain.
+                        className={
+                          outcome === 'count'
+                            ? 'nv-btn nv-btn--neon nv-btn--sm'
+                            : 'nv-btn nv-btn--plain nv-btn--sm'
+                        }
+                        onClick={() => {
+                          setAsked({ sale, outcome });
+                        }}
+                      >
+                        {outcomeLabel(outcome, member)}
+                      </button>
+                    </Fragment>
                   ))}
                 </div>
               )}
@@ -346,7 +351,7 @@ function DecideDialog({
   return (
     <Dialog className="py-dialog" title={words.title} lead={words.lead} busy={busy} onClose={onClose}>
       <div className="tm-dialog__body">
-        <dl className="py-lines nv-num">
+        <dl className="py-lines py-lines--recap nv-num">
           <div>
             <dt>
               {account === null ? 'Un compte' : `${account.creatorName} · ${accountLine(account)}`}
