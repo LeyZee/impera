@@ -72,7 +72,12 @@ export { salesFeedTimeZone } from './domain/sale-days';
  * The daily photo of a creator's statistics (ADR 0081 § 4, § 5), read in the caller's `withTenantMember`: the owner,
  * or an active manager when she is on his list. Counters only, never an amount.
  */
-export { dailyStatsOf, type DailyStatsDay } from './infra/db/daily-stats-store';
+export {
+  chatterStatsOf,
+  dailyStatsOf,
+  type ChatterStatsDay,
+  type DailyStatsDay,
+} from './infra/db/daily-stats-store';
 /** @public Which totals a read gives (CRM-04). */
 export type { SalesRefundsQuery, SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';

@@ -1,0 +1,377 @@
+/*
+ * Réglages › Consommation IA (ADR 0091). Built on the Dashboard's charts (`ins-*`, agency.css): the same plates,
+ * columns, rings and tips. The services take --nv-series-* (validated Nuit and Jour); amber and red only say when to
+ * recharge. Tokens only. A rule that overrides a design-system class takes two classes.
+ */
+
+.cia-body {
+  margin-top: 8px;
+}
+
+/* ── Today: the live dot, the gauge against the cap. */
+.cia-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.cia-live__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-success);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--nv-success) 55%, transparent);
+  animation: cia-pulse 2.4s var(--nv-ease-out) infinite;
+}
+@keyframes cia-pulse {
+  70% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--nv-success) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--nv-success) 0%, transparent);
+  }
+}
+.cia-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cia-gauge__track {
+  position: relative;
+  height: 10px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+.cia-gauge__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--_w);
+  border-radius: inherit;
+  background: var(--nv-data-1);
+  transform-origin: left center;
+  animation: cia-grow var(--nv-dur-data) var(--nv-ease-out) 150ms both;
+}
+.cia-today[data-state='alert'] .cia-gauge__fill {
+  background: var(--nv-warning);
+}
+.cia-today[data-state='reached'] .cia-gauge__fill {
+  background: var(--nv-danger);
+}
+@keyframes cia-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+/* The alert threshold (80 %): a thin notch in the track, the surface's colour. */
+.cia-gauge__mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--_x);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--nv-plate);
+  opacity: 0.9;
+}
+.cia-gauge__scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.cia-gauge__note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+  text-wrap: pretty;
+}
+.cia-today[data-state='alert'] .cia-gauge__note {
+  color: var(--nv-warning);
+}
+.cia-today[data-state='reached'] .cia-gauge__note {
+  color: var(--nv-danger);
+}
+
+/* Beside the gauge, the month's three figures stack: each a row, its value at the end, no empty plate. */
+@media (min-width: 721px) {
+  .ins-tiles.cia-tiles {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .cia-tiles .ins-tile {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'label value'
+      'note value';
+    align-content: center;
+    column-gap: 16px;
+    row-gap: 2px;
+  }
+  .cia-tiles .ins-tile dt {
+    grid-area: label;
+  }
+  .cia-tiles .ins-tile dd:first-of-type {
+    grid-area: value;
+    justify-content: flex-end;
+  }
+  .cia-tiles .ins-tile__note {
+    grid-area: note;
+  }
+}
+
+/* ── Credits: one card per service. */
+.cia-credits {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.cia-credit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px 20px 14px;
+}
+.cia-credit__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cia-credit__name {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+}
+.cia-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cia-badge--ok {
+  color: var(--nv-success);
+  background: color-mix(in srgb, var(--nv-success) 12%, transparent);
+}
+.cia-badge--warn {
+  color: var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
+}
+.cia-badge--bad {
+  color: var(--nv-danger);
+  background: color-mix(in srgb, var(--nv-danger) 12%, transparent);
+}
+.cia-badge--idle {
+  color: var(--nv-ink-muted);
+  background: var(--nv-fill-track);
+}
+.cia-credit__balance {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 0;
+  font-size: var(--nv-text-metric);
+  line-height: var(--nv-text-metric-leading);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.cia-credit__unit {
+  font-size: var(--nv-text-footnote);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--nv-ink-faint);
+}
+.cia-credit[data-tone='bad'] .cia-credit__balance {
+  color: var(--nv-danger);
+}
+/* Thirty days of runway fill the bar: what is left, at a glance. */
+.cia-runway {
+  position: relative;
+  height: 6px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+.cia-runway__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--_w);
+  border-radius: inherit;
+  background: var(--nv-data-1);
+  transform-origin: left center;
+  animation: cia-grow var(--nv-dur-data) var(--nv-ease-out) 200ms both;
+}
+.cia-credit[data-tone='ok'] .cia-runway__fill {
+  background: var(--nv-success);
+}
+/* No pace yet: the bar says nothing, a faint full track rather than a figure. */
+.cia-credit[data-tone='idle'] .cia-runway__fill {
+  background: var(--nv-ink-faint);
+  opacity: 0.35;
+}
+.cia-credit[data-tone='warn'] .cia-runway__fill {
+  background: var(--nv-warning);
+}
+.cia-credit[data-tone='bad'] .cia-runway__fill {
+  background: var(--nv-danger);
+}
+.cia-credit__runway {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  font-weight: 600;
+  color: var(--nv-ink);
+  text-wrap: pretty;
+}
+.cia-credit[data-tone='warn'] .cia-credit__runway {
+  color: var(--nv-warning);
+}
+.cia-credit[data-tone='bad'] .cia-credit__runway {
+  color: var(--nv-danger);
+}
+.cia-credit__detail {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.nv-btn.cia-credit__more {
+  align-self: flex-start;
+  margin-left: -10px;
+}
+.cia-entries ul {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cia-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  border-top: 1px solid var(--nv-hairline);
+}
+.cia-entry__what {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.cia-entry__when {
+  font-size: var(--nv-text-caption);
+  font-weight: 400;
+  color: var(--nv-ink-faint);
+}
+.cia-entry__amount {
+  font-size: var(--nv-text-footnote);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cia-entry__ask {
+  display: inline-flex;
+  gap: 4px;
+}
+.nv-btn.cia-entry__remove {
+  color: var(--nv-danger);
+}
+.cia-none {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px;
+}
+.cia-none p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--nv-ink-muted);
+  text-wrap: pretty;
+}
+
+/* The last day's label ends at the plot's edge, never past it. */
+.cia-body .ins-col:last-child .ins-col__label {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Rings: the legend has no comparison column here. */
+.cia-legend .ins-legend__row {
+  grid-template-columns: auto minmax(0, 1fr) auto 40px;
+  grid-template-areas: 'key label value share';
+}
+.cia-foot {
+  margin: -16px 0 0;
+  padding: 0 4px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  text-wrap: pretty;
+}
+
+/* ── The dialog's amount dominates its form, its currency beside it. */
+.cia-amount__box {
+  position: relative;
+}
+.cia-amount__input.nv-field__control {
+  height: 64px;
+  padding-right: 52px;
+  font-size: var(--nv-text-title-1);
+  line-height: 1;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+.cia-amount__input::placeholder {
+  color: var(--nv-ink-faint);
+}
+.cia-amount__sign {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-title-2);
+  font-weight: 600;
+  pointer-events: none;
+}
+.cia-amount[data-invalid='true'] .cia-amount__input {
+  box-shadow: inset 0 0 0 1.5px var(--nv-warning);
+}
+
+@media (max-width: 720px) {
+  .cia-tiles .ins-tile:last-child {
+    grid-column: 1 / -1;
+  }
+  .cia-credits {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cia-entry {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding: 6px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cia-live__dot,
+  .cia-gauge__fill,
+  .cia-runway__fill {
+    animation: none;
+  }
+}

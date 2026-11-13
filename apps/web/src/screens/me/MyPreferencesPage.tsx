@@ -34,7 +34,7 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
           <Panel className="nv-enter" eyebrow="Ce navigateur" title="Flou des médias">
             <div className="me-prefs__body">
               <p className="me-prefs__text">
-                Ses photos et vidéos, floutées ou nettes sur les écrans de l’agence.
+                Les photos et vidéos des créatrices, floutées ou nettes sur tes écrans.
               </p>
               <MediaBlurToggle variant="sheet" />
             </div>

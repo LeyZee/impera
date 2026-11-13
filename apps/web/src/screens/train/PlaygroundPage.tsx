@@ -304,6 +304,14 @@ export function PlaygroundPage(): JSX.Element {
             else startLesson({ kind: 'corrected', text: comparison?.bubbles.join('\n') ?? '' });
           }}
           onReplay={replay}
+          // Marks are kept per creator: the invented persona has none to keep them for (ADR 0103 § 6).
+          onMarkDesire={
+            state.persona.played === null && !pg.client.isDemo
+              ? undefined
+              : (n, verdict) => {
+                  void pg.run((c) => c.markDesire(n, verdict));
+                }
+          }
           onSend={send}
         />
         <div className="pg-dock">
