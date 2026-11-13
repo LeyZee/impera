@@ -218,6 +218,8 @@ async function writeClosing(
         currency: one.currency,
         netMinor: one.netMinor,
         salePeriod: one.salePeriod,
+        // A shared line is two rows, its member's part each (ADR 0101 § 13); a whole line keeps the defaults.
+        ...(one.part !== null && { shareBp: one.part.shareBp, shareRole: one.part.role }),
       })),
     );
   }
