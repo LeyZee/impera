@@ -39,6 +39,9 @@ export function toConversation(row: typeof schema.conversations.$inferSelect): C
     desireScore: row.desireScore,
     desireBand: row.desireBand === null ? null : DesireBandSchema.parse(row.desireBand),
     desireAt: row.desireAt,
+    careSince: row.careSince,
+    careHelpAt: row.careHelpAt,
+    careClosedAt: row.careClosedAt,
   };
 }
 

@@ -28,10 +28,12 @@ import {
   type FiredAlert,
   type PhraseAlert,
 } from '../domain/alerts';
+import { helpBubble, helpLanguageOf } from '../domain/care';
 import { measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
 import {
   holdDecision,
+  isCareRisk,
   protectionFor,
   protectionWhileAnswering,
   waitRetryAt,
@@ -99,6 +101,11 @@ export interface AgentComposeInput {
   readonly customOrderOpen?: boolean;
   /** The replies of her objection bank he already received (ADR 0090 § B): never twice. */
   readonly usedObjectionReplies?: readonly string[];
+  /**
+   * The care mode open on this conversation (ADR 0088), as `conversations` stores it: she answers him with care
+   * whatever he writes, until a manager or the owner closes it. `helpGiven`: the help bubble already went out in it.
+   */
+  readonly care?: { readonly since: Date; readonly helpGiven: boolean };
 }
 
 interface HistoryMedia {
@@ -166,6 +173,11 @@ type AgentComposeResult = (
     }
 ) & {
   readonly desire?: ScoredDesire;
+  /**
+   * The care mode (ADR 0088), on a draft or a hold: the signs that opened or kept it, and whether this draft closes on
+   * the help bubble. A care hold means the AI could not answer him: a human writes to him.
+   */
+  readonly care?: { readonly signs: readonly string[]; readonly help: boolean };
   /** Her alerts that went off on his message and only let a human know (`alert_triggered` each, P4-01). */
   readonly alerts?: readonly AlertNotice[];
   /** He asked for a custom order and it now waits for the team (`custom_order_opened`, ADR 0090 § A). */
@@ -323,6 +335,18 @@ function voiceUnavailable(gateway: LlmGateway): boolean {
 type Held = Extract<AgentComposeResult, { kind: 'held' }>;
 
 const HANDOFF: Held = { kind: 'held', reason: 'handoff', detail: [], costUsd: 0 };
+
+/**
+ * The AI could not answer him with care (a refusal, a failure, no budget, a guard): never silence, a human writes to
+ * him (ADR 0088 § 5 bis), the care mode stays open.
+ */
+const careUnanswered = (signs: readonly string[], detail: readonly string[], costUsd: number) => ({
+  ...HANDOFF,
+  cause: 'distress' as const,
+  detail: ['care_unanswered', ...detail],
+  costUsd,
+  care: { signs, help: false },
+});
 
 /**
  * A handoff on a risk also sets his limits until a human decides (P3-02): a possible minor is no longer
@@ -556,6 +580,54 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
 const withNotices = (result: AgentComposeResult, notices: readonly AlertNotice[]): AgentComposeResult =>
   notices.length === 0 ? result : { ...result, alerts: notices };
 
+/** What code already knows of the care mode before any model: an episode open, or his words (ADR 0088). */
+interface CareKnown {
+  /** The signs code read, or `care_open` for an episode already open; empty, only the brain can open it. */
+  readonly signs: readonly string[];
+  readonly helpGiven: boolean;
+}
+
+/**
+ * A care answer (ADR 0088): his limits of the care mode set, then the voice's answer as a draft a human validates,
+ * closed on the help bubble the first time he speaks of dark thoughts in the episode. Anything that kept the voice
+ * from answering hands him to a human, never silence.
+ */
+async function settleCare(
+  deps: DraftComposerDeps,
+  input: AgentComposeInput,
+  composed: ComposedTurn,
+  known: CareKnown,
+): Promise<AgentComposeResult> {
+  const { costUsd } = composed;
+  const signs = [...new Set([...known.signs, ...(composed.brief?.risks.filter(isCareRisk) ?? [])])];
+  // His money trouble is kept too: `protectionWhileAnswering` keeps what she keeps while answering.
+  const kept = await keepWhileAnswering(deps.limits, input, [...signs, ...(composed.brief?.risks ?? [])]);
+  if (kept !== null) return careUnanswered(signs, kept.detail, costUsd);
+  if (composed.voiceFailure !== undefined)
+    return careUnanswered(signs, failureDetail(composed.voiceFailure), costUsd);
+  const blocking = composed.violations.filter((v) => v.severity === 'blocking');
+  if (blocking.length > 0)
+    return careUnanswered(signs, ['guard_blocked', ...blocking.map((v) => v.code)], costUsd);
+  if (composed.bubbles.length === 0) return careUnanswered(signs, ['no_voice'], costUsd);
+  const help = signs.includes('self_harm') && !known.helpGiven;
+  const fanText = input.history
+    .slice(input.history.findLastIndex((m) => m.direction === 'outbound') + 1)
+    .map((m) => m.text)
+    .join('\n');
+  return {
+    kind: 'draft',
+    bubbles: help ? [...composed.bubbles, helpBubble(helpLanguageOf(fanText))] : composed.bubbles,
+    softViolations: composed.violations.map((v) => v.code),
+    costUsd,
+    factsProposed: composed.brief === undefined ? [] : withoutOrders(composed.brief.factsProposed),
+    ...(composed.model !== undefined && {
+      voice: { voicePrompt: deps.voicePrompt, voiceModel: composed.model },
+    }),
+    ...(deps.personaVersionId !== undefined && { personaVersionId: deps.personaVersionId }),
+    care: { signs, help },
+  };
+}
+
 /** What his composed answer becomes: a draft, or held for a human, a wait or a failure. */
 async function settle(
   deps: DraftComposerDeps,
@@ -564,6 +636,7 @@ async function settle(
   flags: FanFlags | undefined,
   waited: boolean,
   alertPause: ReturnType<typeof settleAlerts>['pause'],
+  known: CareKnown,
 ): Promise<AgentComposeResult> {
   const { costUsd } = composed;
   if (composed.droppedNotes !== undefined) {
@@ -576,12 +649,16 @@ async function settle(
       costUsd,
     });
   }
+  // Code already knew, or the brain read distress: she answers him with care, unless a handoff risk outranks it.
+  const decision0 = composed.brief === undefined ? undefined : holdDecision(composed.brief, waited);
+  if (composed.care === true && decision0?.kind !== 'handoff' && alertPause === null)
+    return settleCare(deps, input, composed, known);
   if (composed.brief === undefined) {
     const failure = composed.briefFailure;
     const reason = failure?.code === 'budget_reached' ? 'budget_reached' : 'llm_unavailable';
     return { kind: 'held', reason, detail: failure === undefined ? [] : failureDetail(failure), costUsd };
   }
-  const decision: HoldDecision = holdDecision(composed.brief, waited);
+  const decision: HoldDecision = decision0 ?? holdDecision(composed.brief, waited);
   if (decision.kind === 'handoff') {
     const held: Held = { ...HANDOFF, detail: decision.detail, costUsd };
     return protect(deps.limits, input, composed.brief.risks, held);
@@ -664,21 +741,26 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       }
       // What he wrote since her last answer: her alerts, the traps and the safety net read it as one message.
       const fanText = sinceAnswer.map((m) => m.text).join('\n');
-      // He says plainly he is a minor or wants to hurt himself (recette AGT-01): a human answers him before any model,
-      // whatever the brain would have read, and his limits are set until a human decides.
+      // He says plainly he is a minor (recette AGT-01): a human answers him before any model, whatever the brain would
+      // have read, and his limits are set until a human decides. He says he wants to hurt himself: she answers him
+      // with care, a human validating it (ADR 0088), as she does while a care episode is open.
       const signs = safetySigns(fanText);
-      if (signs.length > 0) {
-        const held: Held = {
-          ...HANDOFF,
-          cause: signs.includes('minor_suspected') ? 'minor' : 'distress',
-          detail: ['safety_net', ...signs],
-        };
+      if (signs.includes('minor_suspected')) {
+        const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
       }
+      const known: CareKnown = {
+        signs: [...signs, ...(input.care !== undefined ? ['care_open'] : [])],
+        helpGiven: input.care?.helpGiven === true,
+      };
+      const careForced = known.signs.length > 0;
       // Her active persona, after what safety reads without it (his limits, his media, his words): none, a human
       // answers him.
       const her = await herPersona(deps, input);
-      if ('missing' in her) return { ...HANDOFF, cause: 'persona_inactive', detail: [her.missing] };
+      if ('missing' in her) {
+        if (careForced) return careUnanswered(known.signs, [her.missing], 0);
+        return { ...HANDOFF, cause: 'persona_inactive', detail: [her.missing] };
+      }
       const withHer = her.deps;
       const read = await alertSettings(deps, input);
       if ('held' in read) return read.held;
@@ -695,6 +777,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const asked = phraseAlerts(settings, coded, brainAlertId, BRAIN_ALERTS_MAX);
       const chatter = await onShift(deps, input);
       if (voiceUnavailable(deps.gateway)) {
+        if (careForced) return careUnanswered(known.signs, ['no voice key'], 0);
         return { kind: 'held', reason: 'llm_unavailable', detail: ['no voice key'], costUsd: 0 };
       }
       const history: ConversationTurn[] = input.history.map((m, i) => {
@@ -740,13 +823,17 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           // Counted once per message of his: a second pass after a wait, or a replay, reads it as stored.
           counted: input.desire !== undefined && lastFanAt !== undefined && input.desire.at >= lastFanAt,
         },
-        // Safety first: a possible minor or distress hands over even when he is testing her, and without the
-        // brain's reading of the risks nobody knows, so the voice does not write either.
+        // Safety first: a possible minor hands over even when he is testing her, and without the brain's reading of
+        // the risks nobody knows, so the voice does not write either, unless code already knows he needs care.
         // An alert of hers that pauses the agent stops the voice too: a human answers him.
-        skipVoice: (brief) =>
-          brief === undefined ||
-          holdDecision(brief, waited).kind !== 'answer' ||
-          settleAlerts(firedWith(coded, brief, asked, settings, chatter)).pause !== null,
+        care: (brief) => careForced || (brief !== undefined && holdDecision(brief, waited).kind === 'care'),
+        skipVoice: (brief) => {
+          if (brief === undefined) return !careForced;
+          const kind = holdDecision(brief, waited).kind;
+          if (kind === 'handoff') return true;
+          if (kind === 'no_reply' && !careForced) return true;
+          return settleAlerts(firedWith(coded, brief, asked, settings, chatter)).pause !== null;
+        },
         ...(asked.length > 0 && { alerts: asked.map((a) => ({ id: a.brainId, phrase: a.alert.phrase })) }),
         customOrder: {
           chatterOnShift: chatter,
@@ -768,7 +855,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const pause = composed.handoff !== undefined || riskFirst ? null : alerts.pause;
       const notices = pause === null ? fired.map(noticeOf) : alerts.notices;
       const settled = withSales(
-        withNotices(await settle(withHer, input, composed, stop.flags, waited, pause), notices),
+        withNotices(await settle(withHer, input, composed, stop.flags, waited, pause, known), notices),
         composed,
       );
       if (composed.desire === undefined) return settled;

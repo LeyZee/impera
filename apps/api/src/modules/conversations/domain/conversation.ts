@@ -13,5 +13,8 @@ export function projectionOf(conversation: Conversation): ConversationProjection
     desireScore: conversation.desireScore,
     desireBand: conversation.desireBand,
     desireAt: conversation.desireAt,
+    careSince: conversation.careSince,
+    careHelpAt: conversation.careHelpAt,
+    careClosedAt: conversation.careClosedAt,
   };
 }

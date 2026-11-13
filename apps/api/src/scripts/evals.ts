@@ -297,7 +297,13 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         ageDisputed: false,
         counted: false,
       },
-      skipVoice: (brief) => brief === undefined || holdDecision(brief).kind !== 'answer',
+      // The care mode as the composer runs it (ADR 0088): the voice writes the care brief, a human validates.
+      care: (brief) => brief !== undefined && holdDecision(brief).kind === 'care',
+      skipVoice: (brief) => {
+        if (brief === undefined) return true;
+        const kind = holdDecision(brief).kind;
+        return kind === 'handoff' || kind === 'no_reply';
+      },
       customOrder: {
         chatterOnShift: situation.chatter_on_shift,
         orderOpen: situation.custom_order_open,

@@ -18,6 +18,7 @@ import {
   SetAgentModeBodySchema,
   SendingStopSchema,
   SetModeBodySchema,
+  CloseCareBodySchema,
   ReleaseBodySchema,
   TakeoverBodySchema,
   UserIdSchema,
@@ -362,6 +363,30 @@ export function createConversationRoutes(
           userId,
           correlationId: request.id,
           mode: request.body.mode,
+        });
+        return reply.code(204).send();
+      },
+    );
+
+    // « Il va mieux » (ADR 0088 § 7): the owner or a manager closes the care mode, never a chatter.
+    app.post(
+      '/conversations/:id/care/close',
+      {
+        ...act,
+        schema: {
+          params: ConversationParamsSchema,
+          querystring: CreatorQuerySchema,
+          body: CloseCareBodySchema,
+        },
+      },
+      async (request, reply) => {
+        const { userId } = actorFor(request, request.query.creatorId);
+        await commands.closeCare({
+          creatorId: request.query.creatorId,
+          conversationId: request.params.id,
+          userId,
+          correlationId: request.id,
+          ...(request.body.reason === undefined ? {} : { reason: request.body.reason }),
         });
         return reply.code(204).send();
       },
