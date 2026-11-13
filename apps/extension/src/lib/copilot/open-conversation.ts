@@ -4,31 +4,27 @@ import { placeOf } from '../tab';
 
 /**
  * The Reveal conversation open in a tab (ADR 0086 § 2), read from its address alone: the panel follows it without a
- * click and without touching the page. Which part of Reveal's address names the conversation is not known before the
- * Reveal capture (`docs/runbooks/reveal-capture-express.md`): until then the panel takes a segment after `/messages/`
- * or `/chat/`, or a `conversation` or `chat` parameter, and says « Ouvre une conversation » for anything else. The id
- * is opaque: checked against the contract, never parsed further.
+ * click and without touching the page. Reveal's dashboard names it after `/conversations/`, under the model's own
+ * segment (`/models/<model>/conversations/<conversation>`, seen on the PC on 2026-11-11): the same UUID the API and
+ * the sync use (`docs/reference/reveal-api-observed.md`, question 4). Anything else says « Ouvre une conversation ».
+ * The id is opaque: checked against the contract, never parsed further.
  */
 
-const PATH_PREFIXES = new Set(['messages', 'chat']);
-const PARAMETERS = ['conversation', 'chat'] as const;
+const PATH_PREFIX = 'conversations';
 
 /** `null` when the tab is not on Reveal, or on a Reveal page that is not one conversation. */
 export function openConversationOf(url: string | undefined): string | null {
   // `placeOf` checks HTTPS and the reveal.me domain; no CRM is ever named here.
   if (url === undefined || placeOf(url, 'null') !== 'reveal') return null;
-  const parsed = new URL(url);
-  for (const name of PARAMETERS) {
-    const value = PlatformConversationIdSchema.safeParse(parsed.searchParams.get(name));
-    if (value.success) return value.data;
+  const segments = new URL(url).pathname.split('/').filter((segment) => segment !== '');
+  const at = segments.lastIndexOf(PATH_PREFIX);
+  if (at === -1 || at !== segments.length - 2) return null;
+  let id: string;
+  try {
+    id = decodeURIComponent(segments[at + 1] ?? '');
+  } catch {
+    return null;
   }
-  const segments = parsed.pathname.split('/').filter((segment) => segment !== '');
-  for (let at = 0; at < segments.length - 1; at += 1) {
-    const prefix = segments[at];
-    if (prefix !== undefined && PATH_PREFIXES.has(prefix)) {
-      const value = PlatformConversationIdSchema.safeParse(decodeURIComponent(segments[at + 1] ?? ''));
-      if (value.success) return value.data;
-    }
-  }
-  return null;
+  const value = PlatformConversationIdSchema.safeParse(id);
+  return value.success ? value.data : null;
 }

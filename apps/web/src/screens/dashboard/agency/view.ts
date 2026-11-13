@@ -67,6 +67,103 @@ export function shareOf(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
 }
 
+/** Euros to the cent, always: a figure read in a tip, never rounded away (ADR 0106 § 12). */
+export function exactEuros(cents: number): string {
+  return `${(cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
+}
+
+type MoneyFigures = Pick<
+  AgencyInsights['totals']['current'],
+  'revenueMinor' | 'revenueExclVatMinor' | 'netMinor' | 'agencyMinor' | 'creatorMinor'
+>;
+
+/** One part of « Où va l'argent » (ADR 0106 § 5): what the fans paid, split in four, in the order money leaves. */
+export interface MoneyPart {
+  readonly key: 'fansVat' | 'commission' | 'creator' | 'agency';
+  readonly label: string;
+  readonly cents: number;
+  readonly previousCents: number;
+  /** The net's two parts say their share of the net too. */
+  readonly ofNet: boolean;
+  readonly note: string;
+}
+
+function split(figures: MoneyFigures): Record<MoneyPart['key'], number> {
+  const at = (cents: number): number => Math.max(0, cents);
+  return {
+    fansVat: at(figures.revenueMinor - figures.revenueExclVatMinor),
+    commission: at(figures.revenueExclVatMinor - figures.netMinor),
+    creator: at(figures.creatorMinor),
+    agency: at(figures.agencyMinor),
+  };
+}
+
+/**
+ * The period's revenue split in four, the platform's amounts as they are: the VAT the fans paid (revenue less its
+ * amount without VAT), the platform's commission (that less the net), then the net's two parts, each beside the same
+ * part of the period before. A part never drawn below zero: refunds heavier than sales leave an empty bar, never a
+ * negative block.
+ */
+export function moneyParts(current: MoneyFigures, previous: MoneyFigures, several: boolean): MoneyPart[] {
+  const now = split(current);
+  const then = split(previous);
+  const part = (key: MoneyPart['key'], label: string, ofNet: boolean, note: string): MoneyPart => ({
+    key,
+    label,
+    cents: now[key],
+    previousCents: then[key],
+    ofNet,
+    note,
+  });
+  return [
+    part(
+      'fansVat',
+      'TVA payée par les fans',
+      false,
+      'La plateforme la reverse à l’État : elle n’est à personne.',
+    ),
+    part('commission', 'Commission de la plateforme', false, 'Ce que la plateforme garde sur chaque vente.'),
+    part(
+      'creator',
+      several ? 'Part des créatrices' : 'Part de la créatrice',
+      true,
+      several
+        ? 'Ce que la plateforme leur verse, son propre chiffre.'
+        : 'Ce que la plateforme lui verse, son propre chiffre.',
+    ),
+    part('agency', 'Part de l’agence', true, 'Ce que la plateforme verse à l’agence, son propre chiffre.'),
+  ];
+}
+
+/**
+ * The tip of a money figure (ADR 0106 § 12): the amount to the cent, the period before and how it changed, its share
+ * of the revenue and, for a part of the net, of the net; one sentence in plain ink.
+ */
+export function moneyTip(input: {
+  readonly title: string;
+  readonly cents: number;
+  readonly previousCents: number | null;
+  readonly revenueMinor: number;
+  readonly netMinor: number | null;
+  readonly text: string;
+}): { title: string; rows: (readonly [string, string])[]; text: string } {
+  const rows: (readonly [string, string])[] = [['Montant', exactEuros(input.cents)]];
+  if (input.previousCents !== null) {
+    const change = changeOf(input.cents, input.previousCents);
+    rows.push([
+      'Période d’avant',
+      change === null
+        ? exactEuros(input.previousCents)
+        : `${exactEuros(input.previousCents)} (${deltaText(change)})`,
+    ]);
+  }
+  if (input.revenueMinor > 0)
+    rows.push(['Part du chiffre d’affaires', `${String(shareOf(input.cents, input.revenueMinor))}\u00a0%`]);
+  if (input.netMinor !== null && input.netMinor > 0)
+    rows.push(['Part du net', `${String(shareOf(input.cents, input.netMinor))}\u00a0%`]);
+  return { title: input.title, rows, text: input.text };
+}
+
 /** A slice of a ring: its label, colour, amount, and how it compares. */
 export interface Slice {
   readonly key: string;

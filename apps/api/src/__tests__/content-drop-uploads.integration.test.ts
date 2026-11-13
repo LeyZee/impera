@@ -25,7 +25,7 @@ import {
   TeamMemberIdSchema,
   type CreatorId,
 } from '@impera/contracts';
-import { eq, inArray, schema, sql } from '@impera/db';
+import { and, eq, inArray, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { DropSenseInput, LlmGateway } from '@impera/llm';
 import { AwsClient } from 'aws4fetch';
@@ -906,6 +906,74 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
 
   const held = async (key: string) =>
     (await s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'HEAD' })).status;
+
+  it('erases the reduced pictures of a creator archived 90 days ago, once, and keeps those of one archived since (ADR 0089)', async () => {
+    const day = 86_400_000;
+    const archived = async (label: string, daysAgo: number) => {
+      const creatorId = newId(CreatorIdSchema);
+      await test.admin.db.insert(schema.creators).values({
+        id: creatorId,
+        nameKey: creatorId,
+        displayName: label,
+        timezone: PARIS,
+        archivedAt: new Date(Date.now() - daysAgo * day),
+      });
+      const thumbnailKey = `thumbnails/${creatorId}/1.jpg`;
+      const put = await s3.fetch(`${endpoint}/${bucket}/${thumbnailKey}`, {
+        method: 'PUT',
+        body: jpegOf(1000, 30, 40, 0x5a),
+      });
+      expect(put.status).toBe(200);
+      const [medium] = await test.admin.db
+        .insert(schema.mediaAssets)
+        .values({
+          id: crypto.randomUUID(),
+          creatorId,
+          kind: 'image',
+          origin: 'creator',
+          storageKey: `creators/${creatorId}/1.jpg`,
+          mime: 'image/jpeg',
+          bytes: 1000,
+          sha256: creatorId.replace(/-/gu, '').padEnd(64, '0'),
+          erasedAt: new Date(Date.now() - 200 * day),
+          thumbnailKey,
+          thumbnailedAt: new Date(Date.now() - 300 * day),
+        })
+        .returning({ id: schema.mediaAssets.id });
+      return { creatorId, thumbnailKey, mediaAssetId: medium?.id ?? '' };
+    };
+    const gone = await archived('Partie il y a longtemps', 91);
+    const kept = await archived('Partie récemment', 89);
+    const row = async (mediaAssetId: string) => {
+      const [one] = await test.admin.db
+        .select({ key: schema.mediaAssets.thumbnailKey, tried: schema.mediaAssets.thumbnailedAt })
+        .from(schema.mediaAssets)
+        .where(eq(schema.mediaAssets.id, mediaAssetId));
+      return one;
+    };
+    const audit = (creatorId: string) =>
+      test.admin.db
+        .select({ details: schema.auditLog.details })
+        .from(schema.auditLog)
+        .where(
+          and(eq(schema.auditLog.entityId, creatorId), eq(schema.auditLog.action, 'media.thumbnails_erased')),
+        );
+
+    await erase();
+    expect(await held(gone.thumbnailKey)).toBe(404);
+    // Never made again: its try stays.
+    const erased = await row(gone.mediaAssetId);
+    expect(erased?.key).toBeNull();
+    expect(erased?.tried).toBeInstanceOf(Date);
+    expect((await audit(gone.creatorId)).map((line) => line.details)).toEqual([{ count: 1 }]);
+    expect(await held(kept.thumbnailKey)).toBe(200);
+    expect((await row(kept.mediaAssetId))?.key).toBe(kept.thumbnailKey);
+    expect(await audit(kept.creatorId)).toEqual([]);
+
+    // Replayed: nothing more goes, nothing said twice.
+    await erase();
+    expect(await audit(gone.creatorId)).toHaveLength(1);
+  });
 
   it('keeps an original a year, tells the agency 7 days before, erases it at its date, holds it again if given again', async () => {
     const photo = jpegOf(MB, 30, 40, 0x66);
