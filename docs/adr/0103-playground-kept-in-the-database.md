@@ -1,6 +1,6 @@
 # 0103. Le playground en base : conversations, notes, cas rejouables, taux par version, calibrage du désir
 
-Statut : accepted (« ok 0103 » de Charles, 12/11/2026 ; demande du même jour après l’avis sur le playground, recommandations 3, 4, 5 et la note de désir). Amendée le 13/11/2026 (« ok phrases 0103 » : la disponibilité du fan, porte avant le premier teaser, texte corrigé validé à 1 h 07 ; puis les ventes fictives, « ok phrases 0103 » à 1 h 10).
+Statut : accepted (« ok 0103 » de Charles, 12/11/2026 ; demande du même jour après l’avis sur le playground, recommandations 3, 4, 5 et la note de désir). Amendée le 13/11/2026 (« ok phrases 0103 » : la disponibilité du fan, porte avant le premier teaser, texte corrigé validé à 1 h 07 ; puis les ventes fictives, « ok phrases 0103 » à 1 h 10 ; puis l'écran « Leçons », « ok phrases 0103 » à 1 h 30).
 Date : 2026-11-12
 Précise : l'ADR 0019 (taux au playground) et l'ADR 0022 (la persona fait partie de la version). Ne remplace rien.
 
@@ -38,6 +38,12 @@ Charles, 13/11 : au playground, elle doit pouvoir vendre pour de faux, scripts e
 16. **Le fan peut payer pour de faux.** Chaque étape payante arrive floutée, avec le prix de l'étape, et deux boutons : « Payer (fictif) » et « Refuser ». Payer débloque le média, ajoute le montant à « déjà dépensé » et laisse le script avancer. Refuser vaut un refus explicite. Ignorer l'étape se joue en écrivant d'autres messages, et c'est le compteur du domaine qui en décide, pas un bouton.
 17. **Rien ne sort.** Aucun argent ne bouge, aucune vente n'est enregistrée hors du playground, rien n'est envoyé à une plateforme. Le déroulé d'une session de playground vit dans les tables du playground, jamais dans celles des conversations réelles ; le domaine y accède par un port à deux adaptateurs, la production et le playground. Tout ce qui est payé est marqué « fictif » à l'écran.
 18. **« Pourquoi » dit où en est le script** : quel script, quelle étape, pourquoi elle a envoyé à ce moment-là, ou pourquoi elle attend (dont la condition de la porte qui manque).
+
+## Amendement du 13/11/2026 : l'écran « Leçons »
+
+Relecture design (ADM-11) : une leçon gardée au playground n'est relue nulle part, et une leçon « règle » est perdue.
+
+19. **Entraîner a un écran « Leçons », par créatrice, en trois onglets.** Exemples de voix (la banque de l'ADR 0102, avec « Retirer ») ; cas à rejouer (avec le résultat du dernier rejeu) ; règles proposées, chacune « à coder », « codée » ou « écartée », que seul le propriétaire change. Une règle proposée n'agit jamais d'elle-même : elle attend d'être codée (règle 3 de CLAUDE.md). Chaque leçon gardée au playground donne un lien « Voir dans Leçons ».
 
 ## Conséquences
 
