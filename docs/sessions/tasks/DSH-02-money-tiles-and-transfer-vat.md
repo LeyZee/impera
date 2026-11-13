@@ -1,5 +1,5 @@
 # DSH-02 Le Dashboard de l'agence : l'argent sur des tuiles séparées, et la TVA des virements
-Statut : review (PR en brouillon ; captures Nuit/Jour, PC/téléphone à valider avant fusion)
+Statut : done (#719 fusionnée le 13/11 ; correctif d’arrondi des pourcentages de « Où va l’argent » en PR à part)
 Phase : pilotage (ADR 0078, ADR 0106)
 Dépend de : DSH-01, registre des ventes (ADR 0050)
 Branche : claude/project-thread-t7tj46
