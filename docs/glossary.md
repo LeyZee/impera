@@ -220,7 +220,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Battement | `heartbeat` | Ligne écrite par le worker toutes les 30 s (`worker_heartbeats`), lue par `/ready`. |
 | Identifiant de corrélation | `correlationId` | Le `x-request-id` d'une requête, propagé aux jobs, appels LLM et logs qu'elle déclenche. |
 | Playground | `playground` | Bac à sable de conversation : on parle au bot (soi-même, fan simulé ou rejeu) par le même chemin que la production, sans rien envoyer sur une plateforme. Proposé dans `brainstorm/06`. |
-| Vitrine | `showcase` | Page de démonstration des composants du design system (dev seulement). Ne pas confondre avec le playground. |
+| Vitrine | `showcase` | Page de démonstration des composants du design system (dev seulement). Ne pas confondre avec le playground ni avec la vitrine des trophées. |
+| Vitrine des trophées | `trophy_case` | L'écran « Mes trophées » du chatteur et de la créatrice : objets gagnés, silhouettes de ceux qui restent, avancement vers le prochain (ADR 0108). Forme commune dans `packages/contracts/src/trophy-case.ts`. |
 | Fan simulé | `simulated_fan` | Fan joué par une IA d'après un profil, dans le playground. |
 | Mode démo | `isDemo` | Écran du playground servi par des réponses écrites à l'avance, quand les routes `/v1/playground` ne sont pas en ligne sur le serveur. Signalé par la pastille « Démo » ; rien n'est noté pour de vrai. |
 | À traiter | `todo` | La file en tête du Dashboard et de Suivi : ce qui attend un humain (passage à l'humain, mot-clé d'alerte, fan sans réponse depuis plus de 10 min, proposition du copilote, envoi échoué pour de bon, message sans réponse ni brouillon depuis plus de 30 min `unanswered`, proposition de le marquer fragile `fragile_proposed`), le plus grave en premier. Ligne `nv-todo` du design system. |
