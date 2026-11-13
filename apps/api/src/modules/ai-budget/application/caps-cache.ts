@@ -11,7 +11,10 @@ export interface CapsCache {
   current(): StoredCaps;
   /** After a write in this process: applies at once, without waiting for the next refresh. */
   set(caps: StoredCaps): void;
-  /** The first read, awaited at start so the first call already uses the owner's values. */
+  /**
+   * The first read, awaited at start so the first call already uses the owner's values. It rejects when the read
+   * fails: starting on the code's defaults could lift a lower cap set by the owner, so the process does not start.
+   */
   load(): Promise<void>;
 }
 
@@ -25,7 +28,7 @@ export interface CapsCacheDeps {
 
 /**
  * The owner's caps in memory, refreshed in the background at most every minute. A failed read keeps the last value
- * known, or the code's defaults when none was ever read: the cap is never lifted because the database is slow.
+ * known (the first read, `load`, must succeed): the cap is never lifted because the database is slow.
  */
 export function createCapsCache(deps: CapsCacheDeps): CapsCache {
   const every = deps.refreshEveryMs ?? CAPS_REFRESH_MS;
@@ -35,13 +38,16 @@ export function createCapsCache(deps: CapsCacheDeps): CapsCache {
   /** Bumped by `set`: a read started before a write never brings the old values back. */
   let written = 0;
 
+  const store = (at: number, next: StoredCaps): void => {
+    if (at === written) caps = next;
+  };
   const refresh = (): Promise<void> => {
     const at = written;
     pending ??= deps
       .read()
       .then(
         (next) => {
-          if (at === written) caps = next;
+          store(at, next);
         },
         (error: unknown) => {
           deps.onError(error);
@@ -67,6 +73,10 @@ export function createCapsCache(deps: CapsCacheDeps): CapsCache {
       caps = next;
       readAt = deps.now();
     },
-    load: refresh,
+    async load() {
+      const at = written;
+      store(at, await deps.read());
+      readAt = deps.now();
+    },
   };
 }

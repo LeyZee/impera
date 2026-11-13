@@ -111,9 +111,21 @@
   margin-right: auto;
 }
 
+/* The actions stay in sight at the foot of the window while the fields and the warning scroll above them (avis
+   Design, lot budget-ia-reglable-2: on a phone « Valeurs par défaut » fell under the fold). */
 @media (max-width: 520px) {
   .aib-foot {
     flex-wrap: wrap;
+    position: sticky;
+    /* 1px short of the glass on three sides: its rim stays drawn around the actions. */
+    bottom: calc(1px - var(--nv-space-5));
+    z-index: 1;
+    margin: 0 calc(1px - var(--nv-space-5)) calc(1px - var(--nv-space-5));
+    border-radius: 0 0 calc(var(--nv-radius-xl) - 1px) calc(var(--nv-radius-xl) - 1px);
+    padding: var(--nv-space-3) var(--nv-space-5) var(--nv-space-5);
+    background: var(--nv-glass-thick);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
   }
   .tm-dialog__foot .aib-foot__reset {
     order: 3;

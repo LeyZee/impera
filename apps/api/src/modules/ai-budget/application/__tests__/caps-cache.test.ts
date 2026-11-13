@@ -31,10 +31,11 @@ describe('createCapsCache', () => {
     await cache.load();
     expect(cache.dailyCapEur()).toBe(50);
     expect(cache.trendWatchCapEur()).toBe(0.5);
+    const reads = read.mock.calls.length;
     now = 1000;
     cache.dailyCapEur();
     // Within the minute: the value read at start serves, nothing is read again.
-    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(reads);
   });
 
   it('rereads at most once a minute, in the background', async () => {
@@ -75,5 +76,11 @@ describe('createCapsCache', () => {
     answers[0]?.resolve(caps(500));
     await loading;
     expect(cache.dailyCapEur()).toBe(90);
+  });
+
+  it('refuses to start on the code’s defaults when the first read fails', async () => {
+    const read = vi.fn(() => Promise.reject(new Error('database down')));
+    const cache = createCapsCache({ read, defaults: DEFAULTS, now: () => 0, onError: vi.fn() });
+    await expect(cache.load()).rejects.toThrow('database down');
   });
 });

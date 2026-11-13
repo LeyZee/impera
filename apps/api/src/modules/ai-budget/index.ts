@@ -28,7 +28,7 @@ export interface AiBudgetStartOptions {
   readonly now?: () => number;
 }
 
-/** Reads the owner's caps once before returning: the first call of the gateway already uses them. */
+/** Reads the owner's caps once before returning, so the gateway's first call uses them; rejects if that read fails. */
 export async function startAiBudgetModule(options: AiBudgetStartOptions): Promise<AiBudgetModule> {
   const store = createPostgresBudgetStore(options.adminDb);
   const cache = createCapsCache({
