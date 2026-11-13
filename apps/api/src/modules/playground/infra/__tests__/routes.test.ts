@@ -5,6 +5,7 @@ import {
   AlertTestResultSchema,
   ApiErrorSchema,
   CreatorIdSchema,
+  DesireMarksSchema,
   PersonaSchema,
   PersonaVersionIdSchema,
   PlaygroundAnswerSchema,
@@ -285,6 +286,49 @@ describe('/v1/playground', () => {
     ]);
     expect(state.history.find((turn) => turn.from === 'creator')?.desire).toBeUndefined();
     expect(state.desireThresholds.script).toBeGreaterThan(state.desireThresholds.open);
+  });
+
+  it('keeps the owner’s mark on his desire score for a version of hers, and reads it back with the weights now (ADR 0103 § 6)', async () => {
+    const { app, headers, post } = await server();
+    await post('/messages', { text: 'Salut' });
+    const invented = await post('/desire-marks', { fanMessageNumber: 1, verdict: 'too_high' });
+    expect(invented.statusCode).toBe(409);
+    expect(codeOf(invented)).toBe('desire_mark_invented_persona_conflict');
+
+    await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT });
+    await post('/messages', { text: 'Salut' });
+    expect((await post('/desire-marks', { fanMessageNumber: 2, verdict: 'right' })).statusCode).toBe(404);
+    const marked = await post('/desire-marks', {
+      fanMessageNumber: 1,
+      verdict: 'too_high',
+      note: 'Il dit juste bonjour',
+    });
+    expect(marked.statusCode, marked.body).toBe(200);
+    expect(stateOf(marked).history.find((turn) => turn.from === 'fan')?.desire?.mark).toBe('too_high');
+
+    const read = await app.inject({
+      method: 'GET',
+      url: `/v1/playground/desire-marks?creatorId=${MIA}`,
+      headers,
+    });
+    const { marks, weightsNow } = DesireMarksSchema.parse(read.json());
+    expect(weightsNow).toMatch(/^desire-/);
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toMatchObject({
+      fanMessage: 'Salut',
+      verdict: 'too_high',
+      note: 'Il dit juste bonjour',
+      scoreThen: 0,
+      scoreNow: 0,
+    });
+    // Starting over forgets the marks shown, never the ones kept.
+    expect(stateOf(await post('/reset')).history).toEqual([]);
+    const again = await app.inject({
+      method: 'GET',
+      url: `/v1/playground/desire-marks?creatorId=${MIA}`,
+      headers,
+    });
+    expect(DesireMarksSchema.parse(again.json()).marks).toHaveLength(1);
   });
 
   it('files the rating under the creator when there is one, and leaves it unassigned otherwise', async () => {

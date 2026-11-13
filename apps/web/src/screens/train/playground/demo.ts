@@ -1,6 +1,9 @@
 import {
+  DesireMarkIdSchema,
   MEDIA_VOCABULARY_VERSION,
+  newId,
   type BriefIntent,
+  type DesireMarks,
   type MediaDescription,
   type PlaygroundAnswer,
   type PlaygroundComparison,
@@ -523,6 +526,39 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
         return snapshot();
       }, 900),
     rate: (verdict: Verdict) => later(() => (rated(verdict), snapshot())),
+    // The demo keeps the mark on its turn only: nothing is stored without the server.
+    markDesire: (fanMessageNumber, verdict) =>
+      later(() => {
+        let seen = 0;
+        const at = history.findIndex((t) => t.from === 'fan' && (seen += 1) === fanMessageNumber);
+        const turn = history[at];
+        if (turn?.desire !== undefined) history[at] = { ...turn, desire: { ...turn.desire, mark: verdict } };
+        return snapshot();
+      }),
+    // Its marks are those of the conversation on screen, counted with the demo's weights.
+    desireMarks: () =>
+      later((): DesireMarks => ({
+        weightsNow: 'démo',
+        marks: history
+          .flatMap((t) =>
+            t.from === 'fan' && t.desire?.mark !== undefined
+              ? [{ text: t.text, desire: t.desire, mark: t.desire.mark }]
+              : [],
+          )
+          .reverse()
+          .map(({ text, desire, mark }) => ({
+            id: newId(DesireMarkIdSchema),
+            markedAt: new Date().toISOString(),
+            fanMessage: text,
+            verdict: mark,
+            note: null,
+            before: desire.before,
+            scoreThen: desire.score,
+            weightsThen: desire.weightsVersion,
+            signals: desire.signals,
+            scoreNow: desire.score,
+          })),
+      })),
     branch: (fanMessageNumber) =>
       later(() => {
         let seen = 0;
