@@ -128,20 +128,25 @@ Branche : task/<id>-<slug>
 | VEI-07 | Relevés de l'extension devenus signaux, sur la médiane du compte, et l'écart visible par l'agence | veille | todo | VEI-01, VEI-02, ADR 0082 |
 | VEI-08 | Fiche reel : la créatrice tourne un reel depuis un dessin, l'agence l'écrit avec des compteurs | veille | done | VEI-01, ADR 0082 |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
-| CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01, l'export du dashboard fourni par Charles hors dépôt |
+| CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
 | CRM-04 | Ventes en direct : alertes Telegram, bilan et revenus de la créatrice | API CRM | todo | CRM-01 |
-| CRM-05 | Ventes hors shift, écarts d'assignation et performance des chatteurs | API CRM | todo | CRM-01, CRM-03 pour les ventes en attente |
+| CRM-05 | Ventes hors shift, écarts d'assignation et performance des chatteurs | API CRM | in progress | CRM-01, CRM-03 pour les ventes en attente |
 | CRM-06 | CA de l'agent et achats dans la mémoire du fan | API CRM | todo | CRM-01, CRM-02 pour le CA de l'agent ; la capture Reveal pour la mémoire |
 | CRM-07 | Importer les créatrices depuis Reveal, après revue du propriétaire | API CRM | todo | CRM-01 |
 | CRM-08 | Revue de l'équipe Reveal : l'écran (ADR 0076) | API CRM | done | CRM-01, routes de Bilan (#626, #643), EQ-20 |
+| CRM-14 | Vérification de fiabilité sur deux sources : l'export devient facultatif | API CRM | done | CRM-02, ADR 0050 § 8 amendé le 11/11/2026 |
 | DSH-01 | Le Dashboard de l'agence : insights des ventes | API CRM | done (lots A et B) | CRM-01, ADR 0078 |
+| DSH-02 | Le Dashboard de l'agence : l'argent sur des tuiles séparées, et la TVA des virements | API CRM | review | DSH-01, ADR 0106 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
 | OPS-04 | Plantage journalisé, repli d'écriture épinglé, prix relus | exploitation | done | — |
 | OPS-05 | Les évaluations lisent la clé posée dans le CRM | exploitation | done | ADR 0016, P3-03 |
 | OPS-06 | Grok 4.7 réfléchit moins longtemps que ses délais | exploitation | done | ADR 0009, OPS-05 |
+| OPS-07 | Le juge des évaluations lit le moment que l'agent a vu | exploitation | done | ADR 0009, OPS-06 |
+| OPS-08 | La consommation IA et les crédits prépayés dans le CRM | exploitation | done | ADR 0091 |
+| OPS-10 | Les images Docker ne se disputent plus le cache pnpm | exploitation | done | OPS-03 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -151,6 +156,7 @@ Branche : task/<id>-<slug>
 | SEC-07 | Durcissement : liens d'extension, limites par adresse, appels sortants | exploitation | done | SEC-06 |
 | SEC-08 | Lien d'extension : mot de passe et code redemandés à la création ; ADR 0087 proposée | exploitation | done | SEC-07, ADR 0046 |
 | SEC-09 | Message de fan borné, rythme ralenti passé 60 réponses dans l'heure | exploitation | done | SEC-07 |
+| REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
 | ARC-03 | Le dossier du prestataire sorti de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-02 |
@@ -160,3 +166,4 @@ Branche : task/<id>-<slug>
 | ARC-07 | Une table lue par son seul propriétaire, un job par tâche | exploitation | done | ADR 0047, ARC-06 |
 | ARC-08 | Ordre des virements écartés du journal et relance d'émission par son index | exploitation | done | ARC-07 |
 | REC-PAIE-01 | Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis | exploitation | done | CRM-03, ADR 0076, ADR 0072 |
+| PIL-01 | « Mise en route » d'une créatrice et d'un membre, cochée par le serveur | exploitation | done | CRM-07 |

@@ -1,0 +1,6 @@
+# 2026-11-11 · Recette des écrans chatteur (Suivi, fiche, passations, playground, popup)
+
+Fait : recette dans le bac à sable (ADR 0075) du Suivi chatteur, de la fiche fan, des passations (détresse, mineur, rencontre, paiement, aveu d'IA, mot-clé), du playground et de la carte « Session du connecteur » du popup ; quatre défauts d'affichage corrigés : boutons de la retouche qui se recouvraient, statut long sous « Reprendre la main », compteur « à apprendre » de la fiche lu 30 s trop tard, filtres de l'Historique des alertes tronqués en « Tout… ».
+Vérifié : tests web du Suivi (dont trois nouveaux sur le CSS et un sur la relecture du reste à apprendre) ; captures avant/après Nuit/Jour, PC/téléphone.
+Reste : décisions de Charles sur la fiche d'un fan en détresse (« Ne plus lui écrire » contre « un humain doit lui répondre »), le bouton « Valider » tant que le connecteur n'envoie pas, l'alerte « IA indisponible » restée après le retour de l'IA, le contenu de l'Historique des alertes.
+Découvertes : la liste du Suivi est triée sur la dernière modification interne, pas sur le dernier message ; l'adresse d'une conversation Reveal lue par le copilote reste supposée (`open-conversation.ts`), à vérifier à l'essai sur le PC.

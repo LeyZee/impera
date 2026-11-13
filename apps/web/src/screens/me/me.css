@@ -47,3 +47,7 @@
   width: calc(100% + 28px);
   margin-inline: -14px;
 }
+/* The hint takes the width of the choice above it, not a narrow column beside nothing (GES-18). */
+.me-prefs .nv-appearance__hint {
+  max-width: none;
+}
