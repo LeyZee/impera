@@ -256,18 +256,23 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const accounts = createDrizzleAccountStore(deps.db, deps.adminDb);
   const vault = deps.sessionKeys === null ? null : createSessionVault(deps.sessionKeys);
   const resolver = createConnectorResolver({ accounts, vault, registry: deps.registry });
+  const ledger = createDrizzleSalesLedger(deps.db, deps.adminDb);
   const sessions = createConnectorSessions({
     accounts,
     vault,
     clock,
     shapes: { reveal: revealSessionShape },
+    linkedModels: async (platform, platformAccountId) =>
+      [...(await ledger.modelLinks(platform))]
+        .filter(([, link]) => link.platformAccountId === platformAccountId)
+        .map(([platformModelId]) => platformModelId),
   });
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
   const avatars: AvatarPorts | null =
     deps.avatars == null ? null : { ...deps.avatars, records: createAvatarRecords(deps.adminDb) };
   const salesFeeds = createSalesFeeds({
     keys: deps.credentialKeys === null ? null : createSalesFeedKeyStore(deps.adminDb, deps.credentialKeys),
-    ledger: createDrizzleSalesLedger(deps.db, deps.adminDb),
+    ledger,
     team: createDrizzleTeamImportStore(deps.db),
     registry: deps.salesFeeds,
     clock,

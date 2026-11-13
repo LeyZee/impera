@@ -22,6 +22,7 @@ import {
   type Verdict,
 } from '@impera/contracts';
 
+import { safetySigns } from '../../agent';
 import {
   AutomaticLocked,
   CreatorNotFound,
@@ -266,8 +267,9 @@ export function createConversationCommands({
           },
           meta,
         );
-        // Caught up (P2-02): stored and counted, but nothing reads or answers it on its own.
-        const isFresh = input.catchUp !== true;
+        // Caught up (P2-02): stored and counted, but nothing reads or answers it on its own, unless his words carry a
+        // sign the safety net answers (a minor, self-harm): that one is treated as fresh, so it is never left unread.
+        const isFresh = input.catchUp !== true || (isInbound && safetySigns(message.text).length > 0);
         if (isInbound) {
           // His card is read whoever answers him (ADR 0085 § 7): each message of his puts the next read off.
           const pace = await tx.cardReads.pace(conversation.id);
