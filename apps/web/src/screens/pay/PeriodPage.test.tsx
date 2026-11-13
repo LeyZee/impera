@@ -1702,6 +1702,32 @@ describe('Paie › Quinzaine › Donner une vente (ADR 0101)', () => {
     expect(within(list).getAllByRole('button').map(text)).toEqual(['Compter pour Théo', 'Écarter']);
   });
 
+  it('shows in the open sheet the sale read again after a refusal, its recipients as they are now', async () => {
+    held[OCT2] = [heldSaleOf({ outcomes: ['count', 'exclude', 'give'], recipients: [BASILE.id] })];
+    answer = () => {
+      // Basile's shift was moved meanwhile: only Lou was on shift at the sale's instant.
+      held[OCT2] = [heldSaleOf({ outcomes: ['count', 'exclude', 'give'], recipients: [LOU.id] })];
+      return { status: 409, body: refusal('pay_sale_recipient_conflict') };
+    };
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    fireEvent.click(within(await panelNamed('Ventes en attente')).getByRole('button', { name: 'Donner à…' }));
+    const dialog = await screen.findByRole('dialog');
+    const group = within(dialog).getByRole('radiogroup', { name: 'À qui' });
+    // The hint, and the error it turns into, is read with the choice.
+    expect(document.getElementById(group.getAttribute('aria-describedby') ?? '')?.textContent).toContain(
+      'Seuls les membres en poste',
+    );
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: NOTE } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Donner à Basile' }));
+    expect(await within(dialog).findByRole('alert')).toBeTruthy();
+    await waitFor(() => {
+      expect(within(dialog).queryByRole('radio', { name: 'Basile' })).toBeNull();
+    });
+    expect(within(dialog).getByRole('radio', { name: 'Lou' }).getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Donner' }));
+    expect(text(dialog)).toContain('Choisis le membre qui a convaincu le fan.');
+  });
+
   it('finds a sale by its day, the agent’s too, gives it whole, and goes no further than the period and today', async () => {
     const bot = heldSaleOf({
       platformSaleId: 'vente-ia',

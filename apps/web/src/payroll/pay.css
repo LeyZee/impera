@@ -1367,13 +1367,14 @@
   align-items: center;
   gap: var(--nv-space-3);
 }
+/* 44px to touch (CR-01), the bar and the knob centred in it. */
 .py-share__track {
   --py-thumb: 24px;
   --py-share-mine: var(--nv-neon);
   --py-share-rest: var(--nv-ink-faint);
   position: relative;
   flex: 1 1 auto;
-  height: 36px;
+  height: 44px;
   cursor: pointer;
   touch-action: none;
   border-radius: var(--nv-radius-full);
@@ -1381,7 +1382,7 @@
 .py-share__mine,
 .py-share__rest {
   position: absolute;
-  top: 13px;
+  top: 17px;
   height: 10px;
   transition:
     width var(--nv-dur-fast) var(--nv-ease-out),
@@ -1401,7 +1402,7 @@
 }
 .py-share__thumb {
   position: absolute;
-  top: 6px;
+  top: 10px;
   left: calc(var(--py-share) * 100% - var(--py-thumb) / 2);
   width: var(--py-thumb);
   height: var(--py-thumb);

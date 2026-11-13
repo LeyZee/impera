@@ -55,6 +55,9 @@ const NOTE_MAX = 500;
 const TEAM_NAMES_STALE_MS = 10 * 60_000;
 
 /** A refusal that says the list moved under the reader: it is read again. */
+/** A line of the list, by what it is on its platform: a sale or one of its refunds. */
+const saleKey = (sale: HeldSale): string => `${sale.platform}:${sale.platformSaleId}:${sale.event}`;
+
 const MOVED: ReadonlySet<string> = new Set([
   'pay_sale_not_found',
   'pay_sale_outcome_conflict',
@@ -173,6 +176,10 @@ export function SaleCards({
     readonly sale: HeldSale;
     readonly outcome: SaleDecisionOutcome;
   } | null>(null);
+  // The open sheet reads its sale in the list as it is now: after a refusal « la vente a bougé » the list is read
+  // again, and the sheet shows the fresh sale and its recipients; one gone from the list stays as it was opened.
+  const opened =
+    asked === null ? null : (sales.find((one) => saleKey(one) === saleKey(asked.sale)) ?? asked.sale);
   const nameOf = (memberId: string): string => names.member(memberId).name;
 
   return (
@@ -192,7 +199,7 @@ export function SaleCards({
             : lineChatter(sale, member, teamOf(sale.platform));
           const shown = outcomesShown(sale);
           return (
-            <li key={`${sale.platform}:${sale.platformSaleId}:${sale.event}`} className="py-held__row">
+            <li key={saleKey(sale)} className="py-held__row">
               <div className="py-held__main">
                 <p className="py-held__who" id={about('who')}>
                   {account === null ? 'Un compte' : account.creatorName}
@@ -256,12 +263,12 @@ export function SaleCards({
           );
         })}
       </ul>
-      {asked === null ? null : asked.outcome === 'give' ? (
+      {asked === null || opened === null ? null : asked.outcome === 'give' ? (
         <GiveDialog
-          key={`${asked.sale.platformSaleId}:give`}
+          key={`${saleKey(asked.sale)}:give`}
           period={period}
-          sale={asked.sale}
-          member={saleMemberOf(asked.sale, names, me)}
+          sale={opened}
+          member={saleMemberOf(opened, names, me)}
           names={names}
           zone={zone}
           onClose={() => {
@@ -270,11 +277,11 @@ export function SaleCards({
         />
       ) : (
         <DecideDialog
-          key={`${asked.sale.platformSaleId}:${asked.outcome}`}
+          key={`${saleKey(asked.sale)}:${asked.outcome}`}
           period={period}
-          sale={asked.sale}
+          sale={opened}
           outcome={asked.outcome}
-          member={saleMemberOf(asked.sale, names, me)}
+          member={saleMemberOf(opened, names, me)}
           names={names}
           zone={zone}
           onClose={() => {

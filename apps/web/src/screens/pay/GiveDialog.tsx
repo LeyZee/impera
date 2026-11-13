@@ -70,7 +70,7 @@ export function GiveDialog({
   const refresh = useRefreshPayroll();
   const [decisionId] = useState(() => newId(PaySaleDecisionIdSchema));
   const before = sale.given;
-  const [recipient, setRecipient] = useState<TeamMemberId | null>(
+  const [picked, setPicked] = useState<TeamMemberId | null>(
     before !== null && sale.recipients.includes(before.recipientMemberId)
       ? before.recipientMemberId
       : sale.recipients.length === 1
@@ -89,6 +89,8 @@ export function GiveDialog({
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
 
+  // A sale read again after a refusal may no longer list the member picked: then no one is.
+  const recipient = picked !== null && sale.recipients.includes(picked) ? picked : null;
   const account = names.account(sale.platformAccountId);
   const recipientName = recipient === null ? null : names.member(recipient).name;
   const bp = shared ? shareBp : SALE_WHOLE_BP;
@@ -142,7 +144,12 @@ export function GiveDialog({
           <span className="nv-field__label" id={`${id}-to`}>
             À qui
           </span>
-          <div className="tm-choices py-give__to" role="radiogroup" aria-labelledby={`${id}-to`}>
+          <div
+            className="tm-choices py-give__to"
+            role="radiogroup"
+            aria-labelledby={`${id}-to`}
+            aria-describedby={`${id}-to-hint`}
+          >
             {sale.recipients.map((one) => {
               const who = names.member(one);
               return (
@@ -156,7 +163,7 @@ export function GiveDialog({
                     recipient === one || (recipient === null && one === sale.recipients[0]) ? true : undefined
                   }
                   onClick={() => {
-                    setRecipient(one);
+                    setPicked(one);
                   }}
                 >
                   <Swatch color={who.color} />
