@@ -162,6 +162,9 @@ export function decisionText(
       return member === null ? counted : `${counted} pour ${member.name}`;
     case 'exclude':
       return sale.event === 'sale' ? 'Écartée' : 'Écarté';
+    case 'give':
+      // ADR 0101: a refund follows its sale.
+      return sale.event === 'sale' ? 'Donnée' : 'Sa vente est donnée';
   }
 }
 
@@ -178,10 +181,19 @@ export function outcomeLabel(outcome: SaleDecisionOutcome, member: SaleMember | 
       return member === null ? 'Compter' : `Compter pour ${member.name}`;
     case 'exclude':
       return 'Écarter';
+    case 'give':
+      return 'Donner à…';
     case 'withdraw':
       return 'Retirer la décision';
   }
 }
+
+/**
+ * The gestures the panel shows on a line: those the server offers, but « Donner à… », whose choice of member and share
+ * comes with its own screen (ADR 0101, second part).
+ */
+export const outcomesShown = (outcomes: readonly SaleDecisionOutcome[]): SaleDecisionOutcome[] =>
+  outcomes.filter((outcome) => outcome !== 'give');
 
 /** What the confirmation asks and says before a gesture is sent. */
 export interface OutcomeWords {
@@ -223,6 +235,12 @@ function refundWords(
           : `Il ne se déduira des ventes de personne, et sa vente ne comptera pour personne non plus. ${takenBack}`,
         confirm: 'Écarter',
       };
+    case 'give':
+      return {
+        title: 'Donner la vente de ce remboursement ?',
+        lead: `Sa vente va au membre choisi, et le remboursement se déduit de ses ventes. ${takenBack}`,
+        confirm: outcomeLabel('give', member),
+      };
     case 'withdraw':
       return {
         title: 'Retirer la décision ?',
@@ -257,6 +275,12 @@ export function outcomeWords(
         title: 'Écarter cette vente ?',
         lead: `Elle ne comptera pour personne, ses remboursements non plus. ${TAKEN_BACK}`,
         confirm: 'Écarter',
+      };
+    case 'give':
+      return {
+        title: 'Donner cette vente ?',
+        lead: `Elle compte pour le membre choisi, ses remboursements avec elle. ${TAKEN_BACK}`,
+        confirm: outcomeLabel('give', member),
       };
     case 'withdraw':
       return {

@@ -1,0 +1,9 @@
+/* A text field that grows with its text (`useGrowingArea`): no native grip, no scroll bar, at least two lines. */
+.nv-field__control.grow-area {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+}

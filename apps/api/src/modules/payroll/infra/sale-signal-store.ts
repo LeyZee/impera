@@ -1,7 +1,10 @@
 import {
+  calendarDayAt,
   CurrencySchema,
   MyFiguresSchema,
   MySalesSchema,
+  nextPayPeriod,
+  payPeriodOfDay,
   PayPeriodSchema,
   PaySaleSignalSchema,
   PlatformAccountIdSchema,
@@ -10,6 +13,7 @@ import {
   SaleEventSchema,
   payPeriodAt,
   SaleSignalKindSchema,
+  TeamMemberIdSchema,
   TimezoneSchema,
   type MySales,
   type PayPeriod,
@@ -20,9 +24,12 @@ import {
 import {
   and,
   eq,
+  inArray,
   lockPayrollClose,
+  or,
   schema,
   sql,
+  withAdmin,
   withMember,
   type Database,
   type Transaction,
@@ -43,6 +50,7 @@ import {
   pageOfLines,
   type MyLine,
   type MyLinesAfter,
+  type OwnGift,
   type OwnSignal,
   type OwnStatementSale,
 } from '../domain/my-sales';
@@ -71,6 +79,7 @@ const StoredSaleSchema = z.object({
   netMinor: z.number().int(),
   lateFrom: PayPeriodSchema.nullish(),
   occurredAt: z.iso.datetime().nullish(),
+  shareBp: z.number().int().nullish(),
 });
 
 const SignalRowSchema = z.object({
@@ -176,6 +185,7 @@ async function ownStatementSales(
         netMinor: one.netMinor,
         lateFrom: one.lateFrom ?? null,
         occurredAt: one.occurredAt == null ? null : new Date(one.occurredAt),
+        shareBp: one.shareBp ?? null,
       }));
   });
 }
@@ -355,6 +365,153 @@ async function excludedAmong(tx: Transaction, sales: readonly SaleKey[]): Promis
   );
 }
 
+const GiftRowSchema = z.object({
+  platform: PlatformSchema,
+  platformSaleId: z.string().min(1),
+  outcome: SaleDecisionOutcomeSchema,
+  authorMemberId: TeamMemberIdSchema.nullable(),
+  recipientMemberId: TeamMemberIdSchema.nullable(),
+  shareBp: z.number().int().nullable(),
+  note: z.string().nullable(),
+  platformAccountId: PlatformAccountIdSchema,
+  saleCurrency: CurrencySchema.nullable(),
+  saleNetMinor: z.number().int().nullable(),
+  saleOccurredAt: z.date().nullable(),
+});
+
+/**
+ * The display names of `memberIds`, on the admin connection: a member's policies show them their own row alone. Read
+ * only for the other side of a gift the member's policies already gave them (ADR 0101 § 6): a name, nothing else.
+ */
+async function namesUnscoped(
+  adminDb: Database,
+  memberIds: readonly TeamMemberId[],
+): Promise<Map<TeamMemberId, string>> {
+  if (memberIds.length === 0) return new Map();
+  const rows = await withAdmin(adminDb, (tx) =>
+    tx
+      .select({ id: teamMembers.id, displayName: teamMembers.displayName })
+      .from(teamMembers)
+      .where(inArray(teamMembers.id, [...memberIds])),
+  );
+  return new Map(rows.map((row) => [TeamMemberIdSchema.parse(row.id), row.displayName]));
+}
+
+/**
+ * The latest decision the member reads on each sale they made or received that gives it (ADR 0101), by `saleIdOf`:
+ * on the sales of `named`, and on their own sales given whole whose instant is in `period` (the agency's zone). The
+ * policies give a member the decisions on their own sales and those given to them; a withdrawal or another decision
+ * written since ends a gift.
+ */
+async function ownGifts(
+  tx: Transaction,
+  adminDb: Database,
+  member: TeamMemberId,
+  period: PayPeriod,
+  named: readonly SaleKey[],
+  timeZone: string,
+): Promise<Map<string, OwnGift>> {
+  const day = 24 * 60 * 60 * 1000;
+  const from = new Date(Date.parse(`${period}T00:00:00.000Z`) - day);
+  const to = new Date(Date.parse(`${nextPayPeriod(period)}T00:00:00.000Z`) + day);
+  const sales = [...new Map(named.map((one) => [saleIdOf(one), one])).values()];
+  const ofNamed =
+    sales.length === 0
+      ? sql`false`
+      : sql`(${paySaleDecisions.platform}, ${paySaleDecisions.platformSaleId}) in (${sql.join(
+          sales.map((one) => sql`(${one.platform}, ${one.platformSaleId})`),
+          sql`, `,
+        )})`;
+  // Every decision on the sales concerned, so that the latest of each is known, whatever it is.
+  const concerned = tx
+    .selectDistinct({ platform: paySaleDecisions.platform, platformSaleId: paySaleDecisions.platformSaleId })
+    .from(paySaleDecisions)
+    .where(
+      or(
+        ofNamed,
+        and(
+          eq(paySaleDecisions.outcome, 'give'),
+          eq(paySaleDecisions.authorMemberId, member),
+          sql`${paySaleDecisions.saleOccurredAt} >= ${from} and ${paySaleDecisions.saleOccurredAt} < ${to}`,
+        ),
+      ),
+    );
+  const rows = await tx
+    .selectDistinctOn([paySaleDecisions.platform, paySaleDecisions.platformSaleId], {
+      platform: paySaleDecisions.platform,
+      platformSaleId: paySaleDecisions.platformSaleId,
+      outcome: paySaleDecisions.outcome,
+      authorMemberId: paySaleDecisions.authorMemberId,
+      recipientMemberId: paySaleDecisions.recipientMemberId,
+      shareBp: paySaleDecisions.shareBp,
+      note: paySaleDecisions.note,
+      platformAccountId: paySaleDecisions.platformAccountId,
+      saleCurrency: paySaleDecisions.saleCurrency,
+      saleNetMinor: paySaleDecisions.saleNetMinor,
+      saleOccurredAt: paySaleDecisions.saleOccurredAt,
+    })
+    .from(paySaleDecisions)
+    .where(
+      sql`(${paySaleDecisions.platform}, ${paySaleDecisions.platformSaleId}) in (select * from (${concerned}) c)`,
+    )
+    .orderBy(
+      paySaleDecisions.platform,
+      paySaleDecisions.platformSaleId,
+      sql`${paySaleDecisions.revision} desc`,
+    );
+  const gives = rows
+    .map((row) => GiftRowSchema.parse(row))
+    .flatMap((one) =>
+      one.outcome === 'give' &&
+      one.recipientMemberId !== null &&
+      one.shareBp !== null &&
+      one.note !== null &&
+      one.saleCurrency !== null &&
+      one.saleNetMinor !== null &&
+      one.saleOccurredAt !== null
+        ? [
+            {
+              ...one,
+              recipientMemberId: one.recipientMemberId,
+              shareBp: one.shareBp,
+              note: one.note,
+              saleCurrency: one.saleCurrency,
+              saleNetMinor: one.saleNetMinor,
+              saleOccurredAt: one.saleOccurredAt,
+            },
+          ]
+        : [],
+    );
+  const others = gives.flatMap((one) => {
+    if (one.recipientMemberId !== member) return [one.recipientMemberId];
+    return one.authorMemberId === null ? [] : [one.authorMemberId];
+  });
+  const names = await namesUnscoped(adminDb, [...new Set(others)]);
+  const gifts = new Map<string, OwnGift>();
+  const namedIds = new Set(sales.map((one) => saleIdOf(one)));
+  for (const one of gives) {
+    const role = one.recipientMemberId === member ? 'recipient' : 'author';
+    // Outside the sales named, only the member's own sales of the period given whole away are shown.
+    const inPeriod = payPeriodOfDay(calendarDayAt(one.saleOccurredAt, timeZone)) === period;
+    if (!namedIds.has(saleIdOf(one)) && !(role === 'author' && inPeriod)) continue;
+    const otherId = role === 'author' ? one.recipientMemberId : one.authorMemberId;
+    const name = otherId === null ? undefined : names.get(otherId);
+    gifts.set(saleIdOf(one), {
+      platform: one.platform,
+      platformSaleId: one.platformSaleId,
+      role,
+      recipientShareBp: one.shareBp,
+      other: otherId === null ? { kind: 'agent' } : { kind: 'member', displayName: name ?? 'Membre' },
+      note: one.note,
+      platformAccountId: one.platformAccountId,
+      currency: one.saleCurrency,
+      netMinor: one.saleNetMinor,
+      occurredAt: one.saleOccurredAt,
+    });
+  }
+  return gifts;
+}
+
 const toMySale = (line: MyLine): MySales['items'][number] => ({
   platform: line.platform,
   platformSaleId: line.platformSaleId,
@@ -369,6 +526,7 @@ const toMySale = (line: MyLine): MySales['items'][number] => ({
     line.signal === null
       ? null
       : { note: line.signal.note, signalledAt: line.signal.signalledAt.toISOString() },
+  given: line.given,
   open: line.open,
 });
 
@@ -380,6 +538,7 @@ const toMySale = (line: MyLine): MySales['items'][number] => ({
  */
 export function createDrizzleSaleSignalStore(
   db: Database,
+  adminDb: Database,
   reads: PayInputReads,
   now: () => Date = () => new Date(),
 ): PayrollSaleSignalStore {
@@ -413,18 +572,20 @@ export function createDrizzleSaleSignalStore(
         const signals = await ownSignals(tx, member, query.period);
         const onStatement = new Set(statement.map((one) => saleKeyOf(one)));
         const left = signals.filter((one) => one.kind === 'signal' && !onStatement.has(saleKeyOf(one)));
+        const timeZone = await reads.agencyTimeZone(tx);
         const lines = myLines({
           statement,
           signals,
           excluded: await excludedAmong(tx, left),
           registered: await ownRegistered(tx, member, query.period),
+          gifts: await ownGifts(tx, adminDb, member, query.period, [...statement, ...left], timeZone),
           closed,
         });
         const page = pageOfLines(lines, after, query.limit);
         return MySalesSchema.parse({
           period: query.period,
           closed,
-          days: myDays(lines, await reads.agencyTimeZone(tx)),
+          days: myDays(lines, timeZone),
           items: page.items.map(toMySale),
           nextCursor: page.next === null ? null : encodeCursor(page.next),
         });

@@ -992,17 +992,49 @@ export const SaleHeldReasonSchema = z.enum(SALE_HELD_REASONS);
 export type SaleHeldReason = z.infer<typeof SaleHeldReasonSchema>;
 
 /**
- * What the validator decides on a sale (ADR 0050 § 5): it counts for the member its chatter is linked to (`count`),
- * or for nobody (`exclude`); `withdraw` takes back the decision in force, and the sale follows the rules again. Its
- * refunds follow it. Never another member: the link says who made it. Any decision is taken back until a closing
- * counts the sale.
+ * What the validator decides on a sale (ADR 0050 § 5, ADR 0101): it counts for the member its chatter is linked to
+ * (`count`), for nobody (`exclude`), or for another member who was decisive (`give`), whole or shared with its author;
+ * `withdraw` takes back the decision in force, and the sale follows the rules again. Its refunds follow it. Any
+ * decision is taken back or changed until a closing counts the sale.
  */
-export const SaleDecisionOutcomeSchema = z.enum(['count', 'exclude', 'withdraw']);
+export const SaleDecisionOutcomeSchema = z.enum(['count', 'exclude', 'give', 'withdraw']);
 export type SaleDecisionOutcome = z.infer<typeof SaleDecisionOutcomeSchema>;
 
 /** A decision in force on a sale: `withdraw` leaves none. */
-export const SaleDecisionInForceSchema = z.enum(['count', 'exclude']);
+export const SaleDecisionInForceSchema = z.enum(['count', 'exclude', 'give']);
 export type SaleDecisionInForce = z.infer<typeof SaleDecisionInForceSchema>;
+
+/**
+ * Why the validator excludes a sale (ADR 0101 § 8): the agent was decisive (`agent_decisive`, the sale counts for the
+ * agent in the Dashboard, never in pay), or another reason (`other`). `null` on a decision made before ADR 0101.
+ */
+export const SaleExcludeReasonSchema = z.enum(['agent_decisive', 'other']);
+export type SaleExcludeReason = z.infer<typeof SaleExcludeReasonSchema>;
+
+/** The whole of a sale, in basis points: a share of `SALE_WHOLE_BP` gives the sale whole. */
+export const SALE_WHOLE_BP = 10_000;
+
+/**
+ * The share of a sale its recipient takes (ADR 0101 §§ 11–13), in basis points: the whole sale (`SALE_WHOLE_BP`), or a
+ * share by steps of 10 %, from 10 % to 90 %. The author keeps the rest.
+ */
+export const SaleGiveShareSchema = z
+  .number()
+  .int()
+  .min(1_000)
+  .max(SALE_WHOLE_BP)
+  .refine((bp) => bp % 1_000 === 0, { message: 'A share goes by steps of 10 %' });
+
+/**
+ * A `give` in force, as the validator, the author and the recipient read it (ADR 0101 §§ 6, 15): the member who
+ * receives the sale, their share (`SALE_WHOLE_BP` for the whole sale) and the validator's note.
+ */
+export const SaleGivenSchema = z.object({
+  recipientMemberId: TeamMemberIdSchema,
+  shareBp: SaleGiveShareSchema,
+  note: PayReasonSchema,
+});
+export type SaleGiven = z.infer<typeof SaleGivenSchema>;
 
 /**
  * What a member says of a line on their own statement (CRM-03 lot b4c, ADR 0050 § 5): `signal`, it is not theirs;
@@ -1055,7 +1087,17 @@ export const HeldSaleSchema = z.object({
   reason: SaleHeldReasonSchema.nullable(),
   /** The decision in force on its sale, `null` for none. */
   decision: SaleDecisionInForceSchema.nullable(),
+  /** For a `give` in force, who receives the sale, their share and the note (ADR 0101); `null` otherwise. */
+  given: SaleGivenSchema.nullable(),
+  /** For an `exclude` in force, its reason (ADR 0101 § 8); `null` otherwise, or on an exclusion made before it. */
+  excludeReason: SaleExcludeReasonSchema.nullable(),
   outcomes: z.array(SaleDecisionOutcomeSchema),
+  /**
+   * The members `give` may name (ADR 0101 § 2): on shift on the account at the sale's instant, access margin included,
+   * other than its author and than the validator reading, and without a validated final statement. Empty when `give`
+   * is not offered.
+   */
+  recipients: z.array(TeamMemberIdSchema),
   /**
    * The signal in force of the member the line would pay (CRM-03 lot b4c): « ce n'est pas ma vente ». `null` for none,
    * or once the line would no longer pay them (linked again, for instance): the signal then has no effect.
@@ -1077,10 +1119,11 @@ export const HeldSalesSchema = z.object({
 export type HeldSales = z.infer<typeof HeldSalesSchema>;
 
 /**
- * A decision of the validator on a sale (CRM-03 lot b3, ADR 0050 § 5), added only: the latest one counts, while the
- * chatter's link keeps the version it was made on; a `withdraw` leaves none. `reason` is why the sale was held without
- * a decision when it was decided, `null` for a sale a member would be paid for (excluded as wrongly given to them);
- * `memberId` the member its chatter was linked to then.
+ * A decision of the validator on a sale (CRM-03 lot b3, ADR 0050 § 5, ADR 0101), added only: the latest one counts,
+ * while the chatter's link keeps the version it was made on; a `withdraw` leaves none. `reason` is why the sale was
+ * held without a decision when it was decided, `null` for a sale a member would be paid for (excluded or given away as
+ * wrongly theirs) or the agent's; `memberId` the member its chatter was linked to then (`null` for the agent).
+ * `recipientMemberId` and `shareBp` are a `give`'s, `excludeReason` an `exclude`'s.
  */
 export const PaySaleDecisionSchema = z.object({
   id: PaySaleDecisionIdSchema,
@@ -1091,6 +1134,9 @@ export const PaySaleDecisionSchema = z.object({
   outcome: SaleDecisionOutcomeSchema,
   reason: SaleHeldReasonSchema.nullable(),
   memberId: TeamMemberIdSchema.nullable(),
+  recipientMemberId: TeamMemberIdSchema.nullable(),
+  shareBp: SaleGiveShareSchema.nullable(),
+  excludeReason: SaleExcludeReasonSchema.nullable(),
   note: PayReasonSchema.nullable(),
   decidedBy: UserIdSchema,
   createdAt: z.iso.datetime(),
@@ -1098,20 +1144,44 @@ export const PaySaleDecisionSchema = z.object({
 export type PaySaleDecision = z.infer<typeof PaySaleDecisionSchema>;
 
 /**
- * `POST /v1/payroll/sale-decisions` (owner, active manager, never on a sale of their own) → 201
- * `PaySaleDecisionSchema`, 200 for the same `id` and values. The sale is one `period` takes and no closing counted,
+ * `POST /v1/payroll/sale-decisions` (owner, active manager, never on a sale of their own nor given to themselves) →
+ * 201 `PaySaleDecisionSchema`, 200 for the same `id` and values. The sale is one `period` takes and no closing counted,
  * with an outcome it offers: one of its held lines, one a decision in force settles (to change or `withdraw` it), or,
- * to `exclude` it, one a member is paid for. Counted, it goes in its own period, or in the team's first open period
- * once its own is closed (ADR 0032).
+ * to `exclude` or `give` it, one a member or the agent is paid for. `give` names one of the line's `recipients`, a share
+ * (the whole sale, or by steps of 10 % for a sale of a member, ADR 0101 § 12) and a note; `exclude` its reason. Counted,
+ * it goes in its own period, or in the team's first open period once its own is closed (ADR 0032).
  */
-export const CreatePaySaleDecisionBodySchema = z.object({
-  id: PaySaleDecisionIdSchema,
-  period: PayPeriodSchema,
-  platform: PlatformSchema,
-  platformSaleId: z.string().min(1).max(200),
-  outcome: SaleDecisionOutcomeSchema,
-  note: PayReasonSchema.nullable(),
-});
+export const CreatePaySaleDecisionBodySchema = z
+  .object({
+    id: PaySaleDecisionIdSchema,
+    period: PayPeriodSchema,
+    platform: PlatformSchema,
+    platformSaleId: z.string().min(1).max(200),
+    outcome: SaleDecisionOutcomeSchema,
+    note: PayReasonSchema.nullable(),
+    recipientMemberId: TeamMemberIdSchema.nullable().default(null),
+    shareBp: SaleGiveShareSchema.nullable().default(null),
+    excludeReason: SaleExcludeReasonSchema.nullable().default(null),
+  })
+  .superRefine((body, context) => {
+    const give = body.outcome === 'give';
+    if (give !== (body.recipientMemberId !== null) || give !== (body.shareBp !== null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A give, and a give alone, names its recipient and their share',
+      });
+    }
+    if (give && body.note === null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['note'],
+        message: 'A give says why its recipient was decisive',
+      });
+    }
+    if ((body.outcome === 'exclude') !== (body.excludeReason !== null)) {
+      context.addIssue({ code: 'custom', message: 'An exclusion, and an exclusion alone, says its reason' });
+    }
+  });
 export type CreatePaySaleDecisionBody = z.infer<typeof CreatePaySaleDecisionBodySchema>;
 
 /**
@@ -1155,14 +1225,32 @@ export const CreatePaySaleSignalBodySchema = z.object({
 export type CreatePaySaleSignalBody = z.infer<typeof CreatePaySaleSignalBodySchema>;
 
 /**
- * Where one of the member's own lines stands for them (CRM-03 lot b4c):
+ * Where one of the member's own lines stands for them (CRM-03 lot b4c, ADR 0101 § 6):
  * - `counted`, on their statement, no signal in force;
  * - `signalled`, on their statement, their signal in force: the validator sees it;
  * - `excluded`, signalled, then left their statement on the validator's exclusion;
- * - `removed`, signalled, then left their statement otherwise (linked again to another member, for instance).
+ * - `removed`, signalled, then left their statement otherwise (linked again to another member, for instance);
+ * - `given`, their sale, given whole to another member by the validator: never on their statement.
  */
-export const MySaleStateSchema = z.enum(['counted', 'signalled', 'excluded', 'removed']);
+export const MySaleStateSchema = z.enum(['counted', 'signalled', 'excluded', 'removed', 'given']);
 export type MySaleState = z.infer<typeof MySaleStateSchema>;
+
+/**
+ * A sale given by the validator, as each of its two members reads it on their own line (ADR 0101 §§ 6, 15): whether
+ * the reader made it (`author`) or received it (`recipient`), the reader's own share in basis points (0 for an author
+ * who gave the whole sale), the other side by their display name, or the agent for an agent's sale, and the note. A
+ * member reads nothing else of the other: no total, no other line (ADR 0043 § 7).
+ */
+export const MySaleGivenSchema = z.object({
+  role: z.enum(['author', 'recipient']),
+  myShareBp: z.number().int().min(0).max(SALE_WHOLE_BP),
+  other: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('member'), displayName: z.string().min(1) }),
+    z.object({ kind: z.literal('agent') }),
+  ]),
+  note: PayReasonSchema,
+});
+export type MySaleGiven = z.infer<typeof MySaleGivenSchema>;
 
 /**
  * A line of the platform's net as its member reads it (CRM-03 lot b4c, ADR 0050 § 10): when, on which account, its
@@ -1182,6 +1270,8 @@ export const MySaleSchema = z.object({
   lateFrom: PayPeriodSchema.nullable(),
   state: MySaleStateSchema,
   signal: z.object({ note: PayReasonSchema.nullable(), signalledAt: z.iso.datetime() }).nullable(),
+  /** A sale the validator gave, whole or shared (ADR 0101); `null` otherwise. */
+  given: MySaleGivenSchema.nullable(),
   open: z.boolean(),
 });
 export type MySale = z.infer<typeof MySaleSchema>;
@@ -1302,6 +1392,8 @@ export type MyFigures = z.infer<typeof MyFiguresSchema>;
  * `collective_goal_conflict`, `payout_minimum_conflict`, `pay_sale_decision_conflict` 409, the same `id` with other
  * values (a decision written meanwhile on the same sale too) ;
  * `pay_sale_outcome_conflict` 409, an outcome the sale does not offer (`details.outcomes`, those it does) ;
+ * `pay_sale_recipient_conflict` 409, a give to a member the sale does not offer (not on shift at its instant, its
+ * author, the validator, or gone with a validated final statement), or a share of a sale of the agent (ADR 0101) ;
  * `pay_sale_signal_conflict` 409, the same signal `id` with other values ;
  * `pay_sale_signal_state_conflict` 409, a line already signalled, or a withdrawal without a signal in force ;
  * `pay_rule_started_invalid` 400, tiers or a payout minimum from a period that has begun (PAIE-22, `details.period`) ;
@@ -1347,6 +1439,7 @@ export const PAYROLL_ERROR_CODES = [
   'payout_minimum_conflict',
   'pay_sale_decision_conflict',
   'pay_sale_outcome_conflict',
+  'pay_sale_recipient_conflict',
   'pay_sale_signal_conflict',
   'pay_sale_signal_state_conflict',
   'pay_rule_started_invalid',

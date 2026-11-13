@@ -289,6 +289,7 @@ describe('Équipe › Paie : le chatteur lit ses ventes et signale celle qui n�
       platformSaleId: 'sale_a',
       outcome: 'exclude',
       note: null,
+      excludeReason: 'other',
     });
     expect(excluded.statusCode).toBe(201);
     await team.recalculate(P1);
