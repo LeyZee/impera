@@ -44,7 +44,7 @@ export interface PlatformScriptView {
   readonly steps: readonly PlatformScriptStepView[];
   /** Every media of every step described and validated (ADR 0083). */
   readonly mediaValidated: boolean;
-  /** Its description, what the brain picks on, validated by the agency (ADR 0083): never picked on an unchecked one. */
+  /** Its description, what the brain picks on, validated by the agency (ADR 0100): never picked on an unchecked one. */
   readonly descriptionValidated: boolean;
   /** Something in it touches a limit of her persona. */
   readonly touchesLimits: boolean;
