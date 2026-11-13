@@ -1,6 +1,6 @@
 # 0103. Le playground en base : conversations, notes, cas rejouables, taux par version, calibrage du désir
 
-Statut : accepted (« ok 0103 » de Charles, 12/11/2026 ; demande du même jour après l’avis sur le playground, recommandations 3, 4, 5 et la note de désir). Amendée le 13/11/2026 (« ok phrases 0103 » : la disponibilité du fan, porte avant le premier teaser, texte corrigé validé à 1 h 07).
+Statut : accepted (« ok 0103 » de Charles, 12/11/2026 ; demande du même jour après l’avis sur le playground, recommandations 3, 4, 5 et la note de désir). Amendée le 13/11/2026 (« ok phrases 0103 » : la disponibilité du fan, porte avant le premier teaser, texte corrigé validé à 1 h 07 ; puis les ventes fictives, « ok phrases 0103 » à 1 h 10).
 Date : 2026-11-12
 Précise : l'ADR 0019 (taux au playground) et l'ADR 0022 (la persona fait partie de la version). Ne remplace rien.
 
@@ -29,6 +29,15 @@ Charles, 13/11 : la note de désir doit dire si le fan est en état de recevoir 
 12. **Un « non » après le démarrage met le script en pause** : aucune étape envoyée, aucun refus compté. Le script ne reprend que dans la même session (ADR 0098).
 13. **La question vient du code.** Quand il est chaud et sexualise mais que sa disponibilité est inconnue, le code donne au cerveau la consigne de s'en assurer naturellement (« t'es tranquille là ? »), avant tout teaser. La consigne est donnée une fois par session au plus : un fan qui ne répond pas ne se la voit pas reposer à chaque message.
 14. **Au playground**, une ligne « Disponible : confirmée / inconnue / non » s'affiche à côté de la note de désir, avec ce qui l'a fixée, et la porte dit laquelle des trois conditions manque, pour calibrer comme le reste.
+
+## Amendement du 13/11/2026 : les ventes fictives
+
+Charles, 13/11 : au playground, elle doit pouvoir vendre pour de faux, scripts et médias compris, pour voir comment et à quel moment elle vend. Avant cet amendement, le playground savait décider une offre et laisser le propriétaire jouer un média envoyé, mais il n'y avait ni script, ni prix, ni achat. Avis du fil Agent (ADR 0098) repris.
+
+15. **Elle joue les vrais scripts, par les mêmes règles.** Une fois le déroulé de script de l'ADR 0098 sur `main`, le playground joue les scripts de la créatrice choisie, lus comme en production (coffre synchronisé de l'ADR 0099 ou scripts écrits dans l'outil), ou ceux de la persona fictive. Il appelle les mêmes fonctions du domaine que la production (porte de démarrage, étape suivante, rapprochement) : aucune règle recopiée côté playground. Il n'appelle jamais Reveal.
+16. **Le fan peut payer pour de faux.** Chaque étape payante arrive floutée, avec le prix de l'étape, et deux boutons : « Payer (fictif) » et « Refuser ». Payer débloque le média, ajoute le montant à « déjà dépensé » et laisse le script avancer. Refuser vaut un refus explicite. Ignorer l'étape se joue en écrivant d'autres messages, et c'est le compteur du domaine qui en décide, pas un bouton.
+17. **Rien ne sort.** Aucun argent ne bouge, aucune vente n'est enregistrée hors du playground, rien n'est envoyé à une plateforme. Le déroulé d'une session de playground vit dans les tables du playground, jamais dans celles des conversations réelles ; le domaine y accède par un port à deux adaptateurs, la production et le playground. Tout ce qui est payé est marqué « fictif » à l'écran.
+18. **« Pourquoi » dit où en est le script** : quel script, quelle étape, pourquoi elle a envoyé à ce moment-là, ou pourquoi elle attend (dont la condition de la porte qui manque).
 
 ## Conséquences
 
