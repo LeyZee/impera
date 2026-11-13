@@ -1,5 +1,5 @@
 ---
-version: 1.14.0
+version: 1.15.0
 role: brain
 model_hint: grok-4.7
 output_schema: Brief

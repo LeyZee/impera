@@ -1,5 +1,5 @@
 ---
-version: 1.8.0
+version: 1.9.0
 role: voice
 model_hint: grok-4.7
 output_schema: VoiceOutput
