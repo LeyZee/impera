@@ -358,7 +358,7 @@ function GrowingArea({
       <textarea
         ref={ref}
         id={id}
-        className="nv-glass nv-field__control ps-input ps-area__input st-area"
+        className="nv-glass nv-field__control ps-input ps-area__input grow-area"
         value={value}
         rows={rows}
         maxLength={maxLength}

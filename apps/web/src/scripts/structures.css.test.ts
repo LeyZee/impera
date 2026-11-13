@@ -13,8 +13,4 @@ describe('the fields of a stage, no control of the system (ADM-16)', () => {
     );
     expect(css).toMatch(/\.st-seconds \{[^}]*appearance: textfield;/u);
   });
-
-  it('grows a sentence with its text, without the handle', () => {
-    expect(css).toMatch(/\.ps-area__input\.st-area \{[^}]*resize: none;[^}]*field-sizing: content;/u);
-  });
 });

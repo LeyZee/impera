@@ -101,7 +101,7 @@ describe('the workshop of a structure', () => {
     renderWorkshop();
     expect(await screen.findByLabelText('Intention')).toHaveProperty(
       'className',
-      expect.stringContaining('st-area'),
+      expect.stringContaining('grow-area'),
     );
     expect(screen.getByRole('button', { name: 'Carton précédent' }).getAttribute('title')).toBe(
       'Carton précédent',

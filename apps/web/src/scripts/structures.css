@@ -915,11 +915,6 @@
   -webkit-appearance: none;
   margin: 0;
 }
-/* A sentence grows with its text, no handle (ADM-16). */
-.ps-area__input.st-area {
-  resize: none;
-  field-sizing: content;
-}
 /* A pressed pill: « Facultative » on or off. */
 .st-pill {
   appearance: none;
