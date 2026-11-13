@@ -149,7 +149,9 @@ function CreditCard({ card, index }: { card: AiCredits; index: number }): JSX.El
         <span className={`cia-badge cia-badge--${tone}`}>{CREDIT_BADGE[card.state]}</span>
       </header>
       {card.mode === 'subscription' ? (
-        <p className="cia-credit__balance cia-credit__balance--plan">Inclus dans l’abonnement</p>
+        <p className="cia-credit__balance cia-credit__balance--plan">
+          {card.state === 'quota_reached' ? 'Quota de l’abonnement épuisé' : 'Inclus dans l’abonnement'}
+        </p>
       ) : (
         <p className="cia-credit__balance nv-num">
           {creditText(card.balanceMinor, card.currency)}
@@ -549,7 +551,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
 
       <Section
         title="Crédits"
-        sub="ce qu’il reste chez chaque service, décompté appel par appel"
+        sub="ce qu’il reste chez chaque service, décompté appel par appel, ou son abonnement"
         index={2}
         control={
           usage.credits.length === 0 ? undefined : (

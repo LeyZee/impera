@@ -96,7 +96,7 @@ describe('Consommation IA, what the screen says (ADR 0091)', () => {
     expect(runwayShare(plan)).toBe(100);
     const reached = { ...plan, state: 'quota_reached', quotaRefusedAt: '2026-11-12T22:35:00.000Z' } as const;
     expect(runwayText(reached)).toBe(
-      'Quota épuisé depuis jeudi 12 novembre à 23:35 : l’agent répond avec son modèle de repli jusqu’à la remise à zéro.',
+      'Depuis jeudi 12 novembre à 23:35, l’agent répond avec son modèle de repli jusqu’à la remise à zéro.',
     );
     expect(runwayShare(reached)).toBe(0);
   });

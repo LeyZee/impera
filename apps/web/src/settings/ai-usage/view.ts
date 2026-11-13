@@ -254,7 +254,7 @@ export const refusedText = (at: string): string => REFUSED_AT.format(new Date(at
 /** The card's headline about time: how long, and until when; on a subscription, whether the quota holds. */
 export function runwayText(card: AiCredits): string {
   if (card.state === 'quota_reached' && card.quotaRefusedAt !== null)
-    return `Quota épuisé depuis ${refusedText(card.quotaRefusedAt)} : l’agent répond avec son modèle de repli jusqu’à la remise à zéro.`;
+    return `Depuis ${refusedText(card.quotaRefusedAt)}, l’agent répond avec son modèle de repli jusqu’à la remise à zéro.`;
   if (card.mode === 'subscription')
     return 'Les appels passent sur le quota de ton abonnement. S’il est épuisé, Telegram te prévient.';
   if (card.state === 'empty') return 'Épuisés d’après le décompte : recharge, puis note-le ici.';
