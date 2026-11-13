@@ -724,6 +724,9 @@ describe('words', () => {
     expect(payRefusalText({ kind: 'refused', code: 'pay_sale_outcome_conflict', details: {} }, names)).toBe(
       'Cette décision n’est plus possible pour cette vente : la liste est relue.',
     );
+    expect(payRefusalText({ kind: 'refused', code: 'pay_sale_recipient_conflict', details: {} }, names)).toBe(
+      'Cette vente ne peut pas aller à ce membre : seul un membre en poste au moment de la vente la reçoit, et une vente de l’IA se donne entière. La liste est relue.',
+    );
     expect(payRefusalText({ kind: 'refused', code: 'pay_sale_decision_conflict', details: {} }, names)).toBe(
       'Cette saisie existe déjà avec d’autres valeurs : recharge la page.',
     );

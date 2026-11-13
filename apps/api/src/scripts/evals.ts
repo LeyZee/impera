@@ -41,6 +41,7 @@ import { checkCardScenario, readCardScenario, type CardScenario } from './evals/
 import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './evals/check';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
+import { judgeSituationOf, scenarioFlags, scenarioMoment } from './evals/situation';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const EVALS = resolve(ROOT, 'evals');
@@ -121,7 +122,7 @@ const files =
 
 const today = '2026-11-06';
 const persona = readPersonaFile(
-  readFileSync(resolve(ROOT, 'personas/demo/v0.3.0.yaml'), 'utf8'),
+  readFileSync(resolve(ROOT, 'personas/demo/v0.4.0.yaml'), 'utf8'),
   'Elena',
   today,
 );
@@ -194,12 +195,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
       fanText: inbound.join('\n'),
       media: [],
       fanNotes: scenario.fan_facts.join('\n'),
-      situation: {
-        now,
-        timeZone: 'Europe/Paris',
-        relationshipStartedAt: new Date(now.getTime() - situation.known_hours * HOUR_MS),
-        spentCents: Math.round(situation.spent_euros * 100),
-      },
+      situation: scenarioMoment(scenario, now),
       // The policy decides on the brain's offer, as for a real fan: refused, the voice writes a plain answer.
       offer: {
         now,
@@ -208,12 +204,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
             ? null
             : new Date(now.getTime() - situation.last_offer_hours_ago * HOUR_MS),
         hasNoBudget: situation.has_no_budget,
-        flags: {
-          ...(situation.age_confirmed && { ageConfirmedAt: '2026-10-01T10:00:00.000Z' }),
-          ...(situation.sales_frozen && {
-            salesFrozen: { reason: 'operator', since: '2026-10-10T10:00:00.000Z' },
-          }),
-        },
+        flags: scenarioFlags(scenario),
         limits: persona.offerLimits,
       },
       sexualization: {
@@ -234,12 +225,28 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         counted: false,
       },
       skipVoice: (brief) => brief === undefined || holdDecision(brief).kind !== 'answer',
+      customOrder: {
+        chatterOnShift: situation.chatter_on_shift,
+        orderOpen: situation.custom_order_open,
+        flags: {
+          ...(situation.age_confirmed && { ageConfirmedAt: '2026-10-01T10:00:00.000Z' }),
+          ...(situation.sales_frozen && {
+            salesFrozen: { reason: 'operator', since: '2026-10-10T10:00:00.000Z' },
+          }),
+        },
+      },
+      objections: {
+        bank: persona.objectionReplies,
+        usedReplyIds: new Set(situation.objection_replies_used),
+      },
       ...(alerts.length > 0 && { alerts: alerts.map(({ id, phrase }) => ({ id, phrase })) }),
     },
   );
   const { brief } = composed;
   const handoff =
-    composed.handoff !== undefined || (brief !== undefined && holdDecision(brief).kind === 'handoff');
+    composed.handoff !== undefined ||
+    composed.customOrder?.kind === 'handoff' ||
+    (brief !== undefined && holdDecision(brief).kind === 'handoff');
   const offer = composed.voiceBrief?.action === 'offer';
   const blocking = composed.violations.filter((v) => v.severity === 'blocking').map((v) => v.code);
   const bubbles = handoff || composed.isBlocked ? [] : composed.bubbles;
@@ -250,12 +257,15 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         risks: brief.risks,
         action: brief.action,
         ...(brief.desireSignals !== undefined && { desireSignals: brief.desireSignals }),
+        ...(brief.objection !== undefined && { objection: brief.objection }),
         alertsSeen: alerts.filter((a) => brief.alertsSeen?.includes(a.id) === true).map((a) => a.name),
       },
     }),
     handoff,
     offer,
     desireBand: desireBandOf(composed.desire?.score ?? situation.desire),
+    customOrder: composed.customOrder?.kind ?? 'none',
+    objectionReply: composed.objectionReply?.replyId ?? null,
     bubbles: composed.bubbles,
     blocking,
   };
@@ -265,6 +275,8 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
       creatorName: persona.creatorName,
       personaSheet: persona.personaSheet,
       fanNotes: scenario.fan_facts.join('\n'),
+      // What the agent saw: without it, the judge read every fan as one whose age is unknown (OPS-07).
+      situation: judgeSituationOf(scenario, now),
       history,
       reply: bubbles,
       criteria,

@@ -49,6 +49,7 @@ import {
   salesWaitingBefore,
   type CountedSale,
   type HeldSale,
+  type RegisteredSale,
   type SalesSnapshot,
   type StatementSale,
 } from './sales';
@@ -651,7 +652,13 @@ export function closePeriod(snapshot: PeriodSnapshot): {
   const registered = new Map(snapshot.registered);
   for (const report of counted) registered.set(report.id, period);
   const salesRegistered = new Map(snapshot.sales.registered);
-  for (const one of countedSales) salesRegistered.set(saleKeyOf(one), registeredIn(period, one));
+  // The parts of a shared line are counted by this one closing (ADR 0101 § 13): they replace whatever the key had.
+  const counting = new Map<string, RegisteredSale[]>();
+  for (const one of countedSales) {
+    const key = saleKeyOf(one);
+    counting.set(key, [...(counting.get(key) ?? []), registeredIn(period, one)]);
+  }
+  for (const [key, parts] of counting) salesRegistered.set(key, parts);
   return {
     closing: { ...frozen, counted, countedSales, heldSales },
     closed: {
