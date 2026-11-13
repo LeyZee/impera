@@ -88,7 +88,7 @@ describe('AgentPill', () => {
     expect(pill.dataset['tone']).toBe('unknown');
     expect(pill.querySelector('.nv-dot--live')).toBeNull();
     expect(pill.title).toBe(
-      'Agent : Copilote, mais rien ne tourne : Reveal n’est pas encore relié. Voir le Dashboard.',
+      'Agent : Copilote, mais rien ne tourne : la messagerie Reveal n’est pas encore reliée. Voir le Dashboard.',
     );
   });
 
