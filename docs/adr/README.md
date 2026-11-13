@@ -50,7 +50,7 @@ Date : AAAA-MM-JJ
 | 0023 | La gestion d'équipe entre dans Nirvana : planning, rapports, paie, routine des créatrices | accepted (§ Navigation remplacé par 0024, gardes du chatteur par 0025, congés par 0031, attestation de résidence par 0041, rôle de la créatrice par 0042) |
 | 0024 | Rôles et navigation : chacun ne voit que ce qui le concerne | accepted (Suivi du chatteur remplacé par 0025, ligne Créatrice du rail par 0042) |
 | 0025 | Le chatteur chatte dans Reveal ; dans Nirvana, il traite sa créatrice pendant son shift, et rien hors shift | accepted |
-| 0026 | Serveur MCP de Nirvana : une seconde porte sur les mêmes commandes | accepted (§ 5 « freiner, jamais accélérer » amendé par 0058 pour la seule publication du contenu public) |
+| 0026 | Serveur MCP de Nirvana : une seconde porte sur les mêmes commandes | accepted (§ 5 « freiner, jamais accélérer » amendé par 0058 pour la seule publication du contenu public ; amendé par 0105) |
 | 0027 | Mise en production : deux images, un compose Coolify, un limiteur partagé en Postgres | accepted |
 | 0028 | Export quotidien chiffré de la base, hors de Neon | accepted (§ 1 outils et § 2 `--no-privileges` remplacés par 0029) |
 | 0029 | L'export garde les droits de la base, et s'outille sans binaire hors d'Alpine | accepted |
@@ -117,4 +117,5 @@ Date : AAAA-MM-JJ
 | 0099 | Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser | accepted (précise 0030, 0018, 0083 et P6-01) |
 | 0100 | Une IA écrit les scripts à partir des médias du coffre, le code tient la vente | accepted (précise 0099, 0083, 0009, 0010, 0021) |
 | 0101 | Une vente donnée, entière ou partagée, au chatteur qui a été décisif | accepted (amende 0050 § 5 ; précise 0025, 0043 § 7 et 0092 § 1) |
+| 0105 | Le MCP d'Impera remis à jour : un agent connecté lit, freine et prépare, un humain confirme | accepted (amende 0026 § 2 à § 5, § 7 et § 9) |
 | 0106 | Le Dashboard de l'agence sépare chiffre d'affaires, net, part de la créatrice et part de l'agence, et estime la TVA des virements | accepted (précise 0078 et 0054 § 2) |
