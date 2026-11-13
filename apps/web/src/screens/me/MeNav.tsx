@@ -27,6 +27,13 @@ export function MeNav({
           '/moi/securite',
           '/moi/preferences',
         ]
-      : ['/moi/profil', '/moi/dossier', '/moi/calendrier', '/moi/securite', '/moi/preferences'];
+      : [
+          '/moi/profil',
+          '/moi/trophees',
+          '/moi/dossier',
+          '/moi/calendrier',
+          '/moi/securite',
+          '/moi/preferences',
+        ];
   return <SubNav label="Moi" items={screens.map((to) => ({ to, label: screenLabel(to) }))} />;
 }

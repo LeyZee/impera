@@ -122,6 +122,6 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
       within(tabs)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Dossier', 'Calendrier', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Trophées', 'Dossier', 'Calendrier', 'Sécurité', 'Préférences']);
   });
 });
