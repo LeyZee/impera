@@ -5,6 +5,7 @@ import {
   type DesireBand,
   type EventBody,
   type EventType,
+  type FanAvailabilityRecord,
   type UserId,
 } from '@impera/contracts';
 
@@ -26,6 +27,8 @@ export interface ConversationProjection {
   readonly desireScore: number | null;
   readonly desireBand: DesireBand | null;
   readonly desireAt: Date | null;
+  /** The last `fan_availability_changed` (ADR 0103, amendement du 13/11): his availability and the session's gate. */
+  readonly fanAvailability: FanAvailabilityRecord | null;
 }
 
 export const INITIAL_PROJECTION: ConversationProjection = {
@@ -38,6 +41,7 @@ export const INITIAL_PROJECTION: ConversationProjection = {
   desireScore: null,
   desireBand: null,
   desireAt: null,
+  fanAvailability: null,
 };
 
 /** Events that move the state whatever their payload. */
@@ -95,6 +99,9 @@ export function applyEvent(
   if (event.type === 'desire_scored') {
     const score = event.payload.score;
     return { ...projection, state, desireScore: score, desireBand: desireBandOf(score), desireAt: at };
+  }
+  if (event.type === 'fan_availability_changed') {
+    return { ...projection, state, fanAvailability: event.payload };
   }
   if (event.type === 'mode_changed') {
     return { ...projection, state, mode: event.payload.mode ?? projection.mode };

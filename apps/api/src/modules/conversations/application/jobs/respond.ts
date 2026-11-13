@@ -151,6 +151,21 @@ async function recordDesire(
   );
 }
 
+/**
+ * Journals his availability with the result it came with (ADR 0103, amendement du 13/11): given only when the agent's
+ * record changed, so that the projection is the last `fan_availability_changed` and a rebuild finds it exactly.
+ */
+async function recordAvailability(
+  tx: Transaction,
+  conversation: Conversation,
+  result: ComposeResult,
+  meta: EventMeta,
+): Promise<Conversation> {
+  const record = result.fanAvailability;
+  if (record === undefined) return conversation;
+  return appendEvent(tx, conversation, { type: 'fan_availability_changed', payload: record }, meta);
+}
+
 /** Why the second pass after a wait has nothing to do: he wrote since (another job answers), or she did. */
 function waitedOver(conversation: Conversation, waitedFor: Date): string | null {
   if (conversation.state !== 'idle') return `state ${conversation.state}`;
@@ -364,6 +379,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         usedObjectionReplies: read.sales.usedObjectionReplies,
       }),
       scriptRun: read.scriptRun?.run ?? null,
+      fanAvailability: read.conversation.fanAvailability,
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
 
@@ -384,7 +400,12 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         return;
       }
       const meta: EventMeta = { actor: 'ai', correlationId: payload.correlationId, at: clock.now() };
-      let conversation = await recordDesire(tx, locked, result, meta);
+      let conversation = await recordAvailability(
+        tx,
+        await recordDesire(tx, locked, result, meta),
+        result,
+        meta,
+      );
       // Her alerts that only let a human know (P4-01), whatever the answer becomes: named, never his words. One
       // already sounded since her last answer (a second pass after a wait, another message of his) is not again.
       const sounded =

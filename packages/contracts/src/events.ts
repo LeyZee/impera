@@ -13,6 +13,7 @@ import {
   PlatformSchema,
   SessionStateSchema,
 } from './enums';
+import { FanAvailabilityRecordSchema } from './fan-availability';
 import { FanFlagNameSchema, FanFlagsSchema } from './fans';
 import {
   CommissionStatementIdSchema,
@@ -226,6 +227,7 @@ export const EVENT_TYPES = [
   'reply_skipped',
   'reply_deferred',
   'desire_scored',
+  'fan_availability_changed',
   'takeover_started',
   'takeover_ended',
   'mode_changed',
@@ -384,6 +386,11 @@ export const EVENT_PAYLOADS = {
     signals: z.array(DesireSignalSchema).max(DESIRE_SIGNALS_MAX),
     weightsVersion: z.string().min(1).max(64),
   }),
+  /**
+   * His availability changed (ADR 0103, amendement du 13/11): the whole record the agent's code holds, written with the
+   * result it came with. The conversation projects the last one.
+   */
+  fan_availability_changed: FanAvailabilityRecordSchema,
   takeover_started: takeoverPayload,
   takeover_ended: takeoverPayload,
   mode_changed: controlPayload,
@@ -666,6 +673,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('reply_skipped'),
   typedEvent('reply_deferred'),
   typedEvent('desire_scored'),
+  typedEvent('fan_availability_changed'),
   typedEvent('takeover_started'),
   typedEvent('takeover_ended'),
   typedEvent('mode_changed'),

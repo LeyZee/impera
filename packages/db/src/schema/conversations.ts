@@ -84,6 +84,11 @@ export const conversations = pgTable(
     desireBand: enumText('desire_band'),
     desireAt: timestampTz('desire_at'),
     /**
+     * The fan's availability and the session's gate before a script (`fan_availability_changed`, ADR 0103, amendement
+     * du 13/11), as the agent's code holds it: one record, read through its Zod schema. Null until first read.
+     */
+    fanAvailability: jsonb('fan_availability'),
+    /**
      * The fan's card read in his messages (ADR 0085 § 7, `fans.read_card`): when it was last read, and the ingestion
      * time of the last of his messages it read. Null before the first read.
      */

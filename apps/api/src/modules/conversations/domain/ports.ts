@@ -23,6 +23,7 @@ import type {
   DecidedDraft,
   DesireCurve,
   DesireSignal,
+  FanAvailabilityRecord,
   DraftId,
   DraftStatus,
   EventBody,
@@ -560,6 +561,8 @@ export interface ComposeInput {
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRunState | null;
+  /** His availability as last journaled (ADR 0103, amendement du 13/11); `null` before the first. */
+  readonly fanAvailability?: FanAvailabilityRecord | null;
 }
 
 /** An event of a script run this message journals, in order (ADR 0098 § 2). */
@@ -617,6 +620,8 @@ export type ComposeResult =
       /** What the brief read about the fan in his messages. */
       readonly factsProposed?: readonly ProposedFact[];
       readonly desire?: ComposedDesire;
+      /** His availability after this message, only when it changed: one `fan_availability_changed` (ADR 0103). */
+      readonly fanAvailability?: FanAvailabilityRecord;
       /** Her alerts that went off on his message and only let a human know: one `alert_triggered` each (P4-01). */
       readonly alerts?: readonly ComposedAlert[];
       /** His custom order now waits for the team: one `custom_order_opened` (ADR 0090 § A). */
@@ -642,6 +647,7 @@ export type ComposeResult =
        */
       readonly retryAt?: Date;
       readonly desire?: ComposedDesire;
+      readonly fanAvailability?: FanAvailabilityRecord;
       readonly alerts?: readonly ComposedAlert[];
       readonly customOrderOpened?: true;
       /** His run moved by his message and Reveal only: no step goes without a draft. */
