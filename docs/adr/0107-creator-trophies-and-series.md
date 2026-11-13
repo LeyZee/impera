@@ -21,21 +21,21 @@ Un jeu ne tient que s'il raconte ces faits-là. Il ne doit jamais devenir une ob
 
 ### A. Ce qu'elle gagne
 
-1. **Médailles de série.** Sa série de journées réussies garde ses règles actuelles (ADR 0042 § 3 : joker, fuseau, calcul par le serveur). Chacun de ses paliers devient une médaille, la pièce dans son laurier de l'ADR 0104, gravée du nombre de jours en chiffres arabes : 7 (bronze), 14 (argent), 30 (or), 50 et 100 (or à étoile). Une médaille gagnée reste gagnée, même quand la série retombe ; la série repart de zéro, la vitrine garde la meilleure.
+1. **Médailles de série.** Sa série de journées réussies garde ses règles actuelles (ADR 0042 § 3 : joker, fuseau, calcul par le serveur). Chacun de ses paliers devient une médaille, la pièce dans son laurier de l'ADR 0104, gravée du nombre de jours en chiffres arabes : 7 (bronze), 14 (argent), 30 (or), 50 (or, une étoile) et 100 (or, deux étoiles). Sous 28 px, une pièce ne s'affiche jamais sans son nom à côté. Une médaille gagnée reste gagnée, même quand la série retombe ; la série repart de zéro, la vitrine garde la meilleure.
 2. **Série de livraisons.** Une seconde série compte ses demandes de contenu livrées à l'heure, d'affilée, dans l'ordre de leurs échéances. Une demande est **livrée à l'heure** quand un dépôt fait depuis elle, non retiré, est arrivé (état Reçu ou au-delà, ADR 0055 § 6) au plus tard à la fin du jour de l'échéance, dans son fuseau. Une demande livrée en retard, ou dont l'échéance passe sans dépôt, remet la série à zéro. Une demande qu'elle refuse avant la fin du jour de l'échéance, ou que l'agence annule, ne compte pas et ne casse rien.
 3. **Trophées.** Une liste fermée, écrite dans le code, chacun lié à un fait vérifiable, gagné une fois et jamais perdu (même si un dépôt est ensuite retiré) :
 
 | Trophée | Fait vérifié | Symbole proposé |
 |---|---|---|
-| Premier dépôt | son premier dépôt arrivé (état Reçu ou au-delà) | un appareil photo |
-| Première livraison à l'heure | sa première demande livrée à l'heure | un colis coché |
-| Livraisons à l'heure, 5 | une série de livraisons de 5 | la flamme, « 5 » |
-| Livraisons à l'heure, 10 | une série de livraisons de 10 | la flamme, « 10 » |
-| Livraisons à l'heure, 25 | une série de livraisons de 25 | la flamme, « 25 » |
+| Premier dépôt | son premier dépôt arrivé (état Reçu ou au-delà) | un appareil photo, pastille « 1 » |
+| Première livraison à l'heure | sa première demande livrée à l'heure | un colis, pastille cochée |
+| 5 livraisons à l'heure | une série de livraisons de 5 | le colis, pastille « 5 » |
+| 10 livraisons à l'heure | une série de livraisons de 10 | le colis, pastille « 10 » |
+| 25 livraisons à l'heure | une série de livraisons de 25 | le colis, pastille « 25 » |
 | Journée parfaite | une journée où toutes ses tâches du jour sont faites, essentielles et les siennes (ADR 0042 § 3) | un calendrier coché et une étoile |
-| Premier script tourné | son premier dépôt de catégorie Script arrivé | un clap |
+| Premier script tourné | son premier dépôt de catégorie Script arrivé | un clap, pastille « 1 » |
 | Stock plein | un jour où chacune de ses catégories actives (au moins deux) est au-dessus de son seuil (ADR 0055 § 5) | une jauge pleine |
-| Contenu qui a cartonné | une de ses publications devient « à refaire » (ADR 0044 § 4) ; codé seulement quand ce signal existe | une flèche qui monte |
+| Contenu qui a cartonné | une de ses publications devient « à refaire » (ADR 0044 § 4) ; codé seulement quand ce signal existe | une vignette de photo et un éclat |
 
 4. **Pas de niveaux** pour la créatrice dans cette version : deux séries et neuf trophées suffisent, et un rang de plus l'encombrerait.
 
@@ -58,7 +58,7 @@ Un jeu ne tient que s'il raconte ces faits-là. Il ne doit jamais devenir une ob
 13. **Une table** des trophées gagnés (créatrice, trophée, date, fait qui l'a donné, date du dévoilement vu), unique par créatrice et trophée, `FORCE RLS` : la créatrice lit les siens et marque un dévoilement vu ; l'agence lit ; seul le job écrit. Les séries ne sont pas stockées : elles se recalculent depuis ses coches et ses demandes, comme aujourd'hui.
 14. **Un job rejouable** constate les trophées après une coche, après un dépôt arrivé et chaque nuit dans son fuseau ; rejoué, il ne donne rien deux fois.
 15. **Les seuils sont dans le code**, pas en réglage : la liste est courte et chaque trophée doit dire la même chose à toutes.
-16. **Un seul langage graphique** avec le chatteur : mêmes pièces, mêmes écussons, même dévoilement, même composant ; seuls les symboles de la créatrice sont propres à ses gestes. Chaque symbole doit dire son trophée sans légende, centré dans l'écusson, et être rendu et regardé en grand et à 24 à 40 px, Nuit et Jour, avant d'être montré.
+16. **Un seul langage graphique** avec le chatteur : mêmes pièces, mêmes écussons, même dévoilement, même composant ; seuls les symboles de la créatrice sont propres à ses gestes. Chaque symbole doit dire son trophée sans légende, sa forme principale sur l'axe de l'écusson et sa pastille rentrée dans le coin, et être rendu et regardé en grand et à 24 à 40 px, Nuit et Jour, avant d'être montré.
 
 ## Conséquences
 
