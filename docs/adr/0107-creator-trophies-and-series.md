@@ -29,9 +29,9 @@ Un jeu ne tient que s'il raconte ces faits-là. Il ne doit jamais devenir une ob
 |---|---|---|
 | Premier dépôt | son premier dépôt arrivé (état Reçu ou au-delà) | un appareil photo, pastille « 1 » |
 | Première livraison à l'heure | sa première demande livrée à l'heure | un colis, pastille cochée |
-| 5 livraisons à l'heure | une série de livraisons de 5 | le colis, pastille « 5 » |
-| 10 livraisons à l'heure | une série de livraisons de 10 | le colis, pastille « 10 » |
-| 25 livraisons à l'heure | une série de livraisons de 25 | le colis, pastille « 25 » |
+| 5 livraisons à l'heure | une série de livraisons de 5 | un colis vu de face, « 5 » en grand |
+| 10 livraisons à l'heure | une série de livraisons de 10 | un colis vu de face, « 10 » en grand |
+| 25 livraisons à l'heure | une série de livraisons de 25 | un colis vu de face, « 25 » en grand |
 | Journée parfaite | une journée où toutes ses tâches du jour sont faites, essentielles et les siennes (ADR 0042 § 3) | un calendrier coché et une étoile |
 | Premier script tourné | son premier dépôt de catégorie Script arrivé | un clap, pastille « 1 » |
 | Stock plein | un jour où chacune de ses catégories actives (au moins deux) est au-dessus de son seuil (ADR 0055 § 5) | une jauge pleine |
