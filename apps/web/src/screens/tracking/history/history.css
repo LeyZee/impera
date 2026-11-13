@@ -4,10 +4,11 @@
  * a seen one fades a little; what asks for a hand is in « À traiter ».
  */
 
-/* One line: the chip and compact selects share the column. */
+/* The chip and the compact selects share the column; a select never shrinks under its words (« Toutes les
+ * créatrices »): when they do not fit, they go to the next line (recette 11/11). */
 .hi-filters {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--nv-space-2);
   padding: var(--nv-space-2) var(--nv-space-2) var(--nv-space-3);
@@ -16,8 +17,8 @@
   flex: none;
 }
 .hi-filters .hi-select {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 10.5rem;
   max-width: 240px;
 }
 .hi-filters .hi-select .nv-select__field {
