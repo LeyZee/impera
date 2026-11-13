@@ -203,6 +203,10 @@ export const SYSTEM_ALERTS: Readonly<
     title: 'Le fan demande si c’est un bot',
     what: 'Un fan demande s’il parle à un bot : la main passe à un humain s’il y en a un en poste.',
   },
+  script_price: {
+    title: 'Prix d’un script changé',
+    what: 'Le prix d’une étape sur la plateforme n’est plus celui décidé : l’étape ne part pas et un humain est prévenu, sans pause.',
+  },
 };
 
 /** Why a system alert has no switch: her persona's words are taken out there, never switched off here. */

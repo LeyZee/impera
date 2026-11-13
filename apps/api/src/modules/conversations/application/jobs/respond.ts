@@ -10,6 +10,7 @@ import {
   reopenJobKey,
   type AgentHours,
   type AlertTrigger,
+  type EventBody,
   type HandoffCause,
   type JobPayload,
 } from '@impera/contracts';
@@ -26,6 +27,7 @@ import type {
   HoldReason,
   JobLogger,
   ReplyHours,
+  StoredScriptRun,
   Transaction,
   UnitOfWork,
 } from '../../domain/ports';
@@ -238,6 +240,68 @@ function closedUntil(
   return opening.getTime() > now.getTime() ? opening : null;
 }
 
+type ScriptRunChange = NonNullable<Extract<ComposeResult, { kind: 'draft' }>['scriptRun']>;
+type ScriptRunJournalEvent = NonNullable<ScriptRunChange['moved']>['events'][number];
+
+/** One event of a run's journal, its payload naming the run (and the step, for a step's event). */
+function scriptEventOf(event: ScriptRunJournalEvent, scriptRunId: StoredScriptRun['id']): EventBody {
+  switch (event.type) {
+    case 'script_started':
+      return { type: 'script_started', payload: { scriptRunId } };
+    case 'script_ended':
+      return { type: 'script_ended', payload: { scriptRunId } };
+    case 'script_step_sent':
+      return { type: 'script_step_sent', payload: { scriptRunId, stepIndex: event.stepIndex } };
+    case 'script_step_opened':
+      return { type: 'script_step_opened', payload: { scriptRunId, stepIndex: event.stepIndex } };
+    case 'script_step_refused':
+      return { type: 'script_step_refused', payload: { scriptRunId, stepIndex: event.stepIndex } };
+  }
+}
+
+/**
+ * His script runs after this message (ADR 0098 § 2), in the turn's transaction: the stored run saved, a new one opened,
+ * each change journaled, and a paid step in the draft as an offer. A run another turn closed meanwhile, or a second
+ * one opened, is left as it is, journaled by no one.
+ */
+async function recordScriptRuns(
+  tx: Transaction,
+  conversation: Conversation,
+  stored: StoredScriptRun | null,
+  change: ScriptRunChange | undefined,
+  meta: EventMeta,
+): Promise<Conversation> {
+  if (change === undefined) return conversation;
+  let current = conversation;
+  const journal = async (id: StoredScriptRun['id'], events: readonly ScriptRunJournalEvent[]) => {
+    for (const event of events) current = await appendEvent(tx, current, scriptEventOf(event, id), meta);
+    return true;
+  };
+  let written = false;
+  if (change.moved !== undefined && stored !== null) {
+    if (await tx.scriptRuns.save({ id: stored.id, run: change.moved.run })) {
+      written = await journal(stored.id, change.moved.events);
+    }
+  }
+  if (change.opened !== undefined) {
+    const opened = await tx.scriptRuns.open(conversation.id, change.opened.run);
+    if (opened !== null) written = await journal(opened.id, change.opened.events);
+  }
+  // The paid step is an offer only once its run was written: otherwise it is no one's step.
+  if (change.offer !== undefined && written) {
+    current = await appendEvent(
+      tx,
+      current,
+      {
+        type: 'offer_made',
+        payload: { amountMinor: change.offer.amountMinor, currency: change.offer.currency },
+      },
+      meta,
+    );
+  }
+  return current;
+}
+
 /**
  * `conversation.respond`, after the debounce (message-flow.md §1). Three steps, so that no lock is held while the
  * engine thinks (seconds): read the gates and the context; compose outside any transaction; re-lock and write,
@@ -270,6 +334,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
         stats: await tx.messages.fanStats(conversation.fanId),
         sales: await tx.events.salesState(conversation.id),
+        scriptRun: await tx.scriptRuns.latest(conversation.id),
         lastInbound: lastInboundKey(conversation),
       };
     });
@@ -298,6 +363,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       ...(read.sales.usedObjectionReplies.length > 0 && {
         usedObjectionReplies: read.sales.usedObjectionReplies,
       }),
+      scriptRun: read.scriptRun?.run ?? null,
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
 
@@ -345,6 +411,8 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           meta,
         );
       }
+      // His script runs as his message and Reveal left them (ADR 0098); the step decided only with a draft.
+      conversation = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
       if (result.kind === 'draft') {
         // The reply of her bank this draft was written with: never given to him again (ADR 0090 § B).
         if (result.objectionReply !== undefined) {

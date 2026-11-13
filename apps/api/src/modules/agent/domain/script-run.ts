@@ -15,6 +15,10 @@ interface PlatformScriptStepView {
   readonly kind: ScriptStepKind;
   /** The platform's price in minor units, for a paid step only; `null` for an offered step or a bridge. */
   readonly priceMinor: number | null;
+  /** The agency's instruction for this step (its card, ADR 0064), when the catalogue has one: the voice follows it. */
+  readonly instruction?: string;
+  /** What the step sends, from its media's descriptions (ADR 0083): the voice describes nothing else. */
+  readonly mediaSheet?: string;
 }
 
 /**
@@ -125,7 +129,7 @@ export function openScriptRun(scriptRef: string, at: Date): ScriptRun {
 const current = (run: ScriptRun): StepRecord | undefined => run.steps.at(-1);
 
 /** A paid step sent or opened, neither bought nor refused: what his messages are counted against. */
-const paidWaiting = (run: ScriptRun): StepRecord | undefined => {
+export const paidWaiting = (run: ScriptRun): StepRecord | undefined => {
   const step = current(run);
   return step?.kind === 'paid' && (step.outcome === 'sent' || step.outcome === 'opened') ? step : undefined;
 };
@@ -287,7 +291,7 @@ export function permittedScripts(
 }
 
 /** What goes to `sendScriptStep(conversationRef, scriptRef, stepIndex, key)`, with the price it was decided at. */
-interface ScriptStepToSend {
+export interface ScriptStepToSend {
   readonly scriptRef: string;
   readonly stepIndex: number;
   readonly kind: ScriptStepKind;
@@ -327,9 +331,10 @@ export interface NextScriptStepInput {
   readonly careMode: boolean;
 }
 
-type NoScriptReason = OfferBlock | 'held' | 'no_history' | 'no_script' | 'no_pick' | 'cold_session';
+type NoScriptReason =
+  OfferBlock | 'held' | 'no_history' | 'no_script' | 'no_pick' | 'cold_session' | 'price_mismatch';
 
-type ScriptStepDecision =
+export type ScriptStepDecision =
   | { readonly kind: 'none'; readonly reason: NoScriptReason }
   | { readonly kind: 'start'; readonly script: PlatformScriptView; readonly step: ScriptStepToSend }
   | { readonly kind: 'send_step'; readonly step: ScriptStepToSend }
@@ -420,24 +425,4 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
   const step = toSend(input.conversationRef, script, 0);
   if (step === null) return { kind: 'none', reason: 'no_script' };
   return { kind: 'start', script, step };
-}
-
-/** A run as it is stored: its id and the conversation it belongs to. */
-export interface ScriptRunRecord {
-  readonly id: string;
-  readonly conversationId: string;
-  readonly run: ScriptRun;
-}
-
-/**
- * Where runs are kept (`script_runs`), under her tenant: their decision state only, never a history of what was sent,
- * which is Reveal's (ADR 0018 § 5). A run is never deleted.
- */
-export interface ScriptRunStore {
-  /** His latest run, open or ended; `null` when he never had one. */
-  latest(creatorId: string, conversationId: string): Promise<ScriptRunRecord | null>;
-  /** Opens a run; `null` when he already has one open. */
-  open(creatorId: string, conversationId: string, run: ScriptRun): Promise<ScriptRunRecord | null>;
-  /** Saves a run after an event or a reconciliation; `false` when it was no longer open (another turn closed it). */
-  save(creatorId: string, record: ScriptRunRecord): Promise<boolean>;
 }

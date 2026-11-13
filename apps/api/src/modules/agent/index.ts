@@ -55,7 +55,15 @@ export {
   type RatedMoment,
 } from './infra/calibration-record';
 export { createJsonlCalibrationStore } from './infra/jsonl-calibration-store';
-export { asSent, composeTurn, guardContextOf, withExamples, type OfferInput } from './infra/compose';
+export {
+  asSent,
+  composeTurn,
+  guardContextOf,
+  withExamples,
+  type ComposedTurn,
+  type OfferInput,
+  type ScriptsInput,
+} from './infra/compose';
 export { guardSettingsOf, readPersonaFile, type PersonaForModels } from './infra/persona-file';
 /** @public Her active persona version, the port the composition root wires to `persona` (ADR 0010, 0022). */
 export { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';

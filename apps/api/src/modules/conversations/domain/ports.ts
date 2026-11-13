@@ -43,6 +43,10 @@ import type {
   MessageView,
   OutboundMedia,
   PlatformAccountId,
+  ScriptRunId,
+  ScriptRunStatus,
+  ScriptStepKind,
+  ScriptStepOutcome,
   SendResult,
   UserId,
   Verdict,
@@ -334,6 +338,42 @@ export interface Transaction {
   readonly switches: KillSwitches;
   readonly automatic: AutomaticEvidence;
   readonly audit: AuditTrail;
+  readonly scriptRuns: ScriptRunRepository;
+}
+
+/**
+ * A script run with one fan (ADR 0098): its decision state only, which the agent's domain moves; what was sent and
+ * bought is Reveal's to say (ADR 0018 § 5). Kept in `script_runs`, written in the turn's transaction.
+ */
+export interface ScriptRunState {
+  readonly scriptRef: string;
+  readonly status: ScriptRunStatus;
+  readonly steps: readonly {
+    readonly stepIndex: number;
+    readonly kind: ScriptStepKind;
+    readonly outcome: ScriptStepOutcome;
+    readonly priceMinor: number | null;
+    readonly sentAt: Date;
+    readonly at: Date;
+  }[];
+  readonly ignoredMessages: number;
+  readonly startedAt: Date;
+  readonly endedAt: Date | null;
+}
+
+export interface StoredScriptRun {
+  readonly id: ScriptRunId;
+  readonly run: ScriptRunState;
+}
+
+/** `script_runs` under her tenant: never deleted, at most one open run per conversation. */
+interface ScriptRunRepository {
+  /** His latest run, open or ended; `null` when he never had one. */
+  latest(conversationId: ConversationId): Promise<StoredScriptRun | null>;
+  /** Opens a run; `null` when he already has one open. */
+  open(conversationId: ConversationId, run: ScriptRunState): Promise<StoredScriptRun | null>;
+  /** Saves a run; `false` when it was no longer open (another turn closed it). */
+  save(stored: StoredScriptRun): Promise<boolean>;
 }
 
 /** Who did what from the dashboard (`audit_log`, security.md), in the same transaction as the act. */
@@ -518,6 +558,26 @@ export interface ComposeInput {
   readonly customOrderOpen?: boolean;
   /** The replies of her objection bank he already received (ADR 0090 § B). */
   readonly usedObjectionReplies?: readonly string[];
+  /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
+  readonly scriptRun?: ScriptRunState | null;
+}
+
+/** An event of a script run this message journals, in order (ADR 0098 § 2). */
+type ScriptRunJournalEvent =
+  | { readonly type: 'script_started' | 'script_ended' }
+  | {
+      readonly type: 'script_step_sent' | 'script_step_opened' | 'script_step_refused';
+      readonly stepIndex: number;
+    };
+
+/** What this message did to his script runs (ADR 0098): written with the draft, in the same transaction. */
+interface ComposedScriptRun {
+  /** His latest run as this message left it, with the events that say how. */
+  readonly moved?: { readonly run: ScriptRunState; readonly events: readonly ScriptRunJournalEvent[] };
+  /** A run opened at this message. */
+  readonly opened?: { readonly run: ScriptRunState; readonly events: readonly ScriptRunJournalEvent[] };
+  /** A paid step went into the draft: one `offer_made` at its catalogue price. */
+  readonly offer?: { readonly amountMinor: number; readonly currency: Currency };
 }
 
 /**
@@ -563,6 +623,7 @@ export type ComposeResult =
       readonly customOrderOpened?: true;
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
+      readonly scriptRun?: ComposedScriptRun;
     }
   | {
       readonly kind: 'held';
@@ -583,6 +644,8 @@ export type ComposeResult =
       readonly desire?: ComposedDesire;
       readonly alerts?: readonly ComposedAlert[];
       readonly customOrderOpened?: true;
+      /** His run moved by his message and Reveal only: no step goes without a draft. */
+      readonly scriptRun?: Pick<ComposedScriptRun, 'moved'>;
     };
 
 /** An alert of hers that went off and only lets a human know (P4-01): named, never with what the fan wrote. */

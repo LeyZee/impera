@@ -27,6 +27,7 @@ import {
   type DraftComposerDeps,
   type MediaSight,
   type MediaToSee,
+  type ScriptSource,
 } from '../draft-composer';
 import type { FanLimits } from '../fan-limits';
 
@@ -139,6 +140,22 @@ function gateway(script: Script, seen: Seen): LlmGateway {
   };
 }
 
+/** Her made-up catalogue (ADR 0010): one pack at 15 €, of either moment; Reveal never sent it to him. */
+const PACK_SOURCE: ScriptSource = {
+  catalogue: () =>
+    Promise.resolve([
+      {
+        scriptRef: 'script-demo',
+        moment: null,
+        description: 'Pack de démonstration',
+        steps: [{ kind: 'paid', priceMinor: 1_500 }],
+        mediaValidated: true,
+        touchesLimits: false,
+      },
+    ]),
+  history: () => Promise.resolve({ scripts: [] }),
+};
+
 const INPUT: AgentComposeInput = {
   creatorId: 'creator-1',
   conversationId: 'conversation-1',
@@ -159,7 +176,10 @@ function composer(
   script: Script = {},
   sight?: MediaSight,
   limits?: FanLimits,
-  offer: Pick<DraftComposerDeps, 'offerLimits' | 'lastOfferAt' | 'sexualizationLimits'> = {},
+  offer: Pick<
+    DraftComposerDeps,
+    'offerLimits' | 'lastOfferAt' | 'sexualizationLimits' | 'scripts' | 'alertsOf'
+  > = {},
 ) {
   const traces: unknown[] = [];
   const seen: Seen = { voiceCalls: 0, traces, brainInputs: [], dropped: [], voiceInputs: [] };
@@ -1020,12 +1040,14 @@ describe('createDraftComposer, the offer policy', () => {
     sentiment: 'aroused',
     action: 'offer',
     replyBrief: 'Lui proposer la vidéo de la douche.',
+    scriptPick: 's1',
   };
   const ADULT: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00Z' };
   const policy = (lastOfferAt: Date | null) => ({
     sexualizationLimits: { initiateAfterHours: 0, minHoursBeforeFollowing: 0, minDesireToOpen: 0 },
     offerLimits: { cooldownHours: 10, minDesire: 0 },
     lastOfferAt: () => Promise.resolve(lastOfferAt),
+    scripts: PACK_SOURCE,
   });
   const written = (seen: Seen) => seen.voiceInputs?.[0]?.brief;
 
@@ -1098,12 +1120,14 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
     desireSignals: ['states_desire'],
     action: 'offer',
     replyBrief: 'Lui proposer la vidéo de la douche.',
+    scriptPick: 's1',
   };
   const ADULT: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00Z' };
   const policy = {
     sexualizationLimits: { initiateAfterHours: 0, minHoursBeforeFollowing: 0, minDesireToOpen: 40 },
     offerLimits: { cooldownHours: 10, minDesire: 70 },
     lastOfferAt: () => Promise.resolve(null),
+    scripts: PACK_SOURCE,
   };
   const minutesBefore = (minutes: number) => new Date(INPUT.now.getTime() - minutes * 60_000);
   const stored = (score: number, minutes: number) => ({
@@ -1682,5 +1706,141 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
       objectionReply: { objection: 'too_expensive', replyId: 'testbbbbbbbb' },
     });
     expect(seen.voiceInputs?.[0]?.objectionReply).toBe('Réplique de test B');
+  });
+});
+
+describe('createDraftComposer, her scripts (ADR 0098)', () => {
+  const HOT: Brief = {
+    ...BRIEF,
+    intent: 'sexting',
+    sentiment: 'aroused',
+    action: 'offer',
+    replyBrief: 'Lui proposer quelque chose.',
+    scriptPick: 's1',
+  };
+  const ADULT: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00Z' };
+  const deps = (scripts: ScriptSource | undefined, systemOn: AlertSettings['systemOn'] = new Set()) => ({
+    sexualizationLimits: { initiateAfterHours: 0, minHoursBeforeFollowing: 0, minDesireToOpen: 0 },
+    offerLimits: { cooldownHours: 10, minDesire: 0 },
+    lastOfferAt: () => Promise.resolve(null),
+    alertsOf: () => Promise.resolve({ custom: [], systemOn }),
+    ...(scripts !== undefined && { scripts }),
+  });
+  const sentAt = new Date('2026-10-17T09:30:00Z');
+  const waiting = {
+    scriptRef: 'script-demo',
+    status: 'open' as const,
+    steps: [
+      {
+        stepIndex: 0,
+        kind: 'paid' as const,
+        outcome: 'sent' as const,
+        priceMinor: 1_500,
+        sentAt,
+        at: sentAt,
+      },
+    ],
+    ignoredMessages: 0,
+    startedAt: sentAt,
+    endedAt: null,
+  };
+  const sent: ScriptSource = {
+    ...PACK_SOURCE,
+    history: () =>
+      Promise.resolve({
+        scripts: [{ scriptRef: 'script-demo', sentStepIndexes: [0], boughtStepIndexes: [] }],
+      }),
+  };
+
+  it('opens the script the brain picked: the step and its catalogue price go to the voice and the draft', async () => {
+    const { draftComposer, seen } = composer(
+      { brief: HOT },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose(INPUT);
+
+    expect(seen.brainInputs?.[0]?.scripts).toEqual([{ id: 's1', description: 'Pack de démonstration' }]);
+    expect(seen.voiceInputs?.[0]?.scriptStep).toEqual({
+      kind: 'paid',
+      price: { amountMinor: 1_500, currency: 'EUR' },
+      instruction: null,
+      mediaSheet: null,
+    });
+    expect(result).toMatchObject({
+      kind: 'draft',
+      scriptRun: {
+        opened: { events: [{ type: 'script_started' }, { type: 'script_step_sent', stepIndex: 0 }] },
+        offer: { amountMinor: 1_500, currency: 'EUR' },
+      },
+    });
+  });
+
+  it('sells nothing without her scripts, or when Reveal’s history cannot be read (fail closed)', async () => {
+    const down: ScriptSource = { ...PACK_SOURCE, history: () => Promise.reject(new Error('down')) };
+    for (const source of [undefined, down]) {
+      const { draftComposer, seen } = composer(
+        { brief: HOT },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(source),
+      );
+      const result = await draftComposer.compose(INPUT);
+      expect(result.kind).toBe('draft');
+      expect(result.scriptRun).toBeUndefined();
+      expect(seen.voiceInputs?.[0]?.brief.action).toBe('reply');
+      expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    }
+  });
+
+  it('ends the run on his clear no, and keeps it when a human answers instead', async () => {
+    const refused: Brief = { ...BRIEF, scriptReply: 'refused' };
+    const { draftComposer, seen } = composer(
+      { brief: refused },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(sent),
+    );
+    const result = await draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    expect(seen.brainInputs?.[0]?.scriptStepWaiting).toBe(true);
+    expect(result.scriptRun?.moved?.run.status).toBe('refused');
+    expect(result.scriptRun?.moved?.events).toEqual([
+      { type: 'script_step_refused', stepIndex: 0 },
+      { type: 'script_ended' },
+    ]);
+
+    const handoff = composer(
+      { brief: { ...refused, action: 'handoff' } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(sent),
+    );
+    const held = await handoff.draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    expect(held.kind).toBe('held');
+    expect(held.scriptRun?.moved?.run.status).toBe('refused');
+  });
+
+  it('tells the team when the step waiting no longer has the price she said', async () => {
+    const repriced: ScriptSource = {
+      ...sent,
+      catalogue: async () =>
+        (await PACK_SOURCE.catalogue('creator-1', 'account-1')).map((script) => ({
+          ...script,
+          steps: [{ kind: 'paid', priceMinor: 1_900 }],
+        })),
+    };
+    const answers: Brief = { ...BRIEF, scriptReply: 'answers_step' };
+    const on = composer(
+      { brief: answers },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(repriced, new Set(['script_price'])),
+    );
+    expect((await on.draftComposer.compose({ ...INPUT, scriptRun: waiting })).alerts).toEqual([
+      { trigger: { alert: { kind: 'system', code: 'script_price' }, matchedBy: 'rule' }, notify: true },
+    ]);
+    const off = composer({ brief: answers }, undefined, limitsOf(ADULT).limits, deps(repriced));
+    expect((await off.draftComposer.compose({ ...INPUT, scriptRun: waiting })).alerts).toBeUndefined();
   });
 });

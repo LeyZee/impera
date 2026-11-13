@@ -72,7 +72,7 @@ function priceLabel(price: NonNullable<VoiceScriptStep['price']>): string {
 }
 
 /** The script step code decided (ADR 0098 § 5), as the voice reads it: every value written by code or the agency. */
-export function scriptStepBlock(step: VoiceScriptStep): string {
+function scriptStepBlock(step: VoiceScriptStep): string {
   const lines = [
     `Type : ${STEP_KIND_LABELS[step.kind]}.`,
     step.price === null ? 'Prix : aucun, ne parle pas de prix.' : `Prix exact : ${priceLabel(step.price)}.`,

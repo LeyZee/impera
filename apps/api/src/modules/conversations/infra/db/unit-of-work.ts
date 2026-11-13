@@ -30,6 +30,7 @@ import type { CardReadMessage, Transaction, UnitOfWork } from '../../domain/port
 
 import { heldBy } from './holds';
 import { toConversation, toDraft, toStoredBrief, toStoredEvent } from './rows';
+import { bindScriptRuns } from './script-runs';
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
 
@@ -549,6 +550,8 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         return account?.sessionState === 'expired' ? 'session_expired' : null;
       },
     },
+
+    scriptRuns: bindScriptRuns(tx, creatorId),
   };
 }
 

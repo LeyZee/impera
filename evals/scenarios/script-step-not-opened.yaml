@@ -1,0 +1,57 @@
+# Vente longue (ADR 0098) : l’étape payante n’est pas ouverte, elle attend. Fan, messages, script et prix fictifs (ADR 0010).
+description: >-
+  L’étape payante à 15 € est partie mais il ne l’a pas ouverte et lui pose une question sur l’envoi : elle attend, sans nouvelle étape ni autre prix.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+  - 41 ans, confirmé
+situation:
+  known_hours: 72
+  age_confirmed: true
+  local_time: '23:00'
+  desire: 90
+history:
+  - from: creator
+    text: Je t’ai préparé la suite, tu me dis 😇
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme le plus intime de la soirée.
+          media: Une courte vidéo en nuisette.
+  run:
+    script: soiree-demo
+    steps:
+      - index: 0
+        outcome: sent
+      - index: 1
+        outcome: sent
+  history:
+    - script: soiree-demo
+      sent: [0, 1]
+inbound: C’est quoi exactement que tu m’as envoyé ?
+expect:
+  brief:
+    script_reply_in:
+      - answers_step
+  decision:
+    handoff: false
+    script_in:
+      - wait
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(10|12|20|25|30)\s?(€|euros?)

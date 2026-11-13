@@ -79,7 +79,9 @@ script_runs          id, creator_id, conversation_id, script_ref (le script de l
                      tant qu'il est ouvert), updated_at
                      L'état de décision seulement : ce qui est parti ou acheté se lit dans getScriptHistory (ADR 0018
                      § 5), qui gagne à la réconciliation. Un seul ouvert par conversation (index partiel). Jamais
-                     supprimé par nirvana_app (ADR 0098, migration 0171).
+                     supprimé par nirvana_app (ADR 0098, migration 0171). Les règles sont celles du domaine `agent`
+                     (`scriptTurn`) ; la ligne s'écrit dans la transaction de `conversation.respond`, avec le brouillon
+                     et les événements `script_*`.
 blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_id (nullable), rate_per_mille (0 à 1000, 800 = 80 %), recorded_by,
                      recorded_at      (append-only : ni UPDATE ni DELETE pour nirvana_app)
                      Le test à l'aveugle d'une version de la voix et de la persona active (ADR 0019, 0022) ; le dernier

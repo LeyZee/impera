@@ -29,6 +29,7 @@ import { z } from 'zod';
 import { READ_ONLY_POOL_OPTIONS } from '../key-check';
 import {
   composeTurn,
+  type ComposedTurn,
   guardSettingsOf,
   holdDecision,
   measureDesire,
@@ -41,6 +42,7 @@ import { checkCardScenario, readCardScenario, type CardScenario } from './evals/
 import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './evals/check';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
+import { scriptsInputOf } from './evals/scripts-input';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const EVALS = resolve(ROOT, 'evals');
@@ -165,6 +167,15 @@ async function readCard(scenario: CardScenario): Promise<{ failures: string[]; v
   };
 }
 
+/** What code decided with her scripts, as the scenario checks it. */
+function scriptOutcome(
+  decision: NonNullable<ComposedTurn['scripts']>['decision'],
+): NonNullable<Outcome['script']> {
+  return decision.kind === 'start' || decision.kind === 'send_step'
+    ? { decision: decision.kind, step: { script: decision.step.scriptRef, index: decision.step.stepIndex } }
+    : { decision: decision.kind };
+}
+
 /** One scenario, on the path a real fan's message takes; nothing leaves. */
 async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Record<string, number> }> {
   const { situation } = scenario;
@@ -249,6 +260,8 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         usedReplyIds: new Set(situation.objection_replies_used),
       },
       ...(alerts.length > 0 && { alerts: alerts.map(({ id, phrase }) => ({ id, phrase })) }),
+      // Her made-up scripts, Reveal's history of his and his run (ADR 0098): a long sale, one message at a time.
+      ...(scenario.scripts !== undefined && { scripts: scriptsInputOf(scenario.scripts, now) }),
     },
   );
   const { brief } = composed;
@@ -267,6 +280,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         action: brief.action,
         ...(brief.desireSignals !== undefined && { desireSignals: brief.desireSignals }),
         ...(brief.objection !== undefined && { objection: brief.objection }),
+        ...(brief.scriptReply !== undefined && { scriptReply: brief.scriptReply }),
         alertsSeen: alerts.filter((a) => brief.alertsSeen?.includes(a.id) === true).map((a) => a.name),
       },
     }),
@@ -275,6 +289,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
     desireBand: desireBandOf(composed.desire?.score ?? situation.desire),
     customOrder: composed.customOrder?.kind ?? 'none',
     objectionReply: composed.objectionReply?.replyId ?? null,
+    ...(composed.scripts !== undefined && { script: scriptOutcome(composed.scripts.decision) }),
     bubbles: composed.bubbles,
     blocking,
   };

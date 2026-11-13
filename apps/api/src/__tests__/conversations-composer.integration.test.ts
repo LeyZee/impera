@@ -11,6 +11,7 @@ import {
 import { eq, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { z } from 'zod';
 
 import { createJobQueue, type JobQueue } from '../jobs';
 import {
@@ -319,6 +320,81 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       customOrderOpen: true,
       usedObjectionReplies: ['testaaaaaaaa'],
     });
+  });
+
+  it('keeps his script run with the draft, journals each step and the offer, and gives it back (ADR 0098)', async () => {
+    const id = await fanWrites('c-script', 'Tu me montres ?');
+    const at = new Date('2026-11-12T21:00:00Z');
+    const step = { stepIndex: 0, kind: 'paid' as const, priceMinor: 1_500, sentAt: at, at };
+    const opened = {
+      scriptRef: 'script-demo',
+      status: 'open' as const,
+      steps: [{ ...step, outcome: 'sent' as const }],
+      ignoredMessages: 0,
+      startedAt: at,
+      endedAt: null,
+    };
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['J’ai quelque chose pour toi 😏'],
+      softViolations: [],
+      costUsd: 0,
+      scriptRun: {
+        opened: {
+          run: opened,
+          events: [{ type: 'script_started' }, { type: 'script_step_sent', stepIndex: 0 }],
+        },
+        offer: { amountMinor: 1_500, currency: 'EUR' },
+      },
+    };
+    await respond(id);
+    const written = (await events(id)).slice(-4);
+    expect(written.map((event) => event.type)).toEqual([
+      'script_started',
+      'script_step_sent',
+      'offer_made',
+      'draft_created',
+    ]);
+    expect(written[1]?.payload).toMatchObject({ stepIndex: 0 });
+    expect(written[2]?.payload).toEqual({ amountMinor: 1_500, currency: 'EUR' });
+
+    // His no, with no draft: the run ends all the same, journaled on the same run.
+    await fanWrites('c-script', 'Non merci');
+    composer.next = {
+      kind: 'held',
+      reason: 'no_reply',
+      detail: [],
+      costUsd: 0,
+      scriptRun: {
+        moved: {
+          run: {
+            ...opened,
+            status: 'refused',
+            steps: [{ ...step, outcome: 'refused' as const }],
+            endedAt: at,
+          },
+          events: [{ type: 'script_step_refused', stepIndex: 0 }, { type: 'script_ended' }],
+        },
+      },
+    };
+    await respond(id);
+    expect(composer.inputs.at(-1)?.scriptRun).toEqual(opened);
+    const ended = (await events(id)).filter((event) => event.type.startsWith('script_'));
+    expect(ended.map((event) => event.type)).toEqual([
+      'script_started',
+      'script_step_sent',
+      'script_step_refused',
+      'script_ended',
+    ]);
+    const runIds = new Set(
+      ended.map((event) => z.object({ scriptRunId: z.uuid() }).parse(event.payload).scriptRunId),
+    );
+    expect(runIds.size).toBe(1);
+
+    await fanWrites('c-script', 'Bon');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await respond(id);
+    expect(composer.inputs.at(-1)?.scriptRun).toMatchObject({ status: 'refused' });
   });
 
   it('writes nothing more to the fan while a human is awaited, whatever the fan sends', async () => {

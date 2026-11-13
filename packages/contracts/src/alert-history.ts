@@ -21,6 +21,7 @@ export const SYSTEM_ALERT_LABELS: Readonly<Record<SystemAlertCode, string>> = {
   keyword: 'Mot-clé de sa persona',
   service_request: 'Demande de service',
   identity_doubt: 'Doute sur la personne',
+  script_price: 'Prix d’un script changé',
 };
 
 /**
@@ -41,6 +42,8 @@ export function alertTriggerReason(trigger: AlertTrigger, alertName: string): st
       return 'Le fan demande un service (contenu sur mesure, appel, cam ou vocal).';
     case 'identity_doubt':
       return 'Le fan doute de parler vraiment à la créatrice.';
+    case 'script_price':
+      return 'Le prix d’une étape de script n’est plus celui décidé : l’étape n’est pas partie.';
   }
 }
 

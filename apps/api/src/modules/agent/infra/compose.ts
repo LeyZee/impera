@@ -2,12 +2,15 @@ import { desireNow, type FanFlags, type MediaDescription, type ObjectionReplies 
 import type {
   BrainAlert,
   Brief,
+  BrainScript,
   CallTrace,
   ConversationTurn,
   LlmFailure,
   LlmGateway,
   VoiceInput,
+  VoiceScriptStep,
 } from '@impera/llm';
+import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
 
 import { checkNoCommitment, customOrderDecision, type CustomOrderDecision } from '../domain/custom-order';
 import {
@@ -32,12 +35,21 @@ import { askableOnly } from '../domain/kyc';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { offerDecision, offerSignals, type OfferBlock, type OfferContext } from '../domain/policy';
 import {
+  paidWaiting,
+  permittedScripts,
+  playedScriptRefs,
+  type PlatformScriptView,
+  type ScriptHistoryView,
+  type ScriptRun,
+} from '../domain/script-run';
+import { scriptTurn, type ScriptTurn } from '../domain/script-turn';
+import {
   declaredAdultAge,
   sexualizationDecision,
   type SexualizationDecision,
   type SexualizationLimits,
 } from '../domain/sexualization';
-import { describeSituation, type Situation } from '../domain/situation';
+import { describeSituation, isNight, type Situation } from '../domain/situation';
 import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
 
 /** Who she is for the models: one persona, read by the composition root. */
@@ -116,6 +128,56 @@ export interface ComposeTurnInput {
     readonly bank: ObjectionReplies;
     readonly usedReplyIds: ReadonlySet<string>;
   };
+  /**
+   * Her scripts (ADR 0098): her catalogue, Reveal's history of his, his latest run. Absent, or without `offer`, no
+   * script moves and none is decided; a brain's « offer » is then written as before, through the policy.
+   */
+  readonly scripts?: ScriptsInput;
+}
+
+/** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
+export interface ScriptsInput {
+  /** The conversation on the platform: the idempotency key of a step names it. */
+  readonly conversationRef: string;
+  readonly catalogue: readonly PlatformScriptView[];
+  /** `null` when it could not be read: nothing moves, nothing sells (ADR 0018 § 5). */
+  readonly history: ScriptHistoryView | null;
+  readonly latest: ScriptRun | null;
+  /** ADR 0088: nothing sold to a fan in distress. */
+  readonly careMode: boolean;
+  /** False on a second pass over the same message: it was already counted against the step waiting. */
+  readonly countsHisMessage: boolean;
+}
+
+/** The scripts the brain may pick from, by the short ids it answers with (`s1`…). */
+function scriptChoices(
+  scripts: ScriptsInput | undefined,
+  situation: Situation,
+): readonly { readonly id: string; readonly script: PlatformScriptView }[] {
+  if (scripts?.history === undefined || scripts.history === null) return [];
+  return permittedScripts(scripts.catalogue, {
+    moment: isNight(situation) ? 'night' : 'day',
+    played: playedScriptRefs(scripts.history),
+  })
+    .slice(0, BRAIN_SCRIPTS_MAX)
+    .map((script, index) => ({ id: brainScriptId(index), script }));
+}
+
+/** The step decided, as the voice's typed block says it: kind, catalogue price, instruction, media (ADR 0098 § 5). */
+function voiceStepOf(turn: ScriptTurn | undefined): VoiceScriptStep | undefined {
+  const { decision, script } = turn ?? {};
+  if (script === undefined || script === null) return undefined;
+  if (decision?.kind !== 'start' && decision?.kind !== 'send_step') return undefined;
+  const step = script.steps[decision.step.stepIndex];
+  if (step === undefined) return undefined;
+  return {
+    kind: decision.step.kind,
+    // Reveal sells in euros: the catalogue's minor units are cents.
+    price:
+      decision.step.priceMinor === null ? null : { amountMinor: decision.step.priceMinor, currency: 'EUR' },
+    instruction: step.instruction ?? null,
+    mediaSheet: step.mediaSheet ?? null,
+  };
 }
 
 /** A follow-up as the voice writes it: how long he has been silent, and her own way of following up if she wrote one. */
@@ -140,8 +202,11 @@ interface DesireInput {
 /** The policy's facts on him for an offer; his heat comes from his desire score, the risks from the brain. */
 export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'risks'>;
 
-/** Why the brain's offer was not written: the policy's reason, or nothing to decide on. */
-type OfferRefusal = OfferBlock | 'no_offer_context';
+/**
+ * Why the brain's offer was not written: the policy's reason, nothing to decide on, or, with her scripts read, no step
+ * of a script decided (she offers only what a script sends, ADR 0098).
+ */
+type OfferRefusal = OfferBlock | 'no_offer_context' | 'no_script_step';
 
 /** What the voice writes instead of an offer the policy refused: an answer, nothing to buy. */
 const NO_OFFER_BRIEF =
@@ -223,6 +288,8 @@ export interface ComposedTurn {
   readonly customOrder?: Exclude<CustomOrderDecision, { kind: 'none' }>;
   /** The reply of her bank the voice was given for his price objection (ADR 0090 § B). */
   readonly objectionReply?: PickedObjectionReply;
+  /** Her scripts at this message (ADR 0098): the run moved or opened, the step decided, a price that changed. */
+  readonly scripts?: ScriptTurn;
   /** What the voice was asked to write: kept for a comparison or a rating. */
   readonly voiceBrief?: Brief;
   readonly voiceInput?: VoiceInput;
@@ -360,10 +427,19 @@ export async function composeTurn(
     return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped);
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
+  const choices = scriptChoices(input.scripts, input.situation);
+  const brainScripts: BrainScript[] = choices.map(({ id, script }) => ({
+    id,
+    description: script.description,
+  }));
+  const latestRun = input.scripts?.latest ?? null;
+  const stepWaiting = latestRun?.status === 'open' && paidWaiting(latestRun) !== undefined;
   const brain = await gateway.brain({
     ...base,
     fanNotes: [notes.kept, brainOnly.kept].filter((block) => block !== '').join('\n'),
     ...(input.alerts !== undefined && input.alerts.length > 0 && { alerts: input.alerts }),
+    ...(brainScripts.length > 0 && { scripts: brainScripts }),
+    ...(stepWaiting && { scriptStepWaiting: true }),
   });
   // She asks only what the card lets her ask (ADR 0085 § 2): whatever the brain names, `desires` is never asked.
   const brief = brain.ok ? askableOnly(brain.value.output) : undefined;
@@ -415,10 +491,6 @@ export async function composeTurn(
           toneHints: [...within.toneHints, NO_OPENING_HINT],
         }
       : within;
-  // The brain may suggest an offer, only the policy decides (CLAUDE.md rule 3): refused, she just answers.
-  const offerRefused = cursored.action === 'offer' ? offerRefusal(cursored, input.offer, heat) : undefined;
-  const offered: Brief =
-    offerRefused === undefined ? cursored : { ...cursored, action: 'reply', replyBrief: NO_OFFER_BRIEF };
   // A custom order is never sold by her (ADR 0090 § A): a chatter takes it, or she commits to nothing. A trap's
   // answer comes first.
   const order =
@@ -432,6 +504,56 @@ export async function composeTurn(
           flags: input.customOrder?.flags,
         });
   const customOrder = order?.kind === 'none' ? undefined : order;
+  // His price objection: a reply of her bank he never received, said in her words (ADR 0090 § B).
+  const objectionReply =
+    brief?.intent === 'price_objection' && trap.replyBrief === undefined && input.objections !== undefined
+      ? pickObjectionReply(input.objections.bank, brief.objection, input.objections.usedReplyIds)
+      : undefined;
+  // Her scripts: the run follows his message and Reveal, and code decides the step and its price (ADR 0098).
+  const scripts =
+    input.scripts === undefined || input.offer === undefined
+      ? undefined
+      : scriptTurn({
+          now: input.situation.now,
+          conversationRef: input.scripts.conversationRef,
+          latest: input.scripts.latest,
+          catalogue: input.scripts.catalogue,
+          history: input.scripts.history,
+          moment: isNight(input.situation) ? 'night' : 'day',
+          hotSession: heat >= input.offer.limits.minDesire,
+          // Only an id it was given: anything else picks nothing.
+          brainPick: choices.find(({ id }) => id === brief?.scriptPick)?.script.scriptRef ?? null,
+          offer: {
+            ...input.offer,
+            desire: heat,
+            fanAsksForPaid: brief !== undefined && offerSignals(brief).fanAsksForPaid,
+            risks: brief?.risks ?? [],
+          },
+          careMode: input.scripts.careMode,
+          reply: brief?.scriptReply ?? null,
+          countsHisMessage: input.scripts.countsHisMessage && brief !== undefined,
+          mayAct:
+            brief !== undefined &&
+            trap.replyBrief === undefined &&
+            customOrder === undefined &&
+            objectionReply === undefined &&
+            sexualization?.kind !== 'steer_back',
+        });
+  const scriptStep = voiceStepOf(scripts);
+  // The brain may suggest an offer, only the policy decides (CLAUDE.md rule 3): refused, she just answers. With her
+  // scripts read, she offers only the step code decided.
+  const offerRefused =
+    cursored.action !== 'offer' || scriptStep !== undefined
+      ? undefined
+      : input.scripts !== undefined && input.offer !== undefined
+        ? 'no_script_step'
+        : offerRefusal(cursored, input.offer, heat);
+  const decidedBrief: Brief =
+    scriptStep === undefined
+      ? cursored
+      : { ...cursored, action: scriptStep.kind === 'paid' ? 'offer' : 'reply' };
+  const offered: Brief =
+    offerRefused === undefined ? decidedBrief : { ...cursored, action: 'reply', replyBrief: NO_OFFER_BRIEF };
   const voiceBrief: Brief =
     customOrder?.kind === 'reply'
       ? {
@@ -441,16 +563,12 @@ export async function composeTurn(
           toneHints: [...offered.toneHints, NO_OPENING_HINT],
         }
       : offered;
-  // His price objection: a reply of her bank he never received, said in her words (ADR 0090 § B).
-  const objectionReply =
-    brief?.intent === 'price_objection' && trap.replyBrief === undefined && input.objections !== undefined
-      ? pickObjectionReply(input.objections.bank, brief.objection, input.objections.usedReplyIds)
-      : undefined;
   const brainCostUsd = brain.ok ? (brain.value.meta.costUsd ?? 0) : 0;
   const brainLatencyMs = brain.ok ? brain.value.meta.latencyMs : 0;
   if (input.skipVoice?.(brief) === true || customOrder?.kind === 'handoff') {
     return {
       ...(customOrder !== undefined && { customOrder }),
+      ...(scripts !== undefined && { scripts }),
       ...(trap.isTrap && { trap }),
       ...(droppedNotes.length > 0 && { droppedNotes }),
       ...(brief && { brief }),
@@ -472,6 +590,7 @@ export async function composeTurn(
     ...base,
     brief: voiceBrief,
     ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
+    ...(scriptStep !== undefined && { scriptStep }),
   };
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? voice.value.output.bubbles : [];
@@ -485,6 +604,7 @@ export async function composeTurn(
   return {
     ...(customOrder !== undefined && { customOrder }),
     ...(objectionReply !== undefined && { objectionReply }),
+    ...(scripts !== undefined && { scripts }),
     ...(trap.isTrap && { trap }),
     ...(droppedNotes.length > 0 && { droppedNotes }),
     ...(brief && { brief }),

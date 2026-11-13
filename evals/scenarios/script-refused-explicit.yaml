@@ -1,0 +1,58 @@
+# Vente longue (ADR 0098) : un non clair à l’étape payante. Fan, messages, script et prix fictifs (ADR 0010).
+description: >-
+  L’étape payante à 15 € attend ; il dit non clairement : le code clôt le déroulé, elle ne repropose rien.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+  - 41 ans, confirmé
+situation:
+  known_hours: 72
+  age_confirmed: true
+  local_time: '23:00'
+  desire: 90
+history:
+  - from: creator
+    text: Je t’ai préparé la suite, tu me dis 😇
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme le plus intime de la soirée.
+          media: Une courte vidéo en nuisette.
+  run:
+    script: soiree-demo
+    steps:
+      - index: 0
+        outcome: sent
+      - index: 1
+        outcome: sent
+  history:
+    - script: soiree-demo
+      sent: [0, 1]
+inbound: Non merci, pas ce soir, je vais pas prendre
+expect:
+  brief:
+    script_reply_in:
+      - refused
+  decision:
+    handoff: false
+    offer: false
+    script_in:
+      - after_refusal
+  voice:
+    bubbles_max: 3
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \d+\s?(€|euros?)

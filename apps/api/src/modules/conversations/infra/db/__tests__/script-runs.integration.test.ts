@@ -4,38 +4,54 @@ import {
   FanIdSchema,
   newId,
   PlatformAccountIdSchema,
+  ScriptRunIdSchema,
+  type ConversationId,
+  type CreatorId,
 } from '@impera/contracts';
 import { schema, withAdmin } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import {
-  applyScriptRunEvent,
-  openScriptRun,
-  type PlatformScriptView,
-  type ScriptRunStore,
-} from '../../domain/script-run';
-import { createDrizzleScriptRunStore } from '../db/script-run-store';
+import type { ScriptRunState, StoredScriptRun } from '../../../domain/ports';
+import { createDrizzleUnitOfWork } from '../unit-of-work';
 
 const AT = new Date('2026-11-12T21:00:00.000Z');
 const later = (minutes: number): Date => new Date(AT.getTime() + minutes * 60_000);
 
-/** A made-up script (ADR 0010): teasing, then one paid step. */
-const SCRIPT: PlatformScriptView = {
-  scriptRef: 'script-demo',
-  moment: 'night',
-  description: 'Soirée de démonstration',
-  steps: [
-    { kind: 'free', priceMinor: null },
-    { kind: 'paid', priceMinor: 1_500 },
-  ],
-  mediaValidated: true,
-  touchesLimits: false,
-};
+const opening = (scriptRef: string, at: Date): ScriptRunState => ({
+  scriptRef,
+  status: 'open',
+  steps: [],
+  ignoredMessages: 0,
+  startedAt: at,
+  endedAt: null,
+});
+
+/** A made-up run (ADR 0010): the teasing sent, then a paid step he ignored once. */
+const step = (stepIndex: number, minutes: number, priceMinor: number | null) =>
+  ({
+    stepIndex,
+    kind: priceMinor === null ? 'free' : 'paid',
+    outcome: 'sent',
+    priceMinor,
+    sentAt: later(minutes),
+    at: later(minutes),
+  }) as const;
+
+/** `script_runs` through the turn's transaction, one per call. */
+interface Store {
+  latest(creatorId: CreatorId, conversationId: ConversationId): Promise<StoredScriptRun | null>;
+  open(
+    creatorId: CreatorId,
+    conversationId: ConversationId,
+    run: ScriptRunState,
+  ): Promise<StoredScriptRun | null>;
+  save(creatorId: CreatorId, stored: StoredScriptRun): Promise<boolean>;
+}
 
 describe('script runs kept per fan (ADR 0098)', () => {
   let test: TestDb;
-  let store: ScriptRunStore;
+  let store: Store;
   const creatorId = newId(CreatorIdSchema);
   const otherCreatorId = newId(CreatorIdSchema);
   const conversationId = newId(ConversationIdSchema);
@@ -43,7 +59,13 @@ describe('script runs kept per fan (ADR 0098)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    store = createDrizzleScriptRunStore(test.app.db);
+    const uow = createDrizzleUnitOfWork(test.app.db);
+    store = {
+      latest: (creator, conversation) => uow.inTenant(creator, (tx) => tx.scriptRuns.latest(conversation)),
+      open: (creator, conversation, run) =>
+        uow.inTenant(creator, (tx) => tx.scriptRuns.open(conversation, run)),
+      save: (creator, stored) => uow.inTenant(creator, (tx) => tx.scriptRuns.save(stored)),
+    };
     // Two invented creators, one fan each (ADR 0010).
     await withAdmin(test.admin.db, async (tx) => {
       for (const [creator, conversation, name] of [
@@ -82,23 +104,18 @@ describe('script runs kept per fan (ADR 0098)', () => {
 
   it('opens a run, keeps its steps as they move, and reads it back', async () => {
     expect(await store.latest(creatorId, conversationId)).toBeNull();
-    const opened = await store.open(creatorId, conversationId, openScriptRun(SCRIPT.scriptRef, AT));
+    const opened = await store.open(creatorId, conversationId, opening('script-demo', AT));
     expect(opened?.run.status).toBe('open');
     if (opened === null) return;
-    const sent = applyScriptRunEvent(opened.run, SCRIPT, { type: 'step_sent', stepIndex: 0, at: later(1) });
-    if (!sent.ok) throw new Error(sent.fault);
-    const paid = applyScriptRunEvent(sent.run, SCRIPT, { type: 'step_sent', stepIndex: 1, at: later(2) });
-    if (!paid.ok) throw new Error(paid.fault);
-    const ignored = applyScriptRunEvent(paid.run, SCRIPT, {
-      type: 'fan_message',
-      aboutTheStep: false,
-      at: later(3),
-    });
-    if (!ignored.ok) throw new Error(ignored.fault);
-    expect(await store.save(creatorId, { ...opened, run: ignored.run })).toBe(true);
+    const ignored: ScriptRunState = {
+      ...opened.run,
+      steps: [step(0, 1, null), step(1, 2, 1_500)],
+      ignoredMessages: 1,
+    };
+    expect(await store.save(creatorId, { ...opened, run: ignored })).toBe(true);
 
     const read = await store.latest(creatorId, conversationId);
-    expect(read?.run).toEqual(ignored.run);
+    expect(read?.run).toEqual(ignored);
     expect(read?.run.steps.map((step) => [step.stepIndex, step.outcome, step.priceMinor])).toEqual([
       [0, 'sent', null],
       [1, 'sent', 1_500],
@@ -106,15 +123,14 @@ describe('script runs kept per fan (ADR 0098)', () => {
   });
 
   it('opens no second run while one is open, and a new one once it ended', async () => {
-    expect(await store.open(creatorId, conversationId, openScriptRun('script-other', later(4)))).toBeNull();
+    expect(await store.open(creatorId, conversationId, opening('script-other', later(4)))).toBeNull();
     const open = await store.latest(creatorId, conversationId);
     if (open === null) throw new Error('no run');
-    const refused = applyScriptRunEvent(open.run, SCRIPT, { type: 'refused', at: later(5) });
-    if (!refused.ok) throw new Error(refused.fault);
-    expect(await store.save(creatorId, { ...open, run: refused.run })).toBe(true);
+    const refused: ScriptRunState = { ...open.run, status: 'refused', ignoredMessages: 0, endedAt: later(5) };
+    expect(await store.save(creatorId, { ...open, run: refused })).toBe(true);
 
     // Whether a script was already sent to him is Reveal's history to say (ADR 0018 § 5), not this table's.
-    const next = await store.open(creatorId, conversationId, openScriptRun('script-other', later(7)));
+    const next = await store.open(creatorId, conversationId, opening('script-other', later(7)));
     expect(next?.run.scriptRef).toBe('script-other');
     expect((await store.latest(creatorId, conversationId))?.run.scriptRef).toBe('script-other');
   });
@@ -127,15 +143,14 @@ describe('script runs kept per fan (ADR 0098)', () => {
     if (record === null) throw new Error('no run');
     expect(
       await store.save(creatorId, {
-        id: ended.id,
-        conversationId,
-        run: { ...record.run, scriptRef: SCRIPT.scriptRef, status: 'open', endedAt: null },
+        id: ScriptRunIdSchema.parse(ended.id),
+        run: { ...record.run, scriptRef: 'script-demo', status: 'open', endedAt: null },
       }),
     ).toBe(false);
   });
 
   it('keeps each creator to her own runs', async () => {
-    await store.open(otherCreatorId, otherConversationId, openScriptRun(SCRIPT.scriptRef, AT));
+    await store.open(otherCreatorId, otherConversationId, opening('script-demo', AT));
     expect(await store.latest(creatorId, otherConversationId)).toBeNull();
     expect(await store.latest(otherCreatorId, conversationId)).toBeNull();
   });
