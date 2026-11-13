@@ -129,6 +129,21 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
     expect(second.moved?.run.status).toBe('refused');
   });
 
+  it('pauses while he is not free: his messages neither refuse nor ignore the step (ADR 0103 § 12)', () => {
+    const first = scriptTurn({ ...input, latest: offered, history: history([0, 1]), availability: 'no' });
+    expect(first.decision.kind).toBe('wait');
+    expect(first.moved).toBeNull();
+    const refused = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1]),
+      reply: 'refused',
+      availability: 'no',
+    });
+    expect(refused.decision.kind).toBe('wait');
+    expect(refused.moved).toBeNull();
+  });
+
   it('never takes his « je l’ai pris » for a purchase: only Reveal says what he bought', () => {
     const claimed = scriptTurn({
       ...input,

@@ -450,3 +450,48 @@ describe("Reveal's script history (ADR 0018 § 5)", () => {
     expect(stepPriceCheck({ priceMinor: null }, { kind: 'free', priceMinor: null })).toBe('send');
   });
 });
+
+describe('nextScriptStep: the gate before the first teaser (ADR 0103 § 11-12)', () => {
+  it('starts no script, teaser included, while a condition is missing: it waits on the first one', () => {
+    expect(
+      nextScriptStep({
+        ...base,
+        startGate: { open: false, missing: ['not_sexualizing', 'availability_unconfirmed'] },
+      }),
+    ).toEqual({ kind: 'wait', reason: 'not_sexualizing' });
+    expect(
+      nextScriptStep({ ...base, startGate: { open: false, missing: ['availability_unconfirmed'] } }),
+    ).toEqual({ kind: 'wait', reason: 'availability_unconfirmed' });
+    expect(nextScriptStep({ ...base, startGate: { open: true } })).toEqual({
+      kind: 'start',
+      script: NIGHT,
+      step: toSend(NIGHT, 0),
+    });
+  });
+
+  it('lets a block of the policy speak first: a fan in his cooldown is not told he is not free', () => {
+    expect(
+      nextScriptStep({
+        ...base,
+        offer: { ...offer, lastOfferAt: at(-60) },
+        startGate: { open: false, missing: ['availability_unconfirmed'] },
+      }),
+    ).toEqual({ kind: 'none', reason: 'cooldown' });
+  });
+
+  it('pauses an open run while he is not free: no step, and the gate does not apply to it', () => {
+    const teased = play([sent(0, -2)]);
+    const open = { ...base, latest: { run: teased, script: NIGHT } };
+    expect(nextScriptStep({ ...open, availability: 'no' })).toEqual({
+      kind: 'wait',
+      reason: 'availability_unconfirmed',
+    });
+    expect(
+      nextScriptStep({
+        ...open,
+        availability: 'unknown',
+        startGate: { open: false, missing: ['availability_unconfirmed'] },
+      }),
+    ).toEqual({ kind: 'send_step', step: toSend(NIGHT, 1) });
+  });
+});

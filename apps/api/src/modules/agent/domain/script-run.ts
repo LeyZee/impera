@@ -1,4 +1,12 @@
-import type { FanFlags, ScriptRunStatus, ScriptStepKind, ScriptStepOutcome } from '@impera/contracts';
+import type {
+  FanAvailabilityState,
+  FanFlags,
+  ScriptRunStatus,
+  ScriptStart,
+  ScriptStartBlock,
+  ScriptStepKind,
+  ScriptStepOutcome,
+} from '@impera/contracts';
 
 import { offerDecision, type OfferBlock, type OfferContext } from './policy';
 import type { DayPart } from './situation';
@@ -329,6 +337,13 @@ export interface NextScriptStepInput {
   readonly offer: OfferContext;
   /** ADR 0088: nothing sold to a fan in distress. */
   readonly careMode: boolean;
+  /**
+   * The gate before the first teaser (ADR 0103 § 11, `scriptStartGate`): closed, no script starts and the decision
+   * waits on what is missing. Absent, as open: the evals and tests that predate it.
+   */
+  readonly startGate?: ScriptStart;
+  /** His availability as code holds it: « non » pauses an open run, no step and no refusal counted (§ 12). */
+  readonly availability?: FanAvailabilityState;
 }
 
 type NoScriptReason =
@@ -339,6 +354,8 @@ export type ScriptStepDecision =
   | { readonly kind: 'start'; readonly script: PlatformScriptView; readonly step: ScriptStepToSend }
   | { readonly kind: 'send_step'; readonly step: ScriptStepToSend }
   | { readonly kind: 'wait'; readonly step: StepRecord }
+  /** No script may start yet, or an open one pauses (ADR 0103 § 11-12): the first condition missing. */
+  | { readonly kind: 'wait'; readonly reason: ScriptStartBlock }
   | { readonly kind: 'after_refusal'; readonly step: StepRecord }
   | { readonly kind: 'end'; readonly status: Exclude<ScriptRunStatus, 'open' | 'refused'> };
 
@@ -394,6 +411,8 @@ function nextInOpenRun(
   const next = nextStepIndex(run, script);
   if (next === 'done') return { kind: 'end', status: 'bought_out' };
   if (next === undefined) return { kind: 'none', reason: 'no_script' };
+  // He said someone is there, or he must leave: the run pauses, nothing goes and nothing is held against him.
+  if (input.availability === 'no') return { kind: 'wait', reason: 'availability_unconfirmed' };
   const step = toSend(input.conversationRef, script, next);
   if (step === null) return { kind: 'none', reason: 'no_script' };
   if (!input.hotSession) return { kind: 'none', reason: 'cold_session' };
@@ -413,6 +432,13 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
     ...input.offer,
     lastOfferAt: later(input.offer.lastOfferAt, input.latest?.run.startedAt ?? null),
   });
+  if (!decision.allowed && decision.reason !== 'low_desire') return { kind: 'none', reason: decision.reason };
+  // Hot, sexualizing and free, or no teaser: a teaser sent spends the script, which never plays again (Charles, 13/11).
+  const gate = input.startGate;
+  // Closed without a reason never happens; it stays closed if it did (fail closed).
+  if (gate !== undefined && !gate.open) {
+    return { kind: 'wait', reason: gate.missing[0] ?? 'availability_unconfirmed' };
+  }
   if (!decision.allowed) return { kind: 'none', reason: decision.reason };
   const permitted = permittedScripts(input.catalogue, {
     moment: input.moment,

@@ -129,7 +129,9 @@ export function scriptTurn(input: ScriptTurnInput): ScriptTurn {
   let run = stored;
   if (run !== null && storedScript !== null && run.status === 'open') {
     run = reconcileScriptRun(run, storedScript, history, now);
-    if (input.countsHisMessage) run = afterHisMessage(run, storedScript, input.reply, now);
+    // Paused while he is not free (ADR 0103 § 12): his message is neither an answer to the step nor a refusal.
+    if (input.countsHisMessage && input.availability !== 'no')
+      run = afterHisMessage(run, storedScript, input.reply, now);
   }
   const latest = run === null || storedScript === null ? null : { run, script: storedScript };
   const decided = nextScriptStep({ ...input, latest });
