@@ -1,6 +1,7 @@
 import type { PlaygroundState } from '@impera/contracts';
 import { useEffect, useState, type JSX } from 'react';
 
+import { DesireMarksFold } from './DesireMarks';
 import { PersonaPicker } from './PersonaPicker';
 import { clockAt, duration, money, scriptsHint } from './logic';
 import type { CreatorMedia as CreatorMediaInput, MediaKind } from './model';
@@ -127,6 +128,8 @@ export function SetupPanel({
             />
           </div>
         </details>
+
+        <DesireMarksFold state={state} pg={pg} />
       </div>
     </aside>
   );
