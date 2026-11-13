@@ -15,6 +15,7 @@ const base = {
   creatorIds: [],
   routedCreatorIds: [],
   shiftCreatorIds: [],
+  preferences: { sounds: true },
 };
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 
