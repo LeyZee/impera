@@ -20,7 +20,7 @@ En deux PR (plan du 13/11) :
 
 - [x] 0101a, l'API : contrats (`give`, `SaleGiven`, `MySaleGiven`, `excludeReason`, `recipients`, `pay_sale_recipient_conflict`) ; migration 0175 (registre d'une clôture par membre et par part, décision avec receveur, part, raison d'un écart et vente gardée telle que le registre l'a ; déclencheurs des parts) ; domaine (`recipientsOf`, `recipientPartOf`, attribution `shared`, remboursements aux mêmes parts) ; magasins (décision, clôture, « Mes ventes lues ») ; l'écran de paie garde ses gestes (« Donner à… » caché jusqu'à son écran, « Écarter » envoie « autre raison »).
 - [x] 0101b, les écrans : « Donner à… » avec « Toute la vente » ou « Partager » (50/50 en un geste, pas de 10 % sur une barre), le choix « l'IA a été décisive » sur « Écarter », le panneau « Donner une vente » (les ventes d'un jour, d'un membre ou de l'IA, où un autre membre était en poste ; `GET …/sales-to-give?day=`), « Donnée à … », « Reçue de … », « Partagée avec … : 40 % pour toi » dans « Mes ventes lues » et sur la carte du valideur, le nombre de ventes données par valideur et par mois pour le propriétaire (§ 17, `GET …/sale-gifts`).
-- [ ] 0101b, captures Nuit/Jour, PC/téléphone, vues par Charles avant fusion.
+- [ ] 0101b, captures Nuit/Jour, PC/téléphone, vues par Charles avant fusion (lot `ventes-donnees-0101b` prêt le 13/11, avis de Design demandé).
 
 ## Critères d'acceptation
 
