@@ -91,10 +91,11 @@
   /*
    * Where the money goes (ADR 0106 § 10): the creator's part rose, the agency's gold, the same on every block of the
    * Dashboard; the fans' VAT and the platform's commission take --nv-series-other (the second hatched). Validated
-   * together for colour-blind separation and at 3:1 on the plate, Nuit and Jour (dataviz validator).
+   * against every other hue of the same screen, --nv-series-4's olive first (16 ΔE apart and more, colour-blind
+   * included), Nuit and Jour (dataviz validator); the gold's contrast on the plate is relieved by the legend's labels.
    */
   --nv-money-creator: #d06c98;
-  --nv-money-agency: #ad8838;
+  --nv-money-agency: #8e5a10;
 
   /* Shadows */
   --nv-shadow-glass:
@@ -179,7 +180,7 @@
   --nv-series-4: #7a7414;
   --nv-series-other: rgba(60, 10, 30, 0.26);
   --nv-money-creator: #b8406f;
-  --nv-money-agency: #93701a;
+  --nv-money-agency: #d4a548;
 
   --nv-shadow-glass:
     inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(80, 10, 30, 0.07),

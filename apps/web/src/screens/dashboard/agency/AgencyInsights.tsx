@@ -177,7 +177,7 @@ function Tiles({
           key={tile.label}
           className="nv-plate ins-tile nv-enter"
           style={{ '--nv-i': from + i }}
-          {...(tile.tip === undefined ? {} : { tabIndex: 0, ...tip.bind(tile.tip) })}
+          {...(tile.tip === undefined ? {} : { tabIndex: 0, ...tip.bind(tile.tip, { around: true }) })}
         >
           <dt>
             {tile.part === undefined ? null : (
@@ -219,12 +219,14 @@ function MoneySplit({
   const { current, previous } = insights.totals;
   const parts = moneyParts(current, previous, several);
   const whole = parts.reduce((sum, part) => sum + part.cents, 0);
+  // Shares are of the revenue the card's title shows, never of the blocks' sum, which a block brought to zero changes.
+  const revenue = current.revenueMinor;
   const tipOf = (part: MoneyPart): ReturnType<typeof moneyTip> =>
     moneyTip({
       title: part.label,
       cents: part.cents,
       previousCents: part.previousCents,
-      revenueMinor: whole,
+      revenueMinor: revenue,
       netMinor: part.ofNet ? current.netMinor : null,
       text: part.note,
     });
@@ -232,7 +234,7 @@ function MoneySplit({
     <article className="nv-plate ins-money nv-enter" style={{ '--nv-i': 6 }}>
       <h3 className="ins-card__title">
         Où va l’argent
-        {whole > 0 ? <span className="ins-card__total">{euros(current.revenueMinor)}</span> : null}
+        {whole > 0 ? <span className="ins-card__total">{euros(revenue)}</span> : null}
       </h3>
       {whole <= 0 ? (
         <p className="ins-empty">Aucune vente sur la période.</p>
@@ -243,7 +245,7 @@ function MoneySplit({
             role="img"
             aria-label={`Où va l’argent : ${parts
               .filter((part) => part.cents > 0)
-              .map((part) => `${part.label} ${euros(part.cents)}, ${String(shareOf(part.cents, whole))} %`)
+              .map((part) => `${part.label} ${euros(part.cents)}, ${String(shareOf(part.cents, revenue))} %`)
               .join(' ; ')}`}
           >
             {parts.map((part) =>
@@ -260,11 +262,11 @@ function MoneySplit({
           </div>
           <ul className="ins-money__legend">
             {parts.map((part) => (
-              <li key={part.key} tabIndex={0} {...tip.bind(tipOf(part))}>
+              <li key={part.key} tabIndex={0} {...tip.bind(tipOf(part), { around: true })}>
                 <span className="ins-money__key" data-part={part.key} aria-hidden="true" />
                 <span className="ins-money__label">{part.label}</span>
                 <span className="ins-money__value">{euros(part.cents)}</span>
-                <span className="ins-money__share">{String(shareOf(part.cents, whole))}&nbsp;%</span>
+                <span className="ins-money__share">{String(shareOf(part.cents, revenue))}&nbsp;%</span>
               </li>
             ))}
           </ul>
