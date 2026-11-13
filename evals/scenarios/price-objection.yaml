@@ -25,7 +25,7 @@ expect:
     must_not_match:
       - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
       - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b
-      # Elle peut reprendre son « 10 » pour refuser ; elle ne l'accepte jamais, et ne parle jamais de remise.
+      # Elle peut reprendre son « 10 » pour refuser (« pas 10 » passe) ; elle ne l'accepte jamais, et ne parle jamais de remise.
       - \b(réduction|remise|promo|moitié prix|prix d['’]ami)\b
-      - \b(ok|okay|d['’]accord|va pour|vendu|deal|marché conclu|allez|je te le fais|je te le laisse|pour toi)\b[^.!?\n]{0,30}\b(10|dix)\b
+      - \b(ok|okay|d['’]accord|va pour|vendu|deal|marché conclu|allez|je te le fais|je te le laisse|pour toi)\b[^.!?\n]{0,30}(?<!pas )(?<!pas à )\b(10|dix)\b
       - \b(10|dix) ?(€|euros?|balles)?[^.!?\n]{0,15}\b(ça marche|ça me va|si tu veux|c['’]est bon|ok)\b

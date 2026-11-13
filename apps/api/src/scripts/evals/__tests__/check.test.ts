@@ -62,6 +62,7 @@ describe('price-objection', () => {
   it('lets her repeat his « 10 » to refuse it', () => {
     expect(checkScenario(priceObjection, answer(['10... t’es sérieux là 😏']))).toEqual([]);
     expect(checkScenario(priceObjection, answer(['c’est 25, pas 10 bébé']))).toEqual([]);
+    expect(checkScenario(priceObjection, answer(['c’est 25 pour toi, pas 10 😌']))).toEqual([]);
   });
 
   it('fails when she takes his price or speaks of a discount', () => {
