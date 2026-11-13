@@ -55,7 +55,7 @@ describe('Consommation IA, what the screen says (ADR 0091)', () => {
     expect(days.at(-1)?.title).toMatch(/^Aujourd’hui, /u);
     // xAI first, Mistral empty, Google third, Venice empty: the colours never move.
     expect(days[0]?.parts).toEqual([2, 0, 0.4, 0]);
-    expect(hourColumns(usage)[14]?.title).toBe('14h–15h');
+    expect(hourColumns(usage)[14]?.title).toBe(`14${NBSP}h–15${NBSP}h`);
   });
 
   it('says the part the subscription paid, per column and per provider (« ok 0091 chiffres »)', () => {
@@ -92,7 +92,8 @@ describe('Consommation IA, what the screen says (ADR 0091)', () => {
     expect(runwayShare(card)).toBeCloseTo((3.26 / 30) * 100);
     expect(runwayText({ ...card, state: 'empty', balanceMinor: -20 })).toContain('Épuisés');
     expect(runwayShare({ ...card, state: 'empty' })).toBe(0);
-    expect(runwayText({ ...card, daysLeft: 0.4 })).toContain('moins d’un jour');
+    expect(runwayText({ ...card, daysLeft: 0.4 })).toMatch(/^Moins d’un jour au rythme actuel/u);
+    expect(runwayText({ ...card, daysLeft: 83.9 })).toMatch(/^Plus de deux mois au rythme actuel/u);
     expect(runwayText({ ...card, perDayMinor: 0, daysLeft: null, runsOutOn: null, state: 'ok' })).toContain(
       'le solde ne baisse pas',
     );

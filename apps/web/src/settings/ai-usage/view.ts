@@ -153,8 +153,8 @@ export function dayColumns(usage: AiUsage): Column[] {
 export function hourColumns(usage: AiUsage): Column[] {
   return usage.hours.map((hour) => ({
     key: String(hour.hour),
-    label: `${String(hour.hour)}h`,
-    title: `${String(hour.hour)}h–${String((hour.hour + 1) % 24)}h`,
+    label: `${String(hour.hour)}\u00a0h`,
+    title: `${String(hour.hour)}\u00a0h–${String((hour.hour + 1) % 24)}\u00a0h`,
     eur: hour.eur,
     coveredEur: hour.coveredEur,
     calls: hour.calls,
@@ -293,13 +293,14 @@ export function runwayText(card: AiCredits): string {
   if (card.daysLeft === null || card.runsOutOn === null)
     return 'Pas encore de rythme : il faut une journée complète de dépense.';
   const days = card.daysLeft;
+  // « Environ » goes with a count of days only: « environ plus de deux mois » says two things at once.
   const span =
     days < 1
-      ? 'moins d’un jour'
+      ? 'Moins d’un jour'
       : days >= 60
-        ? 'plus de deux mois'
-        : `${String(Math.floor(days))} jour${Math.floor(days) > 1 ? 's' : ''}`;
-  return `Environ ${span} au rythme actuel, jusqu’au ${longDay(card.runsOutOn)}.`;
+        ? 'Plus de deux mois'
+        : `Environ ${String(Math.floor(days))} jour${Math.floor(days) > 1 ? 's' : ''}`;
+  return `${span} au rythme actuel, jusqu’au ${longDay(card.runsOutOn)}.`;
 }
 
 /** The badge beside the provider's name. */

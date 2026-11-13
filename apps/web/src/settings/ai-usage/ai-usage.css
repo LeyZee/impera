@@ -437,3 +437,8 @@
   margin-top: calc((1lh - 10px) / 2);
   border-radius: 2px;
 }
+/* The small print under the month's figures: never under 13 px on this screen (avis design du 13/11). */
+.cia-tiles .ins-tile__note {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}

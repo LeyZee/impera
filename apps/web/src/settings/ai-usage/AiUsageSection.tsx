@@ -449,7 +449,8 @@ function Spend({
                     ['Appels', countText(column.calls)],
                   ],
                 },
-                { above: true },
+                // Beside the column, inside the card: over it, the tallest column's tip covered the span control.
+                { beside: true },
               )}
             >
               <span className="ins-col__stack">
