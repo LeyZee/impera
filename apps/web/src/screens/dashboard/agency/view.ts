@@ -67,6 +67,55 @@ export function shareOf(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
 }
 
+/** One part of « Où va l'argent » (ADR 0106 § 5): what the fans paid, split in four, in the order money leaves. */
+export interface MoneyPart {
+  readonly key: 'fansVat' | 'commission' | 'creator' | 'agency';
+  readonly label: string;
+  readonly cents: number;
+  readonly note: string;
+}
+
+/**
+ * The period's revenue split in four, the platform's amounts as they are: the VAT the fans paid (revenue less its
+ * amount without VAT), the platform's commission (that less the net), then the net's two parts. A part never drawn
+ * below zero: refunds heavier than sales leave an empty bar, never a negative block.
+ */
+export function moneyParts(
+  figures: Pick<
+    AgencyInsights['totals']['current'],
+    'revenueMinor' | 'revenueExclVatMinor' | 'netMinor' | 'agencyMinor' | 'creatorMinor'
+  >,
+  several: boolean,
+): MoneyPart[] {
+  const at = (cents: number): number => Math.max(0, cents);
+  return [
+    {
+      key: 'fansVat',
+      label: 'TVA payée par les fans',
+      cents: at(figures.revenueMinor - figures.revenueExclVatMinor),
+      note: 'la plateforme la reverse à l’État, elle n’est à personne',
+    },
+    {
+      key: 'commission',
+      label: 'Commission de la plateforme',
+      cents: at(figures.revenueExclVatMinor - figures.netMinor),
+      note: 'ce que la plateforme garde sur chaque vente',
+    },
+    {
+      key: 'creator',
+      label: several ? 'Part des créatrices' : 'Part de la créatrice',
+      cents: at(figures.creatorMinor),
+      note: 'ce que la plateforme leur verse, son propre chiffre',
+    },
+    {
+      key: 'agency',
+      label: 'Part de l’agence',
+      cents: at(figures.agencyMinor),
+      note: 'ce que la plateforme verse à l’agence, son propre chiffre',
+    },
+  ];
+}
+
 /** A slice of a ring: its label, colour, amount, and how it compares. */
 export interface Slice {
   readonly key: string;

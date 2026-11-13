@@ -51,9 +51,19 @@ const day = z.iso.date();
 export const AgencyFiguresSchema = z.strictObject({
   /** The « Chiffre d'affaires »: what the fans paid, VAT included, refunds taken off. */
   revenueMinor: cents,
+  /**
+   * The same sales without the VAT the fans paid (ADR 0106 § 2): the revenue less it is the fans' VAT, it less the net
+   * is the platform's commission.
+   */
+  revenueExclVatMinor: cents,
   netMinor: cents,
   agencyMinor: cents,
   creatorMinor: cents,
+  /**
+   * The VAT the platform adds to the agency's transfers on its part, estimated (ADR 0106 § 6): never added to a sum,
+   * the exact amount is the platform's transfer statement.
+   */
+  agencyTransferVatMinor: cents,
   sales: count,
   refunds: count,
 });

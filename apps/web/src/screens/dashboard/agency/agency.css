@@ -16,7 +16,12 @@
   opacity: 0.55;
 }
 
-/* ── Lead figure and tiles. */
+/* ── Lead figure and tiles: the money beside the revenue (2 × 2), where it goes, then the fans and the sales. */
+.ins-figures-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .ins-figures {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 2fr);
@@ -60,9 +65,113 @@
 }
 .ins-tiles {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
+}
+.ins-figures > .ins-tiles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ins-lead__sub {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+}
+
+/* ── Où va l'argent (ADR 0106 § 5): a tall segmented bar, one ink in four steps, the platform's commission hatched so
+   that it never reads by its lightness alone; 2px between blocks, 4px corners, 28px high. */
+.ins-money {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px 18px;
+}
+.ins-money [data-part='fansVat'] {
+  background: color-mix(in srgb, var(--nv-data-1) 18%, transparent);
+}
+.ins-money [data-part='commission'] {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--nv-data-1) 42%, transparent) 0 3px,
+    color-mix(in srgb, var(--nv-data-1) 14%, transparent) 3px 7px
+  );
+}
+.ins-money [data-part='creator'] {
+  background: color-mix(in srgb, var(--nv-data-1) 55%, transparent);
+}
+.ins-money [data-part='agency'] {
+  background: var(--nv-data-1);
+}
+.ins-money__bar {
+  display: flex;
+  gap: 2px;
+  height: 28px;
+}
+.ins-money__part {
+  flex: 1 1 0;
+  min-width: 3px;
+  border-radius: 4px;
+  transform-origin: left center;
+  animation: ins-money-grow var(--nv-dur-data) var(--nv-ease-out) both;
+  transition: opacity var(--nv-dur-fast);
+}
+.ins-money__bar:hover .ins-money__part:not(:hover) {
+  opacity: 0.6;
+}
+@keyframes ins-money-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.ins-money__legend {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ins-money__legend li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'key label'
+    '. value';
+  column-gap: 8px;
+  row-gap: 2px;
+  align-items: center;
+  min-width: 0;
+}
+.ins-money__key {
+  grid-area: key;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.ins-money__label {
+  grid-area: label;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.ins-money__value {
+  grid-area: value;
+  font-size: var(--nv-text-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.ins-money__share {
+  grid-area: value;
+  justify-self: end;
+  font-size: var(--nv-text-footnote);
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink-faint);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ins-money__part {
+    animation: none;
+  }
 }
 .ins-tile {
   display: flex;
@@ -880,6 +989,13 @@
   .ins-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+  .ins-money {
+    padding: 16px 16px 14px;
+  }
+  .ins-money__legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
   }
   .ins-tile {
     padding: 12px 14px;

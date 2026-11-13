@@ -14,6 +14,7 @@ import {
   deltaText,
   euros,
   kindSlices,
+  moneyParts,
   OTHER,
   SERIES,
   sellerSlices,
@@ -116,5 +117,31 @@ describe('subscribers helpers', () => {
     expect(signedCount(12)).toBe('+12');
     expect(signedCount(-3)).toBe('−3');
     expect(signedCount(0)).toBe('0');
+  });
+
+  it('splits the revenue in four, in the order money leaves, never a negative block (ADR 0106 § 5)', () => {
+    const figures = {
+      revenueMinor: 12_000,
+      revenueExclVatMinor: 10_000,
+      netMinor: 8_000,
+      agencyMinor: 3_200,
+      creatorMinor: 4_800,
+    };
+    expect(moneyParts(figures, false).map((part) => [part.key, part.label, part.cents])).toEqual([
+      ['fansVat', 'TVA payée par les fans', 2_000],
+      ['commission', 'Commission de la plateforme', 2_000],
+      ['creator', 'Part de la créatrice', 4_800],
+      ['agency', 'Part de l’agence', 3_200],
+    ]);
+    expect(moneyParts(figures, true)[2]?.label).toBe('Part des créatrices');
+    const refunded = {
+      ...figures,
+      revenueMinor: -600,
+      revenueExclVatMinor: -500,
+      netMinor: -400,
+      agencyMinor: -160,
+      creatorMinor: -240,
+    };
+    expect(moneyParts(refunded, false).every((part) => part.cents >= 0)).toBe(true);
   });
 });

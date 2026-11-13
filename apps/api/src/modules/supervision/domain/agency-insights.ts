@@ -127,6 +127,7 @@ interface HourPots {
 /** Signed sums kept apart by currency until the end, so each amount is converted once. */
 interface Pot {
   revenue: [number, number];
+  revenueExclVat: [number, number];
   net: [number, number];
   agency: [number, number];
   creator: [number, number];
@@ -136,6 +137,7 @@ interface Pot {
 
 const pot = (): Pot => ({
   revenue: [0, 0],
+  revenueExclVat: [0, 0],
   net: [0, 0],
   agency: [0, 0],
   creator: [0, 0],
@@ -146,6 +148,7 @@ const pot = (): Pot => ({
 function add(into: Pot, row: SalesTotalsRow): void {
   const i = row.currency === 'USD' ? 1 : 0;
   into.revenue[i] += row.grossInclVatMinor;
+  into.revenueExclVat[i] += row.grossExclVatMinor;
   into.net[i] += row.netMinor;
   into.agency[i] += row.agencyMinor;
   into.creator[i] += row.creatorMinor;
@@ -160,14 +163,31 @@ function toEur(usdMinor: number, rate: UsdRate | null): number {
   return usdMinor < 0 ? -magnitude : magnitude;
 }
 
+/** The VAT rate the platform adds to the agency's transfers, on its part (ADR 0106 § 7): France's standard rate. */
+const AGENCY_TRANSFER_VAT_BPS = 2_000;
+
+/**
+ * The VAT the platform adds to a transfer of `agencyMinor` (ADR 0106 § 6): its rate, to the nearest cent, a half up;
+ * nothing on a part at zero or below.
+ */
+export function agencyTransferVat(agencyMinor: number): number {
+  if (agencyMinor <= 0) return 0;
+  const scaled = agencyMinor * AGENCY_TRANSFER_VAT_BPS;
+  const whole = Math.floor(scaled / 10_000);
+  return scaled - whole * 10_000 >= 5_000 ? whole + 1 : whole;
+}
+
 function figuresOf(sums: Pot, rate: UsdRate | null): AgencyFigures {
   const money = ([eur, usd]: [number, number]): number => eur + toEur(usd, rate);
   const counted = ([eur, usd]: [number, number]): number => eur + (rate === null ? 0 : usd);
+  const agencyMinor = money(sums.agency);
   return {
     revenueMinor: money(sums.revenue),
+    revenueExclVatMinor: money(sums.revenueExclVat),
     netMinor: money(sums.net),
-    agencyMinor: money(sums.agency),
+    agencyMinor,
     creatorMinor: money(sums.creator),
+    agencyTransferVatMinor: agencyTransferVat(agencyMinor),
     sales: counted(sums.sales),
     refunds: counted(sums.refunds),
   };
