@@ -25,6 +25,8 @@ import { countryFlag, countryName } from '@/lib/country';
 import { useGrowingArea } from '@/lib/growing-area';
 import { cityOf } from '@/scheduling/time';
 import { useAgencyToday } from '@/screens/pay/data';
+import { MemberSetupBlock } from '@/setup/SetupBlocks';
+import { memberAccessId } from '@/setup/model';
 import '@/shell/dialog.css';
 
 /** Arrived less than this many days ago: the « Nouveau » badge of Imperium. */
@@ -41,6 +43,7 @@ export function MemberSheet({
   creators,
   removals,
   canManage,
+  seesSetup = canManage,
   isSelf,
   onClose,
 }: {
@@ -50,6 +53,8 @@ export function MemberSheet({
   /** His accounts removed from a platform while he is still here (ADR 0076 § 5). */
   removals: readonly TeamPlatformRemoval[];
   canManage: boolean;
+  /** His « Mise en route »: the owner sees everyone's, an active manager the chatters' (the server filters). */
+  seesSetup?: boolean;
   /** His own record: the notes about him are never his to read (the server answers 403). */
   isSelf: boolean;
   onClose: () => void;
@@ -141,6 +146,11 @@ export function MemberSheet({
             Changer le statut
           </button>
         </div>
+      ) : null}
+
+      {/* His « Mise en route » (pilotage plan W1): the owner's, until all is done; nothing for one who left. */}
+      {seesSetup && !gone && (canManage || member.teamRole === 'chatter') ? (
+        <MemberSetupBlock memberId={member.id} />
       ) : null}
 
       <div className="tm-figures">
@@ -235,7 +245,13 @@ export function MemberSheet({
       </nav>
 
       {gone ? null : (
-        <section className="tm-block nv-enter" style={{ '--nv-i': 5 }} aria-label="Accès">
+        <section
+          className="tm-block nv-enter"
+          style={{ '--nv-i': 5 }}
+          aria-label="Accès"
+          id={memberAccessId(member.id)}
+          tabIndex={-1}
+        >
           <h3>Accès</h3>
           <p className="tm-hint">
             {access.kind === 'signed-in'
