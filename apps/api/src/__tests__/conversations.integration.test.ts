@@ -583,6 +583,7 @@ describe('conversations module (P0-05)', () => {
       'desireScore',
       'desireBand',
       'desireAt',
+      'fanAvailability',
     ] as const;
     const pick = (row: typeof projected) => Object.fromEntries(keys.map((key) => [key, row[key]]));
     expect(rebuilt).toEqual(pick(projected));
