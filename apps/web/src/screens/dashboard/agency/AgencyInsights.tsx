@@ -1,4 +1,4 @@
-import type { AgencyInsights, AgencyPeriod } from '@impera/contracts';
+import { AGENCY_TRANSFER_VAT_BPS, type AgencyInsights, type AgencyPeriod } from '@impera/contracts';
 import { chartPoints, linePath, niceTicks, placeSegmentThumb } from '@impera/design-system';
 import { Link } from '@tanstack/react-router';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
@@ -53,6 +53,8 @@ import { ServerSilent } from '@/shell/ServerSilent';
  */
 
 const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+/** « 20 % »: the transfers' VAT rate as the code holds it (ADR 0106 § 7), never written twice. */
+const VAT_RATE = `${(AGENCY_TRANSFER_VAT_BPS / 100).toLocaleString('fr-FR')}\u00a0%`;
 const formatEuros = (cents: number): string => euros(Math.round(cents));
 const formatCount = (n: number): string => Math.round(n).toLocaleString('fr-FR');
 
@@ -359,7 +361,7 @@ function Figures({
     {
       label: 'TVA en plus sur les virements',
       value: euros(current.agencyTransferVatMinor),
-      note: 'estimation, 20 % de la part de l’agence, à reverser à l’État',
+      note: `estimation, ${VAT_RATE} de la part de l’agence, à reverser à l’État`,
       delta: null,
       // Not a part of the revenue: no share of it (ADR 0106 § 6).
       tip: moneyTip({
@@ -368,7 +370,7 @@ function Figures({
         previousCents: previous.agencyTransferVatMinor,
         revenueMinor: 0,
         netMinor: null,
-        text: 'Une estimation : la plateforme ajoute 20 % de TVA à la part de l’agence sur chaque virement. Elle se reverse à l’État ; le montant exact est sur le relevé de virement.',
+        text: `Une estimation : la plateforme ajoute ${VAT_RATE} de TVA à la part de l’agence sur chaque virement. Elle se reverse à l’État ; le montant exact est sur le relevé de virement.`,
       }),
     },
   ];

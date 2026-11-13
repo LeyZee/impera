@@ -44,6 +44,12 @@ export const AgencySaleKindSchema = z.enum([
 ]);
 export type AgencySaleKind = z.infer<typeof AgencySaleKindSchema>;
 
+/**
+ * The VAT rate the platform adds to the agency's transfers, on its part, in basis points (ADR 0106 § 7): France's
+ * standard rate. A rule of the code, read by the server's estimate and by the screen that says it.
+ */
+export const AGENCY_TRANSFER_VAT_BPS = 2_000;
+
 const cents = z.number().int();
 const count = z.number().int().nonnegative();
 const day = z.iso.date();

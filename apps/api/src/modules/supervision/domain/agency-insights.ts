@@ -1,5 +1,6 @@
 import {
   AGENCY_PERIOD_DAYS,
+  AGENCY_TRANSFER_VAT_BPS,
   AgencySaleKindSchema,
   calendarDayAt,
   type AgencyFigures,
@@ -162,9 +163,6 @@ function toEur(usdMinor: number, rate: UsdRate | null): number {
   const magnitude = usdToEurMinor(Math.abs(usdMinor), rate.rateMicros);
   return usdMinor < 0 ? -magnitude : magnitude;
 }
-
-/** The VAT rate the platform adds to the agency's transfers, on its part (ADR 0106 § 7): France's standard rate. */
-const AGENCY_TRANSFER_VAT_BPS = 2_000;
 
 /**
  * The VAT the platform adds to a transfer of `agencyMinor` (ADR 0106 § 6): its rate, to the nearest cent, a half up;
