@@ -1,7 +1,7 @@
 # PROPOSED Trophées et médailles de série de la créatrice
 Statut : proposed
 Phase : créatrice (ADR 0107 ; ADR 0042 § 3, ADR 0055 § 4, ADR 0104 § B)
-Dépend de : ADR 0107 (acceptée le 13/11/2026) ; PR #720 et PR des médailles du chatteur (composant de dévoilement et langage graphique partagés) ; un numéro de migration attribué par le coordinateur
+Dépend de : ADR 0107 (acceptée le 13/11/2026) ; la PR du jeu du chatteur (module `rewards`, migration 0178) ; PR #720 et PR des médailles du chatteur (composant de dévoilement et langage graphique partagés) ; un numéro de migration attribué par le coordinateur
 Branche : claude/project-thread-vnzrdd
 Propriétaire proposé : le fil « Récompenser la créatrice avec des badges » ; relecteurs Design/UX (écrans, dessins), Bilan (base, job), Médias (dépôts et demandes)
 
@@ -18,7 +18,7 @@ La créatrice gagne des médailles à chaque palier de sa série de journées r�
 ## À faire (liste vérifiable)
 
 - [ ] Domaine pur et testé : série de livraisons (§ 2), constat des neuf trophées (§ 3), médaille du palier atteint (§ 1).
-- [ ] Migration : table des trophées gagnés, unique par créatrice et trophée, FORCE RLS, test RLS (elle lit les siens et marque un dévoilement vu ; l'agence lit ; un chatteur ne lit rien).
+- [ ] Migration 0181 dans le module `rewards` : types de la créatrice ajoutés à la liste fermée de la table commune des gains, politiques RLS de la créatrice, test RLS (elle lit les siens et marque un dévoilement vu ; l'agence lit ; un chatteur ne lit rien). Pas de seconde table.
 - [ ] Job rejouable : après une coche, après un dépôt arrivé, chaque nuit dans son fuseau.
 - [ ] Route de la vitrine au harnais d'isolation ; test « une créatrice ne lit pas les trophées d'une autre ».
 - [ ] Écrans : médaille à côté de la série, « Mes trophées » dans Moi, dévoilement partagé avec le chatteur, lecture sur sa fiche côté agence.

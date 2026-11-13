@@ -55,7 +55,7 @@ Un jeu ne tient que s'il raconte ces faits-là. Il ne doit jamais devenir une ob
 
 ### D. Comment c'est fait
 
-13. **Une table** des trophées gagnés (créatrice, trophée, date, fait qui l'a donné, date du dévoilement vu), unique par créatrice et trophée, `FORCE RLS` : la créatrice lit les siens et marque un dévoilement vu ; l'agence lit ; seul le job écrit. Les séries ne sont pas stockées : elles se recalculent depuis ses coches et ses demandes, comme aujourd'hui.
+13. **La table des gains du jeu**, commune au chatteur et à la créatrice et rattachée au compte (module `rewards`, posée par la migration du jeu du chatteur, ADR 0104) : la migration de ce chantier n'ajoute que les types de la créatrice à sa liste fermée et ses politiques, `FORCE RLS` gardé. La créatrice lit ses gains et marque un dévoilement vu ; le propriétaire et un manager actif lisent les siens ; un chatteur ne les lit jamais ; seul le job écrit. Unique par compte, type et portée, pour que le job soit rejouable. Les séries ne sont pas stockées : elles se recalculent depuis ses coches et ses demandes, comme aujourd'hui.
 14. **Un job rejouable** constate les trophées après une coche, après un dépôt arrivé et chaque nuit dans son fuseau ; rejoué, il ne donne rien deux fois.
 15. **Les seuils sont dans le code**, pas en réglage : la liste est courte et chaque trophée doit dire la même chose à toutes.
 16. **Un seul langage graphique** avec le chatteur : mêmes pièces, mêmes écussons, même dévoilement, même composant ; seuls les symboles de la créatrice sont propres à ses gestes. Chaque symbole doit dire son trophée sans légende, sa forme principale sur l'axe de l'écusson et sa pastille rentrée dans le coin, et être rendu et regardé en grand et à 24 à 40 px, Nuit et Jour, avant d'être montré.
@@ -63,7 +63,7 @@ Un jeu ne tient que s'il raconte ces faits-là. Il ne doit jamais devenir une ob
 ## Conséquences
 
 - Positives : la créatrice voit que ce qu'elle fait compte, sur ce qui sert vraiment l'agence (régularité, délais tenus, stock) ; l'agence voit d'un coup d'œil qui tient le rythme.
-- Négatives : une table et une migration ; un job de plus ; des symboles à dessiner et faire valider.
+- Négatives : une migration (types et politiques sur la table commune) ; un job de plus ; des symboles à dessiner et faire valider.
 - À surveiller : si la série de livraisons retombe souvent à zéro, c'est que les échéances sont trop serrées : c'est l'agence qui règle ses demandes, pas le jeu qui doit punir moins.
 
 ## Alternatives rejetées
