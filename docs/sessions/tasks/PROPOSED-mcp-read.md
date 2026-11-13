@@ -1,36 +1,44 @@
-# Serveur MCP, lot 1 : accès d'agent, journal et outils de lecture du chatting
+# Serveur MCP, lot a : accès d'agent, journal et catalogue de lecture
+
 Statut : proposed
-Phase : après le copilote réel (étape 5 de la feuille de route), indépendant de l'Équipe
-Dépend de : ADR 0026 acceptée, EQ-01 (`withMember`, `/v1/me`), EQ-11 (Réglages par rôle)
+Phase : MCP (ADR 0026, amendée par 0105) ; après la lecture Reveal dans la file de Bilan
+Dépend de : ADR 0026 et 0105 acceptées, ADR 0087 lot a (rôle de service), EQ-01 (`withMember`, `/v1/me`), EQ-11 (Réglages par rôle)
 Branche : task/<id>-mcp-read
 
 ## Objectif
-Un agent externe (Claude Code, un agent Grok ou OpenAI par API) se branche sur `POST /v1/mcp` avec un jeton d'agent créé dans Réglages › Agents connectés, et lit l'état de l'agent de chatting, la file À traiter, les stats, les conversations et les fans de sa seule créatrice, chaque appel entrant au journal.
+
+Un agent externe (d'abord une session Claude Code sur le PC de l'agence, branchée sur `localhost`) se branche sur `POST /v1/mcp` avec un jeton d'agent créé dans Réglages › Agents connectés, et lit ce que le CRM sait : état de l'agent de chatting, À traiter, Bilan, ventes relevées, relevés quotidiens, consommation IA, conversations et fans de sa créatrice, équipe, relevés de commission, dépôts et scripts. Chaque appel entre au journal. Ce lot reprend l'ancien lot 3 (lectures de l'Équipe), qui n'a plus de raison d'attendre.
 
 ## Contexte à lire
-ADR 0026 (en entier), ADR 0005, 0016, 0019, 0021, 0023, 0024 ; `docs/conventions/api.md`, `docs/conventions/security.md` §1 et §6 ; `docs/architecture/modules.md` ; `docs/architecture/threat-model.md` ; `apps/api/src/auth.ts` (`requireRole`, `requireRecentLogin`) ; `apps/api/src/modules/conversations/infra/http/routes.ts` et `apps/api/src/modules/supervision/infra/http/dashboard-routes.ts` (ce que les outils réutilisent).
+
+ADR 0026 et 0105 en entier, ADR 0005, 0016, 0021, 0023, 0024, 0046, 0053, 0075, 0087 ; `docs/conventions/api.md`, `docs/conventions/security.md` §1 et §6 ; `docs/architecture/modules.md` ; `docs/architecture/threat-model.md` ; `apps/api/src/auth.ts` (`createRequireRole`, `createRequireRecentLogin`, `currentUserById`) ; les relectures Bilan et Sécurité de la PR de l'ADR 0105.
 
 ## À faire
-- [ ] Contrats (propriétaire de `packages/contracts`) : `mcp.ts` avec `McpCapabilitySchema` (liste fermée de l'ADR), schémas d'entrée et de sortie des outils du lot, `McpGrantSchema` sans le jeton.
-- [ ] Base (propriétaire de `packages/db`) : table `mcp_grants` (personne, créatrice nullable, capacités, empreinte SHA-256 indexée du jeton, expiration, révocation, dernière utilisation), migration nouvelle ; création, liste et révocation par `withMember` en scope `owner` (`created_by = app.user_id`, comme `commission_presets`) ; une seule recherche hors RLS, `findGrantByTokenHashUnscoped` par `withAdmin`, qui ne rend que l'accès actif et non expiré. Jeton de 256 bits aléatoires au moins, jamais stocké en clair.
-- [ ] Prérequis, par le propriétaire de chaque module concerné et dans sa propre PR : descendre dans `application/` la vérification d'accès qu'une route exposée porte encore dans `infra/http` (pour `conversations` : l'`actorOn` de #163 et le contrôle de créatrice des commandes), avec le même test pour la route et pour un appel direct.
-- [ ] Prérequis (propriétaire de la racine de composition) : sortir d'`auth.ts` le calcul de l'acteur qu'utilise `requireRole` (`resolveActor(db, userId)`) et l'exporter ; le MCP l'appelle, il n'a aucun calcul de droits à lui.
-- [ ] Module `mcp` : README, domaine pur (catalogue, capacités, intersection des droits, liste « jamais exposé »), répartiteur, transport HTTP streamable sans état (SDK `@modelcontextprotocol/sdk` épinglé, justifié dans la PR), `/v1/mcp` exempté de la vérification d'origine du dashboard (`originCheck: false`) avec sa propre règle (`Origin` absent accepté, présent dans une liste) ; entrée dans `MODULE_DEPENDENCIES`, règle « `mcp` n'importe pas `@impera/db` », test de frontière.
-- [ ] Accès : droits recalculés à chaque appel (compte suspendu ou parti, manager plus `active`, créatrice retirée de `creatorIds` → refus) ; seul le propriétaire crée un accès ; `requireRecentLogin` pour créer, renouveler, révoquer.
-- [ ] Outils : `whoami`, `creators_list`, `creator_get`, `agent_status`, `todo_list`, `stats_get`, `conversations_list`, `conversation_get`, `conversation_messages`, `drafts_pending`, `fan_get`, tous branchés sur les requêtes des `index.ts` ; messages, faits, résumé du fan et propositions dans le champ `untrusted`.
-- [ ] Ressources miroirs (`impera://todo`, `impera://creators/{id}/status`) et les trois prompts de l'ADR, versionnés.
-- [ ] Journal : chaque appel dans `audit_log` (`mcp.<outil>`, accès, identifiants, issue, `requestId`), sans texte ; les lectures d'agent en catégorie à part, purgée à délai avec EQ-18.
-- [ ] Limites par accès (lectures), garde-fou d'exfiltration (suspension et alerte importante), interrupteur « Agents connectés ».
-- [ ] Écran Réglages › Agents connectés (propriétaire d'`apps/web`) : liste, création avec le jeton montré une fois, capacités dont `read:conversation_content`, jamais cochée d'office, avec sa phrase d'avertissement (le texte part chez le fournisseur de l'agent), révocation, dernière utilisation.
-- [ ] Docs : `api.md` (`/v1/mcp`, hôte à part), `security.md` §1 (l'exception), modèle de menaces (acteur « agent connecté »), glossaire si un terme manque, `modules.md`.
+
+- [ ] Contrats (propriétaire de `packages/contracts`) : `mcp.ts` avec `McpCapabilitySchema` (liste fermée de 0026 § 4 et 0105 § 4, dont `read:sales`, `read:media`, `read:script_content`), schémas d'entrée et de sortie des outils du lot, `McpGrantSchema` sans le jeton.
+- [ ] Base (propriétaire de `packages/db`) : table `mcp_grants` (personne, créatrice nullable, capacités, empreinte SHA-256 indexée du jeton, expiration, révocation, dernière utilisation), migration nouvelle (numéro demandé au coordinateur), FORCE RLS, harnais d'isolation. Création, liste et révocation par `withMember` en scope `owner`. Une seule recherche hors créatrice, `findGrantByTokenHashUnscoped`, par le rôle de service en lecture seule ; sa ligne `GRANT … TO impera_service` dans la migration et dans le test du rôle de service (ADR 0087, lot a). Dernière utilisation et journal s'écrivent sous l'identité de la personne, jamais par `withAdmin`.
+- [ ] Jeton : 256 bits aléatoires au moins, un préfixe reconnaissable, une règle `gitleaks` dédiée à ce préfixe dans `.gitleaks.toml`, stocké par son empreinte seule, comparé par l'empreinte, jamais journalisé.
+- [ ] Prérequis (propriétaire de la racine de composition) : sortir d'`auth.ts` le calcul de l'acteur qu'utilise `requireRole` (`resolveActor(db, userId)`) ; il refuse un compte sans second facteur actif, comme `requireRole` (0105 § 1). Le MCP n'a aucun calcul de droits à lui.
+- [ ] Prérequis, par le propriétaire de chaque module exposé et dans sa propre PR : descendre dans `application/` la vérification d'accès qu'une route exposée porte encore dans `infra/http`.
+- [ ] Module `mcp` : README, domaine pur (catalogue, capacités, intersection des droits, liste « jamais exposé », règle « aucun outil n'atteint une commande gardée par une reconfirmation »), répartiteur, transport HTTP streamable sans état (SDK `@modelcontextprotocol/sdk` épinglé, quarantaine de 14 jours, justifié dans la PR). `/v1/mcp` n'accepte que `Authorization: Bearer` : jamais le jeton en paramètre d'URL, jamais la session du CRM ni son cookie. Règle d'`Origin` de 0026 § 2. Entrée dans `MODULE_DEPENDENCIES`, règle « `mcp` n'importe pas `@impera/db` », test de frontière.
+- [ ] Droits recalculés à chaque appel : membre parti, créatrice retirée, rôle changé, compte suspendu ou sans second facteur → l'accès perd aussitôt ce qu'il n'a plus. Seul le propriétaire crée un accès, derrière `recentLogin`.
+- [ ] Outils de lecture : ceux de 0026 § 5 (`whoami`, `creators_list`, `creator_get`, `agent_status`, `todo_list`, `stats_get`, `conversations_list`, `conversation_get`, `conversation_messages`, `drafts_pending`, `fan_get`, `shifts_list`, `on_shift_now`, `shift_reports_list`, `commission_statements_list`) et ceux de 0105 § 4 (Bilan, relevés quotidiens, consommation IA, ventes relevées, fiche du fan, équipe importée, dépôts et scripts). Chaque message lu porte son auteur (chatteur nommé, agent, créatrice). Texte venu d'un fan, faits, résumé, fiche et propositions dans le champ `untrusted`. Texte des étapes d'un script seulement avec `read:script_content`, qui ne se coche que sur un accès du propriétaire. Aucun média ni URL de média, aucun champ du dossier prestataire, aucun taux.
+- [ ] Ressources miroirs (`impera://todo`, `impera://creators/{id}/status`, `impera://team/on-shift`) et les trois prompts de 0026 § 7, versionnés ; `serverInfo` `impera-mcp`.
+- [ ] Journal : chaque appel dans `audit_log` (`mcp.<outil>`, accès, identifiants, issue, `requestId`), sans texte ; lectures d'agent en catégorie à part.
+- [ ] Limites par accès (lectures), garde-fou d'exfiltration (la lecture d'une fiche de fan compte comme celle d'un fan), suspension et alerte importante, interrupteur « Agents connectés ». Échecs d'authentification par le limiteur partagé.
+- [ ] Recette sur le bac à sable (`IMPERA_SANDBOX=1`, `pnpm sandbox:world`) : un client MCP du SDK lit le monde simulé ; jamais de donnée réelle dans un test.
+- [ ] Écran Réglages › Agents connectés (propriétaire d'`apps/web`) : liste, création avec le jeton montré une fois, capacités jamais cochées d'office, phrase d'avertissement pour `read:conversation_content` et `read:script_content`, révocation, dernière utilisation. Captures Nuit/Jour, PC/téléphone avant fusion.
+- [ ] Docs : `api.md` (`/v1/mcp`), `security.md` §1 (l'exception), modèle de menaces (acteur « agent connecté »), `modules.md`, mode d'emploi pour brancher Claude Code sur `localhost` (jeton dans la configuration locale, hors dépôt et hors dossier partagé).
 
 ## Critères d'acceptation
+
 - Test de contrat : un client MCP du SDK liste les outils, appelle chacun, reçoit les mêmes données que la route correspondante.
-- Tests d'intégration (Testcontainers) : sans jeton, jeton expiré, révoqué ou d'une personne suspendue → refus ; accès sans créatrice → aucun outil de créatrice ; un membre au scope `self` ne lit par MCP que ses créatrices routées, comme par la route ; accès de la créatrice A → rien de la créatrice B ; sans `read:conversation_content` → aucun texte de fan ; chaque appel a sa ligne de journal ; la limite et le garde-fou d'exfiltration se déclenchent.
-- Test d'instantané du catalogue ; test qui échoue si un outil de la liste « jamais exposé » apparaît.
+- Tests d'intégration (Testcontainers) : sans jeton, jeton expiré, révoqué, en paramètre d'URL, ou session du CRM seule → refus ; compte sans second facteur → refus ; membre marqué parti → refus à l'appel suivant ; accès sans créatrice → aucun outil de créatrice ; scope `self` → seulement ses créatrices routées ; créatrice A → rien de B ; sans `read:conversation_content` → aucun texte de fan ; sans `read:script_content` → aucun texte d'étape ; aucun champ du dossier prestataire ni taux dans une réponse ; chaque appel a sa ligne de journal ; limite et garde-fou se déclenchent.
+- Test d'instantané du catalogue ; test qui échoue si un outil de la liste « jamais exposé » apparaît, ou si un outil atteint une commande gardée par une reconfirmation.
 - `pnpm check` et `pnpm test:all` verts.
 
 ## Hors périmètre
-Écritures (lot 2), outils de l'Équipe (lot 3), OAuth et connecteurs grand public (lot 4), accès créés par une créatrice ou un chatteur.
+
+Écritures, dépôts et actions préparées (lot b), OAuth (lot c), liens de suivi de la plateforme (fiche à part quand le CRM les lira), accès créés par une créatrice ou un chatteur.
 
 ## Notes de session

@@ -118,7 +118,7 @@ Branche : task/<id>-<slug>
 | PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | in_progress (ADR 0080, lot A1) | CR-06, P3-07 ; vidéo publique Reveal : CR-08 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | PUB-03 | Légende Instagram : la fenêtre visible avant « … plus », vérifiée pour le modèle, montrée à tous | publication | blocked (PUB-02) | PUB-02, ADR 0082 |
-| MCP-PUB | Publication par un agent externe : préparer, puis publier dans un plafond | MCP | blocked (lot 1 du MCP) | PROPOSED-mcp-read, PUB-01, PUB-02 |
+| MCP-PUB | Publication par un agent externe : préparer, puis publier dans un plafond | MCP | blocked (lot a du MCP) | PROPOSED-mcp-read, PUB-01, PUB-02 |
 | VEI-01 | Signaux de tendance et idées de contenu : la base, les filtres, le lien collé | veille | todo | ADR 0060, CR-05, CR-06 |
 | VEI-02 | Capture passive dans l'extension, page « Veille » et écran « Idées du jour » | veille | done | VEI-01 |
 | VEI-03 | Le job du matin : signaux de Grok et idées du jour | veille | blocked (clé xAI) | VEI-01, P3-01 |
