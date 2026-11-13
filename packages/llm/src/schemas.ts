@@ -7,6 +7,7 @@ import {
   DESIRE_BRAIN_SIGNALS,
   DropMediaDescriptionSchema,
   MediaDescriptionSchema,
+  ObjectionKindSchema,
   TrendCaptureDescriptionSchema,
 } from '@impera/contracts';
 import { z } from 'zod';
@@ -19,6 +20,8 @@ export const brainAlertId = (index: number): string => `a${String(index + 1)}`;
 /** Brain output (docs/architecture/ai-engine.md, « Le Brief »). Decisions are taken by the policy in code, not here. */
 export const BriefSchema = z.object({
   intent: BriefIntentSchema,
+  /** What he opposes to a price, with `price_objection` only (ADR 0090 § 7): the code picks her reply from it. */
+  objection: ObjectionKindSchema.optional(),
   sentiment: z.enum(['positive', 'neutral', 'negative', 'aroused', 'frustrated']),
   factsProposed: z.array(
     z.object({

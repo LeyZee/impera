@@ -8,6 +8,7 @@ import {
   heldReasonText,
   lineChatter,
   outcomeLabel,
+  outcomesShown,
   outcomeWords,
   ownLineText,
   saleAmount,
@@ -113,6 +114,11 @@ describe('held sales (CRM-03 lot b4b)', () => {
     expect(outcomeLabel('count', null)).toBe('Compter');
     expect(outcomeLabel('exclude', THEO)).toBe('Écarter');
     expect(outcomeLabel('withdraw', THEO)).toBe('Retirer la décision');
+    // ADR 0101: a sale given, its refund with it; « Donner à… » waits for its own screen.
+    expect(decisionText(heldSaleOf({ decision: 'give' }), THEO)).toBe('Donnée');
+    expect(decisionText(heldSaleOf({ event: 'refund', decision: 'give' }), THEO)).toBe('Sa vente est donnée');
+    expect(outcomeLabel('give', THEO)).toBe('Donner à…');
+    expect(outcomesShown(['count', 'exclude', 'give', 'withdraw'])).toEqual(['count', 'exclude', 'withdraw']);
   });
 
   it('says before a gesture what it does, its refunds with it, and what taking it back does', () => {

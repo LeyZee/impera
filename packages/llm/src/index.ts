@@ -77,6 +77,7 @@ export {
   type VideoFrame,
   type VideoKeyframes,
   type JudgeInput,
+  type JudgeSituation,
   type VoiceInput,
 } from './gateway';
 export type { HealthReport, HealthState, ProviderHealth, RoleHealth } from './health';
@@ -99,4 +100,5 @@ export {
   type JudgeOutput,
   type VoiceOutput,
 } from './schemas';
+export { INLINE_VIDEO_MAX_BYTES } from './sense-content';
 export { wrapUntrusted, type UntrustedKind } from './untrusted';

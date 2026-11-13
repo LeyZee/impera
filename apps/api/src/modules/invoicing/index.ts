@@ -43,6 +43,8 @@ import { createDrizzleSettlementStore } from './infra/settlement-store';
  * it into `contractors`, which never imports this module.
  */
 export { invoiceRequeue } from './infra/invoice-queue';
+/** Whether a member's invoice could go out today, and what stops it (« Mise en route », pilotage plan W1). */
+export { invoiceReadiness } from './infra/readiness';
 /** What the contractors' file reads of the invoices, plugged into it by the composition root (ARC-07). */
 export { invoiceReadsForContractors } from './infra/contractor-reads';
 /**
