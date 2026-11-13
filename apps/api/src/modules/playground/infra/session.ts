@@ -20,6 +20,7 @@ import {
   type GuardViolation,
   type FollowUpDecision,
   measureDesire,
+  type DesireMeasure,
   type DesireState,
   type OfferInput,
   type OfferLimits,
@@ -28,6 +29,7 @@ import {
   type Situation,
   type TrapAssessment,
 } from '../../agent/index';
+import { kycSlotWords } from '../domain/labels';
 
 export interface PlaygroundTurn {
   /** Safety flags on his media: a human would take over, nothing is written. */
@@ -43,12 +45,21 @@ export interface PlaygroundTurn {
   readonly latencyMs: number;
   readonly model?: string;
   readonly isFallback: boolean;
-  /** His desire score after this message, when it moved (P3-12): what the policy read. */
-  readonly desire?: {
-    readonly score: number;
-    readonly band: DesireBand;
-    readonly signals: readonly DesireSignal[];
-  };
+  /** His desire score read on this message, moved or not (P3-12): what the cursor and the policy read. */
+  readonly desire?: PlaygroundDesireReading;
+  /** What the cursor decided on going sexual (P3-09); absent when the brain did not read the moment. */
+  readonly cursor?: { readonly kind: string; readonly reason?: string };
+  /** The brain wanted to offer and the policy said no: the code of why. */
+  readonly offerRefused?: string;
+}
+
+/** His desire score as one message of his left it, with what moved it (P3-12). */
+export interface PlaygroundDesireReading {
+  readonly before: number | null;
+  readonly score: number;
+  readonly band: DesireBand;
+  readonly signals: readonly DesireSignal[];
+  readonly weightsVersion: string;
 }
 
 /** The last answer and what it was written from: what a rating records, and what a comparison replays. */
@@ -82,6 +93,8 @@ export interface PlaygroundSession {
   sendCreatorMedia(description: MediaDescription, isLocked: boolean): void;
   /** Her answer as the team rewrote it: the conversation goes on from the corrected version. */
   replaceLastAnswer(text: string): void;
+  /** His desire score after each of his messages, by message (from 0); `undefined` where the brain read nothing. */
+  readonly desireTrail: readonly (PlaygroundDesireReading | undefined)[];
   /** Back to just before his n-th message (from 1); returns that message to send again, on a new branch. */
   branchAt(fanMessageNumber: number): { text: string; media: MediaDescription[] } | undefined;
   /** The same moment written by another voice model, side by side; the conversation does not change. */
@@ -123,6 +136,24 @@ export interface PlaygroundDeps {
   readonly objectionReplies?: ObjectionReplies;
 }
 
+/** A fact the brain proposed, as the screen and the brain read it back: in French, never a code (recette 12/11). */
+function fanNote(fact: Brief['factsProposed'][number]): string {
+  const category = FACT_CATEGORY_WORDS[fact.category] ?? fact.category;
+  const key = kycSlotWords(fact.key);
+  return `${category} / ${key} : ${fact.value} (${fact.kind === 'declared' ? 'dit par lui' : 'déduit'})`;
+}
+
+const FACT_CATEGORY_WORDS: Readonly<Record<string, string>> = {
+  identity: 'identité',
+  life: 'sa vie',
+  interests: 'centres d’intérêt',
+  preferences: 'goûts',
+  commercial: 'achats',
+  intimate: 'intime',
+  events: 'événements',
+  operator_note: 'note de l’équipe',
+};
+
 /** Why nothing was written, for the trace: the daily cap, or each model that failed. */
 const failure = (error: LlmFailure): string =>
   error.code === 'budget_reached'
@@ -160,6 +191,14 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   let desire: DesireState | undefined;
   // His score before each of his messages: a branch goes back to it.
   const desireBefore: (DesireState | undefined)[] = [];
+  // His score as each of his messages left it, shown under the message.
+  const desireTrail: (PlaygroundDesireReading | undefined)[] = [];
+  // When each turn was written, on the simulated clock: his reply speed counts in his score, as in production.
+  const writtenAt = new WeakMap<ConversationTurn, Date>();
+  const push = (turn: ConversationTurn): void => {
+    writtenAt.set(turn, situation.now);
+    history.push(turn);
+  };
   const offerAt = (now: Date): OfferInput | undefined =>
     deps.offerLimits === undefined
       ? undefined
@@ -171,9 +210,26 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           limits: deps.offerLimits,
         };
 
+  /**
+   * What code measures of his heat, each turn at its time on the simulated clock. The clock moves only when the trainer
+   * advances it: a reply at the very time of hers says nothing of his speed (he would get `quick_reply` on every
+   * message), so his reply speed counts only once the clock moved between her message and his.
+   */
+  const measuredOnClock = (): DesireMeasure => {
+    const measured = measureDesire(
+      history.map((t) => ({
+        fromFan: t.from === 'fan',
+        text: t.text,
+        at: writtenAt.get(t) ?? situation.now,
+      })),
+    );
+    return measured.replySeconds === 0 ? { ...measured, replySeconds: null } : measured;
+  };
+
   return {
     history,
     fanNotes,
+    desireTrail,
     get situation() {
       return situation;
     },
@@ -191,6 +247,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       followUpsSince = 0;
       desire = undefined;
       desireBefore.length = 0;
+      desireTrail.length = 0;
       situation = { ...situation, relationshipStartedAt: situation.now, spentCents: 0 };
     },
 
@@ -207,7 +264,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     },
 
     sendCreatorMedia(description, isLocked) {
-      history.push({ from: 'creator', text: '', media: [{ description, isLocked }] });
+      push({ from: 'creator', text: '', media: [{ description, isLocked }] });
     },
 
     replaceLastAnswer(text) {
@@ -216,8 +273,11 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       const answer = history.findIndex(
         (t, i) => i > lastFan && t.from === 'creator' && t.media === undefined,
       );
-      if (answer === -1) history.splice(lastFan + 1, 0, { from: 'creator', text });
-      else history.splice(answer, 1, { from: 'creator', text });
+      const corrected: ConversationTurn = { from: 'creator', text };
+      // The correction keeps the time her answer was written: his reply speed is measured from it.
+      writtenAt.set(corrected, writtenAt.get(history[answer] ?? corrected) ?? situation.now);
+      if (answer === -1) history.splice(lastFan + 1, 0, corrected);
+      else history.splice(answer, 1, corrected);
     },
 
     branchAt(fanMessageNumber) {
@@ -228,6 +288,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       history.splice(index);
       desire = desireBefore[fanMessageNumber - 1];
       desireBefore.length = fanMessageNumber - 1;
+      desireTrail.length = fanMessageNumber - 1;
       lastExchange = undefined;
       return { text: turn.text, media: (turn.media ?? []).map((m) => m.description) };
     },
@@ -285,7 +346,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         },
       );
       if (!composed.isBlocked) {
-        history.push({ from: 'creator', text: composed.bubbles.join('\n') });
+        push({ from: 'creator', text: composed.bubbles.join('\n') });
         followUpsSince += 1;
       }
       lastExchange = undefined;
@@ -310,7 +371,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       lastFanAt = situation.now;
       followUpsSince = 0;
       desireBefore.push(desire);
-      history.push({ from: 'fan', text, media: media.map((description) => ({ description })) });
+      desireTrail.push(undefined);
+      push({ from: 'fan', text, media: media.map((description) => ({ description })) });
       const moment: RatedMoment = {
         history: [...history],
         fanNotes: fanNotes.join('\n'),
@@ -350,13 +412,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           }),
           desire: {
             ...(desire !== undefined && { previous: desire }),
-            // No clock per message here: his reply speed is not measured.
-            measured: {
-              ...measureDesire(
-                history.map((t) => ({ fromFan: t.from === 'fan', text: t.text, at: situation.now })),
-              ),
-              replySeconds: null,
-            },
+            measured: measuredOnClock(),
             ageDisputed: false,
             counted: false,
           },
@@ -371,9 +427,20 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         lastOfferAt = situation.now;
       }
       // In-memory fan notes until the fans module stores facts (P3-02).
-      for (const fact of withoutOrders(composed.brief?.factsProposed ?? []))
-        fanNotes.push(`${fact.category} / ${fact.key} : ${fact.value} (${fact.kind})`);
-      if (!composed.isBlocked) history.push({ from: 'creator', text: composed.bubbles.join('\n') });
+      for (const fact of withoutOrders(composed.brief?.factsProposed ?? [])) fanNotes.push(fanNote(fact));
+      if (!composed.isBlocked) push({ from: 'creator', text: composed.bubbles.join('\n') });
+      const read = composed.desireRead;
+      const reading: PlaygroundDesireReading | undefined =
+        read === undefined
+          ? undefined
+          : {
+              before: read.before,
+              score: read.score,
+              band: desireBandOf(read.score),
+              signals: read.signals,
+              weightsVersion: read.weightsVersion,
+            };
+      desireTrail[desireTrail.length - 1] = reading;
 
       const turn: PlaygroundTurn = {
         ...(composed.handoff !== undefined && { handoff: composed.handoff }),
@@ -388,13 +455,14 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         latencyMs: composed.latencyMs,
         ...(composed.model !== undefined && { model: composed.model }),
         isFallback: composed.isFallback,
-        ...(composed.desire !== undefined && {
-          desire: {
-            score: composed.desire.score,
-            band: desireBandOf(composed.desire.score),
-            signals: composed.desire.signals,
+        ...(reading !== undefined && { desire: reading }),
+        ...(composed.sexualization !== undefined && {
+          cursor: {
+            kind: composed.sexualization.kind,
+            ...(composed.sexualization.kind === 'steer_back' && { reason: composed.sexualization.reason }),
           },
         }),
+        ...(composed.offerRefused !== undefined && { offerRefused: composed.offerRefused }),
       };
       lastExchange = {
         fanMessage: text,

@@ -31,6 +31,7 @@ const BASE: PlaygroundState = {
     },
   ],
   presetId: 'mineur',
+  desireThresholds: { open: 40, script: 70 },
   situation: {
     now: '2026-10-28T20:40:00.000Z',
     timeZone: 'Europe/Paris',
