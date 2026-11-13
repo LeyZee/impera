@@ -1,5 +1,5 @@
-# PROPOSED Trophées et médailles de série de la créatrice
-Statut : proposed
+# CRB-01 Trophées et médailles de série de la créatrice
+Statut : todo
 Phase : créatrice (ADR 0107 ; ADR 0042 § 3, ADR 0055 § 4, ADR 0104 § B)
 Dépend de : ADR 0107 (acceptée le 13/11/2026) ; la PR du jeu du chatteur (module `rewards`, migration 0178) ; PR #720 et PR des médailles du chatteur (composant de dévoilement et langage graphique partagés) ; un numéro de migration attribué par le coordinateur
 Branche : claude/project-thread-vnzrdd
