@@ -64,3 +64,274 @@
 .rw-ink {
   fill: var(--rw-ink);
 }
+
+/* A trophy's badge: gold rim, dark wine glass, a neon glow from its foot. */
+.rw-trophy {
+  flex: 0 0 auto;
+  display: block;
+  overflow: visible;
+  color: var(--nv-ink-faint);
+  --rw-hi: #fff0bd;
+  --rw-mid: #e8c37a;
+  --rw-lo: #9a7420;
+  --rw-glass-1: #5a1230;
+  --rw-glass-2: #2a0c1a;
+  --rw-glass-3: #120810;
+  --rw-neon: #ff2a4d;
+  /* What a symbol « pas encore gagné » is cut with: the ground it lies on. */
+  --rw-cut: var(--nv-surface-raised);
+}
+.rw-stop-glass-1 {
+  stop-color: var(--rw-glass-1);
+}
+.rw-stop-glass-2 {
+  stop-color: var(--rw-glass-2);
+}
+.rw-stop-glass-3 {
+  stop-color: var(--rw-glass-3);
+}
+.rw-stop-neon {
+  stop-color: var(--rw-neon);
+}
+.rw-mid {
+  fill: none;
+  stroke: var(--rw-mid);
+}
+.rw-digits {
+  font-family: var(--nv-font-sans, Geist, system-ui, sans-serif);
+  font-weight: 700;
+}
+
+/*
+ * The reveal: a dark stage in both themes (a moment of show), the object in the light. It settles in two seconds
+ * and stays; « réduire les animations » gives the settled picture at once.
+ */
+.rw-reveal {
+  --rw-tone: #f0c46a;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--nv-space-5);
+  overflow: hidden;
+  color: #f6eef1;
+  background: radial-gradient(760px 460px at 50% 42%, rgb(120 10 40 / 0.5), rgb(8 6 10 / 0.92) 72%);
+  backdrop-filter: blur(10px);
+  animation: rw-fade 300ms ease-out both;
+}
+.rw-reveal[data-tone='neon'] {
+  --rw-tone: #ff5a76;
+}
+.rw-reveal__card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  max-width: 100%;
+  text-align: center;
+}
+.rw-reveal__object {
+  position: relative;
+  width: min(248px, 60vw);
+  aspect-ratio: 1;
+  margin-bottom: 18px;
+  perspective: 900px;
+}
+.rw-reveal__art {
+  position: absolute;
+  inset: 0;
+  animation: rw-flip 1050ms cubic-bezier(0.2, 1.35, 0.35, 1) both;
+}
+.rw-reveal__art > svg {
+  width: 100%;
+  height: 100%;
+}
+.rw-reveal__halo {
+  position: absolute;
+  inset: -28%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--rw-tone) 0, transparent 62%);
+  filter: blur(18px);
+  opacity: 0.22;
+  animation: rw-halo 2200ms ease-out 100ms both;
+}
+.rw-reveal__rays {
+  position: absolute;
+  inset: -60%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, var(--rw-tone) 0 5deg, transparent 5deg 20deg);
+  mask: radial-gradient(circle, #000 0, rgb(0 0 0 / 0.5) 28%, transparent 60%);
+  opacity: 0.1;
+  transform: rotate(40deg);
+  animation: rw-rays 2200ms cubic-bezier(0.2, 0.7, 0.3, 1) 100ms both;
+}
+.rw-reveal__ring {
+  position: absolute;
+  inset: 14%;
+  border: 2px solid var(--rw-tone);
+  border-radius: 50%;
+  opacity: 0;
+  animation: rw-ring 800ms ease-out 200ms both;
+}
+.rw-reveal__ring[data-late='true'] {
+  border-width: 1px;
+  animation-duration: 1000ms;
+  animation-delay: 340ms;
+}
+.rw-reveal__spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--_s);
+  height: var(--_s);
+  margin: calc(var(--_s) / -2);
+  border-radius: 50%;
+  background: #fff3d6;
+  box-shadow:
+    0 0 10px var(--rw-tone),
+    0 0 2px #fff;
+  opacity: 0;
+  animation: rw-spark 1100ms cubic-bezier(0.1, 0.7, 0.3, 1) var(--_d) both;
+}
+.rw-reveal__spark[data-diamond='true'] {
+  border-radius: 1px;
+  rotate: 45deg;
+}
+.rw-reveal__kicker {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #f0c46a;
+  animation: rw-rise 450ms ease-out 500ms both;
+}
+.rw-reveal__title {
+  margin: 6px 0 0;
+  padding: 0 var(--nv-space-4);
+  font-family: var(--nv-font-serif);
+  font-size: min(68px, 13vw);
+  font-weight: 400;
+  line-height: 1.05;
+  text-wrap: balance;
+  animation: rw-rise 550ms cubic-bezier(0.2, 1.2, 0.3, 1) 620ms both;
+}
+.rw-reveal__rule {
+  width: 220px;
+  max-width: 60vw;
+  height: 1px;
+  margin: 14px 0 12px;
+  background: linear-gradient(90deg, transparent, var(--rw-tone), transparent);
+  opacity: 0.7;
+  animation: rw-rule 600ms ease-out 800ms both;
+}
+.rw-reveal__text {
+  margin: 0;
+  padding: 0 var(--nv-space-5);
+  font-size: 16px;
+  color: rgb(246 238 241 / 0.78);
+  text-wrap: balance;
+  animation: rw-rise 450ms ease-out 920ms both;
+}
+.rw-reveal__chip {
+  margin: 14px 0 0;
+  padding: 7px 14px;
+  border: 1px solid rgb(240 196 106 / 0.38);
+  border-radius: 999px;
+  background: rgb(240 196 106 / 0.12);
+  font-size: 14px;
+  font-weight: 500;
+  animation: rw-rise 450ms ease-out 1100ms both;
+}
+.rw-reveal__close {
+  margin-top: 26px;
+  padding: 11px 26px;
+  border: 0;
+  border-radius: 999px;
+  background: #f6eef1;
+  color: #1a0b10;
+  font: 600 15px var(--nv-font-sans);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.4);
+  cursor: pointer;
+  animation: rw-rise 450ms ease-out 1100ms both;
+}
+.rw-reveal__close:focus-visible {
+  outline: 2px solid #f0c46a;
+  outline-offset: 3px;
+}
+@keyframes rw-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rw-flip {
+  0% {
+    transform: scale(0.2) rotateY(-540deg);
+    opacity: 0;
+    filter: brightness(2.6);
+  }
+  35% {
+    opacity: 1;
+  }
+  75% {
+    filter: brightness(1.35);
+  }
+}
+@keyframes rw-halo {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  25% {
+    opacity: 0.6;
+  }
+}
+@keyframes rw-rays {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0);
+  }
+  20% {
+    opacity: 0.5;
+  }
+}
+@keyframes rw-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+@keyframes rw-spark {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  70% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--_x), calc(var(--_y) + 46px)) scale(0.3);
+  }
+}
+@keyframes rw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes rw-rule {
+  from {
+    width: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rw-reveal,
+  .rw-reveal * {
+    animation: none !important;
+  }
+}
