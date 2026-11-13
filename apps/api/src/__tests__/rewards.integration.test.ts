@@ -22,7 +22,8 @@ const HOUR = 3_600_000;
 /**
  * The chatter's game (ADR 0104 § 12 to § 20, CHF-01): the job notes what each chatter earned from their own
  * statements and reports, once; each reads their own case and marks their own reveals; nothing of it reaches pay.
- * Théo sold twice on Anna's account; Léa held five shifts with their report on time and sold nothing.
+ * Théo sold twice on Anna's account and reported late; Léa held five shifts with their report on time, around one
+ * the agency cancelled, and sold nothing.
  */
 describe('Jeu du chatteur : gains notés une fois, chacun sa vitrine (ADR 0104)', () => {
   let team: PayrollTeam;
@@ -65,9 +66,12 @@ describe('Jeu du chatteur : gains notés une fois, chacun sa vitrine (ADR 0104)'
       linkVersionAt: linked,
       linkedAt: linked,
     });
-    // Théo's shift has no report: it is missing, so his streak is zero.
+    // Théo's shift: his own report came twenty hours after its end, so it is late and his streak is zero. The agency
+    // then corrected it; the correction's date is forced before his report, to prove that a line written by the
+    // agency never counts as the report handed in (§ 13).
+    const theosShift = newId(ShiftIdSchema);
     await db.insert(schema.shifts).values({
-      id: newId(ShiftIdSchema),
+      id: theosShift,
       creatorId: team.anna,
       platformAccountId: team.annas,
       memberId: theo.id,
@@ -75,6 +79,44 @@ describe('Jeu du chatteur : gains notés une fois, chacun sa vitrine (ADR 0104)'
       endsAt: new Date('2025-05-05T12:00:00Z'),
       createdBy: team.ownerId,
       updatedBy: team.ownerId,
+    });
+    const theosEnd = new Date('2025-05-05T12:00:00Z');
+    const theosReport = newId(ShiftReportIdSchema);
+    const late = new Date(theosEnd.getTime() + 20 * HOUR);
+    const corrected = new Date(theosEnd.getTime() + HOUR);
+    await db.insert(schema.shiftReports).values({
+      id: theosReport,
+      creatorId: team.anna,
+      platformAccountId: team.annas,
+      shiftId: theosShift,
+      memberId: theo.id,
+      period: P1,
+      amountMinor: 0,
+      currency: 'EUR',
+      status: 'submitted',
+      submittedBy: theo.userId,
+      submittedAt: late,
+      createdBy: theo.userId,
+      createdAt: late,
+    });
+    await db.insert(schema.shiftReports).values({
+      id: newId(ShiftReportIdSchema),
+      creatorId: team.anna,
+      platformAccountId: team.annas,
+      shiftId: theosShift,
+      memberId: theo.id,
+      period: P1,
+      correctsId: theosReport,
+      amountMinor: 100,
+      currency: 'EUR',
+      status: 'validated',
+      byAgency: true,
+      submittedBy: team.ownerId,
+      submittedAt: corrected,
+      reviewedBy: team.ownerId,
+      reviewedAt: corrected,
+      createdBy: team.ownerId,
+      createdAt: corrected,
     });
     const sale = (id: string, at: string, net: number) => ({
       id: newId(SalesLineIdSchema),
@@ -134,6 +176,19 @@ describe('Jeu du chatteur : gains notés une fois, chacun sa vitrine (ADR 0104)'
         createdAt: reportedAt,
       });
     }
+    // A shift of Léa's the agency cancelled, in the middle of her five and without a report: it was not hers to hold,
+    // so it does not break her streak (§ 13).
+    await db.insert(schema.shifts).values({
+      id: newId(ShiftIdSchema),
+      creatorId: team.bea,
+      platformAccountId: team.beas,
+      memberId: lea.id,
+      startsAt: new Date('2025-05-04T08:00:00Z'),
+      endsAt: new Date('2025-05-04T12:00:00Z'),
+      cancelledAt: new Date('2025-05-03T09:00:00Z'),
+      createdBy: team.ownerId,
+      updatedBy: team.ownerId,
+    });
     await team.recalculate(P1);
   });
 
@@ -153,12 +208,14 @@ describe('Jeu du chatteur : gains notés une fois, chacun sa vitrine (ADR 0104)'
     expect(players).toBe(2);
     expect(gained).toBe(3);
 
+    // His late report keeps him at zero, and the agency's correction, though dated earlier, does not stand for it.
     const theos = await caseOf(theoCookie);
     expect(earned(theos)).toEqual(['first_sale']);
     expect(theos.streaks).toEqual([{ kind: 'shift', current: 0, best: 0 }]);
 
     const leas = await caseOf(leaCookie);
     expect(earned(leas).toSorted()).toEqual(['fortnight_on_time', 'streak_5']);
+    // Five in a row, across the shift the agency cancelled.
     expect(leas.streaks).toEqual([{ kind: 'shift', current: 5, best: 5 }]);
     expect(leas.items.find((item) => item.kind === 'streak_10')?.progress).toEqual({
       current: 5,
