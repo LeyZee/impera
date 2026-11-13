@@ -49,7 +49,7 @@ Un jeu ne tient que s'il raconte ces faits-là. Il ne doit jamais devenir une ob
 ### C. Où elle le voit
 
 9. **À côté de sa journée.** La série de journées garde sa place ; la dernière médaille gagnée s'y ajoute, en petit, à côté du nombre de jours. Rien d'autre ne s'ajoute à son écran du jour.
-10. **Dans Moi, « Mes trophées ».** Une vitrine : ses médailles de série (la prochaine en silhouette, avec « encore N jours »), sa série de livraisons et sa meilleure, ses trophées gagnés avec leur date, et ceux qui manquent en silhouette avec une ligne qui dit comment les gagner. Le nom est toujours écrit à côté de l'objet.
+10. **Dans Moi, « Mes trophées ».** Une vitrine, commune au chatteur et à la créatrice et décidée à part (ADR 0108), que ce chantier remplit de ses données : ses médailles de série (la prochaine en silhouette, avec « encore N jours »), sa série de livraisons et sa meilleure, ses trophées gagnés avec leur date, et ceux qui manquent en silhouette avec une ligne qui dit comment les gagner. Le nom est toujours écrit à côté de l'objet.
 11. **Le dévoilement.** Celui du chatteur, sans en changer le dessin ni le mouvement : une seule lecture, à l'écran où elle vient de faire le geste qui le gagne (coche, dépôt envoyé), sinon à sa prochaine ouverture d'Aujourd'hui, de l'Agenda ou du Contenu ; jamais sur une conversation. Plusieurs gains d'un coup : trois dévoilements à la suite au plus, le reste dans la vitrine. Son activé par défaut, avec un interrupteur dans Moi ; immobile avec « réduire les animations ». Aucune information n'existe seulement dans l'animation.
 12. **L'agence** (propriétaire, manager actif) voit ses séries et ses trophées sur sa fiche, en lecture. Un chatteur ne les voit jamais.
 
