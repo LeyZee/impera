@@ -123,3 +123,4 @@ Date : AAAA-MM-JJ
 | 0104 | Le chatteur voit ses propres chiffres, et un jeu fait de faits réels l'accompagne | accepted (précise 0043 § 7, 0050 § 10 et 0092 § 1) |
 | 0105 | Le MCP d'Impera remis à jour : un agent connecté lit, freine et prépare, un humain confirme | accepted (amende 0026 § 2 à § 5, § 7 et § 9) |
 | 0106 | Le Dashboard de l'agence sépare chiffre d'affaires, net, part de la créatrice et part de l'agence, et estime la TVA des virements | accepted (précise 0078 et 0054 § 2) |
+| 0107 | La créatrice gagne des médailles de série et des trophées pour ce qu'elle fait pour l'agence | accepted (précise 0042 § 3 et § 7, 0055 § 4 et § 6, 0044 § 4 ; reprend les limites de 0104 § B) |
