@@ -12,6 +12,7 @@ import {
   CREDIT_BADGE,
   CREDIT_TONE,
   CONSOLE_URL,
+  coveredText,
   creditText,
   dayColumns,
   eurText,
@@ -60,6 +61,12 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
             Aujourd’hui, en direct
           </span>
           <CountUp className="nv-figure__value ins-lead__value" value={today.eur} format={formatEur} />
+          {coveredText(today.coveredEur) === null ? null : (
+            <span className="nv-figure__note cia-covered">
+              <span className="cia-covered__key" aria-hidden="true" />
+              {coveredText(today.coveredEur)}
+            </span>
+          )}
           <span className="nv-figure__note">
             {`${countText(today.calls)} appel${today.calls > 1 ? 's' : ''}`}
             {today.failed > 0 ? `, dont ${countText(today.failed)} en erreur` : ''} ·{' '}
@@ -96,11 +103,14 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
             {
               label: 'Ce mois-ci',
               value: eurText(pace.monthEur),
+              covered: coveredText(pace.monthCoveredEur),
               note: `depuis le 1er, aujourd’hui compris`,
             },
             {
               label: 'Prévu fin du mois',
               value: pace.monthForecastEur === null ? '—' : eurText(pace.monthForecastEur),
+              covered:
+                pace.monthForecastCoveredEur === null ? null : coveredText(pace.monthForecastCoveredEur),
               note:
                 pace.monthForecastEur === null
                   ? 'après une première journée complète'
@@ -109,6 +119,7 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
             {
               label: 'Par jour en moyenne',
               value: pace.perDayEur === null ? '—' : eurText(pace.perDayEur),
+              covered: null,
               note:
                 pace.perDayEur === null
                   ? 'après une première journée complète'
@@ -121,6 +132,12 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
             <dd>
               <span className="ins-tile__value">{tile.value}</span>
             </dd>
+            {tile.covered === null ? null : (
+              <dd className="ins-tile__note cia-covered">
+                <span className="cia-covered__key" aria-hidden="true" />
+                {tile.covered}
+              </dd>
+            )}
             <dd className="ins-tile__note">{tile.note}</dd>
           </div>
         ))}
@@ -350,6 +367,7 @@ function Spend({
   const top = ticks[ticks.length - 1] ?? 1;
   const every = columns.length <= 8 ? 1 : columns.length <= 14 ? 3 : columns.length <= 24 ? 4 : 5;
   const used = PROVIDERS.filter((_, p) => columns.some((column) => (column.parts[p] ?? 0) > 0));
+  const anyCovered = columns.some((column) => column.coveredEur > 0);
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const step =
       event.key === 'Home' ? -columns.length : event.key === 'End' ? columns.length : STEPS[event.key];
@@ -380,6 +398,12 @@ function Spend({
               {provider.label}
             </li>
           ))}
+          {anyCovered ? (
+            <li>
+              <span className="ins-key cia-key--covered" aria-hidden="true" />
+              Hachuré : couvert par l’abonnement
+            </li>
+          ) : null}
         </ul>
       ) : null}
       <div className="ins-daily__plot">
@@ -409,7 +433,7 @@ function Spend({
               className="ins-col"
               style={{ '--_i': i }}
               tabIndex={i === current ? 0 : -1}
-              aria-label={`${column.title} : ${eurText(column.eur)}, ${countText(column.calls)} appels`}
+              aria-label={`${column.title} : ${eurText(column.eur)}${column.coveredEur > 0 ? ` dont ${eurText(column.coveredEur)} couverts par l’abonnement` : ''}, ${countText(column.calls)} appels`}
               data-i={i}
               {...tip.bind(
                 {
@@ -419,6 +443,9 @@ function Spend({
                       .filter(([, eur]) => eur > 0)
                       .map(([label, eur]) => [label, eurText(eur)] as const),
                     ['Total', eurText(column.eur)],
+                    ...(column.coveredEur > 0
+                      ? [['dont abonnement', eurText(column.coveredEur)] as const]
+                      : []),
                     ['Appels', countText(column.calls)],
                   ],
                 },
@@ -426,18 +453,24 @@ function Spend({
               )}
             >
               <span className="ins-col__stack">
-                {column.parts.map((eur, p) =>
-                  eur <= 0 ? null : (
-                    <span
-                      key={PROVIDERS[p]?.key ?? p}
-                      className="ins-col__part"
-                      style={{
-                        '--_c': PROVIDERS[p]?.colour ?? OTHER,
-                        '--_h': `${String((eur / top) * 100)}%`,
-                      }}
-                    />
-                  ),
-                )}
+                {column.parts.flatMap((eur, p) => {
+                  // What was paid, then on top, hatched, what the subscription covered (« ok 0091 chiffres »).
+                  const covered = Math.min(eur, column.covered[p] ?? 0);
+                  const colour = PROVIDERS[p]?.colour ?? OTHER;
+                  const key = PROVIDERS[p]?.key ?? String(p);
+                  return [
+                    { part: eur - covered, hatched: false },
+                    { part: covered, hatched: true },
+                  ]
+                    .filter(({ part }) => part > 0)
+                    .map(({ part, hatched }) => (
+                      <span
+                        key={`${key}${hatched ? ':covered' : ''}`}
+                        className={hatched ? 'ins-col__part cia-part--covered' : 'ins-col__part'}
+                        style={{ '--_c': colour, '--_h': `${String((part / top) * 100)}%` }}
+                      />
+                    ));
+                })}
               </span>
               <span className="ins-col__label" aria-hidden="true">
                 {(i % every === 0 && columns.length - 1 - i >= every) || i === columns.length - 1

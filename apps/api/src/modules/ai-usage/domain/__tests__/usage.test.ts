@@ -7,6 +7,7 @@ import {
   aiUsage,
   capState,
   countFrom,
+  coveredBy,
   creditsOf,
   creditState,
   type UsageInput,
@@ -74,7 +75,9 @@ describe('AI usage (ADR 0091)', () => {
       perDayEur: null,
       perDayOver: 0,
       monthEur: 0,
+      monthCoveredEur: 0,
       monthForecastEur: null,
+      monthForecastCoveredEur: null,
       month: '2026-11',
     });
     expect(usage.models).toEqual([]);
@@ -325,5 +328,67 @@ describe('AI credits (ADR 0091 § 3)', () => {
     );
     expect(card({ entries })?.entries).toHaveLength(10);
     expect(card({ entries: [] })).toBeNull();
+  });
+});
+
+describe('AI spend the subscription paid (ADR 0091 § 6, « ok 0091 chiffres »)', () => {
+  const plan = (at: string): AiCreditEntry =>
+    entry({ kind: 'subscription', amountMinor: 0, currency: 'USD', at });
+
+  it('covers a provider from its subscription line to its next top-up or reading, to the hour, in the cap’s zone', () => {
+    // 10:00 UTC is 11h in Paris; the top-up on the 8th at 10:00 UTC closes it at 11h.
+    const covered = coveredBy(
+      [plan('2026-11-05T10:00:00.000Z'), entry({ at: '2026-11-08T10:00:00.000Z' })],
+      'Europe/Paris',
+    );
+    expect(covered(row({ day: '2026-11-05', hour: 10 }))).toBe(false);
+    expect(covered(row({ day: '2026-11-05', hour: 11 }))).toBe(true);
+    expect(covered(row({ day: '2026-11-08', hour: 10 }))).toBe(true);
+    expect(covered(row({ day: '2026-11-08', hour: 11 }))).toBe(false);
+    // Another provider is never covered by xAI's subscription.
+    expect(covered(row({ day: '2026-11-06', provider: 'mistral' }))).toBe(false);
+  });
+
+  it('says the part of today, of each day and hour, of the month and of the forecast the subscription paid', () => {
+    const rows = [
+      row({ day: '2026-11-05', usd: 11 }),
+      row({ day: '2026-11-05', provider: 'mistral', model: 'mistral-large-4', usd: 2.2 }),
+      row({ day: '2026-11-10', usd: 11 }),
+      row({ usd: 3.3 }),
+      row({ provider: 'mistral', model: 'mistral-large-4', usd: 1.1 }),
+    ];
+    const usage = aiUsage(
+      input({ rows, firstDay: '2026-10-20', entries: [plan('2026-11-01T00:00:00.000Z')] }),
+    );
+    expect(AiUsageSchema.parse(usage)).toEqual(usage);
+    const today = usage.days.at(-1);
+    expect(today?.coveredEur).toBeCloseTo(3);
+    expect(today?.providers.map((p) => p.provider)).toEqual(['xai', 'mistral']);
+    expect(today?.providers[0]?.coveredEur).toBeCloseTo(3);
+    expect(today?.providers[1]?.coveredEur).toBe(0);
+    expect(usage.hours[9]?.coveredEur).toBeCloseTo(3);
+    expect(usage.today.coveredEur).toBeCloseTo(3);
+    // November so far: 10 + 2 + 10 + 3 + 1 = 26 €, 23 € of it Grok. Grok's pace: 20 € over 7 days; 19 days left.
+    expect(usage.pace.monthEur).toBeCloseTo(26);
+    expect(usage.pace.monthCoveredEur).toBeCloseTo(23);
+    expect(usage.pace.monthForecastCoveredEur).toBeCloseTo(23 + (20 / 7) * 19);
+  });
+
+  it('never says more covered today than the cap counts', () => {
+    const usage = aiUsage(input({ rows: [row({ usd: 11 })], entries: [plan('2026-11-01T00:00:00.000Z')] }));
+    expect(usage.today.coveredEur).toBe(CAP.spentEur);
+  });
+
+  it('forecasts nothing covered for a provider back on credits', () => {
+    const rows = [row({ day: '2026-11-05', usd: 11 }), row({ day: '2026-11-10', usd: 11 })];
+    const usage = aiUsage(
+      input({
+        rows,
+        firstDay: '2026-10-20',
+        entries: [plan('2026-11-01T00:00:00.000Z'), entry({ at: '2026-11-08T00:00:00.000Z' })],
+      }),
+    );
+    expect(usage.pace.monthCoveredEur).toBeCloseTo(10);
+    expect(usage.pace.monthForecastCoveredEur).toBeCloseTo(10);
   });
 });

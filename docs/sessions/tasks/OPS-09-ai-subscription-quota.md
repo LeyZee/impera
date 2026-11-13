@@ -16,12 +16,15 @@ ADR 0091 (§ 6), `packages/llm/src/call-runner.ts` (classement des erreurs), `ap
 - [x] Module `ai-usage` : carte « Inclus dans l'abonnement », premier refus depuis la dernière réponse, alerte une fois par épisode, vérification toutes les cinq minutes.
 - [x] Telegram : `ai_quota_exhausted` en « urgent ».
 - [x] Écran : choix « Payé par l'abonnement » dans la fenêtre de saisie, carte sans solde, rouge « Quota épuisé ».
-- [ ] Captures Nuit et Jour, PC et téléphone, validées par Charles.
+- [x] Captures Nuit et Jour, PC et téléphone, validées par Charles (lot conso-ia-abonnement-2, 13/11).
+- [x] Chiffres (« ok 0091 chiffres », 13/11, 2 h 56) : « dont X € couverts par l'abonnement » sous Aujourd'hui, Ce mois-ci et Prévu fin du mois ; part couverte hachurée dans le graphique ; le plafond compte tout.
+- [ ] Captures des chiffres validées par Charles (lot conso-ia-chiffres).
 
 ## Critères d'acceptation
 - Une ligne `subscription` porte un montant nul ; une recharge ou un solde noté après reprend le décompte.
 - Un 403 ou 429 dont la réponse dit l'épuisement (quota insuffisant, crédits épuisés, limite de dépense atteinte) n'est ni réessayé ni signalé comme clé refusée ; un 403 sans ces mots l'est toujours, et un 429 avec `retry-after` ou qui ne dit pas l'épuisement reste un débit, réessayé.
 - Une seule alerte par épisode de refus ; une réponse du fournisseur clôt l'épisode.
+- Une dépense est couverte entre une ligne `subscription` et la recharge ou le solde suivant du même fournisseur, à l'heure près ; la part couverte du jour ne dépasse jamais ce que compte le plafond.
 
 ## Hors périmètre
 Lire le pourcentage du quota (aucune API ne le donne) ; la clé de gestion de xAI.

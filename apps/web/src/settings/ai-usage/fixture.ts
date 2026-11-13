@@ -9,13 +9,16 @@ export function usageFixture(overrides: Partial<AiUsage> = {}): AiUsage {
     const day = new Date(Date.UTC(2026, 9, 13 + i)).toISOString().slice(0, 10);
     const xai = 2 + (i % 5) * 0.6;
     const google = i % 3 === 0 ? 0.4 : 0.15;
+    // Grok on the subscription from the 9th of November (ADR 0091 § 6).
+    const covered = day >= '2026-11-09' ? xai : 0;
     return {
       day,
       eur: xai + google,
+      coveredEur: covered,
       calls: 300 + i * 7,
       providers: [
-        { provider: 'xai', eur: xai },
-        { provider: 'google', eur: google },
+        { provider: 'xai', eur: xai, coveredEur: covered },
+        { provider: 'google', eur: google, coveredEur: 0 },
       ],
     };
   });
@@ -23,12 +26,25 @@ export function usageFixture(overrides: Partial<AiUsage> = {}): AiUsage {
     readAt: '2026-11-11T13:30:00.000Z',
     timeZone: 'Europe/Paris',
     usdPerEur: 1.1,
-    today: { day: '2026-11-11', eur: 4.2, capEur: 20, alertAtEur: 16, state: 'ok', calls: 412, failed: 3 },
+    today: {
+      day: '2026-11-11',
+      eur: 4.2,
+      coveredEur: 3.6,
+      capEur: 20,
+      alertAtEur: 16,
+      state: 'ok',
+      calls: 412,
+      failed: 3,
+    },
     hours: Array.from({ length: 15 }, (_, hour) => ({
       hour,
       eur: hour < 8 ? 0.05 : 0.45,
+      coveredEur: hour < 8 ? 0.05 : 0.4,
       calls: hour < 8 ? 4 : 41,
-      providers: [{ provider: 'xai', eur: hour < 8 ? 0.05 : 0.45 }],
+      providers: [
+        { provider: 'xai', eur: hour < 8 ? 0.05 : 0.4, coveredEur: hour < 8 ? 0.05 : 0.4 },
+        ...(hour < 8 ? [] : [{ provider: 'google', eur: 0.05, coveredEur: 0 }]),
+      ],
     })),
     days,
     models: [
@@ -68,7 +84,15 @@ export function usageFixture(overrides: Partial<AiUsage> = {}): AiUsage {
       { use: 'brain', eur: 37.3, calls: 4884 },
       { use: 'sense', eur: 6.9, calls: 1310 },
     ],
-    pace: { perDayEur: 3.4, perDayOver: 7, monthEur: 38.9, monthForecastEur: 103.5, month: '2026-11' },
+    pace: {
+      perDayEur: 3.4,
+      perDayOver: 7,
+      monthEur: 38.9,
+      monthCoveredEur: 9.1,
+      monthForecastEur: 103.5,
+      monthForecastCoveredEur: 64.3,
+      month: '2026-11',
+    },
     lastCallAt: '2026-11-11T13:29:48.000Z',
     credits: [
       {

@@ -71,6 +71,11 @@ describe('Réglages › Consommation IA (ADR 0091)', () => {
     const meter = await screen.findByRole('meter', { name: 'Dépense du jour face au plafond' });
     expect(meter.getAttribute('aria-valuetext')).toBe('4,20 € sur 20,00 €');
     expect(screen.getByText(/412 appels, dont 3 en erreur/u)).toBeTruthy();
+    // Today, the month and the forecast say what the subscription paid; the cap counts it all the same.
+    expect(screen.getByText(/dont 3,60.€ couverts par l’abonnement/u)).toBeTruthy();
+    expect(screen.getByText(/dont 9,10.€ couverts par l’abonnement/u)).toBeTruthy();
+    expect(screen.getByText(/dont 64,30.€ couverts par l’abonnement/u)).toBeTruthy();
+    expect(screen.getByText('Hachuré : couvert par l’abonnement')).toBeTruthy();
     expect(screen.getByText('Prévu fin du mois')).toBeTruthy();
     expect(screen.getByText('Recharger bientôt')).toBeTruthy();
     expect(screen.getByText(/Environ 3 jours au rythme actuel/u)).toBeTruthy();

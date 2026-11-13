@@ -28,12 +28,16 @@ const day = z.iso.date();
 export const AiUsageProviderSpendSchema = z.strictObject({
   provider: AiUsageProviderSchema,
   eur,
+  /** The part of `eur` the owner's subscription paid (ADR 0091 § 6), 0 on credits. */
+  coveredEur: eur,
 });
 export type AiUsageProviderSpend = z.infer<typeof AiUsageProviderSpendSchema>;
 
 export const AiUsageDaySchema = z.strictObject({
   day,
   eur,
+  /** The part of `eur` the owner's subscription paid (ADR 0091 § 6, « ok 0091 chiffres »). */
+  coveredEur: eur,
   calls: count,
   /** Every provider that cost something that day, in `AiUsageProviderSchema`'s order. */
   providers: z.array(AiUsageProviderSpendSchema),
@@ -44,6 +48,7 @@ export const AiUsageHourSchema = z.strictObject({
   /** 0 to 23, the hour of the cap's day; the hours not come yet are left out. */
   hour: z.number().int().min(0).max(23),
   eur,
+  coveredEur: eur,
   calls: count,
   providers: z.array(AiUsageProviderSpendSchema),
 });
@@ -187,6 +192,8 @@ export const AiUsageSchema = z.strictObject({
   today: z.strictObject({
     day,
     eur,
+    /** The part of `eur` the subscription paid; the cap counts it all the same. */
+    coveredEur: eur,
     capEur: z.number().positive(),
     alertAtEur: z.number().positive(),
     state: AiUsageCapStateSchema,
@@ -210,8 +217,15 @@ export const AiUsageSchema = z.strictObject({
     perDayOver: z.number().int().min(0).max(7),
     /** The calendar month so far, today included. */
     monthEur: eur,
+    /** The part of `monthEur` the subscription paid. */
+    monthCoveredEur: eur,
     /** The month so far, plus the average for each day left after today; null without an average. */
     monthForecastEur: eur.nullable(),
+    /**
+     * The part of the forecast the subscription would pay: what it paid this month, plus, for each provider on it now,
+     * its own average for each day left. Null with the forecast.
+     */
+    monthForecastCoveredEur: eur.nullable(),
     month: z.string().regex(/^\d{4}-\d{2}$/u),
   }),
   /** The last call journaled, any provider; null when there is none in the window. */

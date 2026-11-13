@@ -108,6 +108,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       'label value'
+      'covered value'
       'note value';
     align-content: center;
     column-gap: 16px;
@@ -122,6 +123,9 @@
   }
   .cia-tiles .ins-tile__note {
     grid-area: note;
+  }
+  .cia-tiles .ins-tile__note.cia-covered {
+    grid-area: covered;
   }
 }
 
@@ -392,4 +396,44 @@
   .cia-runway__fill {
     animation: none;
   }
+}
+
+/*
+ * What the owner's subscription paid (ADR 0091 § 6, « ok 0091 chiffres »): the same colour as its service, hatched at
+ * 135°, on top of what was paid; the line under a figure carries the same hatch as its key, the text stays in ink.
+ */
+.cia-part--covered {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--_c) 0 1.5px,
+    color-mix(in oklab, var(--_c) 28%, transparent) 1.5px 4.5px
+  );
+}
+.cia-key--covered,
+.cia-covered__key {
+  --_c: var(--nv-ink-muted);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--_c) 0 1.5px,
+    color-mix(in oklab, var(--_c) 25%, transparent) 1.5px 3.5px
+  );
+}
+.cia-key--covered {
+  border-radius: 2px;
+}
+.cia-covered {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.cia-covered__key {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  /* On the first line when the text wraps, centred on it. */
+  margin-top: calc((1lh - 10px) / 2);
+  border-radius: 2px;
 }

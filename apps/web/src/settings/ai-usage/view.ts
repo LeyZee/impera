@@ -117,13 +117,25 @@ export interface Column {
   readonly label: string;
   readonly title: string;
   readonly eur: number;
+  /** The part of `eur` the owner's subscription paid (ADR 0091 § 6). */
+  readonly coveredEur: number;
   readonly calls: number;
   /** Bottom to top, in `PROVIDERS`' order, one per provider (0 where it cost nothing). */
   readonly parts: readonly number[];
+  /** The same, the part of each the subscription paid: drawn hatched on top of what was paid. */
+  readonly covered: readonly number[];
 }
 
 const partsOf = (providers: readonly AiUsageProviderSpend[]): number[] =>
   PROVIDERS.map((p) => providers.find((one) => one.provider === p.key)?.eur ?? 0);
+
+const coveredOf = (providers: readonly AiUsageProviderSpend[]): number[] =>
+  PROVIDERS.map((p) => providers.find((one) => one.provider === p.key)?.coveredEur ?? 0);
+
+/** « dont 3,20 € couverts par l’abonnement », or nothing when the subscription paid nothing. */
+export function coveredText(eur: number): string | null {
+  return eur > 0 ? `dont ${eurText(eur)} couverts par l’abonnement` : null;
+}
 
 export function dayColumns(usage: AiUsage): Column[] {
   return usage.days.map((day) => ({
@@ -131,8 +143,10 @@ export function dayColumns(usage: AiUsage): Column[] {
     label: shortDay(day.day),
     title: day.day === usage.today.day ? `Aujourd’hui, ${dayLabel(day.day)}` : dayLabel(day.day),
     eur: day.eur,
+    coveredEur: day.coveredEur,
     calls: day.calls,
     parts: partsOf(day.providers),
+    covered: coveredOf(day.providers),
   }));
 }
 
@@ -142,8 +156,10 @@ export function hourColumns(usage: AiUsage): Column[] {
     label: `${String(hour.hour)}h`,
     title: `${String(hour.hour)}h–${String((hour.hour + 1) % 24)}h`,
     eur: hour.eur,
+    coveredEur: hour.coveredEur,
     calls: hour.calls,
     parts: partsOf(hour.providers),
+    covered: coveredOf(hour.providers),
   }));
 }
 

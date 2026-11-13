@@ -90,11 +90,57 @@ export function capState(cap: CapReading): AiUsageCapState {
 const PROVIDER_ORDER = AiUsageProviderSchema.options;
 const USE_ORDER = AiUsageUseSchema.options;
 
-function byProvider(rows: readonly UsageRow[], usdPerEur: number): AiUsageProviderSpend[] {
+type Covered = (row: UsageRow) => boolean;
+
+function byProvider(rows: readonly UsageRow[], usdPerEur: number, covered: Covered): AiUsageProviderSpend[] {
   return PROVIDER_ORDER.flatMap((provider) => {
-    const usd = rows.filter((r) => r.provider === provider).reduce((sum, r) => sum + r.usd, 0);
-    return usd > 0 ? [{ provider, eur: usd / usdPerEur }] : [];
+    const own = rows.filter((r) => r.provider === provider);
+    const usd = own.reduce((sum, r) => sum + r.usd, 0);
+    const coveredUsd = own.filter(covered).reduce((sum, r) => sum + r.usd, 0);
+    return usd > 0 ? [{ provider, eur: usd / usdPerEur, coveredEur: coveredUsd / usdPerEur }] : [];
   });
+}
+
+/** `YYYY-MM-DD HH`, the cap's day and hour of an instant: the grain of the summed journal. */
+function slotOf(at: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(at));
+  const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}`;
+}
+
+const slotOfRow = (row: UsageRow): string => `${row.day} ${String(row.hour).padStart(2, '0')}`;
+
+/**
+ * Which calls the owner's subscription paid (ADR 0091 § 6, « ok 0091 chiffres »): those of a provider from one of its
+ * subscription lines to its next top-up or balance reading. To the hour, the journal's grain: the hour of the switch
+ * goes all to the new mode.
+ */
+export function coveredBy(entries: readonly AiCreditEntry[], timeZone: string): Covered {
+  const spans = new Map<AiCreditProvider, { from: string; to: string | null }[]>();
+  for (const provider of AiCreditProviderSchema.options) {
+    const own: { from: string; to: string | null }[] = [];
+    for (const entry of entries.filter((e) => e.provider === provider).sort(byTime)) {
+      const open = own.at(-1);
+      const isOpen = open?.to === null;
+      if (entry.kind === 'subscription') {
+        if (!isOpen) own.push({ from: slotOf(entry.at, timeZone), to: null });
+      } else if (open && isOpen) open.to = slotOf(entry.at, timeZone);
+    }
+    spans.set(provider, own);
+  }
+  return (row) => {
+    const own = AiCreditProviderSchema.safeParse(row.provider);
+    if (!own.success) return false;
+    const slot = slotOfRow(row);
+    return (spans.get(own.data) ?? []).some((s) => slot >= s.from && (s.to === null || slot < s.to));
+  };
 }
 
 /** Lines a credits card shows, latest first. */
@@ -211,6 +257,8 @@ export function aiUsage(input: UsageInput): AiUsage {
   const first = addDays(today, -(AI_USAGE_DAYS - 1));
   const inWindow = rows.filter((r) => r.day >= first && r.day <= today);
   const eurOf = (subset: readonly UsageRow[]): number => sum(subset, (r) => r.usd) / usdPerEur;
+  const covered = coveredBy(input.entries, input.timeZone);
+  const coveredOf = (subset: readonly UsageRow[]): number => eurOf(subset.filter(covered));
 
   const days = Array.from({ length: AI_USAGE_DAYS }, (_, i) => {
     const day = addDays(first, i);
@@ -218,8 +266,9 @@ export function aiUsage(input: UsageInput): AiUsage {
     return {
       day,
       eur: eurOf(ofDay),
+      coveredEur: coveredOf(ofDay),
       calls: sum(ofDay, (r) => r.calls),
-      providers: byProvider(ofDay, usdPerEur),
+      providers: byProvider(ofDay, usdPerEur, covered),
     };
   });
 
@@ -229,8 +278,9 @@ export function aiUsage(input: UsageInput): AiUsage {
     return {
       hour,
       eur: eurOf(ofHour),
+      coveredEur: coveredOf(ofHour),
       calls: sum(ofHour, (r) => r.calls),
-      providers: byProvider(ofHour, usdPerEur),
+      providers: byProvider(ofHour, usdPerEur, covered),
     };
   });
 
@@ -287,8 +337,18 @@ export function aiUsage(input: UsageInput): AiUsage {
   });
 
   const month = today.slice(0, 7);
-  const monthEur = eurOf(inWindow.filter((r) => r.day.startsWith(month)));
+  const ofMonth = inWindow.filter((r) => r.day.startsWith(month));
+  const monthEur = eurOf(ofMonth);
+  const monthCoveredEur = coveredOf(ofMonth);
   const daysLeft = daysInMonth(today) - Number(today.slice(8, 10));
+  // The days left go to the subscription for each provider on it now, at that provider's own pace.
+  const perDayCoveredEur =
+    perDayOver === 0
+      ? 0
+      : credits
+          .filter((card) => card.mode === 'subscription')
+          .reduce((total, card) => total + eurOf(paceRows.filter((r) => r.provider === card.provider)), 0) /
+        perDayOver;
 
   return {
     readAt: input.readAt.toISOString(),
@@ -297,6 +357,8 @@ export function aiUsage(input: UsageInput): AiUsage {
     today: {
       day: today,
       eur: input.cap.spentEur,
+      // The cap counts every call, the subscription's too (« ok 0091 chiffres »); never more than it.
+      coveredEur: Math.min(input.cap.spentEur, coveredOf(ofToday)),
       capEur: input.cap.capEur,
       alertAtEur: input.cap.alertAtEur,
       state: capState(input.cap),
@@ -311,7 +373,9 @@ export function aiUsage(input: UsageInput): AiUsage {
       perDayEur,
       perDayOver,
       monthEur,
+      monthCoveredEur,
       monthForecastEur: perDayEur === null ? null : monthEur + perDayEur * daysLeft,
+      monthForecastCoveredEur: perDayEur === null ? null : monthCoveredEur + perDayCoveredEur * daysLeft,
       month,
     },
     lastCallAt: input.lastCallAt?.toISOString() ?? null,

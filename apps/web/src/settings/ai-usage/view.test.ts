@@ -4,6 +4,7 @@ import { usageFixture } from './fixture';
 import {
   capNote,
   capShare,
+  coveredText,
   creditText,
   dayColumns,
   eurText,
@@ -55,6 +56,17 @@ describe('Consommation IA, what the screen says (ADR 0091)', () => {
     // xAI first, Mistral empty, Google third, Venice empty: the colours never move.
     expect(days[0]?.parts).toEqual([2, 0, 0.4, 0]);
     expect(hourColumns(usage)[14]?.title).toBe('14h–15h');
+  });
+
+  it('says the part the subscription paid, per column and per provider (« ok 0091 chiffres »)', () => {
+    const usage = usageFixture();
+    const days = dayColumns(usage);
+    expect(days[0]?.covered).toEqual([0, 0, 0, 0]);
+    const today = days.at(-1);
+    expect(today?.covered[0]).toBe(today?.parts[0]);
+    expect(today?.covered[2]).toBe(0);
+    expect(coveredText(0)).toBeNull();
+    expect(coveredText(3.2)).toBe(`dont 3,20${NBSP}€ couverts par l’abonnement`);
   });
 
   it('colours each model by its provider and each use by itself, the most expensive first', () => {
