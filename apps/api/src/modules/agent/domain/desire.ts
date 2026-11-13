@@ -214,3 +214,19 @@ export function desireScore(turn: DesireTurn): DesireReading {
 
 /** Whether this message moved his score: only then is it journaled (a first score of 0 moves nothing). */
 export const desireMoved = (reading: DesireReading): boolean => reading.score !== (reading.before ?? 0);
+
+/**
+ * His score counted again from what was read on one message, with the weights in force now (ADR 0103 § 6): the owner's
+ * marks keep the signals counted, so a change of weights shows what it does to each of them without a model.
+ */
+export function recountDesire(reading: {
+  readonly before: number | null;
+  readonly signals: readonly DesireSignal[];
+}): number {
+  const before = reading.before ?? 0;
+  if (reading.signals.includes('minor_suspected') || reading.signals.includes('age_disputed')) return 0;
+  if (reading.signals.includes('frozen')) return before;
+  return bounded(
+    before + reading.signals.filter(isCounted).reduce((sum, signal) => sum + WEIGHTS[signal], 0),
+  );
+}

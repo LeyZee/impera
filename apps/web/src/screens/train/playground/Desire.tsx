@@ -1,4 +1,4 @@
-import type { PlaygroundDesire, PlaygroundState } from '@impera/contracts';
+import type { DesireMarkVerdict, PlaygroundDesire, PlaygroundState } from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import { DESIRE_BAND_LABELS, DESIRE_SIGNAL_LABELS, movementOf } from '@/agent/desire';
@@ -46,8 +46,67 @@ export function desireVerdict(score: number, thresholds: Thresholds): string {
   return 'Elle n’ouvre pas l’intime elle-même';
 }
 
-/** The score under one of his messages: folded to a line, opened to the signals with their points. */
-export function DesireTag({ desire }: { desire: PlaygroundDesire }): JSX.Element {
+/** The owner's three words on a score (ADR 0103 § 6), in the order of the gauge: low, right, high. */
+export const DESIRE_MARKS: readonly { readonly verdict: DesireMarkVerdict; readonly label: string }[] = [
+  { verdict: 'too_low', label: 'Trop basse' },
+  { verdict: 'right', label: 'Juste' },
+  { verdict: 'too_high', label: 'Trop haute' },
+];
+
+export const DESIRE_MARK_WORDS: Readonly<Record<DesireMarkVerdict, string>> = {
+  too_low: 'notée trop basse',
+  right: 'notée juste',
+  too_high: 'notée trop haute',
+};
+
+/**
+ * Where the owner says the score was wrong, or right. Kept with the signals counted, so a change of weights is replayed
+ * on his marks by code (ADR 0103 § 6). Absent when the conversation cannot be marked (the invented persona).
+ */
+function MarkChoice({
+  mark,
+  onMark,
+}: {
+  mark: DesireMarkVerdict | undefined;
+  onMark: (verdict: DesireMarkVerdict) => void;
+}): JSX.Element {
+  const index = DESIRE_MARKS.findIndex((m) => m.verdict === mark);
+  return (
+    <div className="pg-desire-mark">
+      <span className="pg-desire-mark__q">Cette note te semble</span>
+      <div
+        className="nv-seg nv-glass nv-glass--thin pg-desire-mark__seg"
+        role="group"
+        aria-label="Cette note te semble"
+        style={{ '--nv-seg-count': DESIRE_MARKS.length, '--nv-seg-index': Math.max(index, 0) }}
+      >
+        {index < 0 ? null : <span className="nv-seg__thumb nv-glass nv-glass--thin" aria-hidden="true" />}
+        {DESIRE_MARKS.map((m) => (
+          <button
+            key={m.verdict}
+            type="button"
+            className="nv-seg__opt"
+            aria-pressed={m.verdict === mark}
+            onClick={() => {
+              if (m.verdict !== mark) onMark(m.verdict);
+            }}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The score under one of his messages: folded to a line, opened to the signals with their points and his mark. */
+export function DesireTag({
+  desire,
+  onMark,
+}: {
+  desire: PlaygroundDesire;
+  onMark?: ((verdict: DesireMarkVerdict) => void) | undefined;
+}): JSX.Element {
   const [open, setOpen] = useState(false);
   const lines = signalLines(desire);
   return (
@@ -64,6 +123,7 @@ export function DesireTag({ desire }: { desire: PlaygroundDesire }): JSX.Element
         Désir <b>{desire.score}</b>
         {/* His first score has nothing to move from: said in a word, never « Première note : 0 » after the 0. */}
         <span>{desire.before === null ? 'première note' : movementOf(desire)}</span>
+        {desire.mark === undefined ? null : <span>· {DESIRE_MARK_WORDS[desire.mark]}</span>}
       </button>
       {open ? (
         lines.length === 0 ? (
@@ -79,6 +139,7 @@ export function DesireTag({ desire }: { desire: PlaygroundDesire }): JSX.Element
           </ul>
         )
       ) : null}
+      {open && onMark !== undefined ? <MarkChoice mark={desire.mark} onMark={onMark} /> : null}
     </div>
   );
 }

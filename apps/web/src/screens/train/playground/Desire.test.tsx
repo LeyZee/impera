@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { PlaygroundDesire } from '@impera/contracts';
+import type { DesireMarkVerdict, PlaygroundDesire } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -35,6 +35,39 @@ describe('desire in the playground', () => {
     fireEvent.click(screen.getByRole('button'));
     expect(screen.getByText('Rien n’a bougé sur ce message.')).toBeTruthy();
     expect(pointsLabel(null)).toBe('');
+  });
+
+  it('lets the owner mark the score, says his mark folded, and asks nothing when it cannot be kept', () => {
+    const marked: DesireMarkVerdict[] = [];
+    const { rerender } = render(
+      <DesireTag
+        desire={DESIRE}
+        onMark={(verdict) => {
+          marked.push(verdict);
+        }}
+      />,
+    );
+    expect(screen.queryByRole('group', { name: 'Cette note te semble' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Désir/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Trop haute' }));
+    expect(marked).toEqual(['too_high']);
+
+    rerender(
+      <DesireTag
+        desire={{ ...DESIRE, mark: 'too_high' }}
+        onMark={(verdict) => {
+          marked.push(verdict);
+        }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Désir/ }).textContent).toContain('notée trop haute');
+    expect(screen.getByRole('button', { name: 'Trop haute' }).getAttribute('aria-pressed')).toBe('true');
+    // The same word again is no new mark.
+    fireEvent.click(screen.getByRole('button', { name: 'Trop haute' }));
+    expect(marked).toEqual(['too_high']);
+
+    rerender(<DesireTag desire={DESIRE} />);
+    expect(screen.queryByRole('group', { name: 'Cette note te semble' })).toBeNull();
   });
 
   it('reads the score against her own thresholds', () => {

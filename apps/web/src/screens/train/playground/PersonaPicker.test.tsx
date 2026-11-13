@@ -173,6 +173,8 @@ function stubClient(): PlaygroundClient {
     send: unused,
     rate: unused,
     branch: unused,
+    markDesire: unused,
+    desireMarks: unused,
     compare: unused,
     advance: unused,
     setNotes: unused,
