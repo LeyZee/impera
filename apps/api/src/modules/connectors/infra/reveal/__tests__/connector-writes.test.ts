@@ -432,7 +432,9 @@ describe('RevealApiConnector: a whole visit on FakeReveal (P2-03, critère d’a
       ['ai', null],
     ]);
     expect(read[3]?.media.map((media) => media.kind)).toEqual(['audio']);
-    expect(await connector.getScriptHistory(fanRef)).toEqual([{ stepRef: ref('script_3_1'), isPaid: false }]);
+    expect(await connector.getScriptHistory(fanRef)).toEqual([
+      { stepRef: ref('script_3_1'), purchased: false },
+    ]);
     expect(await connector.getFanNote(fanRef)).toEqual({ text: 'Prénom : Prénom02' });
     const recorded: ConnectorSend[] = [...sends.rows.values()];
     expect(recorded.map((send) => send.platformMessageId)).toEqual(read.slice(1).map((m) => m.ref.id));
