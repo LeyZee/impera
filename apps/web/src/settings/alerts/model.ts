@@ -205,7 +205,7 @@ export const SYSTEM_ALERTS: Readonly<
   },
   script_price: {
     title: 'Prix d’un script changé',
-    what: 'Le prix d’une étape sur la plateforme n’est plus celui décidé : rien ne part et un humain est prévenu, sans pause.',
+    what: 'Le prix d’une étape sur la plateforme n’est plus celui décidé : l’étape ne part jamais, même alerte coupée. Active, un humain est aussi prévenu, sans pause.',
   },
 };
 
