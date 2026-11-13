@@ -1,4 +1,4 @@
-import type { CreatorId } from '@impera/contracts';
+import { archivedThumbnailsUntil, type CreatorId } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type JSX } from 'react';
 
@@ -17,8 +17,19 @@ const PROBLEMS: Record<Problem, string> = {
   failed: 'Elle n’est pas rouverte : Impera ne répond pas. Réessaie dans un instant.',
 };
 
+/** « 5 novembre 2026 », never broken across lines. */
 const dayOf = (iso: string): string =>
-  new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
+  new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    .format(new Date(iso))
+    .replaceAll(' ', '\u00a0');
+
+/** « vignettes gardées jusqu’au 3 février 2027 », then « vignettes effacées » once they went (ADR 0089). */
+export function thumbnailsLine(archivedAt: string, now: Date): string {
+  const until = archivedThumbnailsUntil(new Date(archivedAt));
+  return until.getTime() <= now.getTime()
+    ? 'vignettes effacées'
+    : `vignettes gardées jusqu’au ${dayOf(until.toISOString())}`;
+}
 
 /**
  * Créatrices › Archivées (ADR 0071 § 2), the owner's alone, folded: shown only when one is archived. « Rouvrir »
@@ -80,7 +91,11 @@ export function ArchivedCreators({
               <li key={creator.id} className="cr-archived__row">
                 <span>
                   {creator.displayName}
-                  <span className="ps-muted"> · archivée le {dayOf(creator.archivedAt)}</span>
+                  <span className="ps-muted">
+                    {' '}
+                    · archivée le {dayOf(creator.archivedAt)} ·{' '}
+                    {thumbnailsLine(creator.archivedAt, new Date())}
+                  </span>
                 </span>
                 <button
                   type="button"

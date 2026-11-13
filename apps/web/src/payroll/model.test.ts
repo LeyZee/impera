@@ -471,7 +471,7 @@ describe('the money of a statement', () => {
     const steps = (one: CommissionStatementLine, platform: Platform | null) =>
       flowOf(one, 2_500, platform, true).map((step) => plain(`${step.label} | ${step.op} | ${step.amount}`));
     expect(steps(onNet({}), 'reveal')).toEqual([
-      'Net de Reveal | 3 ventes lues | 85,00 €',
+      'Net de Reveal | 3 ventes lues, 1 remboursement | 85,00 €',
       'Ta commission | 25 % | 21,25 €',
     ]);
     expect(
@@ -488,7 +488,7 @@ describe('the money of a statement', () => {
         null,
       ),
     ).toEqual([
-      'Net de la plateforme | 3 ventes lues | 100,00 $US',
+      'Net de la plateforme | 3 ventes lues, 1 remboursement | 100,00 $US',
       'En euros | 1 $ = 0,9200 € | 92,00 €',
       'Ta commission | 25 % | 23,00 €',
     ]);
@@ -1099,6 +1099,8 @@ describe('a member’s row', () => {
     expect(plain(carryLine(statement(second), false) ?? '')).toBe(
       'Sous le minimum de 15,00 € à ce jour : 13,00 € iraient sur la quinzaine suivante, si la quinzaine finit ainsi. Ce serait le deuxième report de suite : la quinzaine suivante verserait ce montant, même sous le minimum.',
     );
+    // A colon never starts a line: it is held to the word before it (recette paie, 11/11).
+    expect(carryLine(statement(second), false)).not.toMatch(/ [:;]/u);
     // After a negative carry-over, the count starts again: a first carry-over, said plainly.
     const afterNegative = { ...second, carryOversIn: [carriedIn(-500, 1)] };
     expect(plain(carryLine(statement({ ...afterNegative, status: 'validated' }), true) ?? '')).toBe(

@@ -18,6 +18,7 @@ import {
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Glance } from '@/screens/agenda/DayView';
+import { FreshnessNote } from '@/screens/agenda/FreshnessNote';
 import { useAgenda, useWithPending } from '@/screens/agenda/api';
 import '@/screens/agenda/agenda.css';
 import { planOf } from '@/screens/agenda/model';
@@ -50,7 +51,8 @@ export function CreatorTodayPage(): JSX.Element {
  */
 function HerDay({ now, today }: { now: Date; today: string }): JSX.Element {
   const monday = mondayOf(today);
-  const read = useAgenda(monday, addDays(monday, 6));
+  const sunday = addDays(monday, 6);
+  const read = useAgenda(monday, sunday);
   const { agenda } = useWithPending(read.data);
   if (agenda === undefined)
     return read.isError ? (
@@ -70,8 +72,12 @@ function HerDay({ now, today }: { now: Date; today: string }): JSX.Element {
     );
   const plan = planOf(agenda, agenda.today);
   const waiting = agenda.suggestions.length;
+  // The glance counts today's; « À décider » the week's, saying how many of them are today's (CRE-05).
+  const ofToday = plan.suggestions.length;
   return (
     <>
+      {/* A copy kept on her phone says so: being updated, or old, and why (CRE-02). */}
+      <FreshnessNote read={read} from={monday} to={sunday} />
       <Glance plan={plan} agenda={agenda} now={now} nowMinute={minuteOf(now, agenda.timeZone)}>
         <Link to="/agenda" className="nv-btn nv-btn--soft nv-btn--sm sc-day__open">
           Ouvrir l’agenda
@@ -83,8 +89,13 @@ function HerDay({ now, today }: { now: Date; today: string }): JSX.Element {
             <h2 className="sc-fans__title">À décider</h2>
             <p className="sc-fans__line">
               {waiting > 1
-                ? `${String(waiting)} propositions de l’agence attendent ta réponse cette semaine.`
-                : 'Une proposition de l’agence attend ta réponse cette semaine.'}
+                ? `${String(waiting)} propositions de l’agence attendent ta réponse cette semaine`
+                : 'Une proposition de l’agence attend ta réponse cette semaine'}
+              {ofToday === 0 || waiting === 1
+                ? '.'
+                : ofToday === waiting
+                  ? ', toutes pour aujourd’hui.'
+                  : `, dont ${String(ofToday)} pour aujourd’hui.`}
             </p>
           </div>
           <Link to="/agenda" search={{ vue: 'semaine' }} className="nv-btn nv-btn--soft nv-btn--sm">

@@ -221,8 +221,62 @@ describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
     ).toBeTruthy();
     expect(within(panel).getByText('Aucun jour en écart')).toBeTruthy();
     expect(
-      within(panel).getByText('Sans export, le registre n’est comparé qu’aux statistiques.'),
+      within(panel).getByText(
+        'Sans export, le registre est comparé aux statistiques seules : l’export est facultatif.',
+      ),
     ).toBeTruthy();
+    expect(
+      within(panel).getByText(
+        'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('says the export is optional, the statistics enough for the switch (ADR 0050 § 8, amended 11/11/2026)', async () => {
+    page(ok(report()));
+    const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });
+    // « facultatif » once, under the totals: neither the file's label nor the verdict repeats it (recette crm-14).
+    expect(within(panel).queryByText('facultatif')).toBeNull();
+    expect(within(panel).getByText(/et avec l’export de son dashboard si tu en as un\./u)).toBeTruthy();
+    expect(
+      within(panel).getByText(
+        /Sans lui, le registre est comparé aux statistiques seules, et cela suffit à la bascule/u,
+      ),
+    ).toBeTruthy();
+    expect(within(panel).queryByText(/trois sources/u)).toBeNull();
+  });
+
+  it('never says the statistics agree when they could not be read, nor the export when there is none (recette crm-14)', async () => {
+    const unread = report({
+      verdict: 'incomplete',
+      total: { register: totals(10_000), stats: null, export: null },
+      days: [
+        {
+          date: '2026-10-20',
+          platformModelId: 'm1',
+          handle: 'lune',
+          linked: true,
+          register: totals(10_000),
+          stats: null,
+          export: null,
+          differs: [],
+        },
+      ],
+      notes: [{ kind: 'stats_unavailable', errorKind: 'rate_limited' }],
+    });
+    page(ok(unread));
+    const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Vérifier ces jours' }));
+    expect(await within(panel).findByText('Aucun jour en écart')).toBeTruthy();
+    expect(
+      within(panel).getByText(
+        'Rien n’a pu être comparé : sans les statistiques ni export, le registre est seul.',
+      ),
+    ).toBeTruthy();
+    expect(within(panel).queryByText(/chaque source dit le chiffre du registre/u)).toBeNull();
+    expect(
+      within(panel).queryByText(/comparé aux statistiques seules : l’export est facultatif/u),
+    ).toBeNull();
   });
 
   it('shows each gap: the day, the model, the figure and how far it is from the register', async () => {

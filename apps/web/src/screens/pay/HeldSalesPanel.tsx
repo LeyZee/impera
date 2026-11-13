@@ -18,6 +18,7 @@ import { decideSale, useHeldSales, useRefreshPayroll, type PayRefusal } from '@/
 import {
   decisionText,
   heldCountText,
+  heldInOrder,
   heldReasonText,
   lineChatter,
   outcomeLabel,
@@ -60,13 +61,11 @@ export function HeldSalesPanel({
   period,
   names,
   me,
-  owner,
   reads,
 }: {
   period: PayPeriod;
   names: PayNames;
   me: { readonly id: string };
-  owner: boolean;
   /** The owner or an active manager: the only readers of the list. */
   reads: boolean;
 }): JSX.Element | null {
@@ -78,7 +77,7 @@ export function HeldSalesPanel({
     readonly outcome: SaleDecisionOutcome;
   } | null>(null);
   const read = held.data?.period === period ? held.data : undefined;
-  const sales = read?.sales ?? [];
+  const sales = heldInOrder(read?.sales ?? []);
   const zone = settings.data?.timeZone ?? null;
   // The platform's team names a chatter not linked (ADR 0076): read only for a line that needs it, by the same readers.
   const unnamed: Platform[] = [
@@ -137,7 +136,7 @@ export function HeldSalesPanel({
             // Each gesture names its sale to a screen reader, out of the list too.
             const about = (part: string): string => `${uid}-${String(index)}-${part}`;
             const account = names.account(sale.platformAccountId);
-            const reason = heldReasonText(sale, member, owner, zone);
+            const reason = heldReasonText(sale, member, zone);
             const signalled = signalText(sale, member);
             const decided = decisionText(sale, member);
             const chatter = lineChatter(sale, member, teamOf(sale.platform));

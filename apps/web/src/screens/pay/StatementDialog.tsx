@@ -308,7 +308,9 @@ function Foot({
         : own
           ? 'Ton relevé : un autre membre de l’agence le valide.'
           : statement.status === 'draft'
-            ? 'À valider : il suit chaque rapport validé jusqu’à sa validation.'
+            ? statement.lines.some((line) => line.base === 'platform_net')
+              ? 'À valider : il suit chaque vente lue et chaque rapport validé jusqu’à sa validation.'
+              : 'À valider : il suit chaque rapport validé jusqu’à sa validation.'
             : 'Validé, il ne change plus : une erreur se corrige par un ajustement.';
   return (
     <div className="py-dialog__foot">

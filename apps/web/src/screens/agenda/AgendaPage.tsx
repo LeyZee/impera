@@ -11,6 +11,7 @@ import { useCallback, useState, type JSX } from 'react';
 
 import { AddDialog, type AddPreset } from './AddDialog';
 import { DayView } from './DayView';
+import { FreshnessNote } from './FreshnessNote';
 import { MonthView } from './MonthView';
 import { PhoneDialog } from './PhoneDialog';
 import { SuggestionDialog, UndatedSuggestions } from './SuggestionCard';
@@ -24,7 +25,6 @@ import { shiftRangeOf, useRepliesShown } from './replies';
 import { useWide } from './useWide';
 import './agenda.css';
 
-import { useOnline } from '@/pwa/online';
 import { useCreatorShifts } from '@/scheduling/api';
 import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
 import { ServerSilent } from '@/shell/ServerSilent';
@@ -34,10 +34,13 @@ export type AgendaView = 'day' | 'week' | 'month';
 
 const NO_SHIFTS: readonly CreatorAccountShift[] = [];
 
-/** On her phone her week is a list and there is no month; on a computer, Semaine is a grid of hours, and Mois. */
+/**
+ * On her phone her week is a list and there is no month; on a computer, Semaine is a grid of hours, and Mois. The same
+ * words on both (CRE-21).
+ */
 const PHONE_VIEWS: readonly (readonly [AgendaView, string])[] = [
   ['day', 'Jour'],
-  ['week', 'Ma semaine'],
+  ['week', 'Semaine'],
 ];
 const WIDE_VIEWS: readonly (readonly [AgendaView, string])[] = [
   ['day', 'Jour'],
@@ -131,9 +134,6 @@ export function AgendaPage({
   };
 
   const herToday = agenda?.today ?? today;
-  // Her kept agenda answers a read without a network: the browser's word says she is offline (CREA-24).
-  const online = useOnline();
-  const offline = !online || read.isError || (read.isFetched && read.fetchStatus === 'paused');
 
   return (
     <Page className="ag-page">
@@ -183,6 +183,19 @@ export function AgendaPage({
           ))}
         </div>
         <div className="ag-nav">
+          {/* Its place is kept on today too, hidden: the arrows never move under her thumb (CRE-20). */}
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm ag-today"
+            data-away={shown === herToday ? undefined : 'true'}
+            aria-hidden={shown === herToday ? true : undefined}
+            tabIndex={shown === herToday ? -1 : undefined}
+            onClick={() => {
+              onDay(null);
+            }}
+          >
+            Aujourd’hui
+          </button>
           <button
             type="button"
             className="ag-arrow"
@@ -207,26 +220,11 @@ export function AgendaPage({
               <path d="m6 3 5 5-5 5" />
             </svg>
           </button>
-          {shown === herToday ? null : (
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm"
-              onClick={() => {
-                onDay(null);
-              }}
-            >
-              Aujourd’hui
-            </button>
-          )}
         </div>
       </div>
-      {offline && agenda !== undefined ? (
-        <p className="ag-offline" role="status">
-          Hors ligne : tu vois ta dernière lecture.
-          {waiting > 0
-            ? ` ${String(waiting)} ${waiting > 1 ? 'coches partiront' : 'coche partira'} au retour du réseau.`
-            : ' Tes coches partiront au retour du réseau.'}
-        </p>
+      <FreshnessNote read={read} from={range.from} to={range.to} waiting={waiting} />
+      {view === 'month' && !wide ? (
+        <p className="ag-updating">Le mois se voit sur un ordinateur : voici ta semaine.</p>
       ) : null}
       {notice === null ? null : (
         <p className="ag-notice" role="status">
@@ -307,6 +305,7 @@ export function AgendaPage({
             setOpen(null);
           }}
           onNotice={setNotice}
+          onTick={tick}
         />
       )}
     </Page>
@@ -401,19 +400,28 @@ function Dialogs({
   onOpen,
   onClose,
   onNotice,
+  onTick,
 }: {
   agenda: CreatorAgenda;
   open: NonNullable<Open>;
   onOpen: (open: Open) => void;
   onClose: () => void;
   onNotice: (notice: string) => void;
+  onTick: (task: CreatorTask, on: boolean, day: string) => void;
 }): JSX.Element {
   switch (open.kind) {
     case 'add':
       return <AddDialog zone={agenda.timeZone} preset={open.preset} onClose={onClose} />;
     case 'task':
       return (
-        <TaskDialog agenda={agenda} task={open.task} day={open.day} onClose={onClose} onNotice={onNotice} />
+        <TaskDialog
+          agenda={agenda}
+          task={open.task}
+          day={open.day}
+          onClose={onClose}
+          onNotice={onNotice}
+          onTick={onTick}
+        />
       );
     case 'suggestion':
       return (
