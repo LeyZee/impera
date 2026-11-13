@@ -29,9 +29,9 @@ export function useAgentMode(shown: string | null = null): AgentModeView {
     const stalled = !reveal.connected
       ? reveal.lastReadAt === null
         ? 'la messagerie Reveal n’est pas encore reliée'
-        : 'Reveal est déconnecté'
+        : 'la messagerie Reveal est déconnectée'
       : reveal.late
-        ? 'Reveal n’est plus lu depuis plusieurs minutes'
+        ? 'la messagerie Reveal n’est plus lue depuis plusieurs minutes'
         : voice.ok
           ? null
           : voice.keyMissing
