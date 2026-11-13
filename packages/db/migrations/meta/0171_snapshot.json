@@ -359,7 +359,7 @@
       "checkConstraints": {
         "system_alert_settings_code_check": {
           "name": "system_alert_settings_code_check",
-          "value": "\"system_alert_settings\".\"code\" in ('keyword', 'service_request', 'identity_doubt')"
+          "value": "\"system_alert_settings\".\"code\" in ('keyword', 'service_request', 'identity_doubt', 'script_price')"
         },
         "system_alert_settings_keyword_check": {
           "name": "system_alert_settings_keyword_check",
