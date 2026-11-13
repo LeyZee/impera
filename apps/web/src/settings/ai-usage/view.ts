@@ -218,6 +218,13 @@ export const USAGE_HINT: Readonly<Record<AiCreditProvider, string>> = {
   google: 'aistudio.google.com › Usage',
 };
 
+/** Each provider's console, where its quota is read and credits are bought. */
+export const CONSOLE_URL: Readonly<Record<AiCreditProvider, string>> = {
+  xai: 'https://console.x.ai',
+  mistral: 'https://console.mistral.ai',
+  google: 'https://aistudio.google.com',
+};
+
 /** The tone of a card, as the rest of the CRM says it: amber a warning, red an urgency. */
 export const CREDIT_TONE: Readonly<Record<AiCreditState, 'ok' | 'warn' | 'bad' | 'idle'>> = {
   ok: 'ok',
@@ -239,17 +246,25 @@ const LONG_DAY = new Intl.DateTimeFormat('fr-FR', {
 /** « samedi 14 novembre »: a calendar day in a sentence, never shifted by a zone. */
 export const longDay = (day: string): string => LONG_DAY.format(new Date(`${day}T12:00:00Z`));
 
-const REFUSED_AT = new Intl.DateTimeFormat('fr-FR', {
+const REFUSED_DAY = new Intl.DateTimeFormat('fr-FR', {
   timeZone: 'Europe/Paris',
   weekday: 'long',
   day: 'numeric',
   month: 'long',
+});
+const REFUSED_TIME = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
   hour: '2-digit',
   minute: '2-digit',
+  hourCycle: 'h23',
 });
 
-/** « jeudi 12 novembre à 23:35 »: when the provider first refused, in Paris time. */
-export const refusedText = (at: string): string => REFUSED_AT.format(new Date(at));
+/** « jeudi 12 novembre à 23 h 35 »: when the provider first refused, in Paris time, as the CRM writes an hour. */
+export function refusedText(at: string): string {
+  const date = new Date(at);
+  const [hour = '00', minute = '00'] = REFUSED_TIME.format(date).split(':');
+  return `${REFUSED_DAY.format(date)} à ${hour}\u00a0h\u00a0${minute}`;
+}
 
 /** The card's headline about time: how long, and until when; on a subscription, whether the quota holds. */
 export function runwayText(card: AiCredits): string {

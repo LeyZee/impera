@@ -26,13 +26,6 @@ const KINDS: readonly { readonly id: AiCreditEntryKind; readonly label: string }
   { id: 'subscription', label: 'Payé par l’abonnement' },
 ];
 
-const LEAD: Readonly<Record<AiCreditEntryKind, string>> = {
-  topup: 'Le CRM part de ce montant et retire le coût de chaque appel fait ensuite.',
-  balance: 'Le CRM part de ce montant et retire le coût de chaque appel fait ensuite.',
-  subscription:
-    'Les appels passent sur le quota de ton abonnement : rien à décompter, Telegram te prévient si le quota est épuisé.',
-};
-
 const NOT_SAVED: Readonly<Record<Exclude<CreditOutcome['kind'], 'ok'>, string>> = {
   in_future: 'Cette saisie est datée dans le futur : vérifie l’heure de ton appareil.',
   conflict: 'Cette saisie existe déjà avec un autre montant : ferme et recommence.',
@@ -80,7 +73,7 @@ function Chips<V extends string>({
 }
 
 /**
- * « Noter une recharge » (ADR 0091 § 3): a top-up, or the balance read in the service's console, written now. The
+ * « Mettre à jour les crédits » (ADR 0091 § 3 and § 6): a top-up, or the balance read in the service's console, written now. The
  * line's id is made when the dialog opens: a retry after a lost answer writes it once.
  */
 export function CreditDialog({
@@ -122,7 +115,12 @@ export function CreditDialog({
   };
 
   return (
-    <Dialog title="Noter une recharge" lead={LEAD[kind]} busy={busy} onClose={onClose}>
+    <Dialog
+      title="Mettre à jour les crédits"
+      lead="Ce que tu notes ici règle la carte du service : un montant décompté appel par appel, ou l’abonnement."
+      busy={busy}
+      onClose={onClose}
+    >
       <form
         className="tm-dialog__body"
         noValidate
@@ -143,8 +141,9 @@ export function CreditDialog({
         <Chips label="Ce que tu notes" value={kind} options={KINDS} onChange={setKind} />
         {isPlan ? (
           <p className="tm-hint">
-            Le quota se lit dans {USAGE_HINT[provider]}. Une recharge ou un solde noté plus tard reprend le
-            décompte des crédits.
+            Les appels passent sur le quota de ton abonnement : rien à décompter, Telegram te prévient s’il
+            est épuisé. Le quota se lit dans {USAGE_HINT[provider]} ; une recharge notée plus tard reprend le
+            décompte.
           </p>
         ) : (
           <>

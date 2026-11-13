@@ -108,8 +108,8 @@ describe('Réglages › Consommation IA (ADR 0091)', () => {
             },
     });
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Noter une recharge' }));
-    const dialog = screen.getByRole('dialog', { name: 'Noter une recharge' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Mettre à jour les crédits' }));
+    const dialog = screen.getByRole('dialog', { name: 'Mettre à jour les crédits' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
     expect(within(dialog).getByText('Un montant comme 25 ou 25,50, sans signe.')).toBeTruthy();
     expect(posted).toHaveLength(0);
@@ -146,8 +146,8 @@ describe('Réglages › Consommation IA (ADR 0091)', () => {
       }),
     });
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Noter une recharge' }));
-    const dialog = screen.getByRole('dialog', { name: 'Noter une recharge' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Mettre à jour les crédits' }));
+    const dialog = screen.getByRole('dialog', { name: 'Mettre à jour les crédits' });
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Payé par l’abonnement' }));
     expect(within(dialog).queryByLabelText('Montant rechargé')).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));

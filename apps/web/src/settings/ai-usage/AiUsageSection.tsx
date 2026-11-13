@@ -1,4 +1,4 @@
-import type { AiCredits, AiUsage } from '@impera/contracts';
+import type { AiCreditProvider, AiCredits, AiUsage } from '@impera/contracts';
 import { niceTicks, placeSegmentThumb } from '@impera/design-system';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
@@ -11,6 +11,7 @@ import {
   countText,
   CREDIT_BADGE,
   CREDIT_TONE,
+  CONSOLE_URL,
   creditText,
   dayColumns,
   eurText,
@@ -129,17 +130,31 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
 }
 
 /** The card's small print: the pace and what was spent since the line it counts from. */
-function creditDetail(card: AiCredits): string {
+function creditDetail(card: AiCredits, usdPerEur: number): string {
   const spent = creditText(card.spentSinceMinor, card.currency);
-  if (card.mode === 'subscription')
-    return `${spent} de valeur consommée depuis le passage à l’abonnement, à titre indicatif · quota visible dans ${USAGE_HINT[card.provider]}`;
+  if (card.mode === 'subscription') {
+    // In euros, as the rest of the screen: the subscription bills nothing per call.
+    const eur = card.spentSinceMinor / 100 / (card.currency === 'USD' ? usdPerEur : 1);
+    return `${eurText(eur)} de valeur consommée depuis le passage à l’abonnement, à titre indicatif · quota visible dans ${USAGE_HINT[card.provider]}`;
+  }
   return card.perDayMinor === null || card.perDayMinor === 0
     ? `${spent} dépensés depuis la dernière saisie`
     : `${creditText(card.perDayMinor, card.currency)} par jour en moyenne · ${spent} dépensés depuis la dernière saisie`;
 }
 
 /** One provider's credits: what is left, how long it lasts, until when, and the lines it is counted from. */
-function CreditCard({ card, index }: { card: AiCredits; index: number }): JSX.Element {
+function CreditCard({
+  card,
+  index,
+  usdPerEur,
+  onTopUp,
+}: {
+  card: AiCredits;
+  index: number;
+  usdPerEur: number;
+  onTopUp: (provider: AiCreditProvider) => void;
+}): JSX.Element {
+  const refused = card.mode === 'credits' && card.quotaRefusedAt !== null;
   const tone = CREDIT_TONE[card.state];
   const [open, setOpen] = useState(false);
   return (
@@ -158,17 +173,47 @@ function CreditCard({ card, index }: { card: AiCredits; index: number }): JSX.El
           <span className="cia-credit__unit">restants</span>
         </p>
       )}
-      <div className="cia-runway" aria-hidden="true">
-        <span className="cia-runway__fill" style={{ '--_w': `${String(runwayShare(card))}%` }} />
-      </div>
-      <p className="cia-credit__runway">{runwayText(card)}</p>
+      {/* No quota is known on a subscription: no gauge, it would read « 100 % » or « 0 % » for nothing. */}
+      {card.mode === 'subscription' ? null : (
+        <div className="cia-runway" aria-hidden="true">
+          <span className="cia-runway__fill" style={{ '--_w': `${String(runwayShare(card))}%` }} />
+        </div>
+      )}
+      <p
+        className={
+          card.mode === 'subscription' ? 'cia-credit__runway cia-credit__runway--plain' : 'cia-credit__runway'
+        }
+      >
+        {runwayText(card)}
+      </p>
       {card.mode === 'credits' && card.quotaRefusedAt !== null ? (
         <p className="cia-credit__runway cia-credit__refused">
           Le service refuse les appels faute de crédits depuis {refusedText(card.quotaRefusedAt)} : l’agent
           répond avec son modèle de repli.
         </p>
       ) : null}
-      <p className="cia-credit__detail">{creditDetail(card)}</p>
+      <p className="cia-credit__detail">{creditDetail(card, usdPerEur)}</p>
+      {refused ? (
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm cia-credit__act"
+          onClick={() => {
+            onTopUp(card.provider);
+          }}
+        >
+          J’ai rechargé
+        </button>
+      ) : null}
+      {card.state === 'quota_reached' ? (
+        <a
+          className="nv-btn nv-btn--soft nv-btn--sm cia-credit__act"
+          href={CONSOLE_URL[card.provider]}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Ouvrir la console
+        </a>
+      ) : null}
       <button
         type="button"
         className="nv-btn nv-btn--plain nv-btn--sm cia-credit__more"
@@ -184,7 +229,13 @@ function CreditCard({ card, index }: { card: AiCredits; index: number }): JSX.El
   );
 }
 
-function Credits({ usage, onAdd }: { usage: AiUsage; onAdd: () => void }): JSX.Element {
+function Credits({
+  usage,
+  onAdd,
+}: {
+  usage: AiUsage;
+  onAdd: (provider?: AiCreditProvider) => void;
+}): JSX.Element {
   if (usage.credits.length === 0) {
     return (
       <div className="nv-plate cia-none nv-enter">
@@ -193,8 +244,14 @@ function Credits({ usage, onAdd }: { usage: AiUsage; onAdd: () => void }): JSX.E
           service : le CRM décompte ensuite chaque appel et te dit quand recharger. Un service payé par ton
           abonnement se note aussi ici, sans montant.
         </p>
-        <button type="button" className="nv-btn nv-btn--soft" onClick={onAdd}>
-          Noter une recharge
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft"
+          onClick={() => {
+            onAdd();
+          }}
+        >
+          Mettre à jour les crédits
         </button>
       </div>
     );
@@ -202,7 +259,13 @@ function Credits({ usage, onAdd }: { usage: AiUsage; onAdd: () => void }): JSX.E
   return (
     <div className="cia-credits">
       {usage.credits.map((card, i) => (
-        <CreditCard key={card.provider} card={card} index={i + 1} />
+        <CreditCard
+          key={card.provider}
+          card={card}
+          index={i + 1}
+          usdPerEur={usage.usdPerEur}
+          onTopUp={onAdd}
+        />
       ))}
     </div>
   );
@@ -515,7 +578,8 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
   const query = useAiUsage();
   const tip = useFloatingTip();
   const [span, setSpan] = useState<Span>('days');
-  const [adding, setAdding] = useState(false);
+  // The dialog, open for a service (« J’ai rechargé » on its card) or for whichever; null when closed.
+  const [adding, setAdding] = useState<{ readonly provider?: AiCreditProvider } | null>(null);
 
   if (query.data === undefined) {
     return (
@@ -536,8 +600,8 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
     );
   }
   const usage = query.data;
-  const open = (): void => {
-    setAdding(true);
+  const open = (provider?: AiCreditProvider): void => {
+    setAdding(provider === undefined ? {} : { provider });
   };
   return (
     <div className="ins-body cia-body">
@@ -555,8 +619,14 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
         index={2}
         control={
           usage.credits.length === 0 ? undefined : (
-            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={open}>
-              Noter une recharge
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              onClick={() => {
+                open();
+              }}
+            >
+              Mettre à jour les crédits
             </button>
           )
         }
@@ -592,13 +662,14 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
         les services facturent en dollars. Les vocaux ElevenLabs ne sont pas comptés ici.
       </p>
       {tip.element}
-      {adding ? (
+      {adding === null ? null : (
         <CreditDialog
+          {...(adding.provider !== undefined && { provider: adding.provider })}
           onClose={() => {
-            setAdding(false);
+            setAdding(null);
           }}
         />
-      ) : null}
+      )}
     </div>
   );
 }

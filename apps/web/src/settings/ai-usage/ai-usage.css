@@ -247,14 +247,22 @@
 .cia-credit[data-tone='bad'] .cia-credit__runway {
   color: var(--nv-danger);
 }
+/* On a subscription the sentence explains, it does not alarm: the badge and the headline carry the red. */
+.cia-credit[data-tone] .cia-credit__runway--plain {
+  font-weight: 400;
+  color: var(--nv-ink);
+}
+.cia-credit__act {
+  align-self: flex-start;
+}
 /* A credits card whose provider refuses for lack of credits: an urgency, whatever the count says. */
 .cia-credit__refused {
   color: var(--nv-danger);
 }
 .cia-credit__detail {
   margin: 0;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-faint);
   font-variant-numeric: tabular-nums;
 }
