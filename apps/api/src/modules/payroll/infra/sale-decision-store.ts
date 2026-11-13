@@ -3,7 +3,9 @@ import {
   nextPayPeriod,
   payPeriodLastDay,
   PaySaleDecisionSchema,
+  PayPeriodSchema,
   PlatformSchema,
+  SALE_WHOLE_BP,
   SaleEventSchema,
   SaleSignalKindSchema,
   TeamMemberIdSchema,
@@ -16,6 +18,7 @@ import {
   and,
   enterCreator,
   eq,
+  inArray,
   lockPayrollClose,
   schema,
   sql,
@@ -26,13 +29,16 @@ import {
 import { z } from 'zod';
 
 import { PayrollForbidden } from '../../contractors/pure';
+import { finalFor } from '../domain/departure';
 import {
   PayEntryConflict,
   PaySaleNotFound,
   PaySaleOutcomeConflict,
+  PaySaleRecipientConflict,
   PayrollOwnForbidden,
 } from '../domain/errors';
 import type { PayrollSaleDecisionStore } from '../domain/ports';
+import type { MemberForPay } from '../domain/recalculation';
 import {
   saleKeyOf,
   salesToDecide,
@@ -48,7 +54,7 @@ import { readPeriodSales, type PeriodSales } from './sales-reads';
 import { closingsSpan, type PayInputReads } from './snapshot';
 import { audit } from './writes';
 
-const { payPeriodClosings, paySaleDecisions, paySaleSignals, teamMembers } = schema;
+const { commissionStatements, payPeriodClosings, paySaleDecisions, paySaleSignals, teamMembers } = schema;
 
 const decisionOfRow = (row: typeof paySaleDecisions.$inferSelect): PaySaleDecision =>
   PaySaleDecisionSchema.parse({
@@ -60,18 +66,23 @@ const decisionOfRow = (row: typeof paySaleDecisions.$inferSelect): PaySaleDecisi
     outcome: row.outcome,
     reason: row.reason,
     memberId: row.authorMemberId,
+    recipientMemberId: row.recipientMemberId,
+    shareBp: row.shareBp,
+    excludeReason: row.excludeReason,
     note: row.note,
     decidedBy: row.decidedBy,
     createdAt: row.createdAt.toISOString(),
   });
 
 /**
- * A line to decide as the owner and an active manager read it, with the decision in force and what may be decided, and
- * the day its member left (`leftOn`, by member).
+ * A line to decide as the owner and an active manager read it, with the decision in force and what may be decided, the
+ * day its member left (`leftOn`, by member), and the members a give may name, less those the reader may not (`barred`:
+ * the reader, the members gone with a validated final statement).
  */
 const heldSaleOf = (
   one: SaleToDecide,
   leftOn: ReadonlyMap<TeamMemberId, string | null>,
+  barred: ReadonlySet<TeamMemberId>,
 ): HeldSales['sales'][number] => ({
   platform: one.line.platform,
   platformSaleId: one.line.platformSaleId,
@@ -87,8 +98,14 @@ const heldSaleOf = (
   memberLeftOn: one.line.author.kind === 'member' ? (leftOn.get(one.line.author.memberId) ?? null) : null,
   platformChatterId: one.line.platformChatterId,
   reason: one.reason,
-  decision: one.decision,
+  decision: one.decision?.outcome ?? null,
+  given:
+    one.decision?.outcome === 'give' && one.decision.memberId !== null && one.decision.note !== null
+      ? { recipientMemberId: one.decision.memberId, shareBp: one.decision.shareBp, note: one.decision.note }
+      : null,
+  excludeReason: one.decision?.outcome === 'exclude' ? one.decision.excludeReason : null,
   outcomes: [...one.outcomes],
+  recipients: one.recipients.filter((member) => !barred.has(member)),
   signal:
     one.signal === null
       ? null
@@ -185,6 +202,42 @@ async function periodSalesOf(
   };
 }
 
+/**
+ * Among `members`, those who left and whose final statement is validated or paid (ADR 0072): a sale is never given to
+ * them (ADR 0101 § 4), as a sale of theirs after it waits.
+ */
+async function goneForGood(tx: Transaction, members: readonly MemberForPay[]): Promise<Set<TeamMemberId>> {
+  const leftOn = new Map(members.filter((one) => one.leftOn !== null).map((one) => [one.id, one.leftOn]));
+  if (leftOn.size === 0) return new Set();
+  const rows = await tx
+    .select({ memberId: commissionStatements.memberId, period: commissionStatements.period })
+    .from(commissionStatements)
+    .where(
+      and(
+        inArray(commissionStatements.memberId, [...leftOn.keys()]),
+        inArray(commissionStatements.status, ['validated', 'paid']),
+      ),
+    );
+  const gone = new Set<TeamMemberId>();
+  for (const row of rows) {
+    const memberId = TeamMemberIdSchema.parse(row.memberId);
+    if (finalFor(leftOn.get(memberId) ?? null, PayPeriodSchema.parse(row.period))) gone.add(memberId);
+  }
+  return gone;
+}
+
+/** Who a give may not name, whatever the shifts say: the reader, and the members gone for good (`goneForGood`). */
+async function barredOf(
+  tx: Transaction,
+  reads: PayInputReads,
+  period: PayPeriod,
+  own: TeamMemberId | null,
+): Promise<Set<TeamMemberId>> {
+  const barred = await goneForGood(tx, await reads.members(tx, payPeriodLastDay(period)));
+  if (own !== null) barred.add(own);
+  return barred;
+}
+
 /** The signed-in account's member, `null` for the owner outside the team. */
 export async function ownMemberOf(tx: Transaction, userId: string): Promise<TeamMemberId | null> {
   const [own] = await tx
@@ -208,9 +261,10 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
         const signals = place.closed ? new Map() : await signalsIn(tx, period);
         const members = await reads.members(tx, payPeriodLastDay(period));
         const leftOn = new Map(members.map((member) => [member.id, member.leftOn]));
+        const barred = await barredOf(tx, reads, period, await ownMemberOf(tx, userId));
         return HeldSalesSchema.parse({
           period,
-          sales: salesToDecide(sales, place, signals).map((one) => heldSaleOf(one, leftOn)),
+          sales: salesToDecide(sales, place, signals).map((one) => heldSaleOf(one, leftOn, barred)),
         });
       }),
 
@@ -225,7 +279,10 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
             sent.platform === body.platform &&
             sent.platformSaleId === body.platformSaleId &&
             sent.outcome === body.outcome &&
-            sent.note === body.note;
+            sent.note === body.note &&
+            sent.recipientMemberId === body.recipientMemberId &&
+            sent.shareBp === body.shareBp &&
+            sent.excludeReason === body.excludeReason;
           if (!same) throw new PayEntryConflict('pay_sale_decision_conflict');
           return { value: decisionOfRow(sent), created: false };
         }
@@ -234,10 +291,24 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
         const target = saleToDecide(sales, place, body);
         if (target === null) throw new PaySaleNotFound();
         if (!target.outcomes.includes(body.outcome)) throw new PaySaleOutcomeConflict(target.outcomes);
-        const { author } = target.line;
+        const { line } = target;
+        const { author } = line;
         const authorMemberId = author.kind === 'member' ? author.memberId : null;
-        if (authorMemberId !== null && authorMemberId === (await ownMemberOf(tx, actor.userId))) {
+        const own = await ownMemberOf(tx, actor.userId);
+        if (own !== null && (own === authorMemberId || own === body.recipientMemberId)) {
           throw new PayrollOwnForbidden();
+        }
+        if (body.outcome === 'give') {
+          const barred = await barredOf(tx, reads, body.period, own);
+          const shared = (body.shareBp ?? SALE_WHOLE_BP) < SALE_WHOLE_BP;
+          if (
+            body.recipientMemberId === null ||
+            !target.recipients.includes(body.recipientMemberId) ||
+            barred.has(body.recipientMemberId) ||
+            (shared && author.kind !== 'member')
+          ) {
+            throw new PaySaleRecipientConflict();
+          }
         }
         const creatorId = creatorOfAccount.get(target.line.platformAccountId);
         if (creatorId === undefined) throw new Error('A sale to decide was not read in a creator');
@@ -263,7 +334,16 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
             outcome: body.outcome,
             reason: target.reason,
             authorMemberId,
-            linkVersion: author.kind === 'member' ? author.linkVersion : null,
+            linkVersion: author.kind === 'member' || author.kind === 'agent' ? author.linkVersion : null,
+            recipientMemberId: body.recipientMemberId,
+            shareBp: body.shareBp,
+            excludeReason: body.excludeReason,
+            // A give keeps its sale as the register has it, for its author to read (the trigger checks it).
+            ...(body.outcome === 'give' && {
+              saleCurrency: line.currency,
+              saleNetMinor: line.netMinor,
+              saleOccurredAt: line.occurredAt,
+            }),
             note: body.note,
             decidedBy: actor.userId,
           })
@@ -274,7 +354,16 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
           actor,
           'pay_sale_decision.create',
           { kind: 'pay_sale_decision', id: row.id },
-          { period: body.period, outcome: body.outcome, revision: row.revision },
+          {
+            period: body.period,
+            outcome: body.outcome,
+            revision: row.revision,
+            ...(body.outcome === 'give' && {
+              recipientMemberId: body.recipientMemberId,
+              shareBp: body.shareBp,
+            }),
+            ...(body.outcome === 'exclude' && { excludeReason: body.excludeReason }),
+          },
         );
         await enqueuePayRecalculation(tx, body.period);
         return { value: decisionOfRow(row), created: true };

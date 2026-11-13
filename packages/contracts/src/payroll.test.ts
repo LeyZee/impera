@@ -14,6 +14,7 @@ import {
   CreateBonusTierSetBodySchema,
   CreateCollectiveGoalBodySchema,
   CreatePayAdjustmentBodySchema,
+  CreatePaySaleDecisionBodySchema,
   CreatePaySaleSignalBodySchema,
   CreatePenaltyBodySchema,
   ExchangeRateSchema,
@@ -504,6 +505,7 @@ describe('a member’s signal on a sale (CRM-03 lot b4c)', () => {
           lateFrom: null,
           state: 'signalled',
           signal: { note: null, signalledAt: '2026-11-02T09:00:00.000Z' },
+          given: null,
           open: true,
         },
       ],
@@ -511,5 +513,42 @@ describe('a member’s signal on a sale (CRM-03 lot b4c)', () => {
       days: [{ day: null, sales: 0, refunds: 1, nets: [{ currency: 'EUR', netMinor: -4_200 }] }],
     });
     expect(page.items[0]?.state).toBe('signalled');
+  });
+
+  it('names a give’s recipient, its share by steps of 10 % and why, and an exclusion’s reason (ADR 0101)', () => {
+    const body = {
+      id: '0199f2a0-0000-7000-8000-0000000000d1',
+      period: '2026-11-01',
+      platform: 'reveal',
+      platformSaleId: 'vente-1',
+    };
+    const recipientMemberId = '0199f2a0-0000-7000-8000-0000000000b2';
+    const ok = (values: object): boolean =>
+      CreatePaySaleDecisionBodySchema.safeParse({ ...body, ...values }).success;
+    expect(CreatePaySaleDecisionBodySchema.parse({ ...body, outcome: 'count', note: null })).toMatchObject({
+      recipientMemberId: null,
+      shareBp: null,
+      excludeReason: null,
+    });
+    expect(ok({ outcome: 'give', note: 'Elle a convaincu le fan', recipientMemberId, shareBp: 6_000 })).toBe(
+      true,
+    );
+    expect(ok({ outcome: 'give', note: 'Elle a convaincu le fan', recipientMemberId, shareBp: 10_000 })).toBe(
+      true,
+    );
+    // A share by steps of 10 %, a give with its recipient and its note, a recipient for a give alone.
+    expect(ok({ outcome: 'give', note: 'Elle a convaincu le fan', recipientMemberId, shareBp: 6_500 })).toBe(
+      false,
+    );
+    expect(ok({ outcome: 'give', note: 'Elle a convaincu le fan', recipientMemberId, shareBp: 0 })).toBe(
+      false,
+    );
+    expect(ok({ outcome: 'give', note: null, recipientMemberId, shareBp: 10_000 })).toBe(false);
+    expect(ok({ outcome: 'give', note: 'Elle a convaincu le fan', shareBp: 10_000 })).toBe(false);
+    expect(ok({ outcome: 'count', note: null, recipientMemberId })).toBe(false);
+    // An exclusion says its reason, and only an exclusion.
+    expect(ok({ outcome: 'exclude', note: null, excludeReason: 'agent_decisive' })).toBe(true);
+    expect(ok({ outcome: 'exclude', note: null })).toBe(false);
+    expect(ok({ outcome: 'withdraw', note: null, excludeReason: 'other' })).toBe(false);
   });
 });

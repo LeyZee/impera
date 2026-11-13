@@ -35,6 +35,7 @@ const mineOf = (patch: Partial<MySale> = {}): MySale =>
     lateFrom: null,
     state: 'counted',
     signal: null,
+    given: null,
     open: true,
     ...patch,
   });
@@ -50,7 +51,7 @@ describe('my sales read (CRM-03 lot b4c)', () => {
   });
 
   it('says where each line stands, amber only while a signal waits on an open period', () => {
-    const states = ['counted', 'signalled', 'excluded', 'removed'].map((state) =>
+    const states = ['counted', 'signalled', 'excluded', 'removed', 'given'].map((state) =>
       MySaleSchema.shape.state.parse(state),
     );
     expect(states.map((state) => mySaleStateText({ state, event: 'sale' }))).toEqual([
@@ -58,12 +59,14 @@ describe('my sales read (CRM-03 lot b4c)', () => {
       'Signalée',
       'Écartée',
       'Retirée du relevé',
+      'Donnée',
     ]);
     expect(states.map((state) => mySaleStateText({ state, event: 'refund' }))).toEqual([
       'Compté',
       'Signalé',
       'Écarté',
       'Retiré du relevé',
+      'Sa vente est donnée',
     ]);
     const signal = { note: 'Vendue pendant le shift de Lou', signalledAt: '2026-10-29T08:00:00.000Z' };
     expect(mySaleWaits(mineOf({ state: 'signalled', signal }))).toBe(true);
@@ -83,6 +86,9 @@ describe('my sales read (CRM-03 lot b4c)', () => {
     );
     expect(mySaleNote(mineOf({ state: 'removed', signal, open: false }), false)).toBe(
       'Tu l’avais signalée : elle n’est plus sur ton relevé.',
+    );
+    expect(mySaleNote(mineOf({ state: 'given' }), false)).toBe(
+      'Un valideur l’a donnée à un autre membre, décisif sur cette vente : elle ne compte pas pour toi.',
     );
     expect(plain(mySignalNote(mineOf({ state: 'signalled', signal })))).toBe(
       '« Vendue pendant le shift de Lou »',
@@ -107,6 +113,10 @@ describe('my sales read (CRM-03 lot b4c)', () => {
     );
     expect(mySaleNote(refund({ state: 'removed', signal, open: false }), false)).toBe(
       'Tu l’avais signalé : il n’est plus sur ton relevé.',
+    );
+    // ADR 0101: its sale given to another member, the refund follows it.
+    expect(mySaleNote(refund({ state: 'given' }), false)).toBe(
+      'Un valideur a donné sa vente à un autre membre : il ne se déduit pas de tes ventes.',
     );
     expect(signalLabel('signal', 'refund')).toBe('Ce remboursement n’est pas à moi');
     expect(signalLabel('withdraw', 'refund')).toBe('Retirer le signalement');

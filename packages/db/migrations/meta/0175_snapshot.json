@@ -1,5 +1,5 @@
 {
-  "id": "054d2f43-624b-4774-b572-897d984e57b4",
+  "id": "5700c780-f21a-4580-8c84-6bc0d40e2578",
   "prevId": "311fd68f-823b-437c-93c8-0c8aee2ab279",
   "version": "7",
   "dialect": "postgresql",
@@ -6802,81 +6802,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.ai_budget_settings": {
-      "name": "ai_budget_settings",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "daily_cap_minor": {
-          "name": "daily_cap_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "trend_watch_cap_minor": {
-          "name": "trend_watch_cap_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "ai_budget_settings_updated_by_user_id_fk": {
-          "name": "ai_budget_settings_updated_by_user_id_fk",
-          "tableFrom": "ai_budget_settings",
-          "tableTo": "user",
-          "columnsFrom": ["updated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "agency_only": {
-          "name": "agency_only",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "ai_budget_settings_single_row_check": {
-          "name": "ai_budget_settings_single_row_check",
-          "value": "\"ai_budget_settings\".\"id\" = 1"
-        },
-        "ai_budget_settings_daily_cap_check": {
-          "name": "ai_budget_settings_daily_cap_check",
-          "value": "\"ai_budget_settings\".\"daily_cap_minor\" is null or \"ai_budget_settings\".\"daily_cap_minor\" between 100 and 20000"
-        },
-        "ai_budget_settings_trend_watch_cap_check": {
-          "name": "ai_budget_settings_trend_watch_cap_check",
-          "value": "\"ai_budget_settings\".\"trend_watch_cap_minor\" is null or \"ai_budget_settings\".\"trend_watch_cap_minor\" between 10 and 2000"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.ai_credit_entries": {
       "name": "ai_credit_entries",
       "schema": "",
@@ -10447,6 +10372,19 @@
           "primaryKey": false,
           "notNull": true
         },
+        "share_bp": {
+          "name": "share_bp",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 10000
+        },
+        "share_role": {
+          "name": "share_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -10510,7 +10448,7 @@
       "compositePrimaryKeys": {
         "pay_period_sales_pkey": {
           "name": "pay_period_sales_pkey",
-          "columns": ["platform", "platform_sale_id", "event"]
+          "columns": ["platform", "platform_sale_id", "event", "member_id"]
         }
       },
       "uniqueConstraints": {},
@@ -10543,6 +10481,10 @@
           "name": "pay_period_sales_currency_check",
           "value": "\"pay_period_sales\".\"currency\" in ('EUR', 'USD')"
         },
+        "pay_period_sales_share_role_check": {
+          "name": "pay_period_sales_share_role_check",
+          "value": "\"pay_period_sales\".\"share_role\" in ('author', 'recipient')"
+        },
         "pay_period_sales_sale_period_check": {
           "name": "pay_period_sales_sale_period_check",
           "value": "extract(day from \"pay_period_sales\".\"sale_period\") in (1, 16)"
@@ -10550,6 +10492,10 @@
         "pay_period_sales_net_check": {
           "name": "pay_period_sales_net_check",
           "value": "\"pay_period_sales\".\"sale_period\" <= \"pay_period_sales\".\"period\" and ((\"pay_period_sales\".\"event\" = 'sale' and \"pay_period_sales\".\"net_minor\" >= 0) or (\"pay_period_sales\".\"event\" = 'refund' and \"pay_period_sales\".\"net_minor\" <= 0))"
+        },
+        "pay_period_sales_share_check": {
+          "name": "pay_period_sales_share_check",
+          "value": "(\"pay_period_sales\".\"share_role\" is null and \"pay_period_sales\".\"share_bp\" = 10000) or (\"pay_period_sales\".\"share_role\" is not null and \"pay_period_sales\".\"share_bp\" between 1 and 9999)"
         }
       },
       "isRLSEnabled": false
@@ -10673,6 +10619,42 @@
           "primaryKey": false,
           "notNull": false
         },
+        "recipient_member_id": {
+          "name": "recipient_member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "share_bp": {
+          "name": "share_bp",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exclude_reason": {
+          "name": "exclude_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sale_currency": {
+          "name": "sale_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sale_net_minor": {
+          "name": "sale_net_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sale_occurred_at": {
+          "name": "sale_occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "note": {
           "name": "note",
           "type": "text",
@@ -10713,6 +10695,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "pay_sale_decisions_recipient_member_id_team_members_id_fk": {
+          "name": "pay_sale_decisions_recipient_member_id_team_members_id_fk",
+          "tableFrom": "pay_sale_decisions",
+          "tableTo": "team_members",
+          "columnsFrom": ["recipient_member_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "pay_sale_decisions_decided_by_user_id_fk": {
           "name": "pay_sale_decisions_decided_by_user_id_fk",
           "tableFrom": "pay_sale_decisions",
@@ -10737,14 +10728,14 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or (\"pay_sale_decisions\".\"author_member_id\" is not null and exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"author_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or (\"pay_sale_decisions\".\"author_member_id\" is not null and exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"author_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))) or (\"pay_sale_decisions\".\"recipient_member_id\" is not null and exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"recipient_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
         },
         "agency_insert": {
           "name": "agency_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"pay_sale_decisions\".\"decided_by\" = nullif(current_setting('app.user_id', true), '') and (\"pay_sale_decisions\".\"author_member_id\" is null or not exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"author_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"pay_sale_decisions\".\"decided_by\" = nullif(current_setting('app.user_id', true), '') and (\"pay_sale_decisions\".\"author_member_id\" is null or not exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"author_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))) and (\"pay_sale_decisions\".\"recipient_member_id\" is null or not exists (select 1 from team_members m where m.id = \"pay_sale_decisions\".\"recipient_member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
         }
       },
       "checkConstraints": {
@@ -10754,7 +10745,7 @@
         },
         "pay_sale_decisions_outcome_check": {
           "name": "pay_sale_decisions_outcome_check",
-          "value": "\"pay_sale_decisions\".\"outcome\" in ('count', 'exclude', 'withdraw')"
+          "value": "\"pay_sale_decisions\".\"outcome\" in ('count', 'exclude', 'give', 'withdraw')"
         },
         "pay_sale_decisions_reason_check": {
           "name": "pay_sale_decisions_reason_check",
@@ -10774,7 +10765,27 @@
         },
         "pay_sale_decisions_link_check": {
           "name": "pay_sale_decisions_link_check",
-          "value": "(\"pay_sale_decisions\".\"author_member_id\" is null) = (\"pay_sale_decisions\".\"link_version\" is null)"
+          "value": "\"pay_sale_decisions\".\"author_member_id\" is null or \"pay_sale_decisions\".\"link_version\" is not null"
+        },
+        "pay_sale_decisions_exclude_reason_check": {
+          "name": "pay_sale_decisions_exclude_reason_check",
+          "value": "\"pay_sale_decisions\".\"exclude_reason\" in ('agent_decisive', 'other')"
+        },
+        "pay_sale_decisions_sale_currency_check": {
+          "name": "pay_sale_decisions_sale_currency_check",
+          "value": "\"pay_sale_decisions\".\"sale_currency\" in ('EUR', 'USD')"
+        },
+        "pay_sale_decisions_give_check": {
+          "name": "pay_sale_decisions_give_check",
+          "value": "(\"pay_sale_decisions\".\"outcome\" = 'give') = (\"pay_sale_decisions\".\"recipient_member_id\" is not null) and (\"pay_sale_decisions\".\"outcome\" = 'give') = (\"pay_sale_decisions\".\"share_bp\" is not null) and (\"pay_sale_decisions\".\"outcome\" <> 'give' or (\"pay_sale_decisions\".\"note\" is not null and \"pay_sale_decisions\".\"link_version\" is not null and \"pay_sale_decisions\".\"sale_currency\" is not null and \"pay_sale_decisions\".\"sale_net_minor\" >= 0 and \"pay_sale_decisions\".\"sale_occurred_at\" is not null and \"pay_sale_decisions\".\"recipient_member_id\" is distinct from \"pay_sale_decisions\".\"author_member_id\" and \"pay_sale_decisions\".\"share_bp\" between 1000 and 10000 and \"pay_sale_decisions\".\"share_bp\" % 1000 = 0 and (\"pay_sale_decisions\".\"share_bp\" = 10000 or \"pay_sale_decisions\".\"author_member_id\" is not null)))"
+        },
+        "pay_sale_decisions_sale_check": {
+          "name": "pay_sale_decisions_sale_check",
+          "value": "(\"pay_sale_decisions\".\"outcome\" = 'give') = (\"pay_sale_decisions\".\"sale_currency\" is not null) and (\"pay_sale_decisions\".\"sale_currency\" is null) = (\"pay_sale_decisions\".\"sale_net_minor\" is null) and (\"pay_sale_decisions\".\"sale_currency\" is null) = (\"pay_sale_decisions\".\"sale_occurred_at\" is null)"
+        },
+        "pay_sale_decisions_exclude_outcome_check": {
+          "name": "pay_sale_decisions_exclude_outcome_check",
+          "value": "\"pay_sale_decisions\".\"exclude_reason\" is null or \"pay_sale_decisions\".\"outcome\" = 'exclude'"
         }
       },
       "isRLSEnabled": false

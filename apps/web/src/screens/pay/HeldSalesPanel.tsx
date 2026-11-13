@@ -23,6 +23,7 @@ import {
   lineChatter,
   outcomeLabel,
   outcomeWords,
+  outcomesShown,
   ownLineText,
   saleAmount,
   saleWhen,
@@ -48,7 +49,11 @@ const NOTE_MAX = 500;
 const TEAM_NAMES_STALE_MS = 10 * 60_000;
 
 /** A refusal that says the list moved under the reader: it is read again. */
-const MOVED: ReadonlySet<string> = new Set(['pay_sale_not_found', 'pay_sale_outcome_conflict']);
+const MOVED: ReadonlySet<string> = new Set([
+  'pay_sale_not_found',
+  'pay_sale_outcome_conflict',
+  'pay_sale_recipient_conflict',
+]);
 
 /**
  * Paie › Quinzaine, for the owner and an active manager (CRM-03 lot b4b, ADR 0050 §§ 3, 5, 7): the sales read on the
@@ -171,9 +176,9 @@ export function HeldSalesPanel({
                 {signalled === null ? null : <p className="py-held__reason">{signalled}</p>}
                 {member?.own === true ? (
                   <p className="py-held__own">{ownLineText(sale)}</p>
-                ) : sale.outcomes.length === 0 ? null : (
+                ) : outcomesShown(sale.outcomes).length === 0 ? null : (
                   <div className="py-held__acts">
-                    {sale.outcomes.map((outcome) => (
+                    {outcomesShown(sale.outcomes).map((outcome) => (
                       <button
                         key={outcome}
                         type="button"
@@ -257,6 +262,10 @@ function DecideDialog({
       platformSaleId: sale.platformSaleId,
       outcome,
       note: trimmed === '' ? null : trimmed,
+      recipientMemberId: null,
+      shareBp: null,
+      // ADR 0101 § 8: « l'IA a été décisive » comes with its choice on the screen of the second part.
+      excludeReason: outcome === 'exclude' ? 'other' : null,
     });
     setBusy(false);
     if (outcomeSent.kind === 'ok') {

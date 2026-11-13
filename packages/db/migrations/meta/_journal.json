@@ -950,8 +950,15 @@
     {
       "idx": 135,
       "version": "7",
-      "when": 1794590604687,
-      "tag": "0174_ai_budget_settings",
+      "when": 1794586140346,
+      "tag": "0175_sale_give",
+      "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1794595544952,
+      "tag": "0183_ai_budget_settings",
       "breakpoints": true
     }
   ]
