@@ -143,4 +143,21 @@ describe('TrophyCaseView', () => {
     expect(screen.queryByRole('button', { name: 'Revoir' })).toBeNull();
     expect(screen.getByText(/Comment gagner Record du jour/)).toBeDefined();
   });
+
+  it('writes the role’s note under an object earned more than once', () => {
+    render(
+      <TrophyCaseView
+        trophyCase={CASE}
+        entry={(item) => {
+          const one = entry(item);
+          return one && item.kind === 'streak_5'
+            ? { ...one, earnedNote: '3 fois · dernière le 9 nov.' }
+            : one;
+        }}
+        chips={[]}
+        sound={false}
+      />,
+    );
+    expect(screen.getByText('3 fois · dernière le 9 nov.')).toBeDefined();
+  });
 });

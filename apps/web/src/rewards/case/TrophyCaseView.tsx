@@ -24,6 +24,8 @@ export interface TrophyCaseEntry {
   readonly how: string;
   /** What is left, short (« Encore 1 shift », « 2 sur 3 »); the shelf's title already says the unit. */
   readonly left?: string;
+  /** What replaces « Gagné le … » under an earned object (« 3 fois · dernière le 9 nov. »). */
+  readonly earnedNote?: string;
   /** The object at a size in pixels, earned or a silhouette. */
   readonly art: (size: number, earned: boolean) => ReactNode;
   /** Its reveal's words (ADR 0104 § 12, 0107 § 11). */
@@ -112,6 +114,8 @@ function Cell({
   const percent = percentOf(item.progress, earned);
   let foot: ReactNode;
   if (fresh) foot = <b className="tc-new">Nouveau</b>;
+  else if (earned && entry.earnedNote !== undefined)
+    foot = <span className="tc-cell__sub">{entry.earnedNote}</span>;
   else if (earned)
     foot = (
       <span className="tc-cell__sub">
