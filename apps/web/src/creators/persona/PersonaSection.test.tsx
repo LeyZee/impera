@@ -85,20 +85,20 @@ const panel = (title: string): HTMLElement => {
 };
 
 describe('Créatrices › Persona, Desirali’s sheet (ADR 0079)', () => {
-  it('shows how complete she is out of 59, and opens the panel of a question still to answer', async () => {
+  it('shows how complete she is out of 61, and opens the panel of a question still to answer', async () => {
     await serve([500, {}]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     const gauge = await screen.findByRole('progressbar', { name: 'Complétude de la fiche' });
-    // The demo leaves her weight and her number of partners unanswered: 57 of 59.
-    expect(gauge.getAttribute('aria-valuenow')).toBe('97');
-    expect(gauge.getAttribute('aria-valuetext')).toBe('57 questions sur 59');
+    // The demo leaves her weight, her number of partners and the two voice-guide questions unanswered: 57 of 61.
+    expect(gauge.getAttribute('aria-valuenow')).toBe('93');
+    expect(gauge.getAttribute('aria-valuetext')).toBe('57 questions sur 61');
     const missing = screen.getByText(/^À compléter\s:$/u).parentElement;
     if (missing === null) throw new Error('the panels still to complete have a line');
     expect(
       within(missing)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Identité et informations de base (1)', 'Relations (1)']);
+    ).toEqual(['Identité et informations de base (1)', 'Style de conversation (2)', 'Relations (1)']);
 
     expect(panel('Relations').getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(tab('Réglages de l’agent'));
@@ -107,7 +107,7 @@ describe('Créatrices › Persona, Desirali’s sheet (ADR 0079)', () => {
     expect(panel('Relations').getAttribute('aria-expanded')).toBe('true');
 
     fireEvent.change(screen.getByLabelText('Passions'), { target: { value: '' } });
-    expect(gauge.getAttribute('aria-valuetext')).toBe('56 questions sur 59');
+    expect(gauge.getAttribute('aria-valuetext')).toBe('56 questions sur 61');
   });
 
   it('opens on her identity, the six other panels folded, the agent’s settings in their own tab', async () => {
