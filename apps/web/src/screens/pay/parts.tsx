@@ -188,6 +188,8 @@ export function PeriodArrows({
         type="button"
         className="sc-arrow"
         aria-label="Quinzaine précédente"
+
+        title="Quinzaine précédente"
         onClick={() => {
           onPeriod(previousPeriod(period));
         }}
@@ -200,6 +202,8 @@ export function PeriodArrows({
         type="button"
         className="sc-arrow"
         aria-label="Quinzaine suivante"
+
+        title="Quinzaine suivante"
         disabled={current !== null && period >= current}
         onClick={() => {
           onPeriod(followingPeriod(period));

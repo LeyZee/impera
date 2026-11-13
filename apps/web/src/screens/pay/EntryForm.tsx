@@ -16,6 +16,7 @@ import { useId, useState, type JSX } from 'react';
 
 import { useCurrentPeriod, useFirstOpenPeriod } from './data';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import {
   addAdjustment,
   addBonus,
@@ -192,6 +193,7 @@ export function EntryForm({
   const [amount, setAmount] = useState('');
   const [taking, setTaking] = useState(false);
   const [reason, setReason] = useState('');
+  const reasonArea = useGrowingArea(reason);
   const [touched, setTouched] = useState(false);
   const [checking, setChecking] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
@@ -468,8 +470,9 @@ export function EntryForm({
               Motif
             </label>
             <textarea
+              ref={reasonArea}
               id={`${id}-reason`}
-              className="nv-field__control nv-glass sc-note"
+              className="nv-field__control nv-glass sc-note grow-area"
               rows={2}
               maxLength={REASON_MAX}
               value={reason}

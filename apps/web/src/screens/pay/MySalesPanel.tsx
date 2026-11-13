@@ -11,6 +11,7 @@ import { useId, useState, type JSX } from 'react';
 import type { PayNames } from './data';
 import { Unreachable } from './parts';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { signalSale, useMySales, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import { payRefusalText } from '@/payroll/model';
 import {
@@ -263,6 +264,7 @@ function SignalDialog({
   const refresh = useRefreshPayroll();
   const [signalId] = useState(() => newId(PaySaleSignalIdSchema));
   const [note, setNote] = useState('');
+  const noteArea = useGrowingArea(note);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
   const words = signalWords(kind, sale.event);
@@ -312,8 +314,9 @@ function SignalDialog({
               Note (facultatif)
             </label>
             <textarea
+              ref={noteArea}
               id={`${id}-note`}
-              className="nv-field__control nv-glass sc-note"
+              className="nv-field__control nv-glass sc-note grow-area"
               rows={2}
               maxLength={NOTE_MAX}
               value={note}
