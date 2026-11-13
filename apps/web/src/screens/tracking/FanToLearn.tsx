@@ -2,7 +2,7 @@ import { KYC_SLOT_LABELS, type KycSlot } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { JSX } from 'react';
 
-import { FanKycRefused, fetchFanKyc } from './api';
+import { FanKycRefused, fanKycKey, fetchFanKyc } from './api';
 
 /** A fact the agent learns comes with one of his messages: read again now and then, like the reader. */
 const REFRESH_MS = 30_000;
@@ -29,7 +29,7 @@ export function useFanKyc(
   enabled: boolean,
 ): UseQueryResult<KycSlot[], unknown> {
   return useQuery({
-    queryKey: ['fan-kyc', creatorId, fanId],
+    queryKey: fanKycKey(creatorId, fanId),
     queryFn: () => fetchFanKyc(creatorId, fanId),
     enabled,
     retry: retryKyc,

@@ -63,6 +63,7 @@ import { installSandboxGuard, sandboxOf, sdkBaseUrlsOf } from './sandbox';
 import { createSecuritySettingsRoutes } from './security-settings';
 import { wireAccounting } from './wiring/accounting';
 import { wireAgent } from './wiring/agent';
+import { wireAiUsage } from './wiring/ai-usage';
 import { wireAlerts } from './wiring/alerts';
 import { wireBackups } from './wiring/backups';
 import { wireConnectors } from './wiring/connectors';
@@ -421,6 +422,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
   });
   const backups = wireBackups(shared);
+  const aiUsage = wireAiUsage(shared, llm);
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
     persona: persona.module,
@@ -472,6 +474,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...telegram.tasks,
     ...fans.tasks,
     ...backups.tasks,
+    ...aiUsage.tasks,
     ...scheduling.tasks,
     ...team.tasks,
     ...contractors.tasks,
@@ -556,6 +559,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...invoicing.routes,
       ...accounting.routes,
       ...backups.routes,
+      ...aiUsage.routes,
       ...providers.routes,
       ...connectors.routes,
       ...supervision.routes,

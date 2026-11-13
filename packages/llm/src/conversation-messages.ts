@@ -1,6 +1,13 @@
 import type { ModelMessage } from 'ai';
 
-import type { BrainAlert, BrainScript, ConversationTurn, TurnMedia, VoiceScriptStep } from './gateway-types';
+import type {
+  BrainAlert,
+  BrainScript,
+  ConversationTurn,
+  JudgeSituation,
+  TurnMedia,
+  VoiceScriptStep,
+} from './gateway-types';
 import type { Brief } from './schemas';
 import { wrapUntrusted } from './untrusted';
 
@@ -133,4 +140,22 @@ export function scriptsBlock(scripts: readonly BrainScript[], stepWaiting: boole
     .map((script) => `${script.id} :\n${wrapUntrusted('script_description', script.description)}`)
     .join('\n');
   return `${listed}\n${waiting}`;
+}
+
+/**
+ * The situation the agent saw, for the judge (evals only): one typed block, its fields as JSON, written by code. Angle
+ * brackets are escaped so nothing in it can close the block; absent, the judge is told it knows nothing of the moment.
+ */
+export function judgeSituationBlock(situation: JudgeSituation | undefined): string {
+  if (situation === undefined) return 'Pas d’information sur le moment : son âge n’est pas confirmé.';
+  const fields: JudgeSituation = {
+    description: situation.description,
+    relationshipHours: situation.relationshipHours,
+    ageConfirmed: situation.ageConfirmed,
+    lastOfferHoursAgo: situation.lastOfferHoursAgo,
+    hasNoBudget: situation.hasNoBudget,
+    flags: situation.flags,
+  };
+  const json = JSON.stringify(fields, null, 2).replaceAll('<', '\\u003c').replaceAll('>', '\\u003e');
+  return `<judge_situation>\n${json}\n</judge_situation>`;
 }

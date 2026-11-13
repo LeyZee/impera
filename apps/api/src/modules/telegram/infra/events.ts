@@ -42,6 +42,14 @@ const BudgetSchema = z.object({
   capMinor: z.number().int().min(0),
 });
 
+const CreditsLowSchema = z.object({
+  provider: z.enum(['xai', 'mistral', 'google']),
+  level: z.enum(['low', 'critical', 'empty']),
+  balanceMinor: z.number().int(),
+  currency: z.enum(['EUR', 'USD']),
+  runsOutOn: z.iso.date().nullable(),
+});
+
 const SessionSchema = z.object({
   platformAccountId: z.string().min(1),
   from: z.string(),
@@ -185,6 +193,11 @@ function signalOf(type: string, payload: unknown): Signal | null {
         spentMinor: parsed.data.spentMinor,
         capMinor: parsed.data.capMinor,
       };
+    }
+    case 'ai_credits_low': {
+      const parsed = CreditsLowSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'ai_credits_low', ...parsed.data };
     }
     case 'session_state_changed': {
       const parsed = SessionSchema.safeParse(payload);

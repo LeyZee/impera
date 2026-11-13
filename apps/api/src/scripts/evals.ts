@@ -45,6 +45,7 @@ import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
 import { scriptsInputOf } from './evals/scripts-input';
+import { judgeSituationOf, scenarioFlags, scenarioMoment } from './evals/situation';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const EVALS = resolve(ROOT, 'evals');
@@ -231,12 +232,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
       fanText: inbound.join('\n'),
       media: [],
       fanNotes: scenario.fan_facts.join('\n'),
-      situation: {
-        now,
-        timeZone: 'Europe/Paris',
-        relationshipStartedAt: new Date(now.getTime() - situation.known_hours * HOUR_MS),
-        spentCents: Math.round(situation.spent_euros * 100),
-      },
+      situation: scenarioMoment(scenario, now),
       // The policy decides on the brain's offer, as for a real fan: refused, the voice writes a plain answer.
       offer: {
         now,
@@ -245,12 +241,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
             ? null
             : new Date(now.getTime() - situation.last_offer_hours_ago * HOUR_MS),
         hasNoBudget: situation.has_no_budget,
-        flags: {
-          ...(situation.age_confirmed && { ageConfirmedAt: '2026-10-01T10:00:00.000Z' }),
-          ...(situation.sales_frozen && {
-            salesFrozen: { reason: 'operator', since: '2026-10-10T10:00:00.000Z' },
-          }),
-        },
+        flags: scenarioFlags(scenario),
         limits: persona.offerLimits,
       },
       sexualization: {
@@ -327,6 +318,8 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
       creatorName: persona.creatorName,
       personaSheet: persona.personaSheet,
       fanNotes: scenario.fan_facts.join('\n'),
+      // What the agent saw: without it, the judge read every fan as one whose age is unknown (OPS-07).
+      situation: judgeSituationOf(scenario, now),
       history,
       reply: bubbles,
       criteria,

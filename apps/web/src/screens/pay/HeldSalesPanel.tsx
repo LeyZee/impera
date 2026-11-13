@@ -13,14 +13,17 @@ import { useId, useState, type JSX } from 'react';
 import type { PayNames } from './data';
 import { Unreachable } from './parts';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { decideSale, useHeldSales, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import {
   decisionText,
   heldCountText,
+  heldInOrder,
   heldReasonText,
   lineChatter,
   outcomeLabel,
   outcomeWords,
+  outcomesShown,
   ownLineText,
   saleAmount,
   saleWhen,
@@ -46,7 +49,11 @@ const NOTE_MAX = 500;
 const TEAM_NAMES_STALE_MS = 10 * 60_000;
 
 /** A refusal that says the list moved under the reader: it is read again. */
-const MOVED: ReadonlySet<string> = new Set(['pay_sale_not_found', 'pay_sale_outcome_conflict']);
+const MOVED: ReadonlySet<string> = new Set([
+  'pay_sale_not_found',
+  'pay_sale_outcome_conflict',
+  'pay_sale_recipient_conflict',
+]);
 
 /**
  * Paie › Quinzaine, for the owner and an active manager (CRM-03 lot b4b, ADR 0050 §§ 3, 5, 7): the sales read on the
@@ -59,13 +66,11 @@ export function HeldSalesPanel({
   period,
   names,
   me,
-  owner,
   reads,
 }: {
   period: PayPeriod;
   names: PayNames;
   me: { readonly id: string };
-  owner: boolean;
   /** The owner or an active manager: the only readers of the list. */
   reads: boolean;
 }): JSX.Element | null {
@@ -77,7 +82,7 @@ export function HeldSalesPanel({
     readonly outcome: SaleDecisionOutcome;
   } | null>(null);
   const read = held.data?.period === period ? held.data : undefined;
-  const sales = read?.sales ?? [];
+  const sales = heldInOrder(read?.sales ?? []);
   const zone = settings.data?.timeZone ?? null;
   // The platform's team names a chatter not linked (ADR 0076): read only for a line that needs it, by the same readers.
   const unnamed: Platform[] = [
@@ -136,7 +141,7 @@ export function HeldSalesPanel({
             // Each gesture names its sale to a screen reader, out of the list too.
             const about = (part: string): string => `${uid}-${String(index)}-${part}`;
             const account = names.account(sale.platformAccountId);
-            const reason = heldReasonText(sale, member, owner, zone);
+            const reason = heldReasonText(sale, member, zone);
             const signalled = signalText(sale, member);
             const decided = decisionText(sale, member);
             const chatter = lineChatter(sale, member, teamOf(sale.platform));
@@ -171,9 +176,9 @@ export function HeldSalesPanel({
                 {signalled === null ? null : <p className="py-held__reason">{signalled}</p>}
                 {member?.own === true ? (
                   <p className="py-held__own">{ownLineText(sale)}</p>
-                ) : sale.outcomes.length === 0 ? null : (
+                ) : outcomesShown(sale.outcomes).length === 0 ? null : (
                   <div className="py-held__acts">
-                    {sale.outcomes.map((outcome) => (
+                    {outcomesShown(sale.outcomes).map((outcome) => (
                       <button
                         key={outcome}
                         type="button"
@@ -240,6 +245,7 @@ function DecideDialog({
   const refresh = useRefreshPayroll();
   const [decisionId] = useState(() => newId(PaySaleDecisionIdSchema));
   const [note, setNote] = useState('');
+  const noteArea = useGrowingArea(note);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
   const words = outcomeWords(outcome, sale, member);
@@ -256,6 +262,10 @@ function DecideDialog({
       platformSaleId: sale.platformSaleId,
       outcome,
       note: trimmed === '' ? null : trimmed,
+      recipientMemberId: null,
+      shareBp: null,
+      // ADR 0101 § 8: « l'IA a été décisive » comes with its choice on the screen of the second part.
+      excludeReason: outcome === 'exclude' ? 'other' : null,
     });
     setBusy(false);
     if (outcomeSent.kind === 'ok') {
@@ -284,8 +294,9 @@ function DecideDialog({
             Note (facultatif)
           </label>
           <textarea
+            ref={noteArea}
             id={`${id}-note`}
-            className="nv-field__control nv-glass sc-note"
+            className="nv-field__control nv-glass sc-note grow-area"
             rows={2}
             maxLength={NOTE_MAX}
             value={note}
