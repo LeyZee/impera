@@ -13,6 +13,7 @@ import {
   hasOtherCurrency,
   heatGrid,
   heatSlots,
+  hourEndText,
   hourText,
   netIn,
   recordToday,
@@ -146,6 +147,8 @@ describe('Mes chiffres, côté écran (ADR 0104 § A)', () => {
     expect(slots[1]?.[7]).toEqual({ netMinor: 12_000, sales: 4 });
     expect(hourText(0)).toBe('0\u00a0h');
     expect(hourText(24)).toBe('0\u00a0h');
+    expect(hourEndText(24)).toBe('minuit');
+    expect(hourEndText(21)).toBe('21\u00a0h');
   });
 
   it('n’étiquette que le meilleur jour, et aujourd’hui seulement si ses voisins sont plus bas', () => {

@@ -142,6 +142,9 @@ export function heatSlots(grid: readonly (readonly HeatCell[])[]): HeatCell[][] 
 /** « 21 h », the house's way to write an hour. */
 export const hourText = (hour: number): string => `${String(hour % 24)}\u00a0h`;
 
+/** The end of a span of hours: « minuit » where a day ends, as the sentence over the grid says it. */
+export const hourEndText = (hour: number): string => (hour % 24 === 0 ? 'minuit' : hourText(hour));
+
 /** The best three hours in a row of the week, by net: where the member sells the most. `null` on an empty grid. */
 export function bestSlot(
   grid: readonly (readonly HeatCell[])[],
@@ -181,7 +184,7 @@ export const WEEKDAY_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] a
 export function slotWords(slot: { readonly weekday: number; readonly from: number }): string {
   const to = slot.from + 3;
   const day = (WEEKDAY_NAMES[slot.weekday - 1] ?? '').toLowerCase();
-  return `le ${day} de ${String(slot.from)}\u00a0h à ${to === 24 ? 'minuit' : `${String(to)}\u00a0h`}`;
+  return `le ${day} de ${hourText(slot.from)} à ${hourEndText(to)}`;
 }
 
 /** How far a tier's ring is drawn, from 0 to 1, between the tier reached and the next. */

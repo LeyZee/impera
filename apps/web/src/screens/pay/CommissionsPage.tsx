@@ -484,7 +484,7 @@ function TierLeft({
   const line = statement === undefined ? null : mainLine(statement.lines);
   const where = line === null ? null : account(line.platformAccountId);
   return (
-    <div className="py-left">
+    <div className="py-left py-left--tier">
       <p className="py-left__title nv-num">
         Palier {next.label} : encore {amountText(left, 'EUR')} de net
       </p>

@@ -20,6 +20,7 @@ import {
   hasRecords,
   heatGrid,
   heatSlots,
+  hourEndText,
   hourText,
   netIn,
   recordToday,
@@ -337,13 +338,16 @@ function HeatGrid({
               className="mf-heat__cell"
               data-best={cell.netMinor === max && max > 0}
               style={{ '--_h': max <= 0 ? 0 : Math.max(0, cell.netMinor) / max }}
-              {...tip.bind({
-                title: `${WEEKDAY_NAMES[day] ?? ''}, de ${hourText(column * by)} à ${hourText((column + 1) * by)}`,
-                rows: [
-                  ['Net', amountText(cell.netMinor, currency)],
-                  ['Ventes', String(cell.sales)],
-                ],
-              })}
+              {...tip.bind(
+                {
+                  title: `${WEEKDAY_NAMES[day] ?? ''}, de ${hourText(column * by)} à ${hourEndText((column + 1) * by)}`,
+                  rows: [
+                    ['Net', amountText(cell.netMinor, currency)],
+                    ['Ventes', String(cell.sales)],
+                  ],
+                },
+                { above: true },
+              )}
             />
           ))}
         </div>
@@ -489,7 +493,7 @@ export function MyDaysCard(): JSX.Element | null {
   const before = figures.previous === null ? null : netIn(figures.previous.toDateNets, currency);
   return (
     <Panel
-      className="nv-enter mf"
+      className="nv-enter mf mf-days"
       eyebrow={<Named kind="sales">Ma quinzaine, jour par jour</Named>}
       actions={
         <span

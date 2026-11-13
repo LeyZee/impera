@@ -13,6 +13,10 @@
   --mf-tier: var(--nv-series-2);
   --mf-record: var(--nv-data-2);
 }
+/* The way to a tier wears its blue on Commissions' gauge as on Aujourd'hui's ring: one colour, both screens. */
+.py-left--tier .nv-gauge__fill {
+  background: var(--nv-series-2);
+}
 .mf-dot {
   display: inline-block;
   width: 8px;
@@ -431,6 +435,12 @@
   }
 }
 @media (max-width: 720px) {
+  /* The total goes under the card's name: beside it, the name broke on two lines. */
+  .mf-days .nv-panel__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
   .mf-heat[data-by='1'] {
     display: none;
   }
