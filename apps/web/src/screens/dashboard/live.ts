@@ -158,10 +158,9 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         ['Dernière lecture', lastRead ?? 'jamais'],
         ['Conversations suivies', String(reveal.conversations)],
       ],
-      alarm: late ? 'Reveal n’est plus lu' : 'Reveal est déconnecté',
-      brief: unlinked
-        ? 'Messagerie Reveal pas encore reliée'
-        : `Reveal ${late ? 'lu en retard' : reveal.connected ? 'connecté' : 'déconnecté'}`,
+      alarm: late ? 'La messagerie Reveal n’est plus lue' : 'La messagerie Reveal est déconnectée',
+      // « Messagerie »: the sales key is another link, Réglages › Ventes may show Reveal linked (choix de Charles 12/11).
+      brief: `Messagerie Reveal ${late ? 'lue en retard' : reveal.connected ? 'connectée' : unlinked ? 'pas encore reliée' : 'déconnectée'}`,
     },
     {
       id: 'voice',
@@ -331,7 +330,7 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
     return {
       ...base,
       tone: 'bad',
-      headline: 'Reveal est **déconnecté**',
+      headline: 'La messagerie Reveal est **déconnectée**',
       // Since when, in the sentence itself, not only in the fold (DASH-18).
       lead: `${lastRead === null ? '' : `Dernière lecture ${lastRead}. `}L’agent ne lit plus les conversations. Reconnecte la session Reveal depuis l’extension.${alsoVoice}`,
       foldTitle: 'Quelque chose ne va pas',
@@ -343,8 +342,8 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       ...base,
       tone: 'warn',
       stalled: true,
-      headline: 'Reveal n’est **plus lu**',
-      lead: `La session tient, mais Reveal a été lu pour la dernière fois ${ago(reveal.lastReadAt, now)}. Les nouveaux messages des fans n’arrivent plus à l’agent.${alsoVoice}`,
+      headline: 'La messagerie Reveal n’est **plus lue**',
+      lead: `La session tient, mais la messagerie a été lue pour la dernière fois ${ago(reveal.lastReadAt, now)}. Les nouveaux messages des fans n’arrivent plus à l’agent.${alsoVoice}`,
       foldTitle: 'Quelque chose ne va pas',
     };
   }

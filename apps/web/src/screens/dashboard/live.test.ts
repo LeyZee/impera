@@ -362,9 +362,13 @@ describe('fromApi', () => {
     );
     expect(card('reveal', late)).toMatchObject({ tone: 'warn', value: 'Lecture en retard' });
     expect(card('reveal', late)?.rows[0]).toEqual(['Dernière lecture', 'il y a 30 min']);
-    expect(late.agent).toMatchObject({ tone: 'warn', stalled: true, headline: 'Reveal n’est **plus lu**' });
-    expect(late.agent.lead).toContain('lu pour la dernière fois il y a 30 min');
-    expect(late.agent.foldSummary).toContain('Reveal lu en retard');
+    expect(late.agent).toMatchObject({
+      tone: 'warn',
+      stalled: true,
+      headline: 'La messagerie Reveal n’est **plus lue**',
+    });
+    expect(late.agent.lead).toContain('la messagerie a été lue pour la dernière fois il y a 30 min');
+    expect(late.agent.foldSummary).toContain('Messagerie Reveal lue en retard');
     expect(card('reveal')).toMatchObject({ tone: 'ok', value: 'Connectée' });
   });
 
@@ -379,7 +383,10 @@ describe('fromApi', () => {
     const offline = apiDashboard({
       reveal: { connected: false, lastReadAt: '2026-10-19T11:00:00Z', late: false, conversations: 0 },
     });
-    expect(fromApi(offline).agent).toMatchObject({ tone: 'bad', headline: 'Reveal est **déconnecté**' });
+    expect(fromApi(offline).agent).toMatchObject({
+      tone: 'bad',
+      headline: 'La messagerie Reveal est **déconnectée**',
+    });
     const mute = apiDashboard({
       voice: { ok: false, keyMissing: false, medianWriteMs: null, outagesLast7d: 3 },
     });
