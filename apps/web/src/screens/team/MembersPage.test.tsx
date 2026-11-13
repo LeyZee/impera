@@ -101,6 +101,7 @@ function serve(
     planningDown?: boolean;
     removals?: readonly unknown[];
     setups?: readonly unknown[];
+    presets?: readonly unknown[];
   } = {},
 ): Posted[] {
   const posted: Posted[] = [];
@@ -116,7 +117,8 @@ function serve(
       } else if (path === '/v1/team/members')
         reply = (posted.length > 0 ? routes.afterPost : undefined) ??
           routes.members ?? { status: 200, body: { members: TEAM } };
-      else if (path === '/v1/team/commission-presets') reply = { status: 200, body: { presets: PRESETS } };
+      else if (path === '/v1/team/commission-presets')
+        reply = { status: 200, body: { presets: routes.presets ?? PRESETS } };
       else if (path === '/v1/creators') reply = { status: 200, body: { creators: [LEA] } };
       else if (path === '/v1/team/platform-removals')
         reply = { status: 200, body: { removals: routes.removals ?? [] } };
@@ -514,6 +516,29 @@ describe('adding a member', () => {
     });
   });
 
+  it('asks for the password of the link with the common prompt, « Voir sa fiche » set aside meanwhile (GES-13)', async () => {
+    serve({
+      post: (path) =>
+        path === '/v1/team/members'
+          ? { status: 201, body: KOFI }
+          : { status: 403, body: apiError('reauthentication_forbidden') },
+    });
+    renderPage();
+    await open();
+    who();
+    fireEvent.click(await screen.findByRole('button', { name: 'Continuer' }));
+    fireEvent.click(await screen.findByRole('radio', { name: /Confirmé/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter Kofi' }));
+    expect(await screen.findByRole('heading', { name: 'Kofi est dans l’équipe' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Créer son lien' }));
+    expect(
+      await screen.findByText('Pour créer un lien d’accès, confirme ton mot de passe et ton code.'),
+    ).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Voir sa fiche' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+    expect(await screen.findByRole('button', { name: 'Voir sa fiche' })).toBeDefined();
+  });
+
   it('sends a rate typed by hand under « Autre »', async () => {
     const posted = serve({ post: () => ({ status: 500 }) });
     renderPage();
@@ -630,6 +655,15 @@ describe('changing a member once added (EQ-10)', () => {
         body: { commission: { presetId: PRESET }, teamShareBps: null, effectiveFrom: '2026-11-16' },
       },
     ]);
+  });
+
+  it('goes straight to the typed rate when the agency has no preset: no lone « Autre » to pick (GES-24)', async () => {
+    serve({ presets: [] });
+    fireEvent.click(within(await sheet()).getByRole('button', { name: 'Changer le taux' }));
+    const panel = await screen.findByRole('dialog', { name: 'Changer le taux' });
+    expect(within(panel).queryByRole('radiogroup', { name: 'Préréglage de commission' })).toBeNull();
+    expect(within(panel).queryByRole('radio', { name: /Autre/u })).toBeNull();
+    expect(within(panel).getByLabelText('Nouveau taux, en %')).toBeDefined();
   });
 
   it('marks a departure only after a confirmation that says what it does', async () => {

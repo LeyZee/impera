@@ -268,6 +268,30 @@ export function monthMarks(cells: readonly CalendarCell[], now: Date): MonthMark
   });
 }
 
+/**
+ * What the month's marks stand for, under the calendar: « Un trait par créneau : 0 h, 6 h, 12 h et 18 h » when every
+ * day shown has the same créneaux, said without hours when a new version changes them within the month (GES-12).
+ */
+export function monthMarksKey(calendar: Calendar, days: readonly string[]): string {
+  const zone = calendar.settings.timeZone;
+  const windows = slotWindowsOf(calendar.settings.versions, days, (day, minute) =>
+    zonedInstant(day, minute, zone),
+  );
+  const starts = new Set(
+    days.map((day) =>
+      windows
+        .filter((window) => window.day === day)
+        .map((window) => clockOf(window.slot.startMinute))
+        .join(', '),
+    ),
+  );
+  const [only] = starts;
+  if (starts.size !== 1 || only === undefined || only === '')
+    return 'Un trait par créneau de la journée, dans l’ordre';
+  const last = only.lastIndexOf(', ');
+  return `Un trait par créneau : ${last === -1 ? only : `${only.slice(0, last)} et ${only.slice(last + 2)}`}`;
+}
+
 /** « novembre 2026 », the month a month view shows. */
 export const monthLabel = (month: string): string =>
   new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(

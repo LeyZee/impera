@@ -8,7 +8,7 @@ Il sert à jouer le branchement des clés et les connexions « dans les mêmes c
 
 | Service | Simulé | Pas encore (phase 2) |
 | --- | --- | --- |
-| xAI, Google, Mistral, ElevenLabs           | Vérification de la clé collée dans Réglages, avec tous les états ; génération des réponses de l'agent par xAI, scriptée (section « Génération ») | Génération par Google, Mistral ou ElevenLabs (503, comme une panne : le repli passe par xAI) |
+| xAI, Google, Mistral, ElevenLabs           | Vérification de la clé collée dans Réglages, avec tous les états ; génération des réponses de l'agent par xAI, scriptée (section « Génération »), et transcription des vocaux et du son des vidéos par xAI | Génération par Google, Mistral ou ElevenLabs (503, comme une panne : le repli passe par xAI) |
 | Reveal (API CRM) | Les huit routes de la documentation « CRM / API » (statistiques, modèles, équipe, liens de suivi, ventes, webhooks), ses erreurs, ses limites de débit, ses webhooks réellement envoyés et signés | Messagerie (connecteur sur session capturée, attend la capture HAR) |
 | Telegram, push, S3 distant, taux de change | — | Bloqués par la garde : ils échouent comme hors ligne |
 
@@ -105,6 +105,8 @@ La prochaine réponse se choisit avec `/__/ai/next` (`GET /__/ai` montre celle q
 | `{"reply":"rate_limited"}`  | Le prochain appel reçoit un 429 avec `retry-after: 1`                 | La passerelle attend et redemande : `rate_limited` puis `ok` au journal                                  |
 | `{"reply":"risk","risk":"minor_suspected"}` | Le prochain cerveau lit ce risque dans le message du fan (`minor_suspected` si `risk` est omis ; aussi `distress`, `self_harm`, `meet_request`, `off_platform_payment`, `dispute`, `harassment`, `money_trouble`, `manipulation_attempt`, `dangerous_request`, `real_abuse`) | Ce que la politique en code décide pour ce risque (A7) : jamais un brouillon ordinaire |
 | `{"reply":"neutral"}`       | Annule ce qui était prévu                                             | —                                                                                                        |
+
+**Médias.** Le faux monde prend une requête jusqu'à 27,7 Mio (`WORLD_BODY_LIMIT`) : un média de 20 Mio au plus, la limite que l'API applique elle-même (vidéo envoyée entière, image, média d'un fan), encodé en base64 (4/3 de sa taille), plus 1 Mio pour les prompts. Une photo ou une vidéo de téléphone (720p et plus) se décrit donc comme en réel ; au-delà, il répond 413 comme un vrai service. La transcription de xAI (`POST /xai/v1/stt`, en `multipart/form-data` comme la vraie) rend toujours la même phrase inventée, en français (« coucou, c’est juste un petit vocal pour te dire bonne soirée »), avec une durée de 0 s : l'appel est journalisé à 0 $. Une clé suit la même règle des mots que pour la génération.
 
 Chaque réponse piégée ne sert qu'une fois : l'appel suivant redevient calme. Le choix vaut pour toute la pile, quelle que soit la créatrice ou la session qui fait l'appel suivant : deux recettes jouées en même temps sur la même pile se prennent leurs pièges. Seul xAI génère : Google et Mistral restent en panne (503), Venice (clé seulement par variable d'environnement, aucun rôle par défaut) est bloqué par la garde comme hors ligne, donc les sens passent par leur repli xAI, et la clé « limitée » (429 à 30 s, au-delà du plafond d'attente de 10 s) n'est pas rejouée. Les réponses ne disent rien de la qualité de l'IA (ADR 0075, conséquences) : elle se mesure par `pnpm evals` avec une vraie clé.
 
