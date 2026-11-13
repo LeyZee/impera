@@ -50,12 +50,27 @@ export interface PlatformConnector {
   getFanProfile?(fanRef: ExternalRef): Promise<FanProfile>;
   /** `fanNoteRead`: read live, never stored nor logged (ADR 0018 § 1). */
   getFanNote?(fanRef: ExternalRef): Promise<FanNote>;
+  /**
+   * `fanNoteWrite`: writes the agency's block of the fan's note (its canvas lines), read again just before and every
+   * other line kept word for word. Idempotent: the same block written twice changes the note once.
+   */
+  setFanNote?(fanRef: ExternalRef, text: string, idempotencyKey: string): Promise<void>;
   /** `creatorNotes`: empty when the platform has none. */
   getCreatorNotes?(conversationRef: ExternalRef): Promise<CreatorNote[]>;
   /** `ppvStats`. */
   getFanPpvStats?(fanRef: ExternalRef): Promise<FanPpvStats>;
   /** `scripts`. */
   listPlatformScripts?(): Promise<PlatformScript[]>;
+  /**
+   * `scripts`: sends one step of a platform script, priced as the platform lists it (never by us). The history is read
+   * again just before: a step already sent in this conversation is refused for good (`ScriptStepAlreadySent`).
+   */
+  sendScriptStep?(
+    conversationRef: ExternalRef,
+    scriptRef: ExternalRef,
+    stepIndex: number,
+    idempotencyKey: string,
+  ): Promise<SendResult>;
   /** `scriptHistory`: the steps already sent to this fan; the platform is the only source (ADR 0018 § 5). */
   getScriptHistory?(fanRef: ExternalRef): Promise<SentScriptStep[]>;
   /** `vault`: every media of the vault, or of one folder. */
@@ -76,5 +91,16 @@ export class ConnectorError extends Error {
     this.name = 'ConnectorError';
     this.code = code;
     this.retryAfterSeconds = options.retryAfterSeconds ?? null;
+  }
+}
+
+/**
+ * A definitive refusal from the platform's own history (ADR 0018 § 5): the step was already sent in this conversation,
+ * so it never goes again. `fatal`, never retried; the guarded writer turns it into a `SendRefused`.
+ */
+export class ScriptStepAlreadySent extends ConnectorError {
+  constructor() {
+    super('fatal', 'script_step_already_sent');
+    this.name = 'ScriptStepAlreadySent';
   }
 }

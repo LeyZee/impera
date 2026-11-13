@@ -396,6 +396,39 @@ describe('FakeReveal: vault and media files (L10, L14)', () => {
 });
 
 describe('FakeReveal: faults (fake-reveal.md § Scénarios)', () => {
+  it('limits sends to 60 a minute with their own headers, 429 beyond, until the window resets (headers.md)', async () => {
+    const f = fake();
+    const body = { message: { content: 'Coucou', isUnread: true }, mediaIds: [], files: [] };
+    const first = await call(f, 'POST', '/conversations/conv_02/messages', body);
+    expect(first.status).toBe(200);
+    const resetAt = Number(first.headers['x-ratelimit-reset']);
+    expect(first.headers['x-ratelimit-limit']).toBe('60');
+    expect(first.headers['x-ratelimit-remaining']).toBe('59');
+    expect(resetAt * 1_000).toBeGreaterThan(f.now().getTime());
+    for (let i = 1; i < 60; i++) {
+      expect((await call(f, 'POST', '/conversations/conv_03/messages', body)).status).toBe(200);
+    }
+    const over = await call(f, 'POST', '/conversations/conv_02/messages', body);
+    expect(over.status).toBe(429);
+    expect(over.headers['x-ratelimit-remaining']).toBe('0');
+    expect(Number(over.headers['retry-after'])).toBeGreaterThan(0);
+    // Reads are not counted in the send window.
+    expect(
+      (await call(f, 'GET', '/conversations/conv_02/messages')).headers['x-ratelimit-limit'],
+    ).toBeUndefined();
+    await advance(f, 60_000);
+    expect((await call(f, 'POST', '/conversations/conv_02/messages', body)).status).toBe(200);
+  });
+
+  it('takes a send and loses its answer: 504, yet the message is in the thread (« envoi accepté puis coupure »)', async () => {
+    const f = fake();
+    await scenario(f, [{ type: 'send_answer_lost', times: 1 }]);
+    const body = { message: { content: 'Coupé', isUnread: true }, mediaIds: [], files: [] };
+    expect((await call(f, 'POST', '/conversations/conv_02/messages', body)).status).toBe(504);
+    expect((await messages(f, 'conv_02')).data[0]?.message.content).toBe('Coupé');
+    expect((await call(f, 'POST', '/conversations/conv_02/messages', body)).status).toBe(200);
+  });
+
   it('rate-limits n requests with Retry-After, then recovers', async () => {
     const f = fake();
     await scenario(f, [{ type: 'rate_limited', requests: 2, retryAfterSeconds: 30 }]);
@@ -492,6 +525,7 @@ it('declares the capabilities a Reveal connector can claim', () => {
     realtime: false,
     fanProfile: true,
     fanNoteRead: true,
+    fanNoteWrite: true,
     creatorNotes: true,
     ppvStats: true,
     scripts: true,

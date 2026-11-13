@@ -198,6 +198,8 @@ export const REVEAL_EXPECTED_CAPABILITIES = {
   // The readings of ADR 0018 (reveal-connector-spec.md § 4).
   fanProfile: true,
   fanNoteRead: true,
+  /** `PATCH …/note` (E4). */
+  fanNoteWrite: true,
   creatorNotes: true,
   ppvStats: true,
   scripts: true,

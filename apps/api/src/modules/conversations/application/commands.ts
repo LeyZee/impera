@@ -223,8 +223,10 @@ export function createConversationCommands({
           platformConversationId: input.platformConversationId,
         });
         const messageId = newId(MessageIdSchema);
-        // An outbound message we did not send ourselves was written by someone on the platform.
-        const author = isInbound ? 'fan' : 'human';
+        // An outbound message is ours (`ai`) when the connector says so (its id is one of its sends, P2-03), even when
+        // the send job did not record it (a script step, a send whose answer was lost); else someone on the platform
+        // wrote it.
+        const author = isInbound ? 'fan' : message.author === 'ai' ? 'ai' : 'human';
         const isNew = await tx.messages.insertIfNew({
           id: messageId,
           conversationId: conversation.id,

@@ -48,6 +48,7 @@ export class FakeConnector implements PlatformConnector {
     // The readings of ADR 0018: none here; FakeReveal plays them for the contract.
     fanProfile: false,
     fanNoteRead: false,
+    fanNoteWrite: false,
     creatorNotes: false,
     ppvStats: false,
     scripts: false,
