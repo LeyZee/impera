@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 import { BriefIntentSchema } from './brief';
-import { CreatorIdSchema, PersonaVersionIdSchema } from './ids';
+import { DESIRE_SIGNALS_MAX, DesireBandSchema, DesireScoreSchema, DesireSignalSchema } from './desire';
+import { CreatorIdSchema, DesireMarkIdSchema, PersonaVersionIdSchema } from './ids';
 import { MediaDescriptionSchema } from './media';
 
 /**
@@ -37,6 +38,20 @@ export const VerdictSchema = z.discriminatedUnion('kind', [
 ]);
 export type Verdict = z.infer<typeof VerdictSchema>;
 
+/**
+ * The owner's mark on his desire score under one of his messages (ADR 0103 § 6): too high, too low, or right. The
+ * weights stay in code; the marks say where the counting is wrong.
+ */
+export const DesireMarkVerdictSchema = z.enum(['too_high', 'too_low', 'right']);
+export type DesireMarkVerdict = z.infer<typeof DesireMarkVerdictSchema>;
+
+/**
+ * A corrected answer in her bank of voice examples (ADR 0102): read by production and the playground while `active`,
+ * `withdrawn` by the owner, `blocked` when the correction itself trips a blocking guard and never entered.
+ */
+export const VoiceExampleStateSchema = z.enum(['active', 'withdrawn', 'blocked']);
+export type VoiceExampleState = z.infer<typeof VoiceExampleStateSchema>;
+
 export const AnswerVersionSchema = z.object({ voicePrompt: z.string(), voiceModel: z.string() });
 export type AnswerVersion = z.infer<typeof AnswerVersionSchema>;
 
@@ -62,11 +77,32 @@ export const PlaygroundSituationSchema = z.object({
 });
 export type PlaygroundSituation = z.infer<typeof PlaygroundSituationSchema>;
 
+/**
+ * His desire score as it stood after one message of his (P3-12, glossary « Note de désir »), shown to calibrate it:
+ * the score before and after, and each signal with what it weighed in the counting `weightsVersion`. A signal that
+ * resets or freezes the score instead of counting has `points: null`. Computed by the server, never by the screen.
+ */
+export const PlaygroundDesireSchema = z.object({
+  /** His score cooled to this message, before it counted; `null` before his first score. */
+  before: DesireScoreSchema.nullable(),
+  score: DesireScoreSchema,
+  band: DesireBandSchema,
+  signals: z
+    .array(z.object({ signal: DesireSignalSchema, points: z.number().int().nullable() }))
+    .max(DESIRE_SIGNALS_MAX),
+  weightsVersion: z.string(),
+  /** The owner's mark on it in this conversation, once he gave one (ADR 0103 § 6). */
+  mark: DesireMarkVerdictSchema.exactOptional(),
+});
+export type PlaygroundDesire = z.infer<typeof PlaygroundDesireSchema>;
+
 export const PlaygroundTurnSchema = z.object({
   index: z.number().int().nonnegative(),
   from: z.enum(['fan', 'creator']),
   text: z.string(),
   media: z.array(z.object({ description: MediaDescriptionSchema, isLocked: z.boolean() })).exactOptional(),
+  /** On his messages the brain read: his desire score after it. */
+  desire: PlaygroundDesireSchema.exactOptional(),
 });
 
 export const GuardViolationSchema = z.object({
@@ -108,6 +144,12 @@ export const PlaygroundAnswerSchema = z.object({
       kycMissing: z.array(z.string()),
     })
     .exactOptional(),
+  /** His desire score after this message, when the brain read it. */
+  desire: PlaygroundDesireSchema.exactOptional(),
+  /** What the cursor decided on going sexual (P3-09), in French; absent when the brain did not read the moment. */
+  cursor: z.object({ kind: z.string(), label: z.string() }).exactOptional(),
+  /** The brain wanted to offer a script and the policy said no: why, in French. She wrote a plain answer. */
+  offerRefused: z.object({ code: z.string(), label: z.string() }).exactOptional(),
   model: z.string().exactOptional(),
   latencyMs: z.number().nonnegative(),
   /** The cost in euros, at the daily budget's rate (ADR 0011); the journal keeps dollars. */
@@ -148,6 +190,11 @@ export const PlaygroundStateSchema = z.object({
   }),
   presets: z.array(PlaygroundPresetSchema),
   presetId: z.string().nullable(),
+  /**
+   * Her two desire thresholds, from her persona: under `open` she never opens the intimate herself, under `script` no
+   * script goes out unless he asks for paid content himself.
+   */
+  desireThresholds: z.object({ open: DesireScoreSchema, script: DesireScoreSchema }),
   situation: PlaygroundSituationSchema,
   fanNotes: z.array(z.string()),
   history: z.array(PlaygroundTurnSchema),
@@ -240,6 +287,44 @@ export const PlaygroundAdvanceBodySchema = z.object({
 export const PlaygroundNotesBodySchema = z.object({ notes: z.array(z.string().max(500)).max(200) });
 export const PlaygroundCreatorMediaBodySchema = PlaygroundMediaSchema.extend({ isLocked: z.boolean() });
 
+/**
+ * `POST /v1/playground/desire-marks` (ADR 0103 § 6): the owner says his desire score after his n-th message was too
+ * high, too low or right. Kept for a creator's version only; the invented persona's conversations are not kept.
+ */
+export const PlaygroundDesireMarkBodySchema = z.strictObject({
+  fanMessageNumber: z.number().int().min(1),
+  verdict: DesireMarkVerdictSchema,
+  note: z.string().trim().min(1).max(500).exactOptional(),
+});
+export type PlaygroundDesireMarkBody = z.infer<typeof PlaygroundDesireMarkBodySchema>;
+
+/**
+ * One mark as the calibration reads it back: the message, the score then and the signals counted, and the same signals
+ * counted again with the weights in force now. When the weights change, `scoreNow` says what the change does to it.
+ */
+export const DesireMarkSchema = z.object({
+  id: DesireMarkIdSchema,
+  markedAt: IsoDateSchema,
+  fanMessage: z.string(),
+  verdict: DesireMarkVerdictSchema,
+  note: z.string().nullable(),
+  before: DesireScoreSchema.nullable(),
+  scoreThen: DesireScoreSchema,
+  weightsThen: z.string(),
+  /** Each signal with its points in the weights in force now. */
+  signals: PlaygroundDesireSchema.shape.signals,
+  scoreNow: DesireScoreSchema,
+});
+export type DesireMark = z.infer<typeof DesireMarkSchema>;
+
+/** `GET /v1/playground/desire-marks?creatorId=`: her marks, newest first, and the weights in force. */
+export const DesireMarksSchema = z.object({
+  weightsNow: z.string(),
+  marks: z.array(DesireMarkSchema).max(500),
+});
+export type DesireMarks = z.infer<typeof DesireMarksSchema>;
+export const DesireMarksQuerySchema = z.strictObject({ creatorId: CreatorIdSchema });
+
 /** Codes of the playground routes (suffix rules of errors.ts; 503 is set by the route itself). */
 export const PLAYGROUND_ERROR_CODES = [
   'llm_unavailable',
@@ -252,5 +337,6 @@ export const PLAYGROUND_ERROR_CODES = [
   'voice_model_invalid',
   'time_zone_invalid',
   'playground_persona_not_found',
+  'desire_mark_invented_persona_conflict',
 ] as const;
 export type PlaygroundErrorCode = (typeof PLAYGROUND_ERROR_CODES)[number];

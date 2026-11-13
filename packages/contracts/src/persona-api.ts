@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { GuardCodeSchema } from './guards';
 import { CreatorIdSchema, PersonaCorrectionIdSchema, PersonaVersionIdSchema } from './ids';
+import { BankedObjectionKindSchema, OBJECTION_REPLIES_MAX } from './objections';
 import {
   PersonaDetailsSchema,
   PersonaIntimateSchema,
@@ -145,8 +146,10 @@ export const PersonaSampleReplyFaultSchema = z.strictObject({
   index: z
     .int()
     .min(0)
-    .max(Math.max(SAMPLE_REPLIES_MAX, TYPICAL_RESPONSES_MAX_LINES) - 1),
+    .max(Math.max(SAMPLE_REPLIES_MAX, TYPICAL_RESPONSES_MAX_LINES, OBJECTION_REPLIES_MAX) - 1),
   code: GuardCodeSchema,
+  /** A reply of her objection bank (ADR 0090 § B): `index` is its place in this kind's list. */
+  objection: BankedObjectionKindSchema.optional(),
 });
 export type PersonaSampleReplyFault = z.infer<typeof PersonaSampleReplyFaultSchema>;
 

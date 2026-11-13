@@ -1,8 +1,11 @@
 /**
  * `pnpm evals`: every scenario of `evals/` through the production path (brain, policy, voice, hard guards), then the
  * judge on what she wrote. Fails unless every scenario passes its own checks and each criterion reaches its
- * threshold (`evals/thresholds.json`). Nothing is sent, the persona is the fictional demo one (ADR 0010).
- * Usage: `pnpm evals [--full] [--file evals/adversarial/asks-if-bot.yaml]` (the path from the repository root), with
+ * threshold (`evals/thresholds.json`). Nothing is sent. The persona is the fictional demo one (ADR 0010), or with
+ * `--persona-from-crm` her active version read from the database, which stays on that machine (OPS-11).
+ * Each scenario is drawn `--draws` times (3 by default) and fails if any draw fails (OPS-11).
+ * Usage: `pnpm evals [--full] [--draws 3] [--file evals/adversarial/asks-if-bot.yaml] [--persona-from-crm
+ * [--creator <id>]]` (the path from the repository root), with
  * LLM_XAI_API_KEY in the environment, or `--key-from-crm`: the keys saved in Réglages › Modèles IA of the database
  * DATABASE_ADMIN_URL names, opened with CREDENTIALS_ENCRYPTION_KEYS (`readSavedProviderKeys`), kept in memory only.
  */
@@ -11,8 +14,15 @@ import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { AiProviderSchema, desireBandOf, MessageIdSchema, newId } from '@impera/contracts';
-import { createDbClient, parseEncryptionKeys } from '@impera/db';
+import {
+  AiProviderSchema,
+  CreatorIdSchema,
+  desireBandOf,
+  MessageIdSchema,
+  newId,
+  StoredPersonaSchema,
+} from '@impera/contracts';
+import { createDbClient, eq, parseEncryptionKeys, schema } from '@impera/db';
 import {
   brainAlertId,
   createInMemoryCallLog,
@@ -28,17 +38,20 @@ import { z } from 'zod';
 
 import { READ_ONLY_POOL_OPTIONS } from '../key-check';
 import {
+  activePersonaForModels,
   composeTurn,
   guardSettingsOf,
   holdDecision,
   measureDesire,
   readPersonaFile,
+  type PersonaForModels,
 } from '../modules/agent/index';
 import { proposalsOfRead } from '../modules/fans/index';
 import { readSavedProviderKeys } from '../modules/providers/index';
 
 import { checkCardScenario, readCardScenario, type CardScenario } from './evals/card-scenario';
 import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './evals/check';
+import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
 import { judgeSituationOf, scenarioFlags, scenarioMoment } from './evals/situation';
@@ -57,27 +70,41 @@ const { values } = parseArgs({
     full: { type: 'boolean', default: false },
     file: { type: 'string' },
     'key-from-crm': { type: 'boolean', default: false },
+    'persona-from-crm': { type: 'boolean', default: false },
+    creator: { type: 'string' },
+    draws: { type: 'string', default: String(DEFAULT_DRAWS) },
   },
 });
+const drawsArg = z.coerce.number().int().min(1).max(5).safeParse(values.draws);
+if (!drawsArg.success) {
+  console.error('evals --draws : un nombre de 1 à 5.');
+  process.exit(1);
+}
+const draws = drawsArg.data;
+
+/** The admin database named in `.env`, on a connection that cannot write. */
+function readOnlyAdmin(flag: string, needsSealing: boolean): ReturnType<typeof createDbClient> {
+  const adminUrl = z.url({ protocol: /^postgres(ql)?$/ }).safeParse(process.env['DATABASE_ADMIN_URL']);
+  const sealing = process.env['CREDENTIALS_ENCRYPTION_KEYS'];
+  if (!adminUrl.success || (needsSealing && (sealing === undefined || sealing === ''))) {
+    console.error(
+      `evals ${flag} : DATABASE_ADMIN_URL${needsSealing ? ' ou CREDENTIALS_ENCRYPTION_KEYS' : ''} manque dans .env.`,
+    );
+    process.exit(1);
+  }
+  return createDbClient(adminUrl.data, READ_ONLY_POOL_OPTIONS);
+}
 
 /**
  * The keys saved in the CRM, under the names the gateway reads (`LLM_XAI_API_KEY`…): read once on a read-only
  * connection, never shown. Only the services found are said, by name.
  */
 async function crmKeys(): Promise<Record<string, string>> {
-  const adminUrl = z.url({ protocol: /^postgres(ql)?$/ }).safeParse(process.env['DATABASE_ADMIN_URL']);
-  const sealing = process.env['CREDENTIALS_ENCRYPTION_KEYS'];
-  if (!adminUrl.success || sealing === undefined || sealing === '') {
-    console.error(
-      'evals --key-from-crm : DATABASE_ADMIN_URL ou CREDENTIALS_ENCRYPTION_KEYS manque dans .env.',
-    );
-    process.exit(1);
-  }
-  const admin = createDbClient(adminUrl.data, READ_ONLY_POOL_OPTIONS);
+  const admin = readOnlyAdmin('--key-from-crm', true);
   try {
     const saved = await readSavedProviderKeys(
       admin.db,
-      parseEncryptionKeys(sealing, 'CREDENTIALS_ENCRYPTION_KEYS'),
+      parseEncryptionKeys(process.env['CREDENTIALS_ENCRYPTION_KEYS'] ?? '', 'CREDENTIALS_ENCRYPTION_KEYS'),
     );
     const found = PROVIDERS.flatMap((provider) => {
       const id = AiProviderSchema.safeParse(provider.id);
@@ -121,11 +148,57 @@ const files =
     : [resolve(ROOT, values.file)];
 
 const today = '2026-11-06';
-const persona = readPersonaFile(
-  readFileSync(resolve(ROOT, 'personas/demo/v0.3.0.yaml'), 'utf8'),
-  'Elena',
-  today,
-);
+
+/**
+ * Her active persona version, as the agent reads it at each draft (OPS-11): the only creator with one, or the one
+ * `--creator` names. Read on a connection that cannot write; only her name and version number are printed.
+ */
+async function crmPersona(): Promise<PersonaForModels> {
+  const admin = readOnlyAdmin('--persona-from-crm', false);
+  try {
+    const rows = await admin.db
+      .select({
+        id: schema.personaVersions.id,
+        creatorId: schema.personaVersions.creatorId,
+        version: schema.personaVersions.version,
+        content: schema.personaVersions.content,
+        creatorName: schema.creators.displayName,
+      })
+      .from(schema.personaVersions)
+      .innerJoin(schema.creators, eq(schema.creators.id, schema.personaVersions.creatorId))
+      .where(eq(schema.personaVersions.isActive, true));
+    const wanted = values.creator === undefined ? undefined : CreatorIdSchema.parse(values.creator);
+    const among = wanted === undefined ? rows : rows.filter((row) => row.creatorId === wanted);
+    const [row, other] = among;
+    if (row === undefined || (wanted === undefined && other !== undefined)) {
+      console.error(
+        row === undefined
+          ? 'evals --persona-from-crm : aucune persona active pour cette créatrice.'
+          : `evals --persona-from-crm : précise --creator parmi ${among.map((r) => `${r.creatorName} (${r.creatorId})`).join(', ')}.`,
+      );
+      process.exit(1);
+    }
+    const stored = {
+      id: row.id,
+      creatorName: row.creatorName,
+      persona: StoredPersonaSchema.parse(row.content),
+    };
+    const persona = await activePersonaForModels(
+      () => Promise.resolve(stored),
+      row.creatorId,
+      new Date(`${today}T12:00:00Z`),
+    );
+    if (persona === null) throw new Error('active persona read as none');
+    console.log(`Persona : ${row.creatorName}, version ${row.version} (en vigueur dans le CRM)`);
+    return persona;
+  } finally {
+    await admin.close();
+  }
+}
+
+const persona = values['persona-from-crm']
+  ? await crmPersona()
+  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.4.0.yaml'), 'utf8'), 'Elena', today);
 const { config, isIndependent } = evalsConfig(DEFAULT_LLM_CONFIG, credentials);
 const gateway = createLlmGateway({
   config,
@@ -225,12 +298,28 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         counted: false,
       },
       skipVoice: (brief) => brief === undefined || holdDecision(brief).kind !== 'answer',
+      customOrder: {
+        chatterOnShift: situation.chatter_on_shift,
+        orderOpen: situation.custom_order_open,
+        flags: {
+          ...(situation.age_confirmed && { ageConfirmedAt: '2026-10-01T10:00:00.000Z' }),
+          ...(situation.sales_frozen && {
+            salesFrozen: { reason: 'operator', since: '2026-10-10T10:00:00.000Z' },
+          }),
+        },
+      },
+      objections: {
+        bank: persona.objectionReplies,
+        usedReplyIds: new Set(situation.objection_replies_used),
+      },
       ...(alerts.length > 0 && { alerts: alerts.map(({ id, phrase }) => ({ id, phrase })) }),
     },
   );
   const { brief } = composed;
   const handoff =
-    composed.handoff !== undefined || (brief !== undefined && holdDecision(brief).kind === 'handoff');
+    composed.handoff !== undefined ||
+    composed.customOrder?.kind === 'handoff' ||
+    (brief !== undefined && holdDecision(brief).kind === 'handoff');
   const offer = composed.voiceBrief?.action === 'offer';
   const blocking = composed.violations.filter((v) => v.severity === 'blocking').map((v) => v.code);
   const bubbles = handoff || composed.isBlocked ? [] : composed.bubbles;
@@ -241,12 +330,15 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         risks: brief.risks,
         action: brief.action,
         ...(brief.desireSignals !== undefined && { desireSignals: brief.desireSignals }),
+        ...(brief.objection !== undefined && { objection: brief.objection }),
         alertsSeen: alerts.filter((a) => brief.alertsSeen?.includes(a.id) === true).map((a) => a.name),
       },
     }),
     handoff,
     offer,
     desireBand: desireBandOf(composed.desire?.score ?? situation.desire),
+    customOrder: composed.customOrder?.kind ?? 'none',
+    objectionReply: composed.objectionReply?.replyId ?? null,
     bubbles: composed.bubbles,
     blocking,
   };
@@ -310,19 +402,32 @@ for (const path of files) {
   }
   if (scenario.tier === 'full' && !values.full && values.file === undefined) continue;
   minima.set(file, scenario.expect.voice?.judge ?? {});
-  const { outcome, scores } = await run(scenario);
-  const failures = checkScenario(scenario, outcome);
-  // A written answer nobody scored is not a pass.
-  if (outcome.bubbles.length > 0 && !outcome.handoff && Object.keys(scores).length === 0) {
-    failures.push('le juge n’a pas répondu');
+  const drawn: Draw[] = [];
+  const lines: string[] = [];
+  for (let index = 0; index < draws; index += 1) {
+    if (index > 0 && gateway.health().budget.state === 'reached') {
+      isCapReached = true;
+      break;
+    }
+    const { outcome, scores } = await run(scenario);
+    const failures = checkScenario(scenario, outcome);
+    // A written answer nobody scored is not a pass.
+    if (outcome.bubbles.length > 0 && !outcome.handoff && Object.keys(scores).length === 0) {
+      failures.push('le juge n’a pas répondu');
+    }
+    drawn.push({ failures, scores });
+    const prefix = draws > 1 ? `[${String(index + 1)}] ` : '';
+    for (const bubble of outcome.bubbles) lines.push(`      ${prefix}« ${bubble} »`);
+    const noted = Object.entries(scores).map(([c, s]) => `${c} ${s.toFixed(2)}`);
+    if (noted.length > 0) lines.push(`      ${prefix}${noted.join(' · ')}`);
   }
-  results.push({ file, failures, scores });
-  const mark = failures.length === 0 ? 'ok ' : 'KO ';
-  console.log(`${mark} ${file}`);
-  for (const bubble of outcome.bubbles) console.log(`      « ${bubble} »`);
-  for (const failure of failures) console.log(`      ✗ ${failure}`);
-  const noted = Object.entries(scores).map(([c, s]) => `${c} ${s.toFixed(2)}`);
-  if (noted.length > 0) console.log(`      ${noted.join(' · ')}`);
+  const result = mergeDraws(file, drawn);
+  results.push(result);
+  const passed = drawn.filter((draw) => draw.failures.length === 0).length;
+  const mark = result.failures.length === 0 ? 'ok ' : 'KO ';
+  console.log(`${mark} ${file}${draws > 1 ? ` (${String(passed)}/${String(drawn.length)} tirages)` : ''}`);
+  for (const line of lines) console.log(line);
+  for (const failure of result.failures) console.log(`      ✗ ${failure}`);
 }
 
 if (isCapReached) {

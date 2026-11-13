@@ -31,9 +31,13 @@ const issuePaths = (value: unknown) => {
 };
 
 describe('PERSONA_SHEET (ADR 0079)', () => {
-  it('holds Desirali’s 59 questions in 7 panels, the last one without a title', () => {
-    expect(PERSONA_SHEET_QUESTION_COUNT).toBe(59);
-    expect(PERSONA_SHEET.map((s) => s.questions.length)).toEqual([15, 6, 11, 8, 7, 11, 1]);
+  it('holds Desirali’s 59 questions in 7 panels, the last one without a title, and the voice guide’s two', () => {
+    expect(PERSONA_SHEET_QUESTION_COUNT).toBe(61);
+    expect(PERSONA_SHEET.map((s) => s.questions.length)).toEqual([15, 6, 11, 10, 7, 11, 1]);
+    expect(PERSONA_SHEET[3]?.questions.slice(-2).map((q) => q.label)).toEqual([
+      'Comment elle dit non',
+      'Ce qu’elle n’écrirait jamais',
+    ]);
     expect(PERSONA_SHEET.map((s) => s.title)).toEqual([
       'Identité et informations de base',
       'Mode de vie',
@@ -130,6 +134,27 @@ describe('PersonaV2Schema', () => {
   });
 });
 
+describe('the voice guide and the objection replies (ADR 0090)', () => {
+  it('reads a version written before them: no guide, an empty bank', () => {
+    const before = demo();
+    expect(before.sheet.conversation.limit_setting_description).toBeNull();
+    expect(before.sheet.conversation.sounds_wrong_description).toBeNull();
+    expect(before.agent.objection_replies).toEqual({});
+  });
+
+  it('reads the demo’s test replies, and refuses two replies with the same id', () => {
+    const now = PersonaV2Schema.parse(personaFile('demo/v0.4.0.yaml'));
+    expect(now.sheet.conversation.limit_setting_description).toContain('Refuse en riant');
+    expect(now.agent.objection_replies.too_expensive?.map((r) => r.id)).toEqual([
+      'testtooexpa',
+      'testtooexpb',
+    ]);
+    const twice = structuredClone(now);
+    twice.agent.objection_replies.asks_discount = [{ id: 'testtooexpa', text: 'Réplique de test D' }];
+    expect(issuePaths(twice)).toEqual(['agent.objection_replies']);
+  });
+});
+
 describe('StoredPersonaSchema', () => {
   it('reads both formats, and no file at a format it does not know', () => {
     expect(StoredPersonaSchema.safeParse(personaFile('demo/v0.1.0.yaml')).success).toBe(true);
@@ -212,13 +237,14 @@ describe('personaSheetFromV1 (ADR 0079 § 5)', () => {
 });
 
 describe('personaSheetCompletion', () => {
-  it('counts the questions answered out of 59, the time zone always answered', () => {
+  it('counts the questions answered out of 61, the time zone always answered', () => {
     expect(personaSheetCompletion(demo().sheet)).toEqual({
       answered: 57,
-      total: 59,
-      percent: 97,
+      total: 61,
+      percent: 93,
       missing: [
         { section: 'identity', left: 1 },
+        { section: 'conversation', left: 2 },
         { section: 'relationships', left: 1 },
       ],
     });

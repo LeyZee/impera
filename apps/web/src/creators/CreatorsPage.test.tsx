@@ -230,7 +230,7 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(within(anna).queryByText('En poste')).toBeNull();
     expect(within(anna).queryByText('Contenu attendu')).toBeNull();
     expect(within(anna).getByText('Rien')).toBeDefined();
-    expect(within(anna).queryByText('À configurer')).toBeNull();
+    expect(within(anna).queryByText('Mise en route')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ajouter une créatrice' })).toBeNull();
     fireEvent.click(within(anna).getByRole('link', { name: 'Anna' }));
     await waitFor(() => {
@@ -477,9 +477,27 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
   });
 });
 
-describe('Créatrices, what is left to set up for her (CRM-07 b2)', () => {
-  /** `serve`, with her account and her percentage answered as given. */
-  async function serveSetup(account: unknown, current: unknown): Promise<void> {
+describe('Créatrices, her « Mise en route » (pilotage plan W1)', () => {
+  const step = (key: string, state: 'done' | 'todo' | 'waiting', note: unknown = null) => ({
+    key,
+    state,
+    note,
+  });
+  const ALL_DONE = [
+    'platform_account',
+    'persona',
+    'agency_rate',
+    'access',
+    'pay_rules',
+    'telegram',
+    'agent_hours',
+    'shifts',
+    'agent_mode',
+    'reliability_check',
+  ].map((key) => step(key, 'done'));
+
+  /** `serve`, with her « Mise en route » answered as given. */
+  async function serveSetup(steps: readonly unknown[]): Promise<void> {
     await serve([ANNA]);
     const inner = vi.mocked(fetch);
     const answered = inner.getMockImplementation();
@@ -487,60 +505,75 @@ describe('Créatrices, what is left to set up for her (CRM-07 b2)', () => {
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
         const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
-        if (url === `/v1/creators/${ANNA.id}/account`) return json({ account });
-        if (url === `/v1/creators/${ANNA.id}/agency-rates`)
-          return json({ today: '2026-11-05', current, rates: current === null ? [] : [current] });
+        if (url === '/v1/dashboard/setup/creators')
+          return json({ creators: [{ creatorId: ANNA.id, steps }] });
         if (answered === undefined) throw new Error('serve() answers first');
         return answered(url, init);
       }),
     );
   }
 
-  it('says on her card what is left to the owner, each step opening its tab', async () => {
-    await serveSetup(null, null);
+  it('says on her card how far she is, her next step opening where it is done', async () => {
+    await serveSetup(
+      ALL_DONE.map((one) =>
+        one.key === 'agency_rate'
+          ? step('agency_rate', 'todo')
+          : one.key === 'access'
+            ? step('access', 'waiting')
+            : one,
+      ),
+    );
     const router = renderAt(owner, '/creatrices');
     const anna = await cardOf('Anna');
-    await within(anna).findByText('À configurer');
-    // Her persona is stored: only her percentage and her access are left.
-    expect(
-      within(anna)
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual(['Anna', 'Pourcentage', 'Accès']);
-    fireEvent.click(within(anna).getByRole('link', { name: 'Pourcentage' }));
+    await within(anna).findByText('Mise en route');
+    expect(within(anna).getByText('8 sur 10')).toBeDefined();
+    // What is to do comes before what waits on her.
+    fireEvent.click(within(anna).getByRole('link', { name: 'Prochaine étape : Le pourcentage de l’agence' }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'pourcentage', creatrice: ANNA.id });
     });
   });
 
-  it('is gone once all is done, and never shown to anyone but the owner', async () => {
-    const rate = {
-      id: '0192f3a0-0000-7000-8000-0000000000f1',
-      creatorId: ANNA.id,
-      fromDay: '2026-11-01',
-      agencyBps: 4000,
-      createdAt: '2026-11-01T08:00:00.000Z',
-    };
+  it('lays out every step on her sheet, the next one first', async () => {
     await serveSetup(
-      { email: 'anna@example.test', invitationPending: false, invitationExpiresAt: null },
-      rate,
+      ALL_DONE.map((one) =>
+        one.key === 'pay_rules'
+          ? step('pay_rules', 'todo', { kind: 'accounts', done: 1, total: 2 })
+          : one.key === 'agent_hours'
+            ? step('agent_hours', 'done', { kind: 'default_hours' })
+            : one,
+      ),
     );
+    renderAt(owner, `/creatrices?onglet=pourcentage&creatrice=${ANNA.id}`);
+    const card = await screen.findByRole('region', { name: 'Mise en route de la créatrice' });
+    expect(within(card).getByText('9 sur 10')).toBeDefined();
+    expect(within(card).getByText('Les règles de paie de ses comptes')).toBeDefined();
+    expect(
+      within(card).getByRole('link', { name: 'Régler : Les règles de paie de ses comptes' }),
+    ).toBeDefined();
+    expect(
+      within(card).getByText('1 compte sur 2 · Sans elles, les rapports de fin de shift sont refusés.'),
+    ).toBeDefined();
+    fireEvent.click(within(card).getByRole('button', { name: 'Tout voir' }));
+    fireEvent.click(within(card).getByRole('button', { name: 'Voir les 9 étapes faites' }));
+    expect(within(card).getByText('Heures par défaut de l’agence.')).toBeDefined();
+    expect(within(card).getAllByRole('listitem')).toHaveLength(10);
+  });
+
+  it('is gone once all is done, and never asked for anyone but the owner', async () => {
+    await serveSetup(ALL_DONE);
     renderAt(owner, '/creatrices');
     await cardOf('Anna');
     await waitFor(() => {
-      expect(vi.mocked(fetch).mock.calls.some(([url]) => url === `/v1/creators/${ANNA.id}/account`)).toBe(
-        true,
-      );
+      expect(vi.mocked(fetch).mock.calls.some(([url]) => url === '/v1/dashboard/setup/creators')).toBe(true);
     });
-    expect(screen.queryByText('À configurer')).toBeNull();
+    expect(screen.queryByText('Mise en route')).toBeNull();
     cleanup();
 
-    await serveSetup(null, null);
+    await serveSetup(ALL_DONE.map((one) => ({ ...one, state: 'todo' })));
     renderAt(operator, '/creatrices');
     await cardOf('Anna');
-    expect(screen.queryByText('À configurer')).toBeNull();
-    expect(vi.mocked(fetch).mock.calls.some(([url]) => url === `/v1/creators/${ANNA.id}/account`)).toBe(
-      false,
-    );
+    expect(screen.queryByText('Mise en route')).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => url === '/v1/dashboard/setup/creators')).toBe(false);
   });
 });

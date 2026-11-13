@@ -74,6 +74,16 @@ export class PaySaleSignalStateConflict extends DomainError {
   }
 }
 
+/**
+ * A give to a member the sale does not offer (`recipientsOf`, less the validator and the members gone with a validated
+ * final statement), or a share of a sale of the agent (ADR 0101 §§ 2, 4, 12).
+ */
+export class PaySaleRecipientConflict extends DomainError {
+  constructor() {
+    super('pay_sale_recipient_conflict', 'Ce membre ne peut pas recevoir cette vente');
+  }
+}
+
 /** An outcome the sale does not offer now (`saleDecisionsOpen`): `details.outcomes` says those it does. */
 export class PaySaleOutcomeConflict extends DomainError {
   constructor(outcomes: readonly SaleDecisionOutcome[]) {

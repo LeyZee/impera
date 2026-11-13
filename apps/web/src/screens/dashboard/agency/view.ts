@@ -69,6 +69,30 @@ export function shareOf(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
 }
 
+/**
+ * The shares of `parts` in `whole`, in whole %, that add up to the rounded share of their sum: 100 when the parts make
+ * the whole. Largest remainder: each part gets its share rounded down, and the points left go to the parts with the
+ * largest fractions, the first one on a tie. Only the percentages move, never an amount (recette du 13/11 : 17 + 17 +
+ * 42 + 25 = 101 %). Zeros for an empty whole.
+ */
+export function sharesOf(parts: readonly number[], whole: number): number[] {
+  if (whole <= 0) return parts.map(() => 0);
+  // In whole cents × 100, never in floats: two equal remainders stay equal, the tie goes to the first part.
+  const scaled = parts.map((part) => Math.max(0, part) * 100);
+  const shares = scaled.map((one) => Math.floor(one / whole));
+  const target = Math.round(scaled.reduce((sum, one) => sum + one, 0) / whole);
+  const order = scaled
+    .map((one, index) => ({ index, rest: one - (shares[index] ?? 0) * whole }))
+    .sort((a, b) => b.rest - a.rest || a.index - b.index);
+  let left = target - shares.reduce((sum, one) => sum + one, 0);
+  for (const { index } of order) {
+    if (left <= 0) break;
+    shares[index] = (shares[index] ?? 0) + 1;
+    left -= 1;
+  }
+  return shares;
+}
+
 /** Euros to the cent, always: a figure read in a tip, never rounded away (ADR 0106 § 12). */
 export function exactEuros(cents: number): string {
   return `${(cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
@@ -97,6 +121,27 @@ function split(figures: MoneyFigures): Record<MoneyPart['key'], number> {
     commission: at(figures.revenueExclVatMinor - figures.netMinor),
     creator: at(figures.creatorMinor),
     agency: at(figures.agencyMinor),
+  };
+}
+
+/** What each money figure says in %, from the same split everywhere, so a tile, the bar and its legend agree. */
+export interface MoneyShares {
+  /** Of the revenue, the four parts adding up to 100. */
+  readonly ofRevenue: Readonly<Record<MoneyPart['key'], number>>;
+  /** Of the net, the two parts adding up to 100. */
+  readonly ofNet: Readonly<Record<'creator' | 'agency', number>>;
+}
+
+export function moneyShares(figures: MoneyFigures): MoneyShares {
+  const parts = split(figures);
+  const [fansVat = 0, commission = 0, creator = 0, agency = 0] = sharesOf(
+    [parts.fansVat, parts.commission, parts.creator, parts.agency],
+    figures.revenueMinor,
+  );
+  const [creatorOfNet = 0, agencyOfNet = 0] = sharesOf([parts.creator, parts.agency], figures.netMinor);
+  return {
+    ofRevenue: { fansVat, commission, creator, agency },
+    ofNet: { creator: creatorOfNet, agency: agencyOfNet },
   };
 }
 
@@ -148,6 +193,9 @@ export function moneyTip(input: {
   readonly revenueMinor: number;
   readonly netMinor: number | null;
   readonly text: string;
+  /** The share already settled with the figure's siblings (`moneyShares`), in place of rounding it alone. */
+  readonly revenueShare?: number;
+  readonly netShare?: number;
 }): { title: string; rows: (readonly [string, string])[]; text: string } {
   const rows: (readonly [string, string])[] = [['Montant', exactEuros(input.cents)]];
   if (input.previousCents !== null) {
@@ -160,9 +208,12 @@ export function moneyTip(input: {
     ]);
   }
   if (input.revenueMinor > 0)
-    rows.push(['Part du chiffre d’affaires', `${String(shareOf(input.cents, input.revenueMinor))}\u00a0%`]);
+    rows.push([
+      'Part du chiffre d’affaires',
+      `${String(input.revenueShare ?? shareOf(input.cents, input.revenueMinor))}\u00a0%`,
+    ]);
   if (input.netMinor !== null && input.netMinor > 0)
-    rows.push(['Part du net', `${String(shareOf(input.cents, input.netMinor))}\u00a0%`]);
+    rows.push(['Part du net', `${String(input.netShare ?? shareOf(input.cents, input.netMinor))}\u00a0%`]);
   return { title: input.title, rows, text: input.text };
 }
 

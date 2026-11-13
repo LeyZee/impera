@@ -20,6 +20,7 @@ import { ScriptsSection } from './scripts/ScriptsSection';
 import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
 import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 
+import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 
 export type CreatorTab = CreatorSheet;
@@ -335,6 +336,10 @@ export function CreatorsPage({
       {/* One child of the page: the sheet follows the switch, never pushed to the foot of the screen (CREA-03). */}
       <div className="ps-sheet">
         {leaving ? <LeaveConfirm onLeave={leave} onStay={stay} /> : null}
+        {/* Her « Mise en route » (pilotage plan W1) above whichever sheet is open, until all is done. */}
+        {isOwner && current !== undefined && !showForm ? (
+          <CreatorSetupBlock key={`${current.id}:${shown}`} creatorId={current.id} />
+        ) : null}
         {body()}
         {/* The archived creators, folded at the foot of the list, the owner's alone (ADR 0071 § 2). */}
         {isOwner && listing && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}

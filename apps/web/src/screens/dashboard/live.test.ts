@@ -232,14 +232,43 @@ describe('fromApi', () => {
     // Its guide is one click away (ADM-18).
     expect(unlinked.agent).toMatchObject({
       tone: 'idle',
-      headline: 'Reveal n’est **pas encore relié**',
+      headline: 'La messagerie Reveal n’est **pas encore reliée**',
       action: 'Comment relier Reveal',
       actionTo: '/aide/reveal',
     });
     expect(card('reveal', unlinked)).toMatchObject({ tone: 'idle', value: 'Pas encore reliée' });
-    expect(unlinked.agent.foldSummary).toContain('Reveal pas encore relié');
+    expect(unlinked.agent.foldSummary).toContain('Messagerie Reveal pas encore reliée');
+    expect(unlinked.agent.lead).not.toContain('ventes');
     // Reveal speaks first, the voice is said in the same lead, not only in the fold.
     expect(unlinked.agent.lead).toContain('L’IA qui écrit ne répond pas non plus.');
+  });
+
+  it('says the sales already come in when only the messaging session is missing', () => {
+    const figures = {
+      sales: 1,
+      refunds: 0,
+      revenueMinor: 1000,
+      netMinor: 1000,
+      agencyMinor: 450,
+      creatorMinor: 550,
+    };
+    const salesOnly = fromApi(
+      apiDashboard({
+        reveal: { connected: false, lastReadAt: null, late: false, conversations: 0 },
+        revealSales: {
+          platforms: ['reveal'],
+          from: '2026-11-03',
+          to: '2026-11-03',
+          totals: figures,
+          bySeller: null,
+          usd: { seen: false, rate: null },
+          refundsWithoutSale: 0,
+          stopped: [],
+        },
+      }),
+    );
+    expect(salesOnly.agent.headline).toBe('La messagerie Reveal n’est **pas encore reliée**');
+    expect(salesOnly.agent.lead).toMatch(/^Les ventes Reveal, elles, remontent déjà\. L’agent commencera/u);
   });
 
   it('says a missing key is a step to take, in amber, and where the key goes', () => {
@@ -336,9 +365,13 @@ describe('fromApi', () => {
     );
     expect(card('reveal', late)).toMatchObject({ tone: 'warn', value: 'Lecture en retard' });
     expect(card('reveal', late)?.rows[0]).toEqual(['Dernière lecture', 'il y a 30 min']);
-    expect(late.agent).toMatchObject({ tone: 'warn', stalled: true, headline: 'Reveal n’est **plus lu**' });
-    expect(late.agent.lead).toContain('lu pour la dernière fois il y a 30 min');
-    expect(late.agent.foldSummary).toContain('Reveal lu en retard');
+    expect(late.agent).toMatchObject({
+      tone: 'warn',
+      stalled: true,
+      headline: 'La messagerie Reveal n’est **plus lue**',
+    });
+    expect(late.agent.lead).toContain('la messagerie a été lue pour la dernière fois il y a 30 min');
+    expect(late.agent.foldSummary).toContain('Messagerie Reveal lue en retard');
     expect(card('reveal')).toMatchObject({ tone: 'ok', value: 'Connectée' });
   });
 
@@ -355,7 +388,7 @@ describe('fromApi', () => {
     });
     expect(fromApi(offline).agent).toMatchObject({
       tone: 'bad',
-      headline: 'Reveal est **déconnecté**',
+      headline: 'La messagerie Reveal est **déconnectée**',
       action: 'Reconnecter Reveal',
       actionTo: '/aide/reveal',
     });
