@@ -1303,7 +1303,9 @@
 }
 
 /* A sale given or shared (ADR 0101): who it went to stands out, why follows in the line's own voice. */
+/* Who gave or received the sale, on its own line above the why. */
 .py-gift__who {
+  display: block;
   color: var(--nv-ink);
   font-weight: 600;
 }
@@ -1384,10 +1386,8 @@
   width: var(--py-thumb);
   height: var(--py-thumb);
   border-radius: var(--nv-radius-full);
-  background: var(--nv-surface-raised);
-  box-shadow:
-    0 0 0 1px var(--nv-hairline),
-    0 2px 6px rgba(0, 0, 0, 0.25);
+  background: var(--nv-thumb);
+  box-shadow: var(--nv-shadow-thumb);
   transition:
     left var(--nv-dur-fast) var(--nv-ease-out),
     transform var(--nv-dur-fast) var(--nv-ease-spring);
@@ -1421,6 +1421,14 @@
   min-width: 0;
   font-weight: 600;
   text-align: center;
+}
+/* The day goes no further than the period's first nor than today. */
+.py-give__day .sc-arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: var(--nv-plate);
+  color: var(--nv-ink-muted);
+  transform: none;
 }
 .py-give__watch {
   margin-top: var(--nv-space-4);

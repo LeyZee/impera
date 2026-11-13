@@ -24,12 +24,14 @@ import {
   heldInOrder,
   heldReasonText,
   lineChatter,
+  notePlaceholder,
   outcomeLabel,
   outcomeWords,
   outcomesShown,
   refundAlone,
   ownLineText,
   saleAmount,
+  saleSellerText,
   saleWhen,
   signalChipText,
   signalText,
@@ -231,7 +233,8 @@ export function SaleCards({
                       type="button"
                       aria-describedby={`${about('who')} ${about('when')} ${about('amount')}`}
                       className={
-                        outcome === 'count' || (outcome === 'give' && sale.reason === null)
+                        outcome === 'count' ||
+                        (outcome === 'give' && sale.reason === null && sale.decision === null)
                           ? 'nv-btn nv-btn--neon nv-btn--sm'
                           : 'nv-btn nv-btn--plain nv-btn--sm'
                       }
@@ -347,7 +350,10 @@ function DecideDialog({
           <div>
             <dt>
               {account === null ? 'Un compte' : `${account.creatorName} · ${accountLine(account)}`}
-              <small>{saleWhen(sale, zone)}</small>
+              <small>
+                {saleWhen(sale, zone)}
+                {sale.event === 'sale' ? ` · ${saleSellerText(sale, member)}` : ''}
+              </small>
             </dt>
             <dd>{saleAmount(sale)}</dd>
           </div>
@@ -402,7 +408,7 @@ function DecideDialog({
             rows={2}
             maxLength={NOTE_MAX}
             value={note}
-            placeholder="Shift prolongé d’une heure, prévenu par message."
+            placeholder={notePlaceholder(outcome, why)}
             onChange={(event) => {
               setNote(event.target.value);
             }}

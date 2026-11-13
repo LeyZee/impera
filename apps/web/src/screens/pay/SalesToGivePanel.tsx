@@ -70,14 +70,17 @@ export function SalesToGivePanel({
         <div className="py-give__day" role="group" aria-label="Jour de la vente">
           <button
             type="button"
-            className="nv-btn nv-btn--plain nv-btn--sm"
+            className="sc-arrow"
             aria-label="Jour précédent"
+            title="Jour précédent"
             disabled={day <= first}
             onClick={() => {
               setDay(addDays(day, -1));
             }}
           >
-            ‹
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m10 3.5-4.5 4.5 4.5 4.5" />
+            </svg>
           </button>
           <span className="py-give__label nv-num" aria-live="polite">
             {day === today ? 'Aujourd’hui · ' : ''}
@@ -85,14 +88,17 @@ export function SalesToGivePanel({
           </span>
           <button
             type="button"
-            className="nv-btn nv-btn--plain nv-btn--sm"
+            className="sc-arrow"
             aria-label="Jour suivant"
+            title="Jour suivant"
             disabled={day >= last}
             onClick={() => {
               setDay(addDays(day, 1));
             }}
           >
-            ›
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m6 3.5 4.5 4.5-4.5 4.5" />
+            </svg>
           </button>
         </div>
         {read === undefined ? (

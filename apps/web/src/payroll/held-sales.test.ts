@@ -5,17 +5,20 @@ import {
   decidedWhyText,
   decisionText,
   giftCountText,
+  giveNoteHint,
   giveWords,
   heldCountText,
   heldInOrder,
   heldReasonText,
   lineChatter,
+  notePlaceholder,
   outcomeLabel,
   outcomesShown,
   outcomeWords,
   ownLineText,
   partsOf,
   saleAmount,
+  saleSellerText,
   saleWhen,
   shareOnStep,
   signalChipText,
@@ -194,6 +197,19 @@ describe('held sales (CRM-03 lot b4b)', () => {
     expect(plain(giftCountText({ decidedBy: 'user-me', given: 1, shared: 0 }, named))).toBe(
       'Toi : 1 vente donnée',
     );
+  });
+
+  it('recalls in a sheet who sold, and gives its note an example fitted to the gesture', () => {
+    expect(saleSellerText(heldSaleOf(), THEO)).toBe('vendue par Théo');
+    expect(saleSellerText(heldSaleOf({ memberId: null }), null)).toBe('vendue par un chatteur');
+    expect(saleSellerText(heldSaleOf({ memberId: null, byAgent: true }), null)).toBe('vendue par l’IA');
+    expect(notePlaceholder('exclude', 'agent_decisive')).toContain('message de l’IA');
+    expect(notePlaceholder('exclude', 'other')).not.toBe(notePlaceholder('exclude', 'agent_decisive'));
+    expect(notePlaceholder('count', null)).toContain('Shift prolongé');
+    expect(giveNoteHint(false, false)).toBe(
+      'Les deux membres la liront sur leur relevé. Jamais le message ni le nom d’un fan.',
+    );
+    expect(giveNoteHint(true, true)).toBe('Obligatoire : le membre la lira sur son relevé.');
   });
 
   it('says before a gesture what it does, its refunds with it, and what taking it back does', () => {

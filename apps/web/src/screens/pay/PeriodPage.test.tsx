@@ -1734,6 +1734,7 @@ describe('Paie › Quinzaine › Donner une vente (ADR 0101)', () => {
     expect(text(dialog)).toContain('Une vente de l’IA se donne entière : elle ne se partage pas.');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Donner' }));
     expect(text(dialog)).toContain('Choisis le membre qui a convaincu le fan.');
+    expect(text(dialog)).toContain('Obligatoire : le membre la lira sur son relevé.');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }));
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Jour précédent' }));

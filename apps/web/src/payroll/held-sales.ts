@@ -2,6 +2,7 @@ import {
   SALE_WHOLE_BP,
   type HeldSale,
   type SaleDecisionOutcome,
+  type SaleExcludeReason,
   type SaleGiftCount,
   type SaleHeldReason,
   type TeamImportOverview,
@@ -61,6 +62,38 @@ export function saleWhen(sale: HeldSale, timeZone: string): string {
       ? ', vente d’avant le registre'
       : ` de la vente du ${momentAt(sale.saleOccurredAt, timeZone)}`;
   return `Remboursement du ${momentAt(sale.occurredAt, timeZone)}${of}`;
+}
+
+/** Who sold, as a gesture's sheet recalls it under the sale's instant: a member, an unlinked chatter or the agent. */
+export function saleSellerText(sale: HeldSale, member: { readonly name: string } | null): string {
+  if (sale.byAgent) return 'vendue par l’IA';
+  return `vendue par ${member?.name ?? 'un chatteur'}`;
+}
+
+/**
+ * Who reads the note of a give, under its field: both members on a member's sale, the one who receives it on the
+ * agent's, which has no one else to tell. Missing, the line says first that it is required.
+ */
+export function giveNoteHint(byAgent: boolean, missing: boolean): string {
+  const readers = byAgent ? 'le membre la lira sur son relevé' : 'les deux membres la liront sur leur relevé';
+  if (missing) return `Obligatoire : ${readers}.`;
+  return `${readers.charAt(0).toUpperCase()}${readers.slice(1)}. Jamais le message ni le nom d’un fan.`;
+}
+
+/** The example in a gesture's note, fitted to the gesture and, to set a sale aside, to its reason. */
+export function notePlaceholder(outcome: SaleDecisionOutcome, why: SaleExcludeReason | null): string {
+  switch (outcome) {
+    case 'count':
+      return 'Shift prolongé d’une heure, prévenu par message.';
+    case 'exclude':
+      return why === 'agent_decisive'
+        ? 'Le fan a payé juste après le message de l’IA.'
+        : 'Vente faite par la créatrice elle-même.';
+    case 'give':
+      return 'Le fan a été convaincu pendant son shift.';
+    case 'withdraw':
+      return 'Décision prise sur le mauvais membre.';
+  }
 }
 
 /**

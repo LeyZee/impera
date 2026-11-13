@@ -14,10 +14,12 @@ import { Swatch } from './parts';
 import { useGrowingArea } from '@/lib/growing-area';
 import { decideSale, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import {
+  giveNoteHint,
   giveWords,
   HALF_BP,
   partsOf,
   saleAmount,
+  saleSellerText,
   saleWhen,
   SHARE_MAX_BP,
   SHARE_MIN_BP,
@@ -129,8 +131,7 @@ export function GiveDialog({
             <dt>
               {account === null ? 'Un compte' : `${account.creatorName} · ${accountLine(account)}`}
               <small>
-                {saleWhen(sale, zone)} ·{' '}
-                {sale.byAgent ? 'vendue par l’IA' : `vendue par ${member?.name ?? 'un chatteur'}`}
+                {saleWhen(sale, zone)} · {saleSellerText(sale, member)}
               </small>
             </dt>
             <dd>{saleAmount(sale)}</dd>
@@ -241,9 +242,7 @@ export function GiveDialog({
             }}
           />
           <p className="tm-hint" id={`${id}-note-hint`}>
-            {touched && noNote
-              ? 'Obligatoire : les deux membres la liront sur leur relevé.'
-              : 'Les deux membres la liront sur leur relevé. Jamais le message ni le nom d’un fan.'}
+            {giveNoteHint(sale.byAgent, touched && noNote)}
           </p>
         </div>
 
