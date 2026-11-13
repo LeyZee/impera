@@ -119,9 +119,11 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     const unlinked = {
       seller: { kind: 'unlinked' },
       revenueMinor: 37_200,
+      revenueExclVatMinor: 31_000,
       netMinor: 29_760,
       agencyMinor: 11_160,
       creatorMinor: 18_600,
+      agencyTransferVatMinor: 2_232,
       sales: 11,
       refunds: 0,
       previousRevenueMinor: 0,
