@@ -1302,6 +1302,147 @@
   }
 }
 
+/* A sale given or shared (ADR 0101): who it went to stands out, why follows in the line's own voice. */
+.py-gift__who {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+
+/* « Donner à… »: the members on shift as chips, each with their colour. */
+.py-give__to .nv-chip {
+  gap: var(--nv-space-2);
+}
+
+/* « Partager »: the recipient's part on the left, the author's on the right, the handle between them; each side says
+   its share and its part of the net. Colours are the members' own, the neon and a quiet ink without them. */
+.py-share {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-2);
+}
+.py-share__sides {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-callout);
+}
+.py-share__side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.py-share__side small {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.py-share__side--author {
+  align-items: flex-end;
+  text-align: right;
+}
+.py-share__row {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.py-share__track {
+  --py-thumb: 24px;
+  --py-share-mine: var(--nv-neon);
+  --py-share-rest: var(--nv-ink-faint);
+  position: relative;
+  flex: 1 1 auto;
+  height: 36px;
+  cursor: pointer;
+  touch-action: none;
+  border-radius: var(--nv-radius-full);
+}
+.py-share__mine,
+.py-share__rest {
+  position: absolute;
+  top: 13px;
+  height: 10px;
+  transition:
+    width var(--nv-dur-fast) var(--nv-ease-out),
+    left var(--nv-dur-fast) var(--nv-ease-out);
+}
+.py-share__mine {
+  left: 0;
+  width: calc(var(--py-share) * 100% - 3px);
+  border-radius: var(--nv-radius-full) 4px 4px var(--nv-radius-full);
+  background: var(--py-share-mine);
+}
+.py-share__rest {
+  left: calc(var(--py-share) * 100% + 3px);
+  right: 0;
+  border-radius: 4px var(--nv-radius-full) var(--nv-radius-full) 4px;
+  background: color-mix(in srgb, var(--py-share-rest) 55%, transparent);
+}
+.py-share__thumb {
+  position: absolute;
+  top: 6px;
+  left: calc(var(--py-share) * 100% - var(--py-thumb) / 2);
+  width: var(--py-thumb);
+  height: var(--py-thumb);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-surface-raised);
+  box-shadow:
+    0 0 0 1px var(--nv-hairline),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+  transition:
+    left var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-fast) var(--nv-ease-spring);
+}
+.py-share__track:hover .py-share__thumb {
+  transform: scale(1.08);
+}
+.py-share__track:active .py-share__thumb {
+  transform: scale(1.18, 0.92);
+}
+.py-share__track:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .py-share__mine,
+  .py-share__rest,
+  .py-share__thumb {
+    transition: none;
+  }
+}
+
+/* « Donner une vente »: the day, stepped back and forth inside the period; the owner's count under the sales. */
+.py-give__day {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin-bottom: var(--nv-space-3);
+}
+.py-give__label {
+  min-width: 0;
+  font-weight: 600;
+  text-align: center;
+}
+.py-give__watch {
+  margin-top: var(--nv-space-4);
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}
+.py-give__watch-head {
+  margin: 0 0 var(--nv-space-1);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.py-give__counts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* Commissions › « Mes ventes lues » (CRM-03 lot b4c): the member's own lines, a fold a day, today's open. The lines
    take the cards of « Ventes en attente ». */
 .py-mine .py-quiet {

@@ -15,6 +15,9 @@ import {
   DomainError,
   ExchangeRatesSchema,
   HeldSalesSchema,
+  SaleGiftCountsSchema,
+  SalesToGiveQuerySchema,
+  SalesToGiveSchema,
   MySalesQuerySchema,
   MySalesSchema,
   PageQuerySchema,
@@ -118,6 +121,29 @@ export function createPayrollRoutes(
         schema: { params: PeriodParamsSchema, response: { 200: HeldSalesSchema } },
       },
       (request) => decisions.heldSales(userOf(request), request.params.period),
+    );
+
+    // ADR 0101 §§ 1, 2, 17: the sales of a day the validator may give, and how many each validator gave in the month.
+    app.get(
+      '/payroll/periods/:period/sales-to-give',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: PeriodParamsSchema,
+          querystring: SalesToGiveQuerySchema,
+          response: { 200: SalesToGiveSchema },
+        },
+      },
+      (request) => decisions.salesToGive(userOf(request), request.params.period, request.query.day),
+    );
+
+    app.get(
+      '/payroll/periods/:period/sale-gifts',
+      {
+        preValidation: ownerOrMember,
+        schema: { params: PeriodParamsSchema, response: { 200: SaleGiftCountsSchema } },
+      },
+      (request) => decisions.saleGifts(userOf(request), request.params.period),
     );
 
     app.post(

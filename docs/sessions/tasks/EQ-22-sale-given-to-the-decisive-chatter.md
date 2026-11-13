@@ -19,7 +19,8 @@ ADR 0101, ADR 0050 § 5, ADR 0025, ADR 0043 § 7, ADR 0032, ADR 0072 ; `apps/api
 En deux PR (plan du 13/11) :
 
 - [x] 0101a, l'API : contrats (`give`, `SaleGiven`, `MySaleGiven`, `excludeReason`, `recipients`, `pay_sale_recipient_conflict`) ; migration 0175 (registre d'une clôture par membre et par part, décision avec receveur, part, raison d'un écart et vente gardée telle que le registre l'a ; déclencheurs des parts) ; domaine (`recipientsOf`, `recipientPartOf`, attribution `shared`, remboursements aux mêmes parts) ; magasins (décision, clôture, « Mes ventes lues ») ; l'écran de paie garde ses gestes (« Donner à… » caché jusqu'à son écran, « Écarter » envoie « autre raison »).
-- [ ] 0101b, les écrans (captures Nuit/Jour, PC/téléphone) : « Donner à… » avec « Toute la vente » ou « Partager » (50/50 en un geste, pas de 10 %), le choix « l'IA a été décisive » sur « Écarter », les ventes de l'agent à donner, « Donnée à … », « Reçue de … », « Partagée avec … : 60 % » sur les relevés et dans « Mes ventes lues », le nombre de partages par manager et par mois pour le propriétaire (§ 17).
+- [x] 0101b, les écrans : « Donner à… » avec « Toute la vente » ou « Partager » (50/50 en un geste, pas de 10 % sur une barre), le choix « l'IA a été décisive » sur « Écarter », le panneau « Donner une vente » (les ventes d'un jour, d'un membre ou de l'IA, où un autre membre était en poste ; `GET …/sales-to-give?day=`), « Donnée à … », « Reçue de … », « Partagée avec … : 40 % pour toi » dans « Mes ventes lues » et sur la carte du valideur, le nombre de ventes données par valideur et par mois pour le propriétaire (§ 17, `GET …/sale-gifts`).
+- [ ] 0101b, captures Nuit/Jour, PC/téléphone, vues par Charles avant fusion.
 
 ## Critères d'acceptation
 
@@ -35,3 +36,4 @@ En deux PR (plan du 13/11) :
 ## Notes de session
 
 - 13/11, Équipe, 0101a : la décision d'un don garde la vente du registre (devise, net, instant), pour que son auteur la lise une fois sortie de son relevé sans lire le registre (la portée `self` ne le lit pas). Les ventes de l'agent ne sont pas listées dans « Ventes en attente » tant qu'aucune décision ne les touche : la liste à part vient avec 0101b.
+- 13/11, Équipe, 0101b : un manager retrouve une vente que personne n'a signalée par son jour (panneau « Donner une vente » sous « Ventes en attente »), parce qu'une vente payée à son auteur n'apparaît dans les ventes en attente que signalée ; la liste ne garde que les ventes où le lecteur a quelqu'un à nommer, jamais les siennes. Le compteur du propriétaire compte les dons en vigueur écrits dans le mois (une décision retirée ou changée depuis ne compte plus). Découverte (relecture de Bilan sur #731) : la contrainte différée du registre ne relie pas `share_bp` ni `member_id` au don en vigueur ; la clôture le garantit et les tests le couvrent, une petite migration pourrait le faire tenir par la base plus tard.

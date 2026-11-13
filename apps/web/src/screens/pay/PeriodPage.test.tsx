@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import type { HeldSale, Me, PayrollPeriod, TeamMember } from '@impera/contracts';
+import {
+  PayPeriodSchema,
+  type HeldSale,
+  type Me,
+  type PayrollPeriod,
+  type TeamMember,
+} from '@impera/contracts';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -57,6 +63,12 @@ let periods: Record<string, PayrollPeriod | 'down'>;
 let reports: unknown[];
 /** The sales each period holds or a decision settles (CRM-03 lot b4b); `'down'` answers a server error. */
 let held: Record<string, HeldSale[] | 'down'>;
+/** The sales a validator may give, by period and day (ADR 0101): `'<period> <day>'`. */
+let toGive: Record<string, HeldSale[]>;
+/** The owner's count of the gives of the month (ADR 0101 § 17). */
+let giftCounts: { decidedBy: string; given: number; shared: number }[];
+/** The paths read, in order: what the screen asked for. */
+const reads: string[] = [];
 let rules: unknown;
 /** The latest dollar rate the daily job read. */
 let usd: unknown;
@@ -84,6 +96,15 @@ function serve(): void {
         const answered = answer(url.pathname);
         return json(answered.body, answered.status);
       }
+      reads.push(`${url.pathname}${url.search}`);
+      const giving = /^\/v1\/payroll\/periods\/([^/]+)\/sales-to-give$/u.exec(url.pathname)?.[1];
+      if (giving !== undefined) {
+        const day = url.searchParams.get('day') ?? '';
+        return json({ period: giving, day, sales: toGive[`${giving} ${day}`] ?? [] });
+      }
+      const gifting = /^\/v1\/payroll\/periods\/([^/]+)\/sale-gifts$/u.exec(url.pathname)?.[1];
+      if (gifting !== undefined)
+        return json({ period: gifting, monthStart: `${gifting.slice(0, 7)}-01`, counts: giftCounts });
       const holding = /^\/v1\/payroll\/periods\/([^/]+)\/held-sales$/u.exec(url.pathname)?.[1];
       if (holding !== undefined) {
         const sales = held[holding] ?? [];
@@ -256,6 +277,9 @@ beforeEach(() => {
   revealTeam = [];
   reports = [];
   held = {};
+  toGive = {};
+  giftCounts = [];
+  reads.length = 0;
   rules = PAY_RULES;
   periods = {
     [OCT1]: periodOf(OCT1, [statementOf(THEO, OCT1, { netMinor: 100_000, ...PAID })], {
@@ -1451,6 +1475,12 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
     fireEvent.click(within(await panel()).getByRole('button', { name: 'Écarter' }));
     const dialog = await screen.findByRole('dialog');
+    // ADR 0101 § 8: « Écarter » asks why first, the agent decisive or another reason.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Écarter' }));
+    expect(text(dialog)).toContain('Choisis une raison.');
+    expect(writes).toEqual([]);
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'L’IA a été décisive' }));
+    expect(text(dialog)).toContain('La vente comptera pour l’IA dans le Dashboard, jamais en paie');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Écarter' }));
     expect(text(await within(dialog).findByRole('alert'))).toBe(
       'Cette vente n’attend plus de décision dans cette quinzaine : la liste est relue.',
@@ -1461,8 +1491,11 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     });
     const [first, second] = writes.map((one) => JSON.stringify(one.body));
     expect(second).toBe(first);
-    // ADR 0101 § 8: an exclusion says its reason, « autre raison » until the screen offers the choice.
-    expect(writes[0]?.body).toMatchObject({ outcome: 'exclude', note: null, excludeReason: 'other' });
+    expect(writes[0]?.body).toMatchObject({
+      outcome: 'exclude',
+      note: null,
+      excludeReason: 'agent_decisive',
+    });
   });
 
   it('says a list it could not read, never an empty one, and reads it again on « Réessayer »', async () => {
@@ -1564,6 +1597,182 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     expect(text(dialog)).toContain(
       'Le remboursement suit de nouveau les règles : il se déduit des ventes de Théo.',
     );
+  });
+});
+
+describe('Paie › Quinzaine › Donner une vente (ADR 0101)', () => {
+  const NOTE = 'Il a relancé le fan et l’a convaincu';
+  const panelNamed = async (name: string): Promise<HTMLElement> => {
+    const found = (await screen.findByText(name)).closest('section');
+    if (found === null) throw new Error(`No panel ${name}`);
+    return found;
+  };
+  const given = (shareBp: number) => ({ recipientMemberId: BASILE.id, shareBp, note: NOTE });
+
+  it('gives a held sale to the member on shift, whole by default, or shared on one bar with its parts', async () => {
+    held[OCT2] = [heldSaleOf({ outcomes: ['count', 'exclude', 'give'], recipients: [BASILE.id] })];
+    answer = () => ({
+      status: 201,
+      body: {
+        id: payId(901),
+        platform: 'reveal',
+        platformSaleId: 'vente-1',
+        revision: 1,
+        platformAccountId: payId(11),
+        outcome: 'give',
+        reason: 'off_shift',
+        memberId: THEO.id,
+        recipientMemberId: BASILE.id,
+        shareBp: 4_000,
+        excludeReason: null,
+        note: NOTE,
+        decidedBy: OWNER_USER,
+        createdAt: '2026-11-02T09:00:00.000Z',
+      },
+    });
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    fireEvent.click(within(await panelNamed('Ventes en attente')).getByRole('button', { name: 'Donner à…' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(text(dialog)).toContain('Donner cette vente');
+    expect(text(dialog)).toContain('vendue par Théo');
+    // The one member on shift is chosen, the whole sale by default.
+    expect(within(dialog).getByRole('radio', { name: 'Basile' }).getAttribute('aria-checked')).toBe('true');
+    expect(within(dialog).getByRole('radio', { name: 'Toute la vente' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    // Why is required: nothing is sent without it.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Donner à Basile' }));
+    expect(text(dialog)).toContain('Obligatoire : les deux membres la liront sur leur relevé.');
+    expect(writes).toEqual([]);
+
+    fireEvent.change(within(dialog).getByLabelText('Pourquoi ce membre a été décisif'), {
+      target: { value: `  ${NOTE}  ` },
+    });
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Partager' }));
+    const bar = within(dialog).getByRole('slider');
+    expect(bar.getAttribute('aria-valuetext')?.replace(NBSP, ' ')).toBe('Basile 50 %, Théo 50 %');
+    expect(text(dialog)).toContain('Basile 50 %21,00 €');
+    fireEvent.keyDown(bar, { key: 'ArrowLeft' });
+    expect(bar.getAttribute('aria-valuetext')?.replace(NBSP, ' ')).toBe('Basile 40 %, Théo 60 %');
+    expect(text(dialog)).toContain('Basile 40 %16,80 €');
+    expect(text(dialog)).toContain('Théo 60 %25,20 €');
+    fireEvent.keyDown(bar, { key: 'Home' });
+    expect(bar.getAttribute('aria-valuenow')).toBe('10');
+    fireEvent.click(within(dialog).getByRole('button', { name: '50/50' }));
+    expect(bar.getAttribute('aria-valuenow')).toBe('50');
+    fireEvent.keyDown(bar, { key: 'ArrowDown' });
+
+    held[OCT2] = [
+      heldSaleOf({
+        decision: 'give',
+        given: given(4_000),
+        outcomes: ['count', 'exclude', 'give', 'withdraw'],
+        recipients: [BASILE.id],
+      }),
+    ];
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Partager avec Basile' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(writes).toEqual([
+      {
+        path: '/v1/payroll/sale-decisions',
+        body: {
+          id: AN_ID,
+          period: OCT2,
+          platform: 'reveal',
+          platformSaleId: 'vente-1',
+          outcome: 'give',
+          note: NOTE,
+          recipientMemberId: BASILE.id,
+          shareBp: 4_000,
+          excludeReason: null,
+        },
+      },
+    ]);
+    const list = await panelNamed('Ventes en attente');
+    expect(text(await within(list).findByText(/Partagée avec Basile/u))).toBe('Partagée avec Basile : 40 %');
+    expect(text(list)).toContain(`Pourquoi : « ${NOTE} »`);
+  });
+
+  it('hides « Donner à… » while nobody may receive the sale', async () => {
+    held[OCT2] = [heldSaleOf({ outcomes: ['count', 'exclude', 'give'], recipients: [] })];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panelNamed('Ventes en attente');
+    expect(within(list).getAllByRole('button').map(text)).toEqual(['Compter pour Théo', 'Écarter']);
+  });
+
+  it('finds a sale by its day, the agent’s too, gives it whole, and goes no further than the period and today', async () => {
+    const bot = heldSaleOf({
+      platformSaleId: 'vente-ia',
+      occurredAt: '2026-11-02T07:30:00.000Z',
+      saleOccurredAt: '2026-11-02T07:30:00.000Z',
+      salePeriod: PayPeriodSchema.parse(NOV1),
+      memberId: null,
+      platformChatterId: 'chatter-bot',
+      byAgent: true,
+      reason: null,
+      outcomes: ['give'],
+      recipients: [BASILE.id, LOU.id],
+    });
+    toGive[`${NOV1} 2026-11-02`] = [bot];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${NOV1}`);
+    const panel = await panelNamed('Donner une vente');
+    expect(text(within(panel).getByText(/Aujourd’hui/u))).toBe('Aujourd’hui · Lundi 2 novembre');
+    expect(within(panel).getByRole('button', { name: 'Jour suivant' })).toHaveProperty('disabled', true);
+    const card = await within(panel).findByText(/vendue par/u);
+    expect(text(card)).toContain('vendue par l’IA');
+    fireEvent.click(within(panel).getByRole('button', { name: 'Donner à…' }));
+    const dialog = await screen.findByRole('dialog');
+    // Two members on shift: none is chosen for the validator; an agent's sale is never shared.
+    expect(
+      within(dialog)
+        .getAllByRole('radio')
+        .map((one) => one.getAttribute('aria-checked')),
+    ).toEqual(['false', 'false']);
+    expect(within(dialog).queryByRole('radio', { name: 'Partager' })).toBeNull();
+    expect(text(dialog)).toContain('Une vente de l’IA se donne entière : elle ne se partage pas.');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Donner' }));
+    expect(text(dialog)).toContain('Choisis le membre qui a convaincu le fan.');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Jour précédent' }));
+    expect(
+      await within(panel).findByText('Aucune vente ce jour où un autre membre était en poste sur le compte.'),
+    ).toBeTruthy();
+    expect(text(panel)).toContain('Dimanche 1er novembre');
+    expect(within(panel).getByRole('button', { name: 'Jour précédent' })).toHaveProperty('disabled', true);
+    expect(reads).toContain(`/v1/payroll/periods/${NOV1}/sales-to-give?day=2026-11-01`);
+  });
+
+  it('shows the owner how many sales each validator gave in the month, never a manager', async () => {
+    giftCounts = [
+      { decidedBy: IRIS.userId, given: 3, shared: 2 },
+      { decidedBy: OWNER.id, given: 1, shared: 0 },
+    ];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${NOV1}`);
+    const panel = await panelNamed('Donner une vente');
+    expect(await within(panel).findByText('Ventes données en novembre')).toBeTruthy();
+    expect(within(panel).getAllByRole('listitem').map(text)).toEqual([
+      'Iris : 3 ventes données, dont 2 partagées',
+      'Toi : 1 vente donnée',
+    ]);
+    cleanup();
+    reads.length = 0;
+    renderPage(IRIS_ME, `/paie/quinzaine?quinzaine=${NOV1}`);
+    const forIris = await panelNamed('Donner une vente');
+    await within(forIris).findByText('Aucune vente ce jour où un autre membre était en poste sur le compte.');
+    expect(within(forIris).queryByText('Ventes données en novembre')).toBeNull();
+    expect(reads.some((path) => path.endsWith('/sale-gifts'))).toBe(false);
+  });
+
+  it('shows no panel on a closed period', async () => {
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT1}`);
+    await screen.findByRole('button', { name: 'Théo' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(screen.queryByText('Donner une vente')).toBeNull();
   });
 });
 

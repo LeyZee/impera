@@ -18,6 +18,8 @@ import {
   myDayLine,
   myDayTitle,
   mySaleAmount,
+  mySaleGivenText,
+  mySaleGivenWhy,
   mySaleNote,
   mySalesCountText,
   mySalesIntro,
@@ -143,6 +145,8 @@ export function MySalesPanel({
                   const account = names.account(sale.platformAccountId);
                   const note = mySaleNote(sale, first.closed);
                   const signal = mySignalNote(sale);
+                  const given = mySaleGivenText(sale);
+                  const why = mySaleGivenWhy(sale);
                   const kind: SaleSignalKind | null = !sale.open
                     ? null
                     : sale.state === 'counted'
@@ -166,7 +170,7 @@ export function MySalesPanel({
                       <div className="py-held__side">
                         <p
                           className={
-                            sale.state === 'excluded' || sale.state === 'removed'
+                            sale.state === 'excluded' || sale.state === 'removed' || sale.state === 'given'
                               ? 'py-held__amount py-mine__gone nv-num'
                               : 'py-held__amount nv-num'
                           }
@@ -182,6 +186,12 @@ export function MySalesPanel({
                         <p className="py-held__reason">
                           {note}
                           {signal === null ? null : <span className="py-mine__note"> {signal}</span>}
+                        </p>
+                      )}
+                      {given === null ? null : (
+                        <p className="py-held__reason py-gift">
+                          <b className="py-gift__who">{given}</b>
+                          {why === null ? null : <span className="py-mine__note"> {why}</span>}
                         </p>
                       )}
                       {kind === null ? null : (

@@ -7,6 +7,8 @@ import {
   CommissionStatementSchema,
   ExchangeRatesSchema,
   HeldSalesSchema,
+  SaleGiftCountsSchema,
+  SalesToGiveSchema,
   MySalesSchema,
   PayAdjustmentSchema,
   PayPeriodPageSchema,
@@ -32,6 +34,8 @@ import {
   type CreatePenaltyBody,
   type ExchangeRates,
   type HeldSales,
+  type SaleGiftCounts,
+  type SalesToGive,
   type MySales,
   type PayAdjustment,
   type PayCommissionStatementBody,
@@ -141,6 +145,44 @@ export function useHeldSales(period: PayPeriod | null, enabled: boolean): UseQue
     enabled: enabled && period !== null,
     // A sale read, a chatter linked or a shift added lands without a write here: read again every minute.
     refetchInterval: 60_000,
+    retry: READ_RETRY,
+    retryDelay: READ_RETRY_DELAY_MS,
+  });
+}
+
+/**
+ * The sales of `day` the reader may give (ADR 0101 §§ 1, 2): a member's or the agent's, on which someone else they may
+ * name was on shift. Read only once a day is chosen, and again every minute like the held sales.
+ */
+export function useSalesToGive(
+  period: PayPeriod | null,
+  day: string | null,
+  enabled: boolean,
+): UseQueryResult<SalesToGive> {
+  return useQuery({
+    queryKey: [...PAYROLL_KEY, 'sales-to-give', period, day],
+    queryFn: () =>
+      period === null || day === null
+        ? Promise.reject(new Error('No period or day'))
+        : read(`/v1/payroll/periods/${period}/sales-to-give?day=${day}`, (body) =>
+            SalesToGiveSchema.parse(body),
+          ),
+    enabled: enabled && period !== null && day !== null,
+    refetchInterval: 60_000,
+    retry: READ_RETRY,
+    retryDelay: READ_RETRY_DELAY_MS,
+  });
+}
+
+/** How many sales each validator gave in the month of `period` (ADR 0101 § 17): the owner's read alone. */
+export function useSaleGifts(period: PayPeriod | null, enabled: boolean): UseQueryResult<SaleGiftCounts> {
+  return useQuery({
+    queryKey: [...PAYROLL_KEY, 'sale-gifts', period],
+    queryFn: () =>
+      period === null
+        ? Promise.reject(new Error('No period'))
+        : read(`/v1/payroll/periods/${period}/sale-gifts`, (body) => SaleGiftCountsSchema.parse(body)),
+    enabled: enabled && period !== null,
     retry: READ_RETRY,
     retryDelay: READ_RETRY_DELAY_MS,
   });

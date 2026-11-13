@@ -1083,6 +1083,8 @@ export const HeldSaleSchema = z.object({
    * not linked by it, from the platform's team. `null` for a line made by nobody, such as a subscription.
    */
   platformChatterId: z.string().min(1).nullable(),
+  /** Made by the agent (its sale, or the refund of one): it may be given whole, never shared (ADR 0101 §§ 1, 12). */
+  byAgent: z.boolean(),
   /** Why the line is held without a decision, `null` for a line a member would be paid for. */
   reason: SaleHeldReasonSchema.nullable(),
   /** The decision in force on its sale, `null` for none. */
@@ -1117,6 +1119,42 @@ export const HeldSalesSchema = z.object({
   sales: z.array(HeldSaleSchema),
 });
 export type HeldSales = z.infer<typeof HeldSalesSchema>;
+
+/**
+ * `GET /v1/payroll/periods/:period/sales-to-give?day=` (owner, active manager) → 200: the sales of `day`, in the
+ * agency's zone, that the period takes and that a give may name a member on (ADR 0101 §§ 1, 2), a member's or the
+ * agent's, each as the held sales read it, in the order of their instants: where the validator finds a sale nobody
+ * signalled to give it to the member who was decisive. A closed period gives none.
+ */
+export const SalesToGiveQuerySchema = z.object({ day: CalendarDaySchema });
+export type SalesToGiveQuery = z.infer<typeof SalesToGiveQuerySchema>;
+
+export const SalesToGiveSchema = z.object({
+  period: PayPeriodSchema,
+  day: CalendarDaySchema,
+  sales: z.array(HeldSaleSchema),
+});
+export type SalesToGive = z.infer<typeof SalesToGiveSchema>;
+
+/** How many sales one validator gave in a month (ADR 0101 § 17): in all, and how many of them shared. */
+export const SaleGiftCountSchema = z.object({
+  decidedBy: UserIdSchema,
+  given: z.number().int().min(1),
+  shared: z.number().int().min(0),
+});
+export type SaleGiftCount = z.infer<typeof SaleGiftCountSchema>;
+
+/**
+ * `GET /v1/payroll/periods/:period/sale-gifts` (owner) → 200: for the month of `period`, from its first day in the
+ * agency's zone (`monthStart`), how many sales each validator gave, whole or shared, by the gives in force written
+ * that month (ADR 0101 § 17), the most first. A give taken back or changed into another decision since is not counted.
+ */
+export const SaleGiftCountsSchema = z.object({
+  period: PayPeriodSchema,
+  monthStart: CalendarDaySchema,
+  counts: z.array(SaleGiftCountSchema),
+});
+export type SaleGiftCounts = z.infer<typeof SaleGiftCountsSchema>;
 
 /**
  * A decision of the validator on a sale (CRM-03 lot b3, ADR 0050 § 5, ADR 0101), added only: the latest one counts,

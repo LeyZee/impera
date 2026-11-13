@@ -34,6 +34,8 @@ import type {
   PayrollSettings,
   PaySaleDecision,
   PaySaleSignal,
+  SaleGiftCounts,
+  SalesToGive,
   Penalty,
   PenaltyId,
   TeamMemberId,
@@ -147,6 +149,10 @@ export interface PayrollEntryStore {
  */
 export interface PayrollSaleDecisionStore {
   heldSales(userId: UserId, period: PayPeriod): Promise<HeldSales>;
+  /** The sales of a day a give may name a member on (ADR 0101 §§ 1, 2), as the held sales read them. */
+  salesToGive(userId: UserId, period: PayPeriod, day: string): Promise<SalesToGive>;
+  /** How many sales each validator gave in the month of `period` (ADR 0101 § 17): the owner only. */
+  saleGifts(userId: UserId, period: PayPeriod): Promise<SaleGiftCounts>;
   decide(actor: Actor, body: CreatePaySaleDecisionBody): Promise<Recorded<PaySaleDecision>>;
 }
 
