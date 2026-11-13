@@ -27,8 +27,8 @@ ADR 0026 et 0105 en entier, ADR 0005, 0016, 0021, 0023, 0024, 0046, 0053, 0075, 
 - [ ] Journal : chaque appel dans `audit_log` (`mcp.<outil>`, accès, identifiants, issue, `requestId`), sans texte ; lectures d'agent en catégorie à part.
 - [ ] Limites par accès (lectures), garde-fou d'exfiltration (la lecture d'une fiche de fan compte comme celle d'un fan), suspension et alerte importante, interrupteur « Agents connectés ». Échecs d'authentification par le limiteur partagé.
 - [ ] Recette sur le bac à sable (`IMPERA_SANDBOX=1`, `pnpm sandbox:world`) : un client MCP du SDK lit le monde simulé ; jamais de donnée réelle dans un test.
-- [ ] Écran Réglages › Agents connectés (propriétaire d'`apps/web`) : liste, création avec le jeton montré une fois, capacités jamais cochées d'office, phrase d'avertissement pour `read:conversation_content` et `read:script_content`, révocation, dernière utilisation. Captures Nuit/Jour, PC/téléphone avant fusion.
-- [ ] Docs : `api.md` (`/v1/mcp`), `security.md` §1 (l'exception), modèle de menaces (acteur « agent connecté »), `modules.md`, mode d'emploi pour brancher Claude Code sur `localhost` (jeton dans la configuration locale, hors dépôt et hors dossier partagé).
+- [ ] Écran Réglages › Agents connectés (propriétaire d'`apps/web`) : liste, création avec le jeton montré une fois, capacités jamais cochées d'office, phrase d'avertissement pour `read:conversation_content` (le texte des fans et le prénom des chatteurs partent chez le fournisseur du modèle de l'agent) et `read:script_content`, révocation, dernière utilisation. Captures Nuit/Jour, PC/téléphone avant fusion.
+- [ ] Docs : `api.md` (`/v1/mcp`), `security.md` §1 (l'exception), modèle de menaces (acteur « agent connecté »), `modules.md`, mode d'emploi pour brancher Claude Code sur `localhost` (l'API n'écoute que sur la machine, `HOST` local ; jeton dans la configuration locale, hors dépôt et hors dossier synchronisé ou partagé).
 
 ## Critères d'acceptation
 

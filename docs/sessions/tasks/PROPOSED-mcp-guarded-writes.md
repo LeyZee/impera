@@ -22,13 +22,13 @@ Freins (inchangés depuis 0026) :
 
 Dépôts (`write:drops`) :
 
-- [ ] `drop_upload` : sur un accès borné à une créatrice, par la même commande que son écran de dépôt ; le dépôt arrive « à valider » chez l'agence ; rien vers la plateforme ni vers un fan. Taille et formats de l'ADR 0070.
+- [ ] `drop_upload` : sur un accès borné à une créatrice, par la même commande que son écran de dépôt ; le dépôt arrive « à valider » chez l'agence ; rien vers la plateforme ni vers un fan. Même nettoyage, mêmes tailles et formats que l'écran (ADR 0070), plafond par jour et par accès en nombre et en volume, adresse d'envoi en écriture seule et pour un seul objet, nom de fichier affiché en texte brut. Tests « dépôt chez une autre créatrice » et « accès sans créatrice » → refus.
 
 Actions préparées (`prepare:team`, accès du propriétaire seul) :
 
 - [ ] Contrats et base : table `prepared_action` (accès, type de liste fermée, arguments, motif ≤ 500 caractères, état `pending` → `confirmed` | `refused` | `expired` | `cancelled`, dates), migration nouvelle (numéro demandé au coordinateur), FORCE RLS, harnais d'isolation, écriture sous l'identité de la personne ; sa ligne `GRANT` pour le rôle de service et dans son test (ADR 0087).
 - [ ] `member_invite_prepare` : prénom, rôle, créatrices. Ni e-mail, ni identifiants de la plateforme, ni taux : le propriétaire les saisit sur l'écran de confirmation.
-- [ ] `script_prepare` (ADR 0100) : étapes et médias, sans aucun prix ; le propriétaire pose les prix à la confirmation.
+- [ ] `script_prepare` (ADR 0100) : étapes et médias, sans aucun prix ; le propriétaire pose les prix à la confirmation. En attente, le script n'existe pour personne (ni listes, ni agent de chatting, ni IA des scripts) ; à la confirmation il est créé par la commande du CRM, avec ses contrôles, et jamais déjà actif.
 - [ ] Arguments validés au dépôt par le schéma de la route, puis revalidés à la confirmation par le schéma et les gardes du jour, sous l'identité de l'humain.
 - [ ] Confirmation : route de session du dashboard (vérification d'origine, `recentLogin`, jamais servie sur l'hôte MCP), écran normal du geste pré-rempli, transition `pending` → `confirmed` unique et atomique dans la transaction de la commande, l'`id` de l'action comme clé d'idempotence. Le journal garde l'`id` et le `grantId`.
 - [ ] Un accès révoqué, expiré, suspendu par le garde-fou, coupé par l'interrupteur, ou dont la personne est suspendue ou sans second facteur passe ses actions en attente à `cancelled`. Expiration à 72 heures par un job rejouable.
