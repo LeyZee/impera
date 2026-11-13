@@ -10,6 +10,7 @@ import type {
   FanNote,
   FanPpvStats,
   FanProfile,
+  Money,
   OutboundMedia,
   Platform,
   PlatformScript,
@@ -64,11 +65,14 @@ export interface PlatformConnector {
   /**
    * `scripts`: sends one step of a platform script, priced as the platform lists it (never by us). The history is read
    * again just before: a step already sent in this conversation is refused for good (`ScriptStepAlreadySent`).
+   * `expectedPrice` is the step's price as the person or the agent validated it: the platform listing another one
+   * just before sends nothing (`ScriptStepPriceChanged`).
    */
   sendScriptStep?(
     conversationRef: ExternalRef,
     scriptRef: ExternalRef,
     stepIndex: number,
+    expectedPrice: Money,
     idempotencyKey: string,
   ): Promise<SendResult>;
   /** `scriptHistory`: the steps already sent to this fan; the platform is the only source (ADR 0018 § 5). */
@@ -102,5 +106,17 @@ export class ScriptStepAlreadySent extends ConnectorError {
   constructor() {
     super('fatal', 'script_step_already_sent');
     this.name = 'ScriptStepAlreadySent';
+  }
+}
+
+/**
+ * The step's price changed on the platform since a person or the agent validated it: Reveal now lists another price
+ * than the expected one, so nothing is sent (the fan would pay what nobody chose). `fatal` for this send, never
+ * retried as it is; the guarded writer turns it into a `SendRefused`, and the step is offered again at its new price.
+ */
+export class ScriptStepPriceChanged extends ConnectorError {
+  constructor() {
+    super('fatal', 'script_price_changed');
+    this.name = 'ScriptStepPriceChanged';
   }
 }

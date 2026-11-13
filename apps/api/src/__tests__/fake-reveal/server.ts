@@ -98,6 +98,11 @@ export const ScenarioEventSchema = z.discriminatedUnion('type', [
    * answer never comes back (504 from the gateway, as a cut connection would leave the client): the outcome is unknown.
    */
   z.object({ type: z.literal('send_answer_lost'), times: z.number().int().min(1) }),
+  /**
+   * « Message listé en retard » (P2-03): from now on, `messages.list` leaves out a message sent from the creator's side
+   * until it is `ms` old by FakeReveal's clock (0 lists it at once again), as Reveal may list a message just taken late.
+   */
+  z.object({ type: z.literal('send_listed_late'), ms: z.number().int().min(0).max(600_000) }),
   z.object({ type: z.literal('challenge'), times: z.number().int().min(1) }),
   z.object({ type: z.literal('conversation_gone'), atMs: AtSchema, conversationId: z.string() }),
   z.object({
@@ -145,6 +150,7 @@ class FakeRevealWorld {
     challenges: 0,
     latencyMs: 0,
     lostSendAnswers: 0,
+    listedLateMs: 0,
   };
   /** The send window (60 a minute): when it opened, by FakeReveal's clock, and how many sends it took. */
   sendWindow = { startMs: 0, count: 0 };
@@ -187,6 +193,9 @@ class FakeRevealWorld {
         return;
       case 'send_answer_lost':
         this.faults.lostSendAnswers += event.times;
+        return;
+      case 'send_listed_late':
+        this.faults.listedLateMs = event.ms;
         return;
       case 'shape_changed':
         this.renames.set(event.endpoint, event.rename);
@@ -318,6 +327,13 @@ class FakeRevealWorld {
   }
 
   /** Newest first, as Reveal pages a conversation. */
+  /** Whether `messages.list` shows this message yet (`send_listed_late`): a sent one only once old enough. */
+  listed(message: FakeMessage): boolean {
+    return (
+      message.direction === 'in' || this.clockMs - Date.parse(message.createdAt) >= this.faults.listedLateMs
+    );
+  }
+
   messagesOf(conversationId: string): FakeMessage[] {
     return this.state.messages
       .filter((m) => m.conversationId === conversationId)
@@ -753,7 +769,7 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     const { id } = IdParams.parse(request.params);
     const query = z.object({ take: Take(10), cursor: z.string().optional() }).parse(request.query);
     const conversation = world.conversation(id);
-    const all = world.messagesOf(id);
+    const all = world.messagesOf(id).filter((m) => world.listed(m));
     const page = pageAfter(all, (m) => m.id, query.cursor, query.take);
     return out('messages.list', {
       data: page.rows.map((m) => world.wireMessageItem(m)),

@@ -24,6 +24,7 @@ import { testConfig } from './support/config';
 import { LogSink } from './support/log-sink';
 
 const SESSION_KEYS = `v1:${randomBytes(32).toString('base64')}`;
+const eur = (amountMinor: number) => ({ amountMinor, currency: 'EUR' as const });
 
 /**
  * P2-03: Reveal's writes through the `connectors` module, its write guard and the real `connector_sends` table, on
@@ -134,7 +135,7 @@ describe('Reveal connector: writes on FakeReveal (P2-03)', () => {
     const refusals = await Promise.all([
       outboundSender.sendText(conversation(), 'Coucou', 'off-1').catch((error: unknown) => error),
       writes
-        .sendScriptStep(conversation(), { platform: 'reveal', id: 'sequence_1' }, 0, 'off-2')
+        .sendScriptStep(conversation(), { platform: 'reveal', id: 'sequence_1' }, 0, eur(500), 'off-2')
         .catch((error: unknown) => error),
       writes
         .setFanNote(conversation(), 'fan_01', 'Prénom : Prénom01', 'off-3')
@@ -181,6 +182,7 @@ describe('Reveal connector: writes on FakeReveal (P2-03)', () => {
       conversation(),
       { platform: 'reveal', id: 'sequence_2' },
       0,
+      eur(500),
       'step-1',
     );
     await fake.app.inject({
@@ -201,5 +203,25 @@ describe('Reveal connector: writes on FakeReveal (P2-03)', () => {
     expect(authors.get(step.messageRef.id)).toBe('ai');
     const chatter = fake.state().messages.find((m) => m.content === 'Message du chatteur');
     expect(authors.get(chatter?.id ?? '')).toBe('human');
+  });
+
+  it('a step whose price changed on Reveal since it was validated: refused, nothing recorded, nothing sent', async () => {
+    await allowWrites(true);
+    await scenario([{ type: 'script_changed', scriptId: 'script_4_1', priceCents: 700 }]);
+    const before = posts.length;
+    const refused: unknown = await app.modules.connectors.writes
+      .sendScriptStep(conversation(), { platform: 'reveal', id: 'sequence_4' }, 0, eur(500), 'price-1')
+      .catch((error: unknown) => error);
+    expect(refused).toMatchObject({ code: 'script_price_changed' });
+    expect(posts.length).toBe(before);
+    expect((await sends()).map((send) => send.idempotency_key)).not.toContain('price-1');
+    const sent = await app.modules.connectors.writes.sendScriptStep(
+      conversation(),
+      { platform: 'reveal', id: 'sequence_4' },
+      0,
+      eur(700),
+      'price-2',
+    );
+    expect(fake.state().messages.find((m) => m.id === sent.messageRef.id)?.bundle?.priceCents).toBe(700);
   });
 });

@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { REVEAL_EXPECTED_CAPABILITIES } from '../../../../../__tests__/fake-reveal/model';
 import { createFakeReveal, type FakeReveal } from '../../../../../__tests__/fake-reveal/server';
-import { ConnectorError, ScriptStepAlreadySent } from '../../../domain/platform-connector';
+import {
+  ConnectorError,
+  ScriptStepAlreadySent,
+  ScriptStepPriceChanged,
+} from '../../../domain/platform-connector';
 import type { ConnectorSend, SendJournal } from '../../../domain/ports';
 import { MemorySendJournal } from '../../__tests__/memory-send-journal';
 import type { RevealFetch } from '../client';
@@ -82,10 +86,18 @@ function connect(
 }
 
 const ref = (id: string) => ({ platform: 'reveal' as const, id });
+/** A step's price as validated: the `quiet` world's steps cost 5, 15 and 30 €. */
+const eur = (amountMinor: number) => ({ amountMinor, currency: 'EUR' as const });
 const posts = (spied: Spied) => spied.calls.filter((call) => call.startsWith('POST '));
 
 async function scenario(fake: FakeReveal, events: object[]): Promise<void> {
   const response = await fake.app.inject({ method: 'POST', url: '/__scenario', payload: { events } });
+  expect(response.statusCode).toBe(200);
+}
+
+/** FakeReveal's clock moves on, and the connector's with it. */
+async function elapse(fake: FakeReveal, ms: number): Promise<void> {
+  const response = await fake.app.inject({ method: 'POST', url: '/__clock', payload: { advanceMs: ms } });
   expect(response.statusCode).toBe(200);
 }
 
@@ -173,6 +185,58 @@ describe('RevealApiConnector: sending (spec § 5)', () => {
     expect(thread(fake, 'conv_01')).toHaveLength(1);
   });
 
+  it('a lost answer listed late: no resend while Reveal may not list it yet, then found and kept', async () => {
+    const fake = world();
+    const spied = spy(fake);
+    const sends = new MemorySendJournal();
+    const connector = connect(fake, { fetch: spied.fetch, sends });
+    await scenario(fake, [
+      { type: 'send_answer_lost', times: 1 },
+      { type: 'send_listed_late', ms: 20_000 },
+    ]);
+    await rejection(connector.sendText(ref('conv_01'), 'Tu es là ?', 'key-1'));
+    expect(await connector.verifySent(ref('conv_01'), 'key-1')).toEqual({ status: 'not_found' });
+    // Within 30 s of the attempt, Reveal not listing it proves nothing: held back, nothing sent.
+    const held = await rejection(connector.sendText(ref('conv_01'), 'Tu es là ?', 'key-1'));
+    expect(held.code).toBe('rate_limited');
+    expect(held.retryAfterSeconds).toBe(30);
+    await elapse(fake, 10_000);
+    expect(
+      (await rejection(connector.sendText(ref('conv_01'), 'Tu es là ?', 'key-1'))).retryAfterSeconds,
+    ).toBe(20);
+    expect(posts(spied)).toHaveLength(1);
+    // Reveal lists it now: the retry finds it, records its id, and sends nothing.
+    await elapse(fake, 10_000);
+    const [taken] = thread(fake, 'conv_01');
+    const retried = await connector.sendText(ref('conv_01'), 'Tu es là ?', 'key-1');
+    expect(retried.messageRef.id).toBe(taken?.id);
+    expect(sends.rows.get('key-1')?.platformMessageId).toBe(taken?.id);
+    expect(posts(spied)).toHaveLength(1);
+    expect(thread(fake, 'conv_01')).toHaveLength(1);
+  });
+
+  it('a pending attempt Reveal never took is sent again once 30 s have passed, and only once', async () => {
+    const fake = world();
+    const spied = spy(fake);
+    const sends = new MemorySendJournal();
+    const connector = connect(fake, { fetch: spied.fetch, sends });
+    await scenario(fake, [{ type: 'server_error', times: 1, status: 500 }]);
+    expect((await rejection(connector.sendText(ref('conv_01'), 'Coucou', 'key-1'))).code).toBe('transient');
+    expect(sends.rows.get('key-1')?.platformMessageId).toBeNull();
+    expect(thread(fake, 'conv_01')).toEqual([]);
+    expect((await rejection(connector.sendText(ref('conv_01'), 'Coucou', 'key-1'))).code).toBe(
+      'rate_limited',
+    );
+    expect(posts(spied)).toHaveLength(1);
+    await elapse(fake, 30_000);
+    const sent = await connector.sendText(ref('conv_01'), 'Coucou', 'key-1');
+    expect(posts(spied)).toHaveLength(2);
+    expect(thread(fake, 'conv_01').map((message) => message.id)).toEqual([sent.messageRef.id]);
+    expect(sends.rows.get('key-1')?.platformMessageId).toBe(sent.messageRef.id);
+    expect((await connector.sendText(ref('conv_01'), 'Coucou', 'key-1')).messageRef).toEqual(sent.messageRef);
+    expect(posts(spied)).toHaveLength(2);
+  });
+
   it('a process killed between Reveal taking the message and our record of it: the retry never sends twice', async () => {
     const fake = world();
     const spied = spy(fake);
@@ -210,6 +274,7 @@ describe('RevealApiConnector: sending (spec § 5)', () => {
       'rate_limited',
     );
     expect(await connector.verifySent(ref('conv_01'), 'key-1')).toEqual({ status: 'not_found' });
+    await elapse(fake, 30_000);
     const sent = await connector.sendText(ref('conv_01'), 'Coucou', 'key-1');
     expect(await connector.verifySent(ref('conv_01'), 'key-1')).toEqual({
       status: 'sent',
@@ -267,7 +332,7 @@ describe('RevealApiConnector: script steps (spec §§ 5, 6; ADR 0018 § 5)', () 
     const fake = world();
     const spied = spy(fake);
     const connector = connect(fake, { fetch: spied.fetch });
-    const sent = await connector.sendScriptStep(ref('conv_01'), ref('sequence_1'), 1, 'step-1');
+    const sent = await connector.sendScriptStep(ref('conv_01'), ref('sequence_1'), 1, eur(1500), 'step-1');
     expect(spied.bodies).toEqual([
       {
         scriptId: 'script_1_2',
@@ -287,17 +352,17 @@ describe('RevealApiConnector: script steps (spec §§ 5, 6; ADR 0018 § 5)', () 
     expect(message?.bundle?.priceCents).toBe(1500);
     // The same key again: the same message, no refusal and no send.
     expect(
-      (await connector.sendScriptStep(ref('conv_01'), ref('sequence_1'), 1, 'step-1')).messageRef,
+      (await connector.sendScriptStep(ref('conv_01'), ref('sequence_1'), 1, eur(1500), 'step-1')).messageRef,
     ).toEqual(sent.messageRef);
     // Another key for the same step: Reveal's history says it went, nothing is sent.
     const before = posts(spied).length;
     const refused = await connector
-      .sendScriptStep(ref('conv_01'), ref('sequence_1'), 1, 'step-2')
+      .sendScriptStep(ref('conv_01'), ref('sequence_1'), 1, eur(1500), 'step-2')
       .catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(ScriptStepAlreadySent);
     expect(posts(spied)).toHaveLength(before);
     // Already sent to fan 01 is not already sent to fan 02.
-    await connector.sendScriptStep(ref('conv_02'), ref('sequence_1'), 1, 'step-3');
+    await connector.sendScriptStep(ref('conv_02'), ref('sequence_1'), 1, eur(1500), 'step-3');
     expect(thread(fake, 'conv_02')).toHaveLength(1);
   });
 
@@ -306,11 +371,38 @@ describe('RevealApiConnector: script steps (spec §§ 5, 6; ADR 0018 § 5)', () 
     const spied = spy(fake);
     const connector = connect(fake, { fetch: spied.fetch });
     await scenario(fake, [{ type: 'send_answer_lost', times: 1 }]);
-    await rejection(connector.sendScriptStep(ref('conv_01'), ref('sequence_2'), 0, 'step-1'));
+    await rejection(connector.sendScriptStep(ref('conv_01'), ref('sequence_2'), 0, eur(500), 'step-1'));
     expect(thread(fake, 'conv_01')[0]?.content).toBe('Coucou Prénom01, étape 1 du script 2');
-    const retried = await connector.sendScriptStep(ref('conv_01'), ref('sequence_2'), 0, 'step-1');
+    const retried = await connector.sendScriptStep(ref('conv_01'), ref('sequence_2'), 0, eur(500), 'step-1');
     expect(retried.messageRef.id).toBe(thread(fake, 'conv_01')[0]?.id);
     expect(posts(spied)).toHaveLength(1);
+  });
+
+  it('sends a step at the price validated; one Reveal now lists at another price is refused, nothing recorded', async () => {
+    const fake = world();
+    const spied = spy(fake);
+    const sends = new MemorySendJournal();
+    const connector = connect(fake, { fetch: spied.fetch, sends });
+    await connector.sendScriptStep(ref('conv_01'), ref('sequence_1'), 0, eur(500), 'step-1');
+    expect(thread(fake, 'conv_01')[0]?.bundle?.priceCents).toBe(500);
+    await scenario(fake, [{ type: 'script_changed', scriptId: 'script_2_1', priceCents: 900 }]);
+    const refused = await connector
+      .sendScriptStep(ref('conv_01'), ref('sequence_2'), 0, eur(500), 'step-2')
+      .catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(ScriptStepPriceChanged);
+    expect(posts(spied)).toHaveLength(1);
+    expect(thread(fake, 'conv_01')).toHaveLength(1);
+    expect(sends.rows.has('step-2')).toBe(false);
+    // Another currency is another price.
+    expect(
+      await connector
+        .sendScriptStep(ref('conv_01'), ref('sequence_2'), 0, { amountMinor: 900, currency: 'USD' }, 'step-3')
+        .catch((error: unknown) => error),
+    ).toBeInstanceOf(ScriptStepPriceChanged);
+    // Validated again at its new price, it goes.
+    const sent = await connector.sendScriptStep(ref('conv_01'), ref('sequence_2'), 0, eur(900), 'step-4');
+    expect(thread(fake, 'conv_01').find((m) => m.id === sent.messageRef.id)?.bundle?.priceCents).toBe(900);
+    expect(posts(spied)).toHaveLength(2);
   });
 
   it('sends nothing when the history cannot be read, nor for a step that does not exist', async () => {
@@ -320,11 +412,12 @@ describe('RevealApiConnector: script steps (spec §§ 5, 6; ADR 0018 § 5)', () 
       (method, url) => method === 'GET' && url.searchParams.get('conversationId') !== null,
     );
     const connector = connect(fake, { fetch: spied.fetch });
-    expect((await rejection(connector.sendScriptStep(ref('conv_01'), ref('sequence_1'), 0, 'k'))).code).toBe(
-      'transient',
-    );
     expect(
-      (await rejection(connect(fake).sendScriptStep(ref('conv_01'), ref('sequence_1'), 3, 'k2'))).code,
+      (await rejection(connector.sendScriptStep(ref('conv_01'), ref('sequence_1'), 0, eur(500), 'k'))).code,
+    ).toBe('transient');
+    expect(
+      (await rejection(connect(fake).sendScriptStep(ref('conv_01'), ref('sequence_1'), 3, eur(500), 'k2')))
+        .code,
     ).toBe('not_found');
     expect(posts(spied)).toEqual([]);
     expect(thread(fake, 'conv_01')).toEqual([]);
@@ -416,7 +509,7 @@ describe('RevealApiConnector: a whole visit on FakeReveal (P2-03, critère d’a
     expect(await connector.getScriptHistory(fanRef)).toEqual([]);
 
     await connector.sendText(conversationRef, 'Coucou toi', 'visit-text');
-    await connector.sendScriptStep(conversationRef, ref('sequence_3'), 0, 'visit-step');
+    await connector.sendScriptStep(conversationRef, ref('sequence_3'), 0, eur(500), 'visit-step');
     await connector.sendMedia(
       conversationRef,
       { mediaRefs: [ref('media_voice_01')], text: '', priceMinor: null, currency: null },

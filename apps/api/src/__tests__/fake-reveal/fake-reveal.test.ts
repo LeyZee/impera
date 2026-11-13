@@ -429,6 +429,19 @@ describe('FakeReveal: faults (fake-reveal.md § Scénarios)', () => {
     expect((await call(f, 'POST', '/conversations/conv_02/messages', body)).status).toBe(200);
   });
 
+  it('lists a sent message late when told (« message listé en retard »), a fan’s at once', async () => {
+    const f = fake();
+    await scenario(f, [{ type: 'send_listed_late', ms: 20_000 }]);
+    const body = { message: { content: 'En retard', isUnread: true }, mediaIds: [], files: [] };
+    expect((await call(f, 'POST', '/conversations/conv_02/messages', body)).status).toBe(200);
+    await scenario(f, [{ type: 'fan_message', conversationId: 'conv_02', text: 'Tout de suite' }]);
+    const contents = async () => (await messages(f, 'conv_02')).data.map((item) => item.message.content);
+    expect(await contents()).toContain('Tout de suite');
+    expect(await contents()).not.toContain('En retard');
+    await advance(f, 20_000);
+    expect(await contents()).toContain('En retard');
+  });
+
   it('rate-limits n requests with Retry-After, then recovers', async () => {
     const f = fake();
     await scenario(f, [{ type: 'rate_limited', requests: 2, retryAfterSeconds: 30 }]);

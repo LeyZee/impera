@@ -73,6 +73,7 @@ API de contrôle, absente du vrai Reveal, préfixée `/__` :
 | `shape_changed` | Un champ renommé ou ajouté dans une réponse : le connecteur doit lever une erreur typée, pas avaler la donnée (schémas Zod stricts aux frontières) |
 | `challenge` | Page anti-bot (403 avec HTML) à la place du JSON |
 | `send_answer_lost` (n fois) | « Envoi accepté puis coupure » : l'envoi est pris, le message est dans le fil, mais la réponse se perd (504 de la passerelle) ; le connecteur doit le retrouver par `verifySent` au lieu de renvoyer (P2-03) |
+| `send_listed_late` (ms) | « Message listé en retard » : dès lors, `messages.list` tait un message envoyé côté créatrice tant qu'il a moins de `ms` à l'horloge de FakeReveal (0 rétablit) ; un message de fan est listé tout de suite. Avec `send_answer_lost`, le connecteur ne doit pas renvoyer pendant son délai d'attente (`PENDING_SETTLE_MS`, 30 s) et retrouve le message une fois listé (P2-03) |
 
 ## API CRM (ADR 0050 § 9)
 

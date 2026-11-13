@@ -8,6 +8,7 @@ import type {
   FanNote,
   FanPpvStats,
   FanProfile,
+  Money,
   OutboundMedia,
   PlatformScript,
   SendResult,
@@ -21,6 +22,7 @@ import { z } from 'zod';
 import {
   ConnectorError,
   ScriptStepAlreadySent,
+  ScriptStepPriceChanged,
   type PlatformConnector,
 } from '../../domain/platform-connector';
 import type { ConnectorRegistry, ConnectorSend, SendJournal } from '../../domain/ports';
@@ -54,8 +56,18 @@ const TAKE = { conversations: 20, messages: 10, ppv: 10, scripts: 20, vault: 10,
 const MAX_PAGES = 500;
 /** `health` warns this long before a readable expiry (spec § 2): the token lives 24 h only (V1). */
 const WARNING_BEFORE_MS = 2 * 3_600_000;
-/** `verifySent` reads this many of the newest messages (spec § 5, point 3): two pages of the official client's ten. */
+/**
+ * `verifySent` reads this many of the newest messages (spec § 5, point 3): two pages of the official client's ten.
+ * A watch point (spec § 5): over 20 messages written in the conversation between the attempt and its check, the
+ * message would be out of reach and sent again.
+ */
 const VERIFY_DEPTH = 20;
+/**
+ * How old a pending attempt must be before it is sent again when Reveal does not list it (spec § 5, point 4): Reveal
+ * may list a message it just took late, so a retry sooner than this would send it twice. Until then the retry is
+ * `rate_limited` and sends nothing.
+ */
+const PENDING_SETTLE_MS = 30_000;
 /** Our own pace (spec § 5): 20 sends a minute per account, Reveal's 60 well out of reach… */
 const SENDS_PER_MINUTE = 20;
 const MINUTE_MS = 60_000;
@@ -267,12 +279,14 @@ export class RevealApiConnector implements PlatformConnector {
   /**
    * One step of a platform script (spec §§ 5, 6; ADR 0018 § 5): its text, its media and its price as `scripts.list`
    * gives them, never a price of ours. The fan's history is read again just before: a step already sent in this
-   * conversation is refused for good (`ScriptStepAlreadySent`), and a history that cannot be read sends nothing.
+   * conversation is refused for good (`ScriptStepAlreadySent`), and a history that cannot be read sends nothing. The
+   * price `scripts.list` gives must be the one validated (`expectedPrice`), or nothing is sent (`ScriptStepPriceChanged`).
    */
   async sendScriptStep(
     conversationRef: ExternalRef,
     scriptRef: ExternalRef,
     stepIndex: number,
+    expectedPrice: Money,
     idempotencyKey: string,
   ): Promise<SendResult> {
     const prior = await this.prior(conversationRef, idempotencyKey);
@@ -289,6 +303,9 @@ export class RevealApiConnector implements PlatformConnector {
     if (step === undefined) throw new ConnectorError('not_found', 'scripts.list: no such script step');
     const history = sentStepsOf(await this.scriptPages([['conversationId', conversationRef.id]]));
     if (history.some((sent) => sent.stepRef.id === step.ref.id)) throw new ScriptStepAlreadySent();
+    if (step.priceMinor !== expectedPrice.amountMinor || step.currency !== expectedPrice.currency) {
+      throw new ScriptStepPriceChanged();
+    }
     const mediaIds = step.media.map((item) => item.ref.id);
     return this.send(conversationRef, prior, { text: step.text, scriptRef: step.ref.id, mediaIds }, () => ({
       scriptId: step.ref.id,
@@ -536,7 +553,8 @@ export class RevealApiConnector implements PlatformConnector {
   /**
    * What a send of `key` finds before calling anything (spec § 5, points 3 and 4): the recorded send once Reveal's id
    * is known (`done`); a pending attempt is first looked for in the thread, so a process killed between Reveal's answer
-   * and our record never sends twice. `done` is `null` when nothing of this key reached Reveal.
+   * and our record never sends twice. Not found, an attempt younger than `PENDING_SETTLE_MS` is `rate_limited` until
+   * then: Reveal may not list it yet. `done` is `null` when nothing of this key reached Reveal.
    */
   private async prior(conversationRef: ExternalRef, key: string): Promise<Prior> {
     const send = await this.journal().find(key);
@@ -551,7 +569,14 @@ export class RevealApiConnector implements PlatformConnector {
       };
       return { key, send, done };
     }
-    return { key, send, done: await this.lookFor(send) };
+    const done = await this.lookFor(send);
+    const age = this.now().getTime() - send.startedAt.getTime();
+    if (done === null && age < PENDING_SETTLE_MS) {
+      throw new ConnectorError('rate_limited', 'reveal: a pending send may not be listed yet', {
+        retryAfterSeconds: Math.max(1, Math.ceil((PENDING_SETTLE_MS - age) / 1_000)),
+      });
+    }
+    return { key, send, done };
   }
 
   /** A pending attempt among the 20 newest messages of its conversation; recorded when found. */

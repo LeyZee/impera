@@ -34,6 +34,8 @@ interface ContractSubject {
   /** The next call answers « too many requests », whatever it is. */
   rateLimitAny(): Promise<void>;
   expireSession(): Promise<void>;
+  /** Time passes on the platform's clock (the adapter's too). */
+  elapse(ms: number): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -70,6 +72,7 @@ function fakeConnectorSubject(): ContractSubject {
       fake.expireSession();
       return Promise.resolve();
     },
+    elapse: () => Promise.resolve(),
     close: () => Promise.resolve(),
   };
 }
@@ -119,6 +122,7 @@ function revealSubject(): ContractSubject {
         ],
       }),
     expireSession: () => control('/__scenario', { events: [{ type: 'session_expired' }] }),
+    elapse: (ms) => control('/__clock', { advanceMs: ms }),
     close: () => fake.app.close(),
   };
 }
@@ -273,7 +277,7 @@ describe.each(Object.entries(WRITERS))('PlatformConnector contract, writes: %s',
     });
   });
 
-  it('a failed send sent nothing: the same key goes through afterwards', async () => {
+  it('a failed send sent nothing: the same key goes through a minute later', async () => {
     const subject = started(make);
     await subject.fanWrites('a', 'Salut');
     const ref = { platform: subject.connector.platform, id: subject.conversation('a').id };
@@ -281,6 +285,8 @@ describe.each(Object.entries(WRITERS))('PlatformConnector contract, writes: %s',
     const limited = await rejection(subject.connector.sendText(ref, 'Coucou', 'key-1'));
     expect(limited.code).toBe('rate_limited');
     expect(await subject.connector.verifySent(ref, 'key-1')).toEqual({ status: 'not_found' });
+    // An adapter may hold a retry back while the platform could still list the first attempt (Reveal: 30 s).
+    await subject.elapse(60_000);
     await subject.connector.sendText(ref, 'Coucou', 'key-1');
   });
 
@@ -304,12 +310,15 @@ describe.each(Object.entries(WRITERS))('PlatformConnector contract, writes: %s',
     if (flags.scripts) {
       const [script] = (await connector.listPlatformScripts?.()) ?? [];
       if (script === undefined) throw new Error('a platform that declares scripts lists one');
-      const sent = await connector.sendScriptStep?.(conversationRef, script.ref, 0, 'step-1');
-      const again = await connector.sendScriptStep?.(conversationRef, script.ref, 0, 'step-1');
+      const [first] = script.steps;
+      if (first === undefined) throw new Error('a platform script has a step');
+      const price = { amountMinor: first.priceMinor, currency: first.currency };
+      const sent = await connector.sendScriptStep?.(conversationRef, script.ref, 0, price, 'step-1');
+      const again = await connector.sendScriptStep?.(conversationRef, script.ref, 0, price, 'step-1');
       expect(again?.messageRef).toEqual(sent?.messageRef);
       if (flags.scriptHistory) {
         const history = (await connector.getScriptHistory?.(fanRef)) ?? [];
-        expect(history.map((step) => step.stepRef)).toContainEqual(script.steps[0]?.ref);
+        expect(history.map((step) => step.stepRef)).toContainEqual(first.ref);
       }
     }
   });
