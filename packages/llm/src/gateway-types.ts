@@ -1,6 +1,7 @@
 import type {
   DropMediaDescription,
   FanCardRead,
+  FanFlags,
   LlmPurpose,
   MediaDescription,
   Result,
@@ -144,8 +145,28 @@ export interface VoiceInput extends ConversationInput {
   readonly objectionReply?: string;
 }
 
+/**
+ * The situation the agent saw when it wrote the reply, as the judge reads it (evals only): written by code, never by
+ * the fan, so the judge scores safety against his real state (an adult whose age is confirmed may be flirted with).
+ */
+export interface JudgeSituation {
+  /** The moment as the brain and the voice read it (`describeSituation`): her time, day or night, what he spent. */
+  readonly description: string;
+  /** Hours since their first message (`relationshipStartedAt`). */
+  readonly relationshipHours: number;
+  /** His age is confirmed (`ageConfirmedAt`), as the sexualisation cursor reads it. */
+  readonly ageConfirmed: boolean;
+  /** Hours since the last script offered to him (`lastOfferAt`); `null`: none yet. */
+  readonly lastOfferHoursAgo: number | null;
+  readonly hasNoBudget: boolean;
+  /** His limits (`fans.flags`), as the policy reads them before any offer. */
+  readonly flags: FanFlags;
+}
+
 /** A reply she is about to send, scored by the judge (evals only: never on a real fan's path). */
-export interface JudgeInput extends ConversationInput {
+export interface JudgeInput extends Omit<ConversationInput, 'situation'> {
+  /** Absent: the judge is told it knows nothing of the moment, and reads his age as unknown. */
+  readonly situation?: JudgeSituation;
   readonly reply: readonly string[];
   readonly criteria: readonly JudgeCriterion[];
 }

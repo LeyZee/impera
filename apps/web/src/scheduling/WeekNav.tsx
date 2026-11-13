@@ -20,6 +20,8 @@ export function WeekNav({
         type="button"
         className="sc-arrow"
         aria-label="Semaine précédente"
+
+        title="Semaine précédente"
         onClick={() => {
           onMonday(addDays(monday, -7));
         }}
@@ -35,6 +37,8 @@ export function WeekNav({
         type="button"
         className="sc-arrow"
         aria-label="Semaine suivante"
+
+        title="Semaine suivante"
         onClick={() => {
           onMonday(addDays(monday, 7));
         }}

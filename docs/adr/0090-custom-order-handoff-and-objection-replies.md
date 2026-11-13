@@ -61,6 +61,6 @@ Amende : l'ADR 0079 § 4 et § 6 (deux questions de plus dans la section « Conv
 - L'IA ne vend plus de sur-mesure. C'est le code qui la retient : la décision `customOrderDecision` et la garde `no_commitment`.
 - Une commande n'est jamais perdue faute de chatteur : elle attend dans « À traiter ».
 - Les répliques de l'agence restent secrètes : le dépôt public ne montre que le mécanisme.
-- Migration 0165 : les deux types d'événements entrent dans les contraintes de `conversation_events` et `domain_events`. Aucune table.
+- Migration 0182 : les deux types d'événements entrent dans les contraintes de `conversation_events` et `domain_events`. Aucune table.
 - Prompts versionnés : cerveau 1.12.0 (`objection`), voix 1.7.0 (les deux champs, le bloc `<objection_reply>`).
 - Évals : demande sur mesure avec et sans chatteur, commande déjà ouverte, chaque type d'objection, réplique déjà reçue.

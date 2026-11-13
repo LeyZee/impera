@@ -201,6 +201,7 @@ describe('Réglages › Sauvegardes', () => {
     expect(await subTabs()).toEqual([
       'Modèles IA',
       'Ventes',
+      'Consommation IA',
       'Alertes',
       'Telegram',
       'Règles de paie',

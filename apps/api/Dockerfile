@@ -13,16 +13,18 @@ RUN corepack enable
 WORKDIR /repo
 # Dependencies first, from the lockfile alone: this layer survives source changes.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+# The pnpm store cache is shared by the api and web images, which compose builds at the same time: `locked` keeps
+# one build at a time on it, and `--prefer-offline` fetches a tarball the store still lacks instead of failing.
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked pnpm fetch
 COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --offline --frozen-lockfile --filter impera --filter "@impera/api..."
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked \
+    pnpm install --prefer-offline --frozen-lockfile --filter impera --filter "@impera/api..."
 RUN pnpm turbo run build --filter=@impera/api
 # Then the API's production dependencies alone, from the same lockfile: the workspace packages are bundled in dist
 # (tsup.config.ts), so they are dev dependencies and stay out, with the build tools.
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked \
     rm -rf node_modules apps/*/node_modules packages/*/node_modules \
-    && pnpm install --offline --frozen-lockfile --prod --ignore-scripts --filter @impera/api
+    && pnpm install --prefer-offline --frozen-lockfile --prod --ignore-scripts --filter @impera/api
 
 FROM ${NODE_IMAGE} AS runtime
 # ffmpeg/ffprobe read the fans' videos and voice notes (module media); tini forwards SIGTERM and reaps them.

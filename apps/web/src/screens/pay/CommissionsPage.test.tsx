@@ -518,6 +518,7 @@ describe('CommissionsPage', () => {
         lateFrom: null,
         state: 'counted',
         signal: null,
+        given: null,
         open: true,
         ...patch,
       });
