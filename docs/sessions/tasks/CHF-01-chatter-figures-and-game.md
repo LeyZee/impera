@@ -21,12 +21,12 @@ Le chatteur lit ses propres chiffres dans le style du Dashboard de l'agence (gai
 
 ### Lot 1 : ses chiffres, sur les données qui existent (sans migration)
 
-- [ ] **Contrat** `MyFiguresSchema` et route `GET /v1/payroll/my-figures` (un membre, les siens) : le net par jour de la quinzaine en cours et de la précédente, la carte jour × heure sur 8 semaines, le meilleur jour et la meilleure quinzaine. Lu dans son relevé seulement.
-- [ ] **Domaine** pur et testé : jours, comparaison arrêtée au même jour, carte jour × heure dans le fuseau du membre, records, seuil de 30 ventes (§ 9).
-- [ ] Route au harnais d'isolation ; test « un chatteur ne lit pas les chiffres d'un autre ».
-- [ ] **Aujourd'hui** : carte compacte « Ma quinzaine » sous le shift (§ 2, § 3).
-- [ ] **Commissions › Ma performance** : barres par jour, anneau du prochain palier (§ 4), « Quand je vends » (§ 5), « Mes records » (§ 8). Écart négatif en encre neutre (§ 10).
-- [ ] Captures Nuit/Jour, PC/téléphone.
+- [x] **Contrat** `MyFiguresSchema` et route `GET /v1/payroll/my-figures` (un membre, les siens) : le net par jour de la quinzaine en cours et de la précédente, la carte jour × heure sur 8 semaines, le meilleur jour et la meilleure quinzaine. Lu dans son relevé seulement.
+- [x] **Domaine** pur et testé : jours, comparaison arrêtée au même jour, carte jour × heure dans le fuseau du membre, records, seuil de 30 ventes (§ 9).
+- [x] Route au harnais d'isolation ; test « un chatteur ne lit pas les chiffres d'un autre ».
+- [x] **Aujourd'hui** : carte compacte « Ma quinzaine » sous le shift (§ 2, § 3).
+- [x] **Commissions › Ma performance** : barres par jour, anneau du prochain palier (§ 4), « Quand je vends » (§ 5), « Mes records » (§ 8). Écart négatif en encre neutre (§ 10).
+- [ ] Captures Nuit/Jour, PC/téléphone validées par Charles (lot `chiffres-chatteur-lot1`, montré le 13/11).
 
 ### Lot 2 : le jeu (migration 0178 réservée)
 
@@ -55,3 +55,4 @@ Le chatteur lit ses propres chiffres dans le style du Dashboard de l'agence (gai
 ## Notes de session (rempli par la session : décisions, surprises, fiches créées)
 
 - 13/11/2026 : ADR 0104 acceptée, fiche ouverte.
+- 13/11/2026, lot 1 : l'anneau du palier vit sur Aujourd'hui seulement ; Commissions garde sa jauge de « Ma performance » (une carte par sujet). Les graphiques se dessinent dans la devise qui rapporte le plus ; une autre devise reste lisible dans « Mes ventes lues ». Un chatteur payé sur rapports déclarés n'a pas de lignes `platform_net` : ses cartes n'apparaissent qu'avec ses premières ventes relevées. Tests d'intégration non joués en local (pas de Docker dans la session) : la CI les joue.

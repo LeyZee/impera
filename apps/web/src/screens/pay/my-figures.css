@@ -1,0 +1,367 @@
+/*
+ * « Mes chiffres » of a member (CHF-01, ADR 0104 § A): the hand of the agency's Dashboard, the data ink alone. A total
+ * and a ramp of one hue; never a status colour on a figure (§ 10). Every movement stops with « réduire les animations ».
+ */
+
+.mf-board {
+  display: grid;
+  gap: var(--nv-space-4);
+  min-width: 0;
+}
+@media (min-width: 1100px) {
+  .mf-board {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .mf-board > .mf-wide,
+  .mf-board > :only-child {
+    grid-column: 1 / -1;
+  }
+}
+.mf-sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding: 4px 24px 22px;
+}
+.mf-total {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
+}
+.mf-lead,
+.mf-change {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-ink-muted);
+}
+.mf-lead b,
+.mf-change b {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+.mf-note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+.mf-note b {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+
+/* ── The fortnight's days: thin bars on one floor, the days ahead a stub of track. */
+.mf-bars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  height: 44px;
+}
+.mf-bars[data-tall='true'] {
+  height: 196px;
+  gap: 6px;
+}
+.mf-bar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  border-radius: 4px;
+  outline: none;
+}
+/* The plot of one day: its label, when it has one, sits on its bar, and both stand on the floor. */
+.mf-bar__col {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 0;
+}
+.mf-bar__fill {
+  flex: 0 0 auto;
+  display: block;
+  width: 100%;
+  max-width: 28px;
+  height: max(3px, calc(var(--_h) * 100%));
+  border-radius: 4px 4px 2px 2px;
+  background: color-mix(in srgb, var(--nv-data-1) 62%, transparent);
+  transform-origin: bottom;
+  animation: mf-grow var(--nv-dur-slow) var(--nv-ease-spring) both;
+  animation-delay: calc(var(--nv-i, 0) * 28ms);
+  transition:
+    background var(--nv-dur-fast),
+    transform var(--nv-dur-fast) var(--nv-ease-spring);
+}
+/* Room kept over the tallest bar for its label. */
+.mf-bars[data-tall='true'] .mf-bar__fill {
+  height: max(3px, calc(var(--_h) * (100% - 22px)));
+}
+.mf-bar[data-today='true'] .mf-bar__fill {
+  background: var(--nv-data-1);
+}
+.mf-bar[data-ahead='true'] .mf-bar__fill {
+  height: 3px;
+  background: var(--nv-fill-track);
+  animation: none;
+}
+.mf-bar:not([data-ahead='true']):hover .mf-bar__fill,
+.mf-bar:focus-visible .mf-bar__fill {
+  background: var(--nv-data-1);
+  transform: scaleX(1.12);
+}
+.mf-bar:focus-visible {
+  box-shadow: 0 0 0 2px var(--nv-focus);
+}
+.mf-bar__value {
+  flex: 0 0 auto;
+  height: 22px;
+  line-height: 22px;
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+  color: var(--nv-ink);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: nv-enter var(--nv-dur-slow) var(--nv-ease-out) both;
+  animation-delay: 320ms;
+}
+.mf-bar__day {
+  flex: 0 0 auto;
+  height: 24px;
+  padding-top: 8px;
+  text-align: center;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+.mf-bar[data-today='true'] .mf-bar__day {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+@keyframes mf-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* ── Aujourd'hui › « Ma quinzaine »: the figure leads, the ring beside it, the days under. */
+.mf-card__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-5);
+  padding: 0 24px;
+}
+.mf-card__lead {
+  min-width: 0;
+}
+.mf-figure {
+  display: block;
+  font-size: var(--nv-text-large-title);
+  line-height: var(--nv-text-large-title-leading);
+  letter-spacing: var(--nv-text-large-title-tracking);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+.mf-figure__label {
+  margin: 2px 0 8px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.mf-card .mf-change {
+  font-size: var(--nv-text-footnote);
+}
+.mf-record-now {
+  margin: 6px 0 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+.mf-card__bars {
+  padding: 18px 24px 24px;
+}
+
+/* ── The way to the next tier. */
+.mf-tier {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  flex: 0 0 auto;
+}
+.mf-ring {
+  width: 80px;
+  height: 80px;
+  flex: 0 0 auto;
+}
+.mf-ring circle {
+  fill: none;
+  stroke-width: 7;
+}
+.mf-ring__track {
+  stroke: var(--nv-fill-track);
+}
+.mf-ring__fill {
+  stroke: var(--nv-data-1);
+  stroke-linecap: round;
+  stroke-dasharray: var(--_len);
+  stroke-dashoffset: var(--_gap);
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  animation: mf-ring 900ms var(--nv-ease-out) both;
+  transition: stroke-dashoffset 900ms var(--nv-ease-out);
+}
+.mf-ring__text {
+  fill: var(--nv-ink);
+  font-size: 15px;
+  font-weight: 650;
+}
+@keyframes mf-ring {
+  from {
+    stroke-dashoffset: var(--_len);
+  }
+}
+.mf-tier__title {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+.mf-tier__sub {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.mf-tier__sub b {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+
+/* ── « Quand je vends »: a ramp of one hue, seven days of twenty-four hours. */
+.mf-heat {
+  display: grid;
+  grid-template-columns: 36px repeat(24, minmax(0, 1fr));
+  gap: 3px;
+}
+.mf-heat__row {
+  display: contents;
+}
+.mf-heat__hour {
+  font-size: var(--nv-text-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--nv-ink-faint);
+}
+.mf-heat__day {
+  align-self: center;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+.mf-heat__cell {
+  height: 22px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--nv-data-1) calc(var(--_h) * 100%), var(--nv-fill-track));
+  transition:
+    transform var(--nv-dur-fast) var(--nv-ease-spring),
+    box-shadow var(--nv-dur-fast);
+}
+.mf-heat__cell:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 2px var(--nv-void);
+}
+.mf-heat__scale {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+.mf-heat__scale i {
+  width: 96px;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: linear-gradient(90deg, var(--nv-fill-track), var(--nv-data-1));
+}
+
+/* ── « Mes records »: two figures side by side, the one being set now a little brighter. */
+.mf-records {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+}
+.mf-record {
+  padding: 14px 16px;
+  border-radius: var(--nv-radius-md, 14px);
+  background: var(--nv-fill-track);
+  transition:
+    transform var(--nv-dur-fast) var(--nv-ease-spring),
+    background var(--nv-dur-fast);
+}
+.mf-record:hover {
+  transform: translateY(-2px);
+}
+.mf-record[data-now='true'] {
+  background: color-mix(in srgb, var(--nv-data-1) 16%, var(--nv-fill-track));
+}
+.mf-record__label {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.mf-record__value {
+  margin: 4px 0 2px;
+  font-size: var(--nv-text-title-2, 22px);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+.mf-record__when {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+.mf-records__left {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .mf-card__body {
+    gap: var(--nv-space-3);
+  }
+  .mf-tier {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+  }
+  .mf-ring {
+    width: 68px;
+    height: 68px;
+  }
+  .mf-bars[data-tall='true'] {
+    height: 150px;
+    gap: 3px;
+  }
+  .mf-heat {
+    grid-template-columns: 28px repeat(24, minmax(0, 1fr));
+    gap: 2px;
+  }
+  .mf-heat__cell {
+    height: 14px;
+    border-radius: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-bar__fill,
+  .mf-bar__value,
+  .mf-ring__fill {
+    animation: none;
+    transition: none;
+  }
+  .mf-bar:hover .mf-bar__fill,
+  .mf-heat__cell:hover,
+  .mf-record:hover {
+    transform: none;
+  }
+}
