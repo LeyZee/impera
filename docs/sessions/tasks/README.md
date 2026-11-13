@@ -137,6 +137,7 @@ Branche : task/<id>-<slug>
 | CRM-08 | Revue de l'équipe Reveal : l'écran (ADR 0076) | API CRM | done | CRM-01, routes de Bilan (#626, #643), EQ-20 |
 | CRM-14 | Vérification de fiabilité sur deux sources : l'export devient facultatif | API CRM | done | CRM-02, ADR 0050 § 8 amendé le 11/11/2026 |
 | DSH-01 | Le Dashboard de l'agence : insights des ventes | API CRM | done (lots A et B) | CRM-01, ADR 0078 |
+| DSH-02 | Le Dashboard de l'agence : l'argent sur des tuiles séparées, et la TVA des virements | API CRM | review | DSH-01, ADR 0106 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
