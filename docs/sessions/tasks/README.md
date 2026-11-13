@@ -131,7 +131,7 @@ Branche : task/<id>-<slug>
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
 | CRM-04 | Ventes en direct : alertes Telegram, bilan et revenus de la créatrice | API CRM | todo | CRM-01 |
-| CRM-05 | Ventes hors shift, écarts d'assignation et performance des chatteurs | API CRM | todo | CRM-01, CRM-03 pour les ventes en attente |
+| CRM-05 | Ventes hors shift, écarts d'assignation et performance des chatteurs | API CRM | in progress | CRM-01, CRM-03 pour les ventes en attente |
 | CRM-06 | CA de l'agent et achats dans la mémoire du fan | API CRM | todo | CRM-01, CRM-02 pour le CA de l'agent ; la capture Reveal pour la mémoire |
 | CRM-07 | Importer les créatrices depuis Reveal, après revue du propriétaire | API CRM | todo | CRM-01 |
 | CRM-08 | Revue de l'équipe Reveal : l'écran (ADR 0076) | API CRM | done | CRM-01, routes de Bilan (#626, #643), EQ-20 |
