@@ -294,6 +294,27 @@ export interface RetentionStore {
   ): Promise<boolean>;
   /** `content_media_erase_failed`, once per medium and date: the next run tries again. */
   eraseFailed(original: DueOriginal, now: Date, correlationId: string): Promise<void>;
+  /** The reduced pictures still held of each creator archived before `archivedBefore` (ADR 0089). */
+  dueThumbnails(archivedBefore: Date): Promise<DueThumbnail[]>;
+  /**
+   * The reduced picture erased by `remove`, then its key emptied, under the medium's row lock: checked again under it,
+   * one whose creator was reopened meanwhile, or already emptied, is left as it is (`false`). A `remove` that throws
+   * leaves it held.
+   */
+  eraseThumbnail(
+    thumbnail: DueThumbnail,
+    archivedBefore: Date,
+    remove: (key: string) => Promise<void>,
+  ): Promise<boolean>;
+  /** One audit line for a creator whose reduced pictures went this run: how many, never a key (ADR 0089 § 5). */
+  thumbnailsErased(creatorId: string, count: number): Promise<void>;
+}
+
+/** A reduced picture of an archived creator's medium that leaves the storage now (ADR 0089). */
+export interface DueThumbnail {
+  readonly mediaAssetId: string;
+  readonly creatorId: string;
+  readonly thumbnailKey: string;
 }
 
 /** The agency's side (`withTenantMember`): the owner and an active manager; a chatter is refused before any read. */

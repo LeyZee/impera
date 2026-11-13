@@ -111,3 +111,7 @@ Date : AAAA-MM-JJ
 | 0085 | La fiche du fan : vingt cases fermées que l'IA remplit en lisant la conversation, et que le chatteur corrige | accepted (précise P3-02, 0018 § 1 et 0063) |
 | 0086 | Le panneau copilote : à côté de la conversation Reveal, la fiche du fan d'abord, le brouillon de l'agent ensuite, et c'est le chatteur qui envoie | accepted (précise 0025, 0019, 0066 § 7 et 0085) |
 | 0087 | Un rôle de service entre le rôle applicatif et le rôle propriétaire de la base | proposed (précise 0005 et 0027) |
+| 0089 | Les vignettes d'une créatrice archivée sont effacées 90 jours après son archivage | accepted (amende 0071 § 2 pour les vignettes ; précise 0030 § 4 et 0044 § 2) |
+| 0091 | La consommation IA dans le CRM : la dépense lue dans `llm_calls`, les crédits prépayés décomptés depuis la saisie des recharges | accepted (précise 0016 et le plafond du jour) |
+| 0099 | Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser | accepted (précise 0030, 0018, 0083 et P6-01) |
+| 0100 | Une IA écrit les scripts à partir des médias du coffre, le code tient la vente | accepted (précise 0099, 0083, 0009, 0010, 0021) |

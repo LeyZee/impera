@@ -432,8 +432,8 @@ describe('Réglages › Règles de paie', () => {
       'Sans effet',
     );
 
-    expect(plain(within(dialog).getByText(/^Cette quinzaine a déjà commencé/u).textContent)).toBe(
-      'Cette quinzaine a déjà commencé : ses relevés en brouillon seront recalculés sur les ventes relevées, et les ventes déclarées dans ses rapports ne compteront plus.',
+    expect(plain(within(dialog).getByText(/^Cette quinzaine est déjà finie/u).textContent)).toBe(
+      'Cette quinzaine est déjà finie : ses relevés en brouillon seront recalculés sur les ventes relevées, et les ventes déclarées dans ses rapports ne compteront plus.',
     );
     expect(writes).toEqual([]);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
@@ -484,7 +484,7 @@ describe('Réglages › Règles de paie', () => {
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Rapports de fin de shift' }));
     expect(valuesOf(from)).not.toContain('2026-10-01');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
-    expect(within(dialog).queryByText(/^Cette quinzaine a déjà commencé/u)).toBeNull();
+    expect(within(dialog).queryByText(/^Cette quinzaine (a déjà commencé|est déjà finie)/u)).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }));
 
     const lea = screen.getByText('Léa Brun').closest<HTMLElement>('.rp-account');
