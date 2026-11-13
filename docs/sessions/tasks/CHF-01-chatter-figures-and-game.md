@@ -34,13 +34,13 @@ Le chatteur lit ses propres chiffres dans le style du Dashboard de l'agence (gai
 - [x] Pièce du palier visé devant son nom sur « Ma quinzaine » ; pièces aux deux bouts de la jauge et médaille au laurier quand le plus haut palier est atteint, sur Commissions.
 - [x] Captures validées par Charles (planche `medailles-planche-7`, écrans `medailles-ecran-lot1-2`).
 
-### Lot 2a : gains, série, trophées, dévoilement (une migration, numéro donné à l'ouverture de la PR)
+### Lot 2a : gains, série, trophées, dévoilement (une migration, 0186)
 
 - [x] Écussons de trophées, dévoilement d'un gain avec son (joué à l'arrivée sur Aujourd'hui ou Commissions, jamais sur une conversation, où une pastille « Voir » l'annonce), préférence « Sons » du compte (`user_preferences`, `PUT /v1/me/preferences`, interrupteur dans Moi › Préférences).
 - [x] Module `rewards` : tables `reward_gains` et `reward_streaks` (FORCE RLS, l'application ne fait que lire et marquer un dévoilement vu), job rejouable `rewards.evaluate`, routes `GET /v1/rewards/my-trophy-case` et `POST …/reveals` (sans identifiant dans leur adresse : le serveur répond pour la session), test « chacun sa vitrine ».
 - [x] Palier atteint (§ 12), série (§ 13), trophées (§ 15).
 - [x] Tests : rien du jeu n'entre dans un relevé (§ 17) ; chacun sa vitrine ; mouvement réduit (§ 19) ; aucune notification (§ 18 : le jeu n'en envoie aucune).
-- [ ] Captures validées par Charles (lot `jeu-devoilement-1`), relectures Équipe, Bilan, Design, fusion.
+- [ ] Captures validées par Charles (lot `jeu-devoilement-2`), relectures Équipe, Bilan, Design, fusion.
 
 ### Lot 2b : défi du shift, niveaux, fiche du membre (PR à part)
 

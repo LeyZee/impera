@@ -116,7 +116,15 @@
   padding: var(--nv-space-5);
   overflow: hidden;
   color: #f6eef1;
-  background: radial-gradient(760px 460px at 50% 42%, rgb(120 10 40 / 0.5), rgb(8 6 10 / 0.92) 72%);
+  /* The same night stage in Day: nothing of the screen behind reads through, and the glow fades to the edges. */
+  background:
+    radial-gradient(
+      circle farthest-corner at 50% 42%,
+      rgb(120 10 40 / 0.55),
+      rgb(70 8 26 / 0.22) 42%,
+      transparent 82%
+    ),
+    rgb(8 6 10 / 0.97);
   backdrop-filter: blur(10px);
   animation: rw-fade 300ms ease-out both;
 }
@@ -338,8 +346,10 @@
 
 /* « Sons » in Moi › Préférences: the state in words, then the shared switch. */
 .rw-sounds {
-  display: inline-flex;
+  display: flex;
+  align-self: stretch;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
   cursor: pointer;
 }

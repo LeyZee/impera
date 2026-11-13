@@ -4,4 +4,4 @@ Pas fait : lot 2b (défi du shift, niveaux, fiche du membre en lecture), lot 3.
 Décisions : aucune ADR nouvelle (note dans 0104) ; `rewards` ne fait que lire la paie et le planning ; « à l'heure » = 12 h après la fin du shift en attendant le choix de Charles.
 Découvertes : aucune.
 Candidats à suppression : aucun.
-Vérifié : pnpm check, pnpm test ; les tests d'intégration ne tournent qu'en CI (pas de Docker dans la session) ; captures du lot `jeu-devoilement-1` à valider par Charles.
+Vérifié : pnpm check, pnpm test ; les tests d'intégration ne tournent qu'en CI (pas de Docker dans la session) ; captures du lot `jeu-devoilement-2` à valider par Charles.
