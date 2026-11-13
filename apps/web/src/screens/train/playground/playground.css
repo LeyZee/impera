@@ -191,8 +191,13 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-.pg-who__activate {
-  align-self: flex-start;
+.pg-who__version {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nv-ink);
+}
+.pg-who__in-force {
+  color: var(--nv-ink-muted);
 }
 .pg-fan {
   display: flex;
