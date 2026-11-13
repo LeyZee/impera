@@ -1,0 +1,123 @@
+/*
+ * Réglages › Modèles IA › Budget IA (choix de Charles 12/11), under the services. Built on the design-system tokens
+ * and nv-* classes; only what the package has no class for lives here, prefixed `aib-`. Amber when the budget nears
+ * its alert, red once it is reached.
+ */
+
+.aib-card {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.aib-card__head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.aib-card__text {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.aib-figures {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.aib-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: var(--nv-radius-md, 14px);
+  background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
+}
+.aib-figure dt {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.aib-figure dd {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+.aib-figure__note {
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+
+.aib-today {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.aib-today[data-tone='warn'] {
+  color: var(--nv-warning);
+}
+.aib-today[data-tone='bad'] {
+  color: var(--nv-danger);
+  font-weight: 600;
+}
+
+.aib-amount__box {
+  position: relative;
+}
+.aib-amount__input.nv-field__control {
+  height: 56px;
+  padding-right: 48px;
+  font-size: var(--nv-text-title-2);
+  line-height: 1;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+.aib-amount__sign {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  transform: translateY(-50%);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-title-3, 20px);
+  font-weight: 600;
+  pointer-events: none;
+}
+.aib-amount[data-invalid='true'] .aib-amount__input {
+  box-shadow: inset 0 0 0 1.5px var(--nv-warning);
+}
+
+.aib-consequence {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--nv-radius-sm, 10px);
+  font-size: var(--nv-text-footnote);
+}
+.aib-consequence[data-tone='warn'] {
+  color: var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
+}
+.aib-consequence[data-tone='error'] {
+  color: var(--nv-danger);
+  background: color-mix(in srgb, var(--nv-danger) 12%, transparent);
+}
+
+/* « Valeurs par défaut » on the left, away from the two actions; on a phone, under them. */
+.tm-dialog__foot .aib-foot__reset {
+  margin-right: auto;
+}
+
+@media (max-width: 520px) {
+  .aib-foot {
+    flex-wrap: wrap;
+  }
+  .tm-dialog__foot .aib-foot__reset {
+    order: 3;
+    flex-basis: 100%;
+    margin-right: 0;
+  }
+}
