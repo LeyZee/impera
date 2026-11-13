@@ -69,7 +69,8 @@ export function DesireMarksFold({
       <div className="nv-disclosure__body">
         <p className="pg-hint">
           Ouvre la note sous un de ses messages et dis si elle te semble trop haute, juste ou trop basse. Les
-          poids se corrigent sur tes marques.
+          poids se corrigent sur tes marques. Avec les poids actuels, seul ce message est recompté, pas la
+          suite.
         </p>
         {marks.length === 0 ? null : (
           <ul className="pg-marks">
