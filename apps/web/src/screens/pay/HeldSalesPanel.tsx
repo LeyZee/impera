@@ -13,6 +13,7 @@ import { useId, useState, type JSX } from 'react';
 import type { PayNames } from './data';
 import { Unreachable } from './parts';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { decideSale, useHeldSales, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import {
   decisionText,
@@ -239,6 +240,7 @@ function DecideDialog({
   const refresh = useRefreshPayroll();
   const [decisionId] = useState(() => newId(PaySaleDecisionIdSchema));
   const [note, setNote] = useState('');
+  const noteArea = useGrowingArea(note);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
   const words = outcomeWords(outcome, sale, member);
@@ -283,8 +285,9 @@ function DecideDialog({
             Note (facultatif)
           </label>
           <textarea
+            ref={noteArea}
             id={`${id}-note`}
-            className="nv-field__control nv-glass sc-note"
+            className="nv-field__control nv-glass sc-note grow-area"
             rows={2}
             maxLength={NOTE_MAX}
             value={note}

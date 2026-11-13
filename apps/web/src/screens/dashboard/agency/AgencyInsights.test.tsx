@@ -30,14 +30,17 @@ function serve(status: number, body: unknown): void {
 function Panel({ creatorId, canOpenSettings }: { creatorId: string | null; canOpenSettings: boolean }) {
   const tip = useFloatingTip();
   return (
-    <AgencyInsightsPanel
-      period="week"
-      onPeriod={() => undefined}
-      creatorId={creatorId}
-      creatorName="Lina Test"
-      canOpenSettings={canOpenSettings}
-      tip={tip}
-    />
+    <>
+      <AgencyInsightsPanel
+        period="week"
+        onPeriod={() => undefined}
+        creatorId={creatorId}
+        creatorName="Lina Test"
+        canOpenSettings={canOpenSettings}
+        tip={tip}
+      />
+      {tip.element}
+    </>
   );
 }
 
@@ -100,6 +103,28 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(screen.getByText(/21h–0h/u)).toBeTruthy();
   });
 
+  it("gives the money on tiles of its own, the parts in shares of the net, the transfers' VAT apart (ADR 0106)", async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const money = await screen.findByLabelText('L’argent');
+    const tile = (label: string): HTMLElement => {
+      const term = within(money).getByText(label);
+      const box = term.parentElement;
+      if (box === null) throw new Error(label);
+      return box;
+    };
+    expect(tile('Part de l’agence').textContent).toContain('40 % du net');
+    expect(tile('Part des créatrices').textContent).toContain('60 % du net');
+    const vat = tile('TVA en plus sur les virements').textContent;
+    expect(vat).toContain('118,14');
+    expect(vat).toContain('estimation');
+    expect(vat).toContain('à reverser à l’État');
+    const split = screen.getByRole('img', { name: /Où va l’argent/u });
+    expect(split.getAttribute('aria-label')).toContain('TVA payée par les fans');
+    expect(split.getAttribute('aria-label')).toContain('Commission de la plateforme');
+    expect(split.getAttribute('aria-label')).not.toContain('virements');
+  });
+
   it('reads one creator alone, without the creators side by side', async () => {
     serve(200, {
       ...AGENCY_WEEK,
@@ -111,6 +136,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(screen.getByRole('heading', { name: /Les chiffres de Lina Test/u })).toBeTruthy();
     expect(reads[0]).toBe(`/v1/dashboard/agency?period=week&creatorId=${LINA}`);
     expect(screen.queryByRole('heading', { name: /Les créatrices/u })).toBeNull();
+    expect(within(screen.getByLabelText('L’argent')).getByText('Part de la créatrice')).toBeTruthy();
   });
 
   it('says nothing is linked yet, never a made-up figure, and leads the owner to Réglages', async () => {
@@ -164,6 +190,26 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(row.className).toContain('is-on');
     tap();
     expect(row.className).not.toContain('is-on');
+  });
+
+  it("opens a money tile's tip on a tap, to the cent and beside the period before, and closes it on a second tap (ADR 0106 § 12, § 13)", async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const money = await screen.findByLabelText('L’argent');
+    const tile = within(money).getByText('Part de l’agence').closest('.ins-tile');
+    if (!(tile instanceof HTMLElement)) throw new Error('tile');
+    fireEvent.pointerDown(tile, { pointerType: 'touch' });
+    const tipText = (): string => document.querySelector('.nv-tip.is-on')?.textContent ?? '';
+    await vi.waitFor(() => {
+      expect(tipText()).toContain('Période d’avant');
+    });
+    expect(tipText()).toContain('590,72');
+    expect(tipText()).toContain('499,20');
+    expect(tipText()).toContain('Part du net');
+    fireEvent.pointerDown(tile, { pointerType: 'touch' });
+    await vi.waitFor(() => {
+      expect(tipText()).not.toContain('Période d’avant');
+    });
   });
 
   it('shows nothing to an account whose scope is its own', async () => {

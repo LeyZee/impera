@@ -592,6 +592,16 @@ export const DROP_UPLOAD_HOURS = 24;
 export const DROP_KEPT_DAYS = 365;
 export const DROP_ERASE_NOTICE_DAYS = 7;
 
+/**
+ * The reduced pictures of an archived creator's media are erased this many days after her archiving (ADR 0089): her
+ * descriptions and her history stay, and reopened before, nothing goes.
+ */
+export const ARCHIVED_THUMBNAIL_DAYS = 90;
+
+/** The instant an archived creator's reduced pictures go (ADR 0089). */
+export const archivedThumbnailsUntil = (archivedAt: Date): Date =>
+  new Date(archivedAt.getTime() + ARCHIVED_THUMBNAIL_DAYS * 86_400_000);
+
 /** The number of parts a file of `bytes` goes up in. */
 export const dropPartCount = (bytes: number): number => Math.max(1, Math.ceil(bytes / DROP_PART_BYTES));
 

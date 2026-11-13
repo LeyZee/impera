@@ -48,8 +48,8 @@ const lineCount = (text: string): number =>
 
 /**
  * The reliability check of Réglages › Ventes (CRM-02, ADR 0050 § 8): the owner picks days already over, adds the
- * dashboard's export if they have it, and reads, to the cent, whether the register says what the platform's
- * statistics and export say. Nothing is written and no amount moves; the export is read for the answer and kept
+ * dashboard's export if they have one (optional since § 8 was amended on 11/11/2026: Reveal's dashboard offers none),
+ * and reads, to the cent, whether the register says what the platform's statistics, and the export if given, say. Nothing is written and no amount moves; the export is read for the answer and kept
  * nowhere, on the page or on the server.
  */
 export function CheckPanel({
@@ -163,8 +163,8 @@ export function CheckPanel({
         </h3>
         <p className="sv-muted">
           Avant qu’un compte passe sur le net de {name}, compare au centime le registre d’Impera avec les
-          statistiques de {name} et l’export de son dashboard, jour par jour puis membre par membre. Rien
-          n’est écrit, aucun montant ne bouge.
+          statistiques de {name}, jour par jour puis membre par membre, et avec l’export de son dashboard si
+          tu en as un. Rien n’est écrit, aucun montant ne bouge.
         </p>
       </header>
 
@@ -272,7 +272,7 @@ export function CheckPanel({
 
         <div className="nv-field">
           <span className="nv-field__label" id={`${id}-file-label`}>
-            Export du dashboard <span className="sf-faint">facultatif</span>
+            Export du dashboard
           </span>
           {/* The browser's own file button speaks its language, not the page's: a pill of ours over the input. */}
           <label
@@ -320,8 +320,8 @@ export function CheckPanel({
           )}
           <p id={`${id}-file-hint`} className="sv-muted sf-small">
             Le fichier CSV des ventes de {name}, téléchargé juste avant de lancer : une vente arrivée après
-            n’y serait pas. Il est lu pour la réponse et gardé nulle part. Sans lui, le registre n’est comparé
-            qu’aux statistiques, et le verdict reste « incomplet » : la bascule demande les trois sources.
+            n’y serait pas. Il est lu pour la réponse et gardé nulle part. Sans lui, le registre est comparé
+            aux statistiques seules, et cela suffit à la bascule ; joint, tout écart avec lui compte aussi.
           </p>
         </div>
 
