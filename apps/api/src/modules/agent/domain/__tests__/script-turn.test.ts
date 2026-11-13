@@ -20,11 +20,12 @@ const NIGHT: PlatformScriptView = {
   moment: 'night',
   description: 'Soirée de démonstration',
   steps: [
-    { kind: 'free', priceMinor: null },
-    { kind: 'paid', priceMinor: 1_500 },
-    { kind: 'paid', priceMinor: 2_500 },
+    { kind: 'free', priceMinor: null, mediaRefs: [] },
+    { kind: 'paid', priceMinor: 1_500, mediaRefs: [] },
+    { kind: 'paid', priceMinor: 2_500, mediaRefs: [] },
   ],
   mediaValidated: true,
+  descriptionValidated: true,
   touchesLimits: false,
 };
 

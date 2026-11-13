@@ -18,8 +18,11 @@ export function scriptsInputOf(scripts: ScenarioScripts, now: Date): ScriptsInpu
       priceMinor: step.price_euros === undefined ? null : Math.round(step.price_euros * 100),
       ...(step.instruction !== undefined && { instruction: step.instruction }),
       ...(step.media !== undefined && { mediaSheet: step.media }),
+      // A scenario names no vault media: what he received is told by the scripts played.
+      mediaRefs: [],
     })),
     mediaValidated: true,
+    descriptionValidated: true,
     touchesLimits: false,
   }));
   const { run } = scripts;

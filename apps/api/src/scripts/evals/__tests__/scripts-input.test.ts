@@ -27,8 +27,8 @@ expect: {}
     const input = scriptsInputOf(scripts, NOW);
 
     expect(input.catalogue[0]?.steps).toEqual([
-      { kind: 'free', priceMinor: null, mediaSheet: 'une photo' },
-      { kind: 'paid', priceMinor: 1_250, instruction: 'la suite' },
+      { kind: 'free', priceMinor: null, mediaSheet: 'une photo', mediaRefs: [] },
+      { kind: 'paid', priceMinor: 1_250, instruction: 'la suite', mediaRefs: [] },
     ]);
     expect(input.latest?.steps.map((step) => [step.stepIndex, step.kind, step.priceMinor])).toEqual([
       [0, 'free', null],

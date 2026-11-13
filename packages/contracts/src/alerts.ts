@@ -126,8 +126,8 @@ export type CustomAlertGroup = z.infer<typeof CustomAlertGroupSchema>;
  * on shift takes over; the `ai_disclosure` guard is unchanged).
  */
 /**
- * `script_price`: a script step's price on the platform is no longer the one decided (ADR 0098 § 5); the step does
- * not go and the team is told, the agent goes on.
+ * `script_price`: a script step's price on the platform is no longer the one decided (ADR 0098 § 5); nothing goes
+ * (in copilot, the whole draft) and the team is told, the agent goes on.
  */
 export const SYSTEM_ALERT_CODES = ['keyword', 'service_request', 'identity_doubt', 'script_price'] as const;
 export const SystemAlertCodeSchema = z.enum(SYSTEM_ALERT_CODES);

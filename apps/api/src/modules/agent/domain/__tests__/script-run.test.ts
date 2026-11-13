@@ -27,12 +27,13 @@ const NIGHT: PlatformScriptView = {
   moment: 'night',
   description: 'Soirée en lingerie, de la douceur au plus chaud',
   steps: [
-    { kind: 'free', priceMinor: null },
-    { kind: 'bridge', priceMinor: null },
-    { kind: 'paid', priceMinor: 1_500 },
-    { kind: 'paid', priceMinor: 2_500 },
+    { kind: 'free', priceMinor: null, mediaRefs: [] },
+    { kind: 'bridge', priceMinor: null, mediaRefs: [] },
+    { kind: 'paid', priceMinor: 1_500, mediaRefs: [] },
+    { kind: 'paid', priceMinor: 2_500, mediaRefs: [] },
   ],
   mediaValidated: true,
+  descriptionValidated: true,
   touchesLimits: false,
 };
 const DAY: PlatformScriptView = { ...NIGHT, scriptRef: 'script-day', moment: 'day' };
@@ -106,10 +107,10 @@ describe('platformScriptFaults', () => {
       platformScriptFaults({
         ...NIGHT,
         steps: [
-          { kind: 'bridge', priceMinor: null },
-          { kind: 'paid', priceMinor: null },
-          { kind: 'free', priceMinor: 300 },
-          { kind: 'bridge', priceMinor: null },
+          { kind: 'bridge', priceMinor: null, mediaRefs: [] },
+          { kind: 'paid', priceMinor: null, mediaRefs: [] },
+          { kind: 'free', priceMinor: 300, mediaRefs: [] },
+          { kind: 'bridge', priceMinor: null, mediaRefs: [] },
         ],
       }),
     ).toEqual(['paid_without_price', 'price_on_free_step', 'starts_with_bridge', 'bridge_at_edge']);
@@ -117,20 +118,63 @@ describe('platformScriptFaults', () => {
 });
 
 describe('permittedScripts', () => {
-  it('keeps her moment on her clock, never a script played to him, nor one with media not validated or touching her limits', () => {
+  const sentTo = (...scripts: [string, number[]][]): ScriptHistoryView => ({
+    scripts: scripts.map(([scriptRef, sent]) => ({
+      scriptRef,
+      sentStepIndexes: sent,
+      boughtStepIndexes: [],
+    })),
+  });
+
+  it('keeps her moment on her clock, never a script played to him, nor one with media or description not validated or touching her limits', () => {
     const catalogue = [
       NIGHT,
       DAY,
       BOTH,
       { ...NIGHT, scriptRef: 'not-validated', mediaValidated: false },
+      { ...NIGHT, scriptRef: 'description-not-validated', descriptionValidated: false },
       { ...NIGHT, scriptRef: 'limits', touchesLimits: true },
       { ...NIGHT, scriptRef: 'broken', steps: [] },
     ];
-    const ids = (moment: 'day' | 'night', played: string[] = []): string[] =>
-      permittedScripts(catalogue, { moment, played: new Set(played) }).map((script) => script.scriptRef);
+    const ids = (moment: 'day' | 'night', history: ScriptHistoryView = NO_HISTORY): string[] =>
+      permittedScripts(catalogue, { moment, history }).map((script) => script.scriptRef);
     expect(ids('night')).toEqual(['script-night', 'script-both']);
     expect(ids('day')).toEqual(['script-day', 'script-both']);
-    expect(ids('night', ['script-night'])).toEqual(['script-both']);
+    expect(ids('night', sentTo(['script-night', [0]]))).toEqual(['script-both']);
+  });
+
+  it('never offers a script with a media he already received through another one, sent or bought', () => {
+    const withMedia = (scriptRef: string, mediaRefs: string[]): PlatformScriptView => ({
+      ...BOTH,
+      scriptRef,
+      steps: [
+        { kind: 'free', priceMinor: null, mediaRefs: [] },
+        { kind: 'paid', priceMinor: 1_500, mediaRefs },
+      ],
+    });
+    const catalogue = [
+      withMedia('first', ['media-a', 'media-b']),
+      withMedia('shares-a', ['media-a']),
+      withMedia('own', ['media-c']),
+    ];
+    const ids = (history: ScriptHistoryView): string[] =>
+      permittedScripts(catalogue, { moment: 'night', history }).map((script) => script.scriptRef);
+    // Only the teaser of « first » went: its paid media did not.
+    expect(ids(sentTo(['first', [0]]))).toEqual(['shares-a', 'own']);
+    expect(ids(sentTo(['first', [0, 1]]))).toEqual(['own']);
+    expect(ids({ scripts: [{ scriptRef: 'first', sentStepIndexes: [], boughtStepIndexes: [1] }] })).toEqual([
+      'own',
+    ]);
+  });
+
+  it('reads nothing received from a step the catalogue no longer holds: only its own script is ruled out', () => {
+    const catalogue = [
+      { ...BOTH, steps: [{ kind: 'free' as const, priceMinor: null, mediaRefs: ['media-a'] }] },
+    ];
+    const ids = (history: ScriptHistoryView): string[] =>
+      permittedScripts(catalogue, { moment: 'night', history }).map((script) => script.scriptRef);
+    expect(ids(sentTo(['gone', [0]]))).toEqual(['script-both']);
+    expect(ids(sentTo(['script-night', [9]]))).toEqual(['script-both']);
   });
 });
 
@@ -445,9 +489,9 @@ describe("Reveal's script history (ADR 0018 § 5)", () => {
   });
 
   it('never sends a step whose price changed on Reveal', () => {
-    expect(stepPriceCheck({ priceMinor: 1_500 }, { kind: 'paid', priceMinor: 1_500 })).toBe('send');
-    expect(stepPriceCheck({ priceMinor: 1_500 }, { kind: 'paid', priceMinor: 1_900 })).toBe('price_mismatch');
-    expect(stepPriceCheck({ priceMinor: null }, { kind: 'free', priceMinor: null })).toBe('send');
+    expect(stepPriceCheck({ priceMinor: 1_500 }, { priceMinor: 1_500 })).toBe('send');
+    expect(stepPriceCheck({ priceMinor: 1_500 }, { priceMinor: 1_900 })).toBe('price_mismatch');
+    expect(stepPriceCheck({ priceMinor: null }, { priceMinor: null })).toBe('send');
   });
 });
 

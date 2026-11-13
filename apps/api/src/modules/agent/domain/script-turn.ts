@@ -76,6 +76,7 @@ const retired = (scriptRef: string): PlatformScriptView => ({
   description: '',
   steps: [],
   mediaValidated: false,
+  descriptionValidated: false,
   touchesLimits: false,
 });
 

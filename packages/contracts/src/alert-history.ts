@@ -43,7 +43,7 @@ export function alertTriggerReason(trigger: AlertTrigger, alertName: string): st
     case 'identity_doubt':
       return 'Le fan doute de parler vraiment à la créatrice.';
     case 'script_price':
-      return 'Le prix d’une étape de script n’est plus celui décidé : l’étape n’est pas partie.';
+      return 'Le prix d’une étape sur la plateforme n’est plus celui décidé : rien ne part et un humain est prévenu, sans pause.';
   }
 }
 

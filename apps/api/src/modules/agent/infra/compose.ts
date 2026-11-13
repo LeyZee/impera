@@ -47,7 +47,6 @@ import { offerDecision, offerSignals, type OfferBlock, type OfferContext } from 
 import {
   paidWaiting,
   permittedScripts,
-  playedScriptRefs,
   type PlatformScriptView,
   type ScriptHistoryView,
   type ScriptRun,
@@ -172,7 +171,7 @@ function scriptChoices(
   if (scripts?.history === undefined || scripts.history === null) return [];
   return permittedScripts(scripts.catalogue, {
     moment: isNight(situation) ? 'night' : 'day',
-    played: playedScriptRefs(scripts.history),
+    history: scripts.history,
   })
     .slice(0, BRAIN_SCRIPTS_MAX)
     .map((script, index) => ({ id: brainScriptId(index), script }));

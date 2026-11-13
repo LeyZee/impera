@@ -27,6 +27,8 @@ interface PlatformScriptStepView {
   readonly instruction?: string;
   /** What the step sends, from its media's descriptions (ADR 0083): the voice describes nothing else. */
   readonly mediaSheet?: string;
+  /** The vault media the step sends, by their platform ref: a media he already received rules out a script (§ 6). */
+  readonly mediaRefs: readonly string[];
 }
 
 /**
@@ -42,6 +44,8 @@ export interface PlatformScriptView {
   readonly steps: readonly PlatformScriptStepView[];
   /** Every media of every step described and validated (ADR 0083). */
   readonly mediaValidated: boolean;
+  /** Its description, what the brain picks on, validated by the agency (ADR 0083): never picked on an unchecked one. */
+  readonly descriptionValidated: boolean;
   /** Something in it touches a limit of her persona. */
   readonly touchesLimits: boolean;
 }
@@ -75,6 +79,27 @@ export interface ScriptHistoryView {
     readonly sentStepIndexes: readonly number[];
     readonly boughtStepIndexes: readonly number[];
   }[];
+}
+
+/**
+ * Every media Reveal's history says he received, through her catalogue: each step sent or bought, by script and index,
+ * gives the media of that step. A step the catalogue no longer holds (script gone, index past its end) gives nothing:
+ * what it sent is unknown, and only its own script is ruled out, by `playedScriptRefs` (§ 6).
+ */
+function receivedMediaRefs(
+  catalogue: readonly PlatformScriptView[],
+  history: ScriptHistoryView,
+): ReadonlySet<string> {
+  const byRef = new Map(catalogue.map((script) => [script.scriptRef, script]));
+  const received = new Set<string>();
+  for (const entry of history.scripts) {
+    const script = byRef.get(entry.scriptRef);
+    if (script === undefined) continue;
+    for (const index of [...entry.sentStepIndexes, ...entry.boughtStepIndexes]) {
+      for (const ref of script.steps[index]?.mediaRefs ?? []) received.add(ref);
+    }
+  }
+  return received;
 }
 
 /** Every script Reveal says was already sent to him, a step at least: never replayed (§ 1). */
@@ -281,18 +306,23 @@ export function scriptStepsHeld(flags: FanFlags, careMode: boolean): boolean {
 }
 
 /**
- * The scripts she may open with him (§ 6): of her moment on her clock, never sent to him by Reveal's history, every
- * media validated, nothing that touches her limits, and playable. The brain picks among these only.
+ * The scripts she may open with him (§ 6): of her moment on her clock, never sent to him by Reveal's history, no media
+ * he already received, every media and the description validated, nothing that touches her limits, and playable. The
+ * brain picks among these only, in the catalogue's order.
  */
 export function permittedScripts(
   catalogue: readonly PlatformScriptView[],
-  options: { readonly moment: DayPart; readonly played: ReadonlySet<string> },
+  options: { readonly moment: DayPart; readonly history: ScriptHistoryView },
 ): PlatformScriptView[] {
+  const played = playedScriptRefs(options.history);
+  const received = receivedMediaRefs(catalogue, options.history);
   return catalogue.filter(
     (script) =>
       (script.moment === null || script.moment === options.moment) &&
-      !options.played.has(script.scriptRef) &&
+      !played.has(script.scriptRef) &&
+      !script.steps.some((step) => step.mediaRefs.some((ref) => received.has(ref))) &&
       script.mediaValidated &&
+      script.descriptionValidated &&
       !script.touchesLimits &&
       platformScriptFaults(script).length === 0,
   );
@@ -314,7 +344,7 @@ export interface ScriptStepToSend {
  */
 export function stepPriceCheck(
   decided: Pick<ScriptStepToSend, 'priceMinor'>,
-  platform: PlatformScriptStepView,
+  platform: Pick<PlatformScriptStepView, 'priceMinor'>,
 ): 'send' | 'price_mismatch' {
   return decided.priceMinor === platform.priceMinor ? 'send' : 'price_mismatch';
 }
@@ -440,10 +470,7 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
     return { kind: 'wait', reason: gate.missing[0] ?? 'availability_unconfirmed' };
   }
   if (!decision.allowed) return { kind: 'none', reason: decision.reason };
-  const permitted = permittedScripts(input.catalogue, {
-    moment: input.moment,
-    played: playedScriptRefs(history),
-  });
+  const permitted = permittedScripts(input.catalogue, { moment: input.moment, history });
   if (permitted.length === 0) return { kind: 'none', reason: 'no_script' };
   // The brain picks the one that fits him; the code checks it is one of them, or nothing opens (fail closed).
   const script = permitted.find((candidate) => candidate.scriptRef === input.brainPick);

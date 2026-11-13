@@ -149,8 +149,9 @@ const PACK_SOURCE: ScriptSource = {
         scriptRef: 'script-demo',
         moment: null,
         description: 'Pack de démonstration',
-        steps: [{ kind: 'paid', priceMinor: 1_500 }],
+        steps: [{ kind: 'paid', priceMinor: 1_500, mediaRefs: [] }],
         mediaValidated: true,
+        descriptionValidated: true,
         touchesLimits: false,
       },
     ]),
@@ -1874,7 +1875,7 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       catalogue: async () =>
         (await PACK_SOURCE.catalogue('creator-1', 'account-1')).map((script) => ({
           ...script,
-          steps: [{ kind: 'paid', priceMinor: 1_900 }],
+          steps: [{ kind: 'paid', priceMinor: 1_900, mediaRefs: [] }],
         })),
     };
     const answers: Brief = { ...BRIEF, scriptReply: 'answers_step' };
