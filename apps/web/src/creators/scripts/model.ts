@@ -1,5 +1,6 @@
 import {
   SCRIPT_EXPORT_MAX_BYTES,
+  scriptDropCode,
   type ContentDrop,
   type ContentDropId,
   type CreatorContent,
@@ -48,7 +49,7 @@ const NBSP = '\u00a0';
 const READY_STATES: ReadonlySet<ContentDrop['state']> = new Set(['ready', 'scheduled', 'published']);
 const AFTER_EXPORT_MS = 30 * 86_400_000;
 
-export const scriptCode = (number: number): string => `S${String(number).padStart(3, '0')}`;
+export const scriptCode = (number: number): string => scriptDropCode(number);
 
 /** Her sent scripts, the latest first: a drop with a number is a script she sent, never one she is filling. */
 export function sentScripts(

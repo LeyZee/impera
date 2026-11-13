@@ -172,6 +172,11 @@ interface DraftRepository {
   lock(id: DraftId): Promise<Draft | null>;
   /** Drafts not yet sent nor closed (`pending`, `approved`, `edited`), oldest first. */
   openFor(conversationId: ConversationId): Promise<readonly Draft[]>;
+  /** Her answers written in this conversation since `since`, whatever became of them, and when the last one was. */
+  paceSince(
+    conversationId: ConversationId,
+    since: Date,
+  ): Promise<{ readonly count: number; readonly lastAt: Date | null }>;
   insert(draft: {
     id: DraftId;
     conversationId: ConversationId;

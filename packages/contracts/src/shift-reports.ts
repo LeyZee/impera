@@ -191,6 +191,12 @@ export const ShiftReportSchema = z
      * `null` for a correction, and for an account whose platform's sales are not read.
      */
     check: ShiftReportCheckSchema.nullable(),
+    /**
+     * Where pay reads its account's amounts for its period, `null` while the account has no rules for it. `detected`:
+     * pay reads the sales, and the report has no effect on pay, even one made before the rules switched (ADR 0084
+     * § 3). It is then never to decide (`canReview` false, out of the open list) and never holds a closing.
+     */
+    earningsSource: EarningsSourceSchema.nullable(),
     createdAt: z.iso.datetime(),
   })
   .superRefine((report, context) => {
@@ -297,7 +303,8 @@ const ReviewedVersionSchema = z.object({ id: ShiftReportIdSchema, version: z.num
  * corrections can each pass their making and together take it below 0, and the second answers
  * `shift_report_total_conflict`. `mayReviewShiftReport` says who may review (`shift_report_own_review_forbidden`).
  * A report whose complete check says `gap` is held until its member corrects or explains it, or until `explainBy`
- * (`shift_report_gap_conflict`, ADR 0073 § 5); then the manager decides, knowing it.
+ * (`shift_report_gap_conflict`, ADR 0073 § 5); then the manager decides, knowing it. A report of a period whose pay
+ * reads the sales is never decided, validated nor sent back (`shift_report_detected_conflict`, ADR 0084 § 3).
  */
 export const ValidateShiftReportsBodySchema = z.object({
   reports: z
@@ -314,7 +321,7 @@ export type ValidateShiftReportsBody = z.infer<typeof ValidateShiftReportsBodySc
 /**
  * `POST /v1/scheduling/shift-reports/:shiftReportId/reject` (owner, active manager) → 200 `ShiftReportSchema`: a
  * submitted report goes back to its maker with a note that says what to look at (`shift_report_changed_conflict`,
- * `shift_report_own_review_forbidden` as for a validation).
+ * `shift_report_own_review_forbidden`, `shift_report_detected_conflict` as for a validation).
  */
 export const RejectShiftReportBodySchema = z.object({
   version: z.number().int().min(1),
@@ -363,9 +370,11 @@ export function validatedTotalWith(
 /**
  * `GET /v1/scheduling/shift-reports?period=…`: with `period`, its reports and corrections, and the shifts that start in
  * it, are not cancelled and take a report already (`opensAt` passed), reported or not: a shift with none is a
- * « Sans rapport » line. Without, the reports still open (submitted or rejected) of every period, and the shifts they
- * name: what the agency has to validate. The owner and an active manager read every member's; any other member reads
- * their own, and `members` holds themselves alone.
+ * « Sans rapport » line, unless its account's pay reads the sales for the period (source `detected`: the shift takes
+ * the mini feedback). Without, the reports still open (submitted or rejected) of every period, and the shifts they
+ * name: what the agency has to validate, a report without effect on pay left out (`earningsSource` `detected`, ADR 0084
+ * § 3). The owner and an active manager read every member's; any other member reads their own, and `members` holds
+ * themselves alone.
  */
 export const ShiftReportQuerySchema = z.object({ period: PayPeriodSchema.optional() });
 export type ShiftReportQuery = z.infer<typeof ShiftReportQuerySchema>;

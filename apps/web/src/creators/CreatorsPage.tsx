@@ -8,6 +8,7 @@ import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
 import { AgendaSection } from './agenda/AgendaSection';
 import { useCreators } from './api';
+import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
 import { CreatorsList } from './overview/CreatorsList';
@@ -181,6 +182,17 @@ export function CreatorsPage({
         />
       );
     }
+    if (shown === 'content' && current !== undefined) {
+      return (
+        <DropsSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          timezone={current.timezone}
+          isOwner={isOwner}
+        />
+      );
+    }
     if (shown === 'telegram' && current !== undefined) {
       return <TelegramChannelSection key={current.id} creatorId={current.id} onDirty={setDirty} />;
     }
@@ -229,6 +241,7 @@ export function CreatorsPage({
     ideas: 'Idées du jour',
     requests: 'Demandes',
     scripts: 'Scripts',
+    content: 'Contenu',
     telegram: 'Canal Telegram',
     hours: 'Heures d’activité',
     access: 'Accès',
@@ -242,6 +255,7 @@ export function CreatorsPage({
     'ideas',
     'requests',
     'scripts',
+    'content',
     'telegram',
     'hours',
     'access',
@@ -250,9 +264,9 @@ export function CreatorsPage({
   ];
 
   const lead = isOwner
-    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, canal Telegram, heures d’activité, accès, pourcentage et profil.'
+    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, contenu, canal Telegram, heures d’activité, accès, pourcentage et profil.'
     : sheets.includes('agenda')
-      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes et ses scripts.'
+      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes, ses scripts et son contenu.'
       : 'Les créatrices qui te sont confiées. Ouvre-en une pour sa persona.';
 
   return (

@@ -45,6 +45,7 @@ import {
 /** What the planning's stores share: the columns read, their parsing, the audit line, the member lock, the leaves. */
 
 const {
+  accountPayRules,
   auditLog,
   leaveRequests,
   platformAccounts,
@@ -551,6 +552,18 @@ export async function agencyTimeZone(tx: Transaction): Promise<string> {
   const result = await tx.execute<{ zone: string }>(sql`select ${agencyZone} as zone`);
   return result.rows[0]?.zone ?? DEFAULT_SCHEDULING_SETTINGS.timeZone;
 }
+
+/**
+ * Where pay reads a report's account's amounts for the report's period, as a column of a read of `shift_reports`
+ * (`earningsSourceFor`): the source of the rules in force then, `null` without. `detected`: the report has no effect
+ * on pay, never to decide nor holding a closing (ADR 0084 § 3).
+ */
+export const reportSource = sql<
+  string | null
+>`(select ${accountPayRules.earningsSource} from ${accountPayRules}
+  where ${accountPayRules.platformAccountId} = ${shiftReports.platformAccountId}
+    and ${accountPayRules.fromPeriod} <= ${shiftReports.period}
+  order by ${accountPayRules.fromPeriod} desc limit 1)`;
 
 /** An account's pay rules as the reports and the feedback read them (`RulesRow`). */
 export const RulesRowSchema = z.object({

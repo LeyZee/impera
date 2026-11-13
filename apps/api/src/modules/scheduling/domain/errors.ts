@@ -327,7 +327,7 @@ export class ShiftReportDetected extends DomainError {
   constructor() {
     super(
       'shift_report_detected_conflict',
-      'Sur cette quinzaine, la paie de ce compte lit les ventes détectées, pas les rapports',
+      'Sur cette quinzaine, la paie de ce compte lit les ventes relevées, pas les rapports',
     );
   }
 }

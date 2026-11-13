@@ -17,7 +17,7 @@ import {
 
 describe('the fan’s limits', () => {
   it('folds to one line, and says when there is none', () => {
-    expect(flagsSummary({})).toBe('Aucune');
+    expect(flagsSummary({})).toBe('Aucune en place');
     expect(
       flagsSummary({
         salesFrozen: { reason: 'operator', since: '2026-10-23T10:00:00.000Z' },

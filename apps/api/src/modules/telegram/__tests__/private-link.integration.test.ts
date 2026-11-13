@@ -137,15 +137,15 @@ describe('private Telegram link on Postgres', () => {
 
     // A second code replaces the first.
     const code = await issue();
-    await start(botId, '501', first.code);
-    expect(telegram.sent.at(-1)).toMatchObject({ chatId: '501', text: EXPIRED_TEXT });
+    await start(botId, '900000000501', first.code);
+    expect(telegram.sent.at(-1)).toMatchObject({ chatId: '900000000501', text: EXPIRED_TEXT });
     expect((await linkState()).linked).toBe(false);
 
-    await start(botId, '501', code.code);
-    expect(telegram.sent.at(-1)).toMatchObject({ chatId: '501', text: LINKED_TEXT });
+    await start(botId, '900000000501', code.code);
+    expect(telegram.sent.at(-1)).toMatchObject({ chatId: '900000000501', text: LINKED_TEXT });
     expect(await linkState()).toMatchObject({ linked: true, botUsername: 'demo_bot' });
     const [link] = await test.admin.db.select().from(schema.telegramPrivateLinks);
-    expect(link).toMatchObject({ userId: USER_ID, botId, telegramChatId: '501' });
+    expect(link).toMatchObject({ userId: USER_ID, botId, telegramChatId: '900000000501' });
 
     // Replayed: taken already, the link stays on its chat.
     await start(botId, '777', code.code);
@@ -154,7 +154,7 @@ describe('private Telegram link on Postgres', () => {
       await test.admin.db
         .select({ chat: schema.telegramPrivateLinks.telegramChatId })
         .from(schema.telegramPrivateLinks),
-    ).toEqual([{ chat: '501' }]);
+    ).toEqual([{ chat: '900000000501' }]);
 
     // Expired after ten minutes: refused and gone.
     const late = await issue();
@@ -190,7 +190,8 @@ describe('private Telegram link on Postgres', () => {
       'telegram_private_link.remove',
     ]);
     const written = JSON.stringify(audit);
-    for (const secret of [first.code, code.code, late.code, '501']) expect(written).not.toContain(secret);
+    for (const secret of [first.code, code.code, late.code, '900000000501'])
+      expect(written).not.toContain(secret);
   });
 
   it('keeps both tables away from the application role', async () => {

@@ -23,7 +23,7 @@ import {
   type ReportRefusal,
 } from '@/reports/api';
 import {
-  AGENCY_STATUS,
+  agencyStatusOf,
   amountText,
   awaitsDecision,
   gapWaits,
@@ -36,8 +36,9 @@ import {
   READ_AGAIN,
   REPORT_ERRORS,
   signedAmountText,
-  STATUS_TONES,
   toDecideText,
+  toneOf,
+  withoutPayEffect,
   lateFor,
   lateLines,
   nudgeText,
@@ -1013,10 +1014,13 @@ function MemberPeriod({
   const left = member !== undefined && nudging.to(member.id).kind === 'gone';
   const missing = lines.filter((line) => line.report === null).length;
   const sums = periodSums(reports);
-  const waiting = reports.filter((one) => one.status === 'submitted').length;
-  const sentBack = reports.filter((one) => one.status === 'rejected').length;
+  // A fortnight switched to the sales read after he reported: those reports stay, without effect (ADR 0084 § 3).
+  const paying = reports.filter((one) => !withoutPayEffect(one));
+  const without = reports.filter((one) => one.correctsId === null && withoutPayEffect(one)).length;
+  const waiting = paying.filter((one) => one.status === 'submitted').length;
+  const sentBack = paying.filter((one) => one.status === 'rejected').length;
   // His gaps with the platform this period, whatever became of them: a repeated one shows here (ADR 0073 § 5).
-  const gaps = reports.filter(hasGap).length;
+  const gaps = paying.filter(hasGap).length;
   // What the member's period holds, said only where there is something: « 210,00 € validés · 1 à valider ». Only
   // the shifts without a report are amber, not the money validated beside them (EQ-14). A report validated at 0 €
   // still says « 0,00 € validés », never a blank row like a member without a shift (recette EQP-14).
@@ -1026,6 +1030,7 @@ function MemberPeriod({
       .map((sum) => `${amountText(sum.validatedMinor, sum.currency)} validés`),
     waiting === 0 ? null : `${String(waiting)} à valider`,
     sentBack === 0 ? null : `${String(sentBack)} renvoyé${sentBack > 1 ? 's' : ''}`,
+    without === 0 ? null : `${String(without)} sans effet sur la paie`,
   ]
     .filter((part) => part !== null)
     .join(' · ');
@@ -1095,20 +1100,25 @@ function MemberPeriod({
                           dont {line.corrections.length} correction{line.corrections.length > 1 ? 's' : ''}
                         </span>
                       )}
-                      {report.check?.state === 'complete' && report.check.verdict === 'gap' ? ' ' : null}
-                      {report.check?.state === 'complete' && report.check.verdict === 'gap' ? (
+                      {hasGap(report) && !withoutPayEffect(report) ? ' ' : null}
+                      {report.check?.state === 'complete' &&
+                      report.check.verdict === 'gap' &&
+                      !withoutPayEffect(report) ? (
                         <span className="rp-pline__gap">
                           écart {signedAmountText(report.check.gapMinor, report.amount.currency)}
                         </span>
                       ) : null}
                     </span>
-                    <span className={`rp-chip rp-chip--${STATUS_TONES[report.status]} rp-pline__status`}>
-                      {report.status === 'validated' && report.reviewKind === 'automatic'
+                    <span className={`rp-chip rp-chip--${toneOf(report)} rp-pline__status`}>
+                      {report.status === 'validated' &&
+                      report.reviewKind === 'automatic' &&
+                      !withoutPayEffect(report)
                         ? 'Validé automatiquement'
-                        : AGENCY_STATUS[report.status]}
+                        : agencyStatusOf(report)}
                     </span>
                   </span>
-                  {report.status === 'validated' ? (
+                  {/* A correction of a report without effect on pay would be refused: no « Corriger » there. */}
+                  {report.status === 'validated' && !withoutPayEffect(report) ? (
                     <button
                       type="button"
                       className="nv-btn nv-btn--plain nv-btn--sm rp-pline__fix-btn"

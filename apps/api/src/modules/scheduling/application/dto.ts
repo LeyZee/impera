@@ -87,7 +87,10 @@ export const toSwapDto = (swap: StoredSwap): ShiftSwapRequest => ({
   createdAt: swap.createdAt.toISOString(),
 });
 
-/** A report as its reader sees it: `canReview` is said for them, from the transaction that read it. */
+/**
+ * A report as its reader sees it: `canReview` is said for them, from the transaction that read it, and never for a
+ * report without effect on pay (ADR 0084 § 3).
+ */
 export const toShiftReportDto = (report: StoredShiftReport, reader: Reader): ShiftReport => ({
   id: report.id,
   shiftId: report.shiftId,
@@ -102,7 +105,7 @@ export const toShiftReportDto = (report: StoredShiftReport, reader: Reader): Shi
   status: report.status,
   version: report.version,
   byAgency: report.byAgency,
-  canReview: canReview(report, reader),
+  canReview: report.earningsSource !== 'detected' && canReview(report, reader),
   submittedAt: report.submittedAt.toISOString(),
   reviewedAt: isoOrNull(report.reviewedAt),
   reviewNote: report.reviewNote,
@@ -110,6 +113,7 @@ export const toShiftReportDto = (report: StoredShiftReport, reader: Reader): Shi
   reviewKind: report.reviewKind ?? (report.reviewedAt === null ? null : 'human'),
   explanation: report.explanation,
   check: report.check,
+  earningsSource: report.earningsSource,
   createdAt: report.createdAt.toISOString(),
 });
 
