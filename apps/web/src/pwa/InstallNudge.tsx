@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router';
-import { useState, useSyncExternalStore, type JSX } from 'react';
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, type JSX } from 'react';
 
 import {
   addRefusal,
@@ -18,8 +18,8 @@ const INSTALL_GUIDE = '/aide/installer';
 let dismissedThisOpening = false;
 
 /**
- * « Installe Impera sur ton téléphone » (CR-01): a card above the tab bar, on a phone that does not run the installed
- * app. Android installs from the card when Chrome allows it; an iPhone gets the steps (/aide/installer).
+ * « Installe Impera sur ton téléphone » (CR-01): a card at the head of the page, on a phone that does not run the
+ * installed app. Android installs from the card when Chrome allows it; an iPhone gets the steps (/aide/installer).
  */
 export function InstallNudge(): JSX.Element | null {
   const [shown, setShown] = useState(() => {
@@ -36,13 +36,34 @@ export function InstallNudge(): JSX.Element | null {
   const canPrompt = useSyncExternalStore(onInstallPrompt, canPromptInstall, () => false);
   // The guide itself says it all: no card on top of it.
   const onGuide = useLocation({ select: (location) => location.pathname.startsWith(INSTALL_GUIDE) });
-  if (!shown || onGuide) return null;
+  const card = useRef<HTMLElement>(null);
+  const visible = shown && !onGuide;
+  // The room the card takes at the head of a phone's page, for a fill page (Suivi) to give it back (SOC-14).
+  useLayoutEffect(() => {
+    const element = card.current;
+    if (!visible || element === null) return undefined;
+    const root = document.documentElement;
+    const measure = (): void => {
+      const style = getComputedStyle(element);
+      const room =
+        style.position === 'fixed' ? 0 : element.offsetHeight + Number.parseFloat(style.marginBottom || '0');
+      root.style.setProperty('--nv-install-room', `${String(room)}px`);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(element);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty('--nv-install-room');
+    };
+  }, [visible]);
+  if (!visible) return null;
   const hide = (): void => {
     dismissedThisOpening = true;
     setShown(false);
   };
   return (
-    <aside className="nv-float nv-install nv-glass nv-glass--thick" aria-label="Installer Impera">
+    <aside ref={card} className="nv-float nv-install nv-glass nv-glass--thick" aria-label="Installer Impera">
       <img className="nv-float__icon" src="/icons/icon-192.png" alt="" width={44} height={44} />
       <div className="nv-float__body">
         <p className="nv-float__title">Impera sur ton écran d’accueil</p>

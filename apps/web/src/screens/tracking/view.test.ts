@@ -51,6 +51,26 @@ describe('mergeConversations', () => {
       'Fan 1 Créatrice A',
     ]);
   });
+
+  it('orders by his last message, as the time under each pseudo reads, not by a change in the background', () => {
+    // Recette chatteur n°6: « Il y a 13 h » listed above « Il y a 12 h ».
+    const touched = conversation('1', {
+      lastInboundAt: '2026-10-17T08:00:00Z',
+      updatedAt: '2026-10-17T20:50:00Z',
+    });
+    const recent = conversation('2', {
+      lastInboundAt: '2026-10-17T09:00:00Z',
+      updatedAt: '2026-10-17T09:00:00Z',
+    });
+    const ours = conversation('3', {
+      lastOutboundAt: '2026-10-17T08:30:00Z',
+      updatedAt: '2026-10-17T20:55:00Z',
+    });
+    const lines = mergeConversations([
+      { creatorId: 'a', creatorName: 'Créatrice A', items: [touched, recent, ours] },
+    ]);
+    expect(lines.map((l) => l.conversation.fanDisplayName)).toEqual(['Fan 2', 'Fan 3', 'Fan 1']);
+  });
 });
 
 describe('lastMessageAgo', () => {

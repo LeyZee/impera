@@ -357,6 +357,9 @@ export const ContentDropSchema = z.strictObject({
 });
 export type ContentDrop = z.infer<typeof ContentDropSchema>;
 
+/** « S014 »: a sent script's number as its folder, its cards and both screens say it (SC-03). */
+export const scriptDropCode = (number: number): string => `S${String(number).padStart(3, '0')}`;
+
 export const DeclaredDropFileSchema = z.strictObject({
   id: ContentDropFileIdSchema,
   mime: DropMimeSchema,
@@ -546,6 +549,8 @@ export const CONTENT_DROP_CARD_NOT_FOUND = 'content_drop_card_not_found';
 export const CONTENT_DROP_EXPORT_UNPROCESSABLE = 'content_drop_export_unprocessable';
 export const SCRIPT_EXPORT_REFUSALS = [
   'not_a_script',
+  // A script asked by the archive of any other drop (recette créatrice 1): its own archive is in Scripts.
+  'a_script',
   'not_ready',
   'original_erased',
   'moment_unknown',
@@ -586,6 +591,16 @@ export const DROP_UPLOAD_HOURS = 24;
  */
 export const DROP_KEPT_DAYS = 365;
 export const DROP_ERASE_NOTICE_DAYS = 7;
+
+/**
+ * The reduced pictures of an archived creator's media are erased this many days after her archiving (ADR 0089): her
+ * descriptions and her history stay, and reopened before, nothing goes.
+ */
+export const ARCHIVED_THUMBNAIL_DAYS = 90;
+
+/** The instant an archived creator's reduced pictures go (ADR 0089). */
+export const archivedThumbnailsUntil = (archivedAt: Date): Date =>
+  new Date(archivedAt.getTime() + ARCHIVED_THUMBNAIL_DAYS * 86_400_000);
 
 /** The number of parts a file of `bytes` goes up in. */
 export const dropPartCount = (bytes: number): number => Math.max(1, Math.ceil(bytes / DROP_PART_BYTES));
@@ -689,8 +704,11 @@ const Instant = z.iso.datetime({ offset: true });
 /** A description of one of her media as the agency reviews it: the latest validated, else the latest written. */
 export const DropDescriptionViewSchema = z.strictObject({
   id: MediaDescriptionIdSchema,
-  /** `sense`, the vision AI; `human`, a correction. */
-  author: z.enum(['sense', 'human']),
+  /**
+   * `sense`, the vision AI; `human`, a correction of it; `hand`, written by hand where the AI gave up (recette
+   * créatrice 2), with no row of the vision under it.
+   */
+  author: z.enum(['sense', 'human', 'hand']),
   detailed: z.string().min(1).max(6000),
   reviewReasons: z.array(DescriptionReviewReasonSchema),
   /** Her own word on the media (P6-01). */
@@ -714,6 +732,11 @@ export const DropMediaReviewSchema = z.strictObject({
   thumbnail: z.boolean(),
   /** Its original is still held (ADR 0044 § 2): `GET …/files/:fileId/media` plays it, in parts for a video. */
   original: z.boolean(),
+  /**
+   * The vision AI failed at each of its tries (`DESCRIPTION_TRIES`, recette créatrice 2): no longer asked by itself,
+   * the agency asks again (`POST …/files/:fileId/describe`) or writes it.
+   */
+  describeFailed: z.boolean(),
 });
 export type DropMediaReview = z.infer<typeof DropMediaReviewSchema>;
 
@@ -768,6 +791,24 @@ export const CorrectDropDescriptionBodySchema = z.strictObject({
   detailed: z.string().trim().min(1).max(6000),
 });
 export type CorrectDropDescriptionBody = z.infer<typeof CorrectDropDescriptionBodySchema>;
+
+/**
+ * The levels the agency picks when it writes a description by hand (recette créatrice 2): the vision's, but « not
+ * visible », which a human who saw the medium never says.
+ */
+export const HAND_INTENSITIES = ['soft', 'suggestive', 'explicit', 'hardcore'] as const;
+export const HandIntensitySchema = z.enum(HAND_INTENSITIES);
+export type HandIntensity = z.infer<typeof HandIntensitySchema>;
+
+/**
+ * `POST …/files/:fileId/description`: a medium the AI did not describe, written by hand (recette créatrice 2), its
+ * words and its level; the vision's other labels are said « not seen ». Validated by whoever writes it.
+ */
+export const WriteDropDescriptionBodySchema = z.strictObject({
+  detailed: z.string().trim().min(1).max(6000),
+  intensity: HandIntensitySchema,
+});
+export type WriteDropDescriptionBody = z.infer<typeof WriteDropDescriptionBodySchema>;
 
 /** `POST …/summary/validate`: the script's current synthesis, validated as it is. */
 export const ValidateScriptSummaryBodySchema = z.strictObject({ summaryId: ScriptDropSummaryIdSchema });

@@ -201,6 +201,7 @@ describe('Réglages › Sauvegardes', () => {
     expect(await subTabs()).toEqual([
       'Modèles IA',
       'Ventes',
+      'Consommation IA',
       'Alertes',
       'Telegram',
       'Règles de paie',
@@ -820,7 +821,7 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
       ['/reglages/modeles-ia', 'Ce qui règle le CRM pour toute l’agence.'],
       [
         '/creatrices',
-        'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, canal Telegram, heures d’activité, accès, pourcentage et profil.',
+        'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, contenu, canal Telegram, heures d’activité, accès, pourcentage et profil.',
       ],
     ] as const) {
       renderApp(owner, path);

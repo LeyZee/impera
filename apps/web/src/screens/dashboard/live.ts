@@ -477,7 +477,7 @@ function sellerOf(line: ApiSellerLine): RevealSeller {
     kind: seller.kind,
     name: seller.kind === 'member' ? seller.name : SELLER_NAME[seller.kind],
     // A chatter of the platform nobody linked yet: his sales count for no one until the owner links him (ADR 0050 § 5).
-    line: seller.kind === 'unlinked' ? `${counts} · à relier dans Réglages › Ventes` : counts,
+    line: seller.kind === 'unlinked' ? `${counts} · à relier dans Équipe › Reveal` : counts,
     revenue: euros(line.revenueMinor),
     net: euros(line.netMinor),
     agency: euros(line.agencyMinor),

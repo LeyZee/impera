@@ -62,6 +62,7 @@ const stored = {
   reviewKind: null,
   explanation: null,
   check: null,
+  earningsSource: 'declared',
   createdAt: '2026-10-29T04:58:00Z',
 };
 
@@ -197,6 +198,15 @@ describe('end-of-shift reports (EQ-03)', () => {
     expect(
       ShiftReportListSchema.safeParse({ reports: [stored], shifts: [], accounts: [], members: [] }).success,
     ).toBe(true);
+  });
+
+  it('says where pay reads its account for its period, null without rules (ADR 0084 § 3)', () => {
+    expect(ShiftReportSchema.parse({ ...stored, earningsSource: 'detected' }).earningsSource).toBe(
+      'detected',
+    );
+    expect(ShiftReportSchema.parse({ ...stored, earningsSource: null }).earningsSource).toBeNull();
+    expect(ShiftReportSchema.safeParse({ ...stored, earningsSource: 'read' }).success).toBe(false);
+    expect(ShiftReportSchema.safeParse({ ...stored, earningsSource: undefined }).success).toBe(false);
   });
 
   it('compares a report with the platform, and bounds the threshold (ADR 0073)', () => {

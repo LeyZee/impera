@@ -14,8 +14,8 @@ import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
 /**
- * One of her tasks, opened: what it is, what it is for, « Changer le moment » (what a drag does in Semaine, by the
- * keyboard or a touch) and « Retirer » (archived, never deleted).
+ * One of her tasks, opened: what it is, what it is for, « C'est fait » (her tick, as on the row), « Changer le moment »
+ * (what a drag does in Semaine, by the keyboard or a touch) and « Retirer » (archived, never deleted). The cross closes.
  */
 export function TaskDialog({
   agenda,
@@ -23,12 +23,15 @@ export function TaskDialog({
   day,
   onClose,
   onNotice,
+  onTick,
 }: {
   agenda: CreatorAgenda;
   task: CreatorTask;
   day: string;
   onClose: () => void;
   onNotice: (notice: string) => void;
+  /** Ticks or unticks the task on `day`, the same gesture as its row's check (kept offline, sent when it can). */
+  onTick: (task: CreatorTask, on: boolean, day: string) => void;
 }): JSX.Element {
   const client = useQueryClient();
   const [mode, setMode] = useState<'read' | 'move' | 'remove'>('read');
@@ -116,19 +119,20 @@ export function TaskDialog({
               </>
             ) : (
               <>
+                {/* Retirer apart, on the left and in red; the gesture the dialog talks about, ticking, is the one néon. */}
                 <button
                   type="button"
-                  className="nv-btn nv-btn--plain"
+                  className="nv-btn nv-btn--plain nv-btn--destructive ag-task-foot__remove"
                   onClick={() => {
                     setMode('remove');
                   }}
                 >
-                  Retirer de mon agenda
+                  Retirer
                 </button>
                 {movable ? (
                   <button
                     type="button"
-                    className="nv-btn nv-btn--plain"
+                    className="nv-btn nv-btn--soft"
                     onClick={() => {
                       setMode('move');
                     }}
@@ -136,8 +140,15 @@ export function TaskDialog({
                     Changer le moment
                   </button>
                 ) : null}
-                <button type="button" className="nv-btn nv-btn--neon" onClick={onClose}>
-                  OK
+                <button
+                  type="button"
+                  className={done ? 'nv-btn nv-btn--soft' : 'nv-btn nv-btn--neon'}
+                  onClick={() => {
+                    onTick(task, !done, day);
+                    onClose();
+                  }}
+                >
+                  {done ? 'Pas faite' : 'C’est fait'}
                 </button>
               </>
             )}

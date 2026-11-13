@@ -7,6 +7,8 @@ import type {
   TeamMember,
 } from '@impera/contracts';
 
+import { longDay, noteDay } from './model';
+
 /**
  * Équipe › Reveal, without React (ADR 0076): where each account of the platform's team shows, what its list offers,
  * and how a proposal, a model and a gap read. The server proposes and decides; this only says it.
@@ -60,8 +62,12 @@ export interface ChoiceOption {
   readonly label: string;
 }
 
+/** « Théo (parti) »: a member who left the team, still linkable for his sales from before his departure (ADR 0072). */
+export const departedLabel = (name: string): string => `${name} (parti)`;
+
 /**
- * What a row's list offers, from what this viewer may do there (`actions`): the members still in the team, the
+ * What a row's list offers, from what this viewer may do there (`actions`): the members still in the team, then those
+ * who left, marked as such (their sales from before their departure go on their final statement, ADR 0072), the
  * agent, nobody, an invitation. A member already named on the row stays in the list even when the team cannot be read.
  */
 export function optionsOf(row: TeamImportRow, members: readonly TeamMember[]): ChoiceOption[] {
@@ -69,17 +75,26 @@ export function optionsOf(row: TeamImportRow, members: readonly TeamMember[]): C
   if (row.actions.includes('link_member')) {
     const named =
       row.link?.kind === 'member'
-        ? { id: row.link.memberId, name: row.link.memberDisplayName }
+        ? { id: row.link.memberId, name: row.link.memberDisplayName, departed: false }
         : row.suggestion?.kind === 'member'
-          ? { id: row.suggestion.memberId, name: row.suggestion.memberDisplayName }
+          ? {
+              id: row.suggestion.memberId,
+              name: row.suggestion.memberDisplayName,
+              departed: row.suggestion.departedOn !== null,
+            }
           : null;
-    const here = members.filter((member) => member.status !== 'left');
-    if (named !== null && !here.some((member) => member.id === named.id)) {
-      options.push({ value: `member:${named.id}`, label: named.name });
+    const sorted = [...members].sort((a, b) => a.displayName.localeCompare(b.displayName, 'fr'));
+    const here = sorted.filter((member) => member.status !== 'left');
+    const gone = sorted.filter((member) => member.status === 'left');
+    if (named !== null && !members.some((member) => member.id === named.id)) {
+      options.push({
+        value: `member:${named.id}`,
+        label: named.departed ? departedLabel(named.name) : named.name,
+      });
     }
-    for (const member of [...here].sort((a, b) => a.displayName.localeCompare(b.displayName, 'fr'))) {
-      options.push({ value: `member:${member.id}`, label: member.displayName });
-    }
+    for (const member of here) options.push({ value: `member:${member.id}`, label: member.displayName });
+    for (const member of gone)
+      options.push({ value: `member:${member.id}`, label: departedLabel(member.displayName) });
   }
   if (row.actions.includes('link_agent')) options.push({ value: 'agent', label: 'L’agent' });
   if (row.actions.includes('invite')) options.push({ value: 'invite', label: 'Inviter dans l’équipe' });
@@ -88,18 +103,33 @@ export function optionsOf(row: TeamImportRow, members: readonly TeamMember[]): C
 }
 
 /** Why the proposal was made, after its name: the reader checks it before ticking. */
-export function matchLine(suggestion: TeamImportSuggestion | null): string | null {
+export function matchLine(
+  suggestion: TeamImportSuggestion | null,
+  chatter: { readonly isBot: boolean; readonly isExternal: boolean },
+): string | null {
   if (suggestion === null) return null;
   switch (suggestion.kind) {
     case 'member':
+      if (suggestion.departedOn !== null) return `Même e-mail · parti le ${longDay(suggestion.departedOn)}`;
       return suggestion.match === 'email' ? 'Même e-mail' : 'Mêmes prénom et nom';
     case 'agent':
       return suggestion.match === 'session' ? 'Compte de la session capturée' : 'Nommé « bot »';
     case 'invite':
       return 'Personne de l’équipe Impera avec cet e-mail';
     case 'none':
-      return 'Bot d’une clé d’API';
+      // « Personne » is proposed for the key's bot, a provider's account (never invited) and one without an e-mail.
+      if (chatter.isBot) return 'Bot d’une clé d’API';
+      return chatter.isExternal ? 'Compte d’un prestataire : jamais invité' : 'Sans e-mail : rien à proposer';
   }
+}
+
+/**
+ * « Retiré de Reveal le 5 nov. » (§ 6): an account the platform removed, without a member still here to alert about
+ * (that one says it with the removal, § 5). It is no newcomer and is not invited; it is linked or dismissed.
+ */
+export function removedLine(row: TeamImportRow, platform: string): string | null {
+  if (row.chatter.removedAt === null || row.removal !== null) return null;
+  return `Retiré de ${platform} le ${noteDay(row.chatter.removedAt)}`;
 }
 
 /** « L’agent », « Personne », or the member's name: the link as the row says it. */

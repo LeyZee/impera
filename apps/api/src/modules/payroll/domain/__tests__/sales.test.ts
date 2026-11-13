@@ -78,6 +78,7 @@ const sale = (
     currency: 'EUR',
     netMinor,
     author,
+    platformChatterId: author.kind === 'none' ? null : 'chatter-of-test',
     ...patch,
   };
 };

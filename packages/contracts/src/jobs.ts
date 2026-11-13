@@ -47,6 +47,7 @@ export const JOB_NAMES = [
   'fans.purge_facts',
   'rate_limit.purge',
   'backups.check',
+  'ai_usage.check_credits',
   'notifications.recap',
   'notifications.creator_sale',
   'creator_tasks.remind',
@@ -119,6 +120,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'fans.purge_facts': 'Nettoyage de la mémoire des fans',
   'rate_limit.purge': 'Nettoyage des limites de connexion',
   'backups.check': 'Vérification des sauvegardes',
+  'ai_usage.check_credits': 'Vérification des crédits IA',
   'notifications.recap': 'Récapitulatif des notifications',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
@@ -236,6 +238,7 @@ export const JOB_PAYLOADS = {
   'fans.purge_facts': z.object({}),
   'rate_limit.purge': z.object({}),
   'backups.check': z.object({}),
+  'ai_usage.check_credits': z.object({}),
   /** At the end of an account's quiet hours: one notification for all it held (CR-01). Keyed by account. */
   'notifications.recap': z.object({ userId: z.string().min(1) }),
   /**
@@ -514,6 +517,8 @@ export const JOB_MAX_ATTEMPTS = {
   'fans.purge_facts': 1,
   'rate_limit.purge': 1,
   'backups.check': 1,
+  // Each hour: the next run is the retry; an alert is published once per episode.
+  'ai_usage.check_credits': 1,
   'notifications.recap': 3,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
@@ -605,6 +610,12 @@ export const JOB_MAX_ATTEMPTS = {
   'telegram.connection_reminders': 1,
   'telegram.purge': 1,
 } as const satisfies Record<JobName, number>;
+
+/**
+ * The vision AI's tries on a dropped medium (recette créatrice, anomaly 2): the describing job's attempts, counted on
+ * the medium (`media_assets.description_failures`); past them, it waits for the agency (« Réessayer », or written).
+ */
+export const DESCRIPTION_TRIES = JOB_MAX_ATTEMPTS['content_drops.describe_file'];
 
 /** Jobs debounced per conversation: a new one replaces the pending one (`jobKeyMode: 'replace'`). */
 export const DEBOUNCED_JOBS = [

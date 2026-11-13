@@ -13,6 +13,7 @@ import type {
   DropMime,
   DropState,
   FillScriptSlotBody,
+  HandIntensity,
   ScriptDropSummary,
   ScriptMoment,
   ScriptSegment,
@@ -24,6 +25,7 @@ import type {
 } from '@impera/contracts';
 
 import type { DropMediaContext } from './describe';
+import type { SentDrop } from './drop-export';
 import type { ExportedFile } from './script-export';
 import type { FileFamily } from './sniff';
 import type { StoredPart } from './upload';
@@ -292,6 +294,27 @@ export interface RetentionStore {
   ): Promise<boolean>;
   /** `content_media_erase_failed`, once per medium and date: the next run tries again. */
   eraseFailed(original: DueOriginal, now: Date, correlationId: string): Promise<void>;
+  /** The reduced pictures still held of each creator archived before `archivedBefore` (ADR 0089). */
+  dueThumbnails(archivedBefore: Date): Promise<DueThumbnail[]>;
+  /**
+   * The reduced picture erased by `remove`, then its key emptied, under the medium's row lock: checked again under it,
+   * one whose creator was reopened meanwhile, or already emptied, is left as it is (`false`). A `remove` that throws
+   * leaves it held.
+   */
+  eraseThumbnail(
+    thumbnail: DueThumbnail,
+    archivedBefore: Date,
+    remove: (key: string) => Promise<void>,
+  ): Promise<boolean>;
+  /** One audit line for a creator whose reduced pictures went this run: how many, never a key (ADR 0089 § 5). */
+  thumbnailsErased(creatorId: string, count: number): Promise<void>;
+}
+
+/** A reduced picture of an archived creator's medium that leaves the storage now (ADR 0089). */
+export interface DueThumbnail {
+  readonly mediaAssetId: string;
+  readonly creatorId: string;
+  readonly thumbnailKey: string;
 }
 
 /** The agency's side (`withTenantMember`): the owner and an active manager; a chatter is refused before any read. */
@@ -338,6 +361,17 @@ export interface AgencyContentStore {
    * never later than it already went. Refused like `sentScript`.
    */
   confirmExport(creatorId: string, userId: string, dropId: string, now: Date): Promise<ContentDrop>;
+  /**
+   * Any other drop of hers as its archive reads it (recette créatrice 1): its category, her word, her day, each live kept
+   * file in her order. Refused (`ContentDropExportUnprocessable`) for a script, a drop not `ready`, `scheduled` or
+   * `published` yet, or one whose original is already erased.
+   */
+  sentDrop(creatorId: string, userId: string, dropId: string): Promise<SentDrop>;
+  /**
+   * The team says it put her drop out by hand (ADR 0044: published by hand until the connector does): said once, with
+   * its audit line; her originals of it go 30 days later (ADR 0044 § 2). Refused like `sentDrop`.
+   */
+  confirmDropExport(creatorId: string, userId: string, dropId: string, now: Date): Promise<ContentDrop>;
 }
 
 /** A sent script's facts for its archive (SC-03 c). */
@@ -399,6 +433,8 @@ export interface DescriptionQueue {
   target(mediaAssetId: string): Promise<MediaToDescribe | null>;
   /** The job again at `runAt` (budget spent, disk short), keyed by the medium: a new job, never twice. */
   later(creatorId: string, mediaAssetId: string, correlationId: string, runAt: Date): Promise<void>;
+  /** One more try of the vision AI failed on this medium: its count of failures, this one included. */
+  failed(mediaAssetId: string): Promise<number>;
 }
 
 /** The media module's description of a dropped media, seen from here (ADR 0083). */
@@ -543,6 +579,31 @@ export interface DescriptionReview {
     dropId: string,
     descriptionId: string,
     detailed: string,
+    now: Date,
+    correlationId: string,
+  ): Promise<DropDescriptionsReview>;
+  /**
+   * The vision AI asked again on a medium it failed at each try (recette créatrice 2): its count of failures set back
+   * to nothing and its job enqueued now. A medium described, or not given up, is left as it is (replayable).
+   */
+  retryDescription(
+    creatorId: string,
+    userId: string,
+    dropId: string,
+    fileId: string,
+    correlationId: string,
+  ): Promise<DropDescriptionsReview>;
+  /**
+   * A medium with no description written by hand (recette créatrice 2): its words and its level, the other labels « not
+   * seen », validated by whoever writes it; the vision no longer asks it, the script is told again. A medium described
+   * meanwhile is refused (`not_shown`), an audio note is not described.
+   */
+  writeDescription(
+    creatorId: string,
+    userId: string,
+    dropId: string,
+    fileId: string,
+    written: { readonly detailed: string; readonly intensity: HandIntensity },
     now: Date,
     correlationId: string,
   ): Promise<DropDescriptionsReview>;

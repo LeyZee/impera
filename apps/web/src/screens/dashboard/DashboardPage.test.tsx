@@ -198,7 +198,7 @@ describe('DashboardPage on the server’s data', () => {
     expect(screen.getByText('28 €')).toBeDefined();
     const sellers = screen.getByRole('list', { name: 'Qui a vendu' });
     expect(sellers.textContent).toMatch(/L’agent.*Maya.*Chatteur non relié/u);
-    expect(screen.getByText('1 vente · à relier dans Réglages › Ventes')).toBeDefined();
+    expect(screen.getByText('1 vente · à relier dans Équipe › Reveal')).toBeDefined();
     expect(
       screen.getByText(/1 remboursement porte sur une vente plus ancienne que le registre/u),
     ).toBeDefined();

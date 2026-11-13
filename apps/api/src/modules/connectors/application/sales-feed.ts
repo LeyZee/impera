@@ -188,9 +188,9 @@ export interface SalesFeeds {
    */
   read(logger: JobLogger, correlationId: string, woken: boolean): Promise<void>;
   /**
-   * The reliability check of ADR 0050 § 8 (CRM-02): the register against the platform's statistics and the
-   * dashboard's export, read for this answer only. The report is kept, by `by`, for the switch of CRM-03; the export
-   * never is. A refusal of the platform is said, not recorded (the minute's reading records it). Throws
+   * The reliability check of ADR 0050 § 8 (CRM-02): the register against the platform's statistics and, when the
+   * owner gives one, the dashboard's export, read for this answer only. The report is kept, by `by`, for the switch of
+   * CRM-03; the export never is. A refusal of the platform is said, not recorded (the minute's reading records it). Throws
    * `SalesFeedExportUnprocessable` (422) for an export it cannot read.
    */
   check(

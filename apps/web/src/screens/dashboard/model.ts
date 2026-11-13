@@ -122,7 +122,7 @@ export interface RevealSeller {
   readonly kind: 'member' | 'agent' | 'unlinked' | 'none';
   /** « Théo », « L’agent », « Chatteur non relié », « Sans chatteur ». */
   readonly name: string;
-  /** « 2 ventes · 1 remboursement », or what to do about it (« à relier dans Réglages › Ventes »). */
+  /** « 2 ventes · 1 remboursement », or what to do about it (« à relier dans Équipe › Reveal »). */
   readonly line: string;
   /** In euros, a refund taken off: negative when refunds outweigh sales. */
   readonly revenue: number;
