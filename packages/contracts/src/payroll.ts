@@ -1305,6 +1305,68 @@ export const MySalesSchema = pageOf(MySaleSchema).extend({
 });
 export type MySales = z.infer<typeof MySalesSchema>;
 
+/** How far back « Quand je vends » reads a member's own sales (ADR 0104 § 5). */
+export const MY_FIGURES_WEEKS = 8;
+
+/** Under this many sales, a card that spreads them concludes nothing (ADR 0104 § 9, as ADR 0092 § 5). */
+export const MY_FIGURES_MIN_SALES = 30;
+
+const MyNetSchema = z.object({ currency: CurrencySchema, netMinor: z.number().int() });
+
+/** A day of the member's own lines: how many sales and refunds, and their net per currency. */
+export const MyFiguresDaySchema = z.object({
+  day: CalendarDaySchema,
+  sales: z.number().int().min(0),
+  refunds: z.number().int().min(0),
+  nets: z.array(MyNetSchema),
+});
+export type MyFiguresDay = z.infer<typeof MyFiguresDaySchema>;
+
+/** An hour of a weekday (1 Monday to 7 Sunday) in the member's own zone: the sales that fell in it and their net. */
+export const MyFiguresCellSchema = z.object({
+  weekday: z.number().int().min(1).max(7),
+  hour: z.number().int().min(0).max(23),
+  sales: z.number().int().min(1),
+  nets: z.array(MyNetSchema),
+});
+export type MyFiguresCell = z.infer<typeof MyFiguresCellSchema>;
+
+/**
+ * `GET /v1/payroll/my-figures` (any member) → 200: the member's own figures (ADR 0104 § A), read from their own
+ * statements only, never from the register: never another member's sale, a team's mean, the agency's share nor a fan.
+ * - `days`, the period under way day by day in the agency's zone, and `nets` their sum; `previous`, the period before
+ *   with `toDateNets` stopped at the same day of the fortnight (`null` without a statement for it);
+ * - `hours`, the sales of the last `MY_FIGURES_WEEKS` weeks by weekday and hour in the member's zone, `enough` from
+ *   `MY_FIGURES_MIN_SALES` sales on;
+ * - `records`, the best day and the best fortnight in the currency that brought the most.
+ * Everything empty for the owner outside the team.
+ */
+export const MyFiguresSchema = z.object({
+  period: PayPeriodSchema,
+  today: CalendarDaySchema,
+  timeZone: TimezoneSchema,
+  days: z.array(MyFiguresDaySchema),
+  nets: z.array(MyNetSchema),
+  previous: z
+    .object({
+      period: PayPeriodSchema,
+      days: z.array(MyFiguresDaySchema),
+      toDateNets: z.array(MyNetSchema),
+    })
+    .nullable(),
+  hours: z.object({
+    since: CalendarDaySchema,
+    sales: z.number().int().min(0),
+    enough: z.boolean(),
+    cells: z.array(MyFiguresCellSchema),
+  }),
+  records: z.object({
+    bestDay: MyNetSchema.extend({ day: CalendarDaySchema }).nullable(),
+    bestPeriod: MyNetSchema.extend({ period: PayPeriodSchema }).nullable(),
+  }),
+});
+export type MyFigures = z.infer<typeof MyFiguresSchema>;
+
 /**
  * The error codes of `/v1/payroll`, for the screen to say them in French (the suffix gives the status, api.md):
  * `team_member_not_found`, `commission_statement_not_found`, `bonus_not_found`, `penalty_not_found` 404 ;
