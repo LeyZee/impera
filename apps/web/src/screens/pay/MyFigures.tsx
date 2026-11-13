@@ -160,19 +160,22 @@ function TierRing({
       className="mf-tier"
       data-done={next === null}
       tabIndex={0}
-      {...tip.bind({
-        title: next === null ? 'Tous les paliers atteints' : `Vers le palier ${next.label}`,
-        rows: [
-          ['Ton net vendu', amountText(netMinor, 'EUR')],
-          ...(reached === null ? [] : [['Palier atteint', reached.label] as const]),
-          ...(next === null
-            ? []
-            : [
-                ['Prochain palier', `${next.label} à ${amountText(next.thresholdMinor, 'EUR')}`] as const,
-                ['Il reste', amountText(next.thresholdMinor - netMinor, 'EUR')] as const,
-              ]),
-        ],
-      })}
+      {...tip.bind(
+        {
+          title: next === null ? 'Tous les paliers atteints' : `Vers le palier ${next.label}`,
+          rows: [
+            ['Ton net vendu', amountText(netMinor, 'EUR')],
+            ...(reached === null ? [] : [['Palier atteint', reached.label] as const]),
+            ...(next === null
+              ? []
+              : [
+                  ['Prochain palier', `${next.label} à ${amountText(next.thresholdMinor, 'EUR')}`] as const,
+                  ['Il reste', amountText(next.thresholdMinor - netMinor, 'EUR')] as const,
+                ]),
+          ],
+        },
+        { above: true },
+      )}
     >
       <svg className="mf-ring" viewBox="0 0 80 80" role="img" aria-label={label}>
         <circle className="mf-ring__track" cx="40" cy="40" r={radius} />
@@ -256,7 +259,7 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
                 ? []
                 : [['Gagné', amountText(statement.totalMinor, 'EUR')] as const]),
             ],
-            note:
+            text:
               statement === undefined
                 ? 'Ton gain s’affiche dès que ton relevé existe.'
                 : 'Avant validation : le relevé peut encore bouger.',
@@ -408,17 +411,20 @@ function Records({ figures, tip }: { figures: MyFigures; tip: FloatingTip }): JS
             className="mf-record"
             data-now={recordToday(figures)}
             tabIndex={0}
-            {...tip.bind({
-              title: 'Ton meilleur jour',
-              rows: [
-                ['Record', amountText(bestDay.netMinor, bestDay.currency)],
-                ['Aujourd’hui', amountText(today, bestDay.currency)],
-                ...(recordToday(figures)
-                  ? []
-                  : [['Il manque', amountText(bestDay.netMinor - today, bestDay.currency)] as const]),
-              ],
-              note: 'En net vendu, sur une journée.',
-            })}
+            {...tip.bind(
+              {
+                title: 'Ton meilleur jour',
+                rows: [
+                  ['Record', amountText(bestDay.netMinor, bestDay.currency)],
+                  ['Aujourd’hui', amountText(today, bestDay.currency)],
+                  ...(recordToday(figures)
+                    ? []
+                    : [['Il manque', amountText(bestDay.netMinor - today, bestDay.currency)] as const]),
+                ],
+                text: 'En net vendu, sur une journée.',
+              },
+              { above: true },
+            )}
           >
             <p className="mf-record__label">Meilleur jour</p>
             <p className="mf-record__value nv-num">{amountText(bestDay.netMinor, bestDay.currency)}</p>
@@ -432,14 +438,20 @@ function Records({ figures, tip }: { figures: MyFigures; tip: FloatingTip }): JS
             className="mf-record"
             data-now={bestPeriod.period === figures.period}
             tabIndex={0}
-            {...tip.bind({
-              title: 'Ta meilleure quinzaine',
-              rows: [
-                ['Record', amountText(bestPeriod.netMinor, bestPeriod.currency)],
-                ['Celle en cours', amountText(netIn(figures.nets, bestPeriod.currency), bestPeriod.currency)],
-              ],
-              note: 'En net vendu, sur une quinzaine entière.',
-            })}
+            {...tip.bind(
+              {
+                title: 'Ta meilleure quinzaine',
+                rows: [
+                  ['Record', amountText(bestPeriod.netMinor, bestPeriod.currency)],
+                  [
+                    'Celle en cours',
+                    amountText(netIn(figures.nets, bestPeriod.currency), bestPeriod.currency),
+                  ],
+                ],
+                text: 'En net vendu, sur une quinzaine entière.',
+              },
+              { above: true },
+            )}
           >
             <p className="mf-record__label">Meilleure quinzaine</p>
             <p className="mf-record__value nv-num">{amountText(bestPeriod.netMinor, bestPeriod.currency)}</p>
