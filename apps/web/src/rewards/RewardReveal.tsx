@@ -62,6 +62,26 @@ export function RewardReveal({
 
   useEffect(() => (sound ? playChime() : undefined), [sound]);
 
+  // The one thing to reach is « Continuer »: Tab stays on it instead of walking the page behind, and Échap closes
+  // wherever the focus went (a click on the stage takes it off the button).
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close.current();
+      } else if (event.key === 'Tab') {
+        event.preventDefault();
+        button.current?.focus({ preventScroll: true });
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
   return createPortal(
     <div
       className="rw-reveal"
@@ -71,12 +91,6 @@ export function RewardReveal({
       aria-labelledby={`${id}t`}
       aria-describedby={`${id}d`}
       onClick={onClose}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          onClose();
-        }
-      }}
     >
       <div className="rw-reveal__card">
         <div className="rw-reveal__object">

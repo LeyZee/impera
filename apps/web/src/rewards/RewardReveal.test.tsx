@@ -44,6 +44,20 @@ describe('RewardReveal', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Continuer' }));
   });
 
+  it('keeps the keyboard on « Continuer »: Tab never reaches the page behind, Échap closes from anywhere', () => {
+    const behind = document.createElement('button');
+    document.body.append(behind);
+    const onClose = vi.fn();
+    reveal(onClose);
+    behind.focus();
+    expect(fireEvent.keyDown(document.body, { key: 'Tab' })).toBe(false);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Continuer' }));
+    behind.focus();
+    fireEvent.keyDown(behind, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+    behind.remove();
+  });
+
   it('stays silent when the account’s sounds are off', () => {
     const created = vi.fn();
     vi.stubGlobal('AudioContext', created);

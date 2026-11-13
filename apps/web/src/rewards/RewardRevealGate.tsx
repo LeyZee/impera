@@ -1,5 +1,5 @@
 import { owedReveals, type Me } from '@impera/contracts';
-import { useRef, useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { RewardReveal } from './RewardReveal';
 import { playsTheGame, useMarkRevealed, useMyTrophyCase, usePreferences } from './api';
@@ -25,22 +25,27 @@ export function RewardRevealGate({ user }: { user: Me }): JSX.Element | null {
   const [seen, setSeen] = useState<readonly string[]>([]);
   const closed = useRef(new Set<string>());
 
-  if (!plays || trophyCase === undefined) return null;
-  const owed = owedReveals(trophyCase).filter((item) => !seen.includes(item.kind));
-  const [first] = owed;
-  if (first === undefined) return null;
-  const words = revealWordsOf(first, current, tiersOf(period));
+  const owed =
+    !plays || trophyCase === undefined
+      ? []
+      : owedReveals(trophyCase).filter((item) => !seen.includes(item.kind));
+  const first = owed[0]?.kind;
+  const words = owed[0] === undefined ? null : revealWordsOf(owed[0], current, tiersOf(period));
   const close = (): void => {
     // « Continuer » is also a tap on the reveal: it closes once.
-    if (closed.current.has(first.kind)) return;
-    closed.current.add(first.kind);
-    setSeen((before) => [...before, first.kind]);
-    mark([first.kind]);
+    if (first === undefined || closed.current.has(first)) return;
+    closed.current.add(first);
+    setSeen((before) => [...before, first]);
+    mark([first]);
   };
-  if (words === null) {
-    // A kind this screen does not draw: seen without a show, so it never blocks the ones behind it.
-    queueMicrotask(close);
-    return null;
-  }
-  return <RewardReveal key={first.kind} {...words} sound={preferences.sounds} onClose={close} />;
+  // A kind this screen does not draw: seen without a show, so it never blocks the ones behind it.
+  const unknown = first !== undefined && words === null;
+  const skip = useRef(close);
+  skip.current = close;
+  useEffect(() => {
+    if (unknown) skip.current();
+  }, [unknown, first]);
+
+  if (first === undefined || words === null) return null;
+  return <RewardReveal key={first} {...words} sound={preferences.sounds} onClose={close} />;
 }
