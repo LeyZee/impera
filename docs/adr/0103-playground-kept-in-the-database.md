@@ -1,6 +1,6 @@
 # 0103. Le playground en base : conversations, notes, cas rejouables, taux par version, calibrage du désir
 
-Statut : accepted (« ok 0103 » de Charles, 12/11/2026 ; demande du même jour après l’avis sur le playground, recommandations 3, 4, 5 et la note de désir). Amendée le 13/11/2026 (« ok phrases 0103 » : la disponibilité du fan).
+Statut : accepted (« ok 0103 » de Charles, 12/11/2026 ; demande du même jour après l’avis sur le playground, recommandations 3, 4, 5 et la note de désir). Amendée le 13/11/2026 (« ok phrases 0103 » : la disponibilité du fan, porte avant le premier teaser, texte corrigé validé à 1 h 07).
 Date : 2026-11-12
 Précise : l'ADR 0019 (taux au playground) et l'ADR 0022 (la persona fait partie de la version). Ne remplace rien.
 
