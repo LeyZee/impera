@@ -399,10 +399,12 @@ describe('playground session, the offer policy and the cursor', () => {
     action: 'offer',
     replyBrief: 'Lui proposer la vidéo de la douche.',
   };
+  // He says he is alone and free in each message: the gate before a script is his heat alone (ADR 0103 § 11).
+  const FREE_OFFER: Brief = { ...OFFER, desireSignals: ['alone', 'free_now'] };
   // His desire score is counted for real here; 0 lets the pace and the cursor be tested on their own.
-  const session = (voiceInputs: VoiceInput[], withPace: boolean, minDesire = 0) =>
+  const session = (voiceInputs: VoiceInput[], withPace: boolean, minDesire = 0, brief: Brief = FREE_OFFER) =>
     createPlaygroundSession({
-      gateway: fakeGateway({ bubbles: ['Mmh tu me chauffes 😏'] }, voiceInputs, [], OFFER),
+      gateway: fakeGateway({ bubbles: ['Mmh tu me chauffes 😏'] }, voiceInputs, [], brief),
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
@@ -432,7 +434,7 @@ describe('playground session, the offer policy and the cursor', () => {
 
   it('offers only once his desire score reaches hers, as it builds message after message (P3-12)', async () => {
     const voiceInputs: VoiceInput[] = [];
-    const playground = session(voiceInputs, true, 70);
+    const playground = session(voiceInputs, true, 99);
     const scores: number[] = [];
     for (const text of [
       'J’ai 30 ans et t’es trop bonne',
@@ -442,9 +444,18 @@ describe('playground session, the offer policy and the cursor', () => {
     ])
       scores.push((await playground.handleFanMessage(text)).desire?.score ?? -1);
     expect(scores.every((score, i) => i === 0 || score > (scores[i - 1] ?? 0))).toBe(true);
-    expect(scores.at(-2)).toBeLessThan(70);
-    expect(scores.at(-1)).toBeGreaterThanOrEqual(70);
+    // 34, 64, 98, then 100: her 99 is reached on the fourth message only.
+    expect(scores.at(-2)).toBeLessThan(99);
+    expect(scores.at(-1)).toBeGreaterThanOrEqual(99);
     expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply', 'reply', 'offer']);
+  });
+
+  it('offers nothing while he has not said he is alone and free (ADR 0103 § 11)', async () => {
+    const voiceInputs: VoiceInput[] = [];
+    const playground = session(voiceInputs, true, 0, OFFER);
+    await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
+    await playground.handleFanMessage('Encore');
+    expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply']);
   });
 
   it('offers nothing without her pace of scripts', async () => {

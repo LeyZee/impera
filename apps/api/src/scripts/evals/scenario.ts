@@ -121,6 +121,13 @@ const ScenarioSchema = z
         custom_order_open: z.boolean().default(false),
         /** The replies of her objection bank he already received, by id (ADR 0090 § B). */
         objection_replies_used: z.array(ObjectionReplyIdSchema).default([]),
+        /**
+         * His availability as stored just before this message (ADR 0103, amendement du 13/11): `confirmed`, he said a
+         * few minutes ago that he is alone and free; `no`, that someone is beside him.
+         */
+        availability: z.enum(['confirmed', 'unknown', 'no']).default('unknown'),
+        /** A message of his sexualized a few minutes ago, in this session (the gate before a script). */
+        sexualized: z.boolean().default(false),
       })
       .strict()
       .prefault({}),

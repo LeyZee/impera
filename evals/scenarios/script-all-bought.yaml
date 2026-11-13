@@ -7,6 +7,8 @@ fan_facts:
   - 'prénom : Bastien (fictif)'
   - 41 ans, confirmé
 situation:
+  availability: confirmed
+  sexualized: true
   known_hours: 72
   age_confirmed: true
   local_time: '23:00'

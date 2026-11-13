@@ -28,6 +28,7 @@ import {
   type FiredAlert,
   type PhraseAlert,
 } from '../domain/alerts';
+import type { FanAvailabilityRecord } from '../domain/availability';
 import { measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
 import {
@@ -109,6 +110,8 @@ export interface AgentComposeInput {
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRun | null;
+  /** His availability as the conversation keeps it (ADR 0103, amendement du 13/11); `null` before the first. */
+  readonly fanAvailability?: FanAvailabilityRecord | null;
 }
 
 /** A run that changed at this message, with its journal (ADR 0098 § 2). */
@@ -182,6 +185,8 @@ type AgentComposeResult = (
     }
 ) & {
   readonly desire?: ScoredDesire;
+  /** His availability after this message, only when it changed (`fan_availability_changed`, ADR 0103). */
+  readonly fanAvailability?: FanAvailabilityRecord;
   /** Her alerts that went off on his message and only let a human know (`alert_triggered` each, P4-01). */
   readonly alerts?: readonly AlertNotice[];
   /** He asked for a custom order and it now waits for the team (`custom_order_opened`, ADR 0090 § A). */
@@ -867,6 +872,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           },
         }),
         scripts,
+        ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
       });
       const fired = firedWith(coded, composed.brief, asked, settings, chatter);
       const alerts = settleAlerts(fired);
@@ -883,9 +889,12 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         composed.scripts,
         settings,
       );
-      if (composed.desire === undefined) return settled;
+      const availability = composed.availability?.changed === true ? composed.availability.record : undefined;
+      const withAvailability =
+        availability === undefined ? settled : { ...settled, fanAvailability: availability };
+      if (composed.desire === undefined) return withAvailability;
       const { before, score, signals, weightsVersion } = composed.desire;
-      return { ...settled, desire: { before, score, signals, weightsVersion } };
+      return { ...withAvailability, desire: { before, score, signals, weightsVersion } };
     },
   };
 }

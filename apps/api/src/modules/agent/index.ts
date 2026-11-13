@@ -34,6 +34,18 @@ export { withoutOrders } from './domain/injection';
 export { offerDecision, offerSignals, type OfferContext, type OfferLimits } from './domain/policy';
 export type { SexualizationLimits } from './domain/sexualization';
 export { followUpDecision, type FollowUpDecision } from './domain/follow-up';
+/**
+ * @public His availability and the gate before the first teaser (ADR 0103, amendement du 13/11): the playground keeps
+ * them as `conversations` does and shows which condition is missing.
+ */
+export {
+  readAvailability,
+  scriptStartGate,
+  UNKNOWN_AVAILABILITY,
+  type FanAvailabilityRecord,
+  type ScriptStart,
+  type ScriptStartBlock,
+} from './domain/availability';
 /** @public measureDesire and DesireState: the playground keeps his score as `conversations` would (P3-12). */
 export { measureDesire, type DesireState } from './domain/desire';
 export { describeSituation, isNight, isTimeZone, nextLocalTime, type Situation } from './domain/situation';

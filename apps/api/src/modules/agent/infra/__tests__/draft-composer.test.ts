@@ -3,6 +3,7 @@ import {
   DEFAULT_AGENT_HOURS,
   err,
   ok,
+  type FanAvailabilityRecord,
   type FanFlags,
   type MediaDescription,
 } from '@impera/contracts';
@@ -171,6 +172,19 @@ const INPUT: AgentComposeInput = {
   ],
   fan: { notes: [], spentMinor: 0, firstMessageAt: new Date('2026-10-17T09:58:00Z') },
 };
+
+/** He said he is alone and free, and sexualized, in this session (ADR 0103 § 11): the gate before a script is open. */
+const READY: FanAvailabilityRecord = {
+  state: 'confirmed',
+  signal: 'free_now',
+  at: new Date('2026-10-17T09:59:00Z'),
+  expiresAt: new Date('2026-10-17T11:59:00Z'),
+  seen: ['alone', 'free_now'],
+  sexualizedAt: new Date('2026-10-17T09:59:00Z'),
+  askedAt: null,
+  hotAt: null,
+};
+const free = (input: AgentComposeInput): AgentComposeInput => ({ ...input, fanAvailability: READY });
 
 function composer(
   script: Script = {},
@@ -1058,7 +1072,7 @@ describe('createDraftComposer, the offer policy', () => {
       limitsOf(ADULT).limits,
       policy(null),
     );
-    expect((await draftComposer.compose(INPUT)).kind).toBe('draft');
+    expect((await draftComposer.compose(free(INPUT))).kind).toBe('draft');
     expect(written(seen)).toMatchObject({ action: 'offer', replyBrief: OFFER.replyBrief });
   });
 
@@ -1139,14 +1153,14 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
   it('gives the worker his new score with what moved it, and offers once he is hot', async () => {
     // Stored at 60 three minutes ago, 59 now: +34 on this message.
     const { draftComposer, seen } = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
-    const result = await draftComposer.compose(stored(60, 3));
+    const result = await draftComposer.compose(free(stored(60, 3)));
     expect(result).toMatchObject({
       kind: 'draft',
       desire: {
         before: 59,
         score: 93,
         signals: ['states_desire', 'intent:sexting', 'sentiment:aroused'],
-        weightsVersion: 'desire-1',
+        weightsVersion: 'desire-2',
       },
     });
     expect(written(seen)?.action).toBe('offer');
@@ -1170,7 +1184,7 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
   it('counts a message of his once: a second pass reads the stored score and gives none back', async () => {
     // Counted at 93 half a minute ago, after his last message (09:59).
     const { draftComposer, seen } = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
-    const result = await draftComposer.compose(stored(93, 0.5));
+    const result = await draftComposer.compose(free(stored(93, 0.5)));
     expect(result.desire).toBeUndefined();
     expect(written(seen)?.action).toBe('offer');
   });
@@ -1759,7 +1773,7 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       limitsOf(ADULT).limits,
       deps(PACK_SOURCE),
     );
-    const result = await draftComposer.compose(INPUT);
+    const result = await draftComposer.compose(free(INPUT));
 
     expect(seen.brainInputs?.[0]?.scripts).toEqual([{ id: 's1', description: 'Pack de démonstration' }]);
     expect(seen.voiceInputs?.[0]?.scriptStep).toEqual({
@@ -1775,6 +1789,39 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
         offer: { amountMinor: 1_500, currency: 'EUR' },
       },
     });
+  });
+
+  it('sends no teaser while he has not said he is free, and asks him once in the session (ADR 0103 § 11-13)', async () => {
+    const { draftComposer, seen } = composer(
+      { brief: HOT },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const first = await draftComposer.compose(INPUT);
+    expect(first.kind).toBe('draft');
+    expect(first.scriptRun).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('tranquille'))).toBe(true);
+    expect(first.fanAvailability).toMatchObject({ state: 'unknown', askedAt: INPUT.now });
+
+    const again = await draftComposer.compose({ ...INPUT, fanAvailability: first.fanAvailability ?? null });
+    expect(again.scriptRun).toBeUndefined();
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.some((hint) => hint.includes('tranquille'))).toBe(false);
+  });
+
+  it('sends no teaser when someone is beside him, even hot and free before', async () => {
+    const busy: Brief = { ...HOT, desireSignals: [...(HOT.desireSignals ?? []), 'someone_nearby'] };
+    const { draftComposer, seen } = composer(
+      { brief: busy },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose(free(INPUT));
+    expect(result.scriptRun).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    expect(result.fanAvailability).toMatchObject({ state: 'no', signal: 'someone_nearby' });
   });
 
   it('sells nothing without her scripts, or when Reveal’s history cannot be read (fail closed)', async () => {
