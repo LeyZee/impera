@@ -18,7 +18,7 @@ La créatrice gagne des médailles à chaque palier de sa série de journées r�
 ## À faire (liste vérifiable)
 
 - [ ] Domaine pur et testé : série de livraisons (§ 2), constat des neuf trophées (§ 3), médaille du palier atteint (§ 1).
-- [ ] Migration 0181 dans le module `rewards` : types de la créatrice ajoutés à la liste fermée de la table commune des gains, politiques RLS de la créatrice, test RLS (elle lit les siens et marque un dévoilement vu ; l'agence lit ; un chatteur ne lit rien). Pas de seconde table.
+- [ ] Migration 0181 dans le module `rewards` : types de la créatrice ajoutés à la liste fermée de la table commune des gains, politiques RLS de la créatrice, test RLS (elle lit les siens et marque un dévoilement vu ; l'agence lit ; un chatteur ne lit rien). Pas de seconde table. Relecture Bilan (13/11) : politiques rattachées au compte du gain ; lecture agence limitée aux rôles propriétaire et manager actif ; GRANT UPDATE de la seule colonne du dévoilement vu au rôle applicatif, sur la ligne de son compte, ni autre UPDATE ni DELETE ; INSERT à `impera_service` (après #716) vérifié par le test des droits ; job en ON CONFLICT DO NOTHING.
 - [ ] Job rejouable : après une coche, après un dépôt arrivé, chaque nuit dans son fuseau.
 - [ ] Route de la vitrine au harnais d'isolation ; test « une créatrice ne lit pas les trophées d'une autre ».
 - [ ] Écrans : médaille à côté de la série, « Mes trophées » dans Moi, dévoilement partagé avec le chatteur, lecture sur sa fiche côté agence.
