@@ -1403,6 +1403,9 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
         outcome: 'count',
         reason: 'off_shift',
         memberId: THEO.id,
+        recipientMemberId: null,
+        shareBp: null,
+        excludeReason: null,
         note: 'Shift prolongé d’une heure.',
         decidedBy: OWNER_USER,
         createdAt: '2026-11-02T09:00:00.000Z',
@@ -1433,6 +1436,9 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
           platformSaleId: 'vente-1',
           outcome: 'count',
           note: 'Shift prolongé d’une heure.',
+          recipientMemberId: null,
+          shareBp: null,
+          excludeReason: null,
         },
       },
     ]);
@@ -1455,7 +1461,8 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     });
     const [first, second] = writes.map((one) => JSON.stringify(one.body));
     expect(second).toBe(first);
-    expect(writes[0]?.body).toMatchObject({ outcome: 'exclude', note: null });
+    // ADR 0101 § 8: an exclusion says its reason, « autre raison » until the screen offers the choice.
+    expect(writes[0]?.body).toMatchObject({ outcome: 'exclude', note: null, excludeReason: 'other' });
   });
 
   it('says a list it could not read, never an empty one, and reads it again on « Réessayer »', async () => {
