@@ -119,8 +119,8 @@ function Calendar({ light, dark, plain, days }: Inks & { days: string }): JSX.El
           <Digits x={47} y={59.5} size={19} fill={dark}>
             {days}
           </Digits>
-          <Corner cx={61} cy={32} dark={dark}>
-            <path d={starPath(61, 32, 6.8)} fill={light} />
+          <Corner cx={59} cy={34} dark={dark}>
+            <path d={starPath(59, 34, 6.8)} fill={light} />
           </Corner>
         </>
       )}
@@ -189,15 +189,15 @@ function Media({ light, dark }: Inks): JSX.Element {
     <>
       <rect x={27} y={34} width={33} height={27} rx={6} fill={light} />
       <path d="M39 41.5v12l10.5-6z" fill={dark} />
-      <circle cx={55.5} cy={37.5} r={11.5} fill={dark} />
+      <circle cx={53.5} cy={39.5} r={11.5} fill={dark} />
       <path
-        d="M51.3 35.5v-2.8a4.3 4.3 0 0 1 8.3-1.5"
+        d="M49.3 37.5v-2.8a4.3 4.3 0 0 1 8.3-1.5"
         fill="none"
         stroke={light}
         strokeWidth={2.6}
         strokeLinecap="round"
       />
-      <rect x={49} y={35} width={13} height={9.5} rx={2.4} fill={light} />
+      <rect x={47} y={37} width={13} height={9.5} rx={2.4} fill={light} />
     </>
   );
 }
