@@ -53,10 +53,11 @@ const ChallengeRowSchema = z.object({ starts_at: instant, ends_at: instant });
 
 /**
  * A member's shifts begun at `now` in the nine weeks before (eight weeks of history before the shift shown), the
- * oldest first, on every creator, cancelled ones left out. Read only; the caller's connection decides whose shifts
- * can be read (the member's own under row-level security).
+ * oldest first, on every creator, cancelled ones left out. Read only, on the service connection: a member's shifts
+ * are closed outside a creator under row-level security, and the challenge reads them across creators. The caller
+ * passes the member the session's own record names, never an id from a request.
  */
-export async function shiftsForChallenge(
+export async function shiftsForChallengeUnscoped(
   tx: Transaction,
   memberId: TeamMemberId,
   now: Date,

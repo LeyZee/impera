@@ -135,8 +135,8 @@ export function createDrizzleRewardsStore(
     // The owner and a manager also read the team's rows (§ 20): this read is the account's own, by its id.
     own: (userId) => withMember(db, userId, (tx) => gainsAndStreakOf(tx, userId)),
 
-    ownFacts: (userId, now) =>
-      withMember(db, userId, async (tx) => {
+    ownFacts: async (userId, now) => {
+      const own = await withMember(db, userId, async (tx) => {
         const [member] = await tx
           .select({ id: teamMembers.id })
           .from(teamMembers)
@@ -146,14 +146,22 @@ export function createDrizzleRewardsStore(
         const agencyZone = await reads.agencyTimeZone(tx);
         const pay = await reads.payFacts(tx, memberId, agencyZone, now);
         return {
+          memberId,
           agencyZone,
           currency: pay.currency,
           cumulatedNetMinor: pay.cumulatedNetMinor,
           timedNets: pay.timedNets,
-          shifts: await reads.shiftsBegun(tx, memberId, now),
           thresholdsMinor: await thresholdsOf(tx),
         };
-      }),
+      });
+      if (own === null) return null;
+      // A member's shifts are read creator by creator under row-level security; the challenge needs them on every
+      // creator at once, so this one read crosses tenants on the service connection, bounded to the member the
+      // session's own record names just above. Nothing of anyone else's is read.
+      const { memberId, ...facts } = own;
+      const shifts = await withAdmin(adminDb, (tx) => reads.shiftsBegun(tx, memberId, now));
+      return { ...facts, shifts };
+    },
 
     ofMember: (viewerId, memberId) =>
       withMember(db, viewerId, async (tx) => {
