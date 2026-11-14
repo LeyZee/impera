@@ -84,7 +84,8 @@ describe('Créatrices › Agenda (CR-05 lot c)', () => {
     const group = await screen.findByRole('region', { name: /Refusées/u });
     expect(within(group).getByText('Séance photo')).toBeDefined();
     expect(within(group).getByText('« Pas ce samedi »')).toBeDefined();
-    expect(screen.getByText('1 proposée · 1 refusée')).toBeDefined();
+    // One standing only: the group's title counts it, no summary says it twice (ADM-25).
+    expect(screen.queryByText(/proposée/u)).toBeNull();
   });
 
   it('proposes a task once, and says when it found no room in her dispos', async () => {
@@ -92,6 +93,11 @@ describe('Créatrices › Agenda (CR-05 lot c)', () => {
     renderSection();
     fireEvent.click(await screen.findByRole('button', { name: 'Proposer une tâche' }));
     const dialog = await screen.findByRole('dialog', { name: 'Proposer à Anna' });
+    // Title, explanation, fields, actions; the actions held at the foot while the fields scroll (ADM-15).
+    expect(within(dialog).getByText(/Elle accepte, place ou refuse/u)).toBeDefined();
+    expect(
+      within(dialog).getByRole('button', { name: 'Proposer' }).closest('.aa-dialog__foot'),
+    ).not.toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Proposer' }));
     // No title: nothing is sent.
     expect(within(dialog).getByText('Donne-lui un titre.')).toBeDefined();

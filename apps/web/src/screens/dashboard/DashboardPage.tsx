@@ -195,6 +195,12 @@ export function DashboardPage({
   if (view.status === 'loading') {
     return (
       <div className="db" aria-busy="true">
+        {/* The chips keep their place while her Dashboard loads: nothing jumps when it comes (ADM-21). */}
+        {agency === undefined ? null : (
+          <header className="db-top">
+            <CreatorPicker onChoose={onCreator} agency={{ selected: false, onChoose: agency.onAgency }} />
+          </header>
+        )}
         <div className="db-loading nv-plate" aria-label="Chargement du Dashboard" role="status" />
       </div>
     );
@@ -305,9 +311,8 @@ function Loaded({
           )}
           <span>
             {several ? null : <span className="db-top__name">{data.creator.name}</span>}
-            <span className="db-top__when">
-              {data.creator.platform} · {data.creator.now}
-            </span>
+            {/* What the hour is: hers, now (recette 11/11, ADM-27). */}
+            <span className="db-top__when">Chez elle : {data.creator.now}</span>
           </span>
         </div>
         {/* The mode changes once the server has made the change (PUT /v1/agent/mode). */}
@@ -365,7 +370,7 @@ function Loaded({
       <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
 
       {/* The AI budget and the stuck jobs of no creator are the agency's, not her agent's health (reco 18, PRO-10). */}
-      <AgencyStrip agency={data.agency} />
+      <AgencyStrip agency={data.agency} opensSettings={forOwner} />
 
       {agency === undefined ? null : agentHero}
 
