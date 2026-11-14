@@ -2,11 +2,17 @@
 
 **Rôle.** Le serveur MCP d'Impera (ADR 0026, amendée par 0105) : une seconde porte, à côté des routes, par laquelle un agent connecté (d'abord une session Claude Code sur le PC de l'agence) lit le CRM, freine l'agent de chatting et prépare des gestes qu'un humain confirme. Il ne porte aucune règle métier : chaque outil appelle la commande ou la requête de l'`index.ts` du module propriétaire, avec les droits de la personne de l'accès.
 
-**État.** Lot a, première partie : les règles pures seulement (`domain/`). Les accès d'agent (`mcp_grants`), le transport `POST /v1/mcp`, le journal et le branchement des outils viennent quand le rôle de service de l'ADR 0087 est sur `main` (fiche `PROPOSED-mcp-read`).
+**État.** Lot a en cours (fiche `PROPOSED-mcp-read`) : règles pures (`domain/`) et accès d'agent (`mcp_grants`, Réglages › Agents connectés). Le transport `POST /v1/mcp`, le journal et le branchement des outils viennent ensuite.
 
-**Peut dépendre de.** Aucun module pour l'instant ; les modules qu'il lit s'ajouteront avec le branchement des outils. Aucun module ne dépend de lui, et il n'importera jamais `@impera/db`.
+**Peut dépendre de.** Aucun module pour l'instant ; les modules qu'il lit s'ajouteront avec le branchement des outils. Aucun module ne dépend de lui. Seuls son magasin d'accès (`infra/db`) et son `index.ts` touchent `@impera/db` (règle ESLint) : un outil lit par l'`index.ts` du module propriétaire, jamais la base.
 
-**Tables possédées.** Aucune pour l'instant.
+**Tables possédées.** `mcp_grants` (migration 0193) : l'accès d'agent (personne, créatrice au plus, capacités, empreinte SHA-256 du jeton, expiration à 90 jours au plus, révocation). Le propriétaire le lit, l'ajoute à son nom, le révoque et en note la dernière utilisation sous `withMember` ; personne ne le supprime ni ne change ce qu'il est (droits par colonne et déclencheur) ; une révocation est définitive. Le rôle de service le lit seulement, pour retrouver l'accès d'un jeton (`findByTokenHashUnscoped`, ADR 0087).
+
+## Routes
+
+- `GET /v1/settings/mcp-grants` : les accès du propriétaire, sans jeton ni empreinte.
+- `POST /v1/settings/mcp-grants` (connexion récente) : crée un accès ; le jeton (`impmcp_` puis 43 caractères, règle `gitleaks` dédiée) n'est montré que dans cette réponse (`cache-control: no-store`). Aucune capacité cochée d'office ; refus 422 par sa sorte (`capability_repeated`, `owner_only`, `role_forbidden`).
+- `DELETE /v1/settings/mcp-grants/:id` (connexion récente) : révoque, au journal.
 
 ## Règles (domaine)
 
@@ -18,5 +24,6 @@
 
 ## Structure
 
-- `domain/` : catalogue, accès, liste « jamais exposé ». Zéro I/O.
-- Pas encore d'`index.ts` : il naît avec le branchement des outils, quand un autre fichier l'importe.
+- `domain/` : catalogue, accès, liste « jamais exposé », ports. Zéro I/O.
+- `application/grants.ts` : créer, lister, révoquer un accès ; retrouver l'accès vivant d'un jeton et noter son usage.
+- `infra/db/grant-store.ts`, `infra/token.ts` (jeton et empreinte), `infra/http/routes.ts`.
