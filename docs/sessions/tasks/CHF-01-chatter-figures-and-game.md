@@ -34,7 +34,7 @@ Le chatteur lit ses propres chiffres dans le style du Dashboard de l'agence (gai
 - [x] Pièce du palier visé devant son nom sur « Ma quinzaine » ; pièces aux deux bouts de la jauge et médaille au laurier quand le plus haut palier est atteint, sur Commissions.
 - [x] Captures validées par Charles (planche `medailles-planche-7`, écrans `medailles-ecran-lot1-2`).
 
-### Lot 2a : gains, série, trophées, dévoilement (une migration, 0186)
+### Lot 2a : gains, série, trophées, dévoilement (une migration, 0194)
 
 - [x] Écussons de trophées, dévoilement d'un gain avec son (joué à l'arrivée sur Aujourd'hui ou Commissions, jamais sur une conversation, où une pastille « Voir » l'annonce), préférence « Sons » du compte (`user_preferences`, `PUT /v1/me/preferences`, interrupteur dans Moi › Préférences).
 - [x] Module `rewards` : tables `reward_gains` et `reward_streaks` (FORCE RLS, l'application ne fait que lire et marquer un dévoilement vu), job rejouable `rewards.evaluate`, routes `GET /v1/rewards/my-trophy-case` et `POST …/reveals` (sans identifiant dans leur adresse : le serveur répond pour la session), test « chacun sa vitrine ».

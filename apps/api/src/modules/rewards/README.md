@@ -4,7 +4,7 @@
 
 **Peut dépendre de.** aucun module métier (feuille). Deux lectures, branchées par le composition root (`RewardsReads`, `apps/api/src/wiring/rewards.ts`) : les faits de paie d'un membre (`payGameFactsUnscoped`, exporté par `payroll`) et ses shifts avec leurs rapports (`shiftsForGameUnscoped`, exporté par `scheduling`). Le module ne fait que LIRE la paie et le planning : il n'écrit dans aucune de leurs tables, et rien de ce qu'il note n'entre dans un relevé (§ 17, vérifié par `rewards.integration.test.ts`).
 
-**Tables possédées.** `reward_gains` et `reward_streaks` (migration 0186), en FORCE RLS. Le job les écrit par la connexion admin ; l'application lit les lignes du compte (le propriétaire et un manager actif lisent celles de l'équipe) et ne peut changer que `revealed_at` de ses propres gains. Rien n'est supprimé. `user_preferences` (même migration) appartient à la session (`apps/api/src/auth.ts`, `PUT /v1/me/preferences`).
+**Tables possédées.** `reward_gains` et `reward_streaks` (migration 0194), en FORCE RLS. Le job les écrit par la connexion admin ; l'application lit les lignes du compte (le propriétaire et un manager actif lisent celles de l'équipe) et ne peut changer que `revealed_at` de ses propres gains. Rien n'est supprimé. `user_preferences` (même migration) appartient à la session (`apps/api/src/auth.ts`, `PUT /v1/me/preferences`).
 
 **Job.** `rewards.evaluate`, toutes les 10 minutes (`crontab.ts`), rejouable : la contrainte `reward_gains_once` (compte, type, clé) fait qu'un gain n'est noté qu'une fois. Aucune notification n'est envoyée (§ 18).
 
