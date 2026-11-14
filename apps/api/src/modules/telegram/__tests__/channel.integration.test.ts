@@ -109,13 +109,13 @@ describe('the creator’s Telegram channel on Postgres', () => {
       .insert(schema.user)
       .values({ id: 'owner-channel', name: 'Owner', email: 'owner@example.test', emailVerified: true });
     const store = createPostgresTelegramStore({
-      adminDb: test.admin.db,
+      adminDb: test.service.db,
       keys: parseEncryptionKeys(`v1:${randomBytes(32).toString('base64')}`),
     });
     module = createTelegramModule({
       bots: store.bots,
       deliveries: store.deliveries,
-      channels: createPostgresChannelsStore(test.admin.db),
+      channels: createPostgresChannelsStore(test.service.db),
       channel: telegram,
       webOrigin: 'https://crm.example.test',
       channelWriter: {
@@ -371,7 +371,7 @@ describe('the creator’s Telegram channel on Postgres', () => {
       { id: one, nameKey: one, displayName: 'Une', timezone: 'Europe/Paris' },
       { id: two, nameKey: two, displayName: 'Deux', timezone: 'Europe/Paris' },
     ]);
-    const store = createPostgresChannelsStore(test.admin.db);
+    const store = createPostgresChannelsStore(test.service.db);
     const setting = { ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, chatId: chat };
     const results = await Promise.all([
       store.saveChannel(one, setting, 'owner-channel'),

@@ -241,7 +241,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         const [row] = await tx
           .select({
             count: sql<number>`count(*)::int`,
-            lastAt: sql<Date | null>`max(${schema.drafts.createdAt})`,
+            lastAt: sql<Date | null>`max(${schema.drafts.createdAt})`.mapWith(schema.drafts.createdAt),
           })
           .from(schema.drafts)
           .where(
@@ -250,8 +250,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
               sql`${schema.drafts.createdAt} >= ${since.toISOString()}::timestamptz`,
             ),
           );
-        const lastAt = row?.lastAt ?? null;
-        return { count: row?.count ?? 0, lastAt: lastAt === null ? null : new Date(lastAt) };
+        return { count: row?.count ?? 0, lastAt: row?.lastAt ?? null };
       },
       async openFor(conversationId) {
         const rows = await tx

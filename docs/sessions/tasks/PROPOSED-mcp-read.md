@@ -44,3 +44,4 @@ ADR 0026 et 0105 en entier, ADR 0005, 0016, 0021, 0023, 0024, 0046, 0053, 0075, 
 ## Notes de session
 
 - 14/11 : `resolveActor(db, shiftCreators, userId)` sorti d'`auth.ts` (PR 1 du lot a), `currentUserById` passe par lui ; le refus d'un compte sans second facteur reste à appliquer par le module `mcp`, qui lit `secondFactorEnabled`. Table des accès, migration et transport attendent le rôle de service (ADR 0087, #716).
+- 14/11 : PR 2 du lot a, domaine pur du module `mcp` (`MCP_CATALOGUE` et son instantané, `decideCall`, `grantProblems`, `NEVER_EXPOSED`) et `McpCapabilitySchema` dans `packages/contracts/src/mcp.ts` ; `mcp: []` dans `MODULE_DEPENDENCIES`. Pas d'`index.ts` tant que rien ne l'importe (knip).

@@ -78,7 +78,7 @@ describe('Reveal connector: a poll on FakeReveal (P2-02)', () => {
     const config = testConfig({
       LOG_LEVEL: 'trace',
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       SESSION_ENCRYPTION_KEYS: SESSION_KEYS,
     });
     logger = createLogger(config, sink);

@@ -34,6 +34,7 @@ export * from './ids';
 export * from './invitation-links';
 export * from './invoices';
 export * from './jobs';
+export * from './mcp';
 export * from './media';
 export * from './money';
 export * from './normalise';

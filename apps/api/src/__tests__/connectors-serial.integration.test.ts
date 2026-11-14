@@ -24,7 +24,7 @@ describe('connector.poll on the account queue (ADR 0006)', () => {
     const config = testConfig({
       LOG_LEVEL: 'info',
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
     });
     const logger = createLogger(config, sink);
     app = await createApp(config, logger, {

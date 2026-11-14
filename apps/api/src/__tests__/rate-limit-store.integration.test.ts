@@ -39,7 +39,7 @@ describe('rate limits shared by every API instance (ADR 0027)', () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       RATE_LIMIT_PER_MINUTE: String(PER_MINUTE),
     });
     app = await createApp(config, createLogger(config));

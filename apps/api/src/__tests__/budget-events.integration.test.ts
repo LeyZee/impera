@@ -28,10 +28,10 @@ describe('budget_threshold_crossed in the outbox', () => {
 
   it('writes one row per day and kind, without a creator, however many processes see it', async () => {
     await Promise.all([
-      publishBudgetThreshold(test.admin.db, crossing('alert')),
-      publishBudgetThreshold(test.admin.db, crossing('alert')),
+      publishBudgetThreshold(test.service.db, crossing('alert')),
+      publishBudgetThreshold(test.service.db, crossing('alert')),
     ]);
-    await publishBudgetThreshold(test.admin.db, crossing('reached'));
+    await publishBudgetThreshold(test.service.db, crossing('reached'));
 
     const rows = await test.admin.db
       .select({ creatorId: schema.domainEvents.creatorId, payload: schema.domainEvents.payload })

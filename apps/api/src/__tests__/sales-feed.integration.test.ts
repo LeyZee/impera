@@ -96,7 +96,7 @@ describe('sales feed (CRM-01)', () => {
     const config = testConfig({
       LOG_LEVEL: 'trace',
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 9).toString('base64')}`,
       // Deliveries are posted to this address: a platform only posts over HTTPS.
       AUTH_BASE_URL: PUBLIC_BASE_URL,

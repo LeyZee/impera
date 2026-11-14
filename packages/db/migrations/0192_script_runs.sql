@@ -24,6 +24,7 @@ ALTER TABLE "script_runs" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 -- Never deleted: an ended run is history.
 REVOKE ALL ON "script_runs" FROM nirvana_app;--> statement-breakpoint
 GRANT SELECT, INSERT, UPDATE ON "script_runs" TO nirvana_app;--> statement-breakpoint
+GRANT SELECT ON "script_runs" TO impera_service;--> statement-breakpoint
 -- ADR 0098 § 5: the system alert « prix d'un script changé » (`script_price`), switched per creator like the others.
 ALTER TABLE "system_alert_settings" DROP CONSTRAINT "system_alert_settings_code_check";--> statement-breakpoint
 ALTER TABLE "conversation_events" DROP CONSTRAINT "conversation_events_type_check";--> statement-breakpoint

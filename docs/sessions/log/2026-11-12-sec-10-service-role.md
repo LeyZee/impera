@@ -1,0 +1,7 @@
+# 2026-11-12 — SEC-10 Rôle de service de la base (ADR 0087, lot a) — done
+Fait : migration 0191 (rôle `impera_service`, lecture partout, écriture sur 62 tables d'après les appels `withAdmin`, `audit_log` en ajout seul) ; `runMigrations` pose le schéma de la file des jobs et ses droits ; `DATABASE_SERVICE_URL` branchée sur `withAdmin` et Graphile Worker ; `ensureServiceLogin` dans `pnpm db:migrate` ; garde au démarrage (`database-roles.ts`) ; tests d'intégration sur trois rôles et `service-role.integration.test.ts` ; ADR 0087 acceptée ; docs d'installation, de déploiement et de restauration.
+Pas fait : lots b et c de l'ADR 0087 ; renommage de `nirvana_admin`, `adminDb`, `withAdmin`.
+Décisions : ADR 0087 acceptée par Charles (« ok 0087 », 12/11).
+Découvertes : `DATABASE_ADMIN_URL` reste dans l'environnement des conteneurs `api` et `worker` parce que les scripts `ops:*` s'y lancent (à sortir vers un conteneur à part, fil Bilan) ; `restore.md` § essai, étape 4, démarre l'API sur le rôle `postgres` du conteneur jetable, ce que la garde des rôles refusait déjà pour `DATABASE_URL` avant ce lot (à revoir par Bilan) ; `dashboard-reveal-sales.integration.test.ts` a échoué une fois vers minuit heure de Paris et passe sinon (à confirmer).
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, pnpm test ✓, suites d'intégration de `packages/db` et de `apps/api` ✓ sur un Postgres local (les deux fichiers qui demandent un stockage objet en conteneur ne tournent qu'en CI).
