@@ -7,9 +7,17 @@ import { contentTools } from './application/content-tools';
 import { createDispatcher, whoami } from './application/dispatch';
 import { createGrants } from './application/grants';
 import { creatorTools, fanTools } from './application/read-tools';
+import { statusTools } from './application/status-tools';
 import { teamTools } from './application/team-tools';
 import type { ActorView } from './domain/access';
-import type { ContentReads, CreatorReader, FanReader, GrantRecord, ShiftReader } from './domain/ports';
+import type {
+  AiUsageReader,
+  ContentReads,
+  CreatorReader,
+  FanReader,
+  GrantRecord,
+  ShiftReader,
+} from './domain/ports';
 import { createDrizzleGrantStore } from './infra/db/grant-store';
 import { createDrizzleJournal } from './infra/db/journal';
 import { createMcpRoutes } from './infra/http/routes';
@@ -52,6 +60,8 @@ export interface McpDeps {
   readonly content: ContentReads;
   /** Who is on shift (`scheduling.reads.onShiftNow`), for `on_shift_now`. */
   readonly shifts: ShiftReader;
+  /** The AI spend (`ai-usage`), for `ai_usage_get`, the owner's alone. */
+  readonly aiUsage: AiUsageReader;
 }
 
 export function createMcpModule(deps: McpDeps): McpModule {
@@ -79,6 +89,7 @@ export function createMcpModule(deps: McpDeps): McpModule {
               ...fanTools(deps.fans),
               ...contentTools(deps.content),
               ...teamTools(deps.shifts),
+              ...statusTools(deps.aiUsage),
             },
           }),
         allowedOrigins: [],

@@ -5,6 +5,8 @@ import {
   myDayLine,
   myDayTitle,
   mySaleAmount,
+  mySaleGivenText,
+  mySaleGivenWhy,
   mySaleNote,
   mySalesCountText,
   mySalesIntro,
@@ -88,7 +90,7 @@ describe('my sales read (CRM-03 lot b4c)', () => {
       'Tu l’avais signalée : elle n’est plus sur ton relevé.',
     );
     expect(mySaleNote(mineOf({ state: 'given' }), false)).toBe(
-      'Un valideur l’a donnée à un autre membre, décisif sur cette vente : elle ne compte pas pour toi.',
+      'Un valideur l’a donnée au membre décisif sur cette vente : elle ne compte pas pour toi.',
     );
     expect(plain(mySignalNote(mineOf({ state: 'signalled', signal })))).toBe(
       '« Vendue pendant le shift de Lou »',
@@ -175,5 +177,26 @@ describe('my sales read (CRM-03 lot b4c)', () => {
       confirm: 'Signaler la vente',
     });
     expect(signalWords('withdraw', 'sale').confirm).toBe('Retirer le signalement');
+  });
+
+  it('says a sale the validator gave, to each of its two members, with why (ADR 0101 §§ 6, 15)', () => {
+    const note = 'Elle a relancé le fan et l’a convaincu';
+    const of = (role: 'author' | 'recipient', myShareBp: number, other: string | null) =>
+      mineOf({
+        given: {
+          role,
+          myShareBp,
+          other: other === null ? { kind: 'agent' } : { kind: 'member', displayName: other },
+          note,
+        },
+      });
+    expect(mySaleGivenText(mineOf())).toBeNull();
+    expect(mySaleGivenText(of('author', 0, 'Léa'))).toBe('Donnée à Léa');
+    expect(mySaleGivenText(of('recipient', 10_000, 'Théo'))).toBe('Reçue de Théo');
+    expect(mySaleGivenText(of('recipient', 10_000, null))).toBe('Reçue de l’IA');
+    expect(plain(mySaleGivenText(of('author', 4_000, 'Léa')))).toBe('Partagée avec Léa : 40 % pour toi');
+    expect(plain(mySaleGivenText(of('recipient', 6_000, 'Théo')))).toBe('Partagée avec Théo : 60 % pour toi');
+    expect(plain(mySaleGivenWhy(of('author', 0, 'Léa')))).toBe(`Pourquoi : « ${note} »`);
+    expect(mySaleGivenWhy(mineOf())).toBeNull();
   });
 });

@@ -13,9 +13,11 @@ import { useId, useState, type JSX, type ReactNode } from 'react';
 import { CloseDialog } from './CloseDialog';
 import { HeldSalesPanel } from './HeldSalesPanel';
 import { PayNav } from './PayNav';
+import { SalesToGivePanel } from './SalesToGivePanel';
 import { StatementDialog } from './StatementDialog';
 import {
   useAgencySettingsDown,
+  useAgencyToday,
   useCurrentPeriod,
   usePayNames,
   usePeriodBlock,
@@ -150,6 +152,7 @@ function PeriodView({
   const owner = user.role === 'owner';
   const me = { id: user.id, name: user.name };
   const now = useNow();
+  const today = useAgencyToday();
   const current = useCurrentPeriod();
   const down = useAgencySettingsDown();
   const read = usePayPeriod(period);
@@ -523,6 +526,17 @@ function PeriodView({
           me={me}
           reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
         />
+        {today === null ? null : (
+          <SalesToGivePanel
+            period={data.period}
+            open={data.closing === null}
+            today={today}
+            names={names}
+            me={me}
+            reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
+            owner={user.teamScope === 'owner'}
+          />
+        )}
       </div>
       {openedStatement === undefined || opened === null ? null : (
         <StatementDialog

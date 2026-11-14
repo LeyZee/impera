@@ -5,27 +5,33 @@ import {
   type PayPeriod,
   type Platform,
   type SaleDecisionOutcome,
+  type SaleExcludeReason,
   type TeamImportOverview,
 } from '@impera/contracts';
 import { useQueries } from '@tanstack/react-query';
-import { useId, useState, type JSX } from 'react';
+import { Fragment, useId, useState, type JSX } from 'react';
 
+import { GiveDialog } from './GiveDialog';
 import type { PayNames } from './data';
 import { Unreachable } from './parts';
 
 import { useGrowingArea } from '@/lib/growing-area';
 import { decideSale, useHeldSales, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import {
+  decidedWhyText,
   decisionText,
   heldCountText,
   heldInOrder,
   heldReasonText,
   lineChatter,
+  notePlaceholder,
   outcomeLabel,
   outcomeWords,
   outcomesShown,
+  refundAlone,
   ownLineText,
   saleAmount,
+  saleSellerText,
   saleWhen,
   signalChipText,
   signalText,
@@ -49,6 +55,9 @@ const NOTE_MAX = 500;
 const TEAM_NAMES_STALE_MS = 10 * 60_000;
 
 /** A refusal that says the list moved under the reader: it is read again. */
+/** A line of the list, by what it is on its platform: a sale or one of its refunds. */
+const saleKey = (sale: HeldSale): string => `${sale.platform}:${sale.platformSaleId}:${sale.event}`;
+
 const MOVED: ReadonlySet<string> = new Set([
   'pay_sale_not_found',
   'pay_sale_outcome_conflict',
@@ -74,13 +83,8 @@ export function HeldSalesPanel({
   /** The owner or an active manager: the only readers of the list. */
   reads: boolean;
 }): JSX.Element | null {
-  const uid = useId();
   const held = useHeldSales(period, reads);
   const settings = useSchedulingSettings();
-  const [asked, setAsked] = useState<{
-    readonly sale: HeldSale;
-    readonly outcome: SaleDecisionOutcome;
-  } | null>(null);
   const read = held.data?.period === period ? held.data : undefined;
   const sales = heldInOrder(read?.sales ?? []);
   const zone = settings.data?.timeZone ?? null;
@@ -115,12 +119,6 @@ export function HeldSalesPanel({
     );
   if (sales.length === 0 || zone === null) return null;
 
-  const memberOf = (sale: HeldSale): SaleMember | null => {
-    if (sale.memberId === null) return null;
-    const member = names.member(sale.memberId);
-    return { name: member.name, own: member.userId === me.id };
-  };
-
   return (
     <Panel
       className="nv-enter py-held"
@@ -135,54 +133,117 @@ export function HeldSalesPanel({
             ? ' Une vente signalée par son chatteur compte pour lui tant qu’elle n’est pas écartée.'
             : null}
         </p>
-        <ul className="py-held__rows">
-          {sales.map((sale, index) => {
-            const member = memberOf(sale);
-            // Each gesture names its sale to a screen reader, out of the list too.
-            const about = (part: string): string => `${uid}-${String(index)}-${part}`;
-            const account = names.account(sale.platformAccountId);
-            const reason = heldReasonText(sale, member, zone);
-            const signalled = signalText(sale, member);
-            const decided = decisionText(sale, member);
-            const chatter = lineChatter(sale, member, teamOf(sale.platform));
-            return (
-              <li key={`${sale.platform}:${sale.platformSaleId}:${sale.event}`} className="py-held__row">
-                <div className="py-held__main">
-                  <p className="py-held__who" id={about('who')}>
-                    {account === null ? 'Un compte' : account.creatorName}
-                    <span className="py-held__account">
-                      {account === null ? '' : ` · ${accountLine(account)}`}
-                    </span>
-                  </p>
-                  <p className="py-member__line nv-num" id={about('when')}>
-                    {saleWhen(sale, zone)} · {chatter.lead}
-                    {'\u00a0'}
-                    <b>{chatter.name}</b>
-                  </p>
-                </div>
-                <div className="py-held__side">
-                  <p className="py-held__amount nv-num" id={about('amount')}>
-                    {saleAmount(sale)}
-                  </p>
-                  {decided === null ? (
+        <SaleCards period={period} sales={sales} names={names} me={me} zone={zone} teamOf={teamOf} />
+      </div>
+    </Panel>
+  );
+}
+
+/** Who made a sale, as the cards name them, and whether it is the reader; `null` for a chatter not linked or the agent. */
+export function saleMemberOf(
+  sale: HeldSale,
+  names: PayNames,
+  me: { readonly id: string },
+): SaleMember | null {
+  if (sale.memberId === null) return null;
+  const member = names.member(sale.memberId);
+  return { name: member.name, own: member.userId === me.id };
+}
+
+/**
+ * The cards of sales to decide (CRM-03 lot b4b, ADR 0101), one a sale: who and when, its net and where it stands, why
+ * it waits, what was decided and why, and the gestures the server offers, each opening its sheet. Shared by « Ventes en
+ * attente » and « Donner une vente ».
+ */
+export function SaleCards({
+  period,
+  sales,
+  names,
+  me,
+  zone,
+  teamOf = () => undefined,
+}: {
+  period: PayPeriod;
+  sales: readonly HeldSale[];
+  names: PayNames;
+  me: { readonly id: string };
+  zone: string;
+  /** The platform's team, to name a chatter not linked (ADR 0076); none read, the line says so. */
+  teamOf?: (platform: Platform) => TeamImportOverview | undefined;
+}): JSX.Element {
+  const uid = useId();
+  const [asked, setAsked] = useState<{
+    readonly sale: HeldSale;
+    readonly outcome: SaleDecisionOutcome;
+  } | null>(null);
+  // The open sheet reads its sale in the list as it is now: after a refusal « la vente a bougé » the list is read
+  // again, and the sheet shows the fresh sale and its recipients; one gone from the list stays as it was opened.
+  const opened =
+    asked === null ? null : (sales.find((one) => saleKey(one) === saleKey(asked.sale)) ?? asked.sale);
+  const nameOf = (memberId: string): string => names.member(memberId).name;
+
+  return (
+    <>
+      <ul className="py-held__rows">
+        {sales.map((sale, index) => {
+          const member = saleMemberOf(sale, names, me);
+          // Each gesture names its sale to a screen reader, out of the list too.
+          const about = (part: string): string => `${uid}-${String(index)}-${part}`;
+          const account = names.account(sale.platformAccountId);
+          const reason = heldReasonText(sale, member, zone);
+          const signalled = signalText(sale, member);
+          const decided = decisionText(sale, member, nameOf);
+          const why = decidedWhyText(sale);
+          const chatter = sale.byAgent
+            ? { lead: 'vendue par', name: 'l’IA' }
+            : lineChatter(sale, member, teamOf(sale.platform));
+          const shown = outcomesShown(sale);
+          return (
+            <li key={saleKey(sale)} className="py-held__row">
+              <div className="py-held__main">
+                <p className="py-held__who" id={about('who')}>
+                  {account === null ? 'Un compte' : account.creatorName}
+                  <span className="py-held__account">
+                    {account === null ? '' : ` · ${accountLine(account)}`}
+                  </span>
+                </p>
+                <p className="py-member__line nv-num" id={about('when')}>
+                  {saleWhen(sale, zone)} · {chatter.lead}
+                  {'\u00a0'}
+                  <b>{chatter.name}</b>
+                </p>
+              </div>
+              <div className="py-held__side">
+                <p className="py-held__amount nv-num" id={about('amount')}>
+                  {saleAmount(sale)}
+                </p>
+                {decided === null ? (
+                  sale.reason === null && sale.signal === null ? null : (
                     <span className="rp-chip rp-chip--warn">
                       {signalled === null ? 'En attente' : signalChipText(sale)}
                     </span>
-                  ) : (
-                    <span className="rp-chip">{decided}</span>
-                  )}
-                </div>
-                {reason === null ? null : <p className="py-held__reason">{reason}</p>}
-                {signalled === null ? null : <p className="py-held__reason">{signalled}</p>}
-                {member?.own === true ? (
-                  <p className="py-held__own">{ownLineText(sale)}</p>
-                ) : outcomesShown(sale.outcomes).length === 0 ? null : (
-                  <div className="py-held__acts">
-                    {outcomesShown(sale.outcomes).map((outcome) => (
+                  )
+                ) : (
+                  <span className="rp-chip">{decided}</span>
+                )}
+              </div>
+              {reason === null ? null : <p className="py-held__reason">{reason}</p>}
+              {signalled === null ? null : <p className="py-held__reason">{signalled}</p>}
+              {why === null ? null : <p className="py-held__reason py-gift">{why}</p>}
+              {member?.own === true ? (
+                <p className="py-held__own">{ownLineText(sale)}</p>
+              ) : shown.length === 0 ? null : (
+                <div className="py-held__acts">
+                  {shown.map((outcome, place) => (
+                    <Fragment key={outcome}>
+                      {/* On a phone, taking a decision back goes on its own line, under the other gestures. */}
+                      {outcome === 'withdraw' && place > 0 ? (
+                        <span className="py-held__break" aria-hidden="true" />
+                      ) : null}
                       <button
-                        key={outcome}
                         type="button"
                         aria-describedby={`${about('who')} ${about('when')} ${about('amount')}`}
+                        // Red is the one gesture a held line waits for; in a list of sales, « Donner à… » stays plain.
                         className={
                           outcome === 'count'
                             ? 'nv-btn nv-btn--neon nv-btn--sm'
@@ -194,21 +255,33 @@ export function HeldSalesPanel({
                       >
                         {outcomeLabel(outcome, member)}
                       </button>
-                    ))}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-      {asked === null ? null : (
-        <DecideDialog
-          key={`${asked.sale.platformSaleId}:${asked.outcome}`}
+                    </Fragment>
+                  ))}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {asked === null || opened === null ? null : asked.outcome === 'give' ? (
+        <GiveDialog
+          key={`${saleKey(asked.sale)}:give`}
           period={period}
-          sale={asked.sale}
+          sale={opened}
+          member={saleMemberOf(opened, names, me)}
+          names={names}
+          zone={zone}
+          onClose={() => {
+            setAsked(null);
+          }}
+        />
+      ) : (
+        <DecideDialog
+          key={`${saleKey(asked.sale)}:${asked.outcome}`}
+          period={period}
+          sale={opened}
           outcome={asked.outcome}
-          member={memberOf(asked.sale)}
+          member={saleMemberOf(opened, names, me)}
           names={names}
           zone={zone}
           onClose={() => {
@@ -216,7 +289,7 @@ export function HeldSalesPanel({
           }}
         />
       )}
-    </Panel>
+    </>
   );
 }
 
@@ -248,10 +321,16 @@ function DecideDialog({
   const noteArea = useGrowingArea(note);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
+  // ADR 0101 § 8: « Écarter » asks why, but on a refund without a sale on the register, which no one sold.
+  const asksWhy = outcome === 'exclude' && !refundAlone(sale);
+  const [why, setWhy] = useState<SaleExcludeReason | null>(null);
+  const [touched, setTouched] = useState(false);
   const words = outcomeWords(outcome, sale, member);
   const account = names.account(sale.platformAccountId);
 
   const send = async () => {
+    setTouched(true);
+    if (asksWhy && why === null) return;
     setBusy(true);
     setRefusal(null);
     const trimmed = note.trim();
@@ -264,8 +343,7 @@ function DecideDialog({
       note: trimmed === '' ? null : trimmed,
       recipientMemberId: null,
       shareBp: null,
-      // ADR 0101 § 8: « l'IA a été décisive » comes with its choice on the screen of the second part.
-      excludeReason: outcome === 'exclude' ? 'other' : null,
+      excludeReason: outcome === 'exclude' ? (why ?? 'other') : null,
     });
     setBusy(false);
     if (outcomeSent.kind === 'ok') {
@@ -280,15 +358,57 @@ function DecideDialog({
   return (
     <Dialog className="py-dialog" title={words.title} lead={words.lead} busy={busy} onClose={onClose}>
       <div className="tm-dialog__body">
-        <dl className="py-lines nv-num">
+        <dl className="py-lines py-lines--recap nv-num">
           <div>
             <dt>
               {account === null ? 'Un compte' : `${account.creatorName} · ${accountLine(account)}`}
-              <small>{saleWhen(sale, zone)}</small>
+              <small>
+                {saleWhen(sale, zone)}
+                {sale.event === 'sale' ? ` · ${saleSellerText(sale, member)}` : ''}
+              </small>
             </dt>
             <dd>{saleAmount(sale)}</dd>
           </div>
         </dl>
+        {asksWhy ? (
+          <div className="nv-field tm-field" data-invalid={touched && why === null ? 'true' : undefined}>
+            <span className="nv-field__label" id={`${id}-why`}>
+              Pourquoi
+            </span>
+            <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-why`}>
+              <button
+                type="button"
+                role="radio"
+                className="nv-chip"
+                aria-checked={why === 'agent_decisive'}
+                data-autofocus
+                onClick={() => {
+                  setWhy('agent_decisive');
+                }}
+              >
+                L’IA a été décisive
+              </button>
+              <button
+                type="button"
+                role="radio"
+                className="nv-chip"
+                aria-checked={why === 'other'}
+                onClick={() => {
+                  setWhy('other');
+                }}
+              >
+                Une autre raison
+              </button>
+            </div>
+            <p className="tm-hint">
+              {touched && why === null
+                ? 'Choisis une raison.'
+                : why === 'agent_decisive'
+                  ? 'La vente comptera pour l’IA dans le Dashboard, jamais en paie : l’IA n’est personne.'
+                  : 'L’IA décisive compte pour elle dans le Dashboard, jamais en paie.'}
+            </p>
+          </div>
+        ) : null}
         <div className="nv-field tm-field">
           <label className="nv-field__label" htmlFor={`${id}-note`}>
             Note (facultatif)
@@ -300,7 +420,7 @@ function DecideDialog({
             rows={2}
             maxLength={NOTE_MAX}
             value={note}
-            placeholder="Shift prolongé d’une heure, prévenu par message."
+            placeholder={notePlaceholder(outcome, why)}
             onChange={(event) => {
               setNote(event.target.value);
             }}
@@ -319,7 +439,7 @@ function DecideDialog({
           <button
             type="button"
             className="nv-btn nv-btn--neon"
-            data-autofocus
+            data-autofocus={asksWhy ? undefined : true}
             disabled={busy}
             aria-busy={busy}
             onClick={() => {

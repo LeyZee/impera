@@ -5,6 +5,7 @@ import {
   type DesireBand,
   type EventBody,
   type EventType,
+  type FanAvailabilityRecord,
   type UserId,
 } from '@impera/contracts';
 
@@ -26,6 +27,8 @@ export interface ConversationProjection {
   readonly desireScore: number | null;
   readonly desireBand: DesireBand | null;
   readonly desireAt: Date | null;
+  /** The last `fan_availability_changed` (ADR 0103, amendement du 13/11): his availability and the session's gate. */
+  readonly fanAvailability: FanAvailabilityRecord | null;
   /**
    * The care mode (ADR 0088): when the open episode began (`care_opened`), when its help bubble went out in a draft,
    * and when the last episode was closed (`care_closed`). `careSince` null: no episode is open.
@@ -45,6 +48,7 @@ export const INITIAL_PROJECTION: ConversationProjection = {
   desireScore: null,
   desireBand: null,
   desireAt: null,
+  fanAvailability: null,
   careSince: null,
   careHelpAt: null,
   careClosedAt: null,
@@ -105,6 +109,9 @@ export function applyEvent(
   if (event.type === 'desire_scored') {
     const score = event.payload.score;
     return { ...projection, state, desireScore: score, desireBand: desireBandOf(score), desireAt: at };
+  }
+  if (event.type === 'fan_availability_changed') {
+    return { ...projection, state, fanAvailability: event.payload };
   }
   // An episode already open stays as it began: a second `care_opened` (another sign) does not move it.
   if (event.type === 'care_opened') {
