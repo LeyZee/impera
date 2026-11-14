@@ -2,7 +2,7 @@
 
 **Rôle.** Le serveur MCP d'Impera (ADR 0026, amendée par 0105) : une seconde porte, à côté des routes, par laquelle un agent connecté (d'abord une session Claude Code sur le PC de l'agence) lit le CRM, freine l'agent de chatting et prépare des gestes qu'un humain confirme. Il ne porte aucune règle métier : chaque outil appelle la commande ou la requête de l'`index.ts` du module propriétaire, avec les droits de la personne de l'accès.
 
-**État.** Lot a en cours (fiche `PROPOSED-mcp-read`) : règles pures (`domain/`) et accès d'agent (`mcp_grants`, Réglages › Agents connectés). Le transport `POST /v1/mcp`, le journal et le branchement des outils viennent ensuite.
+**État.** Lot a en cours (fiche `PROPOSED-mcp-read`) : règles pures (`domain/`), accès d'agent (`mcp_grants`, Réglages › Agents connectés), transport `POST /v1/mcp`, répartiteur, journal et `whoami`. Les autres outils de lecture viennent ensuite, un module à la fois.
 
 **Peut dépendre de.** Aucun module pour l'instant ; les modules qu'il lit s'ajouteront avec le branchement des outils. Aucun module ne dépend de lui. Seuls son magasin d'accès (`infra/db`) et son `index.ts` touchent `@impera/db` (règle ESLint) : un outil lit par l'`index.ts` du module propriétaire, jamais la base.
 
@@ -13,6 +13,7 @@
 - `GET /v1/settings/mcp-grants` : les accès du propriétaire, sans jeton ni empreinte.
 - `POST /v1/settings/mcp-grants` (connexion récente) : crée un accès ; le jeton (`impmcp_` puis 43 caractères, règle `gitleaks` dédiée) n'est montré que dans cette réponse (`cache-control: no-store`). Aucune capacité cochée d'office ; refus 422 par sa sorte (`capability_repeated`, `owner_only`, `role_forbidden`).
 - `DELETE /v1/settings/mcp-grants/:id` (connexion récente) : révoque, au journal.
+- `POST /v1/mcp` : le serveur MCP (HTTP « streamable » sans état, réponses JSON, transport du SDK sur les standards du Web, ni serveur Express ni Hono). Porte à lui : `Authorization: Bearer` seulement, jamais un paramètre d'URL (toute URL avec `?` est refusée), jamais le cookie du CRM ; la forme du jeton avant son empreinte ; la personne relue ; tout échec donne la même réponse 401, comptée par adresse (12 refus par minute, puis 429 sur les refus suivants ; un jeton valide passe encore). `Origin` absent accepté, présent refusé (aucune page n'appelle le serveur MCP au lot a). Corps de 64 Kio au plus, 120 requêtes par minute et par adresse, 60 lectures par minute et par accès. `GET` et `DELETE` répondent 405 : rien n'est envoyé à l'initiative du serveur.
 
 ## Règles (domaine)
 
@@ -26,4 +27,6 @@
 
 - `domain/` : catalogue, accès, liste « jamais exposé », ports. Zéro I/O.
 - `application/grants.ts` : créer, lister, révoquer un accès ; retrouver l'accès vivant d'un jeton et noter son usage sous l'identité de sa personne (rien si elle ne peut plus l'écrire).
-- `infra/db/grant-store.ts`, `infra/token.ts` (jeton et empreinte), `infra/http/routes.ts`.
+- `application/dispatch.ts` : le répartiteur. Un nom du catalogue servi, des arguments que son schéma strict accepte, la règle d'accès sur la personne lue pour cet appel, la limite de lecture de l'accès, puis l'outil. Chaque appel, refusé ou non, a sa ligne au journal avant toute réponse ; un appel qui ne s'écrit pas ne rend rien. `tools/list` ne montre que les outils servis dont l'accès a la capacité.
+- `infra/db/journal.ts` : une ligne d'`audit_log` par appel, sous l'identité de la personne (`withMember`) : `mcp.<outil>` (`mcp.tool_unknown` pour un nom hors catalogue, jamais recopié), l'accès, l'issue, la créatrice, le `requestId`. Jamais un texte, un argument ni le jeton.
+- `infra/db/grant-store.ts`, `infra/token.ts` (jeton et empreinte), `infra/http/routes.ts`, `infra/http/transport.ts`.

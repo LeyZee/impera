@@ -50,12 +50,16 @@ function fakeStore(): McpGrantStore & {
   };
 }
 
+/** Tokens of the right form, invented (ADR 0010); never a real one. */
+const TOKEN = `impmcp_${'A'.repeat(43)}`;
+const OTHER = `impmcp_${'B'.repeat(43)}`;
+
 const setup = (now = NOW) => {
   const store = fakeStore();
   const grants = createGrants({
     store,
-    mint: () => ({ token: 'impmcp_inventé', hash: 'hash-inventé' }),
-    hashOf: (token) => (token === 'impmcp_inventé' ? 'hash-inventé' : 'autre'),
+    mint: () => ({ token: TOKEN, hash: 'hash-inventé' }),
+    hashOf: (token) => (token === TOKEN ? 'hash-inventé' : 'autre'),
     now: () => now,
   });
   return { store, grants };
@@ -67,7 +71,7 @@ describe('agent accesses (ADR 0026 § 3)', () => {
   it('creates one with its expiry in days and its token once', async () => {
     const { grants, store } = setup();
     const result = await grants.create(owner, asOwner, body);
-    expect(result.ok && result.value.token).toBe('impmcp_inventé');
+    expect(result.ok && result.value.token).toBe(TOKEN);
     expect(result.ok && result.value.expiresAt).toBe('2026-12-14T10:00:00.000Z');
     expect([...store.rows.values()][0]?.tokenHash).toBe('hash-inventé');
     expect(JSON.stringify(await grants.list(owner))).not.toContain('impmcp_');
@@ -95,21 +99,24 @@ describe('agent accesses (ADR 0026 § 3)', () => {
     const { grants, store } = setup();
     const result = await grants.create(owner, asOwner, body);
     if (!result.ok) throw new Error('not created');
-    expect((await grants.grantOfToken('impmcp_inventé'))?.id).toBe(result.value.id);
+    expect((await grants.grantOfToken(TOKEN))?.id).toBe(result.value.id);
     expect(store.touched).toBe(1);
     store.touchable = false;
-    expect(await grants.grantOfToken('impmcp_inventé')).toBeNull();
+    expect(await grants.grantOfToken(TOKEN)).toBeNull();
     store.touchable = true;
-    expect(await grants.grantOfToken('impmcp_autre')).toBeNull();
+    expect(await grants.grantOfToken(OTHER)).toBeNull();
+    // A token of another form is not even looked up.
+    expect(await grants.grantOfToken('impmcp_court')).toBeNull();
+    expect(await grants.grantOfToken(`Bearer ${TOKEN}`)).toBeNull();
     const later = createGrants({
       store,
       mint: () => ({ token: '', hash: '' }),
       hashOf: () => 'hash-inventé',
       now: () => new Date('2026-12-15T00:00:00.000Z'),
     });
-    expect(await later.grantOfToken('impmcp_inventé')).toBeNull();
+    expect(await later.grantOfToken(TOKEN)).toBeNull();
     expect(await grants.revoke(owner, McpGrantIdSchema.parse(result.value.id))).toBe(true);
-    expect(await grants.grantOfToken('impmcp_inventé')).toBeNull();
+    expect(await grants.grantOfToken(TOKEN)).toBeNull();
     expect(await grants.revoke(owner, newId(McpGrantIdSchema))).toBe(false);
     expect(store.touched).toBe(2);
   });

@@ -100,3 +100,31 @@ export const McpGrantRefusalKindSchema = z.enum(['capability_repeated', 'owner_o
 export type McpGrantRefusalKind = z.infer<typeof McpGrantRefusalKindSchema>;
 export const MCP_GRANT_UNPROCESSABLE = 'mcp_grant_unprocessable';
 export const McpGrantRefusalBodySchema = refusalBodySchema(McpGrantRefusalKindSchema);
+
+/**
+ * Why a call of a tool is refused (ADR 0026 § 4, ADR 0105 § 1), given back to the agent as is: it names a rule, never
+ * a person, a creator or a datum. `tool_unknown`: a name outside the catalogue, or one not served yet.
+ */
+export const McpCallRefusalSchema = z.enum([
+  'tool_unknown',
+  'arguments_invalid',
+  'second_factor_required',
+  'capability_missing',
+  'owner_only',
+  'creator_required',
+  'creator_forbidden',
+  'role_forbidden',
+  'rate_limited',
+]);
+export type McpCallRefusal = z.infer<typeof McpCallRefusalSchema>;
+
+/** `whoami` (ADR 0026 § 5): the access the agent calls with, never its token, and the catalogue it is served. */
+export const McpWhoamiSchema = z.strictObject({
+  grantId: McpGrantIdSchema,
+  label: z.string(),
+  creatorId: CreatorIdSchema.nullable(),
+  capabilities: z.array(McpCapabilitySchema),
+  expiresAt: z.iso.datetime(),
+  catalogueVersion: z.string(),
+});
+export type McpWhoami = z.infer<typeof McpWhoamiSchema>;
