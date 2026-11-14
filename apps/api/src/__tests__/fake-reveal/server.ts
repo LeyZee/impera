@@ -111,6 +111,8 @@ export const ScenarioEventSchema = z.discriminatedUnion('type', [
     scriptId: z.string(),
     priceCents: z.number().int().min(0),
   }),
+  /** « Script retiré » (ADR 0099 § 1 time 2): the sequence leaves `scriptSequences.list`; its steps stay as loose steps. */
+  z.object({ type: z.literal('sequence_removed'), atMs: AtSchema, sequenceId: z.string() }),
   z.object({
     type: z.literal('shape_changed'),
     endpoint: EndpointNameSchema,
@@ -205,6 +207,7 @@ class FakeRevealWorld {
       case 'session_expired':
       case 'conversation_gone':
       case 'script_changed':
+      case 'sequence_removed':
         this.pending.push({ dueMs: this.clockMs + event.atMs, event });
         this.fireDue();
         return;
@@ -276,6 +279,9 @@ class FakeRevealWorld {
         if (script !== undefined) script.priceCents = event.priceCents;
         return;
       }
+      case 'sequence_removed':
+        this.state.sequences = this.state.sequences.filter((sequence) => sequence.id !== event.sequenceId);
+        return;
     }
   }
 

@@ -1,8 +1,14 @@
 import type {
   CreateScriptStructureBody,
   CreatorId,
+  Currency,
+  MediaSlotKind,
   SaveScriptStructureBody,
   PersonaLimits,
+  PlatformAccountId,
+  PlatformScript,
+  PlatformScriptId,
+  PlatformScriptMoment,
   ScriptCadenceOutcome,
   ScriptCadenceSkip,
   ScriptDisgustBlock,
@@ -11,6 +17,8 @@ import type {
   ScriptStructureList,
   ScriptStructureVersion,
 } from '@impera/contracts';
+
+import type { KnownPlatformScript, PlatformScriptsPlan } from './platform-scripts';
 
 /** A structure of a queue, with the version a request would take: the latest. */
 export interface QueuedStructure {
@@ -150,3 +158,84 @@ interface AskedScript {
 
 /** Her persona's limits, from her active version; `null` without one. */
 export type LimitsOf = (creatorId: CreatorId) => Promise<PersonaLimits | null>;
+
+/** A platform account whose native scripts the import reads, and the creator it belongs to. */
+interface ImportAccount {
+  readonly id: PlatformAccountId;
+  readonly creatorId: CreatorId;
+}
+
+/** The import's writes (`scripts.import_platform_scripts`, ADR 0099 § 1 time 2), as the service role. */
+export interface PlatformScriptImportStore {
+  /** Her account, when it is hers and she is not archived; `null` otherwise. */
+  account(creatorId: CreatorId, platformAccountId: PlatformAccountId): Promise<ImportAccount | null>;
+  known(accountId: PlatformAccountId): Promise<readonly KnownPlatformScript[]>;
+  /** The whole plan in one transaction: a cut import leaves the account as it was. */
+  apply(account: ImportAccount, plan: PlatformScriptsPlan, now: Date): Promise<void>;
+}
+
+/**
+ * The native scripts the platform lists for an account (`listPlatformScripts`, `connectors`, wired by the composition
+ * root): a read, never behind the write guard. `null` when the account's connector reads no scripts (no session, no
+ * adapter, or `capabilities.scripts` false): the import then changes nothing for it.
+ */
+export type PlatformScriptSource = (account: ImportAccount) => Promise<readonly PlatformScript[] | null>;
+
+/** A vault media as its link says it (`media_platform_refs`): listed by the last sync of the vault and not removed. */
+interface VaultLink {
+  /** The media it is, once its file is read (ADR 0099 § 7); `null` before. */
+  readonly mediaAssetId: string | null;
+  /** Its media has a validated description (ADR 0083, ADR 0030 § 3). */
+  readonly described: boolean;
+}
+
+/** A media of a step, by the platform's id of the vault media. */
+export interface StoredStepMedia {
+  readonly ref: string;
+  readonly kind: MediaSlotKind;
+  /**
+   * Its vault link, read in the same transaction as the script (ADR 0030 § 1, ADR 0099): `null` when the media is not
+   * in the vault (never synced, or removed since).
+   */
+  readonly vault: VaultLink | null;
+}
+
+/** A step of a native script as the base keeps it, at its place in the platform's order. */
+interface StoredPlatformStep {
+  readonly position: number;
+  /** What `sendScriptStep` names. */
+  readonly ref: string;
+  readonly name: string;
+  readonly text: string;
+  readonly priceMinor: number;
+  readonly currency: Currency;
+  readonly media: readonly StoredStepMedia[];
+  readonly previewMedia: readonly StoredStepMedia[];
+}
+
+/** A native script as the base keeps it. */
+export interface StoredPlatformScript {
+  readonly id: PlatformScriptId;
+  readonly creatorId: CreatorId;
+  readonly platformAccountId: PlatformAccountId;
+  readonly ref: string;
+  readonly name: string;
+  readonly moment: PlatformScriptMoment | null;
+  readonly active: boolean;
+  readonly deactivatedAt: Date | null;
+  readonly syncedAt: Date;
+  readonly steps: readonly StoredPlatformStep[];
+}
+
+export interface PlatformScriptReadStore {
+  /**
+   * Her native scripts and their vault links, as a person of the agency reads them: in the person's transaction, under
+   * her RLS and his scope. `null` for a reader who may not read her.
+   */
+  ofCreator(creatorId: CreatorId, userId: string): Promise<readonly StoredPlatformScript[] | null>;
+  /**
+   * One of hers by its id and its vault links, as the service role: for a job only, never with an id a request gave
+   * (`forJobs.platformScript`). `null` when it is not hers.
+   */
+  oneForJob(creatorId: CreatorId, scriptId: string): Promise<StoredPlatformScript | null>;
+}
