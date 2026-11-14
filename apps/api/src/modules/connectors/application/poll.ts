@@ -76,9 +76,9 @@ export function createPollJob(deps: AccountJobDeps) {
         created += await ingestConversation(connector, deps.ingest, account, snapshot, {
           since,
           correlationId: payload.correlationId,
-          // The first poll reads the last day once: it is stored, and nothing is answered from it (P2-02).
-          catchUp:
-            account.lastPollAt === null ? true : new Date(now.getTime() - CATCH_UP_AFTER_HOURS * 3_600_000),
+          // The same rule at the first poll as after it (P2-02): the last day is read once, a message older than six
+          // hours is stored and not answered, a fresh one, written just before the first « Sync », is.
+          catchUp: new Date(now.getTime() - CATCH_UP_AFTER_HOURS * 3_600_000),
         });
       }
       await deps.accounts.recordPoll(account.creatorId, account.id, now);
