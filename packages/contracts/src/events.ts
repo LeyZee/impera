@@ -251,6 +251,7 @@ export const EVENT_TYPES = [
   'session_state_changed',
   'budget_threshold_crossed',
   'ai_credits_low',
+  'ai_quota_exhausted',
   'backup_overdue',
   'exchange_rate_overdue',
   'invoice_not_issued',
@@ -459,6 +460,15 @@ export const EVENT_PAYLOADS = {
     runsOutOn: z.iso.date().nullable(),
     /** The latest line of the ledger when it was published: the episode's key. */
     entryId: z.uuid(),
+  }),
+  /**
+   * A provider refused a call for lack of credits or of the quota its subscription includes, and has not answered
+   * since (ADR 0091 § 6). Once per episode: `refusedAt`, its first refusal, is its key. Never the provider's answer.
+   */
+  ai_quota_exhausted: z.object({
+    provider: z.enum(['xai', 'mistral', 'google']),
+    mode: z.enum(['credits', 'subscription']),
+    refusedAt: z.iso.datetime({ offset: true }),
   }),
   /**
    * No export of the database succeeded for 26 hours, or none ever did, in production (ADR 0028 § 5). Published with
@@ -729,6 +739,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('session_state_changed'),
   typedEvent('budget_threshold_crossed'),
   typedEvent('ai_credits_low'),
+  typedEvent('ai_quota_exhausted'),
   typedEvent('backup_overdue'),
   typedEvent('exchange_rate_overdue'),
   typedEvent('invoice_not_issued'),

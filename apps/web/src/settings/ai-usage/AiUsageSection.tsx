@@ -1,4 +1,4 @@
-import type { AiCredits, AiUsage } from '@impera/contracts';
+import type { AiCreditProvider, AiCredits, AiUsage } from '@impera/contracts';
 import { niceTicks, placeSegmentThumb } from '@impera/design-system';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
@@ -11,6 +11,8 @@ import {
   countText,
   CREDIT_BADGE,
   CREDIT_TONE,
+  CONSOLE_URL,
+  coveredText,
   creditText,
   dayColumns,
   eurText,
@@ -18,10 +20,12 @@ import {
   modelSlices,
   PROVIDERS,
   providerLabel,
+  refusedText,
   runwayShare,
   runwayText,
   shareOf,
   sinceText,
+  USAGE_HINT,
   useSlices,
   type Column,
   type Slice,
@@ -57,6 +61,12 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
             Aujourd’hui, en direct
           </span>
           <CountUp className="nv-figure__value ins-lead__value" value={today.eur} format={formatEur} />
+          {coveredText(today.coveredEur) === null ? null : (
+            <span className="nv-figure__note cia-covered">
+              <span className="cia-covered__key" aria-hidden="true" />
+              {coveredText(today.coveredEur)}
+            </span>
+          )}
           <span className="nv-figure__note">
             {`${countText(today.calls)} appel${today.calls > 1 ? 's' : ''}`}
             {today.failed > 0 ? `, dont ${countText(today.failed)} en erreur` : ''} ·{' '}
@@ -93,11 +103,14 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
             {
               label: 'Ce mois-ci',
               value: eurText(pace.monthEur),
+              covered: coveredText(pace.monthCoveredEur),
               note: `depuis le 1er, aujourd’hui compris`,
             },
             {
               label: 'Prévu fin du mois',
               value: pace.monthForecastEur === null ? '—' : eurText(pace.monthForecastEur),
+              covered:
+                pace.monthForecastCoveredEur === null ? null : coveredText(pace.monthForecastCoveredEur),
               note:
                 pace.monthForecastEur === null
                   ? 'après une première journée complète'
@@ -106,6 +119,7 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
             {
               label: 'Par jour en moyenne',
               value: pace.perDayEur === null ? '—' : eurText(pace.perDayEur),
+              covered: null,
               note:
                 pace.perDayEur === null
                   ? 'après une première journée complète'
@@ -118,6 +132,12 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
             <dd>
               <span className="ins-tile__value">{tile.value}</span>
             </dd>
+            {tile.covered === null ? null : (
+              <dd className="ins-tile__note cia-covered">
+                <span className="cia-covered__key" aria-hidden="true" />
+                {tile.covered}
+              </dd>
+            )}
             <dd className="ins-tile__note">{tile.note}</dd>
           </div>
         ))}
@@ -126,8 +146,32 @@ function Today({ usage, now }: { usage: AiUsage; now: Date }): JSX.Element {
   );
 }
 
+/** The card's small print: the pace and what was spent since the line it counts from. */
+function creditDetail(card: AiCredits, usdPerEur: number): string {
+  const spent = creditText(card.spentSinceMinor, card.currency);
+  if (card.mode === 'subscription') {
+    // In euros, as the rest of the screen: the subscription bills nothing per call.
+    const eur = card.spentSinceMinor / 100 / (card.currency === 'USD' ? usdPerEur : 1);
+    return `${eurText(eur)} de valeur consommée depuis le passage à l’abonnement, à titre indicatif · quota visible dans ${USAGE_HINT[card.provider]}`;
+  }
+  return card.perDayMinor === null || card.perDayMinor === 0
+    ? `${spent} dépensés depuis la dernière saisie`
+    : `${creditText(card.perDayMinor, card.currency)} par jour en moyenne · ${spent} dépensés depuis la dernière saisie`;
+}
+
 /** One provider's credits: what is left, how long it lasts, until when, and the lines it is counted from. */
-function CreditCard({ card, index }: { card: AiCredits; index: number }): JSX.Element {
+function CreditCard({
+  card,
+  index,
+  usdPerEur,
+  onTopUp,
+}: {
+  card: AiCredits;
+  index: number;
+  usdPerEur: number;
+  onTopUp: (provider: AiCreditProvider) => void;
+}): JSX.Element {
+  const refused = card.mode === 'credits' && card.quotaRefusedAt !== null;
   const tone = CREDIT_TONE[card.state];
   const [open, setOpen] = useState(false);
   return (
@@ -136,19 +180,57 @@ function CreditCard({ card, index }: { card: AiCredits; index: number }): JSX.El
         <h3 className="cia-credit__name">{providerLabel(card.provider)}</h3>
         <span className={`cia-badge cia-badge--${tone}`}>{CREDIT_BADGE[card.state]}</span>
       </header>
-      <p className="cia-credit__balance nv-num">
-        {creditText(card.balanceMinor, card.currency)}
-        <span className="cia-credit__unit">restants</span>
+      {card.mode === 'subscription' ? (
+        <p className="cia-credit__balance cia-credit__balance--plan">
+          {card.state === 'quota_reached' ? 'Quota de l’abonnement épuisé' : 'Inclus dans l’abonnement'}
+        </p>
+      ) : (
+        <p className="cia-credit__balance nv-num">
+          {creditText(card.balanceMinor, card.currency)}
+          <span className="cia-credit__unit">restants</span>
+        </p>
+      )}
+      {/* No quota is known on a subscription: no gauge, it would read « 100 % » or « 0 % » for nothing. */}
+      {card.mode === 'subscription' ? null : (
+        <div className="cia-runway" aria-hidden="true">
+          <span className="cia-runway__fill" style={{ '--_w': `${String(runwayShare(card))}%` }} />
+        </div>
+      )}
+      <p
+        className={
+          card.mode === 'subscription' ? 'cia-credit__runway cia-credit__runway--plain' : 'cia-credit__runway'
+        }
+      >
+        {runwayText(card)}
       </p>
-      <div className="cia-runway" aria-hidden="true">
-        <span className="cia-runway__fill" style={{ '--_w': `${String(runwayShare(card))}%` }} />
-      </div>
-      <p className="cia-credit__runway">{runwayText(card)}</p>
-      <p className="cia-credit__detail">
-        {card.perDayMinor === null || card.perDayMinor === 0
-          ? `${creditText(card.spentSinceMinor, card.currency)} dépensés depuis la dernière saisie`
-          : `${creditText(card.perDayMinor, card.currency)} par jour en moyenne · ${creditText(card.spentSinceMinor, card.currency)} dépensés depuis la dernière saisie`}
-      </p>
+      {card.mode === 'credits' && card.quotaRefusedAt !== null ? (
+        <p className="cia-credit__runway cia-credit__refused">
+          Le service refuse les appels faute de crédits depuis {refusedText(card.quotaRefusedAt)} : l’agent
+          répond avec son modèle de repli.
+        </p>
+      ) : null}
+      <p className="cia-credit__detail">{creditDetail(card, usdPerEur)}</p>
+      {refused ? (
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm cia-credit__act"
+          onClick={() => {
+            onTopUp(card.provider);
+          }}
+        >
+          J’ai rechargé
+        </button>
+      ) : null}
+      {card.state === 'quota_reached' ? (
+        <a
+          className="nv-btn nv-btn--soft nv-btn--sm cia-credit__act"
+          href={CONSOLE_URL[card.provider]}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Ouvrir la console
+        </a>
+      ) : null}
       <button
         type="button"
         className="nv-btn nv-btn--plain nv-btn--sm cia-credit__more"
@@ -164,16 +246,29 @@ function CreditCard({ card, index }: { card: AiCredits; index: number }): JSX.El
   );
 }
 
-function Credits({ usage, onAdd }: { usage: AiUsage; onAdd: () => void }): JSX.Element {
+function Credits({
+  usage,
+  onAdd,
+}: {
+  usage: AiUsage;
+  onAdd: (provider?: AiCreditProvider) => void;
+}): JSX.Element {
   if (usage.credits.length === 0) {
     return (
       <div className="nv-plate cia-none nv-enter">
         <p>
           Aucun crédit noté pour l’instant. Note ta dernière recharge, ou le solde affiché dans la console du
-          service : le CRM décompte ensuite chaque appel et te dit quand recharger.
+          service : le CRM décompte ensuite chaque appel et te dit quand recharger. Un service payé par ton
+          abonnement se note aussi ici, sans montant.
         </p>
-        <button type="button" className="nv-btn nv-btn--soft" onClick={onAdd}>
-          Noter une recharge
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft"
+          onClick={() => {
+            onAdd();
+          }}
+        >
+          Mettre à jour les crédits
         </button>
       </div>
     );
@@ -181,7 +276,13 @@ function Credits({ usage, onAdd }: { usage: AiUsage; onAdd: () => void }): JSX.E
   return (
     <div className="cia-credits">
       {usage.credits.map((card, i) => (
-        <CreditCard key={card.provider} card={card} index={i + 1} />
+        <CreditCard
+          key={card.provider}
+          card={card}
+          index={i + 1}
+          usdPerEur={usage.usdPerEur}
+          onTopUp={onAdd}
+        />
       ))}
     </div>
   );
@@ -266,6 +367,7 @@ function Spend({
   const top = ticks[ticks.length - 1] ?? 1;
   const every = columns.length <= 8 ? 1 : columns.length <= 14 ? 3 : columns.length <= 24 ? 4 : 5;
   const used = PROVIDERS.filter((_, p) => columns.some((column) => (column.parts[p] ?? 0) > 0));
+  const anyCovered = columns.some((column) => column.coveredEur > 0);
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const step =
       event.key === 'Home' ? -columns.length : event.key === 'End' ? columns.length : STEPS[event.key];
@@ -296,6 +398,12 @@ function Spend({
               {provider.label}
             </li>
           ))}
+          {anyCovered ? (
+            <li>
+              <span className="ins-key cia-key--covered" aria-hidden="true" />
+              Hachuré : couvert par l’abonnement
+            </li>
+          ) : null}
         </ul>
       ) : null}
       <div className="ins-daily__plot">
@@ -325,7 +433,7 @@ function Spend({
               className="ins-col"
               style={{ '--_i': i }}
               tabIndex={i === current ? 0 : -1}
-              aria-label={`${column.title} : ${eurText(column.eur)}, ${countText(column.calls)} appels`}
+              aria-label={`${column.title} : ${eurText(column.eur)}${column.coveredEur > 0 ? ` dont ${eurText(column.coveredEur)} couverts par l’abonnement` : ''}, ${countText(column.calls)} appels`}
               data-i={i}
               {...tip.bind(
                 {
@@ -335,25 +443,35 @@ function Spend({
                       .filter(([, eur]) => eur > 0)
                       .map(([label, eur]) => [label, eurText(eur)] as const),
                     ['Total', eurText(column.eur)],
+                    ...(column.coveredEur > 0
+                      ? [['dont abonnement', eurText(column.coveredEur)] as const]
+                      : []),
                     ['Appels', countText(column.calls)],
                   ],
                 },
-                { above: true },
+                // Beside the column, inside the card: over it, the tallest column's tip covered the span control.
+                { beside: true },
               )}
             >
               <span className="ins-col__stack">
-                {column.parts.map((eur, p) =>
-                  eur <= 0 ? null : (
-                    <span
-                      key={PROVIDERS[p]?.key ?? p}
-                      className="ins-col__part"
-                      style={{
-                        '--_c': PROVIDERS[p]?.colour ?? OTHER,
-                        '--_h': `${String((eur / top) * 100)}%`,
-                      }}
-                    />
-                  ),
-                )}
+                {column.parts.flatMap((eur, p) => {
+                  // What was paid, then on top, hatched, what the subscription covered (« ok 0091 chiffres »).
+                  const covered = Math.min(eur, column.covered[p] ?? 0);
+                  const colour = PROVIDERS[p]?.colour ?? OTHER;
+                  const key = PROVIDERS[p]?.key ?? String(p);
+                  return [
+                    { part: eur - covered, hatched: false },
+                    { part: covered, hatched: true },
+                  ]
+                    .filter(({ part }) => part > 0)
+                    .map(({ part, hatched }) => (
+                      <span
+                        key={`${key}${hatched ? ':covered' : ''}`}
+                        className={hatched ? 'ins-col__part cia-part--covered' : 'ins-col__part'}
+                        style={{ '--_c': colour, '--_h': `${String((part / top) * 100)}%` }}
+                      />
+                    ));
+                })}
               </span>
               <span className="ins-col__label" aria-hidden="true">
                 {(i % every === 0 && columns.length - 1 - i >= every) || i === columns.length - 1
@@ -494,7 +612,8 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
   const query = useAiUsage();
   const tip = useFloatingTip();
   const [span, setSpan] = useState<Span>('days');
-  const [adding, setAdding] = useState(false);
+  // The dialog, open for a service (« J’ai rechargé » on its card) or for whichever; null when closed.
+  const [adding, setAdding] = useState<{ readonly provider?: AiCreditProvider } | null>(null);
 
   if (query.data === undefined) {
     return (
@@ -515,8 +634,8 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
     );
   }
   const usage = query.data;
-  const open = (): void => {
-    setAdding(true);
+  const open = (provider?: AiCreditProvider): void => {
+    setAdding(provider === undefined ? {} : { provider });
   };
   return (
     <div className="ins-body cia-body">
@@ -530,12 +649,18 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
 
       <Section
         title="Crédits"
-        sub="ce qu’il reste chez chaque service, décompté appel par appel"
+        sub="ce qu’il reste chez chaque service, décompté appel par appel, ou son abonnement"
         index={2}
         control={
           usage.credits.length === 0 ? undefined : (
-            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={open}>
-              Noter une recharge
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              onClick={() => {
+                open();
+              }}
+            >
+              Mettre à jour les crédits
             </button>
           )
         }
@@ -571,13 +696,14 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
         les services facturent en dollars. Les vocaux ElevenLabs ne sont pas comptés ici.
       </p>
       {tip.element}
-      {adding ? (
+      {adding === null ? null : (
         <CreditDialog
+          {...(adding.provider !== undefined && { provider: adding.provider })}
           onClose={() => {
-            setAdding(false);
+            setAdding(null);
           }}
         />
-      ) : null}
+      )}
     </div>
   );
 }
