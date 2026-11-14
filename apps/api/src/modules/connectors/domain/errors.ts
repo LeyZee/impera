@@ -223,3 +223,26 @@ export class SalesFeedTeamLinked extends DomainError {
     );
   }
 }
+
+/**
+ * A creator's sales and statistics through the connectors' reads (ADR 0026 § 1) are the owner's, and an active
+ * manager's for the creators of his list (403). Nothing is read for a refused one.
+ */
+export class ConnectorReadsForbidden extends DomainError {
+  constructor() {
+    super(
+      'connector_reads_forbidden',
+      'Réservé au propriétaire et au manager actif qui suit cette créatrice',
+    );
+  }
+}
+
+/** A period of the connectors' reads is days in order, at most `MAX_READ_DAYS` of them (422). */
+export class ConnectorReadsRangeUnprocessable extends DomainError {
+  constructor() {
+    super(
+      'connector_reads_range_unprocessable',
+      'La période demandée n’est pas lisible : 93 jours au plus, dans l’ordre',
+    );
+  }
+}
