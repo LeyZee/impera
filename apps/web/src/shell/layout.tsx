@@ -200,7 +200,8 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     // lit tab is brought into view at once; `mark` below then says which edges hide tabs.
     if ((nav.dataset['more'] ?? 'none') === 'none') nav.dataset['more'] = 'end';
     centreOn(nav, active);
-  }, [pathname]);
+    // `lit` too: a view of one screen (?onglet=) changes the lit tab without changing the path.
+  }, [pathname, lit]);
 
   useEffect(() => {
     const nav = navRef.current;
