@@ -411,7 +411,7 @@ describe('/v1/mcp', () => {
     const listed = RpcSchema.parse(
       (await rpc(agency.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
     );
-    expect(listed.result?.tools?.map((tool) => tool.name)).toEqual(['whoami', 'on_shift_now']);
+    expect(listed.result?.tools?.map((tool) => tool.name)).toEqual(['whoami', 'shifts_list', 'on_shift_now']);
     const all = RpcSchema.parse((await rpc(agency.token, callTool('on_shift_now'))).json());
     expect(all.result?.structuredContent).toEqual({ onShift: [] });
     const bound = await createGrant({ capabilities: ['read:team'] });
@@ -419,6 +419,27 @@ describe('/v1/mcp', () => {
     expect(hers.result?.structuredContent).toEqual({ onShift: [] });
     const other = RpcSchema.parse(
       (await rpc(bound.token, callTool('on_shift_now', { creatorId: lea }))).json(),
+    );
+    expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+  });
+  it('lists the planning over a bounded range, for the agency or for its creator', async () => {
+    const week = { from: '2026-11-16T00:00:00.000Z', to: '2026-11-23T00:00:00.000Z' };
+    const agency = await createGrant({ capabilities: ['read:team'], creatorId: null });
+    const all = RpcSchema.parse((await rpc(agency.token, callTool('shifts_list', week))).json());
+    expect(all.result?.structuredContent).toEqual({ shifts: [] });
+    const tooLong = RpcSchema.parse(
+      (await rpc(agency.token, callTool('shifts_list', { ...week, to: '2026-12-29T00:00:00.000Z' }))).json(),
+    );
+    expect(tooLong.result?.structuredContent).toEqual({ refusal: 'arguments_invalid' });
+    const backwards = RpcSchema.parse(
+      (await rpc(agency.token, callTool('shifts_list', { from: week.to, to: week.from }))).json(),
+    );
+    expect(backwards.result?.structuredContent).toEqual({ refusal: 'arguments_invalid' });
+    const bound = await createGrant({ capabilities: ['read:team'] });
+    const hers = RpcSchema.parse((await rpc(bound.token, callTool('shifts_list', week))).json());
+    expect(hers.result?.structuredContent).toEqual({ shifts: [] });
+    const other = RpcSchema.parse(
+      (await rpc(bound.token, callTool('shifts_list', { ...week, creatorId: lea }))).json(),
     );
     expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
   });
