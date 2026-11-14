@@ -3,6 +3,8 @@ import { createHmac } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z, ZodError } from 'zod';
 
+import type { RevealFetch } from '../../modules/connectors';
+
 import { FIXTURES, type FixtureName } from './fixtures';
 import {
   ENDPOINTS,
@@ -48,6 +50,9 @@ const RATE_LIMIT_HEADERS = {
   'x-ratelimit-remaining-long': '199',
   'x-ratelimit-reset-long': '60',
 } as const;
+/** `POST /conversations/:id/messages` only (headers.md): 60 sends a minute per token, `x-ratelimit-reset` in epoch seconds. */
+const SEND_LIMIT = 60;
+const SEND_WINDOW_MS = 60_000;
 /** Tiny but real files, so a test can check magic bytes: a 1×1 PNG, the head of an MP4 and of an MP3. */
 const FILES = {
   photo: {
@@ -88,6 +93,16 @@ export const ScenarioEventSchema = z.discriminatedUnion('type', [
     status: z.union([z.literal(500), z.literal(502), z.literal(503)]),
   }),
   z.object({ type: z.literal('latency'), ms: z.number().int().min(0).max(10_000) }),
+  /**
+   * « Envoi accepté puis coupure » (P2-03): the next `times` sends are taken, the message is in the thread, but the
+   * answer never comes back (504 from the gateway, as a cut connection would leave the client): the outcome is unknown.
+   */
+  z.object({ type: z.literal('send_answer_lost'), times: z.number().int().min(1) }),
+  /**
+   * « Message listé en retard » (P2-03): from now on, `messages.list` leaves out a message sent from the creator's side
+   * until it is `ms` old by FakeReveal's clock (0 lists it at once again), as Reveal may list a message just taken late.
+   */
+  z.object({ type: z.literal('send_listed_late'), ms: z.number().int().min(0).max(600_000) }),
   z.object({ type: z.literal('challenge'), times: z.number().int().min(1) }),
   z.object({ type: z.literal('conversation_gone'), atMs: AtSchema, conversationId: z.string() }),
   z.object({
@@ -134,7 +149,11 @@ class FakeRevealWorld {
     serverStatus: 500,
     challenges: 0,
     latencyMs: 0,
+    lostSendAnswers: 0,
+    listedLateMs: 0,
   };
+  /** The send window (60 a minute): when it opened, by FakeReveal's clock, and how many sends it took. */
+  sendWindow = { startMs: 0, count: 0 };
   renames = new Map<EndpointName, { from: string; to: string }>();
   sessionValid = true;
 
@@ -171,6 +190,12 @@ class FakeRevealWorld {
         return;
       case 'latency':
         this.faults.latencyMs = event.ms;
+        return;
+      case 'send_answer_lost':
+        this.faults.lostSendAnswers += event.times;
+        return;
+      case 'send_listed_late':
+        this.faults.listedLateMs = event.ms;
         return;
       case 'shape_changed':
         this.renames.set(event.endpoint, event.rename);
@@ -302,6 +327,13 @@ class FakeRevealWorld {
   }
 
   /** Newest first, as Reveal pages a conversation. */
+  /** Whether `messages.list` shows this message yet (`send_listed_late`): a sent one only once old enough. */
+  listed(message: FakeMessage): boolean {
+    return (
+      message.direction === 'in' || this.clockMs - Date.parse(message.createdAt) >= this.faults.listedLateMs
+    );
+  }
+
   messagesOf(conversationId: string): FakeMessage[] {
     return this.state.messages
       .filter((m) => m.conversationId === conversationId)
@@ -583,6 +615,10 @@ export interface FakeReveal {
   /** The model and the team member of the session, as the connector would know them. */
   readonly modelId: string;
   readonly userId: string;
+  /** `fetch` for the connector, served by `app.inject` (no port opened); any host reaches FakeReveal. */
+  readonly fetch: RevealFetch;
+  /** FakeReveal's clock, moved only by `POST /__clock`: a connector under test reads the same time. */
+  now(): Date;
 }
 
 export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeReveal {
@@ -630,6 +666,27 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
         .status(429)
         .header('retry-after', String(world.faults.retryAfterSeconds))
         .send({ statusCode: 429, message: 'ThrottlerException: Too Many Requests' });
+    }
+    if (request.method === 'POST' && /^\/conversations\/[^/]+\/messages(\?|$)/u.test(request.url)) {
+      const window = world.sendWindow;
+      if (world.nowMs() - window.startMs >= SEND_WINDOW_MS) {
+        window.startMs = world.nowMs();
+        window.count = 0;
+      }
+      const resetMs = window.startMs + SEND_WINDOW_MS;
+      const full = window.count >= SEND_LIMIT;
+      if (!full) window.count += 1;
+      void reply.headers({
+        'x-ratelimit-limit': String(SEND_LIMIT),
+        'x-ratelimit-remaining': String(SEND_LIMIT - window.count),
+        'x-ratelimit-reset': String(Math.ceil(resetMs / 1_000)),
+      });
+      if (full) {
+        return reply
+          .status(429)
+          .header('retry-after', String(Math.max(1, Math.ceil((resetMs - world.nowMs()) / 1_000))))
+          .send({ statusCode: 429, message: 'ThrottlerException: Too Many Requests' });
+      }
     }
     if (world.faults.serverErrors > 0) {
       world.faults.serverErrors -= 1;
@@ -712,7 +769,7 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     const { id } = IdParams.parse(request.params);
     const query = z.object({ take: Take(10), cursor: z.string().optional() }).parse(request.query);
     const conversation = world.conversation(id);
-    const all = world.messagesOf(id);
+    const all = world.messagesOf(id).filter((m) => world.listed(m));
     const page = pageAfter(all, (m) => m.id, query.cursor, query.take);
     return out('messages.list', {
       data: page.rows.map((m) => world.wireMessageItem(m)),
@@ -780,6 +837,10 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
       isUnread: body.message.isUnread,
     });
     world.state.messages.push(created);
+    if (world.faults.lostSendAnswers > 0) {
+      world.faults.lostSendAnswers -= 1;
+      throw new HttpFault(504, 'Gateway Timeout');
+    }
     return out('messages.send', world.wireMessageCore(created));
   });
 
@@ -1148,7 +1209,7 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
 
   app.post('/__reset', (request) => {
     const { fixture } = z
-      .object({ fixture: z.enum(['default', 'empty']).default('default') })
+      .object({ fixture: z.enum(['default', 'empty', 'quiet']).default('default') })
       .parse(request.body ?? {});
     world = new FakeRevealWorld(FIXTURES[fixture]());
     return { ok: true };
@@ -1168,8 +1229,29 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     return { now: world.now() };
   });
 
+  const fetch: RevealFetch = async (url, init) => {
+    const target = new URL(url);
+    const response = await app.inject({
+      method: init.method,
+      url: `${target.pathname}${target.search}`,
+      headers: init.headers,
+      ...(init.body === undefined ? {} : { payload: init.body }),
+    });
+    return {
+      status: response.statusCode,
+      headers: {
+        get: (name) => {
+          const value = response.headers[name.toLowerCase()];
+          return value === undefined ? null : String(value);
+        },
+      },
+      text: () => Promise.resolve(response.body),
+    };
+  };
+
   return {
     app,
+    fetch,
     state: () => world.state,
     get authorization() {
       return `Bearer ${world.state.sessionToken}`;
@@ -1180,5 +1262,6 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     get userId() {
       return world.state.teamMember.userId;
     },
+    now: () => new Date(world.nowMs()),
   };
 }

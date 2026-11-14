@@ -41,7 +41,7 @@ Pour essayer le dashboard sur son PC (Windows, macOS ou Linux), avec une base Po
    pnpm db:migrate
    ```
 
-   `db:migrate` doit finir par `Migrations applied.`
+   `db:migrate` doit finir par `Migrations applied.` Il crée aussi le rôle de service (`impera_service`, ADR 0087) et lui donne le mot de passe de `DATABASE_SERVICE_URL` : la première fois, une ligne `Service role: login set from DATABASE_SERVICE_URL.` suit. Sur une installation d'avant le 12/11/2026, ajouter d'abord dans `.env` la ligne `DATABASE_SERVICE_URL` de `.env.example`, puis relancer `pnpm db:migrate` : sans elle, l'API refuse de démarrer.
 
 5. Créer son compte (il n'y a pas d'inscription publique) ; le mot de passe est demandé ensuite deux fois, sans s'afficher pendant la frappe, 12 caractères minimum :
 
@@ -91,7 +91,8 @@ pnpm ops:reencrypt-credentials                              # après une rotatio
 | `pnpm install` refuse la version de Node | Node ni 22.13 ni plus récent en 22 (un Node 23, 24 ou 25 est refusé aussi) | Installer Node 22 LTS : sur nodejs.org, ou `nvm install 22` puis `nvm use 22` avec nvm-windows |
 | `db:migrate` ou `creator:create` : `ECONNREFUSED` alors que Docker est installé | Docker Desktop n'est pas lancé | Ouvrir Docker Desktop, attendre « Engine running », puis `docker compose up -d` |
 | `db:migrate` : `ECONNREFUSED` | Postgres pas démarré | `docker compose up -d`, attendre 10 s |
-| `db:migrate` : `password authentication failed` | `.env` modifié ou ancien volume Docker | Remettre `change-me` dans les deux URL, ou repartir d'une base vide (ci-dessous) |
+| `db:migrate` : `password authentication failed` | `.env` modifié ou ancien volume Docker | Remettre `change-me` dans les URL, ou repartir d'une base vide (ci-dessous) |
+| `pnpm dev` : `DATABASE_SERVICE_URL` manque ou « must be the service role, never the owner » | `.env` d'avant l'ADR 0087, ou l'URL du propriétaire recopiée | Mettre la ligne `DATABASE_SERVICE_URL` de `.env.example`, puis `pnpm db:migrate` |
 | L'API s'arrête au démarrage avec une erreur de configuration | Variable manquante ou invalide dans `.env` | Lire le nom de la variable dans le message, comparer avec `.env.example` |
 | Connexion refusée avec un bon mot de passe | `AUTH_BASE_URL` ou `WEB_ORIGIN` ne valent pas `http://localhost:5173` | Corriger `.env`, relancer `pnpm dev:crm` |
 | `/ready` répond `"worker":false` | Le worker n'est pas lancé | Vérifier `IMPERA_INLINE_WORKER=1` dans `.env` |

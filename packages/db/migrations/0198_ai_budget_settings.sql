@@ -15,4 +15,5 @@ ALTER TABLE "ai_budget_settings" ENABLE ROW LEVEL SECURITY;--> statement-breakpo
 ALTER TABLE "ai_budget_settings" ADD CONSTRAINT "ai_budget_settings_updated_by_user_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE POLICY "agency_only" ON "ai_budget_settings" AS PERMISSIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator') WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 ALTER TABLE "ai_budget_settings" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
-GRANT SELECT ON "ai_budget_settings" TO nirvana_app;
+GRANT SELECT ON "ai_budget_settings" TO nirvana_app;--> statement-breakpoint
+GRANT SELECT, INSERT, UPDATE ON "ai_budget_settings" TO impera_service;

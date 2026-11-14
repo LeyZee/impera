@@ -259,6 +259,22 @@ async function facts(
           order by e.seq desc limit 1) h on true
         where c.state = 'human'`,
   );
+  // His custom order waits for the team (ADR 0090 § A): opened with nobody on shift, no takeover since. One taken by a
+  // chatter on shift is already a handoff above.
+  const orders = await rows(
+    tx,
+    z.object({ conversation_id: z.string(), fan_id: z.string(), fan_name: z.string(), since: timestamp }),
+    sql`select c.id as conversation_id, c.fan_id, f.display_name as fan_name, o.created_at as since
+        from conversations c
+        join fans f on f.id = c.fan_id
+        join lateral (
+          select seq, created_at from conversation_events e
+          where e.conversation_id = c.id and e.type = 'custom_order_opened'
+          order by e.seq desc limit 1) o on true
+        where c.state <> 'human'
+          and not exists (select 1 from conversation_events t
+                          where t.conversation_id = c.id and t.type = 'takeover_started' and t.seq > o.seq)`,
+  );
   const unread = await rows(
     tx,
     z.object({ conversation_id: z.string(), fan_id: z.string(), fan_name: z.string(), since: timestamp }),
@@ -406,6 +422,13 @@ async function facts(
         fanName: h.fan_name,
         kind: h.cause,
         since: h.since,
+      })),
+      ...orders.map((o) => ({
+        conversationId: o.conversation_id,
+        fanId: o.fan_id,
+        fanName: o.fan_name,
+        kind: 'custom_order' as const,
+        since: o.since,
       })),
       ...unread.map((u) => ({
         conversationId: u.conversation_id,

@@ -33,7 +33,13 @@ export async function ingestConversation(
   ingest: IngestMessage,
   account: ConnectorAccount,
   snapshot: ConversationSnapshot,
-  opts: { readonly since?: Date; readonly limit?: number; readonly correlationId: string },
+  opts: {
+    readonly since?: Date;
+    readonly limit?: number;
+    readonly correlationId: string;
+    /** `true` for every message (the account's first poll); otherwise each one older than this instant is caught up. */
+    readonly catchUp: boolean | Date;
+  },
 ): Promise<number> {
   let messages: ExternalMessage[];
   try {
@@ -54,6 +60,9 @@ export async function ingestConversation(
       platformFanId: snapshot.fanRef.id,
       fanDisplayName: withoutNul(snapshot.fanDisplayName),
       message: messageWithoutNul(message),
+      catchUp:
+        opts.catchUp === true ||
+        (opts.catchUp instanceof Date && new Date(message.createdAt).getTime() < opts.catchUp.getTime()),
       correlationId: opts.correlationId,
     });
     if (result.isNew) created += 1;

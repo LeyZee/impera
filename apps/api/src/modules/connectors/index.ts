@@ -11,8 +11,9 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { OutboundSender } from '../conversations';
 
+import { createConnectorReads, type ConnectorReads } from './application/connector-reads';
 import { createDispatchJob } from './application/dispatch';
-import { createOutboundSender } from './application/outbound-sender';
+import { createOutboundSender, type ConnectorWrites } from './application/outbound-sender';
 import { createPollJob } from './application/poll';
 import { createReconcileJob } from './application/reconcile';
 import { createConnectorResolver } from './application/resolver';
@@ -24,6 +25,7 @@ import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domai
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
+import { createDrizzleConnectorReadsStore } from './infra/db/connector-reads-store';
 import { createDrizzleDailyStatsStore } from './infra/db/daily-stats-store';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import {
@@ -32,6 +34,7 @@ import {
   resealSalesFeedWebhookSecrets,
 } from './infra/db/sales-feed-webhooks';
 import { createDrizzleSalesLedger } from './infra/db/sales-ledger';
+import { createSendJournal } from './infra/db/send-journal';
 import { createDrizzleTeamImportStore, invitationChatterLinks } from './infra/db/team-import-store';
 import { createAvatarRoutes } from './infra/http/avatar-routes';
 import { createConnectorRoutes } from './infra/http/routes';
@@ -81,6 +84,16 @@ export {
 /** @public Which totals a read gives (CRM-04). */
 export type { SalesRefundsQuery, SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';
+/** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
+export { revealApiConnectors } from './infra/reveal/connector';
+export type { RevealFetch } from './infra/reveal/client';
+/** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */
+export {
+  REVEAL_ENDPOINTS,
+  RevealMediaTypeSchema,
+  type RevealWireMedia,
+  type RevealWireMessageItem,
+} from './infra/reveal/wire';
 
 function bothReports(keys: ResealReport, webhooks: ResealReport): ResealReport {
   return {
@@ -136,6 +149,11 @@ export interface ConnectorsModule {
   readonly name: 'connectors';
   /** Implements the `conversations` port; the composition root hands it over. */
   readonly outboundSender: OutboundSender;
+  /**
+   * The other writes of ADR 0018 (script step, client note, read mark, typing), behind the same write guard as the
+   * sends (P2-03). No caller yet: the selling engine and the fan card will use them.
+   */
+  readonly writes: ConnectorWrites;
   readonly sessions: ConnectorSessions;
   /** Mounted under `/v1` by the server. */
   readonly routes: FastifyPluginAsyncZod;
@@ -178,6 +196,11 @@ export interface ConnectorsModule {
    * this viewer may see them: `team` shows the warning on the member's page. Read from the base, never the platform.
    */
   readonly teamRemovals: (userId: string) => Promise<TeamPlatformRemoval[]>;
+  /**
+   * The sales, the daily statistics and the imported team for another module's adapter (ADR 0026 § 1, ADR 0105 § 4:
+   * the MCP), as the person reading, bounded by the creators named; never a share, never a call to the platform.
+   */
+  readonly reads: ConnectorReads;
   /** `/v1/webhooks/sales-feeds/:platform`: public, each delivery checked against its webhook's secret. */
   readonly salesFeedDeliveryRoutes: FastifyPluginAsyncZod;
 }
@@ -245,20 +268,31 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const clock = deps.clock ?? systemClock;
   const accounts = createDrizzleAccountStore(deps.db, deps.adminDb);
   const vault = deps.sessionKeys === null ? null : createSessionVault(deps.sessionKeys);
-  const resolver = createConnectorResolver({ accounts, vault, registry: deps.registry });
+  const resolver = createConnectorResolver({
+    accounts,
+    vault,
+    registry: deps.registry,
+    sends: (account) => createSendJournal(deps.db, account),
+  });
+  const ledger = createDrizzleSalesLedger(deps.db, deps.adminDb);
   const sessions = createConnectorSessions({
     accounts,
     vault,
     clock,
     shapes: { reveal: revealSessionShape },
+    linkedModels: async (platform, platformAccountId) =>
+      [...(await ledger.modelLinks(platform))]
+        .filter(([, link]) => link.platformAccountId === platformAccountId)
+        .map(([platformModelId]) => platformModelId),
   });
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
   const avatars: AvatarPorts | null =
     deps.avatars == null ? null : { ...deps.avatars, records: createAvatarRecords(deps.adminDb) };
+  const teamStore = createDrizzleTeamImportStore(deps.db);
   const salesFeeds = createSalesFeeds({
     keys: deps.credentialKeys === null ? null : createSalesFeedKeyStore(deps.adminDb, deps.credentialKeys),
-    ledger: createDrizzleSalesLedger(deps.db, deps.adminDb),
-    team: createDrizzleTeamImportStore(deps.db),
+    ledger,
+    team: teamStore,
     registry: deps.salesFeeds,
     clock,
     webhooks:
@@ -275,9 +309,11 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     avatars,
     dailyStats: createDrizzleDailyStatsStore(deps.adminDb),
   });
+  const sender = createOutboundSender({ accounts, resolver, clock });
   return {
     name: 'connectors',
-    outboundSender: createOutboundSender({ accounts, resolver, clock }),
+    outboundSender: sender,
+    writes: sender,
     sessions,
     routes: createConnectorRoutes({ sessions, accounts, linkUser: deps.linkUser }),
     jobs: {
@@ -301,6 +337,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     salesFeedStates: () => salesFeeds.list(),
     invitationChatterLinks,
     teamRemovals: (userId) => salesFeeds.team.removals(userId),
+    reads: createConnectorReads({ store: createDrizzleConnectorReadsStore(deps.db), team: teamStore }),
     salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),
   };
 }

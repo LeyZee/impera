@@ -1,7 +1,7 @@
 import { MISTRAL_FALLBACK_MODEL, type LlmConfig, type ModelRef, type ProviderCredentials } from '@impera/llm';
 
 /** A run of the evals never spends more than this, on top of and apart from the agent's daily cap. */
-export const EVALS_CAP_EUR = 3;
+export const EVALS_CAP_EUR = 6;
 
 /**
  * The judge's timeout in the evals: it scores nine criteria on a whole conversation and took 37 to 48 s on 11/11,

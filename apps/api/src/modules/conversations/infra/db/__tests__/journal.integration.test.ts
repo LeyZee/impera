@@ -49,8 +49,8 @@ describe('the journal’s outbox', () => {
   it('publishes an alert that only lets a human know, for Telegram (P4-01)', async () => {
     const conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender: {
         sendText: () => Promise.reject(new Error('not used')),
         sendMedia: () => Promise.reject(new Error('not used')),

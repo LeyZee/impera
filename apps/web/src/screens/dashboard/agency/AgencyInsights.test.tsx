@@ -125,6 +125,34 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(split.getAttribute('aria-label')).not.toContain('virements');
   });
 
+  it('says shares of « Où va l’argent » that add up to 100 %, the amounts as the platform gave them', async () => {
+    // Rounded alone: 17 + 17 + 42 + 25 = 101 % (recette du 13/11).
+    serve(200, {
+      ...AGENCY_WEEK,
+      totals: {
+        ...AGENCY_WEEK.totals,
+        current: {
+          ...AGENCY_WEEK.totals.current,
+          revenueMinor: 10_000,
+          revenueExclVatMinor: 8_330,
+          netMinor: 6_660,
+          agencyMinor: 2_490,
+          creatorMinor: 4_170,
+        },
+      },
+    });
+    show();
+    const split = await screen.findByRole('img', { name: /Où va l’argent/u });
+    const card = split.closest('article');
+    if (card === null) throw new Error('card');
+    const shares = Array.from(card.querySelectorAll('.ins-money__share'), (one) =>
+      Number.parseInt(one.textContent, 10),
+    );
+    expect(shares).toEqual([17, 17, 41, 25]);
+    expect(shares.reduce((sum, one) => sum + one, 0)).toBe(100);
+    expect(card.textContent).toContain('41,70');
+  });
+
   it('reads one creator alone, without the creators side by side', async () => {
     serve(200, {
       ...AGENCY_WEEK,

@@ -105,8 +105,8 @@ describe('conversation.respond and her hours', () => {
     const { hours } = options;
     return createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender: new FakeSender(),
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),
@@ -123,6 +123,7 @@ describe('conversation.respond and her hours', () => {
   async function fanWrites(
     conversations: ConversationsModule,
     conversation: string,
+    text = 'Tu dors ?',
   ): Promise<ConversationId> {
     counter += 1;
     const { conversationId } = await conversations.ingestMessage({
@@ -135,7 +136,7 @@ describe('conversation.respond and her hours', () => {
         ref: { platform: 'reveal', id: `ah-${String(counter)}` },
         conversationRef: { platform: 'reveal', id: conversation },
         direction: 'inbound',
-        text: 'Tu dors ?',
+        text,
         media: [],
         priceMinor: null,
         currency: null,
@@ -248,6 +249,26 @@ describe('conversation.respond and her hours', () => {
     expect(composer.inputs.map((input) => input.hours)).toEqual([SLOTS]);
     expect(await stateOf(first)).toBe('awaiting_approval');
     expect(await drafts(first)).toHaveLength(1);
+  });
+
+  it('answers at 3:00 a fan who writes dark thoughts, or whose care episode is open (ADR 0088)', async () => {
+    const conversations = moduleWith({ hours: SLOTS });
+    const dark = await fanWrites(conversations, 'ah-dark', 'je veux en finir, plus envie de vivre');
+    composer.results.push(draft);
+    await respond(conversations, dark);
+    expect(composer.inputs).toHaveLength(1);
+    expect(await drafts(dark)).toHaveLength(1);
+    expect((await events(dark)).map((event) => event.type)).not.toContain('reply_deferred');
+
+    const open = await fanWrites(conversations, 'ah-care-open');
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ careSince: T0 })
+      .where(eq(schema.conversations.id, open));
+    composer.results.push(draft);
+    await respond(conversations, open);
+    expect(composer.inputs).toHaveLength(2);
+    expect(await drafts(open)).toHaveLength(1);
   });
 
   it('keeps the debounce of a fan writing at her opening', async () => {

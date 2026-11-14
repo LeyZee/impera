@@ -23,6 +23,7 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   off_platform_payment: 'un paiement hors de la plateforme',
   price_outside_offer: 'un prix écrit hors offre',
   false_scarcity: 'une fausse urgence (« dernière chance », « plus que 3 places »)',
+  no_commitment: 'un engagement sur une demande sur mesure (un oui, un prix ou un délai)',
   explicit_before_age: 'du contenu explicite avant l’âge confirmé',
   guilt_trip: 'de la culpabilisation',
   pet_name: 'un petit nom qu’elle n’emploie pas',
@@ -33,4 +34,5 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   fake_emergency: 'une maladie, une dette ou une urgence pour vendre',
   repetition: 'une phrase déjà dite',
   closed_question_streak: 'trop de questions fermées d’affilée',
+  care_breach: 'une vente, une rencontre ou un mot sexuel dans une réponse de soin',
 };

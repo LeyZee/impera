@@ -43,6 +43,8 @@ Un seul format, produit par le gestionnaire central :
 
 Cookies de session `HttpOnly Secure SameSite=Lax` ; en-tête `Origin` vérifié sur toute requête non `GET` contre la liste des origines autorisées ; CORS limité à `WEB_ORIGIN`, pour les méthodes `GET`, `HEAD`, `POST`, `PUT`, `PATCH` et `DELETE` ; rate limit par utilisateur et par IP (en-têtes `RateLimit-*`). Détail : `security.md` §6.
 
+**Exception : `POST /v1/mcp`**, le serveur MCP (ADR 0026 § 2, module `mcp`). Il parle JSON-RPC selon la spécification MCP, pas le corps d'erreur commun : un refus d'outil est un résultat `isError` avec `structuredContent: { refusal }` (`McpCallRefusalSchema`), un échec de la porte une réponse 401 unique avec `WWW-Authenticate: Bearer`, `GET` et `DELETE` un 405 JSON-RPC. Il s'authentifie par `Authorization: Bearer` (jeton d'agent, jamais le cookie ni un paramètre d'URL) et porte sa propre règle d'`Origin` (absent accepté, présent dans une liste, vide au lot a), pas celle du dashboard.
+
 ## Ce qu'on ne fait pas
 
 GraphQL, versionnage par en-tête, pagination par offset, réponses enveloppées différemment d'une route à l'autre, champs calculés côté client qui existent côté serveur.

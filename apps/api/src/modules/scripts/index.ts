@@ -4,6 +4,7 @@ import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { askScripts, type AskScriptsRun } from './application/ask-scripts';
+import { creatorQueue, queuedDigest, type QueuedDigest, type ScriptsReader } from './application/reads';
 import { cardContent, cardSvg } from './domain/cards';
 import type { LimitsOf, RasterizeCard, ScriptRequests, ScriptStructureStore } from './domain/ports';
 import { createCardRasterizer } from './infra/card-rasterizer';
@@ -41,6 +42,14 @@ export interface ScriptsModule {
   ): Promise<Uint8Array | null>;
   /** The latest version frozen for a script asked by hand (SC-02 lot b), by an owner or a manager; `null` when archived. */
   freezeForRequest(structureId: string, userId: string): Promise<string | null>;
+  /**
+   * The agency's reads of a creator's scripts, bounded by her id, who reads checked in `application/` (ADR 0026 § 1):
+   * what the MCP server lists (ADR 0105 § 4, `scripts_list`). Her queue in order, names and sizes, never a step's text;
+   * `null` for a creator who does not exist or a reader who may not read her queue.
+   */
+  readonly reads: {
+    queue(creatorId: CreatorId, reader: ScriptsReader): Promise<readonly QueuedDigest[] | null>;
+  };
   /** Mounted under `/v1` by the server: `/script-structures` (and their cards), each creator's `/script-queue` and `/script-cadence`. */
   readonly routes: FastifyPluginAsyncZod;
   readonly jobs: {
@@ -90,6 +99,10 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
       return content === null ? null : rasterize(cardSvg(content, 'folder'));
     },
     freezeForRequest: createRequestFreezer(deps.adminDb),
+    reads: {
+      queue: async (creatorId, reader) =>
+        (await creatorQueue(structures, reader, creatorId))?.map(queuedDigest) ?? null,
+    },
     routes: createScriptRoutes(structures, deps.limitsOf, deps.requireRole, rasterize, {
       store: cadences,
       requests: deps.requests,

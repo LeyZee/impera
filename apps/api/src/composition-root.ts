@@ -75,6 +75,7 @@ import { wireCreatorArchive } from './wiring/creator-archive';
 import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
+import { wireMcp } from './wiring/mcp';
 import { wireMedia } from './wiring/media';
 import { wireNotifications } from './wiring/notifications';
 import { wirePayroll } from './wiring/payroll';
@@ -122,7 +123,7 @@ export interface App {
   readonly modules: Modules;
   /** Application role: RLS applies; tenant access goes through `withTenant`. */
   readonly db: DbClient;
-  /** Owner role: Graphile Worker, unscoped jobs, migration status. */
+  /** Service role (ADR 0087): `withAdmin`, the job queue, the migration status. It crosses creators and owns nothing. */
   readonly adminDb: DbClient;
   readonly jobs: JobQueue;
   /** `llm_calls` for the LLM gateway's journal: one daily cap for the API and the worker, across restarts. */
@@ -175,7 +176,7 @@ export const rateJobSince = (
 const POOL_OPTIONS = { connectionTimeoutMillis: 5_000, idleTimeoutMillis: 30_000 };
 
 export interface AppOptions {
-  /** Tests and local development plug a `FakeConnector` here; production gets the real adapters. */
+  /** Tests plug a `FakeConnector` or FakeReveal here; the real adapters otherwise (Reveal's private API, P2-02). */
   readonly connectorRegistry?: ConnectorRegistry;
   /** Tests plug FakeReveal's CRM API here; Reveal's own (`api.reveal.me`) otherwise. */
   readonly salesFeeds?: SalesFeedRegistry;
@@ -249,12 +250,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const sandbox = sandboxOf(config);
   if (sandbox !== null) installSandboxGuard(sandbox, logger);
   const db = createDbClient(config.DATABASE_URL, POOL_OPTIONS);
-  const adminDb = createDbClient(config.DATABASE_ADMIN_URL, { ...POOL_OPTIONS, max: 5 });
+  const adminDb = createDbClient(config.DATABASE_SERVICE_URL, { ...POOL_OPTIONS, max: 5 });
   const rateLimitDb = createDbClient(config.DATABASE_URL, RATE_LIMIT_POOL_OPTIONS);
   // A client losing its connection must not crash the process; the next query reconnects.
   for (const [role, pool] of [
     ['app', db.pool],
-    ['admin', adminDb.pool],
+    ['service', adminDb.pool],
     ['rate_limit', rateLimitDb.pool],
   ] satisfies [string, Pool][]) {
     const onError = (error: Error): void => {
@@ -263,7 +264,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     pool.on('error', onError);
     pool.on('connect', (client) => client.on('error', onError));
   }
-  // A role that silences RLS (or skips it) must stop the process, not answer empty lists.
+  // A role that silences RLS (or skips it), or a service role that could change a structure, must stop the process.
   try {
     await assertDatabaseRoles(db.db, adminDb.db);
   } catch (error) {
@@ -300,7 +301,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       const holder = await trends.module.linkHolder(token);
       return holder === null ? null : currentUserById(db.db, shiftCreators, holder.userId);
     },
-    registry: options.connectorRegistry ?? {},
+    ...(options.connectorRegistry !== undefined && { registry: options.connectorRegistry }),
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
     ...(options.creatorAvatars !== undefined && { avatars: options.creatorAvatars }),
@@ -395,7 +396,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     llm,
     persona: persona.module,
     activePersona: persona.activePersona,
-    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.3.0.yaml'),
+    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.4.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
   });
@@ -426,6 +427,17 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
   });
   const backups = wireBackups(shared);
+  const mcp = wireMcp(
+    shared,
+    shiftCreators,
+    persona.module,
+    fans.module,
+    {
+      drops: contentDrops.module,
+      scripts: scripts.module,
+    },
+    scheduling.module,
+  );
   const aiUsage = wireAiUsage(shared, llm);
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
@@ -571,6 +583,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...playground.routes,
       ...telegram.routes,
       ...notifications.routes,
+      ...mcp.routes,
     ],
     tasks,
     readiness: () => checkReadiness(db.db, adminDb.db),

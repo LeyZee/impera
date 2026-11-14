@@ -32,7 +32,7 @@ import { AwsClient } from 'aws4fetch';
 import { strFromU8, unzipSync } from 'fflate';
 import { runOnce } from 'graphile-worker';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { createOwner } from '../auth';
@@ -205,7 +205,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       S3_ENDPOINT: endpoint,
       S3_REGION: REGION,
       S3_BUCKET: bucket,
@@ -677,7 +677,13 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     await test.admin.db.execute(sql`update graphile_worker._private_jobs set run_at = now()`);
     await describe();
     expect(await failures()).toBe(DESCRIPTION_TRIES);
-    expect(await queued()).toBe(0);
+    // graphile-worker completes a job without awaiting it: runOnce can return before the row is deleted.
+    await vi.waitFor(
+      async () => {
+        expect(await queued()).toBe(0);
+      },
+      { timeout: 5_000 },
+    );
     await backlog();
     expect(await queued()).toBe(0);
     expect((await review()).media[0]).toMatchObject({ description: null, describeFailed: true });
@@ -1054,8 +1060,8 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
    * step called by hand where the jobs would interleave: the storage holds the key whenever the row says held.
    */
   it('never leaves a medium held without its bytes when she gives it again while it is erased', async () => {
-    const receipts = createDrizzleReceiptStore(test.admin.db);
-    const retention = createDrizzleRetentionStore(test.admin.db);
+    const receipts = createDrizzleReceiptStore(test.service.db);
+    const retention = createDrizzleRetentionStore(test.service.db);
     const removeRaw = (key: string) =>
       s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'DELETE' }).then(() => undefined);
     const keptAgain = async (fileId: string, medium: Awaited<ReturnType<typeof mediumOf>>) => {

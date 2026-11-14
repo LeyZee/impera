@@ -1,5 +1,6 @@
 import {
   AccountPayRulesIdSchema,
+  MyFiguresSchema,
   newId,
   PayPeriodSchema,
   PaySaleDecisionIdSchema,
@@ -210,6 +211,32 @@ describe('Équipe › Paie : le chatteur lit ses ventes et signale celle qui n�
     // Léa and the owner have no sale of theirs: Théo's never show to them here.
     expect((await mine(leaCookie)).items).toEqual([]);
     expect((await mine(team.owner)).items).toEqual([]);
+  });
+
+  it('gives Théo his own figures, and nothing of them to Léa nor to the owner (ADR 0104 § 1)', async () => {
+    const figuresOf = async (cookie: string) => {
+      const response = await team.call('GET', '/payroll/my-figures', cookie);
+      expect(response.statusCode).toBe(200);
+      return MyFiguresSchema.parse(response.json());
+    };
+    const own = await figuresOf(theoCookie);
+    // His best day and fortnight are those of his only statement; the period under way, in 2026, holds nothing yet.
+    expect(own.records).toEqual({
+      bestDay: { day: '2025-05-05', currency: 'EUR', netMinor: 6_500 },
+      bestPeriod: { period: P1, currency: 'EUR', netMinor: 6_500 },
+    });
+    expect(own.days).toEqual([]);
+    expect(own.previous).toBeNull();
+    expect(own.hours).toMatchObject({ sales: 0, enough: false, cells: [] });
+
+    for (const cookie of [leaCookie, team.owner]) {
+      const other = await figuresOf(cookie);
+      expect(other.records).toEqual({ bestDay: null, bestPeriod: null });
+      expect(other.days).toEqual([]);
+      expect(other.nets).toEqual([]);
+      expect(other.hours.cells).toEqual([]);
+    }
+    expect((await team.call('GET', '/payroll/my-figures', '')).statusCode).toBe(401);
   });
 
   it('lets Théo signal a line of his statement once, with a note, and the validator sees it', async () => {

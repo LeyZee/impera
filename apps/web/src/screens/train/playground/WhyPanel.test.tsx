@@ -8,6 +8,7 @@ import { WhyPanel } from './WhyPanel';
 const STATE: PlaygroundState = {
   presets: [],
   presetId: null,
+  desireThresholds: { open: 40, script: 70 },
   situation: {
     now: '2026-10-28T20:40:00.000Z',
     timeZone: 'Europe/Paris',
@@ -96,5 +97,34 @@ describe('WhyPanel', () => {
     expect(screen.queryByText('Relecture avant envoi')).toBeNull();
     // The models' error stays in the technical details, folded.
     expect(screen.getByText('grok-4.7: unavailable, mistral-large-latest: unavailable')).toBeTruthy();
+  });
+
+  it('shows his desire against her two thresholds, each signal with its points, and why an offer was refused', () => {
+    why({
+      ...ANSWER,
+      bubbles: ['Mmh'],
+      desire: {
+        before: 40,
+        score: 58,
+        band: 'playful',
+        signals: [
+          { signal: 'states_desire', points: 12 },
+          { signal: 'suggestive_emoji', points: 4 },
+          { signal: 'suggestive_emoji', points: 4 },
+          { signal: 'short_reply', points: -4 },
+        ],
+        weightsVersion: 'desire-1',
+      },
+      offerRefused: { code: 'low_desire', label: 'Désir sous le seuil du script' },
+    });
+    expect(screen.getByRole('meter', { name: 'Note de désir' }).getAttribute('aria-valuenow')).toBe('58');
+    expect(screen.getByText('Intime à 40 · Script à 70')).toBeTruthy();
+    expect(screen.getByText('Elle peut ouvrir l’intime, pas encore de script')).toBeTruthy();
+    expect(screen.getByText('+18')).toBeTruthy();
+    // Two emojis are one line, their points added.
+    expect(screen.getByText('emoji suggestif ×2')).toBeTruthy();
+    expect(screen.getByText('+8')).toBeTruthy();
+    expect(screen.getByText('−4')).toBeTruthy();
+    expect(screen.getByText(/la règle a dit non : Désir sous le seuil du script/)).toBeTruthy();
   });
 });

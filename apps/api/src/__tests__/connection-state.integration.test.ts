@@ -59,7 +59,7 @@ describe('connection_state_changed', () => {
     crm = createFakeCrm();
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 9).toString('base64')}`,
     });
     const logger = createLogger(config, sink);
@@ -85,7 +85,7 @@ describe('connection_state_changed', () => {
 
   it('keeps the transitions only, one per outage however many processes see it', async () => {
     const at = new Date('2026-11-03T07:00:00.000Z');
-    const publish = createConnectionStatePublisher(test.admin.db, () => at);
+    const publish = createConnectionStatePublisher(test.service.db, () => at);
     // Working with nothing published before: nothing to say.
     expect(await publish('xai', { state: 'back' }, 'test')).toBe(false);
     const raced = await Promise.all([

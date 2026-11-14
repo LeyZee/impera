@@ -2,11 +2,12 @@
 
 Schéma Drizzle (`src/schema/`), migrations SQL relues (`migrations/`), client et pool, `withTenant` / `withMember` / `withTenantMember` / `withCreatorAccount` / `withAdmin` (RLS, ADR 0005, 0023 et 0042) et `enterCreator` (passer d'une créatrice à l'autre dans une même transaction, ADR 0031), chiffrement des secrets (`crypto.ts`, AES-256-GCM, clés versionnées, contexte lié), helpers de tests d'intégration (`src/test/`).
 
-Commandes : `pnpm db:generate` (depuis le schéma), `pnpm db:migrate` (avec `DATABASE_ADMIN_URL`), `pnpm db:studio` (dev).
+Commandes : `pnpm db:generate` (depuis le schéma), `pnpm db:migrate` (avec `DATABASE_ADMIN_URL` ; lit aussi `DATABASE_SERVICE_URL`, voir Rôles), `pnpm db:studio` (dev).
 
 ## Rôles
 
-- `nirvana_admin` possède les tables et lance les migrations. En production : `NOSUPERUSER BYPASSRLS` (les jobs `*Unscoped` passent par `withAdmin`). Le test d'intégration le vérifie.
+- `nirvana_admin` possède les tables et lance les migrations (`runMigrations`, qui pose aussi le schéma `graphile_worker` de la file des jobs), la sauvegarde et les scripts `ops:*`. En production : `NOSUPERUSER BYPASSRLS`. Ni l'API ni le worker ne se connectent avec lui (ADR 0087).
+- `impera_service` (ADR 0087) : `NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS`, le rôle de `withAdmin` (jobs `*Unscoped`, tables fermées à `nirvana_app`) et de la file des jobs. Il ne possède rien et n'a que des droits sur des lignes, donnés table par table par les migrations : lire, et écrire là où le code de service écrit. **Une table nouvelle ne lui donne rien** : la migration qui la crée dit ce qu'elle lui ouvre (`GRANT SELECT …`, et `INSERT`, `UPDATE`, `DELETE` seulement si un appel `withAdmin` en a besoin) ; `service-role.integration.test.ts` échoue sur une table que la migration n'a ni ouverte ni rangée parmi les fermées. `audit_log` : `SELECT` et `INSERT` seulement. La migration crée le rôle sans connexion s'il manque ; `pnpm db:migrate` lui donne le mot de passe de `DATABASE_SERVICE_URL` la première fois seulement, tant qu'il n'a pas de connexion (`ensureServiceLogin`).
 - `nirvana_app` : `NOSUPERUSER NOBYPASSRLS`, droits DML seulement (accordés par la migration). Toute requête de l'application passe par `withTenant(db, creatorId, fn)` ; hors de lui, les tables à `creator_id` renvoient zéro ligne.
 
 ## Le compte de la créatrice (CR-02, ADR 0042 § 2)
