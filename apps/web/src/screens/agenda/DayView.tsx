@@ -328,16 +328,25 @@ export function Glance({
             <span
               className="ag-streak"
               data-risk={streak.atRisk ? 'true' : undefined}
-              title={streak.next === null ? undefined : `Prochain palier : ${String(streak.next)} jours`}
+              {...(medal === null
+                ? {
+                    title:
+                      streak.next === null ? undefined : `Prochain palier : ${String(streak.next)} jours`,
+                  }
+                : {
+                    // The pill takes the focus and the tip, not the coin: its ring stays clear of the count (avis
+                    // Design, 14/11), and the pill is what will open her showcase.
+                    tabIndex: 0,
+                    ...tip.bind({
+                      title: `Médaille : série de ${String(CREATOR_MEDALS[medal].days)} jours`,
+                      ...(streak.next === null
+                        ? {}
+                        : { text: `Prochain palier : ${String(streak.next)} jours` }),
+                    }),
+                  })}
             >
               {medal === null ? null : (
-                <span
-                  className="ag-streak__medal"
-                  tabIndex={0}
-                  {...tip.bind({ title: `Médaille : série de ${String(CREATOR_MEDALS[medal].days)} jours` })}
-                >
-                  <CreatorMedal kind={medal} size={MEDAL_SIZE} />
-                </span>
+                <CreatorMedal kind={medal} size={MEDAL_SIZE} className="ag-streak__medal" />
               )}
               <b className="nv-num">{streak.days}</b> {streak.days > 1 ? 'jours' : 'jour'} de suite
             </span>

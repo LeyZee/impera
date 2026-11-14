@@ -333,13 +333,10 @@
   padding-left: 3px;
 }
 .ag-streak__medal {
-  display: inline-flex;
   flex: none;
   margin: -6px 0;
-  border-radius: var(--nv-radius-full);
-  cursor: default;
 }
-.ag-streak__medal:focus-visible {
+.ag-streak[tabindex]:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
 }
