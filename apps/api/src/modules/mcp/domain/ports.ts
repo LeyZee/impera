@@ -1,4 +1,4 @@
-import type { CreatorId, McpCapability, McpGrantId, UserId } from '@impera/contracts';
+import type { CreatorId, McpCallRefusal, McpCapability, McpGrantId, UserId } from '@impera/contracts';
 
 /** The owner at the screen, for what he does to his agent accesses (each gesture enters the audit log). */
 export interface McpOwner {
@@ -56,4 +56,24 @@ export interface McpGrantStore {
 export interface MintedToken {
   readonly token: string;
   readonly hash: string;
+}
+
+/**
+ * One line of the journal for each call of a tool, read included (ADR 0026 § 8): the person, the access, the tool, the
+ * outcome, the creator the call was confined to. Never a text, an argument or the token. Written as the person, never
+ * by the service role (ADR 0105 § 5).
+ */
+export interface McpCallRecord {
+  readonly userId: UserId;
+  readonly grantId: McpGrantId;
+  /** A name of the catalogue, or `null` for a name outside it (never written as given). */
+  readonly tool: string | null;
+  readonly outcome: 'ok' | McpCallRefusal | 'error';
+  readonly creatorId: string | null;
+  readonly requestId: string;
+  readonly ip: string;
+}
+
+export interface McpJournal {
+  record(entry: McpCallRecord): Promise<void>;
 }

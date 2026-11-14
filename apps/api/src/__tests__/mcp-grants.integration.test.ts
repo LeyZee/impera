@@ -63,7 +63,7 @@ describe('/v1/settings/mcp-grants', () => {
       routes: app.routes,
       readiness: app.readiness,
     });
-    mcp = createMcpModule({ db: app.db.db, adminDb: app.adminDb.db });
+    mcp = createMcpModule({ db: app.db.db, adminDb: app.adminDb.db, actorOf: () => Promise.resolve(null) });
     nora = newId(CreatorIdSchema);
     await test.admin.db
       .insert(schema.creators)
