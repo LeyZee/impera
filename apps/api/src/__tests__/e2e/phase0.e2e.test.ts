@@ -82,11 +82,9 @@ describe('phase 0 end to end', () => {
       sql`insert into creators (id, display_name, name_key, timezone) values (${creatorId}, 'Test', 'test', 'Europe/Paris')`,
     );
     await activateDemoPersona(app, creatorId);
-    // Already polled once: the first poll of an account only catches its history up and answers nothing (P2-02),
-    // and this test is about a fresh message.
     await test.admin.db.execute(sql`
-      insert into platform_accounts (id, creator_id, platform, handle, session_state, connector_config, last_poll_at)
-      values (${platformAccountId}, ${creatorId}, 'reveal', 'e2e', 'valid', '{"writes": true}', now() - interval '1 minute')`);
+      insert into platform_accounts (id, creator_id, platform, handle, session_state, connector_config)
+      values (${platformAccountId}, ${creatorId}, 'reveal', 'e2e', 'valid', '{"writes": true}')`);
 
     const owner = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
     await createOwner(app.auth, app.db.db, owner);

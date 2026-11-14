@@ -1,4 +1,4 @@
-# OPS-12 Le test de bout en bout part d'un compte déjà relevé
+# OPS-12 Le premier relevé répond aux messages frais
 Statut : done
 Phase : exploitation
 Dépend de : P2-02
@@ -6,25 +6,27 @@ Branche : task/ops-12-e2e-first-poll (fil « Bilan »)
 
 ## Objectif (1 phrase)
 
-Que `main` repasse au vert : le test e2e de la phase 0 échoue depuis la fusion de P2-02 (#715).
+Que `main` repasse au vert et qu'un fan qui écrit juste avant le premier « Sync » d'un compte reçoive sa réponse.
 
 ## Contexte à lire (fichiers précis)
 
-- `apps/api/src/__tests__/e2e/phase0.e2e.test.ts`.
-- `apps/api/src/modules/connectors/application/poll.ts` (premier relevé = rattrapage, P2-02).
+- `apps/api/src/modules/connectors/application/poll.ts` (`CATCH_UP_AFTER_HOURS`).
+- `apps/api/src/__tests__/e2e/phase0.e2e.test.ts`, `apps/api/src/__tests__/connectors.integration.test.ts`.
 
 ## Cause
 
-Depuis P2-02, le premier relevé d'un compte rattrape son historique sans y répondre. Le compte du test n'avait jamais été relevé : le message du fan arrivait donc comme rattrapé, aucun brouillon n'était fait, et le test interrogeait la conversation jusqu'à recevoir une erreur.
+P2-02 (#715) traitait tout message lu au premier relevé d'un compte comme rattrapé : ni fiche lue, ni réponse. Le test e2e de la phase 0 part d'un compte jamais relevé : son message de fan n'avait donc plus de brouillon, et `main` est rouge depuis la fusion.
 
 ## À faire (liste vérifiable)
 
-- [x] Le compte du test est créé déjà relevé une fois (`last_poll_at` une minute avant) : le message du fan est frais, ce que le test veut vérifier.
+- [x] Le premier relevé suit la même règle que les suivants (proposition d'Agent) : un message de plus de 6 h est rattrapé, un message frais est lu et répondu. Le relevé lit toujours la dernière journée une seule fois.
+- [x] Tests d'intégration : historique vieux de 10 h rattrapé au premier relevé, message frais au premier relevé répondu, message rattrapé signalé par le filet répondu.
+- [x] Glossaire et flux des messages à jour.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
 
-- Le job « Tests (unit + integration) » est vert sur la PR, test e2e compris.
+- Le job « Tests (unit + integration) » est vert sur la PR, test e2e compris, sans changer ce test.
 
 ## Hors périmètre
 
-- Le comportement du premier relevé, inchangé (P2-02 ; il a ses propres tests dans `connectors.integration.test.ts`).
+- La durée de 6 h, inchangée.
