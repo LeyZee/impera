@@ -1,4 +1,4 @@
-import type { CreatorId, PlatformAccountId } from '@impera/contracts';
+import type { CreatorId, Platform, PlatformAccountId } from '@impera/contracts';
 
 import {
   PlatformAccountNotFound,
@@ -12,7 +12,8 @@ import type { AccountStore, Clock, SessionShapes, SessionVault } from '../domain
 export interface ConnectorSessions {
   /**
    * Stores the session the extension captured, encrypted; the account becomes `valid` and its breaker closes. Refused
-   * when it is not a session of the account's platform, when it belongs to another creator than the one stored, or to
+   * when it is not a session of the account's platform, when it belongs to another creator than the one stored or the
+   * model the sales register links to the account, or to
    * another team member than the one stored (the « bot » member, pinned at the first « Sync »).
    */
   store(input: {
@@ -38,6 +39,14 @@ export function createConnectorSessions(deps: {
   readonly clock: Clock;
   /** How each platform's session reads; a platform without a reader takes no session. */
   readonly shapes: SessionShapes;
+  /**
+   * The platform models the sales register links to this account (Réglages › Relevé des ventes): a session of another
+   * model is refused even at the first « Sync », before any session is stored to compare it with.
+   */
+  readonly linkedModels: (
+    platform: Platform,
+    platformAccountId: PlatformAccountId,
+  ) => Promise<readonly string[]>;
 }): ConnectorSessions {
   const vault = (): SessionVault => {
     if (deps.vault === null) throw new SessionVaultMissing();
@@ -56,6 +65,9 @@ export function createConnectorSessions(deps: {
       const before = previous === null ? null : openOrNull(vault(), platformAccountId, previous);
       const stored = before === null ? null : shape(before);
       if (stored !== null && stored.owner !== read.owner) throw new SessionOwnerConflict();
+      // The first « Sync » has nothing stored to compare with: the model the register links to this account answers.
+      const linked = await deps.linkedModels(account.platform, platformAccountId);
+      if (linked.length > 0 && !linked.includes(read.owner)) throw new SessionOwnerConflict();
       // The member is pinned at the first « Sync » (P2-02): the owner's or a chatter's session is never the bot's.
       if (stored?.member !== undefined && stored.member !== read.member) throw new SessionMemberConflict();
       const sealed = vault().seal(platformAccountId, session);

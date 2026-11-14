@@ -34,7 +34,7 @@ La session envoyée à `POST /v1/connector/sessions` (champ `session`, opaque po
 
 **Qui envoie** : le bouton n'est proposé qu'au propriétaire, et l'envoi passe par la liaison de l'extension de VEI-01 (`x-extension-link`, jeton haché, révocable), comme le copilote, jamais par le cookie du CRM ni par un secret collé à la main (ADR 0066 § 7). Le jeton d'appareil `EXTENSION_DEVICE_TOKEN` de P0-06 est remplacé par cette liaison dans P2-01.
 
-Le compte plateforme et la session ne font jamais apparaître le jeton ailleurs que chiffré en base (AES-256-GCM, P0-06). La route refuse une session dont `modelId` ne correspond pas au compte déjà relié.
+Le compte plateforme et la session ne font jamais apparaître le jeton ailleurs que chiffré en base (AES-256-GCM, P0-06). La route refuse une session dont `modelId` ne correspond pas au compte déjà relié : ni à la session déjà gardée, ni, dès la première « Sync », au modèle que le relevé des ventes relie à ce compte (Réglages › Relevé des ventes).
 
 **Santé (`health`)** : `GET /models/:modelId`. 200 → `valid` ; 401 ou 403 → `expired` ; `exp` du JWT lisible : `warning` 2 h avant (le jeton ne vit que 24 h, V1).
 

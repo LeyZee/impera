@@ -187,6 +187,22 @@ describe('connectors module (P0-06)', () => {
     expect(await jobs('conversation.respond')).toHaveLength(1);
   });
 
+  it('treats a caught-up message the safety net answers as fresh: it is never left unread', async () => {
+    const id = await account('poll-safety', 'valid');
+    fake(id).enqueueInbound({ conversationId: 'c-9', fanId: 'f-9', fanDisplayName: 'Paul', text: 'Salut' });
+    fake(id).enqueueInbound({
+      conversationId: 'c-9',
+      fanId: 'f-9',
+      fanDisplayName: 'Paul',
+      text: 'j’ai plus envie de vivre',
+    });
+    const before = (await jobs('conversation.respond')).length;
+    // The first poll catches them up: the plain one waits, the one with a sign gets its answer.
+    await poll(id);
+    expect(await count('messages', sql`platform_account_id = ${id}`)).toBe(2);
+    expect(await jobs('conversation.respond')).toHaveLength(before + 1);
+  });
+
   it('sends an approved draft through the connector: a 429 is retried, the fan gets each bubble once', async () => {
     const id = await account('send', 'valid');
     fake(id).enqueueInbound({ conversationId: 'c-2', fanId: 'f-2', fanDisplayName: 'Marc', text: 'Coucou' });
@@ -437,6 +453,23 @@ describe('connectors module (P0-06)', () => {
       409,
       'connector_session_member_conflict',
     ]);
+  });
+
+  it('refuses at the first sync a session of another model than the one the sales register links', async () => {
+    const id = await account('register-linked', 'none');
+    await test.admin.db
+      .insert(schema.salesFeedModels)
+      .values({ platform: 'reveal', platformModelId: 'model-test-linked', platformAccountId: id, creatorId });
+    // Nothing is stored yet to compare with: the register's link answers.
+    const other = await sync(id, revealSession('reveal-bearer-wrong-eeee', 'model-test-elsewhere'));
+    expect([other.statusCode, other.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'connector_session_conflict',
+    ]);
+    expect((await accountRow(id)).sessionCiphertext).toBeNull();
+    expect((await sync(id, revealSession('reveal-bearer-right-ffff', 'model-test-linked'))).statusCode).toBe(
+      204,
+    );
   });
 
   it("lists the accounts to sync for the owner's link only, never a session", async () => {

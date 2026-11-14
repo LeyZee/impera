@@ -73,7 +73,12 @@ export { salesFeedTimeZone } from './domain/sale-days';
  * The daily photo of a creator's statistics (ADR 0081 § 4, § 5), read in the caller's `withTenantMember`: the owner,
  * or an active manager when she is on his list. Counters only, never an amount.
  */
-export { dailyStatsOf, type DailyStatsDay } from './infra/db/daily-stats-store';
+export {
+  chatterStatsOf,
+  dailyStatsOf,
+  type ChatterStatsDay,
+  type DailyStatsDay,
+} from './infra/db/daily-stats-store';
 /** @public Which totals a read gives (CRM-04). */
 export type { SalesRefundsQuery, SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';
@@ -262,18 +267,23 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     registry: deps.registry,
     sends: (account) => createSendJournal(deps.db, account),
   });
+  const ledger = createDrizzleSalesLedger(deps.db, deps.adminDb);
   const sessions = createConnectorSessions({
     accounts,
     vault,
     clock,
     shapes: { reveal: revealSessionShape },
+    linkedModels: async (platform, platformAccountId) =>
+      [...(await ledger.modelLinks(platform))]
+        .filter(([, link]) => link.platformAccountId === platformAccountId)
+        .map(([platformModelId]) => platformModelId),
   });
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
   const avatars: AvatarPorts | null =
     deps.avatars == null ? null : { ...deps.avatars, records: createAvatarRecords(deps.adminDb) };
   const salesFeeds = createSalesFeeds({
     keys: deps.credentialKeys === null ? null : createSalesFeedKeyStore(deps.adminDb, deps.credentialKeys),
-    ledger: createDrizzleSalesLedger(deps.db, deps.adminDb),
+    ledger,
     team: createDrizzleTeamImportStore(deps.db),
     registry: deps.salesFeeds,
     clock,

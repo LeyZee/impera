@@ -38,6 +38,7 @@ import {
   panelOfCorrection,
   panelTitle,
   refusedLineIssues,
+  refusedReplyIssues,
   scoped,
   scopedPaths,
   stillRefused,
@@ -58,7 +59,14 @@ import {
 } from './model';
 import { SheetPanels } from './sheet';
 import { activateVersion, readPersonaFile, saveVersion, usePersona, type PersonaReady } from './source';
-import { AgentBehaviorTab, FollowUpsTab, NotificationsTab, RulesTab, StrategiesTab } from './tabs';
+import {
+  AgentBehaviorTab,
+  FollowUpsTab,
+  NotificationsTab,
+  ObjectionRepliesTab,
+  RulesTab,
+  StrategiesTab,
+} from './tabs';
 
 import { fullDay } from '@/scheduling/time';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
@@ -363,7 +371,14 @@ function Editor({
       case 'unprocessable': {
         const text = textOrNull(draft.sheet.conversation['typical_responses']);
         const issues = refusedLineIssues(result.faults, text);
-        if (issues.length > 0) setRefused({ issues, text });
+        const bank = draft.agent.objection_replies;
+        const replies = refusedReplyIssues(result.faults, bank);
+        if (issues.length > 0 || replies.length > 0)
+          setRefused({
+            issues,
+            text,
+            ...(replies.length > 0 && { replies: { issues: replies, bank: JSON.stringify(bank) } }),
+          });
         else setProblem({ text: SAVE_FAILED, reload: false });
         break;
       }
@@ -605,6 +620,8 @@ function Editor({
                   <NotificationsTab {...agentProps('notifications')} isOwner={isOwner} />
                   <AgentBehaviorTab {...agentProps('behavior')} />
                   <RulesTab {...agentProps('rules')} />
+                  {/* An agency method (ADR 0090 § B): the owner's alone, the others never receive it. */}
+                  {isOwner ? <ObjectionRepliesTab {...agentProps('objection_replies')} /> : null}
                 </div>
               </FormContext.Provider>
             )}

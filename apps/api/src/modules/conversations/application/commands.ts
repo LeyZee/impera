@@ -22,6 +22,7 @@ import {
   type Verdict,
 } from '@impera/contracts';
 
+import { safetySigns } from '../../agent';
 import {
   AutomaticLocked,
   CreatorNotFound,
@@ -118,6 +119,8 @@ export interface ConversationCommands {
   /** `note`: what the chatter wants her to remember about the fan, kept as an `operator_note` fact (P3-02). */
   release(input: ConversationCommand & { note?: string }): Promise<void>;
   setMode(input: ConversationCommand & { mode: ConversationMode }): Promise<void>;
+  /** « Il va mieux » (ADR 0088 § 7): the care mode closes; his frozen sales and « Rien d'explicite » stay set. */
+  closeCare(input: ConversationCommand & { reason?: string }): Promise<void>;
   /**
    * The Dashboard's control (Arrêt, Copilote, Automatique) for all her conversations. Returns the mode now in
    * force: Arrêt while the global switch stays on, whatever she asked. Automatique only behind its lock (ADR 0019).
@@ -266,8 +269,9 @@ export function createConversationCommands({
           },
           meta,
         );
-        // Caught up (P2-02): stored and counted, but nothing reads or answers it on its own.
-        const isFresh = input.catchUp !== true;
+        // Caught up (P2-02): stored and counted, but nothing reads or answers it on its own, unless his words carry a
+        // sign the safety net answers (a minor, self-harm): that one is treated as fresh, so it is never left unread.
+        const isFresh = input.catchUp !== true || (isInbound && safetySigns(message.text).length > 0);
         if (isInbound) {
           // His card is read whoever answers him (ADR 0085 § 7): each message of his puts the next read off.
           const pace = await tx.cardReads.pace(conversation.id);
@@ -485,6 +489,26 @@ export function createConversationCommands({
           entityId: conversation.id,
           details: { correlationId: input.correlationId },
         });
+      });
+    },
+
+    closeCare(input) {
+      return uow.inTenant(input.creatorId, async (tx) => {
+        const conversation = await lockConversation(tx, input.conversationId);
+        // Closed already, or never opened: nothing to journal, a second click changes nothing.
+        if (conversation.careSince === null) return;
+        await appendEvent(
+          tx,
+          conversation,
+          {
+            type: 'care_closed',
+            payload: {
+              conversationId: conversation.id,
+              ...(input.reason === undefined ? {} : { reason: input.reason }),
+            },
+          },
+          humanMeta(input),
+        );
       });
     },
 
