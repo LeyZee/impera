@@ -17,6 +17,7 @@ import { ReportPanel } from '@/reports/ReportPanel';
 import { MEMBER_STATUS, reportOf, toneOf, WITHOUT_PAY_EFFECT, withoutPayEffect } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { RewardRevealGate } from '@/rewards/RewardRevealGate';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { useMyShifts } from '@/scheduling/api';
 import { accountLine, dayStateOf, myAwayOf, progressOf, type DayState } from '@/scheduling/model';
@@ -163,6 +164,8 @@ function Day({
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}
       {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}
+      {/* What he earned since his last visit greets him here, never over a conversation (ADR 0104 § 12). */}
+      <RewardRevealGate user={user} />
       <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
       {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
       <Link to="/planning" className="sc-more">

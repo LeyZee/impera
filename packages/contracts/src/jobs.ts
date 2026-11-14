@@ -47,6 +47,7 @@ export const JOB_NAMES = [
   'fans.purge_facts',
   'rate_limit.purge',
   'backups.check',
+  'rewards.evaluate',
   'ai_usage.check_credits',
   'notifications.recap',
   'notifications.creator_sale',
@@ -120,6 +121,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'fans.purge_facts': 'Nettoyage de la mémoire des fans',
   'rate_limit.purge': 'Nettoyage des limites de connexion',
   'backups.check': 'Vérification des sauvegardes',
+  'rewards.evaluate': 'Gains du jeu des chatteurs',
   'ai_usage.check_credits': 'Vérification des crédits IA',
   'notifications.recap': 'Récapitulatif des notifications',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
@@ -238,6 +240,8 @@ export const JOB_PAYLOADS = {
   'fans.purge_facts': z.object({}),
   'rate_limit.purge': z.object({}),
   'backups.check': z.object({}),
+  /** What each chatter earned since the last run (ADR 0104 § 12 to § 15): replayable, a gain is written once. */
+  'rewards.evaluate': z.object({}),
   'ai_usage.check_credits': z.object({}),
   /** At the end of an account's quiet hours: one notification for all it held (CR-01). Keyed by account. */
   'notifications.recap': z.object({ userId: z.string().min(1) }),
@@ -517,6 +521,8 @@ export const JOB_MAX_ATTEMPTS = {
   'fans.purge_facts': 1,
   'rate_limit.purge': 1,
   'backups.check': 1,
+  // Every ten minutes: the next run is the retry.
+  'rewards.evaluate': 1,
   // Each hour: the next run is the retry; an alert is published once per episode.
   'ai_usage.check_credits': 1,
   'notifications.recap': 3,

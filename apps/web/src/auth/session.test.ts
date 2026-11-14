@@ -25,6 +25,7 @@ describe('dashboard session', () => {
       shiftCreatorIds: [],
       team: null,
       teamScope: 'owner',
+      preferences: { sounds: true },
     };
     answer(200, { state: 'signed_in', me: user });
     expect(await fetchCurrentUser()).toEqual(user);
