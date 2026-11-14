@@ -325,6 +325,17 @@
 .ag-streak b {
   color: var(--nv-ink);
 }
+/* Her highest streak medal leads the pill (ADR 0107 § 9): the coin overlaps the pill's padding, its height unchanged. */
+.ag-streak:has(.ag-streak__medal) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 3px;
+}
+.ag-streak__medal {
+  flex: none;
+  margin: -6px 0;
+}
 .ag-streak[data-risk] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 50%, transparent);
 }

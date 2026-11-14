@@ -174,4 +174,4 @@ Branche : task/<id>-<slug>
 | REC-PAIE-01 | Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis | exploitation | done | CRM-03, ADR 0076, ADR 0072 |
 | PIL-01 | « Mise en route » d'une créatrice et d'un membre, cochée par le serveur | exploitation | done | CRM-07 |
 | CHF-01 | Chiffres et jeu du chatteur : ses chiffres, puis un jeu fait de faits réels | équipe | in_progress | ADR 0104, CRM-03, EQ-05 |
-| CRB-01 | Trophées et médailles de série de la créatrice | créatrice | todo | ADR 0107, CHF-01 |
+| CRB-01 | Trophées et médailles de série de la créatrice | créatrice | review | ADR 0107, CHF-01 |

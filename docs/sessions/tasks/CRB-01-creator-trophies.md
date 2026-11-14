@@ -1,5 +1,5 @@
 # CRB-01 Trophées et médailles de série de la créatrice
-Statut : todo
+Statut : review (lot 1 : serveur, médaille à côté de la série, dévoilement)
 Phase : créatrice (ADR 0107 ; ADR 0042 § 3, ADR 0055 § 4, ADR 0104 § B)
 Dépend de : ADR 0107 (acceptée le 13/11/2026) ; la PR du jeu du chatteur (module `rewards`, migration 0186, #740) ; PR #720 et PR des médailles du chatteur (composant de dévoilement et langage graphique partagés)
 Branche : claude/project-thread-vnzrdd
@@ -17,14 +17,14 @@ La créatrice gagne des médailles à chaque palier de sa série de journées r�
 
 ## À faire (liste vérifiable)
 
-- [ ] Domaine pur et testé : série de livraisons (§ 2), constat des neuf trophées (§ 3), médaille du palier atteint (§ 1).
-- [ ] Migration 0187 dans le module `rewards` : types de la créatrice ajoutés à la liste fermée de la table commune des gains, politiques RLS de la créatrice, test RLS (elle lit les siens et marque un dévoilement vu ; l'agence lit ; un chatteur ne lit rien). Pas de seconde table. Relecture Bilan (13/11) : politiques rattachées au compte du gain ; lecture agence limitée aux rôles propriétaire et manager actif ; GRANT UPDATE de la seule colonne du dévoilement vu au rôle applicatif, sur la ligne de son compte, ni autre UPDATE ni DELETE ; INSERT à `impera_service` (après #716) vérifié par le test des droits ; job en ON CONFLICT DO NOTHING.
-- [ ] Job rejouable : après une coche, après un dépôt arrivé, chaque nuit dans son fuseau.
-- [ ] Route de la vitrine au harnais d'isolation ; test « une créatrice ne lit pas les trophées d'une autre ».
-- [ ] Écrans : médaille à côté de la série, « Mes trophées » dans Moi, dévoilement partagé avec le chatteur, lecture sur sa fiche côté agence.
-- [ ] Symboles de la créatrice dessinés dans le langage des médailles du chatteur, rendus en grand et à 24 à 40 px, Nuit et Jour, validés par Charles.
-- [ ] Glossaire : élargir « Trophée » à la créatrice une fois #720 fusionnée.
-- [ ] Captures Nuit/Jour, PC/téléphone validées avant fusion.
+- [x] Domaine pur et testé : série de livraisons (§ 2), constat des neuf trophées (§ 3), médaille du palier atteint (§ 1).
+- [x] Migration 0202 (provisoire, idx et `when` fixés au signal de fusion) dans le module `rewards` : types de la créatrice ajoutés à la liste fermée de la table commune des gains, politiques RLS de la créatrice, test RLS (elle lit les siens et marque un dévoilement vu ; l'agence lit ; un chatteur ne lit rien). Pas de seconde table. Relecture Bilan (13/11) : politiques rattachées au compte du gain ; lecture agence limitée aux rôles propriétaire et manager actif ; GRANT UPDATE de la seule colonne du dévoilement vu au rôle applicatif, sur la ligne de son compte, ni autre UPDATE ni DELETE ; INSERT à `impera_service` (après #716) vérifié par le test des droits ; job en ON CONFLICT DO NOTHING.
+- [~] Job rejouable : la tâche `rewards.evaluate` (toutes les 10 minutes, jour et nuit) constate aussi les gains de la créatrice. Reste : la lancer aussi juste après une coche et un dépôt arrivé (lot 2).
+- [x] Route de la vitrine au harnais d'isolation ; test « une créatrice ne lit pas les trophées d'une autre ».
+- [~] Écrans : médaille à côté de la série et dévoilement faits (lot 1) ; « Mes trophées » dans Moi branché par le fil de la vitrine (ADR 0108) sur `creator-art.tsx` ; reste la lecture sur sa fiche côté agence (route `GET /v1/creators/:creatorId/trophy-case` prête, écran au lot 2).
+- [x] Symboles de la créatrice dessinés dans le langage des médailles du chatteur, rendus en grand et à 24 à 40 px, Nuit et Jour, validés par Charles.
+- [x] Glossaire : « Trophée » élargi à la créatrice.
+- [ ] Captures Nuit/Jour, PC/téléphone validées avant fusion (lot `trophees-creatrice-1`).
 
 ## Critères d'acceptation
 

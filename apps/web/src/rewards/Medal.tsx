@@ -92,25 +92,92 @@ function starPath(cy: number, radius: number): string {
   return `${d}Z`;
 }
 
-/** The tier's place on the coin: I, II, III, then a star from the fourth. */
-function Emblem({ rank, cy, scale }: { rank: number; cy: number; scale: number }): JSX.Element {
+/** What a creator's streak medal carries instead of a rank (ADR 0107 § 1): its days, and one or two stars over them. */
+export interface Engraving {
+  readonly text: string;
+  readonly stars: 0 | 1 | 2;
+}
+
+function starAt(cx: number, cy: number, radius: number): string {
+  let d = '';
+  for (let index = 0; index < 10; index += 1) {
+    const angle = (Math.PI / 5) * index - Math.PI / 2;
+    const r = index % 2 === 0 ? radius : radius * 0.42;
+    d += `${index === 0 ? 'M' : 'L'}${String(round(cx + r * Math.cos(angle)))} ${String(round(cy + r * Math.sin(angle)))}`;
+  }
+  return `${d}Z`;
+}
+
+/** Her days in Arabic numerals, smaller as they grow, under their stars (planche 3, « ok captures » 13/11). */
+function Engraved({ engraving, cy }: { engraving: Engraving; cy: number }): JSX.Element {
+  const { text, stars } = engraving;
+  const size = text.length >= 3 ? 15 : text.length === 2 ? 19 : 23;
+  const dy = stars > 0 ? 3.5 : 0;
+  return (
+    <>
+      {stars === 2 ? (
+        <>
+          <path d={starAt(CX - 5.2, cy - 10.5, 4.2)} />
+          <path d={starAt(CX + 5.2, cy - 10.5, 4.2)} />
+        </>
+      ) : stars === 1 ? (
+        <path d={starAt(CX, cy - 10.5, 4.6)} />
+      ) : null}
+      <text
+        className="rw-engraved"
+        x={CX}
+        y={round(cy + size * 0.36 + dy)}
+        textAnchor="middle"
+        fontSize={size}
+        letterSpacing={-0.5}
+      >
+        {text}
+      </text>
+    </>
+  );
+}
+
+/** The tier's place on the coin: I, II, III, then a star from the fourth; or a creator's engraved days. */
+function Emblem({
+  rank,
+  engraving,
+  cy,
+  scale,
+}: {
+  rank: number;
+  engraving: Engraving | undefined;
+  cy: number;
+  scale: number;
+}): JSX.Element {
   return (
     <g
       transform={`translate(${String(CX)} ${String(cy)}) scale(${String(scale)}) translate(${String(-CX)} ${String(-cy)})`}
     >
-      {rank >= 4 ? <path d={starPath(cy, 11.5)} /> : <Numeral count={Math.max(1, rank)} cy={cy} />}
+      {engraving !== undefined ? (
+        <Engraved engraving={engraving} cy={cy} />
+      ) : rank >= 4 ? (
+        <path d={starPath(cy, 11.5)} />
+      ) : (
+        <Numeral count={Math.max(1, rank)} cy={cy} />
+      )}
     </g>
   );
 }
 
 export function Medal({
   medal,
+  engraving,
+  label,
   earned = true,
   size,
   glow = false,
   className,
 }: {
   medal: TierMedal;
+  /** A creator's streak medal: its days instead of the rank. */
+  engraving?: Engraving;
+  /** What a screen reader hears, when the metal alone does not say it (« Médaille 30 jours »). */
+  label?: string;
   earned?: boolean;
   /** Its side in pixels: under 40 the coin stands alone. */
   size: number;
@@ -133,7 +200,8 @@ export function Medal({
     width: size,
     height: size,
     role: 'img',
-    'aria-label': medalLabel(medal, earned),
+    'aria-label':
+      label === undefined ? medalLabel(medal, earned) : `${label}${earned ? '' : ', pas encore gagnée'}`,
   } as const;
   if (!earned)
     return (
@@ -143,7 +211,7 @@ export function Medal({
             <circle cx={CX} cy={cy} r={40} opacity={0.12} />
             <circle cx={CX} cy={cy} r={40} fill="none" stroke="currentColor" strokeWidth={6} opacity={0.5} />
             <g opacity={0.5}>
-              <Emblem rank={medal.rank} cy={cy} scale={scale} />
+              <Emblem rank={medal.rank} engraving={engraving} cy={cy} scale={scale} />
             </g>
           </>
         ) : (
@@ -162,7 +230,7 @@ export function Medal({
               opacity={0.5}
             />
             <g opacity={0.42}>
-              <Emblem rank={medal.rank} cy={cy} scale={scale} />
+              <Emblem rank={medal.rank} engraving={engraving} cy={cy} scale={scale} />
             </g>
           </>
         )}
@@ -231,10 +299,10 @@ export function Medal({
         />
       )}
       <g className="rw-hi" transform={`translate(${small ? '1.3 1.6' : '0.7 0.9'})`} opacity={0.7}>
-        <Emblem rank={medal.rank} cy={cy} scale={scale} />
+        <Emblem rank={medal.rank} engraving={engraving} cy={cy} scale={scale} />
       </g>
       <g className="rw-ink">
-        <Emblem rank={medal.rank} cy={cy} scale={scale} />
+        <Emblem rank={medal.rank} engraving={engraving} cy={cy} scale={scale} />
       </g>
       <g clipPath={url('k')}>
         <path

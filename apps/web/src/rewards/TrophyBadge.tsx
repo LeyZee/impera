@@ -38,7 +38,7 @@ const HAIRLINE = 'M48 15.5l23.5 7v19c0 15.3-9.3 27.3-23.5 36-14.2-8.7-23.5-20.7-
 
 const round = (value: number): number => Number(value.toFixed(2));
 
-function starPath(cx: number, cy: number, radius: number): string {
+export function starPath(cx: number, cy: number, radius: number): string {
   let d = '';
   for (let index = 0; index < 10; index += 1) {
     const angle = (Math.PI / 5) * index - Math.PI / 2;
@@ -49,14 +49,14 @@ function starPath(cx: number, cy: number, radius: number): string {
 }
 
 /** What a symbol is drawn with: its light (the gold, or the grey of « pas encore ») and the dark it is cut with. */
-interface Inks {
+export interface Inks {
   readonly light: string;
   readonly dark: string;
   /** Under 40 px: the main shape alone. */
   readonly plain: boolean;
 }
 
-function Digits({
+export function Digits({
   x,
   y,
   size,
@@ -68,7 +68,7 @@ function Digits({
   size: number;
   fill: string;
   children: string;
-}) {
+}): JSX.Element {
   return (
     <text className="rw-digits" x={x} y={y} textAnchor="middle" fontSize={size} fill={fill}>
       {children}
@@ -77,7 +77,17 @@ function Digits({
 }
 
 /** The round mark in a symbol's corner. */
-function Corner({ cx, cy, dark, children }: { cx: number; cy: number; dark: string; children: JSX.Element }) {
+export function Corner({
+  cx,
+  cy,
+  dark,
+  children,
+}: {
+  cx: number;
+  cy: number;
+  dark: string;
+  children: JSX.Element;
+}): JSX.Element {
   return (
     <>
       <circle cx={cx} cy={cy} r={10.5} fill={dark} />
@@ -203,12 +213,12 @@ function Media({ light, dark }: Inks): JSX.Element {
 }
 
 /** A symbol and the box of its main shape, which `Fitted` centres on the shield's axis. */
-const SYMBOLS: Readonly<
-  Record<
-    TrophyKind,
-    { readonly box: readonly [number, number, number, number]; readonly draw: (inks: Inks) => JSX.Element }
-  >
-> = {
+export interface ShieldSymbol {
+  readonly box: readonly [number, number, number, number];
+  readonly draw: (inks: Inks) => JSX.Element;
+}
+
+const SYMBOLS: Readonly<Record<TrophyKind, ShieldSymbol>> = {
   first_sale: { box: [26, 25, 68, 67], draw: (inks) => <Coin {...inks} /> },
   day_record: { box: [29, 23, 67, 64], draw: (inks) => <Calendar {...inks} days="1" /> },
   fortnight_record: { box: [29, 23, 67, 64], draw: (inks) => <Calendar {...inks} days="15" /> },
@@ -220,8 +230,7 @@ const SYMBOLS: Readonly<
 };
 
 /** The symbol scaled into the shield's safe field and centred on its main shape: nothing reaches the gold hairline. */
-function Fitted({ kind, inks }: { kind: TrophyKind; inks: Inks }): JSX.Element {
-  const symbol = SYMBOLS[kind];
+function Fitted({ symbol, inks }: { symbol: ShieldSymbol; inks: Inks }): JSX.Element {
   const [x0, y0, x1, y1] = symbol.box;
   const scale = round((inks.plain ? 40 : 32) / Math.max(x1 - x0, y1 - y0));
   return (
@@ -236,12 +245,31 @@ function Fitted({ kind, inks }: { kind: TrophyKind; inks: Inks }): JSX.Element {
 
 export function TrophyBadge({
   kind,
+  ...rest
+}: {
+  kind: TrophyKind;
+  earned?: boolean;
+  size: number;
+  glow?: boolean;
+  className?: string;
+}): JSX.Element {
+  return <ShieldBadge symbol={SYMBOLS[kind]} name={TROPHY_NAMES[kind]} {...rest} />;
+}
+
+/**
+ * The shield with any symbol: the chatter's trophies above, the creator's (ADR 0107 § 16, `creator-art.tsx`) with
+ * their own symbols. `name` is what a screen reader hears.
+ */
+export function ShieldBadge({
+  symbol,
+  name,
   earned = true,
   size,
   glow = false,
   className,
 }: {
-  kind: TrophyKind;
+  symbol: ShieldSymbol;
+  name: string;
   earned?: boolean;
   /** Its side in pixels: under 40 the shield fills its box and the symbol is its main shape alone. */
   size: number;
@@ -260,7 +288,7 @@ export function TrophyBadge({
     width: size,
     height: size,
     role: 'img',
-    'aria-label': `Trophée « ${TROPHY_NAMES[kind]} »${earned ? '' : ', pas encore gagné'}`,
+    'aria-label': `Trophée « ${name} »${earned ? '' : ', pas encore gagné'}`,
   } as const;
   if (!earned)
     return (
@@ -277,7 +305,7 @@ export function TrophyBadge({
           />
           {small ? null : (
             <g opacity={0.42}>
-              <Fitted kind={kind} inks={{ light: 'currentColor', dark: 'var(--rw-cut)', plain: false }} />
+              <Fitted symbol={symbol} inks={{ light: 'currentColor', dark: 'var(--rw-cut)', plain: false }} />
             </g>
           )}
         </g>
@@ -321,7 +349,7 @@ export function TrophyBadge({
         <g clipPath={url('k')}>
           <path d="M16 8h64v22c-18 7-46 7-64 0z" fill="#fff" opacity={0.1} />
         </g>
-        <Fitted kind={kind} inks={{ light: url('y'), dark: 'var(--rw-glass-2)', plain: small }} />
+        <Fitted symbol={symbol} inks={{ light: url('y'), dark: 'var(--rw-glass-2)', plain: small }} />
       </g>
     </svg>
   );
