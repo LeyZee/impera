@@ -61,9 +61,14 @@ function show(page: () => ReactNode): void {
   const router = createRouter({
     routeTree: root.addChildren([
       createRoute({ getParentRoute: () => root, path: '/', component: page }),
-      ...['/creatrices', '/reglages/ventes', '/reglages/telegram', '/reglages/sauvegardes', '/suivi'].map(
-        (path) => createRoute({ getParentRoute: () => root, path }),
-      ),
+      ...[
+        '/creatrices',
+        '/reglages/ventes',
+        '/reglages/telegram',
+        '/reglages/sauvegardes',
+        '/reglages/modeles-ia',
+        '/suivi',
+      ].map((path) => createRoute({ getParentRoute: () => root, path })),
     ]),
     history: createMemoryHistory({ initialEntries: ['/'] }),
   });
@@ -96,6 +101,26 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     await waitFor(() => {
       expect(chosen).toEqual([CREATOR.id]);
     });
+  });
+
+  it('says the AI budget in the banners’ face, without « Pour toute l’agence » on the agency’s view (ADM-26)', async () => {
+    serve();
+    show(() => (
+      <AgencyPage
+        period="week"
+        onPeriod={() => undefined}
+        onCreator={() => undefined}
+        forOwner
+        reviewsReports={false}
+        canAddCreator
+      />
+    ));
+    const budget = await screen.findByRole('complementary', { name: 'Budget IA du jour, toutes créatrices' });
+    expect(budget.textContent).not.toContain('Pour toute l’agence');
+    expect(budget.querySelector('.db-orb')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Voir les modèles IA' }).getAttribute('href')).toBe(
+      '/reglages/modeles-ia',
+    );
   });
 
   it('asks for a first creator before any, never empty charts (DASH-13)', async () => {
