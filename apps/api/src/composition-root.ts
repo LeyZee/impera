@@ -64,6 +64,7 @@ import { installSandboxGuard, sandboxOf, sdkBaseUrlsOf } from './sandbox';
 import { createSecuritySettingsRoutes } from './security-settings';
 import { wireAccounting } from './wiring/accounting';
 import { wireAgent } from './wiring/agent';
+import { wireAiBudget } from './wiring/ai-budget';
 import { wireAiUsage } from './wiring/ai-usage';
 import { wireAlerts } from './wiring/alerts';
 import { wireBackups } from './wiring/backups';
@@ -295,6 +296,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const fans = wireFans(shared);
   const connectors = wireConnectors(shared, {
     ingest: (input) => conversations.module.ingestMessage(input),
+    // The import of her native scripts, queued behind each vault sync the owner asks (ADR 0099 § 1 time 2).
+    onVaultSyncAsked: (input) => scripts.module.askImport(input),
     // The member made by `team`, the account linked by this module's own write, in one transaction (ADR 0076 § 3).
     invite: (actor, input) =>
       team.module.invites(connectors.module.invitationChatterLinks).fromPlatform(actor, input),
@@ -320,8 +323,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       logger.warn({ err: error }, 'llm_calls not written or not reloaded');
     },
   });
+  // The owner's AI budget, read before the gateway is built: its first call already uses it.
+  const aiBudget = await wireAiBudget(shared);
   const llm = createAppLlm({
     log: llmLog,
+    caps: aiBudget.module.caps,
     credentials: providers.module.apiKeySource,
     reportRefusedKey: (provider, kind) => providers.module.reportRefusedKey(provider, kind),
     publishBudget: (crossing) => publishBudgetThreshold(adminDb.db, crossing),
@@ -366,6 +372,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const scripts = wireScripts(shared, {
     persona: persona.module,
     contentDrops: contentDrops.module,
+    connectors: connectors.module,
     cardFontsDir: CARD_FONTS_DIR,
   });
   const contractors = wireContractors(shared, {
@@ -581,6 +588,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...backups.routes,
       ...rewards.routes,
       ...aiUsage.routes,
+      ...aiBudget.routes(llm),
       ...providers.routes,
       ...connectors.routes,
       ...supervision.routes,

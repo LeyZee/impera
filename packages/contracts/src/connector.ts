@@ -150,6 +150,7 @@ export type FanPpvStats = z.infer<typeof FanPpvStatsSchema>;
 
 /** A script's moment (☀️ / 🌙 in the platform's naming): the selling engine's « temps présent » rule reads it. */
 export const PlatformScriptMomentSchema = z.enum(['day', 'night']);
+export type PlatformScriptMoment = z.infer<typeof PlatformScriptMomentSchema>;
 
 /** One step of a platform script: its text, the media it sells, its previews and its price. */
 export const PlatformScriptStepSchema = z.object({

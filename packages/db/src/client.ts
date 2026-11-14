@@ -5,7 +5,7 @@ import {
   UserRoleSchema,
   type TeamScope,
 } from '@impera/contracts';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool, type PoolConfig } from 'pg';
 
@@ -159,6 +159,19 @@ export function withTenantMember<T>(
     },
     config,
   );
+}
+
+/**
+ * Whether the creator is on the person's own list (`user.creator_ids`): the rule that bounds an active manager to the
+ * creators he follows, for what reads her figures and her vault (ADR 0081 § 5, fiche vault-sync). Read in the caller's
+ * transaction; the scope (`owner` | `agency`) is the caller's to check.
+ */
+export async function onCreatorList(tx: Transaction, userId: string, creatorId: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(and(eq(schema.user.id, userId), sql`${creatorId}::uuid = any(${schema.user.creatorIds})`));
+  return row !== undefined;
 }
 
 /**
