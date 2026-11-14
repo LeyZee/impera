@@ -9,6 +9,7 @@ import {
   EVENT_TYPES,
   MessageAuthorSchema,
   MessageDirectionSchema,
+  SCRIPT_RUN_STATUSES,
   type ExternalMedia,
 } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
@@ -23,6 +24,7 @@ import {
   pgTable,
   text,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -81,6 +83,11 @@ export const conversations = pgTable(
     desireScore: integer('desire_score'),
     desireBand: enumText('desire_band'),
     desireAt: timestampTz('desire_at'),
+    /**
+     * The fan's availability and the session's gate before a script (`fan_availability_changed`, ADR 0103, amendement
+     * du 13/11), as the agent's code holds it: one record, read through its Zod schema. Null until first read.
+     */
+    fanAvailability: jsonb('fan_availability'),
     /**
      * The fan's card read in his messages (ADR 0085 § 7, `fans.read_card`): when it was last read, and the ingestion
      * time of the last of his messages it read. Null before the first read.
@@ -158,6 +165,48 @@ export const drafts = pgTable(
     check('drafts_placed_check', sql`(${t.placedBy} is null) = (${t.placedAt} is null)`),
     unique('drafts_idempotency_key_unique').on(t.idempotencyKey),
     index('drafts_conversation_idx').on(t.conversationId, t.createdAt.desc()),
+    tenantPolicy(t.creatorId),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * A script of her catalogue run with one fan (ADR 0098): where he is, step by step. Written by the agent in her
+ * tenant; never deleted. At most one open per conversation, and a script never runs twice with the same fan.
+ */
+export const scriptRuns = pgTable(
+  'script_runs',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => conversations.id),
+    /**
+     * The platform's script (`scriptRef`, ADR 0018 § 5): one plain column, no foreign key, so that it follows the script
+     * identity Médias settles (PR #708). What was sent of it is Reveal's history, never this table's.
+     */
+    scriptRef: text('script_ref').notNull(),
+    status: enumText('status').notNull().default('open'),
+    /** Its decision state per step (`ScriptRunStepsSchema`), reconciled with Reveal's history; the last is current. */
+    steps: jsonb('steps').notNull().default([]),
+    /** His messages in a row that ignore the paid step waiting: two make a refusal. */
+    ignoredMessages: integer('ignored_messages').notNull().default(0),
+    startedAt: timestampTz('started_at').notNull(),
+    endedAt: timestampTz('ended_at'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    enumCheck('script_runs', t.status, SCRIPT_RUN_STATUSES),
+    check('script_runs_steps_check', sql`jsonb_typeof(${t.steps}) = 'array'`),
+    check('script_runs_ignored_messages_check', sql`${t.ignoredMessages} >= 0`),
+    check('script_runs_ended_check', sql`(${t.status} = 'open') = (${t.endedAt} is null)`),
+    uniqueIndex('script_runs_open_unique')
+      .on(t.conversationId)
+      .where(sql`${t.status} = 'open'`),
+    index('script_runs_conversation_idx').on(t.conversationId, t.startedAt.desc()),
     tenantPolicy(t.creatorId),
     closedToCreator(),
   ],
