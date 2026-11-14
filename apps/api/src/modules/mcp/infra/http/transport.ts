@@ -17,11 +17,11 @@ import { MCP_CATALOGUE_VERSION } from '../../domain/catalogue';
 import type { GrantRecord } from '../../domain/ports';
 
 /** Requests to `/v1/mcp` from one address in a minute, good or bad (ADR 0026 § 8). */
-export const MCP_PER_ADDRESS_PER_MINUTE = 120;
+const MCP_PER_ADDRESS_PER_MINUTE = 120;
 /** Refused tokens from one address in a minute before it is refused outright, its counter shared (`security.md` §6). */
 export const MCP_FAILURES_PER_ADDRESS_PER_MINUTE = 10;
 /** Reads of one access in a minute (ADR 0026 § 8). */
-export const MCP_READS_PER_ACCESS_PER_MINUTE = 60;
+const MCP_READS_PER_ACCESS_PER_MINUTE = 60;
 /** A JSON-RPC message of the lot a carries a tool's name and a few identifiers: far under this. */
 const MCP_BODY_LIMIT_BYTES = 64 * 1024;
 

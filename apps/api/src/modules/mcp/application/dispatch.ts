@@ -6,7 +6,7 @@ import { MCP_CATALOGUE_VERSION, toolNamed, type McpToolSpec } from '../domain/ca
 import type { GrantRecord, McpJournal } from '../domain/ports';
 
 /** What a served tool is given: the access, the person as read for this call, the creator it is confined to. */
-export interface ToolContext {
+interface ToolContext {
   readonly grant: GrantRecord;
   readonly actor: ActorView;
   readonly creatorId: string | null;
@@ -24,13 +24,13 @@ export interface ServedTool {
 }
 
 /** A tool as `tools/list` gives it. */
-export interface ListedTool {
+interface ListedTool {
   readonly name: string;
   readonly description: string;
   readonly input: z.ZodType;
 }
 
-export interface McpCall {
+interface McpCall {
   readonly grant: GrantRecord;
   readonly actor: ActorView;
   readonly name: string;
@@ -39,7 +39,7 @@ export interface McpCall {
   readonly ip: string;
 }
 
-export type McpCallResult =
+type McpCallResult =
   { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly refusal: McpCallRefusal };
 
 export interface McpDispatcher {
