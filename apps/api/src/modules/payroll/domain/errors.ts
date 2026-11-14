@@ -99,6 +99,13 @@ export class PenaltyNotFound extends DomainError {
   }
 }
 
+/** Pay is read by the owner and the team's accounts, never a creator (`readsPay`). */
+export class PayReadForbidden extends DomainError {
+  constructor() {
+    super('role_forbidden', 'La paie se lit depuis un compte de l’agence');
+  }
+}
+
 /** One's own statement, bonus, penalty or adjustment: four eyes, a member never decides their own pay (ADR 0023 § Paie). */
 export class PayrollOwnForbidden extends DomainError {
   constructor() {
