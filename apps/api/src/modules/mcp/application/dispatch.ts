@@ -87,11 +87,13 @@ export function createDispatcher(deps: DispatcherDeps): McpDispatcher {
     list: (grant, actor) =>
       Object.entries(deps.tools).flatMap(([name, tool]) => {
         const spec = toolNamed(name);
-        // An owner-only tool is the owner's, on an access of the agency: listed to no one else, as `decideCall` refuses.
+        // An owner-only tool is the owner's, on an access of the agency, and an agency-only one is never listed on an
+        // access bound to a creator: listed to no one `decideCall` would refuse.
+        if (spec === undefined) return [];
         const listed =
-          spec !== undefined &&
-          (spec.ownerOnly !== true || (grant.creatorId === null && actor.role === 'owner'));
-        return spec !== undefined && listed && holds(grant, spec.capability)
+          (spec.ownerOnly !== true || (grant.creatorId === null && actor.role === 'owner')) &&
+          (spec.agencyOnly !== true || grant.creatorId === null);
+        return listed && holds(grant, spec.capability)
           ? [{ name, description: tool.description, input: tool.input }]
           : [];
       }),

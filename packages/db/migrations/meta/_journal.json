@@ -1027,7 +1027,14 @@
     {
       "idx": 146,
       "version": "7",
-      "when": 1794674337730,
+      "when": 1794673385087,
+      "tag": "0205_ai_budget_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1794676545646,
       "tag": "0206_platform_scripts",
       "breakpoints": true
     }

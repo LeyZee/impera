@@ -24,6 +24,7 @@ type Write = 'insert' | 'update' | 'delete';
  */
 const WRITES: Readonly<Record<string, readonly Write[]>> = {
   account: ['insert', 'update'],
+  ai_budget_settings: ['insert', 'update'],
   ai_credit_entries: ['insert', 'delete'],
   audit_log: ['insert'],
   calendar_links: ['insert', 'update'],

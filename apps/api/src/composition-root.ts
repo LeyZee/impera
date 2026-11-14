@@ -64,6 +64,7 @@ import { installSandboxGuard, sandboxOf, sdkBaseUrlsOf } from './sandbox';
 import { createSecuritySettingsRoutes } from './security-settings';
 import { wireAccounting } from './wiring/accounting';
 import { wireAgent } from './wiring/agent';
+import { wireAiBudget } from './wiring/ai-budget';
 import { wireAiUsage } from './wiring/ai-usage';
 import { wireAlerts } from './wiring/alerts';
 import { wireBackups } from './wiring/backups';
@@ -322,8 +323,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       logger.warn({ err: error }, 'llm_calls not written or not reloaded');
     },
   });
+  // The owner's AI budget, read before the gateway is built: its first call already uses it.
+  const aiBudget = await wireAiBudget(shared);
   const llm = createAppLlm({
     log: llmLog,
+    caps: aiBudget.module.caps,
     credentials: providers.module.apiKeySource,
     reportRefusedKey: (provider, kind) => providers.module.reportRefusedKey(provider, kind),
     publishBudget: (crossing) => publishBudgetThreshold(adminDb.db, crossing),
@@ -442,6 +446,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
     scheduling.module,
     aiUsage.module,
+    connectors.module,
   );
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
@@ -583,6 +588,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...backups.routes,
       ...rewards.routes,
       ...aiUsage.routes,
+      ...aiBudget.routes(llm),
       ...providers.routes,
       ...connectors.routes,
       ...supervision.routes,

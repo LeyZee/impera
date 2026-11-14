@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { AiUsageCapStateSchema } from './ai-usage';
 import { DropCategorySchema, DropStateSchema } from './content-drops';
-import { FactCategorySchema, StoredFactKindSchema } from './enums';
+import { FactCategorySchema, PlatformSchema, StoredFactKindSchema } from './enums';
 import { refusalBodySchema } from './errors';
 import { FanCardFieldSchema, FanCardSourceSchema } from './fan-card';
 import { FanFlagsSchema } from './fans';
@@ -425,6 +425,31 @@ export const McpShiftsListSchema = z.strictObject({
   ),
 });
 export type McpShiftsList = z.infer<typeof McpShiftsListSchema>;
+
+/** `team_import_list`'s input: the platform whose team is read, Reveal when none is named. */
+export const McpTeamImportInputSchema = z.strictObject({ platform: PlatformSchema.optional() });
+
+/**
+ * `team_import_list` (ADR 0076, ADR 0105 § 4, `read:team`, an access of the agency only): the chatter accounts of the
+ * platform as the agency linked them, to a member by name or to the agent, removed by the platform or not, and the
+ * counts of the last read. Never a platform account id, an amount nor a rate.
+ */
+export const McpTeamImportListSchema = z.strictObject({
+  platform: PlatformSchema,
+  accounts: z.array(
+    z.strictObject({
+      link: z.discriminatedUnion('kind', [
+        z.strictObject({ kind: z.literal('member'), memberId: TeamMemberIdSchema, memberName: z.string() }),
+        z.strictObject({ kind: z.literal('agent') }),
+      ]),
+      removed: z.boolean(),
+    }),
+  ),
+  newCount: z.number().int().nonnegative(),
+  removalCount: z.number().int().nonnegative(),
+  abnormalRead: z.boolean(),
+});
+export type McpTeamImportList = z.infer<typeof McpTeamImportListSchema>;
 
 const euros = z.number().nonnegative();
 

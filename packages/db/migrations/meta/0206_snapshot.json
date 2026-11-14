@@ -1,6 +1,6 @@
 {
-  "id": "df699900-0f85-42c0-871a-05ff504edb4f",
-  "prevId": "d1ceeb68-b70d-4e30-85b6-2cedbdc32916",
+  "id": "45854898-4196-4a02-b0e4-dc8a6418f024",
+  "prevId": "1d5507f3-3736-4473-9147-d3a9060c546d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7073,6 +7073,81 @@
         "invoices_dates_check": {
           "name": "invoices_dates_check",
           "value": "\"invoices\".\"due_on\" >= \"invoices\".\"issued_on\" and \"invoices\".\"acceptance_deadline\" > \"invoices\".\"issued_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.ai_budget_settings": {
+      "name": "ai_budget_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "daily_cap_minor": {
+          "name": "daily_cap_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trend_watch_cap_minor": {
+          "name": "trend_watch_cap_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ai_budget_settings_updated_by_user_id_fk": {
+          "name": "ai_budget_settings_updated_by_user_id_fk",
+          "tableFrom": "ai_budget_settings",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "agency_only": {
+          "name": "agency_only",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "ai_budget_settings_single_row_check": {
+          "name": "ai_budget_settings_single_row_check",
+          "value": "\"ai_budget_settings\".\"id\" = 1"
+        },
+        "ai_budget_settings_daily_cap_check": {
+          "name": "ai_budget_settings_daily_cap_check",
+          "value": "\"ai_budget_settings\".\"daily_cap_minor\" is null or \"ai_budget_settings\".\"daily_cap_minor\" between 100 and 20000"
+        },
+        "ai_budget_settings_trend_watch_cap_check": {
+          "name": "ai_budget_settings_trend_watch_cap_check",
+          "value": "\"ai_budget_settings\".\"trend_watch_cap_minor\" is null or \"ai_budget_settings\".\"trend_watch_cap_minor\" between 10 and 2000"
         }
       },
       "isRLSEnabled": false
