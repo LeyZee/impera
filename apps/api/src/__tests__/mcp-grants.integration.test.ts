@@ -74,6 +74,12 @@ describe('/v1/settings/mcp-grants', () => {
         flags: () => Promise.resolve({}),
         card: () => Promise.reject(new Error('no fan here')),
       },
+      content: {
+        drops: () => Promise.resolve({ drops: [], next: null }),
+        scripts: () => Promise.resolve([]),
+        scriptSteps: () => Promise.resolve(null),
+        queue: () => Promise.resolve(null),
+      },
     });
     nora = newId(CreatorIdSchema);
     await test.admin.db

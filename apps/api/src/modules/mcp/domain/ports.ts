@@ -1,4 +1,12 @@
-import type { CreatorId, FanId, McpCallRefusal, McpCapability, McpGrantId, UserId } from '@impera/contracts';
+import type {
+  CreatorId,
+  FanId,
+  McpCallRefusal,
+  McpCapability,
+  McpGrantId,
+  ScriptSegment,
+  UserId,
+} from '@impera/contracts';
 
 /** The owner at the screen, for what he does to his agent accesses (each gesture enters the audit log). */
 export interface McpOwner {
@@ -145,4 +153,68 @@ export interface FanReader {
   activeFacts(creatorId: CreatorId, fanId: FanId): Promise<readonly FanFactEntry[]>;
   flags(creatorId: CreatorId, fanId: FanId): Promise<unknown>;
   card(creatorId: CreatorId, fanId: FanId): Promise<CardEntry>;
+}
+
+/** Who reads her content, as `resolveActor` read him for this call: the content modules check it again (ADR 0026 § 1). */
+export interface ContentReaderView {
+  readonly userId: string;
+  readonly role: 'owner' | 'operator' | 'creator';
+}
+
+/** A drop of hers as `content-drops` digests it: never a medium, its key nor its address. */
+interface DropEntry {
+  readonly id: string;
+  readonly category: string;
+  readonly state: string;
+  readonly sentence: string | null;
+  readonly requestId: string | null;
+  readonly scriptNumber: number | null;
+  readonly files: Readonly<Record<'image' | 'video' | 'audio', number>>;
+  readonly createdAt: Date;
+}
+
+/** A script of hers as `content-drops` digests it. */
+interface ScriptEntry {
+  readonly dropId: string;
+  readonly scriptNumber: number | null;
+  readonly name: string | null;
+  readonly moment: string | null;
+  readonly stages: number;
+  readonly bridges: number;
+  readonly state: string;
+  readonly dueOn: string;
+  readonly exportedAt: Date | null;
+  readonly createdAt: Date;
+}
+
+/** A structure of her queue as `scripts` digests it. */
+interface QueueEntry {
+  readonly structureId: string;
+  readonly name: string;
+  readonly moment: string;
+  readonly stages: number;
+  readonly bridges: number;
+}
+
+/** The steps of a script of hers, its frozen version: segments as the contract types them (`ScriptSegment`). */
+interface StepsEntry {
+  readonly dropId: string;
+  readonly name: string;
+  readonly moment: string;
+  readonly segments: readonly ScriptSegment[];
+}
+
+/**
+ * The reads of her content (`content-drops` and `scripts`, by their `index.ts`, ADR 0026 § 1): each bounded by the
+ * creator the call is confined to, who reads checked again in their `application/`.
+ */
+export interface ContentReads {
+  drops(
+    creatorId: CreatorId,
+    reader: ContentReaderView,
+    page: { readonly after: string | null; readonly limit?: number },
+  ): Promise<{ readonly drops: readonly DropEntry[]; readonly next: string | null }>;
+  scripts(creatorId: CreatorId, reader: ContentReaderView): Promise<readonly ScriptEntry[]>;
+  scriptSteps(creatorId: CreatorId, reader: ContentReaderView, dropId: string): Promise<StepsEntry | null>;
+  queue(creatorId: CreatorId, reader: ContentReaderView): Promise<readonly QueueEntry[] | null>;
 }

@@ -1,10 +1,23 @@
 import { z } from 'zod';
 
+import { DropCategorySchema, DropStateSchema } from './content-drops';
 import { FactCategorySchema, StoredFactKindSchema } from './enums';
 import { refusalBodySchema } from './errors';
 import { FanCardFieldSchema, FanCardSourceSchema } from './fan-card';
 import { FanFlagsSchema } from './fans';
-import { CreatorIdSchema, FanIdSchema, McpGrantIdSchema } from './ids';
+import {
+  ContentDropIdSchema,
+  ContentRequestIdSchema,
+  CreatorIdSchema,
+  FanIdSchema,
+  McpGrantIdSchema,
+} from './ids';
+import {
+  ScriptMomentSchema,
+  ScriptStageAccessSchema,
+  ScriptStructureIdSchema,
+  ScriptVariantLetterSchema,
+} from './scripts';
 
 /**
  * The MCP server (ADR 0026, amended by ADR 0105): what an agent access may be granted. A closed list in code; the
@@ -47,6 +60,10 @@ export const McpUntrustedKindSchema = z.enum([
   'fan_card',
   'fan_name',
   'draft',
+  /** What a creator wrote with a drop of hers. */
+  'creator_sentence',
+  /** A script's words, written by the agency in the owner's workshop: free text all the same. */
+  'script_text',
 ]);
 export type McpUntrustedKind = z.infer<typeof McpUntrustedKindSchema>;
 
@@ -220,3 +237,134 @@ export const McpFanCardGetSchema = z.strictObject({
     .nullable(),
 });
 export type McpFanCardGet = z.infer<typeof McpFanCardGetSchema>;
+
+/** The input of a tool on one creator's content: the creator when the call names one (the access's otherwise). */
+export const McpCreatorInputSchema = z.strictObject({ creatorId: CreatorIdSchema.optional() });
+
+/** `drops_list`'s input: a page of 50 at most, after the last drop of the page before. */
+export const McpDropsInputSchema = z.strictObject({
+  creatorId: CreatorIdSchema.optional(),
+  after: ContentDropIdSchema.optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+
+/**
+ * `drops_list` (ADR 0105 § 4, `read:media`): her drops, newest first, what they are and where they stand, how many
+ * files of each kind. Her sentence in an `untrusted` field; never a medium, its key nor its address.
+ */
+export const McpDropsListSchema = z.strictObject({
+  drops: z.array(
+    z.strictObject({
+      id: ContentDropIdSchema,
+      category: DropCategorySchema,
+      state: DropStateSchema,
+      sentence: untrustedOf('creator_sentence').nullable(),
+      requestId: ContentRequestIdSchema.nullable(),
+      scriptNumber: z.number().int().nonnegative().nullable(),
+      files: z.strictObject({
+        image: z.number().int().nonnegative(),
+        video: z.number().int().nonnegative(),
+        audio: z.number().int().nonnegative(),
+      }),
+      createdAt: z.iso.datetime(),
+    }),
+  ),
+  /** The `after` of the next page; `null` on the last. */
+  next: ContentDropIdSchema.nullable(),
+});
+export type McpDropsList = z.infer<typeof McpDropsListSchema>;
+
+const McpScriptSizeShape = {
+  moment: ScriptMomentSchema,
+  stages: z.number().int().nonnegative(),
+  bridges: z.number().int().nonnegative(),
+};
+
+/**
+ * `scripts_list` (ADR 0105 § 4, `read:media`): her scripts asked and dropped, newest first, then the structures her
+ * queue holds, in order. Names in `untrusted` fields; never a step's text (`script_steps_get`), never a price.
+ */
+export const McpScriptsListSchema = z.strictObject({
+  scripts: z.array(
+    z.strictObject({
+      dropId: ContentDropIdSchema,
+      number: z.number().int().nonnegative().nullable(),
+      name: untrustedOf('script_text').nullable(),
+      moment: ScriptMomentSchema.nullable(),
+      stages: z.number().int().nonnegative(),
+      bridges: z.number().int().nonnegative(),
+      state: DropStateSchema,
+      dueOn: z.iso.date(),
+      exportedAt: z.iso.datetime().nullable(),
+      createdAt: z.iso.datetime(),
+    }),
+  ),
+  /** `null` when the reader may not read her queue. */
+  queue: z
+    .array(
+      z.strictObject({
+        structureId: ScriptStructureIdSchema,
+        name: untrustedOf('script_text'),
+        ...McpScriptSizeShape,
+      }),
+    )
+    .nullable(),
+});
+export type McpScriptsList = z.infer<typeof McpScriptsListSchema>;
+
+/** `script_steps_get`'s input: a script drop of hers. */
+export const McpScriptStepsInputSchema = z.strictObject({
+  dropId: ContentDropIdSchema,
+  creatorId: CreatorIdSchema.optional(),
+});
+
+const scriptText = untrustedOf('script_text');
+
+/** A frame to fill: its kind, whether it may be left out, its lengths; its hint in an `untrusted` field. */
+const McpMediaSlotSchema = z.strictObject({
+  kind: z.enum(['image', 'video', 'audio']),
+  optional: z.boolean(),
+  hint: scriptText.nullable(),
+  minSeconds: z.number().int().positive().nullable(),
+  maxSeconds: z.number().int().positive().nullable(),
+});
+
+/**
+ * `script_steps_get` (ADR 0105 § 4, `read:script_content`, ticked on the owner's access only): the steps of a script of
+ * hers, its frozen version. Every word in an `untrusted` field; offered or paid, never a price. `null` for a drop that
+ * is not a script of hers.
+ */
+export const McpScriptStepsGetSchema = z.strictObject({
+  script: z
+    .strictObject({
+      dropId: ContentDropIdSchema,
+      name: scriptText,
+      moment: ScriptMomentSchema,
+      segments: z.array(
+        z.discriminatedUnion('kind', [
+          z.strictObject({
+            kind: z.literal('stage'),
+            key: scriptText,
+            name: scriptText,
+            intention: scriptText,
+            access: ScriptStageAccessSchema,
+            mood: scriptText.nullable(),
+            outfit: scriptText.nullable(),
+            place: scriptText.nullable(),
+            mediaSlots: z.array(McpMediaSlotSchema),
+            variants: z.array(z.strictObject({ letter: ScriptVariantLetterSchema, hint: scriptText })),
+          }),
+          z.strictObject({
+            kind: z.literal('bridge'),
+            key: scriptText,
+            from: scriptText,
+            to: scriptText,
+            teaser: scriptText,
+            mediaSlots: z.array(McpMediaSlotSchema),
+          }),
+        ]),
+      ),
+    })
+    .nullable(),
+});
+export type McpScriptStepsGet = z.infer<typeof McpScriptStepsGetSchema>;
