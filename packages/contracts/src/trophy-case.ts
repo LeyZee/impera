@@ -68,7 +68,8 @@ export const TrophyCaseSchema = z.object({
   items: z.array(TrophyCaseItemSchema),
   streaks: z.array(TrophyCaseStreakSchema),
   level: TrophyCaseLevelSchema.nullable(),
-  nextLevel: TrophyCaseNextLevelSchema.nullable().default(null),
+  /** Left out by a module that has no levels (the creator's badges) and by a read of someone else's case. */
+  nextLevel: TrophyCaseNextLevelSchema.nullable().optional(),
 });
 export type TrophyCase = z.infer<typeof TrophyCaseSchema>;
 

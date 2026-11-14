@@ -35,6 +35,7 @@ import {
   periodLineFrom,
   signedAmountText,
 } from '@/reports/model';
+import { LevelsPanel } from '@/rewards/LevelsPanel';
 import '@/scheduling/scheduling.css';
 import { longDay } from '@/scheduling/time';
 import '@/screens/team/team.css';
@@ -259,6 +260,8 @@ export function GoalsPage({
             setEditing({ kind: 'tiers' });
           }}
         />
+        {/* The chatters' ranks: honorary, the owner's setting alone (ADR 0104 § 16). */}
+        {owner ? <LevelsPanel /> : null}
       </div>
       {editing?.kind === 'goal' ? (
         <GoalDialog
