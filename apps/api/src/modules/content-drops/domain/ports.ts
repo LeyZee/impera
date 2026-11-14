@@ -372,6 +372,31 @@ export interface AgencyContentStore {
    * its audit line; her originals of it go 30 days later (ADR 0044 § 2). Refused like `sentDrop`.
    */
   confirmDropExport(creatorId: string, userId: string, dropId: string, now: Date): Promise<ContentDrop>;
+  /**
+   * Her drops not withdrawn, newest first, at most `limit`, after the drop `after` when given (ADR 0026 § 1, MCP): a drop
+   * `after` she does not have gives none.
+   */
+  dropsPage(
+    creatorId: string,
+    userId: string,
+    after: string | null,
+    limit: number,
+  ): Promise<readonly ContentDrop[]>;
+  /** Her scripts asked and dropped (not withdrawn), newest first, each with what its request fixed (ADR 0026 § 1, MCP). */
+  scriptDrops(creatorId: string, userId: string): Promise<readonly ScriptDropEntry[]>;
+}
+
+/** A script drop of hers and its request: the frozen version it shoots, the moment and the day the request fixed. */
+export interface ScriptDropEntry {
+  readonly dropId: string;
+  readonly scriptNumber: number | null;
+  readonly state: DropState;
+  readonly exportedAt: Date | null;
+  readonly createdAt: Date;
+  readonly dueOn: string;
+  /** `null` for a script asked before SC-02 lot b, which names no frozen version. */
+  readonly versionId: string | null;
+  readonly moment: ShotMoment | null;
 }
 
 /** A sent script's facts for its archive (SC-03 c). */

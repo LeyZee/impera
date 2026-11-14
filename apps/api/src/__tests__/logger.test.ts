@@ -1,5 +1,6 @@
 import { Writable } from 'node:stream';
 
+import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -115,5 +116,22 @@ describe('logged errors (relecture #584): name, message and code, never someone�
       maxAttempts: 3,
     });
     expect(failed?.['error']).toMatchObject({ code: '23505' });
+  });
+});
+
+describe('logged requests (relecture #746): the MCP server’s door without its query', () => {
+  it('writes /v1/mcp without what follows « ? », and keeps the query elsewhere', async () => {
+    const { logger, lines } = memoryLogger();
+    const app = Fastify({ loggerInstance: logger });
+    app.post('/v1/mcp', () => ({}));
+    app.get('/v1/other', () => ({}));
+    await app.inject({ method: 'POST', url: '/v1/mcp?access_token=impmcp_inventé', payload: {} });
+    await app.inject({ method: 'GET', url: '/v1/other?page=2' });
+    await app.close();
+    const urls = lines()
+      .map((line) => LineSchema.safeParse(line['req']))
+      .flatMap((req) => (req.success ? [req.data['url']] : []));
+    expect(urls).toEqual(['/v1/mcp', '/v1/other?page=2']);
+    expect(JSON.stringify(lines())).not.toContain('impmcp_');
   });
 });
