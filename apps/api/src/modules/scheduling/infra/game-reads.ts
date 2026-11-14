@@ -56,13 +56,13 @@ const ChallengeRowSchema = z.object({ starts_at: instant, ends_at: instant });
  * oldest first, on every creator, cancelled ones left out. Read only; the caller's connection decides whose shifts
  * can be read (the member's own under row-level security).
  */
-export async function shiftsForChallengeUnscoped(
+export async function shiftsForChallenge(
   tx: Transaction,
   memberId: TeamMemberId,
   now: Date,
 ): Promise<ShiftForChallenge[]> {
   const result = await tx.execute(sql`
-    select s.starts_at, coalesce(s.stopped_at, s.ends_at) as ends_at
+    select s.starts_at, s.ends_at
     from shifts s
     where s.member_id = ${memberId} and s.cancelled_at is null
       and s.starts_at <= ${now.toISOString()}::timestamptz

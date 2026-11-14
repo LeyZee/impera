@@ -360,7 +360,7 @@
 }
 
 /* A gain that waits while its chatter is elsewhere: a pill above the tab bar on a phone, where the offline pill
-   sits, and in the top corner of a computer; never over what the page shows. Still: a fade, no sound. */
+   sits, and in the top margin of a computer; never over what the page shows. Still: a fade, no sound. */
 .rw-owed-region {
   position: fixed;
   z-index: 27;
@@ -408,10 +408,13 @@
 }
 @media (min-width: 821px) {
   .rw-owed.nv-glass {
+    /* In the margin above a page's header: a page's own tabs and actions start lower, and a pill never covers a
+       control. */
     left: auto;
     right: 24px;
-    top: 20px;
+    top: 6px;
     bottom: auto;
+    padding: 3px 3px 3px 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
