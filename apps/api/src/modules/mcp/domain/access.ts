@@ -40,7 +40,7 @@ type McpRefusal =
   | 'creator_required'
   /** Another creator than the access's, or one the person may no longer read. */
   | 'creator_forbidden'
-  /** The person's role and team scope never open this capability or this tool (ADR 0023, ADR 0026 § 3). */
+  /** The person's role and team scope never open this capability (ADR 0023, ADR 0026 § 3). */
   | 'role_forbidden';
 
 export type McpDecision =
@@ -48,7 +48,8 @@ export type McpDecision =
       readonly ok: true;
       /**
        * The creator the call is confined to: the access's, on a tool of the agency too, where the dispatcher keeps only
-       * what concerns her. `null` only for an access without a creator, read within the person's team scope.
+       * what concerns her, checked like on a tool of hers. `null` only for an access without a creator, read within the
+       * person's team scope.
        */
       readonly creatorId: string | null;
     }
@@ -58,10 +59,10 @@ type Person = Pick<ActorView, 'role' | 'teamScope'>;
 
 /**
  * What each role and team scope may ever hold, the rest refused (an allow-list, never a deny-list). The owner holds
- * all; an active manager all but the owner's own, the pay and the drops; a chatter nothing until the access bound to
- * his shift (ADR 0025, ADR 0026 § 3); a creator her routine, her revenue, who is on shift, her media, her tasks and her
- * drops, never a conversation, a fan nor the team's pay (ADR 0023, ADR 0105 § 4 bis). A pair absent from the table
- * opens nothing.
+ * all; an active manager all but the owner's own, the pay and the drops. A chatter nothing until the access bound to
+ * his shift (ADR 0025, ADR 0026 § 3); a creator nothing either, for now: the agency's tools of `read:status` still show
+ * fans and conversations, which ADR 0023 closes to her, and her agent is an access in the owner's name bound to her, so
+ * nothing is lost (ADR 0026 § 3). A pair absent from the table opens nothing.
  */
 const ALLOWED: Readonly<Record<string, readonly McpCapability[]>> = {
   'owner:owner': MCP_CAPABILITIES,
@@ -69,22 +70,11 @@ const ALLOWED: Readonly<Record<string, readonly McpCapability[]>> = {
     (c) => !MCP_OWNER_ONLY_CAPABILITIES.includes(c) && c !== 'read:payroll' && c !== 'write:drops',
   ),
   'operator:self': [],
-  'creator:self': ['read:status', 'read:team', 'read:sales', 'read:media', 'write:tasks', 'write:drops'],
+  'creator:self': [],
 };
 
 const allowedFor = (person: Person): readonly McpCapability[] =>
   ALLOWED[`${person.role}:${person.teamScope}`] ?? [];
-
-/**
- * Tools of a capability a creator holds that still reach the team's work or pay: ADR 0023 shows her who is on shift
- * and her own revenue, never a chatter's sales, reports or statements.
- */
-const CREATOR_NEVER_CALLS: readonly string[] = [
-  'sales_by_chatter',
-  'shift_reports_list',
-  'team_import_list',
-  'commission_statements_list',
-];
 
 const refuse = (refusal: McpRefusal): McpDecision => ({ ok: false, refusal });
 
@@ -106,9 +96,12 @@ export function decideCall(
       return refuse('owner_only');
     if (!allowedFor(actor).includes(capability)) return refuse('role_forbidden');
   }
-  if (actor.role === 'creator' && CREATOR_NEVER_CALLS.includes(tool.name)) return refuse('role_forbidden');
-  if (tool.scope !== 'creator') return { ok: true, creatorId: grant.creatorId };
-  if (grant.creatorId === null) return refuse('creator_required');
+  if (tool.scope === 'access') return { ok: true, creatorId: grant.creatorId };
+  if (grant.creatorId === null) {
+    if (tool.scope === 'creator') return refuse('creator_required');
+    return namedCreatorId === undefined ? { ok: true, creatorId: null } : refuse('creator_forbidden');
+  }
+  // An access bound to a creator stays bound on a tool of the agency too, and only while the person still reads her.
   const creatorId = namedCreatorId ?? grant.creatorId;
   if (creatorId !== grant.creatorId) return refuse('creator_forbidden');
   const readable = actor.readableCreatorIds === 'all' || actor.readableCreatorIds.includes(creatorId);

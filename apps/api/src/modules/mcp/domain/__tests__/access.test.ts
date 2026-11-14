@@ -131,45 +131,38 @@ describe('decideCall (ADR 0026 § 4, ADR 0105 § 1)', () => {
     });
   });
 
-  it("never lets a creator's own account read a conversation or a fan (ADR 0023)", () => {
-    expect(decideCall(tool('fan_get'), grant(['read:fans']), creator)).toEqual({
-      ok: false,
-      refusal: 'role_forbidden',
-    });
-    expect(decideCall(tool('conversation_messages'), grant(['read:conversation_content']), creator)).toEqual({
-      ok: false,
-      refusal: 'role_forbidden',
-    });
-    expect(decideCall(tool('drops_list'), grant(['read:media']), creator)).toEqual({
-      ok: true,
-      creatorId: A,
-    });
-  });
-
-  it.each([
-    ['sales_by_chatter', 'read:sales'],
-    ['shift_reports_list', 'read:team'],
-    ['team_import_list', 'read:team'],
-    ['commission_statements_list', 'read:payroll'],
-  ] as const)(
-    "never lets a creator's own account call %s, the team's work or pay (ADR 0023)",
-    (name, capability) => {
+  it("opens nothing to a creator's own account for now: her agent is an access in the owner's name (ADR 0023)", () => {
+    for (const [name, capability] of [
+      ['fan_get', 'read:fans'],
+      ['conversation_messages', 'read:conversation_content'],
+      ['stats_get', 'read:status'],
+      ['drops_list', 'read:media'],
+      ['sales_by_chatter', 'read:sales'],
+      ['commission_statements_list', 'read:payroll'],
+    ] as const)
       expect(decideCall(tool(name), grant([capability]), creator)).toEqual({
         ok: false,
         refusal: 'role_forbidden',
       });
-      expect(decideCall(tool(name), grant([capability]), owner)).toEqual({ ok: true, creatorId: A });
-    },
-  );
+    expect(decideCall(tool('whoami'), grant([]), creator)).toEqual({ ok: true, creatorId: A });
+  });
 
-  it('still tells a creator who is on shift, and her own sales (ADR 0023)', () => {
-    expect(decideCall(tool('on_shift_now'), grant(['read:team']), creator)).toEqual({
-      ok: true,
-      creatorId: A,
+  it("refuses a tool of the agency that names another creator than the access's", () => {
+    expect(decideCall(tool('sales_list'), grant(['read:sales'], A), owner, B)).toEqual({
+      ok: false,
+      refusal: 'creator_forbidden',
     });
-    expect(decideCall(tool('sales_list'), grant(['read:sales']), creator)).toEqual({
-      ok: true,
-      creatorId: A,
+    expect(decideCall(tool('sales_list'), grant(['read:sales'], null), owner, B)).toEqual({
+      ok: false,
+      refusal: 'creator_forbidden',
+    });
+  });
+
+  it("refuses a tool of the agency once the person no longer reads the access's creator", () => {
+    const moved: ActorView = { ...manager, readableCreatorIds: [B] };
+    expect(decideCall(tool('stats_get'), grant(['read:status'], A), moved)).toEqual({
+      ok: false,
+      refusal: 'creator_forbidden',
     });
   });
 });
@@ -189,6 +182,7 @@ describe('grantProblems', () => {
     expect(grantProblems(['read:status'], { role: 'operator', teamScope: 'self' })).toEqual([
       'role_forbidden',
     ]);
-    expect(grantProblems(['read:status', 'read:media', 'write:drops'], creator)).toEqual([]);
+    expect(grantProblems(['read:media'], creator)).toEqual(['role_forbidden']);
+    expect(grantProblems(['read:status', 'read:sales'], manager)).toEqual([]);
   });
 });
