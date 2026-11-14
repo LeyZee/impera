@@ -995,6 +995,27 @@
       "when": 1794625630128,
       "tag": "0193_mcp_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 142,
+      "version": "7",
+      "when": 1794631933168,
+      "tag": "0194_rewards_game",
+      "breakpoints": true
+    },
+    {
+      "idx": 143,
+      "version": "7",
+      "when": 1794659979888,
+      "tag": "0195_script_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1794664516634,
+      "tag": "0200_media_platform_refs",
+      "breakpoints": true
     }
   ]
 }

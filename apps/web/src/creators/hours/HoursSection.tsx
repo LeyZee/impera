@@ -218,7 +218,7 @@ function HoursForm({
   };
 
   return (
-    <section className="ps-page">
+    <section className="ps-page hr-page">
       <div className="nv-plate ps-head" ref={headRef}>
         <div className="ps-head__top">
           <div className="ps-head__who">

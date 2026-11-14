@@ -146,6 +146,12 @@ export function wireConnectors(
         logger,
         (payload, context) => module.jobs.copyAvatar(payload, context.logger),
       ),
+      'connector.vault_sync': defineTask(
+        'connector.vault_sync',
+        JOB_PAYLOADS['connector.vault_sync'],
+        logger,
+        (payload, context) => module.jobs.vaultSync(payload, context.logger),
+      ),
     },
     routes: [
       module.routes,
@@ -157,6 +163,7 @@ export function wireConnectors(
       }),
       module.salesFeedDeliveryRoutes,
       module.avatarRoutes(requireRole('owner', 'operator', 'creator')),
+      module.vaultRoutes({ teamGuard: requireRole('owner', 'operator'), ownerGuard: requireRole('owner') }),
     ],
   };
 }
