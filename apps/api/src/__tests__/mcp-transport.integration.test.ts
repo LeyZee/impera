@@ -411,7 +411,12 @@ describe('/v1/mcp', () => {
     const listed = RpcSchema.parse(
       (await rpc(agency.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
     );
-    expect(listed.result?.tools?.map((tool) => tool.name)).toEqual(['whoami', 'shifts_list', 'on_shift_now']);
+    expect(listed.result?.tools?.map((tool) => tool.name)).toEqual([
+      'whoami',
+      'shifts_list',
+      'on_shift_now',
+      'team_import_list',
+    ]);
     const all = RpcSchema.parse((await rpc(agency.token, callTool('on_shift_now'))).json());
     expect(all.result?.structuredContent).toEqual({ onShift: [] });
     const bound = await createGrant({ capabilities: ['read:team'] });
@@ -442,6 +447,24 @@ describe('/v1/mcp', () => {
       (await rpc(bound.token, callTool('shifts_list', { ...week, creatorId: lea }))).json(),
     );
     expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+  });
+  it('gives the team imported from the platform to an access of the agency, never to one bound to a creator', async () => {
+    const agency = await createGrant({ capabilities: ['read:team'], creatorId: null });
+    const team = RpcSchema.parse((await rpc(agency.token, callTool('team_import_list'))).json());
+    expect(team.result?.structuredContent).toEqual({
+      platform: 'reveal',
+      accounts: [],
+      newCount: 0,
+      removalCount: 0,
+      abnormalRead: false,
+    });
+    const bound = await createGrant({ capabilities: ['read:team'] });
+    const listed = RpcSchema.parse(
+      (await rpc(bound.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
+    );
+    expect(listed.result?.tools?.map((tool) => tool.name)).toEqual(['whoami', 'shifts_list', 'on_shift_now']);
+    const refused = RpcSchema.parse((await rpc(bound.token, callTool('team_import_list'))).json());
+    expect(refused.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
   });
   it('refuses the steps of a script to an access without read:script_content, even with read:media', async () => {
     const grant = await createGrant({ capabilities: ['read:media'] });

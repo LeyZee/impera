@@ -17,6 +17,7 @@ import type {
   FanReader,
   GrantRecord,
   ShiftReader,
+  TeamImportReader,
 } from './domain/ports';
 import { createDrizzleGrantStore } from './infra/db/grant-store';
 import { createDrizzleJournal } from './infra/db/journal';
@@ -58,8 +59,10 @@ export interface McpDeps {
   readonly fans: FanReader;
   /** Her drops and scripts (`content-drops`, `scripts`), for `drops_list`, `scripts_list` and `script_steps_get`. */
   readonly content: ContentReads;
-  /** Who is on shift (`scheduling.reads.onShiftNow`), for `on_shift_now`. */
+  /** The planning (`scheduling.reads.shifts`, `reads.onShiftNow`), for `shifts_list` and `on_shift_now`. */
   readonly shifts: ShiftReader;
+  /** The team imported from a platform (`connectors.reads.teamImport`), for `team_import_list`. */
+  readonly teamImport: TeamImportReader;
   /** The AI spend (`ai-usage`), for `ai_usage_get`, the owner's alone. */
   readonly aiUsage: AiUsageReader;
 }
@@ -88,7 +91,7 @@ export function createMcpModule(deps: McpDeps): McpModule {
               ...creatorTools(deps.creators),
               ...fanTools(deps.fans),
               ...contentTools(deps.content),
-              ...teamTools(deps.shifts),
+              ...teamTools(deps.shifts, deps.teamImport),
               ...statusTools(deps.aiUsage),
             },
           }),

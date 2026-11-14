@@ -5,7 +5,9 @@ import type {
   McpCallRefusal,
   McpCapability,
   McpGrantId,
+  Platform,
   ScriptSegment,
+  TeamImportLinked,
   UserId,
 } from '@impera/contracts';
 
@@ -260,4 +262,12 @@ export interface ShiftReader {
 /** The AI spend as `ai-usage` reads it for the screen (`AiUsage`, its `index.ts`): agency-wide, the owner's alone. */
 export interface AiUsageReader {
   read(): Promise<AiUsage>;
+}
+
+/**
+ * The team imported from a platform as the connectors read it for the person (`reads.teamImport`, its `index.ts`,
+ * ADR 0076 § 8): the owner's and an active manager's, the agency's as a whole.
+ */
+export interface TeamImportReader {
+  teamImport(userId: string, platform: Platform): Promise<TeamImportLinked>;
 }
