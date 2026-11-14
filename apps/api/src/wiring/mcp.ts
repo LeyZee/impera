@@ -70,6 +70,12 @@ export function wireMcp(
       queue: (creatorId, reader) => content.scripts.reads.queue(creatorId, reader),
     },
     shifts: {
+      shifts: (reader, creators, range) =>
+        scheduling.reads.shifts(
+          { userId: UserIdSchema.parse(reader.userId), role: reader.role },
+          creators,
+          range,
+        ),
       onShiftNow: (reader, creators, at) =>
         scheduling.reads.onShiftNow(
           { userId: UserIdSchema.parse(reader.userId), role: reader.role },

@@ -51,7 +51,7 @@ type McpCallResult =
 
 export interface McpDispatcher {
   /** The served tools this access holds the capability of; the call still decides on everything else. */
-  list(grant: GrantRecord): readonly ListedTool[];
+  list(grant: GrantRecord, actor: ActorView): readonly ListedTool[];
   call(call: McpCall): Promise<McpCallResult>;
 }
 
@@ -84,11 +84,13 @@ export function createDispatcher(deps: DispatcherDeps): McpDispatcher {
   };
 
   return {
-    list: (grant) =>
+    list: (grant, actor) =>
       Object.entries(deps.tools).flatMap(([name, tool]) => {
         const spec = toolNamed(name);
-        // An owner-only tool is for an access of the agency: one bound to a creator never sees it listed.
-        const listed = spec !== undefined && (spec.ownerOnly !== true || grant.creatorId === null);
+        // An owner-only tool is the owner's, on an access of the agency: listed to no one else, as `decideCall` refuses.
+        const listed =
+          spec !== undefined &&
+          (spec.ownerOnly !== true || (grant.creatorId === null && actor.role === 'owner'));
         return spec !== undefined && listed && holds(grant, spec.capability)
           ? [{ name, description: tool.description, input: tool.input }]
           : [];

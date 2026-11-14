@@ -229,11 +229,27 @@ interface OnShiftEntry {
   readonly endsAt: string;
 }
 
+/** A shift of the planning, as `scheduling` reads it for its person (`ListedShift`); its account is never copied. */
+interface ShiftEntry {
+  readonly id: string;
+  readonly creatorId: string;
+  readonly memberId: string;
+  readonly memberName: string | null;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly stopped: boolean;
+}
+
 /**
- * The scheduling module's read of who is on shift (`reads.onShiftNow`, its `index.ts`, ADR 0026 § 1): as the person,
- * under the database's policies (a manager, only what he plans); a creator out of reach gives nothing.
+ * The scheduling module's reads of the planning (`reads.shifts`, `reads.onShiftNow`, its `index.ts`, ADR 0026 § 1):
+ * as the person, under the database's policies (a manager, only what he plans); a creator out of reach gives nothing.
  */
 export interface ShiftReader {
+  shifts(
+    reader: ContentReaderView,
+    creators: 'all' | readonly string[],
+    range: { readonly from: Date; readonly to: Date },
+  ): Promise<readonly ShiftEntry[]>;
   onShiftNow(
     reader: ContentReaderView,
     creators: 'all' | readonly string[],
