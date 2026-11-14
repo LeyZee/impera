@@ -80,6 +80,8 @@ export type { SchedulingReads } from './application/team-reads';
 export type { ListedShift } from './application/team-reads';
 /** @public A report as that door reads it, without a text a person wrote. */
 export type { ListedShiftReport } from './application/team-reads';
+/** @public Who is on shift at a moment, as that door reads it: by name, never the account nor the margin. */
+export type { OnShiftNow } from './application/team-reads';
 /** @public The person such a read is for. */
 export type { ScheduleReader } from './application/team-reads';
 /** @public The creators such a read is confined to. */
@@ -97,12 +99,13 @@ export interface SchedulingModule {
   /**
    * `onShift` (contract `scheduling.ts`): who is on shift on the creator's accounts at `at`, without the margin, read
    * from the database at each call. For the routing of a « sale » handover (EQ-13), which never goes to a chatter who
-   * is only in their margin.
+   * is only in their margin. Read as the system, for whoever asks: another door reads `reads.onShiftNow`, as the person.
    */
   onShift(creatorId: CreatorId, at: Date): Promise<OnShift[]>;
   /**
-   * The shifts and the reports for a door other than the routes (ADR 0026 § 1, the MCP): as the person, under the same
-   * policies as the screen, confined to the creators named, never a creator's account (`role_forbidden`). Read only.
+   * The shifts, the reports and who is on shift now for a door other than the routes (ADR 0026 § 1, the MCP): as the
+   * person, under the same policies as the screen, confined to the creators named, never a creator's account
+   * (`role_forbidden`). Read only.
    */
   readonly reads: SchedulingReads;
   /**

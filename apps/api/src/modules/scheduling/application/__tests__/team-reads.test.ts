@@ -72,13 +72,15 @@ const planningRead = (patch: Partial<PlanningRead>): PlanningRead => ({
 /** The planning's store in memory: what it was asked, and what it answers. */
 function planningStore(answer: PlanningRead) {
   const asked: { actor: string; creatorIds: readonly CreatorId[] }[] = [];
+  const ranges: { from: Date; to: Date }[] = [];
   const store: Pick<PlanningStore, 'read'> = {
-    read: (actor, creatorIds) => {
+    read: (actor, creatorIds, range) => {
       asked.push({ actor, creatorIds });
+      ranges.push({ from: range.from, to: range.to });
       return Promise.resolve(answer);
     },
   };
-  return { asked, store };
+  return { asked, ranges, store };
 }
 
 const report = (patch: Partial<StoredShiftReport>): StoredShiftReport => ({
@@ -136,6 +138,9 @@ describe('createSchedulingReads (ADR 0026 § 1)', () => {
     const creator: ScheduleReader = { userId: owner.userId, role: 'creator' };
     await expect(reads.shifts(creator, 'all', range)).rejects.toMatchObject({ code: 'role_forbidden' });
     await expect(reads.shiftReports(creator, 'all', P1)).rejects.toMatchObject({ code: 'role_forbidden' });
+    await expect(reads.onShiftNow(creator, 'all', range.from)).rejects.toMatchObject({
+      code: 'role_forbidden',
+    });
     expect(planning.asked).toEqual([]);
     expect(reports.asked).toEqual([]);
   });
@@ -238,5 +243,60 @@ describe('createSchedulingReads (ADR 0026 § 1)', () => {
     });
     const text = JSON.stringify(read);
     for (const written of ['écran', 'incident', 'refus', 'explication']) expect(text).not.toContain(written);
+  });
+
+  it('reads who is on shift at an instant: the start included, the end excluded, active members only', async () => {
+    const at = new Date('2026-11-02T10:00:00Z');
+    const covering = shift({});
+    const starting = shift({
+      memberId: lou,
+      startsAt: at,
+      endsAt: new Date('2026-11-02T14:00:00Z'),
+    });
+    const ended = shift({ startsAt: new Date('2026-11-02T06:00:00Z'), endsAt: at });
+    const stopped = shift({
+      memberId: lou,
+      endsAt: new Date('2026-11-02T09:30:00Z'),
+      stoppedAt: new Date('2026-11-02T09:30:00Z'),
+    });
+    const onLeave = newId(TeamMemberIdSchema);
+    const away = shift({ memberId: onLeave });
+    const hidden = shift({ memberId: newId(TeamMemberIdSchema) });
+    const elsewhere = shift({ creatorId: bea, platformAccountId: beas });
+    const planning = planningStore(
+      planningRead({
+        scope: 'agency',
+        planned: new Set([anna]),
+        shifts: [starting, ended, stopped, away, hidden, elsewhere, covering],
+        members: [
+          { id: theo, displayName: 'Théo', color: null, status: 'active' },
+          { id: lou, displayName: 'Lou', color: null, status: 'active' },
+          { id: onLeave, displayName: 'Nina', color: null, status: 'on_leave' },
+        ],
+      }),
+    );
+    const reads = createSchedulingReads(planning.store, noReports, directory);
+    const manager: ScheduleReader = { userId: newId(UserIdSchema), role: 'operator' };
+    expect(await reads.onShiftNow(manager, [anna, bea], at)).toEqual([
+      {
+        shiftId: covering.id,
+        creatorId: anna,
+        memberId: theo,
+        memberName: 'Théo',
+        endsAt: '2026-11-02T12:00:00.000Z',
+      },
+      {
+        shiftId: starting.id,
+        creatorId: anna,
+        memberId: lou,
+        memberName: 'Lou',
+        endsAt: '2026-11-02T14:00:00.000Z',
+      },
+    ]);
+    // The instant alone is read, as the person, on the creators named.
+    expect(planning.asked).toEqual([{ actor: manager.userId, creatorIds: [anna, bea] }]);
+    expect(planning.ranges).toEqual([{ from: at, to: new Date(at.getTime() + 1) }]);
+    expect(await reads.onShiftNow(manager, [gone], at)).toEqual([]);
+    expect(planning.asked).toHaveLength(1);
   });
 });

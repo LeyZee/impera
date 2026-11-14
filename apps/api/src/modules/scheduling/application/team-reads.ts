@@ -13,7 +13,7 @@ import type {
 
 import { TeamScheduleReadForbidden } from '../domain/errors';
 import type { CreatorDirectory, NamedMember, PlanningStore, ShiftReportStore } from '../domain/ports';
-import { assertPlanningRange, plansCreator } from '../domain/shifts';
+import { assertPlanningRange, covers, plansCreator, type PlannedCreators } from '../domain/shifts';
 import { boundCreators, readsTeamSchedule, type CreatorBound } from '../domain/team-reads';
 
 /**
@@ -62,6 +62,16 @@ export interface ListedShiftReport {
   readonly reviewedAt: string | null;
 }
 
+/** @public Who is on shift at a moment, as another door reads it: the shift, its member by name, its end. */
+export interface OnShiftNow {
+  readonly shiftId: ShiftId;
+  readonly creatorId: CreatorId;
+  readonly memberId: TeamMemberId;
+  readonly memberName: string;
+  /** Its stop, when it was stopped under way. */
+  readonly endsAt: string;
+}
+
 /**
  * The planning and the reports for a door other than the routes (ADR 0026 § 1, the MCP's `shifts_list` and
  * `shift_reports_list`): the same stores, under the same policies and as the same person as the screen, confined in
@@ -83,12 +93,24 @@ export interface SchedulingReads {
     creators: CreatorBound,
     period: PayPeriod | null,
   ): Promise<ListedShiftReport[]>;
+  /**
+   * Who is on shift at `at` (the MCP's `on_shift_now`): the shifts that cover it (`covers`: the start included, the
+   * end excluded), of active members, read as `shifts` reads them. Nothing of the account nor of the margin (ADR 0025).
+   * Unlike the module's `onShift`, which the system reads for the routing of a handover, this read is the person's.
+   */
+  onShiftNow(reader: ScheduleReader, creators: CreatorBound, at: Date): Promise<OnShiftNow[]>;
 }
 
 const nameOf = (members: readonly NamedMember[]): ((id: TeamMemberId) => string | null) => {
   const names = new Map(members.map((member) => [member.id, member.displayName]));
   return (id) => names.get(id) ?? null;
 };
+
+/** What a manager plans is what he is shown (Charles, 06/11): the others were read for the conflicts only. */
+const shown = (
+  read: { readonly planned: PlannedCreators },
+  shift: { readonly creatorId: CreatorId },
+): boolean => plansCreator(read.planned, shift.creatorId);
 
 const byTime = (a: { at: number; id: string }, b: { at: number; id: string }): number =>
   a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -117,28 +139,25 @@ export function createSchedulingReads(
       if (creatorIds.length === 0) return [];
       const read = await planning.read(reader.userId, creatorIds, range);
       const name = nameOf(read.members);
-      return (
-        read.shifts
-          // What a manager plans is what he is shown (Charles, 06/11): the others were read for the conflicts only.
-          .filter(
-            (shift) =>
-              plansCreator(read.planned, shift.creatorId) &&
-              shift.startsAt.getTime() < range.to.getTime() &&
-              range.from.getTime() < shift.endsAt.getTime(),
-          )
-          .map((shift) => ({ at: shift.startsAt.getTime(), id: shift.id, shift }))
-          .sort(byTime)
-          .map(({ shift }) => ({
-            id: shift.id,
-            creatorId: shift.creatorId,
-            platformAccountId: shift.platformAccountId,
-            memberId: shift.memberId,
-            memberName: name(shift.memberId),
-            startsAt: shift.startsAt.toISOString(),
-            endsAt: shift.endsAt.toISOString(),
-            stopped: shift.stoppedAt !== null,
-          }))
-      );
+      return read.shifts
+        .filter(
+          (shift) =>
+            shown(read, shift) &&
+            shift.startsAt.getTime() < range.to.getTime() &&
+            range.from.getTime() < shift.endsAt.getTime(),
+        )
+        .map((shift) => ({ at: shift.startsAt.getTime(), id: shift.id, shift }))
+        .sort(byTime)
+        .map(({ shift }) => ({
+          id: shift.id,
+          creatorId: shift.creatorId,
+          platformAccountId: shift.platformAccountId,
+          memberId: shift.memberId,
+          memberName: name(shift.memberId),
+          startsAt: shift.startsAt.toISOString(),
+          endsAt: shift.endsAt.toISOString(),
+          stopped: shift.stoppedAt !== null,
+        }));
     },
 
     shiftReports: async (reader, bound, period) => {
@@ -165,6 +184,38 @@ export function createSchedulingReads(
           byAgency: report.byAgency,
           submittedAt: report.submittedAt.toISOString(),
           reviewedAt: report.reviewedAt?.toISOString() ?? null,
+        }));
+    },
+
+    onShiftNow: async (reader, bound, at) => {
+      assertReader(reader);
+      const creatorIds = await confined(bound);
+      if (creatorIds.length === 0) return [];
+      // The smallest range the planning reads: the shifts that overlap the instant `at`.
+      const read = await planning.read(reader.userId, creatorIds, {
+        from: at,
+        to: new Date(at.getTime() + 1),
+      });
+      const active = new Map(
+        read.members
+          .filter((member) => member.status === 'active')
+          .map((member) => [member.id, member.displayName]),
+      );
+      return read.shifts
+        .filter((shift) => shown(read, shift) && covers(shift, at))
+        .flatMap((shift) => {
+          const memberName = active.get(shift.memberId);
+          return memberName === undefined
+            ? []
+            : [{ at: shift.startsAt.getTime(), id: shift.id, shift, memberName }];
+        })
+        .sort(byTime)
+        .map(({ shift, memberName }) => ({
+          shiftId: shift.id,
+          creatorId: shift.creatorId,
+          memberId: shift.memberId,
+          memberName,
+          endsAt: shift.endsAt.toISOString(),
         }));
     },
   };

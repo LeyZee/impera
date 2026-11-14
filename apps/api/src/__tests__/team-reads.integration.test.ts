@@ -127,6 +127,29 @@ describe('Lectures pour une autre porte : shifts, rapports et relevés (ADR 0026
     expect(await reads().shifts(as(lou), [team.anna], RANGE)).toEqual([]);
   });
 
+  it('reads who is on shift at an instant, as the person, by name, never the account', async () => {
+    const [theos] = await reads().shifts(as('owner'), [team.anna], RANGE);
+    if (theos === undefined) throw new Error('Théo’s shift is missing');
+    const during = new Date(Date.parse(theos.startsAt) + 3_600_000);
+    expect(await reads().onShiftNow(as('owner'), 'all', during)).toEqual([
+      {
+        shiftId: theos.id,
+        creatorId: team.anna,
+        memberId: theo.id,
+        memberName: 'Théo',
+        endsAt: theos.endsAt,
+      },
+    ]);
+    // A manager on what he plans, a chatter on his own shifts, a creator not named: nothing more.
+    expect((await reads().onShiftNow(as(iris), 'all', during)).map((one) => one.memberName)).toEqual([
+      'Théo',
+    ]);
+    expect(await reads().onShiftNow(as(lou), 'all', during)).toEqual([]);
+    expect(await reads().onShiftNow(as('owner'), [team.bea], during)).toEqual([]);
+    // Its end is not in it.
+    expect(await reads().onShiftNow(as('owner'), 'all', new Date(theos.endsAt))).toEqual([]);
+  });
+
   it('reads the reports’ amounts and states, never a text a person wrote', async () => {
     const all = await reads().shiftReports(as('owner'), 'all', P1);
     expect(all.map((one) => [one.memberName, one.amountMinor, one.status])).toEqual([
@@ -172,6 +195,9 @@ describe('Lectures pour une autre porte : shifts, rapports et relevés (ADR 0026
     const creator = as(theo, 'creator');
     await expect(reads().shifts(creator, 'all', RANGE)).rejects.toMatchObject({ code: 'role_forbidden' });
     await expect(reads().shiftReports(creator, 'all', P1)).rejects.toMatchObject({ code: 'role_forbidden' });
+    await expect(reads().onShiftNow(creator, 'all', RANGE.from)).rejects.toMatchObject({
+      code: 'role_forbidden',
+    });
     await expect(pay().statements(creator, P1)).rejects.toMatchObject({ code: 'role_forbidden' });
   });
 });
