@@ -36,6 +36,13 @@ describe('her objects (ADR 0107 § 1, § 3 and § 16)', () => {
     expect(svg.getAttribute('data-metal')).toBe('or');
   });
 
+  it('shows the metal alone under 40 px, so no number on the coin reads against her streak', () => {
+    render(<CreatorObject kind="day_streak_14" size={28} />);
+    const svg = screen.getByRole('img', { name: 'Médaille « Série de 14 jours »' });
+    expect(svg.querySelector('.rw-ink text')?.textContent).toBe('');
+    expect(svg.getAttribute('data-metal')).toBe('argent');
+  });
+
   it('has a name, a way to earn it and a reveal for each, and nothing for a kind it does not know', () => {
     for (const kind of KINDS) {
       expect(creatorObjectName(kind)).not.toBeNull();

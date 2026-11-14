@@ -31,9 +31,10 @@ import { repliesOn } from './replies';
 
 import { useOnline } from '@/pwa/online';
 import { useHerTrophyCase } from '@/rewards/api';
-import { CreatorMedal, highestMedal } from '@/rewards/creator-art';
+import { CREATOR_MEDALS, CreatorMedal, highestMedal } from '@/rewards/creator-art';
 import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { useFloatingTip } from '@/screens/dashboard/parts';
 
 const WEEKDAY_SHORT = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'] as const;
 const MINUTE_MS = 60_000;
@@ -273,6 +274,7 @@ export function Glance({
   const { streak } = agenda;
   // Her highest streak medal beside the count (ADR 0107 § 9); none before her first, or while her case is not read.
   const medal = highestMedal(useHerTrophyCase(true).data?.items ?? []);
+  const tip = useFloatingTip();
   return (
     <section className="nv-plate ag-glance nv-enter" aria-label="Ta journée">
       <div className="ag-glance__top">
@@ -329,7 +331,13 @@ export function Glance({
               title={streak.next === null ? undefined : `Prochain palier : ${String(streak.next)} jours`}
             >
               {medal === null ? null : (
-                <CreatorMedal kind={medal} size={MEDAL_SIZE} className="ag-streak__medal" />
+                <span
+                  className="ag-streak__medal"
+                  tabIndex={0}
+                  {...tip.bind({ title: `Médaille : série de ${String(CREATOR_MEDALS[medal].days)} jours` })}
+                >
+                  <CreatorMedal kind={medal} size={MEDAL_SIZE} />
+                </span>
               )}
               <b className="nv-num">{streak.days}</b> {streak.days > 1 ? 'jours' : 'jour'} de suite
             </span>
@@ -364,6 +372,7 @@ export function Glance({
         <p className="ag-glance__risk">Coche ta routine aujourd’hui pour garder ta série.</p>
       ) : null}
       {children}
+      {tip.element}
     </section>
   );
 }

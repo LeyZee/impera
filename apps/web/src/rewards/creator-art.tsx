@@ -76,7 +76,7 @@ const REVEAL_TEXTS: Readonly<Record<CreatorMedalKind | CreatorTrophyKind, string
   day_streak_50: '50 jours de routine réussie d’affilée.',
   day_streak_100: '100 jours de routine réussie d’affilée.',
   first_drop: 'Ton premier contenu est arrivé.',
-  first_on_time_delivery: 'Ta première demande livrée à l’heure.',
+  first_on_time_delivery: 'L’agence a eu ce qu’elle t’a demandé, le jour dit.',
   delivery_streak_5: '5 demandes livrées à l’heure d’affilée.',
   delivery_streak_10: '10 demandes livrées à l’heure d’affilée.',
   delivery_streak_25: '25 demandes livrées à l’heure d’affilée.',
@@ -291,10 +291,12 @@ export function CreatorMedal({
   className?: string;
 }): JSX.Element {
   const { days, metal, stars } = CREATOR_MEDALS[kind];
+  // Under 40 px the coin is its metal alone: beside her streak, a number on it read against hers (avis Design, 14/11).
+  const bare = rest.size < 40;
   return (
     <Medal
       medal={{ metal, rank: 1 }}
-      engraving={{ text: String(days), stars }}
+      engraving={bare ? { text: '', stars: 0 } : { text: String(days), stars }}
       label={`Médaille « ${medalName(kind)} »`}
       {...rest}
     />
