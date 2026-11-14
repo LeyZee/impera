@@ -209,9 +209,9 @@ async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<St
 }
 
 /**
- * The agency's reads of her native scripts: under her RLS and the team's scopes (owner, active managers), as her
- * script queue is read; her own account is closed by the base. `creators` is out of RLS: anyone else gets the same
- * `null` for a creator who exists and one who does not, never her existence.
+ * The agency's reads of her native scripts: under her RLS and the team's scopes (the owner, an active manager of her
+ * list, as her vault is read); her own account is closed by the base. Anyone else gets the same `null` for a creator
+ * who exists and one who does not, never her existence.
  */
 export function createDrizzlePlatformScriptReadStore(
   db: Database,
@@ -221,8 +221,17 @@ export function createDrizzlePlatformScriptReadStore(
     ofCreator: (creatorId, userId) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
         if (scope !== 'owner' && scope !== 'agency') return null;
-        const readable = await tx.select({ id: schema.creators.id }).from(schema.creators);
-        if (!readable.some((row) => row.id === creatorId)) return null;
+        // The owner reads every creator of hers; an active manager only those of his list, as her vault (fiche
+        // vault-sync). `creators` is out of RLS: a creator who does not exist answers like one he may not read.
+        const readable = await tx
+          .select({ id: schema.creators.id })
+          .from(schema.creators)
+          .where(
+            scope === 'owner'
+              ? eq(schema.creators.id, creatorId)
+              : sql`${schema.creators.id} = ${creatorId} and exists (select 1 from "user" u where u.id = ${userId} and ${creatorId}::uuid = any(u.creator_ids))`,
+          );
+        if (readable.length === 0) return null;
         const rows = await tx
           .select()
           .from(scripts)

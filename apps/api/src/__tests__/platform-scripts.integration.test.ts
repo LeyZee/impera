@@ -256,11 +256,11 @@ describe('the native scripts imported from the platform', () => {
     });
   });
 
-  it('lets the owner and an active manager read, never a chatter nor her own account, and only her scripts', async () => {
+  it('lets the owner and an active manager of her list read, never a chatter nor her own account', async () => {
     const manager = await scripts.reads.platformScripts(nora, { userId: ids.manager, role: 'operator' });
     expect(manager?.length).toBe(7);
-    // Her RLS: another creator's reader sees none of Nora's.
-    expect(await scripts.reads.platformScripts(ines, { userId: ids.manager, role: 'operator' })).toEqual([]);
+    // A manager reads the creators of his list only, as her vault; the owner reads Inès, who has none of Nora's.
+    expect(await scripts.reads.platformScripts(ines, { userId: ids.manager, role: 'operator' })).toBeNull();
     expect(await scripts.reads.platformScripts(ines, { userId: ids.owner, role: 'owner' })).toEqual([]);
     expect(await scripts.reads.platformScripts(nora, { userId: ids.chatter, role: 'operator' })).toBeNull();
     expect(await scripts.reads.platformScripts(nora, { userId: ids.nora, role: 'creator' })).toBeNull();
