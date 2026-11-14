@@ -64,6 +64,31 @@ describe('conversation projection', () => {
     expect(applyEvent(followUp, rejected(false), at(3)).state).toBe('idle');
   });
 
+  it('puts him at rest when the creator’s side answered him on the platform, as the event says (ADR 0110 § 2)', () => {
+    const fromTeam = (answersFan: boolean) =>
+      EventBodySchema.parse({
+        type: 'message_received',
+        payload: {
+          ...message,
+          direction: 'outbound',
+          author: 'human',
+          ...(answersFan && { answersFan: true }),
+        },
+      });
+    for (const state of ['pending', 'drafting', 'awaiting_approval'] as const) {
+      const waiting = { ...INITIAL_PROJECTION, state, lastInboundAt: at(1) };
+      expect(applyEvent(waiting, fromTeam(true), at(2))).toMatchObject({
+        state: 'idle',
+        lastOutboundAt: at(2),
+      });
+      // An event written before ADR 0110 replays as it was decided (ADR 0007).
+      expect(applyEvent(waiting, fromTeam(false), at(2)).state).toBe(state);
+    }
+    // A draft already leaving is never stopped by it.
+    const sending = { ...INITIAL_PROJECTION, state: 'sending' as const, lastInboundAt: at(1) };
+    expect(applyEvent(sending, fromTeam(true), at(2)).state).toBe('sending');
+  });
+
   it('clears the routing when a human hands the conversation back', () => {
     const routed = { ...INITIAL_PROJECTION, state: 'human' as const, routedToUserId: USER };
     const released = EventBodySchema.parse({
