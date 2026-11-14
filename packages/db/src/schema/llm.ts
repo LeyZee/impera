@@ -1,4 +1,8 @@
 import {
+  AI_BUDGET_DAILY_MAX_MINOR,
+  AI_BUDGET_DAILY_MIN_MINOR,
+  AI_BUDGET_TREND_WATCH_MAX_MINOR,
+  AI_BUDGET_TREND_WATCH_MIN_MINOR,
   AI_CREDIT_MAX_MINOR,
   AiCreditCurrencySchema,
   AiCreditEntryKindSchema,
@@ -32,6 +36,7 @@ export const LLM_CALL_STATUSES = [
   'refused',
   'timeout',
   'rate_limited',
+  'quota_exhausted',
   'auth',
   'unavailable',
   'missing_key',
@@ -73,6 +78,8 @@ export const llmCalls = pgTable(
     enumCheck('llm_calls', t.status, LLM_CALL_STATUSES),
     enumCheck('llm_calls', t.currency, CurrencySchema.options),
     index('llm_calls_creator_created_idx').on(t.creatorId, t.createdAt),
+    /** A provider's latest answer and its refusals for lack of quota since (ADR 0091 § 6), every five minutes. */
+    index('llm_calls_provider_status_created_idx').on(t.provider, t.status, t.createdAt),
     tenantPolicy(t.creatorId),
     closedToCreator(),
   ],
@@ -101,9 +108,37 @@ export const aiCreditEntries = pgTable(
     enumCheck('ai_credit_entries', t.currency, AiCreditCurrencySchema.options),
     check(
       'ai_credit_entries_amount_check',
-      sql`${t.amountMinor} between 0 and ${sql.raw(String(AI_CREDIT_MAX_MINOR))} and (${t.kind} = 'balance' or ${t.amountMinor} > 0)`,
+      sql`${t.amountMinor} between 0 and ${sql.raw(String(AI_CREDIT_MAX_MINOR))} and (${t.kind} = 'balance' or (${t.kind} = 'subscription') = (${t.amountMinor} = 0))`,
     ),
     index('ai_credit_entries_provider_at_idx').on(t.provider, t.at),
+    agencyOnly(),
+  ],
+);
+
+/**
+ * The day's AI budget and the trend watch's cap the owner sets in Réglages › Modèles IA (choix de Charles 12/11), in
+ * euro cents; `null` is the code's default (`DEFAULT_LLM_CONFIG.dailyBudget`). One row for the agency (`id` = 1), out
+ * of tenancy: RLS forced, `agency_only`. Every change writes its `audit_log` line (before, after).
+ */
+export const aiBudgetSettings = pgTable(
+  'ai_budget_settings',
+  {
+    id: integer('id').primaryKey(),
+    dailyCapMinor: integer('daily_cap_minor'),
+    trendWatchCapMinor: integer('trend_watch_cap_minor'),
+    updatedBy: text('updated_by').references(() => user.id),
+    updatedAt: timestampTz('updated_at').notNull(),
+  },
+  (t) => [
+    check('ai_budget_settings_single_row_check', sql`${t.id} = 1`),
+    check(
+      'ai_budget_settings_daily_cap_check',
+      sql`${t.dailyCapMinor} is null or ${t.dailyCapMinor} between ${sql.raw(String(AI_BUDGET_DAILY_MIN_MINOR))} and ${sql.raw(String(AI_BUDGET_DAILY_MAX_MINOR))}`,
+    ),
+    check(
+      'ai_budget_settings_trend_watch_cap_check',
+      sql`${t.trendWatchCapMinor} is null or ${t.trendWatchCapMinor} between ${sql.raw(String(AI_BUDGET_TREND_WATCH_MIN_MINOR))} and ${sql.raw(String(AI_BUDGET_TREND_WATCH_MAX_MINOR))}`,
+    ),
     agencyOnly(),
   ],
 );

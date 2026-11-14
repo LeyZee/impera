@@ -24,7 +24,31 @@ export function PaperworkBanner({ enabled }: { enabled: boolean }): JSX.Element 
   if (lines.length === 0) return null;
 
   return (
-    <aside className="nv-plate db-paper nv-enter" aria-labelledby="db-paper-title">
+    <aside
+      className="nv-plate db-paper nv-enter"
+      data-tone={
+        lines.some((line) => line.tone === 'danger')
+          ? 'danger'
+          : lines.some((line) => line.tone === 'warn')
+            ? 'warn'
+            : 'quiet'
+      }
+      aria-labelledby="db-paper-title"
+    >
+      {/* The banners' one face (ADM-26): a medallion, a title, its lines, the action on the right. */}
+      <span className="db-orb" aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M7 3h7l4 4v14H7z" />
+          <path d="M14 3v4h4M10 12h5M10 16h5" />
+        </svg>
+      </span>
       <div className="db-paper__body">
         <p id="db-paper-title" className="db-paper__title">
           Factures et pièces
@@ -58,7 +82,7 @@ export function PaperworkBanner({ enabled }: { enabled: boolean }): JSX.Element 
         </ul>
       </div>
       {lines.some((line) => line.kind === 'invoices') ? (
-        <Link className="nv-btn nv-btn--soft nv-btn--sm db-paper__go" to="/paie/factures">
+        <Link className="nv-btn nv-btn--soft nv-btn--sm db-banner__go" to="/paie/factures">
           Voir les factures
         </Link>
       ) : null}

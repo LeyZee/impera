@@ -81,10 +81,13 @@ export function requestOf(
   };
 }
 
-/** « 3 à traiter, dont 1 urgent » from « À traiter » (the same count as Suivi). */
+/**
+ * « 3, dont 1 urgent » from « À traiter » (the same count as Suivi): the line's label already says « À traiter », its
+ * value does not say it twice (recette 11/11, ADM-12).
+ */
 export function todosOf(count: CreatorTodoCount | undefined): { readonly text: string; readonly tone: Tone } {
-  if (count === undefined || count.todos === 0) return { text: 'Rien à traiter', tone: 'calm' };
-  const text = `${String(count.todos)} à traiter`;
+  if (count === undefined || count.todos === 0) return { text: 'Rien', tone: 'calm' };
+  const text = String(count.todos);
   if (count.grave === 0) return { text, tone: 'warn' };
   return { text: `${text}, dont ${String(count.grave)} urgent${count.grave > 1 ? 's' : ''}`, tone: 'bad' };
 }

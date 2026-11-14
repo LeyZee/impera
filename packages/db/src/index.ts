@@ -5,6 +5,7 @@ export {
   lockMemberPeriod,
   lockPayrollClose,
   NotACreatorAccount,
+  onCreatorList,
   SNAPSHOT_READ,
   withAdmin,
   withCreatorAccount,

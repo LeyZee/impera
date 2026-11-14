@@ -61,7 +61,7 @@ Quand sa fiche dit un attachement fort avec de la détresse ou des dépenses qui
 conversations        id, creator_id, platform_account_id, fan_id, platform_conversation_id,
                      state (idle|pending|drafting|awaiting_approval|sending|human|paused|error),
                      mode (copilot|auto), last_inbound_at, last_outbound_at, unread_count,
-                     cooldowns jsonb, active_script_run_id (nullable), routed_to_user_id (nullable, fk user), desire_score, desire_band, desire_at (nullables ensemble, P3-12), updated_at
+                     cooldowns jsonb, active_script_run_id (nullable), routed_to_user_id (nullable, fk user), desire_score, desire_band, desire_at (nullables ensemble, P3-12), fan_availability jsonb (nullable, ADR 0103), updated_at
 messages             id, creator_id, platform_account_id (dénormalisé pour l'unicité), conversation_id, platform_message_id,
                      direction (inbound|outbound), author (fan|human|ai), text, media_ids uuid[], price_minor (≥ 0, migration 0036), currency, is_paid,
                      platform_created_at, created_at, draft_id (nullable),
@@ -77,6 +77,16 @@ drafts               id, creator_id, conversation_id, status (pending|approved|e
                      idempotency_key, created_at
                      placed_by / placed_at : le chatteur l'a mis dans le champ de la plateforme depuis le panneau copilote
                      (ADR 0086 § 4, migration 0149), les deux ensemble ; le statut ne bouge pas, ce qui part décide (§ 5).
+script_runs          id, creator_id, conversation_id, script_ref (le script de la plateforme, une colonne sans clé
+                     étrangère), status (open|bought_out|refused|stalled|closed_by_human),
+                     steps jsonb (l'état de décision par étape, dans l'ordre : stepIndex, kind free|paid|bridge, outcome
+                     sent|opened|bought|refused, priceMinor, sentAt, at), ignored_messages, started_at, ended_at (nul
+                     tant qu'il est ouvert), updated_at
+                     L'état de décision seulement : ce qui est parti ou acheté se lit dans getScriptHistory (ADR 0018
+                     § 5), qui gagne à la réconciliation. Un seul ouvert par conversation (index partiel). Jamais
+                     supprimé par nirvana_app (ADR 0098, migration 0195). Les règles sont celles du domaine `agent`
+                     (`scriptTurn`) ; la ligne s'écrit dans la transaction de `conversation.respond`, avec le brouillon
+                     et les événements `script_*`.
 blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_id (nullable), rate_per_mille (0 à 1000, 800 = 80 %), recorded_by,
                      recorded_at      (append-only : ni UPDATE ni DELETE pour nirvana_app)
                      Le test à l'aveugle d'une version de la voix et de la persona active (ADR 0019, 0022) ; le dernier
@@ -85,7 +95,7 @@ blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_
 
 `conversations.last_inbound_at` est l'heure où Impera a lu le dernier message du fan (ordre d'arrivée : debounce, brouillon périmé, relances). Ce que l'écran montre (« A écrit il y a… », `ConversationSummary.lastInboundAt`) est l'heure du message sur la plateforme, `max(messages.platform_created_at)` des messages entrants : une capture qui relit l'historique ne fait pas dire « à l'instant » d'un message de cinq heures.
 
-Types d'événements (liste fermée dans `packages/contracts/src/events.ts`) : `message_received`, `message_sent`, `send_attempted`, `send_failed`, `send_verified`, `media_described`, `draft_created`, `draft_approved`, `draft_edited`, `draft_rejected`, `draft_expired`, `fact_proposed`, `fact_confirmed`, `fact_rejected`, `summary_refreshed`, `handoff_requested`, `alert_triggered`, `takeover_started`, `takeover_ended`, `mode_changed`, `kill_switch_toggled`, `follow_up_scheduled`, `follow_up_cancelled`, `offer_made`, `sale_detected`, `script_started`, `script_step_sent`, `script_ended`, `session_state_changed`, `budget_threshold_crossed`, `connection_state_changed`, `automatic_closed`, `security_alert` (ADR 0046 § 8), `error`.
+Types d'événements (liste fermée dans `packages/contracts/src/events.ts`) : `message_received`, `message_sent`, `send_attempted`, `send_failed`, `send_verified`, `media_described`, `draft_created`, `draft_approved`, `draft_edited`, `draft_rejected`, `draft_expired`, `fact_proposed`, `fact_confirmed`, `fact_rejected`, `summary_refreshed`, `handoff_requested`, `alert_triggered`, `takeover_started`, `takeover_ended`, `mode_changed`, `kill_switch_toggled`, `follow_up_scheduled`, `follow_up_cancelled`, `offer_made`, `sale_detected`, `script_started`, `script_step_sent`, `script_step_opened`, `script_step_refused` (ADR 0098), `script_ended`, `session_state_changed`, `budget_threshold_crossed`, `connection_state_changed`, `automatic_closed`, `security_alert` (ADR 0046 § 8), `error`.
 
 Payload minimal par famille d'événement (clés en camelCase, jamais de contenu média, jamais de secret) :
 
@@ -485,7 +495,8 @@ Un régime ne change pas ; sa validation est une ligne à part. Un dossier garde
 worker_heartbeats   worker_id text PK, hostname, version, last_seen_at      (écrit toutes les 30 s par chaque worker, lu par /ready)
 rate_limit_counters key text PK (haché, ≤ 512), hits int > 0, window_ends_at   (limiteur partagé de l’API, ADR 0027 ; UNLOGGED, purgé 1 h après la fin de la fenêtre)
 backup_runs         id uuid PK (défaut en base), started_at, finished_at?, status (running|succeeded|failed), error? ≤ 500, object_key?, size_bytes?, sha256? unique, pg_dump_version?, row_counts? jsonb objet   (export quotidien, ADR 0028 ; écrit par le service backup seul, lu par l’app)
-ai_credit_entries   id uuid PK (choisi par l’écran, idempotence), provider (xai|mistral|google), kind (topup|balance), amount_minor int ≥ 0 (> 0 pour une recharge), currency (USD|EUR), at, created_by → user, created_at   (crédits IA notés par le propriétaire, ADR 0091 ; RLS forcée, politique agence ; nirvana_app : SELECT, INSERT, DELETE ; migration 0164)
+ai_credit_entries   id uuid PK (choisi par l’écran, idempotence), provider (xai|mistral|google), kind (topup|balance|subscription), amount_minor int ≥ 0 (> 0 pour une recharge, 0 pour un abonnement), currency (USD|EUR), at, created_by → user, created_at   (crédits IA notés par le propriétaire, ADR 0091 ; RLS forcée, politique agence ; nirvana_app : SELECT, INSERT, DELETE ; migration 0164, `subscription` en 0204, ADR 0091 § 6)
+ai_budget_settings  id int PK (= 1, une ligne pour l’agence), daily_cap_minor? int 100–20 000, trend_watch_cap_minor? int 10–2 000, updated_by → user, updated_at   (plafond du jour et plafond de veille réglés par le propriétaire dans Réglages › Modèles IA, null = défaut du code ; RLS forcée, politique agence ; nirvana_app : SELECT ; impera_service : SELECT, INSERT, UPDATE (écriture par withAdmin) ; chaque changement audité, avant et après ; migration 0205)
 restore_tests       id PK, backup_run_id FK, tested_at, duration_seconds > 0, row_count_mismatches ≥ 0, notes? ≤ 500, entered_by_user_id FK, created_at   (essai de restauration saisi par le propriétaire, ajout seul, ADR 0028 § 6)
 ```
 
@@ -502,6 +513,19 @@ script_structure_versions id, structure_id, version ≥ 1 (unique par structure)
                           le numéro ne change pas)
 script_structure_queue    creator_id, position 1–20, structure_id (unique par créatrice), added_by, created_at
                           (clé : creator_id, position ; RLS de la créatrice et portée de l'équipe ; remplacée en entier)
+platform_scripts          id, creator_id, platform_account_id → platform_accounts, platform_script_ref (unique par
+                          compte, ≤ 200), name (celui de la plateforme, ≤ 200), moment? (day|night), fingerprint, active,
+                          deactivated_at? (présent si et seulement si inactif), synced_at, created_at
+                          (scripts natifs, ADR 0099 § 1 temps 2, migration 0206 ; jamais supprimés)
+platform_script_steps     platform_script_id, creator_id, position 0–49 (stepIndex), platform_step_ref (≤ 200),
+                          name (≤ 200), text (≤ 4 000), price_minor ≥ 0 (centimes TTC, tel quel), currency
+                          (clé : platform_script_id, position ; réécrites en entier quand le script change)
+platform_script_step_media platform_script_id, creator_id, position, role (sold|preview), rank 0–49,
+                          platform_media_ref (≤ 200), kind
+                          (clé : script, position, role, rank ; reliée au coffre par platform_media_ref, sans clé
+                          étrangère)
+                          (les trois : RLS forcée de la créatrice, lues par le propriétaire et les managers actifs,
+                          fermées à son compte ; écrites par l'import en rôle de service seulement)
 ```
 
 La règle 6 de l'ADR 0056 § 1 est tenue en base : la dernière version change sur place tant que `frozen_at` est nul, puis un enregistrement écrit la version suivante (SC-01, migration 0084).
@@ -592,6 +616,7 @@ Une commande enfile dans sa propre transaction (outbox, ADR 0006) par `public.en
 
 - `withTenant(creatorId, tx => …)` ouvre une transaction et fait `SET LOCAL app.creator_id = …`. Les jobs système multi-tenant (réconciliation, purge, dispatch des polls) passent par `withAdmin` (`DATABASE_SERVICE_URL`, le rôle de service) dans des fonctions nommées `*Unscoped`.
 - **Note de désir** (`conversations.desire_score`, `desire_band`, `desire_at`, migration 0022) : projection du dernier `desire_scored`, la note de 0 à 100 que le moteur calcule (P3-12), sa bande (`desireBandOf`, jamais stockée à part de sa note) et l'heure du calcul, à partir de laquelle la note retombe. Le moteur ne rend une note que si elle a bougé par rapport à la note stockée retombée jusqu'à maintenant ; le worker écrit alors `desire_scored` avec le résultat qu'elle accompagne. Une reconstruction retrouve exactement la note que la politique a lue. Le Suivi ne lit jamais `desire_band` : la liste rend la note retombée jusqu'à l'heure de la réponse et la bande de cette note (`ConversationSummary.desire`), et la courbe du lecteur relit les `desire_scored` du journal (`GET /v1/conversations/{id}/desire`).
+- **Disponibilité du fan** (`conversations.fan_availability`, migration 0195) : projection du dernier `fan_availability_changed` (ADR 0103, amendement du 13/11). Un seul enregistrement, lu par son schéma Zod (`FanAvailabilityRecordSchema`) : l'état (confirmée, inconnue, non), le signal qui l'a fixé, son heure et son expiration (2 h), plus ce que la session retient pour la porte d'un script (signaux positifs vus, dernier message où il sexualise, question posée, heure où il a atteint le seuil). Le moteur ne le rend que s'il a changé ; le worker écrit alors l'événement avec le résultat qu'il accompagne.
 - **Conversation routée** (`conversations.routed_to_user_id`, migration 0016) : un membre de l'équipe au scope `self` (chatteur, manager qui n'est pas actif) n'a aucun accès à toute une créatrice. `requireRole` déplace ses `creator_ids` dans `routedCreatorIds` (contrat `CurrentUser`), donc toute route qui vérifie `creatorIds` le refuse, et `conversations` ne lui ouvre que les conversations qui lui sont routées : lire, valider, refuser, prendre et rendre la main ; jamais le mode, le Dashboard, les fans ni la persona. Garde du serveur, pas de RLS : pendant sa fenêtre d'accès (son shift, élargi de la marge d'accès, ADR 0025), EQ-13 lui ouvre toutes les conversations et les fiches de fans des créatrices de ce shift par une liste à part (`shiftCreatorIds`, calculée à chaque requête par `createShiftAccessReader`), lue seulement par ces routes et par « À traiter » ; `creatorIds` reste vide, donc le mode, la persona, le Dashboard et l'écriture des drapeaux restent fermés. Hors fenêtre, il garde ce qu'il tient (routée vers lui ou prise par lui) jusqu'à « Rendre la main ».
 - **Tables de l'équipe** (sans `creator_id`) : une politique par compte. `withMember(db, userId, (tx, scope) => …)` fait `SET LOCAL app.user_id`, lit dans la même transaction le rôle d'accès (`user.role`) et la ligne `team_members` du compte, puis fait `SET LOCAL app.team_scope` (scopes fixés par l'ADR 0024) : `owner` pour le propriétaire, `agency` pour un manager au statut `active`, `self` pour tous les autres (`teamScopeFor`, contracts). Le scope n'est jamais lu dans la requête. `self` lit ses propres lignes (sa fiche, ses taux) ; `agency` lit toute l'équipe sauf les notes posées sur sa propre fiche, et écrit des notes signées de son compte ; seul `owner` crée ou modifie une fiche et insère un taux ou un préréglage, signé de son compte (`created_by`). Hors `withMember`, aucune ligne. Notes, préréglages et taux sont en ajout seul (`REVOKE UPDATE, DELETE` et trigger `refuse_change`) ; `team_members` n'a pas de `DELETE` (migration 0015).
 - **Tables du planning** (`creator_id` **et** `member_id`, ADR 0023 § Données et RLS) : `withTenantMember(db, creatorId, userId, (tx, scope) => …)` pose les trois réglages (`app.creator_id`, `app.user_id`, `app.team_scope`). Un shift ou un modèle se lit dans sa créatrice, par le membre lui-même ou par le scope `owner` | `agency` : deux chatteurs d'une même créatrice ne lisent pas les shifts l'un de l'autre. Seuls `owner` et `agency` écrivent, signé de leur compte. Un lecteur de plusieurs créatrices boucle, une transaction par créatrice. `scheduling_settings` (sans créatrice) se lit par tout scope posé et s'écrit par le propriétaire.

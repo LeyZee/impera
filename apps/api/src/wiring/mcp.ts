@@ -1,9 +1,11 @@
-import { UserIdSchema } from '@impera/contracts';
+import { DomainError, UserIdSchema } from '@impera/contracts';
 
 import { resolveActor } from '../auth';
+import type { AiUsageModule } from '../modules/ai-usage';
+import type { ConnectorsModule } from '../modules/connectors';
 import type { ContentDropsModule } from '../modules/content-drops';
 import type { FansModule } from '../modules/fans';
-import { createMcpModule, type ActorView, type McpModule } from '../modules/mcp';
+import { createMcpModule, McpReadRefused, type ActorView, type McpModule } from '../modules/mcp';
 import type { PersonaModule } from '../modules/persona';
 import type { SchedulingModule, ShiftCreators } from '../modules/scheduling';
 import type { ScriptsModule } from '../modules/scripts';
@@ -37,6 +39,22 @@ async function actorOf(
   return { role: user.role, teamScope: membership.teamScope, secondFactorEnabled, readableCreatorIds };
 }
 
+/**
+ * A connectors' read that refused the person in its own transaction becomes a refusal of the call (`McpReadRefused`),
+ * written down as such; anything else stays an error.
+ */
+export async function refusedAsMcp<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof DomainError && error.code === 'connector_reads_forbidden')
+      throw new McpReadRefused('creator_forbidden');
+    if (error instanceof DomainError && error.code === 'sales_feed_team_forbidden')
+      throw new McpReadRefused('role_forbidden');
+    throw error;
+  }
+}
+
 /** The MCP server (ADR 0026, 0105), lot a: the owner's agent accesses, and `POST /v1/mcp`. */
 export function wireMcp(
   shared: Shared,
@@ -48,6 +66,8 @@ export function wireMcp(
     readonly scripts: Pick<ScriptsModule, 'reads'>;
   },
   scheduling: Pick<SchedulingModule, 'reads'>,
+  aiUsage: Pick<AiUsageModule, 'read'>,
+  connectors: Pick<ConnectorsModule, 'reads'>,
 ): WiredMcp {
   const module = createMcpModule({
     db: shared.db,
@@ -68,12 +88,26 @@ export function wireMcp(
       queue: (creatorId, reader) => content.scripts.reads.queue(creatorId, reader),
     },
     shifts: {
+      shifts: (reader, creators, range) =>
+        scheduling.reads.shifts(
+          { userId: UserIdSchema.parse(reader.userId), role: reader.role },
+          creators,
+          range,
+        ),
       onShiftNow: (reader, creators, at) =>
         scheduling.reads.onShiftNow(
           { userId: UserIdSchema.parse(reader.userId), role: reader.role },
           creators,
           at,
         ),
+    },
+    aiUsage: { read: () => aiUsage.read() },
+    teamImport: {
+      teamImport: (userId, platform) => refusedAsMcp(() => connectors.reads.teamImport(userId, platform)),
+    },
+    sales: {
+      sales: (userId, creatorIds, range) =>
+        refusedAsMcp(() => connectors.reads.sales(userId, creatorIds, range)),
     },
   });
   return {

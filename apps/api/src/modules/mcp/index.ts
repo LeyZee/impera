@@ -7,9 +7,20 @@ import { contentTools } from './application/content-tools';
 import { createDispatcher, whoami } from './application/dispatch';
 import { createGrants } from './application/grants';
 import { creatorTools, fanTools } from './application/read-tools';
+import { salesTools } from './application/sales-tools';
+import { statusTools } from './application/status-tools';
 import { teamTools } from './application/team-tools';
 import type { ActorView } from './domain/access';
-import type { ContentReads, CreatorReader, FanReader, GrantRecord, ShiftReader } from './domain/ports';
+import type {
+  AiUsageReader,
+  ContentReads,
+  CreatorReader,
+  FanReader,
+  GrantRecord,
+  SalesReader,
+  ShiftReader,
+  TeamImportReader,
+} from './domain/ports';
 import { createDrizzleGrantStore } from './infra/db/grant-store';
 import { createDrizzleJournal } from './infra/db/journal';
 import { createMcpRoutes } from './infra/http/routes';
@@ -33,6 +44,8 @@ export interface McpModule {
 }
 
 export type { ActorView } from './domain/access';
+/** @public What the wiring throws when another module's read refuses the person: a refusal, never an internal error. */
+export { McpReadRefused } from './domain/errors';
 
 export interface McpDeps {
   /** Application role: the owner's accesses under his policies. */
@@ -50,8 +63,14 @@ export interface McpDeps {
   readonly fans: FanReader;
   /** Her drops and scripts (`content-drops`, `scripts`), for `drops_list`, `scripts_list` and `script_steps_get`. */
   readonly content: ContentReads;
-  /** Who is on shift (`scheduling.reads.onShiftNow`), for `on_shift_now`. */
+  /** The planning (`scheduling.reads.shifts`, `reads.onShiftNow`), for `shifts_list` and `on_shift_now`. */
   readonly shifts: ShiftReader;
+  /** The team imported from a platform (`connectors.reads.teamImport`), for `team_import_list`. */
+  readonly teamImport: TeamImportReader;
+  /** A creator's sales (`connectors.reads.sales`), for `sales_list`: never a share, summed over sellers here. */
+  readonly sales: SalesReader;
+  /** The AI spend (`ai-usage`), for `ai_usage_get`, the owner's alone. */
+  readonly aiUsage: AiUsageReader;
 }
 
 export function createMcpModule(deps: McpDeps): McpModule {
@@ -78,7 +97,9 @@ export function createMcpModule(deps: McpDeps): McpModule {
               ...creatorTools(deps.creators),
               ...fanTools(deps.fans),
               ...contentTools(deps.content),
-              ...teamTools(deps.shifts),
+              ...teamTools(deps.shifts, deps.teamImport),
+              ...statusTools(deps.aiUsage),
+              ...salesTools(deps.sales, deps.creators),
             },
           }),
         allowedOrigins: [],
