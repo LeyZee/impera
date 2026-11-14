@@ -3,11 +3,12 @@ import type { Database } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { contentTools } from './application/content-tools';
 import { createDispatcher, whoami } from './application/dispatch';
 import { createGrants } from './application/grants';
 import { creatorTools, fanTools } from './application/read-tools';
 import type { ActorView } from './domain/access';
-import type { CreatorReader, FanReader, GrantRecord } from './domain/ports';
+import type { ContentReads, CreatorReader, FanReader, GrantRecord } from './domain/ports';
 import { createDrizzleGrantStore } from './infra/db/grant-store';
 import { createDrizzleJournal } from './infra/db/journal';
 import { createMcpRoutes } from './infra/http/routes';
@@ -46,6 +47,8 @@ export interface McpDeps {
   readonly creators: CreatorReader;
   /** The fans module's reads (`getFan`, `activeFacts`, `flags`, `card`), for `fan_get` and `fan_card_get`. */
   readonly fans: FanReader;
+  /** Her drops and scripts (`content-drops`, `scripts`), for `drops_list`, `scripts_list` and `script_steps_get`. */
+  readonly content: ContentReads;
 }
 
 export function createMcpModule(deps: McpDeps): McpModule {
@@ -67,7 +70,12 @@ export function createMcpModule(deps: McpDeps): McpModule {
           createDispatcher({
             journal,
             spendRead,
-            tools: { whoami, ...creatorTools(deps.creators), ...fanTools(deps.fans) },
+            tools: {
+              whoami,
+              ...creatorTools(deps.creators),
+              ...fanTools(deps.fans),
+              ...contentTools(deps.content),
+            },
           }),
         allowedOrigins: [],
       }),

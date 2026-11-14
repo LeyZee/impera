@@ -1,8 +1,10 @@
 import { resolveActor } from '../auth';
+import type { ContentDropsModule } from '../modules/content-drops';
 import type { FansModule } from '../modules/fans';
 import { createMcpModule, type ActorView, type McpModule } from '../modules/mcp';
 import type { PersonaModule } from '../modules/persona';
 import type { ShiftCreators } from '../modules/scheduling';
+import type { ScriptsModule } from '../modules/scripts';
 
 import type { Routes, Shared } from './shared';
 
@@ -39,6 +41,10 @@ export function wireMcp(
   shiftCreators: ShiftCreators,
   persona: Pick<PersonaModule, 'creators'>,
   fans: Pick<FansModule, 'getFan' | 'activeFacts' | 'flags' | 'card'>,
+  content: {
+    readonly drops: Pick<ContentDropsModule, 'reads'>;
+    readonly scripts: Pick<ScriptsModule, 'reads'>;
+  },
 ): WiredMcp {
   const module = createMcpModule({
     db: shared.db,
@@ -51,6 +57,12 @@ export function wireMcp(
       activeFacts: (creatorId, fanId) => fans.activeFacts(creatorId, fanId),
       flags: (creatorId, fanId) => fans.flags(creatorId, fanId),
       card: (creatorId, fanId) => fans.card(creatorId, fanId),
+    },
+    content: {
+      drops: (creatorId, reader, page) => content.drops.reads.drops(creatorId, reader, page),
+      scripts: (creatorId, reader) => content.drops.reads.scripts(creatorId, reader),
+      scriptSteps: (creatorId, reader, dropId) => content.drops.reads.scriptSteps(creatorId, reader, dropId),
+      queue: (creatorId, reader) => content.scripts.reads.queue(creatorId, reader),
     },
   });
   return {
