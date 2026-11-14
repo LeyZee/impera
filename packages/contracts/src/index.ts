@@ -72,3 +72,4 @@ export * from './telegram';
 export * from './telegram-channel';
 export * from './trends';
 export * from './trophy-case';
+export * from './vault';

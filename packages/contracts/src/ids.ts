@@ -33,6 +33,10 @@ export type DesireMarkId = z.infer<typeof DesireMarkIdSchema>;
 export const MediaAssetIdSchema = uuid.brand<'MediaAssetId'>();
 export type MediaAssetId = z.infer<typeof MediaAssetIdSchema>;
 
+/** A media of a platform's vault as the CRM mirrors it (`media_platform_refs`, fiche vault-sync). */
+export const MediaPlatformRefIdSchema = uuid.brand<'MediaPlatformRefId'>();
+export type MediaPlatformRefId = z.infer<typeof MediaPlatformRefIdSchema>;
+
 export const MediaDescriptionIdSchema = uuid.brand<'MediaDescriptionId'>();
 export type MediaDescriptionId = z.infer<typeof MediaDescriptionIdSchema>;
 

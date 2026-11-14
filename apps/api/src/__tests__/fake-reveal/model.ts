@@ -44,6 +44,10 @@ export const FakeMediaSchema = z.object({
   fromFanId: id.nullable(),
   durationSeconds: z.number().int().nullable(),
   createdAt: iso,
+  /** The vault's own text and suggested range (cents), when the creator filled them; absent = none. */
+  description: z.string().nullable().optional(),
+  suggestedMinPrice: z.number().int().nullable().optional(),
+  suggestedMaxPrice: z.number().int().nullable().optional(),
 });
 export type FakeMedia = z.infer<typeof FakeMediaSchema>;
 
