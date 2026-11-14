@@ -503,7 +503,7 @@ describe('database (RLS, constraints, migrations)', () => {
   });
 
   it('migrating again changes nothing', async () => {
-    await runMigrations(test.admin.db);
+    await runMigrations(test.admin);
     const applied = await test.admin.db.execute(
       sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
     );

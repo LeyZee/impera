@@ -105,8 +105,8 @@ describe('conversation.respond and her hours', () => {
     const { hours } = options;
     return createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender: new FakeSender(),
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),

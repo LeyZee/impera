@@ -1,10 +1,9 @@
-import { sql } from '@impera/db';
+import { runMigrations, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { Logger, run } from 'graphile-worker';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { cronKnownSince, parsedCronJobs } from '../crontab';
-import { createJobQueue } from '../jobs';
 
 /** Graphile's own lines stay out of the test output. */
 const silent = new Logger(() => () => undefined);
@@ -33,12 +32,13 @@ describe('cronKnownSince', () => {
   };
 
   it('throws, never reads null, while Graphile’s table is missing', async () => {
+    // A base whose migrations never made Graphile's schema.
+    await test.admin.db.execute(sql`drop schema graphile_worker cascade`);
     await expect(cronKnownSince(test.admin.db, 'payroll.fetch_exchange_rates')).rejects.toThrow(
       '_private_known_crontabs',
     );
-    // Graphile's schema, as the API installs it when it starts.
-    const queue = await createJobQueue(test.admin.pool);
-    await queue.close();
+    // Graphile's schema, as the migrations install it (ADR 0087).
+    await runMigrations(test.admin);
   });
 
   it('is null until a worker carries the job, then the moment the first one started, kept across restarts', async () => {

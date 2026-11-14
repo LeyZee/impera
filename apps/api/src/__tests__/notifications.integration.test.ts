@@ -76,7 +76,7 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
   const config = () =>
     testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${randomBytes(32).toString('base64')}`,
     });
   let configured: ReturnType<typeof config>;

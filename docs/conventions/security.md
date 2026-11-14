@@ -27,6 +27,7 @@ Ce qu'on protège, par ordre d'importance : (1) les médias et conversations int
 - **Effacement** : une commande `erase-fan <id>` supprime tout ce qui concerne un fan (faits, résumés, médias, messages anonymisés dans le journal). Elle existe dès la phase 2, même si personne ne la demande : la construire après coup est dix fois plus cher.
 - **Chiffrement au repos** : disques VPS chiffrés, base chiffrée (Neon par défaut), bucket chiffré. Les champs les plus sensibles (sessions, faits de catégorie `intimate`) chiffrés applicativement en plus.
 - **Logs sans contenu** : par défaut, on logue des identifiants et des métadonnées, pas le texte des messages. Le contenu n'est consultable que dans le dashboard, authentifié, et dans Langfuse (accès restreint, rétention courte).
+- **Trois rôles de base (ADR 0005, ADR 0087)** : `nirvana_app` pour l'application, soumis aux politiques de lignes ; `impera_service` pour ce qui traverse les créatrices (`withAdmin`, la file des jobs), qui lit et écrit des lignes là où une migration le lui ouvre, ne possède aucune table, ne change aucune structure et ne réécrit pas `audit_log` ; `nirvana_admin`, le propriétaire, pour les migrations, la sauvegarde et les scripts `ops:*` seulement. L'API et le worker refusent de démarrer si leur connexion de service peut plus que cela.
 - **Tests et fixtures** : données inventées uniquement. Jamais un export réel dans le dépôt, même anonymisé « à la main ».
 
 ## 4. Le LLM comme surface d'attaque
@@ -68,7 +69,7 @@ Ce qu'on protège, par ordre d'importance : (1) les médias et conversations int
 
 - [ ] Aucune nouvelle entrée sans validation Zod.
 - [ ] Aucun secret, aucune donnée réelle.
-- [ ] Les nouvelles tables ont `creator_id` et une politique RLS.
+- [ ] Les nouvelles tables ont `creator_id` et une politique RLS, et leur migration dit ce qu'elle ouvre au rôle de service (`GRANT … TO impera_service`, rien par défaut).
 - [ ] Les nouveaux logs ne contiennent pas de contenu de message ni de session.
 - [ ] Les nouvelles actions externes passent par la politique en code, pas par une sortie LLM.
 - [ ] Les nouvelles dépendances sont justifiées.

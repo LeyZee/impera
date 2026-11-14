@@ -29,7 +29,7 @@ Le tout est décrit par `docker-compose.prod.yml`. L'API n'a pas de domaine : le
 ### 1.1 Base Neon
 
 1. Neon → nouveau projet, région Europe (Francfort), Postgres 16. PITR : 7 jours au moins. « Scale to zero » **désactivé** (le worker écoute la base en continu).
-2. Le rôle propriétaire créé par Neon sert de rôle admin (`nirvana_admin` dans la doc). Noter sa chaîne de connexion **directe** (sans `-pooler` dans l'hôte) : c'est `DATABASE_ADMIN_URL`.
+2. Le rôle propriétaire créé par Neon sert de rôle admin (`nirvana_admin` dans la doc). Noter sa chaîne de connexion **directe** (sans `-pooler` dans l'hôte) : c'est `DATABASE_ADMIN_URL`. Il possède les tables : il ne sert qu'aux migrations, à la sauvegarde et aux scripts `ops:*` lancés à la main. Ni l'API ni le worker ne se connectent avec lui (ADR 0087).
 3. Créer le rôle applicatif, sans contournement de RLS, dans l'éditeur SQL de Neon, connecté avec le rôle admin. Mot de passe : `openssl rand -base64 24`, jamais réutilisé.
 
    ```sql
@@ -47,6 +47,16 @@ Le tout est décrit par `docker-compose.prod.yml`. L'API n'a pas de domaine : le
 
    Attendu : le rôle admin à `rolbypassrls = t`, `nirvana_app` à `f`, et `rolsuper = f` pour les deux. Les migrations posent `FORCE ROW LEVEL SECURITY`, qui s'applique aussi au propriétaire des tables : sans `BYPASSRLS`, le déploiement passe, mais chaque job multi-tenant et chaque lecture `withAdmin` ne voient plus aucune ligne, sans erreur. L'attribut ne s'hérite pas de `neon_superuser`. Le serveur et le worker refusent d'ailleurs de démarrer dans ce cas (et si `nirvana_app` contourne la RLS), avec un message qui renvoie ici. Si le rôle admin est à `f`, **on s'arrête et on demande** : c'est une question d'ADR (0005), pas un réglage à contourner.
 5. `DATABASE_URL` = la même chaîne directe, avec `nirvana_app` et son mot de passe, et `?sslmode=require`.
+6. Le rôle de service (ADR 0087), celui avec lequel l'API et le worker traversent les créatrices (`withAdmin`, la file des jobs). Dans le même éditeur, avec un autre mot de passe sorti de `openssl rand -base64 24` :
+
+   ```sql
+   CREATE ROLE impera_service LOGIN PASSWORD '<mot de passe>' NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
+   GRANT CONNECT ON DATABASE neondb TO impera_service;
+   ```
+
+   `DATABASE_SERVICE_URL` = la même chaîne directe, avec `impera_service` et son mot de passe, et `?sslmode=require`. Les migrations lui donnent ses droits table par table : lire, et écrire seulement là où le code de service écrit. Il ne possède aucune table, ne crée, ne modifie ni ne supprime aucun objet, et ne réécrit pas le journal d'audit. Si le rôle n'existe pas, la migration le crée sans connexion et `migrate` lui donne le mot de passe de `DATABASE_SERVICE_URL`, une seule fois : dès que le rôle peut se connecter, `migrate` ne touche plus à son mot de passe, qui se change ici, dans l'éditeur SQL, puis dans Coolify. Le créer ici d'abord reste la voie recommandée : son mot de passe ne passe alors par aucune commande. Le serveur et le worker refusent de démarrer si `DATABASE_SERVICE_URL` désigne un rôle qui possède des tables, qui est superutilisateur ou qui peut créer un rôle ou une base, avec un message qui renvoie ici.
+
+   **Sur une installation qui tournait avant ce rôle** : le créer et poser `DATABASE_SERVICE_URL` dans Coolify **avant** de déployer la version qui l'exige. Tous les services du compose la demandent, `migrate` compris ; sans elle, le déploiement s'arrête avant toute migration et l'ancienne version continue de tourner.
 
 Le pooler de Neon (hôte en `-pooler`) est interdit : Graphile Worker a besoin de `LISTEN/NOTIFY`.
 
@@ -76,7 +86,7 @@ Toutes dans Coolify → Environment Variables, marquées « secret » quand c'es
 
 | Variable | Valeur |
 |---|---|
-| `DATABASE_URL`, `DATABASE_ADMIN_URL` | § 1.1 |
+| `DATABASE_URL`, `DATABASE_SERVICE_URL`, `DATABASE_ADMIN_URL` | § 1.1 |
 | `SESSION_ENCRYPTION_KEYS` | `v1:` + `openssl rand -base64 32` |
 | `CREDENTIALS_ENCRYPTION_KEYS` | `v1:` + une **autre** sortie de `openssl rand -base64 32` |
 | `AUTH_SECRET` | `openssl rand -base64 32` |

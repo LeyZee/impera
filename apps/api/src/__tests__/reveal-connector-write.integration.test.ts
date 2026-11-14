@@ -86,7 +86,7 @@ describe('Reveal connector: writes on FakeReveal (P2-03)', () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       SESSION_ENCRYPTION_KEYS: SESSION_KEYS,
     });
     logger = createLogger(config, new LogSink());
