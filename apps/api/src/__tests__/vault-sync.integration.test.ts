@@ -11,7 +11,7 @@ import {
 } from '@impera/contracts';
 import { eq, schema, sql, withTenant } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
 
 import { createOwner } from '../auth';
@@ -220,7 +220,8 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
       suggestedPriceMinor: { min: 1_000, max: 2_000 },
       removed: false,
     });
-    expect((await view()).folders.map((f) => f.folderRef)).toEqual(['folder_1', 'folder_2', 'folder_3']);
+    // Folders by name, numbers read as numbers (« Divers » before « SCRIPT 1 »), the loose media last.
+    expect((await view()).folders.map((f) => f.folderRef)).toEqual(['folder_3', 'folder_1', 'folder_2']);
     // No address of a file, ever.
     expect(JSON.stringify(await view())).not.toMatch(/https?:/u);
 
@@ -239,10 +240,15 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
   it('keeps a media Reveal no longer lists, and moves one that changed folder', async () => {
     const media = fake.state().media;
     const gone = media.findIndex((m) => m.id === 'media_02');
-    media.splice(gone, 1);
+    const [removed] = media.splice(gone, 1);
     const moved = media.find((m) => m.id === 'media_04');
-    if (moved === undefined) throw new Error('fixture changed');
+    if (removed === undefined || moved === undefined) throw new Error('fixture changed');
     moved.folderId = 'folder_2';
+    // The fixture's scripts use these media: the later tests read them from a vault left as it was.
+    onTestFinished(() => {
+      media.splice(gone, 0, removed);
+      moved.folderId = 'folder_1';
+    });
     await sync();
     const folder1 = await folderOf('folder_1');
     expect(folder1?.media.find((m) => m.platformMediaId === 'media_02')?.removed).toBe(true);
