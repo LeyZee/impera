@@ -214,6 +214,27 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(split.getAttribute('aria-label')).not.toContain('virements');
   });
 
+  it('says shares of a ring that add up to 100 %, in its legend and to a screen reader', async () => {
+    // Rounded alone: 33 + 33 + 33 = 99 %.
+    serve(200, {
+      ...AGENCY_WEEK,
+      kinds: [
+        { kind: 'subscriptions', revenueMinor: 10_000, sales: 4, previousRevenueMinor: 10_000 },
+        { kind: 'ppv', revenueMinor: 10_000, sales: 4, previousRevenueMinor: 10_000 },
+        { kind: 'tips', revenueMinor: 10_000, sales: 4, previousRevenueMinor: 10_000 },
+      ],
+    });
+    show();
+    const ring = await screen.findByRole('img', { name: /^D’où vient l’argent/u });
+    const card = ring.closest('article');
+    if (card === null) throw new Error('card');
+    const shares = Array.from(card.querySelectorAll('.ins-legend__share'), (one) =>
+      Number.parseInt(one.textContent, 10),
+    );
+    expect(shares).toEqual([34, 33, 33]);
+    expect(ring.getAttribute('aria-label')).toMatch(/34 %.*33 %.*33 %/u);
+  });
+
   it('says shares of « Où va l’argent » that add up to 100 %, the amounts as the platform gave them', async () => {
     // Rounded alone: 17 + 17 + 42 + 25 = 101 % (recette du 13/11).
     serve(200, {

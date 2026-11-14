@@ -62,18 +62,22 @@ describe('App before any session', () => {
   });
 
   it('says the server does not answer instead of asking to sign in, and asks again on its own', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // A clock only the test moves: one that also follows the real one fires a retry early on a slow machine.
+    vi.useFakeTimers();
     const fetch = serveMe(502, 502, 502, SIGNED_OUT);
     render(<App />);
-    expect(await screen.findByText('ne répond pas')).toBeDefined();
-    expect(screen.queryByLabelText('Mot de passe')).toBeNull();
-
-    // Quickly at first (a local server still starting), then every 30 s: 3 s, 10 s, 30 s.
     const after = async (ms: number): Promise<void> => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(ms);
       });
     };
+    // The answer is read and the retry armed before the clock moves: the message shows one step before its timer.
+    await after(0);
+    expect(screen.getByText('ne répond pas')).toBeDefined();
+    expect(screen.queryByLabelText('Mot de passe')).toBeNull();
+    expect(vi.getTimerCount()).toBe(1);
+
+    // Quickly at first (a local server still starting), then every 30 s: 3 s, 10 s, 30 s.
     await after(2_000);
     expect(fetch).toHaveBeenCalledTimes(1);
     await after(1_500);
@@ -86,6 +90,7 @@ describe('App before any session', () => {
     expect(fetch).toHaveBeenCalledTimes(3);
     await after(3_000);
     expect(fetch).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
     expect(await screen.findByLabelText('Mot de passe')).toBeDefined();
   });
 

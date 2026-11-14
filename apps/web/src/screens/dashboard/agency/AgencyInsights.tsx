@@ -25,6 +25,7 @@ import {
   moneyParts,
   moneyShares,
   moneyTip,
+  sharesOf,
   type MoneyPart,
   OTHER,
   OTHER_KINDS_NOTE,
@@ -612,11 +613,17 @@ function Ring({
   const radius = 52;
   const shown = slices.filter((slice) => slice.cents > 0);
   const total = shown.reduce((sum, slice) => sum + slice.cents, 0);
+  // Settled together, so the legend adds up to 100 % where each share rounded alone could say 99 or 101.
+  const shares = sharesOf(
+    shown.map((slice) => slice.cents),
+    total,
+  );
   const geometry = arcs(
     shown.map((slice) => slice.cents),
     radius,
   );
   const litSlice = lit === null ? null : shown[lit];
+  const litShare = lit === null ? 0 : (shares[lit] ?? 0);
   return (
     <article className="nv-plate ins-ring-card">
       <h3 className="ins-card__title">{title}</h3>
@@ -627,7 +634,7 @@ function Ring({
           <div
             className={lit === null ? 'ins-ring' : 'ins-ring is-lit'}
             role="img"
-            aria-label={`${title} : ${shown.map((s) => `${s.label} ${String(shareOf(s.cents, total))} %`).join(', ')}`}
+            aria-label={`${title} : ${shown.map((s, i) => `${s.label} ${String(shares[i] ?? 0)} %`).join(', ')}`}
           >
             <svg viewBox="0 0 132 132" aria-hidden="true">
               <circle className="ins-ring__track" cx="66" cy="66" r={radius} />
@@ -663,7 +670,7 @@ function Ring({
                 </>
               ) : (
                 <>
-                  <b className="ins-ring__value">{String(shareOf(litSlice.cents, total))}&nbsp;%</b>
+                  <b className="ins-ring__value">{String(litShare)}&nbsp;%</b>
                   <span className="ins-ring__sub">{litSlice.label}</span>
                 </>
               )}
@@ -713,7 +720,7 @@ function Ring({
                     <span className="ins-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
                     <span className="ins-legend__label">{slice.label}</span>
                     <span className="ins-legend__value">{euros(slice.cents)}</span>
-                    <span className="ins-legend__share">{String(shareOf(slice.cents, total))}&nbsp;%</span>
+                    <span className="ins-legend__share">{String(shares[i] ?? 0)}&nbsp;%</span>
                     <Delta current={slice.cents} previous={slice.previousCents} />
                   </button>
                 </li>

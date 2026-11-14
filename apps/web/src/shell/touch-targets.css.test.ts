@@ -117,6 +117,18 @@ describe('touch targets on a phone (CR-01)', () => {
     );
   });
 
+  it('lets a section’s tabs scroll on any screen once they are wider than their place', () => {
+    const css = sheet('./shell.css');
+    const wide = css.slice(0, css.indexOf('@media (max-width: 820px) {'));
+    // Outside the phone's media query: eleven tabs do not fit at 1280 px either (recette du 14/11).
+    expect(rule(wide, '.nv-subnav')).toContain('max-width: 100%');
+    const scrolling = rule(wide, ".nv-subnav[data-more]:not([data-more='none'])");
+    expect(scrolling).toContain('overflow-x: auto');
+    const reachOfTab = reach(rule(css, '.nv-subnav__item::after'))?.block ?? Infinity;
+    expect(px(scrolling, 'padding-block')).toBeGreaterThanOrEqual(reachOfTab);
+    expect(rule(wide, ".nv-subnav[data-more='end']")).toContain('mask-image');
+  });
+
   it('keeps the tabs’ hit area inside their scrolling pill on a phone', () => {
     const css = sheet('./shell.css');
     const phone = css.slice(css.indexOf('@media (max-width: 820px) {'));
