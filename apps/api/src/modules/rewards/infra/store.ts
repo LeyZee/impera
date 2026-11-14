@@ -3,8 +3,10 @@ import {
   newId,
   RewardGainIdSchema,
   TeamMemberIdSchema,
+  UserIdSchema,
   type Currency,
   type TeamMemberId,
+  type UserId,
 } from '@impera/contracts';
 import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
@@ -28,7 +30,8 @@ export interface RewardsReads {
     now: Date,
   ) => Promise<GamePay & { readonly currency: Currency | null; readonly timedNets: readonly TimedNet[] }>;
   readonly shifts: (tx: Transaction, memberId: TeamMemberId, now: Date) => Promise<GameShift[]>;
-  readonly shiftsBegun: (tx: Transaction, memberId: TeamMemberId, now: Date) => Promise<ChallengeShift[]>;
+  /** The member's own shifts begun, read as the member by the planning (its own transaction). */
+  readonly shiftsBegun: (userId: UserId, now: Date) => Promise<ChallengeShift[]>;
 }
 
 const GainKindSchema = z.enum(['tier', 'level', ...TROPHY_KINDS]);
@@ -146,7 +149,6 @@ export function createDrizzleRewardsStore(
         const agencyZone = await reads.agencyTimeZone(tx);
         const pay = await reads.payFacts(tx, memberId, agencyZone, now);
         return {
-          memberId,
           agencyZone,
           currency: pay.currency,
           cumulatedNetMinor: pay.cumulatedNetMinor,
@@ -155,12 +157,8 @@ export function createDrizzleRewardsStore(
         };
       });
       if (own === null) return null;
-      // A member's shifts are read creator by creator under row-level security; the challenge needs them on every
-      // creator at once, so this one read crosses tenants on the service connection, bounded to the member the
-      // session's own record names just above. Nothing of anyone else's is read.
-      const { memberId, ...facts } = own;
-      const shifts = await withAdmin(adminDb, (tx) => reads.shiftsBegun(tx, memberId, now));
-      return { ...facts, shifts };
+      // The planning reads his shifts as himself, creator by creator, in a transaction of its own.
+      return { ...own, shifts: await reads.shiftsBegun(UserIdSchema.parse(userId), now) };
     },
 
     ofMember: (viewerId, memberId) =>

@@ -325,6 +325,7 @@ function sameSlotBefore(at: Date, weeks: number): Date {
 describe('Jeu du chatteur : défi du shift, niveaux, fiche du membre (ADR 0104 § 14, § 16, § 20)', () => {
   let team: PayrollTeam;
   let karim: TeamMember;
+  let lea: TeamMember;
   let karimCookie: string;
   let leaCookie: string;
   let managerCookie: string;
@@ -345,7 +346,7 @@ describe('Jeu du chatteur : défi du shift, niveaux, fiche du membre (ADR 0104 �
   beforeAll(async () => {
     team = await startPayrollTeam(inject('pgSuperuserUrl'));
     ({ member: karim, cookie: karimCookie } = await team.addMember('karim@example.test', 'Karim'));
-    ({ cookie: leaCookie } = await team.addMember('lea@example.test', 'Léa'));
+    ({ member: lea, cookie: leaCookie } = await team.addMember('lea@example.test', 'Léa'));
     ({ cookie: managerCookie } = await team.addMember('manon@example.test', 'Manon', 'manager'));
     const db = team.test.admin.db;
     await db.insert(schema.accountPayRules).values({
@@ -426,6 +427,40 @@ describe('Jeu du chatteur : défi du shift, niveaux, fiche du membre (ADR 0104 �
     const challenge = await challengeOf(karimCookie);
     expect(challenge).toMatchObject({ currency: 'EUR', targetMinor: 2_500, netMinor: 3_000, met: true });
     expect(challenge?.shiftStartsAt).toBe(startsAt.toISOString());
+  });
+
+  it('reads a chatter his own shifts on every creator, never a colleague’s', async () => {
+    const db = team.test.admin.db;
+    // One of Karim's on Béa, two days off the slot of the others, and one of Léa's on Anna.
+    const onBea = new Date(sameSlotBefore(startsAt, 5).getTime() + 2 * 24 * HOUR);
+    const leas = new Date(sameSlotBefore(startsAt, 2).getTime() + 24 * HOUR);
+    for (const [memberId, creatorId, platformAccountId, start] of [
+      [karim.id, team.bea, team.beas, onBea],
+      [lea.id, team.anna, team.annas, leas],
+    ] as const) {
+      await db.insert(schema.shifts).values({
+        id: newId(ShiftIdSchema),
+        creatorId,
+        platformAccountId,
+        memberId,
+        startsAt: start,
+        endsAt: new Date(start.getTime() + 4 * HOUR),
+        createdBy: team.ownerId,
+        updatedBy: team.ownerId,
+      });
+    }
+    const { reads } = team.app.modules.scheduling;
+    const karims = await reads.ownShiftsBegun(karim.userId, new Date());
+    expect(karims.map((shift) => shift.startsAt.toISOString())).toEqual(
+      [onBea, ...[4, 3, 2, 1].map((weeks) => sameSlotBefore(startsAt, weeks)), startsAt].map((at) =>
+        at.toISOString(),
+      ),
+    );
+    expect((await reads.ownShiftsBegun(lea.userId, new Date())).map((shift) => shift.startsAt)).toEqual([
+      leas,
+    ]);
+    // The shift on another creator is not comparable: the challenge stands as it was.
+    expect(await challengeOf(karimCookie)).toMatchObject({ targetMinor: 2_500, netMinor: 3_000 });
   });
 
   it('has no challenge for a chatter with no shift, and none at all for the owner or without a session', async () => {

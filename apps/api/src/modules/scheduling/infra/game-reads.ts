@@ -40,37 +40,3 @@ export async function shiftsForGameUnscoped(
     return { endsAt: row.ends_at, reportedAt: row.reported_at };
   });
 }
-
-/** A shift a member began, as the shift's challenge reads it (ADR 0104 § 14). */
-export interface ShiftForChallenge {
-  readonly startsAt: Date;
-  /** When it ended or will: the minute it was stopped at when a person stopped it under way. */
-  readonly endsAt: Date;
-}
-
-const CHALLENGE_HISTORY_DAYS = 63;
-const ChallengeRowSchema = z.object({ starts_at: instant, ends_at: instant });
-
-/**
- * A member's shifts begun at `now` in the nine weeks before (eight weeks of history before the shift shown), the
- * oldest first, on every creator, cancelled ones left out. Read only, on the service connection: a member's shifts
- * are closed outside a creator under row-level security, and the challenge reads them across creators. The caller
- * passes the member the session's own record names, never an id from a request.
- */
-export async function shiftsForChallengeUnscoped(
-  tx: Transaction,
-  memberId: TeamMemberId,
-  now: Date,
-): Promise<ShiftForChallenge[]> {
-  const result = await tx.execute(sql`
-    select s.starts_at, s.ends_at
-    from shifts s
-    where s.member_id = ${memberId} and s.cancelled_at is null
-      and s.starts_at <= ${now.toISOString()}::timestamptz
-      and s.starts_at >= ${now.toISOString()}::timestamptz - make_interval(days => ${CHALLENGE_HISTORY_DAYS})
-    order by s.starts_at`);
-  return result.rows.map((raw) => {
-    const row = ChallengeRowSchema.parse(raw);
-    return { startsAt: row.starts_at, endsAt: row.ends_at };
-  });
-}

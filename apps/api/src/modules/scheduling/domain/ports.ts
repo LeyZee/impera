@@ -219,6 +219,17 @@ export interface PlanningStore {
     status: TeamMemberStatus;
     shifts: (StoredShift & { platform: Platform; handle: string })[];
   } | null>;
+  /**
+   * The member's own shifts not cancelled that began in [`since`, `until`], the oldest first, read as the member
+   * himself creator by creator: when each began and ended, or will, nothing else. Empty for an account with no member
+   * row (ADR 0104 § 14).
+   */
+  ownShiftsBegun(
+    actor: UserId,
+    creatorIds: readonly CreatorId[],
+    since: Date,
+    until: Date,
+  ): Promise<{ startsAt: Date; endsAt: Date }[]>;
   /** Owner and active manager: each shift covering `at`, of an active member, with that member, on what he plans. */
   onDuty(
     actor: UserId,
