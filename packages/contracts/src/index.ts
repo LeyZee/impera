@@ -19,6 +19,7 @@ export * from './creator-space';
 export * from './creator-tasks';
 export * from './creators';
 export * from './agency-insights';
+export * from './ai-budget';
 export * from './ai-usage';
 export * from './creators-overview';
 export * from './dashboard';
