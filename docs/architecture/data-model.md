@@ -502,6 +502,18 @@ script_structure_versions id, structure_id, version ≥ 1 (unique par structure)
                           le numéro ne change pas)
 script_structure_queue    creator_id, position 1–20, structure_id (unique par créatrice), added_by, created_at
                           (clé : creator_id, position ; RLS de la créatrice et portée de l'équipe ; remplacée en entier)
+platform_scripts          id, creator_id, platform_account_id → platform_accounts, platform_script_ref (unique par
+                          compte), name (celui de la plateforme), moment? (day|night), fingerprint, active,
+                          deactivated_at? (présent si et seulement si inactif), synced_at, created_at
+                          (scripts natifs, ADR 0099 § 1 temps 2, migration 0201 ; jamais supprimés)
+platform_script_steps     platform_script_id, creator_id, position ≥ 0 (stepIndex), platform_step_ref, name, text,
+                          price_minor ≥ 0 (centimes TTC, tel quel), currency
+                          (clé : platform_script_id, position ; réécrites en entier quand le script change)
+platform_script_step_media platform_script_id, creator_id, position, role (sold|preview), rank, platform_media_ref, kind
+                          (clé : script, position, role, rank ; reliée au coffre par platform_media_ref, sans clé
+                          étrangère)
+                          (les trois : RLS forcée de la créatrice, lues par le propriétaire et les managers actifs,
+                          fermées à son compte ; écrites par l'import en rôle de service seulement)
 ```
 
 La règle 6 de l'ADR 0056 § 1 est tenue en base : la dernière version change sur place tant que `frozen_at` est nul, puis un enregistrement écrit la version suivante (SC-01, migration 0084).

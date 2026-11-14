@@ -662,3 +662,15 @@ export const ScriptCardPreviewBodySchema = z.strictObject({
   format: z.enum(['card', 'thumbnail']).default('card'),
 });
 export type ScriptCardPreviewBody = z.infer<typeof ScriptCardPreviewBodySchema>;
+
+/**
+ * The media of a native script's step (glossary « Script natif », ADR 0099 § 1): those it sells (`sold`), those it
+ * shows before it is bought (`preview`).
+ */
+export const PLATFORM_SCRIPT_MEDIA_ROLES = ['sold', 'preview'] as const;
+export const PlatformScriptMediaRoleSchema = z.enum(PLATFORM_SCRIPT_MEDIA_ROLES);
+export type PlatformScriptMediaRole = z.infer<typeof PlatformScriptMediaRoleSchema>;
+
+/** A native script as Impera mirrors it (`platform_scripts`, ADR 0099 § 1 time 2). */
+export const PlatformScriptIdSchema = z.uuid().brand<'PlatformScriptId'>();
+export type PlatformScriptId = z.infer<typeof PlatformScriptIdSchema>;
