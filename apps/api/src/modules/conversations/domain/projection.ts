@@ -67,7 +67,9 @@ const COMMANDS: Readonly<Partial<Record<EventType, ConversationCommand>>> = {
 /** The state-machine command an event stands for, if it moves the state. */
 export function commandFor(event: EventBody): ConversationCommand | null {
   if (event.type === 'message_received') {
-    return event.payload.direction === 'inbound' ? 'receive_inbound' : null;
+    if (event.payload.direction === 'inbound') return 'receive_inbound';
+    // Read from the event, never from the state at replay (ADR 0007): the command saw him waiting (ADR 0110 § 2).
+    return event.payload.answersFan === true ? 'answered_on_platform' : null;
   }
   if (event.type === 'send_failed') {
     // `isFinal` is absent from events written before it existed: the attempt count decides for them.

@@ -12,8 +12,10 @@ import {
   type AutomaticGate,
   type BlindTestResult,
   type LiveRateReading,
+  type MessageId,
   type ConversationId,
   type ConversationMode,
+  type ConversationState,
   type CreatorId,
   type DraftId,
   type ExternalMessage,
@@ -159,6 +161,9 @@ export interface CommandDeps {
 
 const NEW_FAN_MESSAGE = 'Nouveau message du fan';
 const TAKEN_OVER = 'Conversation reprise par un humain';
+const ANSWERED_ON_PLATFORM = 'Déjà répondu sur la plateforme';
+/** The states in which his last message still waits for the agent's answer (ADR 0110 § 2). */
+const AWAITING_AGENT: readonly ConversationState[] = ['pending', 'drafting', 'awaiting_approval'];
 /** How far back the guards read what she already sent (P3-13): the conversation's last twenty messages. */
 const GUARD_HISTORY_MESSAGES = 20;
 
@@ -180,6 +185,19 @@ async function expireOpenDrafts(
     await setDraftStatus(tx, draft, 'expired', { decidedBy: null, at: meta.at });
   }
   return current;
+}
+
+/** His messages since the last one of the creator's side carry a sign the safety net answers (a minor, self-harm). */
+async function waitingSafetySign(
+  tx: Transaction,
+  conversation: Conversation,
+  answer: MessageId,
+): Promise<boolean> {
+  const history = (await tx.messages.history(conversation.id, GUARD_HISTORY_MESSAGES)).filter(
+    (message) => message.id !== answer,
+  );
+  const lastReply = history.findLastIndex((message) => message.author !== 'fan');
+  return history.slice(lastReply + 1).some((message) => safetySigns(message.text).length > 0);
 }
 
 /** Opens the lock and holds it for the transaction, or refuses Automatique with what is missing. */
@@ -253,6 +271,21 @@ export function createConversationCommands({
           correlationId: input.correlationId,
           at,
         };
+        // Answered on the platform (ADR 0110 § 2): a chatter, the creator or an automation wrote while he waited for
+        // the agent. Her open draft falls and nothing of hers goes over it, unless his words carry a sign the safety
+        // net answers, or a care episode is open (ADR 0088): then the agent's draft still reaches a human.
+        const answered =
+          author === 'human' &&
+          AWAITING_AGENT.includes(conversation.state) &&
+          conversation.careSince === null &&
+          !(await waitingSafetySign(tx, conversation, messageId));
+        if (answered)
+          conversation = await expireOpenDrafts(tx, conversation, ANSWERED_ON_PLATFORM, {
+            ...meta,
+            actor: 'system',
+          });
+        // An expired draft already put him at rest; otherwise the message itself does.
+        const answersFan = answered && AWAITING_AGENT.includes(conversation.state);
         conversation = await appendEvent(
           tx,
           conversation,
@@ -265,6 +298,7 @@ export function createConversationCommands({
               author,
               // Media are matched to `media_assets` by the media module (P3-04).
               mediaIds: [],
+              ...(answersFan && { answersFan: true as const }),
             },
           },
           meta,

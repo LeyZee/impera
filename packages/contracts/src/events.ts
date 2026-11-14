@@ -56,6 +56,13 @@ const messagePayload = z.object({
   direction: MessageDirectionSchema,
   author: MessageAuthorSchema,
   mediaIds: z.array(MediaAssetIdSchema),
+  /**
+   * On `message_received`, written on the creator's side by someone else than the agent (a chatter, the creator, or
+   * an automation of the platform) while the fan's last message waited for the agent's answer: that message is
+   * answered, the agent writes nothing over it (ADR 0110 § 2). Set by the command as it saw the conversation; absent
+   * everywhere else, and on the events written before: they replay as they were decided.
+   */
+  answersFan: z.literal(true).optional(),
 });
 
 const sendPayload = z.object({
