@@ -15,6 +15,8 @@ import {
   ShiftIdSchema,
   TeamMemberIdSchema,
 } from './ids';
+import { CurrencySchema } from './money';
+import { SaleTypeSchema } from './sales-feed';
 import { PLANNING_MAX_DAYS } from './scheduling';
 import {
   ScriptMomentSchema,
@@ -479,3 +481,57 @@ export const McpAiUsageSchema = z.strictObject({
   lastCallAt: z.iso.datetime({ offset: true }).nullable(),
 });
 export type McpAiUsage = z.infer<typeof McpAiUsageSchema>;
+
+/** The longest period `sales_list` reads, days both included: the connectors' own bound (a quarter and a few days). */
+export const MCP_SALES_MAX_DAYS = 93;
+
+const dayMs = (day: string): number => Date.parse(`${day}T00:00:00Z`);
+
+/** `sales_list`'s input: days both included, `to` not before `from`, `MCP_SALES_MAX_DAYS` at most. */
+export const McpSalesInputSchema = z
+  .strictObject({ creatorId: CreatorIdSchema.optional(), from: z.iso.date(), to: z.iso.date() })
+  .refine(({ from, to }) => {
+    const span = (dayMs(to) - dayMs(from)) / 86_400_000 + 1;
+    return span >= 1 && span <= MCP_SALES_MAX_DAYS;
+  });
+
+const cents = z.number().int();
+const counted = z.number().int().nonnegative();
+
+/**
+ * `sales_list` (ADR 0073, ADR 0105 § 3 and § 4, `read:sales`; Charles's decision A of 14/11): each creator's sales as
+ * the platform says them, summed over every seller and every account of hers, by day, platform, currency and kind.
+ * Never a seller, a member, an amount per member, the agency's nor the creator's share: no rate can be read from it.
+ */
+export const McpSalesListSchema = z.strictObject({
+  from: z.iso.date(),
+  to: z.iso.date(),
+  creators: z.array(
+    z.strictObject({
+      creatorId: CreatorIdSchema,
+      rows: z.array(
+        z.strictObject({
+          day: z.iso.date(),
+          platform: PlatformSchema,
+          currency: CurrencySchema,
+          saleType: SaleTypeSchema,
+          sales: counted,
+          refunds: counted,
+          grossInclVatMinor: cents,
+          grossExclVatMinor: cents,
+          netMinor: cents,
+        }),
+      ),
+      refundsWithoutSale: counted,
+      /** How far each platform's register was read: a day not read is never a day without a sale. */
+      readings: z.array(
+        z.strictObject({
+          platform: PlatformSchema,
+          readAt: z.iso.datetime().nullable(),
+          pausedUntil: z.iso.datetime().nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+export type McpSalesList = z.infer<typeof McpSalesListSchema>;

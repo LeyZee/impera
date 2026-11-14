@@ -7,6 +7,7 @@ import { contentTools } from './application/content-tools';
 import { createDispatcher, whoami } from './application/dispatch';
 import { createGrants } from './application/grants';
 import { creatorTools, fanTools } from './application/read-tools';
+import { salesTools } from './application/sales-tools';
 import { statusTools } from './application/status-tools';
 import { teamTools } from './application/team-tools';
 import type { ActorView } from './domain/access';
@@ -16,6 +17,7 @@ import type {
   CreatorReader,
   FanReader,
   GrantRecord,
+  SalesReader,
   ShiftReader,
   TeamImportReader,
 } from './domain/ports';
@@ -42,6 +44,8 @@ export interface McpModule {
 }
 
 export type { ActorView } from './domain/access';
+/** @public What the wiring throws when another module's read refuses the person: a refusal, never an internal error. */
+export { McpReadRefused } from './domain/errors';
 
 export interface McpDeps {
   /** Application role: the owner's accesses under his policies. */
@@ -63,6 +67,8 @@ export interface McpDeps {
   readonly shifts: ShiftReader;
   /** The team imported from a platform (`connectors.reads.teamImport`), for `team_import_list`. */
   readonly teamImport: TeamImportReader;
+  /** A creator's sales (`connectors.reads.sales`), for `sales_list`: never a share, summed over sellers here. */
+  readonly sales: SalesReader;
   /** The AI spend (`ai-usage`), for `ai_usage_get`, the owner's alone. */
   readonly aiUsage: AiUsageReader;
 }
@@ -93,6 +99,7 @@ export function createMcpModule(deps: McpDeps): McpModule {
               ...contentTools(deps.content),
               ...teamTools(deps.shifts, deps.teamImport),
               ...statusTools(deps.aiUsage),
+              ...salesTools(deps.sales, deps.creators),
             },
           }),
         allowedOrigins: [],

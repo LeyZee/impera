@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import type { ActorView } from '../../domain/access';
+import { McpReadRefused } from '../../domain/errors';
 import type { GrantRecord, McpCallRecord } from '../../domain/ports';
 import { createDispatcher, whoami, type ServedTool } from '../dispatch';
 
@@ -127,6 +128,35 @@ describe('the dispatcher of the MCP server (ADR 0026 § 4 and § 8)', () => {
     const { call, lines } = setup({ spend: false });
     expect(await call('whoami')).toEqual({ ok: false, refusal: 'rate_limited' });
     expect(lines.at(-1)?.outcome).toBe('rate_limited');
+  });
+
+  it('answers a read the module refused to the person as a refusal, written down, never as an error', async () => {
+    const lines: McpCallRecord[] = [];
+    const refused: ServedTool = {
+      ...creatorGet,
+      run: () => Promise.reject(new McpReadRefused('creator_forbidden')),
+    };
+    const dispatcher = createDispatcher({
+      journal: {
+        record: (entry) => {
+          lines.push(entry);
+          return Promise.resolve();
+        },
+      },
+      spendRead: () => Promise.resolve(true),
+      tools: { creator_get: refused },
+    });
+    expect(
+      await dispatcher.call({
+        grant,
+        actor: owner,
+        name: 'creator_get',
+        args: {},
+        requestId: 'req-1',
+        ip: '203.0.113.1',
+      }),
+    ).toEqual({ ok: false, refusal: 'creator_forbidden' });
+    expect(lines.map((line) => line.outcome)).toEqual(['creator_forbidden']);
   });
 
   it('gives nothing when the call cannot be written down', async () => {
