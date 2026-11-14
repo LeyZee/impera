@@ -128,3 +128,19 @@ export const McpWhoamiSchema = z.strictObject({
   catalogueVersion: z.string(),
 });
 export type McpWhoami = z.infer<typeof McpWhoamiSchema>;
+
+/** A creator as an agent reads her (ADR 0026 § 5): never her persona, her platforms or her photo. */
+export const McpCreatorSchema = z.strictObject({
+  id: CreatorIdSchema,
+  displayName: z.string(),
+  timezone: z.string(),
+});
+export type McpCreator = z.infer<typeof McpCreatorSchema>;
+
+/** `creators_list`: the creators the call may read, archived ones left out (ADR 0071 § 2), ordered by name. */
+export const McpCreatorListSchema = z.strictObject({ creators: z.array(McpCreatorSchema) });
+export type McpCreatorList = z.infer<typeof McpCreatorListSchema>;
+
+/** `creator_get`: the access's creator, `null` once she is archived. */
+export const McpCreatorGetSchema = z.strictObject({ creator: McpCreatorSchema.nullable() });
+export type McpCreatorGet = z.infer<typeof McpCreatorGetSchema>;

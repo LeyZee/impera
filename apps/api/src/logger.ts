@@ -64,6 +64,34 @@ function loggedError(value: unknown): unknown {
   } satisfies LoggedError;
 }
 
+/** The MCP server's door (ADR 0026 § 2): its URL is logged without its query, where a token pasted by mistake would sit. */
+const AGENT_DOOR = '/v1/mcp';
+
+/**
+ * The `req` serializer, in place of Fastify's own (same fields): a request's line keeps its path, and its query too
+ * except on the MCP server's door, which takes none and refuses one (security.md § 6, relecture #746). A token there
+ * would be refused, but already written in the line of the request.
+ */
+const fieldOf = (object: unknown, key: string): unknown =>
+  typeof object === 'object' && object !== null ? Reflect.get(object, key) : undefined;
+
+function loggedRequest(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+  const field = (key: string): unknown => fieldOf(value, key);
+  const url = field('url');
+  const path = typeof url === 'string' ? (url.split('?')[0] ?? url) : url;
+  const headers = field('headers');
+  const socket = field('socket');
+  return {
+    method: field('method'),
+    url: typeof path === 'string' && path.startsWith(AGENT_DOOR) ? path : url,
+    version: fieldOf(headers, 'accept-version'),
+    host: field('host'),
+    remoteAddress: field('ip'),
+    remotePort: fieldOf(socket, 'remotePort'),
+  };
+}
+
 /** One structured logger per process, shared by Fastify and Graphile Worker; `destination` is for tests. */
 export function createLogger(config: Pick<Config, 'LOG_LEVEL'>, destination?: DestinationStream): Logger {
   return pino(
@@ -71,7 +99,7 @@ export function createLogger(config: Pick<Config, 'LOG_LEVEL'>, destination?: De
       level: config.LOG_LEVEL,
       base: { service: 'impera-api' },
       redact: { paths: REDACTED_PATHS, censor: '[redacted]' },
-      serializers: { err: loggedError, error: loggedError },
+      serializers: { err: loggedError, error: loggedError, req: loggedRequest },
     },
     destination,
   );
