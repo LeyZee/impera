@@ -1,6 +1,7 @@
 import { owedReveals, TrophyCaseSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { levelSteps } from '../levels';
 import { TROPHY_KINDS } from '../trophies';
 import { gainKeyOf, trophyCaseOf, type StoredGain } from '../trophy-case';
 
@@ -13,7 +14,7 @@ const gain = (kind: StoredGain['kind'], earned: string, scopeKey = '', revealed?
 
 describe('trophyCaseOf (ADR 0104 § 13 and § 15)', () => {
   it('lists every trophy of the closed list, none earned, for a member with nothing', () => {
-    const empty = trophyCaseOf([], { current: 0, best: 0 });
+    const empty = trophyCaseOf([], { current: 0, best: 0 }, null);
     expect(TrophyCaseSchema.safeParse(empty).success).toBe(true);
     expect(empty.items.map((item) => item.kind)).toEqual([...TROPHY_KINDS]);
     expect(empty.items.every((item) => item.earnedAt === null && item.revealedAt === null)).toBe(true);
@@ -22,7 +23,7 @@ describe('trophyCaseOf (ADR 0104 § 13 and § 15)', () => {
   });
 
   it('shows how far the streak is from each streak trophy still ahead, and nothing on the others', () => {
-    const { items } = trophyCaseOf([gain('streak_5', '2026-11-10T10:00:00Z')], { current: 7, best: 7 });
+    const { items } = trophyCaseOf([gain('streak_5', '2026-11-10T10:00:00Z')], { current: 7, best: 7 }, null);
     const progress = (kind: string) => items.find((item) => item.kind === kind)?.progress;
     expect(progress('streak_5')).toBeNull();
     expect(progress('streak_10')).toEqual({ current: 7, target: 10, unit: 'shift' });
@@ -40,6 +41,7 @@ describe('trophyCaseOf (ADR 0104 § 13 and § 15)', () => {
         gain('first_sale', '2026-11-02T10:00:00Z'),
       ],
       { current: 0, best: 0 },
+      null,
     );
     const tiers = trophyCase.items.filter((item) => item.family === 'medal');
     expect(tiers.map((item) => item.kind)).toEqual(['tier:2026-11-01:100000', 'tier:2026-11-01:200000']);
@@ -53,5 +55,55 @@ describe('trophyCaseOf (ADR 0104 § 13 and § 15)', () => {
   it('reads back the stored key of an item', () => {
     expect(gainKeyOf('first_sale')).toEqual({ kind: 'first_sale', scopeKey: '' });
     expect(gainKeyOf('tier:2026-11-01:100000')).toEqual({ kind: 'tier', scopeKey: '2026-11-01:100000' });
+    expect(gainKeyOf('level:3')).toEqual({ kind: 'level', scopeKey: '3' });
+  });
+});
+
+describe('the rank in the case (ADR 0104 § 16)', () => {
+  const steps = levelSteps([100_000, 500_000, 2_000_000]);
+  const ranks = [
+    gain('level', '2026-11-03T10:00:00Z', '1', '2026-11-03T11:00:00Z'),
+    gain('level', '2026-11-09T10:00:00Z', '2'),
+  ];
+  const streak = { current: 0, best: 0 };
+
+  it('holds the highest rank noted and owes the reveal of a rank not played yet', () => {
+    const trophyCase = trophyCaseOf(ranks, streak, null);
+    expect(trophyCase.level).toEqual({ rank: 2, name: 'Légionnaire' });
+    expect(trophyCase.nextLevel).toBeNull();
+    expect(trophyCase.items.filter((item) => item.family === 'level').map((item) => item.kind)).toEqual([
+      'level:1',
+      'level:2',
+    ]);
+    expect(owedReveals(trophyCase).map((item) => item.kind)).toEqual(['level:2']);
+    expect(TrophyCaseSchema.safeParse(trophyCase).success).toBe(true);
+  });
+
+  it('says the rank ahead and how far the net is, to the account itself', () => {
+    const progress = { steps, cumulatedNetMinor: 800_000, currency: 'EUR' as const };
+    expect(trophyCaseOf(ranks, streak, progress).nextLevel).toEqual({
+      rank: 3,
+      name: 'Décurion',
+      thresholdMinor: 2_000_000,
+      currentMinor: 800_000,
+      currency: 'EUR',
+    });
+    expect(trophyCaseOf([], streak, progress).nextLevel?.rank).toBe(1);
+  });
+
+  it('keeps a rank a refund went back under, and never reads below zero', () => {
+    const progress = { steps, cumulatedNetMinor: -5_000, currency: 'EUR' as const };
+    const trophyCase = trophyCaseOf(ranks, streak, progress);
+    expect(trophyCase.level?.rank).toBe(2);
+    expect(trophyCase.nextLevel?.currentMinor).toBe(0);
+  });
+
+  it('has no rank ahead at the top, with no threshold set above, or with no sale yet', () => {
+    expect(
+      trophyCaseOf(ranks, streak, { steps: steps.slice(0, 2), cumulatedNetMinor: 1, currency: 'EUR' })
+        .nextLevel,
+    ).toBeNull();
+    expect(trophyCaseOf([], streak, { steps, cumulatedNetMinor: 0, currency: null }).nextLevel).toBeNull();
+    expect(trophyCaseOf([], streak, { steps: [], cumulatedNetMinor: 9, currency: 'EUR' }).level).toBeNull();
   });
 });

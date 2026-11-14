@@ -1,6 +1,9 @@
 import {
   AccountPayRulesIdSchema,
+  LevelSettingsSchema,
+  MyShiftChallengeSchema,
   newId,
+  payPeriodAt,
   PayPeriodSchema,
   RewardGainIdSchema,
   SalesLineIdSchema,
@@ -288,5 +291,247 @@ describe('Jeu du chatteur : gains notés une fois, chacun sa vitrine (ADR 0104)'
     await evaluate();
     expect(await team.statementOf(theo, P1)).toEqual(before);
     expect(await team.jobsFor(P1)).toEqual([]);
+  });
+});
+
+const ZONE = 'Europe/Paris';
+const WEEK = 7 * 24 * HOUR;
+
+/** The weekday and the time of day of an instant in the agency's zone. */
+const slotOf = (at: Date): string =>
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: ZONE,
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(at);
+
+/** The instant `weeks` weeks before `at` that falls on the same weekday at the same time there, clock changes included. */
+function sameSlotBefore(at: Date, weeks: number): Date {
+  const found = [0, HOUR, -HOUR]
+    .map((shiftMs) => new Date(at.getTime() - weeks * WEEK + shiftMs))
+    .find((candidate) => slotOf(candidate) === slotOf(at));
+  if (found === undefined) throw new Error('no instant in the same slot');
+  return found;
+}
+
+/**
+ * The second part of the game (ADR 0104 § 14, § 16 and § 20, CHF-01 lot 2b). Karim held four shifts on the same
+ * weekday at the same time and is in a fifth now: his challenge is the median of the four. The owner sets the
+ * thresholds of the levels; the job notes the ranks his net has reached; the owner and a manager read his case on his
+ * file, a colleague does not. Everything is invented (ADR 0010).
+ */
+describe('Jeu du chatteur : défi du shift, niveaux, fiche du membre (ADR 0104 § 14, § 16, § 20)', () => {
+  let team: PayrollTeam;
+  let karim: TeamMember;
+  let karimCookie: string;
+  let leaCookie: string;
+  let managerCookie: string;
+  // The minute is kept whole: a shift starts on one.
+  const startsAt = new Date(Math.floor((Date.now() - HOUR) / 60_000) * 60_000);
+
+  const caseOf = async (cookie: string): Promise<TrophyCase> => {
+    const response = await team.call('GET', '/rewards/my-trophy-case', cookie);
+    expect(response.statusCode, response.body).toBe(200);
+    return TrophyCaseSchema.parse(response.json());
+  };
+  const challengeOf = async (cookie: string) => {
+    const response = await team.call('GET', '/rewards/my-shift-challenge', cookie);
+    expect(response.statusCode, response.body).toBe(200);
+    return MyShiftChallengeSchema.parse(response.json()).challenge;
+  };
+
+  beforeAll(async () => {
+    team = await startPayrollTeam(inject('pgSuperuserUrl'));
+    ({ member: karim, cookie: karimCookie } = await team.addMember('karim@example.test', 'Karim'));
+    ({ cookie: leaCookie } = await team.addMember('lea@example.test', 'Léa'));
+    ({ cookie: managerCookie } = await team.addMember('manon@example.test', 'Manon', 'manager'));
+    const db = team.test.admin.db;
+    await db.insert(schema.accountPayRules).values({
+      id: newId(AccountPayRulesIdSchema),
+      creatorId: team.anna,
+      platformAccountId: team.annas,
+      fromPeriod: P1,
+      currency: 'EUR',
+      vatBps: 0,
+      platformFeeBps: 0,
+      earningsSource: 'detected',
+      createdBy: team.ownerId,
+    });
+    const linked = new Date('2025-01-01T00:00:00Z');
+    await db.insert(schema.salesFeedChatters).values({
+      platform: 'reveal',
+      platformChatterId: 'chatter_karim',
+      kind: 'member',
+      memberId: karim.id,
+      linkVersionAt: linked,
+      linkedAt: linked,
+    });
+    // Four shifts before, the same weekday at the same time, then the one under way; a sale half an hour into each.
+    const shifts = [
+      { start: sameSlotBefore(startsAt, 4), net: 4_000 },
+      { start: sameSlotBefore(startsAt, 3), net: 1_000 },
+      { start: sameSlotBefore(startsAt, 2), net: 3_000 },
+      { start: sameSlotBefore(startsAt, 1), net: 2_000 },
+      { start: startsAt, net: 3_000 },
+    ];
+    for (const [index, { start, net }] of shifts.entries()) {
+      await db.insert(schema.shifts).values({
+        id: newId(ShiftIdSchema),
+        creatorId: team.anna,
+        platformAccountId: team.annas,
+        memberId: karim.id,
+        startsAt: start,
+        endsAt: new Date(start.getTime() + 4 * HOUR),
+        createdBy: team.ownerId,
+        updatedBy: team.ownerId,
+      });
+      const at = new Date(start.getTime() + HOUR / 2);
+      await db.insert(schema.platformSales).values({
+        id: newId(SalesLineIdSchema),
+        creatorId: team.anna,
+        platformAccountId: team.annas,
+        platform: 'reveal',
+        platformSaleId: `sale_k${String(index)}`,
+        event: 'sale',
+        saleType: 'ppv',
+        status: 'paid',
+        occurredAt: at,
+        platformModelId: 'model_test_01',
+        platformChatterId: 'chatter_karim',
+        platformFanId: null,
+        currency: 'EUR',
+        grossInclVatMinor: net * 2,
+        grossExclVatMinor: net * 2,
+        netMinor: net,
+        agencyMinor: net,
+        creatorMinor: 0,
+        position: `sale_k${String(index)}:sale`,
+        inputsHash: 'hash_test',
+        recordedAt: at,
+      });
+    }
+    const periods = new Set(
+      shifts.map(({ start }) => payPeriodAt(new Date(start.getTime() + HOUR / 2), ZONE)),
+    );
+    for (const period of [...periods].toSorted()) await team.recalculate(period);
+  });
+
+  afterAll(async () => {
+    await team.close();
+  });
+
+  it('gives the shift under way a challenge: the median of his own four comparable shifts (§ 14)', async () => {
+    const challenge = await challengeOf(karimCookie);
+    expect(challenge).toMatchObject({ currency: 'EUR', targetMinor: 2_500, netMinor: 3_000, met: true });
+    expect(challenge?.shiftStartsAt).toBe(startsAt.toISOString());
+  });
+
+  it('has no challenge for a chatter with no shift, and none at all for the owner or without a session', async () => {
+    expect(await challengeOf(leaCookie)).toBeNull();
+    expect((await team.call('GET', '/rewards/my-shift-challenge', team.owner)).statusCode).toBe(403);
+    expect((await team.call('GET', '/rewards/my-shift-challenge', '')).statusCode).toBe(401);
+  });
+
+  it('has no level while the owner has set no threshold (§ 16)', async () => {
+    await team.app.modules.rewards.jobs.evaluate();
+    const before = await caseOf(karimCookie);
+    expect(before.level).toBeNull();
+    expect(before.nextLevel).toBeNull();
+    const settings = await team.call('GET', '/rewards/level-thresholds', team.owner);
+    expect(settings.statusCode, settings.body).toBe(200);
+    expect(LevelSettingsSchema.parse(settings.json())).toMatchObject({ thresholdsMinor: [] });
+    expect(LevelSettingsSchema.parse(settings.json()).ranks).toHaveLength(8);
+  });
+
+  it('lets the owner alone set the thresholds, each above the one before', async () => {
+    for (const cookie of [karimCookie, managerCookie]) {
+      expect((await team.call('GET', '/rewards/level-thresholds', cookie)).statusCode).toBe(403);
+      expect(
+        (await team.call('PUT', '/rewards/level-thresholds', cookie, { thresholdsMinor: [1] })).statusCode,
+      ).toBe(403);
+    }
+    for (const body of [
+      {},
+      { thresholdsMinor: [5_000, 5_000] },
+      { thresholdsMinor: [5_000, 4_000] },
+      { thresholdsMinor: [0] },
+      { thresholdsMinor: Array.from({ length: 9 }, (_, index) => (index + 1) * 1_000) },
+      { thresholdsMinor: [5_000], names: ['Chef'] },
+    ]) {
+      expect((await team.call('PUT', '/rewards/level-thresholds', team.owner, body)).statusCode).toBe(400);
+    }
+    const saved = await team.call('PUT', '/rewards/level-thresholds', team.owner, {
+      thresholdsMinor: [5_000, 10_000, 50_000],
+    });
+    expect(saved.statusCode, saved.body).toBe(200);
+    // The application cannot write the setting as a chatter, whatever the route says.
+    const write = withMember(team.app.db.db, karim.userId, (tx) =>
+      tx
+        .update(schema.rewardLevelSettings)
+        .set({ thresholdsMinor: [1] })
+        .returning(),
+    );
+    expect(await write).toEqual([]);
+    const read = await team.call('GET', '/rewards/level-thresholds', team.owner);
+    expect(LevelSettingsSchema.parse(read.json()).thresholdsMinor).toEqual([5_000, 10_000, 50_000]);
+  });
+
+  it('notes each rank his cumulated net has reached, once, and says the rank ahead to him alone', async () => {
+    await team.app.modules.rewards.jobs.evaluate();
+    const karims = await caseOf(karimCookie);
+    // 13 000 of net: the first two ranks, the third still ahead.
+    expect(karims.level).toEqual({ rank: 2, name: 'Légionnaire' });
+    expect(karims.nextLevel).toEqual({
+      rank: 3,
+      name: 'Décurion',
+      thresholdMinor: 50_000,
+      currentMinor: 13_000,
+      currency: 'EUR',
+    });
+    expect(karims.items.filter((item) => item.family === 'level').map((item) => item.kind)).toEqual([
+      'level:1',
+      'level:2',
+    ]);
+    const leas = await caseOf(leaCookie);
+    expect(leas.level).toBeNull();
+    expect(leas.nextLevel).toMatchObject({ rank: 1, currentMinor: 0, thresholdMinor: 5_000 });
+    // Replayable, and a rank is revealed like any other gain.
+    expect((await team.app.modules.rewards.jobs.evaluate()).gained).toBe(0);
+    const seen = await team.call('POST', '/rewards/my-trophy-case/reveals', karimCookie, {
+      kinds: ['level:1'],
+    });
+    expect(
+      TrophyCaseSchema.parse(seen.json()).items.find((item) => item.kind === 'level:1')?.revealedAt,
+    ).not.toBeNull();
+  });
+
+  it('keeps a rank reached when the owner raises its threshold afterwards', async () => {
+    const raised = await team.call('PUT', '/rewards/level-thresholds', team.owner, {
+      thresholdsMinor: [5_000, 40_000, 50_000],
+    });
+    expect(raised.statusCode, raised.body).toBe(200);
+    await team.app.modules.rewards.jobs.evaluate();
+    expect((await caseOf(karimCookie)).level).toEqual({ rank: 2, name: 'Légionnaire' });
+  });
+
+  it('shows his trophies, streak and rank on his file to the owner and a manager, never to a colleague (§ 20)', async () => {
+    for (const cookie of [team.owner, managerCookie]) {
+      const response = await team.call('GET', `/rewards/members/${karim.id}/trophy-case`, cookie);
+      expect(response.statusCode, response.body).toBe(200);
+      const read = TrophyCaseSchema.parse(response.json());
+      expect(read.level).toEqual({ rank: 2, name: 'Légionnaire' });
+      expect(read.items.find((item) => item.kind === 'first_sale')?.earnedAt).not.toBeNull();
+      // His net is not said here: the rank ahead is his own read.
+      expect(read.nextLevel).toBeNull();
+    }
+    expect((await team.call('GET', `/rewards/members/${karim.id}/trophy-case`, leaCookie)).statusCode).toBe(
+      404,
+    );
+    expect((await team.call('GET', `/rewards/members/${karim.id}/trophy-case`, '')).statusCode).toBe(401);
+    expect((await team.call('GET', '/rewards/members/not-an-id/trophy-case', team.owner)).statusCode).toBe(
+      400,
+    );
   });
 });

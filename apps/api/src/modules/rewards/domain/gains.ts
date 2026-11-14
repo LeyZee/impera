@@ -1,5 +1,6 @@
 import { payPeriodAt, type PayPeriod } from '@impera/contracts';
 
+import { ranksReached, type LevelStep } from './levels';
 import { streakOf, type Streak, type StreakReport } from './streak';
 import { beatsRecord, trophiesOf, type TrophyKind } from './trophies';
 
@@ -27,11 +28,16 @@ export interface GamePay {
   /** The net of each fortnight before the one under way, the oldest first. */
   readonly closedPeriodNetsMinor: readonly number[];
   readonly tiers: readonly { readonly period: PayPeriod; readonly thresholdMinor: number }[];
+  /** The net of all their statements (§ 16). */
+  readonly cumulatedNetMinor: number;
 }
 
-export type GainKind = TrophyKind | 'tier';
+export type GainKind = TrophyKind | 'tier' | 'level';
 
-/** A gain and the key it is written once under: empty for a trophy, the fortnight and the threshold for a tier. */
+/**
+ * A gain and the key it is written once under: empty for a trophy, the fortnight and the threshold for a tier, the
+ * rank for a level.
+ */
 export interface Gain {
   readonly kind: GainKind;
   readonly scopeKey: string;
@@ -68,8 +74,10 @@ export function gainsOf(input: {
   readonly shifts: readonly GameShift[];
   readonly now: Date;
   readonly agencyZone: string;
+  /** The ranks the owner's thresholds open; empty when none is set. */
+  readonly levelSteps: readonly LevelStep[];
 }): { readonly gains: Gain[]; readonly streak: Streak } {
-  const { pay, shifts, now, agencyZone } = input;
+  const { pay, shifts, now, agencyZone, levelSteps } = input;
   const streak = streakOf(shifts.map((shift) => ({ endsAt: shift.endsAt, report: reportOf(shift, now) })));
   const trophies = trophiesOf({
     sales: pay.sales,
@@ -84,6 +92,10 @@ export function gainsOf(input: {
     gains: [
       ...trophies.map((kind) => ({ kind, scopeKey: '' })),
       ...pay.tiers.map((tier) => ({ kind: 'tier' as const, scopeKey: tierScopeKey(tier) })),
+      ...ranksReached(pay.cumulatedNetMinor, levelSteps).map((rank) => ({
+        kind: 'level' as const,
+        scopeKey: String(rank),
+      })),
     ],
     streak,
   };

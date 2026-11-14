@@ -1,5 +1,5 @@
 import { sql, type SQL } from 'drizzle-orm';
-import { boolean, check, index, integer, pgPolicy, pgTable, text, unique } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, jsonb, pgPolicy, pgTable, text, unique } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
 import { id, timestampTz, updatedAt } from './columns';
@@ -38,9 +38,13 @@ export const userPreferences = pgTable(
   ],
 );
 
-/** The kinds a chatter earns (ADR 0104 § 12 and § 15). `tier` is one row a fortnight and threshold (`scope_key`). */
+/**
+ * The kinds a chatter earns (ADR 0104 § 12, § 15 and § 16). `tier` is one row a fortnight and threshold, `level` one
+ * row a rank (`scope_key`).
+ */
 export const REWARD_GAIN_KINDS = [
   'tier',
+  'level',
   'first_sale',
   'day_record',
   'fortnight_record',
@@ -77,7 +81,7 @@ export const rewardGains = pgTable(
       'reward_gains_kind_check',
       sql`${t.kind} in (${sql.raw(REWARD_GAIN_KINDS.map((kind) => `'${kind}'`).join(', '))})`,
     ),
-    check('reward_gains_scope_check', sql`(${t.kind} = 'tier') = (${t.scopeKey} <> '')`),
+    check('reward_gains_scope_check', sql`(${t.kind} in ('tier', 'level')) = (${t.scopeKey} <> '')`),
     check('reward_gains_reveal_check', sql`${t.revealedAt} is null or ${t.revealedAt} >= ${t.earnedAt}`),
     pgPolicy('own_read', { for: 'select', using: sql`${t.userId} = ${currentUser}` }),
     pgPolicy('team_read', {
@@ -113,6 +117,37 @@ export const rewardStreaks = pgTable(
     pgPolicy('team_read', {
       for: 'select',
       using: sql`${notCreatorAccount} and ${currentScope} in ('owner', 'agency')`,
+    }),
+  ],
+);
+
+/**
+ * The owner's setting for the levels (§ 16): the cumulated net that opens each rank, the first rank first. One row
+ * at most (`singleton`); no row means no level. The owner writes it, the team reads it (a chatter sees the rank
+ * ahead of them), the job reads it to note a rank reached. Honorary: nothing here reaches pay (§ 17).
+ */
+export const rewardLevelSettings = pgTable(
+  'reward_level_settings',
+  {
+    singleton: boolean('singleton').primaryKey().default(true),
+    thresholdsMinor: jsonb('thresholds_minor').$type<number[]>().notNull(),
+    updatedBy: text('updated_by')
+      .notNull()
+      .references(() => user.id),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check('reward_level_settings_singleton_check', sql`${t.singleton}`),
+    check('reward_level_settings_array_check', sql`jsonb_typeof(${t.thresholdsMinor}) = 'array'`),
+    pgPolicy('team_read', { for: 'select', using: sql`${notCreatorAccount} and ${currentUser} is not null` }),
+    pgPolicy('owner_insert', {
+      for: 'insert',
+      withCheck: sql`${notCreatorAccount} and ${currentScope} = 'owner'`,
+    }),
+    pgPolicy('owner_update', {
+      for: 'update',
+      using: sql`${notCreatorAccount} and ${currentScope} = 'owner'`,
+      withCheck: sql`${notCreatorAccount} and ${currentScope} = 'owner'`,
     }),
   ],
 );

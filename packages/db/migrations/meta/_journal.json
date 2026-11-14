@@ -1002,6 +1002,13 @@
       "when": 1794631933168,
       "tag": "0194_rewards_game",
       "breakpoints": true
+    },
+    {
+      "idx": 143,
+      "version": "7",
+      "when": 1794660415557,
+      "tag": "0203_rewards_levels",
+      "breakpoints": true
     }
   ]
 }

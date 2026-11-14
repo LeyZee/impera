@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { challengeMet, challengeTarget } from '../challenge';
-import { levelOf } from '../levels';
+import { levelOfRank, levelSteps, nextStep, ranksReached } from '../levels';
 import { streakOf, type StreakReport } from '../streak';
 import { beatsRecord, trophiesOf, type TrophyFacts } from '../trophies';
 
@@ -92,19 +92,31 @@ describe('trophiesOf (ADR 0104 § 15)', () => {
   });
 });
 
-const STEPS = [
-  { rank: 1, name: 'Recrue', thresholdMinor: 100_000 },
-  { rank: 2, name: 'Vétéran', thresholdMinor: 500_000 },
-];
+describe('the levels (ADR 0104 § 16)', () => {
+  const steps = levelSteps([100_000, 500_000]);
 
-describe('levelOf (ADR 0104 § 16)', () => {
-  it('has no level without thresholds, nor under the first', () => {
-    expect(levelOf(1_000_000, [])).toBeNull();
-    expect(levelOf(99_999, STEPS)).toBeNull();
+  it('opens the ranks the owner gave a threshold to, by their names, the first first', () => {
+    expect(steps).toEqual([
+      { rank: 1, name: 'Recrue', thresholdMinor: 100_000 },
+      { rank: 2, name: 'Légionnaire', thresholdMinor: 500_000 },
+    ]);
+    expect(levelSteps([])).toEqual([]);
+    expect(levelSteps(Array.from({ length: 12 }, (_, index) => (index + 1) * 1_000))).toHaveLength(8);
   });
 
-  it('gives the highest step reached and the one ahead', () => {
-    expect(levelOf(100_000, STEPS)).toEqual({ rank: 1, name: 'Recrue', next: STEPS[1] });
-    expect(levelOf(900_000, STEPS)).toEqual({ rank: 2, name: 'Vétéran', next: null });
+  it('reaches no rank without thresholds nor under the first, then every rank up to the net', () => {
+    expect(ranksReached(1_000_000, [])).toEqual([]);
+    expect(ranksReached(99_999, steps)).toEqual([]);
+    expect(ranksReached(100_000, steps)).toEqual([1]);
+    expect(ranksReached(900_000, steps)).toEqual([1, 2]);
+  });
+
+  it('names a rank by its number and finds the one ahead', () => {
+    expect(levelOfRank(0)).toBeNull();
+    expect(levelOfRank(8)).toEqual({ rank: 8, name: 'Imperator' });
+    expect(levelOfRank(9)).toBeNull();
+    expect(nextStep(0, steps)?.rank).toBe(1);
+    expect(nextStep(1, steps)?.rank).toBe(2);
+    expect(nextStep(2, steps)).toBeNull();
   });
 });

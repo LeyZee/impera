@@ -3,7 +3,11 @@ import { JOB_PAYLOADS } from '@impera/contracts';
 import { defineTask } from '../jobs';
 import { payGameFactsUnscoped } from '../modules/payroll';
 import { startRewardsModule, type RewardsModule } from '../modules/rewards';
-import { shiftsForGameUnscoped, type SchedulingModule } from '../modules/scheduling';
+import {
+  shiftsForChallengeUnscoped,
+  shiftsForGameUnscoped,
+  type SchedulingModule,
+} from '../modules/scheduling';
 
 import type { Routes, Shared, TasksOf } from './shared';
 
@@ -26,6 +30,7 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
       agencyTimeZone: deps.scheduling.pay.agencyTimeZone,
       payFacts: payGameFactsUnscoped,
       shifts: shiftsForGameUnscoped,
+      shiftsBegun: shiftsForChallengeUnscoped,
     },
   });
   return {
@@ -41,6 +46,12 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
         },
       ),
     },
-    routes: [module.routes({ guard: requireRole('operator') })],
+    routes: [
+      module.routes({
+        guard: requireRole('operator'),
+        teamGuard: requireRole('owner', 'operator'),
+        ownerGuard: requireRole('owner'),
+      }),
+    ],
   };
 }
