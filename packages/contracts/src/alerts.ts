@@ -125,7 +125,11 @@ export type CustomAlertGroup = z.infer<typeof CustomAlertGroupSchema>;
  * (custom content, call, cam, voice: a human may sell it, no pause), a doubt on who she is (`asks_if_bot`: a human
  * on shift takes over; the `ai_disclosure` guard is unchanged).
  */
-export const SYSTEM_ALERT_CODES = ['keyword', 'service_request', 'identity_doubt'] as const;
+/**
+ * `script_price`: a script step's price on the platform is no longer the one decided (ADR 0098 § 5); nothing goes
+ * (in copilot, the whole draft) and the team is told, the agent goes on.
+ */
+export const SYSTEM_ALERT_CODES = ['keyword', 'service_request', 'identity_doubt', 'script_price'] as const;
 export const SystemAlertCodeSchema = z.enum(SYSTEM_ALERT_CODES);
 export type SystemAlertCode = z.infer<typeof SystemAlertCodeSchema>;
 
@@ -143,6 +147,7 @@ export const SYSTEM_ALERT_TOPICS: Readonly<Record<SystemAlertCode, TelegramTopic
   keyword: 'keyword',
   service_request: 'important',
   identity_doubt: 'important',
+  script_price: 'important',
 };
 
 /** A system alert on each creator; on unless switched off. */

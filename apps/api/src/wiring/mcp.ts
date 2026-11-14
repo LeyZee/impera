@@ -1,6 +1,7 @@
 import { UserIdSchema } from '@impera/contracts';
 
 import { resolveActor } from '../auth';
+import type { AiUsageModule } from '../modules/ai-usage';
 import type { ContentDropsModule } from '../modules/content-drops';
 import type { FansModule } from '../modules/fans';
 import { createMcpModule, type ActorView, type McpModule } from '../modules/mcp';
@@ -48,6 +49,7 @@ export function wireMcp(
     readonly scripts: Pick<ScriptsModule, 'reads'>;
   },
   scheduling: Pick<SchedulingModule, 'reads'>,
+  aiUsage: Pick<AiUsageModule, 'read'>,
 ): WiredMcp {
   const module = createMcpModule({
     db: shared.db,
@@ -75,6 +77,7 @@ export function wireMcp(
           at,
         ),
     },
+    aiUsage: { read: () => aiUsage.read() },
   });
   return {
     module,

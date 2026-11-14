@@ -15,7 +15,7 @@ const OnListSchema = z.object({ on_list: z.boolean() });
 const NameSchema = z.object({ id: z.string(), display_name: z.string() });
 
 /** The reader as his transaction sees him: his scope, and whether the creator is on his list. */
-async function readerIn(
+export async function readerIn(
   tx: Transaction,
   userId: string,
   creatorId: CreatorId,

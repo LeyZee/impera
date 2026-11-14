@@ -42,11 +42,13 @@ export const JOB_NAMES = [
   'connector.dispatch',
   'connector.poll',
   'connector.reconcile',
+  'connector.vault_sync',
   'fans.refresh_summary',
   'fans.read_card',
   'fans.purge_facts',
   'rate_limit.purge',
   'backups.check',
+  'rewards.evaluate',
   'ai_usage.check_credits',
   'notifications.recap',
   'notifications.creator_sale',
@@ -116,11 +118,13 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.dispatch': 'Lecture des comptes Reveal',
   'connector.poll': 'Lecture d’un compte Reveal',
   'connector.reconcile': 'Vérification des envois Reveal',
+  'connector.vault_sync': 'Synchronisation du coffre Reveal',
   'fans.refresh_summary': 'Résumé des fans',
   'fans.read_card': 'Fiche des fans remplie par l’IA',
   'fans.purge_facts': 'Nettoyage de la mémoire des fans',
   'rate_limit.purge': 'Nettoyage des limites de connexion',
   'backups.check': 'Vérification des sauvegardes',
+  'rewards.evaluate': 'Gains du jeu des chatteurs',
   'ai_usage.check_credits': 'Vérification des crédits IA',
   'notifications.recap': 'Récapitulatif des notifications',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
@@ -229,6 +233,16 @@ export const JOB_PAYLOADS = {
     platformAccountId: PlatformAccountIdSchema,
     correlationId: z.string().min(1),
   }),
+  /**
+   * The account's vault mirrored in the CRM (ADR 0099 § 2 to 4, fiche vault-sync): folders, media and the platform's
+   * order, read only, never a file nor a model call. On the account's queue, after its poll; replayable, writes nothing
+   * when nothing moved. Asked by the owner (`POST /v1/creators/:creatorId/vault/sync`), never by a cron for now.
+   */
+  'connector.vault_sync': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    correlationId: z.string().min(1),
+  }),
   'fans.refresh_summary': conversationJob.extend({ fanId: FanIdSchema }),
   /**
    * The AI reads his new messages in a conversation and fills his card (ADR 0085 § 7), whoever answers him: debounced
@@ -240,6 +254,8 @@ export const JOB_PAYLOADS = {
   'fans.purge_facts': z.object({}),
   'rate_limit.purge': z.object({}),
   'backups.check': z.object({}),
+  /** What each chatter earned since the last run (ADR 0104 § 12 to § 15): replayable, a gain is written once. */
+  'rewards.evaluate': z.object({}),
   'ai_usage.check_credits': z.object({}),
   /** At the end of an account's quiet hours: one notification for all it held (CR-01). Keyed by account. */
   'notifications.recap': z.object({ userId: z.string().min(1) }),
@@ -523,12 +539,15 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.dispatch': 1,
   'connector.poll': 3,
   'connector.reconcile': 3,
+  'connector.vault_sync': 3,
   'fans.refresh_summary': 3,
   // Replayable: it reads from where the last read stopped (`conversations.card_read_through`).
   'fans.read_card': 3,
   'fans.purge_facts': 1,
   'rate_limit.purge': 1,
   'backups.check': 1,
+  // Every ten minutes: the next run is the retry.
+  'rewards.evaluate': 1,
   // Each hour: the next run is the retry; an alert is published once per episode.
   'ai_usage.check_credits': 1,
   'notifications.recap': 3,

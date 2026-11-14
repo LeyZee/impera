@@ -246,9 +246,16 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
 }
 
 /** Enqueues the account jobs with the owner role (the dispatcher has no tenant): `public.enqueue_job`. */
+/** One waiting job of each kind per account (`job_key`). */
+const JOB_KEYS = {
+  'connector.poll': 'poll',
+  'connector.reconcile': 'reconcile',
+  'connector.vault_sync': 'vault',
+} as const;
+
 export function createDrizzleAccountJobs(adminDb: Database): AccountJobs {
   async function enqueue(
-    job: Extract<JobName, 'connector.poll' | 'connector.reconcile'>,
+    job: Extract<JobName, 'connector.poll' | 'connector.reconcile' | 'connector.vault_sync'>,
     account: ConnectorAccount,
     options: { runAt: Date | null; jobKeyMode: 'replace' | 'preserve_run_at' },
     correlationId: string,
@@ -265,7 +272,7 @@ export function createDrizzleAccountJobs(adminDb: Database): AccountJobs {
         queue_name => ${accountQueueNameFor(account.id)},
         run_at => ${options.runAt?.toISOString() ?? null}::timestamptz,
         max_attempts => ${JOB_MAX_ATTEMPTS[job]}::int,
-        job_key => ${`${job === 'connector.poll' ? 'poll' : 'reconcile'}:${account.id}`},
+        job_key => ${`${JOB_KEYS[job]}:${account.id}`},
         job_key_mode => ${options.jobKeyMode}
       )`,
     );
@@ -276,5 +283,7 @@ export function createDrizzleAccountJobs(adminDb: Database): AccountJobs {
       enqueue('connector.poll', account, { runAt, jobKeyMode: 'preserve_run_at' }, correlationId),
     enqueueReconcile: (account, correlationId) =>
       enqueue('connector.reconcile', account, { runAt: null, jobKeyMode: 'replace' }, correlationId),
+    enqueueVaultSync: (account, correlationId) =>
+      enqueue('connector.vault_sync', account, { runAt: null, jobKeyMode: 'preserve_run_at' }, correlationId),
   };
 }
