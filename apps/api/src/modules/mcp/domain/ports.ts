@@ -1,4 +1,5 @@
 import type {
+  AiUsage,
   CreatorId,
   FanId,
   McpCallRefusal,
@@ -238,4 +239,9 @@ export interface ShiftReader {
     creators: 'all' | readonly string[],
     at: Date,
   ): Promise<readonly OnShiftEntry[]>;
+}
+
+/** The AI spend as `ai-usage` reads it for the screen (`AiUsage`, its `index.ts`): agency-wide, the owner's alone. */
+export interface AiUsageReader {
+  read(): Promise<AiUsage>;
 }

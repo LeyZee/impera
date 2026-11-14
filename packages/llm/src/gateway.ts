@@ -20,6 +20,7 @@ import {
   describeBrief,
   judgeSituationBlock,
   notesBlock,
+  scriptsBlock,
   toMessages,
 } from './conversation-messages';
 import type {
@@ -194,6 +195,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
         alerts: alertsBlock(input.alerts ?? []),
+        scripts: scriptsBlock(input.scripts ?? [], input.scriptStepWaiting === true),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
         canary,
@@ -214,7 +216,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         persona_sheet: input.personaSheet,
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
-        brief: describeBrief(input.brief, input.objectionReply),
+        brief: describeBrief(input.brief, input.objectionReply, input.scriptStep),
         canary,
       });
       return run(
