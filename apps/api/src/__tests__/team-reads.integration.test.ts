@@ -6,7 +6,7 @@ import {
   type TeamMember,
   type UserRole,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, schema, sql } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -85,12 +85,13 @@ describe('Lectures pour une autre porte : shifts, rapports et relevés (ADR 0026
       .update(schema.user)
       .set({ creatorIds: [team.anna] })
       .where(eq(schema.user.id, iris.userId));
-    // Théo on Anna, validated; Lou on Béa, still submitted, with a comment of hers.
+    // Théo on Anna, validated; Lou on Béa, still submitted, with a comment of hers: an edit, as the member makes it
+    // while it is open (the next version, `shift_reports_kept`).
     await team.report(theo, P1, 10_000);
     const lous = await team.report(lou, P1, 5_000, { account: team.beas, status: 'submitted' });
     await team.test.admin.db
       .update(schema.shiftReports)
-      .set({ comment: WRITTEN, incident: WRITTEN })
+      .set({ comment: WRITTEN, incident: WRITTEN, version: sql`${schema.shiftReports.version} + 1` })
       .where(eq(schema.shiftReports.id, lous));
     // A shift of Théo's the agency cancelled: no read ever shows it.
     await team.test.admin.db.insert(schema.shifts).values({
