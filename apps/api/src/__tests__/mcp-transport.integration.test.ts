@@ -111,6 +111,8 @@ describe('/v1/mcp', () => {
       logger: createLogger(config),
       routes: app.routes,
       readiness: app.readiness,
+      // The shared store, as in production: it refuses two limiters of the same bounds when the routes are mounted.
+      rateLimitStore: app.rateLimitStore,
     });
     nora = newId(CreatorIdSchema);
     await test.admin.db
@@ -182,7 +184,8 @@ describe('/v1/mcp', () => {
     expect((await rpc(grant.token, callTool('whoami'))).statusCode).toBe(200);
   });
 
-  it('counts refused tokens by address, and refuses that address for the minute', async () => {
+  it('counts refused tokens by address: past the bound, the next refusals answer 429', async () => {
+    const grant = await createGrant();
     const ip = nextIp();
     for (let i = 0; i < MCP_FAILURES_PER_ADDRESS_PER_MINUTE; i += 1) {
       expect((await rpc('impmcp_court', callTool('whoami'), { ip })).statusCode).toBe(401);
@@ -190,6 +193,8 @@ describe('/v1/mcp', () => {
     const blocked = await rpc('impmcp_court', callTool('whoami'), { ip });
     expect(blocked.statusCode).toBe(429);
     expect(blocked.headers['retry-after']).toBeDefined();
+    // Only refusals are counted and refused: a live token from that address still passes.
+    expect((await rpc(grant.token, callTool('whoami'), { ip })).statusCode).toBe(200);
   });
 
   it('takes no browser origin, and a client without one', async () => {

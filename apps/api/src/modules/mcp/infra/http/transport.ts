@@ -18,9 +18,13 @@ import type { GrantRecord } from '../../domain/ports';
 
 /** Requests to `/v1/mcp` from one address in a minute, good or bad (ADR 0026 § 8). */
 const MCP_PER_ADDRESS_PER_MINUTE = 120;
-/** Refused tokens from one address in a minute before it is refused outright, its counter shared (`security.md` §6). */
-export const MCP_FAILURES_PER_ADDRESS_PER_MINUTE = 10;
-/** Reads of one access in a minute (ADR 0026 § 8). */
+/**
+ * Refused tokens from one address in a minute; past it, the next refusals answer 429 (a live token still passes). Its
+ * counter is shared (`security.md` §6), and the shared store names a limiter by its bounds: no other limiter of the API
+ * may count 12 a minute.
+ */
+export const MCP_FAILURES_PER_ADDRESS_PER_MINUTE = 12;
+/** Reads of one access in a minute (ADR 0026 § 8); a bound of its own in the shared store, like the one above. */
 const MCP_READS_PER_ACCESS_PER_MINUTE = 60;
 /** A JSON-RPC message of the lot a carries a tool's name and a few identifiers: far under this. */
 const MCP_BODY_LIMIT_BYTES = 64 * 1024;
@@ -151,7 +155,7 @@ export function createMcpTransport(options: McpTransportOptions): FastifyPluginA
             if (!result.ok) return refusalResult(result.refusal);
             return {
               content: [{ type: 'text' as const, text: JSON.stringify(result.value) }],
-              structuredContent: z.record(z.string(), z.unknown()).parse(result.value),
+              structuredContent: result.value,
             };
           } catch (error) {
             // Logged here with the request; the agent gets no message of ours, nor of a module's.

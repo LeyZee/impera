@@ -19,7 +19,8 @@ interface ToolContext {
 export interface ServedTool {
   readonly description: string;
   readonly input: z.ZodType<Record<string, unknown>>;
-  readonly output: z.ZodType;
+  /** An object: it is the call's `structuredContent`, which MCP wants as one. */
+  readonly output: z.ZodType<Record<string, unknown>>;
   run(context: ToolContext, input: Record<string, unknown>): Promise<unknown>;
 }
 
@@ -40,7 +41,8 @@ interface McpCall {
 }
 
 type McpCallResult =
-  { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly refusal: McpCallRefusal };
+  | { readonly ok: true; readonly value: Record<string, unknown> }
+  | { readonly ok: false; readonly refusal: McpCallRefusal };
 
 export interface McpDispatcher {
   /** The served tools this access holds the capability of; the call still decides on everything else. */
@@ -118,7 +120,7 @@ export function createDispatcher(deps: DispatcherDeps): McpDispatcher {
       if (!decision.ok) return refuse(spec.name, decision.refusal);
       if (!(await deps.spendRead(call.grant))) return refuse(spec.name, 'rate_limited');
 
-      let value: unknown;
+      let value: Record<string, unknown>;
       try {
         value = tool.output.parse(
           await tool.run({ grant: call.grant, actor: call.actor, creatorId: decision.creatorId }, input.data),
