@@ -7,6 +7,7 @@ import {
   CommissionStatementSchema,
   ExchangeRatesSchema,
   HeldSalesSchema,
+  MyFiguresSchema,
   SaleGiftCountsSchema,
   SalesToGiveSchema,
   MySalesSchema,
@@ -34,6 +35,7 @@ import {
   type CreatePenaltyBody,
   type ExchangeRates,
   type HeldSales,
+  type MyFigures,
   type SaleGiftCounts,
   type SalesToGive,
   type MySales,
@@ -190,6 +192,21 @@ export function useSaleGifts(period: PayPeriod | null, enabled: boolean): UseQue
 
 /** The first page of a list: no cursor. */
 const FIRST_PAGE: string | null = null;
+
+/**
+ * The member's own figures (CHF-01, ADR 0104 § A): the fortnight under way day by day, the one before, when they sell
+ * and their records. Read again every minute, as the period: a sale read by the hourly run lands without a write here.
+ */
+export function useMyFigures(): UseQueryResult<MyFigures> {
+  return useQuery({
+    queryKey: [...PAYROLL_KEY, 'my-figures'],
+    queryFn: () => read('/v1/payroll/my-figures', (body) => MyFiguresSchema.parse(body)),
+    refetchInterval: 60_000,
+    placeholderData: (before) => before,
+    retry: READ_RETRY,
+    retryDelay: READ_RETRY_DELAY_MS,
+  });
+}
 
 /**
  * The member's own lines of a period (CRM-03 lot b4c): their statement's, and those they signalled that left it, the

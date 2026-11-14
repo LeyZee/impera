@@ -1,4 +1,5 @@
 import {
+  BANKED_OBJECTION_KINDS,
   TYPICAL_RESPONSES_MAX_LINES,
   type PersonaSampleReplyFault,
   type StoredPersona,
@@ -27,8 +28,8 @@ const replyOfLine = (line: string): string => {
 /**
  * Her sample replies read by the hard guards of her own answers, with her forbidden words and emojis: an example the
  * voice imitates must not teach it what a guard would block (a stage direction, a meeting word, an illness to sell…).
- * Format 1: each of `sample_replies` (P5-01). Format 2: each line of « Réponses typiques » (ADR 0079 § 6). Nothing is
- * said of the text.
+ * Format 1: each of `sample_replies` (P5-01). Format 2: each line of « Réponses typiques » (ADR 0079 § 6), then each
+ * reply of her objection bank (ADR 0090 § B), named by its kind. Nothing is said of the text.
  */
 export function sampleReplyFaults(persona: StoredPersona): PersonaSampleReplyFault[] {
   const rules = 'sheet' in persona ? persona.agent.rules : persona.limits;
@@ -47,7 +48,17 @@ export function sampleReplyFaults(persona: StoredPersona): PersonaSampleReplyFau
           .slice(0, TYPICAL_RESPONSES_MAX_LINES)
           .map(replyOfLine)
       : (persona.sample_replies ?? []).map(({ reply }) => reply);
-  return replies.flatMap((reply, index) =>
+  const lines = replies.flatMap((reply, index) =>
     reply === '' ? [] : blockingCodes(reply, settings).map((code) => ({ index, code })),
   );
+  if (!('sheet' in persona)) return lines;
+  const bank = persona.agent.objection_replies;
+  return [
+    ...lines,
+    ...BANKED_OBJECTION_KINDS.flatMap((objection) =>
+      (bank[objection] ?? []).flatMap(({ text }, index) =>
+        blockingCodes(text, settings).map((code) => ({ index, code, objection })),
+      ),
+    ),
+  ];
 }

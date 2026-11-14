@@ -4,7 +4,7 @@
  */
 import { createDbClient, parseEncryptionKeys } from '@impera/db';
 
-import { loadConfig, secretOrNull } from '../config';
+import { loadConfig, ownerDatabaseUrl, secretOrNull } from '../config';
 import { reencryptPlatformSessions } from '../ops';
 
 import { requireArguments } from './command-line';
@@ -19,7 +19,7 @@ if (keys === null) {
   console.error('SESSION_ENCRYPTION_KEYS manque dans l’environnement.');
   process.exit(1);
 }
-const admin = createDbClient(config.DATABASE_ADMIN_URL);
+const admin = createDbClient(ownerDatabaseUrl(config));
 try {
   const rewritten = await reencryptPlatformSessions(
     admin.db,

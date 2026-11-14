@@ -150,7 +150,7 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config), { passwordBreaches: () => Promise.resolve(false) });
     server = await buildServer({
       config,

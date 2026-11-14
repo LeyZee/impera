@@ -44,6 +44,9 @@ const MODULE_DEPENDENCIES = {
   'creator-tasks': ['scheduling'],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
   'content-drops': [],
+  // ADR 0026, 0105: a second door on the modules' commands. Lot a, first part, is its pure rules only; the modules it
+  // reads join this list with the tools' wiring.
+  mcp: [],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);

@@ -15,6 +15,7 @@ import {
   DomainError,
   ExchangeRatesSchema,
   HeldSalesSchema,
+  MyFiguresSchema,
   SaleGiftCountsSchema,
   SalesToGiveQuerySchema,
   SalesToGiveSchema,
@@ -169,6 +170,13 @@ export function createPayrollRoutes(
         schema: { querystring: MySalesQuerySchema, response: { 200: MySalesSchema } },
       },
       (request) => signals.mySales(userOf(request), request.query),
+    );
+
+    // CHF-01, ADR 0104 § A: one's own figures, from one's own statements only; never a ranking nor another's sale.
+    app.get(
+      '/payroll/my-figures',
+      { preValidation: ownerOrMember, schema: { response: { 200: MyFiguresSchema } } },
+      (request) => signals.myFigures(userOf(request)),
     );
 
     // Reco 19 of the recette (05/11): what the amount typed in a shift's report brings its member, as pay counts it.

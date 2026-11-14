@@ -145,7 +145,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   );
   const rules = createDrizzlePayrollRuleStore(deps.db, deps.reads, now);
   const decisions = createDrizzleSaleDecisionStore(deps.db, deps.reads);
-  const signals = createDrizzleSaleSignalStore(deps.db, deps.adminDb, deps.reads);
+  const signals = createDrizzleSaleSignalStore(deps.db, deps.adminDb, deps.reads, now);
   const rateJob = {
     source: createEcbSource({ fetch: deps.fetch ?? ((url, init) => fetch(url, init)) }),
     store: createDrizzlePayrollRateStore(deps.adminDb),

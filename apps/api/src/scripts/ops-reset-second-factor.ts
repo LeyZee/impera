@@ -8,7 +8,7 @@ import { parseArgs } from 'node:util';
 
 import { createDbClient } from '@impera/db';
 
-import { loadConfig } from '../config';
+import { loadConfig, ownerDatabaseUrl } from '../config';
 import { resetAccountSecondFactor } from '../ops';
 
 import { requireArguments } from './command-line';
@@ -21,7 +21,7 @@ if (values.email === undefined) {
 }
 
 const config = loadConfig();
-const admin = createDbClient(config.DATABASE_ADMIN_URL);
+const admin = createDbClient(ownerDatabaseUrl(config));
 try {
   const { hadSecondFactor } = await resetAccountSecondFactor(admin.db, values.email);
   console.log(

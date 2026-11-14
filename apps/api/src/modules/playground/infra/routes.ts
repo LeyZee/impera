@@ -2,12 +2,15 @@ import {
   AlertTestBodySchema,
   AlertTestResultSchema,
   ApiErrorSchema,
+  DesireMarksQuerySchema,
+  DesireMarksSchema,
   PlaygroundAdvanceBodySchema,
   PlaygroundAnswerSchema,
   PlaygroundBranchBodySchema,
   PlaygroundCompareBodySchema,
   PlaygroundComparisonSchema,
   PlaygroundCreatorMediaBodySchema,
+  PlaygroundDesireMarkBodySchema,
   PlaygroundMessageBodySchema,
   PlaygroundNotesBodySchema,
   PlaygroundPersonaBodySchema,
@@ -20,7 +23,13 @@ import {
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
-import type { AlertTester } from '../../agent/index';
+import {
+  DESIRE_WEIGHTS_VERSION,
+  desireSignalPoints,
+  recountDesire,
+  type AlertTester,
+} from '../../agent/index';
+import type { DesireMarkStore } from '../application/desire-marks';
 import { LlmUnavailable, type PlaygroundEngine } from '../application/engine';
 import type { PlaygroundService } from '../application/playground-service';
 
@@ -31,6 +40,9 @@ export interface PlaygroundRoutesOptions {
 
 const state = { 200: PlaygroundStateSchema };
 
+/** The marks read back at once: the latest, enough to see where the counting is wrong. */
+const MARKS_SHOWN = 500;
+
 /**
  * `/v1/playground` (fiche P3-06): the training screen drives the calibration engine. Nothing is ever sent to a
  * fan. Domain errors go through the central handler (409, 404, 400) except `llm_unavailable`, answered 503 here.
@@ -38,6 +50,7 @@ const state = { 200: PlaygroundStateSchema };
 export function createPlaygroundRoutes(
   service: PlaygroundService,
   alertTester: AlertTester,
+  desireMarks: DesireMarkStore,
   options: PlaygroundRoutesOptions,
 ): FastifyPluginAsyncZod {
   return (app) => {
@@ -142,6 +155,45 @@ export function createPlaygroundRoutes(
       (request) => {
         const { isLocked, ...media } = request.body;
         return engineOf(request).sendCreatorMedia(media, isLocked);
+      },
+    );
+
+    // ADR 0103 § 6: the owner marks his desire score after one of his messages.
+    app.post(
+      '/playground/desire-marks',
+      { schema: { body: PlaygroundDesireMarkBodySchema, response: state } },
+      (request) => {
+        if (request.user === null) throw new Error('playground route reached without a session');
+        const { fanMessageNumber, verdict, note } = request.body;
+        return engineOf(request).markDesire(
+          fanMessageNumber,
+          { verdict, ...(note !== undefined && { note }) },
+          request.user.id,
+        );
+      },
+    );
+
+    // Her marks read back with the weights in force: what a change of weights does to each of them.
+    app.get(
+      '/playground/desire-marks',
+      { schema: { querystring: DesireMarksQuerySchema, response: { 200: DesireMarksSchema } } },
+      async (request) => {
+        const marks = await desireMarks.list(request.query.creatorId, MARKS_SHOWN);
+        return {
+          weightsNow: DESIRE_WEIGHTS_VERSION,
+          marks: marks.map((mark) => ({
+            id: mark.id,
+            markedAt: mark.markedAt.toISOString(),
+            fanMessage: mark.fanMessage,
+            verdict: mark.verdict,
+            note: mark.note,
+            before: mark.reading.before,
+            scoreThen: mark.reading.score,
+            weightsThen: mark.weightsVersion,
+            signals: mark.reading.signals.map((signal) => ({ signal, points: desireSignalPoints(signal) })),
+            scoreNow: recountDesire(mark.reading),
+          })),
+        };
       },
     );
 

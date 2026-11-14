@@ -66,7 +66,7 @@ describe('phase 0 end to end', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     const logger = createLogger(config);
     app = await createApp(config, logger, {
       connectorRegistry: { reveal: () => platform },

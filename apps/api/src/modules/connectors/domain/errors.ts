@@ -1,6 +1,7 @@
 import {
   CONNECTOR_LINK_FORBIDDEN,
   CONNECTOR_SESSION_CONFLICT,
+  CONNECTOR_SESSION_MEMBER_CONFLICT,
   CONNECTOR_SESSION_UNPROCESSABLE,
   DomainError,
   type ConnectorErrorCode,
@@ -44,6 +45,19 @@ export class ConnectorLinkForbidden extends DomainError {
 export class SessionShapeUnprocessable extends DomainError {
   constructor() {
     super(CONNECTOR_SESSION_UNPROCESSABLE, 'Cette session ne correspond pas à la plateforme du compte');
+  }
+}
+
+/**
+ * A session of another team member than the one already stored on the account (P2-02): the « bot » member is pinned
+ * at the first « Sync », so that a session of the owner or a chatter never reads, sends or counts as the bot: 409.
+ */
+export class SessionMemberConflict extends DomainError {
+  constructor() {
+    super(
+      CONNECTOR_SESSION_MEMBER_CONFLICT,
+      'Cette session est celle d’un autre membre Reveal que le membre « bot » de ce compte',
+    );
   }
 }
 

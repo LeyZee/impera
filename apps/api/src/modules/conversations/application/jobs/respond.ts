@@ -14,6 +14,7 @@ import {
   type JobPayload,
 } from '@impera/contracts';
 
+import { safetySigns } from '../../../agent';
 import type {
   Clock,
   ComposeInput,
@@ -190,6 +191,19 @@ async function stillPending(
 }
 
 /**
+ * Care is not deferred (ADR 0088, relecture Agent du 12/11): out of her hours, a fan in distress is still answered,
+ * when the code already knows it, an episode open or dark thoughts written plainly since her last reply. Nothing
+ * leaves without a human, so deferring would only delay the moment someone sees it. A sign only the brain reads waits
+ * for her opening.
+ */
+async function answersOutOfHours(tx: Transaction, conversation: Conversation): Promise<boolean> {
+  if (conversation.careSince !== null) return true;
+  const history = await tx.messages.history(conversation.id, HISTORY_LIMIT);
+  const lastReply = history.findLastIndex((message) => message.author !== 'fan');
+  return history.slice(lastReply + 1).some((message) => safetySigns(message.text).includes('self_harm'));
+}
+
+/**
  * No draft out of her hours (P3-14): the conversation stays `pending`, his message waits, and her next opening answers
  * it. Every deferral of hers points at one `conversation.reopen` job (its key), which answers all the fans who
  * wrote, the longest wait first. A wait she chose (P3-11) leaves the conversation at rest, so it keeps its own job,
@@ -260,7 +274,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
     const read = await uow.inTenant(payload.creatorId, async (tx) => {
       const conversation = await tx.conversations.lock(payload.conversationId);
       if (conversation === null || !(await stillPending(tx, conversation, logger, waitedFor))) return null;
-      if (until !== null) {
+      if (until !== null && !(await answersOutOfHours(tx, conversation))) {
         await deferReply(tx, conversation, until, payload, clock.now());
         logger.info({ until: until.toISOString() }, 'respond: out of her hours, deferred');
         return null;
@@ -269,6 +283,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
         stats: await tx.messages.fanStats(conversation.fanId),
+        sales: await tx.events.salesState(conversation.id),
         lastInbound: lastInboundKey(conversation),
       };
     });
@@ -293,6 +308,13 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         read.conversation.desireAt !== null && {
           desire: { score: read.conversation.desireScore, at: read.conversation.desireAt },
         }),
+      ...(read.conversation.careSince !== null && {
+        care: { since: read.conversation.careSince, helpGiven: read.conversation.careHelpAt !== null },
+      }),
+      ...(read.sales.customOrderOpen && { customOrderOpen: true }),
+      ...(read.sales.usedObjectionReplies.length > 0 && {
+        usedObjectionReplies: read.sales.usedObjectionReplies,
+      }),
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
 
@@ -331,7 +353,46 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           meta,
         );
       }
+      // The care mode opens on the first sign (ADR 0088), on a draft or on a hold alike: « À traiter » and the reader
+      // read it from the conversation, and only a manager or the owner closes it.
+      const careSigns = (result.care?.signs ?? []).filter((sign) => sign !== 'care_open');
+      if (result.care !== undefined && conversation.careSince === null && careSigns.length > 0) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          {
+            type: 'care_opened',
+            payload: { conversationId: conversation.id, signs: careSigns.slice(0, 10) },
+          },
+          meta,
+        );
+      }
+      // His custom order now waits for the team (ADR 0090 § A), whatever the answer becomes.
+      if (result.customOrderOpened === true) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          { type: 'custom_order_opened', payload: { conversationId: conversation.id } },
+          meta,
+        );
+      }
       if (result.kind === 'draft') {
+        // The reply of her bank this draft was written with: never given to him again (ADR 0090 § B).
+        if (result.objectionReply !== undefined) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            {
+              type: 'objection_reply_used',
+              payload: {
+                conversationId: conversation.id,
+                objection: result.objectionReply.objection,
+                replyId: result.objectionReply.replyId,
+              },
+            },
+            meta,
+          );
+        }
         await tx.drafts.insert({
           id: draftId,
           conversationId: conversation.id,
@@ -347,7 +408,14 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         await appendEvent(
           tx,
           conversation,
-          { type: 'draft_created', payload: { draftId, status: 'pending' } },
+          {
+            type: 'draft_created',
+            payload: {
+              draftId,
+              status: 'pending',
+              ...(result.care !== undefined && { care: { help: result.care.help } }),
+            },
+          },
           meta,
         );
         logger.info(

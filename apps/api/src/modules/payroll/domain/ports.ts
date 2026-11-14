@@ -17,6 +17,7 @@ import type {
   ExchangeRates,
   ForeignCurrency,
   HeldSales,
+  MyFigures,
   MySales,
   MySalesQuery,
   PayAdjustment,
@@ -163,6 +164,8 @@ export interface PayrollSaleDecisionStore {
  */
 export interface PayrollSaleSignalStore {
   mySales(userId: UserId, query: MySalesQuery): Promise<MySales>;
+  /** The member's own figures (ADR 0104 § A), from their own statements only. */
+  myFigures(userId: UserId): Promise<MyFigures>;
   signal(actor: Actor, body: CreatePaySaleSignalBody): Promise<Recorded<PaySaleSignal>>;
 }
 

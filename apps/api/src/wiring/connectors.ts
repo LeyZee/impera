@@ -8,6 +8,7 @@ import {
   createAvatarFetch,
   createConnectorsModule,
   createS3AvatarStore,
+  revealApiConnectors,
   revealSalesFeed,
   type AvatarPorts,
   type ConnectorRegistry,
@@ -37,8 +38,11 @@ export function wireConnectors(
     readonly invite: InviteFromPlatform;
     /** The person an extension link names (ADR 0066 § 7), late bound: `trends` holds the links and is wired later. */
     readonly linkUser: ConnectorsDeps['linkUser'];
-    /** Reveal's adapter arrives with phase 1 (ADR 0008); until then no account is polled. */
-    readonly registry: ConnectorRegistry;
+    /**
+     * One adapter per platform. Reveal's private API by default (P2-02), read with each account's captured session: an
+     * account without one is never called. Tests hand a `FakeConnector` or FakeReveal over.
+     */
+    readonly registry?: ConnectorRegistry;
     /** Reveal's CRM API (ADR 0050) by default; FakeReveal's in the tests. */
     readonly salesFeeds?: SalesFeedRegistry;
     /** Tests only: the connectors' clock. */
@@ -58,7 +62,16 @@ export function wireConnectors(
     db,
     adminDb,
     ingest: deps.ingest,
-    registry: deps.registry,
+    registry: deps.registry ?? {
+      // Reads only: sends stay off until P2-03, and the write guard (`writes`) refuses them first anyway.
+      reveal: revealApiConnectors({
+        fetch,
+        // The route's name, the status and the duration: never the token, a URL or a body (spec § 3).
+        log: (platformAccountId, entry) => {
+          logger.debug({ platformAccountId, ...entry }, 'reveal: call');
+        },
+      }),
+    },
     sessionKeys: sessionKeys === null ? null : parseEncryptionKeys(sessionKeys, 'SESSION_ENCRYPTION_KEYS'),
     linkUser: deps.linkUser,
     // The AI keys' encryption (ADR 0050 § 4): without it no sales feed key is kept, nothing is read.
