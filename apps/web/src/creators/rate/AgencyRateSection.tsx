@@ -5,6 +5,7 @@ import {
   type CreatorId,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { Field } from '../persona/fields';
@@ -355,7 +356,14 @@ function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
         <p className="nv-eyebrow" id={`${id}-read`}>
           Lue chez {readAt(all)}
         </p>
-        {all.length === 0 ? (
+        {!list.observed.linked && all.length === 0 ? (
+          <p className="ps-muted">
+            Aucun compte Reveal relié : aucune part lue.{' '}
+            <Link to="/reglages/ventes" className="ar-read__link">
+              Relier Reveal
+            </Link>
+          </p>
+        ) : all.length === 0 ? (
           <p className="ps-muted">Aucune vente lue ces 30 derniers jours : aucune part à montrer.</p>
         ) : (
           <ul className="ar-read">

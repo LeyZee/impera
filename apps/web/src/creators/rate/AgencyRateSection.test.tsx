@@ -5,7 +5,9 @@ import {
   type CreatorAgencyRateList,
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AgencyRateSection } from './AgencyRateSection';
@@ -73,9 +75,17 @@ function serve(
 
 function renderSection(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // A router of its own: the card links to Réglages › Ventes to link Reveal.
+  const root = createRootRoute({
+    component: (): JSX.Element => <AgencyRateSection creatorId={CREATOR} creatorName="Anna" />,
+  });
+  const router = createRouter({
+    routeTree: root,
+    history: createMemoryHistory({ initialEntries: ['/creatrices'] }),
+  });
   render(
     <QueryClientProvider client={client}>
-      <AgencyRateSection creatorId={CREATOR} creatorName="Anna" />
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }
@@ -94,9 +104,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     serve([]);
     renderSection();
     expect(
-      await screen.findByText(
-        'À régler : aucun pourcentage pour Anna, aucune part de l’agence n’est montrée.',
-      ),
+      await screen.findByText('À régler : relie Reveal ou règle un pourcentage pour Anna.'),
     ).toBeDefined();
     // Typed, never the system's calendar: a day before today is refused in words.
     type('À partir du', '2/11/2026');
@@ -104,6 +112,12 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     type('À partir du', TODAY);
     expect(screen.queryByText(/au plus tôt\.$/u)).toBeNull();
     expect(screen.queryByText('Historique')).toBeNull();
+    // Nothing linked: nothing is read, and the card says where to link Reveal.
+    const read = screen.getByRole('region', { name: 'Lue chez Reveal' });
+    expect(within(read).getByText(/^Aucun compte Reveal relié : aucune part lue\./u)).toBeDefined();
+    expect(within(read).getByRole('link', { name: 'Relier Reveal' }).getAttribute('href')).toBe(
+      '/reglages/ventes',
+    );
   });
 
   it('has the owner read the whole sentence before saving, then shows it in force', async () => {

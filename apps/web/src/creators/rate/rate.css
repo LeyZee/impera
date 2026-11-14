@@ -125,3 +125,8 @@
 .ar-read-panel .ps-block {
   padding-bottom: 0;
 }
+.ar-read__link {
+  color: var(--nv-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

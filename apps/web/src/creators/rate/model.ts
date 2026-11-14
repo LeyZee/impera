@@ -165,7 +165,7 @@ export function sheetHead(
   }
   return {
     dot: 'warn',
-    lead: `À régler : aucun pourcentage pour ${creatorName}, aucune part de l’agence n’est montrée.`,
+    lead: `À régler : relie Reveal ou règle un pourcentage pour ${creatorName}.`,
     then: null,
   };
 }

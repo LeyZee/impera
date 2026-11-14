@@ -348,9 +348,7 @@ describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
     const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
     fireEvent.click(within(views).getByRole('link', { name: 'Part de l’agence' }));
     expect(
-      await screen.findByText(
-        'À régler : aucun pourcentage pour Bea, aucune part de l’agence n’est montrée.',
-      ),
+      await screen.findByText('À régler : relie Reveal ou règle un pourcentage pour Bea.'),
     ).toBeDefined();
     expect(router.state.location.search).toEqual({ onglet: 'pourcentage', creatrice: BEA.id });
     expect(within(views).getByRole('link', { name: 'Part de l’agence' }).getAttribute('aria-current')).toBe(
