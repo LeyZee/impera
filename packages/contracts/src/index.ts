@@ -69,3 +69,4 @@ export * from './team-members';
 export * from './telegram';
 export * from './telegram-channel';
 export * from './trends';
+export * from './vault';

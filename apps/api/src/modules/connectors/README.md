@@ -124,6 +124,13 @@ La version du lien change dès qu'il pointe ailleurs, jamais quand le même lien
 - **Vendeur** (`SaleSellerSchema`) : le lien du propriétaire sur le chatteur de la vente, en quatre cas, comme l'auteur que lit la paie : un membre (`memberId`), l'agent, un chatteur non relié, ou personne. Un remboursement est compté avec le vendeur de sa vente.
 - **`sale_detected`** : `recordPage` le publie dans la transaction qui insère la vente au registre, sous le tenant de sa créatrice, et seulement si l'insertion a eu lieu (une page relue, un curseur remis au début n'insèrent rien, donc ne publient rien). Il faut aussi que la vente ait moins de `SALE_RING_WINDOW_MS` (15 minutes, fixé dans le code) au moment où elle est enregistrée. Une vente lue plus tard (webhook manqué, curseur qui rattrape) ne sonne pas, mais elle compte dans les totaux. Un remboursement ne sonne jamais, ni une ligne en quarantaine, ni une ligne qui sort de quarantaine quand son modèle est relié. Le payload porte la clé de la ligne, la plateforme, le compte, le type, l'instant, la devise, le brut TTC, le net, les deux parts et le vendeur ; jamais le fan, ni son identifiant ni son pseudo. Telegram le lit déjà dans `SCANNED_EVENT_TYPES` mais n'en fait rien tant que le lot b n'a pas écrit son alerte. La même transaction met en file `notifications.creator_sale` (CRM-04 lot d2), une fois par vente (`job_key` sur la ligne) : le job n'existe que si la vente est commitée, et c'est `notifications` qui prévient la créatrice.
 
+## Coffre de la plateforme (fiche vault-sync, ADR 0099)
+
+- `domain/vault-sync.ts` : la lecture du coffre en liaisons (`vaultRefsOf`), la comparaison avec ce qui est gardé (`planVaultSync` : nouveau, déplacé, changé ou revenu = écrit ; plus listé = `removed_at`, jamais effacé ; inchangé = rien), l'ordre de Reveal (`compareVaultOrder`) et celui des dossiers.
+- `application/vault.ts` : le job `connector.vault_sync` (file du compte, aucune horloge : demandé par le propriétaire), la vue `GET /v1/creators/:creatorId/vault` (propriétaire, manager actif de sa liste) et `platformReads.scripts` pour un autre module (par le resolver, derrière `capabilities.scripts`, jamais une écriture).
+- `infra/db/vault-store.ts` : `media_platform_refs`, écrite dans la transaction de la créatrice, une créatrice archivée n'est ni lue ni écrite. `infra/http/vault-routes.ts` : les deux routes.
+- Aucun fichier, aucune adresse, aucun appel d'IA : le téléchargement et la description viennent avec la fiche vault-fetch-media.
+
 ## Structure
 
 - `domain/` : types, règles pures, machines d'état. Zéro I/O, zéro import de framework.

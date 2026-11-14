@@ -42,6 +42,7 @@ export const JOB_NAMES = [
   'connector.dispatch',
   'connector.poll',
   'connector.reconcile',
+  'connector.vault_sync',
   'fans.refresh_summary',
   'fans.read_card',
   'fans.purge_facts',
@@ -115,6 +116,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.dispatch': 'Lecture des comptes Reveal',
   'connector.poll': 'Lecture d’un compte Reveal',
   'connector.reconcile': 'Vérification des envois Reveal',
+  'connector.vault_sync': 'Synchronisation du coffre Reveal',
   'fans.refresh_summary': 'Résumé des fans',
   'fans.read_card': 'Fiche des fans remplie par l’IA',
   'fans.purge_facts': 'Nettoyage de la mémoire des fans',
@@ -223,6 +225,16 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   'connector.reconcile': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
+   * The account's vault mirrored in the CRM (ADR 0099 § 2 to 4, fiche vault-sync): folders, media and the platform's
+   * order, read only, never a file nor a model call. On the account's queue, after its poll; replayable, writes nothing
+   * when nothing moved. Asked by the owner (`POST /v1/creators/:creatorId/vault/sync`), never by a cron for now.
+   */
+  'connector.vault_sync': z.object({
     creatorId: CreatorIdSchema,
     platformAccountId: PlatformAccountIdSchema,
     correlationId: z.string().min(1),
@@ -511,6 +523,7 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.dispatch': 1,
   'connector.poll': 3,
   'connector.reconcile': 3,
+  'connector.vault_sync': 3,
   'fans.refresh_summary': 3,
   // Replayable: it reads from where the last read stopped (`conversations.card_read_through`).
   'fans.read_card': 3,

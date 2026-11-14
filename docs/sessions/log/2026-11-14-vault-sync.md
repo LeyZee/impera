@@ -1,0 +1,9 @@
+# 2026-11-14 — Coffre Reveal : synchroniser dossiers et médias — review
+
+Fiche : `PROPOSED-vault-sync.md` (ADR 0030 § 1 et 2, ADR 0099 § 2 à 4). Branche : `task/vault-sync`.
+Fait : migration 0200 (provisoire) `media_platform_refs` ; `VaultMedia` porte le rang de Reveal, le moment du dossier, la description et la fourchette suggérée ; fusion pure lecture/liaisons (`domain/vault-sync.ts`) ; job `connector.vault_sync` sur la file du compte ; `GET /v1/creators/:creatorId/vault` et `POST …/vault/sync` (propriétaire) ; `connectors.platformReads.scripts` pour l'import des scripts (demande de la coordination).
+Pas fait : vérification sur le PC en lecture seule ; horloge du job ; ligne `media_descriptions` d'auteur `platform` (fiche vault-fetch-media, il faut un fichier).
+Décisions : pas d'horloge, le propriétaire demande la synchronisation ; ordre du plus récent au plus ancien comme Reveal le liste ; `folder_position` = rang entre uploads du même instant ; description de Reveal gardée sur la liaison tant qu'il n'y a pas de fichier.
+Découvertes : le glossaire nommait le job `media.sync` (ADR 0030), mais un job porte le préfixe du module qui l’exécute (`TasksOf<"connector">`) : il devient `connector.vault_sync`, glossaire mis à jour.
+Candidats à suppression : aucun.
+Vérifié : `pnpm check`, tests unitaires ; intégration en CI (pas de Docker ici).

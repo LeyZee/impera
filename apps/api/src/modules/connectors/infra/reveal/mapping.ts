@@ -251,13 +251,22 @@ export function sentStepsOf(items: readonly ScriptItem[]): SentScriptStep[] {
     }));
 }
 
-/** `listVaultMedia`: one media of the vault, with the folder it was listed in (`null` for the vault's root). */
-export function vaultMediaOf(media: VaultItem, folder: VaultFolder | null): VaultMedia {
+/**
+ * `listVaultMedia`: one media of the vault, with the folder it was listed in (`null` for the vault's root) and its rank
+ * in that folder's list as Reveal returned it (ADR 0099 § 3). The suggested range is kept only when both ends are given.
+ */
+export function vaultMediaOf(media: VaultItem, folder: VaultFolder | null, position: number): VaultMedia {
+  const min = media.suggestedMinPrice;
+  const max = media.suggestedMaxPrice;
   return {
     ref: ref(media.id),
     kind: KINDS[media.type],
-    folder: folder === null ? null : { ref: ref(folder.id), name: folder.name },
+    folder:
+      folder === null ? null : { ref: ref(folder.id), name: folder.name, moment: momentOf(folder.name, []) },
+    folderPosition: position,
     durationSeconds: media.durationSeconds ?? null,
     createdAt: media.createdAt,
+    description: media.description === null || media.description.trim() === '' ? null : media.description,
+    suggestedPriceMinor: min === null || max === null || min < 0 || max < 0 ? null : { min, max },
   };
 }

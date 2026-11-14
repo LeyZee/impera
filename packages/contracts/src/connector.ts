@@ -185,13 +185,24 @@ export type PlatformScript = z.infer<typeof PlatformScriptSchema>;
 export const SentScriptStepSchema = z.object({ stepRef: ExternalRefSchema, purchased: z.boolean() });
 export type SentScriptStep = z.infer<typeof SentScriptStepSchema>;
 
-/** A media of the creator's vault on the platform (`listVaultMedia`), with its folder. */
+/**
+ * A media of the creator's vault on the platform (`listVaultMedia`), with its folder (ADR 0099 § 2 to 4).
+ * `folderPosition`: its rank in the platform's own list of that folder (or of the vault's root), from 0, as the pages
+ * came one after the other. `folder.moment`: ☀️ or 🌙 read in the folder's name, which is what decides. `description`:
+ * the platform's text, a starting point never validated. `suggestedPriceMinor`: the platform's suggested range, in the
+ * platform's minor unit (euro cents on Reveal, like its other prices; to confirm at the first real read), only shown.
+ */
 export const VaultMediaSchema = z.object({
   ref: ExternalRefSchema,
   kind: ExternalMediaSchema.shape.kind,
-  folder: z.object({ ref: ExternalRefSchema, name: z.string() }).nullable(),
+  folder: z
+    .object({ ref: ExternalRefSchema, name: z.string(), moment: PlatformScriptMomentSchema.nullable() })
+    .nullable(),
+  folderPosition: z.number().int().min(0),
   durationSeconds: z.number().min(0).nullable(),
   createdAt: z.iso.datetime(),
+  description: z.string().nullable(),
+  suggestedPriceMinor: z.object({ min: z.number().int().min(0), max: z.number().int().min(0) }).nullable(),
 });
 export type VaultMedia = z.infer<typeof VaultMediaSchema>;
 
