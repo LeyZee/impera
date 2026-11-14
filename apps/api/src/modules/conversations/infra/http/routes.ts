@@ -32,45 +32,31 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { ConversationCommands } from '../../application/commands';
-import { ConversationNotFound } from '../../domain/errors';
+import {
+  createConversationReads,
+  readsWholeCreator,
+  viewerOf,
+  type ConversationViewer,
+} from '../../application/reads';
+import { ConversationForbidden, CreatorForbidden } from '../../domain/errors';
 import type { ConversationReader } from '../../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
-
-class CreatorForbidden extends DomainError {
-  constructor() {
-    super('creator_forbidden', 'Créatrice hors de ton périmètre');
-  }
-}
 
 const CreatorQuerySchema = z.object({ creatorId: CreatorIdSchema });
 const ConversationParamsSchema = z.object({ id: ConversationIdSchema });
 const DraftParamsSchema = ConversationParamsSchema.extend({ draftId: DraftIdSchema });
 const CreatorParamsSchema = z.object({ id: CreatorIdSchema });
 
-class ConversationForbidden extends DomainError {
-  constructor() {
-    super('conversation_forbidden', 'Cette conversation ne t’a pas été confiée');
-  }
-}
-
 function signedIn(request: FastifyRequest): CurrentUser {
   if (request.user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
   return request.user;
 }
 
-/** Whether the user reads every conversation of this creator: the owner, or a creator of his `creatorIds`. */
-function readsWholeCreator(user: CurrentUser, creatorId: CreatorId): boolean {
-  return user.role === 'owner' || user.creatorIds.includes(creatorId);
-}
-
-/**
- * Whether the user reads and treats every conversation of this creator: the whole creator, or a chatter whose access
- * window is open on her (ADR 0025, EQ-13). Never her mode nor her blind tests: those stay `actorFor`'s.
- */
-function treatsEveryConversation(user: CurrentUser, creatorId: CreatorId): boolean {
-  return readsWholeCreator(user, creatorId) || user.shiftCreatorIds.includes(creatorId);
+/** The signed-in user as the conversation reads see him (ADR 0026 § 1): 401 without a session. */
+function viewerAt(request: FastifyRequest): ConversationViewer {
+  return viewerOf(signedIn(request));
 }
 
 /** The signed-in user, allowed on the whole creator (her mode, her blind tests): never through routing. */
@@ -79,7 +65,7 @@ export function actorFor(
   creatorId: CreatorId,
 ): { user: CurrentUser; userId: UserId } {
   const user = signedIn(request);
-  if (!readsWholeCreator(user, creatorId)) throw new CreatorForbidden();
+  if (!readsWholeCreator(viewerOf(user), creatorId)) throw new CreatorForbidden();
   return { user, userId: UserIdSchema.parse(user.id) };
 }
 
@@ -91,40 +77,12 @@ export function createConversationRoutes(
 ): FastifyPluginAsyncZod {
   const { requireRole } = guards;
 
-  /**
-   * The signed-in user, allowed on this conversation: the whole creator, a chatter in his access window on her (ADR
-   * 0025), or (a team member whose scope is `self`, ADR 0024) only a conversation he holds, routed to him or taken
-   * over by him and not given back; anything else is 403.
-   */
-  const actorOn = async (
+  const reads = createConversationReads(reader);
+  const actorOn = (
     request: FastifyRequest,
     creatorId: CreatorId,
     conversationId: z.infer<typeof ConversationIdSchema>,
-  ): Promise<UserId> => {
-    const user = signedIn(request);
-    const userId = UserIdSchema.parse(user.id);
-    if (treatsEveryConversation(user, creatorId)) return userId;
-    if (!user.routedCreatorIds.includes(creatorId)) throw new CreatorForbidden();
-    if (!(await reader.isHeldBy(creatorId, conversationId, userId))) throw new ConversationForbidden();
-    return userId;
-  };
-
-  /**
-   * `actorOn` for a read of the conversation and its fan's sheet: a chatter's is written in the audit log first, never
-   * what he read (ADR 0025), and a conversation the creator does not have answers 404 before anything is read.
-   */
-  const readerOn = async (
-    request: FastifyRequest,
-    creatorId: CreatorId,
-    conversationId: z.infer<typeof ConversationIdSchema>,
-    via?: 'messages' | 'events' | 'desire',
-  ): Promise<UserId> => {
-    const userId = await actorOn(request, creatorId, conversationId);
-    if (readsWholeCreator(signedIn(request), creatorId)) return userId;
-    const trace = { userId, ip: request.ip, ...(via === undefined ? {} : { via }) };
-    if (!(await reader.traceOpening(creatorId, conversationId, trace))) throw new ConversationNotFound();
-    return userId;
-  };
+  ): Promise<UserId> => reads.actorOn(viewerAt(request), creatorId, conversationId);
 
   return (app) => {
     // A creator never reads a conversation (ADR 0023): her fans' words stay with the agency.
@@ -145,12 +103,7 @@ export function createConversationRoutes(
       '/conversations/stop',
       { ...read, schema: { querystring: CreatorQuerySchema, response: { 200: SendingStopSchema } } },
       async (request) => {
-        const { creatorId } = request.query;
-        const user = signedIn(request);
-        if (!treatsEveryConversation(user, creatorId) && !user.routedCreatorIds.includes(creatorId)) {
-          throw new CreatorForbidden();
-        }
-        return { stopped: await reader.sendingStopped(creatorId) };
+        return { stopped: await reads.stopped(viewerAt(request), request.query.creatorId) };
       },
     );
 
@@ -165,14 +118,7 @@ export function createConversationRoutes(
       },
       async (request) => {
         const { creatorId, limit, cursor } = request.query;
-        const user = signedIn(request);
-        const heldOnly = !treatsEveryConversation(user, creatorId);
-        if (heldOnly && !user.routedCreatorIds.includes(creatorId)) throw new CreatorForbidden();
-        const page = await reader.list(
-          creatorId,
-          { limit, cursor },
-          { userId: UserIdSchema.parse(user.id), heldOnly },
-        );
+        const page = await reads.list(viewerAt(request), creatorId, { limit, cursor });
         return { items: [...page.items], nextCursor: page.nextCursor };
       },
     );
@@ -188,10 +134,7 @@ export function createConversationRoutes(
         },
       },
       async (request) => {
-        const userId = await readerOn(request, request.query.creatorId, request.params.id);
-        const detail = await reader.get(request.query.creatorId, request.params.id, userId);
-        if (detail === null) throw new ConversationNotFound();
-        return detail;
+        return reads.get(viewerAt(request), request.query.creatorId, request.params.id, { ip: request.ip });
       },
     );
 
@@ -207,9 +150,15 @@ export function createConversationRoutes(
       },
       async (request) => {
         const { creatorId, limit, cursor } = request.query;
-        await readerOn(request, creatorId, request.params.id, 'messages');
-        const page = await reader.messages(creatorId, request.params.id, { limit, cursor });
-        if (page === null) throw new ConversationNotFound();
+        const page = await reads.messages(
+          viewerAt(request),
+          creatorId,
+          request.params.id,
+          { limit, cursor },
+          {
+            ip: request.ip,
+          },
+        );
         return { items: [...page.items], nextCursor: page.nextCursor };
       },
     );
@@ -226,9 +175,15 @@ export function createConversationRoutes(
       },
       async (request) => {
         const { creatorId, limit, cursor } = request.query;
-        await readerOn(request, creatorId, request.params.id, 'events');
-        const page = await reader.events(creatorId, request.params.id, { limit, cursor });
-        if (page === null) throw new ConversationNotFound();
+        const page = await reads.events(
+          viewerAt(request),
+          creatorId,
+          request.params.id,
+          { limit, cursor },
+          {
+            ip: request.ip,
+          },
+        );
         return { items: [...page.items], nextCursor: page.nextCursor };
       },
     );
@@ -245,10 +200,9 @@ export function createConversationRoutes(
         },
       },
       async (request) => {
-        await readerOn(request, request.query.creatorId, request.params.id, 'desire');
-        const curve = await reader.desireCurve(request.query.creatorId, request.params.id);
-        if (curve === null) throw new ConversationNotFound();
-        return curve;
+        return reads.desire(viewerAt(request), request.query.creatorId, request.params.id, {
+          ip: request.ip,
+        });
       },
     );
 
@@ -330,7 +284,7 @@ export function createConversationRoutes(
         // A chatter gives back the hand he holds, or in his window a handoff nobody took (he is the one on shift),
         // never another person's (ADR 0025): the owner and a manager who reads the whole creator give back any.
         if (
-          !readsWholeCreator(signedIn(request), creatorId) &&
+          !readsWholeCreator(viewerAt(request), creatorId) &&
           (await reader.holderOf(creatorId, request.params.id, input.userId)) === 'other'
         ) {
           throw new ConversationForbidden();
