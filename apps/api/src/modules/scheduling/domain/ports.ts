@@ -1,4 +1,5 @@
 import type {
+  CreatorAgencyRateList,
   AccountPayRulesId,
   CreatorAgencyRateId,
   CalendarView,
@@ -650,8 +651,15 @@ interface NewAgencyRate {
  * transaction.
  */
 export interface AgencyRatesStore {
-  /** Her percentages newest first, and the day it is at `now` in the agency's zone. */
-  list(actor: UserId, creatorId: CreatorId, now: Date): Promise<{ today: string; rates: StoredAgencyRate[] }>;
+  /**
+   * Her percentages newest first, the day it is at `now` in the agency's zone, and the agency's share read on the
+   * register over the windows of ADR 0054 § 4, in the same transaction.
+   */
+  list(
+    actor: UserId,
+    creatorId: CreatorId,
+    now: Date,
+  ): Promise<{ today: string; rates: StoredAgencyRate[]; observed: CreatorAgencyRateList['observed'] }>;
   /** Owner; `created` is false when the same percentage was already recorded. */
   create(
     actor: Actor,

@@ -1,5 +1,9 @@
 // @vitest-environment jsdom
-import { CreateCreatorAgencyRateBodySchema, CreatorIdSchema } from '@impera/contracts';
+import {
+  CreateCreatorAgencyRateBodySchema,
+  CreatorIdSchema,
+  type CreatorAgencyRateList,
+} from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -26,11 +30,25 @@ const apiError = (code: string): unknown => ({
  * A fake `/v1/creators/:id/agency-rates` that keeps what it is sent, as the server would: the one in force is the
  * latest day at or before today. `refuse` answers a POST with that status and code instead.
  */
-function serve(rates: Rate[], refuse?: { status: number; code: string }): unknown[] {
+const NOTHING_READ: CreatorAgencyRateList['observed'] = {
+  last30Days: { from: '2026-10-05', to: TODAY, shares: [] },
+  fortnights: [],
+};
+
+function serve(
+  rates: Rate[],
+  refuse?: { status: number; code: string },
+  observed: object = NOTHING_READ,
+): unknown[] {
   const posts: unknown[] = [];
   const list = () => {
     const sorted = rates.toSorted((a, b) => b.fromDay.localeCompare(a.fromDay));
-    return { today: TODAY, current: sorted.find((one) => one.fromDay <= TODAY) ?? null, rates: sorted };
+    return {
+      today: TODAY,
+      current: sorted.find((one) => one.fromDay <= TODAY) ?? null,
+      rates: sorted,
+      observed,
+    };
   };
   vi.stubGlobal(
     'fetch',
@@ -164,6 +182,38 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
       'disabled',
       true,
     );
+  });
+
+  it('shows the agency’s share read at Reveal first, the percentage optional (ADR 0054 § 4 and § 6)', async () => {
+    const share = {
+      platform: 'reveal',
+      platformAccountId: '0192f3a0-0000-7000-8000-0000000000a1',
+      currency: 'EUR',
+      netMinor: 1800,
+      agencyMinor: 700,
+      agencyBps: 3889,
+    };
+    serve([], undefined, {
+      last30Days: { from: '2026-10-05', to: TODAY, shares: [share] },
+      fortnights: [
+        { from: '2026-11-01', to: TODAY, shares: [share] },
+        { from: '2026-10-16', to: '2026-10-31', shares: [] },
+        { from: '2026-10-01', to: '2026-10-15', shares: [] },
+      ],
+    });
+    renderSection();
+    expect(
+      await screen.findByText(
+        /^Lue chez Reveal : 38,89\s% du net sur 30 jours\. Le pourcentage est facultatif\.$/u,
+      ),
+    ).toBeDefined();
+    expect(screen.queryByText(/^À régler/u)).toBeNull();
+    const read = screen.getByRole('region', { name: 'Lue chez la plateforme' });
+    expect(within(read).getAllByText(/^38,89\s% du net$/u)).toHaveLength(2);
+    expect(within(read).getAllByText(/^7\s€ sur 18\s€$/u)).toHaveLength(2);
+    expect(within(read).getByText('du 16/10 au 31/10')).toBeDefined();
+    expect(within(read).getAllByText('aucune vente')).toHaveLength(2);
+    expect(screen.getByText('Son pourcentage, facultatif')).toBeDefined();
   });
 
   it('says the server does not answer, with a way to try again', async () => {

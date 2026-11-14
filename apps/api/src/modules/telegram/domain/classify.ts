@@ -62,6 +62,7 @@ export const SCANNED_EVENT_TYPES = [
   'sales_feed_mismatch',
   'connection_state_changed',
   'agency_share_mismatch',
+  'agency_share_changed',
   'sales_feed_signal',
 ] as const;
 
@@ -758,6 +759,22 @@ export function classify(
         body: `Part créatrice chez ${PLATFORM_NAMES[signal.platform]} : sur ${periodText(signal.from)}, elle s’écarte du pourcentage de l’agence réglé pour elle. À titre d’information.`,
         link: {
           label: 'Ouvrir le pourcentage',
+          path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
+        },
+      };
+    // Important to the groups for all (ADR 0054 § 5), as the gap above: no amount, no share, once per account and
+    // fortnight.
+    case 'agency_share_changed':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        allCreatorsOnly: true,
+        oncePerThread: true,
+        threadKey: `agency_share_changed:${signal.platformAccountId}:${signal.from}`,
+        title: 'Important',
+        body: `Part de l’agence chez ${PLATFORM_NAMES[signal.platform]} : sur ${periodText(signal.from)}, elle a changé par rapport à la quinzaine d’avant. À titre d’information.`,
+        link: {
+          label: 'Ouvrir la part de l’agence',
           path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
         },
       };

@@ -39,6 +39,7 @@ const AccountRow = z.object({
   creator_id: CreatorIdSchema,
   platform: z.string(),
   with_rules: z.boolean(),
+  linked: z.boolean(),
   made_on: day,
 });
 const IdRow = z.object({ creator_id: CreatorIdSchema });
@@ -104,7 +105,8 @@ export function createSetupReader(
         const accounts = await read(
           AccountRow,
           sql`select pa.creator_id, pa.platform, pa.created_at::date as made_on,
-                exists (select 1 from account_pay_rules r where r.platform_account_id = pa.id) as with_rules
+                exists (select 1 from account_pay_rules r where r.platform_account_id = pa.id) as with_rules,
+                exists (select 1 from sales_feed_models m where m.platform_account_id = pa.id) as linked
               from platform_accounts pa`,
         );
         const personas = await read(
@@ -156,6 +158,7 @@ export function createSetupReader(
             accountsWithPayRules: hers.filter((a) => a.with_rules).length,
             hasActivePersona: withPersona.has(id),
             hasAgencyRate: withRate.has(id),
+            hasLinkedReveal: hers.some((a) => a.platform === 'reveal' && a.linked),
             access: account?.invitation ?? 'none',
             telegramReachable: reach === null ? null : (reach.get(id) ?? false),
             hasOwnHours: own_hours,

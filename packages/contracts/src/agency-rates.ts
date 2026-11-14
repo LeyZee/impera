@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { CreatorAgencyRateIdSchema, CreatorIdSchema } from './ids';
+import { PlatformSchema } from './enums';
+import { CreatorAgencyRateIdSchema, CreatorIdSchema, PlatformAccountIdSchema } from './ids';
+import { CurrencySchema } from './money';
 import { BasisPointsSchema } from './team';
 import { CalendarDaySchema } from './team-members';
 
@@ -8,7 +10,8 @@ import { CalendarDaySchema } from './team-members';
  * The agency's percentage of each creator (ADR 0042 § 6, CR-04), under `/v1/creators/:creatorId/agency-rates`: what
  * the agency takes of her net, set by the owner, from a day on, never backwards. No value is ever made up: a creator
  * without one has no agency share shown (« à régler »), and on Reveal it only feeds the owner's gap signal, her part
- * being Reveal's own figure (ADR 0054 § 2).
+ * being Reveal's own figure (ADR 0054 § 2). There it is optional: the agency's share is read on the register instead
+ * (ADR 0054 § 4 to § 7).
  */
 
 /**
@@ -39,13 +42,42 @@ export function agencyRateFor<R extends { readonly fromDay: string }>(
 }
 
 /**
+ * The agency's share of one account in one currency as the platform reads it (ADR 0054 § 4): the sums of the net and
+ * of the agency's part of its sales over a window, refunds taken off, the platform's own figures never computed again,
+ * and their ratio in basis points rounded to the nearest (`null` without a net to divide by).
+ */
+export const ObservedAgencyShareSchema = z.object({
+  platform: PlatformSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  currency: CurrencySchema,
+  netMinor: z.number().int(),
+  agencyMinor: z.number().int(),
+  agencyBps: z.number().int().nullable(),
+});
+export type ObservedAgencyShare = z.infer<typeof ObservedAgencyShareSchema>;
+
+/** One window of days, both included, and the shares read on it; an account without a sale in it is left out. */
+export const ObservedAgencyWindowSchema = z.object({
+  from: CalendarDaySchema,
+  to: CalendarDaySchema,
+  shares: z.array(ObservedAgencyShareSchema),
+});
+export type ObservedAgencyWindow = z.infer<typeof ObservedAgencyWindowSchema>;
+
+/**
  * `GET /v1/creators/:creatorId/agency-rates` (owner only): her percentages newest first, the day it is now in the
- * agency's zone, and the one in force that day (`null` while none is: « à régler »). The screen picks nothing itself.
+ * agency's zone, and the one in force that day (`null` while none is: « à régler »). `observed` is the agency's share
+ * read on the register (ADR 0054 § 4): the last 30 days to today, and the fortnight in course with the two before it,
+ * newest first. The screen picks nothing itself.
  */
 export const CreatorAgencyRateListSchema = z.object({
   today: CalendarDaySchema,
   current: CreatorAgencyRateSchema.nullable(),
   rates: z.array(CreatorAgencyRateSchema),
+  observed: z.object({
+    last30Days: ObservedAgencyWindowSchema,
+    fortnights: z.array(ObservedAgencyWindowSchema),
+  }),
 });
 export type CreatorAgencyRateList = z.infer<typeof CreatorAgencyRateListSchema>;
 

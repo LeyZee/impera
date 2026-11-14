@@ -501,6 +501,28 @@ describe('reading the outbox', () => {
       platformAccountId: accountA,
       from: '2026-11-01',
     });
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'agency_share_changed',
+        payload: {
+          creatorId: shareCreator,
+          platform: 'reveal',
+          platformAccountId: accountA,
+          from: '2026-11-01',
+          to: '2026-11-15',
+          currency: 'EUR',
+          previousAgencyBps: 3_000,
+          agencyBps: 3_500,
+        },
+      })?.signal,
+    ).toEqual({
+      kind: 'agency_share_changed',
+      creatorId: shareCreator,
+      platform: 'reveal',
+      platformAccountId: accountA,
+      from: '2026-11-01',
+    });
     // A service or a reason the contract does not know is not read.
     expect(
       toScannedEvent({

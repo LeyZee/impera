@@ -166,8 +166,9 @@ export interface SchedulingModule {
     readonly lapseSwaps: () => Promise<number>;
     /**
      * `scheduling.check_agency_shares` (CRM-04 lot d3), on the 2nd and the 17th: each creator's part read on the
-     * platform against her agency percentage over the fortnight just over; how many `agency_share_mismatch` were new.
-     * It changes no amount.
+     * platform against her agency percentage over the fortnight just over, then the agency's share read on the
+     * platform against the fortnight before (ADR 0054 § 5); how many `agency_share_mismatch` and
+     * `agency_share_changed` were new. It changes no amount.
      */
     readonly checkAgencyShares: (correlationId: string) => Promise<number>;
     /**
@@ -211,7 +212,8 @@ export interface SchedulingDeps {
   readonly periodClosedFrom: PeriodClosedFrom;
   /**
    * A creator's sales totals (CRM-04): the `connectors` module's `salesFeedTotals.totalsOf`, read on the admin
-   * connection by the agency percentages' check (lot d3).
+   * connection by the agency percentages' check (lot d3), and as the owner for the agency's share read on the
+   * register (ADR 0054 § 4).
    */
   readonly salesTotalsOf: SalesTotalsRead;
   /**
@@ -276,7 +278,11 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       deps.creators,
       now,
     ),
-    agencyRates: createAgencyRatesService(createDrizzleAgencyRatesStore(deps.db), deps.creators, now),
+    agencyRates: createAgencyRatesService(
+      createDrizzleAgencyRatesStore(deps.db, deps.salesTotalsOf),
+      deps.creators,
+      now,
+    ),
   };
   return {
     name: 'scheduling',

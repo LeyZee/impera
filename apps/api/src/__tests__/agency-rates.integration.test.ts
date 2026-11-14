@@ -5,6 +5,8 @@ import {
   CreatorAgencyRateSchema,
   CreatorIdSchema,
   newId,
+  PlatformAccountIdSchema,
+  SalesLineIdSchema,
   TeamMemberSchema,
   type CreatorId,
 } from '@impera/contracts';
@@ -115,8 +117,10 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
   });
 
   it('says « à régler » while she has none: no value is made up', async () => {
-    const read = await list(anna);
+    const { observed, ...read } = await list(anna);
     expect(read).toEqual({ today: parisDay(0), current: null, rates: [] });
+    expect(observed.last30Days).toEqual({ from: parisDay(-29), to: parisDay(0), shares: [] });
+    expect(observed.fortnights.map((fortnight) => fortnight.shares)).toEqual([[], [], []]);
   });
 
   it('starts her first percentage today, once, and answers a retry with the same one', async () => {
@@ -224,5 +228,59 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
     expect(invalid.statusCode).toBe(400);
     const missing = await add(ines, { id: newId(CreatorAgencyRateIdSchema), fromDay: parisDay(0) });
     expect(missing.statusCode).toBe(400);
+  });
+
+  it('shows the agency’s share as Reveal reads it, without any percentage, nothing computed again (ADR 0054 § 4)', async () => {
+    const account = newId(PlatformAccountIdSchema);
+    await test.admin.db
+      .insert(schema.platformAccounts)
+      .values({ id: account, creatorId: ines, platform: 'reveal', handle: 'ines_test' });
+    // Two invented sales a minute ago: 3,00 € and 4,00 € for the agency of 8,00 € and 10,00 € net, 38,89 %.
+    const sale = (platformSaleId: string, netMinor: number, agencyMinor: number) => ({
+      id: newId(SalesLineIdSchema),
+      creatorId: ines,
+      platformAccountId: account,
+      platform: 'reveal' as const,
+      platformSaleId,
+      event: 'sale' as const,
+      saleType: 'ppv' as const,
+      status: 'paid' as const,
+      occurredAt: new Date(Date.now() - 60_000),
+      platformModelId: 'model_test_01',
+      platformChatterId: null,
+      platformFanId: 'fan_test_01',
+      currency: 'EUR' as const,
+      grossInclVatMinor: netMinor * 2,
+      grossExclVatMinor: netMinor * 2,
+      netMinor,
+      agencyMinor,
+      creatorMinor: netMinor - agencyMinor,
+      position: platformSaleId,
+      inputsHash: `hash-${platformSaleId}`,
+    });
+    await test.admin.db
+      .insert(schema.platformSales)
+      .values([sale('sale_rate_01', 800, 300), sale('sale_rate_02', 1000, 400)]);
+    const { observed, current, rates } = await list(ines);
+    expect([current, rates]).toEqual([null, []]);
+    const share = {
+      platform: 'reveal',
+      platformAccountId: account,
+      currency: 'EUR',
+      netMinor: 1800,
+      agencyMinor: 700,
+      agencyBps: 3889,
+    };
+    expect(observed.last30Days.shares).toEqual([share]);
+    expect(observed.fortnights[0]?.shares).toEqual([share]);
+    expect(observed.fortnights[0]?.to).toBe(parisDay(0));
+    // Never a fan, a chatter nor a sale: sums and a ratio.
+    expect(JSON.stringify(observed)).not.toMatch(/fan|chatter|sale_rate/iu);
+    expect(
+      await test.admin.db
+        .select()
+        .from(schema.creatorAgencyRates)
+        .where(eq(schema.creatorAgencyRates.creatorId, ines)),
+    ).toEqual([]);
   });
 });

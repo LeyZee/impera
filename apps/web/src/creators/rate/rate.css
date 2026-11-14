@@ -68,3 +68,56 @@
   color: var(--nv-ink-muted);
   font-weight: 400;
 }
+
+/* The agency's share read at the platform (ADR 0054 § 4): one row per window, the platform's ratio in the ink, its
+   sums muted. Data, not an alarm: no colour. */
+.ar-read {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ar-read__window {
+  display: grid;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.ar-read__label,
+.ar-read__empty,
+.ar-read__where,
+.ar-read__detail {
+  color: var(--nv-ink-muted);
+}
+.ar-read__shares {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+.ar-read__share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+}
+.ar-read__value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.ar-read__detail {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 480px) {
+  .ar-read__window {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

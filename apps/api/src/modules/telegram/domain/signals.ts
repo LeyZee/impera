@@ -227,6 +227,17 @@ export type Signal =
       readonly platform: Platform;
       readonly platformAccountId: string;
       readonly from: PayPeriod;
+    }
+  | {
+      /**
+       * The agency's share read on the platform moved by more than a point from one fortnight to the next, on one
+       * account (ADR 0054 § 5). For the owner, as information: never an amount, a share, a fan nor a chatter.
+       */
+      readonly kind: 'agency_share_changed';
+      readonly creatorId: CreatorId;
+      readonly platform: Platform;
+      readonly platformAccountId: string;
+      readonly from: PayPeriod;
     };
 
 export interface ScannedEvent {

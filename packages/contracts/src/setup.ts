@@ -49,7 +49,8 @@ export type MemberSetupStepKey = z.infer<typeof MemberSetupStepKeySchema>;
 
 /**
  * What a step adds when its state alone says too little: hours left on the defaults, the agent's mode in force, how
- * many of her accounts have pay rules, Telegram off, a latest reliability check that is not clean.
+ * many of her accounts have pay rules, Telegram off, a latest reliability check that is not clean, the agency's share
+ * read at the platform.
  */
 export const SetupNoteSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('default_hours') }),
@@ -61,6 +62,8 @@ export const SetupNoteSchema = z.discriminatedUnion('kind', [
   }),
   z.object({ kind: z.literal('telegram_off') }),
   z.object({ kind: z.literal('check_not_clean') }),
+  /** The agency's share is read at the platform on a linked account (ADR 0054 § 7): the percentage is optional. */
+  z.object({ kind: z.literal('share_read_on_platform') }),
   /** An invitation link was made, none is alive any more and no password was chosen: it has to be sent again. */
   z.object({ kind: z.literal('invitation_expired') }),
   /** What stops his first invoice today, the reason the validation would give (`invoice_not_issued`). */

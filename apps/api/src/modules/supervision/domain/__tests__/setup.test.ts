@@ -14,6 +14,7 @@ const ready: CreatorSetupFacts = {
   accountsWithPayRules: 1,
   hasActivePersona: true,
   hasAgencyRate: true,
+  hasLinkedReveal: true,
   access: 'used',
   telegramReachable: true,
   hasOwnHours: true,
@@ -49,6 +50,7 @@ describe('creatorSetup', () => {
       accountsWithPayRules: 0,
       hasActivePersona: false,
       hasAgencyRate: false,
+      hasLinkedReveal: false,
       access: 'none',
       telegramReachable: false,
       hasOwnHours: false,
@@ -62,6 +64,19 @@ describe('creatorSetup', () => {
     ]);
     expect(steps.find((step) => step.key === 'agent_hours')?.note).toEqual({ kind: 'default_hours' });
     expect(isSetupComplete(steps)).toBe(false);
+  });
+
+  it('takes her share read at Reveal for the percentage, which is then optional (ADR 0054 § 7)', () => {
+    const rate = (facts: Partial<CreatorSetupFacts>) =>
+      creatorSetup({ ...ready, ...facts }).find((step) => step.key === 'agency_rate');
+    expect(rate({ hasAgencyRate: false })).toEqual({
+      key: 'agency_rate',
+      state: 'done',
+      note: { kind: 'share_read_on_platform' },
+    });
+    expect(rate({ hasLinkedReveal: false })).toEqual({ key: 'agency_rate', state: 'done', note: null });
+    expect(rate({})).toEqual({ key: 'agency_rate', state: 'done', note: null });
+    expect(rate({ hasAgencyRate: false, hasLinkedReveal: false })?.state).toBe('todo');
   });
 
   it('waits on her while her invitation is not opened, and asks a new link once it died unused', () => {

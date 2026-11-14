@@ -3,6 +3,12 @@ import {
   CalendarDaySchema,
   CreatorAgencyRateIdSchema,
   CreatorIdSchema,
+  payPeriodLastDay,
+  payPeriodOfDay,
+  previousPayPeriod,
+  type CreatorAgencyRateList,
+  type CreatorId,
+  type PayPeriod,
 } from '@impera/contracts';
 import { and, eq, schema, SNAPSHOT_READ, sql, withTenantMember, type Database } from '@impera/db';
 import { z } from 'zod';
@@ -14,9 +20,11 @@ import {
   AgencyRateForbidden,
   CreatorNotFound,
 } from '../domain/errors';
+import { observedShares } from '../domain/observed-shares';
 import type { AgencyRatesStore, StoredAgencyRate } from '../domain/ports';
-import { calendarDayIn } from '../domain/time';
+import { addDays, calendarDayIn } from '../domain/time';
 
+import type { SalesTotalsRead } from './agency-share-check';
 import { agencyTimeZone, audit, pgErrorOf } from './rows';
 
 const { creatorAgencyRates } = schema;
@@ -42,12 +50,29 @@ const toRate = (row: unknown): StoredAgencyRate => StoredAgencyRateSchema.parse(
 
 const newestFirst = (a: StoredAgencyRate, b: StoredAgencyRate): number => b.fromDay.localeCompare(a.fromDay);
 
+/** The fortnight in course and the two before it, newest first (ADR 0054 § 4). */
+function lastFortnights(today: string): PayPeriod[] {
+  const current = payPeriodOfDay(today);
+  const previous = previousPayPeriod(current);
+  return [current, previous, previousPayPeriod(previous)];
+}
+
 /**
  * The creators' agency percentages (CR-04) through `withTenantMember` in the creator: `owner_read` and `owner_insert`
  * let the owner alone read and add them, and the table refuses any change or removal, for every role. Today is the
- * agency's day (the zone of the pay periods), read in the same transaction.
+ * agency's day (the zone of the pay periods), read in the same transaction, as the agency's share read on the register
+ * (ADR 0054 § 4, the `connectors` module's totals), which needs no percentage.
  */
-export function createDrizzleAgencyRatesStore(db: Database): AgencyRatesStore {
+export function createDrizzleAgencyRatesStore(db: Database, totalsOf: SalesTotalsRead): AgencyRatesStore {
+  const windowOf = async (
+    tx: Parameters<SalesTotalsRead>[0],
+    creatorId: CreatorId,
+    from: string,
+    to: string,
+  ): Promise<CreatorAgencyRateList['observed']['last30Days']> => {
+    const totals = await totalsOf(tx, { creatorId, from, to });
+    return { from, to, shares: observedShares(totals.rows) };
+  };
   return {
     list: (actor, creatorId, now) =>
       withTenantMember(
@@ -60,7 +85,14 @@ export function createDrizzleAgencyRatesStore(db: Database): AgencyRatesStore {
           const rates = (await tx.select(rateColumns).from(creatorAgencyRates))
             .map(toRate)
             .toSorted(newestFirst);
-          return { today, rates };
+          const last30Days = await windowOf(tx, creatorId, addDays(today, -29), today);
+          const fortnights = [];
+          for (const period of lastFortnights(today)) {
+            const last = payPeriodLastDay(period);
+            // The fortnight in course is read up to today: a day to come has no sale.
+            fortnights.push(await windowOf(tx, creatorId, period, last > today ? today : last));
+          }
+          return { today, rates, observed: { last30Days, fortnights } };
         },
         SNAPSHOT_READ,
       ),

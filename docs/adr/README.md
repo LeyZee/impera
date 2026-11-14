@@ -78,7 +78,7 @@ Date : AAAA-MM-JJ
 | 0051 | Un second point d'entrée, pur, pour les règles qu'un module prête aux domaines qui en dépendent | accepted (précise 0002 pour l'ADR 0047 § 1) |
 | 0052 | Le chatteur sous l'œil de la persona : chaque message qu'il écrit dans Reveal est relu, chaque écart lui est signalé, rien n'est bloqué ni retenu sur sa paie | accepted (précise 0025 et 0043 § 6 ; au § 5 la phrase sur Telegram remplacée par 0059) |
 | 0053 | Clé d'accès (Face ID, empreinte) : un geste vaut mot de passe et code | accepted (précise 0046 § 1, 3, 5 à 8) |
-| 0054 | Gains de la créatrice : les chiffres de Reveal dès que son modèle est relié, sans attendre la bascule | accepted (remplace dans 0042 § 6 la phrase sur la source des ventes ; précise 0042 § 6 et 0050 § 8) |
+| 0054 | Gains de la créatrice : les chiffres de Reveal dès que son modèle est relié, sans attendre la bascule | accepted (remplace dans 0042 § 6 la phrase sur la source des ventes ; précise 0042 § 6 et 0050 § 8 ; amendée § 4 à § 8 le 14/11 : part de l'agence lue chez Reveal, pourcentage facultatif) |
 | 0055 | Dépôt de contenu : la créatrice range chaque dépôt dans sa catégorie, l'agence lui demande ce qui manque | accepted (remplace dans 0044 § 1 l'usage à deux valeurs, et § 2 le départ des 30 jours) |
 | 0056 | Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse | accepted (remplace 0030 § 2 et § 4 pour les scripts déposés ; § 3, phrase sur la palette, remplacée par 0064) |
 | 0057 | Instagram et Telegram : deux connecteurs de publication, par les API officielles, dans le même plan que le feed | accepted (§ 6 et § 7 précisés par 0082 : fenêtre visible d'une légende, aperçu) |

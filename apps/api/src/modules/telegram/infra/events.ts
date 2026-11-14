@@ -154,6 +154,14 @@ const AgencyShareMismatchSchema = EVENT_PAYLOADS.agency_share_mismatch.pick({
   from: true,
 });
 
+// Her account and fortnight (ADR 0054 § 5): both shares stay in Impera.
+const AgencyShareChangedSchema = EVENT_PAYLOADS.agency_share_changed.pick({
+  creatorId: true,
+  platform: true,
+  platformAccountId: true,
+  from: true,
+});
+
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
     case 'handoff_requested': {
@@ -307,6 +315,11 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = AgencyShareMismatchSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'agency_share_mismatch', ...parsed.data };
+    }
+    case 'agency_share_changed': {
+      const parsed = AgencyShareChangedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'agency_share_changed', ...parsed.data };
     }
     case 'connection_state_changed': {
       const parsed = EVENT_PAYLOADS.connection_state_changed.safeParse(payload);

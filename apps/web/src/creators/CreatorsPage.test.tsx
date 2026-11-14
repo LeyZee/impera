@@ -109,7 +109,12 @@ async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
       }
       // Her agency percentage (CR-04): none set yet.
       if ((creators ?? []).some((c) => url === `/v1/creators/${c.id}/agency-rates`)) {
-        return json({ today: '2026-11-03', current: null, rates: [] });
+        return json({
+          today: '2026-11-03',
+          current: null,
+          rates: [],
+          observed: { last30Days: { from: '2026-10-05', to: '2026-11-03', shares: [] }, fortnights: [] },
+        });
       }
       return json({}, 404);
     }),
@@ -528,7 +533,7 @@ describe('Créatrices, her « Mise en route » (pilotage plan W1)', () => {
     await within(anna).findByText('Mise en route');
     expect(within(anna).getByText('8 sur 10')).toBeDefined();
     // What is to do comes before what waits on her.
-    fireEvent.click(within(anna).getByRole('link', { name: 'Prochaine étape : Le pourcentage de l’agence' }));
+    fireEvent.click(within(anna).getByRole('link', { name: 'Prochaine étape : La part de l’agence' }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'pourcentage', creatrice: ANNA.id });
     });

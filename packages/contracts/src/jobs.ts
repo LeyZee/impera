@@ -272,7 +272,9 @@ export const JOB_PAYLOADS = {
    * On the 2nd and the 17th (CRM-04 lot d3): the fortnight just over, in the agency's zone, for each creator with an
    * agency percentage on it. Her part read on the platform is compared with the percentage, and
    * `agency_share_mismatch` is published once per account, fortnight and currency when they differ by more than
-   * rounding explains. It writes nothing else.
+   * rounding explains. Then, for each creator, the agency's share read on the platform is compared with the fortnight
+   * before, and `agency_share_changed` is published the same way when it moved by more than a point (ADR 0054 § 5).
+   * It writes nothing else.
    */
   'scheduling.check_agency_shares': z.object({}),
   'scheduling.check_reports': z.object({}),

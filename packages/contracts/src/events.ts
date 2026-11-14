@@ -263,6 +263,7 @@ export const EVENT_TYPES = [
   'sales_feed_signal',
   'sales_feed_mismatch',
   'agency_share_mismatch',
+  'agency_share_changed',
   'connection_state_changed',
   'security_alert',
   'content_drop_received',
@@ -645,6 +646,22 @@ export const EVENT_PAYLOADS = {
     differenceMinor: z.number().int(),
   }),
   /**
+   * ADR 0054 § 5: the agency's share as the platform reads it (Σ `agencyRevenue` / Σ net, in basis points, rounded)
+   * moved by more than one point between the fortnight just over (`from`, `to`) and the one before it, on one account
+   * and in one currency, both with a net. Published once per account, fortnight and currency; no percentage set for
+   * her is needed. Information for the owner: no amount changes, pay never reads it.
+   */
+  agency_share_changed: z.object({
+    creatorId: CreatorIdSchema,
+    platform: PlatformSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    from: PayPeriodSchema,
+    to: z.iso.date(),
+    currency: CurrencySchema,
+    previousAgencyBps: z.number().int().min(0).max(10_000),
+    agencyBps: z.number().int().min(0).max(10_000),
+  }),
+  /**
    * A service went down, or came back after a published `down` (Telegram P3-12). Published with no creator, at the
    * transition only, never at each check; `since` is when the publisher saw it. The rule of each service lives in its
    * publisher (`providers`, `connectors`). Never the key, never a word of the service's answer.
@@ -731,6 +748,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('sales_feed_signal'),
   typedEvent('sales_feed_mismatch'),
   typedEvent('agency_share_mismatch'),
+  typedEvent('agency_share_changed'),
   typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
   typedEvent('content_drop_received'),
