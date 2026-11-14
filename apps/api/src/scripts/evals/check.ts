@@ -100,8 +100,10 @@ export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
 export interface ScenarioResult {
   readonly file: string;
   readonly failures: readonly string[];
-  /** The judge's scores, when her answer was written and judged. */
+  /** The judge's scores, when her answer was written and judged; over several draws, their mean. */
   readonly scores: Readonly<Record<string, number>>;
+  /** Over several draws, each criterion's worst score, present only when every draw was scored on it. */
+  readonly worst?: Readonly<Record<string, number>>;
 }
 
 export interface SuiteReport {
@@ -126,7 +128,7 @@ export function judgeSuite(
   for (const result of results) {
     for (const failure of result.failures) problems.push(`${result.file} : ${failure}`);
     for (const [criterion, min] of Object.entries(minima.get(result.file) ?? {})) {
-      const score = result.scores[criterion];
+      const score = (result.worst ?? result.scores)[criterion];
       if (score === undefined || score < min) {
         problems.push(
           `${result.file} : ${criterion} ${score === undefined ? 'non noté' : score.toFixed(2)} < ${String(min)}`,

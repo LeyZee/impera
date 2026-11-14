@@ -21,6 +21,7 @@ import {
   heatOf,
   kindSlices,
   moneyParts,
+  moneyShares,
   moneyTip,
   type MoneyPart,
   OTHER,
@@ -223,6 +224,8 @@ function MoneySplit({
   const whole = parts.reduce((sum, part) => sum + part.cents, 0);
   // Shares are of the revenue the card's title shows, never of the blocks' sum, which a block brought to zero changes.
   const revenue = current.revenueMinor;
+  // Rounded together, so the legend adds up to 100 % (largest remainder), the amounts untouched.
+  const shares = moneyShares(current);
   const tipOf = (part: MoneyPart): ReturnType<typeof moneyTip> =>
     moneyTip({
       title: part.label,
@@ -231,6 +234,8 @@ function MoneySplit({
       revenueMinor: revenue,
       netMinor: part.ofNet ? current.netMinor : null,
       text: part.note,
+      revenueShare: shares.ofRevenue[part.key],
+      ...(part.key === 'creator' || part.key === 'agency' ? { netShare: shares.ofNet[part.key] } : {}),
     });
   return (
     <article className="nv-plate ins-money nv-enter" style={{ '--nv-i': 6 }}>
@@ -247,7 +252,7 @@ function MoneySplit({
             role="img"
             aria-label={`Où va l’argent : ${parts
               .filter((part) => part.cents > 0)
-              .map((part) => `${part.label} ${euros(part.cents)}, ${String(shareOf(part.cents, revenue))} %`)
+              .map((part) => `${part.label} ${euros(part.cents)}, ${String(shares.ofRevenue[part.key])} %`)
               .join(' ; ')}`}
           >
             {parts.map((part) =>
@@ -268,7 +273,7 @@ function MoneySplit({
                 <span className="ins-money__key" data-part={part.key} aria-hidden="true" />
                 <span className="ins-money__label">{part.label}</span>
                 <span className="ins-money__value">{euros(part.cents)}</span>
-                <span className="ins-money__share">{String(shareOf(part.cents, revenue))}&nbsp;%</span>
+                <span className="ins-money__share">{String(shares.ofRevenue[part.key])}&nbsp;%</span>
               </li>
             ))}
           </ul>
@@ -294,16 +299,16 @@ function Figures({
   const fansVat = current.revenueMinor - current.revenueExclVatMinor;
   const commission = current.revenueExclVatMinor - current.netMinor;
   // ADR 0106 § 4: the parts say their share of the net, the base a percentage agreed with a creator is set on.
-  const ofNet = (cents: number): string =>
-    current.netMinor > 0
-      ? `${String(shareOf(cents, current.netMinor))} % du net`
-      : 'aucun net sur la période';
+  // The two parts' shares of the net are rounded together, to 100 %, as in « Où va l'argent ».
+  const shares = moneyShares(current);
+  const ofNet = (key: 'creator' | 'agency'): string =>
+    current.netMinor > 0 ? `${String(shares.ofNet[key])} % du net` : 'aucun net sur la période';
   const creatorLabel = several ? 'Part des créatrices' : 'Part de la créatrice';
   const tipOf = (
     title: string,
     cents: number,
     previousCents: number,
-    ofTheNet: boolean,
+    part: 'creator' | 'agency' | null,
     text: string,
   ): ReturnType<typeof moneyTip> =>
     moneyTip({
@@ -311,8 +316,9 @@ function Figures({
       cents,
       previousCents,
       revenueMinor: current.revenueMinor,
-      netMinor: ofTheNet ? current.netMinor : null,
+      netMinor: part === null ? null : current.netMinor,
       text,
+      ...(part === null ? {} : { revenueShare: shares.ofRevenue[part], netShare: shares.ofNet[part] }),
     });
   const money: readonly Tile[] = [
     {
@@ -324,35 +330,35 @@ function Figures({
         'Net',
         current.netMinor,
         previous.netMinor,
-        false,
+        null,
         'Ce qui reste après la TVA des fans et la commission de la plateforme : la part de l’agence et celle des créatrices.',
       ),
     },
     {
       label: 'Part de l’agence',
       value: euros(current.agencyMinor),
-      note: ofNet(current.agencyMinor),
+      note: ofNet('agency'),
       delta: [current.agencyMinor, previous.agencyMinor],
       part: 'agency',
       tip: tipOf(
         'Part de l’agence',
         current.agencyMinor,
         previous.agencyMinor,
-        true,
+        'agency',
         'Ce que la plateforme verse à l’agence, son propre chiffre.',
       ),
     },
     {
       label: creatorLabel,
       value: euros(current.creatorMinor),
-      note: ofNet(current.creatorMinor),
+      note: ofNet('creator'),
       delta: [current.creatorMinor, previous.creatorMinor],
       part: 'creator',
       tip: tipOf(
         creatorLabel,
         current.creatorMinor,
         previous.creatorMinor,
-        true,
+        'creator',
         several
           ? 'Ce que la plateforme leur verse, son propre chiffre.'
           : 'Ce que la plateforme lui verse, son propre chiffre.',

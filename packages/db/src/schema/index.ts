@@ -15,6 +15,7 @@ export * from './notifications';
 export * from './payroll';
 export * from './persona';
 export * from './rewards';
+export * from './playground';
 export * from './sales-feed';
 export * from './scheduling';
 export * from './scripts';

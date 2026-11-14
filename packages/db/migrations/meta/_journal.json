@@ -964,8 +964,29 @@
     {
       "idx": 137,
       "version": "7",
-      "when": 1794604321862,
-      "tag": "0186_rewards_game",
+      "when": 1794603095660,
+      "tag": "0185_playground_kept",
+      "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1794610377190,
+      "tag": "0188_care_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 139,
+      "version": "7",
+      "when": 1794615366543,
+      "tag": "0189_connector_sends",
+      "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1794620999978,
+      "tag": "0191_service_role",
       "breakpoints": true
     }
   ]

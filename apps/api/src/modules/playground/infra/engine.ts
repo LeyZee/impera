@@ -1,11 +1,14 @@
-import type {
-  AnswerVersion,
-  Destination,
-  MediaDescription,
-  PlaygroundAnswer,
-  PlaygroundDesire,
-  PlaygroundState,
-  Verdict,
+import {
+  DesireMarkIdSchema,
+  newId,
+  type AnswerVersion,
+  type DesireMarkVerdict,
+  type Destination,
+  type MediaDescription,
+  type PlaygroundAnswer,
+  type PlaygroundDesire,
+  type PlaygroundState,
+  type Verdict,
 } from '@impera/contracts';
 import type { LlmGateway } from '@impera/llm';
 
@@ -25,9 +28,11 @@ import {
   type CalibrationStore,
   type PersonaForModels,
 } from '../../agent/index';
+import type { DesireMarkStore } from '../application/desire-marks';
 import {
   AnswerInProgress,
   BlockedAnswer,
+  DesireMarkInventedPersona,
   FanMessageNotFound,
   LlmUnavailable,
   NothingToCompare,
@@ -67,6 +72,8 @@ export interface EngineDeps {
   readonly played?: NonNullable<PlaygroundState['persona']['played']>;
   readonly timeZone?: string;
   readonly now?: () => Date;
+  /** Where the owner's marks on the desire score are kept (ADR 0103 § 6). */
+  readonly desireMarks: DesireMarkStore;
 }
 
 /** One rating, in the shape the training store keeps (shared with the terminal playground). */
@@ -96,13 +103,14 @@ export function ratingRecord(input: {
 }
 
 /** His score with what each signal weighed in the current counting: the screen adds nothing. */
-function toDesire(reading: PlaygroundDesireReading): PlaygroundDesire {
+function toDesire(reading: PlaygroundDesireReading, mark?: DesireMarkVerdict): PlaygroundDesire {
   return {
     before: reading.before,
     score: reading.score,
     band: reading.band,
     signals: reading.signals.map((signal) => ({ signal, points: desireSignalPoints(signal) })),
     weightsVersion: reading.weightsVersion,
+    ...(mark !== undefined && { mark }),
   };
 }
 
@@ -174,6 +182,8 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
   let sessionCostUsd = 0;
   let ratings = 0;
   let isBusy = false;
+  // The owner's mark on his score after each of his messages, by message number (from 1), in this conversation.
+  const marks = new Map<number, DesireMarkVerdict>();
 
   /** Nothing changes the conversation while an answer or a rating is under way. */
   const idle = (): void => {
@@ -227,7 +237,8 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       fanNotes: [...session.fanNotes],
       history: session.history.map((turn, index) => {
         // His n-th message carries the score it left; hers carry none.
-        const reading = turn.from === 'fan' ? session.desireTrail[(fanNumber += 1) - 1] : undefined;
+        const n = turn.from === 'fan' ? (fanNumber += 1) : 0;
+        const reading = n === 0 ? undefined : session.desireTrail[n - 1];
         return {
           index,
           from: turn.from,
@@ -235,7 +246,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
           ...(turn.media !== undefined && {
             media: turn.media.map((m) => ({ description: m.description, isLocked: m.isLocked ?? false })),
           }),
-          ...(reading !== undefined && { desire: toDesire(reading) }),
+          ...(reading !== undefined && { desire: toDesire(reading, marks.get(n)) }),
         };
       }),
       rate: rate(),
@@ -265,6 +276,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
 
   const restart = (): void => {
     session.reset();
+    marks.clear();
     presetId = null;
     isRated = true;
   };
@@ -333,6 +345,8 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         assertAvailable();
         const replay = session.branchAt(fanMessageNumber);
         if (replay === undefined) throw new FanMessageNotFound();
+        // His messages from this one on are written again: their marks went with them.
+        for (const n of [...marks.keys()]) if (n >= fanMessageNumber) marks.delete(n);
         await sendDescribed(replay.text, replay.media);
         return state();
       }),
@@ -392,6 +406,28 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       session.setFanNotes(notes);
       return state();
     },
+
+    markDesire: (fanMessageNumber, mark, userId) =>
+      exclusive(async () => {
+        if (deps.played === undefined) throw new DesireMarkInventedPersona();
+        const reading = session.desireTrail[fanMessageNumber - 1];
+        const fanMessage = session.history.filter((t) => t.from === 'fan')[fanMessageNumber - 1]?.text;
+        if (reading === undefined || fanMessage === undefined) throw new FanMessageNotFound();
+        await deps.desireMarks.add({
+          id: newId(DesireMarkIdSchema),
+          creatorId: deps.played.creatorId,
+          fanMessageNumber,
+          fanMessage,
+          verdict: mark.verdict,
+          note: mark.note ?? null,
+          reading: { before: reading.before, score: reading.score, signals: reading.signals },
+          weightsVersion: reading.weightsVersion,
+          markedBy: userId,
+          markedAt: (deps.now ?? (() => new Date()))(),
+        });
+        marks.set(fanMessageNumber, mark.verdict);
+        return state();
+      }),
 
     sendCreatorMedia(media, isLocked) {
       idle();

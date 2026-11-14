@@ -44,12 +44,12 @@ describe('client IP and sign-in limits (G6)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config));
     const server = (hops: string) => {
       const withHops = testConfig({
         DATABASE_URL: test.appUrl,
-        DATABASE_ADMIN_URL: test.adminUrl,
+        DATABASE_SERVICE_URL: test.serviceUrl,
         TRUST_PROXY_HOPS: hops,
       });
       return buildServer({

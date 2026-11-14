@@ -43,9 +43,9 @@ Branche : task/<id>-<slug>
 | P1-01 | Extension : enregistreur d'API | 1 | todo | P0-01 |
 | P1-02 | Analyse de l'API Reveal et FakeReveal | 1 | done | P1-01 ou capture HAR |
 | P1-03 | Décision B/C et spécification du connecteur Reveal | 1 | done | P1-02 |
-| P2-01 | Capture de la session Reveal et vérifications V1, V2 | 2 | in_progress | P1-03 |
-| P2-02 | `RevealApiConnector` en lecture | 2 | todo | P2-01 (V1 réussie) |
-| P2-03 | `RevealApiConnector` : envois et note client | 2 | todo | P2-02 |
+| P2-01 | Capture de la session Reveal et vérifications V1, V2 | 2 | done | P1-03 |
+| P2-02 | `RevealApiConnector` en lecture | 2 | done | P2-01 (V1 réussie) |
+| P2-03 | `RevealApiConnector` : envois et note client | 2 | done | P2-02 |
 | P2-04 | Réconciliation Reveal : envois perdus, ventes, historique | 2 | todo | P2-02 |
 | P2-05 | Runbooks Reveal testés sur le compte de test | 2 | todo | P2-03 |
 | P2-06 | Déploiement du connecteur Reveal | 2 | todo | P2-05 |
@@ -148,6 +148,8 @@ Branche : task/<id>-<slug>
 | OPS-07 | Le juge des évaluations lit le moment que l'agent a vu | exploitation | done | ADR 0009, OPS-06 |
 | OPS-08 | La consommation IA et les crédits prépayés dans le CRM | exploitation | done | ADR 0091 |
 | OPS-10 | Les images Docker ne se disputent plus le cache pnpm | exploitation | done | OPS-03 |
+| OPS-11 | Les évaluations tirent trois fois et passent sur la persona en vigueur | exploitation | in_progress | OPS-07 |
+| OPS-12 | Le premier relevé répond aux messages frais | exploitation | done | P2-02 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -157,6 +159,7 @@ Branche : task/<id>-<slug>
 | SEC-07 | Durcissement : liens d'extension, limites par adresse, appels sortants | exploitation | done | SEC-06 |
 | SEC-08 | Lien d'extension : mot de passe et code redemandés à la création ; ADR 0087 proposée | exploitation | done | SEC-07, ADR 0046 |
 | SEC-09 | Message de fan borné, rythme ralenti passé 60 réponses dans l'heure | exploitation | done | SEC-07 |
+| SEC-10 | Rôle de service de la base : l'API et le worker ne se connectent plus en propriétaire (ADR 0087, lot a) | exploitation | done | SEC-08, ADR 0087 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
@@ -169,3 +172,4 @@ Branche : task/<id>-<slug>
 | REC-PAIE-01 | Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis | exploitation | done | CRM-03, ADR 0076, ADR 0072 |
 | PIL-01 | « Mise en route » d'une créatrice et d'un membre, cochée par le serveur | exploitation | done | CRM-07 |
 | CHF-01 | Chiffres et jeu du chatteur : ses chiffres, puis un jeu fait de faits réels | équipe | in_progress | ADR 0104, CRM-03, EQ-05 |
+| CRB-01 | Trophées et médailles de série de la créatrice | créatrice | todo | ADR 0107, CHF-01 |

@@ -22,7 +22,7 @@ describe('graceful shutdown (operations.md)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config));
   });
 
@@ -58,7 +58,7 @@ describe('graceful shutdown (operations.md)', () => {
         PATH: process.env['PATH'],
         LOG_LEVEL: 'info',
         DATABASE_URL: test.appUrl,
-        DATABASE_ADMIN_URL: test.adminUrl,
+        DATABASE_SERVICE_URL: test.serviceUrl,
         WEB_ORIGIN: config.WEB_ORIGIN,
         AUTH_SECRET: config.AUTH_SECRET,
         AUTH_BASE_URL: config.AUTH_BASE_URL,

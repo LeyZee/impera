@@ -47,6 +47,9 @@ const MODULE_DEPENDENCIES = {
   // ADR 0104 § 12 to § 20: the game reads a member's pay and planning through the reads the composition root plugs
   // (`payGameFactsUnscoped`, `shiftsForGameUnscoped`), and never writes them; it imports no module.
   rewards: [],
+  // ADR 0026, 0105: a second door on the modules' commands. Lot a, first part, is its pure rules only; the modules it
+  // reads join this list with the tools' wiring.
+  mcp: [],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);
