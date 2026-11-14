@@ -31,6 +31,7 @@ const apiError = (code: string): unknown => ({
  * latest day at or before today. `refuse` answers a POST with that status and code instead.
  */
 const NOTHING_READ: CreatorAgencyRateList['observed'] = {
+  linked: false,
   last30Days: { from: '2026-10-05', to: TODAY, shares: [] },
   fortnights: [],
 };
@@ -194,6 +195,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
       agencyBps: 3889,
     };
     serve([], undefined, {
+      linked: true,
       last30Days: { from: '2026-10-05', to: TODAY, shares: [share] },
       fortnights: [
         { from: '2026-11-01', to: TODAY, shares: [share] },
@@ -208,12 +210,37 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
       ),
     ).toBeDefined();
     expect(screen.queryByText(/^À régler/u)).toBeNull();
-    const read = screen.getByRole('region', { name: 'Lue chez la plateforme' });
+    const read = screen.getByRole('region', { name: 'Lue chez Reveal' });
     expect(within(read).getAllByText(/^38,89\s% du net$/u)).toHaveLength(2);
-    expect(within(read).getAllByText(/^7\s€ sur 18\s€$/u)).toHaveLength(2);
+    expect(within(read).getAllByText(/^7,00\s€ pour l’agence sur 18,00\s€ nets$/u)).toHaveLength(2);
     expect(within(read).getByText('du 16/10 au 31/10')).toBeDefined();
     expect(within(read).getAllByText('aucune vente')).toHaveLength(2);
     expect(screen.getByText('Son pourcentage, facultatif')).toBeDefined();
+    // Her one account in euros: the card's title names Reveal, no line repeats it.
+    expect(within(read).queryByText('Reveal')).toBeNull();
+  });
+
+  it('keeps the share read first when a percentage is set, and is not « à régler » for a linked account without a sale', async () => {
+    serve(
+      [
+        {
+          id: '0192f3a0-0000-7000-8000-0000000000f1',
+          creatorId: CREATOR,
+          fromDay: '2026-10-01',
+          agencyBps: 3500,
+          createdAt: '2026-10-01T08:00:00.000Z',
+        },
+      ],
+      undefined,
+      { ...NOTHING_READ, linked: true },
+    );
+    renderSection();
+    expect(
+      await screen.findByText(
+        /^Aucune vente lue chez Reveal sur 30 jours\. Pourcentage réglé : 35\s% depuis le 01\/10\/2026\.$/u,
+      ),
+    ).toBeDefined();
+    expect(screen.getByText('Nouveau pourcentage, facultatif')).toBeDefined();
   });
 
   it('says the server does not answer, with a way to try again', async () => {

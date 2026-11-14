@@ -246,7 +246,7 @@ export function CreatorsPage({
     telegram: 'Canal Telegram',
     hours: 'Heures d’activité',
     access: 'Accès',
-    rate: 'Pourcentage',
+    rate: 'Part de l’agence',
     profile: 'Profil',
   };
   // Her agenda right after her persona: the sheet a manager opens most (CR-05 lot c).

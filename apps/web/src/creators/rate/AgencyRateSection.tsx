@@ -23,9 +23,10 @@ import {
   dayLabel,
   earliestDay,
   percentOf,
+  readAt,
   shareText,
+  sheetHead,
   shareWhere,
-  singleShare,
   standing,
   windowLabel,
 } from './model';
@@ -165,9 +166,7 @@ function RateSheet({
     }
   }
 
-  const current = list.current;
-  const read = singleShare(list);
-  const anyRead = list.observed.last30Days.shares.length > 0;
+  const head = sheetHead(list, creatorName);
   return (
     <section className="ps-page">
       <div className="nv-plate ps-head">
@@ -177,15 +176,10 @@ function RateSheet({
           </div>
         </div>
         <div className="ps-head__state" aria-live="polite">
-          <span className="ps-dot" data-dot={current === null && !anyRead ? 'warn' : 'ok'} />
+          <span className="ps-dot" data-dot={head.dot} />
           <span className="ps-head__text">
-            {current !== null
-              ? `${percentOf(current.agencyBps)} pour l’agence aujourd’hui, depuis le ${dayLabel(current.fromDay)}.`
-              : read !== null
-                ? `Lue chez ${shareWhere(read, [read])} : ${shareText(read).value} sur 30 jours. Le pourcentage est facultatif.`
-                : anyRead
-                  ? 'Lue chez la plateforme sur 30 jours, ci-dessous. Le pourcentage est facultatif.'
-                  : `À régler : aucun pourcentage pour ${creatorName}, aucune part de l’agence n’est montrée.`}
+            {head.lead}
+            {head.then === null ? null : ` ${head.then}`}
           </span>
         </div>
         <p className="ps-muted">
@@ -211,9 +205,7 @@ function RateSheet({
           }}
         >
           <p className="nv-eyebrow" id={`${id}-new`}>
-            {current === null && list.rates.length === 0
-              ? 'Son pourcentage, facultatif'
-              : 'Nouveau pourcentage'}
+            {list.rates.length === 0 ? 'Son pourcentage, facultatif' : 'Nouveau pourcentage, facultatif'}
           </p>
           <div className="ar-fields">
             <Field
@@ -353,20 +345,21 @@ function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
   const id = useId();
   const { last30Days, fortnights } = list.observed;
   const all = [last30Days, ...fortnights].flatMap((window) => window.shares);
+  const windows = [
+    { ...last30Days, label: '30 derniers jours' },
+    ...fortnights.map((window) => ({ ...window, label: windowLabel(window) })),
+  ];
   return (
-    <section className="nv-plate ps-panel" aria-labelledby={`${id}-read`}>
+    <section className="nv-plate ps-panel ar-read-panel" aria-labelledby={`${id}-read`}>
       <div className="ps-block">
         <p className="nv-eyebrow" id={`${id}-read`}>
-          Lue chez la plateforme
+          Lue chez {readAt(all)}
         </p>
         {all.length === 0 ? (
           <p className="ps-muted">Aucune vente lue ces 30 derniers jours : aucune part à montrer.</p>
         ) : (
           <ul className="ar-read">
-            {[
-              { ...last30Days, label: '30 derniers jours' },
-              ...fortnights.map((w) => ({ ...w, label: windowLabel(w) })),
-            ].map((window) => (
+            {windows.map((window) => (
               <li key={`${window.from}:${window.to}`} className="ar-read__window">
                 <span className="ar-read__label">{window.label}</span>
                 {window.shares.length === 0 ? (
@@ -375,9 +368,10 @@ function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
                   <ul className="ar-read__shares">
                     {window.shares.map((share) => {
                       const text = shareText(share);
+                      const where = shareWhere(share, all);
                       return (
                         <li key={`${share.platformAccountId}:${share.currency}`} className="ar-read__share">
-                          <span className="ar-read__where">{shareWhere(share, all)}</span>
+                          {where === null ? null : <span className="ar-read__where">{where}</span>}
                           <span className="ar-read__value">{text.value}</span>
                           <span className="ar-read__detail">{text.detail}</span>
                         </li>

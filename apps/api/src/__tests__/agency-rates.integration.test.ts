@@ -119,6 +119,7 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
   it('says « à régler » while she has none: no value is made up', async () => {
     const { observed, ...read } = await list(anna);
     expect(read).toEqual({ today: parisDay(0), current: null, rates: [] });
+    expect(observed.linked).toBe(false);
     expect(observed.last30Days).toEqual({ from: parisDay(-29), to: parisDay(0), shares: [] });
     expect(observed.fortnights.map((fortnight) => fortnight.shares)).toEqual([[], [], []]);
   });
@@ -261,8 +262,14 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
     await test.admin.db
       .insert(schema.platformSales)
       .values([sale('sale_rate_01', 800, 300), sale('sale_rate_02', 1000, 400)]);
+    await test.admin.db.insert(schema.salesFeedModels).values({
+      platform: 'reveal',
+      platformModelId: 'model_test_ines',
+      platformAccountId: account,
+      creatorId: ines,
+    });
     const { observed, current, rates } = await list(ines);
-    expect([current, rates]).toEqual([null, []]);
+    expect([current, rates, observed.linked]).toEqual([null, [], true]);
     const share = {
       platform: 'reveal',
       platformAccountId: account,

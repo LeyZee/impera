@@ -1,6 +1,7 @@
 import {
   CreatorAgencyRateSchema,
   ObservedAgencyShareSchema,
+  type CreatorAgencyRateList,
   type ObservedAgencyShare,
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
@@ -12,8 +13,10 @@ import {
   earliestDay,
   nextDay,
   percentOf,
+  readAt,
   shareText,
   shareWhere,
+  sheetHead,
   singleShare,
   standing,
   windowLabel,
@@ -30,6 +33,7 @@ const rate = (id: string, fromDay: string, agencyBps: number) =>
     createdAt: '2026-11-03T10:00:00.000Z',
   });
 const NOTHING_READ = {
+  linked: false,
   last30Days: { from: '2026-10-05', to: '2026-11-03', shares: [] },
   fortnights: [],
 };
@@ -104,13 +108,22 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
   const B = '0192f3a0-0000-7000-8000-0000000000a2';
 
   it('says the ratio and the two sums it comes from, never computed again', () => {
-    expect(shareText(share(A))).toEqual({ value: '38,89\u00a0% du net', detail: '7\u00a0€ sur 18\u00a0€' });
+    expect(shareText(share(A))).toEqual({
+      value: '38,89\u00a0% du net',
+      detail: '7,00\u00a0€ pour l’agence sur 18,00\u00a0€ nets',
+    });
     expect(shareText(share(A, { agencyBps: null, netMinor: -100, agencyMinor: 0 })).value).toBe('—');
   });
 
-  it('names the platform, its account’s place when she has several, and a currency other than the euro', () => {
+  it('names an account only when she has several, and a currency other than the euro', () => {
     const shares = [share(A), share(A, { currency: 'USD' }), share(B)];
-    expect(shareWhere(share(A), [share(A)])).toBe('Reveal');
+    expect(shareWhere(share(A), [share(A)])).toBeNull();
+    expect(shareWhere(share(A, { currency: 'USD' }), [share(A), share(A, { currency: 'USD' })])).toBe(
+      'en USD',
+    );
+    expect(readAt([share(A)])).toBe('Reveal');
+    expect(readAt([])).toBe('Reveal');
+    expect(readAt([share(A), share(B, { platform: 'onlyfans' })])).toBe('la plateforme');
     expect(shareWhere(share(A, { currency: 'USD' }), shares)).toBe('Reveal 1, en USD');
     expect(shareWhere(share(B), shares)).toBe('Reveal 2');
   });
@@ -126,5 +139,41 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
     expect(singleShare(list([share(A)]))).toEqual(share(A));
     expect(singleShare(list([share(A), share(B)]))).toBeNull();
     expect(singleShare(list([share(A, { agencyBps: null })]))).toBeNull();
+  });
+
+  it('heads the sheet with the share read, the percentage second; « à régler » only with nothing linked nor set', () => {
+    const rateOf = rate('0192f3a0-0000-7000-8000-0000000000e1', '2026-10-01', 3500);
+    const sheet = (
+      patch: Partial<CreatorAgencyRateList>,
+      observed: Partial<CreatorAgencyRateList['observed']> = {},
+    ) =>
+      sheetHead(
+        {
+          today: '2026-11-03',
+          current: null,
+          rates: [],
+          ...patch,
+          observed: { ...NOTHING_READ, ...observed },
+        },
+        'Anna',
+      );
+    const read = { last30Days: { ...NOTHING_READ.last30Days, shares: [share(A)] }, linked: true };
+    expect(sheet({}, read)).toEqual({
+      dot: 'ok',
+      lead: 'Lue chez Reveal : 38,89\u00a0% du net sur 30 jours.',
+      then: 'Le pourcentage est facultatif.',
+    });
+    expect(sheet({ current: rateOf, rates: [rateOf] }, read).then).toBe(
+      'Pourcentage réglé : 35\u00a0% depuis le 01/10/2026.',
+    );
+    expect(sheet({}, { linked: true })).toEqual({
+      dot: 'idle',
+      lead: 'Aucune vente lue chez Reveal sur 30 jours.',
+      then: 'Le pourcentage est facultatif.',
+    });
+    expect(sheet({}).dot).toBe('warn');
+    expect(sheet({ current: rateOf, rates: [rateOf] }).lead).toBe(
+      '35\u00a0% pour l’agence aujourd’hui, depuis le 01/10/2026.',
+    );
   });
 });

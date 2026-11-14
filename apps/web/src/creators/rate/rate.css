@@ -121,3 +121,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* The card ends on its last line: no block below it to space from. */
+.ar-read-panel .ps-block {
+  padding-bottom: 0;
+}

@@ -68,13 +68,15 @@ export type ObservedAgencyWindow = z.infer<typeof ObservedAgencyWindowSchema>;
  * `GET /v1/creators/:creatorId/agency-rates` (owner only): her percentages newest first, the day it is now in the
  * agency's zone, and the one in force that day (`null` while none is: « à régler »). `observed` is the agency's share
  * read on the register (ADR 0054 § 4): the last 30 days to today, and the fortnight in course with the two before it,
- * newest first. The screen picks nothing itself.
+ * newest first. `linked`: one of her accounts is linked to a platform's sales feed, so her share is read there even
+ * on days without a sale. The screen picks nothing itself.
  */
 export const CreatorAgencyRateListSchema = z.object({
   today: CalendarDaySchema,
   current: CreatorAgencyRateSchema.nullable(),
   rates: z.array(CreatorAgencyRateSchema),
   observed: z.object({
+    linked: z.boolean(),
     last30Days: ObservedAgencyWindowSchema,
     fortnights: z.array(ObservedAgencyWindowSchema),
   }),

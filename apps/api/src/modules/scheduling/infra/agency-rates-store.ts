@@ -48,6 +48,8 @@ const StoredAgencyRateSchema = z.object({
 
 const toRate = (row: unknown): StoredAgencyRate => StoredAgencyRateSchema.parse(row);
 
+const LinkedRowSchema = z.object({ linked: z.boolean() });
+
 const newestFirst = (a: StoredAgencyRate, b: StoredAgencyRate): number => b.fromDay.localeCompare(a.fromDay);
 
 /** The fortnight in course and the two before it, newest first (ADR 0054 § 4). */
@@ -92,7 +94,12 @@ export function createDrizzleAgencyRatesStore(db: Database, totalsOf: SalesTotal
             // The fortnight in course is read up to today: a day to come has no sale.
             fortnights.push(await windowOf(tx, creatorId, period, last > today ? today : last));
           }
-          return { today, rates, observed: { last30Days, fortnights } };
+          // An account linked to a sales feed (ADR 0050 § 3): her share is read there, sale or not.
+          const feeds = await tx.execute(
+            sql`select exists (select 1 from sales_feed_models where creator_id = ${creatorId}) as linked`,
+          );
+          const linked = LinkedRowSchema.parse(feeds.rows[0]).linked;
+          return { today, rates, observed: { linked, last30Days, fortnights } };
         },
         SNAPSHOT_READ,
       ),

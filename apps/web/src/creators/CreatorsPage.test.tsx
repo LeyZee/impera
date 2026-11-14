@@ -113,7 +113,11 @@ async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
           today: '2026-11-03',
           current: null,
           rates: [],
-          observed: { last30Days: { from: '2026-10-05', to: '2026-11-03', shares: [] }, fortnights: [] },
+          observed: {
+            linked: false,
+            last30Days: { from: '2026-10-05', to: '2026-11-03', shares: [] },
+            fortnights: [],
+          },
         });
       }
       return json({}, 404);
@@ -342,14 +346,14 @@ describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
     const router = renderAt(owner, `/creatrices?creatrice=${BEA.id}`);
     await picked('Bea');
     const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
-    fireEvent.click(within(views).getByRole('link', { name: 'Pourcentage' }));
+    fireEvent.click(within(views).getByRole('link', { name: 'Part de l’agence' }));
     expect(
       await screen.findByText(
         'À régler : aucun pourcentage pour Bea, aucune part de l’agence n’est montrée.',
       ),
     ).toBeDefined();
     expect(router.state.location.search).toEqual({ onglet: 'pourcentage', creatrice: BEA.id });
-    expect(within(views).getByRole('link', { name: 'Pourcentage' }).getAttribute('aria-current')).toBe(
+    expect(within(views).getByRole('link', { name: 'Part de l’agence' }).getAttribute('aria-current')).toBe(
       'page',
     );
   });
