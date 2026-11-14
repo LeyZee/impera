@@ -206,6 +206,15 @@ async function seedCreator(admin: Database, label: string) {
     await tx
       .insert(s.notifications)
       .values({ id: newId(MessageIdSchema), creatorId, userId: 'u', type: 'sale' });
+    await tx.insert(s.connectorSends).values({
+      id: newId(MessageIdSchema),
+      creatorId,
+      platformAccountId: accountId,
+      idempotencyKey: `send-${label}`,
+      platformConversationId: 'conv-1',
+      fingerprint: 'a'.repeat(64),
+      attemptStartedAt: at,
+    });
     await tx.insert(s.killSwitches).values({
       id: newId(MessageIdSchema),
       scope: 'creator',
@@ -221,6 +230,7 @@ async function seedCreator(admin: Database, label: string) {
 
 const TENANT_TABLES = {
   platform_accounts: s.platformAccounts,
+  connector_sends: s.connectorSends,
   fans: s.fans,
   fan_facts: s.fanFacts,
   fan_summaries: s.fanSummaries,

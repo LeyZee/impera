@@ -228,11 +228,25 @@ export function emptyFixture(): FakeFixture {
   };
 }
 
-/** Two fans, each with his conversation, and nothing said yet: the connector's contract writes the rest. */
+/**
+ * Two fans, each with his conversation, and nothing said yet: the connector's contract writes the rest. The vault has
+ * one voice note more (an audio in « Divers »), the only media the bot sends outside a script (E7).
+ */
 export function quietFixture(): FakeFixture {
   const base = defaultFixture();
   return {
     ...base,
+    media: [
+      ...base.media,
+      {
+        id: 'media_voice_01',
+        type: 'audio',
+        folderId: 'folder_3',
+        fromFanId: null,
+        durationSeconds: 8,
+        createdAt: at(20),
+      },
+    ],
     fans: base.fans.slice(0, 2),
     conversations: base.conversations.slice(0, 2).map((conversation) => ({ ...conversation, note: null })),
     messages: [],

@@ -12,7 +12,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { OutboundSender } from '../conversations';
 
 import { createDispatchJob } from './application/dispatch';
-import { createOutboundSender } from './application/outbound-sender';
+import { createOutboundSender, type ConnectorWrites } from './application/outbound-sender';
 import { createPollJob } from './application/poll';
 import { createReconcileJob } from './application/reconcile';
 import { createConnectorResolver } from './application/resolver';
@@ -32,6 +32,7 @@ import {
   resealSalesFeedWebhookSecrets,
 } from './infra/db/sales-feed-webhooks';
 import { createDrizzleSalesLedger } from './infra/db/sales-ledger';
+import { createSendJournal } from './infra/db/send-journal';
 import { createDrizzleTeamImportStore, invitationChatterLinks } from './infra/db/team-import-store';
 import { createAvatarRoutes } from './infra/http/avatar-routes';
 import { createConnectorRoutes } from './infra/http/routes';
@@ -146,6 +147,11 @@ export interface ConnectorsModule {
   readonly name: 'connectors';
   /** Implements the `conversations` port; the composition root hands it over. */
   readonly outboundSender: OutboundSender;
+  /**
+   * The other writes of ADR 0018 (script step, client note, read mark, typing), behind the same write guard as the
+   * sends (P2-03). No caller yet: the selling engine and the fan card will use them.
+   */
+  readonly writes: ConnectorWrites;
   readonly sessions: ConnectorSessions;
   /** Mounted under `/v1` by the server. */
   readonly routes: FastifyPluginAsyncZod;
@@ -255,7 +261,12 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const clock = deps.clock ?? systemClock;
   const accounts = createDrizzleAccountStore(deps.db, deps.adminDb);
   const vault = deps.sessionKeys === null ? null : createSessionVault(deps.sessionKeys);
-  const resolver = createConnectorResolver({ accounts, vault, registry: deps.registry });
+  const resolver = createConnectorResolver({
+    accounts,
+    vault,
+    registry: deps.registry,
+    sends: (account) => createSendJournal(deps.db, account),
+  });
   const ledger = createDrizzleSalesLedger(deps.db, deps.adminDb);
   const sessions = createConnectorSessions({
     accounts,
@@ -290,9 +301,11 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     avatars,
     dailyStats: createDrizzleDailyStatsStore(deps.adminDb),
   });
+  const sender = createOutboundSender({ accounts, resolver, clock });
   return {
     name: 'connectors',
-    outboundSender: createOutboundSender({ accounts, resolver, clock }),
+    outboundSender: sender,
+    writes: sender,
     sessions,
     routes: createConnectorRoutes({ sessions, accounts, linkUser: deps.linkUser }),
     jobs: {

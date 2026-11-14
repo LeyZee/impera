@@ -15,6 +15,8 @@ import { ConnectorError, type PlatformConnector } from '../../domain/platform-co
 import { FakeConnector } from '../fake/FakeConnector';
 import { RevealApiConnector } from '../reveal/connector';
 
+import { MemorySendJournal } from './memory-send-journal';
+
 /** The conversation a case names: `a` or `b`. Each subject maps it to one of its own. */
 type Key = 'a' | 'b';
 
@@ -29,7 +31,11 @@ interface ContractSubject {
   rateLimitNext(): Promise<void>;
   /** The platform's answers stop matching the shape the adapter knows. */
   changeShape(): Promise<void>;
+  /** The next call answers « too many requests », whatever it is. */
+  rateLimitAny(): Promise<void>;
   expireSession(): Promise<void>;
+  /** Time passes on the platform's clock (the adapter's too). */
+  elapse(ms: number): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -58,10 +64,15 @@ function fakeConnectorSubject(): ContractSubject {
       fake.failNext('listConversations', 'fatal');
       return Promise.resolve();
     },
+    rateLimitAny: () => {
+      fake.failNext('sendText', 'rate_limited');
+      return Promise.resolve();
+    },
     expireSession: () => {
       fake.expireSession();
       return Promise.resolve();
     },
+    elapse: () => Promise.resolve(),
     close: () => Promise.resolve(),
   };
 }
@@ -90,6 +101,9 @@ function revealSubject(): ContractSubject {
       fetch: fake.fetch,
       baseUrl: 'https://reveal.test',
       sleep: () => Promise.resolve(),
+      // FakeReveal's clock: an attempt and the message it made are dated alike.
+      now: () => fake.now(),
+      sends: new MemorySendJournal(),
     }),
     conversation: (key) => ids[key],
     fanWrites: async (key, text) => {
@@ -99,6 +113,8 @@ function revealSubject(): ContractSubject {
     },
     rateLimitNext: () =>
       control('/__scenario', { events: [{ type: 'rate_limited', requests: 1, retryAfterSeconds: 7 }] }),
+    rateLimitAny: () =>
+      control('/__scenario', { events: [{ type: 'rate_limited', requests: 1, retryAfterSeconds: 7 }] }),
     changeShape: () =>
       control('/__scenario', {
         events: [
@@ -106,38 +122,20 @@ function revealSubject(): ContractSubject {
         ],
       }),
     expireSession: () => control('/__scenario', { events: [{ type: 'session_expired' }] }),
+    elapse: (ms) => control('/__clock', { advanceMs: ms }),
     close: () => fake.app.close(),
   };
 }
 
 /**
- * The port's contract (connectors.md), one suite for every adapter. Reads run against all of them; writes against
- * the adapters that send (`RevealApiConnector` joins them with P2-03). A new adapter is added here and must pass
- * unchanged.
+ * The port's contract (connectors.md), one suite for every adapter. Reads and writes run against all of them
+ * (`RevealApiConnector` sends since P2-03). A new adapter is added here and must pass unchanged.
  */
 const READERS: Record<string, () => ContractSubject> = {
   FakeConnector: fakeConnectorSubject,
   'RevealApiConnector + FakeReveal': revealSubject,
 };
-/** A subject that sends, and can make its next send fail. */
-interface WriterSubject extends ContractSubject {
-  failNextSend(code: 'rate_limited' | 'transient'): Promise<void>;
-}
-
-const WRITERS: Record<string, () => WriterSubject> = {
-  FakeConnector: () => {
-    const subject = fakeConnectorSubject();
-    const { connector } = subject;
-    if (!(connector instanceof FakeConnector)) throw new Error('FakeConnector expected');
-    return {
-      ...subject,
-      failNextSend: (code) => {
-        connector.failNext('sendText', code);
-        return Promise.resolve();
-      },
-    };
-  },
-};
+const WRITERS = READERS;
 
 async function rejection(promise: Promise<unknown>): Promise<ConnectorError> {
   const error: unknown = await promise.then(
@@ -279,14 +277,49 @@ describe.each(Object.entries(WRITERS))('PlatformConnector contract, writes: %s',
     });
   });
 
-  it('a failed send sent nothing: the same key goes through afterwards', async () => {
+  it('a failed send sent nothing: the same key goes through a minute later', async () => {
     const subject = started(make);
     await subject.fanWrites('a', 'Salut');
     const ref = { platform: subject.connector.platform, id: subject.conversation('a').id };
-    await subject.failNextSend('rate_limited');
+    await subject.rateLimitAny();
     const limited = await rejection(subject.connector.sendText(ref, 'Coucou', 'key-1'));
     expect(limited.code).toBe('rate_limited');
     expect(await subject.connector.verifySent(ref, 'key-1')).toEqual({ status: 'not_found' });
+    // An adapter may hold a retry back while the platform could still list the first attempt (Reveal: 30 s).
+    await subject.elapse(60_000);
     await subject.connector.sendText(ref, 'Coucou', 'key-1');
+  });
+
+  it('declares each write of ADR 0018 by its flag, and a declared one goes through', async () => {
+    const subject = started(make);
+    await subject.fanWrites('a', 'Salut');
+    const { connector } = subject;
+    const flags = connector.capabilities;
+    const conversationRef = { platform: connector.platform, id: subject.conversation('a').id };
+    const fanRef = { platform: connector.platform, id: subject.conversation('a').fanId };
+    await connector.listConversations({});
+    expect('setFanNote' in connector, 'setFanNote').toBe(flags.fanNoteWrite);
+    expect('markRead' in connector, 'markRead').toBe(flags.markRead);
+    expect('setTyping' in connector, 'setTyping').toBe(flags.typing);
+    if (flags.fanNoteWrite) {
+      await connector.setFanNote?.(fanRef, 'Prénom : Julien', 'note-1');
+      if (flags.fanNoteRead) expect((await connector.getFanNote?.(fanRef))?.text).toContain('Julien');
+    }
+    if (flags.markRead) await connector.markRead?.(conversationRef);
+    if (flags.typing) await connector.setTyping?.(conversationRef, true);
+    if (flags.scripts) {
+      const [script] = (await connector.listPlatformScripts?.()) ?? [];
+      if (script === undefined) throw new Error('a platform that declares scripts lists one');
+      const [first] = script.steps;
+      if (first === undefined) throw new Error('a platform script has a step');
+      const price = { amountMinor: first.priceMinor, currency: first.currency };
+      const sent = await connector.sendScriptStep?.(conversationRef, script.ref, 0, price, 'step-1');
+      const again = await connector.sendScriptStep?.(conversationRef, script.ref, 0, price, 'step-1');
+      expect(again?.messageRef).toEqual(sent?.messageRef);
+      if (flags.scriptHistory) {
+        const history = (await connector.getScriptHistory?.(fanRef)) ?? [];
+        expect(history.map((step) => step.stepRef)).toContainEqual(first.ref);
+      }
+    }
   });
 });
