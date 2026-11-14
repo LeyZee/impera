@@ -218,3 +218,24 @@ export interface ContentReads {
   scriptSteps(creatorId: CreatorId, reader: ContentReaderView, dropId: string): Promise<StepsEntry | null>;
   queue(creatorId: CreatorId, reader: ContentReaderView): Promise<readonly QueueEntry[] | null>;
 }
+
+/** Who is on shift, as `scheduling` reads it for its person (`OnShiftNow`). */
+interface OnShiftEntry {
+  readonly shiftId: string;
+  readonly creatorId: string;
+  readonly memberId: string;
+  readonly memberName: string;
+  readonly endsAt: string;
+}
+
+/**
+ * The scheduling module's read of who is on shift (`reads.onShiftNow`, its `index.ts`, ADR 0026 § 1): as the person,
+ * under the database's policies (a manager, only what he plans); a creator out of reach gives nothing.
+ */
+export interface ShiftReader {
+  onShiftNow(
+    reader: ContentReaderView,
+    creators: 'all' | readonly string[],
+    at: Date,
+  ): Promise<readonly OnShiftEntry[]>;
+}
