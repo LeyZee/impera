@@ -770,7 +770,7 @@ async function dropsPageIn(tx: Transaction, after: string | null, limit: number)
   const past =
     after === null
       ? sql`true`
-      : sql`(${contentDrops.createdAt}, ${contentDrops.id}) < (select d.created_at, d.id from content_drops d where d.id = ${after}::uuid and d.state <> 'withdrawn')`;
+      : sql`(${contentDrops.createdAt}, ${contentDrops.id}) < (select d.created_at, d.id from content_drops d where d.id = ${after}::uuid)`;
   const rows = await tx
     .select()
     .from(contentDrops)

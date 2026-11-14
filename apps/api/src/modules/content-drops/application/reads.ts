@@ -78,7 +78,7 @@ function digestOf(drop: ContentDrop): DropDigest {
 
 /**
  * Her drops, newest first, a page at a time (MCP `drops_list`): never a medium, its key nor its address. `after` is the
- * last drop of the page before; one that is not an id of hers gives an empty page.
+ * last drop of the page before; one that is not an id of hers gives an empty page, one withdrawn since keeps its place.
  */
 export async function creatorDrops(
   store: AgencyContentStore,
