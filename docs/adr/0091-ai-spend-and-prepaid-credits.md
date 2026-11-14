@@ -41,4 +41,4 @@ On ne peut donc pas lire le solde avec les clés que le CRM a déjà.
 - Le décompte s'écarte du vrai solde si un appel est fait hors du CRM (console, autre outil) : l'écran invite à noter le solde lu de temps en temps, ce qui recale tout.
 - Les devises restent celles du fournisseur (dollars chez xAI) ; la conversion avec l'euro suit le taux du plafond du jour.
 - Nouvelle table en `FORCE ROW LEVEL SECURITY`, nouveau type d'événement `ai_credits_low`, nouveau job horaire `ai_usage.check_credits`, trois routes sous `/v1/settings/ai-usage`.
-- Amendement § 6 : migration 0196 (`subscription` dans le registre, statut `quota_exhausted` du journal indexé par fournisseur, événement `ai_quota_exhausted` dans les contrôles de type et le déclencheur Telegram) ; la vérification passe de l'heure aux cinq minutes.
+- Amendement § 6 : migration 0204 (`subscription` dans le registre, statut `quota_exhausted` du journal indexé par fournisseur, événement `ai_quota_exhausted` dans les contrôles de type et le déclencheur Telegram) ; la vérification passe de l'heure aux cinq minutes.

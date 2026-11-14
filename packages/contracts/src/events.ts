@@ -13,6 +13,7 @@ import {
   PlatformSchema,
   SessionStateSchema,
 } from './enums';
+import { FanAvailabilityRecordSchema } from './fan-availability';
 import { FanFlagNameSchema, FanFlagsSchema } from './fans';
 import {
   CommissionStatementIdSchema,
@@ -231,6 +232,7 @@ export const EVENT_TYPES = [
   'reply_skipped',
   'reply_deferred',
   'desire_scored',
+  'fan_availability_changed',
   'care_opened',
   'care_closed',
   'takeover_started',
@@ -243,6 +245,8 @@ export const EVENT_TYPES = [
   'sale_detected',
   'script_started',
   'script_step_sent',
+  'script_step_opened',
+  'script_step_refused',
   'script_ended',
   'session_state_changed',
   'budget_threshold_crossed',
@@ -392,6 +396,11 @@ export const EVENT_PAYLOADS = {
     weightsVersion: z.string().min(1).max(64),
   }),
   /**
+   * His availability changed (ADR 0103, amendement du 13/11): the whole record the agent's code holds, written with the
+   * result it came with. The conversation projects the last one.
+   */
+  fan_availability_changed: FanAvailabilityRecordSchema,
+  /**
    * The care mode opens on a fan in distress (ADR 0088): the agent answers him with care, every answer validated by a
    * human, until a manager or the owner closes it. `signs`: the risks read, by the brain or by the safety net in code.
    */
@@ -419,6 +428,8 @@ export const EVENT_PAYLOADS = {
   sale_detected: saleDetectedPayload,
   script_started: scriptPayload,
   script_step_sent: scriptPayload,
+  script_step_opened: scriptPayload,
+  script_step_refused: scriptPayload,
   script_ended: scriptPayload,
   session_state_changed: z.object({
     platformAccountId: PlatformAccountIdSchema,
@@ -709,6 +720,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('reply_skipped'),
   typedEvent('reply_deferred'),
   typedEvent('desire_scored'),
+  typedEvent('fan_availability_changed'),
   typedEvent('care_opened'),
   typedEvent('care_closed'),
   typedEvent('takeover_started'),
@@ -721,6 +733,8 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('sale_detected'),
   typedEvent('script_started'),
   typedEvent('script_step_sent'),
+  typedEvent('script_step_opened'),
+  typedEvent('script_step_refused'),
   typedEvent('script_ended'),
   typedEvent('session_state_changed'),
   typedEvent('budget_threshold_crossed'),

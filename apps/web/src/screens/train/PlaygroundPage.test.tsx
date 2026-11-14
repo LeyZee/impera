@@ -18,6 +18,7 @@ const owner: Me = {
   role: 'owner',
   team: null,
   teamScope: 'owner',
+  preferences: { sounds: true },
 };
 
 const BASE: PlaygroundState = {

@@ -12,7 +12,7 @@ ADR 0091 (§ 6), `packages/llm/src/call-runner.ts` (classement des erreurs), `ap
 
 ## À faire
 - [x] Passerelle : un refus faute de crédits ou de quota devient `quota_exhausted`, sans réessai, sans marquer la clé « à reconnecter », sans garder la réponse du fournisseur.
-- [x] Migration 0196 : `subscription` dans le registre, statut `quota_exhausted` indexé, événement `ai_quota_exhausted` (contrôles de type, déclencheur Telegram).
+- [x] Migration 0204 : `subscription` dans le registre, statut `quota_exhausted` indexé, événement `ai_quota_exhausted` (contrôles de type, déclencheur Telegram).
 - [x] Module `ai-usage` : carte « Inclus dans l'abonnement », premier refus depuis la dernière réponse, alerte une fois par épisode, vérification toutes les cinq minutes.
 - [x] Telegram : `ai_quota_exhausted` en « urgent ».
 - [x] Écran : choix « Payé par l'abonnement » dans la fenêtre de saisie, carte sans solde, rouge « Quota épuisé ».

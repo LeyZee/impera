@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { AiUsageCapStateSchema } from './ai-usage';
 import { DropCategorySchema, DropStateSchema } from './content-drops';
 import { FactCategorySchema, StoredFactKindSchema } from './enums';
 import { refusalBodySchema } from './errors';
@@ -14,6 +15,7 @@ import {
   ShiftIdSchema,
   TeamMemberIdSchema,
 } from './ids';
+import { PLANNING_MAX_DAYS } from './scheduling';
 import {
   ScriptMomentSchema,
   ScriptStageAccessSchema,
@@ -388,3 +390,67 @@ export const McpOnShiftNowSchema = z.strictObject({
   ),
 });
 export type McpOnShiftNow = z.infer<typeof McpOnShiftNowSchema>;
+
+/**
+ * `shifts_list`'s input: the shifts that overlap [`from`, `to`), `PLANNING_MAX_DAYS` at most, as the planning reads
+ * them; a range out of bounds is refused as invalid arguments before anything is read.
+ */
+export const McpShiftsInputSchema = z
+  .strictObject({
+    creatorId: CreatorIdSchema.optional(),
+    from: z.iso.datetime({ offset: true }),
+    to: z.iso.datetime({ offset: true }),
+  })
+  .refine(({ from, to }) => {
+    const span = Date.parse(to) - Date.parse(from);
+    return span > 0 && span <= PLANNING_MAX_DAYS * 24 * 60 * 60 * 1000;
+  });
+
+/**
+ * `shifts_list` (ADR 0026 § 5, ADR 0105 § 4, `read:team`): the planning as the person reads it, when, for which
+ * creator, who by name, stopped under way or not. Never a platform account, a template, a margin, a rate nor an amount.
+ */
+export const McpShiftsListSchema = z.strictObject({
+  shifts: z.array(
+    z.strictObject({
+      shiftId: ShiftIdSchema,
+      creatorId: CreatorIdSchema,
+      memberId: TeamMemberIdSchema,
+      /** `null` when the policies do not show the person that member. */
+      memberName: z.string().nullable(),
+      startsAt: z.iso.datetime(),
+      endsAt: z.iso.datetime(),
+      stopped: z.boolean(),
+    }),
+  ),
+});
+export type McpShiftsList = z.infer<typeof McpShiftsListSchema>;
+
+const euros = z.number().nonnegative();
+
+/**
+ * `ai_usage_get` (ADR 0091, ADR 0105 § 4, the owner's alone): what the AI costs the agency, as the screen shows it.
+ * Today against the daily cap, the last days, the month's pace, the last call. Never a provider's balance or key.
+ */
+export const McpAiUsageSchema = z.strictObject({
+  readAt: z.iso.datetime({ offset: true }),
+  today: z.strictObject({
+    day: z.iso.date(),
+    eur: euros,
+    capEur: z.number().positive(),
+    alertAtEur: z.number().positive(),
+    state: AiUsageCapStateSchema,
+    calls: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+  }),
+  days: z.array(z.strictObject({ day: z.iso.date(), eur: euros, calls: z.number().int().nonnegative() })),
+  pace: z.strictObject({
+    perDayEur: euros.nullable(),
+    perDayOver: z.number().int().min(0).max(7),
+    monthEur: euros,
+    monthForecastEur: euros.nullable(),
+    month: z.string().regex(/^\d{4}-\d{2}$/u),
+  }),
+  lastCallAt: z.iso.datetime({ offset: true }).nullable(),
+});
+export type McpAiUsage = z.infer<typeof McpAiUsageSchema>;

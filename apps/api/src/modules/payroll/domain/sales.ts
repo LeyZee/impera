@@ -1,4 +1,5 @@
 import {
+  calendarDayAt,
   earningsBaseOf,
   payRulesFor,
   SALE_WHOLE_BP,
@@ -549,6 +550,34 @@ export function salesToDecide(
     if (one.reason !== null || one.decision !== null || one.signal !== null) shown.push(one);
   }
   return byKey(shown, (one) => one.line);
+}
+
+/**
+ * The sales of `day`, in the agency's `timeZone`, that an open period takes and that `give` may name a member on (ADR
+ * 0101 §§ 1, 2): where the validator finds a sale nobody signalled, a member's or the agent's, to give it to the member
+ * who was decisive. Each comes with its decision in force and its signal, so that a sale already given reads as given;
+ * in the order of their instants. A closed period gives none.
+ */
+export function salesToGive(
+  sales: SalesSnapshot,
+  place: PeriodPlace,
+  day: string,
+  timeZone: string,
+  signals: SaleSignals = new Map(),
+): SaleToDecide[] {
+  if (place.closed) return [];
+  const found: SaleToDecide[] = [];
+  for (const line of sales.lines) {
+    if (line.event !== 'sale' || sales.registered.has(saleKeyOf(line)) || !takes(place, line)) continue;
+    if (calendarDayAt(line.occurredAt, timeZone) !== day) continue;
+    const one = toDecide(line, sales, signals);
+    if (one.outcomes.includes('give')) found.push(one);
+  }
+  return found.sort(
+    (a, b) =>
+      a.line.occurredAt.getTime() - b.line.occurredAt.getTime() ||
+      (saleKeyOf(a.line) < saleKeyOf(b.line) ? -1 : 1),
+  );
 }
 
 /** A line a period counts, and the earlier period it comes late from. */
