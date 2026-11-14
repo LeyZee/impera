@@ -21,7 +21,7 @@ Que l'essai trimestriel de restauration (`restore.md` § C) passe tel qu'écrit 
 ## À faire (liste vérifiable)
 
 - [x] `restore-check.sh` crée aussi `nirvana_admin` sans connexion s'il manque.
-- [x] `restore.md` § C étape 4 : connexion donnée à `nirvana_app` et `impera_service` dans le conteneur jetable, puis les trois URL de l'API.
+- [x] `restore.md` § C étape 4 : connexion donnée à `nirvana_app` et `impera_service` dans le conteneur jetable, puis `DATABASE_URL` et `DATABASE_SERVICE_URL` de l'API ; l'essai se joue sur un export postérieur à 0191.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
 
