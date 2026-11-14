@@ -70,6 +70,7 @@ import type {
   SentScript,
   ScriptContentRequest,
   ReceiptStore,
+  ScriptDropEntry,
 } from '../../domain/ports';
 import { keptUntil } from '../../domain/retention';
 import { shotMoment } from '../../domain/shot-moment';
@@ -755,7 +756,52 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
     sentDrop: (creatorId, userId, dropId) => asTeam(creatorId, userId, (tx) => sentDropIn(tx, dropId)),
     confirmDropExport: (creatorId, userId, dropId, now) =>
       asTeam(creatorId, userId, (tx) => confirmDropExportIn(tx, userId, dropId, now)),
+    dropsPage: (creatorId, userId, after, limit) =>
+      asTeam(creatorId, userId, (tx) => dropsPageIn(tx, after, limit)),
+    scriptDrops: (creatorId, userId) => asTeam(creatorId, userId, scriptDropsIn),
   };
+}
+
+/**
+ * Her drops not withdrawn, newest first, past the drop `after` (its time and id, read in the same rows the policies
+ * show): an `after` she does not have matches nothing, so the page is empty.
+ */
+async function dropsPageIn(tx: Transaction, after: string | null, limit: number): Promise<ContentDrop[]> {
+  const past =
+    after === null
+      ? sql`true`
+      : sql`(${contentDrops.createdAt}, ${contentDrops.id}) < (select d.created_at, d.id from content_drops d where d.id = ${after}::uuid and d.state <> 'withdrawn')`;
+  const rows = await tx
+    .select()
+    .from(contentDrops)
+    .where(and(sql`${contentDrops.state} <> 'withdrawn'`, past))
+    .orderBy(sql`${contentDrops.createdAt} desc, ${contentDrops.id} desc`)
+    .limit(limit);
+  const files = await filesOf(
+    tx,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => dropOf(row, files));
+}
+
+/** Her script drops not withdrawn, newest first, with what their request fixed. */
+async function scriptDropsIn(tx: Transaction): Promise<ScriptDropEntry[]> {
+  const rows = await tx
+    .select({ drop: contentDrops, request: contentRequests })
+    .from(contentDrops)
+    .innerJoin(contentRequests, eq(contentRequests.id, contentDrops.requestId))
+    .where(and(eq(contentDrops.category, 'script'), sql`${contentDrops.state} <> 'withdrawn'`))
+    .orderBy(sql`${contentDrops.createdAt} desc, ${contentDrops.id} desc`);
+  return rows.map(({ drop, request }) => ({
+    dropId: drop.id,
+    scriptNumber: drop.scriptNumber,
+    state: DropStateSchema.parse(drop.state),
+    exportedAt: drop.exportedAt,
+    createdAt: drop.createdAt,
+    dueOn: request.dueOn,
+    versionId: request.structureVersionId,
+    moment: request.moment === null ? null : ShotMomentSchema.parse(request.moment),
+  }));
 }
 
 /** The drop's sentence when none of its files could be kept (ADR 0055 § 6: blocked, in amber, with its reason). */
