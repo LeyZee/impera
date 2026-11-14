@@ -22,6 +22,11 @@ export interface ServedTool {
   /** An object: it is the call's `structuredContent`, which MCP wants as one. */
   readonly output: z.ZodType<Record<string, unknown>>;
   run(context: ToolContext, input: Record<string, unknown>): Promise<unknown>;
+  /**
+   * The identifiers the call touches, for its line in the journal (ADR 0026 § 8): ids only, never a name or a text.
+   * Read from its validated input; none for a tool on the access or the agency.
+   */
+  subject?(input: Record<string, unknown>): Readonly<Record<string, string>>;
 }
 
 /** A tool as `tools/list` gives it. */
@@ -92,6 +97,7 @@ export function createDispatcher(deps: DispatcherDeps): McpDispatcher {
         tool: string | null,
         outcome: McpCallRefusal | 'ok' | 'error',
         creatorId: string | null,
+        subject: Readonly<Record<string, string>> = {},
       ) =>
         deps.journal.record({
           userId: call.grant.userId,
@@ -99,6 +105,7 @@ export function createDispatcher(deps: DispatcherDeps): McpDispatcher {
           tool,
           outcome,
           creatorId,
+          subject,
           requestId: call.requestId,
           ip: call.ip,
         });
@@ -118,7 +125,11 @@ export function createDispatcher(deps: DispatcherDeps): McpDispatcher {
       if (!input.success) return refuse(spec.name, 'arguments_invalid');
       const decision = decideCall(spec, call.grant, call.actor, namedCreatorOf(input.data));
       if (!decision.ok) return refuse(spec.name, decision.refusal);
-      if (!(await deps.spendRead(call.grant))) return refuse(spec.name, 'rate_limited');
+      const subject = tool.subject?.(input.data) ?? {};
+      if (!(await deps.spendRead(call.grant))) {
+        await record(spec.name, 'rate_limited', decision.creatorId, subject);
+        return { ok: false, refusal: 'rate_limited' };
+      }
 
       let value: Record<string, unknown>;
       try {
@@ -126,10 +137,10 @@ export function createDispatcher(deps: DispatcherDeps): McpDispatcher {
           await tool.run({ grant: call.grant, actor: call.actor, creatorId: decision.creatorId }, input.data),
         );
       } catch (error) {
-        await record(spec.name, 'error', decision.creatorId);
+        await record(spec.name, 'error', decision.creatorId, subject);
         throw error;
       }
-      await record(spec.name, 'ok', decision.creatorId);
+      await record(spec.name, 'ok', decision.creatorId, subject);
       return { ok: true, value };
     },
   };

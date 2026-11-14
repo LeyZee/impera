@@ -19,7 +19,12 @@ export function createDrizzleJournal(db: Database): McpJournal {
           entity: 'mcp_grant',
           entityId: entry.grantId,
           ip: entry.ip,
-          details: { outcome: entry.outcome, creatorId: entry.creatorId, requestId: entry.requestId },
+          details: {
+            outcome: entry.outcome,
+            creatorId: entry.creatorId,
+            subject: entry.subject,
+            requestId: entry.requestId,
+          },
         });
       }),
   };

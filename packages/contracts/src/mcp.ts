@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
+import { FactCategorySchema, StoredFactKindSchema } from './enums';
 import { refusalBodySchema } from './errors';
-import { CreatorIdSchema, McpGrantIdSchema } from './ids';
+import { FanCardFieldSchema, FanCardSourceSchema } from './fan-card';
+import { FanFlagsSchema } from './fans';
+import { CreatorIdSchema, FanIdSchema, McpGrantIdSchema } from './ids';
 
 /**
  * The MCP server (ADR 0026, amended by ADR 0105): what an agent access may be granted. A closed list in code; the
@@ -144,3 +147,76 @@ export type McpCreatorList = z.infer<typeof McpCreatorListSchema>;
 /** `creator_get`: the access's creator, `null` once she is archived. */
 export const McpCreatorGetSchema = z.strictObject({ creator: McpCreatorSchema.nullable() });
 export type McpCreatorGet = z.infer<typeof McpCreatorGetSchema>;
+
+/** Untrusted text of one kind: what a tool gives back that a fan wrote, or that was read in what he wrote. */
+const untrustedOf = <K extends McpUntrustedKind>(kind: K) =>
+  z.strictObject({ kind: z.literal(kind), text: z.string() });
+
+/** The input of a tool on one fan: his id, and the creator when the call names one (the access's otherwise). */
+export const McpFanInputSchema = z.strictObject({
+  fanId: FanIdSchema,
+  creatorId: CreatorIdSchema.optional(),
+});
+
+/**
+ * `fan_get` (ADR 0026 § 5, `read:fans`): his name and what she knows of him, in `untrusted` fields, his limits, when he
+ * was first and last seen. Never his platform's id, a link or a media. `null` for a fan she does not have.
+ */
+export const McpFanGetSchema = z.strictObject({
+  fan: z
+    .strictObject({
+      id: FanIdSchema,
+      name: untrustedOf('fan_name'),
+      firstSeenAt: z.iso.datetime(),
+      lastSeenAt: z.iso.datetime(),
+      flags: FanFlagsSchema,
+      facts: z.array(
+        z.strictObject({
+          category: FactCategorySchema,
+          /** Written from what he said: free text, like the value. */
+          key: untrustedOf('fan_fact'),
+          kind: StoredFactKindSchema,
+          observedAt: z.iso.datetime(),
+          value: untrustedOf('fan_fact'),
+        }),
+      ),
+    })
+    .nullable(),
+});
+export type McpFanGet = z.infer<typeof McpFanGetSchema>;
+
+const McpCardValueSchema = z.strictObject({
+  items: z.array(untrustedOf('fan_card')),
+  source: FanCardSourceSchema,
+  observedAt: z.iso.datetime(),
+  /** The chatter who noted it (ADR 0085 § 5, ADR 0105 § 4); `null` for what the AI read. */
+  notedByName: z.string().nullable(),
+});
+
+/**
+ * `fan_card_get` (ADR 0085, ADR 0105 § 4, `read:fans`): his card as the AI filled it, each value in `untrusted` fields,
+ * and how many values wait « à vérifier ». Never the message a value was read in.
+ */
+export const McpFanCardGetSchema = z.strictObject({
+  card: z
+    .strictObject({
+      fields: z.array(
+        z.strictObject({
+          field: FanCardFieldSchema,
+          current: McpCardValueSchema.nullable(),
+          toCheck: z.number().int().nonnegative(),
+        }),
+      ),
+      others: z.array(
+        z.strictObject({
+          /** Written from what he said: free text, like the value. */
+          key: untrustedOf('fan_card'),
+          value: untrustedOf('fan_card'),
+          source: FanCardSourceSchema,
+          observedAt: z.iso.datetime(),
+        }),
+      ),
+    })
+    .nullable(),
+});
+export type McpFanCardGet = z.infer<typeof McpFanCardGetSchema>;

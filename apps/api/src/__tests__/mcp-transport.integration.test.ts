@@ -1,5 +1,9 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   CreatorIdSchema,
+  FanIdSchema,
+  McpFanCardGetSchema,
   McpGrantCreatedSchema,
   McpWhoamiSchema,
   newId,
@@ -289,5 +293,82 @@ describe('/v1/mcp', () => {
       'mcp.creators_list',
       'mcp.creator_get',
     ]);
+  });
+  it('reads a fan of its creator, his texts untrusted, nothing of his platform, and names him by id in the journal', async () => {
+    const accountId = randomUUID();
+    const theo = newId(FanIdSchema);
+    await test.admin.db
+      .insert(schema.platformAccounts)
+      .values({ id: accountId, creatorId: nora, platform: 'reveal', handle: 'nora-demo' });
+    await test.admin.db.insert(schema.fans).values({
+      id: theo,
+      creatorId: nora,
+      platformAccountId: accountId,
+      platformFanId: 'plateforme-theo',
+      displayName: 'Théo',
+      flags: { fragile: true },
+    });
+    await test.admin.db.insert(schema.fanFacts).values({
+      id: randomUUID(),
+      creatorId: nora,
+      fanId: theo,
+      category: 'identity',
+      key: 'first_name',
+      value: 'Théo',
+      kind: 'declared',
+      confidence: 0.9,
+      observedAt: new Date('2026-11-01T20:00:00.000Z'),
+    });
+
+    const grant = await createGrant({ capabilities: ['read:fans'] });
+    const listed = RpcSchema.parse(
+      (await rpc(grant.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
+    );
+    expect(listed.result?.tools?.map((tool) => tool.name)).toEqual(['whoami', 'fan_get', 'fan_card_get']);
+
+    const fan = RpcSchema.parse((await rpc(grant.token, callTool('fan_get', { fanId: theo }))).json());
+    expect(fan.result?.structuredContent).toMatchObject({
+      fan: {
+        id: theo,
+        name: { kind: 'fan_name', text: 'Théo' },
+        flags: { fragile: true },
+        facts: [
+          {
+            category: 'identity',
+            key: { kind: 'fan_fact', text: 'first_name' },
+            value: { kind: 'fan_fact', text: 'Théo' },
+          },
+        ],
+      },
+    });
+    const card = RpcSchema.parse((await rpc(grant.token, callTool('fan_card_get', { fanId: theo }))).json());
+    const firstName = McpFanCardGetSchema.parse(card.result?.structuredContent).card?.fields.find(
+      (entry) => entry.field === 'first_name',
+    );
+    expect(firstName?.current?.items).toEqual([{ kind: 'fan_card', text: 'Théo' }]);
+    expect(firstName?.toCheck).toBe(0);
+    const text = JSON.stringify([fan, card]);
+    for (const leak of ['plateforme-theo', accountId, 'nora-demo']) expect(text).not.toContain(leak);
+
+    // Not hers: null, never his card.
+    const stranger = newId(FanIdSchema);
+    const none = RpcSchema.parse(
+      (await rpc(grant.token, callTool('fan_card_get', { fanId: stranger }))).json(),
+    );
+    expect(none.result?.structuredContent).toEqual({ card: null });
+    const elsewhere = RpcSchema.parse(
+      (await rpc(grant.token, callTool('fan_get', { fanId: theo, creatorId: lea }))).json(),
+    );
+    expect(elsewhere.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+
+    const lines = await journal(grant.id);
+    expect(lines.map((line) => [line.action, line.details])).toEqual([
+      ['mcp_grant.create', expect.anything()],
+      ['mcp.fan_get', expect.objectContaining({ outcome: 'ok', subject: { fanId: theo } })],
+      ['mcp.fan_card_get', expect.objectContaining({ outcome: 'ok', subject: { fanId: theo } })],
+      ['mcp.fan_card_get', expect.objectContaining({ outcome: 'ok', subject: { fanId: stranger } })],
+      ['mcp.fan_get', expect.objectContaining({ outcome: 'creator_forbidden', subject: {} })],
+    ]);
+    expect(JSON.stringify(lines)).not.toContain('Théo');
   });
 });
