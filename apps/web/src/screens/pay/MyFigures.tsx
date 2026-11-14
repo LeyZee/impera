@@ -219,7 +219,7 @@ function TierRing({
   );
 }
 
-const tiersOf = (period: PayrollPeriod | undefined): readonly BonusTier[] =>
+export const tiersOf = (period: PayrollPeriod | undefined): readonly BonusTier[] =>
   period?.statements[0]?.rules.bonusTiers ?? period?.bonusTiers?.tiers ?? [];
 
 /** Whether the fortnight has anything of the member's to show yet. */

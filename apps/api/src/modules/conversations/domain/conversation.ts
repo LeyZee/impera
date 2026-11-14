@@ -13,6 +13,7 @@ export function projectionOf(conversation: Conversation): ConversationProjection
     desireScore: conversation.desireScore,
     desireBand: conversation.desireBand,
     desireAt: conversation.desireAt,
+    fanAvailability: conversation.fanAvailability,
     careSince: conversation.careSince,
     careHelpAt: conversation.careHelpAt,
     careClosedAt: conversation.careClosedAt,

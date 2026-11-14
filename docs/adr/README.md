@@ -116,6 +116,7 @@ Date : AAAA-MM-JJ
 | 0090 | Une demande sur mesure passe à un chatteur qui prend la commande ; une objection de prix reçoit une réplique de la banque de l'agence | accepted (amende 0079 § 4 et § 6 ; précise P4-01 et 0023) |
 | 0091 | La consommation IA dans le CRM : la dépense lue dans `llm_calls`, les crédits prépayés décomptés depuis la saisie des recharges | accepted (précise 0016 et le plafond du jour) |
 | 0092 | Piloter l'agence : la valeur de chaque chatteur, ce qui a changé chez une créatrice, les fans qui comptent | accepted (précise 0078, 0081, 0024 et 0043 § 7 ; amende 0078 « jamais nommé ici » et 0024 pour Entraîner) |
+| 0098 | Le déroulé d'un script se tient fan par fan : le code choisit l'étape et le prix, la voix ne fait que les dire | accepted (précise P6-01, P6-02, 0018 § 5, 0056, 0064 et la politique d'offre) |
 | 0099 | Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser | accepted (précise 0030, 0018, 0083 et P6-01) |
 | 0100 | Une IA écrit les scripts à partir des médias du coffre, le code tient la vente | accepted (précise 0099, 0083, 0009, 0010, 0021) |
 | 0101 | Une vente donnée, entière ou partagée, au chatteur qui a été décisif | accepted (amende 0050 § 5 ; précise 0025, 0043 § 7 et 0092 § 1) |

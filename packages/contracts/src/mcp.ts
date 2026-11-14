@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { AiUsageCapStateSchema } from './ai-usage';
 import { DropCategorySchema, DropStateSchema } from './content-drops';
 import { FactCategorySchema, StoredFactKindSchema } from './enums';
 import { refusalBodySchema } from './errors';
@@ -388,3 +389,32 @@ export const McpOnShiftNowSchema = z.strictObject({
   ),
 });
 export type McpOnShiftNow = z.infer<typeof McpOnShiftNowSchema>;
+
+const euros = z.number().nonnegative();
+
+/**
+ * `ai_usage_get` (ADR 0091, ADR 0105 § 4, the owner's alone): what the AI costs the agency, as the screen shows it.
+ * Today against the daily cap, the last days, the month's pace, the last call. Never a provider's balance or key.
+ */
+export const McpAiUsageSchema = z.strictObject({
+  readAt: z.iso.datetime({ offset: true }),
+  today: z.strictObject({
+    day: z.iso.date(),
+    eur: euros,
+    capEur: z.number().positive(),
+    alertAtEur: z.number().positive(),
+    state: AiUsageCapStateSchema,
+    calls: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+  }),
+  days: z.array(z.strictObject({ day: z.iso.date(), eur: euros, calls: z.number().int().nonnegative() })),
+  pace: z.strictObject({
+    perDayEur: euros.nullable(),
+    perDayOver: z.number().int().min(0).max(7),
+    monthEur: euros,
+    monthForecastEur: euros.nullable(),
+    month: z.string().regex(/^\d{4}-\d{2}$/u),
+  }),
+  lastCallAt: z.iso.datetime({ offset: true }).nullable(),
+});
+export type McpAiUsage = z.infer<typeof McpAiUsageSchema>;
