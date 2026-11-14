@@ -60,6 +60,8 @@ export interface UsageInput {
   readonly entries: readonly AiCreditEntry[];
   /** What each provider's calls cost (USD) after its `countFrom`, read by the application once it knows it. */
   readonly spentSinceUsd: Readonly<Partial<Record<AiCreditProvider, number>>>;
+  /** Each provider's first refusal for lack of credits or quota since it last answered (`UsageReader.quotaRefusedAt`). */
+  readonly quotaRefusedAt: Readonly<Partial<Record<AiCreditProvider, Date | null>>>;
 }
 
 /** Full days the average spend is taken over, at most. */
@@ -88,11 +90,57 @@ export function capState(cap: CapReading): AiUsageCapState {
 const PROVIDER_ORDER = AiUsageProviderSchema.options;
 const USE_ORDER = AiUsageUseSchema.options;
 
-function byProvider(rows: readonly UsageRow[], usdPerEur: number): AiUsageProviderSpend[] {
+type Covered = (row: UsageRow) => boolean;
+
+function byProvider(rows: readonly UsageRow[], usdPerEur: number, covered: Covered): AiUsageProviderSpend[] {
   return PROVIDER_ORDER.flatMap((provider) => {
-    const usd = rows.filter((r) => r.provider === provider).reduce((sum, r) => sum + r.usd, 0);
-    return usd > 0 ? [{ provider, eur: usd / usdPerEur }] : [];
+    const own = rows.filter((r) => r.provider === provider);
+    const usd = own.reduce((sum, r) => sum + r.usd, 0);
+    const coveredUsd = own.filter(covered).reduce((sum, r) => sum + r.usd, 0);
+    return usd > 0 ? [{ provider, eur: usd / usdPerEur, coveredEur: coveredUsd / usdPerEur }] : [];
   });
+}
+
+/** `YYYY-MM-DD HH`, the cap's day and hour of an instant: the grain of the summed journal. */
+function slotOf(at: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(at));
+  const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}`;
+}
+
+const slotOfRow = (row: UsageRow): string => `${row.day} ${String(row.hour).padStart(2, '0')}`;
+
+/**
+ * Which calls the owner's subscription paid (ADR 0091 § 6, « ok 0091 chiffres »): those of a provider from one of its
+ * subscription lines to its next top-up or balance reading. To the hour, the journal's grain: the hour of the switch
+ * goes all to the new mode.
+ */
+export function coveredBy(entries: readonly AiCreditEntry[], timeZone: string): Covered {
+  const spans = new Map<AiCreditProvider, { from: string; to: string | null }[]>();
+  for (const provider of AiCreditProviderSchema.options) {
+    const own: { from: string; to: string | null }[] = [];
+    for (const entry of entries.filter((e) => e.provider === provider).sort(byTime)) {
+      const open = own.at(-1);
+      const isOpen = open?.to === null;
+      if (entry.kind === 'subscription') {
+        if (!isOpen) own.push({ from: slotOf(entry.at, timeZone), to: null });
+      } else if (open && isOpen) open.to = slotOf(entry.at, timeZone);
+    }
+    spans.set(provider, own);
+  }
+  return (row) => {
+    const own = AiCreditProviderSchema.safeParse(row.provider);
+    if (!own.success) return false;
+    const slot = slotOfRow(row);
+    return (spans.get(own.data) ?? []).some((s) => slot >= s.from && (s.to === null || slot < s.to));
+  };
 }
 
 /** Lines a credits card shows, latest first. */
@@ -101,12 +149,18 @@ const CREDIT_ENTRIES_SHOWN = 10;
 const byTime = (a: AiCreditEntry, b: AiCreditEntry): number => Date.parse(a.at) - Date.parse(b.at);
 
 /**
- * The line a provider's count starts from (ADR 0091 § 3): its latest balance reading, or its first top-up when it has
- * none. Null without any line.
+ * The line a provider's count starts from (ADR 0091 § 3): its latest subscription line when that is its latest line
+ * (§ 6, nothing to count, only what was spent since); otherwise, among the lines after its latest subscription line,
+ * the latest balance reading, or the first top-up when there is none. Null without any line.
  */
 export function countFrom(entries: readonly AiCreditEntry[]): AiCreditEntry | null {
   const sorted = [...entries].sort(byTime);
-  return sorted.filter((e) => e.kind === 'balance').at(-1) ?? sorted[0] ?? null;
+  const last = sorted.at(-1);
+  if (last === undefined || last.kind === 'subscription') return last ?? null;
+  const subscribedAt = sorted.filter((e) => e.kind === 'subscription').at(-1)?.at;
+  const counted =
+    subscribedAt === undefined ? sorted : sorted.filter((e) => Date.parse(e.at) > Date.parse(subscribedAt));
+  return counted.filter((e) => e.kind === 'balance').at(-1) ?? counted[0] ?? null;
 }
 
 /** An amount of cents in another currency, at the cap's rate (dollars per euro). */
@@ -125,6 +179,7 @@ export function creditState(balanceMinor: number, daysLeft: number | null): AiCr
 
 interface CreditsInput {
   readonly provider: AiCreditProvider;
+  readonly quotaRefusedAt: Date | null;
   readonly entries: readonly AiCreditEntry[];
   readonly spentSinceUsd: number;
   /** This provider's average a day in USD, null without a pace. */
@@ -140,6 +195,24 @@ export function creditsOf(input: CreditsInput): AiCredits | null {
   if (from === null || latest === undefined) return null;
   const { currency } = latest;
   const { usdPerEur } = input;
+  const quotaRefusedAt = input.quotaRefusedAt?.toISOString() ?? null;
+  const entries = [...input.entries].sort(byTime).reverse().slice(0, CREDIT_ENTRIES_SHOWN);
+  const toMinor = (usd: number): number => Math.round(convert(usd * 100, 'USD', currency, usdPerEur));
+  if (from.kind === 'subscription')
+    return {
+      provider: input.provider,
+      mode: 'subscription',
+      currency,
+      balanceMinor: 0,
+      countedFrom: from.at,
+      spentSinceMinor: toMinor(input.spentSinceUsd),
+      perDayMinor: input.perDayUsd === null ? null : toMinor(input.perDayUsd),
+      daysLeft: null,
+      runsOutOn: null,
+      state: quotaRefusedAt === null ? 'included' : 'quota_reached',
+      quotaRefusedAt,
+      entries,
+    };
   const fromAt = Date.parse(from.at);
   // A balance reading counts at its instant; the top-ups after it add up. Counted from a first top-up, it is one.
   const added = input.entries
@@ -157,6 +230,7 @@ export function creditsOf(input: CreditsInput): AiCredits | null {
   const daysLeft = perDayMinor === null || perDayMinor === 0 ? null : Math.max(0, balanceMinor) / perDayMinor;
   return {
     provider: input.provider,
+    mode: 'credits',
     currency,
     balanceMinor,
     countedFrom: new Date(fromAt).toISOString(),
@@ -166,7 +240,8 @@ export function creditsOf(input: CreditsInput): AiCredits | null {
     runsOutOn: daysLeft === null ? null : addDays(input.today, Math.floor(daysLeft)),
     // Nothing spent over the pace's days: the balance does not go down, nothing to recharge.
     state: perDayMinor === 0 && balanceMinor > 0 ? 'ok' : creditState(balanceMinor, daysLeft),
-    entries: [...input.entries].sort(byTime).reverse().slice(0, CREDIT_ENTRIES_SHOWN),
+    quotaRefusedAt,
+    entries,
   };
 }
 
@@ -182,6 +257,8 @@ export function aiUsage(input: UsageInput): AiUsage {
   const first = addDays(today, -(AI_USAGE_DAYS - 1));
   const inWindow = rows.filter((r) => r.day >= first && r.day <= today);
   const eurOf = (subset: readonly UsageRow[]): number => sum(subset, (r) => r.usd) / usdPerEur;
+  const covered = coveredBy(input.entries, input.timeZone);
+  const coveredOf = (subset: readonly UsageRow[]): number => eurOf(subset.filter(covered));
 
   const days = Array.from({ length: AI_USAGE_DAYS }, (_, i) => {
     const day = addDays(first, i);
@@ -189,8 +266,9 @@ export function aiUsage(input: UsageInput): AiUsage {
     return {
       day,
       eur: eurOf(ofDay),
+      coveredEur: coveredOf(ofDay),
       calls: sum(ofDay, (r) => r.calls),
-      providers: byProvider(ofDay, usdPerEur),
+      providers: byProvider(ofDay, usdPerEur, covered),
     };
   });
 
@@ -200,8 +278,9 @@ export function aiUsage(input: UsageInput): AiUsage {
     return {
       hour,
       eur: eurOf(ofHour),
+      coveredEur: coveredOf(ofHour),
       calls: sum(ofHour, (r) => r.calls),
-      providers: byProvider(ofHour, usdPerEur),
+      providers: byProvider(ofHour, usdPerEur, covered),
     };
   });
 
@@ -241,6 +320,7 @@ export function aiUsage(input: UsageInput): AiUsage {
   const credits = AiCreditProviderSchema.options.flatMap((provider) => {
     const card = creditsOf({
       provider,
+      quotaRefusedAt: input.quotaRefusedAt[provider] ?? null,
       entries: input.entries.filter((e) => e.provider === provider),
       spentSinceUsd: input.spentSinceUsd[provider] ?? 0,
       perDayUsd:
@@ -257,8 +337,18 @@ export function aiUsage(input: UsageInput): AiUsage {
   });
 
   const month = today.slice(0, 7);
-  const monthEur = eurOf(inWindow.filter((r) => r.day.startsWith(month)));
+  const ofMonth = inWindow.filter((r) => r.day.startsWith(month));
+  const monthEur = eurOf(ofMonth);
+  const monthCoveredEur = coveredOf(ofMonth);
   const daysLeft = daysInMonth(today) - Number(today.slice(8, 10));
+  // The days left go to the subscription for each provider on it now, at that provider's own pace.
+  const perDayCoveredEur =
+    perDayOver === 0
+      ? 0
+      : credits
+          .filter((card) => card.mode === 'subscription')
+          .reduce((total, card) => total + eurOf(paceRows.filter((r) => r.provider === card.provider)), 0) /
+        perDayOver;
 
   return {
     readAt: input.readAt.toISOString(),
@@ -267,6 +357,8 @@ export function aiUsage(input: UsageInput): AiUsage {
     today: {
       day: today,
       eur: input.cap.spentEur,
+      // The cap counts every call, the subscription's too (« ok 0091 chiffres »); never more than it.
+      coveredEur: Math.min(input.cap.spentEur, coveredOf(ofToday)),
       capEur: input.cap.capEur,
       alertAtEur: input.cap.alertAtEur,
       state: capState(input.cap),
@@ -281,7 +373,9 @@ export function aiUsage(input: UsageInput): AiUsage {
       perDayEur,
       perDayOver,
       monthEur,
+      monthCoveredEur,
       monthForecastEur: perDayEur === null ? null : monthEur + perDayEur * daysLeft,
+      monthForecastCoveredEur: perDayEur === null ? null : monthCoveredEur + perDayCoveredEur * daysLeft,
       month,
     },
     lastCallAt: input.lastCallAt?.toISOString() ?? null,
