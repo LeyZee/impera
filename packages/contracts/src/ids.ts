@@ -248,3 +248,7 @@ export type ContentDropFileId = z.infer<typeof ContentDropFileIdSchema>;
 /** What the agency asks of her (`content_requests`, ADR 0055 § 4). */
 export const ContentRequestIdSchema = uuid.brand<'ContentRequestId'>();
 export type ContentRequestId = z.infer<typeof ContentRequestIdSchema>;
+
+/** An agent access to the MCP server (`mcp_grants`, ADR 0026 § 3, ADR 0105). */
+export const McpGrantIdSchema = uuid.brand<'McpGrantId'>();
+export type McpGrantId = z.infer<typeof McpGrantIdSchema>;

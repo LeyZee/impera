@@ -1,6 +1,6 @@
 {
-  "id": "b208864c-2b6c-438c-9ae6-9aa7cf2d6e0c",
-  "prevId": "d3c02f00-7498-44f7-9f48-96a11953f899",
+  "id": "86a9c625-e353-4109-ad75-62bb0f380542",
+  "prevId": "06ae5452-d83e-4c3a-81fd-2e6bf572cf0c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7224,6 +7224,202 @@
         "llm_calls_currency_check": {
           "name": "llm_calls_currency_check",
           "value": "\"llm_calls\".\"currency\" in ('EUR', 'USD')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_grants": {
+      "name": "mcp_grants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "capabilities": {
+          "name": "capabilities",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_by": {
+          "name": "revoked_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "mcp_grants_user_idx": {
+          "name": "mcp_grants_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_grants_user_id_user_id_fk": {
+          "name": "mcp_grants_user_id_user_id_fk",
+          "tableFrom": "mcp_grants",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "mcp_grants_creator_id_creators_id_fk": {
+          "name": "mcp_grants_creator_id_creators_id_fk",
+          "tableFrom": "mcp_grants",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "mcp_grants_created_by_user_id_fk": {
+          "name": "mcp_grants_created_by_user_id_fk",
+          "tableFrom": "mcp_grants",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "mcp_grants_revoked_by_user_id_fk": {
+          "name": "mcp_grants_revoked_by_user_id_fk",
+          "tableFrom": "mcp_grants",
+          "tableTo": "user",
+          "columnsFrom": ["revoked_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "mcp_grants_token_hash_unique": {
+          "name": "mcp_grants_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": ["token_hash"]
+        }
+      },
+      "policies": {
+        "owner_read": {
+          "name": "owner_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"mcp_grants\".\"user_id\" = nullif(current_setting('app.user_id', true), '') and \"mcp_grants\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_update": {
+          "name": "owner_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "mcp_grants_label_check": {
+          "name": "mcp_grants_label_check",
+          "value": "char_length(\"mcp_grants\".\"label\") between 1 and 40"
+        },
+        "mcp_grants_capabilities_check": {
+          "name": "mcp_grants_capabilities_check",
+          "value": "\"mcp_grants\".\"capabilities\" <@ array['read:status', 'read:conversations', 'read:conversation_content', 'read:fans', 'read:team', 'read:payroll', 'read:sales', 'read:media', 'read:script_content', 'write:drafts', 'write:brakes', 'write:tasks', 'write:drops', 'prepare:team']::text[] and array_position(\"mcp_grants\".\"capabilities\", null) is null"
+        },
+        "mcp_grants_token_hash_check": {
+          "name": "mcp_grants_token_hash_check",
+          "value": "\"mcp_grants\".\"token_hash\" ~ '^[A-Za-z0-9_-]{43}$'"
+        },
+        "mcp_grants_expires_check": {
+          "name": "mcp_grants_expires_check",
+          "value": "\"mcp_grants\".\"expires_at\" > \"mcp_grants\".\"created_at\" and \"mcp_grants\".\"expires_at\" <= \"mcp_grants\".\"created_at\" + interval '90 days'"
+        },
+        "mcp_grants_revoked_check": {
+          "name": "mcp_grants_revoked_check",
+          "value": "(\"mcp_grants\".\"revoked_at\" is null) = (\"mcp_grants\".\"revoked_by\" is null) and (\"mcp_grants\".\"revoked_at\" is null or \"mcp_grants\".\"revoked_at\" >= \"mcp_grants\".\"created_at\")"
         }
       },
       "isRLSEnabled": false

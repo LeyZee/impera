@@ -75,6 +75,7 @@ import { wireCreatorArchive } from './wiring/creator-archive';
 import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
+import { wireMcp } from './wiring/mcp';
 import { wireMedia } from './wiring/media';
 import { wireNotifications } from './wiring/notifications';
 import { wirePayroll } from './wiring/payroll';
@@ -426,6 +427,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const backups = wireBackups(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
+  const mcp = wireMcp(shared);
   const aiUsage = wireAiUsage(shared, llm);
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
@@ -573,6 +575,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...playground.routes,
       ...telegram.routes,
       ...notifications.routes,
+      ...mcp.routes,
     ],
     tasks,
     readiness: () => checkReadiness(db.db, adminDb.db),

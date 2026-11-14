@@ -9,6 +9,7 @@ export * from './events';
 export * from './fans';
 export * from './invoices';
 export * from './llm';
+export * from './mcp';
 export * from './media';
 export * from './memory';
 export * from './notifications';

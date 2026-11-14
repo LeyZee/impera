@@ -47,8 +47,8 @@ const MODULE_DEPENDENCIES = {
   // ADR 0104 § 12 to § 20: the game reads a member's pay and planning through the reads the composition root plugs
   // (`payGameFactsUnscoped`, `shiftsForGameUnscoped`), and never writes them; it imports no module.
   rewards: [],
-  // ADR 0026, 0105: a second door on the modules' commands. Lot a, first part, is its pure rules only; the modules it
-  // reads join this list with the tools' wiring.
+  // ADR 0026, 0105: a second door on the modules' commands. Lot a so far: its pure rules and its own accesses
+  // (`mcp_grants`); the modules it reads join this list with the tools' wiring.
   mcp: [],
 };
 
@@ -325,6 +325,25 @@ export default tseslint.config(
           selector:
             'Program > :not(ExportNamedDeclaration[source.value=/^\\.\\/domain\\//], ExportAllDeclaration[source.value=/^\\.\\/domain\\//])',
           message: 'pure.ts only re-exports from its own domain/ (ADR 0051).',
+        },
+      ],
+    },
+  },
+  {
+    // ADR 0026 § 1: the MCP server reads nothing in the base by itself; its tools go through the modules' index.ts. Only
+    // its own store (`mcp_grants`, infra/db) and the index that hands it the pools touch @impera/db.
+    files: ['apps/api/src/modules/mcp/**/*.ts'],
+    ignores: ['apps/api/src/modules/mcp/infra/db/**', 'apps/api/src/modules/mcp/index.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@impera/db',
+              message: 'The MCP server reads through the modules, never the base (ADR 0026).',
+            },
+          ],
         },
       ],
     },
