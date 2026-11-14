@@ -63,6 +63,11 @@ export const ConversationSummarySchema = z.object({
    * only reads; `null`, nobody: the agent, or a handoff waiting for whoever is on shift.
    */
   heldBy: ConversationHolderSchema.nullable(),
+  /**
+   * The care mode open on him since then (ADR 0088): the agent answers him with care, every answer validated by a
+   * human, nothing sold; `null`, none is open. Never read by a creator (ADR 0063): the inbox is the agency's.
+   */
+  careSince: z.iso.datetime().nullable(),
 });
 export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;
 
@@ -147,3 +152,5 @@ export const TakeoverBodySchema = z.object({ reason: z.string().trim().min(1).ma
 /** `note`: what the chatter wants her to remember about the fan, kept as an `operator_note` fact (P3-02), one line. */
 export const ReleaseBodySchema = z.object({ note: z.string().trim().min(1).max(300).optional() });
 export const SetModeBodySchema = z.object({ mode: ConversationModeSchema });
+/** `POST /v1/conversations/:id/care/close`: « Il va mieux », a manager or the owner closes the care mode (ADR 0088 § 7). */
+export const CloseCareBodySchema = z.object({ reason: z.string().trim().min(1).max(500).optional() });

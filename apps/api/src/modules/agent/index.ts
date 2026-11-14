@@ -30,6 +30,8 @@ export type { TrapAssessment } from './domain/traps';
 /** @public The policy, read by `pnpm evals` on the same path as a real fan (and by the composer at P6-01). */
 export { holdDecision } from './domain/hold';
 export { withoutOrders } from './domain/injection';
+/** The safety net in code, read by `conversation.respond` to answer a fan in distress out of her hours (ADR 0088). */
+export { safetySigns } from './domain/safety-net';
 /** @public */
 export { offerDecision, offerSignals, type OfferContext, type OfferLimits } from './domain/policy';
 export type { SexualizationLimits } from './domain/sexualization';
@@ -47,7 +49,14 @@ export {
   type ScriptStartBlock,
 } from './domain/availability';
 /** @public measureDesire and DesireState: the playground keeps his score as `conversations` would (P3-12). */
-export { desireSignalPoints, measureDesire, type DesireMeasure, type DesireState } from './domain/desire';
+export {
+  DESIRE_WEIGHTS_VERSION,
+  desireSignalPoints,
+  measureDesire,
+  recountDesire,
+  type DesireMeasure,
+  type DesireState,
+} from './domain/desire';
 export { describeSituation, isNight, isTimeZone, nextLocalTime, type Situation } from './domain/situation';
 export {
   parseRejection,

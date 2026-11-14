@@ -418,11 +418,11 @@ describe('createDraftComposer', () => {
   });
 
   it('still hands a risk to a human after a wait', async () => {
-    const { draftComposer } = composer({ brief: { ...BRIEF, risks: ['distress'], action: 'wait' } });
+    const { draftComposer } = composer({ brief: { ...BRIEF, risks: ['minor_suspected'], action: 'wait' } });
     expect(await draftComposer.compose({ ...INPUT, waited: 1 })).toMatchObject({
       kind: 'held',
       reason: 'handoff',
-      detail: ['distress'],
+      detail: ['minor_suspected'],
     });
   });
 
@@ -848,7 +848,7 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     expect(seen.traces).toHaveLength(0);
   });
 
-  it('takes back his age on a possible minor, and stops writing to him on distress', async () => {
+  it('takes back his age on a possible minor, and answers distress with care (ADR 0088)', async () => {
     const minor = limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' });
     await composer(
       { brief: { ...BRIEF, risks: ['minor_suspected'] } },
@@ -861,6 +861,7 @@ describe('createDraftComposer, his limits (P3-02)', () => {
         protection: {
           unconfirmAge: true,
           stopContact: false,
+          care: false,
           freezeSales: false,
           because: ['minor_suspected'],
         },
@@ -873,13 +874,19 @@ describe('createDraftComposer, his limits (P3-02)', () => {
       undefined,
       distress.limits,
     ).draftComposer.compose(INPUT);
-    expect(held).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['distress'] });
+    expect(held).toMatchObject({ kind: 'draft', care: { signs: ['distress'], help: false } });
     expect(distress.protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: false, stopContact: true, freezeSales: true, because: ['distress', 'money_trouble'] },
+      {
+        unconfirmAge: false,
+        stopContact: false,
+        care: true,
+        freezeSales: true,
+        because: ['distress', 'money_trouble'],
+      },
     ]);
   });
 
-  it('hands a fan who says he is 16 or wants to end it to a human, before any model (recette AGT-01)', async () => {
+  it('hands a fan who says he is 16 to a human before any model, and answers one who wants to end it with care', async () => {
     const says = (text: string): AgentComposeInput => ({
       ...INPUT,
       history: [...INPUT.history, { direction: 'inbound', text, at: new Date('2026-10-17T09:59:30Z') }],
@@ -895,18 +902,25 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     });
     expect(young.seen.traces).toHaveLength(0);
     expect(minor.protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: true, stopContact: false, freezeSales: false, because: ['minor_suspected'] },
+      {
+        unconfirmAge: true,
+        stopContact: false,
+        care: false,
+        freezeSales: false,
+        because: ['minor_suspected'],
+      },
     ]);
     const distress = limitsOf({});
-    const low = composer({}, undefined, distress.limits);
-    expect(await low.draftComposer.compose(says('j’en peux plus, je veux en finir'))).toMatchObject({
-      reason: 'handoff',
-      cause: 'distress',
-      detail: ['safety_net', 'self_harm'],
-    });
-    expect(low.seen.traces).toHaveLength(0);
+    const low = composer(
+      { voice: { bubbles: ['Oh, je suis là, je t’écoute 🤍'] } },
+      undefined,
+      distress.limits,
+    );
+    const answered = await low.draftComposer.compose(says('j’en peux plus, je veux en finir'));
+    expect(answered).toMatchObject({ kind: 'draft', care: { signs: ['self_harm'], help: true } });
+    expect(answered.kind === 'draft' && answered.bubbles.at(-1)).toContain('3114');
     expect(distress.protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: false, stopContact: true, freezeSales: false, because: ['self_harm'] },
+      { unconfirmAge: false, stopContact: false, care: true, freezeSales: false, because: ['self_harm'] },
     ]);
   });
 
@@ -930,7 +944,13 @@ describe('createDraftComposer, his limits (P3-02)', () => {
       cause: 'minor',
     });
     expect(protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: true, stopContact: true, freezeSales: false, because: ['possible_minor', 'weapon'] },
+      {
+        unconfirmAge: true,
+        stopContact: true,
+        care: false,
+        freezeSales: false,
+        because: ['possible_minor', 'weapon'],
+      },
     ]);
   });
 
@@ -946,7 +966,7 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     const { draftComposer } = composer({ brief: { ...BRIEF, risks: ['money_trouble'] } }, undefined, limits);
     expect((await draftComposer.compose(INPUT)).kind).toBe('draft');
     expect(protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: false, stopContact: false, freezeSales: true, because: ['money_trouble'] },
+      { unconfirmAge: false, stopContact: false, care: false, freezeSales: true, because: ['money_trouble'] },
     ]);
   });
 
@@ -974,11 +994,24 @@ describe('createDraftComposer, his limits (P3-02)', () => {
 
   it('still hands over when his limits cannot be saved, and says so', async () => {
     const { limits } = limitsOf({}, { failWrite: true });
-    const { draftComposer } = composer({ brief: { ...BRIEF, risks: ['self_harm'] } }, undefined, limits);
+    const { draftComposer } = composer(
+      { brief: { ...BRIEF, risks: ['harassment'], action: 'handoff' } },
+      undefined,
+      limits,
+    );
     expect(await draftComposer.compose(INPUT)).toMatchObject({
       kind: 'held',
       reason: 'handoff',
-      detail: ['self_harm', 'limits_not_saved'],
+      detail: ['harassment', 'limits_not_saved'],
+    });
+    const care = limitsOf({}, { failWrite: true });
+    const low = composer({ brief: { ...BRIEF, risks: ['self_harm'] } }, undefined, care.limits);
+    expect(await low.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'distress',
+      detail: ['care_unanswered', 'self_harm', 'limits_not_saved'],
+      care: { signs: ['self_harm'], help: false },
     });
   });
 
@@ -1638,6 +1671,83 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
   });
 });
 
+describe('createDraftComposer, the care mode (ADR 0088)', () => {
+  const says = (text: string): AgentComposeInput => ({
+    ...INPUT,
+    history: [...INPUT.history, { direction: 'inbound', text, at: new Date('2026-10-17T09:59:30Z') }],
+  });
+
+  it('writes the code\u2019s care brief, whatever the brain suggested, and offers nothing', async () => {
+    const { draftComposer, seen } = composer({
+      brief: { ...BRIEF, risks: ['distress'], action: 'offer', replyBrief: 'Lui proposer la vidéo.' },
+      voice: { bubbles: ['Je suis là pour toi 🤍'] },
+    });
+    seen.voiceInputs = [];
+    const result = await draftComposer.compose(INPUT);
+    expect(result).toMatchObject({ kind: 'draft', bubbles: ['Je suis là pour toi 🤍'] });
+    expect(seen.voiceInputs[0]?.brief.replyBrief).toContain('Elle lui répond avec douceur');
+    expect(seen.voiceInputs[0]?.brief.action).toBe('reply');
+  });
+
+  it('hands him to a human when the care answer sells, meets or goes sexual: never silence', async () => {
+    const { draftComposer } = composer({
+      brief: { ...BRIEF, risks: ['distress'] },
+      voice: { bubbles: ['On pourrait se voir demain, ça te changerait les idées'] },
+    });
+    const held = await draftComposer.compose(INPUT);
+    expect(held).toMatchObject({ kind: 'held', reason: 'handoff', cause: 'distress' });
+    expect(held.kind === 'held' && held.detail).toEqual(
+      expect.arrayContaining(['care_unanswered', 'guard_blocked', 'care_breach']),
+    );
+  });
+
+  it('hands him to a human when the AI cannot answer: no key, a failure, no budget', async () => {
+    const noKey = composer({ hasKey: false });
+    expect(await noKey.draftComposer.compose(says('je veux en finir'))).toMatchObject({
+      cause: 'distress',
+      detail: ['care_unanswered', 'no voice key'],
+      care: { signs: ['self_harm'], help: false },
+    });
+    const failed = composer({
+      voice: { code: 'budget_reached', attempts: [] },
+    });
+    expect(await failed.draftComposer.compose(says('je veux en finir'))).toMatchObject({
+      reason: 'handoff',
+      cause: 'distress',
+      care: { signs: ['self_harm'] },
+    });
+  });
+
+  it('keeps answering with care while an episode is open, and gives the help bubble only once', async () => {
+    const { draftComposer } = composer({ voice: { bubbles: ['Je pense fort à toi'] } });
+    const open = await draftComposer.compose({
+      ...INPUT,
+      care: { since: new Date('2026-10-17T08:00:00Z'), helpGiven: false },
+    });
+    expect(open).toMatchObject({ kind: 'draft', care: { signs: ['care_open'], help: false } });
+    const again = await draftComposer.compose({
+      ...says('je veux toujours en finir'),
+      care: { since: new Date('2026-10-17T08:00:00Z'), helpGiven: true },
+    });
+    expect(again).toMatchObject({ kind: 'draft', bubbles: ['Je pense fort à toi'], care: { help: false } });
+  });
+
+  it('answers with care when the brain failed but code already knows, and never a possible minor', async () => {
+    const brainDown = composer({
+      brain: {
+        code: 'all_models_failed',
+        attempts: [{ provider: 'xai', model: 'grok-4.7', outcome: 'invalid_output' }],
+      },
+      voice: { bubbles: ['Je suis là'] },
+    });
+    expect((await brainDown.draftComposer.compose(says('je veux mourir'))).kind).toBe('draft');
+    const minor = composer({ brief: { ...BRIEF, risks: ['minor_suspected'] } });
+    expect(
+      await minor.draftComposer.compose({ ...INPUT, care: { since: new Date(), helpGiven: false } }),
+    ).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['minor_suspected'] });
+  });
+});
+
 describe('createDraftComposer, a custom order and a price objection (ADR 0090)', () => {
   const ORDER: Brief = { ...BRIEF, intent: 'asks_for_service', replyBrief: 'Lui dire oui.' };
   const adult: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00.000Z' };
@@ -1790,6 +1900,28 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
         offer: { amountMinor: 1_500, currency: 'EUR' },
       },
     });
+  });
+
+  it('sends no step in the care mode, hot, free and at her threshold: the care brief only (ADR 0088 § 2)', async () => {
+    const { draftComposer, seen } = composer(
+      { brief: HOT, voice: { bubbles: ['Je suis là pour toi 🤍'] } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose({
+      ...free(INPUT),
+      care: { since: new Date('2026-10-17T08:00:00Z'), helpGiven: true },
+    });
+
+    expect(result).toMatchObject({ kind: 'draft', bubbles: ['Je suis là pour toi 🤍'] });
+    expect(result.scriptRun?.opened).toBeUndefined();
+    expect(result.scriptRun?.offer).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.brief.action).toBe('reply');
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('Elle lui répond avec douceur');
+    // She asks him nothing about being free either: in care, nothing leads to a sale.
+    expect(seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('tranquille'))).toBe(false);
   });
 
   it('sends no teaser while he has not said he is free, and asks him once in the session (ADR 0103 § 11-13)', async () => {

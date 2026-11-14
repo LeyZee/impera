@@ -60,7 +60,6 @@ export function scriptsInputOf(scripts: ScenarioScripts, now: Date): ScriptsInpu
       })),
     },
     latest,
-    careMode: false,
     countsHisMessage: true,
   };
 }

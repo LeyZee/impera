@@ -9,10 +9,19 @@
 ## Ce qui existe (P0-06)
 
 - `domain/platform-connector.ts` : le port et `ConnectorError` ; `domain/rhythm.ts` : rythme des relèves et coupe-circuit.
-- `application/` : jobs `dispatch`, `poll`, `reconcile` ; `sessions` ; `outbound-sender` (port `OutboundSender` de `conversations`).
+- `application/` : jobs `dispatch`, `poll`, `reconcile` ; `sessions` ; `outbound-sender` (port `OutboundSender` de `conversations`). Un message lu au premier relevé du compte, ou plus de 6 h après son envoi (`CATCH_UP_AFTER_HOURS`), est ingéré « rattrapé » (`catchUp`) : gardé, sans lecture de fiche ni réponse mises en file (P2-02 : une première synchro ou un réveil du PC ne déclenche pas un appel aux modèles par fan).
 - `infra/fake/FakeConnector.ts` : plateforme en mémoire à scénarios. `infra/__tests__/contract.test.ts` : la suite que tout adaptateur doit passer.
-- `infra/http/routes.ts` : la « Sync » de l'extension (P2-01) : `GET /v1/connector/accounts?platform=` (les comptes à synchroniser) et `POST /v1/connector/sessions`, authentifiées par la liaison de l'extension du propriétaire (`x-extension-link`, ADR 0066 § 7), vérifiée dès l'arrivée de la requête : sans liaison valide, 401 `connector_link_unauthenticated` avant toute lecture du corps ; liaison d'un autre rôle, 403 `connector_link_forbidden`. La session est lue par le lecteur de sa plateforme (`infra/reveal/session.ts`) : forme inconnue, 422 ; session d'une autre créatrice que celle déjà gardée, 409.
-- Un adaptateur se branche par le registre (`ConnectorRegistry`, une fabrique par plateforme) passé à `createApp` ; registre vide = aucun compte relevé.
+- `infra/http/routes.ts` : la « Sync » de l'extension (P2-01) : `GET /v1/connector/accounts?platform=` (les comptes à synchroniser) et `POST /v1/connector/sessions`, authentifiées par la liaison de l'extension du propriétaire (`x-extension-link`, ADR 0066 § 7), vérifiée dès l'arrivée de la requête : sans liaison valide, 401 `connector_link_unauthenticated` avant toute lecture du corps ; liaison d'un autre rôle, 403 `connector_link_forbidden`. La session est lue par le lecteur de sa plateforme (`infra/reveal/session.ts`) : forme inconnue, 422 ; session d'une autre créatrice que celle déjà gardée, ou, dès la première « Sync », d'un autre modèle que celui que le relevé des ventes relie au compte, 409 `connector_session_conflict` ; session d'un autre membre Reveal que le membre « bot » épinglé à la première « Sync », 409 `connector_session_member_conflict` (P2-02 : une session du propriétaire ou d'un chatteur ne parle ni ne compte jamais comme le bot).
+- Un adaptateur se branche par le registre (`ConnectorRegistry`, une fabrique par plateforme). Par défaut (`wiring/connectors.ts`), Reveal a le sien ; les tests passent le leur à `createApp`.
+
+## `RevealApiConnector` en lecture (P2-02)
+
+`infra/reveal/` lit l'API privée de Reveal avec la session du membre « bot » (`docs/reference/reveal-connector-spec.md` §§ 3, 4, 6) :
+
+- `wire.ts` : les formes observées (`REVEAL_ENDPOINTS`), une seule copie, servie telle quelle par FakeReveal et tenue aux enregistrements par `fidelity.test.ts`.
+- `client.ts` : `fetch` de Node (undici), en-têtes `authorization`, `user-agent` de la session, `origin` et `referer` du tableau de bord, rien d'autre ; attend la remise à zéro d'une fenêtre de débit sous 20 % ; 401/403 → `session_expired`, 403 en page HTML → `fatal` « challenge », 404 → `not_found`, 429 → `rate_limited` (`Retry-After`), 5xx, délai, réseau → `transient`, forme inattendue → `fatal` « shape_changed » (route et chemins Zod, jamais une valeur). Le journal ne reçoit que la route (nom, sans identifiant), le statut et la durée.
+- `mapping.ts` : traductions pures vers le port. Notre propre message se reconnaît par son id d'abord (ids des envois, fournis par P2-03), par le nom affiché du membre « bot » en repli ; un sortant d'un autre nom est `human`.
+- `connector.ts` : `health`, `listConversations`, `fetchMessages`, `listTransactions` et les lectures de l'ADR 0018 (profil, note client, notes du modèle, onglet PPV, scripts natifs et leur moment, étapes déjà envoyées, coffre). Les écritures lèvent `fatal` jusqu'à P2-03, leurs drapeaux restent à `false`. Sans session lisible : `health` dit `none` et rien n'est appelé.
 
 ## Flux de ventes (CRM-01, ADR 0050)
 

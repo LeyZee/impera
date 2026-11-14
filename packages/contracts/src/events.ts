@@ -84,6 +84,11 @@ const draftPayload = z.object({
    * everywhere else, and on the events written before: they replay as they were decided.
    */
   leavesFanWaiting: z.literal(true).optional(),
+  /**
+   * On `draft_created`: written in the care mode (ADR 0088), a human validates it whatever the mode; `help`, it closes
+   * on the fixed help bubble, given once per episode. Absent everywhere else.
+   */
+  care: z.object({ help: z.boolean() }).optional(),
 });
 
 const factPayload = z.object({
@@ -228,6 +233,8 @@ export const EVENT_TYPES = [
   'reply_deferred',
   'desire_scored',
   'fan_availability_changed',
+  'care_opened',
+  'care_closed',
   'takeover_started',
   'takeover_ended',
   'mode_changed',
@@ -392,6 +399,19 @@ export const EVENT_PAYLOADS = {
    * result it came with. The conversation projects the last one.
    */
   fan_availability_changed: FanAvailabilityRecordSchema,
+  /**
+   * The care mode opens on a fan in distress (ADR 0088): the agent answers him with care, every answer validated by a
+   * human, until a manager or the owner closes it. `signs`: the risks read, by the brain or by the safety net in code.
+   */
+  care_opened: z.object({
+    conversationId: ConversationIdSchema,
+    signs: z.array(z.string().min(1).max(64)).min(1).max(10),
+  }),
+  /** « Il va mieux »: a manager or the owner closes the care mode (ADR 0088 § 7); the actor is that person. */
+  care_closed: z.object({
+    conversationId: ConversationIdSchema,
+    reason: z.string().trim().min(1).max(500).optional(),
+  }),
   takeover_started: takeoverPayload,
   takeover_ended: takeoverPayload,
   mode_changed: controlPayload,
@@ -691,6 +711,8 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('reply_deferred'),
   typedEvent('desire_scored'),
   typedEvent('fan_availability_changed'),
+  typedEvent('care_opened'),
+  typedEvent('care_closed'),
   typedEvent('takeover_started'),
   typedEvent('takeover_ended'),
   typedEvent('mode_changed'),

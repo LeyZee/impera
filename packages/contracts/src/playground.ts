@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { BriefIntentSchema } from './brief';
 import { DESIRE_SIGNALS_MAX, DesireBandSchema, DesireScoreSchema, DesireSignalSchema } from './desire';
-import { CreatorIdSchema, PersonaVersionIdSchema } from './ids';
+import { CreatorIdSchema, DesireMarkIdSchema, PersonaVersionIdSchema } from './ids';
 import { MediaDescriptionSchema } from './media';
 
 /**
@@ -37,6 +37,20 @@ export const VerdictSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 export type Verdict = z.infer<typeof VerdictSchema>;
+
+/**
+ * The owner's mark on his desire score under one of his messages (ADR 0103 § 6): too high, too low, or right. The
+ * weights stay in code; the marks say where the counting is wrong.
+ */
+export const DesireMarkVerdictSchema = z.enum(['too_high', 'too_low', 'right']);
+export type DesireMarkVerdict = z.infer<typeof DesireMarkVerdictSchema>;
+
+/**
+ * A corrected answer in her bank of voice examples (ADR 0102): read by production and the playground while `active`,
+ * `withdrawn` by the owner, `blocked` when the correction itself trips a blocking guard and never entered.
+ */
+export const VoiceExampleStateSchema = z.enum(['active', 'withdrawn', 'blocked']);
+export type VoiceExampleState = z.infer<typeof VoiceExampleStateSchema>;
 
 export const AnswerVersionSchema = z.object({ voicePrompt: z.string(), voiceModel: z.string() });
 export type AnswerVersion = z.infer<typeof AnswerVersionSchema>;
@@ -77,6 +91,8 @@ export const PlaygroundDesireSchema = z.object({
     .array(z.object({ signal: DesireSignalSchema, points: z.number().int().nullable() }))
     .max(DESIRE_SIGNALS_MAX),
   weightsVersion: z.string(),
+  /** The owner's mark on it in this conversation, once he gave one (ADR 0103 § 6). */
+  mark: DesireMarkVerdictSchema.exactOptional(),
 });
 export type PlaygroundDesire = z.infer<typeof PlaygroundDesireSchema>;
 
@@ -271,6 +287,44 @@ export const PlaygroundAdvanceBodySchema = z.object({
 export const PlaygroundNotesBodySchema = z.object({ notes: z.array(z.string().max(500)).max(200) });
 export const PlaygroundCreatorMediaBodySchema = PlaygroundMediaSchema.extend({ isLocked: z.boolean() });
 
+/**
+ * `POST /v1/playground/desire-marks` (ADR 0103 § 6): the owner says his desire score after his n-th message was too
+ * high, too low or right. Kept for a creator's version only; the invented persona's conversations are not kept.
+ */
+export const PlaygroundDesireMarkBodySchema = z.strictObject({
+  fanMessageNumber: z.number().int().min(1),
+  verdict: DesireMarkVerdictSchema,
+  note: z.string().trim().min(1).max(500).exactOptional(),
+});
+export type PlaygroundDesireMarkBody = z.infer<typeof PlaygroundDesireMarkBodySchema>;
+
+/**
+ * One mark as the calibration reads it back: the message, the score then and the signals counted, and the same signals
+ * counted again with the weights in force now. When the weights change, `scoreNow` says what the change does to it.
+ */
+export const DesireMarkSchema = z.object({
+  id: DesireMarkIdSchema,
+  markedAt: IsoDateSchema,
+  fanMessage: z.string(),
+  verdict: DesireMarkVerdictSchema,
+  note: z.string().nullable(),
+  before: DesireScoreSchema.nullable(),
+  scoreThen: DesireScoreSchema,
+  weightsThen: z.string(),
+  /** Each signal with its points in the weights in force now. */
+  signals: PlaygroundDesireSchema.shape.signals,
+  scoreNow: DesireScoreSchema,
+});
+export type DesireMark = z.infer<typeof DesireMarkSchema>;
+
+/** `GET /v1/playground/desire-marks?creatorId=`: her marks, newest first, and the weights in force. */
+export const DesireMarksSchema = z.object({
+  weightsNow: z.string(),
+  marks: z.array(DesireMarkSchema).max(500),
+});
+export type DesireMarks = z.infer<typeof DesireMarksSchema>;
+export const DesireMarksQuerySchema = z.strictObject({ creatorId: CreatorIdSchema });
+
 /** Codes of the playground routes (suffix rules of errors.ts; 503 is set by the route itself). */
 export const PLAYGROUND_ERROR_CODES = [
   'llm_unavailable',
@@ -283,5 +337,6 @@ export const PLAYGROUND_ERROR_CODES = [
   'voice_model_invalid',
   'time_zone_invalid',
   'playground_persona_not_found',
+  'desire_mark_invented_persona_conflict',
 ] as const;
 export type PlaygroundErrorCode = (typeof PLAYGROUND_ERROR_CODES)[number];

@@ -8,11 +8,11 @@ Ce que le connecteur fait, capacité par capacité : `reveal-connector-inventory
 
 | Question | Réponse | Source | Reste à prouver |
 |---|---|---|---|
-| Authentification rejouable depuis un serveur ? | Probable : un seul en-tête `authorization: Bearer`, aucun cookie, aucun en-tête maison, aucune empreinte demandée | captures A, B, C | **V1** : un appel en lecture depuis une autre machine que le navigateur, avec le même jeton (P2-01) |
+| Authentification rejouable depuis un serveur ? | Oui : un seul en-tête `authorization: Bearer`, aucun cookie, aucun en-tête maison, aucune empreinte demandée ; **V1 réussie** le 11/11 (200 depuis un serveur) | captures A, B, C ; V1 | — |
 | Signatures, nonce, CSRF ? | Aucun | captures B, C | — |
 | Anti-bot sur l'API ? | Aucun sur `api.reveal.me` (le script de protection tourne sur le tableau de bord seulement) | captures A, B, C | Une IP de serveur peut être traitée autrement qu'une IP résidentielle : V1 le dira |
-| Durée de la session ? | Inconnue : aucun appel de connexion, de renouvellement ni de déconnexion en 32 minutes | capture A | **V2** : lire `exp` si le jeton est un JWT, sinon mesurer (P2-01) |
-| Invalidation ? | Inconnue : réponse à un jeton invalide jamais vue | — | V2 : réponse exacte (statut, corps) quand la session ne vaut plus ; effet d'une connexion du membre « bot » sur un autre appareil |
+| Durée de la session ? | 24 h : le jeton est un JWT, `exp` = `iat` + 24 h, jamais renouvelé par Reveal ; un « Synchroniser » par jour | capture A ; V1, V2 | — |
+| Invalidation ? | Jeton expiré : 401, sans `www-authenticate` ni en-tête propre à Reveal (V2, 12/11) | V2 | Effet d'une connexion du membre « bot » sur un autre appareil |
 | Limites de débit | 50/s, 100/10 s, 200/min par jeton ; envoi 60/min | en-têtes | — |
 | Temps réel | Aucun WebSocket : le client officiel sonde, le connecteur sonde aussi | captures A, B, C | — |
 
@@ -34,16 +34,16 @@ La session envoyée à `POST /v1/connector/sessions` (champ `session`, opaque po
 
 **Qui envoie** : le bouton n'est proposé qu'au propriétaire, et l'envoi passe par la liaison de l'extension de VEI-01 (`x-extension-link`, jeton haché, révocable), comme le copilote, jamais par le cookie du CRM ni par un secret collé à la main (ADR 0066 § 7). Le jeton d'appareil `EXTENSION_DEVICE_TOKEN` de P0-06 est remplacé par cette liaison dans P2-01.
 
-Le compte plateforme et la session ne font jamais apparaître le jeton ailleurs que chiffré en base (AES-256-GCM, P0-06). La route refuse une session dont `modelId` ne correspond pas au compte déjà relié.
+Le compte plateforme et la session ne font jamais apparaître le jeton ailleurs que chiffré en base (AES-256-GCM, P0-06). La route refuse une session dont `modelId` ne correspond pas au compte déjà relié : ni à la session déjà gardée, ni, dès la première « Sync », au modèle que le relevé des ventes relie à ce compte (Réglages › Relevé des ventes).
 
-**Santé (`health`)** : `GET /models/:modelId`. 200 → `valid` ; 401 ou 403 → `expired` ; si `exp` est lisible, `warning` 24 h avant.
+**Santé (`health`)** : `GET /models/:modelId`. 200 → `valid` ; 401 ou 403 → `expired` ; `exp` du JWT lisible : `warning` 2 h avant (le jeton ne vit que 24 h, V1).
 
 ## 3. Le client HTTP
 
 - `undici` (déjà dans Node, pas de dépendance nouvelle), base `https://api.reveal.me` configurable (FakeReveal en test et en développement).
 - En-têtes : `authorization`, `content-type: application/json` sur les écritures, `user-agent` de la session, `origin` et `referer` du tableau de bord. Rien d'autre.
 - Lecture des limites à chaque réponse : quand `remaining` d'une fenêtre tombe sous 20 %, le client attend son `reset` avant l'appel suivant. 429 → `rate_limited` avec `Retry-After`.
-- Erreurs : 401/403 → `session_expired` ; 404 → `not_found` ; 429 → `rate_limited` ; 5xx, délai dépassé, réseau → `transient` ; réponse qui ne passe pas son schéma → `fatal` « shape_changed », avec le nom de la route et le chemin Zod, jamais le corps.
+- Erreurs : 401/403 → `session_expired`, sauf un 403 en page HTML : `fatal` « challenge » (§ 7) ; 404 → `not_found` ; 429 → `rate_limited` ; 5xx, délai dépassé, réseau → `transient` ; réponse qui ne passe pas son schéma → `fatal` « shape_changed », avec le nom de la route et le chemin Zod, jamais le corps.
 - Un client par compte (résolveur de P0-06), sortie par `connector_config.egress` quand il sera codé (P2-06).
 - Le jeton n'apparaît dans aucun log : le client n'écrit que la route (gabarit, sans identifiant), le statut et la durée.
 
@@ -53,19 +53,19 @@ Le compte plateforme et la session ne font jamais apparaître le jeton ailleurs 
 |---|---|---|
 | `listConversations({ since, limit })` | `GET /conversations/model?filter=all&take=20`, pages suivantes tant que `lastMessage.createdAt ≥ since` | `ConversationSnapshot` : `ref` = `conversation.id` ; `fanRef` = `member.id` ; `fanDisplayName` = `memberFirstname` ou `member.userName` ; `unreadCount` = 1 si `modelIsUnread`, sinon 0 (Reveal ne donne pas de nombre) ; `lastMessageAt`, `lastMessagePreview` = `lastMessage` |
 | `fetchMessages(ref, { since, limit })` | `GET /conversations/:id/messages?take=10`, pages vers le passé jusqu'à `createdAt < since` ou `hasNextPage = false` | `ExternalMessage` : `direction` = `out` si `authorMessage.memberId` est absent (message de l'équipe ou de la modèle), `in` sinon ; `media` = `medias[]` (+ `bundleWithMedias.medias`, verrouillés si `isPaid` est absent) ; `priceMinor` = `bundle.price` ; `isPaid` = `bundle.isPaid === true` ; `senderLabel` = `authorMessage.displayName` pour un sortant |
-| `listTransactions({ since })` | `GET /transactions/model/:modelId?status[]=paid&status[]=refunded`, pages jusqu'à `since` | `ExternalTransaction` ; `kind` : `bundle` → `ppv`, `tip` → `tip`, abonnement → `subscription`, autre → `other` (énumération exacte à revoir, masquée par l'anonymiseur). Les ventes de référence restent celles de l'API CRM (ADR 0050) ; celle-ci sert au lien vente ↔ message |
+| `listTransactions({ since })` | `GET /transactions/model/:modelId?status[]=paid&status[]=refunded`, pages jusqu'à `since` | `ExternalTransaction` (la transaction ne porte ni bundle ni étape : le lien se lit à l'envers, `bundle.transactionId` d'un message) ; `kind` : `bundle` → `ppv`, `tip` → `tip`, abonnement → `subscription`, autre → `other` (énumération exacte à revoir, masquée par l'anonymiseur). Les ventes de référence restent celles de l'API CRM (ADR 0050) ; celle-ci sert au lien vente ↔ message |
 | `getFanProfile(fanRef)` | `GET /conversations/:id` + `GET /conversations/:id/stats` | `FanProfile` (ADR 0018) : date d'inscription, abonnement, total dépensé, dernier paiement, carte vérifiée |
 | `getFanNote(fanRef)` | `conversation.note` de `GET /conversations/:id` | lu en direct, jamais stocké (ADR 0018 § 1) |
 | `getCreatorNotes(ref)` | `creatorNote` de `GET /models/:modelId` | une valeur par modèle, pas par conversation |
-| `getFanPpvStats(fanRef)` | `GET /conversations/:id/ppv-history?kind=paid` (+ `free`) | taux d'achat, prix haut et bas, bundles |
+| `getFanPpvStats(fanRef)` | `GET /conversations/:id/ppv-history?kind=paid` (+ `free`) | taux d'achat, prix haut et bas, bundles ; `lastOfferAt` = le `createdAt` le plus récent des bundles `kind=paid` (Reveal n'a pas de champ à lui) |
 | `listPlatformScripts()` | `GET /script-sequences/model/:modelId` + `GET /scripts/model/:modelId?withConversations=false` (toutes les pages) | voir § 6 |
-| `getScriptHistory(fanRef)` | `GET /scripts/model/:modelId?conversationId=` (toutes les pages) | par étape : envoyée (`conversations[]` non vide), achetée (`isPaid`) |
+| `getScriptHistory(fanRef)` | `GET /scripts/model/:modelId?conversationId=` (toutes les pages) | par étape : envoyée (`conversations[]` non vide), achetée (`purchased`, lu du `isPaid` de Reveal) ; ni heure d’envoi ni script parent : `stepRef` est l’id Reveal de l’étape, unique sur le compte |
 | `listVaultMedia(opts)` | `GET /models/:modelId/vault-folders` + `GET /models/:modelId/medias?vaultFolderId=` | `VaultMedia` |
 | `fetchMedia(ref)` | URL du média (`url` ou HLS) | hors P2-02 : la durée de validité des liens est inconnue (ouvert n° 7) |
 
-`fanRef` → conversation : Reveal a une conversation par fan et par modèle. L'adaptateur garde la correspondance relevée par `listConversations` ; une méthode appelée avec un fan inconnu relit la liste (`searchParticipants`), puis lève `not_found`.
+`fanRef` → conversation : Reveal a une conversation par fan et par modèle. L'adaptateur garde la correspondance relevée par `listConversations` ; une méthode appelée avec un fan inconnu relit toute la liste, puis lève `not_found` (P2-02 : `searchParticipants` cherche un pseudo, et l'adaptateur n'a que l'id du fan).
 
-**Notre propre message** : d'abord par son id, gardé dans `connector_sends` à l'envoi (§ 5) ; en repli seulement (envoi dont la réponse s'est perdue), par `authorMessage.displayName` du membre « bot » et l'empreinte. La paie, elle, lit l'auteur dans l'API CRM (ADR 0050 § 5). Le nom affiché du membre « bot » ne doit pas changer dans Reveal (`session-expired.md`). Un sortant écrit par la modèle elle-même ou par un chatteur porte un autre nom : il est sortant, mais pas le nôtre.
+**Notre propre message** : d'abord par son id, gardé dans `connector_sends` à l'envoi (§ 5) ; en repli seulement (envoi dont la réponse s'est perdue), par `authorMessage.displayName` du membre « bot » et l'empreinte. La paie, elle, lit l'auteur dans l'API CRM (ADR 0050 § 5). Le nom affiché du membre « bot » ne doit pas changer dans Reveal (`session-expired.md`). Un sortant écrit par la modèle elle-même ou par un chatteur porte un autre nom : il est sortant, mais pas le nôtre. Vers le port : `author` vaut `fan`, `ai` (le nôtre) ou `human` (P2-02). **Ouvert** : d'où vient le nom affiché du membre « bot » (la session capturée ne le porte pas) ; tant qu'il manque, seul l'id reconnaît nos messages.
 
 **Sondage** : `connector.poll` (P0-06) appelle `listConversations(since = last_poll_at − 60 s)` puis `fetchMessages` sur chaque conversation bougée. Intervalle par défaut 60 s ± 20 s, au-dessus du client officiel (12 s) : on reste moins bavard qu'un chatteur. Latence attendue entre le message d'un fan et la réponse de l'agent : 2 à 3 minutes (relève, puis délai de frappe et de lecture).
 
@@ -97,7 +97,7 @@ Dans l'API, un « script » est **une étape** ; une **séquence** les ordonne. 
 - une séquence → un `PlatformScript`, ses étapes dans l'ordre de `stepIndex` ;
 - une étape hors de toute séquence → un `PlatformScript` d'une seule étape ;
 - prix : `script.price` en centimes TTC, absent = gratuit ;
-- moment : `day` si le nom de la séquence (ou, à défaut, du dossier du coffre de ses médias) contient ☀️, `night` s'il contient 🌙, sinon `null` ;
+- moment : `day` si le nom de la séquence (ou, à défaut, du dossier du coffre de ses médias vendus, quand ces dossiers s'accordent) contient ☀️, `night` s'il contient 🌙, sinon `null` ; un nom qui porte les deux donne `null` ; le coffre n'est lu que si un nom ne dit rien ;
 - `stepIndex` du port → l'id de l'étape Reveal, résolu par l'adaptateur.
 
 « Déjà envoyée » se lit par étape et par conversation (`conversations[]` de `scripts.list?conversationId=`), avec l'état d'achat : c'est la seule source (ADR 0018 § 5).

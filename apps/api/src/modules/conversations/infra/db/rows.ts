@@ -42,6 +42,9 @@ export function toConversation(row: typeof schema.conversations.$inferSelect): C
     desireAt: row.desireAt,
     fanAvailability:
       row.fanAvailability === null ? null : FanAvailabilityRecordSchema.parse(row.fanAvailability),
+    careSince: row.careSince,
+    careHelpAt: row.careHelpAt,
+    careClosedAt: row.careClosedAt,
   };
 }
 

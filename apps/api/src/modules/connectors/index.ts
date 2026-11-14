@@ -81,6 +81,16 @@ export {
 /** @public Which totals a read gives (CRM-04). */
 export type { SalesRefundsQuery, SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';
+/** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
+export { revealApiConnectors } from './infra/reveal/connector';
+export type { RevealFetch } from './infra/reveal/client';
+/** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */
+export {
+  REVEAL_ENDPOINTS,
+  RevealMediaTypeSchema,
+  type RevealWireMedia,
+  type RevealWireMessageItem,
+} from './infra/reveal/wire';
 
 function bothReports(keys: ResealReport, webhooks: ResealReport): ResealReport {
   return {
@@ -246,18 +256,23 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const accounts = createDrizzleAccountStore(deps.db, deps.adminDb);
   const vault = deps.sessionKeys === null ? null : createSessionVault(deps.sessionKeys);
   const resolver = createConnectorResolver({ accounts, vault, registry: deps.registry });
+  const ledger = createDrizzleSalesLedger(deps.db, deps.adminDb);
   const sessions = createConnectorSessions({
     accounts,
     vault,
     clock,
     shapes: { reveal: revealSessionShape },
+    linkedModels: async (platform, platformAccountId) =>
+      [...(await ledger.modelLinks(platform))]
+        .filter(([, link]) => link.platformAccountId === platformAccountId)
+        .map(([platformModelId]) => platformModelId),
   });
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
   const avatars: AvatarPorts | null =
     deps.avatars == null ? null : { ...deps.avatars, records: createAvatarRecords(deps.adminDb) };
   const salesFeeds = createSalesFeeds({
     keys: deps.credentialKeys === null ? null : createSalesFeedKeyStore(deps.adminDb, deps.credentialKeys),
-    ledger: createDrizzleSalesLedger(deps.db, deps.adminDb),
+    ledger,
     team: createDrizzleTeamImportStore(deps.db),
     registry: deps.salesFeeds,
     clock,

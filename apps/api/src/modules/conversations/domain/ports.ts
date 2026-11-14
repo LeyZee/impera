@@ -563,6 +563,11 @@ export interface ComposeInput {
   readonly scriptRun?: ScriptRunState | null;
   /** His availability as last journaled (ADR 0103, amendement du 13/11); `null` before the first. */
   readonly fanAvailability?: FanAvailabilityRecord | null;
+  /**
+   * The care mode open on the conversation (ADR 0088): she answers him with care whatever he writes. `helpGiven`: the
+   * help bubble already went out in this episode.
+   */
+  readonly care?: { readonly since: Date; readonly helpGiven: boolean };
 }
 
 /** An event of a script run this message journals, in order (ADR 0098 § 2). */
@@ -581,6 +586,15 @@ interface ComposedScriptRun {
   readonly opened?: { readonly run: ScriptRunState; readonly events: readonly ScriptRunJournalEvent[] };
   /** A paid step went into the draft: one `offer_made` at its catalogue price. */
   readonly offer?: { readonly amountMinor: number; readonly currency: Currency };
+}
+
+/**
+ * The care mode the engine read with this result (ADR 0088): the signs that opened or kept it, and whether the draft
+ * closes on the help bubble. On a hold, the AI could not answer him with care and a human writes to him.
+ */
+interface ComposedCare {
+  readonly signs: readonly string[];
+  readonly help: boolean;
 }
 
 /**
@@ -629,6 +643,8 @@ export type ComposeResult =
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
       readonly scriptRun?: ComposedScriptRun;
+      /** Written in the care mode: a human validates it whatever the mode (ADR 0088 § 5). */
+      readonly care?: ComposedCare;
     }
   | {
       readonly kind: 'held';
@@ -652,6 +668,7 @@ export type ComposeResult =
       readonly customOrderOpened?: true;
       /** His run moved by his message and Reveal only: no step goes without a draft. */
       readonly scriptRun?: Pick<ComposedScriptRun, 'moved'>;
+      readonly care?: ComposedCare;
     };
 
 /** An alert of hers that went off and only lets a human know (P4-01): named, never with what the fan wrote. */

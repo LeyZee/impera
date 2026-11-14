@@ -70,8 +70,9 @@ export function platformScriptFaults(script: PlatformScriptView): PlatformScript
 
 /**
  * What Reveal says was sent to him and what he bought (`getScriptHistory(fanRef)`, ADR 0018 § 5), per script and step
- * index: the only source of truth for « already sent ». Its exact shape follows the capture; this is what the agent
- * needs of it.
+ * index: the only source of truth for « already sent ». Reveal gives `SentScriptStep { stepRef, purchased }`, the
+ * step's id unique on the account, with neither its script nor when it went: the adapter finds both script and index
+ * by `stepRef` in her catalogue (`purchased` → `boughtStepIndexes`), and the time of a send is the core's own journal.
  */
 export interface ScriptHistoryView {
   readonly scripts: readonly {

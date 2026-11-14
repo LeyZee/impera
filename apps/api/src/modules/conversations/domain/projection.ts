@@ -29,6 +29,13 @@ export interface ConversationProjection {
   readonly desireAt: Date | null;
   /** The last `fan_availability_changed` (ADR 0103, amendement du 13/11): his availability and the session's gate. */
   readonly fanAvailability: FanAvailabilityRecord | null;
+  /**
+   * The care mode (ADR 0088): when the open episode began (`care_opened`), when its help bubble went out in a draft,
+   * and when the last episode was closed (`care_closed`). `careSince` null: no episode is open.
+   */
+  readonly careSince: Date | null;
+  readonly careHelpAt: Date | null;
+  readonly careClosedAt: Date | null;
 }
 
 export const INITIAL_PROJECTION: ConversationProjection = {
@@ -42,6 +49,9 @@ export const INITIAL_PROJECTION: ConversationProjection = {
   desireBand: null,
   desireAt: null,
   fanAvailability: null,
+  careSince: null,
+  careHelpAt: null,
+  careClosedAt: null,
 };
 
 /** Events that move the state whatever their payload. */
@@ -102,6 +112,16 @@ export function applyEvent(
   }
   if (event.type === 'fan_availability_changed') {
     return { ...projection, state, fanAvailability: event.payload };
+  }
+  // An episode already open stays as it began: a second `care_opened` (another sign) does not move it.
+  if (event.type === 'care_opened') {
+    return { ...projection, state, careSince: projection.careSince ?? at };
+  }
+  if (event.type === 'care_closed') {
+    return { ...projection, state, careSince: null, careHelpAt: null, careClosedAt: at };
+  }
+  if (event.type === 'draft_created' && event.payload.care?.help === true && projection.careSince !== null) {
+    return { ...projection, state, careHelpAt: at };
   }
   if (event.type === 'mode_changed') {
     return { ...projection, state, mode: event.payload.mode ?? projection.mode };

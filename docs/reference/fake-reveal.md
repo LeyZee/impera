@@ -30,7 +30,7 @@ Tout est inventé et évidemment faux (pseudos `fan_test_01`, textes « Message 
 | Envoi de script | le message porte `scriptId` ; l'indicateur « déjà envoyé » se calcule par conversation à partir des messages |
 | Transaction | `ref`, `fanRef`, type (PPV, tip, abonnement), `amountCents`, `messageRef`, `createdAt` |
 
-Fixtures de départ (`fixtures.ts`, `default` et `empty`) : 1 créatrice, 12 fans dont 3 payeurs et 1 sans aucun message, 1 conversation de 320 messages (pagination), 15 médias en 3 dossiers du coffre, 4 séquences de 3 étapes aux prix 5, 15 et 30 €, dont 1 envoyée en entière à un fan (2 étapes achetées) et 1 envoyée jusqu'à l'étape 2 à un autre.
+Fixtures de départ (`fixtures.ts`, `default`, `empty` et `quiet`, deux fans et leurs conversations sans message, pour le test de contrat) : 1 créatrice, 12 fans dont 3 payeurs et 1 sans aucun message, 1 conversation de 320 messages (pagination), 15 médias en 3 dossiers du coffre, 4 séquences de 3 étapes aux prix 5, 15 et 30 €, dont 1 envoyée en entière à un fan (2 étapes achetées) et 1 envoyée jusqu'à l'étape 2 à un autre.
 
 ## Comportements
 
@@ -85,6 +85,7 @@ Le bac à sable de recette (ADR 0075, `docs/recette/bac-a-sable.md`) le sert sur
 
 ## Fidélité
 
+- Les formes servies sont celles du connecteur (`connectors/infra/reveal/wire.ts`, `REVEAL_ENDPOINTS`), une seule copie : FakeReveal et `RevealApiConnector` ne peuvent pas diverger. `createFakeReveal().fetch` sert le connecteur par `app.inject`, sans port ouvert (P2-02).
 - Chaque endpoint de FakeReveal cite sa section de `reveal-api-observed.md` et la date de la capture qui le fonde.
 - Les captures anonymisées retenues comme référence sont copiées dans `apps/api/src/__tests__/fake-reveal/recordings/` (sans secret ni donnée réelle, relues avant commit, gitleaks), et un test vérifie que les réponses de FakeReveal passent les mêmes schémas Zod que ces enregistrements.
 - Quand une nouvelle capture montre un changement, FakeReveal et le journal des changements de `reveal-api-observed.md` sont mis à jour dans la même PR.

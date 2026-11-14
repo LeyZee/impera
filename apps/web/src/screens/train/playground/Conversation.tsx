@@ -1,5 +1,6 @@
 import {
   DestinationSchema,
+  type DesireMarkVerdict,
   type Destination,
   type PlaygroundAnswer as Answer,
   type PlaygroundComparison as Comparison,
@@ -51,6 +52,8 @@ export interface ConversationProps {
   readonly onHandoff: (wasRight: boolean) => void;
   readonly onPick: (side: 'a' | 'b') => void;
   readonly onReplay: (fanMessageNumber: number) => void;
+  /** His score marked by the owner (ADR 0103 § 6); absent when this conversation cannot be marked. */
+  readonly onMarkDesire?: ((fanMessageNumber: number, verdict: DesireMarkVerdict) => void) | undefined;
   readonly onSend: (text: string, media: Media[]) => Promise<boolean>;
 }
 
@@ -101,6 +104,13 @@ export function Conversation(props: ConversationProps): JSX.Element {
               onReplay={() => {
                 props.onReplay(n);
               }}
+              onMark={
+                props.onMarkDesire === undefined
+                  ? undefined
+                  : (verdict) => {
+                      props.onMarkDesire?.(n, verdict);
+                    }
+              }
             />
           );
         })}
@@ -173,12 +183,14 @@ function TurnView({
   canReplay,
   isLastFan,
   onReplay,
+  onMark,
 }: {
   turn: Turn;
   canReplay: boolean;
   /** On a phone only his last message offers to replay: a pill on every message is noise there. */
   isLastFan: boolean;
   onReplay: () => void;
+  onMark: ((verdict: DesireMarkVerdict) => void) | undefined;
 }): JSX.Element {
   return (
     <div className={`pg-m pg-m--${turn.from}`}>
@@ -200,7 +212,7 @@ function TurnView({
           {line}
         </div>
       ))}
-      {turn.desire === undefined ? null : <DesireTag desire={turn.desire} />}
+      {turn.desire === undefined ? null : <DesireTag desire={turn.desire} onMark={onMark} />}
     </div>
   );
 }

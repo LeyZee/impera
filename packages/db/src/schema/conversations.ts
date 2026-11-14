@@ -94,6 +94,13 @@ export const conversations = pgTable(
      */
     cardReadAt: timestampTz('card_read_at'),
     cardReadThrough: timestampTz('card_read_through'),
+    /**
+     * The care mode (ADR 0088), projected from `care_opened` and `care_closed`: when the open episode began (null, none
+     * is open), when its help bubble went out in a draft (once per episode), and when the last episode was closed.
+     */
+    careSince: timestampTz('care_since'),
+    careHelpAt: timestampTz('care_help_at'),
+    careClosedAt: timestampTz('care_closed_at'),
     updatedAt: updatedAt(),
   },
   (t) => [
