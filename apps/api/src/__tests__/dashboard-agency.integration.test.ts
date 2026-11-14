@@ -210,9 +210,12 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       sales: 5,
       refunds: 1,
       revenueMinor: 1200 + 600 - 600 + 3000 + 1200 + 600,
+      revenueExclVatMinor: 1000 + 500 - 500 + 2500 + 1000 + 500,
       netMinor: 800 + 400 - 400 + 2000 + 800 + 400,
       agencyMinor: 300 + 150 - 150 + 750 + 300 + 150,
       creatorMinor: 500 + 250 - 250 + 1250 + 500 + 250,
+      // A fifth of the agency's part (ADR 0106 § 6).
+      agencyTransferVatMinor: 300,
     });
     expect(result.kinds.map((one) => [one.kind, one.revenueMinor])).toEqual([['ppv', 6000]]);
     expect(result.sellers.map((one) => [one.seller, one.revenueMinor])).toEqual([

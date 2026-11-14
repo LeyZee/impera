@@ -3,14 +3,21 @@ import type {
   ConnectorErrorCode,
   ConnectorEvent,
   ConversationSnapshot,
+  CreatorNote,
   ExternalMessage,
   ExternalRef,
   ExternalTransaction,
+  FanNote,
+  FanPpvStats,
+  FanProfile,
   OutboundMedia,
   Platform,
+  PlatformScript,
   SendResult,
+  SentScriptStep,
   SessionState,
   Unsubscribe,
+  VaultMedia,
   VerifyResult,
 } from '@impera/contracts';
 
@@ -34,6 +41,25 @@ export interface PlatformConnector {
   markRead?(conversationRef: ExternalRef): Promise<void>;
   setTyping?(conversationRef: ExternalRef, on: boolean): Promise<void>;
   subscribe?(onEvent: (event: ConnectorEvent) => void): Promise<Unsubscribe>;
+
+  /*
+   * The readings of ADR 0018, each behind its `capabilities` flag (called only when the flag is true). A fan is named
+   * by his `fanRef` from `listConversations`; an unknown one fails with `not_found`.
+   */
+  /** `fanProfile`. */
+  getFanProfile?(fanRef: ExternalRef): Promise<FanProfile>;
+  /** `fanNoteRead`: read live, never stored nor logged (ADR 0018 § 1). */
+  getFanNote?(fanRef: ExternalRef): Promise<FanNote>;
+  /** `creatorNotes`: empty when the platform has none. */
+  getCreatorNotes?(conversationRef: ExternalRef): Promise<CreatorNote[]>;
+  /** `ppvStats`. */
+  getFanPpvStats?(fanRef: ExternalRef): Promise<FanPpvStats>;
+  /** `scripts`. */
+  listPlatformScripts?(): Promise<PlatformScript[]>;
+  /** `scriptHistory`: the steps already sent to this fan; the platform is the only source (ADR 0018 § 5). */
+  getScriptHistory?(fanRef: ExternalRef): Promise<SentScriptStep[]>;
+  /** `vault`: every media of the vault, or of one folder. */
+  listVaultMedia?(opts: { folderRef?: ExternalRef }): Promise<VaultMedia[]>;
 }
 
 /** The only error a connector throws. `retryAfterSeconds` comes with `rate_limited` when the platform says. */

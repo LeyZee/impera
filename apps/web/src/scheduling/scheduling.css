@@ -458,8 +458,15 @@ button.sc-duty__one:active {
   transform: scale(0.97);
   transition-duration: var(--nv-dur-instant);
 }
+/* A finished shift goes quiet by its background, not by fading its text: name and hours stay readable (AA) in both
+   themes, since last week is read to prepare the next one (GES-11). */
 .sc-chip[data-phase='past'] {
-  opacity: 0.58;
+  background: color-mix(in srgb, var(--sc-color) 6%, var(--nv-surface-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 14%, transparent);
+}
+.sc-chip[data-phase='past'] .sc-chip__who,
+.sc-chip[data-phase='past'] .sc-chip__hours {
+  color: var(--nv-ink-muted);
 }
 /* Another member's shift while one member's stand out (« Ses shifts », EQ-11). */
 .sc-chip[data-muted='true'] {

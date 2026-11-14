@@ -128,6 +128,7 @@ export const RevealSyncedSchema = z.strictObject({
     'revoked',
     'not-owner',
     'other-model',
+    'other-member',
     'refused',
     'unreachable',
   ]),

@@ -1,6 +1,7 @@
 import type {
   Actor,
   AlertTrigger,
+  BankedObjectionKind,
   CustomAlertGroupId,
   CustomAlertId,
   EventId,
@@ -230,6 +231,16 @@ interface EventWriter {
   list(conversationId: ConversationId): Promise<readonly StoredEvent[]>;
   /** What set off each `alert_triggered` after `since` (all of them when null), in `seq` order (P4-01). */
   alertsSince(conversationId: ConversationId, since: Date | null): Promise<readonly AlertTrigger[]>;
+  /**
+   * What ADR 0090 reads in his journal: whether a custom order of his waits (a `custom_order_opened` with no
+   * `takeover_started` since), and the replies of her objection bank he already received.
+   */
+  salesState(conversationId: ConversationId): Promise<SalesState>;
+}
+
+interface SalesState {
+  readonly customOrderOpen: boolean;
+  readonly usedObjectionReplies: readonly string[];
 }
 
 interface JobOptions {
@@ -503,6 +514,24 @@ export interface ComposeInput {
   readonly desire?: { readonly score: number; readonly at: Date };
   /** Her hours (P3-14) as stored; absent, the defaults. They set her night and when a follow-up may go out. */
   readonly hours?: AgentHours;
+  /** A custom order of his already waits for the team (ADR 0090 § A). */
+  readonly customOrderOpen?: boolean;
+  /** The replies of her objection bank he already received (ADR 0090 § B). */
+  readonly usedObjectionReplies?: readonly string[];
+  /**
+   * The care mode open on the conversation (ADR 0088): she answers him with care whatever he writes. `helpGiven`: the
+   * help bubble already went out in this episode.
+   */
+  readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+}
+
+/**
+ * The care mode the engine read with this result (ADR 0088): the signs that opened or kept it, and whether the draft
+ * closes on the help bubble. On a hold, the AI could not answer him with care and a human writes to him.
+ */
+interface ComposedCare {
+  readonly signs: readonly string[];
+  readonly help: boolean;
 }
 
 /**
@@ -544,6 +573,12 @@ export type ComposeResult =
       readonly desire?: ComposedDesire;
       /** Her alerts that went off on his message and only let a human know: one `alert_triggered` each (P4-01). */
       readonly alerts?: readonly ComposedAlert[];
+      /** His custom order now waits for the team: one `custom_order_opened` (ADR 0090 § A). */
+      readonly customOrderOpened?: true;
+      /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
+      readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
+      /** Written in the care mode: a human validates it whatever the mode (ADR 0088 § 5). */
+      readonly care?: ComposedCare;
     }
   | {
       readonly kind: 'held';
@@ -563,6 +598,8 @@ export type ComposeResult =
       readonly retryAt?: Date;
       readonly desire?: ComposedDesire;
       readonly alerts?: readonly ComposedAlert[];
+      readonly customOrderOpened?: true;
+      readonly care?: ComposedCare;
     };
 
 /** An alert of hers that went off and only lets a human know (P4-01): named, never with what the fan wrote. */

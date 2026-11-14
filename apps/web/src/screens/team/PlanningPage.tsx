@@ -1175,6 +1175,7 @@ function Cell({
           type="button"
           className="sc-add"
           aria-label={`Ajouter un shift le ${longDay(day)} sur ${where}`}
+          title={`Ajouter un shift le ${longDay(day)} sur ${where}`}
           onClick={() => {
             onAdd({ accountId, day });
           }}

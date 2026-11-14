@@ -13,7 +13,8 @@ Plateforme ──(poll toutes les N s, ou WebSocket)──▶ Connector.listConv
                                      • upsert conversation
                                      • INSERT message  (UNIQUE platform_message_id → doublon = no-op silencieux)
                                      • event message_received
-                                     • si inbound : addJob('conversation.respond', { conversationId },
+                                     • si inbound et pas rattrapé (P2-02 : message de moins de 6 h, ou signalé par
+                                       le filet de sécurité) : addJob('fans.read_card') et addJob('conversation.respond', { conversationId },
                                          { queueName: 'conv:'+id, jobKey: 'respond:'+id, jobKeyMode: 'replace',
                                            runAt: now + debounceFor(conversation, persona) })
                                      • la relance en attente ne partira pas : son ancre (son dernier message) a bougé

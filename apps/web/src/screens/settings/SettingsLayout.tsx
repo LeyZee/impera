@@ -3,6 +3,7 @@ import { Outlet } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { SecuritySection } from '@/security/SecuritySection';
+import { AiUsageSection } from '@/settings/ai-usage/AiUsageSection';
 import { AlertsSection } from '@/settings/alerts/AlertsSection';
 import { BackupsSection } from '@/settings/backups/BackupsSection';
 import { BillingSection } from '@/settings/billing/BillingSection';
@@ -18,15 +19,16 @@ import { screenLabel, type ScreenPath } from '@/shell/nav';
 
 /**
  * Réglages is the owner's alone (NAV-18): every page of it is served to the owner only, and the appearance, which is
- * everyone's, lives in the account's menu (NAV-03). The AI keys, the platforms' sales feeds (CRM-01), the bots and
- * groups (P3-03, P3-07), the alerts (P4-01), the accounts' pay rules (EQ-03), what each invoice prints (EQ-06), the
- * backups (ADR 0028) and the security of every account (SEC-04).
+ * everyone's, lives in the account's menu (NAV-03). The AI keys, the platforms' sales feeds (CRM-01), the AI spend and
+ * credits (ADR 0091), the bots and groups (P3-03, P3-07), the alerts (P4-01), the accounts' pay rules (EQ-03), what
+ * each invoice prints (EQ-06), the backups (ADR 0028) and the security of every account (SEC-04).
  * Ventes carries the count of the creators found on the platforms and not imported yet (CRM-07 b2, ADR 0069 § 5).
  */
 const TABS: readonly SubNavItem[] = (
   [
     '/reglages/modeles-ia',
     '/reglages/ventes',
+    '/reglages/consommation-ia',
     '/reglages/alertes',
     '/reglages/telegram',
     '/reglages/regles-de-paie',
@@ -61,6 +63,11 @@ export function SettingsLayout(): JSX.Element {
 /** Réglages › Modèles IA: the Services page of P3-03, as the Connecteurs thread built it. */
 export function AiModelsPage(): JSX.Element {
   return <ServicesSection />;
+}
+
+/** Réglages › Consommation IA (ADR 0091): what the AI costs, live, and when to recharge its credits. */
+export function AiUsagePage(): JSX.Element {
+  return <AiUsageSection />;
 }
 
 /** Réglages › Ventes: the key of each platform's sales feed, its webhook and the owner's links (CRM-01). */

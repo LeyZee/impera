@@ -24,6 +24,7 @@ type Write = 'insert' | 'update' | 'delete';
  */
 const WRITES: Readonly<Record<string, readonly Write[]>> = {
   account: ['insert', 'update'],
+  ai_credit_entries: ['insert', 'delete'],
   audit_log: ['insert'],
   calendar_links: ['insert', 'update'],
   commission_statement_lines: ['insert'],
@@ -52,6 +53,7 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   password_reset_links: ['insert', 'update'],
   pay_period_blocks: ['insert', 'update', 'delete'],
   pay_periods: ['insert'],
+  platform_chatter_daily_stats: ['insert', 'update'],
   platform_daily_stats: ['insert', 'update'],
   provider_credentials: ['insert', 'update', 'delete'],
   push_server_keys: ['insert'],

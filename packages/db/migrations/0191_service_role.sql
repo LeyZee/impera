@@ -24,11 +24,12 @@ GRANT UPDATE ON
 	"telegram_state"
 	TO impera_service;--> statement-breakpoint
 GRANT INSERT, DELETE ON
-	"sales_feed_deliveries", "telegram_link_codes", "telegram_routes", "telegram_settings"
+	"ai_credit_entries", "sales_feed_deliveries", "telegram_link_codes", "telegram_routes", "telegram_settings"
 	TO impera_service;--> statement-breakpoint
 GRANT INSERT, UPDATE ON
 	"account", "calendar_links", "commission_statements", "extension_links", "invitation_links",
-	"invoice_counters", "media_assets", "password_reset_links", "platform_daily_stats", "push_subscriptions",
+	"invoice_counters", "media_assets", "password_reset_links", "platform_chatter_daily_stats",
+	"platform_daily_stats", "push_subscriptions",
 	"sales_feed_chatter_reviews", "sales_feed_chatters", "sales_feed_cursors", "sales_feed_stats_calls",
 	"script_cadences", "telegram_bots", "telegram_channels", "telegram_deliveries", "user"
 	TO impera_service;--> statement-breakpoint

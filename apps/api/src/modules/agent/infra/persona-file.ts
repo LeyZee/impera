@@ -8,6 +8,7 @@ import {
   sectionAnswers,
   StoredPersonaSchema,
   type KycSlot,
+  type ObjectionReplies,
   type PersonaSheet,
   type PersonaStrategies,
   type StoredPersona,
@@ -49,6 +50,11 @@ export interface PersonaForModels {
   readonly forbiddenEmojis: readonly string[];
   /** The canvas lines she tries to learn of each fan, in her order (`strategies.kyc.collect`, P5-01). */
   readonly kycSlots: readonly KycSlot[];
+  /**
+   * Her replies to a price objection (`agent.objection_replies`, ADR 0090 § B): code picks one, never the whole bank
+   * in a prompt.
+   */
+  readonly objectionReplies: ObjectionReplies;
 }
 
 const isPlaceholder = (value: string): boolean => value.startsWith('<');
@@ -173,6 +179,7 @@ export function personaForModels(
     alertKeywords: agent.notifications.alert_keywords.filter((term) => !isPlaceholder(term)),
     forbiddenEmojis: rules.emojis_forbidden,
     kycSlots,
+    objectionReplies: agent.objection_replies,
   };
 }
 

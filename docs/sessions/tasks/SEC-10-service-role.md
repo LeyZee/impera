@@ -16,7 +16,7 @@ Brancher `withAdmin` et la file des jobs sur un rôle qui lit et écrit des lign
 
 ## À faire (liste vérifiable)
 
-- [x] Migration 0172 : le rôle `impera_service` (créé sans connexion s'il manque), lecture sur les tables, écriture table par table d'après ce que les appels `withAdmin` font, `audit_log` en ajout seul.
+- [x] Migration 0191 : le rôle `impera_service` (créé sans connexion s'il manque), lecture sur les tables, écriture table par table d'après ce que les appels `withAdmin` font, `audit_log` en ajout seul.
 - [x] `runMigrations` pose aussi le schéma de la file des jobs et ses droits : l'API ne le crée plus à son démarrage.
 - [x] `DATABASE_SERVICE_URL` ; l'API et le worker ne lisent plus `DATABASE_ADMIN_URL` (gardée pour les migrations, la sauvegarde et les scripts `ops:*`).
 - [x] `pnpm db:migrate` donne au rôle le mot de passe de `DATABASE_SERVICE_URL` quand il ne se connecte pas encore.

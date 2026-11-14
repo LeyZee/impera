@@ -14,6 +14,7 @@ describe('fan limits set by the policy, through the fans module', () => {
   const fanId = newId(FanIdSchema);
   const brokeFanId = newId(FanIdSchema);
   const frozenFanId = newId(FanIdSchema);
+  const sadFanId = newId(FanIdSchema);
   const AT = new Date('2026-10-17T20:00:00.000Z');
 
   beforeAll(async () => {
@@ -54,6 +55,14 @@ describe('fan limits set by the policy, through the fans module', () => {
           displayName: 'Hugo',
           flags: { salesFrozen: { reason: 'operator', since: '2026-10-10T09:00:00.000Z' } },
         },
+        {
+          id: sadFanId,
+          creatorId,
+          platformAccountId: accountId,
+          platformFanId: 'fan-4',
+          displayName: 'Léo',
+          flags: {},
+        },
       ]);
     });
   });
@@ -63,7 +72,7 @@ describe('fan limits set by the policy, through the fans module', () => {
   });
 
   it('stops contact and takes back his age, authored by the system, once', async () => {
-    const protection = protectionFor(['possible_minor', 'distress']);
+    const protection = protectionFor(['possible_minor', 'harassment']);
     await limits.protect(creatorId, fanId, protection, 'correlation-1', AT);
     // A replayed job changes nothing more.
     await limits.protect(creatorId, fanId, protection, 'correlation-1', AT);
@@ -85,7 +94,17 @@ describe('fan limits set by the policy, through the fans module', () => {
       ['fan_flag_cleared', 'system'],
       ['fan_flag_set', 'system'],
     ]);
-    expect(events[0]?.payload).toMatchObject({ reason: 'possible_minor, distress' });
+    expect(events[0]?.payload).toMatchObject({ reason: 'possible_minor, harassment' });
+  });
+
+  it('in distress, freezes his sales for distress and stops the explicit, never stops contact (ADR 0088)', async () => {
+    const care = protectionFor(['distress']);
+    await limits.protect(creatorId, sadFanId, care, 'correlation-care', AT);
+    await limits.protect(creatorId, sadFanId, care, 'correlation-care', AT);
+    expect(await limits.flags(creatorId, sadFanId)).toEqual({
+      noExplicit: true,
+      salesFrozen: { reason: 'distress', since: AT.toISOString() },
+    });
   });
 
   it('freezes his sales when he says he cannot pay, dated, and keeps a freeze a human set', async () => {

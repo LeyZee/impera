@@ -44,6 +44,12 @@ export const AgencySaleKindSchema = z.enum([
 ]);
 export type AgencySaleKind = z.infer<typeof AgencySaleKindSchema>;
 
+/**
+ * The VAT rate the platform adds to the agency's transfers, on its part, in basis points (ADR 0106 § 7): France's
+ * standard rate. A rule of the code, read by the server's estimate and by the screen that says it.
+ */
+export const AGENCY_TRANSFER_VAT_BPS = 2_000;
+
 const cents = z.number().int();
 const count = z.number().int().nonnegative();
 const day = z.iso.date();
@@ -51,9 +57,19 @@ const day = z.iso.date();
 export const AgencyFiguresSchema = z.strictObject({
   /** The « Chiffre d'affaires »: what the fans paid, VAT included, refunds taken off. */
   revenueMinor: cents,
+  /**
+   * The same sales without the VAT the fans paid (ADR 0106 § 2): the revenue less it is the fans' VAT, it less the net
+   * is the platform's commission.
+   */
+  revenueExclVatMinor: cents,
   netMinor: cents,
   agencyMinor: cents,
   creatorMinor: cents,
+  /**
+   * The VAT the platform adds to the agency's transfers on its part, estimated (ADR 0106 § 6): never added to a sum,
+   * the exact amount is the platform's transfer statement.
+   */
+  agencyTransferVatMinor: cents,
   sales: count,
   refunds: count,
 });

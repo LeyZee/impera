@@ -46,6 +46,7 @@ function conversation(id: string, patch: Partial<ConversationSummary> = {}): Con
     updatedAt: '2026-10-17T20:00:00Z',
     desire: null,
     heldBy: null,
+    careSince: null,
     ...patch,
   });
 }
@@ -845,7 +846,7 @@ describe('the reader of Suivi', () => {
     // Before the sheet, never inside it: read without unfolding anything.
     expect(banner.closest('details')).toBeNull();
     fireEvent.click(lift);
-    expect(await screen.findByText('Aucune', { selector: '.tr-limits__sum' })).toBeDefined();
+    expect(await screen.findByText('Aucune en place', { selector: '.tr-limits__sum' })).toBeDefined();
     expect(screen.queryByRole('list', { name: 'Avant de lui écrire' })).toBeNull();
     expect(posted).toEqual([{ action: 'flags', body: { flag: 'doNotContact', set: false } }]);
   });

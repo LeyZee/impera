@@ -1,4 +1,4 @@
-import { desireNow, type MediaDescription } from '@impera/contracts';
+import { desireNow, type FanFlags, type MediaDescription, type ObjectionReplies } from '@impera/contracts';
 import type {
   BrainAlert,
   Brief,
@@ -9,6 +9,8 @@ import type {
   VoiceInput,
 } from '@impera/llm';
 
+import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
+import { checkNoCommitment, customOrderDecision, type CustomOrderDecision } from '../domain/custom-order';
 import {
   desireMoved,
   desireScore,
@@ -28,6 +30,7 @@ import {
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
+import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { offerDecision, offerSignals, type OfferBlock, type OfferContext } from '../domain/policy';
 import {
   declaredAdultAge,
@@ -100,6 +103,26 @@ export interface ComposeTurnInput {
   readonly skipVoice?: (brief: Brief | undefined) => boolean;
   /** Her alerts written as a phrase, for the brain to check his last message against (P4-01). */
   readonly alerts?: readonly BrainAlert[];
+  /**
+   * The care mode (ADR 0088): true when code already knows (an episode open, his words read by the safety net), or
+   * read on the brain's risks. In care, the voice writes the code's care brief, nothing is offered, nothing sexual, and
+   * the care guard reads what it wrote; a brain that failed does not stop it when code already knows.
+   */
+  readonly care?: boolean | ((brief: Brief | undefined) => boolean);
+  /**
+   * What a custom order of his needs (ADR 0090 § A): whether a chatter is on shift, whether one of his already waits,
+   * and his limits. Absent: nobody on shift, none open, his limits unknown; she still commits to nothing.
+   */
+  readonly customOrder?: {
+    readonly chatterOnShift: boolean;
+    readonly orderOpen: boolean;
+    readonly flags: FanFlags | undefined;
+  };
+  /** Her replies to a price objection (ADR 0090 § B), and those he already received: never twice. */
+  readonly objections?: {
+    readonly bank: ObjectionReplies;
+    readonly usedReplyIds: ReadonlySet<string>;
+  };
 }
 
 /** A follow-up as the voice writes it: how long he has been silent, and her own way of following up if she wrote one. */
@@ -176,6 +199,11 @@ function followUpBrief(followUp: FollowUpTurn): Brief {
 const CAME_BACK_BRIEF =
   'Il lui avait dit d’attendre un peu et n’a rien écrit depuis. Elle lui demande avec légèreté s’il est revenu, en une phrase, sans reproche, sans rien proposer de payant.';
 
+/** What the voice writes in the care mode: the code's brief, whatever the brain or a trap suggested (ADR 0088 § 3). */
+function careBrief(read: Brief): Brief {
+  return { ...read, action: 'reply', replyBrief: CARE_BRIEF, toneHints: [...CARE_TONE_HINTS] };
+}
+
 /** The brief as the cursor lets the voice write it. */
 function withinCursor(brief: Brief, decision: SexualizationDecision): Brief {
   if (decision.kind === 'steer_back')
@@ -199,10 +227,16 @@ export interface ComposedTurn {
   readonly sexualization?: SexualizationDecision;
   /** His desire score after this message, only when it changed: the worker writes it (P3-12). */
   readonly desire?: DesireReading;
+  /** His desire score read on this message, moved or not: the playground shows it to calibrate the counting. */
+  readonly desireRead?: DesireReading;
   /** An adult age he stated himself in this message (`declaredAdultAge`): the composer may confirm his age. */
   readonly ageDeclared?: number;
   /** The brain suggested an offer and the policy refused it: the voice wrote a plain answer. */
   readonly offerRefused?: OfferRefusal;
+  /** He asked for a custom order (ADR 0090 § A): a chatter takes it, or she answered committing to nothing. */
+  readonly customOrder?: Exclude<CustomOrderDecision, { kind: 'none' }>;
+  /** The reply of her bank the voice was given for his price objection (ADR 0090 § B). */
+  readonly objectionReply?: PickedObjectionReply;
   /** What the voice was asked to write: kept for a comparison or a rating. */
   readonly voiceBrief?: Brief;
   readonly voiceInput?: VoiceInput;
@@ -216,6 +250,8 @@ export interface ComposedTurn {
   readonly isFallback: boolean;
   /** `skipVoice` stopped it: no voice call was made. */
   readonly isSkipped?: boolean;
+  /** Written in the care mode (ADR 0088): a human validates it, whatever her mode. */
+  readonly care?: true;
 }
 
 /** Answers the team corrected in the playground, given to the voice as her examples (they take precedence). */
@@ -397,18 +433,52 @@ export async function composeTurn(
       : within;
   // The brain may suggest an offer, only the policy decides (CLAUDE.md rule 3): refused, she just answers.
   const offerRefused = cursored.action === 'offer' ? offerRefusal(cursored, input.offer, heat) : undefined;
-  const voiceBrief: Brief =
+  const care = typeof input.care === 'function' ? input.care(brief) : input.care === true;
+  const offered: Brief =
     offerRefused === undefined ? cursored : { ...cursored, action: 'reply', replyBrief: NO_OFFER_BRIEF };
+  // A custom order is never sold by her (ADR 0090 § A): a chatter takes it, or she commits to nothing. A trap's
+  // answer comes first, and in the care mode nothing is sold at all (ADR 0088 § 2).
+  const order =
+    brief === undefined || trap.replyBrief !== undefined || care
+      ? undefined
+      : customOrderDecision({
+          asksForService: brief.intent === 'asks_for_service',
+          chatterOnShift: input.customOrder?.chatterOnShift === true,
+          orderOpen: input.customOrder?.orderOpen === true,
+          risks: brief.risks,
+          flags: input.customOrder?.flags,
+        });
+  const customOrder = order?.kind === 'none' ? undefined : order;
+  const voiceBrief: Brief = care
+    ? careBrief(read)
+    : customOrder?.kind === 'reply'
+      ? {
+          ...offered,
+          action: 'reply',
+          replyBrief: customOrder.brief,
+          toneHints: [...offered.toneHints, NO_OPENING_HINT],
+        }
+      : offered;
+  // His price objection: a reply of her bank he never received, said in her words (ADR 0090 § B).
+  const objectionReply =
+    !care &&
+    brief?.intent === 'price_objection' &&
+    trap.replyBrief === undefined &&
+    input.objections !== undefined
+      ? pickObjectionReply(input.objections.bank, brief.objection, input.objections.usedReplyIds)
+      : undefined;
   const brainCostUsd = brain.ok ? (brain.value.meta.costUsd ?? 0) : 0;
   const brainLatencyMs = brain.ok ? brain.value.meta.latencyMs : 0;
-  if (input.skipVoice?.(brief) === true) {
+  if (input.skipVoice?.(brief) === true || customOrder?.kind === 'handoff') {
     return {
+      ...(customOrder !== undefined && { customOrder }),
       ...(trap.isTrap && { trap }),
       ...(droppedNotes.length > 0 && { droppedNotes }),
       ...(brief && { brief }),
       ...(!brain.ok && { briefFailure: brain.error }),
       ...(sexualization !== undefined && { sexualization }),
       ...(desire !== undefined && desireMoved(desire) && { desire }),
+      ...(desire !== undefined && { desireRead: desire }),
       ...(ageDeclared !== null && { ageDeclared }),
       ...(offerRefused !== undefined && { offerRefused }),
       bubbles: [],
@@ -420,24 +490,34 @@ export async function composeTurn(
       isSkipped: true,
     };
   }
-  const voiceInput: VoiceInput = { ...base, brief: voiceBrief };
+  const voiceInput: VoiceInput = {
+    ...base,
+    brief: voiceBrief,
+    ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
+  };
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? voice.value.output.bubbles : [];
   // Checked as written: the length and count guards read the voice's bubbles, not the joined message.
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
-    ...(ageConfirmed && !noExplicit ? [] : checkExplicit(written)),
+    ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
+    ...(care ? checkCare(written) : []),
+    ...(customOrder === undefined ? [] : checkNoCommitment(written)),
   ];
   const bubbles = asSent(written, persona.splitMessages);
   return {
+    ...(customOrder !== undefined && { customOrder }),
+    ...(objectionReply !== undefined && { objectionReply }),
     ...(trap.isTrap && { trap }),
     ...(droppedNotes.length > 0 && { droppedNotes }),
     ...(brief && { brief }),
     ...(!brain.ok && { briefFailure: brain.error }),
     ...(sexualization !== undefined && { sexualization }),
     ...(desire !== undefined && desireMoved(desire) && { desire }),
+    ...(desire !== undefined && { desireRead: desire }),
     ...(ageDeclared !== null && { ageDeclared }),
-    ...(offerRefused !== undefined && { offerRefused }),
+    ...(offerRefused !== undefined && !care && { offerRefused }),
+    ...(care && { care: true }),
     voiceBrief,
     voiceInput,
     bubbles,
