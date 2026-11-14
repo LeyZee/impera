@@ -423,10 +423,17 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
   });
   const backups = wireBackups(shared);
-  const mcp = wireMcp(shared, shiftCreators, persona.module, fans.module, {
-    drops: contentDrops.module,
-    scripts: scripts.module,
-  });
+  const mcp = wireMcp(
+    shared,
+    shiftCreators,
+    persona.module,
+    fans.module,
+    {
+      drops: contentDrops.module,
+      scripts: scripts.module,
+    },
+    scheduling.module,
+  );
   const aiUsage = wireAiUsage(shared, llm);
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,

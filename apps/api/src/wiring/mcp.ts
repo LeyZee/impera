@@ -1,9 +1,11 @@
+import { UserIdSchema } from '@impera/contracts';
+
 import { resolveActor } from '../auth';
 import type { ContentDropsModule } from '../modules/content-drops';
 import type { FansModule } from '../modules/fans';
 import { createMcpModule, type ActorView, type McpModule } from '../modules/mcp';
 import type { PersonaModule } from '../modules/persona';
-import type { ShiftCreators } from '../modules/scheduling';
+import type { SchedulingModule, ShiftCreators } from '../modules/scheduling';
 import type { ScriptsModule } from '../modules/scripts';
 
 import type { Routes, Shared } from './shared';
@@ -45,6 +47,7 @@ export function wireMcp(
     readonly drops: Pick<ContentDropsModule, 'reads'>;
     readonly scripts: Pick<ScriptsModule, 'reads'>;
   },
+  scheduling: Pick<SchedulingModule, 'reads'>,
 ): WiredMcp {
   const module = createMcpModule({
     db: shared.db,
@@ -63,6 +66,14 @@ export function wireMcp(
       scripts: (creatorId, reader) => content.drops.reads.scripts(creatorId, reader),
       scriptSteps: (creatorId, reader, dropId) => content.drops.reads.scriptSteps(creatorId, reader, dropId),
       queue: (creatorId, reader) => content.scripts.reads.queue(creatorId, reader),
+    },
+    shifts: {
+      onShiftNow: (reader, creators, at) =>
+        scheduling.reads.onShiftNow(
+          { userId: UserIdSchema.parse(reader.userId), role: reader.role },
+          creators,
+          at,
+        ),
     },
   });
   return {

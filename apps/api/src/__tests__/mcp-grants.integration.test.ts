@@ -80,6 +80,7 @@ describe('/v1/settings/mcp-grants', () => {
         scriptSteps: () => Promise.resolve(null),
         queue: () => Promise.resolve(null),
       },
+      shifts: { onShiftNow: () => Promise.resolve([]) },
     });
     nora = newId(CreatorIdSchema);
     await test.admin.db

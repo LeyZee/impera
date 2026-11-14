@@ -258,7 +258,7 @@ describe('/v1/mcp', () => {
   });
 
   it('lists only the tools whose capability the access holds', async () => {
-    const grant = await createGrant({ capabilities: ['read:team'], creatorId: null });
+    const grant = await createGrant({ capabilities: ['read:payroll'], creatorId: null });
     const listed = RpcSchema.parse(
       (await rpc(grant.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
     );
@@ -405,5 +405,28 @@ describe('/v1/mcp', () => {
       ['mcp.script_steps_get', expect.objectContaining({ outcome: 'ok', subject: { dropId: absent } })],
       ['mcp.drops_list', expect.objectContaining({ outcome: 'arguments_invalid' })],
     ]);
+  });
+  it('says who is on shift now, read as its person, for the agency or for its creator', async () => {
+    const agency = await createGrant({ capabilities: ['read:team'], creatorId: null });
+    const listed = RpcSchema.parse(
+      (await rpc(agency.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
+    );
+    expect(listed.result?.tools?.map((tool) => tool.name)).toEqual(['whoami', 'on_shift_now']);
+    const all = RpcSchema.parse((await rpc(agency.token, callTool('on_shift_now'))).json());
+    expect(all.result?.structuredContent).toEqual({ onShift: [] });
+    const bound = await createGrant({ capabilities: ['read:team'] });
+    const hers = RpcSchema.parse((await rpc(bound.token, callTool('on_shift_now'))).json());
+    expect(hers.result?.structuredContent).toEqual({ onShift: [] });
+    const other = RpcSchema.parse(
+      (await rpc(bound.token, callTool('on_shift_now', { creatorId: lea }))).json(),
+    );
+    expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+  });
+  it('refuses the steps of a script to an access without read:script_content, even with read:media', async () => {
+    const grant = await createGrant({ capabilities: ['read:media'] });
+    const steps = RpcSchema.parse(
+      (await rpc(grant.token, callTool('script_steps_get', { dropId: newId(ContentDropIdSchema) }))).json(),
+    );
+    expect(steps.result?.structuredContent).toEqual({ refusal: 'capability_missing' });
   });
 });

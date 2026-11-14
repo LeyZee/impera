@@ -7,8 +7,9 @@ import { contentTools } from './application/content-tools';
 import { createDispatcher, whoami } from './application/dispatch';
 import { createGrants } from './application/grants';
 import { creatorTools, fanTools } from './application/read-tools';
+import { teamTools } from './application/team-tools';
 import type { ActorView } from './domain/access';
-import type { ContentReads, CreatorReader, FanReader, GrantRecord } from './domain/ports';
+import type { ContentReads, CreatorReader, FanReader, GrantRecord, ShiftReader } from './domain/ports';
 import { createDrizzleGrantStore } from './infra/db/grant-store';
 import { createDrizzleJournal } from './infra/db/journal';
 import { createMcpRoutes } from './infra/http/routes';
@@ -49,6 +50,8 @@ export interface McpDeps {
   readonly fans: FanReader;
   /** Her drops and scripts (`content-drops`, `scripts`), for `drops_list`, `scripts_list` and `script_steps_get`. */
   readonly content: ContentReads;
+  /** Who is on shift (`scheduling.reads.onShiftNow`), for `on_shift_now`. */
+  readonly shifts: ShiftReader;
 }
 
 export function createMcpModule(deps: McpDeps): McpModule {
@@ -75,6 +78,7 @@ export function createMcpModule(deps: McpDeps): McpModule {
               ...creatorTools(deps.creators),
               ...fanTools(deps.fans),
               ...contentTools(deps.content),
+              ...teamTools(deps.shifts),
             },
           }),
         allowedOrigins: [],

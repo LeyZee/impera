@@ -11,6 +11,8 @@ import {
   CreatorIdSchema,
   FanIdSchema,
   McpGrantIdSchema,
+  ShiftIdSchema,
+  TeamMemberIdSchema,
 } from './ids';
 import {
   ScriptMomentSchema,
@@ -368,3 +370,21 @@ export const McpScriptStepsGetSchema = z.strictObject({
     .nullable(),
 });
 export type McpScriptStepsGet = z.infer<typeof McpScriptStepsGetSchema>;
+
+/**
+ * `on_shift_now` (ADR 0026 § 5, `read:team`): who is on shift now on the creators the access reads, read as its person
+ * (a manager, only what he plans). The member by id and name, the shift's end; never an account of a platform, a margin
+ * nor a rate.
+ */
+export const McpOnShiftNowSchema = z.strictObject({
+  onShift: z.array(
+    z.strictObject({
+      shiftId: ShiftIdSchema,
+      creatorId: CreatorIdSchema,
+      memberId: TeamMemberIdSchema,
+      memberName: z.string(),
+      endsAt: z.iso.datetime(),
+    }),
+  ),
+});
+export type McpOnShiftNow = z.infer<typeof McpOnShiftNowSchema>;
