@@ -32,6 +32,9 @@ const PUBLIC: Readonly<Record<string, string>> = {
   'POST /v1/invitation-links/redeem': 'uses an invitation by its token',
   'GET /v1/calendar-feed/:file': 'a calendar feed, by its secret token',
   'POST /v1/webhooks/sales-feeds/:platform': 'the platform’s webhook, checked by its signature',
+  'POST /v1/mcp': 'the MCP server, by an agent’s token only, never a session (ADR 0026 § 2)',
+  'GET /v1/mcp': 'the MCP server without state: 405, nothing to stream (ADR 0026 § 2)',
+  'DELETE /v1/mcp': 'the MCP server without state: 405, no session to close (ADR 0026 § 2)',
 };
 
 /** A value for each path parameter: none is looked up, the guard answers first. */
@@ -44,7 +47,7 @@ describe('no route answers without a session, but those said (audit des tests d�
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     const app = await createApp(config, createLogger(config));
     server = await buildServer({
       config,

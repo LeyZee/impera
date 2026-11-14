@@ -946,6 +946,69 @@
       "when": 1794522249966,
       "tag": "0170_chatter_daily_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1794586140346,
+      "tag": "0175_sale_give",
+      "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1794595462013,
+      "tag": "0182_custom_order_objection_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 137,
+      "version": "7",
+      "when": 1794603095660,
+      "tag": "0185_playground_kept",
+      "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1794610377190,
+      "tag": "0188_care_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 139,
+      "version": "7",
+      "when": 1794615366543,
+      "tag": "0189_connector_sends",
+      "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1794620999978,
+      "tag": "0191_service_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "7",
+      "when": 1794625630128,
+      "tag": "0193_mcp_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 142,
+      "version": "7",
+      "when": 1794631933168,
+      "tag": "0194_rewards_game",
+      "breakpoints": true
+    },
+    {
+      "idx": 143,
+      "version": "7",
+      "when": 1794659979888,
+      "tag": "0195_script_runs",
+      "breakpoints": true
     }
   ]
 }

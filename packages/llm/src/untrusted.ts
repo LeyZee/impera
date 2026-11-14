@@ -22,7 +22,13 @@ export type UntrustedKind =
    */
   | 'channel_examples'
   | 'link_destination'
-  | 'agency_advice';
+  | 'agency_advice'
+  /** A reply of her bank to a price objection (ADR 0090 § 8): the agency's words, said in hers, never an order. */
+  | 'objection_reply'
+  /** What a script of her catalogue is about (ADR 0098 § 6): the agency's words, a criterion for the brain's pick. */
+  | 'script_description'
+  /** The script step code decided to send now (ADR 0098 § 5): its kind, the agency's instruction, the price, the media. */
+  | 'script_step';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.

@@ -17,6 +17,7 @@ import {
 import {
   and,
   eq,
+  inArray,
   schema,
   sql,
   withTenant,
@@ -29,6 +30,7 @@ import type { CardReadMessage, Transaction, UnitOfWork } from '../../domain/port
 
 import { heldBy } from './holds';
 import { toConversation, toDraft, toStoredBrief, toStoredEvent } from './rows';
+import { bindScriptRuns } from './script-runs';
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
 
@@ -239,7 +241,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         const [row] = await tx
           .select({
             count: sql<number>`count(*)::int`,
-            lastAt: sql<Date | null>`max(${schema.drafts.createdAt})`,
+            lastAt: sql<Date | null>`max(${schema.drafts.createdAt})`.mapWith(schema.drafts.createdAt),
           })
           .from(schema.drafts)
           .where(
@@ -248,8 +250,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
               sql`${schema.drafts.createdAt} >= ${since.toISOString()}::timestamptz`,
             ),
           );
-        const lastAt = row?.lastAt ?? null;
-        return { count: row?.count ?? 0, lastAt: lastAt === null ? null : new Date(lastAt) };
+        return { count: row?.count ?? 0, lastAt: row?.lastAt ?? null };
       },
       async openFor(conversationId) {
         const rows = await tx
@@ -368,6 +369,30 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         return rows
           .map(toStoredEvent)
           .flatMap(({ body }) => (body.type === 'alert_triggered' ? [body.payload.trigger] : []));
+      },
+      async salesState(conversationId) {
+        const rows = await tx
+          .select()
+          .from(schema.conversationEvents)
+          .where(
+            and(
+              eq(schema.conversationEvents.conversationId, conversationId),
+              inArray(schema.conversationEvents.type, [
+                'custom_order_opened',
+                'objection_reply_used',
+                'takeover_started',
+              ]),
+            ),
+          )
+          .orderBy(schema.conversationEvents.seq);
+        let customOrderOpen = false;
+        const usedObjectionReplies: string[] = [];
+        for (const { body } of rows.map(toStoredEvent)) {
+          if (body.type === 'custom_order_opened') customOrderOpen = true;
+          if (body.type === 'takeover_started') customOrderOpen = false;
+          if (body.type === 'objection_reply_used') usedObjectionReplies.push(body.payload.replyId);
+        }
+        return { customOrderOpen, usedObjectionReplies };
       },
       async list(conversationId) {
         const rows = await tx
@@ -524,6 +549,8 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         return account?.sessionState === 'expired' ? 'session_expired' : null;
       },
     },
+
+    scriptRuns: bindScriptRuns(tx, creatorId),
   };
 }
 

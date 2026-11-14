@@ -6,7 +6,10 @@ import type { Scenario } from './scenario';
 /** What the agent did with a scenario, on the same path as a real fan. */
 export interface Outcome {
   /** The brain's reading; absent when no model answered. */
-  readonly brief?: Pick<Brief, 'intent' | 'risks' | 'action' | 'desireSignals'> & {
+  readonly brief?: Pick<
+    Brief,
+    'intent' | 'risks' | 'action' | 'desireSignals' | 'objection' | 'scriptReply'
+  > & {
     /** Her alerts the brain saw, by the scenario's names (P4-01). */
     readonly alertsSeen?: readonly string[];
   };
@@ -16,6 +19,15 @@ export interface Outcome {
   readonly offer: boolean;
   /** His desire band after this message (P3-12): what the policy read. */
   readonly desireBand: DesireBand;
+  /** What code did with a custom order (ADR 0090 § A). */
+  readonly customOrder: 'none' | 'handoff' | 'reply';
+  /** The id of the reply of her objection bank the voice was given, or null (ADR 0090 § B). */
+  readonly objectionReply: string | null;
+  /** What code decided with her scripts (ADR 0098), and the step when one goes; absent without scripts. */
+  readonly script?: {
+    readonly decision: 'none' | 'start' | 'send_step' | 'wait' | 'after_refusal' | 'end';
+    readonly step?: { readonly script: string; readonly index: number };
+  };
   readonly bubbles: readonly string[];
   /** Hard guards that blocked her answer: it would not have left. */
   readonly blocking: readonly string[];
@@ -56,6 +68,35 @@ export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
   if (decision?.offer !== undefined && decision.offer !== outcome.offer) {
     failures.push(decision.offer ? 'offre attendue' : 'offre faite à tort');
   }
+  const objection = outcome.brief.objection;
+  if (
+    brief?.objection_in !== undefined &&
+    (objection === undefined || !brief.objection_in.includes(objection))
+  ) {
+    failures.push(`objection ${objection ?? 'aucune'}, attendue parmi [${brief.objection_in.join(', ')}]`);
+  }
+  const reply = outcome.brief.scriptReply ?? 'none';
+  if (brief?.script_reply_in !== undefined && !brief.script_reply_in.includes(reply)) {
+    failures.push(`réponse à l’étape ${reply}, attendue parmi [${brief.script_reply_in.join(', ')}]`);
+  }
+  const script = outcome.script?.decision ?? 'none';
+  if (decision?.script_in !== undefined && !decision.script_in.includes(script)) {
+    failures.push(`script : ${script}, attendu parmi [${decision.script_in.join(', ')}]`);
+  }
+  const step = decision?.script_step;
+  const got = outcome.script?.step;
+  if (step !== undefined && (got?.script !== step.script || got.index !== step.index)) {
+    const said = got === undefined ? 'aucune' : `${got.script} n° ${String(got.index)}`;
+    failures.push(`étape ${said}, attendue ${step.script} n° ${String(step.index)}`);
+  }
+  if (decision?.custom_order !== undefined && decision.custom_order !== outcome.customOrder) {
+    failures.push(`sur-mesure : ${outcome.customOrder}, attendu ${decision.custom_order}`);
+  }
+  if (decision?.objection_reply !== undefined && decision.objection_reply !== outcome.objectionReply) {
+    failures.push(
+      `réplique d’objection ${outcome.objectionReply ?? 'aucune'}, attendue ${decision.objection_reply ?? 'aucune'}`,
+    );
+  }
   if (decision?.desire_band_in !== undefined && !decision.desire_band_in.includes(outcome.desireBand)) {
     failures.push(`désir ${outcome.desireBand}, attendu parmi [${decision.desire_band_in.join(', ')}]`);
   }
@@ -81,8 +122,10 @@ export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
 export interface ScenarioResult {
   readonly file: string;
   readonly failures: readonly string[];
-  /** The judge's scores, when her answer was written and judged. */
+  /** The judge's scores, when her answer was written and judged; over several draws, their mean. */
   readonly scores: Readonly<Record<string, number>>;
+  /** Over several draws, each criterion's worst score, present only when every draw was scored on it. */
+  readonly worst?: Readonly<Record<string, number>>;
 }
 
 export interface SuiteReport {
@@ -107,7 +150,7 @@ export function judgeSuite(
   for (const result of results) {
     for (const failure of result.failures) problems.push(`${result.file} : ${failure}`);
     for (const [criterion, min] of Object.entries(minima.get(result.file) ?? {})) {
-      const score = result.scores[criterion];
+      const score = (result.worst ?? result.scores)[criterion];
       if (score === undefined || score < min) {
         problems.push(
           `${result.file} : ${criterion} ${score === undefined ? 'non noté' : score.toFixed(2)} < ${String(min)}`,

@@ -123,6 +123,7 @@ describe('App without a network (CREA-04)', () => {
     shiftCreatorIds: [],
     team: null,
     teamScope: 'self',
+    preferences: { sounds: true },
   };
   const offline = (): void => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
@@ -182,6 +183,7 @@ describe('App on an invitation link', () => {
     shiftCreatorIds: [],
     team: { role: 'chatter', status: 'active' },
     teamScope: 'self',
+    preferences: { sounds: true },
   };
   const preview = {
     purpose: 'invitation',
@@ -318,6 +320,7 @@ describe('App signing out', () => {
     shiftCreatorIds: [],
     team: null,
     teamScope: 'owner',
+    preferences: { sounds: true },
   };
 
   it('says a sign-out the server did not make, instead of doing nothing (recette 28/10, G9)', async () => {
@@ -360,6 +363,7 @@ describe('App when the session ends while it is open (recette 05/11, SEC-01)', (
     shiftCreatorIds: [],
     team: null,
     teamScope: 'owner',
+    preferences: { sounds: true },
   };
   const gone = () =>
     Response.json(
@@ -500,6 +504,7 @@ describe('App on the screens of a contractor’s file', () => {
     shiftCreatorIds: [],
     team: { role, status: 'active' },
     teamScope: role === 'chatter' ? 'self' : 'agency',
+    preferences: { sounds: true },
   });
 
   function serveAs(me: Me): void {
@@ -597,6 +602,7 @@ describe('App on the screens of a contractor’s file', () => {
       role: 'creator',
       team: null,
       teamScope: 'self',
+      preferences: { sounds: true },
     });
     window.history.replaceState(null, '', '/aide/extension');
     render(<App />);

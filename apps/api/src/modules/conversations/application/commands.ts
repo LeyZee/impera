@@ -22,6 +22,7 @@ import {
   type Verdict,
 } from '@impera/contracts';
 
+import { safetySigns } from '../../agent';
 import {
   AutomaticLocked,
   CreatorNotFound,
@@ -79,6 +80,11 @@ interface IngestMessage {
   readonly platformFanId: string;
   readonly fanDisplayName: string;
   readonly message: ExternalMessage;
+  /**
+   * Caught up rather than just received (the account's first poll, or an old message read late, P2-02): stored and
+   * counted, but neither his card read nor an answer is queued for it. His next fresh message starts both.
+   */
+  readonly catchUp?: boolean;
   readonly correlationId: string;
 }
 
@@ -113,6 +119,8 @@ export interface ConversationCommands {
   /** `note`: what the chatter wants her to remember about the fan, kept as an `operator_note` fact (P3-02). */
   release(input: ConversationCommand & { note?: string }): Promise<void>;
   setMode(input: ConversationCommand & { mode: ConversationMode }): Promise<void>;
+  /** « Il va mieux » (ADR 0088 § 7): the care mode closes; his frozen sales and « Rien d'explicite » stay set. */
+  closeCare(input: ConversationCommand & { reason?: string }): Promise<void>;
   /**
    * The Dashboard's control (Arrêt, Copilote, Automatique) for all her conversations. Returns the mode now in
    * force: Arrêt while the global switch stays on, whatever she asked. Automatique only behind its lock (ADR 0019).
@@ -218,8 +226,10 @@ export function createConversationCommands({
           platformConversationId: input.platformConversationId,
         });
         const messageId = newId(MessageIdSchema);
-        // An outbound message we did not send ourselves was written by someone on the platform.
-        const author = isInbound ? 'fan' : 'human';
+        // An outbound message is ours (`ai`) when the connector says so (its id is one of its sends, P2-03), even when
+        // the send job did not record it (a script step, a send whose answer was lost); else someone on the platform
+        // wrote it.
+        const author = isInbound ? 'fan' : message.author === 'ai' ? 'ai' : 'human';
         const isNew = await tx.messages.insertIfNew({
           id: messageId,
           conversationId: conversation.id,
@@ -259,26 +269,30 @@ export function createConversationCommands({
           },
           meta,
         );
+        // Caught up (P2-02): stored and counted, but nothing reads or answers it on its own, unless his words carry a
+        // sign the safety net answers (a minor, self-harm): that one is treated as fresh, so it is never left unread.
+        const isFresh = input.catchUp !== true || (isInbound && safetySigns(message.text).length > 0);
         if (isInbound) {
           // His card is read whoever answers him (ADR 0085 § 7): each message of his puts the next read off.
           const pace = await tx.cardReads.pace(conversation.id);
-          await tx.jobs.enqueue(
-            'fans.read_card',
-            {
-              creatorId: input.creatorId,
-              conversationId: conversation.id,
-              correlationId: input.correlationId,
-            },
-            {
-              jobKey: jobKeyFor('fans.read_card', conversation.id),
-              runAt: cardReadRunAt({ now: at, unread: pace.unread, lastReadAt: pace.lastReadAt }),
-            },
-          );
+          if (isFresh)
+            await tx.jobs.enqueue(
+              'fans.read_card',
+              {
+                creatorId: input.creatorId,
+                conversationId: conversation.id,
+                correlationId: input.correlationId,
+              },
+              {
+                jobKey: jobKeyFor('fans.read_card', conversation.id),
+                runAt: cardReadRunAt({ now: at, unread: pace.unread, lastReadAt: pace.lastReadAt }),
+              },
+            );
           conversation = await expireOpenDrafts(tx, conversation, NEW_FAN_MESSAGE, {
             ...meta,
             actor: 'system',
           });
-          if (conversation.state === 'pending') {
+          if (isFresh && conversation.state === 'pending') {
             // Debounce: each new message replaces the pending job, so a burst gets one answer (ADR 0006). Past 60
             // answers to him within the hour, she slows down to one every three minutes, and never stops.
             const replies = await tx.drafts.paceSince(conversation.id, new Date(at.getTime() - 3_600_000));
@@ -475,6 +489,26 @@ export function createConversationCommands({
           entityId: conversation.id,
           details: { correlationId: input.correlationId },
         });
+      });
+    },
+
+    closeCare(input) {
+      return uow.inTenant(input.creatorId, async (tx) => {
+        const conversation = await lockConversation(tx, input.conversationId);
+        // Closed already, or never opened: nothing to journal, a second click changes nothing.
+        if (conversation.careSince === null) return;
+        await appendEvent(
+          tx,
+          conversation,
+          {
+            type: 'care_closed',
+            payload: {
+              conversationId: conversation.id,
+              ...(input.reason === undefined ? {} : { reason: input.reason }),
+            },
+          },
+          humanMeta(input),
+        );
       });
     },
 

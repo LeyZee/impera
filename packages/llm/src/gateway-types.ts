@@ -4,8 +4,10 @@ import type {
   FanFlags,
   LlmPurpose,
   MediaDescription,
+  Money,
   Result,
   ScriptDropSummary,
+  ScriptStepKind,
   TrendCaptureDescription,
 } from '@impera/contracts';
 import type { TranscriptionModel } from 'ai';
@@ -131,13 +133,42 @@ export interface BrainAlert {
   readonly phrase: string;
 }
 
+/** A script she may open with him, as the brain reads it (ADR 0098 § 6): the id it answers with, what it is about. */
+export interface BrainScript {
+  readonly id: string;
+  readonly description: string;
+}
+
 export interface BrainInput extends ConversationInput {
   /** Her alerts written as a phrase, at most `BRAIN_ALERTS_MAX`; absent or empty, none is read. */
   readonly alerts?: readonly BrainAlert[];
+  /** The scripts code permits now, at most `BRAIN_SCRIPTS_MAX`; absent or empty, the brain picks none. */
+  readonly scripts?: readonly BrainScript[];
+  /** A step of a script waits for his answer: the brain reads what his last message does with it (`scriptReply`). */
+  readonly scriptStepWaiting?: boolean;
+}
+
+/**
+ * The script step code decided to send now (ADR 0098 § 5), for the voice to say: its kind, the price from the
+ * catalogue (never the model's), the agency's instruction and the media's sheet when the catalogue has them.
+ */
+export interface VoiceScriptStep {
+  readonly kind: ScriptStepKind;
+  /** A paid step only. */
+  readonly price: Money | null;
+  readonly instruction: string | null;
+  readonly mediaSheet: string | null;
 }
 
 export interface VoiceInput extends ConversationInput {
   readonly brief: Brief;
+  /**
+   * A reply of her bank to his price objection (ADR 0090 § 8), chosen by code: the voice says it in her words, in a
+   * typed block after the brief. Absent, none.
+   */
+  readonly objectionReply?: string;
+  /** The script step code decided to send now, in a typed block after the brief. Absent, none. */
+  readonly scriptStep?: VoiceScriptStep;
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   DESIRE_BRAIN_SIGNALS,
   DropMediaDescriptionSchema,
   MediaDescriptionSchema,
+  ObjectionKindSchema,
   TrendCaptureDescriptionSchema,
 } from '@impera/contracts';
 import { z } from 'zod';
@@ -16,9 +17,22 @@ export const BRAIN_ALERTS_MAX = 50;
 const BRAIN_ALERT_ID = /^a[1-9]\d?$/;
 export const brainAlertId = (index: number): string => `a${String(index + 1)}`;
 
+/** The scripts she may open with him that the brain reads at most, and how it names them (`s1`, `s2`…, ADR 0098 § 6). */
+export const BRAIN_SCRIPTS_MAX = 20;
+const BRAIN_SCRIPT_ID = /^s[1-9]\d?$/;
+export const brainScriptId = (index: number): string => `s${String(index + 1)}`;
+
+/**
+ * What his last message does with the script step waiting for him (ADR 0098 § 9): a clear no, an answer to it, or he
+ * says he bought it. Read by the brain, decided by code; « bought » is only ever Reveal's to say.
+ */
+export const SCRIPT_REPLIES = ['refused', 'answers_step', 'claims_bought'] as const;
+
 /** Brain output (docs/architecture/ai-engine.md, « Le Brief »). Decisions are taken by the policy in code, not here. */
 export const BriefSchema = z.object({
   intent: BriefIntentSchema,
+  /** What he opposes to a price, with `price_objection` only (ADR 0090 § 7): the code picks her reply from it. */
+  objection: ObjectionKindSchema.optional(),
   sentiment: z.enum(['positive', 'neutral', 'negative', 'aroused', 'frustrated']),
   factsProposed: z.array(
     z.object({
@@ -55,6 +69,13 @@ export const BriefSchema = z.object({
    * code keeps only the ids it gave and decides what each does. Never a free text. Absent, none.
    */
   alertsSeen: z.array(z.string().regex(BRAIN_ALERT_ID)).max(BRAIN_ALERTS_MAX).optional(),
+  /**
+   * The script that fits him best among those the prompt listed, by its id (`s1`…, ADR 0098 § 6): the code keeps only
+   * an id it gave, and decides whether one opens. Absent, none.
+   */
+  scriptPick: z.string().regex(BRAIN_SCRIPT_ID).optional(),
+  /** What his last message does with the script step waiting for him, when the prompt says one waits. */
+  scriptReply: z.enum(SCRIPT_REPLIES).optional(),
   action: z.enum(['reply', 'offer', 'wait', 'follow_up', 'handoff']),
   replyBrief: z.string().min(1),
   toneHints: z.array(z.string()),

@@ -1,6 +1,7 @@
 import type {
   Actor,
   AlertTrigger,
+  BankedObjectionKind,
   CustomAlertGroupId,
   CustomAlertId,
   EventId,
@@ -22,6 +23,7 @@ import type {
   DecidedDraft,
   DesireCurve,
   DesireSignal,
+  FanAvailabilityRecord,
   DraftId,
   DraftStatus,
   EventBody,
@@ -42,6 +44,10 @@ import type {
   MessageView,
   OutboundMedia,
   PlatformAccountId,
+  ScriptRunId,
+  ScriptRunStatus,
+  ScriptStepKind,
+  ScriptStepOutcome,
   SendResult,
   UserId,
   Verdict,
@@ -230,6 +236,16 @@ interface EventWriter {
   list(conversationId: ConversationId): Promise<readonly StoredEvent[]>;
   /** What set off each `alert_triggered` after `since` (all of them when null), in `seq` order (P4-01). */
   alertsSince(conversationId: ConversationId, since: Date | null): Promise<readonly AlertTrigger[]>;
+  /**
+   * What ADR 0090 reads in his journal: whether a custom order of his waits (a `custom_order_opened` with no
+   * `takeover_started` since), and the replies of her objection bank he already received.
+   */
+  salesState(conversationId: ConversationId): Promise<SalesState>;
+}
+
+interface SalesState {
+  readonly customOrderOpen: boolean;
+  readonly usedObjectionReplies: readonly string[];
 }
 
 interface JobOptions {
@@ -323,6 +339,42 @@ export interface Transaction {
   readonly switches: KillSwitches;
   readonly automatic: AutomaticEvidence;
   readonly audit: AuditTrail;
+  readonly scriptRuns: ScriptRunRepository;
+}
+
+/**
+ * A script run with one fan (ADR 0098): its decision state only, which the agent's domain moves; what was sent and
+ * bought is Reveal's to say (ADR 0018 § 5). Kept in `script_runs`, written in the turn's transaction.
+ */
+export interface ScriptRunState {
+  readonly scriptRef: string;
+  readonly status: ScriptRunStatus;
+  readonly steps: readonly {
+    readonly stepIndex: number;
+    readonly kind: ScriptStepKind;
+    readonly outcome: ScriptStepOutcome;
+    readonly priceMinor: number | null;
+    readonly sentAt: Date;
+    readonly at: Date;
+  }[];
+  readonly ignoredMessages: number;
+  readonly startedAt: Date;
+  readonly endedAt: Date | null;
+}
+
+export interface StoredScriptRun {
+  readonly id: ScriptRunId;
+  readonly run: ScriptRunState;
+}
+
+/** `script_runs` under her tenant: never deleted, at most one open run per conversation. */
+interface ScriptRunRepository {
+  /** His latest run, open or ended; `null` when he never had one. */
+  latest(conversationId: ConversationId): Promise<StoredScriptRun | null>;
+  /** Opens a run; `null` when he already has one open. */
+  open(conversationId: ConversationId, run: ScriptRunState): Promise<StoredScriptRun | null>;
+  /** Saves a run; `false` when it was no longer open (another turn closed it). */
+  save(stored: StoredScriptRun): Promise<boolean>;
 }
 
 /** Who did what from the dashboard (`audit_log`, security.md), in the same transaction as the act. */
@@ -503,6 +555,46 @@ export interface ComposeInput {
   readonly desire?: { readonly score: number; readonly at: Date };
   /** Her hours (P3-14) as stored; absent, the defaults. They set her night and when a follow-up may go out. */
   readonly hours?: AgentHours;
+  /** A custom order of his already waits for the team (ADR 0090 § A). */
+  readonly customOrderOpen?: boolean;
+  /** The replies of her objection bank he already received (ADR 0090 § B). */
+  readonly usedObjectionReplies?: readonly string[];
+  /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
+  readonly scriptRun?: ScriptRunState | null;
+  /** His availability as last journaled (ADR 0103, amendement du 13/11); `null` before the first. */
+  readonly fanAvailability?: FanAvailabilityRecord | null;
+  /**
+   * The care mode open on the conversation (ADR 0088): she answers him with care whatever he writes. `helpGiven`: the
+   * help bubble already went out in this episode.
+   */
+  readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+}
+
+/** An event of a script run this message journals, in order (ADR 0098 § 2). */
+type ScriptRunJournalEvent =
+  | { readonly type: 'script_started' | 'script_ended' }
+  | {
+      readonly type: 'script_step_sent' | 'script_step_opened' | 'script_step_refused';
+      readonly stepIndex: number;
+    };
+
+/** What this message did to his script runs (ADR 0098): written with the draft, in the same transaction. */
+interface ComposedScriptRun {
+  /** His latest run as this message left it, with the events that say how. */
+  readonly moved?: { readonly run: ScriptRunState; readonly events: readonly ScriptRunJournalEvent[] };
+  /** A run opened at this message. */
+  readonly opened?: { readonly run: ScriptRunState; readonly events: readonly ScriptRunJournalEvent[] };
+  /** A paid step went into the draft: one `offer_made` at its catalogue price. */
+  readonly offer?: { readonly amountMinor: number; readonly currency: Currency };
+}
+
+/**
+ * The care mode the engine read with this result (ADR 0088): the signs that opened or kept it, and whether the draft
+ * closes on the help bubble. On a hold, the AI could not answer him with care and a human writes to him.
+ */
+interface ComposedCare {
+  readonly signs: readonly string[];
+  readonly help: boolean;
 }
 
 /**
@@ -542,8 +634,17 @@ export type ComposeResult =
       /** What the brief read about the fan in his messages. */
       readonly factsProposed?: readonly ProposedFact[];
       readonly desire?: ComposedDesire;
+      /** His availability after this message, only when it changed: one `fan_availability_changed` (ADR 0103). */
+      readonly fanAvailability?: FanAvailabilityRecord;
       /** Her alerts that went off on his message and only let a human know: one `alert_triggered` each (P4-01). */
       readonly alerts?: readonly ComposedAlert[];
+      /** His custom order now waits for the team: one `custom_order_opened` (ADR 0090 § A). */
+      readonly customOrderOpened?: true;
+      /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
+      readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
+      readonly scriptRun?: ComposedScriptRun;
+      /** Written in the care mode: a human validates it whatever the mode (ADR 0088 § 5). */
+      readonly care?: ComposedCare;
     }
   | {
       readonly kind: 'held';
@@ -562,7 +663,12 @@ export type ComposeResult =
        */
       readonly retryAt?: Date;
       readonly desire?: ComposedDesire;
+      readonly fanAvailability?: FanAvailabilityRecord;
       readonly alerts?: readonly ComposedAlert[];
+      readonly customOrderOpened?: true;
+      /** His run moved by his message and Reveal only: no step goes without a draft. */
+      readonly scriptRun?: Pick<ComposedScriptRun, 'moved'>;
+      readonly care?: ComposedCare;
     };
 
 /** An alert of hers that went off and only lets a human know (P4-01): named, never with what the fan wrote. */

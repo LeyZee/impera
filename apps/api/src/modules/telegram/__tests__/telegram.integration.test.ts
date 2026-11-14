@@ -60,7 +60,7 @@ describe('telegram module on Postgres', () => {
     resealTokens: () => Promise<ResealReport>;
   } {
     const store = createPostgresTelegramStore({
-      adminDb: test.admin.db,
+      adminDb: test.service.db,
       keys: parseEncryptionKeys(encryptionKeys),
     });
     return {

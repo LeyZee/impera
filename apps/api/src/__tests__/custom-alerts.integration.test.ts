@@ -35,7 +35,7 @@ describe('alerts (P4-01, /v1/alerts)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config));
     server = await buildServer({
       config,
@@ -204,12 +204,17 @@ describe('alerts (P4-01, /v1/alerts)', () => {
       ['keyword', true, true],
       ['service_request', false, true],
       ['identity_doubt', false, true],
+      ['script_price', false, true],
     ]);
 
     const off = await put('service_request', false);
     expect(off.statusCode).toBe(200);
     expect(enabledFor(SystemAlertSettingSchema.parse(off.json()))).toBe(false);
-    expect([...(await app.modules.alerts.store.systemOn(basile.id))]).toEqual(['keyword', 'identity_doubt']);
+    expect([...(await app.modules.alerts.store.systemOn(basile.id))]).toEqual([
+      'keyword',
+      'identity_doubt',
+      'script_price',
+    ]);
     expect(enabledFor(SystemAlertSettingSchema.parse((await put('service_request', true)).json()))).toBe(
       true,
     );

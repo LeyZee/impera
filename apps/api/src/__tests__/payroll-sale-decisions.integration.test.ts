@@ -118,6 +118,8 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
       platformSaleId: values.sale,
       outcome: values.outcome,
       note: values.note ?? null,
+      // Since ADR 0101 an exclusion says its reason.
+      ...(values.outcome === 'exclude' && { excludeReason: 'other' }),
     });
 
   const salesOf = async (member: TeamMember, period: string) => {

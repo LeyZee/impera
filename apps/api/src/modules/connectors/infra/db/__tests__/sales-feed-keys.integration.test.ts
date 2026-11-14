@@ -27,7 +27,7 @@ describe('sales feed key store', () => {
     const v1 = newKey('v1');
     const v2 = newKey('v2');
     const both = [...v2, ...v1];
-    await createSalesFeedKeyStore(test.admin.db, v1).save('reveal', FAKE_KEY, ['sales'], new Date(), by);
+    await createSalesFeedKeyStore(test.service.db, v1).save('reveal', FAKE_KEY, ['sales'], new Date(), by);
 
     expect(await resealSalesFeedKeys(test.admin.db, both, true)).toEqual({
       total: 1,
@@ -45,7 +45,7 @@ describe('sales feed key store', () => {
       unreadable: [],
     });
 
-    const v2Only = createSalesFeedKeyStore(test.admin.db, v2);
+    const v2Only = createSalesFeedKeyStore(test.service.db, v2);
     expect(await v2Only.find('reveal')).toMatchObject({ key: FAKE_KEY, state: 'connected' });
     const [row] = await withAdmin(test.admin.db, (tx) => tx.select().from(schema.salesFeedCredentials));
     expect(row?.keyVersion).toBe('v2');
@@ -60,7 +60,7 @@ describe('sales feed key store', () => {
 
   it('leaves a key no listed encryption key opens, names its platform, and reads it as one to connect again', async () => {
     const lost = newKey('v1');
-    await createSalesFeedKeyStore(test.admin.db, lost).save('reveal', FAKE_KEY, ['sales'], new Date(), by);
+    await createSalesFeedKeyStore(test.service.db, lost).save('reveal', FAKE_KEY, ['sales'], new Date(), by);
     const stranger = newKey('v3');
 
     expect(await resealSalesFeedKeys(test.admin.db, stranger)).toEqual({
@@ -68,21 +68,21 @@ describe('sales feed key store', () => {
       rewritten: 0,
       unreadable: ['reveal'],
     });
-    expect(await createSalesFeedKeyStore(test.admin.db, stranger).find('reveal')).toMatchObject({
+    expect(await createSalesFeedKeyStore(test.service.db, stranger).find('reveal')).toMatchObject({
       key: null,
       state: 'needs_reconnect',
     });
-    expect(await createSalesFeedKeyStore(test.admin.db, lost).find('reveal')).toMatchObject({
+    expect(await createSalesFeedKeyStore(test.service.db, lost).find('reveal')).toMatchObject({
       key: FAKE_KEY,
     });
-    await createSalesFeedKeyStore(test.admin.db, lost).remove('reveal', by);
+    await createSalesFeedKeyStore(test.service.db, lost).remove('reveal', by);
   });
 
   it('re-seals a webhook’s secret the same way, and names one no listed key opens', async () => {
     const v1 = newKey('v1');
     const v2 = newKey('v2');
     const created = { platformWebhookId: 'webhook_test_01', secret: 'whsec_FAKEFAKEFAKE' };
-    await createSalesFeedWebhookStore(test.admin.db, v1).save(
+    await createSalesFeedWebhookStore(test.service.db, v1).save(
       'reveal',
       created,
       'https://impera.example.test/v1/webhooks/sales-feeds/reveal',
@@ -94,7 +94,7 @@ describe('sales feed key store', () => {
       rewritten: 1,
       unreadable: [],
     });
-    expect(await createSalesFeedWebhookStore(test.admin.db, v2).find('reveal')).toMatchObject({
+    expect(await createSalesFeedWebhookStore(test.service.db, v2).find('reveal')).toMatchObject({
       secret: created.secret,
     });
     const [row] = await withAdmin(test.admin.db, (tx) => tx.select().from(schema.salesFeedWebhooks));
@@ -107,9 +107,9 @@ describe('sales feed key store', () => {
       rewritten: 0,
       unreadable: ['reveal (webhook)'],
     });
-    expect(await createSalesFeedWebhookStore(test.admin.db, stranger).find('reveal')).toMatchObject({
+    expect(await createSalesFeedWebhookStore(test.service.db, stranger).find('reveal')).toMatchObject({
       secret: null,
     });
-    await createSalesFeedWebhookStore(test.admin.db, v2).remove('reveal', by);
+    await createSalesFeedWebhookStore(test.service.db, v2).remove('reveal', by);
   });
 });

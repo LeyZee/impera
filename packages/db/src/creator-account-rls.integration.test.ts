@@ -180,7 +180,10 @@ const CREATOR_DECISIONS: Readonly<
   media_assets: 'readsOnly',
   media_sends: 'readsOnly',
   platform_accounts: 'readsOnly',
+  // The connector's own sends (P2-03): written by the agent's connector only.
+  connector_sends: 'closed',
   drafts: 'closed',
+  script_runs: 'closed',
   conversation_events: 'closed',
   llm_calls: 'closed',
   calibration_ratings: 'closed',
@@ -198,6 +201,11 @@ const CREATOR_DECISIONS: Readonly<
   platform_sales: 'closed',
   // `sale_detected` names who sold; an event her transaction publishes still goes in.
   domain_events: 'hidden',
+  // The agency's training rows (ADR 0103): what the playground played, missed and marked in her name.
+  playground_conversations: 'closed',
+  playground_cases: 'closed',
+  playground_case_runs: 'closed',
+  desire_marks: 'closed',
 };
 
 /**

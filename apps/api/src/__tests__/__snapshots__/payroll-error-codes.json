@@ -61,6 +61,7 @@
   "pay_sale_decision_conflict": 409,
   "pay_sale_not_found": 404,
   "pay_sale_outcome_conflict": 409,
+  "pay_sale_recipient_conflict": 409,
   "pay_sale_signal_conflict": 409,
   "pay_sale_signal_not_found": 404,
   "pay_sale_signal_state_conflict": 409,
@@ -76,6 +77,7 @@
   "penalty_conflict": 409,
   "penalty_not_found": 404,
   "request_invalid": 400,
+  "role_forbidden": 403,
   "session_unauthenticated": 401,
   "team_member_not_found": 404
 }

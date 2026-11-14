@@ -23,6 +23,8 @@ const fine: Outcome = {
   handoff: false,
   offer: false,
   desireBand: 'neutral',
+  customOrder: 'none',
+  objectionReply: null,
   bubbles: ['Okidoki, pas de souci'],
   blocking: [],
 };
@@ -51,6 +53,32 @@ describe('scenario files', () => {
   });
 });
 
+describe('price-objection', () => {
+  const priceObjection = readScenario(readFileSync(`${EVALS}scenarios/price-objection.yaml`, 'utf8'));
+  const answer = (bubbles: string[]): Outcome => ({
+    ...fine,
+    brief: { intent: 'price_objection', risks: [], action: 'reply' },
+    bubbles,
+  });
+
+  it('lets her repeat his « 10 » to refuse it', () => {
+    expect(checkScenario(priceObjection, answer(['10... t’es sérieux là 😏']))).toEqual([]);
+    expect(checkScenario(priceObjection, answer(['c’est 25, pas 10 bébé']))).toEqual([]);
+    expect(checkScenario(priceObjection, answer(['c’est 25 pour toi, pas 10 😌']))).toEqual([]);
+  });
+
+  it('fails when she takes his price or speaks of a discount', () => {
+    for (const text of [
+      'ok pour 10 alors',
+      'allez je te le fais à 10 😘',
+      '10 balles si tu veux',
+      'une petite remise ?',
+    ]) {
+      expect(checkScenario(priceObjection, answer([text])), text).not.toEqual([]);
+    }
+  });
+});
+
 describe('checkScenario', () => {
   it('passes when every expectation holds', () => {
     expect(checkScenario(scenario, fine)).toEqual([]);
@@ -62,6 +90,8 @@ describe('checkScenario', () => {
       handoff: true,
       offer: true,
       desireBand: 'neutral',
+      customOrder: 'none',
+      objectionReply: null,
       bubbles: ['un', 'deux', 'trois pour 15 €'],
       blocking: ['ai_disclosure'],
     });
@@ -122,12 +152,43 @@ expect: {}
     ).toThrow();
   });
 
+  it('checks what code did with her scripts and what the brain read of his reply (ADR 0098)', () => {
+    const sale = readScenario(`
+description: L’escalier dans la même session.
+persona_version: demo
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      description: un script fictif
+      steps: [{ kind: free }, { kind: paid, price_euros: 15 }]
+  run: { script: soiree-demo, steps: [{ index: 0, outcome: sent }] }
+  history: [{ script: soiree-demo, sent: [0] }]
+inbound: encore
+expect:
+  brief: { script_reply_in: [answers_step] }
+  decision: { script_in: [send_step], script_step: { script: soiree-demo, index: 1 } }
+`);
+    const sent: Outcome = {
+      ...fine,
+      brief: { ...fine.brief!, scriptReply: 'answers_step' },
+      script: { decision: 'send_step', step: { script: 'soiree-demo', index: 1 } },
+    };
+    expect(checkScenario(sale, sent)).toEqual([]);
+    expect(checkScenario(sale, fine)).toEqual([
+      'réponse à l’étape none, attendue parmi [answers_step]',
+      'script : none, attendu parmi [send_step]',
+      'étape aucune, attendue soiree-demo n° 1',
+    ]);
+  });
+
   it('fails when the brain did not answer', () => {
     expect(
       checkScenario(scenario, {
         handoff: false,
         offer: false,
         desireBand: 'neutral',
+        customOrder: 'none',
+        objectionReply: null,
         bubbles: [],
         blocking: [],
       }),

@@ -48,6 +48,7 @@ export const OWNER: Me = {
   role: 'owner',
   team: null,
   teamScope: 'owner',
+  preferences: { sounds: true },
 };
 export const IRIS_ME: Me = {
   ...me,
@@ -56,6 +57,7 @@ export const IRIS_ME: Me = {
   role: 'operator',
   team: { role: 'manager', status: 'active' },
   teamScope: 'agency',
+  preferences: { sounds: true },
 };
 export const THEO_ME: Me = {
   ...me,
@@ -64,6 +66,7 @@ export const THEO_ME: Me = {
   role: 'operator',
   team: { role: 'chatter', status: 'active' },
   teamScope: 'self',
+  preferences: { sounds: true },
 };
 
 function member(
@@ -449,10 +452,14 @@ export function heldSaleOf(patch: Partial<HeldSale> = {}): HeldSale {
     memberId: THEO.id,
     memberLeftOn: null,
     platformChatterId: 'chatter-theo',
+    byAgent: false,
     reason: 'off_shift',
     decision: null,
     outcomes: ['count', 'exclude'],
     signal: null,
+    given: null,
+    excludeReason: null,
+    recipients: [],
     ...patch,
   });
 }

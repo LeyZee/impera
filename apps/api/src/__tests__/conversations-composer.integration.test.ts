@@ -11,6 +11,7 @@ import {
 import { eq, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { z } from 'zod';
 
 import { createJobQueue, type JobQueue } from '../jobs';
 import {
@@ -116,8 +117,8 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       .values({ id: platformAccountId, creatorId, platform: 'reveal', handle: 'composer' });
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender: {
         sendText: () => Promise.reject(new Error('not used')),
         sendMedia: () => Promise.reject(new Error('not used')),
@@ -134,6 +135,50 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
   afterAll(async () => {
     await queue.close();
     await test.close();
+  });
+
+  it('opens the care mode on a care draft, keeps it for his next message, and gives its help once (ADR 0088)', async () => {
+    const conversationId = await fanWrites('c-care', 'je veux en finir');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Je suis là', 'Et si les idées noires reviennent, appelle le 3114'],
+      softViolations: [],
+      costUsd: 0,
+      care: { signs: ['self_harm'], help: true },
+    };
+    await respond(conversationId);
+    expect((await events(conversationId)).map((e) => e.type)).toEqual([
+      'message_received',
+      'care_opened',
+      'draft_created',
+    ]);
+    const [opened] = (await events(conversationId)).filter((e) => e.type === 'care_opened');
+    expect(opened?.payload).toEqual({ conversationId, signs: ['self_harm'] });
+    const [row] = await test.admin.db
+      .select({ since: schema.conversations.careSince, help: schema.conversations.careHelpAt })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.id, conversationId));
+    expect(row?.since).toBeInstanceOf(Date);
+    expect(row?.help).toBeInstanceOf(Date);
+    // His next message: the engine is told the episode is open and its help already given; no second opening.
+    await test.admin.db.delete(schema.drafts).where(eq(schema.drafts.conversationId, conversationId));
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ state: 'idle' })
+      .where(eq(schema.conversations.id, conversationId));
+    await fanWrites('c-care', 'merci');
+    composer.next = {
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'distress',
+      detail: ['care_unanswered'],
+      costUsd: 0,
+      care: { signs: ['care_open'], help: false },
+    };
+    await respond(conversationId);
+    expect(composer.inputs.at(-1)?.care).toEqual({ since: row?.since, helpGiven: true });
+    expect((await events(conversationId)).filter((e) => e.type === 'care_opened')).toHaveLength(1);
+    composer.next = { kind: 'draft', bubbles: [], softViolations: [], costUsd: 0 };
   });
 
   it('writes the engine’s bubbles as a draft, from the history oldest first', async () => {
@@ -178,7 +223,9 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       .select()
       .from(schema.domainEvents)
       .where(eq(schema.domainEvents.type, 'handoff_requested'));
-    expect(outbox).toHaveLength(1);
+    // Its own handoff only: another test of this file hands its conversation over too.
+    const payloads: unknown[] = outbox.map((event) => event.payload);
+    expect(payloads.filter((p) => JSON.stringify(p).includes(id))).toHaveLength(1);
   });
 
   it('gives the engine every media of the fan, captioned or not, even before the media module stores it', async () => {
@@ -292,6 +339,108 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       { conversationId: id, trigger: service, notify: true },
       { conversationId: id, trigger: doubt, notify: true },
     ]);
+  });
+
+  it('journals his custom order and the objection reply, and gives them back on his next message (ADR 0090)', async () => {
+    const id = await fanWrites('c-order', 'Tu me ferais une vidéo rien que pour moi ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Oh j’adore l’idée 🙈'],
+      softViolations: [],
+      costUsd: 0,
+      customOrderOpened: true,
+      objectionReply: { objection: 'too_expensive', replyId: 'testaaaaaaaa' },
+    };
+    await respond(id);
+    expect((await events(id)).map((event) => event.type).slice(-3)).toEqual([
+      'custom_order_opened',
+      'objection_reply_used',
+      'draft_created',
+    ]);
+    expect(composer.inputs.at(-1)).not.toHaveProperty('customOrderOpen');
+
+    await fanWrites('c-order', 'Alors ?');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await respond(id);
+    expect(composer.inputs.at(-1)).toMatchObject({
+      customOrderOpen: true,
+      usedObjectionReplies: ['testaaaaaaaa'],
+    });
+  });
+
+  it('keeps his script run with the draft, journals each step and the offer, and gives it back (ADR 0098)', async () => {
+    const id = await fanWrites('c-script', 'Tu me montres ?');
+    const at = new Date('2026-11-12T21:00:00Z');
+    const step = { stepIndex: 0, kind: 'paid' as const, priceMinor: 1_500, sentAt: at, at };
+    const opened = {
+      scriptRef: 'script-demo',
+      status: 'open' as const,
+      steps: [{ ...step, outcome: 'sent' as const }],
+      ignoredMessages: 0,
+      startedAt: at,
+      endedAt: null,
+    };
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['J’ai quelque chose pour toi 😏'],
+      softViolations: [],
+      costUsd: 0,
+      scriptRun: {
+        opened: {
+          run: opened,
+          events: [{ type: 'script_started' }, { type: 'script_step_sent', stepIndex: 0 }],
+        },
+        offer: { amountMinor: 1_500, currency: 'EUR' },
+      },
+    };
+    await respond(id);
+    const written = (await events(id)).slice(-4);
+    expect(written.map((event) => event.type)).toEqual([
+      'script_started',
+      'script_step_sent',
+      'offer_made',
+      'draft_created',
+    ]);
+    expect(written[1]?.payload).toMatchObject({ stepIndex: 0 });
+    expect(written[2]?.payload).toEqual({ amountMinor: 1_500, currency: 'EUR' });
+
+    // His no, with no draft: the run ends all the same, journaled on the same run.
+    await fanWrites('c-script', 'Non merci');
+    composer.next = {
+      kind: 'held',
+      reason: 'no_reply',
+      detail: [],
+      costUsd: 0,
+      scriptRun: {
+        moved: {
+          run: {
+            ...opened,
+            status: 'refused',
+            steps: [{ ...step, outcome: 'refused' as const }],
+            endedAt: at,
+          },
+          events: [{ type: 'script_step_refused', stepIndex: 0 }, { type: 'script_ended' }],
+        },
+      },
+    };
+    await respond(id);
+    expect(composer.inputs.at(-1)?.scriptRun).toEqual(opened);
+    const ended = (await events(id)).filter((event) => event.type.startsWith('script_'));
+    expect(ended.map((event) => event.type)).toEqual([
+      'script_started',
+      'script_step_sent',
+      'script_step_refused',
+      'script_ended',
+    ]);
+    const runIds = new Set(
+      ended.map((event) => z.object({ scriptRunId: z.uuid() }).parse(event.payload).scriptRunId),
+    );
+    expect(runIds.size).toBe(1);
+
+    await fanWrites('c-script', 'Bon');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await respond(id);
+    expect(composer.inputs.at(-1)?.scriptRun).toMatchObject({ status: 'refused' });
   });
 
   it('writes nothing more to the fan while a human is awaited, whatever the fan sends', async () => {

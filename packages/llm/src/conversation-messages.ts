@@ -1,6 +1,13 @@
 import type { ModelMessage } from 'ai';
 
-import type { BrainAlert, ConversationTurn, JudgeSituation, TurnMedia } from './gateway-types';
+import type {
+  BrainAlert,
+  BrainScript,
+  ConversationTurn,
+  JudgeSituation,
+  TurnMedia,
+  VoiceScriptStep,
+} from './gateway-types';
 import type { Brief } from './schemas';
 import { wrapUntrusted } from './untrusted';
 
@@ -54,7 +61,39 @@ export function toMessages(history: readonly ConversationTurn[]): ModelMessage[]
   });
 }
 
-export function describeBrief(brief: Brief): string {
+const STEP_KIND_LABELS: Readonly<Record<VoiceScriptStep['kind'], string>> = {
+  free: 'étape offerte (sans prix)',
+  paid: 'étape payante',
+  bridge: 'pont entre deux étapes (offert, sans prix)',
+};
+
+/** A price as she would write it, from the catalogue's minor units: « 15 € », « 12,50 € ». */
+function priceLabel(price: NonNullable<VoiceScriptStep['price']>): string {
+  const whole = price.amountMinor % 100 === 0;
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: price.currency,
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(price.amountMinor / 100);
+}
+
+/** The script step code decided (ADR 0098 § 5), as the voice reads it: every value written by code or the agency. */
+function scriptStepBlock(step: VoiceScriptStep): string {
+  const lines = [
+    `Type : ${STEP_KIND_LABELS[step.kind]}.`,
+    step.price === null ? 'Prix : aucun, ne parle pas de prix.' : `Prix exact : ${priceLabel(step.price)}.`,
+    step.instruction === null ? '' : `Consigne de l’étape : ${step.instruction}`,
+    step.mediaSheet === null ? '' : `Ce que contient l’envoi : ${step.mediaSheet}`,
+  ].filter((line) => line !== '');
+  return wrapUntrusted('script_step', lines.join('\n'));
+}
+
+/**
+ * The brief the voice follows; her objection reply, when code chose one, and the script step code decided, each in its
+ * own typed block after it.
+ */
+export function describeBrief(brief: Brief, objectionReply?: string, scriptStep?: VoiceScriptStep): string {
   const lines = [
     `Intention du fan : ${brief.intent} (humeur : ${brief.sentiment}).`,
     `À dire : ${brief.replyBrief}`,
@@ -64,7 +103,13 @@ export function describeBrief(brief: Brief): string {
   ]
     .filter((line) => line !== '')
     .join('\n');
-  return wrapUntrusted('brief', lines);
+  return [
+    wrapUntrusted('brief', lines),
+    objectionReply === undefined ? '' : wrapUntrusted('objection_reply', objectionReply),
+    scriptStep === undefined ? '' : scriptStepBlock(scriptStep),
+  ]
+    .filter((block) => block !== '')
+    .join('\n');
 }
 
 export function notesBlock(fanNotes: string): string {
@@ -80,6 +125,21 @@ export function notesBlock(fanNotes: string): string {
 export function alertsBlock(alerts: readonly BrainAlert[]): string {
   if (alerts.length === 0) return 'Aucune : ne rends pas `alertsSeen`.';
   return alerts.map((alert) => `${alert.id} :\n${wrapUntrusted('creator_alert', alert.phrase)}`).join('\n');
+}
+
+/**
+ * The scripts she may open with him (ADR 0098 § 6): each id beside what it is about, in a typed block; none, the
+ * brain is told so and answers none. A step waiting for his answer is said too, for `scriptReply`.
+ */
+export function scriptsBlock(scripts: readonly BrainScript[], stepWaiting: boolean): string {
+  const waiting = stepWaiting
+    ? 'Une étape d’un script attend sa réponse : rends `scriptReply`.'
+    : 'Aucune étape n’attend sa réponse : ne rends pas `scriptReply`.';
+  if (scripts.length === 0) return `Aucun script à proposer : ne rends pas \`scriptPick\`.\n${waiting}`;
+  const listed = scripts
+    .map((script) => `${script.id} :\n${wrapUntrusted('script_description', script.description)}`)
+    .join('\n');
+  return `${listed}\n${waiting}`;
 }
 
 /**

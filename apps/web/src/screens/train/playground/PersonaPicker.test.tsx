@@ -23,6 +23,7 @@ const BASE: PlaygroundState = {
   persona: { name: 'Elena', played: null },
   presets: [],
   presetId: null,
+  desireThresholds: { open: 40, script: 70 },
   situation: {
     now: '2026-10-17T21:40:00.000Z',
     timeZone: 'Europe/Paris',
@@ -172,6 +173,8 @@ function stubClient(): PlaygroundClient {
     send: unused,
     rate: unused,
     branch: unused,
+    markDesire: unused,
+    desireMarks: unused,
     compare: unused,
     advance: unused,
     setNotes: unused,

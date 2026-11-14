@@ -103,7 +103,7 @@ describe('AgentPill', () => {
     const pill = await renderPill();
     await waitFor(() => {
       expect(pill.title).toBe(
-        'Agent : Copilote, mais rien ne tourne : Reveal est déconnecté. Voir le Dashboard.',
+        'Agent : Copilote, mais rien ne tourne : la messagerie Reveal est déconnectée. Voir le Dashboard.',
       );
     });
     expect(pill.dataset['tone']).toBe('unknown');
@@ -217,7 +217,7 @@ describe('AgentPill', () => {
     const pill = await renderPill();
     await waitFor(() => {
       expect(pill.title).toBe(
-        'Agent : Copilote, mais rien ne tourne : Reveal n’est plus lu depuis plusieurs minutes. Voir le Dashboard.',
+        'Agent : Copilote, mais rien ne tourne : la messagerie Reveal n’est plus lue depuis plusieurs minutes. Voir le Dashboard.',
       );
     });
     expect(pill.dataset['tone']).toBe('unknown');

@@ -87,6 +87,7 @@ const CAUSE_TEXT: Readonly<Record<HandoffCause, string>> = {
   custom_alert: 'Une alerte personnalisée a sonné.',
   identity_doubt: 'Le fan doute de parler vraiment à la créatrice.',
   persona_inactive: 'La créatrice n’a pas de persona active : l’agent n’écrit rien.',
+  custom_order: 'Le fan demande quelque chose fait pour lui : un humain prend la commande.',
 };
 
 /**
@@ -105,6 +106,8 @@ const SYSTEM_ALERT_TEXT: Readonly<Record<SystemAlertCode, string>> = {
   service_request:
     'Le fan demande un service (contenu sur mesure, appel, cam, vocal) : un humain peut le lui vendre.',
   identity_doubt: CAUSE_TEXT.identity_doubt,
+  script_price:
+    'Le prix d’une étape de script a changé sur la plateforme : l’étape n’est pas partie, vérifiez le catalogue.',
 };
 
 /** An alert of hers is named, as Suivi › Historique des alertes names it; the system's by their label there. */
