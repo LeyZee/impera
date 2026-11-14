@@ -422,4 +422,11 @@ describe('/v1/mcp', () => {
     );
     expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
   });
+  it('refuses the steps of a script to an access without read:script_content, even with read:media', async () => {
+    const grant = await createGrant({ capabilities: ['read:media'] });
+    const steps = RpcSchema.parse(
+      (await rpc(grant.token, callTool('script_steps_get', { dropId: newId(ContentDropIdSchema) }))).json(),
+    );
+    expect(steps.result?.structuredContent).toEqual({ refusal: 'capability_missing' });
+  });
 });
