@@ -54,6 +54,17 @@ interface TipContent {
   readonly note?: string;
 }
 
+/**
+ * `above`: over the element's top edge at the pointer's x. `around`: under or over the element at a tap. `beside`:
+ * beside the element on the side with more room, on hover too, so a tall chart's tip stays inside its card and never
+ * covers the controls over it.
+ */
+export interface TipOptions {
+  readonly above?: boolean;
+  readonly around?: boolean;
+  readonly beside?: boolean;
+}
+
 export interface FloatingTip {
   /**
    * Spread on any element that explains itself on hover or focus. `above` sets the tip over the element's top edge,
@@ -62,7 +73,7 @@ export interface FloatingTip {
    */
   readonly bind: (
     content: TipContent,
-    options?: { readonly above?: boolean; readonly around?: boolean },
+    options?: TipOptions,
   ) => {
     onPointerMove: (event: React.PointerEvent) => void;
     onPointerDown: (event: React.PointerEvent) => void;
@@ -96,14 +107,10 @@ interface PlacedTip {
  * Where a tap or the keyboard puts the tip: under the element, or beside it with `above`. A phone has no room over a
  * chart's column: there the tip covered the chart's title, under it the next card's (recette du 07/11).
  */
-function placedOn(
-  content: TipContent,
-  box: DOMRect,
-  options: { readonly above?: boolean; readonly around?: boolean } | undefined,
-): PlacedTip {
+function placedOn(content: TipContent, box: DOMRect, options: TipOptions | undefined): PlacedTip {
   const sides = { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
   if (options?.around === true) return { content, x: box.left, y: box.bottom, around: sides };
-  if (options?.above === true) {
+  if (options?.above === true || options?.beside === true) {
     return {
       content,
       x: box.left,
@@ -225,8 +232,12 @@ export function useFloatingTip(): FloatingTip {
     };
   }, [shown, hide, openTitle]);
   const bind = useCallback(
-    (content: TipContent, options?: { readonly above?: boolean; readonly around?: boolean }) => ({
+    (content: TipContent, options?: TipOptions) => ({
       onPointerMove: (event: React.PointerEvent) => {
+        if (options?.beside === true) {
+          setTip(placedOn(content, event.currentTarget.getBoundingClientRect(), options));
+          return;
+        }
         if (options?.above === true) {
           setTip({
             content,

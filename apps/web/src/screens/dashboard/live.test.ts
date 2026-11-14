@@ -229,9 +229,12 @@ describe('fromApi', () => {
         voice: { ok: false, keyMissing: false, medianWriteMs: null, outagesLast7d: 0 },
       }),
     );
+    // Its guide is one click away (ADM-18).
     expect(unlinked.agent).toMatchObject({
       tone: 'idle',
       headline: 'La messagerie Reveal n’est **pas encore reliée**',
+      action: 'Comment relier Reveal',
+      actionTo: '/aide/reveal',
     });
     expect(card('reveal', unlinked)).toMatchObject({ tone: 'idle', value: 'Pas encore reliée' });
     expect(unlinked.agent.foldSummary).toContain('Messagerie Reveal pas encore reliée');
@@ -386,6 +389,8 @@ describe('fromApi', () => {
     expect(fromApi(offline).agent).toMatchObject({
       tone: 'bad',
       headline: 'La messagerie Reveal est **déconnectée**',
+      action: 'Reconnecter Reveal',
+      actionTo: '/aide/reveal',
     });
     const mute = apiDashboard({
       voice: { ok: false, keyMissing: false, medianWriteMs: null, outagesLast7d: 3 },

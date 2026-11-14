@@ -36,6 +36,7 @@ export const LLM_CALL_STATUSES = [
   'refused',
   'timeout',
   'rate_limited',
+  'quota_exhausted',
   'auth',
   'unavailable',
   'missing_key',
@@ -77,6 +78,8 @@ export const llmCalls = pgTable(
     enumCheck('llm_calls', t.status, LLM_CALL_STATUSES),
     enumCheck('llm_calls', t.currency, CurrencySchema.options),
     index('llm_calls_creator_created_idx').on(t.creatorId, t.createdAt),
+    /** A provider's latest answer and its refusals for lack of quota since (ADR 0091 § 6), every five minutes. */
+    index('llm_calls_provider_status_created_idx').on(t.provider, t.status, t.createdAt),
     tenantPolicy(t.creatorId),
     closedToCreator(),
   ],
@@ -105,7 +108,7 @@ export const aiCreditEntries = pgTable(
     enumCheck('ai_credit_entries', t.currency, AiCreditCurrencySchema.options),
     check(
       'ai_credit_entries_amount_check',
-      sql`${t.amountMinor} between 0 and ${sql.raw(String(AI_CREDIT_MAX_MINOR))} and (${t.kind} = 'balance' or ${t.amountMinor} > 0)`,
+      sql`${t.amountMinor} between 0 and ${sql.raw(String(AI_CREDIT_MAX_MINOR))} and (${t.kind} = 'balance' or (${t.kind} = 'subscription') = (${t.amountMinor} = 0))`,
     ),
     index('ai_credit_entries_provider_at_idx').on(t.provider, t.at),
     agencyOnly(),

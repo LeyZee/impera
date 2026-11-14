@@ -20,6 +20,7 @@ const ME = {
   shiftCreatorIds: [],
   team: { role: 'chatter', status: 'active' },
   teamScope: 'self',
+  preferences: { sounds: true },
 };
 
 function preview(purpose: 'invitation' | 'reset') {

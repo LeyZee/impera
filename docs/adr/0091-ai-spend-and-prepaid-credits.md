@@ -1,6 +1,6 @@
 # 0091. La consommation IA dans le CRM : la dépense lue dans `llm_calls`, les crédits prépayés décomptés depuis la saisie des recharges
 
-Statut : accepted (choix « Saisie des recharges » de Charles sur la carte de décision du 11/11/2026, 18 h 43, et « ok conso-ia » du 11/11/2026, fil « Suivre la consommation IA en direct » : ambre sous 5 jours de crédits, rouge sous 2 jours, alerte Telegram au premier franchissement ; numéro attribué par le coordinateur)
+Statut : accepted (choix « Saisie des recharges » de Charles sur la carte de décision du 11/11/2026, 18 h 43, et « ok conso-ia » du 11/11/2026, fil « Suivre la consommation IA en direct » : ambre sous 5 jours de crédits, rouge sous 2 jours, alerte Telegram au premier franchissement ; numéro attribué par le coordinateur ; § 6 amendé par « ok 0091 abonnement » du 13/11/2026, 2 h 03, et « ok 0091 chiffres » du 13/11/2026, 2 h 56)
 Date : 2026-11-11
 Précise : l'ADR 0016 (clés des fournisseurs saisies dans le CRM, jamais dans le dépôt ni le chat) et le plafond du jour de `packages/llm` (20 € par jour, heure de Paris). Ne remplace rien.
 
@@ -29,8 +29,16 @@ On ne peut donc pas lire le solde avec les clés que le CRM a déjà.
 
 5. **Aucun appel aux consoles des fournisseurs.** La clé de gestion de xAI n'est pas reliée : elle pourrait recharger la carte. Si Charles la veut un jour pour lire le solde exact, ce sera une nouvelle décision, avec la recharge interdite dans le code.
 
+6. **Fournisseur payé par l'abonnement (amendement « ok 0091 abonnement » de Charles, 13/11/2026, 2 h 03).** Charles a constaté sur sa page Usage de xAI que les appels de Grok passent sur l'usage inclus dans son abonnement (quota hebdomadaire), sans crédit prépayé : l'usage inclus est consommé avant les crédits, et sans crédit xAI refuse les appels une fois le quota épuisé. Pour un tel fournisseur :
+   - le propriétaire note « Payé par l'abonnement » (une ligne `subscription` du registre, sans montant) ; la carte dit « Inclus dans l'abonnement », sans solde ni jours restants, avec la valeur consommée depuis à titre indicatif et l'endroit de la console où lire le quota. Une recharge ou un solde noté plus tard reprend le décompte des crédits à partir de cette ligne ;
+   - un appel refusé faute de crédits ou de quota (402, ou 403 et 429 dont la réponse le dit) est journalisé `quota_exhausted` : ni réessayé, ni pris pour une clé refusée (la clé n'est pas marquée « à reconnecter »), et la réponse du fournisseur n'est jamais gardée (elle nomme l'équipe). L'agent continue avec son modèle de repli ;
+   - la vérification passe toutes les cinq minutes et publie `ai_quota_exhausted` au premier refus depuis la dernière réponse du fournisseur, une fois par épisode, crédits ou abonnement ; Telegram l'envoie en « urgent ». La carte passe au rouge « Quota épuisé » jusqu'à la prochaine réponse ;
+   - aucune API ne donne le pourcentage du quota : le CRM ne l'invente pas, il prévient au premier refus ;
+   - les chiffres gardent ce fournisseur (« ok 0091 chiffres » de Charles, 13/11/2026, 2 h 56) : « Aujourd'hui », « Ce mois-ci » et « Prévu fin du mois » le comptent, avec en dessous « dont X € couverts par l'abonnement » ; le graphique hachure, dans la couleur du service, la part couverte. Une dépense est couverte quand elle tombe entre une ligne `subscription` du fournisseur et sa recharge ou son solde suivant, à l'heure près (le grain du journal). La projection compte comme couvert, pour les jours restants, le rythme propre de chaque fournisseur encore sur l'abonnement. Le plafond du jour compte tout, abonnement compris : il protège aussi contre un emballement.
+
 ## Conséquences
 
 - Le décompte s'écarte du vrai solde si un appel est fait hors du CRM (console, autre outil) : l'écran invite à noter le solde lu de temps en temps, ce qui recale tout.
 - Les devises restent celles du fournisseur (dollars chez xAI) ; la conversion avec l'euro suit le taux du plafond du jour.
 - Nouvelle table en `FORCE ROW LEVEL SECURITY`, nouveau type d'événement `ai_credits_low`, nouveau job horaire `ai_usage.check_credits`, trois routes sous `/v1/settings/ai-usage`.
+- Amendement § 6 : migration 0204 (`subscription` dans le registre, statut `quota_exhausted` du journal indexé par fournisseur, événement `ai_quota_exhausted` dans les contrôles de type et le déclencheur Telegram) ; la vérification passe de l'heure aux cinq minutes.

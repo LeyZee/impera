@@ -30,6 +30,7 @@ import {
   saleKeyOf,
   salesLeftHeld,
   salesToDecide,
+  salesToGive,
   saleToDecide,
   salesWaitingBefore,
   type AccountSourceForPay,
@@ -935,5 +936,44 @@ describe('a sale given to the member who was decisive, whole or shared (ADR 0101
     expect(one?.decision).toEqual(gives(lea, 7_000));
     expect(one?.recipients).toEqual([lea.id]);
     expect(saleToDecide(sales, place, night)?.outcomes).toEqual(['count', 'exclude', 'give', 'withdraw']);
+  });
+
+  it('finds the sales of a day a give may name a member on, a member’s or the agent’s, by their instant', () => {
+    const late = shift(sam, '2025-03-17T18:00:00.000Z', '2025-03-17T23:00:00.000Z');
+    const agent: SaleAuthorForPay = { kind: 'agent', linkVersion: 'v1' };
+    const byAgent = sale(agent, '2025-03-17T21:00:00.000Z', 900);
+    const byLea = sale(linked(lea), '2025-03-17T19:00:00.000Z', 700);
+    const alone = sale(linked(theo), '2025-03-17T12:00:00.000Z', 500);
+    const nextDay = sale(linked(lea), '2025-03-17T23:10:00.000Z', 300);
+    const unlinked = sale({ kind: 'unlinked' }, '2025-03-17T20:30:00.000Z', 400);
+    const sales = {
+      ...base,
+      shifts: [morning, evening, late],
+      lines: [byAgent, night, alone, byLea, nextDay, unlinked, refundOf(byLea, P2, 700)],
+    };
+    const found = (day: string, zone = 'UTC') =>
+      salesToGive(sales, place, day, zone).map((one) => [
+        one.line.platformSaleId,
+        one.outcomes,
+        one.recipients,
+      ]);
+    // Théo's morning had nobody else, a chatter not linked is no one's: neither is found; nor is a refund.
+    expect(found('2025-03-17')).toEqual([
+      [byLea.platformSaleId, ['exclude', 'give'], [sam.id]],
+      [night.platformSaleId, ['count', 'exclude', 'give'], [lea.id, sam.id].sort()],
+      [byAgent.platformSaleId, ['give'], [lea.id, sam.id].sort()],
+      [nextDay.platformSaleId, ['exclude', 'give'], [sam.id]],
+    ]);
+    // The day is the agency's: ten past eleven in UTC is the next day in Paris.
+    expect(found('2025-03-18', 'Europe/Paris').map(([id]) => id)).toEqual([nextDay.platformSaleId]);
+    expect(found('2025-03-16')).toEqual([]);
+    // A sale given already shows with its decision; a closed period or a registered line gives none.
+    const given = { ...sales, decisions: decided(byAgent, gives(sam)) };
+    expect(
+      salesToGive(given, place, '2025-03-17', 'UTC').find((one) => one.line === byAgent)?.decision,
+    ).toEqual(gives(sam));
+    expect(salesToGive(sales, { ...place, closed: true }, '2025-03-17', 'UTC')).toEqual([]);
+    const registered = { ...sales, registered: new Map([[saleKeyOf(byLea), []]]) };
+    expect(salesToGive(registered, place, '2025-03-17', 'UTC').map((one) => one.line)).not.toContain(byLea);
   });
 });

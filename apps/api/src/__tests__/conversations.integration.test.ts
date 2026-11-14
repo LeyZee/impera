@@ -583,6 +583,7 @@ describe('conversations module (P0-05)', () => {
       'desireScore',
       'desireBand',
       'desireAt',
+      'fanAvailability',
       'careSince',
       'careHelpAt',
       'careClosedAt',

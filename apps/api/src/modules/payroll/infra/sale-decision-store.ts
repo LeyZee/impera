@@ -1,4 +1,5 @@
 import {
+  calendarDayAt,
   HeldSalesSchema,
   nextPayPeriod,
   payPeriodLastDay,
@@ -7,8 +8,11 @@ import {
   PlatformSchema,
   SALE_WHOLE_BP,
   SaleEventSchema,
+  SaleGiftCountsSchema,
   SaleSignalKindSchema,
+  SalesToGiveSchema,
   TeamMemberIdSchema,
+  UserIdSchema,
   type HeldSales,
   type PayPeriod,
   type PaySaleDecision,
@@ -42,6 +46,7 @@ import type { MemberForPay } from '../domain/recalculation';
 import {
   saleKeyOf,
   salesToDecide,
+  salesToGive,
   saleToDecide,
   type PeriodPlace,
   type SaleSignalForPay,
@@ -97,6 +102,7 @@ const heldSaleOf = (
   memberId: one.line.author.kind === 'member' ? one.line.author.memberId : null,
   memberLeftOn: one.line.author.kind === 'member' ? (leftOn.get(one.line.author.memberId) ?? null) : null,
   platformChatterId: one.line.platformChatterId,
+  byAgent: one.line.author.kind === 'agent',
   reason: one.reason,
   decision: one.decision?.outcome ?? null,
   given:
@@ -169,6 +175,7 @@ async function signalsIn(tx: Transaction, period: PayPeriod): Promise<SaleSignal
 interface PeriodSalesRead extends PeriodSales {
   readonly place: PeriodPlace;
   readonly creatorIds: readonly string[];
+  readonly timeZone: string;
 }
 
 /**
@@ -187,17 +194,19 @@ async function periodSalesOf(
     .where(eq(payPeriodClosings.period, period));
   const closed = closing !== undefined;
   const creatorIds = await reads.creatorIds();
+  const timeZone = await reads.agencyTimeZone(tx);
   const read = await readPeriodSales(
     tx,
     reads.sales,
     period,
     { closed, lastClosed: last },
     { kind: 'member', creatorIds },
-    await reads.agencyTimeZone(tx),
+    timeZone,
   );
   return {
     ...read,
     creatorIds,
+    timeZone,
     place: { period, closed, firstOpen: last === null ? period : nextPayPeriod(last) },
   };
 }
@@ -248,6 +257,27 @@ export async function ownMemberOf(tx: Transaction, userId: string): Promise<Team
 }
 
 /**
+ * What the validator reads to decide on `period`'s sales: the sales and where the period stands, the signals in force,
+ * the day each member left, who a give may not name (`barredOf`) and the reader's own member.
+ */
+async function decidingOf(tx: Transaction, reads: PayInputReads, period: PayPeriod, userId: string) {
+  const read = await periodSalesOf(tx, reads, period);
+  const signals: SaleSignals = read.place.closed ? new Map() : await signalsIn(tx, period);
+  const members = await reads.members(tx, payPeriodLastDay(period));
+  const leftOn = new Map(members.map((member) => [member.id, member.leftOn]));
+  const own = await ownMemberOf(tx, userId);
+  const barred = await barredOf(tx, reads, period, own);
+  return { ...read, signals, leftOn, own, barred };
+}
+
+const GiftRowSchema = z.object({
+  outcome: z.string(),
+  shareBp: z.number().int().nullable(),
+  decidedBy: UserIdSchema,
+  createdAt: z.date(),
+});
+
+/**
  * The sales an open period holds or a decision settles, and the validator's decisions (CRM-03 lot b3, ADR 0050 § 5),
  * as the member who reads or decides (`withMember`): the policies keep the four eyes and the decisions added only, the
  * triggers a sale of the register never decided once a closing counted it, and a `withdraw` only after a decision.
@@ -257,14 +287,65 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
     heldSales: (userId, period) =>
       withMember(db, userId, async (tx, scope) => {
         if (scope === 'self') throw new PayrollForbidden();
-        const { sales, place } = await periodSalesOf(tx, reads, period);
-        const signals = place.closed ? new Map() : await signalsIn(tx, period);
-        const members = await reads.members(tx, payPeriodLastDay(period));
-        const leftOn = new Map(members.map((member) => [member.id, member.leftOn]));
-        const barred = await barredOf(tx, reads, period, await ownMemberOf(tx, userId));
+        const { sales, place, signals, leftOn, barred } = await decidingOf(tx, reads, period, userId);
         return HeldSalesSchema.parse({
           period,
           sales: salesToDecide(sales, place, signals).map((one) => heldSaleOf(one, leftOn, barred)),
+        });
+      }),
+
+    // The reader's own sales and those no one they may name was on shift for are left out: they give none of them.
+    salesToGive: (userId, period, day) =>
+      withMember(db, userId, async (tx, scope) => {
+        if (scope === 'self') throw new PayrollForbidden();
+        const deciding = await decidingOf(tx, reads, period, userId);
+        const { sales, place, timeZone, signals, leftOn, barred, own } = deciding;
+        return SalesToGiveSchema.parse({
+          period,
+          day,
+          sales: salesToGive(sales, place, day, timeZone, signals)
+            .map((one) => heldSaleOf(one, leftOn, barred))
+            .filter((one) => one.recipients.length > 0 && (own === null || one.memberId !== own)),
+        });
+      }),
+
+    // The latest decision of each sale written since the month began, kept when it is a give written that month.
+    saleGifts: (userId, period) =>
+      withMember(db, userId, async (tx, scope) => {
+        if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
+        const timeZone = await reads.agencyTimeZone(tx);
+        const month = period.slice(0, 7);
+        const monthStart = `${month}-01`;
+        const rows = await tx
+          .selectDistinctOn([paySaleDecisions.platform, paySaleDecisions.platformSaleId], {
+            outcome: paySaleDecisions.outcome,
+            shareBp: paySaleDecisions.shareBp,
+            decidedBy: paySaleDecisions.decidedBy,
+            createdAt: paySaleDecisions.createdAt,
+          })
+          .from(paySaleDecisions)
+          .where(sql`${paySaleDecisions.createdAt} >= (${monthStart}::timestamp at time zone ${timeZone})`)
+          .orderBy(
+            paySaleDecisions.platform,
+            paySaleDecisions.platformSaleId,
+            sql`${paySaleDecisions.revision} desc`,
+          );
+        const counts = new Map<string, { given: number; shared: number }>();
+        for (const row of rows) {
+          const one = GiftRowSchema.parse(row);
+          if (one.outcome !== 'give' || calendarDayAt(one.createdAt, timeZone).slice(0, 7) !== month)
+            continue;
+          const count = counts.get(one.decidedBy) ?? { given: 0, shared: 0 };
+          count.given += 1;
+          if (one.shareBp !== null && one.shareBp < SALE_WHOLE_BP) count.shared += 1;
+          counts.set(one.decidedBy, count);
+        }
+        return SaleGiftCountsSchema.parse({
+          period,
+          monthStart,
+          counts: [...counts.entries()]
+            .map(([decidedBy, count]) => ({ decidedBy, ...count }))
+            .sort((a, b) => b.given - a.given || a.decidedBy.localeCompare(b.decidedBy)),
         });
       }),
 

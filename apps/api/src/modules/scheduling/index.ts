@@ -70,6 +70,8 @@ export { salesCheckReads } from './infra/sales-check-reads';
  * session of every route (`auth.ts`) asks it, so it needs nothing but the app connection.
  */
 export { createShiftAccessReader, type ShiftCreators } from './infra/access-window';
+/** What the game reads of the planning, plugged into it by the composition root (ADR 0104 § 13): read only. */
+export { shiftsForGameUnscoped } from './infra/game-reads';
 /** @public An account the automatic sales check compares: its platform and its rules' currency. */
 export type { DetectedAccountForCheck } from './domain/sales-checks';
 /** @public What pay's estimate of a report reads of its shift (reco 19). */
