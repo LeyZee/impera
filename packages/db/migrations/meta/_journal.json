@@ -974,6 +974,13 @@
       "when": 1794610377190,
       "tag": "0188_care_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 139,
+      "version": "7",
+      "when": 1794615366543,
+      "tag": "0189_connector_sends",
+      "breakpoints": true
     }
   ]
 }

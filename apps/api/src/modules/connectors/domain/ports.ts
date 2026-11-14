@@ -25,8 +25,46 @@ export interface ConnectorAccount extends BreakerState {
   readonly config: ConnectorConfig;
 }
 
+/**
+ * One attempt to send, as `connector_sends` keeps it (reveal-connector-spec.md § 5): recorded before the platform is
+ * called, given the platform's message id once known. Never the text: only its fingerprint.
+ */
+export interface ConnectorSend {
+  readonly idempotencyKey: string;
+  readonly platformConversationId: string;
+  /** SHA-256 (hex) of the text, the script step and the media sent. */
+  readonly fingerprint: string;
+  /** The platform's step, for a script step: what the fingerprint was computed with. */
+  readonly scriptRef: string | null;
+  /** When the first attempt started, by our clock. */
+  readonly startedAt: Date;
+  /** `null` while the outcome is unknown (`pending`). */
+  readonly platformMessageId: string | null;
+  readonly sentAt: Date | null;
+}
+
+/** `connector_sends` of one account, under its creator's RLS. */
+export interface SendJournal {
+  find(idempotencyKey: string): Promise<ConnectorSend | null>;
+  /** Records the attempt before the call; an existing row of this key is left as it is and returned. */
+  begin(send: Omit<ConnectorSend, 'platformMessageId' | 'sentAt'>): Promise<ConnectorSend>;
+  /** The platform took it: its message id, once. */
+  settle(idempotencyKey: string, platformMessageId: string, sentAt: Date): Promise<void>;
+  /** Which of these platform message ids are sends of ours, in this conversation. */
+  ownIds(platformConversationId: string, platformMessageIds: readonly string[]): Promise<ReadonlySet<string>>;
+}
+
+/** What the module gives an adapter besides its session: its account's send journal. */
+interface ConnectorContext {
+  readonly sends: SendJournal;
+}
+
 /** Builds the connector of one account from its decrypted session (`null` when none was captured). */
-type ConnectorFactory = (account: ConnectorAccount, session: string | null) => PlatformConnector;
+type ConnectorFactory = (
+  account: ConnectorAccount,
+  session: string | null,
+  context: ConnectorContext,
+) => PlatformConnector;
 
 /** One factory per platform that has an adapter; an account whose platform has none is never polled. */
 export type ConnectorRegistry = Partial<Record<Platform, ConnectorFactory>>;

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createFakeReveal, type FakeReveal } from '../../../../../__tests__/fake-reveal/server';
 import { ConnectorError } from '../../../domain/platform-connector';
+import { MemorySendJournal } from '../../__tests__/memory-send-journal';
 import type { RevealCallLog, RevealFetch } from '../client';
 import { RevealApiConnector, revealApiConnectors } from '../connector';
 import type { RevealSession } from '../session';
@@ -22,8 +23,8 @@ afterEach(async () => {
   fakes = [];
 });
 
-function world(fixture: 'default' | 'quiet' = 'default'): FakeReveal {
-  const fake = createFakeReveal({ fixture });
+function world(): FakeReveal {
+  const fake = createFakeReveal();
   fakes.push(fake);
   return fake;
 }
@@ -209,7 +210,7 @@ describe('RevealApiConnector: the client (spec § 3)', () => {
       pausedUntil: null,
     };
     for (const session of [null, '{"v":2}']) {
-      const connector = factory(account, session);
+      const connector = factory(account, session, { sends: new MemorySendJournal() });
       expect(await connector.health()).toBe('none');
       expect((await rejection(connector.listConversations({}))).code).toBe('session_expired');
     }
@@ -329,12 +330,5 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       ['ppv', 500],
     ]);
     expect(await connector.listTransactions({ since: new Date(all[1]?.createdAt ?? 0) })).toHaveLength(1);
-  });
-
-  it('refuses every write until P2-03', async () => {
-    const connector = connect(world('quiet'));
-    expect((await rejection(connector.sendText())).code).toBe('fatal');
-    expect((await rejection(connector.sendMedia())).code).toBe('fatal');
-    expect((await rejection(connector.verifySent())).code).toBe('fatal');
   });
 });

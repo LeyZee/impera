@@ -33,7 +33,7 @@ Les réponses découpées sont dans `apps/api/src/__tests__/fake-reveal/recordin
 
 **Vocal (E7)** : le bouton micro envoie un fichier importé `files: [{ type: "audio", key }]` hors bundle. Un audio rangé dans le coffre puis envoyé s'affiche chez le fan comme un vrai vocal avec lecteur (Charles, 10/11).
 
-**Capacités déclarées** (`ConnectorCapabilities`, constante `REVEAL_EXPECTED_CAPABILITIES` de FakeReveal) : `unreadWithoutOpen`, `sendMedia`, `transactions`, `markRead`, `typing` et les lectures de l'ADR 0018 (`fanProfile`, `fanNoteRead`, `creatorNotes`, `ppvStats`, `scripts`, `scriptHistory`, `vault`) à `true` ; `realtime` à `false`. `RevealApiConnector` (P2-02) déclare les lectures ; `sendMedia`, `markRead` et `typing` restent à `false` jusqu'à P2-03.
+**Capacités déclarées** (`ConnectorCapabilities`, constante `REVEAL_EXPECTED_CAPABILITIES` de FakeReveal) : `unreadWithoutOpen`, `sendMedia`, `transactions`, `markRead`, `typing`, `fanNoteWrite` et les lectures de l'ADR 0018 (`fanProfile`, `fanNoteRead`, `creatorNotes`, `ppvStats`, `scripts`, `scriptHistory`, `vault`) à `true` ; `realtime` à `false`. `RevealApiConnector` déclare les lectures (P2-02) et, depuis P2-03, les écritures (`sendMedia` limité au vocal du coffre, `markRead`, `typing`, `fanNoteWrite`, l'envoi d'étape sous `scripts`).
 
 ## En-têtes
 
