@@ -3,6 +3,8 @@ import { createHmac } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z, ZodError } from 'zod';
 
+import type { RevealFetch } from '../../modules/connectors';
+
 import { FIXTURES, type FixtureName } from './fixtures';
 import {
   ENDPOINTS,
@@ -583,6 +585,8 @@ export interface FakeReveal {
   /** The model and the team member of the session, as the connector would know them. */
   readonly modelId: string;
   readonly userId: string;
+  /** `fetch` for the connector, served by `app.inject` (no port opened); any host reaches FakeReveal. */
+  readonly fetch: RevealFetch;
 }
 
 export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeReveal {
@@ -1148,7 +1152,7 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
 
   app.post('/__reset', (request) => {
     const { fixture } = z
-      .object({ fixture: z.enum(['default', 'empty']).default('default') })
+      .object({ fixture: z.enum(['default', 'empty', 'quiet']).default('default') })
       .parse(request.body ?? {});
     world = new FakeRevealWorld(FIXTURES[fixture]());
     return { ok: true };
@@ -1168,8 +1172,28 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     return { now: world.now() };
   });
 
+  const fetch: RevealFetch = async (url, init) => {
+    const target = new URL(url);
+    const response = await app.inject({
+      method: init.method,
+      url: `${target.pathname}${target.search}`,
+      headers: init.headers,
+    });
+    return {
+      status: response.statusCode,
+      headers: {
+        get: (name) => {
+          const value = response.headers[name.toLowerCase()];
+          return value === undefined ? null : String(value);
+        },
+      },
+      text: () => Promise.resolve(response.body),
+    };
+  };
+
   return {
     app,
+    fetch,
     state: () => world.state,
     get authorization() {
       return `Bearer ${world.state.sessionToken}`;

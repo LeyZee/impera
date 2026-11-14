@@ -13,6 +13,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Personne | `person` | (Plus tard) un même humain reconnu sur plusieurs plateformes. `fans.person_id` nullable. |
 | Conversation | `conversation` | Le fil 1:1 entre un fan et un compte plateforme. |
 | Message | `message` | Un message reçu ou envoyé. `direction: inbound | outbound`, `author: fan | human | ai`. |
+| Message rattrapé | `catchUp` (`IngestMessage`), `CATCH_UP_AFTER_HOURS` | Un message de fan lu au premier relevé d'un compte, ou lu plus de 6 h après son envoi (PC éteint, panne) : il est gardé et compté, mais ni la lecture de la fiche ni une réponse ne partent pour lui. Le prochain message frais du fan relance les deux (P2-02). |
 | Journal d'événements | `conversation_events` | Historique append-only de tout ce qui arrive à une conversation. Source de vérité. |
 | Brouillon, proposition | `draft` | Une réponse proposée par l'IA, en attente d'approbation ou auto-approuvée. |
 | Brouillon placé | `drafts.placed_at`, verdict `placed` | Un brouillon que le chatteur a mis dans le champ de saisie de la plateforme depuis le panneau copilote (`a`, ou `e` après retouche) : il l'envoie lui-même, le brouillon reste en attente, et c'est le message parti qui le juge validé ou corrigé (ADR 0086 § 4 et 5). Jamais « Envoyé » au clic. |
@@ -159,6 +160,10 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Post marqué | `markedFor`, `watch/mark` | Un post qu'une personne désigne pendant sa veille « pour » une créatrice (popup, menu contextuel ou Alt+Maj+M) : son relevé porte la créatrice, et, marqué depuis la popup ou le raccourci, jusqu'à quatre captures de l'onglet partent à la vision sans être gardées (VEI-02). |
 | Liaison de l'extension | `extension_link` | Le jeton haché et révocable qui relie l'extension d'un navigateur d'une personne au serveur, créé depuis le CRM (« Relier l'extension ») et nommé par son libellé (Chrome, Edge), trois au plus par personne ; il dit qui a regardé (VEI-01). |
 | Script natif | `platform_script` | Un script de vente stocké sur la plateforme (Reveal), que l'agent lit et déroule. À ne pas confondre avec `script`, notre structure interne. |
+| Étape déjà envoyée | `SentScriptStep`, `getScriptHistory` | Une étape d'un script natif que la plateforme dit déjà envoyée à ce fan, achetée ou non. La plateforme est la seule source : une étape déjà envoyée ne repart jamais (ADR 0018 § 5). |
+| Moment d'un script natif | `PlatformScript.moment` | Jour (☀️) ou Nuit (🌙), lu dans le nom du script sur la plateforme, à défaut dans les dossiers du coffre des médias qu'il vend ; aucun quand rien ne le dit ou que les indices se contredisent. Distinct du moment de tournage. |
+| Profil du fan (plateforme) | `FanProfile`, `getFanProfile` | Ce que la plateforme montre d'un fan à côté de la conversation : inscription, abonnement, total dépensé, dernier paiement, carte vérifiée (ADR 0018). Distinct de la fiche du fan. |
+| Statistiques PPV | `FanPpvStats`, `getFanPpvStats` | L'onglet PPV d'un fan sur la plateforme : bundles achetés sur bundles payants proposés, prix le plus haut et le plus bas, date de la dernière offre payante (`lastOfferAt`), et chaque bundle envoyé (ADR 0018). |
 | Note client | `fan_note` | La note libre qu'une plateforme attache à un fan, lue et écrite par les chatteurs et l'agent. Distincte de `fan_fact`. |
 | Notes du modèle | `creator_note` | Les notes que Reveal affiche à côté de chaque conversation sur la créatrice : sa fiche persona vue par la plateforme. |
 | Bundle (PPV) | `bundle` | Le PPV de Reveal : médias floutés vendus (au moins un), prix TTC, tarif réduit optionnel, aperçu gratuit de 10 médias au plus. |

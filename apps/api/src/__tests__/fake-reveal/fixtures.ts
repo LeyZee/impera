@@ -228,5 +228,18 @@ export function emptyFixture(): FakeFixture {
   };
 }
 
-export const FIXTURES = { default: defaultFixture, empty: emptyFixture } as const;
+/** Two fans, each with his conversation, and nothing said yet: the connector's contract writes the rest. */
+export function quietFixture(): FakeFixture {
+  const base = defaultFixture();
+  return {
+    ...base,
+    fans: base.fans.slice(0, 2),
+    conversations: base.conversations.slice(0, 2).map((conversation) => ({ ...conversation, note: null })),
+    messages: [],
+    transactions: [],
+    notifications: [],
+  };
+}
+
+export const FIXTURES = { default: defaultFixture, empty: emptyFixture, quiet: quietFixture } as const;
 export type FixtureName = keyof typeof FIXTURES;

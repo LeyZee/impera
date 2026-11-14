@@ -160,19 +160,47 @@ describe('connectors module (P0-06)', () => {
     await test.close();
   });
 
-  it('ingests 3 fan messages into 3 messages and 1 debounced respond job; a second poll adds nothing', async () => {
+  it('ingests 3 fan messages caught up on the first poll without an answer; a fresh one gets 1 debounced respond job', async () => {
     const id = await account('poll', 'valid');
     for (const text of ['Salut', 'Ça va ?', 'Tu fais quoi ce soir']) {
       fake(id).enqueueInbound({ conversationId: 'c-1', fanId: 'f-1', fanDisplayName: 'Julien', text });
     }
+    // The first poll catches the last day up: stored, nothing answered from it (P2-02).
     await poll(id);
     expect(await count('messages', sql`platform_account_id = ${id}`)).toBe(3);
-    expect(await jobs('conversation.respond')).toHaveLength(1);
+    expect(await jobs('conversation.respond')).toHaveLength(0);
     expect((await accountRow(id)).lastPollAt).not.toBeNull();
 
     await poll(id);
     expect(await count('messages', sql`platform_account_id = ${id}`)).toBe(3);
+    expect(await jobs('conversation.respond')).toHaveLength(0);
+
+    // A fresh message of his: one debounced answer.
+    fake(id).enqueueInbound({
+      conversationId: 'c-1',
+      fanId: 'f-1',
+      fanDisplayName: 'Julien',
+      text: 'Alors ?',
+    });
+    await poll(id);
+    expect(await count('messages', sql`platform_account_id = ${id}`)).toBe(4);
     expect(await jobs('conversation.respond')).toHaveLength(1);
+  });
+
+  it('treats a caught-up message the safety net answers as fresh: it is never left unread', async () => {
+    const id = await account('poll-safety', 'valid');
+    fake(id).enqueueInbound({ conversationId: 'c-9', fanId: 'f-9', fanDisplayName: 'Paul', text: 'Salut' });
+    fake(id).enqueueInbound({
+      conversationId: 'c-9',
+      fanId: 'f-9',
+      fanDisplayName: 'Paul',
+      text: 'j’ai plus envie de vivre',
+    });
+    const before = (await jobs('conversation.respond')).length;
+    // The first poll catches them up: the plain one waits, the one with a sign gets its answer.
+    await poll(id);
+    expect(await count('messages', sql`platform_account_id = ${id}`)).toBe(2);
+    expect(await jobs('conversation.respond')).toHaveLength(before + 1);
   });
 
   it('sends an approved draft through the connector: a 429 is retried, the fan gets each bubble once', async () => {
@@ -313,20 +341,31 @@ describe('connectors module (P0-06)', () => {
   });
 
   /** A Reveal session of the shape the extension sends (reveal-connector-spec.md § 2), all invented. */
-  const revealSession = (bearer: string, modelId = 'model-test-a'): string =>
+  const revealSession = (bearer: string, modelId = 'model-test-a', userId = 'user-bot-test'): string =>
     JSON.stringify({
       v: 1,
       bearer,
-      userId: 'user-bot-test',
+      userId,
       modelId,
       userAgent: 'Mozilla/5.0 (test)',
       capturedAt: '2026-11-11T10:00:00.000Z',
     });
 
+  // Each account syncs from its own address: the route's limit (10 a minute per address) is per test, not per file.
+  const addresses = new Map<string, string>();
+  const addressOf = (platformAccountId: string): string => {
+    const known = addresses.get(platformAccountId);
+    if (known !== undefined) return known;
+    const address = `10.0.0.${String(addresses.size + 1)}`;
+    addresses.set(platformAccountId, address);
+    return address;
+  };
+
   const sync = (platformAccountId: PlatformAccountId, session: string, link: string | null = ownerLink) =>
     server.inject({
       method: 'POST',
       url: '/v1/connector/sessions',
+      remoteAddress: addressOf(platformAccountId),
       headers: {
         origin: 'chrome-extension://abcdef',
         ...(link === null ? {} : { 'x-extension-link': link }),
@@ -395,7 +434,7 @@ describe('connectors module (P0-06)', () => {
     expect(logged).not.toContain(ownerLink);
   });
 
-  it('refuses a session of another creator than the one the account already holds', async () => {
+  it('refuses a session of another creator, or of another member, than the one the account already holds', async () => {
     const id = await account('other-model', 'none');
     expect((await sync(id, revealSession('reveal-bearer-first-aaaa', 'model-test-a'))).statusCode).toBe(204);
     const other = await sync(id, revealSession('reveal-bearer-second-bbb', 'model-test-b'));
@@ -405,6 +444,32 @@ describe('connectors module (P0-06)', () => {
     ]);
     // The same creator, a new token: a re-sync, taken.
     expect((await sync(id, revealSession('reveal-bearer-third-cccc', 'model-test-a'))).statusCode).toBe(204);
+    // The « bot » member is pinned at the first sync (P2-02): the owner's or a chatter's session is refused.
+    const member = await sync(
+      id,
+      revealSession('reveal-bearer-owner-dddd', 'model-test-a', 'user-owner-test'),
+    );
+    expect([member.statusCode, member.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'connector_session_member_conflict',
+    ]);
+  });
+
+  it('refuses at the first sync a session of another model than the one the sales register links', async () => {
+    const id = await account('register-linked', 'none');
+    await test.admin.db
+      .insert(schema.salesFeedModels)
+      .values({ platform: 'reveal', platformModelId: 'model-test-linked', platformAccountId: id, creatorId });
+    // Nothing is stored yet to compare with: the register's link answers.
+    const other = await sync(id, revealSession('reveal-bearer-wrong-eeee', 'model-test-elsewhere'));
+    expect([other.statusCode, other.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'connector_session_conflict',
+    ]);
+    expect((await accountRow(id)).sessionCiphertext).toBeNull();
+    expect((await sync(id, revealSession('reveal-bearer-right-ffff', 'model-test-linked'))).statusCode).toBe(
+      204,
+    );
   });
 
   it("lists the accounts to sync for the owner's link only, never a session", async () => {

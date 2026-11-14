@@ -22,6 +22,7 @@ import {
   type Verdict,
 } from '@impera/contracts';
 
+import { safetySigns } from '../../agent';
 import {
   AutomaticLocked,
   CreatorNotFound,
@@ -79,6 +80,11 @@ interface IngestMessage {
   readonly platformFanId: string;
   readonly fanDisplayName: string;
   readonly message: ExternalMessage;
+  /**
+   * Caught up rather than just received (the account's first poll, or an old message read late, P2-02): stored and
+   * counted, but neither his card read nor an answer is queued for it. His next fresh message starts both.
+   */
+  readonly catchUp?: boolean;
   readonly correlationId: string;
 }
 
@@ -261,26 +267,30 @@ export function createConversationCommands({
           },
           meta,
         );
+        // Caught up (P2-02): stored and counted, but nothing reads or answers it on its own, unless his words carry a
+        // sign the safety net answers (a minor, self-harm): that one is treated as fresh, so it is never left unread.
+        const isFresh = input.catchUp !== true || (isInbound && safetySigns(message.text).length > 0);
         if (isInbound) {
           // His card is read whoever answers him (ADR 0085 § 7): each message of his puts the next read off.
           const pace = await tx.cardReads.pace(conversation.id);
-          await tx.jobs.enqueue(
-            'fans.read_card',
-            {
-              creatorId: input.creatorId,
-              conversationId: conversation.id,
-              correlationId: input.correlationId,
-            },
-            {
-              jobKey: jobKeyFor('fans.read_card', conversation.id),
-              runAt: cardReadRunAt({ now: at, unread: pace.unread, lastReadAt: pace.lastReadAt }),
-            },
-          );
+          if (isFresh)
+            await tx.jobs.enqueue(
+              'fans.read_card',
+              {
+                creatorId: input.creatorId,
+                conversationId: conversation.id,
+                correlationId: input.correlationId,
+              },
+              {
+                jobKey: jobKeyFor('fans.read_card', conversation.id),
+                runAt: cardReadRunAt({ now: at, unread: pace.unread, lastReadAt: pace.lastReadAt }),
+              },
+            );
           conversation = await expireOpenDrafts(tx, conversation, NEW_FAN_MESSAGE, {
             ...meta,
             actor: 'system',
           });
-          if (conversation.state === 'pending') {
+          if (isFresh && conversation.state === 'pending') {
             // Debounce: each new message replaces the pending job, so a burst gets one answer (ADR 0006). Past 60
             // answers to him within the hour, she slows down to one every three minutes, and never stops.
             const replies = await tx.drafts.paceSince(conversation.id, new Date(at.getTime() - 3_600_000));
