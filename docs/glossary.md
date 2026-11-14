@@ -13,7 +13,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Personne | `person` | (Plus tard) un même humain reconnu sur plusieurs plateformes. `fans.person_id` nullable. |
 | Conversation | `conversation` | Le fil 1:1 entre un fan et un compte plateforme. |
 | Message | `message` | Un message reçu ou envoyé. `direction: inbound | outbound`, `author: fan | human | ai`. |
-| Message rattrapé | `catchUp` (`IngestMessage`), `CATCH_UP_AFTER_HOURS` | Un message de fan lu au premier relevé d'un compte, ou lu plus de 6 h après son envoi (PC éteint, panne) : il est gardé et compté, mais ni la lecture de la fiche ni une réponse ne partent pour lui. Le prochain message frais du fan relance les deux (P2-02). |
+| Message rattrapé | `catchUp` (`IngestMessage`), `CATCH_UP_AFTER_HOURS` | Un message de fan lu plus de 6 h après son envoi (PC éteint, panne, ou historique lu au premier relevé d'un compte) : il est gardé et compté, mais ni la lecture de la fiche ni une réponse ne partent pour lui. Un message où le filet de sécurité trouve un signe n'est jamais rattrapé. Le prochain message frais du fan relance les deux (P2-02, OPS-12). |
 | Journal d'événements | `conversation_events` | Historique append-only de tout ce qui arrive à une conversation. Source de vérité. |
 | Brouillon, proposition | `draft` | Une réponse proposée par l'IA, en attente d'approbation ou auto-approuvée. |
 | Brouillon placé | `drafts.placed_at`, verdict `placed` | Un brouillon que le chatteur a mis dans le champ de saisie de la plateforme depuis le panneau copilote (`a`, ou `e` après retouche) : il l'envoie lui-même, le brouillon reste en attente, et c'est le message parti qui le juge validé ou corrigé (ADR 0086 § 4 et 5). Jamais « Envoyé » au clic. |
