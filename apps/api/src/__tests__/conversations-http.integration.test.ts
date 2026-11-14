@@ -16,7 +16,7 @@ import {
   type ConversationId,
   type CreatorId,
 } from '@impera/contracts';
-import { eq, schema, sql } from '@impera/db';
+import { and, eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -53,7 +53,7 @@ describe('/v1/conversations', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config), { composer: fixedComposer });
     server = await buildServer({
       config,
@@ -319,6 +319,40 @@ describe('/v1/conversations', () => {
       .from(schema.auditLog)
       .where(eq(schema.auditLog.entityId, id));
     expect(audit.map((entry) => entry.action)).toEqual(['conversation.takeover', 'conversation.release']);
+  });
+
+  it('closes the care mode for the owner only, « Il va mieux », once (ADR 0088 § 7)', async () => {
+    const id = conversationIds[1] ?? newId(ConversationIdSchema);
+    const since = new Date('2026-11-12T20:00:00Z');
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ careSince: since })
+      .where(eq(schema.conversations.id, id));
+    const read = async () =>
+      ConversationDetailSchema.parse(
+        (await call('GET', `/v1/conversations/${id}?creatorId=${creatorId}`, ownerCookie)).json(),
+      );
+    expect((await read()).careSince).toBe(since.toISOString());
+    const close = (cookie: string) =>
+      call('POST', `/v1/conversations/${id}/care/close?creatorId=${creatorId}`, cookie, {
+        reason: 'Il va mieux',
+      });
+    expect((await close(operatorCookie)).statusCode).toBe(403);
+    expect((await close(ownerCookie)).statusCode).toBe(204);
+    expect((await close(ownerCookie)).statusCode).toBe(204);
+    expect((await read()).careSince).toBeNull();
+    const closed = await test.admin.db
+      .select({ payload: schema.conversationEvents.payload, actor: schema.conversationEvents.actor })
+      .from(schema.conversationEvents)
+      .where(
+        and(
+          eq(schema.conversationEvents.conversationId, id),
+          eq(schema.conversationEvents.type, 'care_closed'),
+        ),
+      );
+    expect(closed).toHaveLength(1);
+    expect(closed[0]?.payload).toEqual({ conversationId: id, reason: 'Il va mieux' });
+    expect(closed[0]?.actor).toMatch(/^human:/u);
   });
 
   it('keeps an operator out of a creator they do not handle', async () => {

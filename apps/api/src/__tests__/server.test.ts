@@ -491,7 +491,7 @@ describe('loadConfig', () => {
   });
 
   it('names every missing required variable', () => {
-    expect(() => loadConfig({})).toThrow(/DATABASE_URL[\s\S]*DATABASE_ADMIN_URL[\s\S]*WEB_ORIGIN/);
+    expect(() => loadConfig({})).toThrow(/DATABASE_URL[\s\S]*DATABASE_SERVICE_URL[\s\S]*WEB_ORIGIN/);
   });
 
   it('refuses the placeholder secret in production only', () => {

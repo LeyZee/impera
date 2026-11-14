@@ -248,7 +248,7 @@ describe('drafts written with her active persona version, and what an activation
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config));
     cleo = (await app.modules.persona.creators.create({ displayName: 'Cleo' })).id;
     account = newId(PlatformAccountIdSchema);
@@ -271,7 +271,7 @@ describe('drafts written with her active persona version, and what an activation
     const guard = startBubbleGuard({ activePersona });
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
+      adminDb: test.service.db,
       fans: app.modules.fans,
       sender: new FakeSender(clock),
       requireRole: () => () => Promise.resolve(),

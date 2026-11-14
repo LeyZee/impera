@@ -116,8 +116,8 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       .values({ id: platformAccountId, creatorId, platform: 'reveal', handle: 'composer' });
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender: {
         sendText: () => Promise.reject(new Error('not used')),
         sendMedia: () => Promise.reject(new Error('not used')),
@@ -134,6 +134,50 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
   afterAll(async () => {
     await queue.close();
     await test.close();
+  });
+
+  it('opens the care mode on a care draft, keeps it for his next message, and gives its help once (ADR 0088)', async () => {
+    const conversationId = await fanWrites('c-care', 'je veux en finir');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Je suis là', 'Et si les idées noires reviennent, appelle le 3114'],
+      softViolations: [],
+      costUsd: 0,
+      care: { signs: ['self_harm'], help: true },
+    };
+    await respond(conversationId);
+    expect((await events(conversationId)).map((e) => e.type)).toEqual([
+      'message_received',
+      'care_opened',
+      'draft_created',
+    ]);
+    const [opened] = (await events(conversationId)).filter((e) => e.type === 'care_opened');
+    expect(opened?.payload).toEqual({ conversationId, signs: ['self_harm'] });
+    const [row] = await test.admin.db
+      .select({ since: schema.conversations.careSince, help: schema.conversations.careHelpAt })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.id, conversationId));
+    expect(row?.since).toBeInstanceOf(Date);
+    expect(row?.help).toBeInstanceOf(Date);
+    // His next message: the engine is told the episode is open and its help already given; no second opening.
+    await test.admin.db.delete(schema.drafts).where(eq(schema.drafts.conversationId, conversationId));
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ state: 'idle' })
+      .where(eq(schema.conversations.id, conversationId));
+    await fanWrites('c-care', 'merci');
+    composer.next = {
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'distress',
+      detail: ['care_unanswered'],
+      costUsd: 0,
+      care: { signs: ['care_open'], help: false },
+    };
+    await respond(conversationId);
+    expect(composer.inputs.at(-1)?.care).toEqual({ since: row?.since, helpGiven: true });
+    expect((await events(conversationId)).filter((e) => e.type === 'care_opened')).toHaveLength(1);
+    composer.next = { kind: 'draft', bubbles: [], softViolations: [], costUsd: 0 };
   });
 
   it('writes the engine’s bubbles as a draft, from the history oldest first', async () => {
@@ -178,7 +222,9 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       .select()
       .from(schema.domainEvents)
       .where(eq(schema.domainEvents.type, 'handoff_requested'));
-    expect(outbox).toHaveLength(1);
+    // Its own handoff only: another test of this file hands its conversation over too.
+    const payloads: unknown[] = outbox.map((event) => event.payload);
+    expect(payloads.filter((p) => JSON.stringify(p).includes(id))).toHaveLength(1);
   });
 
   it('gives the engine every media of the fan, captioned or not, even before the media module stores it', async () => {

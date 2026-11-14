@@ -30,13 +30,12 @@ export interface JobQueue {
 }
 
 /**
- * Enqueues through Graphile's own functions on the owner pool, outside any business transaction (ops, tests).
- * A command enqueues in its own transaction instead, through `public.enqueue_job` (ADR 0006).
+ * Enqueues through Graphile's own functions on the service pool, outside any business transaction (ops, tests).
+ * A command enqueues in its own transaction instead, through `public.enqueue_job` (ADR 0006). The `graphile_worker`
+ * schema is made by the migrations, as the owner (`runMigrations`, ADR 0087): this role could not create it.
  */
-export async function createJobQueue(adminPool: Pool): Promise<JobQueue> {
-  const utils: WorkerUtils = await makeWorkerUtils({ pgPool: adminPool });
-  // Graphile manages its own schema (`graphile_worker`); this is idempotent and guarded by an advisory lock.
-  await utils.migrate();
+export async function createJobQueue(servicePool: Pool): Promise<JobQueue> {
+  const utils: WorkerUtils = await makeWorkerUtils({ pgPool: servicePool });
   return {
     async enqueue(task, payload, options = {}) {
       // Widened so Graphile does not look the name up in its global task registry; the payload is typed above.

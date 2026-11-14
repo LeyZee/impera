@@ -44,7 +44,7 @@ describe('no route answers without a session, but those said (audit des tests dâ
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     const app = await createApp(config, createLogger(config));
     server = await buildServer({
       config,

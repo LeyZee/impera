@@ -14,11 +14,12 @@ describe('fan limits set by the policy, through the fans module', () => {
   const fanId = newId(FanIdSchema);
   const brokeFanId = newId(FanIdSchema);
   const frozenFanId = newId(FanIdSchema);
+  const sadFanId = newId(FanIdSchema);
   const AT = new Date('2026-10-17T20:00:00.000Z');
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    limits = createFanLimits(createFansModule({ db: test.app.db, adminDb: test.admin.db }));
+    limits = createFanLimits(createFansModule({ db: test.app.db, adminDb: test.service.db }));
     // One invented creator and fan (ADR 0010), already confirmed an adult.
     const accountId = newId(PlatformAccountIdSchema);
     await withAdmin(test.admin.db, async (tx) => {
@@ -54,6 +55,14 @@ describe('fan limits set by the policy, through the fans module', () => {
           displayName: 'Hugo',
           flags: { salesFrozen: { reason: 'operator', since: '2026-10-10T09:00:00.000Z' } },
         },
+        {
+          id: sadFanId,
+          creatorId,
+          platformAccountId: accountId,
+          platformFanId: 'fan-4',
+          displayName: 'Léo',
+          flags: {},
+        },
       ]);
     });
   });
@@ -63,7 +72,7 @@ describe('fan limits set by the policy, through the fans module', () => {
   });
 
   it('stops contact and takes back his age, authored by the system, once', async () => {
-    const protection = protectionFor(['possible_minor', 'distress']);
+    const protection = protectionFor(['possible_minor', 'harassment']);
     await limits.protect(creatorId, fanId, protection, 'correlation-1', AT);
     // A replayed job changes nothing more.
     await limits.protect(creatorId, fanId, protection, 'correlation-1', AT);
@@ -85,7 +94,17 @@ describe('fan limits set by the policy, through the fans module', () => {
       ['fan_flag_cleared', 'system'],
       ['fan_flag_set', 'system'],
     ]);
-    expect(events[0]?.payload).toMatchObject({ reason: 'possible_minor, distress' });
+    expect(events[0]?.payload).toMatchObject({ reason: 'possible_minor, harassment' });
+  });
+
+  it('in distress, freezes his sales for distress and stops the explicit, never stops contact (ADR 0088)', async () => {
+    const care = protectionFor(['distress']);
+    await limits.protect(creatorId, sadFanId, care, 'correlation-care', AT);
+    await limits.protect(creatorId, sadFanId, care, 'correlation-care', AT);
+    expect(await limits.flags(creatorId, sadFanId)).toEqual({
+      noExplicit: true,
+      salesFrozen: { reason: 'distress', since: AT.toISOString() },
+    });
   });
 
   it('freezes his sales when he says he cannot pay, dated, and keeps a freeze a human set', async () => {
@@ -107,7 +126,7 @@ describe('fan limits set by the policy, through the fans module', () => {
   });
 
   it('never confirms again an age taken back, by a sign of a minor or by a human, until a human decides', async () => {
-    const fans = createFansModule({ db: test.app.db, adminDb: test.admin.db });
+    const fans = createFansModule({ db: test.app.db, adminDb: test.service.db });
     // Taken back by the policy (fan-1, a sign of a minor above): « j'ai 19 ans » next does not confirm it.
     await limits.confirmAge(creatorId, fanId, 'correlation-7', AT);
     expect((await limits.flags(creatorId, fanId)).ageConfirmedAt).toBeUndefined();

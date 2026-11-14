@@ -1,6 +1,7 @@
 import { CHANNEL_ONLY_GUARD_CODES, GUARD_CODES, OBSOLETE_GUARD_CODES } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { checkCare } from '../care';
 import { checkNoCommitment } from '../custom-order';
 import {
   checkExplicit,
@@ -161,6 +162,7 @@ describe('voice guards (P3-13)', () => {
       }),
       ...read(['Tu as un chien ?'], { previousTurns: [['Tu aimes le sport ?'], ['Tu bosses demain ?']] }),
       ...checkExplicit(['J’ai envie de te sucer']).map((v) => v.code),
+      ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),
     ]);
     const known: readonly string[] = GUARD_CODES;

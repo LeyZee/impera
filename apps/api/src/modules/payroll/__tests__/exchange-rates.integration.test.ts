@@ -42,8 +42,8 @@ describe('payroll.fetch_exchange_rates', () => {
     fetchExchangeRates(
       {
         source: createEcbSource({ fetch }),
-        store: createDrizzlePayrollRateStore(test.admin.db),
-        alerts: createPostgresRateAlerts(test.admin.db),
+        store: createDrizzlePayrollRateStore(test.service.db),
+        alerts: createPostgresRateAlerts(test.service.db),
         since,
         now: () => new Date(at),
       },

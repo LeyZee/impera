@@ -38,6 +38,8 @@ export const GUARD_CODES = [
   'false_scarcity',
   // ADR 0090 § A: her waiting answer to a custom order commits to nothing (no yes, no price, no delay).
   'no_commitment',
+  // ADR 0088 § 3: a care answer (a fan in distress) that sells, meets or goes sexual.
+  'care_breach',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

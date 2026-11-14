@@ -130,10 +130,10 @@ describe('fans.read_card', () => {
     await test.admin.db
       .insert(schema.user)
       .values({ id: CHATTER, name: 'Léa', email: 'lea@nirvana.test', creatorIds: [creatorId] });
-    fans = createFansModule({ db: test.app.db, adminDb: test.admin.db });
+    fans = createFansModule({ db: test.app.db, adminDb: test.service.db });
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
+      adminDb: test.service.db,
       fans,
       sender: {
         sendText: () => Promise.reject(new Error('not used')),
