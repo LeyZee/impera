@@ -78,4 +78,31 @@ describe('Moi › Préférences (D-03)', () => {
     await screen.findByRole('heading', { name: 'Préférences', level: 1 });
     expect(screen.queryByRole('switch', { name: 'Flou des médias' })).toBeNull();
   });
+
+  it('gives a chatter « Sons », kept with the account, and nobody who does not play (ADR 0104 § 19)', async () => {
+    const calls: [string, unknown][] = [];
+    vi.stubGlobal('fetch', (url: string, init?: { body?: string }) => {
+      calls.push([url, init?.body === undefined ? null : JSON.parse(init.body)]);
+      return Promise.resolve(new Response(JSON.stringify({ sounds: false }), { status: 200 }));
+    });
+    renderPage(vi.fn());
+    const sounds = await screen.findByRole('switch', { name: 'Sons : activés' });
+    fireEvent.click(sounds);
+    expect(await screen.findByRole('switch', { name: 'Sons : coupés' })).toBeTruthy();
+    expect(calls).toEqual([['/v1/me/preferences', { sounds: false }]]);
+    cleanup();
+    for (const user of [OWNER, IRIS_ME]) {
+      renderPage(vi.fn(), user);
+      await screen.findByRole('heading', { name: 'Préférences', level: 1 });
+      expect(screen.queryByRole('switch', { name: /^Sons/u })).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('puts « Sons » back as it was when the server does not take the change', async () => {
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response('', { status: 503 })));
+    renderPage(vi.fn());
+    fireEvent.click(await screen.findByRole('switch', { name: 'Sons : activés' }));
+    expect(await screen.findByRole('switch', { name: 'Sons : activés' })).toBeTruthy();
+  });
 });

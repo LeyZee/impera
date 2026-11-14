@@ -15,6 +15,7 @@ const ME: Me = {
   shiftCreatorIds: [],
   team: null,
   teamScope: 'owner',
+  preferences: { sounds: true },
 };
 
 const frame = { origin: 'http://localhost:5173', version: '0.1.0', hour: 20 };

@@ -1,5 +1,5 @@
 import { DesireBandSchema, ObjectionKindSchema, ObjectionReplyIdSchema } from '@impera/contracts';
-import { BRAIN_ALERTS_MAX, BriefSchema, JudgeCriterionSchema } from '@impera/llm';
+import { BRAIN_ALERTS_MAX, BriefSchema, JudgeCriterionSchema, SCRIPT_REPLIES } from '@impera/llm';
 import { parse } from 'yaml';
 import { z } from 'zod';
 
@@ -7,6 +7,74 @@ const Risk = BriefSchema.shape.risks.element;
 const Intent = BriefSchema.shape.intent;
 const Action = BriefSchema.shape.action;
 const DesireSignal = BriefSchema.shape.desireSignals.unwrap().element;
+
+/** A name the scenario gives one of her scripts (ADR 0098), its ref on the made-up platform. */
+const ScriptRef = z.string().regex(/^[a-z][a-z0-9-]*$/u);
+
+/**
+ * Her made-up catalogue, his run as stored and what Reveal says he was sent and bought (ADR 0098): the long sales
+ * scenarios play one message of his at a given point of the staircase. A purchase is Reveal's `bought`, never his word.
+ */
+const ScriptsSchema = z
+  .object({
+    catalogue: z
+      .array(
+        z
+          .object({
+            ref: ScriptRef,
+            moment: z.enum(['day', 'night']).nullable().default(null),
+            description: z.string().min(1),
+            steps: z
+              .array(
+                z
+                  .object({
+                    kind: z.enum(['free', 'paid', 'bridge']),
+                    price_euros: z.number().positive().optional(),
+                    instruction: z.string().min(1).optional(),
+                    media: z.string().min(1).optional(),
+                  })
+                  .strict(),
+              )
+              .min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    /** His latest run as stored: its steps by index, their kind and price read from the catalogue. */
+    run: z
+      .object({
+        script: ScriptRef,
+        status: z.enum(['open', 'bought_out', 'refused', 'stalled', 'closed_by_human']).default('open'),
+        steps: z
+          .array(
+            z
+              .object({
+                index: z.int().nonnegative(),
+                outcome: z.enum(['sent', 'opened', 'bought', 'refused']),
+              })
+              .strict(),
+          )
+          .default([]),
+        ignored_messages: z.int().nonnegative().default(0),
+        started_minutes_ago: z.number().nonnegative().default(20),
+      })
+      .strict()
+      .optional(),
+    /** What Reveal says: per script, the step indexes sent and bought. */
+    history: z
+      .array(
+        z
+          .object({
+            script: ScriptRef,
+            sent: z.array(z.int().nonnegative()).default([]),
+            bought: z.array(z.int().nonnegative()).default([]),
+          })
+          .strict(),
+      )
+      .default([]),
+  })
+  .strict();
+export type ScenarioScripts = z.infer<typeof ScriptsSchema>;
 
 /** A name the scenario gives one of her alerts, to say which the brain must see. */
 const AlertName = z.string().regex(/^[a-z][a-z0-9_]*$/u);
@@ -53,6 +121,13 @@ const ScenarioSchema = z
         custom_order_open: z.boolean().default(false),
         /** The replies of her objection bank he already received, by id (ADR 0090 § B). */
         objection_replies_used: z.array(ObjectionReplyIdSchema).default([]),
+        /**
+         * His availability as stored just before this message (ADR 0103, amendement du 13/11): `confirmed`, he said a
+         * few minutes ago that he is alone and free; `no`, that someone is beside him.
+         */
+        availability: z.enum(['confirmed', 'unknown', 'no']).default('unknown'),
+        /** A message of his sexualized a few minutes ago, in this session (the gate before a script). */
+        sexualized: z.boolean().default(false),
       })
       .strict()
       .prefault({}),
@@ -65,6 +140,7 @@ const ScenarioSchema = z
       .max(BRAIN_ALERTS_MAX)
       .refine((list) => new Set(list.map((a) => a.name)).size === list.length, 'alert name repeated')
       .default([]),
+    scripts: ScriptsSchema.optional(),
     /** His message, or several in a row since her last answer. */
     inbound: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
     expect: z
@@ -81,6 +157,11 @@ const ScenarioSchema = z
             alerts_seen: z.array(AlertName).optional(),
             /** What he opposes to a price, among these (ADR 0090 § B). */
             objection_in: z.array(ObjectionKindSchema).min(1).optional(),
+            /** What his message does with the step waiting, among these (ADR 0098 § 9); `none`: nothing. */
+            script_reply_in: z
+              .array(z.enum([...SCRIPT_REPLIES, 'none']))
+              .min(1)
+              .optional(),
           })
           .strict()
           .optional(),
@@ -94,6 +175,13 @@ const ScenarioSchema = z
             custom_order: z.enum(['none', 'handoff', 'reply']).optional(),
             /** The reply of her objection bank given to the voice, by id; `null`: none (ADR 0090 § B). */
             objection_reply: ObjectionReplyIdSchema.nullable().optional(),
+            /** What code decided with her scripts (ADR 0098 § 4), among these. */
+            script_in: z
+              .array(z.enum(['none', 'start', 'send_step', 'wait', 'after_refusal', 'end']))
+              .min(1)
+              .optional(),
+            /** The step decided, by its index, and of which script (`start`, `send_step`). */
+            script_step: z.object({ script: ScriptRef, index: z.int().nonnegative() }).strict().optional(),
           })
           .strict()
           .optional(),
