@@ -4,13 +4,16 @@ import {
   McpOnShiftNowSchema,
   McpShiftsInputSchema,
   McpShiftsListSchema,
+  McpTeamImportInputSchema,
+  McpTeamImportListSchema,
   ShiftIdSchema,
   TeamMemberIdSchema,
   type McpOnShiftNow,
   type McpShiftsList,
+  type McpTeamImportList,
 } from '@impera/contracts';
 
-import type { ShiftReader } from '../domain/ports';
+import type { ShiftReader, TeamImportReader } from '../domain/ports';
 
 import type { ServedTool } from './dispatch';
 
@@ -20,6 +23,7 @@ import type { ServedTool } from './dispatch';
  */
 export function teamTools(
   shifts: ShiftReader,
+  team: TeamImportReader,
   now: () => Date = () => new Date(),
 ): Readonly<Record<string, ServedTool>> {
   return {
@@ -65,6 +69,33 @@ export function teamTools(
             memberName: entry.memberName,
             endsAt: new Date(entry.endsAt).toISOString(),
           })),
+        };
+      },
+    },
+    team_import_list: {
+      description:
+        'L’équipe importée d’une plateforme (Reveal si aucune n’est nommée), sur un accès d’agence seulement : chaque compte de chatteur lié à un membre (par son nom) ou à l’agent, retiré par la plateforme ou non, et les comptes de la dernière lecture (nouveaux, retraits, lecture anormale). Jamais l’identifiant d’un compte de plateforme, un montant ni un taux.',
+      input: McpTeamImportInputSchema,
+      output: McpTeamImportListSchema,
+      run: async ({ grant }, input): Promise<McpTeamImportList> => {
+        const { platform } = McpTeamImportInputSchema.parse(input);
+        const read = await team.teamImport(grant.userId, platform ?? 'reveal');
+        return {
+          platform: read.platform,
+          accounts: read.accounts.map((account) => ({
+            link:
+              account.link.kind === 'member'
+                ? {
+                    kind: 'member',
+                    memberId: TeamMemberIdSchema.parse(account.link.memberId),
+                    memberName: account.link.memberDisplayName,
+                  }
+                : { kind: 'agent' },
+            removed: account.removed,
+          })),
+          newCount: read.newCount,
+          removalCount: read.removalCount,
+          abnormalRead: read.abnormalRead,
         };
       },
     },
