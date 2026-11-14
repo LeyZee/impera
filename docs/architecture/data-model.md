@@ -24,7 +24,7 @@ platform_accounts   id, creator_id, platform (reveal|onlyfans|instagram|impera),
 connector_sends     id, creator_id, platform_account_id (FK composite vers platform_accounts (id, creator_id)), idempotency_key
                     (unique par compte), platform_conversation_id, fingerprint (SHA-256 hex), script_ref, state (pending|sent),
                     attempt_started_at, platform_message_id (unique par compte, connu une fois envoyé), sent_at, created_at
-                    (migration 0177, P2-03 : les envois du connecteur, gardés avant l'appel ; RLS forcée, fermée au compte de
+                    (migration 0189, P2-03 : les envois du connecteur, gardés avant l'appel ; RLS forcée, fermée au compte de
                     la créatrice, jamais supprimée par l'application)
 audit_log           id, user_id, action, entity, entity_id, details jsonb, ip, created_at   (append-only)
 ```

@@ -35,7 +35,7 @@ Spécification § 5. Toute écriture passe d'abord par la garde `writes` du comp
 - `markRead` : `PATCH …/read` ; `setTyping(true)` : `POST …/typing` (Reveal n'a pas de route pour arrêter, l'appelant répète toutes les 3 s).
 - Lecture : `fetchMessages` marque `ai` les sortants dont l'id est dans `connector_sends` ; `ingestMessage` (module `conversations`) garde cet auteur.
 
-Table possédée : `connector_sends` (migration 0177). Tests : `infra/reveal/__tests__/connector-writes.test.ts` et `note.test.ts` contre FakeReveal, `application/__tests__/outbound-sender.test.ts` (la garde sur chaque écriture), le contrat commun (`infra/__tests__/contract.test.ts`, FakeConnector et Reveal), `src/__tests__/reveal-connector-write.integration.test.ts` (vraie table).
+Table possédée : `connector_sends` (migration 0189). Tests : `infra/reveal/__tests__/connector-writes.test.ts` et `note.test.ts` contre FakeReveal, `application/__tests__/outbound-sender.test.ts` (la garde sur chaque écriture), le contrat commun (`infra/__tests__/contract.test.ts`, FakeConnector et Reveal), `src/__tests__/reveal-connector-write.integration.test.ts` (vraie table).
 
 ## Flux de ventes (CRM-01, ADR 0050)
 

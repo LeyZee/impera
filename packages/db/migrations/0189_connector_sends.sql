@@ -1,4 +1,4 @@
--- P2-03 (reveal-connector-spec.md § 5): the connector's own sends. Reveal takes no nonce, so each attempt is recorded
+-- P2-03 (migration 0189, reveal-connector-spec.md § 5): the connector's own sends. Reveal takes no nonce, so each attempt is recorded
 -- here before the call (unique idempotency key per account, the conversation, the SHA-256 fingerprint of the text, the
 -- script step and the media, when the attempt started) and gets Reveal's message id once known. A retry of a key still
 -- `pending` asks Reveal (`verifySent`) before any new send. Written by the connector inside the creator's tenant
