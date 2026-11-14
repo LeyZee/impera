@@ -1020,8 +1020,15 @@
     {
       "idx": 145,
       "version": "7",
-      "when": 1794669312870,
-      "tag": "0201_platform_scripts",
+      "when": 1794670798611,
+      "tag": "0204_ai_subscription",
+      "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1794674337730,
+      "tag": "0206_platform_scripts",
       "breakpoints": true
     }
   ]

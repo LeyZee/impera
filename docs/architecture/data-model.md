@@ -495,7 +495,7 @@ Un régime ne change pas ; sa validation est une ligne à part. Un dossier garde
 worker_heartbeats   worker_id text PK, hostname, version, last_seen_at      (écrit toutes les 30 s par chaque worker, lu par /ready)
 rate_limit_counters key text PK (haché, ≤ 512), hits int > 0, window_ends_at   (limiteur partagé de l’API, ADR 0027 ; UNLOGGED, purgé 1 h après la fin de la fenêtre)
 backup_runs         id uuid PK (défaut en base), started_at, finished_at?, status (running|succeeded|failed), error? ≤ 500, object_key?, size_bytes?, sha256? unique, pg_dump_version?, row_counts? jsonb objet   (export quotidien, ADR 0028 ; écrit par le service backup seul, lu par l’app)
-ai_credit_entries   id uuid PK (choisi par l’écran, idempotence), provider (xai|mistral|google), kind (topup|balance), amount_minor int ≥ 0 (> 0 pour une recharge), currency (USD|EUR), at, created_by → user, created_at   (crédits IA notés par le propriétaire, ADR 0091 ; RLS forcée, politique agence ; nirvana_app : SELECT, INSERT, DELETE ; migration 0164)
+ai_credit_entries   id uuid PK (choisi par l’écran, idempotence), provider (xai|mistral|google), kind (topup|balance|subscription), amount_minor int ≥ 0 (> 0 pour une recharge, 0 pour un abonnement), currency (USD|EUR), at, created_by → user, created_at   (crédits IA notés par le propriétaire, ADR 0091 ; RLS forcée, politique agence ; nirvana_app : SELECT, INSERT, DELETE ; migration 0164, `subscription` en 0204, ADR 0091 § 6)
 restore_tests       id PK, backup_run_id FK, tested_at, duration_seconds > 0, row_count_mismatches ≥ 0, notes? ≤ 500, entered_by_user_id FK, created_at   (essai de restauration saisi par le propriétaire, ajout seul, ADR 0028 § 6)
 ```
 
@@ -515,7 +515,7 @@ script_structure_queue    creator_id, position 1–20, structure_id (unique par 
 platform_scripts          id, creator_id, platform_account_id → platform_accounts, platform_script_ref (unique par
                           compte, ≤ 200), name (celui de la plateforme, ≤ 200), moment? (day|night), fingerprint, active,
                           deactivated_at? (présent si et seulement si inactif), synced_at, created_at
-                          (scripts natifs, ADR 0099 § 1 temps 2, migration 0201 ; jamais supprimés)
+                          (scripts natifs, ADR 0099 § 1 temps 2, migration 0206 ; jamais supprimés)
 platform_script_steps     platform_script_id, creator_id, position 0–49 (stepIndex), platform_step_ref (≤ 200),
                           name (≤ 200), text (≤ 4 000), price_minor ≥ 0 (centimes TTC, tel quel), currency
                           (clé : platform_script_id, position ; réécrites en entier quand le script change)

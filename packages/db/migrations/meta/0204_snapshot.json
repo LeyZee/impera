@@ -1,5 +1,5 @@
 {
-  "id": "671f721c-c793-4f3f-a61f-9026e7cb6ccc",
+  "id": "d1ceeb68-b70d-4e30-85b6-2cedbdc32916",
   "prevId": "1a19ede2-9013-4ebc-9f26-d959963ef03f",
   "version": "7",
   "dialect": "postgresql",
@@ -2592,7 +2592,7 @@
       "checkConstraints": {
         "conversation_events_type_check": {
           "name": "conversation_events_type_check",
-          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -4770,7 +4770,7 @@
       "checkConstraints": {
         "domain_events_type_check": {
           "name": "domain_events_type_check",
-          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -7184,7 +7184,7 @@
         },
         "ai_credit_entries_kind_check": {
           "name": "ai_credit_entries_kind_check",
-          "value": "\"ai_credit_entries\".\"kind\" in ('topup', 'balance')"
+          "value": "\"ai_credit_entries\".\"kind\" in ('topup', 'balance', 'subscription')"
         },
         "ai_credit_entries_currency_check": {
           "name": "ai_credit_entries_currency_check",
@@ -7192,7 +7192,7 @@
         },
         "ai_credit_entries_amount_check": {
           "name": "ai_credit_entries_amount_check",
-          "value": "\"ai_credit_entries\".\"amount_minor\" between 0 and 1000000 and (\"ai_credit_entries\".\"kind\" = 'balance' or \"ai_credit_entries\".\"amount_minor\" > 0)"
+          "value": "\"ai_credit_entries\".\"amount_minor\" between 0 and 1000000 and (\"ai_credit_entries\".\"kind\" = 'balance' or (\"ai_credit_entries\".\"kind\" = 'subscription') = (\"ai_credit_entries\".\"amount_minor\" = 0))"
         }
       },
       "isRLSEnabled": false
@@ -7340,6 +7340,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "llm_calls_provider_status_created_idx": {
+          "name": "llm_calls_provider_status_created_idx",
+          "columns": [
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -7392,7 +7419,7 @@
         },
         "llm_calls_status_check": {
           "name": "llm_calls_status_check",
-          "value": "\"llm_calls\".\"status\" in ('ok', 'invalid_output', 'refused', 'timeout', 'rate_limited', 'auth', 'unavailable', 'missing_key', 'unknown_model', 'unsupported_input', 'prompt_leak', 'error')"
+          "value": "\"llm_calls\".\"status\" in ('ok', 'invalid_output', 'refused', 'timeout', 'rate_limited', 'quota_exhausted', 'auth', 'unavailable', 'missing_key', 'unknown_model', 'unsupported_input', 'prompt_leak', 'error')"
         },
         "llm_calls_currency_check": {
           "name": "llm_calls_currency_check",
@@ -17182,442 +17209,6 @@
         "shifts_template_check": {
           "name": "shifts_template_check",
           "value": "(\"shifts\".\"template_id\" is null) = (\"shifts\".\"template_starts_at\" is null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.platform_script_step_media": {
-      "name": "platform_script_step_media",
-      "schema": "",
-      "columns": {
-        "platform_script_id": {
-          "name": "platform_script_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rank": {
-          "name": "rank",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_media_ref": {
-          "name": "platform_media_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "platform_script_step_media_creator_media_idx": {
-          "name": "platform_script_step_media_creator_media_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform_media_ref",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "platform_script_step_media_creator_id_creators_id_fk": {
-          "name": "platform_script_step_media_creator_id_creators_id_fk",
-          "tableFrom": "platform_script_step_media",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "platform_script_step_media_script_creator_fk": {
-          "name": "platform_script_step_media_script_creator_fk",
-          "tableFrom": "platform_script_step_media",
-          "tableTo": "platform_scripts",
-          "columnsFrom": ["platform_script_id", "creator_id"],
-          "columnsTo": ["id", "creator_id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "platform_script_step_media_step_fk": {
-          "name": "platform_script_step_media_step_fk",
-          "tableFrom": "platform_script_step_media",
-          "tableTo": "platform_script_steps",
-          "columnsFrom": ["platform_script_id", "position"],
-          "columnsTo": ["platform_script_id", "position"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "platform_script_step_media_pkey": {
-          "name": "platform_script_step_media_pkey",
-          "columns": ["platform_script_id", "position", "role", "rank"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"platform_script_step_media\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "platform_script_step_media_rank_check": {
-          "name": "platform_script_step_media_rank_check",
-          "value": "\"platform_script_step_media\".\"rank\" >= 0 and \"platform_script_step_media\".\"rank\" < 50"
-        },
-        "platform_script_step_media_ref_check": {
-          "name": "platform_script_step_media_ref_check",
-          "value": "char_length(\"platform_script_step_media\".\"platform_media_ref\") <= 200"
-        },
-        "platform_script_step_media_role_check": {
-          "name": "platform_script_step_media_role_check",
-          "value": "\"platform_script_step_media\".\"role\" in ('sold', 'preview')"
-        },
-        "platform_script_step_media_kind_check": {
-          "name": "platform_script_step_media_kind_check",
-          "value": "\"platform_script_step_media\".\"kind\" in ('image', 'video', 'audio')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.platform_script_steps": {
-      "name": "platform_script_steps",
-      "schema": "",
-      "columns": {
-        "platform_script_id": {
-          "name": "platform_script_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_step_ref": {
-          "name": "platform_step_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "price_minor": {
-          "name": "price_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "platform_script_steps_creator_step_idx": {
-          "name": "platform_script_steps_creator_step_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform_step_ref",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "platform_script_steps_creator_id_creators_id_fk": {
-          "name": "platform_script_steps_creator_id_creators_id_fk",
-          "tableFrom": "platform_script_steps",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "platform_script_steps_script_creator_fk": {
-          "name": "platform_script_steps_script_creator_fk",
-          "tableFrom": "platform_script_steps",
-          "tableTo": "platform_scripts",
-          "columnsFrom": ["platform_script_id", "creator_id"],
-          "columnsTo": ["id", "creator_id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "platform_script_steps_pkey": {
-          "name": "platform_script_steps_pkey",
-          "columns": ["platform_script_id", "position"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"platform_script_steps\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "platform_script_steps_position_check": {
-          "name": "platform_script_steps_position_check",
-          "value": "\"platform_script_steps\".\"position\" >= 0 and \"platform_script_steps\".\"position\" < 50"
-        },
-        "platform_script_steps_text_check": {
-          "name": "platform_script_steps_text_check",
-          "value": "char_length(\"platform_script_steps\".\"name\") <= 200 and char_length(\"platform_script_steps\".\"text\") <= 4000 and char_length(\"platform_script_steps\".\"platform_step_ref\") <= 200"
-        },
-        "platform_script_steps_price_check": {
-          "name": "platform_script_steps_price_check",
-          "value": "\"platform_script_steps\".\"price_minor\" >= 0"
-        },
-        "platform_script_steps_currency_check": {
-          "name": "platform_script_steps_currency_check",
-          "value": "\"platform_script_steps\".\"currency\" in ('EUR', 'USD')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.platform_scripts": {
-      "name": "platform_scripts",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_account_id": {
-          "name": "platform_account_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_script_ref": {
-          "name": "platform_script_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "moment": {
-          "name": "moment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fingerprint": {
-          "name": "fingerprint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "active": {
-          "name": "active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "deactivated_at": {
-          "name": "deactivated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "synced_at": {
-          "name": "synced_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "platform_scripts_creator_idx": {
-          "name": "platform_scripts_creator_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "platform_scripts_creator_id_creators_id_fk": {
-          "name": "platform_scripts_creator_id_creators_id_fk",
-          "tableFrom": "platform_scripts",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "platform_scripts_account_creator_fk": {
-          "name": "platform_scripts_account_creator_fk",
-          "tableFrom": "platform_scripts",
-          "tableTo": "platform_accounts",
-          "columnsFrom": ["platform_account_id", "creator_id"],
-          "columnsTo": ["id", "creator_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "platform_scripts_account_ref_unique": {
-          "name": "platform_scripts_account_ref_unique",
-          "nullsNotDistinct": false,
-          "columns": ["platform_account_id", "platform_script_ref"]
-        },
-        "platform_scripts_id_creator_unique": {
-          "name": "platform_scripts_id_creator_unique",
-          "nullsNotDistinct": false,
-          "columns": ["id", "creator_id"]
-        }
-      },
-      "policies": {
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"platform_scripts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "platform_scripts_moment_check": {
-          "name": "platform_scripts_moment_check",
-          "value": "\"platform_scripts\".\"moment\" in ('day', 'night')"
-        },
-        "platform_scripts_active_check": {
-          "name": "platform_scripts_active_check",
-          "value": "\"platform_scripts\".\"active\" = (\"platform_scripts\".\"deactivated_at\" is null)"
-        },
-        "platform_scripts_text_check": {
-          "name": "platform_scripts_text_check",
-          "value": "char_length(\"platform_scripts\".\"name\") <= 200 and char_length(\"platform_scripts\".\"platform_script_ref\") <= 200"
         }
       },
       "isRLSEnabled": false

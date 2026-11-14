@@ -84,6 +84,16 @@ export function createPostgresUsageReader(adminDb: Database): UsageReader {
         where provider = ${provider} and created_at > ${after.toISOString()}::timestamptz`);
       return z.object({ usd: z.coerce.number() }).parse(result.rows[0] ?? { usd: 0 }).usd;
     },
+    async quotaRefusedAt(provider) {
+      // The provider's latest answered call bounds the episode; a refusal before it is over.
+      const result = await adminDb.execute(sql`
+        select min(created_at) as at from llm_calls
+        where provider = ${provider} and status = 'quota_exhausted'
+          and created_at > coalesce(
+            (select max(created_at) from llm_calls where provider = ${provider} and status = 'ok'),
+            '-infinity'::timestamptz)`);
+      return z.object({ at: z.coerce.date().nullable() }).parse(result.rows[0] ?? { at: null }).at;
+    },
   };
 }
 
@@ -213,6 +223,30 @@ export function createPostgresCreditAlerts(adminDb: Database): CreditAlerts {
           id: newId(EventIdSchema),
           creatorId: null,
           type: 'ai_credits_low',
+          payload,
+          actor: 'system',
+          correlationId: key,
+          createdAt: new Date(),
+        });
+        return true;
+      });
+    },
+    publishQuota(input) {
+      const payload = EVENT_PAYLOADS.ai_quota_exhausted.parse(input);
+      const key = `ai_quota_exhausted:${payload.provider}:${payload.refusedAt}`;
+      // Published after its first refusal; a day of margin covers a clock of the database behind the server's.
+      return withAdmin(adminDb, async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+        const seen = await tx.execute(sql`
+          select 1 from domain_events
+          where created_at >= ${payload.refusedAt}::timestamptz - interval '1 day' and type = 'ai_quota_exhausted'
+            and correlation_id = ${key}
+          limit 1`);
+        if (seen.rows.length > 0) return false;
+        await tx.insert(schema.domainEvents).values({
+          id: newId(EventIdSchema),
+          creatorId: null,
+          type: 'ai_quota_exhausted',
           payload,
           actor: 'system',
           correlationId: key,

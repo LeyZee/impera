@@ -4,7 +4,7 @@
 
 **Peut dépendre de.** aucun module métier (feuille). Les limites de la persona lui viennent de `persona` par le composition root (`limitsOf`, sa version active) ; la demande de script est écrite par `content-drops`, branché de même (`requests`, son `scriptRequests`).
 
-**Tables possédées.** `script_structures`, `script_structure_versions`, `script_structure_queue` (migrations 0084 et 0095) et `script_cadences` (migration 0121) ; `platform_scripts`, `platform_script_steps` et `platform_script_step_media` (migration 0201, les scripts natifs).
+**Tables possédées.** `script_structures`, `script_structure_versions`, `script_structure_queue` (migrations 0084 et 0095) et `script_cadences` (migration 0121) ; `platform_scripts`, `platform_script_steps` et `platform_script_step_media` (migration 0206, les scripts natifs).
 
 - La bibliothèque (`script_structures`, `script_structure_versions`) appartient à l'agence : hors RLS des créatrices, sous les politiques de l'équipe (`withMember`). Le propriétaire écrit, le propriétaire et les managers actifs lisent, personne d'autre (un chatteur, un compte de créatrice : rien).
 - Une version porte le nom, le moment et les segments (`ScriptSegment[]`, relus par le contrat). La dernière version change sur place tant qu'elle n'est pas figée ; une fois figée (`frozen_at`, posée par `structures.freeze` quand une demande la prend, SC-02), un enregistrement écrit la version suivante (règle 6). Un déclencheur refuse toute modification d'une version figée, tout changement de numéro et toute suppression, pour tous les rôles.
