@@ -18,7 +18,10 @@ export function MemberGameBlock({ memberId, name }: { memberId: string; name: st
   const streak = trophyCase.streaks.find((one) => one.kind === 'shift') ?? { current: 0, best: 0 };
   const trophies = trophyCase.items.filter((item) => isTrophy(item.kind));
   const earned = trophies.filter((item) => item.earnedAt !== null);
-  const tiers = trophyCase.items.filter((item) => item.family === 'medal').length;
+  // A tier gain is `tier:<fortnight>:<threshold>`: what counts here is the fortnights that reached one.
+  const tiers = new Set(
+    trophyCase.items.filter((item) => item.family === 'medal').map((item) => item.kind.split(':')[1]),
+  ).size;
   const { level } = trophyCase;
   return (
     <section className="tm-block nv-enter rw-member" style={{ '--nv-i': 5 }} aria-label="Jeu">
@@ -50,10 +53,11 @@ export function MemberGameBlock({ memberId, name }: { memberId: string; name: st
           </dd>
         </div>
         <div>
-          <dt>Paliers atteints</dt>
+          <dt>Quinzaines avec un palier atteint</dt>
           <dd className="nv-num">{tiers === 0 ? <span className="tm-muted">Aucun</span> : tiers}</dd>
         </div>
       </dl>
+      <p className="rw-member__label">Trophées</p>
       {earned.length === 0 ? (
         <p className="tm-muted rw-member__none">Aucun trophée pour l’instant.</p>
       ) : (

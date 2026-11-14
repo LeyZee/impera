@@ -47,8 +47,8 @@ export function ShiftChallengeCard({ user }: { user: Me }): JSX.Element | null {
         </div>
         <p className="rw-challenge__note">
           {met
-            ? `Tu as dépassé ta médiane des ${weekday}s sur ce créneau.`
-            : `Encore ${amountText(left, currency)} de net pour passer ta médiane des ${weekday}s sur ce créneau.`}{' '}
+            ? `Tu as dépassé ton ${weekday} habituel sur ce créneau.`
+            : `Encore ${amountText(left, currency)} de net pour passer ton ${weekday} habituel sur ce créneau.`}{' '}
           Sans effet sur ta paie.
         </p>
       </div>

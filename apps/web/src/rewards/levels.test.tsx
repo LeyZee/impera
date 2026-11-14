@@ -113,7 +113,9 @@ describe('ShiftChallengeCard (ADR 0104 § 14)', () => {
     expect(screen.getByRole('progressbar', { name: 'Avancée du défi' }).getAttribute('aria-valuenow')).toBe(
       '25',
     );
-    expect(screen.getByText(/Encore 150,00\s€ de net/u).textContent).toContain('Sans effet sur ta paie.');
+    const note = screen.getByText(/Encore 150,00\s€ de net/u).textContent;
+    expect(note).toContain('ton jeudi habituel sur ce créneau');
+    expect(note).toContain('Sans effet sur ta paie.');
   });
 
   it('says a challenge met, and shows nothing without one or to the owner', async () => {
@@ -169,7 +171,7 @@ describe('MemberGameBlock (ADR 0104 § 20)', () => {
     expect(screen.queryByText('Record du jour')).toBeNull();
     // The coin drawn on a trophy aside, no amount is written: the facts hold a rank, a streak and a count.
     expect(document.querySelector('.rw-member__facts')?.textContent).toBe(
-      'RangRecrueSérie en cours3 shifts · meilleure : 9Paliers atteints1',
+      'RangRecrueSérie en cours3 shifts · meilleure : 9Quinzaines avec un palier atteint1',
     );
   });
 });

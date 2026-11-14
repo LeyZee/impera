@@ -453,7 +453,9 @@
 }
 /* Met: the gold of what is earned, never the red of an urgency. */
 .rw-challenge__body[data-met='true'] .nv-gauge__fill {
-  background: var(--nv-data-2);
+  /* The gold of what is earned: the metal of the medals and of the rim of an insignia. */
+  background: linear-gradient(90deg, #9a7420 0%, #e8c37a 55%, #fff0bd 100%);
+  box-shadow: 0 0 10px rgb(240 196 106 / 0.35);
 }
 .rw-challenge__note,
 .rw-rank__note {
@@ -589,6 +591,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+.rw-member__label {
+  margin: 0 0 6px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
 }
 .rw-member__none {
   margin: 0;
