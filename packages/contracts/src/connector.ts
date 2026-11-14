@@ -210,11 +210,13 @@ export const ConnectorCapabilitiesSchema = z.object({
   fanProfile: z.boolean(),
   /** `getFanNote`. */
   fanNoteRead: z.boolean(),
+  /** `setFanNote`: a platform may let the note be read without letting it be written (ADR 0018 § 1). */
+  fanNoteWrite: z.boolean(),
   /** `getCreatorNotes`. */
   creatorNotes: z.boolean(),
   /** `getFanPpvStats`. */
   ppvStats: z.boolean(),
-  /** `listPlatformScripts`. */
+  /** `listPlatformScripts` and `sendScriptStep`. */
   scripts: z.boolean(),
   /** `getScriptHistory`. */
   scriptHistory: z.boolean(),
