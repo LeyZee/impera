@@ -14,6 +14,16 @@ import type { ActorView } from '../../domain/access';
 import type { FanReader, GrantRecord } from '../../domain/ports';
 import { creatorTools, fanTools } from '../read-tools';
 
+/** The strings of a value outside a `{ kind, text }` field: what an agent would take as ours. */
+function freeStrings(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(freeStrings);
+  if (typeof value !== 'object' || value === null) return [];
+  const entries = Object.entries(value);
+  if (entries.length === 2 && 'kind' in value && 'text' in value) return [];
+  return entries.flatMap(([, field]) => freeStrings(field));
+}
+
 const nora = newId(CreatorIdSchema);
 const lea = newId(CreatorIdSchema);
 const grant: GrantRecord = {
@@ -116,6 +126,13 @@ function fans(): FanReader & { asked: string[] } {
           observedAt: seen,
           ...{ sourceMessageId: 'msg-1', confidence: 0.9 },
         },
+        {
+          category: 'operator_note',
+          key: 'note',
+          value: 'note-du-chatteur',
+          kind: 'declared',
+          observedAt: seen,
+        },
       ]),
     flags: () => Promise.resolve({ fragile: true, spendingLimitMinor: 5000 }),
     card: (creatorId, fanId) => {
@@ -142,6 +159,7 @@ function fans(): FanReader & { asked: string[] } {
             observedAt: seen,
             ...{ sourceMessageId: 'msg-3' },
           },
+          { key: 'note', value: 'carte-note-du-chatteur', source: 'noted', observedAt: seen },
         ],
       });
     },
@@ -153,7 +171,7 @@ describe('the fan tools (ADR 0105 § 4, read:fans)', () => {
   const cardGet = fanTools(fans())['fan_card_get'];
   if (fanGet === undefined || cardGet === undefined) throw new Error('fan tools missing');
 
-  it('give a fan of the access’s creator, his texts marked untrusted, and nothing of his platform', async () => {
+  it('give a fan of the access’s creator, his texts marked untrusted, nothing of his platform nor a chatter’s note', async () => {
     const value = McpFanGetSchema.parse(
       await fanGet.run({ grant, actor: manager, creatorId: lea }, { fanId: theo }),
     );
@@ -167,7 +185,7 @@ describe('the fan tools (ADR 0105 § 4, read:fans)', () => {
         facts: [
           {
             category: 'life',
-            key: 'job',
+            key: { kind: 'fan_fact', text: 'job' },
             kind: 'declared',
             observedAt: seen.toISOString(),
             value: { kind: 'fan_fact', text: 'infirmier' },
@@ -176,7 +194,8 @@ describe('the fan tools (ADR 0105 § 4, read:fans)', () => {
       },
     });
     const text = JSON.stringify(value);
-    for (const leak of ['pf-123', 'pa-456', 'msg-1', 'confidence']) expect(text).not.toContain(leak);
+    for (const leak of ['pf-123', 'pa-456', 'msg-1', 'confidence', 'note-du-chatteur'])
+      expect(text).not.toContain(leak);
   });
 
   it('give his card with the count of values to check, never who noted it nor the message', async () => {
@@ -197,14 +216,15 @@ describe('the fan tools (ADR 0105 § 4, read:fans)', () => {
     ]);
     expect(value.card?.others).toEqual([
       {
-        key: 'chien',
+        key: { kind: 'fan_card', text: 'chien' },
         value: { kind: 'fan_card', text: 'un berger' },
         source: 'inferred',
         observedAt: seen.toISOString(),
       },
     ]);
     const text = JSON.stringify(value);
-    for (const leak of ['user-1', 'msg-2', 'msg-3', 'Teo']) expect(text).not.toContain(leak);
+    for (const leak of ['user-1', 'msg-2', 'msg-3', 'Teo', 'carte-note-du-chatteur'])
+      expect(text).not.toContain(leak);
   });
 
   it('give null for a fan of another creator, without asking his card', async () => {
@@ -214,6 +234,17 @@ describe('the fan tools (ADR 0105 § 4, read:fans)', () => {
     expect(await tools['fan_get']?.run(context, { fanId: theo })).toEqual({ fan: null });
     expect(await tools['fan_card_get']?.run(context, { fanId: theo })).toEqual({ card: null });
     expect(reader.asked).toEqual([`getFan:${nora}`, `getFan:${nora}`]);
+  });
+
+  it('give no free text outside a field marked untrusted: ids, dates and closed codes only', async () => {
+    const context = { grant, actor: manager, creatorId: lea };
+    const fan = await fanGet.run(context, { fanId: theo });
+    const card = await cardGet.run(context, { fanId: theo });
+    const free = new Set(freeStrings([fan, card]));
+    // `notedByName` is a member of the team, not the fan (ADR 0105 § 4).
+    expect([...free].sort()).toEqual(
+      [theo, seen.toISOString(), 'life', 'declared', 'first_name', 'noted', 'inferred', 'Marie'].sort(),
+    );
   });
 
   it('name the fan, by his id only, in the line of the journal', () => {

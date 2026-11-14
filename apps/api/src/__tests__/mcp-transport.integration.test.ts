@@ -332,7 +332,13 @@ describe('/v1/mcp', () => {
         id: theo,
         name: { kind: 'fan_name', text: 'Théo' },
         flags: { fragile: true },
-        facts: [{ category: 'identity', key: 'first_name', value: { kind: 'fan_fact', text: 'Théo' } }],
+        facts: [
+          {
+            category: 'identity',
+            key: { kind: 'fan_fact', text: 'first_name' },
+            value: { kind: 'fan_fact', text: 'Théo' },
+          },
+        ],
       },
     });
     const card = RpcSchema.parse((await rpc(grant.token, callTool('fan_card_get', { fanId: theo }))).json());

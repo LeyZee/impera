@@ -88,7 +88,7 @@ const UNTRUSTED =
 export function fanTools(reader: FanReader): Readonly<Record<string, ServedTool>> {
   return {
     fan_get: {
-      description: `Un fan de la créatrice de cet accès : son nom, ce qu’elle sait de lui, ses limites, première et dernière visite ; \`null\` s’il n’est pas à elle. ${UNTRUSTED}`,
+      description: `Un fan de la créatrice de cet accès : son nom, ce qu’elle sait de lui (faits intimes compris), ses limites, première et dernière visite ; jamais les notes des chatteurs ; \`null\` s’il n’est pas à elle. ${UNTRUSTED}`,
       input: McpFanInputSchema,
       output: McpFanGetSchema,
       subject: fanSubject,
@@ -107,19 +107,22 @@ export function fanTools(reader: FanReader): Readonly<Record<string, ServedTool>
             firstSeenAt: fan.firstSeenAt.toISOString(),
             lastSeenAt: fan.lastSeenAt.toISOString(),
             flags: FanFlagsSchema.parse(flags),
-            facts: facts.map((fact) => ({
-              category: FactCategorySchema.parse(fact.category),
-              key: fact.key,
-              kind: StoredFactKindSchema.parse(fact.kind),
-              observedAt: fact.observedAt.toISOString(),
-              value: { kind: 'fan_fact', text: fact.value },
-            })),
+            // The chatter's notes are never exposed (ADR 0026 § 5): only what was read from him.
+            facts: facts
+              .filter((fact) => fact.category !== 'operator_note')
+              .map((fact) => ({
+                category: FactCategorySchema.parse(fact.category),
+                key: { kind: 'fan_fact', text: fact.key },
+                kind: StoredFactKindSchema.parse(fact.kind),
+                observedAt: fact.observedAt.toISOString(),
+                value: { kind: 'fan_fact', text: fact.value },
+              })),
           },
         };
       },
     },
     fan_card_get: {
-      description: `La fiche d’un fan de la créatrice de cet accès, telle que l’IA l’a remplie : chaque champ, sa valeur, qui l’a notée, combien de valeurs attendent « à vérifier » ; \`null\` s’il n’est pas à elle. ${UNTRUSTED}`,
+      description: `La fiche d’un fan de la créatrice de cet accès, telle que l’IA l’a remplie : chaque champ, sa valeur, qui l’a notée, combien de valeurs attendent « à vérifier » (faits intimes compris, jamais les notes des chatteurs) ; \`null\` s’il n’est pas à elle. ${UNTRUSTED}`,
       input: McpFanInputSchema,
       output: McpFanCardGetSchema,
       subject: fanSubject,
@@ -135,12 +138,16 @@ export function fanTools(reader: FanReader): Readonly<Record<string, ServedTool>
               current: entry.current === null ? null : cardValueOf(entry.current),
               toCheck: entry.toCheck.length,
             })),
-            others: card.others.map((other) => ({
-              key: other.key,
-              value: { kind: 'fan_card', text: other.value },
-              source: FanCardSourceSchema.parse(other.source),
-              observedAt: other.observedAt.toISOString(),
-            })),
+            // A value off the card's fields that a person noted is a chatter's note (`operator_note`, or `noted`
+            // without a field): never exposed (ADR 0026 § 5), whatever its key.
+            others: card.others
+              .filter((other) => other.source !== 'noted')
+              .map((other) => ({
+                key: { kind: 'fan_card', text: other.key },
+                value: { kind: 'fan_card', text: other.value },
+                source: FanCardSourceSchema.parse(other.source),
+                observedAt: other.observedAt.toISOString(),
+              })),
           },
         };
       },

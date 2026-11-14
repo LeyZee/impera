@@ -173,7 +173,8 @@ export const McpFanGetSchema = z.strictObject({
       facts: z.array(
         z.strictObject({
           category: FactCategorySchema,
-          key: z.string(),
+          /** Written from what he said: free text, like the value. */
+          key: untrustedOf('fan_fact'),
           kind: StoredFactKindSchema,
           observedAt: z.iso.datetime(),
           value: untrustedOf('fan_fact'),
@@ -208,7 +209,8 @@ export const McpFanCardGetSchema = z.strictObject({
       ),
       others: z.array(
         z.strictObject({
-          key: z.string(),
+          /** Written from what he said: free text, like the value. */
+          key: untrustedOf('fan_card'),
           value: untrustedOf('fan_card'),
           source: FanCardSourceSchema,
           observedAt: z.iso.datetime(),
