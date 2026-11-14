@@ -1,4 +1,9 @@
-import { MCP_OWNER_ONLY_CAPABILITIES, type McpCapability } from '@impera/contracts';
+import {
+  MCP_CAPABILITIES,
+  MCP_OWNER_ONLY_CAPABILITIES,
+  type McpCapability,
+  type TeamScope,
+} from '@impera/contracts';
 
 import type { McpToolSpec } from './catalogue';
 
@@ -18,6 +23,8 @@ export interface GrantView {
 /** The person the access acts for, as read now. */
 export interface ActorView {
   readonly role: 'owner' | 'operator' | 'creator';
+  /** As `/v1/me` gives it: a manager who is no longer active falls to `self`. */
+  readonly teamScope: TeamScope;
   readonly secondFactorEnabled: boolean;
   /** The creators he may read now: `all` for the owner, his own for a creator, those his shift opens for a member. */
   readonly readableCreatorIds: 'all' | readonly string[];
@@ -33,15 +40,50 @@ type McpRefusal =
   | 'creator_required'
   /** Another creator than the access's, or one the person may no longer read. */
   | 'creator_forbidden'
-  /** ADR 0023: a creator's own account never reads a conversation nor a fan. */
+  /** The person's role and team scope never open this capability or this tool (ADR 0023, ADR 0026 § 3). */
   | 'role_forbidden';
 
-export type McpDecision = { readonly ok: true } | { readonly ok: false; readonly refusal: McpRefusal };
+export type McpDecision =
+  | {
+      readonly ok: true;
+      /**
+       * The creator the call is confined to: the access's, on a tool of the agency too, where the dispatcher keeps only
+       * what concerns her. `null` only for an access without a creator, read within the person's team scope.
+       */
+      readonly creatorId: string | null;
+    }
+  | { readonly ok: false; readonly refusal: McpRefusal };
 
-const CREATOR_NEVER_READS: readonly McpCapability[] = [
-  'read:conversations',
-  'read:conversation_content',
-  'read:fans',
+type Person = Pick<ActorView, 'role' | 'teamScope'>;
+
+/**
+ * What each role and team scope may ever hold, the rest refused (an allow-list, never a deny-list). The owner holds
+ * all; an active manager all but the owner's own, the pay and the drops; a chatter nothing until the access bound to
+ * his shift (ADR 0025, ADR 0026 § 3); a creator her routine, her revenue, who is on shift, her media, her tasks and her
+ * drops, never a conversation, a fan nor the team's pay (ADR 0023, ADR 0105 § 4 bis). A pair absent from the table
+ * opens nothing.
+ */
+const ALLOWED: Readonly<Record<string, readonly McpCapability[]>> = {
+  'owner:owner': MCP_CAPABILITIES,
+  'operator:agency': MCP_CAPABILITIES.filter(
+    (c) => !MCP_OWNER_ONLY_CAPABILITIES.includes(c) && c !== 'read:payroll' && c !== 'write:drops',
+  ),
+  'operator:self': [],
+  'creator:self': ['read:status', 'read:team', 'read:sales', 'read:media', 'write:tasks', 'write:drops'],
+};
+
+const allowedFor = (person: Person): readonly McpCapability[] =>
+  ALLOWED[`${person.role}:${person.teamScope}`] ?? [];
+
+/**
+ * Tools of a capability a creator holds that still reach the team's work or pay: ADR 0023 shows her who is on shift
+ * and her own revenue, never a chatter's sales, reports or statements.
+ */
+const CREATOR_NEVER_CALLS: readonly string[] = [
+  'sales_by_chatter',
+  'shift_reports_list',
+  'team_import_list',
+  'commission_statements_list',
 ];
 
 const refuse = (refusal: McpRefusal): McpDecision => ({ ok: false, refusal });
@@ -62,27 +104,32 @@ export function decideCall(
     if (!grant.capabilities.includes(capability)) return refuse('capability_missing');
     if (MCP_OWNER_ONLY_CAPABILITIES.includes(capability) && actor.role !== 'owner')
       return refuse('owner_only');
-    if (actor.role === 'creator' && CREATOR_NEVER_READS.includes(capability)) return refuse('role_forbidden');
+    if (!allowedFor(actor).includes(capability)) return refuse('role_forbidden');
   }
-  if (tool.scope !== 'creator') return { ok: true };
+  if (actor.role === 'creator' && CREATOR_NEVER_CALLS.includes(tool.name)) return refuse('role_forbidden');
+  if (tool.scope !== 'creator') return { ok: true, creatorId: grant.creatorId };
   if (grant.creatorId === null) return refuse('creator_required');
   const creatorId = namedCreatorId ?? grant.creatorId;
   if (creatorId !== grant.creatorId) return refuse('creator_forbidden');
   const readable = actor.readableCreatorIds === 'all' || actor.readableCreatorIds.includes(creatorId);
-  return readable ? { ok: true } : refuse('creator_forbidden');
+  return readable ? { ok: true, creatorId } : refuse('creator_forbidden');
 }
+
+type GrantProblem = 'capability_repeated' | 'owner_only' | 'role_forbidden';
 
 /**
  * What is wrong with the capabilities asked for a new access, empty when nothing: the owner creates every access in
- * lot a (ADR 0026 § 3), and the owner-only ones go on an access in his own name only.
+ * lot a (ADR 0026 § 3), the owner-only ones go on an access in his own name only, and none goes beyond what the
+ * person's role and team scope may ever hold.
  */
 export function grantProblems(
   capabilities: readonly McpCapability[],
-  personRole: ActorView['role'],
-): readonly ('capability_repeated' | 'owner_only')[] {
-  const problems: ('capability_repeated' | 'owner_only')[] = [];
+  person: Person,
+): readonly GrantProblem[] {
+  const problems: GrantProblem[] = [];
   if (new Set(capabilities).size !== capabilities.length) problems.push('capability_repeated');
-  if (personRole !== 'owner' && capabilities.some((c) => MCP_OWNER_ONLY_CAPABILITIES.includes(c)))
-    problems.push('owner_only');
+  const beyond = capabilities.filter((c) => !allowedFor(person).includes(c));
+  if (beyond.some((c) => MCP_OWNER_ONLY_CAPABILITIES.includes(c))) problems.push('owner_only');
+  if (beyond.some((c) => !MCP_OWNER_ONLY_CAPABILITIES.includes(c))) problems.push('role_forbidden');
   return problems;
 }

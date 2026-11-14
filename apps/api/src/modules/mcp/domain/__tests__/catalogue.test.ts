@@ -52,20 +52,61 @@ describe('MCP catalogue (ADR 0026 § 5 and § 9, ADR 0105 § 4)', () => {
 
 describe('never exposed (ADR 0026 § 5, ADR 0105 § 3)', () => {
   it.each([
-    'draft_approve',
+    // To a fan
     'message_send',
+    'message_create',
+    'broadcast',
+    'draft_approve',
+    'draft_propose',
+    'draft_suggest',
+    // Speeding up
     'fan_age_confirm',
+    'fan_unfreeze',
+    'conversation_hand_back',
     'agent_set_automatic',
+    'agent_set_auto',
+    'agent_enable',
+    // Prepared actions
+    'prepared_action_confirm',
+    // Keys, accesses, second factor
+    'telegram_token_get',
+    'grant_create',
+    'access_renew',
+    'access_revoke',
+    'second_factor_reset',
+    'passkey_add',
+    'login',
+    // Persona
     'persona_get',
+    // Pay and rates
     'payroll_validate',
+    'pay_period_validate',
+    'payment_mark',
+    'statement_validate',
     'commission_rate_set',
+    'agency_rate_set',
     'contractor_file_get',
+    // Members
     'member_create',
+    'member_invite',
+    'invitation_create',
+    'member_depart',
+    // Scripts and drops
+    'script_create',
+    'script_update',
+    'script_activate',
+    'script_price_set',
+    'drop_validate',
+    'drop_publish',
+    // Deletion, export, notes, AI budget, connectors
     'fan_delete',
     'fans_export',
     'operator_note_set',
+    'fan_note_set',
     'playground_reply',
-    'telegram_token_get',
+    'media_describe',
+    'conversation_summarize',
+    'connector_sync',
   ])('catches %s', (name) => {
     expect(neverExposedHits(name).length).toBeGreaterThan(0);
   });
