@@ -2,7 +2,16 @@
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
-import { evaluateRewards, markRevealed, myTrophyCase, type RewardsDeps } from './application/rewards';
+import {
+  evaluateRewards,
+  levelSettings,
+  markRevealed,
+  memberTrophyCase,
+  myShiftChallenge,
+  myTrophyCase,
+  saveLevelThresholds,
+  type RewardsDeps,
+} from './application/rewards';
 import { createRewardsRoutes, type RewardsRoutesOptions } from './infra/routes';
 import { createDrizzleRewardsStore, type RewardsReads } from './infra/store';
 
@@ -15,7 +24,7 @@ export interface RewardsModule {
     /** What each chatter earned since the last run; replayable. */
     readonly evaluate: () => Promise<{ players: number; gained: number }>;
   };
-  /** `/v1/rewards/my-trophy-case` and its reveals, behind the guard given here. */
+  /** The session's case, reveals and challenge, a member's case on their file, the owner's thresholds. */
   readonly routes: (options: RewardsRoutesOptions) => FastifyPluginAsyncZod;
 }
 
@@ -42,6 +51,10 @@ export function startRewardsModule(options: RewardsStartOptions): RewardsModule 
         {
           myTrophyCase: (userId) => myTrophyCase(deps, userId),
           markRevealed: (userId, body) => markRevealed(deps, userId, body),
+          myShiftChallenge: (userId) => myShiftChallenge(deps, userId),
+          memberTrophyCase: (viewerId, memberId) => memberTrophyCase(deps, viewerId, memberId),
+          levelSettings: (userId) => levelSettings(deps, userId),
+          saveLevelThresholds: (userId, body) => saveLevelThresholds(deps, userId, body),
         },
         routeOptions,
       ),

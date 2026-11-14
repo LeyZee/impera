@@ -40,12 +40,14 @@ Le chatteur lit ses propres chiffres dans le style du Dashboard de l'agence (gai
 - [x] Module `rewards` : tables `reward_gains` et `reward_streaks` (FORCE RLS, l'application ne fait que lire et marquer un dévoilement vu), job rejouable `rewards.evaluate`, routes `GET /v1/rewards/my-trophy-case` et `POST …/reveals` (sans identifiant dans leur adresse : le serveur répond pour la session), test « chacun sa vitrine ».
 - [x] Palier atteint (§ 12), série (§ 13), trophées (§ 15).
 - [x] Tests : rien du jeu n'entre dans un relevé (§ 17) ; chacun sa vitrine ; mouvement réduit (§ 19) ; aucune notification (§ 18 : le jeu n'en envoie aucune).
-- [ ] Captures validées par Charles (lot `jeu-devoilement-2`), relectures Équipe, Bilan, Design, fusion.
+- [x] Captures validées par Charles (lot `jeu-devoilement-2`), relectures Équipe, Bilan, Design, fusion (#740).
 
-### Lot 2b : défi du shift, niveaux, fiche du membre (PR à part)
+### Lot 2b : défi du shift, rangs, fiche du membre (PR à part, une migration, 0203 provisoire)
 
-- [ ] Défi du shift (§ 14) et niveaux (§ 16), seuils réglés par le propriétaire.
-- [ ] Lecture de la série et des trophées sur la fiche du membre pour le propriétaire et le manager (§ 20).
+- [x] Défi du shift (§ 14) : `GET /v1/rewards/my-shift-challenge`, carte sur Aujourd'hui.
+- [x] Rangs (§ 16) : huit rangs fixes et leurs insignes, seuils réglés par le propriétaire (`reward_level_settings`, Paie › Objectifs), carte « Mon rang » sur Commissions, dévoilement d'un rang gagné.
+- [x] Lecture du rang, de la série et des trophées sur la fiche du membre pour le propriétaire et le manager (§ 20).
+- [ ] Captures validées par Charles, relectures Équipe, Bilan, Design, numéro de migration confirmé, fusion.
 
 ### Lot 3 : quand les données arrivent
 
@@ -69,3 +71,4 @@ Le chatteur lit ses propres chiffres dans le style du Dashboard de l'agence (gai
 
 - 13/11/2026 : ADR 0104 acceptée, fiche ouverte.
 - 13/11/2026, lot 1 : l'anneau du palier vit sur Aujourd'hui seulement ; Commissions garde sa jauge de « Ma performance » (une carte par sujet). Les graphiques se dessinent dans la devise qui rapporte le plus ; une autre devise reste lisible dans « Mes ventes lues ». Un chatteur payé sur rapports déclarés n'a pas de lignes `platform_net` : ses cartes n'apparaissent qu'avec ses premières ventes relevées. Tests d'intégration non joués en local (pas de Docker dans la session) : la CI les joue.
+- 14/11/2026, lot 2b : Charles a choisi « rangs fixes, seuils à lui » ; l'écran dit « rang », le code `level`. Un défi réussi ne note aucun gain (pas de dévoilement). La vitrine gagne la famille `level` et un champ facultatif `nextLevel`.

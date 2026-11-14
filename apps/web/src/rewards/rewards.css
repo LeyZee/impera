@@ -360,7 +360,7 @@
 }
 
 /* A gain that waits while its chatter is elsewhere: a pill above the tab bar on a phone, where the offline pill
-   sits, and in the top corner of a computer; never over what the page shows. Still: a fade, no sound. */
+   sits, and in the top margin of a computer; never over what the page shows. Still: a fade, no sound. */
 .rw-owed-region {
   position: fixed;
   z-index: 27;
@@ -408,14 +408,198 @@
 }
 @media (min-width: 821px) {
   .rw-owed.nv-glass {
+    /* In the margin above a page's header: a page's own tabs and actions start lower, and a pill never covers a
+       control. */
     left: auto;
     right: 24px;
-    top: 20px;
+    top: 6px;
     bottom: auto;
+    padding: 3px 3px 3px 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .rw-owed {
     animation: none !important;
   }
+}
+
+/* ───────────── Défi du shift (ADR 0104 § 14) ───────────── */
+
+/* The way to the target is a progress: its blue, as the way to a tier. */
+.rw-challenge__body {
+  display: grid;
+  gap: 6px;
+  padding: 0 24px 24px;
+}
+.rw-challenge__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.rw-challenge__figures {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  color: var(--nv-ink-muted);
+}
+.rw-challenge__figures b {
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+.rw-challenge__gauge {
+  margin: 6px 0 4px;
+}
+.rw-challenge__gauge .nv-gauge__fill,
+.rw-rank__gauge .nv-gauge__fill {
+  background: var(--nv-series-2);
+}
+/* Met: the gold of what is earned, never the red of an urgency. */
+.rw-challenge__body[data-met='true'] .nv-gauge__fill {
+  /* The gold of what is earned: the metal of the medals and of the rim of an insignia. */
+  background: linear-gradient(90deg, #9a7420 0%, #e8c37a 55%, #fff0bd 100%);
+  box-shadow: 0 0 10px rgb(240 196 106 / 0.35);
+}
+.rw-challenge__note,
+.rw-rank__note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+
+/* ───────────── Mon rang (ADR 0104 § 16) ───────────── */
+
+.rw-rank__body {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-4);
+  padding: 0 24px 24px;
+}
+.rw-rank__body > svg {
+  flex: none;
+}
+.rw-rank__main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.rw-rank__name {
+  margin: 0;
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-text-title-1);
+  line-height: 1.1;
+  color: var(--nv-ink);
+}
+.rw-rank__next {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  color: var(--nv-ink-muted);
+}
+.rw-rank__next b {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+
+/* ───────────── Rangs des chatteurs, réglage du propriétaire ───────────── */
+
+.rw-levels__list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (max-width: 640px) {
+  .rw-levels__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.rw-levels__rank {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: var(--nv-space-3) var(--nv-space-2);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  text-align: center;
+  color: var(--nv-ink-muted);
+}
+.rw-levels__name {
+  margin: 4px 0 0;
+  font-size: var(--nv-text-callout);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.rw-levels__rank[data-open='false'] .rw-levels__name {
+  color: var(--nv-ink-muted);
+}
+.rw-levels__at {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+}
+.rw-levelform {
+  display: grid;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rw-levelform__row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(104px, min(180px, 45%));
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.rw-levelform__name {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+
+/* ───────────── Jeu, sur la fiche d'un membre (ADR 0104 § 20) ───────────── */
+
+.rw-member__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--nv-space-3);
+  margin: var(--nv-space-3) 0;
+}
+.rw-member__facts dt {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rw-member__facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.rw-member__rank {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rw-member__trophies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2) var(--nv-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-callout);
+  color: var(--nv-ink);
+}
+.rw-member__trophies li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.rw-member__label {
+  margin: 0 0 6px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rw-member__none {
+  margin: 0;
 }

@@ -26,6 +26,7 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
       agencyTimeZone: deps.scheduling.pay.agencyTimeZone,
       payFacts: payGameFactsUnscoped,
       shifts: shiftsForGameUnscoped,
+      shiftsBegun: (userId, now) => deps.scheduling.reads.ownShiftsBegun(userId, now),
     },
   });
   return {
@@ -41,6 +42,12 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
         },
       ),
     },
-    routes: [module.routes({ guard: requireRole('operator') })],
+    routes: [
+      module.routes({
+        guard: requireRole('operator'),
+        teamGuard: requireRole('owner', 'operator'),
+        ownerGuard: requireRole('owner'),
+      }),
+    ],
   };
 }

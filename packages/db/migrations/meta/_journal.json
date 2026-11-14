@@ -1009,6 +1009,13 @@
       "when": 1794659979888,
       "tag": "0195_script_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1794663130419,
+      "tag": "0203_rewards_levels",
+      "breakpoints": true
     }
   ]
 }

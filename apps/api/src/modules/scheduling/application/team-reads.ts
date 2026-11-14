@@ -99,7 +99,22 @@ export interface SchedulingReads {
    * Unlike the module's `onShift`, which the system reads for the routing of a handover, this read is the person's.
    */
   onShiftNow(reader: ScheduleReader, creators: CreatorBound, at: Date): Promise<OnShiftNow[]>;
+  /**
+   * For the shift's challenge (ADR 0104 § 14): the shifts `userId` himself began in the nine weeks before `at` (eight
+   * weeks of history before the shift shown), on every creator, cancelled ones left out, the oldest first; when each
+   * began and when it ended or will (the minute it was stopped at), nothing of the account. Read as the member,
+   * creator by creator, under the same policies as his planning: never a colleague's shift.
+   */
+  ownShiftsBegun(userId: UserId, at: Date): Promise<OwnShiftBegun[]>;
 }
+
+/** A shift a member began, as the shift's challenge reads it. */
+interface OwnShiftBegun {
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+}
+
+const CHALLENGE_HISTORY_DAYS = 63;
 
 const nameOf = (members: readonly NamedMember[]): ((id: TeamMemberId) => string | null) => {
   const names = new Map(members.map((member) => [member.id, member.displayName]));
@@ -116,7 +131,7 @@ const byTime = (a: { at: number; id: string }, b: { at: number; id: string }): n
   a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 export function createSchedulingReads(
-  planning: Pick<PlanningStore, 'read'>,
+  planning: Pick<PlanningStore, 'read' | 'ownShiftsBegun'>,
   reports: Pick<ShiftReportStore, 'list'>,
   creators: CreatorDirectory,
   now: () => Date = () => new Date(),
@@ -218,5 +233,13 @@ export function createSchedulingReads(
           endsAt: shift.endsAt.toISOString(),
         }));
     },
+
+    ownShiftsBegun: async (userId, at) =>
+      planning.ownShiftsBegun(
+        userId,
+        (await creators.list()).map((creator) => creator.id),
+        new Date(at.getTime() - CHALLENGE_HISTORY_DAYS * 86_400_000),
+        at,
+      ),
   };
 }
