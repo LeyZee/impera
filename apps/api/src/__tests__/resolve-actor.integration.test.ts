@@ -47,6 +47,7 @@ describe('resolveActor: an account read by its id as a session is read (ADR 0026
   it('says whether the second factor is active, without guessing it', async () => {
     const before = await resolveActor(app.db.db, shiftCreators, ownerId);
     expect(before?.user.role).toBe('owner');
+    expect(before?.membership.teamScope).toBe('owner');
     expect(before?.secondFactorEnabled).toBe(false);
     await test.admin.db
       .update(schema.user)
@@ -71,7 +72,8 @@ describe('resolveActor: an account read by its id as a session is read (ADR 0026
     expect(atWork?.user.creatorIds).toEqual([]);
     expect(atWork?.user.routedCreatorIds).toEqual([CREATOR_ID]);
     expect(atWork?.user.shiftCreatorIds).toEqual([CREATOR_ID]);
-    expect(atWork?.membership?.team?.role).toBe('chatter');
+    expect(atWork?.membership.team?.role).toBe('chatter');
+    expect(atWork?.membership.teamScope).toBe('self');
 
     await test.admin.db
       .update(schema.teamMembers)

@@ -837,7 +837,8 @@ export async function currentUserById(
 /** Who an account is right now, read without a request: what a session's guard reads, by the account's id. */
 export interface ResolvedActor {
   readonly user: CurrentUser;
-  readonly membership: Pick<Me, 'team' | 'teamScope'> | null;
+  /** Always read, the owner's and a creator's too (as `/v1/me` does): never `null` for « not read ». */
+  readonly membership: Pick<Me, 'team' | 'teamScope'>;
   readonly secondFactorEnabled: boolean;
 }
 
@@ -867,7 +868,11 @@ export async function resolveActor(
   if (row === undefined) return null;
   const signedIn = await userOf(db, shiftCreators, row);
   if (signedIn === null) return null;
-  return { ...signedIn, secondFactorEnabled: row.twoFactorEnabled };
+  return {
+    user: signedIn.user,
+    membership: signedIn.membership ?? (await membership(db, userId)),
+    secondFactorEnabled: row.twoFactorEnabled,
+  };
 }
 
 /** Mounts Better Auth's own handler under `/v1/auth/*` and adds `GET /v1/me`. */
