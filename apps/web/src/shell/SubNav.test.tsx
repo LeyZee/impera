@@ -126,6 +126,28 @@ describe('SubNav', () => {
     expect(screen.queryByRole('button', { name: 'Onglets suivants' })).toBeNull();
   });
 
+  // Recette du 14/11 : at 1280 px a creator's eleven tabs ran off the page, the lit one cut in two.
+  it('brings the lit tab into view when the tabs stop fitting, on any screen', async () => {
+    renderNav([
+      { to: '/paie/releves', label: 'Relevés' },
+      { to: '/paie/quinzaine', label: 'Quinzaine' },
+    ]);
+    const lit = await screen.findByRole('link', { name: 'Quinzaine' });
+    const nav = screen.getByRole('navigation', { name: 'Paie' });
+    expect(nav.dataset['more']).toBe('none');
+    Object.defineProperty(lit, 'offsetLeft', { configurable: true, value: 400 });
+    Object.defineProperty(lit, 'offsetWidth', { configurable: true, value: 100 });
+    Object.defineProperty(nav, 'clientWidth', { configurable: true, value: 300 });
+    Object.defineProperty(nav, 'scrollWidth', { configurable: true, value: 600 });
+    act(() => {
+      resized([]);
+    });
+    // The lit tab in the middle of what shows, and the edge that now hides tabs marked.
+    expect(nav.scrollLeft).toBe(300);
+    expect(nav.dataset['more']).toBe('start');
+    expect(screen.getByRole('button', { name: 'Onglets précédents' })).toBeDefined();
+  });
+
   // Relecture des captures (#569): the font once loaded, or a count drawn outside the list, widened a tab and the
   // glass stayed where the lit tab had been.
   it('puts its glass back under the lit tab when a tab changes width, not at its first size', async () => {
