@@ -1,6 +1,6 @@
 {
-  "id": "142cac61-7fe2-440e-9eb6-085633bc553b",
-  "prevId": "06139950-2caa-405c-abef-c5bd417c8360",
+  "id": "d3c02f00-7498-44f7-9f48-96a11953f899",
+  "prevId": "6e8624d1-c499-4b9b-93a0-6bd214b4b266",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -19205,6 +19205,206 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.connector_sends": {
+      "name": "connector_sends",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_conversation_id": {
+          "name": "platform_conversation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "script_ref": {
+          "name": "script_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempt_started_at": {
+          "name": "attempt_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_message_id": {
+          "name": "platform_message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "connector_sends_message_unique": {
+          "name": "connector_sends_message_unique",
+          "columns": [
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_message_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"connector_sends\".\"platform_message_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "connector_sends_conversation_idx": {
+          "name": "connector_sends_conversation_idx",
+          "columns": [
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_conversation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "connector_sends_creator_idx": {
+          "name": "connector_sends_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "connector_sends_creator_id_creators_id_fk": {
+          "name": "connector_sends_creator_id_creators_id_fk",
+          "tableFrom": "connector_sends",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "connector_sends_account_creator_fk": {
+          "name": "connector_sends_account_creator_fk",
+          "tableFrom": "connector_sends",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "connector_sends_key_unique": {
+          "name": "connector_sends_key_unique",
+          "nullsNotDistinct": false,
+          "columns": ["platform_account_id", "idempotency_key"]
+        }
+      },
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"connector_sends\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "\"connector_sends\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "connector_sends_state_check": {
+          "name": "connector_sends_state_check",
+          "value": "\"connector_sends\".\"state\" in ('pending', 'sent')"
+        },
+        "connector_sends_fingerprint_check": {
+          "name": "connector_sends_fingerprint_check",
+          "value": "\"connector_sends\".\"fingerprint\" ~ '^[0-9a-f]{64}$'"
+        },
+        "connector_sends_sent_check": {
+          "name": "connector_sends_sent_check",
+          "value": "(\"connector_sends\".\"state\" = 'sent') = (\"connector_sends\".\"platform_message_id\" is not null) and (\"connector_sends\".\"platform_message_id\" is null) = (\"connector_sends\".\"sent_at\" is null)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.creators": {
