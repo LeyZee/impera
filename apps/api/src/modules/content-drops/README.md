@@ -129,6 +129,14 @@ Un script se dépose depuis sa demande, qui porte la version figée de sa struct
 - « Envoyer le script » est refusé tant qu'un emplacement obligatoire est vide, ou que son fichier a été refusé (422 `content_drop_slots_unprocessable`, les emplacements dans `details.slotKeys`). Envoyé, le dépôt passe en `uploading` sous le rôle propriétaire et suit le chemin de tout dépôt (reçu, prêt).
 - Elle reprend quand elle veut, depuis n'importe quel appareil : le serveur garde chaque fichier déclaré, jamais un brouillon local. Retirer un dépôt en cours de remplissage est permis.
 
+## Lectures de l'agence pour le serveur MCP (ADR 0026 § 1, ADR 0105 § 4)
+
+`reads` dans `index.ts`, ce que liront `drops_list`, `scripts_list` et `script_steps_get` : toujours bornées par l'id de la créatrice, le lecteur `{ userId, role }` vérifié dans `application/reads.ts` (propriétaire et équipe ; jamais son compte), puis le scope d'équipe du store (un chatteur est refusé, `content_drop_forbidden`) et sa RLS. La route `GET /creators/:creatorId/content` passe par la même vérification, sans changement de comportement.
+
+- `drops` : ses dépôts non retirés, du plus récent au plus ancien, 50 au plus par page ; `after` est le dernier id de la page d'avant, un id qui n'est pas à elle donne une page vide. Catégorie, état, sa phrase (texte libre de la créatrice), demande liée, numéro de script, nombre de fichiers par type. Jamais un média, sa clé ni son adresse.
+- `scripts` : ses scripts demandés et déposés, avec le nom de la structure (version figée), le moment fixé par la demande, le nombre d'étapes et de ponts, l'état et le jour demandé.
+- `scriptSteps` : les étapes de la version figée d'un de ses scripts, texte de l'agence ; `null` pour un dépôt qui n'est pas un script à elle.
+
 ## Routes
 
 - `GET /v1/creator-space/content` (créatrice) : ses demandes (la plus proche d'abord) et ses 100 derniers dépôts non retirés.
