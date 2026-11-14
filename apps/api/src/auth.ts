@@ -831,6 +831,28 @@ export async function currentUserById(
   shiftCreators: ShiftCreators,
   userId: string,
 ): Promise<CurrentUser | null> {
+  return (await resolveActor(db, shiftCreators, userId))?.user ?? null;
+}
+
+/** Who an account is right now, read without a request: what a session's guard reads, by the account's id. */
+export interface ResolvedActor {
+  readonly user: CurrentUser;
+  readonly membership: Pick<Me, 'team' | 'teamScope'> | null;
+  readonly secondFactorEnabled: boolean;
+}
+
+/**
+ * The actor of an account read without a request, by the same rules as `requireRole` reads a session (ADR 0026 § 4):
+ * his creators, those his shift opens (ADR 0025), his team role and scope (ADR 0024), and whether his second factor is
+ * active (ADR 0046 § 1). `null` for an account gone, a member who left, a creator archived, or a row that does not
+ * validate. Every door that acts for a person without his cookie (the extension link, the connected agents of ADR 0105)
+ * reads him here, so that a rule of access that changes, changes for all of them.
+ */
+export async function resolveActor(
+  db: Database,
+  shiftCreators: ShiftCreators,
+  userId: string,
+): Promise<ResolvedActor | null> {
   const [row] = await db
     .select({
       id: schema.user.id,
@@ -838,11 +860,14 @@ export async function currentUserById(
       name: schema.user.name,
       role: schema.user.role,
       creatorIds: schema.user.creatorIds,
+      twoFactorEnabled: schema.user.twoFactorEnabled,
     })
     .from(schema.user)
     .where(eq(schema.user.id, userId));
   if (row === undefined) return null;
-  return (await userOf(db, shiftCreators, row))?.user ?? null;
+  const signedIn = await userOf(db, shiftCreators, row);
+  if (signedIn === null) return null;
+  return { ...signedIn, secondFactorEnabled: row.twoFactorEnabled };
 }
 
 /** Mounts Better Auth's own handler under `/v1/auth/*` and adds `GET /v1/me`. */
