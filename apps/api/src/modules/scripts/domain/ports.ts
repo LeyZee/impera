@@ -160,15 +160,15 @@ interface AskedScript {
 export type LimitsOf = (creatorId: CreatorId) => Promise<PersonaLimits | null>;
 
 /** A platform account whose native scripts the import reads, and the creator it belongs to. */
-export interface ImportAccount {
+interface ImportAccount {
   readonly id: PlatformAccountId;
   readonly creatorId: CreatorId;
 }
 
 /** The import's writes (`scripts.import_platform_scripts`, ADR 0099 § 1 time 2), as the service role. */
 export interface PlatformScriptImportStore {
-  /** The accounts of the creators not archived. */
-  accounts(): Promise<readonly ImportAccount[]>;
+  /** Her account, when it is hers and she is not archived; `null` otherwise. */
+  account(creatorId: CreatorId, platformAccountId: PlatformAccountId): Promise<ImportAccount | null>;
   known(accountId: PlatformAccountId): Promise<readonly KnownPlatformScript[]>;
   /** The whole plan in one transaction: a cut import leaves the account as it was. */
   apply(account: ImportAccount, plan: PlatformScriptsPlan, now: Date): Promise<void>;

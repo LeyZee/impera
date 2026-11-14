@@ -26,7 +26,6 @@ import {
   type PlatformScriptsPlan,
 } from '../../domain/platform-scripts';
 import type {
-  ImportAccount,
   PlatformScriptImportStore,
   PlatformScriptReadStore,
   StoredPlatformScript,
@@ -80,21 +79,24 @@ async function writeSteps(
  */
 export function createDrizzlePlatformScriptImportStore(adminDb: Database): PlatformScriptImportStore {
   return {
-    accounts: () =>
-      withAdmin(adminDb, async (tx) =>
-        (
-          await tx
-            .select({ id: schema.platformAccounts.id, creatorId: schema.platformAccounts.creatorId })
-            .from(schema.platformAccounts)
-            .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
-            // An archived creator is read no more (ADR 0071 § 2).
-            .where(sql`${schema.creators.archivedAt} is null`)
-            .orderBy(schema.platformAccounts.createdAt)
-        ).map((row): ImportAccount => ({
-          id: PlatformAccountIdSchema.parse(row.id),
-          creatorId: CreatorIdSchema.parse(row.creatorId),
-        })),
-      ),
+    account: (creatorId, platformAccountId) =>
+      withAdmin(adminDb, async (tx) => {
+        const [row] = await tx
+          .select({ id: schema.platformAccounts.id, creatorId: schema.platformAccounts.creatorId })
+          .from(schema.platformAccounts)
+          .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
+          // Hers, and an archived creator is read no more (ADR 0071 § 2).
+          .where(
+            and(
+              eq(schema.platformAccounts.id, platformAccountId),
+              eq(schema.platformAccounts.creatorId, creatorId),
+              sql`${schema.creators.archivedAt} is null`,
+            ),
+          );
+        return row === undefined
+          ? null
+          : { id: PlatformAccountIdSchema.parse(row.id), creatorId: CreatorIdSchema.parse(row.creatorId) };
+      }),
 
     known: (accountId) =>
       withAdmin(adminDb, async (tx) =>

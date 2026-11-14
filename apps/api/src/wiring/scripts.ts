@@ -63,6 +63,18 @@ export function wireScripts(
           context.logger.info(run, 'scripts: the scripts due asked');
         },
       ),
+      'scripts.import_platform_scripts': defineTask(
+        'scripts.import_platform_scripts',
+        JOB_PAYLOADS['scripts.import_platform_scripts'],
+        shared.logger,
+        async (payload, context) => {
+          const run = await module.jobs.importPlatformScripts(payload, now());
+          context.logger.info(
+            { platformAccountId: payload.platformAccountId, ...run },
+            'scripts: the native scripts imported',
+          );
+        },
+      ),
     },
     routes: [module.routes],
   };

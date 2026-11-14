@@ -17,7 +17,7 @@ ADR 0099 (§ 1, § 3), ADR 0098 (déroulé et clés de segment), P6-01, `docs/re
 - [x] Un média d'étape absent du coffre rend l'étape incomplète, donc le script non proposable.
 - [x] Un script importé garde le nom de Reveal.
 - [x] « Proposable » = chaque média a une description validée **et** l'identité du script (schéma c8, unique) est validée (remarque Médias, point 6). Tant que c8 n'existe pas, aucun script natif n'est proposable.
-- [ ] Brancher le job `scripts.import_platform_scripts` (crontab) sur la lecture des scripts de `connectors` et les liaisons du coffre (`media_platform_refs`) quand la synchronisation du coffre (`PROPOSED-vault-sync.md`, Bilan) est dans main.
+- [ ] Brancher le job `scripts.import_platform_scripts` (un compte, demandé avec chaque synchronisation du coffre, sans horloge) sur la lecture des scripts de `connectors` et les liaisons du coffre (`media_platform_refs`) quand la synchronisation du coffre (`PROPOSED-vault-sync.md`, Bilan, #759) est dans main.
 
 ## Critères d'acceptation
 - Tests contre `FakeReveal` : script modifié resynchronisé, script supprimé désactivé, ordre des étapes respecté, prix repris tel quel, script non proposable tant qu'une description ou l'identité manque.

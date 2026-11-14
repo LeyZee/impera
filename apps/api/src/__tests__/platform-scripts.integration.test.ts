@@ -96,6 +96,9 @@ describe('the native scripts imported from the platform', () => {
     return connector.listPlatformScripts();
   }
 
+  const importOf = (platformAccountId: PlatformAccountId, creatorId: CreatorId, at: Date) =>
+    scripts.jobs.importPlatformScripts({ creatorId, platformAccountId }, at);
+
   const scriptRows = () =>
     test.admin.db.select().from(schema.platformScripts).orderBy(schema.platformScripts.platformScriptRef);
 
@@ -174,8 +177,15 @@ describe('the native scripts imported from the platform', () => {
   });
 
   it('imports each sequence with its steps in the platform’s order and its prices as they are', async () => {
-    const run = await scripts.jobs.importPlatformScripts(new Date('2026-11-14T10:00:00Z'));
-    expect(run).toEqual({ accounts: 2, skipped: 1, failed: 0, added: 4, changed: 0, gone: 0 });
+    const run = await importOf(noraAccount, nora, new Date('2026-11-14T10:00:00Z'));
+    expect(run).toEqual({ outcome: 'imported', added: 4, changed: 0, gone: 0 });
+    // Inès's account reads no scripts; an account named with another creator is not read.
+    expect(await importOf(inesAccount, ines, new Date('2026-11-14T10:00:00Z'))).toEqual({
+      outcome: 'skipped',
+    });
+    expect(await importOf(noraAccount, ines, new Date('2026-11-14T10:00:00Z'))).toEqual({
+      outcome: 'unknown_account',
+    });
     const rows = await scriptRows();
     expect(rows.map((row) => [row.platformScriptRef, row.creatorId, row.active])).toEqual([
       ['sequence_1', nora, true],
@@ -209,16 +219,16 @@ describe('the native scripts imported from the platform', () => {
   });
 
   it('changes nothing when nothing changed, rewrites a changed script, deactivates a gone one', async () => {
-    const again = await scripts.jobs.importPlatformScripts(new Date('2026-11-14T11:00:00Z'));
-    expect(again).toMatchObject({ added: 0, changed: 0, gone: 0 });
+    const again = await importOf(noraAccount, nora, new Date('2026-11-14T11:00:00Z'));
+    expect(again).toEqual({ outcome: 'imported', added: 0, changed: 0, gone: 0 });
     await scenario([
       { type: 'script_changed', scriptId: 'script_1_3', priceCents: 4_500 },
       { type: 'sequence_removed', sequenceId: 'sequence_2' },
     ]);
     const at = new Date('2026-11-14T12:00:00Z');
-    const run = await scripts.jobs.importPlatformScripts(at);
+    const run = await importOf(noraAccount, nora, at);
     // Sequence 2's steps stay on the platform as loose steps: three scripts of one step each.
-    expect(run).toMatchObject({ added: 3, changed: 1, gone: 1, failed: 0 });
+    expect(run).toEqual({ outcome: 'imported', added: 3, changed: 1, gone: 1 });
     const rows = await scriptRows();
     const gone = rows.find((row) => row.platformScriptRef === 'sequence_2');
     expect([gone?.active, gone?.deactivatedAt?.toISOString()]).toEqual([false, at.toISOString()]);

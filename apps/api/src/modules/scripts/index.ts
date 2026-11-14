@@ -1,5 +1,11 @@
 /** Public entry point of the `scripts` module (SC-01, ADR 0056). Other modules import this file only. */
-import type { CreatorId, ScriptStructureVersion, ScriptVariantLetter, ShotMoment } from '@impera/contracts';
+import type {
+  CreatorId,
+  PlatformAccountId,
+  ScriptStructureVersion,
+  ScriptVariantLetter,
+  ShotMoment,
+} from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -90,12 +96,12 @@ export interface ScriptsModule {
      */
     askScripts(now: Date, onFailure?: (creatorId: CreatorId, error: unknown) => void): Promise<AskScriptsRun>;
     /**
-     * `scripts.import_platform_scripts` (ADR 0099 § 1 time 2): each account's native scripts mirrored from the platform.
-     * Counts only; `onFailure` hears each creator whose import failed.
+     * `scripts.import_platform_scripts` (ADR 0099 § 1 time 2): one account's native scripts mirrored from the
+     * platform, asked with each vault sync. Counts only; a failed read throws, for the job's retry.
      */
     importPlatformScripts(
+      request: { readonly creatorId: CreatorId; readonly platformAccountId: PlatformAccountId },
       now: Date,
-      onFailure?: (creatorId: CreatorId, error: unknown) => void,
     ): Promise<ImportPlatformScriptsRun>;
   };
 }
@@ -181,15 +187,8 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
           },
           now,
         ),
-      importPlatformScripts: (now, onFailure) =>
-        importPlatformScripts(
-          {
-            store: platformImports,
-            source: platform.source,
-            ...(onFailure === undefined ? {} : { onFailure }),
-          },
-          now,
-        ),
+      importPlatformScripts: (request, now) =>
+        importPlatformScripts({ store: platformImports, source: platform.source }, request, now),
     },
   };
 }

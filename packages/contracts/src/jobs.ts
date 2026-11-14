@@ -84,6 +84,7 @@ export const JOB_NAMES = [
   'content_drops.make_thumbnail',
   'content_drops.thumbnail_backlog',
   'scripts.ask_scripts',
+  'scripts.import_platform_scripts',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
@@ -157,6 +158,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.make_thumbnail': 'Vignettes des médias déposés',
   'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
+  'scripts.import_platform_scripts': 'Import des scripts Reveal',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
@@ -456,6 +458,16 @@ export const JOB_PAYLOADS = {
    * next structure of her queue that does not touch her limits, frozen. Replayable: one request per due day.
    */
   'scripts.ask_scripts': z.object({}),
+  /**
+   * The account's native scripts mirrored from the platform (ADR 0099 § 1 time 2): steps in the platform's order, prices
+   * as they are, a script gone deactivated. Asked with each vault sync the owner asks, never by a cron for now;
+   * replayable, writes nothing when nothing changed.
+   */
+  'scripts.import_platform_scripts': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    correlationId: z.string().min(1),
+  }),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -586,6 +598,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.thumbnail_backlog': 1,
   // Each hour: the next run is the retry.
   'scripts.ask_scripts': 1,
+  // A platform that did not answer: a few tries; a failed read changes nothing for the account.
+  'scripts.import_platform_scripts': 3,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,
