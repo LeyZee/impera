@@ -45,6 +45,11 @@ export function wireConnectors(
     readonly registry?: ConnectorRegistry;
     /** Reveal's CRM API (ADR 0050) by default; FakeReveal's in the tests. */
     readonly salesFeeds?: SalesFeedRegistry;
+    /**
+     * Each account whose vault sync the owner asked (fiche vault-sync), late bound: `scripts`, wired after this module,
+     * queues the import of its native scripts behind it (ADR 0099 § 1 time 2).
+     */
+    readonly onVaultSyncAsked?: ConnectorsDeps['onVaultSyncAsked'];
     /** Tests only: the connectors' clock. */
     readonly now?: () => Date;
     /** Tests only: the photo copy's fetch and store (CRM-07 a2b). */
@@ -99,6 +104,7 @@ export function wireConnectors(
             store,
           },
     ...(deps.now !== undefined && { clock: { now: deps.now } }),
+    ...(deps.onVaultSyncAsked !== undefined && { onVaultSyncAsked: deps.onVaultSyncAsked }),
   });
   return {
     module,

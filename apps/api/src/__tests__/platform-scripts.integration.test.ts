@@ -1,39 +1,47 @@
+import { randomBytes } from 'node:crypto';
+
 import {
-  ConnectorConfigSchema,
   CreatorIdSchema,
+  MediaAssetIdSchema,
   newId,
   PlatformAccountIdSchema,
   TeamMemberIdSchema,
   type CreatorId,
   type PlatformAccountId,
-  type PlatformScript,
 } from '@impera/contracts';
-import { eq, schema, sql, withTenant } from '@impera/db';
+import { and, eq, schema, sql, withTenant } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { z } from 'zod';
 
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
 import { revealApiConnectors } from '../modules/connectors';
-import { createScriptsModule, type ScriptsModule } from '../modules/scripts';
+import { buildServer, type Server } from '../server';
 
 import { createFakeReveal, type FakeReveal } from './fake-reveal/server';
+import { fixedComposer } from './support/composer';
 import { testConfig } from './support/config';
+import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
+const SESSION_KEYS = `v1:${randomBytes(32).toString('base64')}`;
 const PASSWORD = 'correct horse battery';
 const PARIS = 'Europe/Paris';
 
+const JobSchema = z.object({ key: z.string(), queue_name: z.string().nullable(), task: z.string() });
+
 /**
- * The import of the native scripts (ADR 0099 § 1 time 2, P6-01) against FakeReveal's default world: four sequences
- * of three steps, invented. The import writes as the service role; the agency reads under her RLS and the team's
- * scopes. Invented data only (ADR 0010).
+ * The import of the native scripts (ADR 0099 § 1 time 2, P6-01) on FakeReveal's invented world, through the owner's
+ * « Synchroniser », the real connector, the vault sync and the real tables: four sequences of three steps. The import
+ * writes as the service role; the agency reads under her RLS and the team's scopes. Invented data only (ADR 0010).
  */
 describe('the native scripts imported from the platform', () => {
   let test: TestDb;
   let app: App;
+  let server: Server;
   let fake: FakeReveal;
-  let scripts: ScriptsModule;
+  let logger: ReturnType<typeof createLogger>;
   let nora: CreatorId;
   let ines: CreatorId;
   let noraAccount: PlatformAccountId;
@@ -44,11 +52,8 @@ describe('the native scripts imported from the platform', () => {
     chatter: '',
     nora: '',
   };
-  /** The vault as the sync left it: media_02 read and described, media_09 listed and not read yet. */
-  const vault = new Map([
-    ['media_02', { mediaAssetId: '0193a000-0000-7000-8000-000000000002', described: true }],
-    ['media_09', { mediaAssetId: null, described: false }],
-  ]);
+
+  const scripts = () => app.modules.scripts;
 
   async function account(email: string, set: Partial<typeof schema.user.$inferInsert>) {
     const { userId } = await createOwner(app.auth, app.db.db, { email, name: email, password: PASSWORD });
@@ -61,69 +66,40 @@ describe('the native scripts imported from the platform', () => {
     expect(response.statusCode).toBe(200);
   }
 
-  /** Nora's account reads FakeReveal; Inès's reads no scripts. */
-  async function listed(accountId: PlatformAccountId): Promise<readonly PlatformScript[] | null> {
-    if (accountId !== noraAccount) return null;
-    const connector = revealApiConnectors({ fetch: fake.fetch, baseUrl: 'https://reveal.test' })(
-      {
-        id: noraAccount,
-        creatorId: nora,
-        platform: 'reveal',
-        sessionState: 'valid',
-        lastPollAt: null,
-        config: ConnectorConfigSchema.parse({}),
-        consecutiveErrors: 0,
-        pausedUntil: null,
-      },
-      JSON.stringify({
-        v: 1,
-        bearer: fake.authorization.slice('Bearer '.length),
-        userId: fake.userId,
-        modelId: fake.modelId,
-        userAgent: 'Mozilla/5.0 (test)',
-        capturedAt: '2026-10-01T00:00:00.000Z',
-      }),
-      {
-        sends: {
-          find: () => Promise.reject(new Error('no send in an import')),
-          begin: () => Promise.reject(new Error('no send in an import')),
-          settle: () => Promise.reject(new Error('no send in an import')),
-          ownIds: () => Promise.reject(new Error('no send in an import')),
-        },
-      },
-    );
-    if (connector.listPlatformScripts === undefined) throw new Error('the Reveal connector reads scripts');
-    return connector.listPlatformScripts();
-  }
-
   const importOf = (platformAccountId: PlatformAccountId, creatorId: CreatorId, at: Date) =>
-    scripts.jobs.importPlatformScripts({ creatorId, platformAccountId }, at);
+    scripts().jobs.importPlatformScripts({ creatorId, platformAccountId }, at);
+
+  const vaultSync = () =>
+    app.modules.connectors.jobs.vaultSync(
+      { creatorId: nora, platformAccountId: noraAccount, correlationId: 'test' },
+      logger,
+    );
 
   const scriptRows = () =>
     test.admin.db.select().from(schema.platformScripts).orderBy(schema.platformScripts.platformScriptRef);
 
+  const ownerView = async (ref: string) =>
+    (await scripts().reads.platformScripts(nora, { userId: ids.owner, role: 'owner' }))?.find(
+      (view) => view.ref === ref,
+    );
+
   beforeAll(async () => {
     fake = createFakeReveal();
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
-    app = await createApp(config, createLogger(config));
-    scripts = createScriptsModule({
-      db: app.db.db,
-      adminDb: test.service.db,
-      requests: {
-        ask: () => Promise.reject(new Error('no request here')),
-        last: () => Promise.resolve(null),
-        lastFor: () => Promise.resolve(null),
-      },
-      requireRole: app.requireRole,
-      limitsOf: () => Promise.resolve(null),
-      cardFontsDir: '',
-      rasterizeCard: () => Promise.reject(new Error('no card here')),
-      platformScripts: {
-        source: (account) => listed(account.id),
-        vault: (_accountId, refs) => linksOf(refs),
+    const config = testConfig({
+      DATABASE_URL: test.appUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
+      SESSION_ENCRYPTION_KEYS: SESSION_KEYS,
+    });
+    logger = createLogger(config);
+    app = await createApp(config, logger, {
+      composer: fixedComposer,
+      connectorsClock: () => new Date(fake.state().now),
+      connectorRegistry: {
+        reveal: revealApiConnectors({ fetch: fake.fetch, baseUrl: 'https://reveal.test' }),
       },
     });
+    server = await buildServer({ config, logger, routes: app.routes, readiness: app.readiness });
     nora = newId(CreatorIdSchema);
     ines = newId(CreatorIdSchema);
     noraAccount = newId(PlatformAccountIdSchema);
@@ -140,8 +116,23 @@ describe('the native scripts imported from the platform', () => {
         creatorId: id,
         platform: 'reveal',
         handle: `compte_${label.toLowerCase()}`,
+        sessionState: 'none',
       });
     }
+    // Nora's account reads FakeReveal; Inès's has no session.
+    await app.modules.connectors.sessions.store({
+      platformAccountId: noraAccount,
+      session: JSON.stringify({
+        v: 1,
+        bearer: fake.authorization.slice('Bearer '.length),
+        userId: fake.userId,
+        modelId: fake.modelId,
+        userAgent: 'Mozilla/5.0 (test)',
+        capturedAt: '2026-10-01T00:00:00.000Z',
+      }),
+      correlationId: 'test',
+      userId: null,
+    });
     ids.owner = (
       await createOwner(app.auth, app.db.db, {
         email: 'owner@example.test',
@@ -166,20 +157,46 @@ describe('the native scripts imported from the platform', () => {
     ids.nora = await account('nora@example.test', { role: 'creator', creatorIds: [nora] });
   });
 
-  function linksOf(refs: readonly string[]) {
-    return Promise.resolve(new Map([...vault].filter(([ref]) => refs.includes(ref))));
-  }
-
   afterAll(async () => {
+    await server.close();
     await app.shutdown();
     await test.close();
     await fake.app.close();
   });
 
+  it('queues the import behind the vault sync the owner asks, on the account’s queue, and no cron', async () => {
+    const cookie = await signIn(server, 'owner@example.test', PASSWORD);
+    const response = await server.inject({
+      method: 'POST',
+      url: `/v1/creators/${nora}/vault/sync`,
+      headers: { cookie, origin: DASHBOARD_ORIGIN },
+    });
+    expect(response.statusCode).toBe(200);
+    const queued = z.array(JobSchema).parse(
+      (
+        await test.admin.db.execute(
+          sql`select j.key, q.queue_name, t.identifier as task from graphile_worker._private_jobs j
+              left join graphile_worker._private_job_queues q on q.id = j.job_queue_id
+              join graphile_worker._private_tasks t on t.id = j.task_id
+              where j.key in (${`vault:${noraAccount}`}, ${`scripts:${noraAccount}`}) order by j.id`,
+        )
+      ).rows,
+    );
+    expect(queued).toEqual([
+      { key: `vault:${noraAccount}`, queue_name: `account:${noraAccount}`, task: 'connector.vault_sync' },
+      {
+        key: `scripts:${noraAccount}`,
+        queue_name: `account:${noraAccount}`,
+        task: 'scripts.import_platform_scripts',
+      },
+    ]);
+  });
+
   it('imports each sequence with its steps in the platform’s order and its prices as they are', async () => {
+    await vaultSync();
     const run = await importOf(noraAccount, nora, new Date('2026-11-14T10:00:00Z'));
     expect(run).toEqual({ outcome: 'imported', added: 4, changed: 0, gone: 0 });
-    // Inès's account reads no scripts; an account named with another creator is not read.
+    // Inès's account has no session: left as it was; an account named with another creator is not read.
     expect(await importOf(inesAccount, ines, new Date('2026-11-14T10:00:00Z'))).toEqual({
       outcome: 'skipped',
     });
@@ -232,8 +249,7 @@ describe('the native scripts imported from the platform', () => {
     const rows = await scriptRows();
     const gone = rows.find((row) => row.platformScriptRef === 'sequence_2');
     expect([gone?.active, gone?.deactivatedAt?.toISOString()]).toEqual([false, at.toISOString()]);
-    const views = await scripts.reads.platformScripts(nora, { userId: ids.owner, role: 'owner' });
-    const changed = views?.find((view) => view.ref === 'sequence_1');
+    const changed = await ownerView('sequence_1');
     expect(changed?.steps.map((step) => step.priceMinor)).toEqual([500, 1_500, 4_500]);
     // 5 € then 15 €: already more than double; then 45 €, three times 15 € and above 40 €.
     expect(changed?.warnings).toEqual([
@@ -242,49 +258,89 @@ describe('the native scripts imported from the platform', () => {
       { code: 'price_above_ceiling', position: 2 },
     ]);
     // A gone script keeps its steps: a run or a reward may still name it.
-    expect(views?.find((view) => view.ref === 'sequence_2')?.steps).toHaveLength(3);
+    expect((await ownerView('sequence_2'))?.steps).toHaveLength(3);
   });
 
-  it('says where each media stands in the vault, and offers no script before its identity (SC-04 c8)', async () => {
-    const views = await scripts.reads.platformScripts(nora, { userId: ids.owner, role: 'owner' });
-    const step = views?.find((view) => view.ref === 'sequence_1')?.steps[1];
-    expect(step?.media).toEqual([
-      {
-        ref: 'media_02',
-        kind: 'image',
-        inVault: true,
-        mediaAssetId: '0193a000-0000-7000-8000-000000000002',
-        described: true,
-      },
+  it('says where each media stands in the vault the sync left, and offers no script before its identity', async () => {
+    const step = () => ownerView('sequence_1').then((view) => view?.steps[1]);
+    // The preview of that step is gone from her vault since (the sync marks it removed, never deletes it).
+    await test.admin.db
+      .update(schema.mediaPlatformRefs)
+      .set({ removedAt: new Date() })
+      .where(
+        and(
+          eq(schema.mediaPlatformRefs.platformAccountId, noraAccount),
+          eq(schema.mediaPlatformRefs.platformMediaId, 'media_09'),
+        ),
+      );
+    // Listed by the sync, its file not read yet; the preview no longer in her vault.
+    expect((await step())?.media).toEqual([
+      { ref: 'media_02', kind: 'image', inVault: true, mediaAssetId: null, described: false },
     ]);
-    expect(step?.previewMedia).toEqual([
-      { ref: 'media_09', kind: 'video', inVault: true, mediaAssetId: null, described: false },
+    expect((await step())?.previewMedia).toEqual([
+      { ref: 'media_09', kind: 'video', inVault: false, mediaAssetId: null, described: false },
     ]);
-    expect(views?.find((view) => view.ref === 'sequence_1')).toMatchObject({
+    expect((await step())?.complete).toBe(false);
+    // Its file read and a description validated by a person: the link says so.
+    const asset = newId(MediaAssetIdSchema);
+    await test.admin.db.insert(schema.mediaAssets).values({
+      id: asset,
+      creatorId: nora,
+      kind: 'image',
+      origin: 'creator',
+      storageKey: `test/${asset}`,
+      mime: 'image/jpeg',
+      bytes: 1000,
+      sha256: asset,
+    });
+    await test.admin.db.insert(schema.mediaDescriptions).values({
+      id: newId(z.uuid()),
+      creatorId: nora,
+      mediaAssetId: asset,
+      vocabularyVersion: '1',
+      content: { factualDescription: 'Une photo inventée.' },
+      model: 'test',
+      promptHash: 'test',
+      validatedBy: ids.owner,
+      validatedAt: new Date(),
+    });
+    await test.admin.db
+      .update(schema.mediaPlatformRefs)
+      .set({ mediaAssetId: asset })
+      .where(
+        and(
+          eq(schema.mediaPlatformRefs.platformAccountId, noraAccount),
+          eq(schema.mediaPlatformRefs.platformMediaId, 'media_02'),
+        ),
+      );
+    expect((await step())?.media).toEqual([
+      { ref: 'media_02', kind: 'image', inVault: true, mediaAssetId: asset, described: true },
+    ]);
+    expect(await ownerView('sequence_1')).toMatchObject({
       gaps: ['media_absent', 'media_not_described', 'identity_not_validated'],
       proposable: false,
     });
   });
 
   it('lets the owner and an active manager of her list read, never a chatter nor her own account', async () => {
-    const manager = await scripts.reads.platformScripts(nora, { userId: ids.manager, role: 'operator' });
+    const manager = await scripts().reads.platformScripts(nora, { userId: ids.manager, role: 'operator' });
     expect(manager?.length).toBe(7);
     // A manager reads the creators of his list only, as her vault; the owner reads Inès, who has none of Nora's.
-    expect(await scripts.reads.platformScripts(ines, { userId: ids.manager, role: 'operator' })).toBeNull();
-    expect(await scripts.reads.platformScripts(ines, { userId: ids.owner, role: 'owner' })).toEqual([]);
-    expect(await scripts.reads.platformScripts(nora, { userId: ids.chatter, role: 'operator' })).toBeNull();
-    expect(await scripts.reads.platformScripts(nora, { userId: ids.nora, role: 'creator' })).toBeNull();
+    expect(await scripts().reads.platformScripts(ines, { userId: ids.manager, role: 'operator' })).toBeNull();
+    expect(await scripts().reads.platformScripts(ines, { userId: ids.owner, role: 'owner' })).toEqual([]);
+    expect(await scripts().reads.platformScripts(nora, { userId: ids.chatter, role: 'operator' })).toBeNull();
+    expect(await scripts().reads.platformScripts(nora, { userId: ids.nora, role: 'creator' })).toBeNull();
     // A creator who does not exist answers like a reader who may not read: never her existence.
     expect(
-      await scripts.reads.platformScripts(newId(CreatorIdSchema), { userId: ids.owner, role: 'owner' }),
+      await scripts().reads.platformScripts(newId(CreatorIdSchema), { userId: ids.owner, role: 'owner' }),
     ).toBeNull();
   });
 
   it('reads one script of hers out of any person, and none of another creator', async () => {
     const row = (await scriptRows()).find((each) => each.platformScriptRef === 'sequence_1');
     if (row === undefined) throw new Error('imported');
-    expect((await scripts.reads.platformScript(nora, row.id))?.steps[0]?.ref).toBe('script_1_1');
-    expect(await scripts.reads.platformScript(ines, row.id)).toBeNull();
+    expect((await scripts().reads.platformScript(nora, row.id))?.steps[0]?.ref).toBe('script_1_1');
+    expect(await scripts().reads.platformScript(ines, row.id)).toBeNull();
   });
 
   it('keeps the application role from writing a native script, even in her tenant', async () => {

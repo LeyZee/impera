@@ -295,6 +295,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const fans = wireFans(shared);
   const connectors = wireConnectors(shared, {
     ingest: (input) => conversations.module.ingestMessage(input),
+    // The import of her native scripts, queued behind each vault sync the owner asks (ADR 0099 § 1 time 2).
+    onVaultSyncAsked: (input) => scripts.module.askImport(input),
     // The member made by `team`, the account linked by this module's own write, in one transaction (ADR 0076 § 3).
     invite: (actor, input) =>
       team.module.invites(connectors.module.invitationChatterLinks).fromPlatform(actor, input),
@@ -366,6 +368,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const scripts = wireScripts(shared, {
     persona: persona.module,
     contentDrops: contentDrops.module,
+    connectors: connectors.module,
     cardFontsDir: CARD_FONTS_DIR,
   });
   const contractors = wireContractors(shared, {

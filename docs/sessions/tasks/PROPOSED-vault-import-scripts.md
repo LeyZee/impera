@@ -17,7 +17,7 @@ ADR 0099 (§ 1, § 3), ADR 0098 (déroulé et clés de segment), P6-01, `docs/re
 - [x] Un média d'étape absent du coffre rend l'étape incomplète, donc le script non proposable.
 - [x] Un script importé garde le nom de Reveal.
 - [x] « Proposable » = chaque média a une description validée **et** l'identité du script (schéma c8, unique) est validée (remarque Médias, point 6). Tant que c8 n'existe pas, aucun script natif n'est proposable.
-- [ ] Brancher le job `scripts.import_platform_scripts` (un compte, demandé avec chaque synchronisation du coffre, sans horloge) sur la lecture des scripts de `connectors` et les liaisons du coffre (`media_platform_refs`) quand la synchronisation du coffre (`PROPOSED-vault-sync.md`, Bilan, #759) est dans main.
+- [x] Brancher le job `scripts.import_platform_scripts` (un compte, demandé avec chaque synchronisation du coffre, sans horloge) sur la lecture des scripts de `connectors` et les liaisons du coffre (`media_platform_refs`) quand la synchronisation du coffre (`PROPOSED-vault-sync.md`, Bilan, #759) est dans main.
 
 ## Critères d'acceptation
 - Tests contre `FakeReveal` : script modifié resynchronisé, script supprimé désactivé, ordre des étapes respecté, prix repris tel quel, script non proposable tant qu'une description ou l'identité manque.
@@ -26,4 +26,4 @@ ADR 0099 (§ 1, § 3), ADR 0098 (déroulé et clés de segment), P6-01, `docs/re
 Création de scripts dans Reveal, écriture des textes par l'IA.
 
 ## Notes de session
-- 14/11/2026 (Médias) : domaine, tables, import et lectures écrits et testés contre FakeReveal (scénario `sequence_removed` ajouté). Reste le branchement du job sur la lecture de `connectors` et sur les liaisons du coffre, qui arrivent avec la PR de la synchronisation du coffre.
+- 14/11/2026 (Médias) : domaine, tables, import et lectures écrits et testés contre FakeReveal (scénario `sequence_removed` ajouté). Branché ensuite sur la synchronisation du coffre (#759) : lecture des scripts par `connectors.platformReads`, liaisons de `media_platform_refs`, import mis en file derrière chaque synchronisation demandée par le propriétaire. Reste l'écran (fiche à part) et l'identité c8.

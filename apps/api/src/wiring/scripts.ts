@@ -1,6 +1,7 @@
 import { JOB_PAYLOADS, ScriptStructureIdSchema, asPersonaV2 } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
+import { PlatformReadUnavailable, type ConnectorsModule } from '../modules/connectors';
 import type { ContentDropsModule } from '../modules/content-drops';
 import type { PersonaModule } from '../modules/persona';
 import { createScriptsModule, type ScriptsModule } from '../modules/scripts';
@@ -24,6 +25,8 @@ export function wireScripts(
   deps: {
     readonly persona: PersonaModule;
     readonly contentDrops: ContentDropsModule;
+    /** The platform's scripts of an account (fiche vault-sync, `platformReads`), for the import (ADR 0099 § 1 time 2). */
+    readonly connectors: Pick<ConnectorsModule, 'platformReads'>;
     readonly cardFontsDir: string;
     /** Tests only: another clock than the server's. */
     readonly now?: () => Date;
@@ -46,6 +49,18 @@ export function wireScripts(
       last: async (creatorId) => asked(await deps.contentDrops.scriptRequests.last(creatorId)),
       lastFor: async (creatorId, userId) =>
         asked(await deps.contentDrops.scriptRequests.lastFor(creatorId, userId)),
+    },
+    platformScripts: {
+      // No session usable now, or a connector that gives no scripts: the account is skipped, as it was. A platform
+      // that did not answer throws, for the job's retry: nothing is deactivated on a failed read.
+      source: async (account) => {
+        try {
+          return await deps.connectors.platformReads.scripts(account.id);
+        } catch (error) {
+          if (error instanceof PlatformReadUnavailable && error.reason !== 'failed') return null;
+          throw error;
+        }
+      },
     },
   });
   const now = deps.now ?? (() => new Date());
