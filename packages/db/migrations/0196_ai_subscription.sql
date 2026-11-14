@@ -13,8 +13,6 @@ ALTER TABLE "ai_credit_entries" ADD CONSTRAINT "ai_credit_entries_kind_check" CH
 ALTER TABLE "ai_credit_entries" ADD CONSTRAINT "ai_credit_entries_amount_check" CHECK ("ai_credit_entries"."amount_minor" between 0 and 1000000 and ("ai_credit_entries"."kind" = 'balance' or ("ai_credit_entries"."kind" = 'subscription') = ("ai_credit_entries"."amount_minor" = 0)));--> statement-breakpoint
 ALTER TABLE "llm_calls" ADD CONSTRAINT "llm_calls_status_check" CHECK ("llm_calls"."status" in ('ok', 'invalid_output', 'refused', 'timeout', 'rate_limited', 'quota_exhausted', 'auth', 'unavailable', 'missing_key', 'unknown_model', 'unsupported_input', 'prompt_leak', 'error'));
 --> statement-breakpoint
-ALTER TABLE "llm_calls" ADD CONSTRAINT "llm_calls_status_check" CHECK ("llm_calls"."status" in ('ok', 'invalid_output', 'refused', 'timeout', 'rate_limited', 'quota_exhausted', 'auth', 'unavailable', 'missing_key', 'unknown_model', 'unsupported_input', 'prompt_leak', 'error'));
---> statement-breakpoint
 -- The Telegram trigger's list of event types (it mirrors SCANNED_EVENT_TYPES in the telegram module, a test compares
 -- them) takes `ai_quota_exhausted` (ADR 0091 § 6). The function is unchanged; no row is touched.
 DROP TRIGGER IF EXISTS "domain_events_telegram_scan" ON "domain_events";--> statement-breakpoint
