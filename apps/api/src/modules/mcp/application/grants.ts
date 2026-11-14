@@ -1,5 +1,6 @@
 import {
   McpGrantIdSchema,
+  McpTokenSchema,
   newId,
   type CreateMcpGrantBody,
   type McpGrant,
@@ -75,6 +76,8 @@ export function createGrants(deps: GrantsDeps): GrantsApi {
     revoke: (owner, id) => deps.store.revoke(owner, id),
 
     async grantOfToken(token) {
+      // Its form before its fingerprint: anything else is no token, and nothing is looked up for it.
+      if (!McpTokenSchema.safeParse(token).success) return null;
       const grant = await deps.store.findByTokenHashUnscoped(deps.hashOf(token));
       if (grant?.revokedAt !== null || grant.expiresAt <= deps.now()) return null;
       // Stamped as its person: a person who may no longer write it (no longer the owner) gets nothing from it.
