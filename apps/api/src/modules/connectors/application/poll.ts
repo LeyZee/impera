@@ -11,6 +11,12 @@ import type { ConnectorResolver } from './resolver';
 /** On the very first poll, how far back to read: recent fans get an answer, an old history is not replayed. */
 const FIRST_POLL_LOOKBACK_HOURS = 24;
 
+/**
+ * A fan's message older than this when it is read is caught up, not answered (P2-02): after the PC slept, a whole
+ * night of messages never sets off one model call per fan at once. A fresh message of his still starts the answer.
+ */
+export const CATCH_UP_AFTER_HOURS = 6;
+
 const POLLABLE: readonly SessionState[] = ['valid', 'warning'];
 
 export interface AccountJobDeps {
@@ -70,6 +76,9 @@ export function createPollJob(deps: AccountJobDeps) {
         created += await ingestConversation(connector, deps.ingest, account, snapshot, {
           since,
           correlationId: payload.correlationId,
+          // The first poll reads the last day once: it is stored, and nothing is answered from it (P2-02).
+          catchUp:
+            account.lastPollAt === null ? true : new Date(now.getTime() - CATCH_UP_AFTER_HOURS * 3_600_000),
         });
       }
       await deps.accounts.recordPoll(account.creatorId, account.id, now);

@@ -1,0 +1,66 @@
+/*
+ * The metals of Impera's game objects (CHF-01, ADR 0104 note « médailles »). A medal is an object one earns, not an
+ * icon: it keeps its own metals in both themes. Day drops the halo and darkens the silver laurel, which a pale
+ * ground would wash out.
+ */
+.rw-medal {
+  flex: 0 0 auto;
+  display: block;
+  color: var(--nv-ink-faint);
+  overflow: visible;
+}
+.rw-medal[data-metal='bronze'] {
+  --rw-hi: #f3c3a4;
+  --rw-mid: #c98566;
+  --rw-lo: #7e4631;
+  --rw-ink: #4a2416;
+  --rw-glow: #d08a66;
+  --rw-leaf: var(--rw-hi);
+}
+.rw-medal[data-metal='argent'] {
+  --rw-hi: #ffffff;
+  --rw-mid: #b9c4d4;
+  --rw-lo: #69768a;
+  --rw-ink: #333c4a;
+  --rw-glow: #b9c9e6;
+  --rw-leaf: var(--rw-hi);
+}
+.rw-medal[data-metal='or'] {
+  --rw-hi: #fff0bd;
+  --rw-mid: #e8c37a;
+  --rw-lo: #9a7420;
+  --rw-ink: #573f08;
+  --rw-glow: #f0c46a;
+  --rw-leaf: var(--rw-hi);
+}
+[data-theme='light'] .rw-medal[data-metal='argent'] {
+  --rw-leaf: var(--rw-mid);
+}
+[data-theme='light'] .rw-glow {
+  display: none;
+}
+.rw-stop-hi {
+  stop-color: var(--rw-hi);
+}
+.rw-stop-mid {
+  stop-color: var(--rw-mid);
+}
+.rw-stop-lo {
+  stop-color: var(--rw-lo);
+}
+.rw-stop-leaf {
+  stop-color: var(--rw-leaf);
+}
+.rw-stop-glow {
+  stop-color: var(--rw-glow);
+}
+.rw-lo {
+  fill: none;
+  stroke: var(--rw-lo);
+}
+.rw-hi {
+  fill: var(--rw-hi);
+}
+.rw-ink {
+  fill: var(--rw-ink);
+}

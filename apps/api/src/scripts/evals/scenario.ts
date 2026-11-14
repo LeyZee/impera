@@ -1,4 +1,4 @@
-import { DesireBandSchema } from '@impera/contracts';
+import { DesireBandSchema, ObjectionKindSchema, ObjectionReplyIdSchema } from '@impera/contracts';
 import { BRAIN_ALERTS_MAX, BriefSchema, JudgeCriterionSchema } from '@impera/llm';
 import { parse } from 'yaml';
 import { z } from 'zod';
@@ -47,6 +47,12 @@ const ScenarioSchema = z
         sales_frozen: z.boolean().default(false),
         /** His desire score as stored just before this message (P3-12); the engine counts this one on top. */
         desire: z.int().min(0).max(100).default(0),
+        /** A chatter is on shift on her accounts (ADR 0090 § A: a custom order goes to them). */
+        chatter_on_shift: z.boolean().default(false),
+        /** A custom order of his already waits for the team. */
+        custom_order_open: z.boolean().default(false),
+        /** The replies of her objection bank he already received, by id (ADR 0090 § B). */
+        objection_replies_used: z.array(ObjectionReplyIdSchema).default([]),
       })
       .strict()
       .prefault({}),
@@ -73,6 +79,8 @@ const ScenarioSchema = z
             desire_signals_contain: z.array(DesireSignal).min(1).optional(),
             /** Exactly the alerts of `alerts` the brain must see, by name (P4-01); `[]`: none. */
             alerts_seen: z.array(AlertName).optional(),
+            /** What he opposes to a price, among these (ADR 0090 § B). */
+            objection_in: z.array(ObjectionKindSchema).min(1).optional(),
           })
           .strict()
           .optional(),
@@ -82,6 +90,10 @@ const ScenarioSchema = z
             offer: z.boolean().optional(),
             /** His desire band after this message, among these (P3-12). */
             desire_band_in: z.array(DesireBandSchema).min(1).optional(),
+            /** What code did with a custom order (ADR 0090 § A): `none` when he asked for none. */
+            custom_order: z.enum(['none', 'handoff', 'reply']).optional(),
+            /** The reply of her objection bank given to the voice, by id; `null`: none (ADR 0090 § B). */
+            objection_reply: ObjectionReplyIdSchema.nullable().optional(),
           })
           .strict()
           .optional(),

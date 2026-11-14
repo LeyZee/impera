@@ -4,7 +4,7 @@ import type { JobLogger } from '../domain/ports';
 
 import { recordConnectorFailure } from './failures';
 import { ingestConversation } from './ingest-conversation';
-import { loadActiveAccount, type AccountJobDeps } from './poll';
+import { CATCH_UP_AFTER_HOURS, loadActiveAccount, type AccountJobDeps } from './poll';
 
 /** Conversations that moved in this window are re-read. */
 const RECONCILE_WINDOW_HOURS = 24;
@@ -37,6 +37,8 @@ export function createReconcileJob(deps: AccountJobDeps) {
         created += await ingestConversation(connector, deps.ingest, account, snapshot, {
           limit: RECONCILE_MESSAGES,
           correlationId: payload.correlationId,
+          // A message the polls missed is answered like a polled one, unless it is old (P2-02).
+          catchUp: new Date(now.getTime() - CATCH_UP_AFTER_HOURS * 3_600_000),
         });
       }
       logger.info(

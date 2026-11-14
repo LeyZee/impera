@@ -1,6 +1,7 @@
 import {
   calendarDayAt,
   CurrencySchema,
+  MyFiguresSchema,
   MySalesSchema,
   nextPayPeriod,
   payPeriodOfDay,
@@ -10,8 +11,10 @@ import {
   PlatformSchema,
   SaleDecisionOutcomeSchema,
   SaleEventSchema,
+  payPeriodAt,
   SaleSignalKindSchema,
   TeamMemberIdSchema,
+  TimezoneSchema,
   type MySales,
   type PayPeriod,
   type PaySaleSignal,
@@ -40,6 +43,7 @@ import {
   PaySaleSignalNotFound,
   PaySaleSignalStateConflict,
 } from '../domain/errors';
+import { myFigures, type FigureLine } from '../domain/my-figures';
 import {
   myDays,
   myLines,
@@ -184,6 +188,53 @@ async function ownStatementSales(
         shareBp: one.shareBp ?? null,
       }));
   });
+}
+
+/**
+ * Every line of the platform's net on the member's own statements, each at its statement's revision, with the period
+ * that statement pays: what their figures are made of (ADR 0104 § 1), nothing of the register.
+ */
+async function ownFigureLines(tx: Transaction, memberId: TeamMemberId): Promise<FigureLine[]> {
+  const rows = await tx
+    .select({
+      period: commissionStatements.period,
+      currency: commissionStatementLines.currency,
+      sales: commissionStatementLines.sales,
+    })
+    .from(commissionStatements)
+    .innerJoin(
+      commissionStatementLines,
+      and(
+        eq(commissionStatementLines.statementId, commissionStatements.id),
+        eq(commissionStatementLines.revision, commissionStatements.revision),
+      ),
+    )
+    .where(
+      and(eq(commissionStatements.memberId, memberId), eq(commissionStatementLines.base, 'platform_net')),
+    );
+  return rows.flatMap((row) => {
+    const period = PayPeriodSchema.parse(row.period);
+    const currency = CurrencySchema.parse(row.currency);
+    return z
+      .array(StoredSaleSchema)
+      .parse(row.sales)
+      .map((one) => ({
+        period,
+        event: one.event,
+        currency,
+        netMinor: one.netMinor,
+        occurredAt: one.occurredAt == null ? null : new Date(one.occurredAt),
+      }));
+  });
+}
+
+/** The zone of the member's own record, the one their screens read the hours in. */
+async function ownZoneOf(tx: Transaction, memberId: TeamMemberId): Promise<string | null> {
+  const [own] = await tx
+    .select({ timeZone: teamMembers.timeZone })
+    .from(teamMembers)
+    .where(eq(teamMembers.id, memberId));
+  return own === undefined ? null : TimezoneSchema.parse(own.timeZone);
 }
 
 /** The member's latest signal on each line of `period`, withdrawn or not, with what it kept of the line. */
@@ -489,8 +540,26 @@ export function createDrizzleSaleSignalStore(
   db: Database,
   adminDb: Database,
   reads: PayInputReads,
+  now: () => Date = () => new Date(),
 ): PayrollSaleSignalStore {
   return {
+    myFigures: (userId) =>
+      withMember(db, userId, async (tx) => {
+        const at = now();
+        const agencyZone = await reads.agencyTimeZone(tx);
+        const member = await ownMemberOf(tx, userId);
+        const memberZone = member === null ? null : await ownZoneOf(tx, member);
+        return MyFiguresSchema.parse(
+          myFigures({
+            lines: member === null ? [] : await ownFigureLines(tx, member),
+            now: at,
+            agencyZone,
+            memberZone: memberZone ?? agencyZone,
+            period: payPeriodAt(at, agencyZone),
+          }),
+        );
+      }),
+
     mySales: (userId, query) =>
       withMember(db, userId, async (tx) => {
         const after = decodeCursor(query.cursor);
