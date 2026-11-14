@@ -165,6 +165,25 @@ describe('decideCall (ADR 0026 § 4, ADR 0105 § 1)', () => {
       refusal: 'creator_forbidden',
     });
   });
+  it('gives the agency’s AI spend to the owner alone, on an access of the agency', () => {
+    expect(decideCall(tool('ai_usage_get'), grant(['read:status'], null), owner)).toEqual({
+      ok: true,
+      creatorId: null,
+    });
+    expect(
+      decideCall(tool('ai_usage_get'), grant(['read:status'], null), {
+        ...manager,
+        readableCreatorIds: 'all',
+      }),
+    ).toEqual({
+      ok: false,
+      refusal: 'owner_only',
+    });
+    expect(decideCall(tool('ai_usage_get'), grant(['read:status']), owner)).toEqual({
+      ok: false,
+      refusal: 'creator_forbidden',
+    });
+  });
 });
 
 describe('grantProblems', () => {

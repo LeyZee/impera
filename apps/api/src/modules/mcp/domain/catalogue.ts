@@ -22,6 +22,11 @@ export interface McpToolSpec {
   readonly capability: McpCapability | null;
   readonly kind: McpToolKind;
   readonly scope: McpToolScope;
+  /**
+   * The owner's alone, whatever the capability: agency-wide figures no manager reads on the screen. Called on an access
+   * of the agency only, never one bound to a creator, whose agent has no business with them.
+   */
+  readonly ownerOnly?: true;
 }
 
 /** Semver of the catalogue, announced in `serverInfo` (`impera-mcp`). */
@@ -37,7 +42,7 @@ export const MCP_CATALOGUE: readonly McpToolSpec[] = [
   { name: 'stats_get', capability: 'read:status', kind: 'read', scope: 'agency' },
   { name: 'fortnight_review_get', capability: 'read:status', kind: 'read', scope: 'agency' },
   { name: 'platform_daily_stats_list', capability: 'read:status', kind: 'read', scope: 'creator' },
-  { name: 'ai_usage_get', capability: 'read:status', kind: 'read', scope: 'agency' },
+  { name: 'ai_usage_get', capability: 'read:status', kind: 'read', scope: 'agency', ownerOnly: true },
   // Conversations: their metadata, then their text, which only `read:conversation_content` opens (ADR 0026 § 4).
   { name: 'conversations_list', capability: 'read:conversations', kind: 'read', scope: 'creator' },
   { name: 'conversation_get', capability: 'read:conversations', kind: 'read', scope: 'creator' },

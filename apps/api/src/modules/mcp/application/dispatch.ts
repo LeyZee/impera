@@ -87,7 +87,9 @@ export function createDispatcher(deps: DispatcherDeps): McpDispatcher {
     list: (grant) =>
       Object.entries(deps.tools).flatMap(([name, tool]) => {
         const spec = toolNamed(name);
-        return spec !== undefined && holds(grant, spec.capability)
+        // An owner-only tool is for an access of the agency: one bound to a creator never sees it listed.
+        const listed = spec !== undefined && (spec.ownerOnly !== true || grant.creatorId === null);
+        return spec !== undefined && listed && holds(grant, spec.capability)
           ? [{ name, description: tool.description, input: tool.input }]
           : [];
       }),
