@@ -109,7 +109,7 @@ export interface SchedulingReads {
 }
 
 /** A shift a member began, as the shift's challenge reads it. */
-export interface OwnShiftBegun {
+interface OwnShiftBegun {
   readonly startsAt: Date;
   readonly endsAt: Date;
 }
