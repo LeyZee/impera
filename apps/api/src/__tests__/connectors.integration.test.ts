@@ -50,6 +50,8 @@ describe('connectors module (P0-06)', () => {
   let ownerId: string;
   let ownerLink: string;
   let chatterLink: string;
+  /** How long ago the fakes' fans write: ten hours makes a message the poll catches up (P2-02), 0 a fresh one. */
+  let fakeLagMs = 0;
 
   async function account(
     handle: string,
@@ -60,7 +62,7 @@ describe('connectors module (P0-06)', () => {
     await test.admin.db
       .insert(schema.platformAccounts)
       .values({ id, creatorId, platform: 'reveal', handle, sessionState, connectorConfig: { writes } });
-    fakes.set(id, new FakeConnector());
+    fakes.set(id, new FakeConnector({ now: () => new Date(Date.now() - fakeLagMs) }));
     return id;
   }
 
@@ -160,12 +162,14 @@ describe('connectors module (P0-06)', () => {
     await test.close();
   });
 
-  it('ingests 3 fan messages caught up on the first poll without an answer; a fresh one gets 1 debounced respond job', async () => {
+  it('ingests 3 old fan messages caught up on the first poll without an answer; a fresh one gets 1 debounced respond job', async () => {
     const id = await account('poll', 'valid');
+    fakeLagMs = 10 * 3_600_000;
     for (const text of ['Salut', 'Ça va ?', 'Tu fais quoi ce soir']) {
       fake(id).enqueueInbound({ conversationId: 'c-1', fanId: 'f-1', fanDisplayName: 'Julien', text });
     }
-    // The first poll catches the last day up: stored, nothing answered from it (P2-02).
+    fakeLagMs = 0;
+    // The first poll reads the last day: what is older than six hours is stored, nothing answered from it (P2-02).
     await poll(id);
     expect(await count('messages', sql`platform_account_id = ${id}`)).toBe(3);
     expect(await jobs('conversation.respond')).toHaveLength(0);
@@ -187,17 +191,27 @@ describe('connectors module (P0-06)', () => {
     expect(await jobs('conversation.respond')).toHaveLength(1);
   });
 
+  it('answers at the first poll a fan who wrote just before the first sync', async () => {
+    const id = await account('poll-fresh', 'valid');
+    fake(id).enqueueInbound({ conversationId: 'c-8', fanId: 'f-8', fanDisplayName: 'Hugo', text: 'Coucou' });
+    const before = (await jobs('conversation.respond')).length;
+    await poll(id);
+    expect(await jobs('conversation.respond')).toHaveLength(before + 1);
+  });
+
   it('treats a caught-up message the safety net answers as fresh: it is never left unread', async () => {
     const id = await account('poll-safety', 'valid');
+    fakeLagMs = 10 * 3_600_000;
     fake(id).enqueueInbound({ conversationId: 'c-9', fanId: 'f-9', fanDisplayName: 'Paul', text: 'Salut' });
     fake(id).enqueueInbound({
-      conversationId: 'c-9',
-      fanId: 'f-9',
-      fanDisplayName: 'Paul',
+      conversationId: 'c-10',
+      fanId: 'f-10',
+      fanDisplayName: 'Noé',
       text: 'j’ai plus envie de vivre',
     });
+    fakeLagMs = 0;
     const before = (await jobs('conversation.respond')).length;
-    // The first poll catches them up: the plain one waits, the one with a sign gets its answer.
+    // Both are caught up: the plain one waits, the one with a sign gets its answer.
     await poll(id);
     expect(await count('messages', sql`platform_account_id = ${id}`)).toBe(2);
     expect(await jobs('conversation.respond')).toHaveLength(before + 1);
