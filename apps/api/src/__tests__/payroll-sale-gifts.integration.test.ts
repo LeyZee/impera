@@ -1,5 +1,6 @@
 import {
   AccountPayRulesIdSchema,
+  calendarDayAt,
   newId,
   PayPeriodSchema,
   PaySaleDecisionIdSchema,
@@ -245,6 +246,31 @@ describe('Équipe › Paie : donner ou partager une vente avec le chatteur déci
     expect((await decide({ sale: 'sale_whole', outcome: 'give', to: lea }, theoCookie)).statusCode).toBe(403);
   });
 
+  it('finds the sales of a day the reader may give, a member’s or the agent’s, never their own', async () => {
+    const toGive = async (day: string, cookie = team.owner) => {
+      const response = await team.call('GET', `/payroll/periods/${P1}/sales-to-give?day=${day}`, cookie);
+      expect(response.statusCode, response.body).toBe(200);
+      return HeldListSchema.parse(response.json()).sales.map((one) => [
+        one.platformSaleId,
+        one.outcomes,
+        one.recipients,
+      ]);
+    };
+    // Théo's morning had nobody else on the account. The agent's sale, at midnight in Paris, is the next day's.
+    expect(await toGive('2025-05-05')).toEqual([
+      ['sale_whole', ['count', 'exclude', 'give'], [lea.id]],
+      ['sale_split', ['count', 'exclude', 'give'], [lea.id]],
+    ]);
+    expect(await toGive('2025-05-06')).toEqual([['sale_bot', ['give'], [lea.id]]]);
+    // A manager never finds his own sales; a chatter reads none; a day is a day.
+    expect(await toGive('2025-05-05', theoCookie)).toEqual([]);
+    expect((await toGive('2025-05-06', theoCookie)).map(([id]) => id)).toEqual(['sale_bot']);
+    const asked = (cookie: string, day: string) =>
+      team.call('GET', `/payroll/periods/${P1}/sales-to-give?day=${day}`, cookie);
+    expect((await asked(leaCookie, '2025-05-05')).statusCode).toBe(403);
+    expect((await asked(team.owner, 'mai')).statusCode).toBe(400);
+  });
+
   it('counts a sale given whole for its recipient, and tells both of them on their own lines', async () => {
     const given = await decide({ sale: 'sale_whole', outcome: 'give', to: lea });
     expect(given.statusCode, given.body).toBe(201);
@@ -321,6 +347,24 @@ describe('Équipe › Paie : donner ou partager une vente avec le chatteur déci
     expect(await statementSales(lea)).toContainEqual(['sale_bot', 2_000, null]);
     const bot = (await mySales(leaCookie)).items.find((one) => one.platformSaleId === 'sale_bot');
     expect(bot?.given?.other).toEqual({ kind: 'agent' });
+  });
+
+  it('counts for the owner the sales each validator gave in the month, and how many of them shared', async () => {
+    // The decisions above were written today: the month under way counts them, May 2025 none.
+    const today = calendarDayAt(new Date(), 'Europe/Paris');
+    const period = PayPeriodSchema.parse(`${today.slice(0, 7)}-01`);
+    const gifts = await team.call('GET', `/payroll/periods/${period}/sale-gifts`, team.owner);
+    expect(gifts.statusCode, gifts.body).toBe(200);
+    expect(gifts.json()).toEqual({
+      period,
+      monthStart: `${today.slice(0, 7)}-01`,
+      counts: [{ decidedBy: team.ownerId, given: 3, shared: 1 }],
+    });
+    const may = await team.call('GET', `/payroll/periods/${P1}/sale-gifts`, team.owner);
+    expect(may.json()).toMatchObject({ monthStart: '2025-05-01', counts: [] });
+    // A manager does not read them: they watch him.
+    const refused = await team.call('GET', `/payroll/periods/${period}/sale-gifts`, theoCookie);
+    expect(refused.statusCode).toBe(403);
   });
 
   it('registers a shared sale as two parts at the closing, and the base keeps the parts whole', async () => {
