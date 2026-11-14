@@ -4,3 +4,4 @@ Fait : prérequis de `drops_list`, `scripts_list` et `script_steps_get`. `conten
 Pas fait : les outils MCP eux-mêmes (fil MCP, après fusion).
 Décisions : `scripts_list` en portée créatrice lit ses scripts et sa file, jamais la bibliothèque de l'agence (non bornée par créatrice) ; forme validée par le fil MCP le 14/11.
 Découvertes (relecture de Bilan) : le store `asTeam` laisse un manager actif lire une créatrice hors de sa liste, comme la route de l'écran ; côté MCP, la borne de l'accès (sa créatrice, `readableCreatorIds`) tient. Le rôle du lecteur passé par le MCP doit venir de `resolveActor`, jamais du jeton.
+Suite (relecture de #752) : le curseur de `reads.drops` excluait un dépôt retiré ; retiré entre deux pages, il rendait la page suivante vide et l'agent croyait la liste finie. Le curseur garde maintenant sa place, les retirés restent hors de la liste ; test d'intégration qui échouait avant le correctif.

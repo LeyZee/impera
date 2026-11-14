@@ -89,7 +89,7 @@ describe('reads of her drops and scripts, for the MCP server', () => {
   const feedDrops: string[] = [];
   let inesDrop = '';
 
-  const call = (method: 'GET' | 'POST' | 'PUT', url: string, cookie: string, body?: object) =>
+  const call = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, cookie: string, body?: object) =>
     server.inject({
       method,
       url,
@@ -239,6 +239,29 @@ describe('reads of her drops and scripts, for the MCP server', () => {
     expect(await drops.reads.drops(nora, owner(), { after: 'pas-un-id' })).toEqual({ drops: [], next: null });
     expect((await drops.reads.drops(nora, owner(), { after: null, limit: 500 })).drops).toHaveLength(4);
     expect((await drops.reads.drops(ines, owner(), { after: null })).drops.map((drop) => drop.id)).toEqual([
+      inesDrop,
+    ]);
+  });
+
+  it('keeps the place of a cursor withdrawn between two pages, and never lists it', async () => {
+    const older = newId(ContentDropIdSchema);
+    const newer = newId(ContentDropIdSchema);
+    for (const id of [older, newer]) {
+      const dropped = await call('POST', `/v1/creators/${ines}/drops`, ownerCookie, {
+        id,
+        category: 'feed_shoot',
+        files: [photo()],
+      });
+      expect(dropped.statusCode, dropped.body).toBe(200);
+    }
+    const first = await drops.reads.drops(ines, owner(), { after: null, limit: 1 });
+    expect([first.drops.map((drop) => drop.id), first.next]).toEqual([[newer], newer]);
+    const withdrawn = await call('DELETE', `/v1/creators/${ines}/drops/${newer}`, ownerCookie);
+    expect(withdrawn.statusCode, withdrawn.body).toBe(204);
+    const second = await drops.reads.drops(ines, owner(), { after: first.next, limit: 5 });
+    expect(second.drops.map((drop) => drop.id)).toEqual([older, inesDrop]);
+    expect((await drops.reads.drops(ines, owner(), { after: null })).drops.map((drop) => drop.id)).toEqual([
+      older,
       inesDrop,
     ]);
   });
