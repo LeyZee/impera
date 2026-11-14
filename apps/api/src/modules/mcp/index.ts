@@ -5,9 +5,9 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createDispatcher, whoami } from './application/dispatch';
 import { createGrants } from './application/grants';
-import { creatorTools } from './application/read-tools';
+import { creatorTools, fanTools } from './application/read-tools';
 import type { ActorView } from './domain/access';
-import type { CreatorReader, GrantRecord } from './domain/ports';
+import type { CreatorReader, FanReader, GrantRecord } from './domain/ports';
 import { createDrizzleGrantStore } from './infra/db/grant-store';
 import { createDrizzleJournal } from './infra/db/journal';
 import { createMcpRoutes } from './infra/http/routes';
@@ -44,6 +44,8 @@ export interface McpDeps {
   readonly actorOf: (userId: string) => Promise<ActorView | null>;
   /** The persona module's directory (`persona.creators`), for `creators_list` and `creator_get`. */
   readonly creators: CreatorReader;
+  /** The fans module's reads (`getFan`, `activeFacts`, `flags`, `card`), for `fan_get` and `fan_card_get`. */
+  readonly fans: FanReader;
 }
 
 export function createMcpModule(deps: McpDeps): McpModule {
@@ -62,7 +64,11 @@ export function createMcpModule(deps: McpDeps): McpModule {
         grantOfToken: (token) => grants.grantOfToken(token),
         actorOf: deps.actorOf,
         dispatcher: (spendRead) =>
-          createDispatcher({ journal, spendRead, tools: { whoami, ...creatorTools(deps.creators) } }),
+          createDispatcher({
+            journal,
+            spendRead,
+            tools: { whoami, ...creatorTools(deps.creators), ...fanTools(deps.fans) },
+          }),
         allowedOrigins: [],
       }),
     grantOfToken: (token) => grants.grantOfToken(token),

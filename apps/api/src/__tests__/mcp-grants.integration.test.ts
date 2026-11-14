@@ -68,6 +68,12 @@ describe('/v1/settings/mcp-grants', () => {
       adminDb: app.adminDb.db,
       actorOf: () => Promise.resolve(null),
       creators: { unarchived: () => Promise.resolve([]) },
+      fans: {
+        getFan: () => Promise.resolve(null),
+        activeFacts: () => Promise.resolve([]),
+        flags: () => Promise.resolve({}),
+        card: () => Promise.reject(new Error('no fan here')),
+      },
     });
     nora = newId(CreatorIdSchema);
     await test.admin.db
@@ -175,7 +181,9 @@ describe('/v1/settings/mcp-grants', () => {
       .from(schema.mcpGrants)
       .where(eq(schema.mcpGrants.id, created.id));
     expect(used?.lastUsedAt).not.toBeNull();
-    expect(await mcp.grantOfToken(`${created.token.slice(0, -1)}A`)).toBeNull();
+    // Its last character changed: one that differs, or a token ending in « A » would still be found (1 time in 64).
+    const other = created.token.endsWith('A') ? 'B' : 'A';
+    expect(await mcp.grantOfToken(`${created.token.slice(0, -1)}${other}`)).toBeNull();
     expect(await mcp.grantOfToken('not-a-token')).toBeNull();
 
     expect((await call('DELETE', `/v1/settings/mcp-grants/${created.id}`, cookies.manager)).statusCode).toBe(

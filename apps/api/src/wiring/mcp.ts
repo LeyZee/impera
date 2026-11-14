@@ -1,4 +1,5 @@
 import { resolveActor } from '../auth';
+import type { FansModule } from '../modules/fans';
 import { createMcpModule, type ActorView, type McpModule } from '../modules/mcp';
 import type { PersonaModule } from '../modules/persona';
 import type { ShiftCreators } from '../modules/scheduling';
@@ -37,12 +38,20 @@ export function wireMcp(
   shared: Shared,
   shiftCreators: ShiftCreators,
   persona: Pick<PersonaModule, 'creators'>,
+  fans: Pick<FansModule, 'getFan' | 'activeFacts' | 'flags' | 'card'>,
 ): WiredMcp {
   const module = createMcpModule({
     db: shared.db,
     adminDb: shared.adminDb,
     actorOf: (userId) => actorOf(shared, shiftCreators, userId),
-    creators: persona.creators,
+    // Only what the tools read: never a write of either module.
+    creators: { unarchived: (ids) => persona.creators.unarchived(ids) },
+    fans: {
+      getFan: (creatorId, fanId) => fans.getFan(creatorId, fanId),
+      activeFacts: (creatorId, fanId) => fans.activeFacts(creatorId, fanId),
+      flags: (creatorId, fanId) => fans.flags(creatorId, fanId),
+      card: (creatorId, fanId) => fans.card(creatorId, fanId),
+    },
   });
   return {
     module,

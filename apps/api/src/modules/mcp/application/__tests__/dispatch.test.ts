@@ -62,6 +62,7 @@ describe('the dispatcher of the MCP server (ADR 0026 § 4 and § 8)', () => {
         tool: 'creator_get',
         outcome: 'ok',
         creatorId: nora,
+        subject: {},
         requestId: 'req-1',
         ip: '203.0.113.1',
       },
@@ -87,6 +88,30 @@ describe('the dispatcher of the MCP server (ADR 0026 § 4 and § 8)', () => {
       ['creator_get', 'arguments_invalid'],
       ['creator_get', 'creator_forbidden'],
       ['whoami', 'second_factor_required'],
+    ]);
+  });
+
+  it('writes down the identifiers a call touches, from its validated input, once the rule has let it through', async () => {
+    const lines: McpCallRecord[] = [];
+    const dispatcher = createDispatcher({
+      journal: { record: (entry) => Promise.resolve(void lines.push(entry)) },
+      spendRead: () => Promise.resolve(true),
+      tools: { creator_get: { ...creatorGet, subject: () => ({ fanId: 'fan-1' }) } },
+    });
+    const call = (args: unknown) =>
+      dispatcher.call({
+        grant,
+        actor: owner,
+        name: 'creator_get',
+        args,
+        requestId: 'req-1',
+        ip: '203.0.113.1',
+      });
+    await call({});
+    await call({ creatorId: newId(CreatorIdSchema) });
+    expect(lines.map((line) => [line.outcome, line.subject])).toEqual([
+      ['ok', { fanId: 'fan-1' }],
+      ['creator_forbidden', {}],
     ]);
   });
 
