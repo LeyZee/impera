@@ -33,7 +33,7 @@ export interface GrantsApi {
   revoke(owner: McpOwner, id: McpGrantId): Promise<boolean>;
   /**
    * The live access a token names, its last use stamped as its person; `null` for a token unknown, revoked or
-   * expired. The person's rights are not read here: the dispatcher reads them at every call (`resolveActor`).
+   * expired, or when its person can no longer stamp it. The person's rights are not read here: the dispatcher reads them at every call (`resolveActor`).
    */
   grantOfToken(token: string): Promise<GrantRecord | null>;
 }
@@ -77,8 +77,8 @@ export function createGrants(deps: GrantsDeps): GrantsApi {
     async grantOfToken(token) {
       const grant = await deps.store.findByTokenHashUnscoped(deps.hashOf(token));
       if (grant?.revokedAt !== null || grant.expiresAt <= deps.now()) return null;
-      await deps.store.touch(grant.userId, grant.id);
-      return grant;
+      // Stamped as its person: a person who may no longer write it (no longer the owner) gets nothing from it.
+      return (await deps.store.touch(grant.userId, grant.id)) ? grant : null;
     },
   };
 }

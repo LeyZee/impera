@@ -118,10 +118,12 @@ export function createDrizzleGrantStore(db: Database, serviceDb: Database): McpG
 
     touch: (userId, id) =>
       withMember(db, userId, async (tx) => {
-        await tx
+        const touched = await tx
           .update(mcpGrants)
           .set({ lastUsedAt: sql`greatest(coalesce(${mcpGrants.lastUsedAt}, now()), now())` })
-          .where(eq(mcpGrants.id, id));
+          .where(eq(mcpGrants.id, id))
+          .returning({ id: mcpGrants.id });
+        return touched.length > 0;
       }),
   };
 }

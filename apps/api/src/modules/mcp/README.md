@@ -6,7 +6,7 @@
 
 **Peut dépendre de.** Aucun module pour l'instant ; les modules qu'il lit s'ajouteront avec le branchement des outils. Aucun module ne dépend de lui. Seuls son magasin d'accès (`infra/db`) et son `index.ts` touchent `@impera/db` (règle ESLint) : un outil lit par l'`index.ts` du module propriétaire, jamais la base.
 
-**Tables possédées.** `mcp_grants` (migration 0193) : l'accès d'agent (personne, créatrice au plus, capacités, empreinte SHA-256 du jeton, expiration à 90 jours au plus, révocation). Le propriétaire le lit, l'ajoute à son nom, le révoque et en note la dernière utilisation sous `withMember` ; personne ne le supprime ni ne change ce qu'il est (droits par colonne et déclencheur) ; une révocation est définitive. Le rôle de service le lit seulement, pour retrouver l'accès d'un jeton (`findByTokenHashUnscoped`, ADR 0087).
+**Tables possédées.** `mcp_grants` (migration 0193) : l'accès d'agent (personne, créatrice au plus, capacités, empreinte SHA-256 du jeton, expiration à 90 jours au plus, révocation). Le propriétaire le lit, l'ajoute à son nom (les politiques lisent la portée `owner`, pas la personne : tout propriétaire lit et révoque tous les accès ; un seul propriétaire aujourd'hui), le révoque et en note la dernière utilisation sous `withMember` ; personne ne le supprime ni ne change ce qu'il est (droits par colonne et déclencheur) ; une révocation est définitive. Le rôle de service le lit seulement, pour retrouver l'accès d'un jeton (`findByTokenHashUnscoped`, ADR 0087).
 
 ## Routes
 
@@ -25,5 +25,5 @@
 ## Structure
 
 - `domain/` : catalogue, accès, liste « jamais exposé », ports. Zéro I/O.
-- `application/grants.ts` : créer, lister, révoquer un accès ; retrouver l'accès vivant d'un jeton et noter son usage.
+- `application/grants.ts` : créer, lister, révoquer un accès ; retrouver l'accès vivant d'un jeton et noter son usage sous l'identité de sa personne (rien si elle ne peut plus l'écrire).
 - `infra/db/grant-store.ts`, `infra/token.ts` (jeton et empreinte), `infra/http/routes.ts`.

@@ -185,6 +185,24 @@ describe('/v1/settings/mcp-grants', () => {
     expect(codeOf(again)).toBe('mcp_grant_not_found');
   });
 
+  it('gives nothing once its person is no longer the owner', async () => {
+    const created = McpGrantCreatedSchema.parse(
+      (await call('POST', '/v1/settings/mcp-grants', cookies.owner, body())).json(),
+    );
+    const [grant] = await test.admin.db
+      .select({ userId: schema.mcpGrants.userId })
+      .from(schema.mcpGrants)
+      .where(eq(schema.mcpGrants.id, created.id));
+    const userId = grant?.userId ?? '';
+    await test.admin.db.update(schema.user).set({ role: 'operator' }).where(eq(schema.user.id, userId));
+    try {
+      expect(await mcp.grantOfToken(created.token)).toBeNull();
+    } finally {
+      await test.admin.db.update(schema.user).set({ role: 'owner' }).where(eq(schema.user.id, userId));
+    }
+    expect((await mcp.grantOfToken(created.token))?.id).toBe(created.id);
+  });
+
   it('finds nothing for an expired access', async () => {
     const created = McpGrantCreatedSchema.parse(
       (await call('POST', '/v1/settings/mcp-grants', cookies.owner, body({ days: 1 }))).json(),

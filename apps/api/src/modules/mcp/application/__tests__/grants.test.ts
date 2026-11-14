@@ -11,11 +11,13 @@ const nora = newId(CreatorIdSchema);
 function fakeStore(): McpGrantStore & {
   readonly rows: Map<string, GrantRecord & { tokenHash: string }>;
   touched: number;
+  touchable: boolean;
 } {
   const rows = new Map<string, GrantRecord & { tokenHash: string }>();
   return {
     rows,
     touched: 0,
+    touchable: true,
     list: () => Promise.resolve([...rows.values()]),
     create: (by, grant: NewGrant) => {
       const row = {
@@ -43,7 +45,7 @@ function fakeStore(): McpGrantStore & {
       Promise.resolve([...rows.values()].find((row) => row.tokenHash === hash) ?? null),
     touch() {
       this.touched += 1;
-      return Promise.resolve();
+      return Promise.resolve(this.touchable);
     },
   };
 }
@@ -95,6 +97,9 @@ describe('agent accesses (ADR 0026 § 3)', () => {
     if (!result.ok) throw new Error('not created');
     expect((await grants.grantOfToken('impmcp_inventé'))?.id).toBe(result.value.id);
     expect(store.touched).toBe(1);
+    store.touchable = false;
+    expect(await grants.grantOfToken('impmcp_inventé')).toBeNull();
+    store.touchable = true;
     expect(await grants.grantOfToken('impmcp_autre')).toBeNull();
     const later = createGrants({
       store,
@@ -106,6 +111,6 @@ describe('agent accesses (ADR 0026 § 3)', () => {
     expect(await grants.revoke(owner, McpGrantIdSchema.parse(result.value.id))).toBe(true);
     expect(await grants.grantOfToken('impmcp_inventé')).toBeNull();
     expect(await grants.revoke(owner, newId(McpGrantIdSchema))).toBe(false);
-    expect(store.touched).toBe(1);
+    expect(store.touched).toBe(2);
   });
 });

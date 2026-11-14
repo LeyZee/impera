@@ -29,7 +29,10 @@ export interface NewGrant {
   readonly days: number;
 }
 
-/** `mcp_grants` (migration 0193): the owner's, inside `withMember`; the token's access by the service role only. */
+/**
+ * `mcp_grants` (migration 0193): the owner's, inside `withMember`; the token's access by the service role only. The
+ * policies read the scope `owner`, not the person: any owner lists and revokes every access (one owner today).
+ */
 export interface McpGrantStore {
   /** His accesses, the newest first, revoked and expired ones included. */
   list(owner: McpOwner): Promise<readonly GrantRecord[]>;
@@ -42,8 +45,11 @@ export interface McpGrantStore {
    * (ADR 0026 § 3, ADR 0087), by the service role in read only. `null` for anything else.
    */
   findByTokenHashUnscoped(tokenHash: string): Promise<GrantRecord | null>;
-  /** Its last use, written as the person it acts for, never by the service role (ADR 0105 § 5). */
-  touch(userId: UserId, id: McpGrantId): Promise<void>;
+  /**
+   * Its last use, written as the person it acts for, never by the service role (ADR 0105 § 5). `false` when no row was
+   * written: the person may no longer write it (no longer the owner), and the access then serves nothing.
+   */
+  touch(userId: UserId, id: McpGrantId): Promise<boolean>;
 }
 
 /** A new token and its fingerprint; the token itself is shown once and kept nowhere. */
