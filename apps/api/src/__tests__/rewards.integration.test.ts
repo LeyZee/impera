@@ -1,5 +1,6 @@
 import {
   AccountPayRulesIdSchema,
+  ApiErrorSchema,
   LevelSettingsSchema,
   MyShiftChallengeSchema,
   newId,
@@ -8,6 +9,7 @@ import {
   RewardGainIdSchema,
   SalesLineIdSchema,
   ShiftIdSchema,
+  TeamMemberIdSchema,
   ShiftReportIdSchema,
   TrophyCaseSchema,
   type TeamMember,
@@ -561,9 +563,20 @@ describe('Jeu du chatteur : dÃ©fi du shift, niveaux, fiche du membre (ADR 0104 Â
       // His net is not said here: the rank ahead is his own read.
       expect(read.nextLevel).toBeNull();
     }
-    expect((await team.call('GET', `/rewards/members/${karim.id}/trophy-case`, leaCookie)).statusCode).toBe(
-      404,
+    const hidden = await team.call('GET', `/rewards/members/${karim.id}/trophy-case`, leaCookie);
+    expect(hidden.statusCode).toBe(404);
+    // A member nobody has answers as one the reader cannot see.
+    const unknown = await team.call(
+      'GET',
+      `/rewards/members/${newId(TeamMemberIdSchema)}/trophy-case`,
+      team.owner,
     );
+    expect(unknown.statusCode).toBe(404);
+    const said = (response: typeof hidden): unknown => {
+      const { code, message, details } = ApiErrorSchema.parse(response.json()).error;
+      return { code, message, details };
+    };
+    expect(said(unknown)).toEqual(said(hidden));
     expect((await team.call('GET', `/rewards/members/${karim.id}/trophy-case`, '')).statusCode).toBe(401);
     expect((await team.call('GET', '/rewards/members/not-an-id/trophy-case', team.owner)).statusCode).toBe(
       400,
