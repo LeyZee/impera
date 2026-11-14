@@ -93,7 +93,7 @@ Les morceaux existent déjà mais ne sont pas reliés :
 ## Conséquences
 
 - L'agent sait vendre un script étape par étape, sans jamais choisir un prix ni rejouer un pack.
-- Une table nouvelle `script_runs` (FORCE RLS, migration 0184) qui ne tient que l'état de décision, avec deux types d'événements de plus ; l'historique de Reveal reste la seule mémoire de ce qui est parti.
+- Une table nouvelle `script_runs` (FORCE RLS, migration 0190) qui ne tient que l'état de décision, avec deux types d'événements de plus ; l'historique de Reveal reste la seule mémoire de ce qui est parti.
 - Prompts : la voix reçoit `<script_step>`, le cerveau garde son rôle de lecteur (refus, signal d'achat). Aucune règle de vente n'entre dans un prompt.
 - Les méthodes de l'agence (consignes réelles, prix, textes) restent hors dépôt : le dépôt ne montre que le mécanisme et un script fictif.
 - Évals de vente : premier achat, escalier dans la même session, refus à la deuxième étape, étape non ouverte, script de nuit refusé en plein jour, tout acheté.
