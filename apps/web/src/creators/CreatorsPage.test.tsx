@@ -24,6 +24,7 @@ const base = {
   creatorIds: [],
   routedCreatorIds: [],
   shiftCreatorIds: [],
+  preferences: { sounds: true },
 };
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 /** An operator without a team row: the rail that still opens Créatrices, read-only. */

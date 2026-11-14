@@ -115,6 +115,7 @@ export type ShiftSwapRequestId = z.infer<typeof ShiftSwapRequestIdSchema>;
 /** A chatter's end-of-shift report, or a correction of one once validated (EQ-03, ADR 0023). */
 export const ShiftReportIdSchema = uuid.brand<'ShiftReportId'>();
 export type ShiftReportId = z.infer<typeof ShiftReportIdSchema>;
+export const RewardGainIdSchema = uuid.brand<'RewardGainId'>();
 
 /** A chatter's mini feedback at the end of a shift on an account whose sales are read (ADR 0050 § 10). */
 export const ShiftFeedbackIdSchema = uuid.brand<'ShiftFeedbackId'>();
