@@ -1,7 +1,7 @@
 import type { TrophyCase, TrophyCaseItem } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { earnedCount, foldedShelf, nextTrophy, percentOf, shelvesOf } from './arrange';
+import { earnedCount, foldedShelf, nextTrophy, onShelf, percentOf, SHELF_ORDER, shelvesOf } from './arrange';
 
 const item = (over: Partial<TrophyCaseItem> & Pick<TrophyCaseItem, 'kind' | 'family'>): TrophyCaseItem => ({
   earnedAt: null,
@@ -101,4 +101,10 @@ describe('foldedShelf', () => {
 
 it('counts what was earned', () => {
   expect(earnedCount(CASE)).toBe(3);
+});
+
+describe('onShelf', () => {
+  it('lays medals, streaks and trophies on shelves, and leaves any other family to the role', () => {
+    expect(SHELF_ORDER.every((family) => onShelf({ family }))).toBe(true);
+  });
 });

@@ -1,10 +1,18 @@
-import type { TrophyCase, TrophyCaseFamily, TrophyCaseItem } from '@impera/contracts';
+import type { TrophyCase, TrophyCaseItem } from '@impera/contracts';
 import { countUp } from '@impera/design-system';
 import { useEffect, useId, useRef, useState, type JSX, type PointerEvent, type ReactNode } from 'react';
 
 import { RewardReveal } from '../RewardReveal';
 
-import { earnedCount, foldedShelf, nextTrophy, percentOf, shelvesOf } from './arrange';
+import {
+  earnedCount,
+  foldedShelf,
+  nextTrophy,
+  onShelf,
+  percentOf,
+  shelvesOf,
+  type ShelfFamily,
+} from './arrange';
 
 import { Dialog } from '@/shell/Dialog';
 
@@ -32,7 +40,7 @@ export interface TrophyCaseEntry {
   readonly reveal: { readonly kicker: string; readonly text: string; readonly tone: 'gold' | 'neon' };
 }
 
-const SHELF_TITLES: Readonly<Record<TrophyCaseFamily, string>> = {
+const SHELF_TITLES: Readonly<Record<ShelfFamily, string>> = {
   medal: 'Médailles',
   streak: 'Séries',
   trophy: 'Trophées',
@@ -190,9 +198,12 @@ export function TrophyCaseView({
   const id = useId();
   const [open, setOpen] = useState<TrophyCaseItem | null>(null);
   const [playing, setPlaying] = useState<TrophyCaseItem | null>(null);
-  const [unfolded, setUnfolded] = useState<ReadonlySet<TrophyCaseFamily>>(new Set());
+  const [unfolded, setUnfolded] = useState<ReadonlySet<ShelfFamily>>(new Set());
 
-  const known = { ...trophyCase, items: trophyCase.items.filter((item) => entry(item) !== null) };
+  const known = {
+    ...trophyCase,
+    items: trophyCase.items.filter((item) => onShelf(item) && entry(item) !== null),
+  };
   const shelves = shelvesOf(known);
   const next = nextTrophy(known);
   const nextEntry = next === null ? null : entry(next);

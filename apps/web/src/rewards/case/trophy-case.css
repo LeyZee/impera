@@ -152,6 +152,10 @@
   color: var(--nv-ink);
   font-weight: 600;
 }
+.tc-all {
+  /* A computer shows every object: « Voir tout » is the phone's alone. */
+  display: none;
+}
 .tc-all::before {
   content: '· ';
   color: var(--nv-ink-faint);
@@ -409,6 +413,9 @@
     display: none;
   }
   .tc-narrow {
+    display: inline;
+  }
+  .tc-all {
     display: inline;
   }
 }

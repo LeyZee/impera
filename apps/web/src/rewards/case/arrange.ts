@@ -7,7 +7,11 @@ import type { TrophyCase, TrophyCaseFamily, TrophyCaseItem, TrophyCaseProgress }
  */
 
 /** The shelves, always in this order (ADR 0108 § 4). */
-export const SHELF_ORDER: readonly TrophyCaseFamily[] = ['medal', 'streak', 'trophy'];
+/** The families the case lays on shelves; any other (the level, ADR 0104 § 16) is the role's to show elsewhere. */
+export type ShelfFamily = Extract<TrophyCaseFamily, 'medal' | 'streak' | 'trophy'>;
+export const SHELF_ORDER: readonly ShelfFamily[] = ['medal', 'streak', 'trophy'];
+export const onShelf = (item: Pick<TrophyCaseItem, 'family'>): boolean =>
+  SHELF_ORDER.some((family) => family === item.family);
 
 /**
  * How far along, in whole percent, rounded down: 9 shifts out of 10 is 90 %, and an object never shows 100 % before
@@ -30,7 +34,7 @@ function byShelfOrder(a: TrophyCaseItem, b: TrophyCaseItem): number {
 }
 
 export interface Shelf {
-  readonly family: TrophyCaseFamily;
+  readonly family: ShelfFamily;
   readonly items: readonly TrophyCaseItem[];
   readonly earned: number;
 }
