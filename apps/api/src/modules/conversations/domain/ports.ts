@@ -721,7 +721,7 @@ export interface JobLogger {
   warn(fields: object, message: string): void;
 }
 
-interface Page<T> {
+export interface Page<T> {
   readonly items: readonly T[];
   readonly nextCursor: string | null;
 }
