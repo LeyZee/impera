@@ -11,6 +11,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { OutboundSender } from '../conversations';
 
+import { createConnectorReads, type ConnectorReads } from './application/connector-reads';
 import { createDispatchJob } from './application/dispatch';
 import { createOutboundSender, type ConnectorWrites } from './application/outbound-sender';
 import { createPollJob } from './application/poll';
@@ -24,6 +25,7 @@ import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domai
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
+import { createDrizzleConnectorReadsStore } from './infra/db/connector-reads-store';
 import { createDrizzleDailyStatsStore } from './infra/db/daily-stats-store';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import {
@@ -194,6 +196,11 @@ export interface ConnectorsModule {
    * this viewer may see them: `team` shows the warning on the member's page. Read from the base, never the platform.
    */
   readonly teamRemovals: (userId: string) => Promise<TeamPlatformRemoval[]>;
+  /**
+   * The sales, the daily statistics and the imported team for another module's adapter (ADR 0026 § 1, ADR 0105 § 4:
+   * the MCP), as the person reading, bounded by the creators named; never a share, never a call to the platform.
+   */
+  readonly reads: ConnectorReads;
   /** `/v1/webhooks/sales-feeds/:platform`: public, each delivery checked against its webhook's secret. */
   readonly salesFeedDeliveryRoutes: FastifyPluginAsyncZod;
 }
@@ -281,10 +288,11 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
   const avatars: AvatarPorts | null =
     deps.avatars == null ? null : { ...deps.avatars, records: createAvatarRecords(deps.adminDb) };
+  const teamStore = createDrizzleTeamImportStore(deps.db);
   const salesFeeds = createSalesFeeds({
     keys: deps.credentialKeys === null ? null : createSalesFeedKeyStore(deps.adminDb, deps.credentialKeys),
     ledger,
-    team: createDrizzleTeamImportStore(deps.db),
+    team: teamStore,
     registry: deps.salesFeeds,
     clock,
     webhooks:
@@ -329,6 +337,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     salesFeedStates: () => salesFeeds.list(),
     invitationChatterLinks,
     teamRemovals: (userId) => salesFeeds.team.removals(userId),
+    reads: createConnectorReads({ store: createDrizzleConnectorReadsStore(deps.db), team: teamStore }),
     salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),
   };
 }

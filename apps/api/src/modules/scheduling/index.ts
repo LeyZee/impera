@@ -20,6 +20,7 @@ import { remindReports, type ReportRemindersRun } from './application/report-rem
 import { createShiftReportService } from './application/reports';
 import { createSchedulingService } from './application/scheduling';
 import { createSwapService } from './application/swaps';
+import { createSchedulingReads, type SchedulingReads } from './application/team-reads';
 import type { CreatorAgendaFeed, CreatorDirectory, JobLogger, Notify, OnShift } from './domain/ports';
 import type { ShiftFactsForPay } from './domain/reports';
 import { calendarDayIn } from './domain/time';
@@ -75,6 +76,18 @@ export { shiftsForGameUnscoped } from './infra/game-reads';
 export type { DetectedAccountForCheck } from './domain/sales-checks';
 /** @public What pay's estimate of a report reads of its shift (reco 19). */
 export type { ShiftFactsForPay } from './domain/reports';
+/** @public What another door (the MCP, ADR 0026 § 1) reads of the planning and the reports. */
+export type { SchedulingReads } from './application/team-reads';
+/** @public A shift as that door reads it. */
+export type { ListedShift } from './application/team-reads';
+/** @public A report as that door reads it, without a text a person wrote. */
+export type { ListedShiftReport } from './application/team-reads';
+/** @public Who is on shift at a moment, as that door reads it: by name, never the account nor the margin. */
+export type { OnShiftNow } from './application/team-reads';
+/** @public The person such a read is for. */
+export type { ScheduleReader } from './application/team-reads';
+/** @public The creators such a read is confined to. */
+export type { CreatorBound } from './domain/team-reads';
 
 /** Public entry point of the `scheduling` module (EQ-02, ADR 0002). Other modules import this file only. */
 export interface SchedulingModule {
@@ -88,9 +101,15 @@ export interface SchedulingModule {
   /**
    * `onShift` (contract `scheduling.ts`): who is on shift on the creator's accounts at `at`, without the margin, read
    * from the database at each call. For the routing of a « sale » handover (EQ-13), which never goes to a chatter who
-   * is only in their margin.
+   * is only in their margin. Read as the system, for whoever asks: another door reads `reads.onShiftNow`, as the person.
    */
   onShift(creatorId: CreatorId, at: Date): Promise<OnShift[]>;
+  /**
+   * The shifts, the reports and who is on shift now for a door other than the routes (ADR 0026 § 1, the MCP): as the
+   * person, under the same policies as the screen, confined to the creators named, never a creator's account
+   * (`role_forbidden`). Read only.
+   */
+  readonly reads: SchedulingReads;
   /**
    * What still plans someone on her now (ADR 0071 § 2): her shifts not over and her weekly templates still running,
    * read as the system. She is archived only when both are zero.
@@ -264,6 +283,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   return {
     name: 'scheduling',
     onShift: (creatorId, at) => admin.onShiftUnscoped(creatorId, at),
+    reads: createSchedulingReads(planning, reportStore, deps.creators, now),
     planned: async (creatorId) => {
       const at = now();
       const { timeZone } = await admin.settingsUnscoped();
