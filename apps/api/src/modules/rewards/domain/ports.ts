@@ -21,7 +21,7 @@ interface PlayerFacts {
 }
 
 /** What a chatter's own read adds to their stored gains: their net, their shifts begun, the thresholds. */
-export interface OwnFacts {
+interface OwnFacts {
   readonly agencyZone: string;
   readonly currency: Currency | null;
   readonly cumulatedNetMinor: number;
