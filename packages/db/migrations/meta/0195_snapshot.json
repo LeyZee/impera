@@ -1,6 +1,6 @@
 {
-  "id": "569ea64c-6dd1-4e68-9b80-4c3853e4102c",
-  "prevId": "06ae5452-d83e-4c3a-81fd-2e6bf572cf0c",
+  "id": "772e5c6e-0c85-40f3-840f-1dc3d5e29b19",
+  "prevId": "86a9c625-e353-4109-ad75-62bb0f380542",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -12149,6 +12149,264 @@
           "to": ["public"],
           "using": "\"persona_versions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"persona_versions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.reward_gains": {
+      "name": "reward_gains",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope_key": {
+          "name": "scope_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "earned_at": {
+          "name": "earned_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revealed_at": {
+          "name": "revealed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "reward_gains_user_idx": {
+          "name": "reward_gains_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "earned_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "reward_gains_user_id_user_id_fk": {
+          "name": "reward_gains_user_id_user_id_fk",
+          "tableFrom": "reward_gains",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "reward_gains_once": {
+          "name": "reward_gains_once",
+          "nullsNotDistinct": false,
+          "columns": ["user_id", "kind", "scope_key"]
+        }
+      },
+      "policies": {
+        "own_read": {
+          "name": "own_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"reward_gains\".\"user_id\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "own_reveal": {
+          "name": "own_reveal",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"reward_gains\".\"user_id\" = nullif(current_setting('app.user_id', true), '')",
+          "withCheck": "\"reward_gains\".\"user_id\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "reward_gains_kind_check": {
+          "name": "reward_gains_kind_check",
+          "value": "\"reward_gains\".\"kind\" in ('tier', 'first_sale', 'day_record', 'fortnight_record', 'fortnight_on_time', 'streak_5', 'streak_10', 'streak_25', 'ten_ppv_shift')"
+        },
+        "reward_gains_scope_check": {
+          "name": "reward_gains_scope_check",
+          "value": "(\"reward_gains\".\"kind\" = 'tier') = (\"reward_gains\".\"scope_key\" <> '')"
+        },
+        "reward_gains_reveal_check": {
+          "name": "reward_gains_reveal_check",
+          "value": "\"reward_gains\".\"revealed_at\" is null or \"reward_gains\".\"revealed_at\" >= \"reward_gains\".\"earned_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.reward_streaks": {
+      "name": "reward_streaks",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "current": {
+          "name": "current",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "best": {
+          "name": "best",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "reward_streaks_user_id_user_id_fk": {
+          "name": "reward_streaks_user_id_user_id_fk",
+          "tableFrom": "reward_streaks",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "own_read": {
+          "name": "own_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"reward_streaks\".\"user_id\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        }
+      },
+      "checkConstraints": {
+        "reward_streaks_count_check": {
+          "name": "reward_streaks_count_check",
+          "value": "\"reward_streaks\".\"current\" >= 0 and \"reward_streaks\".\"best\" >= \"reward_streaks\".\"current\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.user_preferences": {
+      "name": "user_preferences",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "sounds_enabled": {
+          "name": "sounds_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_preferences_user_id_user_id_fk": {
+          "name": "user_preferences_user_id_user_id_fk",
+          "tableFrom": "user_preferences",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "own_read": {
+          "name": "own_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"user_preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "own_insert": {
+          "name": "own_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"user_preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "own_update": {
+          "name": "own_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"user_preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), '')",
+          "withCheck": "\"user_preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), '')"
         }
       },
       "checkConstraints": {},
