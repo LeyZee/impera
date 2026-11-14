@@ -151,10 +151,10 @@ describe('SubNav', () => {
   // Captures du 14/11 : a creator's tabs are views of one address (?onglet=), so the path never changes between them.
   it('brings the lit tab into view when a view of the same screen is chosen', async () => {
     const views = (lit: string): readonly SubNavItem[] => [
-      { to: '/paie/quinzaine', search: { onglet: 'persona' }, label: 'Persona', current: lit === 'Persona' },
+      { to: '/paie/quinzaine', search: { onglet: 'agenda' }, label: 'Agenda', current: lit === 'Agenda' },
       { to: '/paie/quinzaine', search: { onglet: 'profil' }, label: 'Profil', current: lit === 'Profil' },
     ];
-    renderNav(views('Persona'));
+    renderNav(views('Agenda'));
     const last = await screen.findByRole('link', { name: 'Profil' });
     const nav = screen.getByRole('navigation', { name: 'Paie' });
     Object.defineProperty(last, 'offsetLeft', { configurable: true, value: 400 });
