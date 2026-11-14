@@ -429,4 +429,26 @@ describe('/v1/mcp', () => {
     );
     expect(steps.result?.structuredContent).toEqual({ refusal: 'capability_missing' });
   });
+  it('gives the AI spend to the owner on an access of the agency, never on one bound to a creator', async () => {
+    const agency = await createGrant({ capabilities: ['read:status'], creatorId: null });
+    const listed = RpcSchema.parse(
+      (await rpc(agency.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
+    );
+    expect(listed.result?.tools?.map((tool) => tool.name)).toContain('ai_usage_get');
+    const usage = RpcSchema.parse((await rpc(agency.token, callTool('ai_usage_get'))).json());
+    expect(Object.keys(usage.result?.structuredContent ?? {}).sort()).toEqual([
+      'days',
+      'lastCallAt',
+      'pace',
+      'readAt',
+      'today',
+    ]);
+    const bound = await createGrant({ capabilities: ['read:status'] });
+    const boundList = RpcSchema.parse(
+      (await rpc(bound.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
+    );
+    expect(boundList.result?.tools?.map((tool) => tool.name)).not.toContain('ai_usage_get');
+    const refused = RpcSchema.parse((await rpc(bound.token, callTool('ai_usage_get'))).json());
+    expect(refused.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+  });
 });

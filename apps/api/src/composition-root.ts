@@ -427,6 +427,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const backups = wireBackups(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
+  const aiUsage = wireAiUsage(shared, llm);
   const mcp = wireMcp(
     shared,
     shiftCreators,
@@ -437,8 +438,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       scripts: scripts.module,
     },
     scheduling.module,
+    aiUsage.module,
   );
-  const aiUsage = wireAiUsage(shared, llm);
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
     persona: persona.module,
