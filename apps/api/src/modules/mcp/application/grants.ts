@@ -18,8 +18,6 @@ export interface GrantsDeps {
   readonly now: () => Date;
 }
 
-const DAY_MS = 86_400_000;
-
 type CreateGrantResult =
   | { readonly ok: true; readonly value: McpGrantCreated }
   | { readonly ok: false; readonly kind: McpGrantRefusalKind };
@@ -69,7 +67,7 @@ export function createGrants(deps: GrantsDeps): GrantsApi {
         creatorId: body.creatorId,
         capabilities: body.capabilities,
         tokenHash: minted.hash,
-        expiresAt: new Date(deps.now().getTime() + body.days * DAY_MS),
+        days: body.days,
       });
       return { ok: true, value: { ...viewOf(created), token: minted.token } };
     },

@@ -25,7 +25,8 @@ export interface NewGrant {
   readonly creatorId: CreatorId | null;
   readonly capabilities: readonly McpCapability[];
   readonly tokenHash: string;
-  readonly expiresAt: Date;
+  /** Days from its creation, counted on the base's clock with its `created_at` (`mcp_grants_expires_check`). */
+  readonly days: number;
 }
 
 /** `mcp_grants` (migration 0193): the owner's, inside `withMember`; the token's access by the service role only. */

@@ -81,7 +81,8 @@ export function createDrizzleGrantStore(db: Database, serviceDb: Database): McpG
             capabilities: [...grant.capabilities],
             tokenHash: grant.tokenHash,
             createdBy: owner.userId,
-            expiresAt: grant.expiresAt,
+            // One clock: the base's `now()`, the same as `created_at`'s default in this transaction.
+            expiresAt: sql`now() + make_interval(days => ${grant.days})`,
           })
           .returning(columns);
         if (row === undefined) throw new Error('mcp grant not created');

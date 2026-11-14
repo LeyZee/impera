@@ -25,7 +25,7 @@ function fakeStore(): McpGrantStore & {
         label: grant.label,
         capabilities: grant.capabilities,
         createdAt: NOW,
-        expiresAt: grant.expiresAt,
+        expiresAt: new Date(NOW.getTime() + grant.days * 86_400_000),
         lastUsedAt: null,
         revokedAt: null,
         tokenHash: grant.tokenHash,

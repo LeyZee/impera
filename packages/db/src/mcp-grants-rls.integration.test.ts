@@ -140,6 +140,7 @@ describe('mcp_grants (ADR 0026 § 3): the owner’s, added and revoked, read by 
     expect(await failure(update({ lastUsedAt: new Date(Date.now() - 86_400_000) }))).toMatch(
       /only moves forward/u,
     );
+    expect(await failure(update({ lastUsedAt: null }))).toMatch(/only moves forward/u);
     await update({ revokedAt: new Date(), revokedBy: owner });
     expect(await failure(update({ revokedAt: null, revokedBy: null }))).toMatch(/stays revoked/u);
     expect(

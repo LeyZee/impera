@@ -48,7 +48,7 @@ BEGIN
     RAISE EXCEPTION 'this change to mcp_grants is refused: a revoked access stays revoked'
       USING ERRCODE = 'restrict_violation';
   END IF;
-  IF NEW."last_used_at" < OLD."last_used_at" THEN
+  IF NEW."last_used_at" < OLD."last_used_at" OR (NEW."last_used_at" IS NULL AND OLD."last_used_at" IS NOT NULL) THEN
     RAISE EXCEPTION 'this change to mcp_grants is refused: a last use only moves forward'
       USING ERRCODE = 'restrict_violation';
   END IF;
