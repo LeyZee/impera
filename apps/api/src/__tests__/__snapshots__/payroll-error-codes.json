@@ -77,6 +77,7 @@
   "penalty_conflict": 409,
   "penalty_not_found": 404,
   "request_invalid": 400,
+  "role_forbidden": 403,
   "session_unauthenticated": 401,
   "team_member_not_found": 404
 }

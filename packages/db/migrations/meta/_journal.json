@@ -988,6 +988,13 @@
       "when": 1794620999978,
       "tag": "0191_service_role",
       "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "7",
+      "when": 1794625630128,
+      "tag": "0193_mcp_grants",
+      "breakpoints": true
     }
   ]
 }

@@ -11,6 +11,7 @@ export * from './backups';
 export * from './brief';
 export * from './calendar';
 export * from './connector';
+export * from './connector-reads';
 export * from './content-drops';
 export * from './conversations';
 export * from './copilot';

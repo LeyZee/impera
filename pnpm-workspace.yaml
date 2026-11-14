@@ -26,6 +26,12 @@ overrides:
   '@peculiar/asn1-schema': 2.11.0
   '@peculiar/asn1-x509': 2.11.0
   '@peculiar/asn1-x509-attr': 2.11.0
+  # Quarantine (14 days) for the MCP SDK's tree (ADR 0026 § 2, @modelcontextprotocol/sdk 1.32.2 of 23/10/2026): the
+  # latest of these that passed it on 14/11/2026. Remove each once the newer one is 14 days old.
+  hono: 4.13.14
+  '@hono/node-server': 2.1.5
+  express-rate-limit: 8.7.2
+  encodeurl: 2.0.1
 
 auditConfig:
   ignoreGhsas:
