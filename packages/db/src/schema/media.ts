@@ -113,6 +113,11 @@ export const mediaPlatformRefs = pgTable(
     folderRef: text('folder_ref'),
     folderName: text('folder_name'),
     folderMoment: enumText('folder_moment'),
+    /**
+     * Not the connector's `VaultMedia.folderPosition` (its rank in the whole folder, which moves at each upload): the
+     * rank among the media of the same folder uploaded at the same millisecond, from 0, in the platform's order. The
+     * folder's order is `platform_created_at` descending, then this rank.
+     */
     folderPosition: integer('folder_position').notNull(),
     platformCreatedAt: timestampTz('platform_created_at').notNull(),
     durationSeconds: integer('duration_seconds'),

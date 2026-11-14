@@ -4,6 +4,7 @@ import {
   VaultViewSchema,
   type CreatorId,
   type JobPayload,
+  type Platform,
   type PlatformAccountId,
   type PlatformScript,
   type VaultFolderView,
@@ -13,10 +14,11 @@ import { z } from 'zod';
 
 import { PlatformAccountNotFound, PlatformReadUnavailable, VaultForbidden } from '../domain/errors';
 import { ConnectorError, type PlatformConnector } from '../domain/platform-connector';
-import type { AccountStore, Clock, ConnectorAccount, JobLogger } from '../domain/ports';
+import type { AccountJobs, AccountStore, Clock, ConnectorAccount, JobLogger } from '../domain/ports';
 import {
   compareVaultFolders,
   compareVaultOrder,
+  type VaultRead,
   type VaultRefRow,
   type VaultStore,
 } from '../domain/vault-sync';
@@ -65,6 +67,36 @@ export function createVaultSyncJob(deps: VaultDeps) {
   };
 }
 
+/** What `onVaultSyncAsked` is told: one account whose sync the owner's « Synchroniser » queued. */
+export interface VaultSyncAsked {
+  readonly platformAccountId: PlatformAccountId;
+  readonly creatorId: CreatorId;
+  readonly correlationId: string;
+}
+
+/**
+ * The owner's « Synchroniser » (fiche vault-sync): one `connector.vault_sync` queued for each of her accounts that may
+ * be read now, then `onAsked` told of each, once, just after its own enqueue (the queue is not transactional: the job
+ * is already queued when it is called). How many accounts were asked.
+ */
+export function createAskVaultSync(deps: {
+  readonly accounts: Pick<AccountStore, 'listPollable'>;
+  readonly jobs: Pick<AccountJobs, 'enqueueVaultSync'>;
+  readonly platforms: readonly Platform[];
+  readonly onAsked?: ((input: VaultSyncAsked) => Promise<void>) | undefined;
+}) {
+  return async (creatorId: CreatorId, correlationId: string): Promise<number> => {
+    const theirs = (await deps.accounts.listPollable(deps.platforms)).filter(
+      (account) => account.creatorId === creatorId,
+    );
+    for (const account of theirs) {
+      await deps.jobs.enqueueVaultSync(account, correlationId);
+      await deps.onAsked?.({ platformAccountId: account.id, creatorId, correlationId });
+    }
+    return theirs.length;
+  };
+}
+
 function mediaOf(row: VaultRefRow): VaultFolderView['media'][number] {
   return {
     platformMediaId: row.platformMediaId,
@@ -81,7 +113,7 @@ function mediaOf(row: VaultRefRow): VaultFolderView['media'][number] {
 }
 
 /** Her vault folder by folder, each in the platform's order; the folders by their number, the root last. */
-function vaultViewOf(creatorId: CreatorId, rows: readonly VaultRefRow[]): VaultView {
+function vaultViewOf(creatorId: CreatorId, { rows, syncedAt }: VaultRead): VaultView {
   const folders = new Map<string, { readonly head: VaultRefRow; readonly rows: VaultRefRow[] }>();
   for (const row of rows) {
     const key = `${row.platformAccountId}|${row.folderRef ?? ''}`;
@@ -89,7 +121,6 @@ function vaultViewOf(creatorId: CreatorId, rows: readonly VaultRefRow[]): VaultV
     if (folder === undefined) folders.set(key, { head: row, rows: [row] });
     else folder.rows.push(row);
   }
-  const synced = rows.map((row) => row.lastSyncedAt.getTime());
   return VaultViewSchema.parse({
     creatorId,
     folders: [...folders.values()]
@@ -102,7 +133,7 @@ function vaultViewOf(creatorId: CreatorId, rows: readonly VaultRefRow[]): VaultV
         moment: head.folderMoment,
         media: [...inside].sort(compareVaultOrder).map(mediaOf),
       })),
-    syncedAt: synced.length === 0 ? null : new Date(Math.max(...synced)).toISOString(),
+    syncedAt: syncedAt?.toISOString() ?? null,
   });
 }
 
@@ -114,9 +145,9 @@ export interface VaultReads {
 export function createVaultReads(store: VaultStore): VaultReads {
   return {
     async view(creatorId, userId) {
-      const rows = await store.rows(creatorId, userId);
-      if (rows === null) throw new VaultForbidden();
-      return vaultViewOf(creatorId, rows);
+      const read = await store.read(creatorId, userId);
+      if (read === null) throw new VaultForbidden();
+      return vaultViewOf(creatorId, read);
     },
   };
 }

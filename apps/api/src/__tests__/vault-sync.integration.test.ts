@@ -28,7 +28,7 @@ const PASSWORD = 'correct horse battery';
 
 /**
  * The vault's sync (fiche vault-sync, ADR 0099 § 2 to 4) on FakeReveal's invented vault, through the real connector and
- * the real tables: folders and media mirrored in the platform's order, a second sync writing nothing, a media removed
+ * the real tables: folders and media mirrored in the platform's order, a second sync writing only the account's sync time, a media removed
  * kept, a media moved changing folder, an archived creator not read, and her rows out of another tenant's reach.
  */
 describe('vault sync on FakeReveal (fiche vault-sync)', () => {
@@ -38,6 +38,7 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
   let creatorId: CreatorId;
   let accountId: PlatformAccountId;
   let logger: ReturnType<typeof createLogger>;
+  let now: Date;
   const users = new Map<'owner' | 'manager' | 'outsider' | 'chatter', string>();
   const user = (key: Parameters<typeof users.get>[0]): string => {
     const id = users.get(key);
@@ -102,7 +103,7 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
       SESSION_ENCRYPTION_KEYS: SESSION_KEYS,
     });
     logger = createLogger(config);
-    const now = new Date(fake.state().now);
+    now = new Date(fake.state().now);
     app = await createApp(config, logger, {
       composer: fixedComposer,
       connectorsClock: () => now,
@@ -218,11 +219,16 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
     // No address of a file, ever.
     expect(JSON.stringify(await view())).not.toMatch(/https?:/u);
 
+    const firstSync = (await view()).syncedAt;
+    expect(firstSync).toBe(now.toISOString());
     const before = await syncTimes();
+    now = new Date(now.getTime() + 60_000);
     await sync();
     expect((await folderOf('folder_1'))?.media.map((m) => m.platformMediaId)).toEqual(FOLDER_1);
-    // Nothing moved: nothing written.
+    // Nothing moved: no media row written, only the account's sync time, which the view shows.
     expect(await syncTimes()).toEqual(before);
+    expect((await view()).syncedAt).toBe(now.toISOString());
+    expect((await view()).syncedAt).not.toBe(firstSync);
   });
 
   it('keeps a media Reveal no longer lists, and moves one that changed folder', async () => {

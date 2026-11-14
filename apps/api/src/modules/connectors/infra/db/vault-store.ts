@@ -138,13 +138,26 @@ export function createDrizzleVaultStore(db: Database): VaultStore {
               ),
             );
         }
+        // The account's own sync time, moved even when nothing else did: what « synchronisé à » shows.
+        await tx
+          .update(schema.platformAccounts)
+          .set({ vaultSyncedAt: now })
+          .where(eq(schema.platformAccounts.id, account.id));
         return { listed: read.length, written: plan.upserts.length, removed: plan.removals.length };
       }),
 
-    rows: (creatorId, userId) =>
+    read: (creatorId, userId) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
         if (!readsCreatorFigures(await readerIn(tx, userId, creatorId, scope))) return null;
-        return (await selectRows(tx)).map(rowOf);
+        const [synced] = await tx
+          .select({
+            at: sql<Date | null>`max(${schema.platformAccounts.vaultSyncedAt})`.mapWith(
+              schema.platformAccounts.vaultSyncedAt,
+            ),
+          })
+          .from(schema.platformAccounts)
+          .where(eq(schema.platformAccounts.creatorId, creatorId));
+        return { rows: (await selectRows(tx)).map(rowOf), syncedAt: synced?.at ?? null };
       }),
   };
 }

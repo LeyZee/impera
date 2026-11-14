@@ -262,6 +262,9 @@ export class VaultForbidden extends DomainError {
  * that does not declare this read, or a platform that failed to answer it.
  */
 export class PlatformReadUnavailable extends DomainError {
+  /** Why: no usable session, a read the platform does not give, or a platform that failed to answer. */
+  readonly reason: 'session' | 'unsupported' | 'failed';
+
   constructor(reason: 'session' | 'unsupported' | 'failed') {
     super(
       'platform_read_unavailable',
@@ -270,6 +273,8 @@ export class PlatformReadUnavailable extends DomainError {
         : reason === 'unsupported'
           ? 'Cette plateforme ne donne pas cette lecture'
           : 'La plateforme n’a pas répondu à cette lecture',
+      { details: { reason } },
     );
+    this.reason = reason;
   }
 }

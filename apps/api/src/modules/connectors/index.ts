@@ -1,7 +1,6 @@
 import type {
   ConnectionService,
   ConnectionSignal,
-  CreatorId,
   JobPayload,
   SalesFeedStatus,
   TeamPlatformRemoval,
@@ -21,11 +20,13 @@ import { createConnectorResolver } from './application/resolver';
 import { createSalesFeeds, type SalesFeedDeps } from './application/sales-feed';
 import { createConnectorSessions, type ConnectorSessions } from './application/sessions';
 import {
+  createAskVaultSync,
   createPlatformReads,
   createVaultReads,
   createVaultSyncJob,
   type PlatformReads,
   type VaultReads,
+  type VaultSyncAsked,
 } from './application/vault';
 import type { AvatarPorts } from './domain/avatar';
 import { connectionServiceOf } from './domain/connection-outage';
@@ -97,6 +98,8 @@ export { FakeConnector } from './infra/fake/FakeConnector';
 /** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
 export { revealApiConnectors } from './infra/reveal/connector';
 export type { RevealFetch } from './infra/reveal/client';
+/** @public The errors `platformReads` throws, for the adapter that reads through it (`reason` says why a read is refused). */
+export { PlatformAccountNotFound, PlatformReadUnavailable } from './domain/errors';
 /** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */
 export {
   REVEAL_ENDPOINTS,
@@ -284,6 +287,11 @@ export interface ConnectorsDeps {
    * is the module's own.
    */
   readonly avatars?: Omit<AvatarPorts, 'records'> | null;
+  /**
+   * Told of each `connector.vault_sync` the owner's « Synchroniser » queued, once per account, just after its enqueue
+   * (fiche vault-sync; asked by `media`, wired by the composition root). Never a write of this module's tables.
+   */
+  readonly onVaultSyncAsked?: (input: VaultSyncAsked) => Promise<void>;
 }
 
 const systemClock: Clock = { now: () => new Date() };
@@ -337,13 +345,12 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const accountJobQueue = createDrizzleAccountJobs(deps.adminDb);
   const vaultStore = createDrizzleVaultStore(deps.db);
   const vaultReads = createVaultReads(vaultStore);
-  const askVaultSync = async (creatorId: CreatorId, correlationId: string): Promise<number> => {
-    const theirs = (await accounts.listPollable(resolver.platforms)).filter(
-      (account) => account.creatorId === creatorId,
-    );
-    for (const account of theirs) await accountJobQueue.enqueueVaultSync(account, correlationId);
-    return theirs.length;
-  };
+  const askVaultSync = createAskVaultSync({
+    accounts,
+    jobs: accountJobQueue,
+    platforms: resolver.platforms,
+    onAsked: deps.onVaultSyncAsked,
+  });
   return {
     name: 'connectors',
     outboundSender: sender,

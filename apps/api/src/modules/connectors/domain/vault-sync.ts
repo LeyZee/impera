@@ -39,8 +39,9 @@ export interface VaultSyncPlan {
 const folderKey = (media: VaultMedia): string => (media.folder === null ? '' : `f:${media.folder.ref.id}`);
 
 /**
- * The read as rows: each media once (the first time it is listed), its upload time to the millisecond, and its rank
- * among the uploads of the same time of its folder, in the order the platform listed them.
+ * The read as rows: each media once, its upload time to the millisecond, and its rank among the uploads of the same time
+ * of its folder, in the order the platform listed them. A media listed twice (in two folders, or twice in one) is kept
+ * where it was listed first; whether Reveal allows a media in two folders is not known, to see at the first real read.
  */
 export function vaultRefsOf(read: readonly VaultMedia[]): VaultRefFields[] {
   const seen = new Set<string>();
@@ -150,10 +151,17 @@ export interface VaultRefRow extends VaultRefFields {
   readonly lastSyncedAt: Date;
 }
 
+/** Her vault as kept, and the latest sync of any of her accounts that went through (`null` before a first one). */
+export interface VaultRead {
+  readonly rows: readonly VaultRefRow[];
+  readonly syncedAt: Date | null;
+}
+
 /**
  * `media_platform_refs` (fiche vault-sync). `apply` runs in the creator's tenant: it skips an archived creator (ADR
- * 0071, `null`), reads what is kept for the account, plans and writes in the same transaction. `rows` reads as the
- * person, for the owner and an active manager of her list (`null` when refused, before anything is read).
+ * 0071, `null`), reads what is kept for the account, plans and writes in the same transaction, and stamps the account's
+ * `vault_synced_at` (the only write when nothing moved). `read` reads as the person, for the owner and an active manager
+ * of her list (`null` when refused, before anything is read).
  */
 export interface VaultStore {
   apply(
@@ -165,5 +173,5 @@ export interface VaultStore {
     read: readonly VaultMedia[],
     now: Date,
   ): Promise<VaultSyncOutcome | null>;
-  rows(creatorId: CreatorId, userId: string): Promise<readonly VaultRefRow[] | null>;
+  read(creatorId: CreatorId, userId: string): Promise<VaultRead | null>;
 }

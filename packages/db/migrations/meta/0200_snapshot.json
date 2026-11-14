@@ -1,5 +1,5 @@
 {
-  "id": "953c457e-307d-4661-84bb-10f064412279",
+  "id": "f7f95a96-4a29-47a2-b473-0bbbd6ace61f",
   "prevId": "86a9c625-e353-4109-ad75-62bb0f380542",
   "version": "7",
   "dialect": "postgresql",
@@ -20265,6 +20265,12 @@
         },
         "last_poll_at": {
           "name": "last_poll_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vault_synced_at": {
+          "name": "vault_synced_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

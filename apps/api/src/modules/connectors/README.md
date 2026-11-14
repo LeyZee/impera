@@ -126,9 +126,9 @@ La version du lien change dès qu'il pointe ailleurs, jamais quand le même lien
 
 ## Coffre de la plateforme (fiche vault-sync, ADR 0099)
 
-- `domain/vault-sync.ts` : la lecture du coffre en liaisons (`vaultRefsOf`), la comparaison avec ce qui est gardé (`planVaultSync` : nouveau, déplacé, changé ou revenu = écrit ; plus listé = `removed_at`, jamais effacé ; inchangé = rien), l'ordre de Reveal (`compareVaultOrder`) et celui des dossiers.
-- `application/vault.ts` : le job `connector.vault_sync` (file du compte, aucune horloge : demandé par le propriétaire), la vue `GET /v1/creators/:creatorId/vault` (propriétaire, manager actif de sa liste) et `platformReads.scripts` pour un autre module (par le resolver, derrière `capabilities.scripts`, jamais une écriture).
-- `infra/db/vault-store.ts` : `media_platform_refs`, écrite dans la transaction de la créatrice, une créatrice archivée n'est ni lue ni écrite. `infra/http/vault-routes.ts` : les deux routes.
+- `domain/vault-sync.ts` : la lecture du coffre en liaisons (`vaultRefsOf`), la comparaison avec ce qui est gardé (`planVaultSync` : nouveau, déplacé, changé ou revenu = écrit ; plus listé = `removed_at`, jamais effacé ; inchangé = rien ; si Reveal liste un média deux fois, seul le premier listé est gardé), l'ordre de Reveal (`compareVaultOrder`) et celui des dossiers.
+- `application/vault.ts` : le job `connector.vault_sync` (file du compte, aucune horloge : demandé par le propriétaire), la vue `GET /v1/creators/:creatorId/vault` (propriétaire, manager actif de sa liste) et `platformReads.scripts` pour un autre module (par le resolver, derrière `capabilities.scripts`, jamais une écriture ; refus : `PlatformAccountNotFound`, ou `PlatformReadUnavailable` et sa raison `session`, `unsupported` ou `failed`, tous deux exportés). Le « Synchroniser » du propriétaire met un job en file par compte puis appelle `onVaultSyncAsked` (facultatif, branché par la racine de composition) une fois par compte.
+- `infra/db/vault-store.ts` : `media_platform_refs`, écrite dans la transaction de la créatrice, une créatrice archivée n'est ni lue ni écrite. Chaque synchronisation réussie écrit `platform_accounts.vault_synced_at`, même sans changement : c'est l'heure que la vue montre (`syncedAt`). `infra/http/vault-routes.ts` : les deux routes.
 - Aucun fichier, aucune adresse, aucun appel d'IA : le téléchargement et la description viennent avec la fiche vault-fetch-media.
 
 ## Structure

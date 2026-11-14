@@ -40,7 +40,7 @@ export type VaultFolderView = z.infer<typeof VaultFolderViewSchema>;
 export const VaultViewSchema = z.strictObject({
   creatorId: CreatorIdSchema,
   folders: z.array(VaultFolderViewSchema),
-  /** The latest sync of any of her accounts; `null` before a first one. */
+  /** The latest vault sync of any of her accounts that went through, changes or not; `null` before a first one. */
   syncedAt: z.iso.datetime({ offset: true }).nullable(),
 });
 export type VaultView = z.infer<typeof VaultViewSchema>;

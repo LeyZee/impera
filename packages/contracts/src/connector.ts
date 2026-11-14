@@ -188,7 +188,9 @@ export type SentScriptStep = z.infer<typeof SentScriptStepSchema>;
 /**
  * A media of the creator's vault on the platform (`listVaultMedia`), with its folder (ADR 0099 § 2 to 4).
  * `folderPosition`: its rank in the platform's own list of that folder (or of the vault's root), from 0, as the pages
- * came one after the other. `folder.moment`: ☀️ or 🌙 read in the folder's name, which is what decides. `description`:
+ * came one after the other. The CRM does not keep that rank, which moves at each new upload: `media_platform_refs.
+ * folder_position` keeps the rank among the media of the same folder uploaded at the same millisecond, in this list's
+ * order (`vaultRefsOf`), and the order is rebuilt from the upload time, then that rank. `folder.moment`: ☀️ or 🌙 read in the folder's name, which is what decides. `description`:
  * the platform's text, a starting point never validated. `suggestedPriceMinor`: the platform's suggested range, in the
  * platform's minor unit (euro cents on Reveal, like its other prices; to confirm at the first real read), only shown.
  */

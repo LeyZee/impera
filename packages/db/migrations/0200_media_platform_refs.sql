@@ -2,7 +2,8 @@
 -- mirrors it, one row per media of an account, its folder, its moment and its order as the platform lists them; never a
 -- file (`media_asset_id` stays empty until a fetch), never deleted (`removed_at`). Written by `connector.vault_sync`
 -- inside the creator's tenant (withTenant): nirvana_app selects, inserts and updates, never deletes; read-only to her
--- own account.
+-- own account. `platform_accounts.vault_synced_at`: the account's last vault sync that went through; a sync where
+-- nothing moved writes only that time.
 CREATE TABLE "media_platform_refs" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"creator_id" uuid NOT NULL,
@@ -34,6 +35,7 @@ CREATE TABLE "media_platform_refs" (
 );
 --> statement-breakpoint
 ALTER TABLE "media_platform_refs" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "platform_accounts" ADD COLUMN "vault_synced_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "media_platform_refs" ADD CONSTRAINT "media_platform_refs_creator_id_creators_id_fk" FOREIGN KEY ("creator_id") REFERENCES "public"."creators"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "media_platform_refs" ADD CONSTRAINT "media_platform_refs_media_asset_id_media_assets_id_fk" FOREIGN KEY ("media_asset_id") REFERENCES "public"."media_assets"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "media_platform_refs" ADD CONSTRAINT "media_platform_refs_account_fk" FOREIGN KEY ("platform_account_id","creator_id") REFERENCES "public"."platform_accounts"("id","creator_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
