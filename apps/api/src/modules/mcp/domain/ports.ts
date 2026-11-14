@@ -6,6 +6,7 @@ import type {
   McpCapability,
   McpGrantId,
   Platform,
+  SalesOfCreator,
   ScriptSegment,
   TeamImportLinked,
   UserId,
@@ -270,4 +271,16 @@ export interface AiUsageReader {
  */
 export interface TeamImportReader {
   teamImport(userId: string, platform: Platform): Promise<TeamImportLinked>;
+}
+
+/**
+ * The connectors' read of a creator's sales (`reads.sales`, its `index.ts`, ADR 0026 § 1): as the person, each creator
+ * checked in its own transaction, one refused refusing the call; never the agency's nor the creator's share.
+ */
+export interface SalesReader {
+  sales(
+    userId: string,
+    creatorIds: readonly CreatorId[],
+    range: { readonly from: string; readonly to: string },
+  ): Promise<readonly SalesOfCreator[]>;
 }

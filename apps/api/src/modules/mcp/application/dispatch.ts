@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { decideCall, type ActorView } from '../domain/access';
 import { MCP_CATALOGUE_VERSION, toolNamed, type McpToolSpec } from '../domain/catalogue';
+import { McpReadRefused } from '../domain/errors';
 import type { GrantRecord, McpJournal } from '../domain/ports';
 
 /** What a served tool is given: the access, the person as read for this call, the creator it is confined to. */
@@ -143,6 +144,11 @@ export function createDispatcher(deps: DispatcherDeps): McpDispatcher {
           await tool.run({ grant: call.grant, actor: call.actor, creatorId: decision.creatorId }, input.data),
         );
       } catch (error) {
+        // The module read refused the person itself (its rule, read again in its transaction): a refusal, not a fault.
+        if (error instanceof McpReadRefused) {
+          await record(spec.name, error.refusal, decision.creatorId, subject);
+          return { ok: false, refusal: error.refusal };
+        }
         await record(spec.name, 'error', decision.creatorId, subject);
         throw error;
       }
