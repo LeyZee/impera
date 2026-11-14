@@ -6,7 +6,7 @@ import { MCP_CATALOGUE_VERSION, toolNamed, type McpToolSpec } from '../domain/ca
 import type { GrantRecord, McpJournal } from '../domain/ports';
 
 /** What a served tool is given: the access, the person as read for this call, the creator it is confined to. */
-interface ToolContext {
+export interface ToolContext {
   readonly grant: GrantRecord;
   readonly actor: ActorView;
   readonly creatorId: string | null;

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  ContentDropIdSchema,
   CreatorIdSchema,
   FanIdSchema,
   McpFanCardGetSchema,
@@ -104,7 +105,9 @@ describe('/v1/mcp', () => {
     test.admin.db
       .select({ action: schema.auditLog.action, details: schema.auditLog.details })
       .from(schema.auditLog)
-      .where(and(eq(schema.auditLog.entity, 'mcp_grant'), eq(schema.auditLog.entityId, grantId)));
+      .where(and(eq(schema.auditLog.entity, 'mcp_grant'), eq(schema.auditLog.entityId, grantId)))
+      // Each call writes its line in its own transaction, so in the order of the calls.
+      .orderBy(schema.auditLog.createdAt);
   const setSecondFactor = (enabled: boolean) =>
     test.admin.db.update(schema.user).set({ twoFactorEnabled: enabled }).where(eq(schema.user.id, ownerId));
 
@@ -370,5 +373,37 @@ describe('/v1/mcp', () => {
       ['mcp.fan_get', expect.objectContaining({ outcome: 'creator_forbidden', subject: {} })],
     ]);
     expect(JSON.stringify(lines)).not.toContain('Théo');
+  });
+  it('reads her drops and scripts through their modules, and names a script by its id in the journal', async () => {
+    const grant = await createGrant({ capabilities: ['read:media', 'read:script_content'] });
+    const listed = RpcSchema.parse(
+      (await rpc(grant.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
+    );
+    expect(listed.result?.tools?.map((tool) => tool.name)).toEqual([
+      'whoami',
+      'drops_list',
+      'scripts_list',
+      'script_steps_get',
+    ]);
+    const drops = RpcSchema.parse((await rpc(grant.token, callTool('drops_list', { limit: 5 }))).json());
+    expect(drops.result?.structuredContent).toEqual({ drops: [], next: null });
+    const scripts = RpcSchema.parse((await rpc(grant.token, callTool('scripts_list'))).json());
+    expect(scripts.result?.structuredContent).toMatchObject({ scripts: [] });
+    const absent = newId(ContentDropIdSchema);
+    const steps = RpcSchema.parse(
+      (await rpc(grant.token, callTool('script_steps_get', { dropId: absent }))).json(),
+    );
+    expect(steps.result?.structuredContent).toEqual({ script: null });
+    const tooMany = RpcSchema.parse((await rpc(grant.token, callTool('drops_list', { limit: 51 }))).json());
+    expect(tooMany.result?.structuredContent).toEqual({ refusal: 'arguments_invalid' });
+
+    const lines = await journal(grant.id);
+    expect(lines.map((line) => [line.action, line.details])).toEqual([
+      ['mcp_grant.create', expect.anything()],
+      ['mcp.drops_list', expect.objectContaining({ outcome: 'ok', subject: {} })],
+      ['mcp.scripts_list', expect.objectContaining({ outcome: 'ok', subject: {} })],
+      ['mcp.script_steps_get', expect.objectContaining({ outcome: 'ok', subject: { dropId: absent } })],
+      ['mcp.drops_list', expect.objectContaining({ outcome: 'arguments_invalid' })],
+    ]);
   });
 });
