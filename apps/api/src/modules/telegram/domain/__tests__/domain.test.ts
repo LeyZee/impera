@@ -272,6 +272,22 @@ describe('classification (ADR 0020 §2)', () => {
     });
   });
 
+  it('says a provider refuses for lack of quota or credits, urgent, the agent on its fallback (ADR 0091 § 6)', () => {
+    expect(classify({ kind: 'ai_quota_exhausted', provider: 'xai', mode: 'subscription' })).toEqual({
+      kind: 'notice',
+      topic: 'urgent',
+      fallbackTopic: 'important',
+      threadKey: null,
+      title: 'URGENT',
+      body: 'Grok (xAI) refuse les appels : le quota de ton abonnement est épuisé. L’agent répond avec son modèle de repli jusqu’à la remise à zéro du quota.',
+      link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
+    });
+    expect(classify({ kind: 'ai_quota_exhausted', provider: 'mistral', mode: 'credits' })).toMatchObject({
+      topic: 'urgent',
+      body: 'Mistral refuse les appels faute de crédits. L’agent répond avec son modèle de repli : recharge, puis note-le dans Consommation IA.',
+    });
+  });
+
   it('says the database export is overdue, in Paris time, or has never succeeded', () => {
     expect(classify({ kind: 'backup_overdue', lastSucceededAt: new Date('2026-10-26T02:04:00Z') })).toEqual({
       kind: 'notice',

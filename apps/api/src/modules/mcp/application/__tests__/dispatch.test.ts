@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import type { ActorView } from '../../domain/access';
+import { McpReadRefused } from '../../domain/errors';
 import type { GrantRecord, McpCallRecord } from '../../domain/ports';
 import { createDispatcher, whoami, type ServedTool } from '../dispatch';
 
@@ -33,6 +34,14 @@ const creatorGet: ServedTool = {
   run: (context) => Promise.resolve({ creatorId: context.creatorId }),
 };
 
+/** The owner's alone (`ownerOnly` in the catalogue), served by a stub. */
+const aiUsageGet: ServedTool = {
+  description: 'stub',
+  input: z.strictObject({}),
+  output: z.object({}),
+  run: () => Promise.resolve({}),
+};
+
 const setup = (over: { spend?: boolean; journalFails?: boolean } = {}) => {
   const lines: McpCallRecord[] = [];
   const dispatcher = createDispatcher({
@@ -44,7 +53,7 @@ const setup = (over: { spend?: boolean; journalFails?: boolean } = {}) => {
       },
     },
     spendRead: () => Promise.resolve(over.spend ?? true),
-    tools: { whoami, creator_get: creatorGet },
+    tools: { whoami, creator_get: creatorGet, ai_usage_get: aiUsageGet },
   });
   const call = (name: string, args: unknown = {}, actor: ActorView = owner) =>
     dispatcher.call({ grant, actor, name, args, requestId: 'req-1', ip: '203.0.113.1' });
@@ -121,6 +130,35 @@ describe('the dispatcher of the MCP server (ADR 0026 § 4 and § 8)', () => {
     expect(lines.at(-1)?.outcome).toBe('rate_limited');
   });
 
+  it('answers a read the module refused to the person as a refusal, written down, never as an error', async () => {
+    const lines: McpCallRecord[] = [];
+    const refused: ServedTool = {
+      ...creatorGet,
+      run: () => Promise.reject(new McpReadRefused('creator_forbidden')),
+    };
+    const dispatcher = createDispatcher({
+      journal: {
+        record: (entry) => {
+          lines.push(entry);
+          return Promise.resolve();
+        },
+      },
+      spendRead: () => Promise.resolve(true),
+      tools: { creator_get: refused },
+    });
+    expect(
+      await dispatcher.call({
+        grant,
+        actor: owner,
+        name: 'creator_get',
+        args: {},
+        requestId: 'req-1',
+        ip: '203.0.113.1',
+      }),
+    ).toEqual({ ok: false, refusal: 'creator_forbidden' });
+    expect(lines.map((line) => line.outcome)).toEqual(['creator_forbidden']);
+  });
+
   it('gives nothing when the call cannot be written down', async () => {
     const { call } = setup({ journalFails: true });
     await expect(call('whoami')).rejects.toThrow('journal down');
@@ -128,9 +166,48 @@ describe('the dispatcher of the MCP server (ADR 0026 § 4 and § 8)', () => {
 
   it('lists the served tools whose capability the access holds', () => {
     const { dispatcher } = setup();
-    expect(dispatcher.list(grant).map((tool) => tool.name)).toEqual(['whoami', 'creator_get']);
-    expect(dispatcher.list({ ...grant, capabilities: ['read:team'] }).map((tool) => tool.name)).toEqual([
+    expect(dispatcher.list(grant, owner).map((tool) => tool.name)).toEqual(['whoami', 'creator_get']);
+    expect(
+      dispatcher.list({ ...grant, capabilities: ['read:team'] }, owner).map((tool) => tool.name),
+    ).toEqual(['whoami']);
+  });
+
+  it('lists an owner-only tool to the owner on an access of the agency, and to no one else', () => {
+    const { dispatcher } = setup();
+    const agency = { ...grant, creatorId: null };
+    const manager: ActorView = {
+      ...owner,
+      role: 'operator',
+      teamScope: 'agency',
+      readableCreatorIds: [nora],
+    };
+    expect(dispatcher.list(agency, owner).map((tool) => tool.name)).toEqual([
       'whoami',
+      'creator_get',
+      'ai_usage_get',
     ]);
+    expect(dispatcher.list(agency, manager).map((tool) => tool.name)).toEqual(['whoami', 'creator_get']);
+    expect(dispatcher.list(grant, owner).map((tool) => tool.name)).toEqual(['whoami', 'creator_get']);
+  });
+
+  it('refuses an owner-only tool to a manager on an access of the agency', async () => {
+    const { dispatcher, lines } = setup();
+    const manager: ActorView = {
+      ...owner,
+      role: 'operator',
+      teamScope: 'agency',
+      readableCreatorIds: [nora],
+    };
+    expect(
+      await dispatcher.call({
+        grant: { ...grant, creatorId: null },
+        actor: manager,
+        name: 'ai_usage_get',
+        args: {},
+        requestId: 'req-1',
+        ip: '203.0.113.1',
+      }),
+    ).toEqual({ ok: false, refusal: 'owner_only' });
+    expect(lines.at(-1)?.outcome).toBe('owner_only');
   });
 });

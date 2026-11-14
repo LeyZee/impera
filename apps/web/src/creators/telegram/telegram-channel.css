@@ -106,8 +106,18 @@
   gap: 4px;
 }
 .tc-day {
+  position: relative;
   min-width: 44px;
   justify-content: center;
+}
+/* A day: 32px seen, 44px to the finger; its × too (ADM-22). The gap of 4px is shared, never covered twice. */
+.tc-day::after {
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
+}
+.tc-slot .ps-entry__remove::after {
+  inset: -11px;
 }
 .tc-slot__end,
 .tc-link__end {

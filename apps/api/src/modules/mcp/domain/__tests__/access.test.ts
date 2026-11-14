@@ -165,6 +165,44 @@ describe('decideCall (ADR 0026 § 4, ADR 0105 § 1)', () => {
       refusal: 'creator_forbidden',
     });
   });
+  it('gives the agency’s AI spend to the owner alone, on an access of the agency', () => {
+    expect(decideCall(tool('ai_usage_get'), grant(['read:status'], null), owner)).toEqual({
+      ok: true,
+      creatorId: null,
+    });
+    expect(
+      decideCall(tool('ai_usage_get'), grant(['read:status'], null), {
+        ...manager,
+        readableCreatorIds: 'all',
+      }),
+    ).toEqual({
+      ok: false,
+      refusal: 'owner_only',
+    });
+    expect(decideCall(tool('ai_usage_get'), grant(['read:status']), owner)).toEqual({
+      ok: false,
+      refusal: 'creator_forbidden',
+    });
+  });
+
+  it('keeps what is the agency’s as a whole (team imported, commission statements) from an access bound to a creator', () => {
+    expect(decideCall(tool('team_import_list'), grant(['read:team'], null), manager)).toEqual({
+      ok: true,
+      creatorId: null,
+    });
+    expect(decideCall(tool('team_import_list'), grant(['read:team']), owner)).toEqual({
+      ok: false,
+      refusal: 'creator_forbidden',
+    });
+    expect(decideCall(tool('commission_statements_list'), grant(['read:payroll']), owner)).toEqual({
+      ok: false,
+      refusal: 'creator_forbidden',
+    });
+    expect(decideCall(tool('commission_statements_list'), grant(['read:payroll'], null), owner)).toEqual({
+      ok: true,
+      creatorId: null,
+    });
+  });
 });
 
 describe('grantProblems', () => {

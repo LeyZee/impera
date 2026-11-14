@@ -1,14 +1,39 @@
 /** Public entry point of the `scripts` module (SC-01, ADR 0056). Other modules import this file only. */
-import type { CreatorId, ScriptStructureVersion, ScriptVariantLetter, ShotMoment } from '@impera/contracts';
+import type {
+  CreatorId,
+  JobPayload,
+  PlatformAccountId,
+  ScriptStructureVersion,
+  ScriptVariantLetter,
+  ShotMoment,
+} from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { askScripts, type AskScriptsRun } from './application/ask-scripts';
+import { importPlatformScripts, type ImportPlatformScriptsRun } from './application/import-platform-scripts';
+import {
+  creatorPlatformScripts,
+  platformScriptForJob,
+  type PlatformScriptsReader,
+  type PlatformScriptView,
+} from './application/platform-script-reads';
 import { creatorQueue, queuedDigest, type QueuedDigest, type ScriptsReader } from './application/reads';
 import { cardContent, cardSvg } from './domain/cards';
-import type { LimitsOf, RasterizeCard, ScriptRequests, ScriptStructureStore } from './domain/ports';
+import type {
+  LimitsOf,
+  PlatformScriptSource,
+  RasterizeCard,
+  ScriptRequests,
+  ScriptStructureStore,
+} from './domain/ports';
 import { createCardRasterizer } from './infra/card-rasterizer';
 import { createDrizzleCadenceStore } from './infra/db/cadence-store';
+import { createImportQueue } from './infra/db/import-queue';
+import {
+  createDrizzlePlatformScriptImportStore,
+  createDrizzlePlatformScriptReadStore,
+} from './infra/db/platform-script-store';
 import { createDrizzleScriptStructureStore } from './infra/db/structure-store';
 import { createFrozenVersionReader, createRequestFreezer } from './infra/db/version-reader';
 import { createScriptRoutes, type RequireRole } from './infra/http/routes';
@@ -49,17 +74,58 @@ export interface ScriptsModule {
    */
   readonly reads: {
     queue(creatorId: CreatorId, reader: ScriptsReader): Promise<readonly QueuedDigest[] | null>;
+    /**
+     * Her native scripts imported from the platform (ADR 0099 § 1 time 2), with their price warnings and what keeps each
+     * from being offered; the owner and her active managers only. `null` for a reader who may not read her.
+     */
+    platformScripts(
+      creatorId: CreatorId,
+      reader: PlatformScriptsReader,
+    ): Promise<readonly PlatformScriptView[] | null>;
+  };
+  /**
+   * Reads out of any person, as the service role: for a job only (ADR 0026 § 1). Never called with an id a request
+   * gave, nor from a route: a person reads through `reads`.
+   */
+  readonly forJobs: {
+    /**
+     * One native script of hers, by an id the base gave the job: what a job of the agent reads before sending its step
+     * (ADR 0111, the reward). `null` when it is not hers.
+     */
+    platformScript(creatorId: CreatorId, scriptId: string): Promise<PlatformScriptView | null>;
   };
   /** Mounted under `/v1` by the server: `/script-structures` (and their cards), each creator's `/script-queue` and `/script-cadence`. */
   readonly routes: FastifyPluginAsyncZod;
+  /**
+   * Queues the import of one account's native scripts, on the account's queue after its vault sync: what the owner's
+   * « Synchroniser » asks too (`connectors.onVaultSyncAsked`, wired by the composition root). No cron.
+   */
+  askImport(request: JobPayload<'scripts.import_platform_scripts'>): Promise<void>;
   readonly jobs: {
     /**
      * `scripts.ask_scripts`, each hour (SC-02): the scripts due asked of each creator. Counts only; `onFailure` hears
      * each creator whose run failed, with its cause, for the log.
      */
     askScripts(now: Date, onFailure?: (creatorId: CreatorId, error: unknown) => void): Promise<AskScriptsRun>;
+    /**
+     * `scripts.import_platform_scripts` (ADR 0099 § 1 time 2): one account's native scripts mirrored from the
+     * platform, asked with each vault sync (`askImport`). Counts only; a failed read throws, for the job's retry.
+     */
+    importPlatformScripts(
+      request: { readonly creatorId: CreatorId; readonly platformAccountId: PlatformAccountId },
+      now: Date,
+    ): Promise<ImportPlatformScriptsRun>;
   };
 }
+
+/** What the import of the native scripts reads, wired by the composition root. */
+interface PlatformScriptPorts {
+  /** `connectors`: the scripts the platform lists for an account; `null` when its connector reads none now. */
+  readonly source: PlatformScriptSource;
+}
+
+/** Until the connectors' read is wired: no account reads any script. */
+const NO_PLATFORM_SCRIPTS: PlatformScriptPorts = { source: () => Promise.resolve(null) };
 
 export interface ScriptsDeps {
   /** Application role: the library under the team's policies, the queue under her RLS too. */
@@ -75,6 +141,8 @@ export interface ScriptsDeps {
   readonly cardFontsDir: string;
   /** Tests only: another rasteriser than ffmpeg's. */
   readonly rasterizeCard?: RasterizeCard;
+  /** The platform's scripts; absent, the import reads nothing (see `NO_PLATFORM_SCRIPTS`). */
+  readonly platformScripts?: PlatformScriptPorts;
 }
 
 export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
@@ -82,6 +150,9 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
   const cadences = createDrizzleCadenceStore(deps.db, deps.adminDb);
   const frozenVersion = createFrozenVersionReader(deps.adminDb);
   const rasterize = deps.rasterizeCard ?? createCardRasterizer(deps.cardFontsDir);
+  const platform = deps.platformScripts ?? NO_PLATFORM_SCRIPTS;
+  const platformReads = { store: createDrizzlePlatformScriptReadStore(deps.db, deps.adminDb) };
+  const platformImports = createDrizzlePlatformScriptImportStore(deps.adminDb);
   return {
     name: 'scripts',
     structures,
@@ -99,9 +170,14 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
       return content === null ? null : rasterize(cardSvg(content, 'folder'));
     },
     freezeForRequest: createRequestFreezer(deps.adminDb),
+    askImport: createImportQueue(deps.adminDb),
     reads: {
       queue: async (creatorId, reader) =>
         (await creatorQueue(structures, reader, creatorId))?.map(queuedDigest) ?? null,
+      platformScripts: (creatorId, reader) => creatorPlatformScripts(platformReads, reader, creatorId),
+    },
+    forJobs: {
+      platformScript: (creatorId, scriptId) => platformScriptForJob(platformReads, creatorId, scriptId),
     },
     routes: createScriptRoutes(structures, deps.limitsOf, deps.requireRole, rasterize, {
       store: cadences,
@@ -118,6 +194,8 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
           },
           now,
         ),
+      importPlatformScripts: (request, now) =>
+        importPlatformScripts({ store: platformImports, source: platform.source }, request, now),
     },
   };
 }

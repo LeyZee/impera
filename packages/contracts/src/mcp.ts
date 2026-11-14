@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
+import { AiUsageCapStateSchema } from './ai-usage';
 import { DropCategorySchema, DropStateSchema } from './content-drops';
-import { FactCategorySchema, StoredFactKindSchema } from './enums';
+import { FactCategorySchema, PlatformSchema, StoredFactKindSchema } from './enums';
 import { refusalBodySchema } from './errors';
 import { FanCardFieldSchema, FanCardSourceSchema } from './fan-card';
 import { FanFlagsSchema } from './fans';
@@ -14,6 +15,9 @@ import {
   ShiftIdSchema,
   TeamMemberIdSchema,
 } from './ids';
+import { CurrencySchema } from './money';
+import { SaleTypeSchema } from './sales-feed';
+import { PLANNING_MAX_DAYS } from './scheduling';
 import {
   ScriptMomentSchema,
   ScriptStageAccessSchema,
@@ -388,3 +392,146 @@ export const McpOnShiftNowSchema = z.strictObject({
   ),
 });
 export type McpOnShiftNow = z.infer<typeof McpOnShiftNowSchema>;
+
+/**
+ * `shifts_list`'s input: the shifts that overlap [`from`, `to`), `PLANNING_MAX_DAYS` at most, as the planning reads
+ * them; a range out of bounds is refused as invalid arguments before anything is read.
+ */
+export const McpShiftsInputSchema = z
+  .strictObject({
+    creatorId: CreatorIdSchema.optional(),
+    from: z.iso.datetime({ offset: true }),
+    to: z.iso.datetime({ offset: true }),
+  })
+  .refine(({ from, to }) => {
+    const span = Date.parse(to) - Date.parse(from);
+    return span > 0 && span <= PLANNING_MAX_DAYS * 24 * 60 * 60 * 1000;
+  });
+
+/**
+ * `shifts_list` (ADR 0026 § 5, ADR 0105 § 4, `read:team`): the planning as the person reads it, when, for which
+ * creator, who by name, stopped under way or not. Never a platform account, a template, a margin, a rate nor an amount.
+ */
+export const McpShiftsListSchema = z.strictObject({
+  shifts: z.array(
+    z.strictObject({
+      shiftId: ShiftIdSchema,
+      creatorId: CreatorIdSchema,
+      memberId: TeamMemberIdSchema,
+      /** `null` when the policies do not show the person that member. */
+      memberName: z.string().nullable(),
+      startsAt: z.iso.datetime(),
+      endsAt: z.iso.datetime(),
+      stopped: z.boolean(),
+    }),
+  ),
+});
+export type McpShiftsList = z.infer<typeof McpShiftsListSchema>;
+
+/** `team_import_list`'s input: the platform whose team is read, Reveal when none is named. */
+export const McpTeamImportInputSchema = z.strictObject({ platform: PlatformSchema.optional() });
+
+/**
+ * `team_import_list` (ADR 0076, ADR 0105 § 4, `read:team`, an access of the agency only): the chatter accounts of the
+ * platform as the agency linked them, to a member by name or to the agent, removed by the platform or not, and the
+ * counts of the last read. Never a platform account id, an amount nor a rate.
+ */
+export const McpTeamImportListSchema = z.strictObject({
+  platform: PlatformSchema,
+  accounts: z.array(
+    z.strictObject({
+      link: z.discriminatedUnion('kind', [
+        z.strictObject({ kind: z.literal('member'), memberId: TeamMemberIdSchema, memberName: z.string() }),
+        z.strictObject({ kind: z.literal('agent') }),
+      ]),
+      removed: z.boolean(),
+    }),
+  ),
+  newCount: z.number().int().nonnegative(),
+  removalCount: z.number().int().nonnegative(),
+  abnormalRead: z.boolean(),
+});
+export type McpTeamImportList = z.infer<typeof McpTeamImportListSchema>;
+
+const euros = z.number().nonnegative();
+
+/**
+ * `ai_usage_get` (ADR 0091, ADR 0105 § 4, the owner's alone): what the AI costs the agency, as the screen shows it.
+ * Today against the daily cap, the last days, the month's pace, the last call. Never a provider's balance or key.
+ */
+export const McpAiUsageSchema = z.strictObject({
+  readAt: z.iso.datetime({ offset: true }),
+  today: z.strictObject({
+    day: z.iso.date(),
+    eur: euros,
+    capEur: z.number().positive(),
+    alertAtEur: z.number().positive(),
+    state: AiUsageCapStateSchema,
+    calls: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+  }),
+  days: z.array(z.strictObject({ day: z.iso.date(), eur: euros, calls: z.number().int().nonnegative() })),
+  pace: z.strictObject({
+    perDayEur: euros.nullable(),
+    perDayOver: z.number().int().min(0).max(7),
+    monthEur: euros,
+    monthForecastEur: euros.nullable(),
+    month: z.string().regex(/^\d{4}-\d{2}$/u),
+  }),
+  lastCallAt: z.iso.datetime({ offset: true }).nullable(),
+});
+export type McpAiUsage = z.infer<typeof McpAiUsageSchema>;
+
+/** The longest period `sales_list` reads, days both included: the connectors' own bound (a quarter and a few days). */
+export const MCP_SALES_MAX_DAYS = 93;
+
+const dayMs = (day: string): number => Date.parse(`${day}T00:00:00Z`);
+
+/** `sales_list`'s input: days both included, `to` not before `from`, `MCP_SALES_MAX_DAYS` at most. */
+export const McpSalesInputSchema = z
+  .strictObject({ creatorId: CreatorIdSchema.optional(), from: z.iso.date(), to: z.iso.date() })
+  .refine(({ from, to }) => {
+    const span = (dayMs(to) - dayMs(from)) / 86_400_000 + 1;
+    return span >= 1 && span <= MCP_SALES_MAX_DAYS;
+  });
+
+const cents = z.number().int();
+const counted = z.number().int().nonnegative();
+
+/**
+ * `sales_list` (ADR 0073, ADR 0105 § 3 and § 4, `read:sales`; Charles's decision A of 14/11): each creator's sales as
+ * the platform says them, summed over every seller and every account of hers, by day, platform, currency and kind.
+ * Never a seller, a member, an amount per member, the agency's nor the creator's share: no rate can be read from it.
+ */
+export const McpSalesListSchema = z.strictObject({
+  from: z.iso.date(),
+  to: z.iso.date(),
+  creators: z.array(
+    z.strictObject({
+      creatorId: CreatorIdSchema,
+      rows: z.array(
+        z.strictObject({
+          day: z.iso.date(),
+          platform: PlatformSchema,
+          currency: CurrencySchema,
+          saleType: SaleTypeSchema,
+          sales: counted,
+          refunds: counted,
+          grossInclVatMinor: cents,
+          grossExclVatMinor: cents,
+          netMinor: cents,
+        }),
+      ),
+      refundsWithoutSale: counted,
+      /** How far each platform's register was read: a day not read is never a day without a sale. */
+      readings: z.array(
+        z.strictObject({
+          platform: PlatformSchema,
+          readAt: z.iso.datetime().nullable(),
+          pausedUntil: z.iso.datetime().nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+export type McpSalesList = z.infer<typeof McpSalesListSchema>;

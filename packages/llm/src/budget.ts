@@ -61,6 +61,7 @@ export const UNKNOWN_CALL_COST_USD = 0.05;
 export const UNBILLED_OUTCOMES: ReadonlySet<CallOutcome> = new Set([
   'auth',
   'rate_limited',
+  'quota_exhausted',
   'unavailable',
   'missing_key',
   'unknown_model',

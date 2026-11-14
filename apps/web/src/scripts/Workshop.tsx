@@ -570,6 +570,7 @@ export function Workshop({
               type="button"
               className="st-tool"
               aria-label="Carton précédent"
+              title="Carton précédent"
               disabled={index === 0}
               onClick={() => {
                 select(draft.segments[index - 1]?.key ?? selected, false);
@@ -585,6 +586,7 @@ export function Workshop({
               type="button"
               className="st-tool"
               aria-label="Carton suivant"
+              title="Carton suivant"
               disabled={index >= draft.segments.length - 1}
               onClick={() => {
                 select(draft.segments[index + 1]?.key ?? selected, false);

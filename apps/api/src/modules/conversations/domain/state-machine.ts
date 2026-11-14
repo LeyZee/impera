@@ -18,6 +18,7 @@ export type ConversationCommand =
   | 'takeover'
   | 'handoff'
   | 'skip_reply'
+  | 'answered_on_platform'
   | 'release';
 
 type Transitions = Readonly<Partial<Record<ConversationState, ConversationState>>>;
@@ -72,6 +73,9 @@ const TRANSITIONS: Readonly<Record<ConversationCommand, Transitions>> = {
   },
   // The engine has nothing to say, or no model answered: the fan's next message starts again.
   skip_reply: { pending: 'idle', drafting: 'idle' },
+  // Someone on the creator's side (a chatter, the creator, an automation of the platform) answered him on the platform
+  // while he waited for the agent: nothing of the agent goes over it (ADR 0110 § 2). Never while a draft is leaving.
+  answered_on_platform: { pending: 'idle', drafting: 'idle', awaiting_approval: 'idle' },
   release: { human: 'idle', error: 'idle' },
 };
 
