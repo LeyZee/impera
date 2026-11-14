@@ -1,6 +1,6 @@
 # 0110. L'agent tient compte des automatisations de Reveal
 
-Statut : proposed (demande de Charles du 14/11/2026 : « applique tout ça », après la lecture du guide Reveal pour les agences ; numéro attribué par le coordinateur le 14/11)
+Statut : accepted (« ok 0110 » de Charles le 14/11/2026, 13 h 08 heure de Paris ; demande de Charles du 14/11/2026 : « applique tout ça », après la lecture du guide Reveal pour les agences ; numéro attribué par le coordinateur le 14/11)
 Date : 2026-11-14
 Remplace : la ligne « Automatisations de Reveal : actives, mais sans effet sur le bot » de `docs/reference/reveal-connector-inventory.md` (décision du 17/10). Précise : P3-10 (relances), ADR 0006 (debounce), ADR 0018 (ce que Reveal donne du fan).
 
@@ -24,14 +24,14 @@ Ce que fait le code aujourd'hui (main au 14/11) :
 
 ## Décision
 
-Règles proposées à Charles le 14/11, en attente de son accord :
+Règles acceptées par Charles le 14/11. La règle 1 est déjà appliquée côté compte : Charles a coupé la réponse automatique à l'accroche le 14/11.
 
 1. **Accroche.** La réponse automatique de Reveal à l'accroche est coupée dans le compte (réglage fait par l'agence, hors code). Le connecteur reconnaît une accroche : message du fan dont le texte, une fois `%NAME%` retiré, est identique à l'un des modèles d'accroche du compte. Le cerveau la lit comme « il a choisi une accroche toute faite », jamais comme ses propres mots : aucune note du fan n'en est tirée, l'agent ne la cite pas comme s'il l'avait écrite.
 2. **Rien par-dessus une réponse déjà faite.** Quand un message côté créatrice (automatisme de Reveal, chatteur, créatrice) arrive après le dernier message du fan, le brouillon ouvert de l'agent tombe et aucune réponse ne part pour ce message du fan. La garde vaut même si une automatisation reste active.
 3. **Bienvenue.** L'agent ne parle jamais en premier à un nouvel abonné : la bienvenue de Reveal fait ce travail, et l'agent ne coupe jamais sa séquence (seul le fan la coupe en répondant). Les messages de bienvenue sont marqués comme tels dans le contexte du cerveau, pour qu'il ne les répète pas.
 4. **Réponse à une story.** Un message du fan qui répond à une story est marqué comme tel dans le contexte du cerveau (« il réagit à ta story »). Le cerveau ne voit pas l'image de la story tant que sa forme n'est pas capturée. Un message vide (réaction seule) reçoit une réponse courte, comme un autre.
 5. **Mass DM.** Un Mass DM est marqué « envoyé à tous » dans le contexte du cerveau, qui ne le cite jamais comme un message personnel. Un Mass DM de plus de 7 jours sans réponse, réaction ni achat du fan est retiré de ce contexte (le fan ne le voit plus).
-6. **Relances.** Une relance de l'agent ne part pas dans les 6 h qui suivent un message automatique de Reveal (rappel d'expiration, Mass DM) ; elle est remise à la fin de ce délai. La relance « à la connexion du fan » de la fiche proposée ne se code pas tant que le Mass DM « à la connexion » est actif dans le compte.
+6. **Relances.** Une relance de l'agent ne part pas dans les 6 h qui suivent un message automatique de Reveal (rappel d'expiration, Mass DM) ; elle est remise à la fin de ce délai. L'agence envoie ses Mass DM de relance aux seuls fans qui n'ont pas écrit depuis une durée qu'elle choisit (précision de Charles le 14/11) : ils visent les mêmes fans silencieux que les relances de l'agent, d'où ce délai. La relance « à la connexion du fan » de la fiche proposée ne se code pas tant que le Mass DM « à la connexion » est actif dans le compte.
 7. La ligne de l'inventaire du connecteur est corrigée : les automatisations ont un effet sur le bot, et cette ADR dit lequel.
 
 ## Ce qui reste à capturer avant le code
