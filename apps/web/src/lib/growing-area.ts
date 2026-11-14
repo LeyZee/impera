@@ -1,5 +1,8 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 
+/* `grow-area` on the field: it grows by itself where the browser can, without a grip. */
+import './growing-area.css';
+
 /** Whether the browser grows a text field with its text by itself (Chromium, Edge, Safari 18.4+). */
 const SIZED_BY_CONTENT = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
 

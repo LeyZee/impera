@@ -301,7 +301,7 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
       payouts: payoutGate,
       afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },
     });
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     const blindServer = await buildServer({
       config,
       logger: createLogger(config),

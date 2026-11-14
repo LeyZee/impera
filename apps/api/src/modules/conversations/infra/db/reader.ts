@@ -98,6 +98,7 @@ async function summaries(
       updatedAt: schema.conversations.updatedAt,
       desireScore: schema.conversations.desireScore,
       desireAt: schema.conversations.desireAt,
+      careSince: schema.conversations.careSince,
       heldBy: sql<string | null>`${holderFor(sql`${readerId}`)}`,
       cursorAt: cursorInstant(schema.conversations.updatedAt),
     })
@@ -120,6 +121,7 @@ async function summaries(
       updatedAt: row.updatedAt.toISOString(),
       desire: desireAt(row.desireScore, row.desireAt, now),
       heldBy: ConversationHolderSchema.nullable().parse(row.heldBy),
+      careSince: row.careSince?.toISOString() ?? null,
     },
   }));
 }

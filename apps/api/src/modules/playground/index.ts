@@ -18,6 +18,7 @@ import {
   type PersonaForModels,
 } from '../agent/index';
 
+import { createMemoryDesireMarkStore, type DesireMarkStore } from './application/desire-marks';
 import { PlaygroundPersonaNotFound } from './application/engine';
 import { createPlaygroundService } from './application/playground-service';
 import { createPlaygroundEngine } from './infra/engine';
@@ -29,6 +30,8 @@ export { ratingRecord } from './infra/engine';
 export { createPlaygroundGateway, createVoiceVariant } from './infra/gateways';
 export { readPersonaFile, withExamples } from '../agent/index';
 export { createPlaygroundSession, type PlaygroundFollowUp, type PlaygroundTurn } from './infra/session';
+export { createDbDesireMarkStore } from './infra/db/desire-mark-store';
+export type { DesireMarkRecord } from './application/desire-marks';
 
 /** One of her stored versions with her name, as `persona.versions.version` answers it (matched by shape). */
 type PersonaVersionSource = (
@@ -72,6 +75,8 @@ export interface PlaygroundDeps extends PlaygroundGatewayDeps {
   readonly gateway?: LlmGateway;
   /** Tests only: fake gateways for the comparison. */
   readonly gatewayForVoice?: (voiceModel: string) => LlmGateway | undefined;
+  /** The owner's marks on the desire score (ADR 0103 § 6), in `desire_marks`; in memory without a database. */
+  readonly desireMarks?: DesireMarkStore;
 }
 
 export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
@@ -81,6 +86,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
     voiceModel: DEFAULT_LLM_CONFIG.roles.voice.model,
   };
   const now = deps.now ?? (() => new Date());
+  const desireMarks = deps.desireMarks ?? createMemoryDesireMarkStore();
   const engineFor = (persona: PersonaForModels, played?: PlayedVersion) =>
     createPlaygroundEngine({
       gateway,
@@ -91,6 +97,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
       version,
       sessionId: `api-${randomUUID()}`,
       usdPerEur: DEFAULT_LLM_CONFIG.dailyBudget.usdPerEur,
+      desireMarks,
       ...(played !== undefined && { played }),
       ...(deps.creatorId !== undefined && { creatorId: deps.creatorId }),
       ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
@@ -113,7 +120,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
   });
   return {
     name: 'playground',
-    routes: (options) => createPlaygroundRoutes(service, alertTester, options),
+    routes: (options) => createPlaygroundRoutes(service, alertTester, desireMarks, options),
   };
 }
 
@@ -126,6 +133,7 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly creatorId?: () => Promise<string | null>;
   readonly activePersona: ActivePersonaSource;
   readonly personaVersion?: PersonaVersionSource;
+  readonly desireMarks?: DesireMarkStore;
 }
 
 /** Reads the persona and the ratings kept so far, then builds the module. Throws when the persona is unreadable. */

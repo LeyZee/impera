@@ -6,7 +6,7 @@
  */
 import { createDbClient, parseEncryptionKeys } from '@impera/db';
 
-import { loadConfig, secretOrNull } from '../config';
+import { loadConfig, ownerDatabaseUrl, secretOrNull } from '../config';
 import { resealSalesFeedCredentials } from '../modules/connectors';
 import { resealProviderCredentials } from '../modules/providers';
 import { resealTelegramTokens } from '../modules/telegram';
@@ -23,7 +23,7 @@ if (keys === null) {
   console.error('CREDENTIALS_ENCRYPTION_KEYS manque dans l’environnement.');
   process.exit(1);
 }
-const admin = createDbClient(config.DATABASE_ADMIN_URL);
+const admin = createDbClient(ownerDatabaseUrl(config));
 try {
   const parsed = parseEncryptionKeys(keys, 'CREDENTIALS_ENCRYPTION_KEYS');
   const version = parsed[0]?.version ?? '?';

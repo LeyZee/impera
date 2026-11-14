@@ -32,7 +32,10 @@ export interface DbClient {
   close(): Promise<void>;
 }
 
-/** A pool and its Drizzle handle. The app connects as `nirvana_app` (RLS applies), ops as `nirvana_admin`. */
+/**
+ * A pool and its Drizzle handle. The app connects as `nirvana_app` (RLS applies), `withAdmin` as `impera_service`
+ * (ADR 0087), the migrations and the ops scripts as `nirvana_admin`.
+ */
 export function createDbClient(connectionString: string, options: PoolConfig = {}): DbClient {
   const pool = new Pool({ connectionString, max: 10, ...options });
   const db = drizzle(pool, { schema, casing: 'snake_case' });
@@ -175,8 +178,9 @@ export async function enterCreator(
 }
 
 /**
- * Runs `fn` in a transaction on the admin connection (BYPASSRLS), for the multi-tenant system jobs only. Callers
- * are named `*Unscoped` so a review sees every place that crosses tenants.
+ * Runs `fn` in a transaction on the service connection (BYPASSRLS, rights on rows only: ADR 0087), for what crosses
+ * tenants or reads a table closed to the app role. Callers are named `*Unscoped` so a review sees every place that
+ * crosses tenants. The name is older than the service role: `adminDb` is this connection, never the owner's.
  */
 export function withAdmin<T>(adminDb: Database, fn: (tx: Transaction) => Promise<T>): Promise<T> {
   return adminDb.transaction(fn);

@@ -82,7 +82,7 @@ describe('forgotten password', () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       LOG_LEVEL: 'info',
     });
     const sink = new Writable({

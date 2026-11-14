@@ -1,6 +1,6 @@
 import type { ModelMessage } from 'ai';
 
-import type { BrainAlert, ConversationTurn, TurnMedia } from './gateway-types';
+import type { BrainAlert, ConversationTurn, JudgeSituation, TurnMedia } from './gateway-types';
 import type { Brief } from './schemas';
 import { wrapUntrusted } from './untrusted';
 
@@ -54,7 +54,8 @@ export function toMessages(history: readonly ConversationTurn[]): ModelMessage[]
   });
 }
 
-export function describeBrief(brief: Brief): string {
+/** The brief the voice follows; her objection reply, when code chose one, in its own typed block after it. */
+export function describeBrief(brief: Brief, objectionReply?: string): string {
   const lines = [
     `Intention du fan : ${brief.intent} (humeur : ${brief.sentiment}).`,
     `À dire : ${brief.replyBrief}`,
@@ -64,7 +65,10 @@ export function describeBrief(brief: Brief): string {
   ]
     .filter((line) => line !== '')
     .join('\n');
-  return wrapUntrusted('brief', lines);
+  const block = wrapUntrusted('brief', lines);
+  return objectionReply === undefined
+    ? block
+    : `${block}\n${wrapUntrusted('objection_reply', objectionReply)}`;
 }
 
 export function notesBlock(fanNotes: string): string {
@@ -80,4 +84,22 @@ export function notesBlock(fanNotes: string): string {
 export function alertsBlock(alerts: readonly BrainAlert[]): string {
   if (alerts.length === 0) return 'Aucune : ne rends pas `alertsSeen`.';
   return alerts.map((alert) => `${alert.id} :\n${wrapUntrusted('creator_alert', alert.phrase)}`).join('\n');
+}
+
+/**
+ * The situation the agent saw, for the judge (evals only): one typed block, its fields as JSON, written by code. Angle
+ * brackets are escaped so nothing in it can close the block; absent, the judge is told it knows nothing of the moment.
+ */
+export function judgeSituationBlock(situation: JudgeSituation | undefined): string {
+  if (situation === undefined) return 'Pas d’information sur le moment : son âge n’est pas confirmé.';
+  const fields: JudgeSituation = {
+    description: situation.description,
+    relationshipHours: situation.relationshipHours,
+    ageConfirmed: situation.ageConfirmed,
+    lastOfferHoursAgo: situation.lastOfferHoursAgo,
+    hasNoBudget: situation.hasNoBudget,
+    flags: situation.flags,
+  };
+  const json = JSON.stringify(fields, null, 2).replaceAll('<', '\\u003c').replaceAll('>', '\\u003e');
+  return `<judge_situation>\n${json}\n</judge_situation>`;
 }

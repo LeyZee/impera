@@ -1,5 +1,5 @@
 # Production deployment (ADR 0027, docs/runbooks/deploy.md): what Coolify deploys from `main`, and a local rehearsal.
-# The database is Neon (ADR 0005): DATABASE_URL and DATABASE_ADMIN_URL point to its direct endpoint, never the pooler
+# The database is Neon (ADR 0005): DATABASE_URL, DATABASE_SERVICE_URL and DATABASE_ADMIN_URL point to its direct endpoint, never the pooler
 # (Graphile Worker needs LISTEN/NOTIFY). Every variable is set in Coolify, never in a file of the repository.
 #
 # Local rehearsal against the development Postgres, with a .env.prod (ignored by git) copied from .env.example and the
@@ -16,6 +16,9 @@ x-api-env: &api-env
   TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
   WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
   DATABASE_URL: ${DATABASE_URL:?}
+  # The role the API and the worker cross creators with (ADR 0087): rows only, it owns nothing.
+  DATABASE_SERVICE_URL: ${DATABASE_SERVICE_URL:?}
+  # The owner: `migrate` and the ops scripts run by hand in this image. The API and the worker never connect with it.
   DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:?}
   SESSION_ENCRYPTION_KEYS: ${SESSION_ENCRYPTION_KEYS:?}
   CREDENTIALS_ENCRYPTION_KEYS: ${CREDENTIALS_ENCRYPTION_KEYS:?}

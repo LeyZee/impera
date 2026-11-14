@@ -28,6 +28,8 @@ import {
   type PendingGesture,
 } from './offline';
 
+import { isOnline } from '@/pwa/online';
+
 /*
  * Her agenda's doors (CR-05, `/v1/creator-space`), parsed with the `strict` contracts: a field the server would add by
  * mistake (where a suggestion came from) fails here instead of reaching her screen. Reading and ticking work offline
@@ -53,9 +55,11 @@ export function useAgenda(from: string, to: string): UseQueryResult<CreatorAgend
           credentials: 'include',
         });
       } catch {
-        const kept = snapshotOf(range);
+        // Offline, her last read answers. With a network that does not reach the server, the read fails: her copy stays
+        // on the screen and says it is a copy (CRE-02), never passed off as a fresh answer.
+        const kept = isOnline() ? undefined : snapshotOf(range);
         if (kept !== undefined) return kept;
-        throw new Unreachable(`GET ${BASE}/agenda: offline`);
+        throw new Unreachable(`GET ${BASE}/agenda: unreachable`);
       }
       if (!response.ok) throw new Error(`GET ${BASE}/agenda: ${String(response.status)}`);
       const agenda = CreatorAgendaSchema.parse(await response.json());
@@ -205,18 +209,23 @@ async function sendAll(): Promise<Flushed> {
   }
 }
 
-/** Sends what her phone kept, once at a time; offline, it all stays for the next try. */
+/**
+ * Sends what her phone kept, once at a time; offline, it all stays for the next try. The send is over before her agenda
+ * is read again: a network back while that read waits on the server sends at once, it does not wait behind it.
+ */
 export function flushGestures(client: QueryClient): Promise<Flushed> {
   flushing ??= sendAll()
-    .then(async (result) => {
+    .then((result) => {
       changed();
-      await client.invalidateQueries({ queryKey: AGENDA_KEY });
       return result;
     })
     .finally(() => {
       flushing = null;
     });
-  return flushing;
+  return flushing.then(async (result) => {
+    await client.invalidateQueries({ queryKey: AGENDA_KEY });
+    return result;
+  });
 }
 
 /** Ticks or unticks a task on a day: shown at once, kept on the phone, sent now or when the network comes back. */

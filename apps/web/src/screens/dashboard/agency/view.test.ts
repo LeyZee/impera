@@ -14,9 +14,14 @@ import {
   deltaText,
   euros,
   kindSlices,
+  exactEuros,
+  moneyParts,
+  moneyShares,
+  moneyTip,
   OTHER,
   SERIES,
   sellerSlices,
+  sharesOf,
   shortEuros,
   STACKS,
   zoneLabel,
@@ -116,5 +121,111 @@ describe('subscribers helpers', () => {
     expect(signedCount(12)).toBe('+12');
     expect(signedCount(-3)).toBe('−3');
     expect(signedCount(0)).toBe('0');
+  });
+
+  it('splits the revenue in four, in the order money leaves, never a negative block (ADR 0106 § 5)', () => {
+    const figures = {
+      revenueMinor: 12_000,
+      revenueExclVatMinor: 10_000,
+      netMinor: 8_000,
+      agencyMinor: 3_200,
+      creatorMinor: 4_800,
+    };
+    const before = { ...figures, agencyMinor: 1_600, creatorMinor: 2_400, netMinor: 4_000 };
+    expect(moneyParts(figures, before, false).map((part) => [part.key, part.label, part.cents])).toEqual([
+      ['fansVat', 'TVA payée par les fans', 2_000],
+      ['commission', 'Commission de la plateforme', 2_000],
+      ['creator', 'Part de la créatrice', 4_800],
+      ['agency', 'Part de l’agence', 3_200],
+    ]);
+    expect(moneyParts(figures, before, true)[2]?.label).toBe('Part des créatrices');
+    const refunded = {
+      ...figures,
+      revenueMinor: -600,
+      revenueExclVatMinor: -500,
+      netMinor: -400,
+      agencyMinor: -160,
+      creatorMinor: -240,
+    };
+    expect(moneyParts(refunded, refunded, false).every((part) => part.cents >= 0)).toBe(true);
+  });
+
+  it('explains a money figure to the cent, beside the period before, its share of the revenue and of the net (ADR 0106 § 12)', () => {
+    expect(exactEuros(184_600)).toBe('1\u202f846,00\u00a0€');
+    const tip = moneyTip({
+      title: 'Part de l’agence',
+      cents: 3_200,
+      previousCents: 1_600,
+      revenueMinor: 12_000,
+      netMinor: 8_000,
+      text: 'Ce que la plateforme verse à l’agence.',
+    });
+    expect(tip.rows).toEqual([
+      ['Montant', '32,00\u00a0€'],
+      ['Période d’avant', '16,00\u00a0€ (+100\u00a0%)'],
+      ['Part du chiffre d’affaires', '27\u00a0%'],
+      ['Part du net', '40\u00a0%'],
+    ]);
+    // Nothing before: the amount alone, no change made up.
+    const first = moneyTip({
+      title: 'Net',
+      cents: 100,
+      previousCents: 0,
+      revenueMinor: 0,
+      netMinor: null,
+      text: '',
+    });
+    expect(first.rows).toEqual([
+      ['Montant', '1,00\u00a0€'],
+      ['Période d’avant', '0,00\u00a0€'],
+    ]);
+  });
+});
+
+describe('sharesOf', () => {
+  it('adds up to 100 where rounding each share alone made 101 (recette du 13/11)', () => {
+    // 16,7 + 16,7 + 41,7 + 24,9: rounded alone, 17 + 17 + 42 + 25 = 101.
+    const shares = sharesOf([1_670, 1_670, 4_170, 2_490], 10_000);
+    expect(shares).toEqual([17, 17, 41, 25]);
+    expect(shares.reduce((sum, one) => sum + one, 0)).toBe(100);
+  });
+
+  it('gives the points left to the largest fractions, the first one on a tie', () => {
+    expect(sharesOf([1, 1, 1], 3)).toEqual([34, 33, 33]);
+    expect(sharesOf([5, 5], 10)).toEqual([50, 50]);
+  });
+
+  it('adds up to the rounded share of the sum when the parts do not make the whole', () => {
+    expect(sharesOf([2_500, 2_500], 10_000)).toEqual([25, 25]);
+    expect(sharesOf([333, 333], 1_000)).toEqual([34, 33]);
+  });
+
+  it('says zero for an empty whole and never counts a negative part', () => {
+    expect(sharesOf([100, 200], 0)).toEqual([0, 0]);
+    expect(sharesOf([-100, 1_000], 1_000)).toEqual([0, 100]);
+  });
+
+  it('adds up to 100 on any split of a whole', () => {
+    for (let seed = 1; seed < 500; seed += 1) {
+      const parts = [seed * 7, seed * 13 + 1, (seed * 31) % 97, seed + 3];
+      const whole = parts.reduce((sum, one) => sum + one, 0);
+      expect(sharesOf(parts, whole).reduce((sum, one) => sum + one, 0)).toBe(100);
+    }
+  });
+});
+
+describe('moneyShares', () => {
+  it('splits the revenue and the net to 100 % each, the amounts untouched', () => {
+    const figures = {
+      revenueMinor: 10_000,
+      revenueExclVatMinor: 8_330,
+      netMinor: 6_660,
+      agencyMinor: 2_490,
+      creatorMinor: 4_170,
+    };
+    const shares = moneyShares(figures);
+    expect(shares.ofRevenue).toEqual({ fansVat: 17, commission: 17, creator: 41, agency: 25 });
+    expect(shares.ofNet.creator + shares.ofNet.agency).toBe(100);
+    expect(figures.agencyMinor).toBe(2_490);
   });
 });

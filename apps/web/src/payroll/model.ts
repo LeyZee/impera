@@ -156,10 +156,19 @@ export function payoutBlockPlace(
   reason: InvoiceNotIssuedReason | null,
 ): 'file' | 'billing' | null {
   if (block.reason !== 'documents_not_issued') return 'file';
+  return notIssuedPlace(reason);
+}
+
+/** Where the owner settles what holds an invoice back: the member's file, Réglages › Facturation, or nowhere. */
+export function notIssuedPlace(reason: InvoiceNotIssuedReason | null): 'file' | 'billing' | null {
   if (reason === 'agency_missing' || reason === 'mandate_unpublished' || reason === 'regime_not_validated')
     return 'billing';
   return reason === 'no_invoice_to_credit' ? null : 'file';
 }
+
+/** Why an invoice would be held back, as the owner reads it (« ta vérification »): one clause, no capital. */
+export const notIssuedForOwner = (reason: InvoiceNotIssuedReason): string =>
+  NOT_ISSUED_FOR_AGENCY[reason]('ta vérification');
 
 /** A transfer that waits, as the member reads it (recette EQP-04): why, and whether the next step is theirs. */
 export interface MyPayoutHold {
@@ -732,6 +741,9 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return `${member ?? 'Un membre'} n’a pas de taux de commission en vigueur.`;
     case 'pay_sale_outcome_conflict':
       return 'Cette décision n’est plus possible pour cette vente : la liste est relue.';
+    case 'pay_sale_recipient_conflict':
+      // ADR 0101: only a member on shift at the sale's instant receives it, and a sale of the agent is given whole.
+      return 'Cette vente ne peut pas aller à ce membre : seul un membre en poste au moment de la vente la reçoit, et une vente de l’IA se donne entière. La liste est relue.';
     case 'payroll_own_forbidden':
       return 'Personne ne décide de sa propre paie : un autre s’en charge.';
     case 'payroll_forbidden':

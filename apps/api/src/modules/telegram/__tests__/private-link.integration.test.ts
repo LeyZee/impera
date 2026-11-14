@@ -88,13 +88,13 @@ describe('private Telegram link on Postgres', () => {
     offsetMs = 0;
     telegram = new FakeTelegram();
     const store = createPostgresTelegramStore({
-      adminDb: test.admin.db,
+      adminDb: test.service.db,
       keys: parseEncryptionKeys(`v1:${randomBytes(32).toString('base64')}`),
     });
     module = createTelegramModule({
       bots: store.bots,
       deliveries: store.deliveries,
-      privateLinks: createPostgresPrivateLinksStore(test.admin.db),
+      privateLinks: createPostgresPrivateLinksStore(test.service.db),
       channel: telegram,
       clock,
       webOrigin: config.WEB_ORIGIN,

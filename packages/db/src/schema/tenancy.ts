@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import {
   check,
   customType,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -13,7 +14,16 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
+import {
+  closedToCreator,
+  createdAt,
+  creatorReadsOnly,
+  enumCheck,
+  enumText,
+  id,
+  tenantPolicy,
+  timestampTz,
+} from './columns';
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 
@@ -87,6 +97,59 @@ export const platformAccounts = pgTable(
     index('platform_accounts_creator_idx').on(t.creatorId),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
+  ],
+);
+
+/** States of a `connector_sends` row: the outcome is unknown until the platform's message id is known. */
+const CONNECTOR_SEND_STATES = ['pending', 'sent'] as const;
+
+/**
+ * The connector's own sends (reveal-connector-spec.md § 5, P2-03): a platform without a nonce (Reveal) makes two
+ * messages of two sends, so each attempt is recorded before the call, under its idempotency key, and given the
+ * platform's message id once known. A retry of a key still `pending` asks the platform (`verifySent`) before sending
+ * again. Never the text: its fingerprint only. Written by the connector inside the creator's tenant; closed to her own
+ * account; never deleted by the application.
+ */
+export const connectorSends = pgTable(
+  'connector_sends',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformAccountId: uuid('platform_account_id').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    platformConversationId: text('platform_conversation_id').notNull(),
+    /** SHA-256 (hex) of the text, the script step and the media sent. */
+    fingerprint: text('fingerprint').notNull(),
+    /** The platform's script step of a step send, with which the fingerprint was computed; `null` otherwise. */
+    scriptRef: text('script_ref'),
+    state: enumText('state').notNull().default('pending'),
+    attemptStartedAt: timestampTz('attempt_started_at').notNull(),
+    platformMessageId: text('platform_message_id'),
+    sentAt: timestampTz('sent_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    enumCheck('connector_sends', t.state, CONNECTOR_SEND_STATES),
+    check('connector_sends_fingerprint_check', sql`${t.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check(
+      'connector_sends_sent_check',
+      sql`(${t.state} = 'sent') = (${t.platformMessageId} is not null) and (${t.platformMessageId} is null) = (${t.sentAt} is null)`,
+    ),
+    foreignKey({
+      name: 'connector_sends_account_creator_fk',
+      columns: [t.platformAccountId, t.creatorId],
+      foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
+    }),
+    unique('connector_sends_key_unique').on(t.platformAccountId, t.idempotencyKey),
+    uniqueIndex('connector_sends_message_unique')
+      .on(t.platformAccountId, t.platformMessageId)
+      .where(sql`${t.platformMessageId} is not null`),
+    index('connector_sends_conversation_idx').on(t.platformAccountId, t.platformConversationId),
+    index('connector_sends_creator_idx').on(t.creatorId),
+    tenantPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );
 

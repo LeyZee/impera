@@ -11,12 +11,15 @@ import { useId, useState, type JSX } from 'react';
 import type { PayNames } from './data';
 import { Unreachable } from './parts';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { signalSale, useMySales, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import { payRefusalText } from '@/payroll/model';
 import {
   myDayLine,
   myDayTitle,
   mySaleAmount,
+  mySaleGivenText,
+  mySaleGivenWhy,
   mySaleNote,
   mySalesCountText,
   mySalesIntro,
@@ -142,6 +145,8 @@ export function MySalesPanel({
                   const account = names.account(sale.platformAccountId);
                   const note = mySaleNote(sale, first.closed);
                   const signal = mySignalNote(sale);
+                  const given = mySaleGivenText(sale);
+                  const why = mySaleGivenWhy(sale);
                   const kind: SaleSignalKind | null = !sale.open
                     ? null
                     : sale.state === 'counted'
@@ -165,7 +170,7 @@ export function MySalesPanel({
                       <div className="py-held__side">
                         <p
                           className={
-                            sale.state === 'excluded' || sale.state === 'removed'
+                            sale.state === 'excluded' || sale.state === 'removed' || sale.state === 'given'
                               ? 'py-held__amount py-mine__gone nv-num'
                               : 'py-held__amount nv-num'
                           }
@@ -181,6 +186,12 @@ export function MySalesPanel({
                         <p className="py-held__reason">
                           {note}
                           {signal === null ? null : <span className="py-mine__note"> {signal}</span>}
+                        </p>
+                      )}
+                      {given === null ? null : (
+                        <p className="py-held__reason py-gift">
+                          <b className="py-gift__who">{given}</b>
+                          {why === null ? null : <span className="py-mine__note"> {why}</span>}
                         </p>
                       )}
                       {kind === null ? null : (
@@ -263,6 +274,7 @@ function SignalDialog({
   const refresh = useRefreshPayroll();
   const [signalId] = useState(() => newId(PaySaleSignalIdSchema));
   const [note, setNote] = useState('');
+  const noteArea = useGrowingArea(note);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
   const words = signalWords(kind, sale.event);
@@ -294,7 +306,7 @@ function SignalDialog({
   return (
     <Dialog className="py-dialog" title={words.title} lead={words.lead} busy={busy} onClose={onClose}>
       <div className="tm-dialog__body">
-        <dl className="py-lines nv-num">
+        <dl className="py-lines py-lines--recap nv-num">
           <div>
             <dt>
               {account === null ? 'Un compte' : `${account.creatorName} · ${accountLine(account)}`}
@@ -312,8 +324,9 @@ function SignalDialog({
               Note (facultatif)
             </label>
             <textarea
+              ref={noteArea}
               id={`${id}-note`}
-              className="nv-field__control nv-glass sc-note"
+              className="nv-field__control nv-glass sc-note grow-area"
               rows={2}
               maxLength={NOTE_MAX}
               value={note}

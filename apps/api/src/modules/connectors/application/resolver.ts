@@ -2,7 +2,13 @@ import { PlatformSchema, type Platform } from '@impera/contracts';
 
 import { SessionVaultMissing } from '../domain/errors';
 import type { PlatformConnector } from '../domain/platform-connector';
-import type { AccountStore, ConnectorAccount, ConnectorRegistry, SessionVault } from '../domain/ports';
+import type {
+  AccountStore,
+  ConnectorAccount,
+  ConnectorRegistry,
+  SendJournal,
+  SessionVault,
+} from '../domain/ports';
 
 export interface ConnectorResolver {
   /** Platforms that have an adapter: only their accounts are polled. */
@@ -16,6 +22,8 @@ export function createConnectorResolver(deps: {
   readonly accounts: AccountStore;
   readonly vault: SessionVault | null;
   readonly registry: ConnectorRegistry;
+  /** The account's `connector_sends`, handed to its adapter (spec § 5). */
+  readonly sends: (account: ConnectorAccount) => SendJournal;
 }): ConnectorResolver {
   const cache = new Map<string, { readonly stamp: string; readonly connector: PlatformConnector }>();
   return {
@@ -32,7 +40,7 @@ export function createConnectorResolver(deps: {
         if (deps.vault === null) throw new SessionVaultMissing();
         session = deps.vault.open(account.id, sealed);
       }
-      const connector = factory(account, session);
+      const connector = factory(account, session, { sends: deps.sends(account) });
       cache.set(account.id, { stamp, connector });
       return connector;
     },

@@ -13,8 +13,9 @@ declare module 'vitest' {
 
 /**
  * One Postgres per run (testing.md): a Testcontainers Postgres 16, or the server named by
- * `IMPERA_TEST_PG_URL` (a superuser URL) where Docker is not available. Creates the two roles the way production
- * has them: the owner with BYPASSRLS but not superuser, the app role with neither.
+ * `IMPERA_TEST_PG_URL` (a superuser URL) where Docker is not available. Creates the three roles the way production
+ * has them (ADR 0087): the owner with BYPASSRLS but not superuser, the service role with BYPASSRLS and nothing else,
+ * the app role with neither.
  */
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   let container: StartedPostgreSqlContainer | undefined;
@@ -42,25 +43,31 @@ export default async function setup(project: TestProject): Promise<() => Promise
       if not exists (select from pg_roles where rolname = 'nirvana_app') then
         create role nirvana_app login password ${quoted} nosuperuser nocreatedb nobypassrls;
       end if;
+      if not exists (select from pg_roles where rolname = 'impera_service') then
+        create role impera_service login password ${quoted} nosuperuser nocreatedb nocreaterole bypassrls;
+      end if;
     end $$;
   `);
   await client.end();
-  // Roles left by another use of this server may have another password: say so once, before any test makes a database.
-  const asAdmin = new URL(url);
-  asAdmin.username = 'nirvana_admin';
-  asAdmin.password = password;
-  const probe = new Client({ connectionString: asAdmin.toString() });
-  try {
-    await probe.connect();
-  } catch (error) {
-    await container?.stop();
-    throw new Error(
-      'Les rôles nirvana_admin et nirvana_app existent déjà sur ce Postgres avec un autre mot de passe : ' +
-        'donne-le dans IMPERA_TEST_ROLE_PASSWORD, ou utilise un Postgres jetable (testing.md).',
-      { cause: error },
-    );
-  } finally {
-    await probe.end().catch(() => undefined);
+  // Roles left by another use of this server may have another password, or no login: say so once, before any test
+  // makes a database.
+  for (const role of ['nirvana_admin', 'impera_service']) {
+    const asRole = new URL(url);
+    asRole.username = role;
+    asRole.password = password;
+    const probe = new Client({ connectionString: asRole.toString() });
+    try {
+      await probe.connect();
+    } catch (error) {
+      await container?.stop();
+      throw new Error(
+        `Le rôle ${role} existe déjà sur ce Postgres avec un autre mot de passe, ou sans connexion : ` +
+          'donne le mot de passe des rôles dans IMPERA_TEST_ROLE_PASSWORD, ou utilise un Postgres jetable (testing.md).',
+        { cause: error },
+      );
+    } finally {
+      await probe.end().catch(() => undefined);
+    }
   }
   project.provide('pgSuperuserUrl', url);
   return async () => {

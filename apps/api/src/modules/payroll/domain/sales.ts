@@ -1,6 +1,8 @@
 import {
+  calendarDayAt,
   earningsBaseOf,
   payRulesFor,
+  SALE_WHOLE_BP,
   type Currency,
   type EarningsBase,
   type EarningsSource,
@@ -10,6 +12,7 @@ import {
   type SaleDecisionInForce,
   type SaleDecisionOutcome,
   type SaleEvent,
+  type SaleExcludeReason,
   type SaleHeldReason,
   type SaleStatus,
   type TeamMemberId,
@@ -42,22 +45,35 @@ export const saleKeyOf = (key: SaleKey): string => `${key.platform} ${key.platfo
 export const saleIdOf = (key: Omit<SaleKey, 'event'>): string => `${key.platform} ${key.platformSaleId}`;
 
 /**
- * What the validator decided on a sale (CRM-03 lot b3, ADR 0050 § 5), for its own line and its refunds: it counts for
- * the member its chatter is linked to (`count`), or for nobody (`exclude`). A decision holds while the chatter's link
- * keeps the version it was made on: linked elsewhere since, the sale follows the rules again and comes back to decide.
+ * What the validator decided on a sale (CRM-03 lot b3, ADR 0050 § 5, ADR 0101), for its own line and its refunds: it
+ * counts for the member its chatter is linked to (`count`), for nobody (`exclude`), or for another member who was
+ * decisive (`give`), whole or shared with its author. A decision holds while the chatter's link keeps the version it was
+ * made on: linked elsewhere since, the sale follows the rules again and comes back to decide.
  */
 export interface SaleDecisionForPay {
   readonly outcome: SaleDecisionInForce;
   /** The link's version of the sale's chatter when it was decided, `null` for a chatter not linked or none. */
   readonly linkVersion: string | null;
-  /** For `count`, the member it counts for, the one the link gave then; `null` for `exclude`. */
+  /**
+   * For `count`, the member it counts for, the one the link gave then; for `give`, the member who receives it; `null`
+   * for `exclude`.
+   */
   readonly memberId: TeamMemberId | null;
+  /** For `give`, the recipient's share in basis points, `SALE_WHOLE_BP` for the whole sale; `SALE_WHOLE_BP` otherwise. */
+  readonly shareBp: number;
+  /** The validator's note; required on a `give` (ADR 0101 § 3). */
+  readonly note: string | null;
+  /** For `exclude`, why (ADR 0101 § 8); `null` otherwise or on an exclusion made before it. */
+  readonly excludeReason: SaleExcludeReason | null;
 }
 
-/** Whose a line is by the owner's link of its platform chatter (a refund is its sale's): only a member is paid. */
+/**
+ * Whose a line is by the owner's link of its platform chatter (a refund is its sale's): only a member is paid. The
+ * agent's link keeps its version too: a sale of the agent given to a member holds while it does (ADR 0101 § 1).
+ */
 export type SaleAuthorForPay =
   | { readonly kind: 'member'; readonly memberId: TeamMemberId; readonly linkVersion: string }
-  | { readonly kind: 'agent' }
+  | { readonly kind: 'agent'; readonly linkVersion: string }
   | { readonly kind: 'unlinked' }
   | { readonly kind: 'none' };
 
@@ -103,8 +119,17 @@ export interface ShiftForPay {
 }
 
 /**
+ * A member's part of a line the validator shared (ADR 0101 §§ 11–14): their share in basis points, and whether they
+ * made the sale (`author`, who takes the rest) or received it (`recipient`, whose part is rounded once).
+ */
+interface SalePart {
+  readonly shareBp: number;
+  readonly role: 'author' | 'recipient';
+}
+
+/**
  * A line as a period counts it: its key, its account, currency and net, its sale's period, the member it counts for
- * and the link's version that gave it to them.
+ * and the link's version that gave it to them; for a shared line, the member's part (`part`), and the net is theirs.
  */
 export interface CountedSaleLine extends SaleKey {
   readonly platformAccountId: PlatformAccountId;
@@ -113,6 +138,7 @@ export interface CountedSaleLine extends SaleKey {
   readonly salePeriod: PayPeriod;
   readonly memberId: TeamMemberId;
   readonly linkVersion: string;
+  readonly part: SalePart | null;
 }
 
 /**
@@ -134,6 +160,7 @@ const countedLineOf = (one: CountedSaleLine): CountedSaleLine => ({
   salePeriod: one.salePeriod,
   memberId: one.memberId,
   linkVersion: one.linkVersion,
+  part: one.part,
 });
 
 /** What the closing of `period` registers of a line it counts. */
@@ -151,10 +178,10 @@ export interface SalesSnapshot {
   readonly lines: readonly SaleForPay[];
   /**
    * By `saleKeyOf`: for an open period, the lines a closing registered among those, with the registry of the sale of
-   * each refund among them (a refund goes to the member its sale was counted for); for a closed period, what its
-   * closing registered.
+   * each refund among them (a refund goes to the member its sale was counted for, or to its two members with the same
+   * parts); for a closed period, what its closing registered. A line counted whole has one entry, a shared line two.
    */
-  readonly registered: ReadonlyMap<string, RegisteredSale>;
+  readonly registered: ReadonlyMap<string, readonly RegisteredSale[]>;
   /**
    * By `saleIdOf`: the validator's latest decision on each sale read (CRM-03 lot b3), which its refunds follow.
    */
@@ -176,10 +203,23 @@ export const NO_SALES: SalesSnapshot = {
   accessMarginMinutes: 0,
 };
 
+/** A member a line counts for, with the link's version that gave it to them. */
+interface SaleHolder {
+  readonly memberId: TeamMemberId;
+  readonly linkVersion: string;
+}
+
 /** What a line is for pay. */
 export type SaleAttribution =
   /** It counts for the member. */
   | { readonly kind: 'member'; readonly memberId: TeamMemberId; readonly linkVersion: string }
+  /** The validator shared it (ADR 0101 §§ 11–14): the recipient takes their share, rounded once, the author the rest. */
+  | {
+      readonly kind: 'shared';
+      readonly author: SaleHolder;
+      readonly recipient: SaleHolder;
+      readonly recipientShareBp: number;
+    }
   /** Held, for nobody until someone acts. */
   | { readonly kind: 'held'; readonly reason: SaleHeldReason }
   /** Nobody's, and nothing to act on: the agent's, or without a chatter (ADR 0050 § 8). */
@@ -203,9 +243,27 @@ function accountBaseOf(
 const MINUTE_MS = 60_000;
 
 /**
+ * Whether `shift` covers the instant on the account (ADR 0025): widened by the margin on each side, without the
+ * margin after the end of a shift stopped while under way.
+ */
+function covers(
+  shift: ShiftForPay,
+  accessMarginMinutes: number,
+  platformAccountId: PlatformAccountId,
+  at: Date,
+): boolean {
+  const margin = accessMarginMinutes * MINUTE_MS;
+  const instant = at.getTime();
+  return (
+    shift.platformAccountId === platformAccountId &&
+    shift.startsAt.getTime() - margin <= instant &&
+    instant < shift.endsAt.getTime() + (shift.stopped ? 0 : margin)
+  );
+}
+
+/**
  * Whether the member could have made the sale (ADR 0025, ADR 0050 § 5): one of their shifts on the account covers its
- * instant, widened by the margin on each side, without the margin after the end of a shift stopped while under way.
- * The member's status today is not read: a sale made on shift stays theirs once they are on leave or gone.
+ * instant. The member's status today is not read: a sale made on shift stays theirs once they are on leave or gone.
  */
 function onShiftAt(
   shifts: readonly ShiftForPay[],
@@ -214,37 +272,110 @@ function onShiftAt(
   platformAccountId: PlatformAccountId,
   at: Date,
 ): boolean {
-  const margin = accessMarginMinutes * MINUTE_MS;
-  const instant = at.getTime();
   return shifts.some(
-    (shift) =>
-      shift.memberId === memberId &&
-      shift.platformAccountId === platformAccountId &&
-      shift.startsAt.getTime() - margin <= instant &&
-      instant < shift.endsAt.getTime() + (shift.stopped ? 0 : margin),
+    (shift) => shift.memberId === memberId && covers(shift, accessMarginMinutes, platformAccountId, at),
   );
 }
 
+/** The link's version of the line's chatter: a member's or the agent's, `null` for a chatter not linked or none. */
+const linkVersionOf = (author: SaleAuthorForPay): string | null =>
+  author.kind === 'member' || author.kind === 'agent' ? author.linkVersion : null;
+
 /**
  * The validator's decision on `line`'s sale, while it holds: made on the link's version the chatter has now (`null`
- * for a chatter not linked, the agent or none). A refund follows its sale's decision.
+ * for a chatter not linked or none). A refund follows its sale's decision.
  */
 function decisionOn(line: SaleForPay, sales: SalesSnapshot): SaleDecisionForPay | null {
   const decision = sales.decisions.get(saleIdOf(line));
   if (decision === undefined) return null;
-  const linkVersion = line.author.kind === 'member' ? line.author.linkVersion : null;
-  return decision.linkVersion === linkVersion ? decision : null;
+  return decision.linkVersion === linkVersionOf(line.author) ? decision : null;
 }
 
 /**
- * Whose `line` is (ADR 0050 §§ 5, 7, 8), from the account's base at its sale's period, its status, its author, the
- * shifts and the validator's decision:
+ * The recipient's part of a net (ADR 0101 § 13): their share of its magnitude, rounded once, half away from zero, with
+ * the net's sign. The author takes the rest, so that the parts always sum to the net; a refund shared with the same
+ * shares as its sale takes back exactly what the sale gave each of them.
+ */
+export function recipientPartOf(netMinor: number, recipientShareBp: number): number {
+  const magnitude = Math.floor((Math.abs(netMinor) * recipientShareBp + SALE_WHOLE_BP / 2) / SALE_WHOLE_BP);
+  return netMinor < 0 && magnitude > 0 ? -magnitude : magnitude;
+}
+
+/**
+ * The members `give` may name on `line`'s sale (ADR 0101 § 2): those with a shift on its account that covers its
+ * instant, access margin included, other than its author; in one order. A give is on a sale's own line, of a member or
+ * of the agent; its refunds follow it. The validator and the members who left with a validated final statement are
+ * left out by the reader, who knows them.
+ */
+export function recipientsOf(line: SaleForPay, sales: SalesSnapshot): TeamMemberId[] {
+  const { author } = line;
+  if (line.event !== 'sale' || line.saleOccurredAt === null) return [];
+  if (author.kind !== 'member' && author.kind !== 'agent') return [];
+  const at = line.saleOccurredAt;
+  const members = new Set<TeamMemberId>();
+  for (const shift of sales.shifts) {
+    if (covers(shift, sales.accessMarginMinutes, line.platformAccountId, at)) members.add(shift.memberId);
+  }
+  if (author.kind === 'member') members.delete(author.memberId);
+  return [...members].sort();
+}
+
+/**
+ * What a `give` in force makes of a sale of a member or of the agent (ADR 0101 §§ 1, 5, 11): the whole sale for its
+ * recipient, on the author's link's version, or, for a member's sale, the recipient's share and the rest to the author.
+ * A share of the agent's sale is never written (the base refuses it): it would give the agent's part to nobody, so the
+ * sale stays the agent's.
+ */
+function givenAttribution(
+  author: Extract<SaleAuthorForPay, { kind: 'member' | 'agent' }>,
+  recipientMemberId: TeamMemberId,
+  shareBp: number,
+): SaleAttribution {
+  if (shareBp >= SALE_WHOLE_BP) {
+    return { kind: 'member', memberId: recipientMemberId, linkVersion: author.linkVersion };
+  }
+  if (author.kind === 'agent') return { kind: 'nobody' };
+  return {
+    kind: 'shared',
+    author: { memberId: author.memberId, linkVersion: author.linkVersion },
+    recipient: { memberId: recipientMemberId, linkVersion: author.linkVersion },
+    recipientShareBp: shareBp,
+  };
+}
+
+/**
+ * Whose the refund of a sale a closing counted is (ADR 0050 § 7, ADR 0101 § 14): the member and the link's version the
+ * sale was counted for, whatever the link says since and whatever is decided; for a sale counted in two parts, its two
+ * members with the same shares.
+ */
+function registeredAttribution(paid: readonly RegisteredSale[]): SaleAttribution | null {
+  const author = paid.find((one) => one.part?.role === 'author');
+  const recipient = paid.find((one) => one.part?.role === 'recipient');
+  if (author !== undefined && recipient?.part != null) {
+    return {
+      kind: 'shared',
+      author: { memberId: author.memberId, linkVersion: author.linkVersion },
+      recipient: { memberId: recipient.memberId, linkVersion: recipient.linkVersion },
+      recipientShareBp: recipient.part.shareBp,
+    };
+  }
+  const [whole] = paid;
+  return whole === undefined
+    ? null
+    : { kind: 'member', memberId: whole.memberId, linkVersion: whole.linkVersion };
+}
+
+/**
+ * Whose `line` is (ADR 0050 §§ 5, 7, 8, ADR 0101), from the account's base at its sale's period, its status, its
+ * author, the shifts and the validator's decision:
  * - a line under the chain of ADR 0023 is the reports' (`outside`);
  * - a refund whose sale was never paid on the platform's net is held, or nobody's once the validator excludes it (no
  *   deduction, until Charles decides, 03/11);
- * - once a closing counted a sale, its refund comes off the member and the link's version it was counted for, whatever
- *   the link says since and whatever is decided (ADR 0050 § 7);
- * - the agent's or no chatter is nobody's;
+ * - once a closing counted a sale, its refund comes off the member and the link's version it was counted for, or off
+ *   its two members with the same shares, whatever the link says since and whatever is decided (ADR 0050 § 7);
+ * - no chatter is nobody's;
+ * - a sale of a member or of the agent given in force goes to its recipient, whole or shared with its author;
+ * - the agent's is nobody's otherwise;
  * - the validator's decision comes next: excluded, nobody's; counted, the member it was counted for, while the link
  *   still gives that member;
  * - then a chatter not linked is held, a member off shift is held, an unknown status is held, and a member on shift
@@ -267,10 +398,19 @@ export function saleAttribution(line: SaleForPay, sales: SalesSnapshot): SaleAtt
   }
   const paid =
     line.event === 'refund' ? sales.registered.get(saleKeyOf({ ...line, event: 'sale' })) : undefined;
-  if (paid !== undefined) return { kind: 'member', memberId: paid.memberId, linkVersion: paid.linkVersion };
+  const fromPaid = paid === undefined ? null : registeredAttribution(paid);
+  if (fromPaid !== null) return fromPaid;
   const { author } = line;
-  if (author.kind === 'agent' || author.kind === 'none') return { kind: 'nobody' };
+  if (author.kind === 'none') return { kind: 'nobody' };
   const decision = decisionOn(line, sales);
+  if (
+    decision?.outcome === 'give' &&
+    decision.memberId !== null &&
+    (author.kind === 'member' || author.kind === 'agent')
+  ) {
+    return givenAttribution(author, decision.memberId, decision.shareBp);
+  }
+  if (author.kind === 'agent') return { kind: 'nobody' };
   if (decision?.outcome === 'exclude') return { kind: 'nobody' };
   if (author.kind === 'unlinked') return { kind: 'held', reason: 'chatter_unlinked' };
   if (decision?.outcome === 'count' && decision.memberId === author.memberId) {
@@ -292,31 +432,36 @@ export function saleAttribution(line: SaleForPay, sales: SalesSnapshot): SaleAtt
 }
 
 /**
- * What the validator may decide now on the sale of `line` in an open period (CRM-03 lot b3). Without a decision in
- * force: `count` and `exclude` on a line held because its member was off shift or its status is unknown, `exclude`
- * alone on any other held line (a chatter not linked, a refund never paid on this net: no deduction until Charles
- * decides, 03/11) and on a line a member is paid for but no closing counted yet (wrongly given to them). With one: the
- * other outcome among those, and `withdraw`, which gives the sale back to the rules: no decision is final before a
- * closing counts the sale. Nothing on a refund whose sale a closing counted, on the agent's, on no chatter, or outside
- * the platform's net.
+ * What the validator may decide now on the sale of `line` in an open period (CRM-03 lot b3, ADR 0101). Without a
+ * decision in force: `count`, `exclude` and `give` on a line held because its member was off shift or its status is
+ * unknown, `exclude` alone on any other held line (a chatter not linked, a refund never paid on this net: no deduction
+ * until Charles decides, 03/11), `exclude` and `give` on a line a member is paid for but no closing counted yet
+ * (wrongly given to them), `give` alone on a sale of the agent. `give` only on a sale's own line, while a member may
+ * receive it (`recipientsOf`). With a decision in force: the other outcomes among those, `give` again to change the
+ * recipient or the share, and `withdraw`, which gives the sale back to the rules: no decision is final before a closing
+ * counts the sale. Nothing on a refund whose sale a closing counted, on no chatter, or outside the platform's net.
  */
 export function saleDecisionsOpen(line: SaleForPay, sales: SalesSnapshot): readonly SaleDecisionOutcome[] {
   const undecided = saleAttribution(line, { ...sales, decisions: new Map() });
+  const giving: readonly SaleDecisionOutcome[] = recipientsOf(line, sales).length > 0 ? ['give'] : [];
   let open: readonly SaleDecisionOutcome[];
   if (undecided.kind === 'held') {
     open =
       undecided.reason === 'off_shift' || undecided.reason === 'status_unknown'
-        ? ['count', 'exclude']
+        ? ['count', 'exclude', ...giving]
         : ['exclude'];
-  } else if (undecided.kind === 'member') {
+  } else if (undecided.kind === 'member' || undecided.kind === 'shared') {
     const paid = line.event === 'refund' && sales.registered.has(saleKeyOf({ ...line, event: 'sale' }));
     if (paid) return [];
-    open = ['exclude'];
+    open = ['exclude', ...giving];
+  } else if (undecided.kind === 'nobody' && line.author.kind === 'agent') {
+    open = giving;
   } else {
     return [];
   }
   const inForce = decisionOn(line, sales);
-  return inForce === null ? open : [...open.filter((one) => one !== inForce.outcome), 'withdraw'];
+  if (inForce === null) return open;
+  return [...open.filter((one) => one !== inForce.outcome || one === 'give'), 'withdraw'];
 }
 
 /**
@@ -334,14 +479,15 @@ export type SaleSignals = ReadonlyMap<string, readonly SaleSignalForPay[]>;
 
 /**
  * A sale the validator may decide on in an open period: the line shown, why it is held without a decision (`null`: a
- * member would be paid for it), the decision in force (`null`: none), the outcomes, and the signal in force of the
- * member the line would pay without a decision (`null`: none).
+ * member would be paid for it, or it is the agent's), the decision in force (`null`: none), the outcomes, the members
+ * `give` may name, and the signal in force of the member the line would pay without a decision (`null`: none).
  */
 export interface SaleToDecide {
   readonly line: SaleForPay;
   readonly reason: SaleHeldReason | null;
-  readonly decision: SaleDecisionInForce | null;
+  readonly decision: SaleDecisionForPay | null;
   readonly outcomes: readonly SaleDecisionOutcome[];
+  readonly recipients: readonly TeamMemberId[];
   readonly signal: SaleSignalForPay | null;
 }
 
@@ -352,11 +498,13 @@ function toDecide(line: SaleForPay, sales: SalesSnapshot, signals: SaleSignals):
     undecided.kind === 'member'
       ? (signals.get(saleKeyOf(line))?.find((one) => one.memberId === undecided.memberId) ?? null)
       : null;
+  const outcomes = saleDecisionsOpen(line, sales);
   return {
     line,
     reason: undecided.kind === 'held' ? undecided.reason : null,
-    decision: decisionOn(line, sales)?.outcome ?? null,
-    outcomes: saleDecisionsOpen(line, sales),
+    decision: decisionOn(line, sales),
+    outcomes,
+    recipients: outcomes.includes('give') ? recipientsOf(line, sales) : [],
     signal,
   };
 }
@@ -383,10 +531,11 @@ export function saleToDecide(
 }
 
 /**
- * What an open period shows the owner and the validator (CRM-03 lots b3, b4c), in key order: the lines it takes that
- * no closing counted and that are held without a decision, settled by a decision in force, or signalled by the member
- * they would pay (`signals`), so that every decision can be seen and taken back, and every signal answered. A closed
- * period shows nothing: what it did not register goes to the first open period.
+ * What an open period shows the owner and the validator (CRM-03 lots b3, b4c, ADR 0101), in key order: the lines it
+ * takes that no closing counted and that are held without a decision, settled by a decision in force, or signalled by
+ * the member they would pay (`signals`), so that every decision can be seen and taken back, and every signal answered.
+ * A sale of the agent shows once given; before, it is one of many and is found where the agent's sales are read. A
+ * closed period shows nothing: what it did not register goes to the first open period.
  */
 export function salesToDecide(
   sales: SalesSnapshot,
@@ -401,6 +550,34 @@ export function salesToDecide(
     if (one.reason !== null || one.decision !== null || one.signal !== null) shown.push(one);
   }
   return byKey(shown, (one) => one.line);
+}
+
+/**
+ * The sales of `day`, in the agency's `timeZone`, that an open period takes and that `give` may name a member on (ADR
+ * 0101 §§ 1, 2): where the validator finds a sale nobody signalled, a member's or the agent's, to give it to the member
+ * who was decisive. Each comes with its decision in force and its signal, so that a sale already given reads as given;
+ * in the order of their instants. A closed period gives none.
+ */
+export function salesToGive(
+  sales: SalesSnapshot,
+  place: PeriodPlace,
+  day: string,
+  timeZone: string,
+  signals: SaleSignals = new Map(),
+): SaleToDecide[] {
+  if (place.closed) return [];
+  const found: SaleToDecide[] = [];
+  for (const line of sales.lines) {
+    if (line.event !== 'sale' || sales.registered.has(saleKeyOf(line)) || !takes(place, line)) continue;
+    if (calendarDayAt(line.occurredAt, timeZone) !== day) continue;
+    const one = toDecide(line, sales, signals);
+    if (one.outcomes.includes('give')) found.push(one);
+  }
+  return found.sort(
+    (a, b) =>
+      a.line.occurredAt.getTime() - b.line.occurredAt.getTime() ||
+      (saleKeyOf(a.line) < saleKeyOf(b.line) ? -1 : 1),
+  );
 }
 
 /** A line a period counts, and the earlier period it comes late from. */
@@ -421,6 +598,14 @@ const byKey = <T>(items: readonly T[], keyOf: (item: T) => SaleKey): T[] =>
   [...items].sort((a, b) => {
     const left = saleKeyOf(keyOf(a));
     const right = saleKeyOf(keyOf(b));
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+
+/** Counted lines in key order, the two parts of a shared line by their member: one order, whatever the read gave. */
+const byOrder = <T extends SaleKey & { readonly memberId: TeamMemberId }>(items: readonly T[]): T[] =>
+  [...items].sort((a, b) => {
+    const left = `${saleKeyOf(a)} ${a.memberId}`;
+    const right = `${saleKeyOf(b)} ${b.memberId}`;
     return left < right ? -1 : left > right ? 1 : 0;
   });
 
@@ -453,36 +638,52 @@ const lateFrom = (salePeriod: PayPeriod, period: PayPeriod): PayPeriod | null =>
 export function salesCounted(sales: SalesSnapshot, place: PeriodPlace): CountedSale[] {
   const counted: CountedSale[] = [];
   if (place.closed) {
-    for (const registered of sales.registered.values()) {
-      if (registered.period !== place.period) continue;
-      counted.push({
-        ...countedLineOf(registered),
-        lateFrom: lateFrom(registered.salePeriod, place.period),
-        occurredAt: null,
-      });
+    for (const parts of sales.registered.values()) {
+      for (const registered of parts) {
+        if (registered.period !== place.period) continue;
+        counted.push({
+          ...countedLineOf(registered),
+          lateFrom: lateFrom(registered.salePeriod, place.period),
+          occurredAt: null,
+        });
+      }
     }
-    return byKey(counted, (one) => one);
+    return byOrder(counted);
   }
   for (const line of sales.lines) {
     if (sales.registered.has(saleKeyOf(line)) || !takes(place, line)) continue;
     const attribution = saleAttribution(line, sales);
     // A member is paid only for a sale of a period on the platform's net, so its period is known.
-    if (attribution.kind !== 'member' || line.salePeriod === null) continue;
-    counted.push({
+    if (line.salePeriod === null) continue;
+    const { salePeriod } = line;
+    const one = (holder: SaleHolder, netMinor: number, part: SalePart | null): CountedSale => ({
       platform: line.platform,
       platformSaleId: line.platformSaleId,
       event: line.event,
       platformAccountId: line.platformAccountId,
       currency: line.currency,
-      netMinor: line.netMinor,
-      salePeriod: line.salePeriod,
-      memberId: attribution.memberId,
-      linkVersion: attribution.linkVersion,
-      lateFrom: lateFrom(line.salePeriod, place.period),
+      netMinor,
+      salePeriod,
+      memberId: holder.memberId,
+      linkVersion: holder.linkVersion,
+      part,
+      lateFrom: lateFrom(salePeriod, place.period),
       occurredAt: line.occurredAt,
     });
+    if (attribution.kind === 'member') {
+      counted.push(one(attribution, line.netMinor, null));
+    } else if (attribution.kind === 'shared') {
+      const given = recipientPartOf(line.netMinor, attribution.recipientShareBp);
+      counted.push(
+        one(attribution.author, line.netMinor - given, {
+          shareBp: SALE_WHOLE_BP - attribution.recipientShareBp,
+          role: 'author',
+        }),
+        one(attribution.recipient, given, { shareBp: attribution.recipientShareBp, role: 'recipient' }),
+      );
+    }
   }
-  return byKey(counted, (one) => one);
+  return byOrder(counted);
 }
 
 /**
@@ -519,11 +720,16 @@ export function salesLeftHeld(sales: SalesSnapshot, period: PayPeriod): HeldSale
   return salesHeld(sales, { period, closed: false, firstOpen: period });
 }
 
-/** A counted line as a statement keeps it: its key, its net, the link's version, and where it comes late from. */
+/**
+ * A counted line as a statement keeps it: its key, its net, the link's version, where it comes late from, and for a
+ * shared line the member's share (ADR 0101 § 13), absent on a whole line so that every statement written before keeps
+ * its content and its `inputsHash`.
+ */
 export interface StatementSale extends SaleKey {
   readonly netMinor: number;
   readonly linkVersion: string;
   readonly lateFrom?: PayPeriod;
+  readonly shareBp?: number;
   /**
    * The line's own instant, in ISO, for its member to read and signal it (CRM-03 lot b4c): kept on the statement, out
    * of its `inputsHash` (`inputsHashOf`), absent on a statement written before it and on a closed period's.
@@ -548,7 +754,7 @@ export function saleLinesOf(counted: readonly CountedSale[]): SaleLineGroup[] {
     string,
     { platformAccountId: PlatformAccountId; currency: Currency; sales: CountedSale[] }
   >();
-  for (const one of byKey(counted, (item) => item)) {
+  for (const one of byOrder(counted)) {
     const key = `${one.platformAccountId} ${one.currency}`;
     const group = groups.get(key) ?? {
       platformAccountId: one.platformAccountId,
@@ -571,6 +777,7 @@ export function saleLinesOf(counted: readonly CountedSale[]): SaleLineGroup[] {
         netMinor: one.netMinor,
         linkVersion: one.linkVersion,
         ...(one.lateFrom !== null && { lateFrom: one.lateFrom }),
+        ...(one.part !== null && { shareBp: one.part.shareBp }),
         ...(one.occurredAt !== null && { occurredAt: one.occurredAt.toISOString() }),
       })),
     }));

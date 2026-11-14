@@ -28,7 +28,7 @@ describe('Telegram wired in the app', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const urls = { DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl };
+    const urls = { DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl };
     const config = testConfig({
       ...urls,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${randomBytes(32).toString('base64')}`,

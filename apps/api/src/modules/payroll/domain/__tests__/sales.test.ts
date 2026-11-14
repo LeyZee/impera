@@ -1,4 +1,10 @@
-import { DomainError, newId, PlatformAccountIdSchema, type PayPeriod } from '@impera/contracts';
+import {
+  DomainError,
+  newId,
+  PlatformAccountIdSchema,
+  SALE_WHOLE_BP,
+  type PayPeriod,
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -16,12 +22,15 @@ import {
 } from '../recalculation';
 import {
   NO_SALES,
+  recipientPartOf,
+  recipientsOf,
   saleAttribution,
   saleDecisionsOpen,
   saleIdOf,
   saleKeyOf,
   salesLeftHeld,
   salesToDecide,
+  salesToGive,
   saleToDecide,
   salesWaitingBefore,
   type AccountSourceForPay,
@@ -137,11 +146,19 @@ const registeredAs = (
     salePeriod: line.salePeriod,
     memberId: who.id,
     linkVersion,
+    part: null,
     period,
   };
 };
-const registryOf = (...entries: RegisteredSale[]) =>
-  new Map(entries.map((entry) => [saleKeyOf(entry), entry]));
+const registryOf = (...entries: RegisteredSale[]): Map<string, RegisteredSale[]> => {
+  const registry = new Map<string, RegisteredSale[]>();
+  for (const entry of entries) {
+    registry.set(saleKeyOf(entry), [...(registry.get(saleKeyOf(entry)) ?? []), entry]);
+  }
+  return registry;
+};
+/** The agent's link, at a version of its own. */
+const AGENT: SaleAuthorForPay = { kind: 'agent', linkVersion: 'agent-v1' };
 /** The keys of some lines, in the order pay keeps them. */
 const keysOf = (lines: readonly SaleForPay[]) => lines.map((line) => saleKeyOf(line)).sort();
 
@@ -191,7 +208,7 @@ describe('whose a sale is (ADR 0050 §§ 5, 8)', () => {
       kind: 'held',
       reason: 'chatter_unlinked',
     });
-    expect(at('2025-03-17T12:00:00.000Z', { kind: 'agent' })).toEqual({ kind: 'nobody' });
+    expect(at('2025-03-17T12:00:00.000Z', AGENT)).toEqual({ kind: 'nobody' });
     expect(at('2025-03-17T12:00:00.000Z', { kind: 'none' })).toEqual({ kind: 'nobody' });
     expect(
       saleAttribution(sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000, { status: 'other' }), sales),
@@ -329,11 +346,17 @@ describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', 
     outcome: 'count',
     linkVersion,
     memberId: who.id,
+    shareBp: SALE_WHOLE_BP,
+    note: null,
+    excludeReason: null,
   });
   const excludes = (linkVersion: string | null = 'v1'): SaleDecisionForPay => ({
     outcome: 'exclude',
     linkVersion,
     memberId: null,
+    shareBp: SALE_WHOLE_BP,
+    note: null,
+    excludeReason: 'other',
   });
 
   it('counts a sale made off shift for the member its chatter is linked to, while the link keeps its version', () => {
@@ -407,7 +430,6 @@ describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', 
     expect(at(linked(theo), { status: 'other' })).toEqual(['count', 'exclude']);
     expect(at({ kind: 'unlinked' })).toEqual(['exclude']);
     expect(at(linked(theo))).toEqual(['exclude']);
-    expect(at({ kind: 'agent' })).toEqual([]);
     expect(at({ kind: 'none' })).toEqual([]);
     const before = refundOf(sale(linked(theo), '2025-03-10T12:00:00.000Z', 1_000), P2, 1_000);
     expect(saleDecisionsOpen(before, sales)).toEqual(['exclude']);
@@ -431,20 +453,24 @@ describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', 
   it('gives a sale back to the rules once its decision is taken back, and shows every decided one', () => {
     const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
     const paid = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
-    const quiet = sale({ kind: 'agent' }, '2025-03-17T13:00:00.000Z', 700);
+    const quiet = sale(AGENT, '2025-03-17T13:00:00.000Z', 700);
     const sales = salesOf({ lines: [night, paid, quiet], shifts: [morning] });
     const place = { period: P2, closed: false, firstOpen: P2 };
     // A withdrawal leaves no decision in force (pay reads none): the sale is what the rules say.
     expect(saleAttribution(paid, sales)).toEqual({ kind: 'member', memberId: theo.id, linkVersion: 'v1' });
-    expect(salesToDecide(sales, place).map((one) => [saleKeyOf(one.line), one.reason, one.decision])).toEqual(
-      [[saleKeyOf(night), 'off_shift', null]],
-    );
+    expect(
+      salesToDecide(sales, place).map((one) => [
+        saleKeyOf(one.line),
+        one.reason,
+        one.decision?.outcome ?? null,
+      ]),
+    ).toEqual([[saleKeyOf(night), 'off_shift', null]]);
     const decisions = new Map([...decided(paid, excludes()), ...decided(night, counts(theo))]);
     expect(
       salesToDecide({ ...sales, decisions }, place).map((one) => [
         saleKeyOf(one.line),
         one.reason,
-        one.decision,
+        one.decision?.outcome ?? null,
         one.outcomes,
       ]),
     ).toEqual([
@@ -478,7 +504,7 @@ describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', 
     // Excluded, it still shows with the signal it answers, and can be taken back.
     const excluded = { ...sales, decisions: decided(paid, excludes()) };
     expect(
-      salesToDecide(excluded, place, signals).map((one) => [one.decision, one.outcomes, one.signal]),
+      salesToDecide(excluded, place, signals).map((one) => [one.decision?.outcome, one.outcomes, one.signal]),
     ).toEqual([['exclude', ['withdraw'], signal]]);
     // Linked again to Léa, the line would no longer pay Théo: his signal has no effect.
     const relinked = salesOf({ lines: [{ ...paid, author: linked(lea, 'v2') }], shifts: [morning] });
@@ -495,6 +521,7 @@ describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', 
       reason: 'off_shift',
       decision: null,
       outcomes: ['count', 'exclude'],
+      recipients: [],
       signal: null,
     });
     expect(saleToDecide(sales, { ...place, closed: true }, night)).toBeNull();
@@ -577,7 +604,7 @@ describe('a statement on the platform’s net (ADR 0050 § 8)', () => {
 
   it('takes a refund off on the same line, negative, and leaves the agent’s sales to nobody', () => {
     const one = sale(linked(theo), '2025-03-17T11:00:00.000Z', 10_000);
-    const agents = sale({ kind: 'agent' }, '2025-03-17T12:00:00.000Z', 50_000);
+    const agents = sale(AGENT, '2025-03-17T12:00:00.000Z', 50_000);
     const plan = planPeriod(open([one, refundOf(one, P2, 4_000), agents]));
     const content = contentOf(plan, theo);
     expect(content.lines.map((line) => [line.grossMinor, line.commissionMinor])).toEqual([[6_000, 1_200]]);
@@ -640,7 +667,7 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
     const { closing, closed } = closePeriod(open);
     expect(keys(closing.countedSales)).toEqual(keysOf([one]));
     expect(closing.teamNetMinor).toBe(10_000);
-    expect(closed.sales.registered.get(saleKeyOf(one))).toEqual(registeredAs(one, theo, P2));
+    expect(closed.sales.registered.get(saleKeyOf(one))).toEqual([registeredAs(one, theo, P2)]);
     expect(statementOf(closed, theo.id).inputsHash).toBe(statementOf(open, theo.id).inputsHash);
     // Read again from its registry alone, its lines and their links left unread: the same statement.
     const again: PeriodSnapshot = { ...closed, sales: { ...closed.sales, lines: [] } };
@@ -696,5 +723,257 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
       },
     ]);
     expect(paysMember(next, lea.id)).toBe(false);
+  });
+});
+
+describe('a sale given to the member who was decisive, whole or shared (ADR 0101)', () => {
+  const theo = member();
+  const lea = member();
+  const sam = member();
+  // Léa holds the account in the evening; Théo's morning ended before the sale.
+  const morning = shift(theo, '2025-03-17T10:00:00.000Z', '2025-03-17T14:00:00.000Z');
+  const evening = shift(lea, '2025-03-17T18:00:00.000Z', '2025-03-17T23:00:00.000Z');
+  const decided = (line: SaleForPay, decision: SaleDecisionForPay) => new Map([[saleIdOf(line), decision]]);
+  const gives = (to: MemberForPay, shareBp = SALE_WHOLE_BP, linkVersion = 'v1'): SaleDecisionForPay => ({
+    outcome: 'give',
+    linkVersion,
+    memberId: to.id,
+    shareBp,
+    note: 'Elle a relancé le fan et l’a convaincu',
+    excludeReason: null,
+  });
+  const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 10_001);
+  const base = salesOf({ shifts: [morning, evening] });
+  /** Some counted or registered lines by their member, whatever their order. */
+  const byMember = <T extends { readonly memberId: string }>(
+    rows: readonly T[],
+    value: (one: T) => unknown,
+  ) => Object.fromEntries(rows.map((one) => [one.memberId, value(one)]));
+  const place = { period: P2, closed: false, firstOpen: P2 };
+
+  it('offers only the members on shift on the account at the sale’s instant, margin included, never its author', () => {
+    expect(recipientsOf(night, base)).toEqual([lea.id]);
+    expect(recipientsOf(sale(linked(theo), '2025-03-17T12:00:00.000Z', 100), base)).toEqual([]);
+    // Léa's margin before her shift counts; a shift elsewhere does not; Sam on the account counts too.
+    expect(recipientsOf(sale(linked(theo), '2025-03-17T17:45:00.000Z', 100), base)).toEqual([lea.id]);
+    const elsewhere = { ...shift(sam, '2025-03-17T18:00:00.000Z', '2025-03-17T23:00:00.000Z') };
+    expect(
+      recipientsOf(night, {
+        ...base,
+        shifts: [morning, evening, { ...elsewhere, platformAccountId: newId(PlatformAccountIdSchema) }],
+      }),
+    ).toEqual([lea.id]);
+    expect(recipientsOf(night, { ...base, shifts: [morning, evening, elsewhere] })).toEqual(
+      [lea.id, sam.id].sort(),
+    );
+    // On a refund, of a chatter not linked, of no chatter: nobody, the sale's own line is what is given.
+    expect(recipientsOf(refundOf(night, P2, 100), base)).toEqual([]);
+    expect(recipientsOf({ ...night, author: { kind: 'unlinked' } }, base)).toEqual([]);
+    expect(recipientsOf({ ...night, author: { kind: 'none' } }, base)).toEqual([]);
+  });
+
+  it('offers to give a sale off shift, a paid one, and the agent’s, while a member may receive it', () => {
+    expect(saleDecisionsOpen(night, base)).toEqual(['count', 'exclude', 'give']);
+    const paid = sale(linked(lea), '2025-03-17T20:00:00.000Z', 1_000);
+    expect(saleDecisionsOpen(paid, salesOf({ shifts: [evening] }))).toEqual(['exclude']);
+    expect(
+      saleDecisionsOpen(
+        paid,
+        salesOf({ shifts: [evening, shift(sam, '2025-03-17T19:00:00.000Z', '2025-03-17T21:00:00.000Z')] }),
+      ),
+    ).toEqual(['exclude', 'give']);
+    expect(saleDecisionsOpen(sale(AGENT, '2025-03-17T20:00:00.000Z', 700), base)).toEqual(['give']);
+    expect(saleDecisionsOpen(sale(AGENT, '2025-03-17T16:00:00.000Z', 700), base)).toEqual([]);
+    expect(saleDecisionsOpen(sale({ kind: 'unlinked' }, '2025-03-17T20:00:00.000Z', 700), base)).toEqual([
+      'exclude',
+    ]);
+    // Given, it can be given again (another member, another share), counted, excluded or taken back.
+    expect(saleDecisionsOpen(night, { ...base, decisions: decided(night, gives(lea)) })).toEqual([
+      'count',
+      'exclude',
+      'give',
+      'withdraw',
+    ]);
+  });
+
+  it('counts a sale given whole for its recipient, on its author’s link, and never for its author', () => {
+    const sales = { ...base, lines: [night], decisions: decided(night, gives(lea)) };
+    expect(saleAttribution(night, sales)).toEqual({ kind: 'member', memberId: lea.id, linkVersion: 'v1' });
+    expect(
+      salesCountedIn(snapshot({ period: P2, members: [theo, lea], sales })).map((one) => [
+        one.memberId,
+        one.netMinor,
+        one.part,
+      ]),
+    ).toEqual([[lea.id, 10_001, null]]);
+    expect(paysMember(snapshot({ period: P2, members: [theo, lea], sales }), theo.id)).toBe(false);
+    // Its refund follows the sale: off the recipient, never off the author.
+    const refund = refundOf(night, P2, 4_000);
+    expect(saleAttribution(refund, { ...sales, lines: [night, refund] })).toEqual({
+      kind: 'member',
+      memberId: lea.id,
+      linkVersion: 'v1',
+    });
+    // Linked elsewhere since, the gift lapses and the sale comes back to decide.
+    expect(saleAttribution({ ...night, author: linked(theo, 'v2') }, sales)).toEqual({
+      kind: 'held',
+      reason: 'off_shift',
+    });
+  });
+
+  it('gives a sale of the agent whole, while the agent’s link keeps its version, never a share of it', () => {
+    const bot = sale(AGENT, '2025-03-17T20:00:00.000Z', 3_000);
+    const sales = { ...base, lines: [bot], decisions: decided(bot, gives(lea, SALE_WHOLE_BP, 'agent-v1')) };
+    expect(saleAttribution(bot, sales)).toEqual({
+      kind: 'member',
+      memberId: lea.id,
+      linkVersion: 'agent-v1',
+    });
+    expect(saleAttribution({ ...bot, author: { kind: 'agent', linkVersion: 'agent-v2' } }, sales)).toEqual({
+      kind: 'nobody',
+    });
+    // A share of the agent's sale is never written; read anyway, the sale stays the agent's.
+    const shared = { ...sales, decisions: decided(bot, gives(lea, 6_000, 'agent-v1')) };
+    expect(saleAttribution(bot, shared)).toEqual({ kind: 'nobody' });
+  });
+
+  it('shares a sale: the recipient’s part rounded once, the rest to the author, on two lines of their own', () => {
+    const sales = { ...base, lines: [night], decisions: decided(night, gives(lea, 5_000)) };
+    expect(saleAttribution(night, sales)).toEqual({
+      kind: 'shared',
+      author: { memberId: theo.id, linkVersion: 'v1' },
+      recipient: { memberId: lea.id, linkVersion: 'v1' },
+      recipientShareBp: 5_000,
+    });
+    const open = snapshot({ period: P2, members: [theo, lea], sales });
+    const counted = salesCountedIn(open);
+    expect(byMember(counted, (one) => [one.netMinor, one.part])).toEqual({
+      [theo.id]: [5_000, { shareBp: 5_000, role: 'author' }],
+      [lea.id]: [5_001, { shareBp: 5_000, role: 'recipient' }],
+    });
+    // Each pays their part at their rate, and the team counts the sale once.
+    expect(
+      contentOf(planPeriod(open), lea).lines.map((line) => [line.netMinor, line.commissionMinor]),
+    ).toEqual([[5_001, 1_000]]);
+    expect(contentOf(planPeriod(open), theo).lines[0]?.sales).toEqual([
+      {
+        platform: 'reveal',
+        platformSaleId: night.platformSaleId,
+        event: 'sale',
+        netMinor: 5_000,
+        linkVersion: 'v1',
+        shareBp: 5_000,
+        occurredAt: night.occurredAt.toISOString(),
+      },
+    ]);
+    expect(closePeriod(open).closing.teamNetMinor).toBe(10_001);
+  });
+
+  it('always sums the parts to the net, to the cent, from 10 % to 90 %, a sale or a refund', () => {
+    for (const net of [0, 1, 5, 99, 101, 1_001, 4_999, 10_001, 123_457]) {
+      for (let share = 1_000; share < SALE_WHOLE_BP; share += 1_000) {
+        for (const signed of net === 0 ? [0] : [net, -net]) {
+          const given = recipientPartOf(signed, share);
+          expect(Math.abs(given)).toBe(Math.round((Math.abs(signed) * share) / SALE_WHOLE_BP));
+          expect(Math.sign(given) === 0 || Math.sign(given) === Math.sign(signed)).toBe(true);
+          expect(Object.is(given, -0)).toBe(false);
+          // The author's rest: never more than the net, the two parts its whole.
+          const rest = signed - given;
+          expect(Math.abs(rest) <= Math.abs(signed)).toBe(true);
+          expect(given + rest).toBe(signed);
+        }
+      }
+    }
+    // Half a cent goes to the recipient, away from zero: a refund takes back exactly what the sale gave.
+    expect(recipientPartOf(5, 5_000)).toBe(3);
+    expect(recipientPartOf(-5, 5_000)).toBe(-3);
+  });
+
+  it('registers a shared line as two parts at its closing, and takes a refund after it off both with the same shares', () => {
+    const open = snapshot({
+      period: P2,
+      firstClosed: P1,
+      lastClosed: P1,
+      members: [theo, lea],
+      sales: { ...base, lines: [night], decisions: decided(night, gives(lea, 6_000)) },
+    });
+    const { closing, closed } = closePeriod(open);
+    expect(closing.countedSales.map((one) => [one.memberId, one.netMinor, one.part?.role])).toHaveLength(2);
+    const parts = closed.sales.registered.get(saleKeyOf(night)) ?? [];
+    expect(byMember(parts, (one) => [one.netMinor, one.part])).toEqual({
+      [theo.id]: [4_000, { shareBp: 4_000, role: 'author' }],
+      [lea.id]: [6_001, { shareBp: 6_000, role: 'recipient' }],
+    });
+    // Read again from its registry alone: the same statements.
+    const again: PeriodSnapshot = { ...closed, sales: { ...closed.sales, lines: [] } };
+    expect(statementOf(again, lea.id).inputsHash).toBe(statementOf(open, lea.id).inputsHash);
+    expect(statementOf(again, theo.id).inputsHash).toBe(statementOf(open, theo.id).inputsHash);
+    // A partial refund after the closing, linked elsewhere and decided otherwise since: the same shares, the same
+    // rounding, off the first open period; the whole refund cancels each part exactly.
+    for (const [refunded, forLea, forTheo] of [
+      [10_001, -6_001, -4_000],
+      [2_501, -1_501, -1_000],
+    ] as const) {
+      const refund = refundOf(night, P3, refunded, linked(sam, 'v9'));
+      const next = snapshot({
+        period: P3,
+        firstClosed: P1,
+        lastClosed: P2,
+        members: [theo, lea, sam],
+        sales: { ...closed.sales, lines: [refund], decisions: new Map() },
+      });
+      expect(byMember(salesCountedIn(next), (one) => [one.netMinor, one.lateFrom])).toEqual({
+        [lea.id]: [forLea, P2],
+        [theo.id]: [forTheo, P2],
+      });
+      expect(saleDecisionsOpen(refund, next.sales)).toEqual([]);
+    }
+  });
+
+  it('shows a given sale in the open period with the decision in force and who may receive it', () => {
+    const sales = { ...base, lines: [night], decisions: decided(night, gives(lea, 7_000)) };
+    const [one] = salesToDecide(sales, place);
+    expect(one?.decision).toEqual(gives(lea, 7_000));
+    expect(one?.recipients).toEqual([lea.id]);
+    expect(saleToDecide(sales, place, night)?.outcomes).toEqual(['count', 'exclude', 'give', 'withdraw']);
+  });
+
+  it('finds the sales of a day a give may name a member on, a member’s or the agent’s, by their instant', () => {
+    const late = shift(sam, '2025-03-17T18:00:00.000Z', '2025-03-17T23:00:00.000Z');
+    const agent: SaleAuthorForPay = { kind: 'agent', linkVersion: 'v1' };
+    const byAgent = sale(agent, '2025-03-17T21:00:00.000Z', 900);
+    const byLea = sale(linked(lea), '2025-03-17T19:00:00.000Z', 700);
+    const alone = sale(linked(theo), '2025-03-17T12:00:00.000Z', 500);
+    const nextDay = sale(linked(lea), '2025-03-17T23:10:00.000Z', 300);
+    const unlinked = sale({ kind: 'unlinked' }, '2025-03-17T20:30:00.000Z', 400);
+    const sales = {
+      ...base,
+      shifts: [morning, evening, late],
+      lines: [byAgent, night, alone, byLea, nextDay, unlinked, refundOf(byLea, P2, 700)],
+    };
+    const found = (day: string, zone = 'UTC') =>
+      salesToGive(sales, place, day, zone).map((one) => [
+        one.line.platformSaleId,
+        one.outcomes,
+        one.recipients,
+      ]);
+    // Théo's morning had nobody else, a chatter not linked is no one's: neither is found; nor is a refund.
+    expect(found('2025-03-17')).toEqual([
+      [byLea.platformSaleId, ['exclude', 'give'], [sam.id]],
+      [night.platformSaleId, ['count', 'exclude', 'give'], [lea.id, sam.id].sort()],
+      [byAgent.platformSaleId, ['give'], [lea.id, sam.id].sort()],
+      [nextDay.platformSaleId, ['exclude', 'give'], [sam.id]],
+    ]);
+    // The day is the agency's: ten past eleven in UTC is the next day in Paris.
+    expect(found('2025-03-18', 'Europe/Paris').map(([id]) => id)).toEqual([nextDay.platformSaleId]);
+    expect(found('2025-03-16')).toEqual([]);
+    // A sale given already shows with its decision; a closed period or a registered line gives none.
+    const given = { ...sales, decisions: decided(byAgent, gives(sam)) };
+    expect(
+      salesToGive(given, place, '2025-03-17', 'UTC').find((one) => one.line === byAgent)?.decision,
+    ).toEqual(gives(sam));
+    expect(salesToGive(sales, { ...place, closed: true }, '2025-03-17', 'UTC')).toEqual([]);
+    const registered = { ...sales, registered: new Map([[saleKeyOf(byLea), []]]) };
+    expect(salesToGive(registered, place, '2025-03-17', 'UTC').map((one) => one.line)).not.toContain(byLea);
   });
 });

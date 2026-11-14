@@ -15,6 +15,7 @@ import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';
+import { MyDaysCard, MyFiguresAside } from './MyFigures';
 import { MySalesPanel } from './MySalesPanel';
 import { useAgencySettingsDown, useCfaFrancs, useCurrentPeriod, usePayNames } from './data';
 import { Chip, Empty, Gauge, GoalTicks, Loading, MoneyPath, Unreachable } from './parts';
@@ -54,6 +55,9 @@ import {
   periodTitle,
   signedAmountText,
 } from '@/reports/model';
+import { Medal } from '@/rewards/Medal';
+import { RewardRevealGate } from '@/rewards/RewardRevealGate';
+import { tierMedals } from '@/rewards/metals';
 import { platformName } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import { longDay } from '@/scheduling/time';
@@ -192,6 +196,8 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   return (
     <Page>
       {head()}
+      {/* What he earned since his last visit greets him here too (ADR 0104 § 12). */}
+      <RewardRevealGate user={user} />
       <div className="py-me" data-single={plain ? 'true' : undefined}>
         <div className="py-me__col">
           {heroData === undefined ? (
@@ -253,6 +259,8 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
               ) : null}
             </>
           )}
+          <MyDaysCard />
+          {plain ? <MyFiguresAside /> : null}
         </div>
         {plain ? null : (
           <div className="py-me__col">
@@ -324,6 +332,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                 ) : null}
               </div>
             </Panel>
+            <MyFiguresAside />
           </div>
         )}
       </div>
@@ -449,6 +458,22 @@ function Performance({
   );
 }
 
+/** A tier's medal beside its name: gold, silver or bronze by its name, else from the top (ADR 0104, note). */
+function TierMedalMark({
+  tiers,
+  tier,
+  earned,
+  size,
+}: {
+  tiers: readonly BonusTier[];
+  tier: BonusTier;
+  earned: boolean;
+  size: number;
+}): JSX.Element | null {
+  const medal = tierMedals(tiers).of(tier.thresholdMinor);
+  return medal === null ? null : <Medal medal={medal} earned={earned} size={size} />;
+}
+
 function TierLeft({
   net,
   tiers,
@@ -465,8 +490,11 @@ function TierLeft({
   const { reached, next } = tierProgress(net, tiers);
   if (next === null && reached !== null)
     return (
-      <div className="py-left">
-        <p className="py-left__title">Palier {reached.label} atteint</p>
+      <div className="py-left py-left--tier">
+        <p className="py-left__title py-left__title--medal">
+          <TierMedalMark tiers={tiers} tier={reached} earned size={40} />
+          Palier {reached.label} atteint
+        </p>
         <Gauge value={100} mark={null} />
         <p className="py-left__text">
           Le plus haut : <b className="nv-num">{signedAmountText(reached.bonusMinor, 'EUR')}</b> sur ce
@@ -480,16 +508,18 @@ function TierLeft({
   const line = statement === undefined ? null : mainLine(statement.lines);
   const where = line === null ? null : account(line.platformAccountId);
   return (
-    <div className="py-left">
+    <div className="py-left py-left--tier">
       <p className="py-left__title nv-num">
         Palier {next.label} : encore {amountText(left, 'EUR')} de net
       </p>
       <Gauge value={gaugePercent(net - from, next.thresholdMinor - from)} mark={null} />
       <div className="py-gaugelabels nv-num">
-        <span>
+        <span className="py-gaugelabels__tier">
+          {reached === null ? null : <TierMedalMark tiers={tiers} tier={reached} earned size={24} />}
           {reached === null ? roundAmountText(0, 'EUR') : `${reached.label} ${roundAmountText(from, 'EUR')}`}
         </span>
-        <span>
+        <span className="py-gaugelabels__tier">
+          <TierMedalMark tiers={tiers} tier={next} earned={false} size={24} />
           {next.label} {roundAmountText(next.thresholdMinor, 'EUR')}
         </span>
       </div>

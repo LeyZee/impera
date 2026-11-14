@@ -6,6 +6,7 @@ import {
   CountryCodeSchema,
   KnownCountryCodeSchema,
   MeSchema,
+  UpdateMePreferencesBodySchema,
   teamScopeFor,
 } from './team';
 
@@ -55,7 +56,8 @@ describe('MeSchema', () => {
 
   it('carries the team role and the scope, never the session token', () => {
     const me = { ...user, team: { role: 'chatter', status: 'active' }, teamScope: 'self' };
-    expect(MeSchema.parse({ ...me, token: 'secret' })).toEqual(me);
+    expect(MeSchema.parse({ ...me, token: 'secret' })).toEqual({ ...me, preferences: { sounds: true } });
+    expect(MeSchema.parse({ ...me, preferences: { sounds: false } }).preferences).toEqual({ sounds: false });
     expect(MeSchema.parse({ ...user, role: 'owner', team: null, teamScope: 'owner' }).team).toBeNull();
   });
 
@@ -64,5 +66,11 @@ describe('MeSchema', () => {
       MeSchema.safeParse({ ...user, team: { role: 'va', status: 'active' }, teamScope: 'self' }).success,
     ).toBe(false);
     expect(MeSchema.safeParse({ ...user, team: null, teamScope: 'admin' }).success).toBe(false);
+  });
+
+  it('takes the account’s own preferences whole, and nothing else in their body', () => {
+    expect(UpdateMePreferencesBodySchema.safeParse({ sounds: false }).success).toBe(true);
+    expect(UpdateMePreferencesBodySchema.safeParse({}).success).toBe(false);
+    expect(UpdateMePreferencesBodySchema.safeParse({ sounds: true, userId: 'u2' }).success).toBe(false);
   });
 });

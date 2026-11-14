@@ -13,6 +13,11 @@ id = "impera-llm-keys"
 description = "LLM API key"
 regex = '''LLM_[A-Z]+_API_KEY\s*=\s*[A-Za-z0-9_\-]{20,}'''
 
+[[rules]]
+id = "impera-mcp-token"
+description = "MCP agent token (ADR 0026 § 3): shown once, never written down"
+regex = '''impmcp_[A-Za-z0-9_-]{43}'''
+
 [allowlist]
 paths = ['''\.env\.example$''']
 regexes = ['''replace-with-openssl-rand-base64-32''', '''replace-me''', '''change-me''']

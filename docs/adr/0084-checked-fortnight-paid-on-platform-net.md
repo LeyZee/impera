@@ -1,6 +1,6 @@
 # 0084. La quinzaine vérifiée peut être la première payée sur les ventes Reveal
 
-Statut : accepted (« ok 0084 » de Charles le 08/11/2026, 16 h 46, chat du projet ; « ok novembre-reveal » le 08/11/2026, 16 h 29, fil Équipe : la paie de novembre se calcule sur les ventes Reveal ; numéro attribué par le coordinateur)
+Statut : accepted (« ok 0084 » de Charles le 08/11/2026, 16 h 46, chat du projet ; « ok novembre-reveal » le 08/11/2026, 16 h 29, fil Équipe : la paie de novembre se calcule sur les ventes Reveal ; numéro attribué par le coordinateur ; étape 4 amendée le 12/11/2026 : l'export devient facultatif, comme au § 8 de l'ADR 0050, « ok phrases 0084 », chat du projet)
 Date : 2026-11-08
 Amende : l'ADR 0050 § 8, pour deux phrases : « posée à une frontière de période et jamais rétroactive » et « sur une quinzaine passée couverte par le registre […] La bascule se fait ensuite à une frontière de période ». Amende aussi la règle de départ des règles de paie (EQ-03 : de nouvelles règles partent d'une quinzaine qui n'a pas commencé). Ne change ni la vérification (CRM-02, `isCleanMatch`), ni le calcul (CRM-03), ni l'attribution d'une vente (ADR 0050 § 5).
 
@@ -49,7 +49,7 @@ Le CRM est arrêté depuis le 06/11 au soir. Le registre rattrapera les ventes d
 1. Relancer le CRM, pour que les ventes de novembre soient lues.
 2. Relier les chatteurs dans Réglages › Ventes › Équipe Reveal, et le compte « bot » à l'agent s'il y en a un.
 3. Saisir au planning les shifts de novembre. Sans eux, chaque vente attend « hors poste » et se compte une à une dans Paie › Quinzaine › Ventes en attente.
-4. Le 16/11, lancer la vérification de fiabilité du 1er au 15 novembre (Réglages › Ventes), avec l'export du dashboard Reveal de ces jours-là.
+4. Le 16/11, lancer la vérification de fiabilité du 1er au 15 novembre (Réglages › Ventes) : elle compare le registre aux statistiques par jour de Reveal ; l'export du dashboard est facultatif.
 5. Si elle est propre, poser les règles du compte Reveal en source « Ventes relevées », à partir de la quinzaine du 1er novembre. La quinzaine du 16 au 30 suit les mêmes règles.
 6. Valider les relevés du 1er au 15 : la première validation clôture la quinzaine.
 
