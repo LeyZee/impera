@@ -6,12 +6,7 @@ import {
   type PlatformScriptGap,
   type PlatformScriptWarning,
 } from '../domain/platform-scripts';
-import type {
-  PlatformScriptReadStore,
-  StoredPlatformScript,
-  StoredStepMedia,
-  VaultLinks,
-} from '../domain/ports';
+import type { PlatformScriptReadStore, StoredPlatformScript, StoredStepMedia } from '../domain/ports';
 
 /** Who reads her native scripts: the owner and the team; the store then keeps the team's scope and her RLS. */
 export interface PlatformScriptsReader {
@@ -56,7 +51,6 @@ export interface PlatformScriptView extends Omit<StoredPlatformScript, 'steps'> 
 
 interface Deps {
   readonly store: PlatformScriptReadStore;
-  readonly vault: VaultLinks;
 }
 
 /**
@@ -65,21 +59,14 @@ interface Deps {
  */
 const IDENTITY_VALIDATED = false;
 
-async function viewOf(vault: VaultLinks, script: StoredPlatformScript): Promise<PlatformScriptView> {
-  const refs = script.steps.flatMap((step) =>
-    [...step.media, ...step.previewMedia].map((media) => media.ref),
-  );
-  const links = refs.length === 0 ? new Map<string, never>() : await vault(script.platformAccountId, refs);
-  const mediaView = (media: StoredStepMedia): PlatformStepMediaView => {
-    const link = links.get(media.ref);
-    return {
-      ref: media.ref,
-      kind: media.kind,
-      inVault: link !== undefined,
-      mediaAssetId: link?.mediaAssetId ?? null,
-      described: link?.described ?? false,
-    };
-  };
+function viewOf(script: StoredPlatformScript): PlatformScriptView {
+  const mediaView = (media: StoredStepMedia): PlatformStepMediaView => ({
+    ref: media.ref,
+    kind: media.kind,
+    inVault: media.vault !== null,
+    mediaAssetId: media.vault?.mediaAssetId ?? null,
+    described: media.vault?.described ?? false,
+  });
   const steps = script.steps.map((step): PlatformStepView => {
     const media = step.media.map(mediaView);
     const previewMedia = step.previewMedia.map(mediaView);
@@ -112,18 +99,20 @@ export async function creatorPlatformScripts(
   if (reader.role !== 'owner' && reader.role !== 'operator') return null;
   const scripts = await deps.store.ofCreator(creatorId, reader.userId);
   if (scripts === null) return null;
-  return Promise.all(scripts.map((script) => viewOf(deps.vault, script)));
+  return scripts.map(viewOf);
 }
 
 /**
- * One native script of hers, out of any person: what a job of the agent reads before sending a step (ADR 0111, the
- * reward: its step's ref and price, its media and the media they are). `null` when it is not hers.
+ * One native script of hers, out of any person and as the service role: what a job of the agent reads before sending a
+ * step (ADR 0111, the reward: its step's ref and price, its media and the media they are). For a job only: its ids come
+ * from the base (a run, a reward), never from a request, which reads through `creatorPlatformScripts`. `null` when it
+ * is not hers.
  */
-export async function platformScriptOf(
+export async function platformScriptForJob(
   deps: Deps,
   creatorId: CreatorId,
   scriptId: string,
 ): Promise<PlatformScriptView | null> {
-  const script = await deps.store.one(creatorId, scriptId);
-  return script === null ? null : viewOf(deps.vault, script);
+  const script = await deps.store.oneForJob(creatorId, scriptId);
+  return script === null ? null : viewOf(script);
 }

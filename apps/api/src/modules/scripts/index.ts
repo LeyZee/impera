@@ -14,7 +14,7 @@ import { askScripts, type AskScriptsRun } from './application/ask-scripts';
 import { importPlatformScripts, type ImportPlatformScriptsRun } from './application/import-platform-scripts';
 import {
   creatorPlatformScripts,
-  platformScriptOf,
+  platformScriptForJob,
   type PlatformScriptsReader,
   type PlatformScriptView,
 } from './application/platform-script-reads';
@@ -26,7 +26,6 @@ import type {
   RasterizeCard,
   ScriptRequests,
   ScriptStructureStore,
-  VaultLinks,
 } from './domain/ports';
 import { createCardRasterizer } from './infra/card-rasterizer';
 import { createDrizzleCadenceStore } from './infra/db/cadence-store';
@@ -36,7 +35,6 @@ import {
   createDrizzlePlatformScriptReadStore,
 } from './infra/db/platform-script-store';
 import { createDrizzleScriptStructureStore } from './infra/db/structure-store';
-import { createDrizzleVaultLinks } from './infra/db/vault-links';
 import { createFrozenVersionReader, createRequestFreezer } from './infra/db/version-reader';
 import { createScriptRoutes, type RequireRole } from './infra/http/routes';
 
@@ -84,9 +82,15 @@ export interface ScriptsModule {
       creatorId: CreatorId,
       reader: PlatformScriptsReader,
     ): Promise<readonly PlatformScriptView[] | null>;
+  };
+  /**
+   * Reads out of any person, as the service role: for a job only (ADR 0026 § 1). Never called with an id a request
+   * gave, nor from a route: a person reads through `reads`.
+   */
+  readonly forJobs: {
     /**
-     * One native script of hers, out of any person: what a job of the agent reads before sending its step (ADR 0111,
-     * the reward). `null` when it is not hers.
+     * One native script of hers, by an id the base gave the job: what a job of the agent reads before sending its step
+     * (ADR 0111, the reward). `null` when it is not hers.
      */
     platformScript(creatorId: CreatorId, scriptId: string): Promise<PlatformScriptView | null>;
   };
@@ -118,8 +122,6 @@ export interface ScriptsModule {
 interface PlatformScriptPorts {
   /** `connectors`: the scripts the platform lists for an account; `null` when its connector reads none now. */
   readonly source: PlatformScriptSource;
-  /** Tests only: other vault links than `media_platform_refs`'. */
-  readonly vault?: VaultLinks;
 }
 
 /** Until the connectors' read is wired: no account reads any script. */
@@ -149,10 +151,7 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
   const frozenVersion = createFrozenVersionReader(deps.adminDb);
   const rasterize = deps.rasterizeCard ?? createCardRasterizer(deps.cardFontsDir);
   const platform = deps.platformScripts ?? NO_PLATFORM_SCRIPTS;
-  const platformReads = {
-    store: createDrizzlePlatformScriptReadStore(deps.db, deps.adminDb),
-    vault: platform.vault ?? createDrizzleVaultLinks(deps.adminDb),
-  };
+  const platformReads = { store: createDrizzlePlatformScriptReadStore(deps.db, deps.adminDb) };
   const platformImports = createDrizzlePlatformScriptImportStore(deps.adminDb);
   return {
     name: 'scripts',
@@ -176,7 +175,9 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
       queue: async (creatorId, reader) =>
         (await creatorQueue(structures, reader, creatorId))?.map(queuedDigest) ?? null,
       platformScripts: (creatorId, reader) => creatorPlatformScripts(platformReads, reader, creatorId),
-      platformScript: (creatorId, scriptId) => platformScriptOf(platformReads, creatorId, scriptId),
+    },
+    forJobs: {
+      platformScript: (creatorId, scriptId) => platformScriptForJob(platformReads, creatorId, scriptId),
     },
     routes: createScriptRoutes(structures, deps.limitsOf, deps.requireRole, rasterize, {
       store: cadences,

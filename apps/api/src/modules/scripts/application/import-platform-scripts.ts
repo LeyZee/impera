@@ -9,7 +9,14 @@ export type ImportPlatformScriptsRun =
   | { readonly outcome: 'unknown_account' }
   /** Its connector reads no scripts now (no session, no adapter, no `capabilities.scripts`): left as it was. */
   | { readonly outcome: 'skipped' }
-  | { readonly outcome: 'imported'; readonly added: number; readonly changed: number; readonly gone: number };
+  | {
+      readonly outcome: 'imported';
+      readonly added: number;
+      readonly changed: number;
+      readonly gone: number;
+      /** Out of the base's bounds, not imported (`boundedPlatformScript`). */
+      readonly refused: number;
+    };
 
 interface ImportDeps {
   readonly store: PlatformScriptImportStore;
@@ -38,5 +45,6 @@ export async function importPlatformScripts(
     added: plan.added.length,
     changed: plan.changed.length,
     gone: plan.gone.length,
+    refused: plan.refused,
   };
 }

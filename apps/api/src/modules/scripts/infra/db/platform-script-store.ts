@@ -12,6 +12,7 @@ import {
   and,
   eq,
   inArray,
+  onCreatorList,
   schema,
   sql,
   withAdmin,
@@ -19,6 +20,7 @@ import {
   type Database,
   type Transaction,
 } from '@impera/db';
+import { z } from 'zod';
 
 import {
   platformScriptFingerprint,
@@ -163,7 +165,55 @@ type ScriptRow = typeof scripts.$inferSelect;
 type StepRow = typeof steps.$inferSelect;
 type MediaRow = typeof stepMedia.$inferSelect;
 
-/** Rows of a set of scripts, put back together in the platform's order. */
+const LinkRowSchema = z.object({
+  platform_account_id: z.uuid(),
+  platform_media_id: z.string(),
+  media_asset_id: z.uuid().nullable(),
+  described: z.boolean(),
+});
+
+/**
+ * Where the media of these scripts stand in her vault (`media_platform_refs`, written by the vault sync, fiche
+ * vault-sync), in the caller's transaction and so under its RLS: a link the platform no longer lists (`removed_at`) is
+ * not in the vault. `described`: its media has a description a human validated (ADR 0083), as the drops read it. Keyed
+ * by account and platform id.
+ */
+async function vaultLinksOf(
+  tx: Transaction,
+  rows: readonly ScriptRow[],
+  mediaRows: readonly MediaRow[],
+): Promise<Map<string, StoredStepMedia['vault']>> {
+  if (mediaRows.length === 0) return new Map();
+  const accounts = sql.join(
+    [...new Set(rows.map((row) => row.platformAccountId))].map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
+  const refs = sql.join(
+    [...new Set(mediaRows.map((media) => media.platformMediaRef))].map((ref) => sql`${ref}`),
+    sql`, `,
+  );
+  const result = await tx.execute(sql`
+    select l.platform_account_id, l.platform_media_id, l.media_asset_id,
+      (l.media_asset_id is not null and exists (
+        select 1 from ${schema.mediaDescriptions} md
+        where md.media_asset_id = l.media_asset_id and md.validated_at is not null
+      )) as described
+    from ${schema.mediaPlatformRefs} l
+    where l.platform_account_id in (${accounts})
+      and l.platform_media_id in (${refs})
+      and l.removed_at is null`);
+  return new Map(
+    z
+      .array(LinkRowSchema)
+      .parse(result.rows)
+      .map((row) => [
+        `${row.platform_account_id}:${row.platform_media_id}`,
+        { mediaAssetId: row.media_asset_id, described: row.described },
+      ]),
+  );
+}
+
+/** Rows of a set of scripts, put back together in the platform's order, with their vault links. */
 async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<StoredPlatformScript[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
@@ -177,6 +227,8 @@ async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<St
     .from(stepMedia)
     .where(inArray(stepMedia.platformScriptId, ids))
     .orderBy(stepMedia.platformScriptId, stepMedia.position, stepMedia.role, stepMedia.rank);
+  const links = await vaultLinksOf(tx, rows, mediaRows);
+  const accountOf = new Map(rows.map((row) => [row.id, row.platformAccountId]));
   const mediaOf = (step: StepRow, role: 'sold' | 'preview'): StoredStepMedia[] =>
     mediaRows
       .filter(
@@ -184,7 +236,11 @@ async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<St
           media.platformScriptId === step.platformScriptId && media.position === step.position,
       )
       .filter((media) => media.role === role)
-      .map((media) => ({ ref: media.platformMediaRef, kind: MediaSlotKindSchema.parse(media.kind) }));
+      .map((media) => ({
+        ref: media.platformMediaRef,
+        kind: MediaSlotKindSchema.parse(media.kind),
+        vault: links.get(`${accountOf.get(media.platformScriptId) ?? ''}:${media.platformMediaRef}`) ?? null,
+      }));
   return rows.map((row) => ({
     id: PlatformScriptIdSchema.parse(row.id),
     creatorId: CreatorIdSchema.parse(row.creatorId),
@@ -212,8 +268,9 @@ async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<St
 
 /**
  * The agency's reads of her native scripts: under her RLS and the team's scopes (the owner, an active manager of her
- * list, as her vault is read); her own account is closed by the base. Anyone else gets the same `null` for a creator
- * who exists and one who does not, never her existence.
+ * list, `onCreatorList`, as her vault is read); her own account is closed by the base. Anyone else gets the same `null`
+ * for a creator who exists and one who does not, never her existence. Her vault links are read in the same
+ * transaction, never by the service role. `oneForJob` alone is the service role's, for a job.
  */
 export function createDrizzlePlatformScriptReadStore(
   db: Database,
@@ -225,14 +282,11 @@ export function createDrizzlePlatformScriptReadStore(
         if (scope !== 'owner' && scope !== 'agency') return null;
         // The owner reads every creator of hers; an active manager only those of his list, as her vault (fiche
         // vault-sync). `creators` is out of RLS: a creator who does not exist answers like one he may not read.
+        if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId))) return null;
         const readable = await tx
           .select({ id: schema.creators.id })
           .from(schema.creators)
-          .where(
-            scope === 'owner'
-              ? eq(schema.creators.id, creatorId)
-              : sql`${schema.creators.id} = ${creatorId} and exists (select 1 from "user" u where u.id = ${userId} and ${creatorId}::uuid = any(u.creator_ids))`,
-          );
+          .where(eq(schema.creators.id, creatorId));
         if (readable.length === 0) return null;
         const rows = await tx
           .select()
@@ -242,7 +296,7 @@ export function createDrizzlePlatformScriptReadStore(
         return storedOf(tx, rows);
       }),
 
-    one: (creatorId, scriptId) =>
+    oneForJob: (creatorId, scriptId) =>
       withAdmin(adminDb, async (tx) => {
         const rows = await tx
           .select()

@@ -1,6 +1,14 @@
 import { createHash } from 'node:crypto';
 
-import type { Currency, PlatformScript } from '@impera/contracts';
+import {
+  PLATFORM_SCRIPT_NAME_MAX,
+  PLATFORM_SCRIPT_REF_MAX,
+  PLATFORM_SCRIPT_STEP_MEDIA_MAX,
+  PLATFORM_SCRIPT_STEP_TEXT_MAX,
+  PLATFORM_SCRIPT_STEPS_MAX,
+  type Currency,
+  type PlatformScript,
+} from '@impera/contracts';
 
 /**
  * The import of the native scripts (ADR 0099 § 1, time 2; P6-01): each script the platform keeps for an account, its
@@ -69,6 +77,48 @@ export function platformScriptFingerprint(script: PlatformScript): string {
   return createHash('sha256').update(canonical).digest('hex');
 }
 
+/** At most `max` UTF-16 units, never half of an emoji: the platform's text is cut, not refused (as the vault's). */
+function cut(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const head = text.slice(0, max);
+  const last = head.charCodeAt(head.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? head.slice(0, -1) : head;
+}
+
+/**
+ * A script as Impera keeps it, within the base's bounds (`PLATFORM_SCRIPT_*_MAX`): its names and texts cut; `null`
+ * when it has more steps or more media in a step than the bounds, or a platform id longer, which are not cut (a step
+ * or a media dropped would sell another script than the platform's).
+ */
+export function boundedPlatformScript(script: PlatformScript): PlatformScript | null {
+  const refs = [
+    script.ref.id,
+    ...script.steps.flatMap((step) => [
+      step.ref.id,
+      ...[...step.media, ...step.previewMedia].map((media) => media.ref.id),
+    ]),
+  ];
+  if (
+    script.steps.length > PLATFORM_SCRIPT_STEPS_MAX ||
+    script.steps.some(
+      (step) =>
+        step.media.length > PLATFORM_SCRIPT_STEP_MEDIA_MAX ||
+        step.previewMedia.length > PLATFORM_SCRIPT_STEP_MEDIA_MAX,
+    ) ||
+    refs.some((ref) => ref.length > PLATFORM_SCRIPT_REF_MAX)
+  )
+    return null;
+  return {
+    ...script,
+    name: cut(script.name, PLATFORM_SCRIPT_NAME_MAX),
+    steps: script.steps.map((step) => ({
+      ...step,
+      name: cut(step.name, PLATFORM_SCRIPT_NAME_MAX),
+      text: cut(step.text, PLATFORM_SCRIPT_STEP_TEXT_MAX),
+    })),
+  };
+}
+
 /** A native script already imported for the account, as the base keeps it. */
 export interface KnownPlatformScript {
   readonly id: string;
@@ -87,12 +137,18 @@ export interface PlatformScriptsPlan {
   readonly unchanged: readonly string[];
   /** Known and active, gone from the platform: deactivated, never deleted. */
   readonly gone: readonly string[];
+  /**
+   * Listed, but out of the bounds (`boundedPlatformScript`): not imported. One already known stays as it was, neither
+   * rewritten nor gone. Counted only.
+   */
+  readonly refused: number;
 }
 
 /**
  * The plan of one import, from the scripts the platform lists now and those the base knows. A script listed twice
  * by the platform is taken once (its first listing). Its steps keep the platform's order: `PlatformScript.steps` is
- * already sorted by `stepIndex` (spec § 6) and its `index` is the position kept.
+ * already sorted by `stepIndex` (spec § 6) and its `index` is the position kept. Each is bounded first
+ * (`boundedPlatformScript`): what the plan carries is what the base keeps.
  */
 export function planPlatformScripts(
   known: readonly KnownPlatformScript[],
@@ -103,9 +159,15 @@ export function planPlatformScripts(
   const added: PlatformScript[] = [];
   const changed: { id: string; script: PlatformScript }[] = [];
   const unchanged: string[] = [];
-  for (const script of listed) {
-    if (seen.has(script.ref.id)) continue;
-    seen.add(script.ref.id);
+  let refused = 0;
+  for (const listing of listed) {
+    if (seen.has(listing.ref.id)) continue;
+    seen.add(listing.ref.id);
+    const script = boundedPlatformScript(listing);
+    if (script === null) {
+      refused += 1;
+      continue;
+    }
     const before = byRef.get(script.ref.id);
     if (before === undefined) added.push(script);
     else if (before.active && before.fingerprint === platformScriptFingerprint(script))
@@ -113,7 +175,7 @@ export function planPlatformScripts(
     else changed.push({ id: before.id, script });
   }
   const gone = known.filter((script) => script.active && !seen.has(script.ref)).map((script) => script.id);
-  return { added, changed, unchanged, gone };
+  return { added, changed, unchanged, gone, refused };
 }
 
 /** Where a media of a step stands in the vault, as the vault's link (`media_platform_refs`) and the descriptions say. */

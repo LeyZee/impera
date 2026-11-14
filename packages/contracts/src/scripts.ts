@@ -674,3 +674,16 @@ export type PlatformScriptMediaRole = z.infer<typeof PlatformScriptMediaRoleSche
 /** A native script as Impera mirrors it (`platform_scripts`, ADR 0099 § 1 time 2). */
 export const PlatformScriptIdSchema = z.uuid().brand<'PlatformScriptId'>();
 export type PlatformScriptId = z.infer<typeof PlatformScriptIdSchema>;
+
+/**
+ * The bounds of a native script as Impera keeps it (`platform_scripts`, `platform_script_steps`,
+ * `platform_script_step_media`, CHECK), as the vault's (`VAULT_FOLDER_NAME_MAX`): a name or a text longer is cut at
+ * import, never refused; a script with more steps, more media in a step, or a platform id longer is not imported.
+ */
+export const PLATFORM_SCRIPT_NAME_MAX = 200;
+export const PLATFORM_SCRIPT_STEP_TEXT_MAX = 4_000;
+export const PLATFORM_SCRIPT_STEPS_MAX = 50;
+/** Per step and per role (`sold`, `preview`). */
+export const PLATFORM_SCRIPT_STEP_MEDIA_MAX = 50;
+/** The platform's ids: a script, a step, a media. */
+export const PLATFORM_SCRIPT_REF_MAX = 200;

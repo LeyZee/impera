@@ -4,12 +4,15 @@ import {
   CreatorIdSchema,
   MediaAssetIdSchema,
   newId,
+  PLATFORM_SCRIPT_NAME_MAX,
+  PLATFORM_SCRIPT_STEP_TEXT_MAX,
+  PLATFORM_SCRIPT_STEPS_MAX,
   PlatformAccountIdSchema,
   TeamMemberIdSchema,
   type CreatorId,
   type PlatformAccountId,
 } from '@impera/contracts';
-import { and, eq, schema, sql, withTenant } from '@impera/db';
+import { and, eq, schema, sql, withCreatorAccount, withTenant } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -195,7 +198,7 @@ describe('the native scripts imported from the platform', () => {
   it('imports each sequence with its steps in the platform’s order and its prices as they are', async () => {
     await vaultSync();
     const run = await importOf(noraAccount, nora, new Date('2026-11-14T10:00:00Z'));
-    expect(run).toEqual({ outcome: 'imported', added: 4, changed: 0, gone: 0 });
+    expect(run).toEqual({ outcome: 'imported', added: 4, changed: 0, gone: 0, refused: 0 });
     // Inès's account has no session: left as it was; an account named with another creator is not read.
     expect(await importOf(inesAccount, ines, new Date('2026-11-14T10:00:00Z'))).toEqual({
       outcome: 'skipped',
@@ -237,7 +240,7 @@ describe('the native scripts imported from the platform', () => {
 
   it('changes nothing when nothing changed, rewrites a changed script, deactivates a gone one', async () => {
     const again = await importOf(noraAccount, nora, new Date('2026-11-14T11:00:00Z'));
-    expect(again).toEqual({ outcome: 'imported', added: 0, changed: 0, gone: 0 });
+    expect(again).toEqual({ outcome: 'imported', added: 0, changed: 0, gone: 0, refused: 0 });
     await scenario([
       { type: 'script_changed', scriptId: 'script_1_3', priceCents: 4_500 },
       { type: 'sequence_removed', sequenceId: 'sequence_2' },
@@ -245,7 +248,7 @@ describe('the native scripts imported from the platform', () => {
     const at = new Date('2026-11-14T12:00:00Z');
     const run = await importOf(noraAccount, nora, at);
     // Sequence 2's steps stay on the platform as loose steps: three scripts of one step each.
-    expect(run).toEqual({ outcome: 'imported', added: 3, changed: 1, gone: 1 });
+    expect(run).toEqual({ outcome: 'imported', added: 3, changed: 1, gone: 1, refused: 0 });
     const rows = await scriptRows();
     const gone = rows.find((row) => row.platformScriptRef === 'sequence_2');
     expect([gone?.active, gone?.deactivatedAt?.toISOString()]).toEqual([false, at.toISOString()]);
@@ -320,6 +323,15 @@ describe('the native scripts imported from the platform', () => {
       gaps: ['media_absent', 'media_not_described', 'identity_not_validated'],
       proposable: false,
     });
+    // A manager of her list reads the same links in his own transaction, under her RLS; a job as the service role.
+    const managerView = (
+      await scripts().reads.platformScripts(nora, { userId: ids.manager, role: 'operator' })
+    )?.find((each) => each.ref === 'sequence_1');
+    expect(managerView?.steps[1]?.media).toEqual((await step())?.media);
+    if (managerView === undefined) throw new Error('read');
+    expect((await scripts().forJobs.platformScript(nora, managerView.id))?.steps[1]?.previewMedia).toEqual(
+      (await step())?.previewMedia,
+    );
   });
 
   it('lets the owner and an active manager of her list read, never a chatter nor her own account', async () => {
@@ -330,6 +342,13 @@ describe('the native scripts imported from the platform', () => {
     expect(await scripts().reads.platformScripts(ines, { userId: ids.owner, role: 'owner' })).toEqual([]);
     expect(await scripts().reads.platformScripts(nora, { userId: ids.chatter, role: 'operator' })).toBeNull();
     expect(await scripts().reads.platformScripts(nora, { userId: ids.nora, role: 'creator' })).toBeNull();
+    // Closed to her account by the base too, not only by the reads' role check (`creator_closed`).
+    const hers = await withCreatorAccount(app.db.db, ids.nora, async (tx) => [
+      ...(await tx.select().from(schema.platformScripts)),
+      ...(await tx.select().from(schema.platformScriptSteps)),
+      ...(await tx.select().from(schema.platformScriptStepMedia)),
+    ]);
+    expect(hers).toEqual([]);
     // A creator who does not exist answers like a reader who may not read: never her existence.
     expect(
       await scripts().reads.platformScripts(newId(CreatorIdSchema), { userId: ids.owner, role: 'owner' }),
@@ -339,8 +358,8 @@ describe('the native scripts imported from the platform', () => {
   it('reads one script of hers out of any person, and none of another creator', async () => {
     const row = (await scriptRows()).find((each) => each.platformScriptRef === 'sequence_1');
     if (row === undefined) throw new Error('imported');
-    expect((await scripts().reads.platformScript(nora, row.id))?.steps[0]?.ref).toBe('script_1_1');
-    expect(await scripts().reads.platformScript(ines, row.id)).toBeNull();
+    expect((await scripts().forJobs.platformScript(nora, row.id))?.steps[0]?.ref).toBe('script_1_1');
+    expect(await scripts().forJobs.platformScript(ines, row.id)).toBeNull();
   });
 
   it('keeps the application role from writing a native script, even in her tenant', async () => {
@@ -355,5 +374,52 @@ describe('the native scripts imported from the platform', () => {
     );
     const cause = failure instanceof Error && failure.cause instanceof Error ? failure.cause.message : '';
     expect(cause).toMatch(/permission denied/u);
+  });
+
+  it('holds the bounds in the base too: a name, a text or a step past them is refused, even to the service role', async () => {
+    const row = (await scriptRows()).find((each) => each.platformScriptRef === 'sequence_1');
+    if (row === undefined) throw new Error('imported');
+    const refusal = (write: Promise<unknown>) =>
+      write.then(
+        () => '',
+        (error: unknown) =>
+          error instanceof Error && error.cause instanceof Error ? error.cause.message : String(error),
+      );
+    expect(
+      await refusal(
+        test.service.db
+          .update(schema.platformScripts)
+          .set({ name: 'a'.repeat(PLATFORM_SCRIPT_NAME_MAX + 1) })
+          .where(eq(schema.platformScripts.id, row.id)),
+      ),
+    ).toMatch(/platform_scripts_text_check/u);
+    expect(
+      await refusal(
+        test.service.db.insert(schema.platformScriptSteps).values({
+          platformScriptId: row.id,
+          creatorId: nora,
+          position: PLATFORM_SCRIPT_STEPS_MAX,
+          platformStepRef: 'step_inventee',
+          name: 'Étape',
+          text: 'Texte',
+          priceMinor: 0,
+          currency: 'EUR',
+        }),
+      ),
+    ).toMatch(/platform_script_steps_position_check/u);
+    expect(
+      await refusal(
+        test.service.db.insert(schema.platformScriptSteps).values({
+          platformScriptId: row.id,
+          creatorId: nora,
+          position: PLATFORM_SCRIPT_STEPS_MAX - 1,
+          platformStepRef: 'step_inventee',
+          name: 'Étape',
+          text: 'c'.repeat(PLATFORM_SCRIPT_STEP_TEXT_MAX + 1),
+          priceMinor: 0,
+          currency: 'EUR',
+        }),
+      ),
+    ).toMatch(/platform_script_steps_text_check/u);
   });
 });

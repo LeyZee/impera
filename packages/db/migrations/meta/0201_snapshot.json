@@ -1,5 +1,5 @@
 {
-  "id": "5298ba17-7f41-4431-adcd-d4bf4e283149",
+  "id": "671f721c-c793-4f3f-a61f-9026e7cb6ccc",
   "prevId": "1a19ede2-9013-4ebc-9f26-d959963ef03f",
   "version": "7",
   "dialect": "postgresql",
@@ -17311,7 +17311,11 @@
       "checkConstraints": {
         "platform_script_step_media_rank_check": {
           "name": "platform_script_step_media_rank_check",
-          "value": "\"platform_script_step_media\".\"rank\" >= 0"
+          "value": "\"platform_script_step_media\".\"rank\" >= 0 and \"platform_script_step_media\".\"rank\" < 50"
+        },
+        "platform_script_step_media_ref_check": {
+          "name": "platform_script_step_media_ref_check",
+          "value": "char_length(\"platform_script_step_media\".\"platform_media_ref\") <= 200"
         },
         "platform_script_step_media_role_check": {
           "name": "platform_script_step_media_role_check",
@@ -17446,7 +17450,11 @@
       "checkConstraints": {
         "platform_script_steps_position_check": {
           "name": "platform_script_steps_position_check",
-          "value": "\"platform_script_steps\".\"position\" >= 0"
+          "value": "\"platform_script_steps\".\"position\" >= 0 and \"platform_script_steps\".\"position\" < 50"
+        },
+        "platform_script_steps_text_check": {
+          "name": "platform_script_steps_text_check",
+          "value": "char_length(\"platform_script_steps\".\"name\") <= 200 and char_length(\"platform_script_steps\".\"text\") <= 4000 and char_length(\"platform_script_steps\".\"platform_step_ref\") <= 200"
         },
         "platform_script_steps_price_check": {
           "name": "platform_script_steps_price_check",
@@ -17606,6 +17614,10 @@
         "platform_scripts_active_check": {
           "name": "platform_scripts_active_check",
           "value": "\"platform_scripts\".\"active\" = (\"platform_scripts\".\"deactivated_at\" is null)"
+        },
+        "platform_scripts_text_check": {
+          "name": "platform_scripts_text_check",
+          "value": "char_length(\"platform_scripts\".\"name\") <= 200 and char_length(\"platform_scripts\".\"platform_script_ref\") <= 200"
         }
       },
       "isRLSEnabled": false

@@ -181,10 +181,23 @@ export interface PlatformScriptImportStore {
  */
 export type PlatformScriptSource = (account: ImportAccount) => Promise<readonly PlatformScript[] | null>;
 
+/** A vault media as its link says it (`media_platform_refs`): listed by the last sync of the vault and not removed. */
+interface VaultLink {
+  /** The media it is, once its file is read (ADR 0099 § 7); `null` before. */
+  readonly mediaAssetId: string | null;
+  /** Its media has a validated description (ADR 0083, ADR 0030 § 3). */
+  readonly described: boolean;
+}
+
 /** A media of a step, by the platform's id of the vault media. */
 export interface StoredStepMedia {
   readonly ref: string;
   readonly kind: MediaSlotKind;
+  /**
+   * Its vault link, read in the same transaction as the script (ADR 0030 § 1, ADR 0099): `null` when the media is not
+   * in the vault (never synced, or removed since).
+   */
+  readonly vault: VaultLink | null;
 }
 
 /** A step of a native script as the base keeps it, at its place in the platform's order. */
@@ -215,25 +228,14 @@ export interface StoredPlatformScript {
 }
 
 export interface PlatformScriptReadStore {
-  /** Her native scripts, as a person of the agency reads them; `null` for a reader who may not read her. */
+  /**
+   * Her native scripts and their vault links, as a person of the agency reads them: in the person's transaction, under
+   * her RLS and his scope. `null` for a reader who may not read her.
+   */
   ofCreator(creatorId: CreatorId, userId: string): Promise<readonly StoredPlatformScript[] | null>;
-  /** One of hers by its id, out of any person (a job of the agent's); `null` when it is not hers. */
-  one(creatorId: CreatorId, scriptId: string): Promise<StoredPlatformScript | null>;
+  /**
+   * One of hers by its id and its vault links, as the service role: for a job only, never with an id a request gave
+   * (`forJobs.platformScript`). `null` when it is not hers.
+   */
+  oneForJob(creatorId: CreatorId, scriptId: string): Promise<StoredPlatformScript | null>;
 }
-
-/** A vault media as its link says it (`media_platform_refs`): listed by the last sync of the vault and not removed. */
-interface VaultLink {
-  /** The media it is, once its file is read (ADR 0099 § 7); `null` before. */
-  readonly mediaAssetId: string | null;
-  /** Its media has a validated description (ADR 0083, ADR 0030 § 3). */
-  readonly described: boolean;
-}
-
-/**
- * The vault links of an account's media, by the platform's id (`media_platform_refs`, ADR 0030 § 1, ADR 0099): a media
- * absent from the map is not in the vault (never synced, or removed since).
- */
-export type VaultLinks = (
-  platformAccountId: PlatformAccountId,
-  mediaRefs: readonly string[],
-) => Promise<ReadonlyMap<string, VaultLink>>;

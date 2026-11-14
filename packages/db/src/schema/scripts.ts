@@ -2,6 +2,11 @@ import {
   CurrencySchema,
   MEDIA_SLOT_KINDS,
   PLATFORM_SCRIPT_MEDIA_ROLES,
+  PLATFORM_SCRIPT_NAME_MAX,
+  PLATFORM_SCRIPT_REF_MAX,
+  PLATFORM_SCRIPT_STEP_MEDIA_MAX,
+  PLATFORM_SCRIPT_STEP_TEXT_MAX,
+  PLATFORM_SCRIPT_STEPS_MAX,
   PlatformScriptMomentSchema,
   SCRIPT_CADENCE_DEFAULT_DAYS,
   SCRIPT_CADENCE_MAX_DAYS,
@@ -254,6 +259,11 @@ export const platformScripts = pgTable(
     index('platform_scripts_creator_idx').on(t.creatorId),
     enumCheck('platform_scripts', t.moment, PlatformScriptMomentSchema.options),
     check('platform_scripts_active_check', sql`${t.active} = (${t.deactivatedAt} is null)`),
+    // The contract's bounds (`PLATFORM_SCRIPT_*_MAX`): the import cuts a name, and does not import a longer id.
+    check(
+      'platform_scripts_text_check',
+      sql`char_length(${t.name}) <= ${sql.raw(String(PLATFORM_SCRIPT_NAME_MAX))} and char_length(${t.platformScriptRef}) <= ${sql.raw(String(PLATFORM_SCRIPT_REF_MAX))}`,
+    ),
     pgPolicy('team_read', {
       for: 'select',
       using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
@@ -290,7 +300,14 @@ export const platformScriptSteps = pgTable(
       foreignColumns: [platformScripts.id, platformScripts.creatorId],
     }).onDelete('cascade'),
     index('platform_script_steps_creator_step_idx').on(t.creatorId, t.platformStepRef),
-    check('platform_script_steps_position_check', sql`${t.position} >= 0`),
+    check(
+      'platform_script_steps_position_check',
+      sql`${t.position} >= 0 and ${t.position} < ${sql.raw(String(PLATFORM_SCRIPT_STEPS_MAX))}`,
+    ),
+    check(
+      'platform_script_steps_text_check',
+      sql`char_length(${t.name}) <= ${sql.raw(String(PLATFORM_SCRIPT_NAME_MAX))} and char_length(${t.text}) <= ${sql.raw(String(PLATFORM_SCRIPT_STEP_TEXT_MAX))} and char_length(${t.platformStepRef}) <= ${sql.raw(String(PLATFORM_SCRIPT_REF_MAX))}`,
+    ),
     check('platform_script_steps_price_check', sql`${t.priceMinor} >= 0`),
     enumCheck('platform_script_steps', t.currency, CurrencySchema.options),
     pgPolicy('team_read', {
@@ -335,7 +352,14 @@ export const platformScriptStepMedia = pgTable(
       foreignColumns: [platformScriptSteps.platformScriptId, platformScriptSteps.position],
     }).onDelete('cascade'),
     index('platform_script_step_media_creator_media_idx').on(t.creatorId, t.platformMediaRef),
-    check('platform_script_step_media_rank_check', sql`${t.rank} >= 0`),
+    check(
+      'platform_script_step_media_rank_check',
+      sql`${t.rank} >= 0 and ${t.rank} < ${sql.raw(String(PLATFORM_SCRIPT_STEP_MEDIA_MAX))}`,
+    ),
+    check(
+      'platform_script_step_media_ref_check',
+      sql`char_length(${t.platformMediaRef}) <= ${sql.raw(String(PLATFORM_SCRIPT_REF_MAX))}`,
+    ),
     enumCheck('platform_script_step_media', t.role, PLATFORM_SCRIPT_MEDIA_ROLES),
     enumCheck('platform_script_step_media', t.kind, MEDIA_SLOT_KINDS),
     pgPolicy('team_read', {

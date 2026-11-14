@@ -1,5 +1,5 @@
 import { PlatformAccountIdSchema, type CreatorId } from '@impera/contracts';
-import { sql, withTenantMember, type Database, type Transaction } from '@impera/db';
+import { onCreatorList, sql, withTenantMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import {
@@ -11,7 +11,6 @@ import {
 import { dailyStatsOf } from './daily-stats-store';
 import { salesFeedTotals } from './totals-reads';
 
-const OnListSchema = z.object({ on_list: z.boolean() });
 const NameSchema = z.object({ id: z.string(), display_name: z.string() });
 
 /** The reader as his transaction sees him: his scope, and whether the creator is on his list. */
@@ -21,10 +20,7 @@ export async function readerIn(
   creatorId: CreatorId,
   scope: FiguresReader['scope'],
 ): Promise<FiguresReader> {
-  const result = await tx.execute(sql`
-    select exists (select 1 from "user" u where u.id = ${userId} and ${creatorId}::uuid = any(u.creator_ids)) as on_list`);
-  const [row] = z.array(OnListSchema).parse(result.rows);
-  return { scope, onList: row?.on_list ?? false };
+  return { scope, onList: await onCreatorList(tx, userId, creatorId) };
 }
 
 /**

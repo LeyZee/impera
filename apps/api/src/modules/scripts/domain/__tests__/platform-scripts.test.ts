@@ -1,7 +1,15 @@
-import type { PlatformScript } from '@impera/contracts';
+import {
+  PLATFORM_SCRIPT_NAME_MAX,
+  PLATFORM_SCRIPT_REF_MAX,
+  PLATFORM_SCRIPT_STEP_MEDIA_MAX,
+  PLATFORM_SCRIPT_STEP_TEXT_MAX,
+  PLATFORM_SCRIPT_STEPS_MAX,
+  type PlatformScript,
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
+  boundedPlatformScript,
   planPlatformScripts,
   platformScriptFingerprint,
   platformScriptGaps,
@@ -61,6 +69,64 @@ describe('the import of the native scripts (ADR 0099 § 1, time 2)', () => {
   it('takes a script listed twice once', () => {
     const twice = script('seq_1');
     expect(planPlatformScripts([], [twice, twice]).added).toHaveLength(1);
+  });
+
+  it('cuts a name or a text past the bounds, never half of an emoji, and keeps the rest as the platform gives it', () => {
+    const base = script('seq_1');
+    const [first] = base.steps;
+    if (first === undefined) throw new Error('one step');
+    const long: PlatformScript = {
+      ...base,
+      name: `${'a'.repeat(PLATFORM_SCRIPT_NAME_MAX - 1)}😈`,
+      steps: [
+        {
+          ...first,
+          name: 'b'.repeat(PLATFORM_SCRIPT_NAME_MAX + 5),
+          text: 'c'.repeat(PLATFORM_SCRIPT_STEP_TEXT_MAX + 1),
+        },
+      ],
+    };
+    const bounded = boundedPlatformScript(long);
+    expect(bounded?.name).toBe('a'.repeat(PLATFORM_SCRIPT_NAME_MAX - 1));
+    expect(bounded?.steps[0]?.name).toHaveLength(PLATFORM_SCRIPT_NAME_MAX);
+    expect(bounded?.steps[0]?.text).toHaveLength(PLATFORM_SCRIPT_STEP_TEXT_MAX);
+    expect(bounded?.steps[0]?.priceMinor).toBe(first.priceMinor);
+    expect(boundedPlatformScript(base)).toEqual(base);
+  });
+
+  it('does not import a script past the bounds of steps, media or ids, and leaves one known as it was', () => {
+    const base = script('seq_1');
+    const [first] = base.steps;
+    if (first === undefined) throw new Error('one step');
+    const tooMany = script(
+      'seq_2',
+      Array.from({ length: PLATFORM_SCRIPT_STEPS_MAX + 1 }, () => 0),
+    );
+    const media = Array.from({ length: PLATFORM_SCRIPT_STEP_MEDIA_MAX + 1 }, (_, rank) => ({
+      ref: reveal(`m_${String(rank)}`),
+      kind: 'image' as const,
+    }));
+    const tooManyMedia: PlatformScript = { ...script('seq_3'), steps: [{ ...first, media }] };
+    const tooManyPreviews: PlatformScript = {
+      ...script('seq_4'),
+      steps: [{ ...first, previewMedia: media }],
+    };
+    const longRef: PlatformScript = { ...base, ref: reveal('r'.repeat(PLATFORM_SCRIPT_REF_MAX + 1)) };
+    for (const each of [tooMany, tooManyMedia, tooManyPreviews, longRef])
+      expect(boundedPlatformScript(each)).toBeNull();
+    expect(
+      boundedPlatformScript(
+        script(
+          'seq_5',
+          Array.from({ length: PLATFORM_SCRIPT_STEPS_MAX }, () => 0),
+        ),
+      ),
+    ).not.toBeNull();
+
+    const plan = planPlatformScripts([known('b', script('seq_2'))], [tooMany, tooManyMedia, base]);
+    expect(plan.refused).toBe(2);
+    expect(plan.added.map((each) => each.ref.id)).toEqual(['seq_1']);
+    expect([plan.changed, plan.unchanged, plan.gone]).toEqual([[], [], []]);
   });
 
   it('says a change of order, price, text or media in the fingerprint, nothing else', () => {

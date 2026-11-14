@@ -7,7 +7,8 @@ CREATE TABLE "platform_script_step_media" (
 	"platform_media_ref" text NOT NULL,
 	"kind" text NOT NULL,
 	CONSTRAINT "platform_script_step_media_pkey" PRIMARY KEY("platform_script_id","position","role","rank"),
-	CONSTRAINT "platform_script_step_media_rank_check" CHECK ("platform_script_step_media"."rank" >= 0),
+	CONSTRAINT "platform_script_step_media_rank_check" CHECK ("platform_script_step_media"."rank" >= 0 and "platform_script_step_media"."rank" < 50),
+	CONSTRAINT "platform_script_step_media_ref_check" CHECK (char_length("platform_script_step_media"."platform_media_ref") <= 200),
 	CONSTRAINT "platform_script_step_media_role_check" CHECK ("platform_script_step_media"."role" in ('sold', 'preview')),
 	CONSTRAINT "platform_script_step_media_kind_check" CHECK ("platform_script_step_media"."kind" in ('image', 'video', 'audio'))
 );
@@ -23,7 +24,8 @@ CREATE TABLE "platform_script_steps" (
 	"price_minor" integer NOT NULL,
 	"currency" text NOT NULL,
 	CONSTRAINT "platform_script_steps_pkey" PRIMARY KEY("platform_script_id","position"),
-	CONSTRAINT "platform_script_steps_position_check" CHECK ("platform_script_steps"."position" >= 0),
+	CONSTRAINT "platform_script_steps_position_check" CHECK ("platform_script_steps"."position" >= 0 and "platform_script_steps"."position" < 50),
+	CONSTRAINT "platform_script_steps_text_check" CHECK (char_length("platform_script_steps"."name") <= 200 and char_length("platform_script_steps"."text") <= 4000 and char_length("platform_script_steps"."platform_step_ref") <= 200),
 	CONSTRAINT "platform_script_steps_price_check" CHECK ("platform_script_steps"."price_minor" >= 0),
 	CONSTRAINT "platform_script_steps_currency_check" CHECK ("platform_script_steps"."currency" in ('EUR', 'USD'))
 );
@@ -44,7 +46,8 @@ CREATE TABLE "platform_scripts" (
 	CONSTRAINT "platform_scripts_account_ref_unique" UNIQUE("platform_account_id","platform_script_ref"),
 	CONSTRAINT "platform_scripts_id_creator_unique" UNIQUE("id","creator_id"),
 	CONSTRAINT "platform_scripts_moment_check" CHECK ("platform_scripts"."moment" in ('day', 'night')),
-	CONSTRAINT "platform_scripts_active_check" CHECK ("platform_scripts"."active" = ("platform_scripts"."deactivated_at" is null))
+	CONSTRAINT "platform_scripts_active_check" CHECK ("platform_scripts"."active" = ("platform_scripts"."deactivated_at" is null)),
+	CONSTRAINT "platform_scripts_text_check" CHECK (char_length("platform_scripts"."name") <= 200 and char_length("platform_scripts"."platform_script_ref") <= 200)
 );
 --> statement-breakpoint
 ALTER TABLE "platform_scripts" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
