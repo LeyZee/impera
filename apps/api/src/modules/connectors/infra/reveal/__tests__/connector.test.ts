@@ -1,4 +1,11 @@
-import { ConnectorConfigSchema, CreatorIdSchema, PlatformAccountIdSchema } from '@impera/contracts';
+import {
+  ConnectorConfigSchema,
+  CreatorIdSchema,
+  PlatformAccountIdSchema,
+  VAULT_DESCRIPTION_MAX,
+  VAULT_FOLDER_NAME_MAX,
+  VaultMediaSchema,
+} from '@impera/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createFakeReveal, type FakeReveal } from '../../../../../__tests__/fake-reveal/server';
@@ -353,6 +360,23 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       description: null,
       suggestedPriceMinor: null,
     });
+  });
+
+  it('cuts a vault folder’s name and a description longer than the contract allows, never half an emoji', async () => {
+    const fake = world();
+    const state = fake.state();
+    const folder = state.folders.find((f) => f.id === 'folder_1');
+    const media = state.media.find((m) => m.id === 'media_01');
+    if (folder === undefined || media === undefined) throw new Error('fixture changed');
+    folder.name = `${'a'.repeat(VAULT_FOLDER_NAME_MAX - 1)}🌙 nuit`;
+    media.description = 'Texte inventé '.repeat(500);
+    const vault = await connect(fake).listVaultMedia({});
+    const cut = vault.find((m) => m.ref.id === 'media_01');
+    expect(cut?.folder?.name).toBe('a'.repeat(VAULT_FOLDER_NAME_MAX - 1));
+    // The moment is read in the whole name, before it is cut.
+    expect(cut?.folder?.moment).toBe('night');
+    expect(cut?.description).toHaveLength(VAULT_DESCRIPTION_MAX);
+    expect(() => VaultMediaSchema.array().parse(vault)).not.toThrow();
   });
 
   it('lists transactions, newest first, until `since`', async () => {

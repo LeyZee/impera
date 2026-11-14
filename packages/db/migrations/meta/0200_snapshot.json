@@ -1,5 +1,5 @@
 {
-  "id": "f7f95a96-4a29-47a2-b473-0bbbd6ace61f",
+  "id": "863cdee5-2e68-41ed-92e6-fde0853a7593",
   "prevId": "86a9c625-e353-4109-ad75-62bb0f380542",
   "version": "7",
   "dialect": "postgresql",
@@ -8087,6 +8087,10 @@
         "media_platform_refs_suggested_check": {
           "name": "media_platform_refs_suggested_check",
           "value": "(\"media_platform_refs\".\"suggested_min_minor\" is null) = (\"media_platform_refs\".\"suggested_max_minor\" is null) and coalesce(\"media_platform_refs\".\"suggested_min_minor\", 0) >= 0 and coalesce(\"media_platform_refs\".\"suggested_max_minor\", 0) >= 0"
+        },
+        "media_platform_refs_text_check": {
+          "name": "media_platform_refs_text_check",
+          "value": "char_length(\"media_platform_refs\".\"folder_name\") <= 200 and char_length(\"media_platform_refs\".\"platform_description\") <= 2000"
         },
         "media_platform_refs_duration_check": {
           "name": "media_platform_refs_duration_check",

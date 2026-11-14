@@ -31,6 +31,7 @@ CREATE TABLE "media_platform_refs" (
 	CONSTRAINT "media_platform_refs_folder_moment_check" CHECK ("media_platform_refs"."folder_moment" in ('day', 'night')),
 	CONSTRAINT "media_platform_refs_folder_position_check" CHECK ("media_platform_refs"."folder_position" >= 0),
 	CONSTRAINT "media_platform_refs_suggested_check" CHECK (("media_platform_refs"."suggested_min_minor" is null) = ("media_platform_refs"."suggested_max_minor" is null) and coalesce("media_platform_refs"."suggested_min_minor", 0) >= 0 and coalesce("media_platform_refs"."suggested_max_minor", 0) >= 0),
+	CONSTRAINT "media_platform_refs_text_check" CHECK (char_length("media_platform_refs"."folder_name") <= 200 and char_length("media_platform_refs"."platform_description") <= 2000),
 	CONSTRAINT "media_platform_refs_duration_check" CHECK ("media_platform_refs"."duration_seconds" is null or "media_platform_refs"."duration_seconds" >= 0)
 );
 --> statement-breakpoint

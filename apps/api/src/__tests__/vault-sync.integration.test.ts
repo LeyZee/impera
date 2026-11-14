@@ -18,10 +18,12 @@ import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
 import { revealApiConnectors } from '../modules/connectors';
+import { buildServer, type Server } from '../server';
 
 import { createFakeReveal, type FakeReveal } from './fake-reveal/server';
 import { fixedComposer } from './support/composer';
 import { testConfig } from './support/config';
+import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const SESSION_KEYS = `v1:${randomBytes(32).toString('base64')}`;
 const PASSWORD = 'correct horse battery';
@@ -34,6 +36,7 @@ const PASSWORD = 'correct horse battery';
 describe('vault sync on FakeReveal (fiche vault-sync)', () => {
   let test: TestDb;
   let app: App;
+  let server: Server;
   let fake: FakeReveal;
   let creatorId: CreatorId;
   let accountId: PlatformAccountId;
@@ -111,6 +114,7 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
         reveal: revealApiConnectors({ fetch: fake.fetch, baseUrl: 'https://reveal.test' }),
       },
     });
+    server = await buildServer({ config, logger, routes: app.routes, readiness: app.readiness });
     creatorId = newId(CreatorIdSchema);
     const otherCreator = newId(CreatorIdSchema);
     await test.admin.db.insert(schema.creators).values([
@@ -177,6 +181,7 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
   });
 
   afterAll(async () => {
+    await server.close();
     await app.shutdown();
     await test.close();
     await fake.app.close();
@@ -259,6 +264,25 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
       .values({ id: other, nameKey: 'autre', displayName: 'Autre', timezone: 'Europe/Paris' });
     const seen = await withTenant(app.db.db, other, (tx) => tx.select().from(schema.mediaPlatformRefs));
     expect(seen).toEqual([]);
+  });
+
+  it('refuses over HTTP a sync to a manager, and the vault to a manager out of her list (403)', async () => {
+    const cookies = {
+      manager: await signIn(server, 'manager@example.test', PASSWORD),
+      outsider: await signIn(server, 'outsider@example.test', PASSWORD),
+    };
+    const as = async (who: keyof typeof cookies, method: 'GET' | 'POST', path: string) =>
+      (
+        await server.inject({
+          method,
+          url: `/v1/creators/${creatorId}/vault${path}`,
+          headers: { cookie: cookies[who], origin: DASHBOARD_ORIGIN },
+        })
+      ).statusCode;
+    // A manager of her list reads her vault, but only the owner asks the platform for a sync.
+    expect(await as('manager', 'GET', '')).toBe(200);
+    expect(await as('manager', 'POST', '/sync')).toBe(403);
+    expect(await as('outsider', 'GET', '')).toBe(403);
   });
 
   it('gives another module the account’s scripts through the connector, and refuses an unknown account', async () => {

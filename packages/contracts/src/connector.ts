@@ -194,16 +194,25 @@ export type SentScriptStep = z.infer<typeof SentScriptStepSchema>;
  * the platform's text, a starting point never validated. `suggestedPriceMinor`: the platform's suggested range, in the
  * platform's minor unit (euro cents on Reveal, like its other prices; to confirm at the first real read), only shown.
  */
+/** Longest vault folder name kept (`media_platform_refs.folder_name`, CHECK): longer, the connector cuts it. */
+export const VAULT_FOLDER_NAME_MAX = 200;
+/** Longest platform text on a vault media kept (`media_platform_refs.platform_description`, CHECK): longer, cut. */
+export const VAULT_DESCRIPTION_MAX = 2_000;
+
 export const VaultMediaSchema = z.object({
   ref: ExternalRefSchema,
   kind: ExternalMediaSchema.shape.kind,
   folder: z
-    .object({ ref: ExternalRefSchema, name: z.string(), moment: PlatformScriptMomentSchema.nullable() })
+    .object({
+      ref: ExternalRefSchema,
+      name: z.string().max(VAULT_FOLDER_NAME_MAX),
+      moment: PlatformScriptMomentSchema.nullable(),
+    })
     .nullable(),
   folderPosition: z.number().int().min(0),
   durationSeconds: z.number().min(0).nullable(),
   createdAt: z.iso.datetime(),
-  description: z.string().nullable(),
+  description: z.string().max(VAULT_DESCRIPTION_MAX).nullable(),
   suggestedPriceMinor: z.object({ min: z.number().int().min(0), max: z.number().int().min(0) }).nullable(),
 });
 export type VaultMedia = z.infer<typeof VaultMediaSchema>;

@@ -3,6 +3,8 @@ import {
   DESCRIPTION_REVIEW_REASONS,
   PlatformSchema,
   PlatformScriptMomentSchema,
+  VAULT_DESCRIPTION_MAX,
+  VAULT_FOLDER_NAME_MAX,
 } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import {
@@ -142,6 +144,11 @@ export const mediaPlatformRefs = pgTable(
     check(
       'media_platform_refs_suggested_check',
       sql`(${t.suggestedMinMinor} is null) = (${t.suggestedMaxMinor} is null) and coalesce(${t.suggestedMinMinor}, 0) >= 0 and coalesce(${t.suggestedMaxMinor}, 0) >= 0`,
+    ),
+    // The contract's bounds (VaultMediaSchema): the platform's text is cut by the connector, never refused here.
+    check(
+      'media_platform_refs_text_check',
+      sql`char_length(${t.folderName}) <= ${sql.raw(String(VAULT_FOLDER_NAME_MAX))} and char_length(${t.platformDescription}) <= ${sql.raw(String(VAULT_DESCRIPTION_MAX))}`,
     ),
     check(
       'media_platform_refs_duration_check',
