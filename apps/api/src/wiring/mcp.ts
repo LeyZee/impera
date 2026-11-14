@@ -1,5 +1,6 @@
 import { resolveActor } from '../auth';
 import { createMcpModule, type ActorView, type McpModule } from '../modules/mcp';
+import type { PersonaModule } from '../modules/persona';
 import type { ShiftCreators } from '../modules/scheduling';
 
 import type { Routes, Shared } from './shared';
@@ -32,11 +33,16 @@ async function actorOf(
 }
 
 /** The MCP server (ADR 0026, 0105), lot a: the owner's agent accesses, and `POST /v1/mcp`. */
-export function wireMcp(shared: Shared, shiftCreators: ShiftCreators): WiredMcp {
+export function wireMcp(
+  shared: Shared,
+  shiftCreators: ShiftCreators,
+  persona: Pick<PersonaModule, 'creators'>,
+): WiredMcp {
   const module = createMcpModule({
     db: shared.db,
     adminDb: shared.adminDb,
     actorOf: (userId) => actorOf(shared, shiftCreators, userId),
+    creators: persona.creators,
   });
   return {
     module,

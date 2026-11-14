@@ -77,3 +77,18 @@ export interface McpCallRecord {
 export interface McpJournal {
   record(entry: McpCallRecord): Promise<void>;
 }
+
+/** A creator as the persona module lists her (`CreatorSummary`), what a tool keeps of her. */
+export interface CreatorEntry {
+  readonly id: string;
+  readonly displayName: string;
+  readonly timezone: string;
+}
+
+/**
+ * The creators a person may read, by the persona module's directory (its `index.ts`, ADR 0026 § 1): archived ones
+ * left out (ADR 0071 § 2), ordered by name. The call has already decided which ones.
+ */
+export interface CreatorReader {
+  unarchived(ids: readonly CreatorId[] | 'all'): Promise<readonly CreatorEntry[]>;
+}

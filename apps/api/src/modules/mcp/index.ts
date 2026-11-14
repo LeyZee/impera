@@ -5,8 +5,9 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createDispatcher, whoami } from './application/dispatch';
 import { createGrants } from './application/grants';
+import { creatorTools } from './application/read-tools';
 import type { ActorView } from './domain/access';
-import type { GrantRecord } from './domain/ports';
+import type { CreatorReader, GrantRecord } from './domain/ports';
 import { createDrizzleGrantStore } from './infra/db/grant-store';
 import { createDrizzleJournal } from './infra/db/journal';
 import { createMcpRoutes } from './infra/http/routes';
@@ -41,6 +42,8 @@ export interface McpDeps {
    * § 4): the module computes no right of its own. `null` for an account gone, a member who left.
    */
   readonly actorOf: (userId: string) => Promise<ActorView | null>;
+  /** The persona module's directory (`persona.creators`), for `creators_list` and `creator_get`. */
+  readonly creators: CreatorReader;
 }
 
 export function createMcpModule(deps: McpDeps): McpModule {
@@ -58,7 +61,8 @@ export function createMcpModule(deps: McpDeps): McpModule {
       createMcpTransport({
         grantOfToken: (token) => grants.grantOfToken(token),
         actorOf: deps.actorOf,
-        dispatcher: (spendRead) => createDispatcher({ journal, spendRead, tools: { whoami } }),
+        dispatcher: (spendRead) =>
+          createDispatcher({ journal, spendRead, tools: { whoami, ...creatorTools(deps.creators) } }),
         allowedOrigins: [],
       }),
     grantOfToken: (token) => grants.grantOfToken(token),

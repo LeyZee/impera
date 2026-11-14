@@ -46,6 +46,8 @@ describe('/v1/mcp', () => {
   let app: App;
   let server: Server;
   let nora: CreatorId;
+  let lea: CreatorId;
+  let gone: CreatorId;
   let ownerId = '';
   let cookie = '';
   let address = 0;
@@ -118,6 +120,12 @@ describe('/v1/mcp', () => {
     await test.admin.db
       .insert(schema.creators)
       .values({ id: nora, nameKey: nora, displayName: 'Nora', timezone: 'Europe/Paris' });
+    lea = newId(CreatorIdSchema);
+    gone = newId(CreatorIdSchema);
+    await test.admin.db.insert(schema.creators).values([
+      { id: lea, nameKey: lea, displayName: 'Léa', timezone: 'America/Montreal' },
+      { id: gone, nameKey: gone, displayName: 'Archivée', timezone: 'Europe/Paris', archivedAt: new Date() },
+    ]);
     ownerId = (await createOwner(app.auth, app.db.db, OWNER)).userId;
     cookie = await signIn(server, OWNER.email, OWNER.password);
     // Signed in before: the code itself is not what these tests are about (ADR 0046).
@@ -141,7 +149,11 @@ describe('/v1/mcp', () => {
     );
     try {
       expect(client.getServerVersion()?.name).toBe('impera-mcp');
-      expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['whoami']);
+      expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual([
+        'whoami',
+        'creators_list',
+        'creator_get',
+      ]);
       const result = await client.callTool({ name: 'whoami', arguments: {} });
       const whoami = McpWhoamiSchema.parse(result.structuredContent);
       expect(whoami).toMatchObject({ grantId: grant.id, creatorId: nora, capabilities: ['read:status'] });
@@ -244,5 +256,38 @@ describe('/v1/mcp', () => {
       (await rpc(grant.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
     );
     expect(listed.result?.tools?.map((tool) => tool.name)).toEqual(['whoami']);
+  });
+
+  it('reads the creators of its access only, never an archived one nor her persona', async () => {
+    const bound = await createGrant();
+    const listed = RpcSchema.parse((await rpc(bound.token, callTool('creators_list'))).json());
+    expect(listed.result?.structuredContent).toEqual({
+      creators: [{ id: nora, displayName: 'Nora', timezone: 'Europe/Paris' }],
+    });
+    const got = RpcSchema.parse((await rpc(bound.token, callTool('creator_get'))).json());
+    expect(got.result?.structuredContent).toEqual({
+      creator: { id: nora, displayName: 'Nora', timezone: 'Europe/Paris' },
+    });
+    const other = RpcSchema.parse(
+      (await rpc(bound.token, callTool('creator_get', { creatorId: lea }))).json(),
+    );
+    expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+
+    const agency = await createGrant({ creatorId: null });
+    const all = RpcSchema.parse((await rpc(agency.token, callTool('creators_list'))).json());
+    const ids = z
+      .object({ creators: z.array(z.object({ id: z.string() })) })
+      .parse(all.result?.structuredContent)
+      .creators.map((creator) => creator.id);
+    expect(ids).toContain(nora);
+    expect(ids).toContain(lea);
+    expect(ids).not.toContain(gone);
+    const none = RpcSchema.parse((await rpc(agency.token, callTool('creator_get'))).json());
+    expect(none.result?.structuredContent).toEqual({ refusal: 'creator_required' });
+    expect((await journal(agency.id)).map((line) => line.action)).toEqual([
+      'mcp_grant.create',
+      'mcp.creators_list',
+      'mcp.creator_get',
+    ]);
   });
 });
