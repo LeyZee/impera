@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MCP catalogue (ADR 0026 § 5 and § 9, ADR 0105 § 4) > is pinned: a change of a name, a capability or a scope shows in the PR 1`] = `
+[
+  "whoami - access",
+  "creators_list read:status agency",
+  "creator_get read:status creator",
+  "agent_status read:status creator",
+  "todo_list read:status agency",
+  "stats_get read:status agency",
+  "fortnight_review_get read:status agency",
+  "platform_daily_stats_list read:status creator",
+  "ai_usage_get read:status agency",
+  "conversations_list read:conversations creator",
+  "conversation_get read:conversations creator",
+  "conversation_messages read:conversation_content creator",
+  "drafts_pending read:conversation_content creator",
+  "fan_get read:fans creator",
+  "fan_card_get read:fans creator",
+  "shifts_list read:team agency",
+  "on_shift_now read:team agency",
+  "shift_reports_list read:team agency",
+  "team_import_list read:team agency",
+  "commission_statements_list read:payroll agency",
+  "sales_list read:sales agency",
+  "sales_by_chatter read:sales agency",
+  "drops_list read:media creator",
+  "scripts_list read:media creator",
+  "script_steps_get read:script_content creator",
+]
+`;
