@@ -10,6 +10,11 @@ export interface UsageReader {
   lastCallAt(from: Date): Promise<Date | null>;
   /** What a provider's calls cost in USD strictly after `after`, billed calls without a cost at the cap's estimate. */
   spentSince(provider: AiCreditProvider, after: Date): Promise<number>;
+  /**
+   * The first call of this provider refused for lack of credits or quota (`quota_exhausted`) since its last call that
+   * answered; null when it answered last, or never refused (ADR 0091 § 6).
+   */
+  quotaRefusedAt(provider: AiCreditProvider): Promise<Date | null>;
 }
 
 export interface CreditActor {
@@ -35,11 +40,16 @@ export interface CreditLedger {
 }
 
 type CreditsLowPayload = z.infer<(typeof EVENT_PAYLOADS)['ai_credits_low']>;
+type QuotaExhaustedPayload = z.infer<(typeof EVENT_PAYLOADS)['ai_quota_exhausted']>;
 
-/** `ai_credits_low` in the outbox, once per provider, level and latest line; true when it published. */
 export interface CreditAlerts {
-  /** `since`: the latest line's instant, no alert of the episode can be older. */
+  /**
+   * `ai_credits_low` in the outbox, once per provider, level and latest line; true when it published. `since`: the
+   * latest line's instant, no alert of the episode can be older.
+   */
   publish(payload: CreditsLowPayload, since: Date): Promise<boolean>;
+  /** `ai_quota_exhausted`, once per provider and first refusal (`refusedAt`); true when it published. */
+  publishQuota(payload: QuotaExhaustedPayload): Promise<boolean>;
 }
 
 export interface Clock {

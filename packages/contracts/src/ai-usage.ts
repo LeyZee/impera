@@ -28,12 +28,16 @@ const day = z.iso.date();
 export const AiUsageProviderSpendSchema = z.strictObject({
   provider: AiUsageProviderSchema,
   eur,
+  /** The part of `eur` the owner's subscription paid (ADR 0091 § 6), 0 on credits. */
+  coveredEur: eur,
 });
 export type AiUsageProviderSpend = z.infer<typeof AiUsageProviderSpendSchema>;
 
 export const AiUsageDaySchema = z.strictObject({
   day,
   eur,
+  /** The part of `eur` the owner's subscription paid (ADR 0091 § 6, « ok 0091 chiffres »). */
+  coveredEur: eur,
   calls: count,
   /** Every provider that cost something that day, in `AiUsageProviderSchema`'s order. */
   providers: z.array(AiUsageProviderSpendSchema),
@@ -44,6 +48,7 @@ export const AiUsageHourSchema = z.strictObject({
   /** 0 to 23, the hour of the cap's day; the hours not come yet are left out. */
   hour: z.number().int().min(0).max(23),
   eur,
+  coveredEur: eur,
   calls: count,
   providers: z.array(AiUsageProviderSpendSchema),
 });
@@ -72,8 +77,12 @@ export type AiUsageUseSpend = z.infer<typeof AiUsageUseSpendSchema>;
  * with the cost of every call journaled since.
  */
 
-/** A top-up adds to what was there; a balance reading replaces it from that instant. */
-export const AiCreditEntryKindSchema = z.enum(['topup', 'balance']);
+/**
+ * A top-up adds to what was there; a balance reading replaces it from that instant. `subscription` (ADR 0091 § 6,
+ * « ok 0091 abonnement »): from that instant the provider is paid by the owner's subscription, with a usage quota and
+ * no balance; a top-up or a balance reading after it goes back to counting credits.
+ */
+export const AiCreditEntryKindSchema = z.enum(['topup', 'balance', 'subscription']);
 export type AiCreditEntryKind = z.infer<typeof AiCreditEntryKindSchema>;
 
 /** The currency the provider bills its credits in, as its console shows them. */
@@ -91,7 +100,7 @@ export const AiCreditEntrySchema = z.strictObject({
   id: z.uuid(),
   provider: AiCreditProviderSchema,
   kind: AiCreditEntryKindSchema,
-  /** In cents of `currency`; a top-up is above 0, a balance reading may be 0. */
+  /** In cents of `currency`; a top-up is above 0, a balance reading may be 0, a subscription line is 0. */
   amountMinor: z.number().int().min(0).max(AI_CREDIT_MAX_MINOR),
   currency: AiCreditCurrencySchema,
   /** When the money arrived, or when the balance was read. */
@@ -105,8 +114,12 @@ export const AddAiCreditEntryBodySchema = AiCreditEntrySchema.omit({ at: true })
     /** Absent: now. Never later than the server's clock (5 minutes of drift allowed). */
     at: z.iso.datetime({ offset: true }).optional(),
   })
-  .refine((body) => body.kind === 'balance' || body.amountMinor > 0, {
+  .refine((body) => body.kind !== 'topup' || body.amountMinor > 0, {
     message: 'Une recharge est d’au moins un centime.',
+    path: ['amountMinor'],
+  })
+  .refine((body) => body.kind !== 'subscription' || body.amountMinor === 0, {
+    message: 'L’abonnement ne porte pas de montant.',
     path: ['amountMinor'],
   });
 export type AddAiCreditEntryBody = z.infer<typeof AddAiCreditEntryBodySchema>;
@@ -118,25 +131,50 @@ export type AddAiCreditEntryBody = z.infer<typeof AddAiCreditEntryBodySchema>;
 export const AI_CREDIT_LOW_DAYS = 5;
 export const AI_CREDIT_CRITICAL_DAYS = 2;
 
-export const AiCreditStateSchema = z.enum(['ok', 'low', 'critical', 'empty', 'unknown_pace']);
+/**
+ * A credits card: `ok`, `low`, `critical`, `empty`, `unknown_pace`. A subscription card (ADR 0091 § 6): `included`
+ * while the provider answers, `quota_reached` once it refused for lack of quota and has not answered since.
+ */
+export const AiCreditStateSchema = z.enum([
+  'ok',
+  'low',
+  'critical',
+  'empty',
+  'unknown_pace',
+  'included',
+  'quota_reached',
+]);
 export type AiCreditState = z.infer<typeof AiCreditStateSchema>;
+
+/** `credits`: counted down from the ledger. `subscription`: paid by the owner's subscription, nothing to count. */
+export const AiCreditModeSchema = z.enum(['credits', 'subscription']);
+export type AiCreditMode = z.infer<typeof AiCreditModeSchema>;
 
 export const AiCreditsSchema = z.strictObject({
   provider: AiCreditProviderSchema,
+  mode: AiCreditModeSchema,
   /** The currency of its latest line: every figure of the card is in it. */
   currency: AiCreditCurrencySchema,
-  /** Estimated credits left now, in cents; below 0 when the calls went past what was written down. */
+  /** Estimated credits left now, in cents; below 0 when the calls went past what was written down. 0 on a subscription. */
   balanceMinor: z.number().int(),
-  /** The line the count starts from (the latest balance reading, or the first top-up), and what was spent since. */
+  /**
+   * The line the count starts from (the latest balance reading, or the first top-up; the subscription line on a
+   * subscription), and what was spent since: on a subscription, what the calls would have cost, for information.
+   */
   countedFrom: z.iso.datetime({ offset: true }),
   spentSinceMinor: z.number().int().nonnegative(),
   /** This provider's average a day (cents), as `pace.perDayEur` is taken; null before a first full day. */
   perDayMinor: z.number().int().nonnegative().nullable(),
-  /** Days of credits left at that pace; null without a pace or a spend. */
+  /** Days of credits left at that pace; null without a pace or a spend, and always on a subscription. */
   daysLeft: z.number().nonnegative().nullable(),
   /** The day they run out at that pace, in the cap's zone. */
   runsOutOn: z.iso.date().nullable(),
   state: AiCreditStateSchema,
+  /**
+   * The first refusal for lack of credits or quota since this provider last answered; null while it answers. The agent
+   * goes on with its fallback model meanwhile.
+   */
+  quotaRefusedAt: z.iso.datetime({ offset: true }).nullable(),
   /** The latest lines first, at most ten. */
   entries: z.array(AiCreditEntrySchema),
 });
@@ -154,6 +192,8 @@ export const AiUsageSchema = z.strictObject({
   today: z.strictObject({
     day,
     eur,
+    /** The part of `eur` the subscription paid; the cap counts it all the same. */
+    coveredEur: eur,
     capEur: z.number().positive(),
     alertAtEur: z.number().positive(),
     state: AiUsageCapStateSchema,
@@ -177,8 +217,15 @@ export const AiUsageSchema = z.strictObject({
     perDayOver: z.number().int().min(0).max(7),
     /** The calendar month so far, today included. */
     monthEur: eur,
+    /** The part of `monthEur` the subscription paid. */
+    monthCoveredEur: eur,
     /** The month so far, plus the average for each day left after today; null without an average. */
     monthForecastEur: eur.nullable(),
+    /**
+     * The part of the forecast the subscription would pay: what it paid this month, plus, for each provider on it now,
+     * its own average for each day left. Null with the forecast.
+     */
+    monthForecastCoveredEur: eur.nullable(),
     month: z.string().regex(/^\d{4}-\d{2}$/u),
   }),
   /** The last call journaled, any provider; null when there is none in the window. */
