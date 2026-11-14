@@ -62,7 +62,7 @@ describe('/v1/settings/ai-usage', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config));
     server = await buildServer({
       config,
@@ -180,7 +180,7 @@ describe('/v1/settings/ai-usage', () => {
   });
 
   it('publishes one alert per provider, level and line', async () => {
-    const alerts = createPostgresCreditAlerts(test.admin.db);
+    const alerts = createPostgresCreditAlerts(test.service.db);
     const payload = {
       provider: 'xai',
       level: 'low',
@@ -228,8 +228,8 @@ describe('/v1/settings/ai-usage', () => {
   });
 
   it('finds the first refusal for lack of quota since the last answer, and alerts once per episode', async () => {
-    const reader = createPostgresUsageReader(test.admin.db);
-    const alerts = createPostgresCreditAlerts(test.admin.db);
+    const reader = createPostgresUsageReader(test.service.db);
+    const alerts = createPostgresCreditAlerts(test.service.db);
     // Ahead of the calls the other tests journaled just now: this episode is the latest one.
     const at = (s: number) => new Date(Date.now() + s * 1000);
     await call({ provider: 'google', model: 'gemini-x', status: 'ok', createdAt: at(1) });

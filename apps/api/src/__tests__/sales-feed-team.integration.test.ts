@@ -149,7 +149,7 @@ describe('team imported from the platform after review (ADR 0076)', () => {
     crm = createFakeCrm();
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 7).toString('base64')}`,
     });
     const logger = createLogger(config, new LogSink());

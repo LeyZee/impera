@@ -1,6 +1,10 @@
 import {
+  BANKED_OBJECTION_KINDS,
   DESIRE_BAND_FLOORS,
   KycSlotSchema,
+  OBJECTION_KIND_LABELS,
+  OBJECTION_REPLIES_MAX,
+  OBJECTION_REPLY_MAX_LENGTH,
   PERSONA_BOUNDS,
   PERSONA_EMOJIS_MAX,
   PERSONA_OPTIONS,
@@ -9,6 +13,9 @@ import {
   type PersonaFollowUps,
   type PersonaNotifications,
   type PersonaStrategies,
+  type BankedObjectionKind,
+  type ObjectionReplies,
+  type ObjectionReply,
 } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type ReactNode } from 'react';
@@ -797,6 +804,100 @@ export function RulesTab({ value: r, onChange }: TabProps<PersonaAgentRules>): J
           }}
         />
       </Field>
+    </Block>
+  );
+}
+
+/** An id drawn once for a new reply, never reused: what the journal names, never the text (ADR 0090 § B). */
+function newReplyId(): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(12)), (byte) => alphabet[byte % 36]).join('');
+}
+
+/** The replies of one kind of objection: each one a text to adapt, removable, in the order the agent tries them. */
+function ObjectionList({
+  kind,
+  values,
+  onChange,
+}: {
+  kind: BankedObjectionKind;
+  values: readonly ObjectionReply[];
+  onChange: (values: ObjectionReply[]) => void;
+}): JSX.Element {
+  const id = useId();
+  return (
+    <div className="ps-replies">
+      {values.map((reply, index) => (
+        <div key={reply.id} className="ps-reply">
+          <label className="sr-only" htmlFor={`${id}-${reply.id}`}>
+            {`Réplique ${String(index + 1)} à ${OBJECTION_KIND_LABELS[kind]}`}
+          </label>
+          <TextArea
+            id={`${id}-${reply.id}`}
+            rows={2}
+            value={reply.text}
+            maxLength={OBJECTION_REPLY_MAX_LENGTH}
+            invalid={reply.text.trim() === ''}
+            placeholder="L’idée de sa réponse, qu’elle dira avec ses mots"
+            onChange={(text) => {
+              onChange(values.map((r) => (r.id === reply.id ? { ...r, text } : r)));
+            }}
+          />
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm ps-reply__remove"
+            onClick={() => {
+              onChange(values.filter((r) => r.id !== reply.id));
+            }}
+          >
+            Retirer
+          </button>
+        </div>
+      ))}
+      {values.length < OBJECTION_REPLIES_MAX ? (
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm ps-replies__add"
+          onClick={() => {
+            onChange([...values, { id: newReplyId(), text: '' }]);
+          }}
+        >
+          Ajouter une réplique
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Her replies to a price objection (ADR 0090 § B): a bank per kind of objection, an agency method. The agent picks
+ * one when a fan discusses a price, never the same twice to one fan, and says it in her words; it never lowers a price.
+ * Only the owner reads it: the others never receive it.
+ */
+export function ObjectionRepliesTab({ value, onChange }: TabProps<ObjectionReplies>): JSX.Element {
+  const id = useId();
+  return (
+    <Block
+      title="Réponses aux objections de prix"
+      code
+      lead="Quand un fan discute un prix, l’agent prend la première réplique de son cas qu’il n’a jamais reçue et la dit avec ses mots. Il ne baisse jamais un prix. Seul le propriétaire voit ces répliques."
+    >
+      {BANKED_OBJECTION_KINDS.map((kind) => (
+        <Field
+          key={kind}
+          label={OBJECTION_KIND_LABELS[kind]}
+          id={`${id}-${kind}`}
+          path={`objection_replies.${kind}`}
+        >
+          <ObjectionList
+            kind={kind}
+            values={value[kind] ?? []}
+            onChange={(replies) => {
+              onChange({ ...value, [kind]: replies });
+            }}
+          />
+        </Field>
+      ))}
     </Block>
   );
 }

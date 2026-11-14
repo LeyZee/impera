@@ -27,6 +27,8 @@ export type DraftId = z.infer<typeof DraftIdSchema>;
 
 /** A calibration rating (`calibration_ratings`): the playground's, or a real draft's through the copilot panel. */
 export const CalibrationRatingIdSchema = uuid.brand<'CalibrationRatingId'>();
+export const DesireMarkIdSchema = uuid.brand<'DesireMarkId'>();
+export type DesireMarkId = z.infer<typeof DesireMarkIdSchema>;
 
 export const MediaAssetIdSchema = uuid.brand<'MediaAssetId'>();
 export type MediaAssetId = z.infer<typeof MediaAssetIdSchema>;
@@ -245,3 +247,7 @@ export type ContentDropFileId = z.infer<typeof ContentDropFileIdSchema>;
 /** What the agency asks of her (`content_requests`, ADR 0055 § 4). */
 export const ContentRequestIdSchema = uuid.brand<'ContentRequestId'>();
 export type ContentRequestId = z.infer<typeof ContentRequestIdSchema>;
+
+/** An agent access to the MCP server (`mcp_grants`, ADR 0026 § 3, ADR 0105). */
+export const McpGrantIdSchema = uuid.brand<'McpGrantId'>();
+export type McpGrantId = z.infer<typeof McpGrantIdSchema>;

@@ -39,7 +39,7 @@ Chaque écriture ajoute une ligne `script_structure.create`, `.update`, `.archiv
 ## Structure
 
 - `domain/` : limites de la persona, décision d'enregistrement, vue de la file, cartons, ports `ScriptStructureStore` et `RasterizeCard`. Zéro I/O.
-- `application/` : le job de la cadence.
+- `application/` : le job de la cadence, et la lecture de sa file par l'agence (`reads.ts`), pour la route et le serveur MCP (ADR 0026 § 1) : `reads.queue` de `index.ts` rend, bornée par son id et le lecteur vérifié, chaque structure de sa file par son nom, son moment et le nombre de ses étapes et ponts, jamais le texte d'une étape ; `null` pour un lecteur qui ne lit pas sa file.
 - `infra/db/` : les tables, chaque ligne relue par le contrat.
 - `infra/http/` : les routes.
 - `infra/card-rasterizer.ts` et `infra/fonts/` : le PNG d'un carton.

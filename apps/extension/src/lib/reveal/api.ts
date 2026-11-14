@@ -1,6 +1,7 @@
 import {
   CONNECTOR_LINK_FORBIDDEN,
   CONNECTOR_SESSION_CONFLICT,
+  CONNECTOR_SESSION_MEMBER_CONFLICT,
   ConnectorAccountsSchema,
   ConnectorSessionBodySchema,
   type ConnectorAccounts,
@@ -34,7 +35,8 @@ export function fetchSyncableAccounts(
 }
 
 /** What became of a « Sync »: stored, or why not. */
-export type Synced = 'synced' | 'revoked' | 'not-owner' | 'other-model' | 'refused' | 'unreachable';
+export type Synced =
+  'synced' | 'revoked' | 'not-owner' | 'other-model' | 'other-member' | 'refused' | 'unreachable';
 
 export async function sendSession(
   origin: string,
@@ -62,6 +64,7 @@ export async function sendSession(
     case 'refused':
       if (sent.code === CONNECTOR_LINK_FORBIDDEN) return 'not-owner';
       if (sent.code === CONNECTOR_SESSION_CONFLICT) return 'other-model';
+      if (sent.code === CONNECTOR_SESSION_MEMBER_CONFLICT) return 'other-member';
       return 'refused';
   }
 }

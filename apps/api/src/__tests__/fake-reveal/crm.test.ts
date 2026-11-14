@@ -288,6 +288,23 @@ describe('Reveal sales feed adapter', () => {
       null,
     ]);
   });
+
+  it('reads the days by chatter as it reads the rest: a 429 waits, a changed shape is refused (ADR 0092 § 1)', async () => {
+    const range = { from: '2026-10-20', to: '2026-10-20' };
+    const limited = setup();
+    limited.crm.rateLimit(1, 42);
+    expect(await limited.feed.chatterDailyStats(range)).toEqual({
+      ok: false,
+      failure: { kind: 'rate_limited', retryAfterMs: 42_000 },
+    });
+
+    const reshaped = setup();
+    reshaped.crm.breakChatterStatsShape(1);
+    const broken = await reshaped.feed.chatterDailyStats(range);
+    expect(broken.ok).toBe(false);
+    expect(!broken.ok && broken.failure.kind).toBe('unexpected_answer');
+    expect((await reshaped.feed.chatterDailyStats(range)).ok).toBe(true);
+  });
 });
 
 function rawSale(id: string) {

@@ -1,6 +1,6 @@
 # 0050. Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste
 
-Statut : accepted (Charles, 02/11/2026, « ok 0050 », après lecture de l'avis du même jour, fil « Évaluer l'API CRM de Reveal face à l'extension » ; § 8 : « ok netAmount », le même jour ; § 10 : « je valide l'option 3 », le même jour ; § 4 et part de la créatrice au § 8 : ses messages du même jour ; règles de paie d'Équipe aux §§ 5, 7 et 8 : « ok relecture », le même jour)
+Statut : accepted (Charles, 02/11/2026, « ok 0050 », après lecture de l'avis du même jour, fil « Évaluer l'API CRM de Reveal face à l'extension » ; § 8 : « ok netAmount », le même jour ; § 10 : « je valide l'option 3 », le même jour ; § 4 et part de la créatrice au § 8 : ses messages du même jour ; règles de paie d'Équipe aux §§ 5, 7 et 8 : « ok relecture », le même jour ; § 8 amendé le 11/11/2026 : le dashboard de Reveal n'offre pas d'export, la vérification se fait sur le registre et les statistiques par jour, l'export devient facultatif ; carte « Deux sources » et « ok phrases 0050 », 18 h 24)
 Date : 2026-11-02
 Complète : l'ADR 0008, dont la phrase « attendre une API officielle : il n'y en aura pas » est dépassée pour les ventes et les chiffres ; sa stratégie reste celle de tout le reste.
 Remplace : dans l'ADR 0018, l'alternative rejetée « un second port », pour les seules ventes et les seuls chiffres ; dans l'ADR 0043 § 4, la phrase « une vente de la fenêtre sans attribution envoie le rapport au valideur » ; dans l'ADR 0043 § 5, la phrase « le rapport reste dû pour le commentaire, l'incident, les remontées et le contrôle ».
@@ -48,7 +48,7 @@ Cette ADR s'appuie sur la seule documentation : aucune clé n'existe encore, auc
 
    **Part de la créatrice sur Reveal** (Charles : « c'est le chiffre de Reveal […] c'est le plus fiable ») : sur un compte basculé, `modelRevenue` fait foi, y compris sur son écran (CR-04), et non le pourcentage réglé dans Nirvana (ADR 0042). Un écart avec ce pourcentage se signale au propriétaire, à titre d'information, sans changer aucun montant.
 
-   **Vérification avant toute bascule.** Aucun compte ne passe en « détecté » avant que Charles ait vu, sur une quinzaine passée couverte par le registre : la somme des `netAmount` face à l'export du dashboard et à `/v1/stats/daily`, qui doivent concorder au centime, et les commissions de chaque chatteur calculées sur `netAmount` face à celles de la chaîne de l'ADR 0023, avec l'écart expliqué. La bascule se fait ensuite à une frontière de période (ADR 0023).
+   **Vérification avant toute bascule.** Aucun compte ne passe en « détecté » avant que Charles ait vu, sur une quinzaine passée couverte par le registre : la somme des `netAmount` face à `/v1/stats/daily`, qui doivent concorder au centime, et face à l'export du dashboard quand il y en a un, puisque le dashboard de Reveal n'en offre pas (constat du 11/11/2026) ; et les commissions de chaque chatteur calculées sur `netAmount` face à celles de la chaîne de l'ADR 0023, avec l'écart expliqué. La bascule se fait ensuite à une frontière de période (ADR 0023).
 
 9. **Tests.** `FakeReveal` gagne l'API CRM : curseur, vente tardive, remboursement, webhook rejoué ou mal signé, `429`, `401`. Aucun appel au vrai Reveal sans la demande de Charles.
 

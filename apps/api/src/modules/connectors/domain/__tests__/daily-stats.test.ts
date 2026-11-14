@@ -1,8 +1,9 @@
-import type { PlatformDailyStat } from '@impera/contracts';
+import type { PlatformChatterDailyStat, PlatformDailyStat } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
   addDays,
+  chatterStatsRows,
   dailyStatsRange,
   dailyStatsRows,
   hourAt,
@@ -110,6 +111,61 @@ describe('daily statistics (ADR 0081)', () => {
         ppvPurchased: 3,
         messagesSent: null,
         messagesReceived: 4,
+      },
+    ]);
+  });
+
+  it('keeps by chatter the linked models alone, never the line of nobody nor an amount (ADR 0092 § 1)', () => {
+    const links = new Map<string, LinkedAccount>([
+      ['model_test_01', { platformAccountId: 'account_01', creatorId: 'creator_01' }],
+    ]);
+    const stat = (
+      platformModelId: string,
+      platformChatterId: string | null,
+      ppvSent: number | null,
+    ): PlatformChatterDailyStat => ({
+      date: '2026-11-07',
+      platformChatterId,
+      platformModelId,
+      salesCount: 2,
+      revenueInclVat: 2400,
+      agency: 600,
+      creator: 1000,
+      ppvPurchased: 2,
+      ppvSent,
+      messagesSent: ppvSent === null ? null : 15,
+    });
+    expect(
+      chatterStatsRows(
+        'reveal',
+        [
+          stat('model_test_01', 'chatter_test_01', 7),
+          stat('model_test_01', 'chatter_test_02', null),
+          stat('model_test_01', null, 0),
+          stat('model_test_02', 'chatter_test_01', 4),
+        ],
+        links,
+      ),
+    ).toEqual([
+      {
+        platform: 'reveal',
+        platformAccountId: 'account_01',
+        creatorId: 'creator_01',
+        platformChatterId: 'chatter_test_01',
+        day: '2026-11-07',
+        ppvSent: 7,
+        ppvPurchased: 2,
+        messagesSent: 15,
+      },
+      {
+        platform: 'reveal',
+        platformAccountId: 'account_01',
+        creatorId: 'creator_01',
+        platformChatterId: 'chatter_test_02',
+        day: '2026-11-07',
+        ppvSent: null,
+        ppvPurchased: 2,
+        messagesSent: null,
       },
     ]);
   });

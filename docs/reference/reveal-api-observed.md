@@ -18,7 +18,7 @@ Les réponses découpées sont dans `apps/api/src/__tests__/fake-reveal/recordin
 2. **Temps réel** : **aucun WebSocket** (0 trame dans les trois captures). Le client officiel sonde : messages de la conversation ouverte toutes les ~11,5 s, « en train d'écrire » toutes les 3,5 s, liste des conversations toutes les ~11,8 s, compteurs toutes les ~16,3 s, notifications avec `since`. Un achat apparaît dans le fil au sondage suivant (~18 s après le paiement dans la capture B). → `realtime: false`, le connecteur sonde.
 3. **Non-lus et dernier message sans ouvrir** : oui. Chaque élément de `GET /conversations/model` porte `conversation.modelIsUnread`, `lastMessage` (texte, date), `lastMessageAuthor`, `lastMessageHasMedia`, `memberTotalSpent`, `memberLastSeenAt`, la note client (`conversation.note`), le prénom (`memberFirstname`) et la note du modèle (`modelCreatorNote`). Compteur : `GET /conversations/model/count?isUnread=true`. → `unreadWithoutOpen: true`.
 4. **Identifiants** : UUID pour tout (modèle, membre, conversation, message, bundle, script, média, transaction). Stables entre les captures B et C (même conversation, mêmes étapes de script). Un message de l'équipe ne porte que le nom affiché de son auteur, aucun identifiant de membre.
-5. **Authentification** : en-tête `authorization: Bearer <jeton>`, aucun cookie vers l'API. L'export « sanitized » retire la valeur : forme du jeton et durée de vie **inconnues**. La réponse à une session invalide **n'a pas été capturée** (L1 ouvert).
+5. **Authentification** : en-tête `authorization: Bearer <jeton>`, aucun cookie vers l'API. L'export « sanitized » retire la valeur. Depuis P2-01 (V1, V2) : JWT valable 24 h, non renouvelé par Reveal ; une session expirée répond 401 (voir « Ce qui reste ouvert », n° 1).
 6. **Écritures** : JSON simple, **ni CSRF, ni signature, ni nonce, ni clé d'idempotence**. Envoyer deux fois crée deux messages : le connecteur relit le fil (`verifySent`) avant tout renvoi.
 7. **Anti-bot** : aucun sur `api.reveal.me` (pas de Cloudflare, Turnstile ni défi). Un script de protection tourne sur le tableau de bord seulement.
 8. **Ventes PPV** : un bundle acheté passe à `bundle.isPaid: true` avec un `transactionId` dans le fil ; la transaction apparaît dans `GET /transactions/model/:id` ; une notification arrive (`GET /users/:id/notifications?since=`). L'API CRM officielle (clé `x-api-key`) donne aussi chaque vente. → `transactions: true`.
@@ -33,7 +33,7 @@ Les réponses découpées sont dans `apps/api/src/__tests__/fake-reveal/recordin
 
 **Vocal (E7)** : le bouton micro envoie un fichier importé `files: [{ type: "audio", key }]` hors bundle. Un audio rangé dans le coffre puis envoyé s'affiche chez le fan comme un vrai vocal avec lecteur (Charles, 10/11).
 
-**Capacités déclarées** (`ConnectorCapabilities`, constante `REVEAL_EXPECTED_CAPABILITIES` de FakeReveal) : `unreadWithoutOpen`, `sendMedia`, `transactions`, `markRead`, `typing` à `true` ; `realtime` à `false`.
+**Capacités déclarées** (`ConnectorCapabilities`, constante `REVEAL_EXPECTED_CAPABILITIES` de FakeReveal) : `unreadWithoutOpen`, `sendMedia`, `transactions`, `markRead`, `typing`, `fanNoteWrite` et les lectures de l'ADR 0018 (`fanProfile`, `fanNoteRead`, `creatorNotes`, `ppvStats`, `scripts`, `scriptHistory`, `vault`) à `true` ; `realtime` à `false`. `RevealApiConnector` déclare les lectures (P2-02) et, depuis P2-03, les écritures (`sendMedia` limité au vocal du coffre, `markRead`, `typing`, `fanNoteWrite`, l'envoi d'étape sous `scripts`).
 
 ## En-têtes
 
@@ -86,7 +86,9 @@ Prix en centimes TTC (`price: 300` = 3 €).
 
 ## Ce qui reste ouvert
 
-1. Réponse à une session invalide ou expirée (L1), et durée de vie du jeton.
+1. ~~Réponse à une session invalide ou expirée (L1), et durée de vie du jeton.~~ Observé (P2-01) :
+   - **V1, 11/11/2026** : un `GET` fait depuis un serveur avec la session capturée (membre « bot », capturée dans une fenêtre InPrivate) répond 200. Le jeton est un JWT valable exactement 24 h (`exp` = `iat` + 24 h) ; sa charge porte `userId`, `email`, `type` et `createdAt`.
+   - **V2, 12/11/2026 à 22:30 UTC** : `GET /conversations/model/count?isUnread=true` avec la même session, environ 6 h après `exp`, répond 401, sans en-tête `www-authenticate` ni en-tête d'authentification propre à Reveal. Reveal ne renouvelle pas le jeton de lui-même : un nouveau « Synchroniser » est nécessaire toutes les 24 h.
 2. Premier message d'une conversation (fin de pagination) et types de messages autres que `default` (tip, système, Mass DM, supprimé).
 3. Valeurs de `notifications[].type`, `transactions[].type` et `subscriptionPeriodicity` : masquées par l'anonymiseur, qui doit les garder en clair (énumérations) à la prochaine capture.
 4. Qui remplace `%NAME%` (le tableau de bord ou Reveal) : contenu masqué ; l'anonymiseur doit signaler sa présence sans le texte.
@@ -115,3 +117,4 @@ Lu le 2026-11-11 (P1-03) sur les pages publiques : `https://reveal.me/cgu` (« C
 | Date | Changement | Impact | Action |
 |---|---|---|---|
 | 2026-11-10 | Première lecture (captures A, B, C) | Routes de FakeReveal réécrites sur les vraies | P1-02 |
+| 2026-11-12 | V1 (11/11) et V2 (12/11) : jeton JWT de 24 h rejouable depuis un serveur, 401 après `exp`, aucun renouvellement | Re-sync quotidien ; `health` avertit 2 h avant `exp` | P2-01, P2-02 |

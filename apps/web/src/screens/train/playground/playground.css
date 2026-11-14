@@ -994,6 +994,152 @@
   color: var(--nv-danger);
 }
 
+/* ── Désir (P3-12): the score under his message, and the gauge in « Pourquoi » ── */
+.pg-desire-tag {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(320px, 100%);
+}
+.pg-desire-tag__sum {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--nv-ink-muted);
+}
+.pg-desire-tag__sum b {
+  color: var(--nv-ink);
+  font-variant-numeric: tabular-nums;
+}
+.pg-desire-tag__sum span {
+  font-variant-numeric: tabular-nums;
+}
+.pg-desire-tag__sum:hover {
+  color: var(--nv-ink);
+}
+.pg-desire-tag__sum:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+  border-radius: var(--nv-radius-sm);
+}
+.pg-desire-tag__none {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nv-ink-muted);
+}
+.pg-desire-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+}
+.pg-desire-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--nv-ink-muted);
+}
+.pg-desire-lines b {
+  color: var(--nv-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pg-desire-mark {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.pg-desire-mark__q {
+  font-size: 11.5px;
+  color: var(--nv-ink-muted);
+}
+.pg-desire-mark__seg {
+  align-self: flex-start;
+}
+.pg-desire-mark__seg .nv-seg__opt {
+  height: 28px;
+  padding: 0 var(--nv-space-3);
+  font-size: 12px;
+}
+.pg-marks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.pg-marks li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pg-marks__msg {
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+}
+.pg-marks__meta {
+  color: var(--nv-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.pg-desire {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pg-desire__head {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--nv-ink-muted);
+  font-size: 12px;
+}
+.pg-desire__head b {
+  font-size: 22px;
+  color: var(--nv-ink);
+  font-variant-numeric: tabular-nums;
+}
+.pg-desire__move {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.pg-desire__gauge {
+  overflow: visible;
+}
+/* Her two thresholds, ticks across the track: never a colour of their own. */
+.pg-desire__mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--nv-ink);
+  opacity: 0.55;
+}
+.pg-desire__scale,
+.pg-desire__verdict {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nv-ink-muted);
+}
+.pg-desire__verdict {
+  color: var(--nv-ink);
+}
+
 /* Medium screens: « Pourquoi » opens over the conversation. */
 @media (max-width: 1180px) {
   .pg {

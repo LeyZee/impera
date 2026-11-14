@@ -149,6 +149,7 @@ jobs:
         run: |
           {
             echo "DATABASE_URL=postgres://nirvana_app:change-me@postgres:5432/impera"
+            echo "DATABASE_SERVICE_URL=postgres://impera_service:change-me@postgres:5432/impera"
             echo "DATABASE_ADMIN_URL=postgres://nirvana_admin:change-me@postgres:5432/impera"
             echo "SESSION_ENCRYPTION_KEYS=v1:$(openssl rand -base64 32)"
             echo "CREDENTIALS_ENCRYPTION_KEYS=v1:$(openssl rand -base64 32)"

@@ -40,6 +40,7 @@ import {
   PayoutBlockSchema,
 } from './invoices';
 import { CurrencySchema } from './money';
+import { BankedObjectionKindSchema, ObjectionReplyIdSchema } from './objections';
 import { PayPeriodSchema } from './pay-periods';
 import { SaleSellerSchema, SaleTypeSchema, SalesFeedSignalSchema } from './sales-feed';
 import { SecurityAlertPayloadSchema } from './security';
@@ -82,6 +83,11 @@ const draftPayload = z.object({
    * everywhere else, and on the events written before: they replay as they were decided.
    */
   leavesFanWaiting: z.literal(true).optional(),
+  /**
+   * On `draft_created`: written in the care mode (ADR 0088), a human validates it whatever the mode; `help`, it closes
+   * on the fixed help bubble, given once per episode. Absent everywhere else.
+   */
+  care: z.object({ help: z.boolean() }).optional(),
 });
 
 const factPayload = z.object({
@@ -134,6 +140,11 @@ export const HANDOFF_CAUSES = [
    * it (ADR 0010, 0022).
    */
   'persona_inactive',
+  /**
+   * He asks for something she does not sell, made for him (ADR 0090): a chatter on shift takes the order, priced and
+   * timed by them, never by the agent. Ranked « important », never urgent: nothing is set on his limits.
+   */
+  'custom_order',
 ] as const;
 export const HandoffCauseSchema = z.enum(HANDOFF_CAUSES);
 export type HandoffCause = z.infer<typeof HandoffCauseSchema>;
@@ -215,9 +226,13 @@ export const EVENT_TYPES = [
   'summary_refreshed',
   'handoff_requested',
   'alert_triggered',
+  'custom_order_opened',
+  'objection_reply_used',
   'reply_skipped',
   'reply_deferred',
   'desire_scored',
+  'care_opened',
+  'care_closed',
   'takeover_started',
   'takeover_ended',
   'mode_changed',
@@ -336,6 +351,21 @@ export const EVENT_PAYLOADS = {
     notify: z.boolean(),
   }),
   /**
+   * He asked for something made for him and his order now waits for the team (ADR 0090 § 4): taken by the chatter on
+   * shift (beside a `handoff_requested` of cause `custom_order`), or answered without a yes, a price or a delay. It
+   * stays open until a human takes the conversation (`takeover_started`); never two open at once.
+   */
+  custom_order_opened: z.object({ conversationId: ConversationIdSchema }),
+  /**
+   * A reply of her bank was given to the voice for a price objection (ADR 0090 § 9): its id only, never its text,
+   * so that the same fan does not get it twice.
+   */
+  objection_reply_used: z.object({
+    conversationId: ConversationIdSchema,
+    objection: BankedObjectionKindSchema,
+    replyId: ObjectionReplyIdSchema,
+  }),
+  /**
    * The engine answered nothing: the conversation goes back to `idle`. `llm_unavailable` is only read from older
    * journals; an unreachable model now hands the conversation to a human (`handoff_requested`, cause `llm_unavailable`).
    */
@@ -360,6 +390,19 @@ export const EVENT_PAYLOADS = {
     score: DesireScoreSchema,
     signals: z.array(DesireSignalSchema).max(DESIRE_SIGNALS_MAX),
     weightsVersion: z.string().min(1).max(64),
+  }),
+  /**
+   * The care mode opens on a fan in distress (ADR 0088): the agent answers him with care, every answer validated by a
+   * human, until a manager or the owner closes it. `signs`: the risks read, by the brain or by the safety net in code.
+   */
+  care_opened: z.object({
+    conversationId: ConversationIdSchema,
+    signs: z.array(z.string().min(1).max(64)).min(1).max(10),
+  }),
+  /** « Il va mieux »: a manager or the owner closes the care mode (ADR 0088 § 7); the actor is that person. */
+  care_closed: z.object({
+    conversationId: ConversationIdSchema,
+    reason: z.string().trim().min(1).max(500).optional(),
   }),
   takeover_started: takeoverPayload,
   takeover_ended: takeoverPayload,
@@ -661,9 +704,13 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('summary_refreshed'),
   typedEvent('handoff_requested'),
   typedEvent('alert_triggered'),
+  typedEvent('custom_order_opened'),
+  typedEvent('objection_reply_used'),
   typedEvent('reply_skipped'),
   typedEvent('reply_deferred'),
   typedEvent('desire_scored'),
+  typedEvent('care_opened'),
+  typedEvent('care_closed'),
   typedEvent('takeover_started'),
   typedEvent('takeover_ended'),
   typedEvent('mode_changed'),

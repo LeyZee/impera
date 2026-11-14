@@ -1,6 +1,7 @@
 import {
   CONNECTOR_LINK_FORBIDDEN,
   CONNECTOR_SESSION_CONFLICT,
+  CONNECTOR_SESSION_MEMBER_CONFLICT,
   CONNECTOR_SESSION_UNPROCESSABLE,
   DomainError,
   type ConnectorErrorCode,
@@ -44,6 +45,19 @@ export class ConnectorLinkForbidden extends DomainError {
 export class SessionShapeUnprocessable extends DomainError {
   constructor() {
     super(CONNECTOR_SESSION_UNPROCESSABLE, 'Cette session ne correspond pas à la plateforme du compte');
+  }
+}
+
+/**
+ * A session of another team member than the one already stored on the account (P2-02): the « bot » member is pinned
+ * at the first « Sync », so that a session of the owner or a chatter never reads, sends or counts as the bot: 409.
+ */
+export class SessionMemberConflict extends DomainError {
+  constructor() {
+    super(
+      CONNECTOR_SESSION_MEMBER_CONFLICT,
+      'Cette session est celle d’un autre membre Reveal que le membre « bot » de ce compte',
+    );
   }
 }
 
@@ -206,6 +220,29 @@ export class SalesFeedTeamLinked extends DomainError {
     super(
       'sales_feed_chatter_linked_conflict',
       'Ce compte est relié : change son lien plutôt que de l’écarter',
+    );
+  }
+}
+
+/**
+ * A creator's sales and statistics through the connectors' reads (ADR 0026 § 1) are the owner's, and an active
+ * manager's for the creators of his list (403). Nothing is read for a refused one.
+ */
+export class ConnectorReadsForbidden extends DomainError {
+  constructor() {
+    super(
+      'connector_reads_forbidden',
+      'Réservé au propriétaire et au manager actif qui suit cette créatrice',
+    );
+  }
+}
+
+/** A period of the connectors' reads is days in order, at most `MAX_READ_DAYS` of them (422). */
+export class ConnectorReadsRangeUnprocessable extends DomainError {
+  constructor() {
+    super(
+      'connector_reads_range_unprocessable',
+      'La période demandée n’est pas lisible : 93 jours au plus, dans l’ordre',
     );
   }
 }

@@ -184,6 +184,14 @@ function measuredSignals(measured: DesireMeasure): CountedSignal[] {
 const isCounted = (signal: string): signal is CountedSignal => Object.hasOwn(WEIGHTS, signal);
 
 /**
+ * What one signal is worth in the current counting, for a screen that shows why the score moved; `null` for the
+ * signals that reset or freeze it instead of counting.
+ */
+export function desireSignalPoints(signal: DesireSignal): number | null {
+  return isCounted(signal) ? WEIGHTS[signal] : null;
+}
+
+/**
  * His score after his new message: the stored one decayed to now, plus what this message moves, within 0 and 100.
  * A possible minor or a disputed age resets it to 0; a risk that stops any sale freezes it as it stands.
  */
@@ -206,3 +214,19 @@ export function desireScore(turn: DesireTurn): DesireReading {
 
 /** Whether this message moved his score: only then is it journaled (a first score of 0 moves nothing). */
 export const desireMoved = (reading: DesireReading): boolean => reading.score !== (reading.before ?? 0);
+
+/**
+ * His score counted again from what was read on one message, with the weights in force now (ADR 0103 § 6): the owner's
+ * marks keep the signals counted, so a change of weights shows what it does to each of them without a model.
+ */
+export function recountDesire(reading: {
+  readonly before: number | null;
+  readonly signals: readonly DesireSignal[];
+}): number {
+  const before = reading.before ?? 0;
+  if (reading.signals.includes('minor_suspected') || reading.signals.includes('age_disputed')) return 0;
+  if (reading.signals.includes('frozen')) return before;
+  return bounded(
+    before + reading.signals.filter(isCounted).reduce((sum, signal) => sum + WEIGHTS[signal], 0),
+  );
+}

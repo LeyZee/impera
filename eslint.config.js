@@ -44,6 +44,9 @@ const MODULE_DEPENDENCIES = {
   'creator-tasks': ['scheduling'],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
   'content-drops': [],
+  // ADR 0026, 0105: a second door on the modules' commands. Lot a so far: its pure rules and its own accesses
+  // (`mcp_grants`); the modules it reads join this list with the tools' wiring.
+  mcp: [],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);
@@ -319,6 +322,25 @@ export default tseslint.config(
           selector:
             'Program > :not(ExportNamedDeclaration[source.value=/^\\.\\/domain\\//], ExportAllDeclaration[source.value=/^\\.\\/domain\\//])',
           message: 'pure.ts only re-exports from its own domain/ (ADR 0051).',
+        },
+      ],
+    },
+  },
+  {
+    // ADR 0026 § 1: the MCP server reads nothing in the base by itself; its tools go through the modules' index.ts. Only
+    // its own store (`mcp_grants`, infra/db) and the index that hands it the pools touch @impera/db.
+    files: ['apps/api/src/modules/mcp/**/*.ts'],
+    ignores: ['apps/api/src/modules/mcp/infra/db/**', 'apps/api/src/modules/mcp/index.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@impera/db',
+              message: 'The MCP server reads through the modules, never the base (ADR 0026).',
+            },
+          ],
         },
       ],
     },

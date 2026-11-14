@@ -179,6 +179,8 @@ const SYNC_NOTICES: Readonly<Record<Exclude<RevealSynced['state'], 'synced'>, st
   revoked: 'Cette liaison a été retirée dans le CRM : colle un nouveau code.',
   'not-owner': 'Seul le propriétaire synchronise une session.',
   'other-model': 'Cet onglet montre une autre créatrice que ce compte : ouvre la bonne dans Reveal.',
+  'other-member':
+    'Cet onglet est connecté avec un autre membre Reveal que le membre « bot » de ce compte : connecte-toi avec le membre « bot ».',
   refused: 'Le CRM a refusé cette session : vérifie que l’onglet est bien connecté à Reveal.',
   unreachable: 'Le CRM ne répond pas : réessaie dans un instant.',
 };

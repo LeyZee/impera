@@ -1,9 +1,13 @@
 import {
   ApiErrorSchema,
+  DesireMarksSchema,
   PlaygroundAnswerSchema,
   PlaygroundComparisonSchema,
   PlaygroundRatingResultSchema,
   PlaygroundStateSchema,
+  type CreatorId,
+  type DesireMarks,
+  type DesireMarkVerdict,
   type Destination,
   type PlaygroundComparison,
   type PlaygroundMedia,
@@ -32,6 +36,13 @@ export interface PlaygroundClient {
   rate(verdict: Verdict, destination?: Destination): Promise<PlaygroundState>;
   /** Back to just before his n-th message (from 1), sent again: a new answer to the same moment. */
   branch(fanMessageNumber: number): Promise<PlaygroundState>;
+  /** The owner's mark on his desire score after his n-th message (ADR 0103 § 6): kept, with what was counted. */
+  markDesire(fanMessageNumber: number, verdict: DesireMarkVerdict): Promise<PlaygroundState>;
+  /**
+   * Her marks, newest first, each counted again with the weights in force: where the counting goes wrong. `null` is the
+   * invented persona, which keeps none (the demo answers with the marks on screen).
+   */
+  desireMarks(creatorId: CreatorId | null): Promise<DesireMarks>;
   /** The pending answer written again by another voice model, side by side. */
   compare(voiceModel: string): Promise<PlaygroundComparison>;
   advance(hours: number): Promise<PlaygroundState>;
@@ -114,6 +125,12 @@ export function createHttpClient(): PlaygroundClient {
       return state();
     },
     branch: (fanMessageNumber) => call(PlaygroundStateSchema, '/branch', 'POST', { fanMessageNumber }),
+    markDesire: (fanMessageNumber, verdict) =>
+      call(PlaygroundStateSchema, '/desire-marks', 'POST', { fanMessageNumber, verdict }),
+    desireMarks: (creatorId) =>
+      creatorId === null
+        ? Promise.resolve({ weightsNow: '', marks: [] })
+        : call(DesireMarksSchema, `/desire-marks?creatorId=${encodeURIComponent(creatorId)}`),
     compare: (voiceModel) => call(PlaygroundComparisonSchema, '/compare', 'POST', { voiceModel }),
     advance: (hours) => call(PlaygroundStateSchema, '/advance', 'POST', { hours }),
     setNotes: (notes) => call(PlaygroundStateSchema, '/notes', 'PUT', { notes }),

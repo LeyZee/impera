@@ -30,7 +30,7 @@ Tout est inventé et évidemment faux (pseudos `fan_test_01`, textes « Message 
 | Envoi de script | le message porte `scriptId` ; l'indicateur « déjà envoyé » se calcule par conversation à partir des messages |
 | Transaction | `ref`, `fanRef`, type (PPV, tip, abonnement), `amountCents`, `messageRef`, `createdAt` |
 
-Fixtures de départ (`fixtures.ts`, `default` et `empty`) : 1 créatrice, 12 fans dont 3 payeurs et 1 sans aucun message, 1 conversation de 320 messages (pagination), 15 médias en 3 dossiers du coffre, 4 séquences de 3 étapes aux prix 5, 15 et 30 €, dont 1 envoyée en entière à un fan (2 étapes achetées) et 1 envoyée jusqu'à l'étape 2 à un autre.
+Fixtures de départ (`fixtures.ts`, `default`, `empty` et `quiet`, deux fans et leurs conversations sans message et un vocal de plus dans le coffre, `media_voice_01`, pour le test de contrat et les écritures) : 1 créatrice, 12 fans dont 3 payeurs et 1 sans aucun message, 1 conversation de 320 messages (pagination), 15 médias en 3 dossiers du coffre, 4 séquences de 3 étapes aux prix 5, 15 et 30 €, dont 1 envoyée en entière à un fan (2 étapes achetées) et 1 envoyée jusqu'à l'étape 2 à un autre.
 
 ## Comportements
 
@@ -48,7 +48,7 @@ Fixtures de départ (`fixtures.ts`, `default` et `empty`) : 1 créatrice, 12 fan
 | L10 | Coffre paginé |
 | L14 | Sert de vrais fichiers de test (image et vidéo minuscules, générées) derrière des URL signées qui expirent ; une URL expirée répond comme Reveal |
 | E1, E2 | Envoi : nouvel identifiant, message visible à la relecture ; bornes de prix (rejet hors bornes, code observé) ; bundle refusé sans média vendu ou avec plus de 10 médias d'aperçu ; `%NAME%` remplacé par le prénom du membre |
-| E5 | Reveal ne prend pas de nonce : un envoi rejoué crée un doublon, et `verifySent` doit l'éviter en amont |
+| E5 | Reveal ne prend pas de nonce : un envoi rejoué crée un doublon, et `verifySent` doit l'éviter en amont. Limite d'envoi de la capture : 60 `POST /conversations/:id/messages` par minute de l'horloge de FakeReveal, avec `x-ratelimit-limit`, `-remaining` et `-reset` (seconde epoch de la fin de la fenêtre) sur chaque envoi, puis 429 et `Retry-After` au-delà (remarque 1 de la relecture de #679, P2-03) |
 | E6 | Accepte `markRead` et la frappe, remet `unreadCount` à zéro |
 
 ## Scénarios pilotables
@@ -72,6 +72,8 @@ API de contrôle, absente du vrai Reveal, préfixée `/__` :
 | `script_changed` | Un script change d'étapes ou de prix entre deux lectures |
 | `shape_changed` | Un champ renommé ou ajouté dans une réponse : le connecteur doit lever une erreur typée, pas avaler la donnée (schémas Zod stricts aux frontières) |
 | `challenge` | Page anti-bot (403 avec HTML) à la place du JSON |
+| `send_answer_lost` (n fois) | « Envoi accepté puis coupure » : l'envoi est pris, le message est dans le fil, mais la réponse se perd (504 de la passerelle) ; le connecteur doit le retrouver par `verifySent` au lieu de renvoyer (P2-03) |
+| `send_listed_late` (ms) | « Message listé en retard » : dès lors, `messages.list` tait un message envoyé côté créatrice tant qu'il a moins de `ms` à l'horloge de FakeReveal (0 rétablit) ; un message de fan est listé tout de suite. Avec `send_answer_lost`, le connecteur ne doit pas renvoyer pendant son délai d'attente (`PENDING_SETTLE_MS`, 30 s) et retrouve le message une fois listé (P2-03) |
 
 ## API CRM (ADR 0050 § 9)
 
@@ -79,12 +81,13 @@ API de contrôle, absente du vrai Reveal, préfixée `/__` :
 
 Options : `now` (horloge), `limits` (limites de débit comptées : statistiques 10 par minute par clé, 20 par minute et 500 par jour pour l'agence, 200 par minute pour toutes les routes), `allowLoopbackHttp` (webhook en `http://127.0.0.1`, bac à sable seulement), `deliver` (envoie réellement les livraisons, `pumpDeliveries`).
 
-Commandes : `sell` (vente ajoutée au registre dans son ordre, quelle que soit sa date : une vente 3-D Secure confirmée tard vient en dernier), `refund`, `appendRaw` (événement inconnu), `rateLimit` (429 et `Retry-After`), `revoke` (401), `restore`, `withhold` (403 sur les ventes, les statistiques ou les webhooks), `limitTo` (clé limitée à des modèles), `setNightlyDone` (compteurs de messages `null` avant la nuit de calcul), `setCountTimeout`, `breakShape` (réponse sans `pageInfo`), `positionOf`, `calls`, `webhooks`, `deliveries`, `setWebhookOutage` (ventes sans envoi), `duplicateNext`, `failNext`, `setShuffle`, `pumpDeliveries` (envois dus : 15 s après la vente, puis 30 s, 1 min, 2 min… une heure au plus, 8 essais), `delivery` (la livraison qu'enverrait Reveal pour une ligne du registre, signée avec le secret du webhook ; secret, `t` et id remplaçables pour en forger une), `revealSignature`.
+Commandes : `sell` (vente ajoutée au registre dans son ordre, quelle que soit sa date : une vente 3-D Secure confirmée tard vient en dernier), `refund`, `appendRaw` (événement inconnu), `rateLimit` (429 et `Retry-After`), `revoke` (401), `restore`, `withhold` (403 sur les ventes, les statistiques ou les webhooks), `limitTo` (clé limitée à des modèles), `setNightlyDone` (compteurs de messages `null` avant la nuit de calcul), `setCountTimeout`, `breakShape` (réponse sans `pageInfo`), `breakChatterStatsShape` (`/v1/stats/chatters/daily` sans `data`), `rateLimitChatterStats` (429 sur `/v1/stats/chatters/daily` seulement), `positionOf`, `calls`, `webhooks`, `deliveries`, `setWebhookOutage` (ventes sans envoi), `duplicateNext`, `failNext`, `setShuffle`, `pumpDeliveries` (envois dus : 15 s après la vente, puis 30 s, 1 min, 2 min… une heure au plus, 8 essais), `delivery` (la livraison qu'enverrait Reveal pour une ligne du registre, signée avec le secret du webhook ; secret, `t` et id remplaçables pour en forger une), `revealSignature`.
 
 Le bac à sable de recette (ADR 0075, `docs/recette/bac-a-sable.md`) le sert sur la machine par `pnpm sandbox:world`, avec les limites, l'horloge avançable et l'envoi réel des webhooks à l'API locale.
 
 ## Fidélité
 
+- Les formes servies sont celles du connecteur (`connectors/infra/reveal/wire.ts`, `REVEAL_ENDPOINTS`), une seule copie : FakeReveal et `RevealApiConnector` ne peuvent pas diverger. `createFakeReveal().fetch` sert le connecteur par `app.inject`, sans port ouvert (P2-02), corps des écritures compris (P2-03) ; `now()` donne son horloge, que le connecteur testé lit pour dater ses tentatives comme FakeReveal date les messages.
 - Chaque endpoint de FakeReveal cite sa section de `reveal-api-observed.md` et la date de la capture qui le fonde.
 - Les captures anonymisées retenues comme référence sont copiées dans `apps/api/src/__tests__/fake-reveal/recordings/` (sans secret ni donnée réelle, relues avant commit, gitleaks), et un test vérifie que les réponses de FakeReveal passent les mêmes schémas Zod que ces enregistrements.
 - Quand une nouvelle capture montre un changement, FakeReveal et le journal des changements de `reveal-api-observed.md` sont mis à jour dans la même PR.

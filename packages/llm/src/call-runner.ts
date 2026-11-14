@@ -27,6 +27,8 @@ interface Classified {
   readonly usage?: LanguageModelUsage;
   /** The provider turned the key down: the CRM marks the service « à reconnecter » (ADR 0016). */
   readonly refusedStatus?: 401 | 403;
+  /** No text at all and no content filter: a block for Gemini, a reasoning that ended without its answer for Grok. */
+  readonly isEmpty?: boolean;
   /** How long the provider asked to wait (`retry-after`), when it said. */
   readonly retryAfterMs?: number;
 }
@@ -66,6 +68,7 @@ function isQuotaRefusal(
 export function classify(error: unknown): Classified {
   if (NoObjectGeneratedError.isInstance(error)) {
     // A block the SDK only reports as a failed object (see the finish check in `run`).
+    const isEmpty = error.finishReason !== 'content-filter' && (error.text ?? '').trim() === '';
     const isBlocked =
       error.finishReason === 'content-filter' ||
       error.finishReason === 'other' ||
@@ -74,6 +77,7 @@ export function classify(error: unknown): Classified {
       outcome: isBlocked ? 'refused' : 'invalid_output',
       isTransient: false,
       message: error.message,
+      ...(isEmpty && { isEmpty }),
       ...(error.usage !== undefined && { usage: error.usage }),
     };
   }
@@ -238,6 +242,9 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
       let messages = built;
       let transientLeft = deps.config.maxTransientRetries;
       let hasRepaired = false;
+      // Grok sometimes ends its reasoning with no answer at all (11/11, about one judge call in four on a scenario):
+      // asked once more on the same model. Never Gemini, whose empty answer is a block of the media (see below).
+      let hasRetriedEmpty = ref.provider === 'google';
       for (;;) {
         const startedAt = now().getTime();
         try {
@@ -264,6 +271,15 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
             result.finishReason === 'content-filter' ||
             (result.finishReason === 'other' && result.text.trim() === '');
           if (isBlocked) {
+            const isEmpty = result.finishReason !== 'content-filter' && result.text.trim() === '';
+            if (isEmpty && !hasRetriedEmpty) {
+              hasRetriedEmpty = true;
+              record('invalid_output', latencyMs, {
+                errorMessage: 'empty answer',
+                ...(cost !== undefined && { costUsd: cost }),
+              });
+              continue;
+            }
             record('refused', latencyMs, cost === undefined ? {} : { costUsd: cost });
             break;
           }
@@ -300,9 +316,18 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
             usage,
             refusedStatus,
             retryAfterMs: asked,
+            isEmpty,
           } = classify(error);
           if (refusedStatus !== undefined) deps.reportRefusal(ref.provider, refusedStatus);
           const cost = usage === undefined ? undefined : costUsd(ref, usage);
+          if (isEmpty === true && !hasRetriedEmpty) {
+            hasRetriedEmpty = true;
+            record('invalid_output', latencyMs, {
+              errorMessage: 'empty answer',
+              ...(cost !== undefined && { costUsd: cost }),
+            });
+            continue;
+          }
           record(outcome, latencyMs, {
             errorMessage: message.slice(0, 200),
             ...(cost !== undefined && { costUsd: cost }),

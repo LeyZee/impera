@@ -55,11 +55,13 @@ interface TipContent {
 }
 
 /**
- * `above`: over the element's top edge at the pointer's x. `beside`: beside the element on the side with more room,
- * on hover too, so a tall chart's tip stays inside its card and never covers the controls over it.
+ * `above`: over the element's top edge at the pointer's x. `around`: under or over the element at a tap. `beside`:
+ * beside the element on the side with more room, on hover too, so a tall chart's tip stays inside its card and never
+ * covers the controls over it.
  */
 export interface TipOptions {
   readonly above?: boolean;
+  readonly around?: boolean;
   readonly beside?: boolean;
 }
 
@@ -97,6 +99,8 @@ interface PlacedTip {
   y: number;
   above?: boolean;
   beside?: Beside;
+  /** Under the box, or over it when the window has no room under: never on it (ADR 0106 § 13). */
+  around?: Beside;
 }
 
 /**
@@ -104,6 +108,8 @@ interface PlacedTip {
  * chart's column: there the tip covered the chart's title, under it the next card's (recette du 07/11).
  */
 function placedOn(content: TipContent, box: DOMRect, options: TipOptions | undefined): PlacedTip {
+  const sides = { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+  if (options?.around === true) return { content, x: box.left, y: box.bottom, around: sides };
   if (options?.above === true || options?.beside === true) {
     return {
       content,
@@ -137,6 +143,23 @@ export function besidePlacement(
   return { left, top };
 }
 
+/**
+ * Under a box, or over it when the window has no room under, never on it; its left edge on the box's, kept inside the
+ * window. A tile's tip at a tap: covering the tile it explains hid it (recette du 13/11). Exported for its tests.
+ */
+export function aroundPlacement(
+  box: Beside,
+  tip: { readonly width: number; readonly height: number },
+  view: { readonly width: number; readonly height: number },
+): { left: number; top: number } {
+  const below = box.bottom + TIP_GAP;
+  const fitsBelow = below + tip.height <= view.height - TIP_MARGIN;
+  const over = box.top - TIP_GAP - tip.height;
+  const top = fitsBelow || over < TIP_MARGIN ? below : over;
+  const left = Math.min(Math.max(TIP_MARGIN, box.left), view.width - tip.width - TIP_MARGIN);
+  return { left: Math.max(TIP_MARGIN, left), top };
+}
+
 /** One floating `nv-tip` for the whole screen, placed under the pointer by `tipPlacement`. */
 export function useFloatingTip(): FloatingTip {
   const [tip, setTip] = useState<PlacedTip | null>(null);
@@ -145,6 +168,16 @@ export function useFloatingTip(): FloatingTip {
   useLayoutEffect(() => {
     const element = ref.current;
     if (element === null || tip === null) return;
+    if (tip.around !== undefined) {
+      const around = aroundPlacement(
+        tip.around,
+        { width: element.offsetWidth, height: element.offsetHeight },
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      element.style.left = `${String(around.left)}px`;
+      element.style.top = `${String(around.top)}px`;
+      return;
+    }
     if (tip.beside !== undefined) {
       const beside = besidePlacement(
         tip.beside,
@@ -177,10 +210,19 @@ export function useFloatingTip(): FloatingTip {
   // A tip opened by a tap stays until the next tap: caught before the element's own handler, which may reopen it.
   // The page scrolls under a tip placed in viewport coordinates: any scroll, wherever it happens, hides it too.
   const shown = tip !== null;
+  // The title of the tip a tap just put out: a second tap on the same element closes it and leaves it closed.
+  const closedByTap = useRef<string | null>(null);
+  const openTitle = tip?.content.title ?? null;
   useEffect(() => {
     if (!shown) return undefined;
     const onDown = (event: PointerEvent): void => {
-      if (event.pointerType !== 'mouse') hide();
+      if (event.pointerType === 'mouse') return;
+      closedByTap.current = openTitle;
+      // Only for this tap: the element's own handler reads it in the same dispatch, anything later finds it empty.
+      setTimeout(() => {
+        closedByTap.current = null;
+      }, 0);
+      hide();
     };
     document.addEventListener('pointerdown', onDown, true);
     addEventListener('scroll', hide, { capture: true, passive: true });
@@ -188,7 +230,7 @@ export function useFloatingTip(): FloatingTip {
       document.removeEventListener('pointerdown', onDown, true);
       removeEventListener('scroll', hide, { capture: true });
     };
-  }, [shown, hide]);
+  }, [shown, hide, openTitle]);
   const bind = useCallback(
     (content: TipContent, options?: TipOptions) => ({
       onPointerMove: (event: React.PointerEvent) => {
@@ -211,6 +253,9 @@ export function useFloatingTip(): FloatingTip {
       // anywhere hides it.
       onPointerDown: (event: React.PointerEvent) => {
         if (event.pointerType === 'mouse') return;
+        const again = closedByTap.current === content.title;
+        closedByTap.current = null;
+        if (again) return;
         setTip(placedOn(content, event.currentTarget.getBoundingClientRect(), options));
       },
       onPointerLeave: (event: React.PointerEvent) => {
