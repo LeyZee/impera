@@ -23,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 
 import { RevealPage } from './RevealPage';
 
-import { valuesOf } from '@/test/select';
+import { openList, valuesOf } from '@/test/select';
 
 const id = (n: number): string => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const mid = (n: number): TeamMemberId => TeamMemberIdSchema.parse(id(n));
@@ -60,7 +60,13 @@ function row(patch: Partial<TeamImportRow>, chatter: Partial<TeamImportRow['chat
 
 const LEA = row(
   {
-    suggestion: { kind: 'member', memberId: mid(1), memberDisplayName: 'Léa', match: 'email' },
+    suggestion: {
+      kind: 'member',
+      memberId: mid(1),
+      memberDisplayName: 'Léa',
+      match: 'email',
+      departedOn: null,
+    },
     preselected: true,
   },
   { platformChatterId: 'c-lea', firstName: 'Léa', email: 'lea@example.test' },
@@ -268,6 +274,45 @@ describe('Équipe › Reveal (ADR 0076)', () => {
     const field = await screen.findByRole('combobox', { name: 'Que faire de Max Test' });
     expect(valuesOf(field)).toEqual(['none']);
     expect(screen.getByText('Prestataire')).toBeTruthy();
+  });
+
+  it('proposes a departed member on his e-mail, marked as departed, for an account removed from Reveal', async () => {
+    const departed = TeamMemberSchema.parse({ ...member(5, 'Hugo'), status: 'left' });
+    const removed = row(
+      {
+        suggestion: {
+          kind: 'member',
+          memberId: mid(5),
+          memberDisplayName: 'Hugo',
+          match: 'email',
+          departedOn: '2026-11-01',
+        },
+        actions: ['link_member', 'link_agent', 'link_none', 'dismiss'],
+      },
+      {
+        platformChatterId: 'c-hugo',
+        firstName: 'Hugo',
+        email: 'm5@example.test',
+        removedAt: '2026-11-05T12:00:00.000Z',
+      },
+    );
+    serve({
+      ...TEAM,
+      'GET /v1/team/members': ok({ members: [member(1, 'Léa'), departed] }),
+      [`GET ${BASE}`]: ok(overview([removed], { newCount: 0, removalCount: 0 })),
+    });
+    renderPage();
+    const toConfirm = await screen.findByRole('list', { name: 'Comptes de Reveal à confirmer' });
+    expect(within(toConfirm).getByText('Même e-mail · parti le 1er novembre 2026')).toBeTruthy();
+    expect(within(toConfirm).getByText('Retiré de Reveal le 5 nov.')).toBeTruthy();
+    expect(within(toConfirm).queryByRole('button', { name: 'Inviter Hugo Test' })).toBeNull();
+    const box = within(toConfirm).getByRole('checkbox', { name: 'Confirmer Hugo Test' });
+    expect(box instanceof HTMLInputElement && box.checked).toBe(false);
+    const field = within(toConfirm).getByRole('combobox', { name: 'Que faire de Hugo Test' });
+    await waitFor(() => {
+      expect(valuesOf(field)).toEqual([`member:${id(1)}`, `member:${id(5)}`, 'agent', 'none']);
+    });
+    expect(within(openList(field)).getByRole('option', { name: 'Hugo (parti)' })).toBeTruthy();
   });
 
   it('sets a row aside, and takes one back from the fold', async () => {

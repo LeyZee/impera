@@ -27,6 +27,7 @@ import {
   StartScriptDropBodySchema,
   ValidateDropDescriptionsBodySchema,
   ValidateScriptSummaryBodySchema,
+  WriteDropDescriptionBodySchema,
   CorrectScriptSummaryBodySchema,
   type UserRole,
 } from '@impera/contracts';
@@ -35,6 +36,8 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { exportDrop } from '../../application/drop-export';
+import { agencyContent, type ContentReader } from '../../application/reads';
 import {
   fillScriptSlot,
   readScriptDrop,
@@ -68,6 +71,11 @@ class CreatorAccountForbidden extends DomainError {
 function signedIn(user: { readonly id: string } | null): string {
   if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
   return user.id;
+}
+
+function readerOf(user: { readonly id: string; readonly role: UserRole } | null): ContentReader {
+  if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+  return { userId: user.id, role: user.role };
 }
 
 async function asCreator<T>(run: () => Promise<T>): Promise<T> {
@@ -254,7 +262,7 @@ export function createContentDropRoutes(
     app.get(
       '/creators/:creatorId/content',
       { ...team, schema: { params: CreatorParamsSchema, response: { 200: CreatorContentSchema } } },
-      (request) => agency.content(request.params.creatorId, signedIn(request.user)),
+      (request) => agencyContent(agency, readerOf(request.user), request.params.creatorId),
     );
 
     app.post(
@@ -357,6 +365,40 @@ export function createContentDropRoutes(
       { ...team, schema: { params: CreatorDropParamsSchema, response: { 200: ContentDropSchema } } },
       (request) =>
         agency.confirmExport(request.params.creatorId, signedIn(request.user), request.params.id, clock()),
+    );
+
+    // Any other drop of hers as a ZIP (recette créatrice 1): her media in her order and the sheet, streamed as zipped.
+    app.get(
+      '/creators/:creatorId/drops/:id/export',
+      { ...team, schema: { params: CreatorDropParamsSchema } },
+      async (request, reply) => {
+        const archive = await exportDrop(
+          { agency, storage },
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          clock(),
+        );
+        return reply
+          .header('content-type', SCRIPT_EXPORT_MEDIA_TYPE)
+          .header('content-disposition', `attachment; filename="${archive.fileName}"`)
+          .header('cache-control', 'no-store')
+          .header('x-content-type-options', 'nosniff')
+          .send(archive.stream);
+      },
+    );
+
+    // Put out by hand (ADR 0044, recette créatrice 1): her originals of the drop go 30 days later.
+    app.post(
+      '/creators/:creatorId/drops/:id/export/confirm',
+      { ...team, schema: { params: CreatorDropParamsSchema, response: { 200: ContentDropSchema } } },
+      (request) =>
+        agency.confirmDropExport(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          clock(),
+        ),
     );
 
     app.post(
@@ -518,6 +560,46 @@ export function createContentDropRoutes(
           request.params.id,
           request.body.summaryId,
           clock(),
+        ),
+    );
+
+    // The vision AI asked again on a medium it gave up (recette créatrice 2): her team's, as each review.
+    app.post(
+      '/creators/:creatorId/drops/:id/files/:fileId/describe',
+      {
+        ...team,
+        schema: { params: CreatorFileParamsSchema, response: { 200: DropDescriptionsReviewSchema } },
+      },
+      (request) =>
+        review.retryDescription(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.params.fileId,
+          request.id,
+        ),
+    );
+
+    // A medium the AI did not describe, written by hand (recette créatrice 2): its words and its level.
+    app.post(
+      '/creators/:creatorId/drops/:id/files/:fileId/description',
+      {
+        ...team,
+        schema: {
+          params: CreatorFileParamsSchema,
+          body: WriteDropDescriptionBodySchema,
+          response: { 200: DropDescriptionsReviewSchema },
+        },
+      },
+      (request) =>
+        review.writeDescription(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.params.fileId,
+          { detailed: request.body.detailed, intensity: request.body.intensity },
+          clock(),
+          request.id,
         ),
     );
 

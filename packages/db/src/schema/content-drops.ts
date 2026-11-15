@@ -176,8 +176,9 @@ export const contentDrops = pgTable(
      */
     scriptNumber: integer('script_number'),
     /**
-     * When the team confirmed it copied her sent script into Reveal from its archive (SC-03 c, ADR 0056 § 7), and who:
-     * her originals of it go 30 days later (ADR 0044 § 2). Null until then.
+     * When the team confirmed it copied her sent script into Reveal from its archive (SC-03 c, ADR 0056 § 7), or put
+     * any other drop of hers out by hand (recette créatrice 1, ADR 0044: published by hand until the connector does),
+     * and who: her originals of it go 30 days later (ADR 0044 § 2). Null until then.
      */
     exportedAt: timestampTz('exported_at'),
     exportedBy: text('exported_by').references(() => user.id),
@@ -217,9 +218,11 @@ export const contentDrops = pgTable(
       'content_drops_script_number_check',
       sql`${t.scriptNumber} is null or (${t.category} = 'script' and ${t.scriptNumber} >= 1)`,
     ),
+    // Copied out by hand (recette créatrice 1): a script once she sent it (its number), any other drop as it is.
     check(
       'content_drops_exported_check',
-      sql`(${t.exportedAt} is null) = (${t.exportedBy} is null) and (${t.exportedAt} is null or ${t.scriptNumber} is not null)`,
+      sql`(${t.exportedAt} is null) = (${t.exportedBy} is null)
+        and (${t.exportedAt} is null or ${t.category} <> 'script' or ${t.scriptNumber} is not null)`,
     ),
     uniqueIndex('content_drops_script_number_unique')
       .on(t.creatorId, t.scriptNumber)

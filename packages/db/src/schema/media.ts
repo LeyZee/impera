@@ -1,13 +1,22 @@
-import { CurrencySchema, DESCRIPTION_REVIEW_REASONS } from '@impera/contracts';
+import {
+  CurrencySchema,
+  DESCRIPTION_REVIEW_REASONS,
+  PlatformSchema,
+  PlatformScriptMomentSchema,
+  VAULT_DESCRIPTION_MAX,
+  VAULT_FOLDER_NAME_MAX,
+} from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
   char,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
   pgTable,
+  smallint,
   text,
   unique,
   uniqueIndex,
@@ -18,7 +27,7 @@ import { user } from './auth';
 import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { conversations, messages } from './conversations';
 import { fans } from './fans';
-import { creators } from './tenancy';
+import { creators, platformAccounts } from './tenancy';
 
 /** Module `media`: files (the bytes live in object storage), their descriptions, and what was sold to whom. */
 
@@ -56,6 +65,11 @@ export const mediaAssets = pgTable(
     thumbnailKey: text('thumbnail_key'),
     /** When its reduced picture was tried, made or not: a medium is tried once. */
     thumbnailedAt: timestampTz('thumbnailed_at'),
+    /**
+     * The vision AI's tries that failed to describe it (recette créatrice, anomaly 2): at the job's attempts, it is no
+     * longer asked, by the job nor by the hourly backlog, until the agency asks again (« Réessayer ») or writes it.
+     */
+    descriptionFailures: smallint('description_failures').notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [
@@ -65,11 +79,95 @@ export const mediaAssets = pgTable(
       'media_assets_thumbnail_check',
       sql`${t.thumbnailKey} is null or (${t.thumbnailedAt} is not null and ${t.kind} <> 'audio')`,
     ),
+    check('media_assets_description_failures_check', sql`${t.descriptionFailures} >= 0`),
     unique('media_assets_creator_sha256_unique').on(t.creatorId, t.sha256),
     // The originals still held with a date (CR-06 c): `content_drops.erase_originals` reads them each hour.
     index('media_assets_due_idx')
       .on(t.expiresAt)
       .where(sql`${t.erasedAt} is null and ${t.expiresAt} is not null`),
+    tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
+  ],
+);
+
+/**
+ * The platform's vault as the CRM mirrors it (ADR 0030 § 1, ADR 0099 § 2 to 4, fiche vault-sync): one row per media of
+ * a creator's account, written by `connector.vault_sync` inside her tenant, never deleted (`removed_at` when the
+ * platform no longer lists it). No file: `media_asset_id` stays empty until its bytes are fetched (fiche
+ * vault-fetch-media). Its folder and order are the platform's, read again at each sync: sorted by `platform_created_at`
+ * as the platform lists it, then `folder_position` (the platform's rank between uploads of the same second), then the
+ * platform's id. `platform_description` is the platform's own text, a starting point never validated: it becomes a
+ * `media_descriptions` row of its own once the media has an asset (ADR 0099 § 4).
+ */
+export const mediaPlatformRefs = pgTable(
+  'media_platform_refs',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platform: enumText('platform').notNull(),
+    platformAccountId: uuid('platform_account_id').notNull(),
+    platformMediaId: text('platform_media_id').notNull(),
+    mediaAssetId: uuid('media_asset_id').references(() => mediaAssets.id),
+    kind: enumText('kind').notNull(),
+    /** `null` at the vault's root. */
+    folderRef: text('folder_ref'),
+    folderName: text('folder_name'),
+    folderMoment: enumText('folder_moment'),
+    /**
+     * Not the connector's `VaultMedia.folderPosition` (its rank in the whole folder, which moves at each upload): the
+     * rank among the media of the same folder uploaded at the same millisecond, from 0, in the platform's order. The
+     * folder's order is `platform_created_at` descending, then this rank.
+     */
+    folderPosition: integer('folder_position').notNull(),
+    platformCreatedAt: timestampTz('platform_created_at').notNull(),
+    durationSeconds: integer('duration_seconds'),
+    platformDescription: text('platform_description'),
+    /** The platform's suggested range, in its minor unit: shown to the agency, never applied (ADR 0099 § 4). */
+    suggestedMinMinor: integer('suggested_min_minor'),
+    suggestedMaxMinor: integer('suggested_max_minor'),
+    lastSyncedAt: timestampTz('last_synced_at').notNull(),
+    removedAt: timestampTz('removed_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    enumCheck('media_platform_refs', t.platform, PlatformSchema.options),
+    enumCheck('media_platform_refs', t.kind, MEDIA_KINDS),
+    check(
+      'media_platform_refs_folder_check',
+      sql`(${t.folderRef} is null) = (${t.folderName} is null) and (${t.folderRef} is not null or ${t.folderMoment} is null)`,
+    ),
+    // ☀️ or 🌙 read in the folder's name (ADR 0099 § 2); `null` when it says neither or both.
+    enumCheck('media_platform_refs', t.folderMoment, PlatformScriptMomentSchema.options),
+    check('media_platform_refs_folder_position_check', sql`${t.folderPosition} >= 0`),
+    check(
+      'media_platform_refs_suggested_check',
+      sql`(${t.suggestedMinMinor} is null) = (${t.suggestedMaxMinor} is null) and coalesce(${t.suggestedMinMinor}, 0) >= 0 and coalesce(${t.suggestedMaxMinor}, 0) >= 0`,
+    ),
+    // The contract's bounds (VaultMediaSchema): the platform's text is cut by the connector, never refused here.
+    check(
+      'media_platform_refs_text_check',
+      sql`char_length(${t.folderName}) <= ${sql.raw(String(VAULT_FOLDER_NAME_MAX))} and char_length(${t.platformDescription}) <= ${sql.raw(String(VAULT_DESCRIPTION_MAX))}`,
+    ),
+    check(
+      'media_platform_refs_duration_check',
+      sql`${t.durationSeconds} is null or ${t.durationSeconds} >= 0`,
+    ),
+    unique('media_platform_refs_account_media_unique').on(t.platformAccountId, t.platformMediaId),
+    // An account and its creator always go together, as the planning's keys hold them (EQ-02).
+    foreignKey({
+      name: 'media_platform_refs_account_fk',
+      columns: [t.platformAccountId, t.creatorId],
+      foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
+    }),
+    index('media_platform_refs_order_idx').on(
+      t.creatorId,
+      t.folderRef,
+      t.platformCreatedAt,
+      t.folderPosition,
+      t.platformMediaId,
+    ),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
   ],

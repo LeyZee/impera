@@ -39,6 +39,7 @@ export function MembersPage({
   tab,
   selected,
   canManage,
+  seesSetup = canManage,
   viewerId,
   onTab,
   onSelect,
@@ -48,6 +49,8 @@ export function MembersPage({
   selected: string | null;
   /** The owner adds members, makes their links and sees their rates; a manager reads. */
   canManage: boolean;
+  /** « Mise en route »: the owner's for everyone, an active manager's for the chatters (« ok manager mise en route »). */
+  seesSetup?: boolean;
   /** The account reading: a manager's own record shows no notes, he never reads those about him. */
   viewerId: string;
   onTab: (tab: TeamRole) => void;
@@ -217,6 +220,7 @@ export function MembersPage({
               creators={names}
               removals={removalsOf(open)}
               canManage={canManage}
+              seesSetup={seesSetup}
               isSelf={open.userId === viewerId}
               onClose={() => {
                 onSelect(null);

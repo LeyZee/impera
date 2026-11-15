@@ -69,7 +69,10 @@ describe('a signed-in request while the database is down (recette 07/11, BIL-01)
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     relay = await relayTo(new URL(test.appUrl));
-    const config = testConfig({ DATABASE_URL: relay.url(test.appUrl), DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({
+      DATABASE_URL: relay.url(test.appUrl),
+      DATABASE_SERVICE_URL: test.serviceUrl,
+    });
     app = await createApp(config, createLogger(config));
     server = await buildServer({
       config,

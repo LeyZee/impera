@@ -16,7 +16,10 @@ import {
 import type { Logger } from './logger';
 
 /** What every gateway of the app shares: keys, one call journal (so the daily cap is one), the listeners. */
-type AppLlmDeps = Pick<LlmGatewayDeps, 'credentials' | 'log' | 'onKeyRefused' | 'onBudget'>;
+type AppLlmDeps = Pick<
+  LlmGatewayDeps,
+  'credentials' | 'log' | 'onKeyRefused' | 'onBudget' | 'dailyCapEur' | 'trendWatchCapEur'
+>;
 
 export interface AppLlm {
   readonly gateway: LlmGateway;
@@ -37,6 +40,8 @@ export interface AppLlmOptions {
   readonly log?: LlmCallLog;
   /** The recette sandbox's fake world (ADR 0075); each provider's own API when absent. */
   readonly baseUrls?: ProviderBaseUrls;
+  /** The caps the owner sets in Réglages › Modèles IA (ai-budget module); the code's defaults when absent. */
+  readonly caps?: Pick<LlmGatewayDeps, 'dailyCapEur' | 'trendWatchCapEur'>;
 }
 
 /** The one LLM gateway of the app (ADR 0009), built once by the composition root and handed to the modules. */
@@ -45,6 +50,8 @@ export function createAppLlm(options: AppLlmOptions): AppLlm {
   const deps: AppLlmDeps = {
     credentials: options.credentials,
     log: options.log ?? createInMemoryCallLog(),
+    ...(options.caps?.dailyCapEur !== undefined && { dailyCapEur: options.caps.dailyCapEur }),
+    ...(options.caps?.trendWatchCapEur !== undefined && { trendWatchCapEur: options.caps.trendWatchCapEur }),
     onKeyRefused: ({ provider, status }) => {
       void options
         .reportRefusedKey(provider, status === 401 ? 'unauthorized' : 'missing_permission')

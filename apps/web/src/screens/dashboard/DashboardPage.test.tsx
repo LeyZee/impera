@@ -198,7 +198,7 @@ describe('DashboardPage on the server’s data', () => {
     expect(screen.getByText('28 €')).toBeDefined();
     const sellers = screen.getByRole('list', { name: 'Qui a vendu' });
     expect(sellers.textContent).toMatch(/L’agent.*Maya.*Chatteur non relié/u);
-    expect(screen.getByText('1 vente · à relier dans Réglages › Ventes')).toBeDefined();
+    expect(screen.getByText('1 vente · à relier dans Équipe › Reveal')).toBeDefined();
     expect(
       screen.getByText(/1 remboursement porte sur une vente plus ancienne que le registre/u),
     ).toBeDefined();
@@ -910,6 +910,25 @@ describe('DashboardPage, the fold of the agent', () => {
       tile.textContent.includes('Taux en réel'),
     );
     expect(rate?.querySelector('.sr-only')?.textContent).toContain('Automatique : à partir de');
+  });
+
+  it('says whose hour the header gives: hers (ADM-27)', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard(true);
+    await screen.findByText('Kévin');
+    expect(document.querySelector('.db-top__when')?.textContent).toMatch(/^Chez elle : /u);
+  });
+
+  it('offers the owner the guide to link Reveal while it is not linked (ADM-18)', async () => {
+    const body = apiDashboard();
+    serveDashboard({
+      status: 200,
+      body: { ...body, reveal: { ...body.reveal, connected: false, lastReadAt: null, conversations: 0 } },
+    });
+    renderDashboard(true);
+    expect((await screen.findByRole('link', { name: 'Comment relier Reveal' })).getAttribute('href')).toBe(
+      '/aide/reveal',
+    );
   });
 
   it('says the AI budget once, for the whole agency, apart from her agent’s health (recette 05/11, reco 18)', async () => {

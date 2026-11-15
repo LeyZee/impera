@@ -3,11 +3,19 @@ import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from
 
 import type { DailyStatsStore, LinkedAccount } from '../../domain/daily-stats';
 
-const { creators, platformDailyStats, salesFeedCursors, salesFeedModels, salesFeedStatsCalls } = schema;
+const {
+  creators,
+  platformChatterDailyStats,
+  platformDailyStats,
+  salesFeedCursors,
+  salesFeedModels,
+  salesFeedStatsCalls,
+} = schema;
 
 /**
- * The photo of the daily statistics and the calls counted (ADR 0081), through `withAdmin` only: `nirvana_app` has no
- * write policy on either table, and reads the photo inside `withTenantMember` (`dailyStatsOf`).
+ * The photo of the daily statistics, by account (ADR 0081) and by chatter (ADR 0092 § 1), and the calls counted,
+ * through `withAdmin` only: `nirvana_app` has no write policy on any of them, and reads the photos inside
+ * `withTenantMember` (`dailyStatsOf`, `chatterStatsOf`).
  */
 export function createDrizzleDailyStatsStore(adminDb: Database): DailyStatsStore {
   return {
@@ -98,6 +106,36 @@ export function createDrizzleDailyStatsStore(adminDb: Database): DailyStatsStore
             .onConflictDoUpdate({ target: salesFeedCursors.platform, set: { statsFullReadAt: readAt } });
         }
       }),
+
+    recordChatters: (rows, readAt) =>
+      withAdmin(adminDb, async (tx) => {
+        for (const row of rows) {
+          const values = {
+            ppvSent: row.ppvSent,
+            ppvPurchased: row.ppvPurchased,
+            messagesSent: row.messagesSent,
+            readAt,
+          };
+          await tx
+            .insert(platformChatterDailyStats)
+            .values({
+              platform: row.platform,
+              platformAccountId: row.platformAccountId,
+              creatorId: row.creatorId,
+              platformChatterId: row.platformChatterId,
+              day: row.day,
+              ...values,
+            })
+            .onConflictDoUpdate({
+              target: [
+                platformChatterDailyStats.platformAccountId,
+                platformChatterDailyStats.platformChatterId,
+                platformChatterDailyStats.day,
+              ],
+              set: { creatorId: row.creatorId, ...values },
+            });
+        }
+      }),
   };
 }
 
@@ -143,5 +181,49 @@ export async function dailyStatsOf(
     .from(platformDailyStats)
     .where(sql`${platformDailyStats.day} between ${range.from} and ${range.to}`)
     .orderBy(platformDailyStats.day, platformDailyStats.platformAccountId);
+  return rows.map((row) => ({ ...row, platform: PlatformSchema.parse(row.platform) }));
+}
+
+/** A day of one chatter of the platform on a creator account (ADR 0092 § 1): counters only, with their reading time. */
+export interface ChatterStatsDay {
+  readonly platform: Platform;
+  readonly platformAccountId: string;
+  /** The platform's id of its team member's account: the owner's link says who he is in Impera. */
+  readonly platformChatterId: string;
+  readonly day: string;
+  /** `null` while the platform has not computed it yet: « pas encore compté », never 0. */
+  readonly ppvSent: number | null;
+  readonly ppvPurchased: number;
+  readonly messagesSent: number | null;
+  readonly readAt: Date;
+}
+
+/**
+ * The photo by chatter of the creator the caller's transaction is in (`withTenantMember`), from `from` to `to`
+ * included, by day then account then chatter: the policy shows it to the owner, or to an active manager when she is on
+ * his list, as the photo by account; never to a chatter, his own days included, nor to a creator.
+ */
+export async function chatterStatsOf(
+  tx: Transaction,
+  range: { readonly from: string; readonly to: string },
+): Promise<ChatterStatsDay[]> {
+  const rows = await tx
+    .select({
+      platform: platformChatterDailyStats.platform,
+      platformAccountId: platformChatterDailyStats.platformAccountId,
+      platformChatterId: platformChatterDailyStats.platformChatterId,
+      day: platformChatterDailyStats.day,
+      ppvSent: platformChatterDailyStats.ppvSent,
+      ppvPurchased: platformChatterDailyStats.ppvPurchased,
+      messagesSent: platformChatterDailyStats.messagesSent,
+      readAt: platformChatterDailyStats.readAt,
+    })
+    .from(platformChatterDailyStats)
+    .where(sql`${platformChatterDailyStats.day} between ${range.from} and ${range.to}`)
+    .orderBy(
+      platformChatterDailyStats.day,
+      platformChatterDailyStats.platformAccountId,
+      platformChatterDailyStats.platformChatterId,
+    );
   return rows.map((row) => ({ ...row, platform: PlatformSchema.parse(row.platform) }));
 }

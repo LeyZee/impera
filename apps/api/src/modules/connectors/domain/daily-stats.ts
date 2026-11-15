@@ -1,4 +1,9 @@
-import { calendarDayAt, type Platform, type PlatformDailyStat } from '@impera/contracts';
+import {
+  calendarDayAt,
+  type Platform,
+  type PlatformChatterDailyStat,
+  type PlatformDailyStat,
+} from '@impera/contracts';
 
 /**
  * The daily photo of a platform's statistics (ADR 0081), pure: which days an hourly reading asks, whether the
@@ -113,6 +118,48 @@ export function dailyStatsRows(
   });
 }
 
+/**
+ * A row of the photo by chatter (ADR 0092 § 1): the counters of one member of the platform's team on a creator
+ * account's day, never an amount.
+ */
+export interface ChatterStatsRow {
+  readonly platform: Platform;
+  readonly platformAccountId: string;
+  readonly creatorId: string;
+  readonly platformChatterId: string;
+  readonly day: string;
+  readonly ppvSent: number | null;
+  readonly ppvPurchased: number;
+  readonly messagesSent: number | null;
+}
+
+/**
+ * The rows by chatter of an answer of `/v1/stats/chatters/daily`: a model with no link is left out as for the photo,
+ * and so is the line of nobody (`platformChatterId` `null`, the sales no chatter made), which is no one's work.
+ */
+export function chatterStatsRows(
+  platform: Platform,
+  stats: readonly PlatformChatterDailyStat[],
+  links: ReadonlyMap<string, LinkedAccount>,
+): ChatterStatsRow[] {
+  return stats.flatMap((stat) => {
+    const link = links.get(stat.platformModelId);
+    if (link === undefined || stat.platformChatterId === null) return [];
+    return [
+      {
+        platform,
+        platformAccountId: link.platformAccountId,
+        creatorId: link.creatorId,
+        platformChatterId: stat.platformChatterId,
+        day: stat.date,
+        ppvSent: stat.ppvSent,
+        ppvPurchased: stat.ppvPurchased,
+        messagesSent: stat.messagesSent,
+      },
+    ];
+  });
+}
+
 /** The store of the photo and of the calls counted, through `withAdmin` (§ 5): the reading alone writes them. */
 export interface DailyStatsStore {
   /** When the last reading of 31 days went through, `null` before the first. */
@@ -125,4 +172,6 @@ export interface DailyStatsStore {
   links(platform: Platform): Promise<ReadonlyMap<string, LinkedAccount>>;
   /** Writes each row over the one of its day (the platform's last word), and, after 31 days, the time of that read. */
   record(platform: Platform, rows: readonly DailyStatsRow[], readAt: Date, full: boolean): Promise<void>;
+  /** Writes each row by chatter over the one of its day (ADR 0092 § 1), the platform's last word as for the photo. */
+  recordChatters(rows: readonly ChatterStatsRow[], readAt: Date): Promise<void>;
 }

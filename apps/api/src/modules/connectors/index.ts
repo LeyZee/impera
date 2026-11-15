@@ -11,19 +11,30 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { OutboundSender } from '../conversations';
 
+import { createConnectorReads, type ConnectorReads } from './application/connector-reads';
 import { createDispatchJob } from './application/dispatch';
-import { createOutboundSender } from './application/outbound-sender';
+import { createOutboundSender, type ConnectorWrites } from './application/outbound-sender';
 import { createPollJob } from './application/poll';
 import { createReconcileJob } from './application/reconcile';
 import { createConnectorResolver } from './application/resolver';
 import { createSalesFeeds, type SalesFeedDeps } from './application/sales-feed';
 import { createConnectorSessions, type ConnectorSessions } from './application/sessions';
+import {
+  createAskVaultSync,
+  createPlatformReads,
+  createVaultReads,
+  createVaultSyncJob,
+  type PlatformReads,
+  type VaultReads,
+  type VaultSyncAsked,
+} from './application/vault';
 import type { AvatarPorts } from './domain/avatar';
 import { connectionServiceOf } from './domain/connection-outage';
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
+import { createDrizzleConnectorReadsStore } from './infra/db/connector-reads-store';
 import { createDrizzleDailyStatsStore } from './infra/db/daily-stats-store';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import {
@@ -32,7 +43,9 @@ import {
   resealSalesFeedWebhookSecrets,
 } from './infra/db/sales-feed-webhooks';
 import { createDrizzleSalesLedger } from './infra/db/sales-ledger';
+import { createSendJournal } from './infra/db/send-journal';
 import { createDrizzleTeamImportStore, invitationChatterLinks } from './infra/db/team-import-store';
+import { createDrizzleVaultStore } from './infra/db/vault-store';
 import { createAvatarRoutes } from './infra/http/avatar-routes';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
@@ -41,6 +54,7 @@ import {
   createSalesFeedTeamRoutes,
   type SalesFeedTeamRoutesOptions,
 } from './infra/http/sales-feed-team-routes';
+import { createVaultRoutes, type VaultRoutesOptions } from './infra/http/vault-routes';
 import { revealSessionShape } from './infra/reveal/session';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
@@ -72,10 +86,27 @@ export { salesFeedTimeZone } from './domain/sale-days';
  * The daily photo of a creator's statistics (ADR 0081 § 4, § 5), read in the caller's `withTenantMember`: the owner,
  * or an active manager when she is on his list. Counters only, never an amount.
  */
-export { dailyStatsOf, type DailyStatsDay } from './infra/db/daily-stats-store';
+export {
+  chatterStatsOf,
+  dailyStatsOf,
+  type ChatterStatsDay,
+  type DailyStatsDay,
+} from './infra/db/daily-stats-store';
 /** @public Which totals a read gives (CRM-04). */
 export type { SalesRefundsQuery, SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';
+/** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
+export { revealApiConnectors } from './infra/reveal/connector';
+export type { RevealFetch } from './infra/reveal/client';
+/** @public The errors `platformReads` throws, for the adapter that reads through it (`reason` says why a read is refused). */
+export { PlatformAccountNotFound, PlatformReadUnavailable } from './domain/errors';
+/** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */
+export {
+  REVEAL_ENDPOINTS,
+  RevealMediaTypeSchema,
+  type RevealWireMedia,
+  type RevealWireMessageItem,
+} from './infra/reveal/wire';
 
 function bothReports(keys: ResealReport, webhooks: ResealReport): ResealReport {
   return {
@@ -131,6 +162,11 @@ export interface ConnectorsModule {
   readonly name: 'connectors';
   /** Implements the `conversations` port; the composition root hands it over. */
   readonly outboundSender: OutboundSender;
+  /**
+   * The other writes of ADR 0018 (script step, client note, read mark, typing), behind the same write guard as the
+   * sends (P2-03). No caller yet: the selling engine and the fan card will use them.
+   */
+  readonly writes: ConnectorWrites;
   readonly sessions: ConnectorSessions;
   /** Mounted under `/v1` by the server. */
   readonly routes: FastifyPluginAsyncZod;
@@ -151,7 +187,21 @@ export interface ConnectorsModule {
     copyAvatar(payload: JobPayload<'connector.copy_avatar'>, logger: JobLogger): Promise<void>;
     /** The platform's daily statistics of each linked account, kept as counters (ADR 0081 § 3). */
     readDailyStats(logger: JobLogger, correlationId: string): Promise<void>;
+    /** Her vault's folders and media mirrored in the CRM, read only (ADR 0099, fiche vault-sync). */
+    vaultSync(payload: JobPayload<'connector.vault_sync'>, logger: JobLogger): Promise<void>;
   };
+  /**
+   * `/v1/creators/:creatorId/vault` and its owner's « Synchroniser » (fiche vault-sync), behind the guards given here.
+   * Nothing else starts a read of the platform's vault: no cron.
+   */
+  readonly vaultRoutes: (options: Omit<VaultRoutesOptions, 'askSync'>) => FastifyPluginAsyncZod;
+  /** Her vault as the last sync read it, as the person reading (the owner, an active manager of her list). */
+  readonly vault: VaultReads;
+  /**
+   * Reads of the platform for another module's adapter (the import of the scripts by `scripts`): through the resolver,
+   * each behind its `capabilities` flag, never a write.
+   */
+  readonly platformReads: PlatformReads;
   /** `/v1/creators/:creatorId/avatar`, behind the guard given here (owner, operator, creator). */
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
@@ -173,6 +223,11 @@ export interface ConnectorsModule {
    * this viewer may see them: `team` shows the warning on the member's page. Read from the base, never the platform.
    */
   readonly teamRemovals: (userId: string) => Promise<TeamPlatformRemoval[]>;
+  /**
+   * The sales, the daily statistics and the imported team for another module's adapter (ADR 0026 § 1, ADR 0105 § 4:
+   * the MCP), as the person reading, bounded by the creators named; never a share, never a call to the platform.
+   */
+  readonly reads: ConnectorReads;
   /** `/v1/webhooks/sales-feeds/:platform`: public, each delivery checked against its webhook's secret. */
   readonly salesFeedDeliveryRoutes: FastifyPluginAsyncZod;
 }
@@ -232,6 +287,11 @@ export interface ConnectorsDeps {
    * is the module's own.
    */
   readonly avatars?: Omit<AvatarPorts, 'records'> | null;
+  /**
+   * Told of each `connector.vault_sync` the owner's « Synchroniser » queued, once per account, just after its enqueue
+   * (fiche vault-sync; asked by `media`, wired by the composition root). Never a write of this module's tables.
+   */
+  readonly onVaultSyncAsked?: (input: VaultSyncAsked) => Promise<void>;
 }
 
 const systemClock: Clock = { now: () => new Date() };
@@ -240,20 +300,31 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const clock = deps.clock ?? systemClock;
   const accounts = createDrizzleAccountStore(deps.db, deps.adminDb);
   const vault = deps.sessionKeys === null ? null : createSessionVault(deps.sessionKeys);
-  const resolver = createConnectorResolver({ accounts, vault, registry: deps.registry });
+  const resolver = createConnectorResolver({
+    accounts,
+    vault,
+    registry: deps.registry,
+    sends: (account) => createSendJournal(deps.db, account),
+  });
+  const ledger = createDrizzleSalesLedger(deps.db, deps.adminDb);
   const sessions = createConnectorSessions({
     accounts,
     vault,
     clock,
     shapes: { reveal: revealSessionShape },
+    linkedModels: async (platform, platformAccountId) =>
+      [...(await ledger.modelLinks(platform))]
+        .filter(([, link]) => link.platformAccountId === platformAccountId)
+        .map(([platformModelId]) => platformModelId),
   });
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
   const avatars: AvatarPorts | null =
     deps.avatars == null ? null : { ...deps.avatars, records: createAvatarRecords(deps.adminDb) };
+  const teamStore = createDrizzleTeamImportStore(deps.db);
   const salesFeeds = createSalesFeeds({
     keys: deps.credentialKeys === null ? null : createSalesFeedKeyStore(deps.adminDb, deps.credentialKeys),
-    ledger: createDrizzleSalesLedger(deps.db, deps.adminDb),
-    team: createDrizzleTeamImportStore(deps.db),
+    ledger,
+    team: teamStore,
     registry: deps.salesFeeds,
     clock,
     webhooks:
@@ -270,15 +341,26 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     avatars,
     dailyStats: createDrizzleDailyStatsStore(deps.adminDb),
   });
+  const sender = createOutboundSender({ accounts, resolver, clock });
+  const accountJobQueue = createDrizzleAccountJobs(deps.adminDb);
+  const vaultStore = createDrizzleVaultStore(deps.db);
+  const vaultReads = createVaultReads(vaultStore);
+  const askVaultSync = createAskVaultSync({
+    accounts,
+    jobs: accountJobQueue,
+    platforms: resolver.platforms,
+    onAsked: deps.onVaultSyncAsked,
+  });
   return {
     name: 'connectors',
-    outboundSender: createOutboundSender({ accounts, resolver, clock }),
+    outboundSender: sender,
+    writes: sender,
     sessions,
     routes: createConnectorRoutes({ sessions, accounts, linkUser: deps.linkUser }),
     jobs: {
       dispatch: createDispatchJob({
         accounts,
-        jobs: createDrizzleAccountJobs(deps.adminDb),
+        jobs: accountJobQueue,
         resolver,
         clock,
         ...(deps.random === undefined ? {} : { random: deps.random }),
@@ -289,13 +371,18 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       checkSales: (payload, logger, correlationId) => salesFeeds.autoCheck(payload, logger, correlationId),
       readDailyStats: (logger, correlationId) => salesFeeds.readDailyStats(logger, correlationId),
       copyAvatar: (payload, logger) => salesFeeds.copyAvatar(payload, logger),
+      vaultSync: createVaultSyncJob({ accounts, resolver, store: vaultStore, clock }),
     },
+    vaultRoutes: (options) => createVaultRoutes(vaultReads, { ...options, askSync: askVaultSync }),
+    vault: vaultReads,
+    platformReads: createPlatformReads({ accounts, resolver, clock }),
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedTeamRoutes: (options) => createSalesFeedTeamRoutes(salesFeeds.team, options),
     salesFeedStates: () => salesFeeds.list(),
     invitationChatterLinks,
     teamRemovals: (userId) => salesFeeds.team.removals(userId),
+    reads: createConnectorReads({ store: createDrizzleConnectorReadsStore(deps.db), team: teamStore }),
     salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),
   };
 }

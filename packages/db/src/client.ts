@@ -5,7 +5,7 @@ import {
   UserRoleSchema,
   type TeamScope,
 } from '@impera/contracts';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool, type PoolConfig } from 'pg';
 
@@ -32,7 +32,10 @@ export interface DbClient {
   close(): Promise<void>;
 }
 
-/** A pool and its Drizzle handle. The app connects as `nirvana_app` (RLS applies), ops as `nirvana_admin`. */
+/**
+ * A pool and its Drizzle handle. The app connects as `nirvana_app` (RLS applies), `withAdmin` as `impera_service`
+ * (ADR 0087), the migrations and the ops scripts as `nirvana_admin`.
+ */
 export function createDbClient(connectionString: string, options: PoolConfig = {}): DbClient {
   const pool = new Pool({ connectionString, max: 10, ...options });
   const db = drizzle(pool, { schema, casing: 'snake_case' });
@@ -159,6 +162,19 @@ export function withTenantMember<T>(
 }
 
 /**
+ * Whether the creator is on the person's own list (`user.creator_ids`): the rule that bounds an active manager to the
+ * creators he follows, for what reads her figures and her vault (ADR 0081 § 5, fiche vault-sync). Read in the caller's
+ * transaction; the scope (`owner` | `agency`) is the caller's to check.
+ */
+export async function onCreatorList(tx: Transaction, userId: string, creatorId: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(and(eq(schema.user.id, userId), sql`${creatorId}::uuid = any(${schema.user.creatorIds})`));
+  return row !== undefined;
+}
+
+/**
  * Moves a `withMember` or `withTenantMember` transaction to another creator, for what touches several creators at
  * once: a reader of several creators, a swap of shifts on two creators, a leave whose approval reads every creator of
  * the member (ADR 0031). Still `SET LOCAL`. `allowed` is the list the caller checked first (the creators that exist,
@@ -175,8 +191,9 @@ export async function enterCreator(
 }
 
 /**
- * Runs `fn` in a transaction on the admin connection (BYPASSRLS), for the multi-tenant system jobs only. Callers
- * are named `*Unscoped` so a review sees every place that crosses tenants.
+ * Runs `fn` in a transaction on the service connection (BYPASSRLS, rights on rows only: ADR 0087), for what crosses
+ * tenants or reads a table closed to the app role. Callers are named `*Unscoped` so a review sees every place that
+ * crosses tenants. The name is older than the service role: `adminDb` is this connection, never the owner's.
  */
 export function withAdmin<T>(adminDb: Database, fn: (tx: Transaction) => Promise<T>): Promise<T> {
   return adminDb.transaction(fn);

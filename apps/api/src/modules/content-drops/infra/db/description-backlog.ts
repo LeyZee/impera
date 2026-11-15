@@ -1,4 +1,10 @@
-import { AuditEntryIdSchema, CreatorSettingsSchema, JOB_MAX_ATTEMPTS, newId } from '@impera/contracts';
+import {
+  AuditEntryIdSchema,
+  CreatorSettingsSchema,
+  DESCRIPTION_TRIES,
+  JOB_MAX_ATTEMPTS,
+  newId,
+} from '@impera/contracts';
 import { eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
@@ -17,8 +23,8 @@ const switchedOn = (creatorId: string | null) =>
 
 /**
  * Each medium of a live drop with no description of now: none for a drop, or only the vision's of an older prompt,
- * and none a human wrote or validated (ADR 0083 § 2, ADR 0030 § 3). Enqueued under the medium's key, keeping the
- * time of a job already waiting.
+ * and none a human wrote or validated (ADR 0083 § 2, ADR 0030 § 3), nor one the vision failed on at each of its tries
+ * (left to the agency, recette créatrice 2). Enqueued under the medium's key, keeping the time of a job waiting.
  */
 async function enqueueMedia(
   tx: Transaction,
@@ -40,6 +46,7 @@ async function enqueueMedia(
         join creators c on c.id = m.creator_id
        where ${switchedOn(creatorId)}
          and m.kind <> 'audio' and m.erased_at is null
+         and m.description_failures < ${DESCRIPTION_TRIES}
          and exists (
            select 1 from content_drop_files f join content_drops d on d.id = f.drop_id
             where f.media_asset_id = m.id and f.state in ('kept', 'duplicate') and f.replaced_at is null
@@ -55,9 +62,9 @@ async function enqueueMedia(
 }
 
 /**
- * Each sent script with no synthesis of now: none with the prompt of now, or one older than a description of its
- * media or its validation (a correction, a new describer, an older row validated). The job waits by itself for what
- * is not described yet.
+ * Each sent script with no synthesis of now: none with the prompt of now nor written by hand (SC-04 lot c5), or one
+ * older than a description of its media or its validation (a correction, a new describer, an older row validated).
+ * The job waits by itself for what is not described yet.
  */
 async function enqueueScripts(
   tx: Transaction,
@@ -81,7 +88,7 @@ async function enqueueScripts(
          and d.category = 'script' and d.state not in ('filling', 'withdrawn')
          and not exists (
            select 1 from script_drop_summaries s
-            where s.drop_id = d.id and s.prompt_hash = ${promptHash}
+            where s.drop_id = d.id and (s.prompt_hash = ${promptHash} or s.author = 'human')
               and s.created_at >= coalesce((
                 select max(greatest(md.created_at, md.validated_at)) from media_descriptions md
                   join content_drop_files f on f.media_asset_id = md.media_asset_id

@@ -5,6 +5,7 @@ import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import type { NewCredential } from '../../domain/credential';
+import { readSavedProviderKeys } from '../../index';
 import { createPostgresCredentialStore, keyFingerprint, resealProviderCredentials } from '../postgres.store';
 
 const FAKE_KEY = 'sk_FAKEFAKEFAKEFAKEFAKEFAKE0000';
@@ -38,7 +39,7 @@ describe('Postgres credential store (ADR 0016)', () => {
   });
 
   it('saves, replaces and removes a key, sealed at rest', async () => {
-    const store = createPostgresCredentialStore({ adminDb: test.admin.db, keys: newKey('v1') });
+    const store = createPostgresCredentialStore({ adminDb: test.service.db, keys: newKey('v1') });
     await store.save(elevenlabs);
     const saved = await store.find('elevenlabs');
     expect(saved).toEqual({ ...elevenlabs, revision: saved?.revision });
@@ -58,7 +59,7 @@ describe('Postgres credential store (ADR 0016)', () => {
   });
 
   it('leaves an audit line for each connection, replacement and removal, with a fingerprint and never the key', async () => {
-    const store = createPostgresCredentialStore({ adminDb: test.admin.db, keys: newKey('v1') });
+    const store = createPostgresCredentialStore({ adminDb: test.service.db, keys: newKey('v1') });
     const owner = { userId: 'usr_owner', ip: '203.0.113.7' };
     const replacement = 'sk_FAKEREPLACEMENTFAKEKEY00000';
     await store.save(elevenlabs, owner);
@@ -97,7 +98,7 @@ describe('Postgres credential store (ADR 0016)', () => {
   });
 
   it('writes a status only over the version it read, never the key', async () => {
-    const store = createPostgresCredentialStore({ adminDb: test.admin.db, keys: newKey('v1') });
+    const store = createPostgresCredentialStore({ adminDb: test.service.db, keys: newKey('v1') });
     await store.save(elevenlabs);
     const read = await store.find('elevenlabs');
     if (read === null) throw new Error('saved row not found');
@@ -116,10 +117,10 @@ describe('Postgres credential store (ADR 0016)', () => {
 
   it('reads a key it can no longer open as one to replace, and leaves its seal intact', async () => {
     const original = newKey('v1');
-    await createPostgresCredentialStore({ adminDb: test.admin.db, keys: original }).save(elevenlabs);
+    await createPostgresCredentialStore({ adminDb: test.service.db, keys: original }).save(elevenlabs);
     const logged: string[] = [];
     const rotatedTooEarly = createPostgresCredentialStore({
-      adminDb: test.admin.db,
+      adminDb: test.service.db,
       keys: newKey('v2'),
       onUnreadable: (provider) => logged.push(provider),
     });
@@ -132,7 +133,7 @@ describe('Postgres credential store (ADR 0016)', () => {
 
     await rotatedTooEarly.update({ ...unreadable, settings: {} });
     // Putting the old encryption key back recovers the key.
-    const restored = createPostgresCredentialStore({ adminDb: test.admin.db, keys: original });
+    const restored = createPostgresCredentialStore({ adminDb: test.service.db, keys: original });
     expect(await restored.find('elevenlabs')).toMatchObject({ key: FAKE_KEY });
   });
 
@@ -140,15 +141,15 @@ describe('Postgres credential store (ADR 0016)', () => {
     const v1 = newKey('v1');
     const v2 = newKey('v2');
     const both = [...v2, ...v1];
-    await createPostgresCredentialStore({ adminDb: test.admin.db, keys: v1 }).save(elevenlabs);
-    const before = await createPostgresCredentialStore({ adminDb: test.admin.db, keys: both }).find(
+    await createPostgresCredentialStore({ adminDb: test.service.db, keys: v1 }).save(elevenlabs);
+    const before = await createPostgresCredentialStore({ adminDb: test.service.db, keys: both }).find(
       'elevenlabs',
     );
 
     expect(await resealProviderCredentials(test.admin.db, both)).toEqual({ rewritten: 1, unreadable: [] });
     expect(await resealProviderCredentials(test.admin.db, both)).toEqual({ rewritten: 0, unreadable: [] });
 
-    const v2Only = createPostgresCredentialStore({ adminDb: test.admin.db, keys: v2 });
+    const v2Only = createPostgresCredentialStore({ adminDb: test.service.db, keys: v2 });
     const after = await v2Only.find('elevenlabs');
     expect(after).toMatchObject({ key: FAKE_KEY, state: 'connected' });
     // The row's version is kept: a check that read it before the rotation still lands.
@@ -167,14 +168,38 @@ describe('Postgres credential store (ADR 0016)', () => {
 
   it('leaves a key no listed encryption key opens, and names it', async () => {
     const lost = newKey('v1');
-    await createPostgresCredentialStore({ adminDb: test.admin.db, keys: lost }).save(elevenlabs);
+    await createPostgresCredentialStore({ adminDb: test.service.db, keys: lost }).save(elevenlabs);
     expect(await resealProviderCredentials(test.admin.db, newKey('v3'))).toEqual({
       rewritten: 0,
       unreadable: ['elevenlabs'],
     });
     expect(
-      await createPostgresCredentialStore({ adminDb: test.admin.db, keys: lost }).find('elevenlabs'),
+      await createPostgresCredentialStore({ adminDb: test.service.db, keys: lost }).find('elevenlabs'),
     ).toMatchObject({ key: FAKE_KEY });
-    await createPostgresCredentialStore({ adminDb: test.admin.db, keys: lost }).remove('elevenlabs');
+    await createPostgresCredentialStore({ adminDb: test.service.db, keys: lost }).remove('elevenlabs');
+  });
+  it('gives `pnpm evals --key-from-crm` the keys these encryption keys open, and leaves out one they do not', async () => {
+    const current = newKey('v1');
+    const xaiKey = 'xai-FAKEFAKEFAKEFAKEFAKEFAKE0000';
+    await createPostgresCredentialStore({ adminDb: test.service.db, keys: current }).save({
+      ...elevenlabs,
+      provider: 'xai',
+      key: xaiKey,
+      settings: {},
+      voices: [],
+      charactersLeft: null,
+    });
+    await createPostgresCredentialStore({ adminDb: test.service.db, keys: newKey('v9') }).save({
+      ...elevenlabs,
+      provider: 'mistral',
+      settings: {},
+      voices: [],
+      charactersLeft: null,
+    });
+
+    const keys = await readSavedProviderKeys(test.admin.db, current);
+
+    expect(keys.xai).toBe(xaiKey);
+    expect(keys.mistral).toBeUndefined();
   });
 });

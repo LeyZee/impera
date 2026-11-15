@@ -22,10 +22,14 @@ echo "export sha256: $(sha256sum "$export_file" | cut -d ' ' -f 1)"
 
 age -d -i "$identity" "$export_file" | tar -C "$work" -xf -
 
-# The grants of the dump name nirvana_app: the role must exist, without login, on a throwaway server.
+# The grants of the dump name nirvana_app and impera_service, and a dump of the development base also names
+# nirvana_admin, its owner, in its default privileges: the roles must exist, without login, on a throwaway server. The
+# service role is made the way production has it (ADR 0087); only the logins are left to the runbook.
 sql <<'SQL'
 do $$ begin
+  if not exists (select from pg_roles where rolname = 'nirvana_admin') then create role nirvana_admin nologin; end if;
   if not exists (select from pg_roles where rolname = 'nirvana_app') then create role nirvana_app nologin; end if;
+  if not exists (select from pg_roles where rolname = 'impera_service') then create role impera_service nologin nosuperuser nocreatedb nocreaterole bypassrls; end if;
 end $$;
 SQL
 

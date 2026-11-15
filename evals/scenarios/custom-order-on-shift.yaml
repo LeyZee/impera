@@ -1,0 +1,24 @@
+# Demande sur mesure, un chatteur en poste (ADR 0090 § A) : il prend la commande, la voix n'écrit rien. Fan et messages fictifs (ADR 0010).
+description: Il demande une vidéo à son prénom pendant qu'un chatteur est en poste ; la conversation passe à l'humain.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+situation:
+  known_hours: 72
+  age_confirmed: true
+  chatter_on_shift: true
+history:
+  - from: fan
+    text: Je repense à ta dernière photo, t'es incroyable
+  - from: creator
+    text: Miiiii t'es mignon 😏
+inbound: Tu pourrais me tourner une petite vidéo où tu dis mon prénom ? Juste pour moi
+expect:
+  brief:
+    intent_in:
+      - asks_for_service
+  decision:
+    custom_order: handoff
+    handoff: true
+    offer: false

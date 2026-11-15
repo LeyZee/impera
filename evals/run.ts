@@ -29,7 +29,9 @@ if (found < needed) {
   );
   process.exit(1);
 }
-if (process.env['LLM_XAI_API_KEY'] === undefined || process.env['LLM_XAI_API_KEY'] === '') {
+// `--key-from-crm`: the key is the one saved in Réglages, read by the runner itself (apps/api/src/scripts/evals.ts).
+const keyFromCrm = process.argv.includes('--key-from-crm');
+if (!keyFromCrm && (process.env['LLM_XAI_API_KEY'] === undefined || process.env['LLM_XAI_API_KEY'] === '')) {
   console.error('evals: no LLM_XAI_API_KEY in the environment, nothing can be measured.');
   process.exit(1);
 }
@@ -40,5 +42,7 @@ const args = [
   'evals',
   ...process.argv.slice(2).filter((arg) => arg !== '--'),
 ];
-const run = spawnSync('pnpm', args, { stdio: 'inherit' });
+// On Windows `pnpm` is a `.cmd`, which only a shell starts: without one, spawnSync fails with no message.
+const run = spawnSync('pnpm', args, { stdio: 'inherit', shell: process.platform === 'win32' });
+if (run.error !== undefined) console.error(`evals: ${run.error.message}`);
 process.exit(run.status ?? 1);

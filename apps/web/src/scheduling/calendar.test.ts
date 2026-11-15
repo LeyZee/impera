@@ -10,6 +10,7 @@ import {
   cellWho,
   dayWords,
   monthMarks,
+  monthMarksKey,
   monthBounds,
   monthWindow,
   shownOn,
@@ -205,6 +206,39 @@ describe('monthBounds', () => {
 
   it('crosses the year', () => {
     expect(monthBounds('2026-12', PARIS).to.toISOString()).toBe('2026-12-31T23:00:00.000Z');
+  });
+});
+
+describe('monthMarksKey', () => {
+  it('says the hour each mark of a day stands for (GES-12)', () => {
+    expect(words(monthMarksKey(calendarOf(), [DAY, '2026-11-05']))).toBe(
+      'Un trait par créneau : 0 h, 6 h, 12 h et 18 h',
+    );
+    const two = calendarOf({ settings: settingsOf({ start: 480, length: 720 }) });
+    expect(words(monthMarksKey(two, [DAY]))).toBe('Un trait par créneau : 8 h et 20 h');
+  });
+
+  it('says no hours when a new version changes the créneaux within the days shown', () => {
+    const base = settingsOf();
+    const [first] = base.versions;
+    if (first === undefined) throw new Error('no version');
+    const changed = calendarOf({
+      settings: {
+        ...base,
+        versions: [
+          first,
+          {
+            ...first,
+            id: id(90),
+            effectiveAt: at(0, '2026-11-05'),
+            slots: settingsOf({ length: 720 }).versions[0]?.slots ?? [],
+          },
+        ],
+      },
+    });
+    expect(monthMarksKey(changed, [DAY, '2026-11-05'])).toBe(
+      'Un trait par créneau de la journée, dans l’ordre',
+    );
   });
 });
 

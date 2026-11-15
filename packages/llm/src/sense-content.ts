@@ -5,7 +5,8 @@ import type { ModelRef } from './config';
 import type { DropContext, DropSenseInput, SenseInput, VideoKeyframes } from './gateway-types';
 import { wrapUntrusted } from './untrusted';
 
-const INLINE_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
+/** The largest video given whole to a model that takes video; a larger one is read by its keyframes. */
+export const INLINE_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
 
 const ORIGIN = { fan: 'Média envoyé par un fan.', creator: 'Média du catalogue de la créatrice.' } as const;
 

@@ -1,6 +1,7 @@
 import type { CreatorAccountShift, CreatorAgenda, CreatorSuggestion, CreatorTask } from '@impera/contracts';
 import { CREATOR_TASK_CATEGORY_LABELS } from '@impera/contracts';
 import {
+  useId,
   useRef,
   useState,
   type JSX,
@@ -76,6 +77,7 @@ export function DayView({
   // Suggestions at an hour sit in the Programme (CREA-22); the others, without an hour, stay as cards on top.
   const proposed = timedSuggestionsOf(plan, agenda.timeZone);
   const cards = plan.suggestions.filter((suggestion) => suggestion.when?.kind !== 'timed');
+  const decideId = useId();
   const swipe = useSwipe((step) => {
     onDay(addDays(day, step));
   });
@@ -88,7 +90,12 @@ export function DayView({
         <UndatedSuggestions agenda={agenda} onDecline={actions.onDecline} onPlace={actions.onPlace} />
       ) : null}
       {cards.length === 0 ? null : (
-        <section className="ag-sec" aria-label="Propositions de l’agence">
+        // Titled like « Sans date » above it, so that a dated card is never read as one of those (CRE-07).
+        <section className="ag-sec" aria-labelledby={decideId}>
+          <div className="ag-sec__head">
+            <h2 id={decideId}>{isToday ? 'Proposé pour aujourd’hui' : 'Proposé ce jour-là'}</h2>
+            <span className="ag-count nv-num">{cards.length}</span>
+          </div>
           {cards.map((suggestion) => (
             <SuggestionCard
               key={suggestion.id}
@@ -246,13 +253,17 @@ export function Glance({
   const { done, total } = progressOf(plan);
   const left = total - done;
   const first = firstOf(plan, nowMinute);
+  const proposed = plan.suggestions.length;
+  // Nothing of hers but a suggestion waiting: the title says the suggestion, never « Rien à faire » (CRE-05).
   const title =
     total === 0
-      ? 'Rien à faire'
+      ? proposed > 0
+        ? `${String(proposed)} ${proposed > 1 ? 'propositions' : 'proposition'} à regarder`
+        : 'Rien à faire'
       : left === 0
         ? 'Tout est fait'
         : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
-  const proposed = plan.suggestions.length;
+  const share = total === 0 ? 0 : done / total;
   // « Plus rien à heure » only when there was something at an hour: an empty day says it once, in the title.
   const moment = nowMinute === null || plan.timed.length === 0 ? null : momentOf(plan, nowMinute);
   const { streak } = agenda;
@@ -267,13 +278,16 @@ export function Glance({
         >
           <svg viewBox="0 0 66 66" aria-hidden="true">
             <circle className="nv-ring__track" cx="33" cy="33" r={RING_RADIUS} />
-            <circle
-              className="nv-ring__value"
-              cx="33"
-              cy="33"
-              r={RING_RADIUS}
-              strokeDasharray={ringDash(total === 0 ? 0 : done / total)}
-            />
+            {/* At nothing done, no value at all: a round cap of length 0 still draws a lit dot (CRE-06). */}
+            {share === 0 ? null : (
+              <circle
+                className="nv-ring__value"
+                cx="33"
+                cy="33"
+                r={RING_RADIUS}
+                strokeDasharray={ringDash(share)}
+              />
+            )}
           </svg>
           <span className="nv-ring__label nv-num" aria-hidden="true">
             {total === 0 ? '–' : `${String(done)}/${String(total)}`}
@@ -284,7 +298,7 @@ export function Glance({
           <span>
             {total === 0 ? (
               proposed > 0 ? (
-                `${String(proposed)} ${proposed > 1 ? 'propositions' : 'proposition'} de l’agence à regarder.`
+                `Rien d’autre à faire ${nowMinute === null ? 'ce jour-là' : 'aujourd’hui'}.`
               ) : nowMinute === null ? (
                 'Aucune tâche ce jour-là.'
               ) : (
@@ -411,7 +425,8 @@ function TaskRow({
           {task.title}
           {task.essential ? <span className="ag-ess">essentielle</span> : null}
         </b>
-        <span>{task.purpose ?? CREATOR_TASK_CATEGORY_LABELS[task.category]}</span>
+        {/* Without a purpose, the title stands alone: the category is the tag on the right (CRE-19). */}
+        {task.purpose === null ? null : <span>{task.purpose}</span>}
       </button>
       <span className="ag-tag">
         {task.when.kind === 'routine' ? 'Routine' : CREATOR_TASK_CATEGORY_LABELS[task.category]}

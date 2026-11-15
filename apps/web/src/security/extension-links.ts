@@ -1,6 +1,8 @@
 import {
+  ApiErrorSchema,
   ExtensionLinkCreatedSchema,
   ExtensionLinkListSchema,
+  REAUTHENTICATION_ERROR_CODE,
   type ExtensionLink,
   type ExtensionLinkCreated,
 } from '@impera/contracts';
@@ -10,11 +12,13 @@ import {
  * at most. The token is shown once, at its creation; the server keeps its hash only.
  */
 
-export type LinkFailure = 'full' | 'forbidden' | 'failed';
+/** `reauth`: the sign-in is over 10 minutes old, the page asks for the password and a code, then links again. */
+export type LinkFailure = 'full' | 'forbidden' | 'reauth' | 'failed';
 
 export const LINK_FAILURES: Readonly<Record<LinkFailure, string>> = {
   full: 'Trois navigateurs sont déjà reliés : délies-en un d’abord.',
   forbidden: 'Ce compte ne peut pas relier d’extension.',
+  reauth: 'Confirme ton mot de passe et ton code pour relier ce navigateur.',
   failed: 'Le serveur ne répond pas. Réessaie dans un instant.',
 };
 
@@ -34,7 +38,12 @@ async function call(path: string, init: RequestInit = {}): Promise<Response> {
     ...init,
   }).catch(() => null);
   if (response === null) throw new ExtensionLinkError('failed');
-  if (response.status === 403) throw new ExtensionLinkError('forbidden');
+  if (response.status === 403) {
+    const error = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+    throw new ExtensionLinkError(
+      error.data?.error.code === REAUTHENTICATION_ERROR_CODE ? 'reauth' : 'forbidden',
+    );
+  }
   if (response.status === 409) throw new ExtensionLinkError('full');
   return response;
 }

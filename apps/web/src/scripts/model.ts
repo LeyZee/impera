@@ -5,6 +5,7 @@ import {
   ScriptStructureBodySchema,
   scriptCardInk,
   scriptSegmentCodes,
+  scriptSlots,
   type MediaSlot,
   type ScriptBridge,
   type ScriptColor,
@@ -215,13 +216,14 @@ export function slotsSummary(slots: readonly MediaSlot[]): string {
   return parts.length === 0 ? 'Rien à tourner' : parts.join(', ');
 }
 
-/** The stack in one line, above it: « 4 étapes · 1 pont · 12 photos, 4 vidéos ». */
+/** The stack in one line, above it: « 4 étapes · 1 pont · 12 photos, 4 vidéos », each series counted. */
 export function stackSummary(segments: readonly ScriptSegment[]): string {
   const stages = segments.filter((segment) => segment.kind === 'stage').length;
   const bridges = segments.length - stages;
   const parts = [`${String(stages)} étape${stages > 1 ? 's' : ''}`];
   if (bridges > 0) parts.push(`${String(bridges)} pont${bridges > 1 ? 's' : ''}`);
-  const slots = segments.flatMap((segment) => segment.mediaSlots);
+  // Every slot she shoots: a stage's slots once per series (A, B, C), as her cards ask them (recette créatrice 10).
+  const slots = scriptSlots(segments).map((one) => one.slot);
   if (slots.length > 0) parts.push(slotsSummary(slots));
   return parts.join(' · ');
 }

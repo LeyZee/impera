@@ -33,7 +33,7 @@ Sans lui, la boucle « un fan écrit, l'agent répond » ne se voit sur aucun é
 2. `pnpm ops:check-keys` sur le serveur : la clé est lisible.
 3. **xAI** : `pnpm probe` (persona fictive), puis `pnpm evals`, résultats lus avant toute conversation ; Playground ; Copilote sur le fan « test » seulement ; jamais Automatique avant des évals vertes et l'accord de Charles.
 4. **Google** : `pnpm probe:vision` sur des médias factices, puis un média envoyé par le fan « test ».
-5. **Reveal CRM** : connecter, relier le modèle de Messa et le membre « bot » à l'agent, lire une page de ventes, lancer la vérification avec l'export du dashboard sur la dernière quinzaine terminée ; ajuster les noms de colonnes de l'export ; inscrire le webhook quand le support l'a ouvert.
+5. **Reveal CRM** : connecter, relier le modèle de Messa et le membre « bot » à l'agent, lire une page de ventes, lancer la vérification sur la dernière quinzaine terminée (registre face aux statistiques par jour ; l'export est facultatif, le dashboard de Reveal n'en offrant pas) ; ajuster les noms de colonnes de l'export si un export apparaît un jour ; inscrire le webhook quand le support l'a ouvert.
 6. **Session Reveal** : seulement après la capture, le connecteur écrit et sa suite de contrat verte.
 7. Pour chaque clé : retirer la clé, vérifier que l'écran le dit et que rien ne casse ; remettre.
 

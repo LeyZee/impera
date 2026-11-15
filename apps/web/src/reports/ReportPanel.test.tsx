@@ -70,6 +70,7 @@ const report = (patch: Record<string, unknown>): FakeReport => ({
   version: 1,
   byAgency: false,
   reviewKind: null,
+  earningsSource: 'declared',
   explanation: null,
   check: null,
   canReview: false,
@@ -189,6 +190,10 @@ function renderPage(): void {
 }
 
 const amountField = (): HTMLElement => screen.getByLabelText('Ce que tu as généré');
+
+/** What an element says, its spaces plain. */
+const said = (element: Element | null | undefined): string =>
+  (element?.textContent ?? '').replaceAll(/[\s\u00a0\u202f]+/gu, ' ').trim();
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -446,6 +451,31 @@ describe('Mes rapports', () => {
         body: { version: 2, amountMinor: 10_000, comment: null, incident: null },
       },
     ]);
+  });
+
+  it('asks nothing more of a report whose fortnight switched to the sales read, and says it without effect (ADR 0084 § 3)', async () => {
+    served.reports = [
+      report({
+        status: 'rejected',
+        version: 2,
+        reviewNote: 'Il manque le pourboire de 20 €',
+        earningsSource: 'detected',
+      }),
+    ];
+    served.rules = { currency: 'EUR', earningsSource: 'detected' };
+    renderPage();
+    const mine = await screen.findByText('Tous mes rapports');
+    expect(said(mine.closest('details')?.querySelector('summary'))).toContain('1 sans effet sur la paie');
+    // Nothing to take up again: no « Renvoyé » in what is left to do.
+    expect(screen.queryByRole('button', { name: /Rapport renvoyé par l’agence/u })).toBe(null);
+    const line = mine.closest('details')?.querySelector('.rp-line');
+    if (!(line instanceof HTMLButtonElement)) throw new Error('no line');
+    expect(said(line.querySelector('.rp-chip'))).toBe('Sans effet sur la paie');
+    fireEvent.click(line);
+    const dialog = await screen.findByRole('dialog', { name: 'Mon rapport' });
+    expect(await within(dialog).findByText('Sans effet sur la paie')).toBeTruthy();
+    expect(said(dialog)).toContain('Ce rapport de 80,00 € reste');
+    expect(within(dialog).queryByLabelText('Ce que tu as généré')).toBe(null);
   });
 
   it('says nothing validated in a currency where nothing is, rather than « Validé 0,00 $US »', async () => {

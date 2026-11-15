@@ -9,7 +9,7 @@ import { NO_SALE_RISKS } from './policy';
  */
 
 /** Bumped whenever a weight, a bound or the emoji list changes: each score says which counting it came from. */
-export const DESIRE_WEIGHTS_VERSION = 'desire-1';
+export const DESIRE_WEIGHTS_VERSION = 'desire-2';
 
 /** Defaults of the persona's thresholds, when her file sets none. */
 export const DEFAULT_MIN_DESIRE_TO_OPEN = DESIRE_BAND_FLOORS.playful;
@@ -38,6 +38,13 @@ const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
   busy_now: -30,
   slows_down: -20,
   discomfort: -30,
+  // His availability (ADR 0103, amendement du 13/11): a fan alone and free warms a little; someone beside him or an
+  // appointment cools him as much as being busy. The gate before a script reads the state code holds, not these.
+  alone: 6,
+  at_home: 3,
+  free_now: 6,
+  someone_nearby: -30,
+  leaving_soon: -25,
   // From the brief.
   'intent:flirt': 6,
   'intent:sexting': 12,
@@ -184,6 +191,14 @@ function measuredSignals(measured: DesireMeasure): CountedSignal[] {
 const isCounted = (signal: string): signal is CountedSignal => Object.hasOwn(WEIGHTS, signal);
 
 /**
+ * What one signal is worth in the current counting, for a screen that shows why the score moved; `null` for the
+ * signals that reset or freeze it instead of counting.
+ */
+export function desireSignalPoints(signal: DesireSignal): number | null {
+  return isCounted(signal) ? WEIGHTS[signal] : null;
+}
+
+/**
  * His score after his new message: the stored one decayed to now, plus what this message moves, within 0 and 100.
  * A possible minor or a disputed age resets it to 0; a risk that stops any sale freezes it as it stands.
  */
@@ -206,3 +221,19 @@ export function desireScore(turn: DesireTurn): DesireReading {
 
 /** Whether this message moved his score: only then is it journaled (a first score of 0 moves nothing). */
 export const desireMoved = (reading: DesireReading): boolean => reading.score !== (reading.before ?? 0);
+
+/**
+ * His score counted again from what was read on one message, with the weights in force now (ADR 0103 § 6): the owner's
+ * marks keep the signals counted, so a change of weights shows what it does to each of them without a model.
+ */
+export function recountDesire(reading: {
+  readonly before: number | null;
+  readonly signals: readonly DesireSignal[];
+}): number {
+  const before = reading.before ?? 0;
+  if (reading.signals.includes('minor_suspected') || reading.signals.includes('age_disputed')) return 0;
+  if (reading.signals.includes('frozen')) return before;
+  return bounded(
+    before + reading.signals.filter(isCounted).reduce((sum, signal) => sum + WEIGHTS[signal], 0),
+  );
+}

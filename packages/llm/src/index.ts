@@ -1,7 +1,14 @@
 /** LlmGateway: sense, brain, voice and judge roles over provider SDKs (ADR 0009). The only package that imports one. */
 export const LLM_PACKAGE = '@impera/llm';
 
-export { startOfLocalDay, type BudgetEvent, type BudgetState, type BudgetStatus } from './budget';
+export {
+  startOfLocalDay,
+  UNBILLED_OUTCOMES,
+  UNKNOWN_CALL_COST_USD,
+  type BudgetEvent,
+  type BudgetState,
+  type BudgetStatus,
+} from './budget';
 export {
   CALL_OUTCOMES,
   createInMemoryCallLog,
@@ -42,6 +49,7 @@ export {
 export {
   createLlmGateway,
   type BrainAlert,
+  type BrainScript,
   type BrainInput,
   type CallMeta,
   type ChannelPostInput,
@@ -70,7 +78,9 @@ export {
   type VideoFrame,
   type VideoKeyframes,
   type JudgeInput,
+  type JudgeSituation,
   type VoiceInput,
+  type VoiceScriptStep,
 } from './gateway';
 export type { HealthReport, HealthState, ProviderHealth, RoleHealth } from './health';
 export { loadPrompt } from './prompts';
@@ -83,7 +93,10 @@ export {
 export {
   BRAIN_ALERTS_MAX,
   brainAlertId,
+  BRAIN_SCRIPTS_MAX,
+  brainScriptId,
   BriefSchema,
+  SCRIPT_REPLIES,
   CHANNEL_POST_TEXT_MAX,
   JudgeCriterionSchema,
   VoiceOutputSchema,
@@ -92,4 +105,5 @@ export {
   type JudgeOutput,
   type VoiceOutput,
 } from './schemas';
+export { INLINE_VIDEO_MAX_BYTES } from './sense-content';
 export { wrapUntrusted, type UntrustedKind } from './untrusted';

@@ -138,3 +138,17 @@ export const BLOCKED_EXPIRY_REASONS: Readonly<Record<BlockedReason, string>> = {
   kill_switch: 'Arrêt d’urgence à l’envoi',
   session_expired: 'Session de la plateforme expirée à l’envoi',
 };
+
+/** A creator outside the reader's scope (ADR 0026 § 1): 403. */
+export class CreatorForbidden extends DomainError {
+  constructor() {
+    super('creator_forbidden', 'Créatrice hors de ton périmètre');
+  }
+}
+
+/** A conversation of her that was not given to him, for a member who reads only what he holds (ADR 0024): 403. */
+export class ConversationForbidden extends DomainError {
+  constructor() {
+    super('conversation_forbidden', 'Cette conversation ne t’a pas été confiée');
+  }
+}

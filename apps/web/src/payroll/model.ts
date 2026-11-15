@@ -156,10 +156,19 @@ export function payoutBlockPlace(
   reason: InvoiceNotIssuedReason | null,
 ): 'file' | 'billing' | null {
   if (block.reason !== 'documents_not_issued') return 'file';
+  return notIssuedPlace(reason);
+}
+
+/** Where the owner settles what holds an invoice back: the member's file, Réglages › Facturation, or nowhere. */
+export function notIssuedPlace(reason: InvoiceNotIssuedReason | null): 'file' | 'billing' | null {
   if (reason === 'agency_missing' || reason === 'mandate_unpublished' || reason === 'regime_not_validated')
     return 'billing';
   return reason === 'no_invoice_to_credit' ? null : 'file';
 }
+
+/** Why an invoice would be held back, as the owner reads it (« ta vérification »): one clause, no capital. */
+export const notIssuedForOwner = (reason: InvoiceNotIssuedReason): string =>
+  NOT_ISSUED_FOR_AGENCY[reason]('ta vérification');
 
 /** A transfer that waits, as the member reads it (recette EQP-04): why, and whether the next step is theirs. */
 export interface MyPayoutHold {
@@ -497,7 +506,13 @@ export function flowOf(
       : [
           {
             label: platformNetName(platform),
-            op: plural(line.countedSales?.sales ?? 0, 'vente lue', 'ventes lues'),
+            // A refund counted with the sales says so: « 1 vente lue » alone read wrong before a net below zero.
+            op: [
+              plural(line.countedSales?.sales ?? 0, 'vente lue', 'ventes lues'),
+              (line.countedSales?.refunds ?? 0) === 0
+                ? ''
+                : `, ${plural(line.countedSales?.refunds ?? 0, 'remboursement', 'remboursements')}`,
+            ].join(''),
             amount: amountText(line.grossMinor, line.currency),
           },
         ];
@@ -726,6 +741,9 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return `${member ?? 'Un membre'} n’a pas de taux de commission en vigueur.`;
     case 'pay_sale_outcome_conflict':
       return 'Cette décision n’est plus possible pour cette vente : la liste est relue.';
+    case 'pay_sale_recipient_conflict':
+      // ADR 0101: only a member on shift at the sale's instant receives it, and a sale of the agent is given whole.
+      return 'Cette vente ne peut pas aller à ce membre : seul un membre en poste au moment de la vente la reçoit, et une vente de l’IA se donne entière. La liste est relue.';
     case 'payroll_own_forbidden':
       return 'Personne ne décide de sa propre paie : un autre s’en charge.';
     case 'payroll_forbidden':
@@ -1095,10 +1113,10 @@ function secondCarry(statement: CommissionStatement, ended: boolean): string {
   if (statement.carryOverOutMinor <= 0) return '';
   if (carryOverRank(statement.carryOversIn, statement.carryOverOutMinor) !== CARRY_OVER_RANK_MAX) return '';
   if (statement.status !== 'draft')
-    return ' Deuxième report de suite : la quinzaine suivante versera ce montant, même sous le minimum.';
+    return ' Deuxième report de suite\u00a0: la quinzaine suivante versera ce montant, même sous le minimum.';
   return ended
-    ? ' Ce sera le deuxième report de suite : la quinzaine suivante versera ce montant, même sous le minimum.'
-    : ' Ce serait le deuxième report de suite : la quinzaine suivante verserait ce montant, même sous le minimum.';
+    ? ' Ce sera le deuxième report de suite\u00a0: la quinzaine suivante versera ce montant, même sous le minimum.'
+    : ' Ce serait le deuxième report de suite\u00a0: la quinzaine suivante verserait ce montant, même sous le minimum.';
 }
 
 /**
@@ -1113,7 +1131,7 @@ function paidAfterTwoCarries(statement: CommissionStatement, ended: boolean): st
   if (positiveCarryRankIn(statement.carryOversIn) < CARRY_OVER_RANK_MAX) return null;
   const draft = statement.status === 'draft';
   const soFar = draft && !ended ? ' à ce jour' : '';
-  return `Sous le minimum de ${amountText(rules.minimumPayoutMinor, 'EUR')}${soFar}, mais le montant qui entre a déjà été reporté deux fois : la quinzaine ${draft ? 'versera' : 'verse'} tout quand même, pour que la facture qui attend soit payée avant son échéance.`;
+  return `Sous le minimum de ${amountText(rules.minimumPayoutMinor, 'EUR')}${soFar}, mais le montant qui entre a déjà été reporté deux fois\u00a0: la quinzaine ${draft ? 'versera' : 'verse'} tout quand même, pour que la facture qui attend soit payée avant son échéance.`;
 }
 
 /**
@@ -1145,11 +1163,11 @@ export function carryLine(statement: CommissionStatement, ended: boolean): strin
       : 'iraient sur la quinzaine suivante, si la quinzaine finit ainsi';
     return statement.totalMinor < 0
       ? `Total sous zéro${soFar} : ${signedAmountText(statement.carryOverOutMinor, 'EUR')} ${when}.`
-      : `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')}${soFar} : ${amountText(statement.carryOverOutMinor, 'EUR')} ${when}.${second}`;
+      : `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')}${soFar}\u00a0: ${amountText(statement.carryOverOutMinor, 'EUR')} ${when}.${second}`;
   }
   if (statement.totalMinor < 0)
     return `Total sous zéro : ${signedAmountText(statement.carryOverOutMinor, 'EUR')} reportés sur la quinzaine suivante.`;
-  return `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')} : ${amountText(statement.carryOverOutMinor, 'EUR')} reportés sur la quinzaine suivante.${second}`;
+  return `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')}\u00a0: ${amountText(statement.carryOverOutMinor, 'EUR')} reportés sur la quinzaine suivante.${second}`;
 }
 
 /** One part of a split: a name, its net, and its share of the whole in basis points. */
@@ -1602,7 +1620,7 @@ function myCarryLine(statement: CommissionStatement, ended: boolean): string | n
   if (ended || statement.carryOverOutMinor === 0) return carryLine(statement, ended);
   if (statement.totalMinor < 0)
     return `Ton total est sous zéro à ce jour : si la quinzaine finit ainsi, ${signedAmountText(statement.carryOverOutMinor, 'EUR')} iront sur la suivante.`;
-  return `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')} à ce jour : si la quinzaine finit ainsi, ${amountText(statement.carryOverOutMinor, 'EUR')} iront sur la suivante.${secondCarry(statement, ended)}`;
+  return `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')} à ce jour\u00a0: si la quinzaine finit ainsi, ${amountText(statement.carryOverOutMinor, 'EUR')} iront sur la suivante.${secondCarry(statement, ended)}`;
 }
 
 /** Where a net stands among the tiers: the highest reached, its threshold included, and the next one. */

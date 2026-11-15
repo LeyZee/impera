@@ -150,5 +150,15 @@ describe('the workshop draft', () => {
     expect(stackSummary(emptyDraft().segments)).toBe('1 étape · 3 photos, 1 vidéo');
     const bridged = addBridgeAfter(addStage(emptyDraft().segments, null), 0);
     expect(stackSummary(bridged)).toBe('2 étapes · 1 pont · 7 photos, 2 vidéos');
+    // A stage in three series is shot three times (recette créatrice 10: « 22 photos » for 37 media).
+    const [first] = emptyDraft().segments;
+    if (first?.kind !== 'stage') throw new Error('stage expected');
+    const series = [
+      {
+        ...first,
+        variants: (['A', 'B', 'C'] as const).map((letter) => ({ letter, hint: 'Série inventée' })),
+      },
+    ];
+    expect(stackSummary(series)).toBe('1 étape · 9 photos, 3 vidéos');
   });
 });

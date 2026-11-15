@@ -6,7 +6,7 @@ import {
   type PlaygroundState,
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PersonaPicker } from './PersonaPicker';
@@ -23,6 +23,7 @@ const BASE: PlaygroundState = {
   persona: { name: 'Elena', played: null },
   presets: [],
   presetId: null,
+  desireThresholds: { open: 40, script: 70 },
   situation: {
     now: '2026-10-17T21:40:00.000Z',
     timeZone: 'Europe/Paris',
@@ -48,10 +49,15 @@ const summary = (id: string, version: string, isActive: boolean) => ({
   createdAt: '2026-11-01T10:00:00.000Z',
 });
 
-/** Mia has 0.0.3 not yet active over 0.0.2 in force; Nina has no persona. */
-function serve(activate: { status: number; body: unknown } = { status: 200, body: {} }, more = 0): unknown[] {
+/** Mia has 0.0.3 not yet active over 0.0.2 in force (none with `miaInForce` false); Nina has no persona. */
+function serve(
+  activate: { status: number; body: unknown } = { status: 200, body: {} },
+  more = 0,
+  miaInForce = true,
+  miaFails = false,
+): unknown[] {
   const asked: unknown[] = [];
-  let active = LIVE;
+  let active: string | null = miaInForce ? LIVE : null;
   const json = (body: unknown, status = 200) =>
     Promise.resolve(new Response(JSON.stringify(body), { status }));
   vi.stubGlobal(
@@ -66,6 +72,8 @@ function serve(activate: { status: number; body: unknown } = { status: 200, body
         });
       }
       if (url === `/v1/creators/${MIA}/persona`) {
+        if (miaFails)
+          return json({ error: { code: 'internal', message: '', details: {}, requestId: 'x' } }, 500);
         return json({
           creatorId: MIA,
           latest: null,
@@ -98,7 +106,7 @@ function serve(activate: { status: number; body: unknown } = { status: 200, body
 }
 
 /** The playground as the screen holds it: each choice answers the state the server would. */
-function show(state: PlaygroundState): { chosen: PlaygroundPersonaBody[] } {
+function show(state: PlaygroundState, runs = true): { chosen: PlaygroundPersonaBody[] } {
   const chosen: PlaygroundPersonaBody[] = [];
   let current = state;
   const choosePersona = (body: PlaygroundPersonaBody): Promise<PlaygroundState> => {
@@ -117,8 +125,11 @@ function show(state: PlaygroundState): { chosen: PlaygroundPersonaBody[] } {
               },
             },
           };
-    rerender();
-    return Promise.resolve(current);
+    // As the server answers: after the call, never inside React's own work (the scene may be chosen by an effect).
+    return Promise.resolve().then(() => {
+      act(rerender);
+      return current;
+    });
   };
   const client: Pick<PlaygroundClient, 'isDemo' | 'choosePersona'> = { isDemo: false, choosePersona };
   const pg = (): Playground => ({
@@ -127,9 +138,10 @@ function show(state: PlaygroundState): { chosen: PlaygroundPersonaBody[] } {
     isLoading: false,
     busy: false,
     error: undefined,
+    // `runs` false: the server refuses the scene, as `pg.run` says when its call fails.
     run: async (call) => {
       await call({ ...stubClient(), ...client });
-      return true;
+      return runs;
     },
     fail: () => undefined,
     retry: () => undefined,
@@ -161,6 +173,8 @@ function stubClient(): PlaygroundClient {
     send: unused,
     rate: unused,
     branch: unused,
+    markDesire: unused,
+    desireMarks: unused,
     compare: unused,
     advance: unused,
     setNotes: unused,
@@ -174,98 +188,99 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('PersonaPicker (PRO-21)', () => {
-  it('plays her version in force first, lets a version not yet active be heard, then activates it', async () => {
-    const asked = serve();
+describe('PersonaPicker (PRO-21, Charles 11/11)', () => {
+  it('opens on the first creator’s version in force, never the invented persona nor an older version', async () => {
+    serve();
     const { chosen } = show(BASE);
-    // Chips of the design system, never a native menu that cuts « en vigueur » (PRO-21 captures).
-    expect(screen.getByRole('radiogroup', { name: 'Persona' })).toBeDefined();
-    expect(screen.getByRole('radio', { name: 'Fictive (Elena)' })).toHaveProperty('ariaChecked', 'true');
-    fireEvent.click(await screen.findByRole('radio', { name: 'Mia' }));
     await waitFor(() => {
       expect(chosen).toEqual([{ kind: 'version', creatorId: MIA, versionId: LIVE }]);
     });
-    expect(await screen.findByText(/La version que lisent ses fans/u)).toBeDefined();
-    expect(screen.getByRole('radio', { name: '0.0.2 · en vigueur' })).toHaveProperty('ariaChecked', 'true');
+    // Chips of the design system, never a native menu that cuts its words (PRO-21 captures).
+    expect(screen.getByRole('radiogroup', { name: 'Persona' })).toBeDefined();
+    expect(screen.queryByRole('radio', { name: /Fictive/u })).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Mia' })).toHaveProperty('ariaChecked', 'true');
+    expect(await screen.findByText('Version 0.0.2')).toBeDefined();
+    expect(screen.queryByText(/0\.0\.3/u)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Activer cette version' })).toBeNull();
-
-    fireEvent.click(screen.getByRole('radio', { name: '0.0.3' }));
-    await waitFor(() => {
-      expect(chosen.at(-1)).toEqual({ kind: 'version', creatorId: MIA, versionId: DRAFT });
-    });
-    expect(await screen.findByText(/Pas encore active/u)).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Activer cette version' }));
-    expect(await screen.findByRole('status')).toHaveProperty(
-      'textContent',
-      'Version 0.0.3 activée : ses prochains brouillons l’écrivent avec elle.',
-    );
-    // Once activated, the screen says so everywhere: no « Pas encore active » left beside « activée ».
-    expect(screen.queryByText(/Pas encore active/u)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Activer cette version' })).toBeNull();
-    expect(screen.getByRole('radio', { name: '0.0.3 · en vigueur' })).toHaveProperty('ariaChecked', 'true');
-    // The server is told which version this screen saw in force: another tab's change is refused, not overwritten.
-    expect(asked).toEqual([
-      {
-        url: `/v1/creators/${MIA}/persona/versions/${DRAFT}/activate`,
-        body: { expectedActive: LIVE },
-      },
-    ]);
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Fictive' }));
-    await waitFor(() => {
-      expect(chosen.at(-1)).toEqual({ kind: 'invented' });
-    });
+    expect(screen.getByText(/Sa version en vigueur, celle que lisent ses fans/u)).toBeDefined();
   });
 
-  it('says so when she has no persona yet, and asks for the password before activating after 10 minutes', async () => {
-    serve({
-      status: 403,
-      body: { error: { code: 'reauthentication_forbidden', message: '', details: {}, requestId: 'r' } },
+  it('says so when a creator has no persona in force, and plays nothing', async () => {
+    serve();
+    const { chosen } = show({
+      ...BASE,
+      persona: { name: 'Mia', played: { creatorId: MIA, versionId: LIVE, version: '0.0.2' } },
     });
-    const { chosen } = show(BASE);
     fireEvent.click(await screen.findByRole('radio', { name: 'Nina' }));
     expect((await screen.findByRole('alert')).textContent).toBe(
-      'Nina n’a pas encore de persona : écris-la dans Créatrices.',
+      'Nina n’a pas de persona en vigueur : active-en une dans Créatrices › Persona.',
     );
     expect(chosen).toEqual([]);
+  });
 
-    cleanup();
-    show({
+  it('follows the version put in force since the scene began', async () => {
+    serve();
+    const { chosen } = show({
       ...BASE,
       persona: { name: 'Mia', played: { creatorId: MIA, versionId: DRAFT, version: '0.0.3' } },
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Activer cette version' }));
-    expect(await screen.findByText(/confirme ton mot de passe et ton code/u)).toBeDefined();
+    await waitFor(() => {
+      expect(chosen).toEqual([{ kind: 'version', creatorId: MIA, versionId: LIVE }]);
+    });
+  });
+
+  it('says so when no creator has a persona in force', async () => {
+    serve(undefined, 0, false);
+    const { chosen } = show(BASE);
+    expect(
+      await screen.findByText(
+        'Aucune créatrice n’a de persona en vigueur : active-en une dans Créatrices › Persona.',
+      ),
+    ).toBeDefined();
+    expect(chosen).toEqual([]);
+  });
+
+  it('never says « no persona in force » when her versions did not load (relecture #705)', async () => {
+    serve(undefined, 0, true, true);
+    const { chosen } = show(BASE);
+    expect(
+      await screen.findByText('Les personas ne se chargent pas. Choisis une créatrice pour réessayer.'),
+    ).toBeDefined();
+    expect(screen.queryByText(/Aucune créatrice n’a de persona en vigueur/u)).toBeNull();
+    expect(chosen).toEqual([]);
+  });
+
+  it('says so when following the version put in force fails, the scene staying on the old one (relecture #705)', async () => {
+    serve();
+    const { chosen } = show(
+      { ...BASE, persona: { name: 'Mia', played: { creatorId: MIA, versionId: DRAFT, version: '0.0.3' } } },
+      false,
+    );
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Sa nouvelle version en vigueur ne se charge pas : la conversation reste sur l’ancienne. Réessaie dans un instant.',
+    );
+    // Tried once for this read of her versions, never in a loop.
+    expect(chosen).toHaveLength(1);
   });
 
   it('moves with the arrows without starting over, and sends one choice for two quick clicks', async () => {
     serve();
-    const { chosen } = show(BASE);
+    const { chosen } = show({
+      ...BASE,
+      persona: { name: 'Mia', played: { creatorId: NINA, versionId: LIVE, version: '0.0.2' } },
+    });
     const mia = await screen.findByRole('radio', { name: 'Mia' });
-    const invented = screen.getByRole('radio', { name: 'Fictive (Elena)' });
-    invented.focus();
-    fireEvent.keyDown(invented, { key: 'ArrowRight' });
+    const nina = screen.getByRole('radio', { name: 'Nina' });
+    nina.focus();
+    fireEvent.keyDown(nina, { key: 'ArrowLeft' });
     // The focus is on Mia, nothing chosen: choosing starts the scene over, so it waits for Enter or a click.
     expect(document.activeElement).toBe(mia);
     expect(chosen).toEqual([]);
 
     fireEvent.click(mia);
-    fireEvent.click(screen.getByRole('radio', { name: 'Nina' }));
+    fireEvent.click(nina);
     await waitFor(() => {
       expect(chosen).toEqual([{ kind: 'version', creatorId: MIA, versionId: LIVE }]);
     });
-  });
-
-  it('lists her versions in the design system list past five, chips up to five (#566)', async () => {
-    serve(undefined, 4);
-    show({
-      ...BASE,
-      persona: { name: 'Mia', played: { creatorId: MIA, versionId: LIVE, version: '0.0.2' } },
-    });
-    const field = await screen.findByRole('combobox', { name: 'Version' });
-    fireEvent.click(field);
-    expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(6);
-    // Two creators and the invented persona: still chips.
-    expect(screen.getByRole('radiogroup', { name: 'Persona' })).toBeDefined();
   });
 });

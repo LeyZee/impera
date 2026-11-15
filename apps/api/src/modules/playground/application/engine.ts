@@ -2,6 +2,7 @@ import {
   DomainError,
   type Destination,
   type PlaygroundAnswer,
+  type DesireMarkVerdict,
   type PlaygroundComparison,
   type PlaygroundErrorCode,
   type PlaygroundMedia,
@@ -27,6 +28,12 @@ export interface PlaygroundEngine {
   advance(hours: number): PlaygroundState;
   setNotes(notes: readonly string[]): PlaygroundState;
   sendCreatorMedia(media: PlaygroundMedia, isLocked: boolean): PlaygroundState;
+  /** The owner marks his desire score after his n-th message (ADR 0103 § 6); kept for a creator's version only. */
+  markDesire(
+    fanMessageNumber: number,
+    mark: { readonly verdict: DesireMarkVerdict; readonly note?: string },
+    userId: string,
+  ): Promise<PlaygroundState>;
 }
 
 /** Every error of the playground carries one of the codes the contract lists for the screen. */
@@ -102,5 +109,15 @@ export class TimeZoneInvalid extends PlaygroundError {
 export class PlaygroundPersonaNotFound extends PlaygroundError {
   constructor() {
     super('playground_persona_not_found', 'Cette version de persona n’existe pas pour cette créatrice.');
+  }
+}
+
+/** The invented persona belongs to no creator: its conversations, and so its marks, are not kept (ADR 0103 § 7). */
+export class DesireMarkInventedPersona extends PlaygroundError {
+  constructor() {
+    super(
+      'desire_mark_invented_persona_conflict',
+      'La persona fictive n’est pas gardée : choisis une version d’une créatrice pour noter le désir.',
+    );
   }
 }

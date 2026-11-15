@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ObjectionRepliesSchema } from './objections';
 import {
   ageOn,
   LANGUAGES,
@@ -66,7 +67,7 @@ const q = (
   extra: { help?: string; required?: true } = {},
 ): SheetQuestion => ({ key, label, kind, width, ...extra });
 
-/** Desirali's sheet as its screen shows it (06/11/2026): 7 panels, 59 questions, in this order. */
+/** Desirali's sheet as its screen shows it (06/11/2026): 7 panels, 59 questions, in this order, and the two of the voice guide (ADR 0090 § 12). */
 export const PERSONA_SHEET: readonly SheetSection[] = [
   {
     key: 'identity',
@@ -139,6 +140,13 @@ export const PERSONA_SHEET: readonly SheetSection[] = [
       q('flirt_description', 'Style de flirt', 'long', 'full'),
       q('common_expressions', 'Expressions courantes', 'long', 'full'),
       q('typical_responses', 'Réponses typiques', 'long', 'full'),
+      // Not Desirali's: the voice guide of ADR 0090 § 12, the two things a sheet lacked to sound like her.
+      q('limit_setting_description', 'Comment elle dit non', 'long', 'full', {
+        help: 'Comment elle refuse, recadre ou pose une limite, sans casser l’ambiance.',
+      }),
+      q('sounds_wrong_description', 'Ce qu’elle n’écrirait jamais', 'long', 'full', {
+        help: 'Les tournures, les mots et les attitudes qui ne lui ressemblent pas.',
+      }),
     ],
   },
   {
@@ -264,6 +272,12 @@ export const PersonaConversationSchema = z.strictObject({
     (text) => text === null || text.split('\n').length <= TYPICAL_RESPONSES_MAX_LINES,
     { message: `${String(TYPICAL_RESPONSES_MAX_LINES)} lignes au plus` },
   ),
+  /**
+   * The voice guide (ADR 0090 § 12): read by the model like the rest of the sheet, never a rule (the guards read
+   * « Réglages de l'agent »). Absent in a version written before it: unanswered.
+   */
+  limit_setting_description: long.default(null),
+  sounds_wrong_description: long.default(null),
 });
 
 export const PersonaRelationshipsSchema = z.strictObject({
@@ -326,6 +340,8 @@ export const PersonaAgentSettingsSchema = z.strictObject({
   notifications: PersonaNotificationsSchema,
   behavior: PersonaAgentBehaviorSchema,
   rules: PersonaAgentRulesSchema,
+  /** Her replies to price objections (ADR 0090 § 10): the owner's and the agent's, never hers nor a chatter's. */
+  objection_replies: ObjectionRepliesSchema.default({}),
 });
 export type PersonaAgentSettings = z.infer<typeof PersonaAgentSettingsSchema>;
 
@@ -387,7 +403,7 @@ export interface PersonaSheetCompletion {
   readonly missing: readonly { readonly section: PersonaSheetSectionKey; readonly left: number }[];
 }
 
-/** How complete her sheet is: the questions she answered, out of 59 (ADR 0079 § 6). */
+/** How complete her sheet is: the questions she answered, out of all of them (ADR 0079 § 6, 0090 § 11). */
 export function personaSheetCompletion(sheet: PersonaSheet): PersonaSheetCompletion {
   let count = 0;
   const missing: { section: PersonaSheetSectionKey; left: number }[] = [];
@@ -591,6 +607,8 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
         flirt_description: null,
         common_expressions: null,
         typical_responses: fit('conversation', 'typical_responses', lines(...replies), SHEET_LONG_MAX),
+        limit_setting_description: null,
+        sounds_wrong_description: null,
       },
       relationships: {
         relationship_status: null,
@@ -631,6 +649,7 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
         response_delay_minutes: v1.behavior.response_delay_minutes,
       },
       rules: { ...v1.limits, emojis_forbidden: w?.emojis_forbidden ?? [] },
+      objection_replies: {},
     },
   };
   return { persona, moved };

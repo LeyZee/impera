@@ -177,6 +177,11 @@ function centeredStart(nav: HTMLElement, active: HTMLElement): number {
 const reducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/** Scrolls a sub-nav so that its lit tab sits in the middle of what shows, no label cut under a chevron. */
+function centreOn(nav: HTMLElement, active: HTMLElement): void {
+  nav.scrollLeft = centeredStart(nav, active);
+}
+
 /** The screens of a section, as tabs. The active one follows the URL; its glass slides from tab to tab. */
 export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: string }): JSX.Element {
   const pathname = useRouterState({ select: (router) => router.location.pathname });
@@ -240,9 +245,13 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     const nav = navRef.current;
     const active = nav?.querySelector('[aria-current="page"]');
     if (nav === null || !(active instanceof HTMLElement) || nav.scrollWidth <= nav.clientWidth) return;
-    nav.scrollLeft = centeredStart(nav, active);
+    // The bar scrolls only once marked as wider than its place (shell.css): mark it before the first paint, so the
+    // lit tab is brought into view at once; `mark` below then says which edges hide tabs.
+    if ((nav.dataset['more'] ?? 'none') === 'none') nav.dataset['more'] = 'end';
+    centreOn(nav, active);
     // Again when a count arrives and widens a tab (Paie's « Quinzaine 5 »): the label it pushes under the chevron.
-  }, [pathname, counts, tabs]);
+    // `lit` too: a view of one screen (?onglet=) changes the lit tab without changing the path.
+  }, [pathname, counts, tabs, lit]);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -251,8 +260,15 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
       const start = nav.scrollLeft > 1;
       const end = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1;
       const next: SubNavMore = start && end ? 'both' : start ? 'start' : end ? 'end' : 'none';
+      const before = nav.dataset['more'] ?? 'none';
       nav.dataset['more'] = next;
       setMore(next);
+      // A window narrowed until the tabs no longer fit: the bar starts to scroll, with the lit tab in view.
+      const active = nav.querySelector('[aria-current="page"]');
+      if (before === 'none' && next !== 'none' && active instanceof HTMLElement) {
+        centreOn(nav, active);
+        mark();
+      }
     };
     mark();
     nav.addEventListener('scroll', mark, { passive: true });

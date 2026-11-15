@@ -1,14 +1,29 @@
-import { desireNow, type MediaDescription } from '@impera/contracts';
+import { desireNow, type FanFlags, type MediaDescription, type ObjectionReplies } from '@impera/contracts';
 import type {
   BrainAlert,
   Brief,
+  BrainScript,
   CallTrace,
   ConversationTurn,
   LlmFailure,
   LlmGateway,
   VoiceInput,
+  VoiceScriptStep,
 } from '@impera/llm';
+import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
 
+import {
+  asksAvailability,
+  availabilityChanged,
+  readAvailability,
+  scriptStartGate,
+  sexualizes,
+  type FanAvailabilityRecord,
+  type ScriptStart,
+  type ScriptStartBlock,
+} from '../domain/availability';
+import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
+import { checkNoCommitment, customOrderDecision, type CustomOrderDecision } from '../domain/custom-order';
 import {
   desireMoved,
   desireScore,
@@ -28,14 +43,23 @@ import {
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
+import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { offerDecision, offerSignals, type OfferBlock, type OfferContext } from '../domain/policy';
+import {
+  paidWaiting,
+  permittedScripts,
+  type PlatformScriptView,
+  type ScriptHistoryView,
+  type ScriptRun,
+} from '../domain/script-run';
+import { scriptTurn, type ScriptTurn } from '../domain/script-turn';
 import {
   declaredAdultAge,
   sexualizationDecision,
   type SexualizationDecision,
   type SexualizationLimits,
 } from '../domain/sexualization';
-import { describeSituation, type Situation } from '../domain/situation';
+import { describeSituation, isNight, type Situation } from '../domain/situation';
 import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
 
 /** Who she is for the models: one persona, read by the composition root. */
@@ -100,6 +124,79 @@ export interface ComposeTurnInput {
   readonly skipVoice?: (brief: Brief | undefined) => boolean;
   /** Her alerts written as a phrase, for the brain to check his last message against (P4-01). */
   readonly alerts?: readonly BrainAlert[];
+  /**
+   * The care mode (ADR 0088): true when code already knows (an episode open, his words read by the safety net), or
+   * read on the brain's risks. In care, the voice writes the code's care brief, nothing is offered, nothing sexual, and
+   * the care guard reads what it wrote; a brain that failed does not stop it when code already knows.
+   */
+  readonly care?: boolean | ((brief: Brief | undefined) => boolean);
+  /**
+   * What a custom order of his needs (ADR 0090 § A): whether a chatter is on shift, whether one of his already waits,
+   * and his limits. Absent: nobody on shift, none open, his limits unknown; she still commits to nothing.
+   */
+  readonly customOrder?: {
+    readonly chatterOnShift: boolean;
+    readonly orderOpen: boolean;
+    readonly flags: FanFlags | undefined;
+  };
+  /** Her replies to a price objection (ADR 0090 § B), and those he already received: never twice. */
+  readonly objections?: {
+    readonly bank: ObjectionReplies;
+    readonly usedReplyIds: ReadonlySet<string>;
+  };
+  /**
+   * Her scripts (ADR 0098): her catalogue, Reveal's history of his, his latest run. Absent, or without `offer`, no
+   * script moves and none is decided; a brain's « offer » is then written as before, through the policy.
+   */
+  readonly scripts?: ScriptsInput;
+  /**
+   * His availability as the conversation keeps it (ADR 0103, amendement du 13/11); `null` before the first. Read with
+   * `offer` (her script threshold): the record follows his message and gates the first teaser.
+   */
+  readonly availability?: FanAvailabilityRecord | null;
+}
+
+/** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
+export interface ScriptsInput {
+  /** The conversation on the platform: the idempotency key of a step names it. */
+  readonly conversationRef: string;
+  readonly catalogue: readonly PlatformScriptView[];
+  /** `null` when it could not be read: nothing moves, nothing sells (ADR 0018 § 5). */
+  readonly history: ScriptHistoryView | null;
+  readonly latest: ScriptRun | null;
+  /** False on a second pass over the same message: it was already counted against the step waiting. */
+  readonly countsHisMessage: boolean;
+}
+
+/** The scripts the brain may pick from, by the short ids it answers with (`s1`…). */
+function scriptChoices(
+  scripts: ScriptsInput | undefined,
+  situation: Situation,
+): readonly { readonly id: string; readonly script: PlatformScriptView }[] {
+  if (scripts?.history === undefined || scripts.history === null) return [];
+  return permittedScripts(scripts.catalogue, {
+    moment: isNight(situation) ? 'night' : 'day',
+    history: scripts.history,
+  })
+    .slice(0, BRAIN_SCRIPTS_MAX)
+    .map((script, index) => ({ id: brainScriptId(index), script }));
+}
+
+/** The step decided, as the voice's typed block says it: kind, catalogue price, instruction, media (ADR 0098 § 5). */
+function voiceStepOf(turn: ScriptTurn | undefined): VoiceScriptStep | undefined {
+  const { decision, script } = turn ?? {};
+  if (script === undefined || script === null) return undefined;
+  if (decision?.kind !== 'start' && decision?.kind !== 'send_step') return undefined;
+  const step = script.steps[decision.step.stepIndex];
+  if (step === undefined) return undefined;
+  return {
+    kind: decision.step.kind,
+    // Reveal sells in euros: the catalogue's minor units are cents.
+    price:
+      decision.step.priceMinor === null ? null : { amountMinor: decision.step.priceMinor, currency: 'EUR' },
+    instruction: step.instruction ?? null,
+    mediaSheet: step.mediaSheet ?? null,
+  };
 }
 
 /** A follow-up as the voice writes it: how long he has been silent, and her own way of following up if she wrote one. */
@@ -124,8 +221,11 @@ interface DesireInput {
 /** The policy's facts on him for an offer; his heat comes from his desire score, the risks from the brain. */
 export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'risks'>;
 
-/** Why the brain's offer was not written: the policy's reason, or nothing to decide on. */
-type OfferRefusal = OfferBlock | 'no_offer_context';
+/**
+ * Why the brain's offer was not written: the policy's reason, nothing to decide on, or, with her scripts read, no step
+ * of a script decided (she offers only what a script sends, ADR 0098).
+ */
+type OfferRefusal = OfferBlock | ScriptStartBlock | 'no_offer_context' | 'no_script_step';
 
 /** What the voice writes instead of an offer the policy refused: an answer, nothing to buy. */
 const NO_OFFER_BRIEF =
@@ -154,6 +254,9 @@ const STEER_BACK_BRIEF: Readonly<Record<'age_unconfirmed' | 'too_early', string>
     'Il va trop vite : elle ralentit avec douceur et humour, sans rien d’explicite ni de sous-entendu, sans reproche, et ramène la conversation sur lui ; si ça vient naturellement, elle lui demande son âge.',
 };
 const NO_OPENING_HINT = 'aucune allusion sexuelle, elle n’ouvre pas ce terrain';
+/** He is hot and sexualizes, only his availability is unknown: she makes sure in passing, once (ADR 0103 § 13). */
+const ASK_AVAILABILITY_HINT =
+  'en passant, elle s’assure qu’il est tranquille (seul, chez lui, pas pressé), naturellement, sans rien proposer';
 const SUGGESTIVE_HINT = 'suggestive seulement, jamais explicite';
 
 /** What the voice writes for a follow-up: decided by code, never by the brain (CLAUDE.md rule 3). */
@@ -175,6 +278,11 @@ function followUpBrief(followUp: FollowUpTurn): Brief {
 /** What the voice writes when she waited for him once and he has not written since (P3-11), set by code. */
 const CAME_BACK_BRIEF =
   'Il lui avait dit d’attendre un peu et n’a rien écrit depuis. Elle lui demande avec légèreté s’il est revenu, en une phrase, sans reproche, sans rien proposer de payant.';
+
+/** What the voice writes in the care mode: the code's brief, whatever the brain or a trap suggested (ADR 0088 § 3). */
+function careBrief(read: Brief): Brief {
+  return { ...read, action: 'reply', replyBrief: CARE_BRIEF, toneHints: [...CARE_TONE_HINTS] };
+}
 
 /** The brief as the cursor lets the voice write it. */
 function withinCursor(brief: Brief, decision: SexualizationDecision): Brief {
@@ -199,10 +307,25 @@ export interface ComposedTurn {
   readonly sexualization?: SexualizationDecision;
   /** His desire score after this message, only when it changed: the worker writes it (P3-12). */
   readonly desire?: DesireReading;
+  /** His desire score read on this message, moved or not: the playground shows it to calibrate the counting. */
+  readonly desireRead?: DesireReading;
   /** An adult age he stated himself in this message (`declaredAdultAge`): the composer may confirm his age. */
   readonly ageDeclared?: number;
   /** The brain suggested an offer and the policy refused it: the voice wrote a plain answer. */
   readonly offerRefused?: OfferRefusal;
+  /** He asked for a custom order (ADR 0090 § A): a chatter takes it, or she answered committing to nothing. */
+  readonly customOrder?: Exclude<CustomOrderDecision, { kind: 'none' }>;
+  /** The reply of her bank the voice was given for his price objection (ADR 0090 § B). */
+  readonly objectionReply?: PickedObjectionReply;
+  /** Her scripts at this message (ADR 0098): the run moved or opened, the step decided, a price that changed. */
+  readonly scripts?: ScriptTurn;
+  /**
+   * His availability after this message (ADR 0103): the record, and whether it changed (only then is it journaled).
+   * Absent without the brain's reading or her script threshold.
+   */
+  readonly availability?: { readonly record: FanAvailabilityRecord; readonly changed: boolean };
+  /** The gate before the first teaser at this message: open, or the conditions missing (ADR 0103 § 11). */
+  readonly scriptStart?: ScriptStart;
   /** What the voice was asked to write: kept for a comparison or a rating. */
   readonly voiceBrief?: Brief;
   readonly voiceInput?: VoiceInput;
@@ -216,6 +339,8 @@ export interface ComposedTurn {
   readonly isFallback: boolean;
   /** `skipVoice` stopped it: no voice call was made. */
   readonly isSkipped?: boolean;
+  /** Written in the care mode (ADR 0088): a human validates it, whatever her mode. */
+  readonly care?: true;
 }
 
 /** Answers the team corrected in the playground, given to the voice as her examples (they take precedence). */
@@ -340,10 +465,19 @@ export async function composeTurn(
     return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped);
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
+  const choices = scriptChoices(input.scripts, input.situation);
+  const brainScripts: BrainScript[] = choices.map(({ id, script }) => ({
+    id,
+    description: script.description,
+  }));
+  const latestRun = input.scripts?.latest ?? null;
+  const stepWaiting = latestRun?.status === 'open' && paidWaiting(latestRun) !== undefined;
   const brain = await gateway.brain({
     ...base,
     fanNotes: [notes.kept, brainOnly.kept].filter((block) => block !== '').join('\n'),
     ...(input.alerts !== undefined && input.alerts.length > 0 && { alerts: input.alerts }),
+    ...(brainScripts.length > 0 && { scripts: brainScripts }),
+    ...(stepWaiting && { scriptStepWaiting: true }),
   });
   // She asks only what the card lets her ask (ADR 0085 § 2): whatever the brain names, `desires` is never asked.
   const brief = brain.ok ? askableOnly(brain.value.output) : undefined;
@@ -395,20 +529,141 @@ export async function composeTurn(
           toneHints: [...within.toneHints, NO_OPENING_HINT],
         }
       : within;
-  // The brain may suggest an offer, only the policy decides (CLAUDE.md rule 3): refused, she just answers.
-  const offerRefused = cursored.action === 'offer' ? offerRefusal(cursored, input.offer, heat) : undefined;
-  const voiceBrief: Brief =
-    offerRefused === undefined ? cursored : { ...cursored, action: 'reply', replyBrief: NO_OFFER_BRIEF };
+  // The care mode (ADR 0088) comes before any sale: no custom order, no objection reply, no script step.
+  const care = typeof input.care === 'function' ? input.care(brief) : input.care === true;
+  // A custom order is never sold by her (ADR 0090 § A): a chatter takes it, or she commits to nothing. A trap's
+  // answer comes first, and in the care mode nothing is sold at all (ADR 0088 § 2).
+  const order =
+    brief === undefined || trap.replyBrief !== undefined || care
+      ? undefined
+      : customOrderDecision({
+          asksForService: brief.intent === 'asks_for_service',
+          chatterOnShift: input.customOrder?.chatterOnShift === true,
+          orderOpen: input.customOrder?.orderOpen === true,
+          risks: brief.risks,
+          flags: input.customOrder?.flags,
+        });
+  const customOrder = order?.kind === 'none' ? undefined : order;
+  // His price objection: a reply of her bank he never received, said in her words (ADR 0090 § B).
+  const objectionReply =
+    !care &&
+    brief?.intent === 'price_objection' &&
+    trap.replyBrief === undefined &&
+    input.objections !== undefined
+      ? pickObjectionReply(input.objections.bank, brief.objection, input.objections.usedReplyIds)
+      : undefined;
+  // His availability and the gate before the first teaser (ADR 0103 § 9-13): code holds both, the brain only reports.
+  const threshold = input.offer?.limits.minDesire;
+  const availability =
+    brief === undefined || threshold === undefined
+      ? undefined
+      : readAvailability({
+          previous: input.availability ?? null,
+          signals: brief.desireSignals ?? [],
+          sexualizes: sexualizes(brief),
+          desire: heat,
+          threshold,
+          now: input.situation.now,
+        });
+  const scriptStart =
+    availability === undefined || threshold === undefined
+      ? undefined
+      : scriptStartGate(availability, heat, threshold);
+  // Her scripts: the run follows his message and Reveal, and code decides the step and its price (ADR 0098).
+  const scripts =
+    input.scripts === undefined || input.offer === undefined
+      ? undefined
+      : scriptTurn({
+          now: input.situation.now,
+          conversationRef: input.scripts.conversationRef,
+          latest: input.scripts.latest,
+          catalogue: input.scripts.catalogue,
+          history: input.scripts.history,
+          moment: isNight(input.situation) ? 'night' : 'day',
+          hotSession: heat >= input.offer.limits.minDesire,
+          // Only an id it was given: anything else picks nothing.
+          brainPick: choices.find(({ id }) => id === brief?.scriptPick)?.script.scriptRef ?? null,
+          offer: {
+            ...input.offer,
+            desire: heat,
+            fanAsksForPaid: brief !== undefined && offerSignals(brief).fanAsksForPaid,
+            risks: brief?.risks ?? [],
+          },
+          // In care, the run still follows his message and Reveal, and no step goes (ADR 0088 § 2).
+          careMode: care,
+          ...(scriptStart !== undefined && { startGate: scriptStart }),
+          ...(availability !== undefined && { availability: availability.state }),
+          reply: brief?.scriptReply ?? null,
+          countsHisMessage: input.scripts.countsHisMessage && brief !== undefined,
+          mayAct:
+            !care &&
+            brief !== undefined &&
+            trap.replyBrief === undefined &&
+            customOrder === undefined &&
+            objectionReply === undefined &&
+            sexualization?.kind !== 'steer_back',
+        });
+  const scriptStep = voiceStepOf(scripts);
+  // The brain may suggest an offer, only the policy decides (CLAUDE.md rule 3): refused, she just answers. With her
+  // scripts read, she offers only the step code decided.
+  const offerRefused =
+    cursored.action !== 'offer' || scriptStep !== undefined
+      ? undefined
+      : input.scripts !== undefined && input.offer !== undefined
+        ? 'no_script_step'
+        : scriptStart !== undefined && !scriptStart.open
+          ? (scriptStart.missing[0] ?? 'availability_unconfirmed')
+          : offerRefusal(cursored, input.offer, heat);
+  const decidedBrief: Brief =
+    scriptStep === undefined
+      ? cursored
+      : { ...cursored, action: scriptStep.kind === 'paid' ? 'offer' : 'reply' };
+  const offered: Brief =
+    offerRefused === undefined ? decidedBrief : { ...cursored, action: 'reply', replyBrief: NO_OFFER_BRIEF };
+  const answered: Brief = care
+    ? careBrief(read)
+    : customOrder?.kind === 'reply'
+      ? {
+          ...offered,
+          action: 'reply',
+          replyBrief: customOrder.brief,
+          toneHints: [...offered.toneHints, NO_OPENING_HINT],
+        }
+      : offered;
+  const asking =
+    !care &&
+    availability !== undefined &&
+    scriptStart !== undefined &&
+    asksAvailability(availability, scriptStart) &&
+    scriptStep === undefined &&
+    customOrder === undefined &&
+    objectionReply === undefined &&
+    trap.replyBrief === undefined &&
+    sexualization?.kind !== 'steer_back';
+  const voiceBrief: Brief = asking
+    ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
+    : answered;
+  const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
+    record === undefined
+      ? {}
+      : {
+          availability: { record, changed: availabilityChanged(input.availability ?? null, record) },
+          ...(scriptStart !== undefined && { scriptStart }),
+        };
   const brainCostUsd = brain.ok ? (brain.value.meta.costUsd ?? 0) : 0;
   const brainLatencyMs = brain.ok ? brain.value.meta.latencyMs : 0;
-  if (input.skipVoice?.(brief) === true) {
+  if (input.skipVoice?.(brief) === true || customOrder?.kind === 'handoff') {
     return {
+      ...(customOrder !== undefined && { customOrder }),
+      ...(scripts !== undefined && { scripts }),
+      ...availabilityOut(availability),
       ...(trap.isTrap && { trap }),
       ...(droppedNotes.length > 0 && { droppedNotes }),
       ...(brief && { brief }),
       ...(!brain.ok && { briefFailure: brain.error }),
       ...(sexualization !== undefined && { sexualization }),
       ...(desire !== undefined && desireMoved(desire) && { desire }),
+      ...(desire !== undefined && { desireRead: desire }),
       ...(ageDeclared !== null && { ageDeclared }),
       ...(offerRefused !== undefined && { offerRefused }),
       bubbles: [],
@@ -420,24 +675,42 @@ export async function composeTurn(
       isSkipped: true,
     };
   }
-  const voiceInput: VoiceInput = { ...base, brief: voiceBrief };
+  const voiceInput: VoiceInput = {
+    ...base,
+    brief: voiceBrief,
+    ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
+    ...(scriptStep !== undefined && { scriptStep }),
+  };
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? voice.value.output.bubbles : [];
   // Checked as written: the length and count guards read the voice's bubbles, not the joined message.
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
-    ...(ageConfirmed && !noExplicit ? [] : checkExplicit(written)),
+    ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
+    ...(care ? checkCare(written) : []),
+    ...(customOrder === undefined ? [] : checkNoCommitment(written)),
   ];
   const bubbles = asSent(written, persona.splitMessages);
   return {
+    ...(customOrder !== undefined && { customOrder }),
+    ...(objectionReply !== undefined && { objectionReply }),
+    ...(scripts !== undefined && { scripts }),
+    // She asked only if the voice wrote: a question never written is asked again.
+    ...availabilityOut(
+      availability !== undefined && asking && voice.ok
+        ? { ...availability, askedAt: input.situation.now }
+        : availability,
+    ),
     ...(trap.isTrap && { trap }),
     ...(droppedNotes.length > 0 && { droppedNotes }),
     ...(brief && { brief }),
     ...(!brain.ok && { briefFailure: brain.error }),
     ...(sexualization !== undefined && { sexualization }),
     ...(desire !== undefined && desireMoved(desire) && { desire }),
+    ...(desire !== undefined && { desireRead: desire }),
     ...(ageDeclared !== null && { ageDeclared }),
-    ...(offerRefused !== undefined && { offerRefused }),
+    ...(offerRefused !== undefined && !care && { offerRefused }),
+    ...(care && { care: true }),
     voiceBrief,
     voiceInput,
     bubbles,

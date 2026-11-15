@@ -22,7 +22,7 @@ const member = (memberId: typeof LEA, first: string, last: string, email: string
   firstName: first,
   lastName: last,
   email,
-  active: true,
+  leftOn: null,
 });
 
 const chatter = (patch: Partial<PlatformChatter> = {}): PlatformChatter => ({
@@ -46,7 +46,13 @@ const members = [
 describe('proposeFor', () => {
   it('links to the member with the same e-mail, whatever its case, ticked', () => {
     expect(proposeFor(chatter({ firstName: 'Autre' }), { sessionChatterId: null, members })).toEqual({
-      suggestion: { kind: 'member', memberId: LEA, memberDisplayName: 'Lea', match: 'email' },
+      suggestion: {
+        kind: 'member',
+        memberId: LEA,
+        memberDisplayName: 'Lea',
+        match: 'email',
+        departedOn: null,
+      },
       preselected: true,
     });
   });
@@ -57,7 +63,13 @@ describe('proposeFor', () => {
       members,
     });
     expect(proposal).toEqual({
-      suggestion: { kind: 'member', memberId: LEA, memberDisplayName: 'Lea', match: 'name' },
+      suggestion: {
+        kind: 'member',
+        memberId: LEA,
+        memberDisplayName: 'Lea',
+        match: 'name',
+        departedOn: null,
+      },
       preselected: true,
     });
   });
@@ -65,15 +77,47 @@ describe('proposeFor', () => {
   it('proposes a name shared by two members unticked', () => {
     const twice = [...members, member(HOMONYM, 'Léa', 'Test', 'lea2@recette.test')];
     const proposal = proposeFor(chatter({ email: null }), { sessionChatterId: null, members: twice });
-    expect(proposal.preselected).toBe(false);
-    expect(proposal.suggestion.kind).toBe('member');
+    expect(proposal?.preselected).toBe(false);
+    expect(proposal?.suggestion.kind).toBe('member');
   });
 
-  it('never proposes a member who left', () => {
-    const gone = members.map((one) => ({ ...one, active: false }));
-    expect(proposeFor(chatter(), { sessionChatterId: null, members: gone }).suggestion).toEqual({
-      kind: 'invite',
+  it('proposes a member who left on his e-mail, marked as departed and unticked, never an invitation', () => {
+    const gone = members.map((one) => ({ ...one, leftOn: '2026-11-01' }));
+    expect(proposeFor(chatter(), { sessionChatterId: null, members: gone })).toEqual({
+      suggestion: {
+        kind: 'member',
+        memberId: LEA,
+        memberDisplayName: 'Lea',
+        match: 'email',
+        departedOn: '2026-11-01',
+      },
+      preselected: false,
     });
+  });
+
+  it('prefers a member still in the team when a departed one had the same e-mail', () => {
+    const back = [{ ...members[0]!, memberId: HOMONYM, leftOn: '2026-10-01' }, ...members];
+    expect(proposeFor(chatter(), { sessionChatterId: null, members: back })?.suggestion).toMatchObject({
+      memberId: LEA,
+      departedOn: null,
+    });
+  });
+
+  it('never proposes a member who left by name alone', () => {
+    const gone = members.map((one) => ({ ...one, leftOn: '2026-11-01' }));
+    const proposal = proposeFor(chatter({ email: null }), { sessionChatterId: null, members: gone });
+    expect(proposal?.suggestion).toEqual({ kind: 'none' });
+  });
+
+  it('proposes nothing for an account the platform removed, unless its e-mail is a member’s', () => {
+    const removed = chatter({ email: 'nouveau@recette.test', removedAt: '2026-11-05T10:00:00.000Z' });
+    expect(proposeFor(removed, { sessionChatterId: null, members })).toBeNull();
+    expect(proposeFor({ ...removed, email: null }, { sessionChatterId: null, members })).toBeNull();
+    const gone = members.map((one) => ({ ...one, leftOn: '2026-11-01' }));
+    expect(
+      proposeFor({ ...removed, email: 'lea@recette.test' }, { sessionChatterId: null, members: gone })
+        ?.suggestion,
+    ).toMatchObject({ kind: 'member', memberId: LEA, departedOn: '2026-11-01' });
   });
 
   it('proposes the agent for the captured session’s account, ticked', () => {
@@ -110,12 +154,12 @@ describe('proposeFor', () => {
 
   it('never invites a provider’s account, even with an e-mail', () => {
     const external = chatter({ isExternal: true, email: 'presta@recette.test', firstName: 'Presta' });
-    expect(proposeFor(external, { sessionChatterId: null, members }).suggestion).toEqual({ kind: 'none' });
+    expect(proposeFor(external, { sessionChatterId: null, members })?.suggestion).toEqual({ kind: 'none' });
   });
 
   it('does not match a provider by e-mail, only by name', () => {
     const external = chatter({ isExternal: true, email: 'lea@recette.test', firstName: 'Autre' });
-    expect(proposeFor(external, { sessionChatterId: null, members }).suggestion).toEqual({ kind: 'none' });
+    expect(proposeFor(external, { sessionChatterId: null, members })?.suggestion).toEqual({ kind: 'none' });
   });
 });
 
@@ -124,47 +168,55 @@ describe('actionsFor', () => {
   const lea = { kind: 'member', memberId: LEA } as const;
 
   it('gives the owner every action on an agency member without a link', () => {
-    expect(actionsFor({ chatter: chatter(), link: null, listed: true }, { kind: 'owner' })).toEqual([
-      'link_member',
-      'link_agent',
-      'link_none',
-      'invite',
-      'dismiss',
-    ]);
+    expect(
+      actionsFor({ chatter: chatter(), link: null, listed: true, invitable: true }, { kind: 'owner' }),
+    ).toEqual(['link_member', 'link_agent', 'link_none', 'invite', 'dismiss']);
   });
 
   it('gives a manager nothing on a row linked to his own record', () => {
     expect(
-      actionsFor({ chatter: chatter(), link: { kind: 'member', memberId: MANAGER }, listed: true }, manager),
+      actionsFor(
+        { chatter: chatter(), link: { kind: 'member', memberId: MANAGER }, listed: true, invitable: true },
+        manager,
+      ),
     ).toEqual([]);
   });
 
   it('never offers the agent for a provider, and keeps his link to a member for the owner', () => {
     const external = chatter({ isExternal: true, email: null });
-    expect(actionsFor({ chatter: external, link: null, listed: true }, manager)).toEqual([
+    expect(actionsFor({ chatter: external, link: null, listed: true, invitable: true }, manager)).toEqual([
       'link_none',
       'dismiss',
     ]);
-    expect(actionsFor({ chatter: external, link: null, listed: true }, { kind: 'owner' })).toEqual([
-      'link_member',
-      'link_none',
-      'dismiss',
-    ]);
+    expect(
+      actionsFor({ chatter: external, link: null, listed: true, invitable: true }, { kind: 'owner' }),
+    ).toEqual(['link_member', 'link_none', 'dismiss']);
   });
 
   it('neither invites nor sets aside an account already linked, to the agent or a member', () => {
     for (const link of [{ kind: 'agent' } as const, lea]) {
-      const actions = actionsFor({ chatter: chatter(), link, listed: true }, { kind: 'owner' });
+      const actions = actionsFor(
+        { chatter: chatter(), link, listed: true, invitable: true },
+        { kind: 'owner' },
+      );
       expect(actions).not.toContain('invite');
       expect(actions).not.toContain('dismiss');
     }
   });
 
+  it('never offers to invite an account that is not invitable, and keeps linking and dismissing it', () => {
+    expect(
+      actionsFor({ chatter: chatter(), link: null, listed: true, invitable: false }, { kind: 'owner' }),
+    ).toEqual(['link_member', 'link_agent', 'link_none', 'dismiss']);
+  });
+
   it('only unlinks an account gone from the list, and offers nothing on one never linked', () => {
-    expect(actionsFor({ chatter: chatter(), link: lea, listed: false }, { kind: 'owner' })).toEqual([
-      'link_none',
-    ]);
-    expect(actionsFor({ chatter: chatter(), link: null, listed: false }, { kind: 'owner' })).toEqual([]);
+    expect(
+      actionsFor({ chatter: chatter(), link: lea, listed: false, invitable: true }, { kind: 'owner' }),
+    ).toEqual(['link_none']);
+    expect(
+      actionsFor({ chatter: chatter(), link: null, listed: false, invitable: true }, { kind: 'owner' }),
+    ).toEqual([]);
   });
 });
 
@@ -268,8 +320,35 @@ describe('teamImportOverview', () => {
   });
 
   it('never alerts for a member who left', () => {
-    const left = context({ members: [{ ...members[0]!, active: false, creatorIds: [] }] });
+    const left = context({ members: [{ ...members[0]!, leftOn: '2026-11-01', creatorIds: [] }] });
     const [row] = teamImportOverview(left, live([chatter({ removedAt: '2026-11-05T10:00:00.000Z' })])).rows;
     expect(row?.removal).toBeNull();
+  });
+
+  it('lists an account removed from the platform without counting it, proposing nor inviting it', () => {
+    const removed = chatter({
+      platformChatterId: 'chatter_test_02',
+      email: 'nouveau@recette.test',
+      removedAt: '2026-11-05T10:00:00.000Z',
+    });
+    const overview = teamImportOverview(context(), live([chatter(), removed]));
+    const row = overview.rows.find((one) => one.chatter.platformChatterId === 'chatter_test_02');
+    expect(row?.suggestion).toBeNull();
+    expect(row?.preselected).toBe(false);
+    expect(row?.actions).toEqual(['link_member', 'link_agent', 'link_none', 'dismiss']);
+    expect(overview.newCount).toBe(0);
+  });
+
+  it('offers a departed member for an account with his e-mail, with no invitation, removed or not', () => {
+    const left = context({
+      members: [{ ...members[0]!, leftOn: '2026-11-01', creatorIds: [] }],
+      links: new Map(),
+    });
+    for (const removedAt of [null, '2026-11-05T10:00:00.000Z']) {
+      const [row] = teamImportOverview(left, live([chatter({ removedAt })])).rows;
+      expect(row?.suggestion).toMatchObject({ kind: 'member', memberId: LEA, departedOn: '2026-11-01' });
+      expect(row?.preselected).toBe(false);
+      expect(row?.actions).not.toContain('invite');
+    }
   });
 });

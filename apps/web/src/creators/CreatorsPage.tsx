@@ -8,6 +8,7 @@ import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
 import { AgendaSection } from './agenda/AgendaSection';
 import { useCreators } from './api';
+import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
 import { CreatorsList } from './overview/CreatorsList';
@@ -19,6 +20,7 @@ import { ScriptsSection } from './scripts/ScriptsSection';
 import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
 import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 
+import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 
 export type CreatorTab = CreatorSheet;
@@ -94,6 +96,14 @@ export function CreatorsPage({
       );
     }
     if (query.isPending) {
+      // The list waits in the shape of its cards, so nothing jumps when they arrive (recette 11/11, ADM-21).
+      if (creatorId === null)
+        return (
+          <ul className="cl-grid" aria-busy="true" aria-label="Chargement des créatrices">
+            <li className="nv-plate cl-card cl-card--skeleton" />
+            <li className="nv-plate cl-card cl-card--skeleton" />
+          </ul>
+        );
       return (
         <section className="ps-page" aria-busy="true">
           <div className="nv-plate ps-head ps-skeleton" />
@@ -181,6 +191,17 @@ export function CreatorsPage({
         />
       );
     }
+    if (shown === 'content' && current !== undefined) {
+      return (
+        <DropsSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          timezone={current.timezone}
+          isOwner={isOwner}
+        />
+      );
+    }
     if (shown === 'telegram' && current !== undefined) {
       return <TelegramChannelSection key={current.id} creatorId={current.id} onDirty={setDirty} />;
     }
@@ -229,6 +250,7 @@ export function CreatorsPage({
     ideas: 'Idées du jour',
     requests: 'Demandes',
     scripts: 'Scripts',
+    content: 'Contenu',
     telegram: 'Canal Telegram',
     hours: 'Heures d’activité',
     access: 'Accès',
@@ -242,6 +264,7 @@ export function CreatorsPage({
     'ideas',
     'requests',
     'scripts',
+    'content',
     'telegram',
     'hours',
     'access',
@@ -250,9 +273,9 @@ export function CreatorsPage({
   ];
 
   const lead = isOwner
-    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, canal Telegram, heures d’activité, accès, pourcentage et profil.'
+    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, contenu, canal Telegram, heures d’activité, accès, pourcentage et profil.'
     : sheets.includes('agenda')
-      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes et ses scripts.'
+      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes, ses scripts et son contenu.'
       : 'Les créatrices qui te sont confiées. Ouvre-en une pour sa persona.';
 
   return (
@@ -313,6 +336,10 @@ export function CreatorsPage({
       {/* One child of the page: the sheet follows the switch, never pushed to the foot of the screen (CREA-03). */}
       <div className="ps-sheet">
         {leaving ? <LeaveConfirm onLeave={leave} onStay={stay} /> : null}
+        {/* Her « Mise en route » (pilotage plan W1) above whichever sheet is open, until all is done. */}
+        {isOwner && current !== undefined && !showForm ? (
+          <CreatorSetupBlock key={`${current.id}:${shown}`} creatorId={current.id} />
+        ) : null}
         {body()}
         {/* The archived creators, folded at the foot of the list, the owner's alone (ADR 0071 § 2). */}
         {isOwner && listing && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}

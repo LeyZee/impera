@@ -16,6 +16,7 @@ describe('the sheets of a creator a member opens', () => {
       'ideas',
       'requests',
       'scripts',
+      'content',
     ]);
   });
 

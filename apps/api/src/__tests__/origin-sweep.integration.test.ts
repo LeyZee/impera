@@ -20,6 +20,8 @@ const NO_ORIGIN_CHECK: Readonly<Record<string, string>> = {
   'POST /v1/trends/readings': 'the extension, by its link token',
   'POST /v1/trends/readings/captures': 'the extension, by its link token',
   'POST /v1/webhooks/sales-feeds/:platform': 'the platform’s webhook, checked by its signature',
+  'POST /v1/mcp': 'the MCP server, by an agent’s token, with its own rule of Origin (ADR 0026 § 2)',
+  'DELETE /v1/mcp': 'the MCP server without state: 405 whatever the origin (ADR 0026 § 2)',
 };
 
 const WRITES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -40,7 +42,7 @@ describe('no write comes from another site (audit des tests d’isolation, 06/11
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     const app = await createApp(config, createLogger(config));
     server = await buildServer({
       config,

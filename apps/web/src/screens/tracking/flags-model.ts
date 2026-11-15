@@ -95,7 +95,7 @@ export function flagsSummary(flags: FanFlags): string {
     ...SWITCHES.filter((s) => isOn(flags, s.flag)).map((s) => s.label),
   ];
   if (flags.spendingLimitMinor !== undefined) on.push(`plafond de ${euros(flags.spendingLimitMinor)}`);
-  if (on.length === 0) return 'Aucune';
+  if (on.length === 0) return 'Aucune en place';
   const [first = '', ...rest] = on;
   return [
     first.charAt(0).toUpperCase() + first.slice(1),

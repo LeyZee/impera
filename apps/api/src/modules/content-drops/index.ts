@@ -7,6 +7,15 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { describeBacklog } from './application/backlog';
 import { describeFile, type DescribeOutcome } from './application/describe';
+import {
+  creatorDrops,
+  creatorScripts,
+  creatorScriptSteps,
+  type ContentReader,
+  type DropsPage,
+  type ScriptDigest,
+  type ScriptSteps,
+} from './application/reads';
 import { eraseOriginals, type RetentionRun } from './application/retention';
 import { summarizeScript, type SummarizeOutcome } from './application/summarize';
 import { makeThumbnail, type ThumbnailOutcome } from './application/thumbnail';
@@ -87,6 +96,22 @@ export interface ContentDropsModule {
    * `idea`, under the idea's id, replayable.
    */
   requestFromIdea(request: IdeaContentRequest): Promise<void>;
+  /**
+   * The agency's reads of her content, bounded by her id, who reads checked in `application/` (ADR 0026 § 1): what the
+   * MCP server lists (ADR 0105 § 4, `drops_list`, `scripts_list`, `script_steps_get`). Never a medium nor its address.
+   */
+  readonly reads: {
+    /** Her drops, newest first, 50 at most a page; `after` is the last id of the page before. */
+    drops(
+      creatorId: string,
+      reader: ContentReader,
+      page: { readonly after: string | null; readonly limit?: number },
+    ): Promise<DropsPage>;
+    /** Her scripts asked and dropped, newest first, with their structure's name and size. */
+    scripts(creatorId: string, reader: ContentReader): Promise<readonly ScriptDigest[]>;
+    /** The steps of a script of hers, the agency's words; `null` for a drop that is not a script of hers. */
+    scriptSteps(creatorId: string, reader: ContentReader, dropId: string): Promise<ScriptSteps | null>;
+  };
   /** The scripts the cadence asks of her (SC-02), written by the scripts' job as the owner's role, replayable. */
   readonly scriptRequests: {
     ask(request: ScriptContentRequest): Promise<void>;
@@ -129,11 +154,13 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const receipt = { storage, receipts, cleaner, scratchDir, room: createScratchRoom(scratchDir) };
   const summaries = createDrizzleScriptSummaryStore(deps.adminDb);
   const thumbnails = createDrizzleThumbnailQueue(deps.adminDb);
+  const agency = createDrizzleAgencyContentStore(deps.db);
+  const scriptReads = { store: agency, versions: deps.scriptVersions };
   return {
     name: 'content-drops',
     routes: createContentDropRoutes(
       createDrizzleCreatorContentStore(deps.db),
-      createDrizzleAgencyContentStore(deps.db),
+      agency,
       storage,
       { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
       createDrizzleDescribeSwitch(deps.adminDb),
@@ -202,6 +229,11 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
           clock(),
           correlationId,
         ),
+    },
+    reads: {
+      drops: (creatorId, reader, page) => creatorDrops(agency, reader, creatorId, page),
+      scripts: (creatorId, reader) => creatorScripts(scriptReads, reader, creatorId),
+      scriptSteps: (creatorId, reader, dropId) => creatorScriptSteps(scriptReads, reader, creatorId, dropId),
     },
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
     scriptRequests: {

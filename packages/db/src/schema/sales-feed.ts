@@ -521,6 +521,55 @@ export const platformDailyStats = pgTable(
 );
 
 /**
+ * The platform's statistics of one member of its team on a creator account's day (ADR 0092 § 1, CRM-05): the PPV he
+ * sent and those bought, and his messages, never an amount (the money stays in `platform_sales`) nor a fan. Keyed by
+ * the platform's own account of the chatter: who he is in Impera is the owner's link (`sales_feed_chatters`), read at
+ * the time of reading, never copied here. Written, read and rewritten exactly as `platform_daily_stats`: by
+ * `connector.read_daily_stats` alone through `withAdmin`; `null` is « not computed yet », never 0; read inside
+ * `withTenantMember` of her creator by the owner, or an active manager when she is on his list. A chatter never reads
+ * it, his own rows included (ADR 0043 § 7: what he may see of himself is served to him, never read from here).
+ */
+export const platformChatterDailyStats = pgTable(
+  'platform_chatter_daily_stats',
+  {
+    platform: enumText('platform').notNull(),
+    platformAccountId: uuid('platform_account_id').notNull(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    /** The platform's id of its team member's account, as `/v1/stats/chatters/daily` gives it. */
+    platformChatterId: text('platform_chatter_id').notNull(),
+    /** The platform's day, in its own zone (`salesFeedTimeZone`). */
+    day: date('day').notNull(),
+    ppvSent: integer('ppv_sent'),
+    ppvPurchased: integer('ppv_purchased').notNull(),
+    messagesSent: integer('messages_sent'),
+    readAt: timestampTz('read_at').notNull(),
+  },
+  (t) => [
+    primaryKey({
+      name: 'platform_chatter_daily_stats_pk',
+      columns: [t.platformAccountId, t.platformChatterId, t.day],
+    }),
+    foreignKey({
+      name: 'platform_chatter_daily_stats_account_creator_fk',
+      columns: [t.platformAccountId, t.creatorId],
+      foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
+    }),
+    index('platform_chatter_daily_stats_creator_day_idx').on(t.creatorId, t.day),
+    enumCheck('platform_chatter_daily_stats', t.platform, PlatformSchema.options),
+    check(
+      'platform_chatter_daily_stats_counts_check',
+      sql`${t.ppvPurchased} >= 0 and coalesce(${t.ppvSent}, 0) >= 0 and coalesce(${t.messagesSent}, 0) >= 0`,
+    ),
+    pgPolicy('chatter_stats_read', {
+      for: 'select',
+      using: sql`${notCreatorAccount} and ${t.creatorId} = ${currentCreator} and (${currentScope} = 'owner' or (${currentScope} = 'agency' and exists (select 1 from "user" u where u.id = ${currentUser} and ${t.creatorId} = any(u.creator_ids))))`,
+    }),
+  ],
+);
+
+/**
  * The calls made to a platform's statistics on one of its days (ADR 0081 § 3), by the daily reading and by the check
  * of CRM-02 alike, counted before each call: the reading makes none when fewer than 100 of the agency's 500 are left.
  * Agency-level, read and written through `withAdmin` only: no policy, and `nirvana_app` has no right on it.

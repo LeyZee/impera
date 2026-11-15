@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { besidePlacement } from './parts';
+import { aroundPlacement, besidePlacement } from './parts';
 
 const phone = { width: 390, height: 844 };
 const tip = { width: 180, height: 110 };
@@ -21,5 +21,23 @@ describe('besidePlacement', () => {
     expect(place.left).toBeGreaterThanOrEqual(12);
     expect(place.left + tip.width).toBeLessThanOrEqual(phone.width - 12);
     expect(place.top).toBe(12);
+  });
+});
+
+describe('aroundPlacement', () => {
+  const view = { width: 390, height: 844 };
+  const tip = { width: 300, height: 160 };
+
+  it("sits under the box when the window has room, its left edge on the box's", () => {
+    expect(aroundPlacement({ left: 20, right: 190, top: 300, bottom: 420 }, tip, view)).toEqual({
+      left: 20,
+      top: 428,
+    });
+  });
+
+  it('goes over the box when there is no room under, never on it', () => {
+    const placed = aroundPlacement({ left: 200, right: 370, top: 600, bottom: 760 }, tip, view);
+    expect(placed.top + tip.height).toBeLessThanOrEqual(600);
+    expect(placed.left).toBe(390 - 300 - 12);
   });
 });

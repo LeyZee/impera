@@ -82,7 +82,7 @@ describe('GET /v1/dashboard', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config), { composer: versionedComposer });
     server = await buildServer({
       config,
@@ -488,6 +488,40 @@ describe('GET /v1/dashboard', () => {
     expect(listed).toContain('Leo');
     expect(listed).not.toContain('Nina');
     expect(listed).not.toContain('Paul');
+  });
+
+  it('lists a custom order that waits for the team until a person takes the hand (ADR 0090 § A)', async () => {
+    const { conversationId: zoe } = await app.modules.conversations.ingestMessage({
+      creatorId,
+      platformAccountId,
+      platformConversationId: 'c-Zoe',
+      platformFanId: 'f-Zoe',
+      fanDisplayName: 'Zoe',
+      message: {
+        ref: { platform: 'reveal', id: 'm-Zoe' },
+        conversationRef: { platform: 'reveal', id: 'c-Zoe' },
+        direction: 'inbound',
+        text: 'Tu me ferais une vidéo à moi ?',
+        media: [],
+        priceMinor: null,
+        currency: null,
+        isPaid: false,
+        createdAt: new Date().toISOString(),
+      },
+      correlationId: 'seed',
+    });
+    await test.admin.db.execute(sql`
+      insert into conversation_events (id, creator_id, conversation_id, seq, type, payload, actor, correlation_id)
+      select ${newId(EventIdSchema)}::uuid, ${creatorId}::uuid, ${zoe}::uuid, max(seq) + 1, 'custom_order_opened',
+             ${JSON.stringify({ conversationId: zoe })}::jsonb, 'ai', 'seed'
+      from conversation_events where conversation_id = ${zoe}::uuid`);
+    const orders = async () =>
+      DashboardSchema.parse(
+        (await call(`/v1/dashboard?creatorId=${creatorId}`, ownerCookie)).json(),
+      ).todos.filter((t) => t.title === 'Zoe' && t.kind === 'custom_order');
+    expect(await orders()).toHaveLength(1);
+    expect((await post(`/v1/conversations/${zoe}/takeover?creatorId=${creatorId}`, {})).statusCode).toBe(204);
+    expect(await orders()).toHaveLength(0);
   });
 
   it('ranks the best fans on their sales in euros, dollars at the last ECB rate known (choix de Charles, 28/10)', async () => {

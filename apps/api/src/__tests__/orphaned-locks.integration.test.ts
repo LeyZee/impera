@@ -52,7 +52,7 @@ describe('locks of dead workers', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config, new LogSink()));
     // Graphile's schema comes with its first start.
     const worker = await startWorker(app, {
@@ -78,18 +78,18 @@ describe('locks of dead workers', () => {
     // Locked a minute ago: maybe a worker whose first heartbeat is on its way.
     await lockedJob('conv:fresh', 'pool-starting', 1);
 
-    expect(await countOrphanedJobs(test.admin.db)).toBe(2);
+    expect(await countOrphanedJobs(test.service.db)).toBe(2);
     expect((await app.readiness()).orphanedJobs).toBe(2);
 
-    expect((await releaseOrphanedLocks(test.admin.db)).sort()).toEqual(['pool-dead', 'pool-never-seen']);
+    expect((await releaseOrphanedLocks(test.service.db)).sort()).toEqual(['pool-dead', 'pool-never-seen']);
     expect(await locksOf('conv:dead')).toEqual([{ locked_by: null, queue_locked_by: null }]);
     expect(await locksOf('account:gone')).toEqual([{ locked_by: null, queue_locked_by: null }]);
     expect(await locksOf('conv:alive')).toEqual([{ locked_by: 'pool-alive', queue_locked_by: 'pool-alive' }]);
     expect(await locksOf('conv:fresh')).toEqual([
       { locked_by: 'pool-starting', queue_locked_by: 'pool-starting' },
     ]);
-    expect(await countOrphanedJobs(test.admin.db)).toBe(0);
-    expect(await releaseOrphanedLocks(test.admin.db)).toEqual([]);
+    expect(await countOrphanedJobs(test.service.db)).toBe(0);
+    expect(await releaseOrphanedLocks(test.service.db)).toEqual([]);
   });
 
   it('a worker that starts runs the job a dead one left in its queue, and beats under its own pool id', async () => {

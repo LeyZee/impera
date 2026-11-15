@@ -13,8 +13,11 @@ const session = {
 };
 
 describe('revealSessionShape', () => {
-  it('reads the creator a Reveal session speaks for', () => {
-    expect(revealSessionShape(JSON.stringify(session))).toEqual({ owner: 'model-test-a' });
+  it('reads the creator a Reveal session speaks for and the member it belongs to', () => {
+    expect(revealSessionShape(JSON.stringify(session))).toEqual({
+      owner: 'model-test-a',
+      member: session.userId,
+    });
   });
 
   it.each([

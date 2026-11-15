@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agencyInsights,
+  agencyTransferVat,
   agencyRange,
   subscribersOf,
   type AgencyCreatorRead,
@@ -99,6 +100,7 @@ describe('agencyInsights', () => {
           day: '2026-11-06',
           saleType: 'subscription',
           grossInclVatMinor: 1000,
+          grossExclVatMinor: 900,
           netMinor: 800,
           agencyMinor: 400,
           creatorMinor: 400,
@@ -116,9 +118,11 @@ describe('agencyInsights', () => {
     ]);
     expect(result.totals.current).toEqual({
       revenueMinor: 2200,
+      revenueExclVatMinor: 1900,
       netMinor: 1600,
       agencyMinor: 700,
       creatorMinor: 900,
+      agencyTransferVatMinor: 140,
       sales: 2,
       refunds: 0,
     });
@@ -128,6 +132,20 @@ describe('agencyInsights', () => {
       ['2026-11-05', 1200],
       ['2026-11-06', 1000],
     ]);
+  });
+
+  it("estimates the VAT added to the agency's transfers on its part alone, never on a part at zero (ADR 0106)", () => {
+    expect(agencyTransferVat(10_000)).toBe(2_000);
+    // A fifth of a cent rounds down, three fifths up.
+    expect(agencyTransferVat(1)).toBe(0);
+    expect(agencyTransferVat(3)).toBe(1);
+    expect(agencyTransferVat(0)).toBe(0);
+    expect(agencyTransferVat(-500)).toBe(0);
+    const result = insights([
+      creator(LINA, 'Lina', [row({ day: '2026-11-06', netMinor: 800, agencyMinor: 300, creatorMinor: 500 })]),
+    ]);
+    expect(result.totals.current.agencyTransferVatMinor).toBe(60);
+    expect(result.byCreator[0]?.agencyTransferVatMinor).toBe(60);
   });
 
   it('groups a subscription with its renewals, keeps the kinds in their fixed order and their previous revenue', () => {

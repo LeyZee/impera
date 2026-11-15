@@ -5,6 +5,7 @@ import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 import { acceptSuggestion, AGENDA_KEY, declineSuggestion, NOT_SENT } from './api';
 import { firstMoment, spanOf } from './draft';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { addDays, clockOf, dayOf, inputOfDay, longDay, minuteOf, weekOf } from '@/scheduling/time';
@@ -27,6 +28,8 @@ export function DeclineDialog({
   const id = useId();
   const client = useQueryClient();
   const [reason, setReason] = useState('');
+  // No handle of the browser: the field grows with her text (CRE-30).
+  const area = useGrowingArea(reason);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const submit = (event: SyntheticEvent): void => {
@@ -52,8 +55,9 @@ export function DeclineDialog({
             Pourquoi ? <span className="ag-optional">facultatif</span>
           </label>
           <textarea
+            ref={area}
             id={`${id}-reason`}
-            className="nv-field__control nv-glass"
+            className="nv-field__control nv-glass ag-area"
             rows={2}
             maxLength={200}
             value={reason}

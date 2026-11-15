@@ -1,14 +1,19 @@
-import type {
-  AnswerVersion,
-  Destination,
-  MediaDescription,
-  PlaygroundAnswer,
-  PlaygroundState,
-  Verdict,
+import {
+  DesireMarkIdSchema,
+  newId,
+  type AnswerVersion,
+  type DesireMarkVerdict,
+  type Destination,
+  type MediaDescription,
+  type PlaygroundAnswer,
+  type PlaygroundDesire,
+  type PlaygroundState,
+  type Verdict,
 } from '@impera/contracts';
 import type { LlmGateway } from '@impera/llm';
 
 import {
+  desireSignalPoints,
   guardSettingsOf,
   isNight,
   isTimeZone,
@@ -23,9 +28,11 @@ import {
   type CalibrationStore,
   type PersonaForModels,
 } from '../../agent/index';
+import type { DesireMarkStore } from '../application/desire-marks';
 import {
   AnswerInProgress,
   BlockedAnswer,
+  DesireMarkInventedPersona,
   FanMessageNotFound,
   LlmUnavailable,
   NothingToCompare,
@@ -36,10 +43,10 @@ import {
   type PlaygroundEngine,
 } from '../application/engine';
 import { FAN_PRESETS, findPreset } from '../domain/fan-presets';
-import { guardLabel, trapLabel } from '../domain/labels';
+import { cursorLabel, guardLabel, kycSlotWords, offerRefusalLabel, trapLabel } from '../domain/labels';
 import { completeMedia } from '../domain/media';
 
-import { createPlaygroundSession, type PlaygroundTurn } from './session';
+import { createPlaygroundSession, type PlaygroundDesireReading, type PlaygroundTurn } from './session';
 
 const HOUR_MS = 3_600_000;
 
@@ -65,6 +72,8 @@ export interface EngineDeps {
   readonly played?: NonNullable<PlaygroundState['persona']['played']>;
   readonly timeZone?: string;
   readonly now?: () => Date;
+  /** Where the owner's marks on the desire score are kept (ADR 0103 § 6). */
+  readonly desireMarks: DesireMarkStore;
 }
 
 /** One rating, in the shape the training store keeps (shared with the terminal playground). */
@@ -90,6 +99,18 @@ export function ratingRecord(input: {
     fanMessage: input.exchange.fanMessage,
     bubbles: input.exchange.bubbles,
     moment: input.moment,
+  };
+}
+
+/** His score with what each signal weighed in the current counting: the screen adds nothing. */
+function toDesire(reading: PlaygroundDesireReading, mark?: DesireMarkVerdict): PlaygroundDesire {
+  return {
+    before: reading.before,
+    score: reading.score,
+    band: reading.band,
+    signals: reading.signals.map((signal) => ({ signal, points: desireSignalPoints(signal) })),
+    weightsVersion: reading.weightsVersion,
+    ...(mark !== undefined && { mark }),
   };
 }
 
@@ -120,8 +141,15 @@ function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
         risks: [...turn.brief.risks],
         action: turn.brief.action,
         replyBrief: turn.brief.replyBrief,
-        kycMissing: [...turn.brief.kycMissing],
+        kycMissing: turn.brief.kycMissing.map(kycSlotWords),
       },
+    }),
+    ...(turn.desire !== undefined && { desire: toDesire(turn.desire) }),
+    ...(turn.cursor !== undefined && {
+      cursor: { kind: turn.cursor.kind, label: cursorLabel(turn.cursor.kind, turn.cursor.reason) },
+    }),
+    ...(turn.offerRefused !== undefined && {
+      offerRefused: { code: turn.offerRefused, label: offerRefusalLabel(turn.offerRefused) },
     }),
     ...(turn.model !== undefined && { model: turn.model }),
     latencyMs: turn.latencyMs,
@@ -145,6 +173,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     offerLimits: deps.persona.offerLimits,
     sexualizationLimits: deps.persona.sexualizationLimits,
     followUps: deps.persona.followUps,
+    objectionReplies: deps.persona.objectionReplies,
     ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
     ...(deps.now !== undefined && { now: deps.now }),
   });
@@ -153,6 +182,8 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
   let sessionCostUsd = 0;
   let ratings = 0;
   let isBusy = false;
+  // The owner's mark on his score after each of his messages, by message number (from 1), in this conversation.
+  const marks = new Map<number, DesireMarkVerdict>();
 
   /** Nothing changes the conversation while an answer or a rating is under way. */
   const idle = (): void => {
@@ -187,10 +218,15 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
 
   const state = (): PlaygroundState => {
     const { situation, lastExchange } = session;
+    let fanNumber = 0;
     return {
       persona: { name: deps.persona.creatorName, played: deps.played ?? null },
       presets: FAN_PRESETS.map((p) => ({ id: p.id, label: p.label, tests: p.tests, opening: p.opening })),
       presetId,
+      desireThresholds: {
+        open: deps.persona.sexualizationLimits.minDesireToOpen,
+        script: deps.persona.offerLimits.minDesire,
+      },
       situation: {
         now: situation.now.toISOString(),
         timeZone: situation.timeZone,
@@ -199,14 +235,20 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         isNight: isNight(situation),
       },
       fanNotes: [...session.fanNotes],
-      history: session.history.map((turn, index) => ({
-        index,
-        from: turn.from,
-        text: turn.text,
-        ...(turn.media !== undefined && {
-          media: turn.media.map((m) => ({ description: m.description, isLocked: m.isLocked ?? false })),
-        }),
-      })),
+      history: session.history.map((turn, index) => {
+        // His n-th message carries the score it left; hers carry none.
+        const n = turn.from === 'fan' ? (fanNumber += 1) : 0;
+        const reading = n === 0 ? undefined : session.desireTrail[n - 1];
+        return {
+          index,
+          from: turn.from,
+          text: turn.text,
+          ...(turn.media !== undefined && {
+            media: turn.media.map((m) => ({ description: m.description, isLocked: m.isLocked ?? false })),
+          }),
+          ...(reading !== undefined && { desire: toDesire(reading, marks.get(n)) }),
+        };
+      }),
       rate: rate(),
       version: deps.version,
       rejectReasons: REJECT_REASONS.map((id) => ({ id, label: REJECT_REASON_LABELS[id] })),
@@ -234,6 +276,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
 
   const restart = (): void => {
     session.reset();
+    marks.clear();
     presetId = null;
     isRated = true;
   };
@@ -302,6 +345,8 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         assertAvailable();
         const replay = session.branchAt(fanMessageNumber);
         if (replay === undefined) throw new FanMessageNotFound();
+        // His messages from this one on are written again: their marks went with them.
+        for (const n of [...marks.keys()]) if (n >= fanMessageNumber) marks.delete(n);
         await sendDescribed(replay.text, replay.media);
         return state();
       }),
@@ -361,6 +406,28 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       session.setFanNotes(notes);
       return state();
     },
+
+    markDesire: (fanMessageNumber, mark, userId) =>
+      exclusive(async () => {
+        if (deps.played === undefined) throw new DesireMarkInventedPersona();
+        const reading = session.desireTrail[fanMessageNumber - 1];
+        const fanMessage = session.history.filter((t) => t.from === 'fan')[fanMessageNumber - 1]?.text;
+        if (reading === undefined || fanMessage === undefined) throw new FanMessageNotFound();
+        await deps.desireMarks.add({
+          id: newId(DesireMarkIdSchema),
+          creatorId: deps.played.creatorId,
+          fanMessageNumber,
+          fanMessage,
+          verdict: mark.verdict,
+          note: mark.note ?? null,
+          reading: { before: reading.before, score: reading.score, signals: reading.signals },
+          weightsVersion: reading.weightsVersion,
+          markedBy: userId,
+          markedAt: (deps.now ?? (() => new Date()))(),
+        });
+        marks.set(fanMessageNumber, mark.verdict);
+        return state();
+      }),
 
     sendCreatorMedia(media, isLocked) {
       idle();

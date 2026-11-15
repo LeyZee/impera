@@ -176,7 +176,7 @@ describe('the reliability check', () => {
     expect(report.verdict).toBe('mismatch');
   });
 
-  it('is only incomplete without the export or the statistics, and says why', () => {
+  it('matches without the export when the statistics agree (ADR 0050 § 8, amended 11/11/2026)', () => {
     const lines = [line({ platformSaleId: 'sale_a', platformChatterId: null })];
     const withoutExport = buildCheckReport(
       sources({
@@ -201,7 +201,34 @@ describe('the reliability check', () => {
         },
       }),
     );
-    expect(withoutExport.verdict).toBe('incomplete');
+    expect(withoutExport).toMatchObject({ verdict: 'match', total: { export: null }, notes: [] });
+    expect(withoutExport.days[0]).toMatchObject({ export: null, differs: [] });
+  });
+
+  it('is a mismatch when a given export differs, even with the statistics agreeing', () => {
+    const lines = [line({ platformSaleId: 'sale_a', platformChatterId: null })];
+    const report = buildCheckReport(
+      sources({
+        lines,
+        stats: { ok: true, daily: [stat('2026-10-20', 800)], chatters: [] },
+        exported: {
+          rows: [
+            {
+              date: '2026-10-20',
+              platformModelId: 'model_test_01',
+              totals: { grossInclVat: null, agency: null, creator: null, net: 799 },
+            },
+          ],
+          notes: [],
+        },
+      }),
+    );
+    expect(report.verdict).toBe('mismatch');
+    expect(report.days[0]).toMatchObject({ differs: ['export'] });
+  });
+
+  it('is only incomplete without the statistics, with or without the export, and says why', () => {
+    const lines = [line({ platformSaleId: 'sale_a', platformChatterId: null })];
     const withoutStats = buildCheckReport(
       sources({ lines, stats: { ok: false, errorKind: 'rate_limited' } }),
     );
@@ -210,6 +237,23 @@ describe('the reliability check', () => {
       total: { stats: null },
       notes: [{ kind: 'stats_unavailable', errorKind: 'rate_limited' }],
     });
+    const exportOnly = buildCheckReport(
+      sources({
+        lines,
+        stats: { ok: false, errorKind: 'rate_limited' },
+        exported: {
+          rows: [
+            {
+              date: '2026-10-20',
+              platformModelId: 'model_test_01',
+              totals: { grossInclVat: 1200, agency: 300, creator: 500, net: 800 },
+            },
+          ],
+          notes: [],
+        },
+      }),
+    );
+    expect(exportOnly.verdict).toBe('incomplete');
   });
 
   it('counts a refund whose sale is older than the register in a note, and names a bot not linked to the agent', () => {
@@ -282,6 +326,7 @@ describe('the reliability check', () => {
       notes: [{ kind: 'register_starts_after', firstLineAt: '2026-10-21T08:00:00.000Z' }],
     });
     expect(buildCheckReport(sources({ exported: { rows: [], notes: [] } })).verdict).toBe('match');
+    expect(buildCheckReport(sources()).verdict).toBe('match');
   });
 
   it('compares a member’s net, not the count Reveal may keep after a refund', () => {
@@ -362,8 +407,16 @@ describe('the report a switch can rest on (CRM-03)', () => {
     expect(isCleanMatch({ ...matching(), generatedAt: '2026-10-31T23:30:00.000Z' })).toBe(true);
   });
 
+  it('needs no export: the register and the statistics agreeing over the fortnight are enough', () => {
+    expect(isCleanMatch(buildCheckReport(sources({ ...FORTNIGHT })))).toBe(true);
+  });
+
   it('is never an incomplete or differing report', () => {
-    expect(isCleanMatch(buildCheckReport(sources({ ...FORTNIGHT })))).toBe(false);
+    expect(
+      isCleanMatch(
+        buildCheckReport(sources({ ...FORTNIGHT, stats: { ok: false, errorKind: 'rate_limited' } })),
+      ),
+    ).toBe(false);
     expect(isCleanMatch({ ...matching(), verdict: 'mismatch' })).toBe(false);
   });
 });

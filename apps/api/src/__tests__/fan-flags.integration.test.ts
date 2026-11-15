@@ -58,7 +58,7 @@ describe('fan flags (GET and PUT /v1/fans/:id/flags) and lines to learn (GET /v1
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config));
     server = await buildServer({
       config,
@@ -261,8 +261,8 @@ describe('fan flags (GET and PUT /v1/fans/:id/flags) and lines to learn (GET /v1
         observedAt: new Date(),
       },
     ]);
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
-    const fans = createFansModule({ db: app.db.db, adminDb: test.admin.db });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
+    const fans = createFansModule({ db: app.db.db, adminDb: test.service.db });
     const bare = await buildServer({
       config,
       logger: createLogger(config),

@@ -34,6 +34,7 @@ import {
   panelOfCorrection,
   panelTitle,
   refusedLineIssues,
+  refusedReplyIssues,
   schemaIssues,
   scoped,
   stillRefused,
@@ -184,10 +185,10 @@ describe('A new creator', () => {
   });
 });
 
-describe('Completion, out of 59 (ADR 0079 § 6)', () => {
+describe('Completion, out of 61 (ADR 0079 § 6, ADR 0090 § C)', () => {
   it('counts the questions answered, the time zone always, never a placeholder', async () => {
     const empty = draftCompletion(firstDraft(await example(), HERS, null));
-    expect(empty.total).toBe(59);
+    expect(empty.total).toBe(61);
     expect(empty.answered).toBe(2);
     expect(empty.missing).toHaveLength(7);
     expect(empty.missing[0]?.section).toBe('identity');
@@ -195,7 +196,7 @@ describe('Completion, out of 59 (ADR 0079 § 6)', () => {
   });
 
   it('never says complete while a field of a panel waits to be fixed (CREA-14)', () => {
-    const full = { answered: 59, total: 59, percent: 100, missing: [] };
+    const full = { answered: 61, total: 61, percent: 100, missing: [] };
     const held = withIssues(full, [
       { field: 'sheet.relationships.body_count', message: 'Nombre entier attendu' },
     ]);
@@ -304,6 +305,41 @@ describe('« Réponses typiques » refused by the guards', () => {
       [],
     );
     expect(stillRefused(NOTHING_REFUSED, persona)).toEqual([]);
+  });
+});
+
+describe('Her objection replies refused by the guards (ADR 0090 § B)', () => {
+  const bank = {
+    too_expensive: [
+      { id: 'testaaaaaaaa', text: 'Réplique de test A' },
+      { id: 'testbbbbbbbb', text: 'Réplique de test B' },
+    ],
+  };
+
+  it('names each reply refused, from 1 in its kind, on its kind, and leaves « Réponses typiques » alone', () => {
+    const faults = [{ index: 1, code: 'discount' as const, objection: 'too_expensive' as const }];
+    const [issue, ...rest] = refusedReplyIssues(faults, bank);
+    expect(rest).toEqual([]);
+    expect(issue?.field).toBe('agent.objection_replies.too_expensive');
+    expect(issue?.message).toMatch(
+      /^L’agent ne les dirait pas : réplique 2 \([^)]+\)\. Corrige ou retire cette réplique\.$/u,
+    );
+    expect(refusedLineIssues(faults, 'a')).toEqual([]);
+    // A reply the bank sent does not have: the refusal does not read.
+    expect(refusedReplyIssues([{ index: 2, code: 'discount', objection: 'too_expensive' }], bank)).toEqual(
+      [],
+    );
+  });
+
+  it('keeps the refusal until her bank changes', async () => {
+    const persona = await demo();
+    const banked = { ...persona, agent: { ...persona.agent, objection_replies: bank } };
+    const issues = refusedReplyIssues([{ index: 0, code: 'discount', objection: 'too_expensive' }], bank);
+    const refused = { ...NOTHING_REFUSED, replies: { issues, bank: JSON.stringify(bank) } };
+    expect(stillRefused(refused, answer(banked, 'preferences', 'passions', 'Autre'))).toHaveLength(1);
+    expect(stillRefused(refused, { ...banked, agent: { ...banked.agent, objection_replies: {} } })).toEqual(
+      [],
+    );
   });
 });
 

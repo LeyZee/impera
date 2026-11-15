@@ -1,0 +1,7 @@
+# 2026-11-13 — Playground fiable, PR 2 : marquer la note de désir, amendements de l'ADR 0103 — done
+Fait : sous chaque message du fan, la note ouverte propose « Trop basse / Juste / Trop haute » ; la marque est gardée en base par créatrice avec le comptage de l'époque (score avant et après, signaux, version des poids). Le volet « Calibrer le désir » de la mise en situation relit les marques et recompte chaque message avec les poids en vigueur (`recountDesire`). Migration 0185 : toutes les tables de l'ADR 0103 (conversations, cas, rejeux, marques), en FORCE RLS et fermées au compte créatrice, et les colonnes de `calibration_ratings` pour les PR suivantes. ADR 0103 amendée quatre fois (« ok phrases 0103 » de Charles, 13/11) : disponibilité du fan et porte avant le premier teaser (§ 9 à 14, avec les précisions du fil Agent), ventes fictives (§ 15 à 18), écran « Leçons » (§ 19). Terme « Disponibilité du fan » au glossaire.
+Pas fait : la ligne « Disponible » au playground (attend le code de la porte, fil Agent), les ventes fictives (attendent le déroulé 0098), l'écran « Leçons », les notes en base par version, les cas rejouables, la banque 0102 en prod, le composeur de prod au playground.
+Décisions : amendements de l'ADR 0103 ci-dessus.
+Découvertes : `drizzle-kit generate` numérote ses fichiers d'après l'index du journal et écrase un instantané existant du même numéro (ici 0137) : toujours restaurer l'instantané écrasé avant de renommer.
+Candidats à suppression : aucun.
+Vérifié : voir la PR.

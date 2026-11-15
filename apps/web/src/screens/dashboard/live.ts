@@ -34,7 +34,7 @@ const plural = (n: number, one: string, many: string): string => `${String(n)} $
 
 /** « 7,40 € »: the AI spend is small, its cents matter. */
 const euroCents = (value: number): string =>
-  `${value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
+  [value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), '€'].join(' ');
 
 /** « 1 min 40 » from minutes with a tenth; « 45 s » under a minute. */
 export function replyDelay(minutes: number): string {
@@ -158,8 +158,9 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         ['Dernière lecture', lastRead ?? 'jamais'],
         ['Conversations suivies', String(reveal.conversations)],
       ],
-      alarm: late ? 'Reveal n’est plus lu' : 'Reveal est déconnecté',
-      brief: `Reveal ${late ? 'lu en retard' : reveal.connected ? 'connecté' : unlinked ? 'pas encore relié' : 'déconnecté'}`,
+      alarm: late ? 'La messagerie Reveal n’est plus lue' : 'La messagerie Reveal est déconnectée',
+      // « Messagerie »: the sales key is another link, Réglages › Ventes may show Reveal linked (choix de Charles 12/11).
+      brief: `Messagerie Reveal ${late ? 'lue en retard' : reveal.connected ? 'connectée' : unlinked ? 'pas encore reliée' : 'déconnectée'}`,
     },
     {
       id: 'voice',
@@ -313,11 +314,17 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       ? ' L’IA qui écrit attend aussi sa clé.'
       : ' L’IA qui écrit ne répond pas non plus.';
   if (unlinked) {
+    // The sales key and the messaging session are two links: Réglages › Ventes may show Reveal linked while the
+    // agent reads nothing yet, so the page names the one missing (recette socle 11/11, point 4 ; choix de Charles 12/11).
+    const salesLinked = api.revealSales === null ? '' : 'Les ventes Reveal, elles, remontent déjà. ';
     return {
       ...base,
       tone: 'idle',
-      headline: 'Reveal n’est **pas encore relié**',
-      lead: `L’agent commencera à lire les conversations dès que la session Reveal sera capturée depuis l’extension.${alsoVoice}`,
+      headline: 'La messagerie Reveal n’est **pas encore reliée**',
+      lead: `${salesLinked}L’agent commencera à lire les conversations dès que la session Reveal sera capturée depuis l’extension.${alsoVoice}`,
+      // The way to do it exists: its guide, offered to the owner, who alone captures the session (ADM-18).
+      action: 'Comment relier Reveal',
+      actionTo: '/aide/reveal',
       foldTitle: 'Rien ne tourne encore',
     };
   }
@@ -326,9 +333,11 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
     return {
       ...base,
       tone: 'bad',
-      headline: 'Reveal est **déconnecté**',
+      headline: 'La messagerie Reveal est **déconnectée**',
       // Since when, in the sentence itself, not only in the fold (DASH-18).
       lead: `${lastRead === null ? '' : `Dernière lecture ${lastRead}. `}L’agent ne lit plus les conversations. Reconnecte la session Reveal depuis l’extension.${alsoVoice}`,
+      action: 'Reconnecter Reveal',
+      actionTo: '/aide/reveal',
       foldTitle: 'Quelque chose ne va pas',
     };
   }
@@ -338,8 +347,8 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       ...base,
       tone: 'warn',
       stalled: true,
-      headline: 'Reveal n’est **plus lu**',
-      lead: `La session tient, mais Reveal a été lu pour la dernière fois ${ago(reveal.lastReadAt, now)}. Les nouveaux messages des fans n’arrivent plus à l’agent.${alsoVoice}`,
+      headline: 'La messagerie Reveal n’est **plus lue**',
+      lead: `La session tient, mais la messagerie a été lue pour la dernière fois ${ago(reveal.lastReadAt, now)}. Les nouveaux messages des fans n’arrivent plus à l’agent.${alsoVoice}`,
       foldTitle: 'Quelque chose ne va pas',
     };
   }
@@ -472,7 +481,7 @@ function sellerOf(line: ApiSellerLine): RevealSeller {
     kind: seller.kind,
     name: seller.kind === 'member' ? seller.name : SELLER_NAME[seller.kind],
     // A chatter of the platform nobody linked yet: his sales count for no one until the owner links him (ADR 0050 § 5).
-    line: seller.kind === 'unlinked' ? `${counts} · à relier dans Réglages › Ventes` : counts,
+    line: seller.kind === 'unlinked' ? `${counts} · à relier dans Équipe › Reveal` : counts,
     revenue: euros(line.revenueMinor),
     net: euros(line.netMinor),
     agency: euros(line.agencyMinor),

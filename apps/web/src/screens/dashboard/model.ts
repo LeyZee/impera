@@ -69,8 +69,11 @@ export interface AgentState {
   readonly action?: string;
   /** Nothing is written, in a tone that is not red (its key is missing): its sentence still leads the hero. */
   readonly stalled?: true;
-  /** Where the action leads, when it is a page and not the first todo (« Poser la clé » › Réglages). */
-  readonly actionTo?: '/reglages/modeles-ia';
+  /**
+   * Where the action leads, when it is a page and not the first todo (« Poser la clé » › Réglages, « Comment relier
+   * Reveal » › its guide, ADM-18). Both are the owner's alone.
+   */
+  readonly actionTo?: '/reglages/modeles-ia' | '/aide/reveal';
   /** The lead read by whoever cannot open `actionTo` (Réglages is the owner's alone): who does it, and where. */
   readonly leadWithoutAction?: string;
   /**
@@ -119,7 +122,7 @@ export interface RevealSeller {
   readonly kind: 'member' | 'agent' | 'unlinked' | 'none';
   /** « Théo », « L’agent », « Chatteur non relié », « Sans chatteur ». */
   readonly name: string;
-  /** « 2 ventes · 1 remboursement », or what to do about it (« à relier dans Réglages › Ventes »). */
+  /** « 2 ventes · 1 remboursement », or what to do about it (« à relier dans Équipe › Reveal »). */
   readonly line: string;
   /** In euros, a refund taken off: negative when refunds outweigh sales. */
   readonly revenue: number;

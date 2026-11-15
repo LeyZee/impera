@@ -22,16 +22,21 @@ export interface ScriptArchive {
   readonly stream: Readable;
 }
 
+/** An entry of an archive: a medium read from the storage as it goes out, or bytes made for it (a card). */
+export type ArchiveEntry =
+  | { readonly path: string; readonly storageKey: string }
+  | { readonly path: string; readonly made: () => Promise<Uint8Array> };
+
 /**
- * The archive's bytes, pulled by the response: the sheet first, then each card and each medium in the script's
- * order, stored as they are (`ZipPassThrough`: a photo or a video is compressed already). A medium is read from the
- * storage as it goes out, never held whole: the heaviest video is 10 Gio. A medium the storage no longer has once
- * the archive has begun cuts it, and the agency asks for it again.
+ * The archive's bytes, pulled by the response: the sheet first, then each entry in its order, stored as they are
+ * (`ZipPassThrough`: a photo or a video is compressed already). A medium is read from the storage as it goes out,
+ * never held whole: the heaviest video is 10 Gio. A medium the storage no longer has once the archive has begun cuts
+ * it, and the agency asks for it again.
  */
-async function* archiveChunks(
-  deps: ScriptExportDeps,
-  versionId: string,
-  plan: ScriptExportPlan,
+export async function* archiveChunks(
+  storage: DropStorage,
+  sheet: { readonly path: string; readonly text: string },
+  entries: readonly ArchiveEntry[],
   now: Date,
 ): AsyncGenerator<Uint8Array> {
   const ready: Uint8Array[] = [];
@@ -51,20 +56,17 @@ async function* archiveChunks(
     yield* ready.splice(0);
   };
 
-  open(plan.sheetPath).push(new TextEncoder().encode(plan.sheet), true);
+  open(sheet.path).push(new TextEncoder().encode(sheet.text), true);
   yield* drained();
-  for (const { path, source } of plan.entries) {
-    if (source.kind === 'card') {
-      const png = await deps.versions.folderCard(versionId, source.segmentKey, source.variant, plan.moment);
-      if (png === null) throw new ContentDropCardNotFound();
-      open(path).push(png, true);
+  for (const one of entries) {
+    if ('made' in one) {
+      open(one.path).push(await one.made(), true);
       yield* drained();
       continue;
     }
-    const bytes = await deps.storage.read(source.storageKey);
-    if (bytes === null)
-      throw new ContentDropStorageUnavailable(`${source.storageKey} is gone from the storage`);
-    const entry = open(path);
+    const bytes = await storage.read(one.storageKey);
+    if (bytes === null) throw new ContentDropStorageUnavailable(`${one.storageKey} is gone from the storage`);
+    const entry = open(one.path);
     for await (const chunk of bytes) {
       entry.push(chunk, false);
       yield* drained();
@@ -74,6 +76,27 @@ async function* archiveChunks(
   }
   zip.end();
   yield* drained();
+}
+
+/** The script's entries for `archiveChunks`: each card made from its frozen version, each medium from the storage. */
+function scriptEntries(deps: ScriptExportDeps, versionId: string, plan: ScriptExportPlan): ArchiveEntry[] {
+  return plan.entries.map(({ path, source }) =>
+    source.kind === 'card'
+      ? {
+          path,
+          made: async () => {
+            const png = await deps.versions.folderCard(
+              versionId,
+              source.segmentKey,
+              source.variant,
+              plan.moment,
+            );
+            if (png === null) throw new ContentDropCardNotFound();
+            return png;
+          },
+        }
+      : { path, storageKey: source.storageKey },
+  );
 }
 
 /**
@@ -106,6 +129,13 @@ export async function exportScript(
   });
   return {
     fileName: `${plan.folder}.zip`,
-    stream: Readable.from(archiveChunks(deps, sent.versionId, plan, now)),
+    stream: Readable.from(
+      archiveChunks(
+        deps.storage,
+        { path: plan.sheetPath, text: plan.sheet },
+        scriptEntries(deps, sent.versionId, plan),
+        now,
+      ),
+    ),
   };
 }

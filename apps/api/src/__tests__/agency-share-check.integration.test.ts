@@ -61,7 +61,7 @@ describe('agency percentages against her part on the register (CRM-04 d3)', () =
     crm = createFakeCrm();
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 9).toString('base64')}`,
     });
     const logger = createLogger(config, new LogSink());

@@ -17,6 +17,7 @@ import type {
   ExchangeRates,
   ForeignCurrency,
   HeldSales,
+  MyFigures,
   MySales,
   MySalesQuery,
   PayAdjustment,
@@ -34,6 +35,8 @@ import type {
   PayrollSettings,
   PaySaleDecision,
   PaySaleSignal,
+  SaleGiftCounts,
+  SalesToGive,
   Penalty,
   PenaltyId,
   TeamMemberId,
@@ -147,6 +150,10 @@ export interface PayrollEntryStore {
  */
 export interface PayrollSaleDecisionStore {
   heldSales(userId: UserId, period: PayPeriod): Promise<HeldSales>;
+  /** The sales of a day a give may name a member on (ADR 0101 §§ 1, 2), as the held sales read them. */
+  salesToGive(userId: UserId, period: PayPeriod, day: string): Promise<SalesToGive>;
+  /** How many sales each validator gave in the month of `period` (ADR 0101 § 17): the owner only. */
+  saleGifts(userId: UserId, period: PayPeriod): Promise<SaleGiftCounts>;
   decide(actor: Actor, body: CreatePaySaleDecisionBody): Promise<Recorded<PaySaleDecision>>;
 }
 
@@ -157,6 +164,8 @@ export interface PayrollSaleDecisionStore {
  */
 export interface PayrollSaleSignalStore {
   mySales(userId: UserId, query: MySalesQuery): Promise<MySales>;
+  /** The member's own figures (ADR 0104 § A), from their own statements only. */
+  myFigures(userId: UserId): Promise<MyFigures>;
   signal(actor: Actor, body: CreatePaySaleSignalBody): Promise<Recorded<PaySaleSignal>>;
 }
 

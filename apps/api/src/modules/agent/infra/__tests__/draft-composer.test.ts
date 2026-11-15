@@ -3,6 +3,7 @@ import {
   DEFAULT_AGENT_HOURS,
   err,
   ok,
+  type FanAvailabilityRecord,
   type FanFlags,
   type MediaDescription,
 } from '@impera/contracts';
@@ -27,6 +28,7 @@ import {
   type DraftComposerDeps,
   type MediaSight,
   type MediaToSee,
+  type ScriptSource,
 } from '../draft-composer';
 import type { FanLimits } from '../fan-limits';
 
@@ -139,6 +141,23 @@ function gateway(script: Script, seen: Seen): LlmGateway {
   };
 }
 
+/** Her made-up catalogue (ADR 0010): one pack at 15 €, of either moment; Reveal never sent it to him. */
+const PACK_SOURCE: ScriptSource = {
+  catalogue: () =>
+    Promise.resolve([
+      {
+        scriptRef: 'script-demo',
+        moment: null,
+        description: 'Pack de démonstration',
+        steps: [{ kind: 'paid', priceMinor: 1_500, mediaRefs: [] }],
+        mediaValidated: true,
+        descriptionValidated: true,
+        touchesLimits: false,
+      },
+    ]),
+  history: () => Promise.resolve({ scripts: [] }),
+};
+
 const INPUT: AgentComposeInput = {
   creatorId: 'creator-1',
   conversationId: 'conversation-1',
@@ -155,11 +174,27 @@ const INPUT: AgentComposeInput = {
   fan: { notes: [], spentMinor: 0, firstMessageAt: new Date('2026-10-17T09:58:00Z') },
 };
 
+/** He said he is alone and free, and sexualized, in this session (ADR 0103 § 11): the gate before a script is open. */
+const READY: FanAvailabilityRecord = {
+  state: 'confirmed',
+  signal: 'free_now',
+  at: new Date('2026-10-17T09:59:00Z'),
+  expiresAt: new Date('2026-10-17T11:59:00Z'),
+  seen: ['alone', 'free_now'],
+  sexualizedAt: new Date('2026-10-17T09:59:00Z'),
+  askedAt: null,
+  hotAt: null,
+};
+const free = (input: AgentComposeInput): AgentComposeInput => ({ ...input, fanAvailability: READY });
+
 function composer(
   script: Script = {},
   sight?: MediaSight,
   limits?: FanLimits,
-  offer: Pick<DraftComposerDeps, 'offerLimits' | 'lastOfferAt' | 'sexualizationLimits'> = {},
+  offer: Pick<
+    DraftComposerDeps,
+    'offerLimits' | 'lastOfferAt' | 'sexualizationLimits' | 'scripts' | 'alertsOf'
+  > = {},
 ) {
   const traces: unknown[] = [];
   const seen: Seen = { voiceCalls: 0, traces, brainInputs: [], dropped: [], voiceInputs: [] };
@@ -383,11 +418,11 @@ describe('createDraftComposer', () => {
   });
 
   it('still hands a risk to a human after a wait', async () => {
-    const { draftComposer } = composer({ brief: { ...BRIEF, risks: ['distress'], action: 'wait' } });
+    const { draftComposer } = composer({ brief: { ...BRIEF, risks: ['minor_suspected'], action: 'wait' } });
     expect(await draftComposer.compose({ ...INPUT, waited: 1 })).toMatchObject({
       kind: 'held',
       reason: 'handoff',
-      detail: ['distress'],
+      detail: ['minor_suspected'],
     });
   });
 
@@ -813,7 +848,7 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     expect(seen.traces).toHaveLength(0);
   });
 
-  it('takes back his age on a possible minor, and stops writing to him on distress', async () => {
+  it('takes back his age on a possible minor, and answers distress with care (ADR 0088)', async () => {
     const minor = limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' });
     await composer(
       { brief: { ...BRIEF, risks: ['minor_suspected'] } },
@@ -826,6 +861,7 @@ describe('createDraftComposer, his limits (P3-02)', () => {
         protection: {
           unconfirmAge: true,
           stopContact: false,
+          care: false,
           freezeSales: false,
           because: ['minor_suspected'],
         },
@@ -838,13 +874,19 @@ describe('createDraftComposer, his limits (P3-02)', () => {
       undefined,
       distress.limits,
     ).draftComposer.compose(INPUT);
-    expect(held).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['distress'] });
+    expect(held).toMatchObject({ kind: 'draft', care: { signs: ['distress'], help: false } });
     expect(distress.protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: false, stopContact: true, freezeSales: true, because: ['distress', 'money_trouble'] },
+      {
+        unconfirmAge: false,
+        stopContact: false,
+        care: true,
+        freezeSales: true,
+        because: ['distress', 'money_trouble'],
+      },
     ]);
   });
 
-  it('hands a fan who says he is 16 or wants to end it to a human, before any model (recette AGT-01)', async () => {
+  it('hands a fan who says he is 16 to a human before any model, and answers one who wants to end it with care', async () => {
     const says = (text: string): AgentComposeInput => ({
       ...INPUT,
       history: [...INPUT.history, { direction: 'inbound', text, at: new Date('2026-10-17T09:59:30Z') }],
@@ -860,18 +902,25 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     });
     expect(young.seen.traces).toHaveLength(0);
     expect(minor.protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: true, stopContact: false, freezeSales: false, because: ['minor_suspected'] },
+      {
+        unconfirmAge: true,
+        stopContact: false,
+        care: false,
+        freezeSales: false,
+        because: ['minor_suspected'],
+      },
     ]);
     const distress = limitsOf({});
-    const low = composer({}, undefined, distress.limits);
-    expect(await low.draftComposer.compose(says('j’en peux plus, je veux en finir'))).toMatchObject({
-      reason: 'handoff',
-      cause: 'distress',
-      detail: ['safety_net', 'self_harm'],
-    });
-    expect(low.seen.traces).toHaveLength(0);
+    const low = composer(
+      { voice: { bubbles: ['Oh, je suis là, je t’écoute 🤍'] } },
+      undefined,
+      distress.limits,
+    );
+    const answered = await low.draftComposer.compose(says('j’en peux plus, je veux en finir'));
+    expect(answered).toMatchObject({ kind: 'draft', care: { signs: ['self_harm'], help: true } });
+    expect(answered.kind === 'draft' && answered.bubbles.at(-1)).toContain('3114');
     expect(distress.protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: false, stopContact: true, freezeSales: false, because: ['self_harm'] },
+      { unconfirmAge: false, stopContact: false, care: true, freezeSales: false, because: ['self_harm'] },
     ]);
   });
 
@@ -895,7 +944,13 @@ describe('createDraftComposer, his limits (P3-02)', () => {
       cause: 'minor',
     });
     expect(protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: true, stopContact: true, freezeSales: false, because: ['possible_minor', 'weapon'] },
+      {
+        unconfirmAge: true,
+        stopContact: true,
+        care: false,
+        freezeSales: false,
+        because: ['possible_minor', 'weapon'],
+      },
     ]);
   });
 
@@ -911,7 +966,7 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     const { draftComposer } = composer({ brief: { ...BRIEF, risks: ['money_trouble'] } }, undefined, limits);
     expect((await draftComposer.compose(INPUT)).kind).toBe('draft');
     expect(protections.map((p) => p.protection)).toEqual([
-      { unconfirmAge: false, stopContact: false, freezeSales: true, because: ['money_trouble'] },
+      { unconfirmAge: false, stopContact: false, care: false, freezeSales: true, because: ['money_trouble'] },
     ]);
   });
 
@@ -939,11 +994,24 @@ describe('createDraftComposer, his limits (P3-02)', () => {
 
   it('still hands over when his limits cannot be saved, and says so', async () => {
     const { limits } = limitsOf({}, { failWrite: true });
-    const { draftComposer } = composer({ brief: { ...BRIEF, risks: ['self_harm'] } }, undefined, limits);
+    const { draftComposer } = composer(
+      { brief: { ...BRIEF, risks: ['harassment'], action: 'handoff' } },
+      undefined,
+      limits,
+    );
     expect(await draftComposer.compose(INPUT)).toMatchObject({
       kind: 'held',
       reason: 'handoff',
-      detail: ['self_harm', 'limits_not_saved'],
+      detail: ['harassment', 'limits_not_saved'],
+    });
+    const care = limitsOf({}, { failWrite: true });
+    const low = composer({ brief: { ...BRIEF, risks: ['self_harm'] } }, undefined, care.limits);
+    expect(await low.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'distress',
+      detail: ['care_unanswered', 'self_harm', 'limits_not_saved'],
+      care: { signs: ['self_harm'], help: false },
     });
   });
 
@@ -1020,12 +1088,14 @@ describe('createDraftComposer, the offer policy', () => {
     sentiment: 'aroused',
     action: 'offer',
     replyBrief: 'Lui proposer la vidéo de la douche.',
+    scriptPick: 's1',
   };
   const ADULT: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00Z' };
   const policy = (lastOfferAt: Date | null) => ({
     sexualizationLimits: { initiateAfterHours: 0, minHoursBeforeFollowing: 0, minDesireToOpen: 0 },
     offerLimits: { cooldownHours: 10, minDesire: 0 },
     lastOfferAt: () => Promise.resolve(lastOfferAt),
+    scripts: PACK_SOURCE,
   });
   const written = (seen: Seen) => seen.voiceInputs?.[0]?.brief;
 
@@ -1036,7 +1106,7 @@ describe('createDraftComposer, the offer policy', () => {
       limitsOf(ADULT).limits,
       policy(null),
     );
-    expect((await draftComposer.compose(INPUT)).kind).toBe('draft');
+    expect((await draftComposer.compose(free(INPUT))).kind).toBe('draft');
     expect(written(seen)).toMatchObject({ action: 'offer', replyBrief: OFFER.replyBrief });
   });
 
@@ -1098,12 +1168,14 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
     desireSignals: ['states_desire'],
     action: 'offer',
     replyBrief: 'Lui proposer la vidéo de la douche.',
+    scriptPick: 's1',
   };
   const ADULT: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00Z' };
   const policy = {
     sexualizationLimits: { initiateAfterHours: 0, minHoursBeforeFollowing: 0, minDesireToOpen: 40 },
     offerLimits: { cooldownHours: 10, minDesire: 70 },
     lastOfferAt: () => Promise.resolve(null),
+    scripts: PACK_SOURCE,
   };
   const minutesBefore = (minutes: number) => new Date(INPUT.now.getTime() - minutes * 60_000);
   const stored = (score: number, minutes: number) => ({
@@ -1115,14 +1187,14 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
   it('gives the worker his new score with what moved it, and offers once he is hot', async () => {
     // Stored at 60 three minutes ago, 59 now: +34 on this message.
     const { draftComposer, seen } = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
-    const result = await draftComposer.compose(stored(60, 3));
+    const result = await draftComposer.compose(free(stored(60, 3)));
     expect(result).toMatchObject({
       kind: 'draft',
       desire: {
         before: 59,
         score: 93,
         signals: ['states_desire', 'intent:sexting', 'sentiment:aroused'],
-        weightsVersion: 'desire-1',
+        weightsVersion: 'desire-2',
       },
     });
     expect(written(seen)?.action).toBe('offer');
@@ -1146,7 +1218,7 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
   it('counts a message of his once: a second pass reads the stored score and gives none back', async () => {
     // Counted at 93 half a minute ago, after his last message (09:59).
     const { draftComposer, seen } = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
-    const result = await draftComposer.compose(stored(93, 0.5));
+    const result = await draftComposer.compose(free(stored(93, 0.5)));
     expect(result.desire).toBeUndefined();
     expect(written(seen)?.action).toBe('offer');
   });
@@ -1596,5 +1668,359 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
     const active = withPersonaOf(() => Promise.resolve(NORA), limitsOf({}).limits);
     expect(await active.draftComposer.compose(FOLLOW_UP)).toMatchObject({ kind: 'draft' });
     expect(active.seen.voiceInputs?.[0]).toMatchObject({ creatorName: 'Nora' });
+  });
+});
+
+describe('createDraftComposer, the care mode (ADR 0088)', () => {
+  const says = (text: string): AgentComposeInput => ({
+    ...INPUT,
+    history: [...INPUT.history, { direction: 'inbound', text, at: new Date('2026-10-17T09:59:30Z') }],
+  });
+
+  it('writes the code\u2019s care brief, whatever the brain suggested, and offers nothing', async () => {
+    const { draftComposer, seen } = composer({
+      brief: { ...BRIEF, risks: ['distress'], action: 'offer', replyBrief: 'Lui proposer la vidéo.' },
+      voice: { bubbles: ['Je suis là pour toi 🤍'] },
+    });
+    seen.voiceInputs = [];
+    const result = await draftComposer.compose(INPUT);
+    expect(result).toMatchObject({ kind: 'draft', bubbles: ['Je suis là pour toi 🤍'] });
+    expect(seen.voiceInputs[0]?.brief.replyBrief).toContain('Elle lui répond avec douceur');
+    expect(seen.voiceInputs[0]?.brief.action).toBe('reply');
+  });
+
+  it('hands him to a human when the care answer sells, meets or goes sexual: never silence', async () => {
+    const { draftComposer } = composer({
+      brief: { ...BRIEF, risks: ['distress'] },
+      voice: { bubbles: ['On pourrait se voir demain, ça te changerait les idées'] },
+    });
+    const held = await draftComposer.compose(INPUT);
+    expect(held).toMatchObject({ kind: 'held', reason: 'handoff', cause: 'distress' });
+    expect(held.kind === 'held' && held.detail).toEqual(
+      expect.arrayContaining(['care_unanswered', 'guard_blocked', 'care_breach']),
+    );
+  });
+
+  it('hands him to a human when the AI cannot answer: no key, a failure, no budget', async () => {
+    const noKey = composer({ hasKey: false });
+    expect(await noKey.draftComposer.compose(says('je veux en finir'))).toMatchObject({
+      cause: 'distress',
+      detail: ['care_unanswered', 'no voice key'],
+      care: { signs: ['self_harm'], help: false },
+    });
+    const failed = composer({
+      voice: { code: 'budget_reached', attempts: [] },
+    });
+    expect(await failed.draftComposer.compose(says('je veux en finir'))).toMatchObject({
+      reason: 'handoff',
+      cause: 'distress',
+      care: { signs: ['self_harm'] },
+    });
+  });
+
+  it('keeps answering with care while an episode is open, and gives the help bubble only once', async () => {
+    const { draftComposer } = composer({ voice: { bubbles: ['Je pense fort à toi'] } });
+    const open = await draftComposer.compose({
+      ...INPUT,
+      care: { since: new Date('2026-10-17T08:00:00Z'), helpGiven: false },
+    });
+    expect(open).toMatchObject({ kind: 'draft', care: { signs: ['care_open'], help: false } });
+    const again = await draftComposer.compose({
+      ...says('je veux toujours en finir'),
+      care: { since: new Date('2026-10-17T08:00:00Z'), helpGiven: true },
+    });
+    expect(again).toMatchObject({ kind: 'draft', bubbles: ['Je pense fort à toi'], care: { help: false } });
+  });
+
+  it('answers with care when the brain failed but code already knows, and never a possible minor', async () => {
+    const brainDown = composer({
+      brain: {
+        code: 'all_models_failed',
+        attempts: [{ provider: 'xai', model: 'grok-4.7', outcome: 'invalid_output' }],
+      },
+      voice: { bubbles: ['Je suis là'] },
+    });
+    expect((await brainDown.draftComposer.compose(says('je veux mourir'))).kind).toBe('draft');
+    const minor = composer({ brief: { ...BRIEF, risks: ['minor_suspected'] } });
+    expect(
+      await minor.draftComposer.compose({ ...INPUT, care: { since: new Date(), helpGiven: false } }),
+    ).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['minor_suspected'] });
+  });
+});
+
+describe('createDraftComposer, a custom order and a price objection (ADR 0090)', () => {
+  const ORDER: Brief = { ...BRIEF, intent: 'asks_for_service', replyBrief: 'Lui dire oui.' };
+  const adult: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00.000Z' };
+  const ordering = (options: { readonly chatter?: boolean; readonly voice?: VoiceOutput } = {}) => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    const draftComposer = createDraftComposer({
+      gateway: gateway({ brief: ORDER, ...(options.voice !== undefined && { voice: options.voice }) }, seen),
+      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+      limits: limitsOf(adult).limits,
+      ...(options.chatter !== undefined && {
+        chatterOnShift: () => Promise.resolve(options.chatter === true),
+      }),
+    });
+    return { draftComposer, seen };
+  };
+
+  it('hands a custom order to the chatter on shift, without the voice, and opens it', async () => {
+    const { draftComposer, seen } = ordering({ chatter: true });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'custom_order',
+      detail: ['custom_order'],
+      customOrderOpened: true,
+    });
+    expect(seen.voiceCalls).toBe(0);
+  });
+
+  it('with nobody on shift, answers from the code’s brief and opens the order', async () => {
+    const { draftComposer, seen } = ordering({ voice: { bubbles: ['oh j’adore l’idée 🙈', 'je te redis'] } });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft', customOrderOpened: true });
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('sans dire oui ni non');
+  });
+
+  it('holds an answer that commits to his order, and opens it all the same', async () => {
+    const { draftComposer } = ordering({ voice: { bubbles: ['ok je te fais ça demain 😘'] } });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'guard_blocked',
+      detail: ['no_commitment'],
+      customOrderOpened: true,
+    });
+  });
+
+  it('opens no second order while one waits', async () => {
+    const { draftComposer, seen } = ordering({
+      chatter: true,
+      voice: { bubbles: ['je l’ai pas oubliée 😌'] },
+    });
+    const result = await draftComposer.compose({ ...INPUT, customOrderOpen: true });
+    expect(result).toMatchObject({ kind: 'draft' });
+    expect(result).not.toHaveProperty('customOrderOpened');
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('déjà notée');
+  });
+
+  it('gives the voice the first reply of her bank he never received, and says which', async () => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    const draftComposer = createDraftComposer({
+      gateway: gateway({ brief: { ...BRIEF, intent: 'price_objection', objection: 'too_expensive' } }, seen),
+      personaOf: () =>
+        Promise.resolve({
+          persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+          followUpSpirit: null,
+          offerLimits: { cooldownHours: 10, minDesire: 70 },
+          sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },
+          alertKeywords: [],
+          objectionReplies: {
+            too_expensive: [
+              { id: 'testaaaaaaaa', text: 'Réplique de test A' },
+              { id: 'testbbbbbbbb', text: 'Réplique de test B' },
+            ],
+          },
+        }),
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+    });
+    expect(await draftComposer.compose({ ...INPUT, usedObjectionReplies: ['testaaaaaaaa'] })).toMatchObject({
+      kind: 'draft',
+      objectionReply: { objection: 'too_expensive', replyId: 'testbbbbbbbb' },
+    });
+    expect(seen.voiceInputs?.[0]?.objectionReply).toBe('Réplique de test B');
+  });
+});
+
+describe('createDraftComposer, her scripts (ADR 0098)', () => {
+  const HOT: Brief = {
+    ...BRIEF,
+    intent: 'sexting',
+    sentiment: 'aroused',
+    action: 'offer',
+    replyBrief: 'Lui proposer quelque chose.',
+    scriptPick: 's1',
+  };
+  const ADULT: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00Z' };
+  const deps = (scripts: ScriptSource | undefined, systemOn: AlertSettings['systemOn'] = new Set()) => ({
+    sexualizationLimits: { initiateAfterHours: 0, minHoursBeforeFollowing: 0, minDesireToOpen: 0 },
+    offerLimits: { cooldownHours: 10, minDesire: 0 },
+    lastOfferAt: () => Promise.resolve(null),
+    alertsOf: () => Promise.resolve({ custom: [], systemOn }),
+    ...(scripts !== undefined && { scripts }),
+  });
+  const sentAt = new Date('2026-10-17T09:30:00Z');
+  const waiting = {
+    scriptRef: 'script-demo',
+    status: 'open' as const,
+    steps: [
+      {
+        stepIndex: 0,
+        kind: 'paid' as const,
+        outcome: 'sent' as const,
+        priceMinor: 1_500,
+        sentAt,
+        at: sentAt,
+      },
+    ],
+    ignoredMessages: 0,
+    startedAt: sentAt,
+    endedAt: null,
+  };
+  const sent: ScriptSource = {
+    ...PACK_SOURCE,
+    history: () =>
+      Promise.resolve({
+        scripts: [{ scriptRef: 'script-demo', sentStepIndexes: [0], boughtStepIndexes: [] }],
+      }),
+  };
+
+  it('opens the script the brain picked: the step and its catalogue price go to the voice and the draft', async () => {
+    const { draftComposer, seen } = composer(
+      { brief: HOT },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose(free(INPUT));
+
+    expect(seen.brainInputs?.[0]?.scripts).toEqual([{ id: 's1', description: 'Pack de démonstration' }]);
+    expect(seen.voiceInputs?.[0]?.scriptStep).toEqual({
+      kind: 'paid',
+      price: { amountMinor: 1_500, currency: 'EUR' },
+      instruction: null,
+      mediaSheet: null,
+    });
+    expect(result).toMatchObject({
+      kind: 'draft',
+      scriptRun: {
+        opened: { events: [{ type: 'script_started' }, { type: 'script_step_sent', stepIndex: 0 }] },
+        offer: { amountMinor: 1_500, currency: 'EUR' },
+      },
+    });
+  });
+
+  it('sends no step in the care mode, hot, free and at her threshold: the care brief only (ADR 0088 § 2)', async () => {
+    const { draftComposer, seen } = composer(
+      { brief: HOT, voice: { bubbles: ['Je suis là pour toi 🤍'] } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose({
+      ...free(INPUT),
+      care: { since: new Date('2026-10-17T08:00:00Z'), helpGiven: true },
+    });
+
+    expect(result).toMatchObject({ kind: 'draft', bubbles: ['Je suis là pour toi 🤍'] });
+    expect(result.scriptRun?.opened).toBeUndefined();
+    expect(result.scriptRun?.offer).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.brief.action).toBe('reply');
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('Elle lui répond avec douceur');
+    // She asks him nothing about being free either: in care, nothing leads to a sale.
+    expect(seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('tranquille'))).toBe(false);
+  });
+
+  it('sends no teaser while he has not said he is free, and asks him once in the session (ADR 0103 § 11-13)', async () => {
+    const { draftComposer, seen } = composer(
+      { brief: HOT },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const first = await draftComposer.compose(INPUT);
+    expect(first.kind).toBe('draft');
+    expect(first.scriptRun).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('tranquille'))).toBe(true);
+    expect(first.fanAvailability).toMatchObject({ state: 'unknown', askedAt: INPUT.now });
+
+    const again = await draftComposer.compose({ ...INPUT, fanAvailability: first.fanAvailability ?? null });
+    expect(again.scriptRun).toBeUndefined();
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.some((hint) => hint.includes('tranquille'))).toBe(false);
+  });
+
+  it('sends no teaser when someone is beside him, even hot and free before', async () => {
+    const busy: Brief = { ...HOT, desireSignals: [...(HOT.desireSignals ?? []), 'someone_nearby'] };
+    const { draftComposer, seen } = composer(
+      { brief: busy },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose(free(INPUT));
+    expect(result.scriptRun).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    expect(result.fanAvailability).toMatchObject({ state: 'no', signal: 'someone_nearby' });
+  });
+
+  it('sells nothing without her scripts, or when Reveal’s history cannot be read (fail closed)', async () => {
+    const down: ScriptSource = { ...PACK_SOURCE, history: () => Promise.reject(new Error('down')) };
+    for (const source of [undefined, down]) {
+      const { draftComposer, seen } = composer(
+        { brief: HOT },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(source),
+      );
+      const result = await draftComposer.compose(INPUT);
+      expect(result.kind).toBe('draft');
+      expect(result.scriptRun).toBeUndefined();
+      expect(seen.voiceInputs?.[0]?.brief.action).toBe('reply');
+      expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    }
+  });
+
+  it('ends the run on his clear no, and keeps it when a human answers instead', async () => {
+    const refused: Brief = { ...BRIEF, scriptReply: 'refused' };
+    const { draftComposer, seen } = composer(
+      { brief: refused },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(sent),
+    );
+    const result = await draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    expect(seen.brainInputs?.[0]?.scriptStepWaiting).toBe(true);
+    expect(result.scriptRun?.moved?.run.status).toBe('refused');
+    expect(result.scriptRun?.moved?.events).toEqual([
+      { type: 'script_step_refused', stepIndex: 0 },
+      { type: 'script_ended' },
+    ]);
+
+    const handoff = composer(
+      { brief: { ...refused, action: 'handoff' } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(sent),
+    );
+    const held = await handoff.draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    expect(held.kind).toBe('held');
+    expect(held.scriptRun?.moved?.run.status).toBe('refused');
+  });
+
+  it('tells the team when the step waiting no longer has the price she said', async () => {
+    const repriced: ScriptSource = {
+      ...sent,
+      catalogue: async () =>
+        (await PACK_SOURCE.catalogue('creator-1', 'account-1')).map((script) => ({
+          ...script,
+          steps: [{ kind: 'paid', priceMinor: 1_900, mediaRefs: [] }],
+        })),
+    };
+    const answers: Brief = { ...BRIEF, scriptReply: 'answers_step' };
+    const on = composer(
+      { brief: answers },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(repriced, new Set(['script_price'])),
+    );
+    expect((await on.draftComposer.compose({ ...INPUT, scriptRun: waiting })).alerts).toEqual([
+      { trigger: { alert: { kind: 'system', code: 'script_price' }, matchedBy: 'rule' }, notify: true },
+    ]);
+    const off = composer({ brief: answers }, undefined, limitsOf(ADULT).limits, deps(repriced));
+    expect((await off.draftComposer.compose({ ...INPUT, scriptRun: waiting })).alerts).toBeUndefined();
   });
 });

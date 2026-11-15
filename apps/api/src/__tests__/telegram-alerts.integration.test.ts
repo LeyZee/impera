@@ -152,7 +152,7 @@ describe('Telegram alerts from the conversations module', () => {
     // group would get the earlier tests' alerts again.
     telegram = new FakeTelegram();
     const store = createPostgresTelegramStore({
-      adminDb: test.admin.db,
+      adminDb: test.service.db,
       keys: parseEncryptionKeys(`v1:${randomBytes(32).toString('base64')}`),
     });
     module = createTelegramModule({
@@ -186,10 +186,10 @@ describe('Telegram alerts from the conversations module', () => {
   });
 
   beforeEach(() => {
-    const fans = createFansModule({ db: test.app.db, adminDb: test.admin.db });
+    const fans = createFansModule({ db: test.app.db, adminDb: test.service.db });
     const deps = {
       db: test.app.db,
-      adminDb: test.admin.db,
+      adminDb: test.service.db,
       fans,
       sender: new FailingSender(),
       requireRole: () => () => Promise.resolve(),

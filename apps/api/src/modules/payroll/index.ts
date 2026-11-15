@@ -8,6 +8,7 @@ import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
 import { createPayrollReads } from './application/periods';
 import { createRecalculation, type RecalculationOutcome } from './application/recalculation';
+import { createPayrollStatementReads, type PayrollStatementReads } from './application/statement-reads';
 import { createPayrollValidation } from './application/validation';
 import type { RateJobSince } from './domain/ports';
 import { createEcbSource, type GetLike } from './infra/ecb';
@@ -31,6 +32,8 @@ import { createDrizzlePayrollValidationStore } from './infra/validation-store';
  * report, through the composition root (EQ-04). One key and one number of attempts for every writer.
  */
 export { enqueuePayRecalculation } from './infra/recalculation-queue';
+/** What the game reads of a member's pay, plugged into it by the composition root (ADR 0104 § 12, § 15): read only. */
+export { payGameFactsUnscoped } from './infra/game-reads';
 /** What the contractors' file reads of pay, plugged into it by the composition root (ARC-07). */
 export { payReadsForContractors } from './infra/contractor-reads';
 
@@ -62,6 +65,12 @@ export { payReadsForPayRules } from './infra/pay-rules-reads';
 /** The newest rate of a currency, on or before a day, in the caller's transaction (Telegram's minimum, CRM-04). */
 export { latestRateOf } from './infra/latest-rate';
 export type { StatementForInvoicing } from './infra/invoicing-reads';
+/** @public What another door (the MCP, ADR 0026 § 1) reads of the statements. */
+export type { PayrollStatementReads } from './application/statement-reads';
+/** @public The person such a read is for. */
+export type { PayStatementReader } from './application/statement-reads';
+/** @public A statement as that door reads it, cut to what tells no rate. */
+export type { StatementAmounts } from './domain/statement-reads';
 /** Public entry point of the `payroll` module (EQ-04, ADR 0002). Other modules import this file only. */
 export interface PayrollModule {
   readonly name: 'payroll';
@@ -76,6 +85,11 @@ export interface PayrollModule {
    * the Dashboard, which ranks its best fans with it and shows only its day.
    */
   readonly latestRate: (userId: UserId, currency: ForeignCurrency) => Promise<ExchangeRate | null>;
+  /**
+   * The statements of a period for a door other than the routes (ADR 0026 § 1, ADR 0105 § 4, the MCP): as the person,
+   * under the same policies as the screen, never a creator's account (`role_forbidden`), cut to what tells no rate.
+   */
+  readonly reads: PayrollStatementReads;
   /** The adjustments of an upheld contest's correction, in `invoicing`'s transaction (ADR 0039 § 3). */
   readonly correctContest: ContestCorrectionWrite;
   readonly jobs: {
@@ -124,10 +138,8 @@ export interface PayrollDeps {
 export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   const now = deps.now ?? (() => new Date());
   const jobStore = createDrizzlePayrollJobStore(deps.adminDb, deps.reads, now);
-  const reads = createPayrollReads(
-    createDrizzlePayrollReadStore(deps.db, deps.adminDb, deps.reads, now, deps.payouts),
-    now,
-  );
+  const readStore = createDrizzlePayrollReadStore(deps.db, deps.adminDb, deps.reads, now, deps.payouts);
+  const reads = createPayrollReads(readStore, now);
   const validation = createPayrollValidation(
     createDrizzlePayrollValidationStore(
       deps.db,
@@ -145,7 +157,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   );
   const rules = createDrizzlePayrollRuleStore(deps.db, deps.reads, now);
   const decisions = createDrizzleSaleDecisionStore(deps.db, deps.reads);
-  const signals = createDrizzleSaleSignalStore(deps.db, deps.reads);
+  const signals = createDrizzleSaleSignalStore(deps.db, deps.adminDb, deps.reads, now);
   const rateJob = {
     source: createEcbSource({ fetch: deps.fetch ?? ((url, init) => fetch(url, init)) }),
     store: createDrizzlePayrollRateStore(deps.adminDb),
@@ -167,6 +179,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),
+    reads: createPayrollStatementReads(readStore),
     correctContest: (tx, actor, correction) => writeContestCorrection(tx, deps.reads, now, actor, correction),
     jobs: {
       recalculate: (period, logger) => createRecalculation(jobStore, logger, now).recalculate(period),

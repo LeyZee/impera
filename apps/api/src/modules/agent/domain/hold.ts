@@ -1,20 +1,25 @@
 /**
- * When the bot steps back and a chatter takes over (methode-chatting.md): a possible minor, distress, self-harm,
- * and from the sales corpus a dangerous request or a story of real sexual abuse (L05, L28).
- * Decided here from the brain's risks, whatever action it suggested; the brain only reports.
+ * When the bot steps back and a chatter takes over (methode-chatting.md): a possible minor, and from the sales corpus
+ * a dangerous request or a story of real sexual abuse (L05, L28). Decided here from the brain's risks, whatever action
+ * it suggested; the brain only reports. `real_abuse` stays here while the brain does not tell a fan who suffered it
+ * from one who tells of doing it (L28 is the latter): the care mode is for the first only (ADR 0088, question open).
  */
-const HANDOFF_RISKS = [
-  'minor_suspected',
-  'distress',
-  'self_harm',
-  'dangerous_request',
-  'real_abuse',
-] as const;
+const HANDOFF_RISKS = ['minor_suspected', 'dangerous_request', 'real_abuse'] as const;
+
+/**
+ * Distress and self-harm: she answers him with care, a human validating every word, and nothing is sold (ADR 0088).
+ * A risk of a handoff above outranks it: a possible minor is never answered by the agent.
+ */
+const CARE_RISKS = ['distress', 'self_harm'] as const;
 
 const isHandoffRisk = (risk: string): boolean => HANDOFF_RISKS.some((r) => r === risk);
 
+/** A risk that opens the care mode (ADR 0088 § 1). */
+export const isCareRisk = (risk: string): boolean => CARE_RISKS.some((r) => r === risk);
+
 export type HoldDecision =
   | { readonly kind: 'answer' }
+  | { readonly kind: 'care'; readonly detail: readonly string[] }
   | { readonly kind: 'handoff'; readonly detail: readonly string[] }
   | { readonly kind: 'no_reply'; readonly detail: readonly string[] };
 
@@ -31,6 +36,9 @@ export function holdDecision(
 ): HoldDecision {
   const risks = brief.risks.filter(isHandoffRisk);
   if (risks.length > 0) return { kind: 'handoff', detail: risks };
+  // She answers him with care whatever the brain suggested, a handoff or a wait included (ADR 0088 § 1).
+  const care = brief.risks.filter(isCareRisk);
+  if (care.length > 0) return { kind: 'care', detail: care };
   if (brief.action === 'handoff')
     return { kind: 'handoff', detail: brief.risks.length > 0 ? [...brief.risks] : ['brain'] };
   // He has nothing to answer yet (« attends, je reviens ») : she stays quiet, and is asked again at `waitRetryAt`.
@@ -54,8 +62,13 @@ export function waitRetryAt(now: Date): Date {
 export interface Protection {
   /** A possible minor: whatever was confirmed before, his age is not anymore. */
   readonly unconfirmAge: boolean;
-  /** Distress or a threat: nothing more is written to him. */
+  /** A threat: nothing more is written to him. */
   readonly stopContact: boolean;
+  /**
+   * Distress, self-harm or a story of real abuse (ADR 0088 § 2): sales frozen for distress and nothing explicit, never
+   * « Ne plus lui écrire »; she answers him with care.
+   */
+  readonly care: boolean;
   /** He said he cannot pay: no sale until he comes back to paid content himself (méthode, « budget nul »). */
   readonly freezeSales: boolean;
   /** The risks and media flags behind it, for the event's reason. */
@@ -63,18 +76,13 @@ export interface Protection {
 }
 
 const MINOR_SIGNS: readonly string[] = ['minor_suspected', 'possible_minor'];
-// Distress (his, or a story of real abuse) and threats (harassment, a dangerous request, a weapon shown).
-const STOP_SIGNS: readonly string[] = [
-  'distress',
-  'self_harm',
-  'real_abuse',
-  'harassment',
-  'dangerous_request',
-  'weapon',
-];
+// A story of real abuse told by its author (L28), and threats: harassment, a dangerous request, a weapon shown.
+const STOP_SIGNS: readonly string[] = ['real_abuse', 'harassment', 'dangerous_request', 'weapon'];
+// Distress and self-harm (ADR 0088): no more « Ne plus lui écrire », the care mode instead.
+const CARE_SIGNS: readonly string[] = CARE_RISKS;
 
 const MONEY_SIGNS: readonly string[] = ['money_trouble'];
-const PROTECTED_SIGNS: readonly string[] = [...MINOR_SIGNS, ...STOP_SIGNS, ...MONEY_SIGNS];
+const PROTECTED_SIGNS: readonly string[] = [...MINOR_SIGNS, ...STOP_SIGNS, ...CARE_SIGNS, ...MONEY_SIGNS];
 
 /** The limits the policy sets itself from the brain's risks and the media flags; code decides, the brain reports. */
 export function protectionFor(signs: readonly string[]): Protection {
@@ -82,12 +90,16 @@ export function protectionFor(signs: readonly string[]): Protection {
   return {
     unconfirmAge: because.some((s) => MINOR_SIGNS.includes(s)),
     stopContact: because.some((s) => STOP_SIGNS.includes(s)),
+    care: because.some((s) => CARE_SIGNS.includes(s)),
     freezeSales: because.some((s) => MONEY_SIGNS.includes(s)),
     because,
   };
 }
 
-/** What she keeps while still answering him: only that he cannot pay; his other limits come with a handoff. */
+/**
+ * What she keeps while still answering him: that he cannot pay, and the care mode's limits when she answers him with
+ * care (ADR 0088); his other limits come with a handoff.
+ */
 export function protectionWhileAnswering(signs: readonly string[]): Protection {
-  return protectionFor(signs.filter((s) => MONEY_SIGNS.includes(s)));
+  return protectionFor(signs.filter((s) => MONEY_SIGNS.includes(s) || CARE_SIGNS.includes(s)));
 }

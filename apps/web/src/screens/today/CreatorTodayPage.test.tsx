@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreatorTodayPage } from './CreatorTodayPage';
 
 import { agendaOf } from '@/screens/agenda/fixtures';
+import { keepSnapshot, rangeKey } from '@/screens/agenda/offline';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -165,7 +166,12 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
     serve({ current: [], next: [] }, 200, agendaOf());
     show();
     expect(await screen.findByRole('heading', { name: 'À décider' })).toBeDefined();
-    expect(screen.getByText('2 propositions de l’agence attendent ta réponse cette semaine.')).toBeDefined();
+    // The week's number, saying how many are today's: the glance above counts today's (CRE-05).
+    expect(
+      screen.getByText(
+        '2 propositions de l’agence attendent ta réponse cette semaine, dont 1 pour aujourd’hui.',
+      ),
+    ).toBeDefined();
     expect(screen.getByRole('link', { name: 'Voir' }).getAttribute('href')).toBe('/agenda?vue=semaine');
 
     cleanup();
@@ -181,5 +187,41 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
     show();
     expect(await screen.findByText(/Ton agenda n’a pas pu être lu/u)).toBeDefined();
     expect(screen.getByText('Personne n’est prévu dans les prochaines 24 heures.')).toBeDefined();
+  });
+});
+
+describe('Aujourd’hui, her kept copy (CRE-02)', () => {
+  beforeEach(() => {
+    vi.setSystemTime(new Date('2026-11-04T08:10:00Z'));
+    // Her phone's copy of the week, read on Tuesday at 21 h: nothing to do then.
+    keepSnapshot(
+      rangeKey('2026-11-02', '2026-11-08'),
+      agendaOf({ tasks: [], suggestions: [] }),
+      Date.parse('2026-11-03T20:00:00.000Z'),
+    );
+  });
+
+  it('says the copy is being updated while the server is asked', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        url.startsWith('/v1/creator-space/agenda?')
+          ? new Promise<Response>(() => undefined)
+          : Promise.resolve(new Response(JSON.stringify({ current: [], next: [] }), { status: 200 })),
+      ),
+    );
+    show();
+    expect(await screen.findByText('Rien à faire')).toBeDefined();
+    expect(screen.getByText('Mise à jour…')).toBeDefined();
+  });
+
+  it('says the server is silent, with the copy’s age and « Réessayer », never silently', async () => {
+    serve({ current: [], next: [] }, 200, null);
+    show();
+    expect(
+      await screen.findByText(/^Le serveur ne répond pas : tu vois ta dernière lecture, hier à 21\sh\.$/u),
+    ).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
+    expect(screen.queryByText(/Hors ligne/u)).toBeNull();
   });
 });

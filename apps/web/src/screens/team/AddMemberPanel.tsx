@@ -202,6 +202,8 @@ export function AddMemberPanel({
   );
   /** The invitation waits for the password and the code (ADR 0076 § 3), then goes again. */
   const [asking, setAsking] = useState(false);
+  // The link's password asked again: « Voir sa fiche » waits, one way out at a time (GES-13).
+  const [linkAsking, setLinkAsking] = useState(false);
   const [step, setStep] = useState(0);
   const [shown, setShown] = useState<Problems>({});
   const [busy, setBusy] = useState(false);
@@ -328,7 +330,7 @@ export function AddMemberPanel({
 
   return createPortal(
     <div
-      className="tm-scrim"
+      className="tm-scrim tm-scrim--top"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) close();
       }}
@@ -400,12 +402,15 @@ export function AddMemberPanel({
                 label="Créer son lien"
                 initial={created.link}
                 primary
+                onAsking={setLinkAsking}
               />
-              <div className="tm-dialog__foot">
-                <button type="button" className="nv-btn nv-btn--plain" onClick={close}>
-                  Voir sa fiche
-                </button>
-              </div>
+              {linkAsking ? null : (
+                <div className="tm-dialog__foot">
+                  <button type="button" className="nv-btn nv-btn--plain" onClick={close}>
+                    Voir sa fiche
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <form

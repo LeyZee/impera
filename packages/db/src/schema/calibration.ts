@@ -1,9 +1,15 @@
-import { CalibrationSourceSchema, DestinationSchema, type Verdict } from '@impera/contracts';
+import {
+  CalibrationSourceSchema,
+  DestinationSchema,
+  VoiceExampleStateSchema,
+  type Verdict,
+} from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import { check, index, jsonb, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import { closedToCreator, createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { drafts } from './conversations';
+import { personaVersions } from './persona';
 import { creators } from './tenancy';
 
 const VERDICT_KINDS = ['validated', 'corrected', 'rejected'] as const satisfies readonly Verdict['kind'][];
@@ -41,12 +47,30 @@ export const calibrationRatings = pgTable(
     /** `RatedMoment` (module `agent`), opaque here, never queried; null once purged. */
     moment: jsonb('moment'),
     momentPurgedAt: timestampTz('moment_purged_at'),
+    /**
+     * The persona version that answered (ADR 0103 § 5): the playground rate is counted per version. Null on the ratings
+     * kept before (migration 0185) and on those of the invented persona, which are no longer kept.
+     */
+    personaVersionId: uuid('persona_version_id').references(() => personaVersions.id),
+    /**
+     * A correction filed as a voice example in her bank (ADR 0102): `active` is read by production and the playground,
+     * `withdrawn` by the owner, `blocked` when the correction trips a blocking guard. Null for every other rating.
+     */
+    exampleState: enumText('example_state'),
+    exampleStateAt: timestampTz('example_state_at'),
     createdAt: createdAt(),
   },
   (t) => [
     enumCheck('calibration_ratings', t.verdictKind, VERDICT_KINDS),
     enumCheck('calibration_ratings', t.destination, DestinationSchema.options),
     enumCheck('calibration_ratings', t.source, CalibrationSourceSchema.options),
+    enumCheck('calibration_ratings', t.exampleState, VoiceExampleStateSchema.options),
+    // Only a correction filed as a voice example is in her bank, and its state says since when.
+    check(
+      'calibration_ratings_example_shape_check',
+      sql`(${t.exampleState} is null and ${t.exampleStateAt} is null)
+        or (${t.exampleState} is not null and ${t.exampleStateAt} is not null and ${t.verdictKind} = 'corrected' and ${t.destination} = 'voice_example')`,
+    ),
     // A playground rating names its session and its fan's message, and a purged one keeps its verdict (`moment` and
     // `moment_purged_at` go together); a live one names its draft and keeps no moment nor fan's words.
     check(
@@ -59,6 +83,10 @@ export const calibrationRatings = pgTable(
       .where(sql`${t.draftId} is not null`),
     index('calibration_ratings_creator_at_idx').on(t.creatorId, t.ratedAt.desc()),
     index('calibration_ratings_version_idx').on(t.creatorId, t.voicePrompt, t.voiceModel, t.ratedAt.desc()),
+    index('calibration_ratings_persona_version_idx').on(t.creatorId, t.personaVersionId, t.ratedAt.desc()),
+    index('calibration_ratings_examples_idx')
+      .on(t.creatorId, t.ratedAt.desc())
+      .where(sql`${t.exampleState} = 'active'`),
     tenantPolicy(t.creatorId),
     closedToCreator(),
   ],

@@ -30,12 +30,33 @@ export type { TrapAssessment } from './domain/traps';
 /** @public The policy, read by `pnpm evals` on the same path as a real fan (and by the composer at P6-01). */
 export { holdDecision } from './domain/hold';
 export { withoutOrders } from './domain/injection';
+/** The safety net in code, read by `conversation.respond` to answer a fan in distress out of her hours (ADR 0088). */
+export { safetySigns } from './domain/safety-net';
 /** @public */
 export { offerDecision, offerSignals, type OfferContext, type OfferLimits } from './domain/policy';
 export type { SexualizationLimits } from './domain/sexualization';
 export { followUpDecision, type FollowUpDecision } from './domain/follow-up';
+/**
+ * @public His availability and the gate before the first teaser (ADR 0103, amendement du 13/11): the playground keeps
+ * them as `conversations` does and shows which condition is missing.
+ */
+export {
+  readAvailability,
+  scriptStartGate,
+  UNKNOWN_AVAILABILITY,
+  type FanAvailabilityRecord,
+  type ScriptStart,
+  type ScriptStartBlock,
+} from './domain/availability';
 /** @public measureDesire and DesireState: the playground keeps his score as `conversations` would (P3-12). */
-export { measureDesire, type DesireState } from './domain/desire';
+export {
+  DESIRE_WEIGHTS_VERSION,
+  desireSignalPoints,
+  measureDesire,
+  recountDesire,
+  type DesireMeasure,
+  type DesireState,
+} from './domain/desire';
 export { describeSituation, isNight, isTimeZone, nextLocalTime, type Situation } from './domain/situation';
 export {
   parseRejection,
@@ -55,7 +76,15 @@ export {
   type RatedMoment,
 } from './infra/calibration-record';
 export { createJsonlCalibrationStore } from './infra/jsonl-calibration-store';
-export { asSent, composeTurn, guardContextOf, withExamples, type OfferInput } from './infra/compose';
+export {
+  asSent,
+  composeTurn,
+  guardContextOf,
+  withExamples,
+  type ComposedTurn,
+  type OfferInput,
+  type ScriptsInput,
+} from './infra/compose';
 export { guardSettingsOf, readPersonaFile, type PersonaForModels } from './infra/persona-file';
 /** @public Her active persona version, the port the composition root wires to `persona` (ADR 0010, 0022). */
 export { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
@@ -116,6 +145,7 @@ function composerFields(persona: PersonaForModels): ComposerPersonaFields {
     sexualizationLimits: persona.sexualizationLimits,
     followUpSpirit: persona.followUps.spirit,
     alertKeywords: persona.alertKeywords,
+    objectionReplies: persona.objectionReplies,
     ...(persona.versionId !== undefined && { personaVersionId: persona.versionId }),
   };
 }

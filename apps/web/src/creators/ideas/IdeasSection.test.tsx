@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { IdeasSection } from './IdeasSection';
+import { IDEAS_NOT_MADE_YET, IdeasSection } from './IdeasSection';
 
 /* An invented creator, ideas and trends. */
 const CREATOR = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000c1');
@@ -132,6 +132,9 @@ describe('Idées du jour', () => {
     serve({ [IDEAS]: list([]) });
     show();
     expect(await screen.findByText('Pas d’idée aujourd’hui')).toBeTruthy();
+    // Recette 11/11: no promise of a 7 a.m. job that does not run yet (VEI-03).
+    expect(screen.getByText(IDEAS_NOT_MADE_YET)).toBeTruthy();
+    expect(screen.queryByText(/Chaque matin à 7 h/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Jour suivant' }).hasAttribute('disabled')).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Jour précédent' }));
     expect(await screen.findByText('Pas d’idée ce jour-là')).toBeTruthy();

@@ -1,0 +1,28 @@
+# Demande sur mesure, personne en poste (ADR 0090 § A) : elle accueille sans oui, sans prix, sans délai. Fan et messages fictifs (ADR 0010).
+description: Il demande une vidéo à son prénom la nuit, sans chatteur en poste ; elle dit qu'elle va voir, sans rien promettre.
+persona_version: demo
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+situation:
+  known_hours: 72
+  age_confirmed: true
+history:
+  - from: fan
+    text: Je repense à ta dernière photo, t'es incroyable
+  - from: creator
+    text: Miiiii t'es mignon 😏
+inbound: Tu pourrais me tourner une petite vidéo où tu dis mon prénom ? Je paie ce qu'il faut
+expect:
+  brief:
+    intent_in:
+      - asks_for_service
+  decision:
+    custom_order: reply
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(demain|ce soir|cette semaine|d'ici|dans \d+)\b
+      - \d+ ?(€|euros?|balles)

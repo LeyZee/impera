@@ -103,6 +103,7 @@ const report = (n: number, shiftIndex: number, patch: Record<string, unknown> = 
     version: 1,
     byAgency: false,
     reviewKind: null,
+    earningsSource: 'declared',
     explanation: null,
     check: null,
     canReview: true,
@@ -448,6 +449,35 @@ describe('Équipe › Rapports', () => {
     expect(dialog.textContent).not.toContain('Préviens l’agence');
   });
 
+  it('says the reports of a fortnight switched to the sales read without effect on pay, with nothing to decide (ADR 0084 § 3)', async () => {
+    period = [
+      report(5, 0, {
+        status: 'validated',
+        reviewedAt: '2026-10-27T08:00:00.000Z',
+        canReview: false,
+        earningsSource: 'detected',
+      }),
+      report(6, 2, { status: 'submitted', canReview: false, earningsSource: 'detected' }),
+    ];
+    renderPage();
+    const theo = await screen.findByText('Théo', { selector: '.nv-disclosure__title' });
+    const summary = text(theo.closest('summary'));
+    // Neither validated money nor a report to validate: what stays is said for what it is.
+    expect(summary).toContain('2 sans effet sur la paie');
+    expect(summary).not.toContain('validés');
+    expect(summary).not.toContain('à valider');
+    const chips = [...(theo.closest('details')?.querySelectorAll('.rp-pline__status') ?? [])].map((one) => [
+      one.textContent,
+      one.className,
+    ]);
+    expect(chips).toEqual([
+      ['Sans effet sur la paie', 'rp-chip rp-chip--neutral rp-pline__status'],
+      ['Sans effet sur la paie', 'rp-chip rp-chip--neutral rp-pline__status'],
+    ]);
+    // A correction would be refused: nothing offers one.
+    expect(screen.queryByRole('button', { name: 'Corriger' })).toBe(null);
+  });
+
   it('says the shifts without a report at a glance, oldest first, and copies a word to send (EQ-14, EQ-15)', async () => {
     period = [report(5, 0, { status: 'validated', reviewedAt: '2026-10-27T08:00:00.000Z' })];
     const copied: string[] = [];
@@ -688,7 +718,7 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
       'Reveal a lu 40,00 € pour l’instant : la comparaison se fait un quart d’heure après la fin du shift.',
     );
     expect(text(unlinked)).toContain(
-      'Ce membre n’est relié à aucun chatteur de Reveal : relie-le dans Réglages › Ventes pour comparer ses rapports.',
+      'Ce membre n’est relié à aucun chatteur de Reveal : relie-le dans Équipe › Reveal pour comparer ses rapports.',
     );
     // Nothing the comparison cannot say holds a validation back.
     fireEvent.click(screen.getByLabelText('Tout sélectionner'));

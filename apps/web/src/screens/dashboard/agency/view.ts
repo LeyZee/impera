@@ -1,5 +1,7 @@
 import type { AgencyInsights, AgencyPeriod, AgencySaleKind, DashboardSalesSeller } from '@impera/contracts';
 
+import { clockOf } from '@/scheduling/time';
+
 /*
  * The agency's insights as the screen says them (ADR 0078): pure, from the server's answer. Money comes in cents and
  * leaves as euros; every colour is a series token in a fixed order, following the entity, never its rank.
@@ -67,6 +69,154 @@ export function shareOf(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
 }
 
+/**
+ * The shares of `parts` in `whole`, in whole %, that add up to the rounded share of their sum: 100 when the parts make
+ * the whole. Largest remainder: each part gets its share rounded down, and the points left go to the parts with the
+ * largest fractions, the first one on a tie. Only the percentages move, never an amount (recette du 13/11 : 17 + 17 +
+ * 42 + 25 = 101 %). Zeros for an empty whole.
+ */
+export function sharesOf(parts: readonly number[], whole: number): number[] {
+  if (whole <= 0) return parts.map(() => 0);
+  // In whole cents × 100, never in floats: two equal remainders stay equal, the tie goes to the first part.
+  const scaled = parts.map((part) => Math.max(0, part) * 100);
+  const shares = scaled.map((one) => Math.floor(one / whole));
+  const target = Math.round(scaled.reduce((sum, one) => sum + one, 0) / whole);
+  const order = scaled
+    .map((one, index) => ({ index, rest: one - (shares[index] ?? 0) * whole }))
+    .sort((a, b) => b.rest - a.rest || a.index - b.index);
+  let left = target - shares.reduce((sum, one) => sum + one, 0);
+  for (const { index } of order) {
+    if (left <= 0) break;
+    shares[index] = (shares[index] ?? 0) + 1;
+    left -= 1;
+  }
+  return shares;
+}
+
+/** Euros to the cent, always: a figure read in a tip, never rounded away (ADR 0106 § 12). */
+export function exactEuros(cents: number): string {
+  return `${(cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
+}
+
+type MoneyFigures = Pick<
+  AgencyInsights['totals']['current'],
+  'revenueMinor' | 'revenueExclVatMinor' | 'netMinor' | 'agencyMinor' | 'creatorMinor'
+>;
+
+/** One part of « Où va l'argent » (ADR 0106 § 5): what the fans paid, split in four, in the order money leaves. */
+export interface MoneyPart {
+  readonly key: 'fansVat' | 'commission' | 'creator' | 'agency';
+  readonly label: string;
+  readonly cents: number;
+  readonly previousCents: number;
+  /** The net's two parts say their share of the net too. */
+  readonly ofNet: boolean;
+  readonly note: string;
+}
+
+function split(figures: MoneyFigures): Record<MoneyPart['key'], number> {
+  const at = (cents: number): number => Math.max(0, cents);
+  return {
+    fansVat: at(figures.revenueMinor - figures.revenueExclVatMinor),
+    commission: at(figures.revenueExclVatMinor - figures.netMinor),
+    creator: at(figures.creatorMinor),
+    agency: at(figures.agencyMinor),
+  };
+}
+
+/** What each money figure says in %, from the same split everywhere, so a tile, the bar and its legend agree. */
+export interface MoneyShares {
+  /** Of the revenue, the four parts adding up to 100. */
+  readonly ofRevenue: Readonly<Record<MoneyPart['key'], number>>;
+  /** Of the net, the two parts adding up to 100. */
+  readonly ofNet: Readonly<Record<'creator' | 'agency', number>>;
+}
+
+export function moneyShares(figures: MoneyFigures): MoneyShares {
+  const parts = split(figures);
+  const [fansVat = 0, commission = 0, creator = 0, agency = 0] = sharesOf(
+    [parts.fansVat, parts.commission, parts.creator, parts.agency],
+    figures.revenueMinor,
+  );
+  const [creatorOfNet = 0, agencyOfNet = 0] = sharesOf([parts.creator, parts.agency], figures.netMinor);
+  return {
+    ofRevenue: { fansVat, commission, creator, agency },
+    ofNet: { creator: creatorOfNet, agency: agencyOfNet },
+  };
+}
+
+/**
+ * The period's revenue split in four, the platform's amounts as they are: the VAT the fans paid (revenue less its
+ * amount without VAT), the platform's commission (that less the net), then the net's two parts, each beside the same
+ * part of the period before. A part never drawn below zero: refunds heavier than sales leave an empty bar, never a
+ * negative block.
+ */
+export function moneyParts(current: MoneyFigures, previous: MoneyFigures, several: boolean): MoneyPart[] {
+  const now = split(current);
+  const then = split(previous);
+  const part = (key: MoneyPart['key'], label: string, ofNet: boolean, note: string): MoneyPart => ({
+    key,
+    label,
+    cents: now[key],
+    previousCents: then[key],
+    ofNet,
+    note,
+  });
+  return [
+    part(
+      'fansVat',
+      'TVA payée par les fans',
+      false,
+      'La plateforme la reverse à l’État : elle n’est à personne.',
+    ),
+    part('commission', 'Commission de la plateforme', false, 'Ce que la plateforme garde sur chaque vente.'),
+    part(
+      'creator',
+      several ? 'Part des créatrices' : 'Part de la créatrice',
+      true,
+      several
+        ? 'Ce que la plateforme leur verse, son propre chiffre.'
+        : 'Ce que la plateforme lui verse, son propre chiffre.',
+    ),
+    part('agency', 'Part de l’agence', true, 'Ce que la plateforme verse à l’agence, son propre chiffre.'),
+  ];
+}
+
+/**
+ * The tip of a money figure (ADR 0106 § 12): the amount to the cent, the period before and how it changed, its share
+ * of the revenue and, for a part of the net, of the net; one sentence in plain ink.
+ */
+export function moneyTip(input: {
+  readonly title: string;
+  readonly cents: number;
+  readonly previousCents: number | null;
+  readonly revenueMinor: number;
+  readonly netMinor: number | null;
+  readonly text: string;
+  /** The share already settled with the figure's siblings (`moneyShares`), in place of rounding it alone. */
+  readonly revenueShare?: number;
+  readonly netShare?: number;
+}): { title: string; rows: (readonly [string, string])[]; text: string } {
+  const rows: (readonly [string, string])[] = [['Montant', exactEuros(input.cents)]];
+  if (input.previousCents !== null) {
+    const change = changeOf(input.cents, input.previousCents);
+    rows.push([
+      'Période d’avant',
+      change === null
+        ? exactEuros(input.previousCents)
+        : `${exactEuros(input.previousCents)} (${deltaText(change)})`,
+    ]);
+  }
+  if (input.revenueMinor > 0)
+    rows.push([
+      'Part du chiffre d’affaires',
+      `${String(input.revenueShare ?? shareOf(input.cents, input.revenueMinor))}\u00a0%`,
+    ]);
+  if (input.netMinor !== null && input.netMinor > 0)
+    rows.push(['Part du net', `${String(input.netShare ?? shareOf(input.cents, input.netMinor))}\u00a0%`]);
+  return { title: input.title, rows, text: input.text };
+}
+
 /** A slice of a ring: its label, colour, amount, and how it compares. */
 export interface Slice {
   readonly key: string;
@@ -127,7 +277,7 @@ const SELLER_SLICES: readonly {
 export const SELLER_NOTES: Readonly<Record<DashboardSalesSeller['kind'], string>> = {
   member: 'Les ventes des membres de l’équipe, reliés à leur compte Reveal.',
   agent: 'Ce que l’agent a vendu seul, sur la clé de l’agence.',
-  unlinked: 'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Réglages › Ventes).',
+  unlinked: 'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Équipe › Reveal).',
   none: 'Une vente sans chatteur : un abonnement, un renouvellement, un tip spontané.',
 };
 
@@ -229,7 +379,7 @@ export function busiest(hours: AgencyInsights['hours']): { day: number; hour: nu
   return best;
 }
 
-/** The busiest slot of three hours of the week, summed over the days: « 21h–0h ». */
+/** The busiest slot of three hours of the week, summed over the days: « 21 h – 0 h ». */
 export function bestSlot(hours: AgencyInsights['hours']): { from: number; share: number } | null {
   const total = hours.flat().reduce((sum, cents) => sum + cents, 0);
   if (total <= 0) return null;
@@ -244,10 +394,15 @@ export function bestSlot(hours: AgencyInsights['hours']): { from: number; share:
   return { from: best.from, share: shareOf(best.cents, total) };
 }
 
-/** « 21h–0h » for the slot of three hours that starts at 21h. */
-export function slotLabel(from: number): string {
-  return `${String(from)}h–${String((from + 3) % 24)}h`;
-}
+/** « 18 h », an hour of the day as the rest of the CRM writes it (recette 11/11, ADM-08). */
+export const hourLabel = (hour: number): string => clockOf(hour * 60);
+
+/** « 18 h – 21 h », never cut between two lines: `hours` from `from`. */
+export const hoursLabel = (from: number, hours = 1): string =>
+  `${hourLabel(from)}\u00a0–\u00a0${hourLabel((from + hours) % 24)}`;
+
+/** « 21 h – 0 h » for the slot of three hours that starts at 21 h. */
+export const slotLabel = (from: number): string => hoursLabel(from, 3);
 
 /** A heat level from 0 to 1 against the busiest cell (a sequential ramp of one hue). */
 export function heatOf(cents: number, max: number): number {

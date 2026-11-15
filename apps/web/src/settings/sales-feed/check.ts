@@ -169,15 +169,18 @@ export interface VerdictView {
 
 /**
  * The verdict's sentence. Amber, not red, for a difference: nothing is broken, the switch to the platform's net
- * simply stays closed until the gap is explained (ADR 0050 § 8).
+ * simply stays closed until the gap is explained (ADR 0050 § 8). The export is optional (§ 8 amended on 11/11/2026,
+ * Reveal's dashboard offers none): a match names it only when one was given.
  */
-export function verdictOf(verdict: SalesFeedCheckVerdict): VerdictView {
+export function verdictOf(verdict: SalesFeedCheckVerdict, withExport: boolean): VerdictView {
   switch (verdict) {
     case 'match':
       return {
         dot: 'ok',
         title: 'Les chiffres concordent au centime',
-        line: 'Le registre, les statistiques et l’export disent la même chose, jour par jour, et membre par membre face aux statistiques.',
+        line: withExport
+          ? 'Le registre, les statistiques et l’export disent la même chose, jour par jour, et membre par membre face aux statistiques.'
+          : 'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre.',
       };
     case 'mismatch':
       return {
@@ -189,7 +192,7 @@ export function verdictOf(verdict: SalesFeedCheckVerdict): VerdictView {
       return {
         dot: 'low',
         title: 'Ce qui a été comparé concorde, mais pas tout',
-        line: 'Une source manque ou une partie n’a pas pu être comparée : les notes disent quoi.',
+        line: 'Les statistiques manquent ou une partie n’a pas pu être comparée : les notes disent quoi.',
       };
   }
 }
@@ -263,7 +266,7 @@ export function noteText(
     case 'export_rows_outside':
       return `${plural(note.count, 'ligne de l’export tombe', 'lignes de l’export tombent')} hors des jours vérifiés : laissées de côté.`;
     case 'stats_unavailable':
-      return `Les statistiques de ${platform} n’ont pas pu être lues : le registre n’est comparé qu’à l’export.`;
+      return `Les statistiques de ${platform} n’ont pas pu être lues : la vérification les exige, l’export seul ne suffit pas. Réessaie dans un moment.`;
     case 'register_starts_after':
       return note.firstLineAt === null
         ? `Le registre n’a encore aucune vente lue : la lecture de ${platform} n’a pas remonté l’historique. Ce n’est pas un écart ; réessaie quand elle l’aura fait.`

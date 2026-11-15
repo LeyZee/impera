@@ -51,6 +51,7 @@ const taken = ConversationSummarySchema.parse({
   updatedAt: '2026-10-27T23:50:00Z',
   desire: null,
   heldBy: 'you',
+  careSince: null,
 });
 
 /**

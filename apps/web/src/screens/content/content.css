@@ -236,10 +236,13 @@
   gap: 0;
 }
 .ct-out__name {
+  flex-shrink: 0;
   font-weight: 600;
+  white-space: nowrap;
 }
 .ct-out__meta {
   margin-left: auto;
+  text-align: right;
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
 }

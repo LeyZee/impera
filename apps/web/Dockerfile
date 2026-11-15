@@ -12,10 +12,12 @@ ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=1
 RUN corepack enable
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+# The pnpm store cache is shared by the api and web images, which compose builds at the same time: `locked` keeps
+# one build at a time on it, and `--prefer-offline` fetches a tarball the store still lacks instead of failing.
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked pnpm fetch
 COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --offline --frozen-lockfile --filter impera --filter "@impera/web..." --filter "@impera/extension..."
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked \
+    pnpm install --prefer-offline --frozen-lockfile --filter impera --filter "@impera/web..." --filter "@impera/extension..."
 RUN pnpm turbo run build --filter=@impera/web
 # The extension the team downloads from the guide (/aide/extension, ADR 0067): built with the CRM, so both ship together.
 RUN pnpm --filter @impera/extension zip \

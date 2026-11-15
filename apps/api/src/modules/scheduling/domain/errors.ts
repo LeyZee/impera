@@ -125,6 +125,13 @@ export class PlanningForbidden extends DomainError {
   }
 }
 
+/** The planning and the reports are read by the owner and the team's accounts, never a creator (`readsTeamSchedule`). */
+export class TeamScheduleReadForbidden extends DomainError {
+  constructor() {
+    super('role_forbidden', 'Le planning et les rapports se lisent depuis un compte de l’agence');
+  }
+}
+
 /** The settings are the owner's alone. */
 export class OwnerOnly extends DomainError {
   constructor() {
@@ -327,7 +334,7 @@ export class ShiftReportDetected extends DomainError {
   constructor() {
     super(
       'shift_report_detected_conflict',
-      'Sur cette quinzaine, la paie de ce compte lit les ventes détectées, pas les rapports',
+      'Sur cette quinzaine, la paie de ce compte lit les ventes relevées, pas les rapports',
     );
   }
 }

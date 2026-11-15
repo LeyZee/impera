@@ -1,13 +1,18 @@
 import type { AiProvider } from '@impera/contracts';
+import { createInMemoryCallLog, INLINE_VIDEO_MAX_BYTES, type LlmCallLog } from '@impera/llm';
 import Fastify from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { createAppLlm, type AppLlm } from '../../llm';
+import { createLogger } from '../../logger';
 import { revealSalesFeed } from '../../modules/connectors';
 import { createMemoryCredentialStore, createProvidersModule } from '../../modules/providers';
 import { revealSignature } from '../fake-reveal/crm';
+import { testConfig } from '../support/config';
 
-import { createWorld, outcomeOfKey, type World } from './world';
+import { SANDBOX_TRANSCRIPT } from './ai-generation';
+import { createWorld, outcomeOfKey, WORLD_BODY_LIMIT, type World } from './world';
 
 /**
  * The recette sandbox's fake world (ADR 0075), over real HTTP on this machine, read by Impera's real key verifiers
@@ -267,5 +272,99 @@ describe('Reveal’s webhooks, delivered for real on this machine', () => {
       body: JSON.stringify({ url: 'http://192.0.2.10/hook', events: ['sale_created'] }),
     });
     expect(created.status).toBe(400);
+  });
+});
+
+describe('the media Impera sends, as large as the API lets them be', () => {
+  const MIB = 1024 * 1024;
+
+  /** Impera's real gateway, aimed at the world: xAI, and Google when its key is given (which answers 503). */
+  function gateway(keys: { readonly xai: string; readonly google?: string }): {
+    llm: AppLlm;
+    log: LlmCallLog;
+  } {
+    const log = createInMemoryCallLog();
+    const llm = createAppLlm({
+      credentials: (provider) =>
+        provider === 'xai' ? keys.xai : provider === 'google' ? keys.google : undefined,
+      reportRefusedKey: () => Promise.resolve(),
+      logger: createLogger(testConfig()),
+      log,
+      baseUrls: { xai: `${base}/xai/v1`, google: `${base}/google/v1beta` },
+    });
+    return { llm, log };
+  }
+
+  it('takes up to one 20 MiB media in base64 and the prompts around it, refuses beyond', async () => {
+    expect(WORLD_BODY_LIMIT).toBe(Math.ceil((INLINE_VIDEO_MAX_BYTES * 4) / 3) + MIB);
+    const past = await fetch(`${base}/xai/v1/responses`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer xai-recette-ok-0000000001', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'grok-4.7', padding: 'x'.repeat(WORLD_BODY_LIMIT) }),
+    });
+    expect(past.status).toBe(413);
+  });
+
+  it.each([
+    ['a phone photo of 2 MiB', 2 * MIB],
+    ['the largest image the API sends', INLINE_VIDEO_MAX_BYTES],
+  ])('describes %s: 200, where Fastify’s default 1 MiB answered 413', async (_name, bytes) => {
+    const { llm, log } = gateway({ xai: 'xai-recette-ok-0000000001' });
+    const result = await llm.gateway.sense({
+      origin: 'fan',
+      media: { kind: 'image', mediaType: 'image/jpeg', data: new Uint8Array(bytes).fill(7) },
+    });
+    expect(result.ok).toBe(true);
+    expect(log.since(new Date(0)).at(-1)).toEqual(expect.objectContaining({ role: 'sense', outcome: 'ok' }));
+  });
+
+  it('describes a 720p phone video: Google, whole, is down; xAI reads its keyframes and its transcript', async () => {
+    const { llm, log } = gateway({ xai: 'xai-recette-ok-0000000001', google: 'AIza-recette-ok-0000000001' });
+    const frames = Array.from({ length: 24 }, (_, atS) => ({
+      atS,
+      mediaType: 'image/jpeg',
+      data: new Uint8Array(150_000).fill(atS),
+    }));
+    const result = await llm.gateway.sense({
+      origin: 'creator',
+      media: {
+        kind: 'video',
+        mediaType: 'video/mp4',
+        durationS: 24,
+        data: new Uint8Array(8 * MIB).fill(1),
+        keyframes: () => Promise.resolve({ frames, transcript: SANDBOX_TRANSCRIPT }),
+      },
+    });
+    expect(result.ok).toBe(true);
+    const calls = log.since(new Date(0)).map((record) => `${record.provider}:${record.outcome}`);
+    // Google's generation is not simulated: 503 (asked again as a real outage would be), never 413.
+    expect(new Set(calls.slice(0, -1))).toEqual(new Set(['google:unavailable']));
+    expect(calls.at(-1)).toBe('xai:ok');
+  });
+
+  it('transcribes a voice note sent as xAI takes it, read by the real provider, at 0 $', async () => {
+    const { llm, log } = gateway({ xai: 'xai-recette-ok-0000000001' });
+    // An MP3's first bytes (ID3), then silence: the world reads the form, never the sound.
+    const audio = new Uint8Array(3 * MIB);
+    audio.set([0x49, 0x44, 0x33, 0x04]);
+    const heard = await llm.gateway.transcribe({ data: audio, mediaType: 'audio/mpeg', durationS: 42 });
+    expect(heard).toEqual({ ok: true, value: { text: SANDBOX_TRANSCRIPT, durationS: 0 } });
+    expect(log.since(new Date(0)).map((record) => [record.role, record.outcome, record.costUsd])).toEqual([
+      ['sense', 'ok', 0],
+    ]);
+  });
+
+  it('refuses a transcription with no sound, or with a key that asks to be refused', async () => {
+    const form = new FormData();
+    form.append('model', 'grok-voice-transcribe-2.0');
+    const empty = await fetch(`${base}/xai/v1/stt`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer xai-recette-ok-0000000001' },
+      body: form,
+    });
+    expect(empty.status).toBe(400);
+    const { llm } = gateway({ xai: 'xai-recette-refus-000000001' });
+    const heard = await llm.gateway.transcribe({ data: new Uint8Array(16), mediaType: 'audio/mpeg' });
+    expect(heard.ok).toBe(false);
   });
 });

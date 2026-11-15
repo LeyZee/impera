@@ -27,7 +27,7 @@ export function PhoneDialog({ onClose }: { onClose: () => void }): JSX.Element {
       busy={shown}
       onClose={onClose}
     >
-      <div className="ag-phone">
+      <div className="ag-callink">
         <CalendarLinkBody words={AGENDA_LINK_WORDS} onShown={setShown} />
         <ShiftsChoice />
       </div>
@@ -48,7 +48,7 @@ function ShiftsChoice(): JSX.Element | null {
   if (live === null) return null;
   return (
     <>
-      <label className="nv-notif__row ag-phone__shifts">
+      <label className="nv-notif__row ag-callink__shifts">
         <span className="nv-notif__label">
           <strong>Qui répond à tes fans</strong>
           <span className="nv-notif__hint">

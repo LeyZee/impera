@@ -190,7 +190,7 @@ describe('/v1/creator-space/content/script-drops', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config), { dropStorage: storage, scriptBrain });
     server = await buildServer({
       config,
@@ -443,7 +443,7 @@ describe('/v1/creator-space/content/script-drops', () => {
         .set({ state: 'kept', mediaAssetId: medium?.id ?? null })
         .where(eq(schema.contentDropFiles.id, file.id));
     }
-    const due = await createDrizzleRetentionStore(test.admin.db).dueOriginals(
+    const due = await createDrizzleRetentionStore(test.service.db).dueOriginals(
       new Date('2026-11-06T12:00:00Z'),
     );
     expect(due.filter((one) => one.creatorId === nora).map((one) => [one.mediaAssetId, one.reason])).toEqual([
@@ -770,7 +770,7 @@ describe('/v1/creator-space/content/script-drops', () => {
 
     // The last one described: the job asked for this script alone, which is told and kept.
     await describe(media[2] ?? '');
-    expect(await createDrizzleScriptSummaryStore(test.admin.db).enqueueFor(media[2] ?? '', 'test')).toBe(1);
+    expect(await createDrizzleScriptSummaryStore(test.service.db).enqueueFor(media[2] ?? '', 'test')).toBe(1);
     await summarize();
     expect(told).toHaveLength(1);
     expect(told[0]?.scriptName).toBe('Soirée inventée');
@@ -1175,7 +1175,7 @@ describe('/v1/creator-space/content/script-drops', () => {
           () => null,
           (error: unknown) => error,
         );
-    const store = createDrizzleScriptSummaryStore(test.admin.db);
+    const store = createDrizzleScriptSummaryStore(test.service.db);
     expect(await store.summarized(dropId, row.mediaHash, 'summary-v2')).toBe(true);
     expect(await store.summarized(dropId, 'other-media', 'summary-v2')).toBe(false);
     expect(await insert({ validatedBy: null, validatedAt: null })).toBeInstanceOf(Error);

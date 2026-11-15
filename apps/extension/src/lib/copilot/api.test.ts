@@ -66,6 +66,7 @@ describe('what the panel reads with the CRM’s session (ADR 0086 § 8)', () => 
       updatedAt: '2026-11-08T18:00:00.000Z',
       desire: { score: 55, band: 'playful' },
       heldBy: null,
+      careSince: null,
       openDrafts: [],
       failedDraft: null,
     };

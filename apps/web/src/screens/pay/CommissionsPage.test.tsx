@@ -518,6 +518,7 @@ describe('CommissionsPage', () => {
         lateFrom: null,
         state: 'counted',
         signal: null,
+        given: null,
         open: true,
         ...patch,
       });
@@ -587,6 +588,37 @@ describe('CommissionsPage', () => {
       expect(within(excluded).queryByRole('button')).toBeNull();
       // Not on the page, nor in the ids that name a gesture to a screen reader.
       expect(mine.innerHTML).not.toMatch(/vente-\d/u);
+    });
+
+    it('says on a line the sale the validator gave or shared, with whom and why (ADR 0101 §§ 6, 15)', async () => {
+      onNet(OCT2);
+      const note = 'Lou a convaincu le fan après le média';
+      mySales[OCT2] = {
+        '': pageOf(OCT2, [
+          lineOf(5, {
+            state: 'given',
+            open: false,
+            occurredAt: '2026-10-28T21:05:00.000Z',
+            given: { role: 'author', myShareBp: 0, other: { kind: 'member', displayName: 'Lou' }, note },
+          }),
+          lineOf(6, {
+            netMinor: 1_680,
+            occurredAt: '2026-10-28T08:00:00.000Z',
+            given: { role: 'author', myShareBp: 4_000, other: { kind: 'member', displayName: 'Lou' }, note },
+          }),
+        ]),
+      };
+      renderPage();
+      const mine = await waitFor(() => panel('Mes ventes lues'));
+      const away = within(mine).getByText('Vente de 22 h 05').closest('li');
+      const shared = within(mine).getByText('Vente de 9 h').closest('li');
+      if (away === null || shared === null) throw new Error('No line');
+      expect(text(away)).toContain('Donnée');
+      expect(text(away)).toContain(`Donnée à Lou Pourquoi : « ${note} »`);
+      // Given away, it is no longer theirs to signal.
+      expect(within(away).queryByRole('button')).toBeNull();
+      expect(text(shared)).toContain('+16,80 €');
+      expect(text(shared)).toContain('Partagée avec Lou : 40 % pour toi');
     });
 
     it('says a refund line as a refund: its chip, its gesture and its sheet', async () => {

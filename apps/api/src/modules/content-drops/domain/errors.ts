@@ -191,6 +191,7 @@ export class ContentDropCardNotFound extends DomainError {
 
 const EXPORT_SENTENCES: Readonly<Record<ScriptExportRefusal, string>> = {
   not_a_script: 'Seul un script envoyé s’exporte',
+  a_script: 'Un script s’exporte depuis l’onglet Scripts',
   not_ready: 'Ce script n’est pas encore prêt : ses fichiers sont encore en cours de traitement',
   original_erased: 'Un original de ce script a déjà été effacé : l’archive serait incomplète',
   moment_unknown:

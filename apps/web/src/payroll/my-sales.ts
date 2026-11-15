@@ -1,4 +1,12 @@
-import type { Currency, MySale, MySalesDay, Platform, SaleEvent, SaleSignalKind } from '@impera/contracts';
+import {
+  SALE_WHOLE_BP,
+  type Currency,
+  type MySale,
+  type MySalesDay,
+  type Platform,
+  type SaleEvent,
+  type SaleSignalKind,
+} from '@impera/contracts';
 
 import { amountText, signedAmountText } from '@/reports/model';
 import { platformName } from '@/scheduling/model';
@@ -40,6 +48,8 @@ export function mySaleStateText(sale: Pick<MySale, 'state' | 'event'>): string {
       return ofSale ? 'Écartée' : 'Écarté';
     case 'removed':
       return ofSale ? 'Retirée du relevé' : 'Retiré du relevé';
+    case 'given':
+      return ofSale ? 'Donnée' : 'Sa vente est donnée';
   }
 }
 
@@ -70,6 +80,8 @@ function saleNote(sale: Pick<MySale, 'state' | 'open'>, closed: boolean): string
       return 'Tu l’as signalée et un valideur l’a écartée : elle ne compte pas pour toi.';
     case 'removed':
       return 'Tu l’avais signalée : elle n’est plus sur ton relevé.';
+    case 'given':
+      return 'Un valideur l’a donnée au membre décisif sur cette vente : elle ne compte pas pour toi.';
   }
 }
 
@@ -85,8 +97,28 @@ function refundNote(sale: Pick<MySale, 'state' | 'open'>, closed: boolean): stri
       return 'Tu l’as signalé et un valideur l’a écarté : il ne se déduit pas de tes ventes.';
     case 'removed':
       return 'Tu l’avais signalé : il n’est plus sur ton relevé.';
+    case 'given':
+      return 'Un valideur a donné sa vente à un autre membre : il ne se déduit pas de tes ventes.';
   }
 }
+
+/**
+ * A sale the validator gave, as its line says it to each of its two members (ADR 0101 §§ 6, 15): « Donnée à Léa »,
+ * « Reçue de Théo », « Reçue de l'IA », « Partagée avec Léa : 40 % pour toi », the reader's own share; `null` for a line
+ * nobody gave. Nothing else of the other member: no total, no other line (ADR 0043 § 7).
+ */
+export function mySaleGivenText(sale: Pick<MySale, 'given'>): string | null {
+  const { given } = sale;
+  if (given === null) return null;
+  const other = given.other.kind === 'agent' ? 'l’IA' : given.other.displayName;
+  if (given.myShareBp > 0 && given.myShareBp < SALE_WHOLE_BP)
+    return `Partagée avec ${other}${NBSP}: ${String(Math.round(given.myShareBp / 100))}${NBSP}% pour toi`;
+  return given.role === 'author' ? `Donnée à ${other}` : `Reçue de ${other}`;
+}
+
+/** Why the validator gave it, quoted as written: both members read it (ADR 0101 § 6). */
+export const mySaleGivenWhy = (sale: Pick<MySale, 'given'>): string | null =>
+  sale.given === null ? null : `Pourquoi${NBSP}: «${NBSP}${sale.given.note}${NBSP}»`;
 
 /** The member's own note on their signal, quoted, `null` for none. */
 export const mySignalNote = (sale: Pick<MySale, 'signal'>): string | null =>

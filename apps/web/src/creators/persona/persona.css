@@ -392,9 +392,12 @@
 .ps-area {
   position: relative;
 }
-.ps-area__input {
-  resize: vertical;
+.ps-area__input.nv-field__control {
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
   min-height: 88px;
+  /* Its count sits under the last line, never over it. */
   padding-bottom: 26px;
   line-height: 22px;
 }
@@ -712,6 +715,41 @@
 }
 .ps-delays__add .ps-number {
   width: 150px;
+}
+
+/* ── Objection replies (ADR 0090 § B) ── */
+.ps-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ps-reply {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ps-reply .ps-area {
+  flex: 1;
+  min-width: 0;
+}
+.ps-reply__remove {
+  flex: none;
+  margin-top: 6px;
+}
+.ps-replies__add {
+  align-self: flex-start;
+}
+/* On a phone the reply keeps the whole width, « Retirer » under it. */
+@media (max-width: 640px) {
+  .ps-reply {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .ps-reply__remove {
+    align-self: flex-end;
+    margin-top: 0;
+  }
 }
 
 /* ── Folds ── */

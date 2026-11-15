@@ -270,11 +270,14 @@ const FIELD_ICONS: Readonly<Record<string, JSX.Element>> = {
 type Language = (typeof LANGUAGES)[number];
 const isLanguage = (value: string): value is Language => LANGUAGES.some((language) => language === value);
 
-/** « 26 ans aujourd’hui », on the local calendar of today; nothing for a date not yet whole or still to come. */
+/**
+ * « 26 ans », her age on the local calendar of today (recette créatrice 10: « aujourd’hui » read like a birthday);
+ * nothing for a date not yet whole or still to come.
+ */
 export function ageLine(birthDate: string, today: string = localDay()): string | undefined {
   try {
     const age = ageOn(birthDate, today);
-    return age >= 0 ? `${String(age)} ans aujourd’hui` : undefined;
+    return age >= 0 ? `${String(age)} ans` : undefined;
   } catch {
     return undefined;
   }

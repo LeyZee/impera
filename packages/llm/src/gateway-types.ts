@@ -1,10 +1,13 @@
 import type {
   DropMediaDescription,
   FanCardRead,
+  FanFlags,
   LlmPurpose,
   MediaDescription,
+  Money,
   Result,
   ScriptDropSummary,
+  ScriptStepKind,
   TrendCaptureDescription,
 } from '@impera/contracts';
 import type { TranscriptionModel } from 'ai';
@@ -130,17 +133,66 @@ export interface BrainAlert {
   readonly phrase: string;
 }
 
+/** A script she may open with him, as the brain reads it (ADR 0098 § 6): the id it answers with, what it is about. */
+export interface BrainScript {
+  readonly id: string;
+  readonly description: string;
+}
+
 export interface BrainInput extends ConversationInput {
   /** Her alerts written as a phrase, at most `BRAIN_ALERTS_MAX`; absent or empty, none is read. */
   readonly alerts?: readonly BrainAlert[];
+  /** The scripts code permits now, at most `BRAIN_SCRIPTS_MAX`; absent or empty, the brain picks none. */
+  readonly scripts?: readonly BrainScript[];
+  /** A step of a script waits for his answer: the brain reads what his last message does with it (`scriptReply`). */
+  readonly scriptStepWaiting?: boolean;
+}
+
+/**
+ * The script step code decided to send now (ADR 0098 § 5), for the voice to say: its kind, the price from the
+ * catalogue (never the model's), the agency's instruction and the media's sheet when the catalogue has them.
+ */
+export interface VoiceScriptStep {
+  readonly kind: ScriptStepKind;
+  /** A paid step only. */
+  readonly price: Money | null;
+  readonly instruction: string | null;
+  readonly mediaSheet: string | null;
 }
 
 export interface VoiceInput extends ConversationInput {
   readonly brief: Brief;
+  /**
+   * A reply of her bank to his price objection (ADR 0090 § 8), chosen by code: the voice says it in her words, in a
+   * typed block after the brief. Absent, none.
+   */
+  readonly objectionReply?: string;
+  /** The script step code decided to send now, in a typed block after the brief. Absent, none. */
+  readonly scriptStep?: VoiceScriptStep;
+}
+
+/**
+ * The situation the agent saw when it wrote the reply, as the judge reads it (evals only): written by code, never by
+ * the fan, so the judge scores safety against his real state (an adult whose age is confirmed may be flirted with).
+ */
+export interface JudgeSituation {
+  /** The moment as the brain and the voice read it (`describeSituation`): her time, day or night, what he spent. */
+  readonly description: string;
+  /** Hours since their first message (`relationshipStartedAt`). */
+  readonly relationshipHours: number;
+  /** His age is confirmed (`ageConfirmedAt`), as the sexualisation cursor reads it. */
+  readonly ageConfirmed: boolean;
+  /** Hours since the last script offered to him (`lastOfferAt`); `null`: none yet. */
+  readonly lastOfferHoursAgo: number | null;
+  readonly hasNoBudget: boolean;
+  /** His limits (`fans.flags`), as the policy reads them before any offer. */
+  readonly flags: FanFlags;
 }
 
 /** A reply she is about to send, scored by the judge (evals only: never on a real fan's path). */
-export interface JudgeInput extends ConversationInput {
+export interface JudgeInput extends Omit<ConversationInput, 'situation'> {
+  /** Absent: the judge is told it knows nothing of the moment, and reads his age as unknown. */
+  readonly situation?: JudgeSituation;
   readonly reply: readonly string[];
   readonly criteria: readonly JudgeCriterion[];
 }

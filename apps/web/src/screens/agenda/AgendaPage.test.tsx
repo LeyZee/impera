@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { CreatorTaskSchema } from '@impera/contracts';
+import { CreatorSuggestionSchema, CreatorTaskSchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgendaPage, type AgendaView } from './AgendaPage';
-import { agendaOf, post, shoot, WEDNESDAY } from './fixtures';
+import { agendaOf, post, shoot, stretch, WEDNESDAY } from './fixtures';
+import { keepSnapshot, rangeKey } from './offline';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -78,13 +79,30 @@ function serve(online: () => boolean, shifts: readonly unknown[] = SHIFTS, agend
   return calls;
 }
 
-function show(view: AgendaView = 'day'): void {
+function show(view: AgendaView = 'day', day: string = WEDNESDAY): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <AgendaPage day={WEDNESDAY} view={view} onDay={() => undefined} onView={() => undefined} />
+      <AgendaPage day={day} view={view} onDay={() => undefined} onView={() => undefined} />
     </QueryClientProvider>,
   );
 }
+
+/** Her agenda's read answered by `answer`, every other door as `serve` answers it. */
+function serveAgenda(answer: () => Promise<Response>, agenda = agendaOf()): void {
+  serve(() => true, SHIFTS, agenda);
+  const others = globalThis.fetch;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) =>
+      url.startsWith('/v1/creator-space/agenda') ? answer() : others(url, init),
+    ),
+  );
+}
+
+/** Her phone's copy of the week, read on Tuesday at 21 h. */
+const keepYesterday = (agenda = agendaOf()): void => {
+  keepSnapshot(rangeKey('2026-11-02', '2026-11-08'), agenda, Date.parse('2026-11-03T20:00:00.000Z'));
+};
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -183,7 +201,10 @@ describe('Agenda, the creator’s (CR-05)', () => {
     online = false;
     const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     fireEvent(window, new Event('offline'));
-    expect(await screen.findByText(/Hors ligne : tu vois ta dernière lecture\./u)).toBeDefined();
+    // Her copy says how old it is (CRE-02).
+    expect(
+      await screen.findByText(/Hors ligne : tu vois ta dernière lecture, aujourd’hui à 13\sh\./u),
+    ).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: `Cocher ${post.title}` }));
     const waiting = await screen.findByRole('button', {
       name: `Décocher ${post.title}, en attente du réseau`,
@@ -314,5 +335,117 @@ describe('Agenda, the creator’s (CR-05)', () => {
         when: { kind: 'timed', startsAt: '2026-11-05T13:00:00.000Z', endsAt: '2026-11-05T15:00:00.000Z' },
       });
     });
+  });
+});
+
+describe('Agenda, recette design du 11/11 (lot B)', () => {
+  it('says her copy is being updated while the server is asked (CRE-02)', async () => {
+    keepYesterday();
+    serveAgenda(() => new Promise<Response>(() => undefined));
+    show();
+    expect(await screen.findByText('4 choses à faire')).toBeDefined();
+    expect(screen.getByText('Mise à jour…')).toBeDefined();
+  });
+
+  it('says the server is silent, never « Hors ligne », when it fails with a network, and offers to try again (CRE-02)', async () => {
+    keepYesterday();
+    serveAgenda(() => Promise.resolve(new Response('{}', { status: 500 })));
+    show();
+    const silent = await screen.findByText(
+      /^Le serveur ne répond pas : tu vois ta dernière lecture, hier à 21\sh\.$/u,
+    );
+    expect(silent.closest('.ag-offline')).not.toBeNull();
+    expect(screen.queryByText(/Hors ligne/u)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
+  });
+
+  it('titles a day with nothing of hers but a suggestion by the suggestion, and draws no value on the ring (CRE-05, CRE-06)', async () => {
+    serve(() => true, SHIFTS, agendaOf({ tasks: [] }));
+    show();
+    expect(await screen.findByText('1 proposition à regarder')).toBeDefined();
+    expect(screen.getByText('Rien d’autre à faire aujourd’hui.')).toBeDefined();
+    expect(screen.queryByText('Rien à faire')).toBeNull();
+    expect(document.querySelector('.ag-ring .nv-ring__value')).toBeNull();
+  });
+
+  it('titles the suggestions of the day like « Sans date », with their count (CRE-07)', async () => {
+    const dated = CreatorSuggestionSchema.parse({
+      ...agendaOf().suggestions[0],
+      id: '01936f00-0000-7000-8000-000000000931',
+      when: { kind: 'day', day: WEDNESDAY },
+      title: 'Story coulisses',
+    });
+    serve(() => true, SHIFTS, agendaOf({ suggestions: [...agendaOf().suggestions, dated] }));
+    show();
+    const heading = await screen.findByRole('heading', { name: 'Proposé pour aujourd’hui' });
+    expect(heading.parentElement?.textContent).toBe('Proposé pour aujourd’hui1');
+    expect(screen.getByRole('region', { name: 'Proposé pour aujourd’hui' }).textContent).toContain(
+      'Story coulisses',
+    );
+  });
+
+  it('writes a task without a purpose by its title alone: its category is the tag (CRE-19)', async () => {
+    serve(() => true);
+    show();
+    const row = (await screen.findByRole('button', { name: /^Publier le carrousel/u })).closest('li');
+    expect(post.purpose).toBeNull();
+    expect(row?.querySelector('.ag-task__body')?.textContent).toBe('Publier le carrousel');
+    expect(row?.querySelector('.ag-tag')?.textContent).toBe('Publication');
+  });
+
+  it('keeps the place of « Aujourd’hui » on today, so that the arrows never move (CRE-20)', async () => {
+    serve(() => true);
+    show();
+    await screen.findByText('4 choses à faire');
+    expect(screen.queryByRole('button', { name: 'Aujourd’hui' })).toBeNull();
+    expect(document.querySelector('.ag-today')).not.toBeNull();
+    cleanup();
+    show('day', '2026-11-05');
+    expect(await screen.findByRole('button', { name: 'Aujourd’hui' })).toBeDefined();
+  });
+
+  it('says « Semaine » on a phone as on a computer, and that the month is a computer’s (CRE-21)', async () => {
+    serve(() => true);
+    show('month');
+    expect(await screen.findByRole('radio', { name: 'Semaine' })).toBeDefined();
+    expect(screen.queryByRole('radio', { name: 'Ma semaine' })).toBeNull();
+    expect(screen.getByText('Le mois se voit sur un ordinateur : voici ta semaine.')).toBeDefined();
+  });
+
+  it('ticks a task from its dialog, « Retirer » apart (CRE-23)', async () => {
+    const calls = serve(() => true);
+    show();
+    await screen.findByText('4 choses à faire');
+    fireEvent.click(screen.getByRole('button', { name: /^Story du matin/u }));
+    expect(screen.queryByRole('button', { name: 'OK' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Retirer' }).className).toContain('nv-btn--destructive');
+    fireEvent.click(screen.getByRole('button', { name: 'C’est fait' }));
+    await waitFor(() => {
+      expect(calls.find((call) => call.url === '/v1/creator-space/ticks')?.body).toEqual({
+        ticks: [{ taskId: stretch.id, day: WEDNESDAY, doneAt: '2026-11-04T12:00:00.000Z' }],
+      });
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('opens « Mon agenda dans mon téléphone » in its own column, not in the reel’s phone frame (CRE-17)', async () => {
+    serve(() => true);
+    show();
+    await screen.findByText('4 choses à faire');
+    fireEvent.click(screen.getByRole('button', { name: /Mon agenda dans mon téléphone/u }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mon agenda dans mon téléphone' });
+    expect(dialog.querySelector('.ag-callink')).not.toBeNull();
+    expect(dialog.querySelector('.ag-phone')).toBeNull();
+  });
+
+  it('lets her say why in a field that grows with her text, without the browser’s handle (CRE-30)', async () => {
+    serve(() => true);
+    show();
+    await screen.findByText('4 choses à faire');
+    const [decline] = screen.getAllByRole('button', { name: 'Non merci' });
+    if (decline === undefined) throw new Error('no « Non merci »');
+    fireEvent.click(decline);
+    const why = await screen.findByLabelText(/Pourquoi \?/u);
+    expect(why.className).toContain('ag-area');
   });
 });

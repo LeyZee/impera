@@ -7,7 +7,7 @@ import { parseArgs } from 'node:util';
 
 import { createDbClient } from '@impera/db';
 
-import { loadConfig } from '../config';
+import { loadConfig, ownerDatabaseUrl } from '../config';
 import { KillSwitchInputSchema, setKillSwitch } from '../ops';
 
 import { requireArguments } from './command-line';
@@ -40,7 +40,7 @@ if (values.on === values.off || !input.success) {
 }
 
 const config = loadConfig();
-const admin = createDbClient(config.DATABASE_ADMIN_URL);
+const admin = createDbClient(ownerDatabaseUrl(config));
 try {
   await setKillSwitch(admin.db, input.data);
   console.log(`Interrupteur ${input.data.scope} ${input.data.active ? 'activé' : 'levé'}.`);

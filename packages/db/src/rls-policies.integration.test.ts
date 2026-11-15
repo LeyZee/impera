@@ -22,6 +22,12 @@ const POLICY_EXCEPTIONS: Readonly<Record<string, string>> = {
   'invoice_lines.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
   'invoice_pdf_copies.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
   'invoice_pdfs.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
+  'mcp_grants.owner_insert':
+    'agency-level, the owner alone in his own name (app.team_scope, app.user_id): creator_id is the creator an agent access is bound to, not a tenant (migration 0193)',
+  'mcp_grants.owner_read':
+    'agency-level, the owner alone (app.team_scope): creator_id is the creator an agent access is bound to, not a tenant (migration 0193)',
+  'mcp_grants.owner_update':
+    'agency-level, the owner alone (app.team_scope), last use and revocation only: creator_id is the creator an agent access is bound to, not a tenant (migration 0193)',
   'kill_switches.global_read':
     'creator_id IS NULL: the global switch, read by every creator (migration 0010)',
   'shift_swap_requests.requester_withdraw':

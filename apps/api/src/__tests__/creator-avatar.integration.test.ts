@@ -138,7 +138,7 @@ describe('creator photo (CRM-07 a2b)', () => {
     crm = createFakeCrm();
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 9).toString('base64')}`,
     });
     jobLogger = createLogger(config, new LogSink());

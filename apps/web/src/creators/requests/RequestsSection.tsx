@@ -235,9 +235,10 @@ function CadencePlate({
           </p>
           <p className="rq-cadence__line nv-num">
             {everyText(days)}
+            {/* The cadence's own (ADR 0056): a script asked by hand is not its, and does not move its next. */}
             {cadence.data.lastDueOn === null
-              ? ' · aucun encore demandé'
-              : ` · le dernier pour ${namedDay(cadence.data.lastDueOn, today)}`}
+              ? ' · la cadence n’en a encore demandé aucun'
+              : ` · le dernier de la cadence pour ${namedDay(cadence.data.lastDueOn, today)}`}
           </p>
         </div>
         {isOwner ? (
@@ -475,6 +476,7 @@ function AskDialog({
     setBusy(false);
     if (outcome.kind === 'ok') {
       await client.invalidateQueries({ queryKey: contentKey(creatorId) });
+      await client.invalidateQueries({ queryKey: cadenceKey(creatorId) });
       // The moment the code fixed, read from its value, never from the label shown.
       const moment = outcome.value.category === 'script' ? outcome.value.moment : null;
       onAsked(

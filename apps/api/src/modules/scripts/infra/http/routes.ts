@@ -23,6 +23,7 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { creatorQueue, type ScriptsReader } from '../../application/reads';
 import { cardContent, cardSvg } from '../../domain/cards';
 import type {
   CadenceStore,
@@ -118,6 +119,11 @@ export type { LimitsOf } from '../../domain/ports';
 function signedIn(user: { readonly id: string } | null): string {
   if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
   return user.id;
+}
+
+function readerOf(user: { readonly id: string; readonly role: UserRole } | null): ScriptsReader {
+  if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+  return { userId: user.id, role: user.role };
 }
 
 /**
@@ -271,7 +277,7 @@ export function createScriptRoutes(
       },
       async (request) => {
         const { creatorId } = request.params;
-        const entries = await store.queue(creatorId, signedIn(request.user));
+        const entries = await creatorQueue(store, readerOf(request.user), creatorId);
         if (entries === null) throw new ScriptQueueCreatorNotFound();
         return queueView(creatorId, entries, await limitsOf(creatorId));
       },

@@ -103,7 +103,7 @@ const RefusalSchema = z.object({ error: z.object({ code: z.string(), details: z.
 
 export async function startPayrollTeam(superuserUrl: string, options: AppOptions = {}): Promise<PayrollTeam> {
   const test = await createTestDb(superuserUrl);
-  const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+  const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
   const app = await createApp(config, createLogger(config), options);
   const server = await buildServer({
     config,

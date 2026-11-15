@@ -35,6 +35,7 @@ import { InstallNudge } from '@/pwa/InstallNudge';
 import { useOnline } from '@/pwa/online';
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
+import { RewardOwedNotice } from '@/rewards/RewardOwedNotice';
 
 /** What the account is, under its name: a manager on leave has the chatter's rail, and stays a manager. */
 function roleLabel(user: Me): string {
@@ -169,6 +170,7 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
               </p>
             ) : null}
           </div>
+          <RewardOwedNotice user={user} pathname={pathname} />
           <p className="nv-notice-region" role="status">
             {said === null ? null : (
               <span className="nv-notice nv-glass nv-glass--thick" key={said.at}>

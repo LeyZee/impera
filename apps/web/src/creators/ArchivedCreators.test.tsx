@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ArchivedCreators } from './ArchivedCreators';
+import { ArchivedCreators, thumbnailsLine } from './ArchivedCreators';
 
 /* Invented creators: no real person. */
 const NORA = { id: '0192f3a0-0000-7000-8000-0000000000c1', displayName: 'Nora', timezone: 'Europe/Paris' };
@@ -52,11 +52,20 @@ describe('ArchivedCreators (ADR 0071 § 2)', () => {
     expect(await screen.findByText('Archivées')).toBeDefined();
     expect(screen.getByText('1 créatrice')).toBeDefined();
     expect(screen.getByText('· archivée le 5 novembre 2026', { exact: false })).toBeDefined();
+    expect(screen.getByText(/vignettes (gardées|effacées)/)).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Rouvrir' }));
     expect(await screen.findByRole('status')).toHaveProperty(
       'textContent',
       'Rouverte : Nora. Son agent reste à l’arrêt : relance-le depuis le Dashboard. Son espace se rouvre avec un nouveau lien, dans l’onglet Accès.',
     );
     expect(onRestored).toHaveBeenCalledWith(NORA.id);
+  });
+
+  it('says until when her reduced pictures stay, then that they went (ADR 0089)', () => {
+    const archivedAt = '2026-11-05T20:00:00.000Z';
+    expect(thumbnailsLine(archivedAt, new Date('2026-11-11T12:00:00.000Z'))).toBe(
+      'vignettes gardées jusqu’au 3\u00a0février\u00a02027',
+    );
+    expect(thumbnailsLine(archivedAt, new Date('2027-02-03T20:00:00.000Z'))).toBe('vignettes effacées');
   });
 });

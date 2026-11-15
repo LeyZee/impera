@@ -120,7 +120,7 @@ describe('GET /v1/dashboard, the sales read in the register (CRM-04 lot c)', () 
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       // The sales feeds' key store, for the stopped reading (AGT-11); no key is ever saved here.
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 9).toString('base64')}`,
     });
