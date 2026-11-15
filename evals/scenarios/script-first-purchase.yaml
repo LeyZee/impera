@@ -1,0 +1,49 @@
+# Vente longue (ADR 0098) : le premier pas d’un script choisi par le cerveau, sans prix. Fan, messages, script et prix fictifs (ADR 0010).
+description: >-
+  Il est chaud la nuit, aucun script ne lui a été envoyé ; le code ouvre celui que le cerveau choisit par son aperçu offert.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+  - 41 ans, confirmé
+situation:
+  availability: confirmed
+  sexualized: true
+  known_hours: 72
+  age_confirmed: true
+  local_time: '23:00'
+  desire: 90
+history:
+  - from: creator
+    text: Tu fais quoi de ta soirée toi 😏
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme le plus intime de la soirée.
+          media: Une courte vidéo en nuisette.
+inbound: Je pense à toi en fait… j’aimerais bien voir à quoi tu ressembles ce soir
+expect:
+  decision:
+    handoff: false
+    script_in:
+      - start
+    script_step:
+      script: soiree-demo
+      index: 0
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \d+\s?(€|euros?)

@@ -19,6 +19,15 @@ import { createReconcileJob } from './application/reconcile';
 import { createConnectorResolver } from './application/resolver';
 import { createSalesFeeds, type SalesFeedDeps } from './application/sales-feed';
 import { createConnectorSessions, type ConnectorSessions } from './application/sessions';
+import {
+  createAskVaultSync,
+  createPlatformReads,
+  createVaultReads,
+  createVaultSyncJob,
+  type PlatformReads,
+  type VaultReads,
+  type VaultSyncAsked,
+} from './application/vault';
 import type { AvatarPorts } from './domain/avatar';
 import { connectionServiceOf } from './domain/connection-outage';
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
@@ -36,6 +45,7 @@ import {
 import { createDrizzleSalesLedger } from './infra/db/sales-ledger';
 import { createSendJournal } from './infra/db/send-journal';
 import { createDrizzleTeamImportStore, invitationChatterLinks } from './infra/db/team-import-store';
+import { createDrizzleVaultStore } from './infra/db/vault-store';
 import { createAvatarRoutes } from './infra/http/avatar-routes';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
@@ -44,6 +54,7 @@ import {
   createSalesFeedTeamRoutes,
   type SalesFeedTeamRoutesOptions,
 } from './infra/http/sales-feed-team-routes';
+import { createVaultRoutes, type VaultRoutesOptions } from './infra/http/vault-routes';
 import { revealSessionShape } from './infra/reveal/session';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
@@ -87,6 +98,8 @@ export { FakeConnector } from './infra/fake/FakeConnector';
 /** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
 export { revealApiConnectors } from './infra/reveal/connector';
 export type { RevealFetch } from './infra/reveal/client';
+/** @public The errors `platformReads` throws, for the adapter that reads through it (`reason` says why a read is refused). */
+export { PlatformAccountNotFound, PlatformReadUnavailable } from './domain/errors';
 /** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */
 export {
   REVEAL_ENDPOINTS,
@@ -174,7 +187,21 @@ export interface ConnectorsModule {
     copyAvatar(payload: JobPayload<'connector.copy_avatar'>, logger: JobLogger): Promise<void>;
     /** The platform's daily statistics of each linked account, kept as counters (ADR 0081 § 3). */
     readDailyStats(logger: JobLogger, correlationId: string): Promise<void>;
+    /** Her vault's folders and media mirrored in the CRM, read only (ADR 0099, fiche vault-sync). */
+    vaultSync(payload: JobPayload<'connector.vault_sync'>, logger: JobLogger): Promise<void>;
   };
+  /**
+   * `/v1/creators/:creatorId/vault` and its owner's « Synchroniser » (fiche vault-sync), behind the guards given here.
+   * Nothing else starts a read of the platform's vault: no cron.
+   */
+  readonly vaultRoutes: (options: Omit<VaultRoutesOptions, 'askSync'>) => FastifyPluginAsyncZod;
+  /** Her vault as the last sync read it, as the person reading (the owner, an active manager of her list). */
+  readonly vault: VaultReads;
+  /**
+   * Reads of the platform for another module's adapter (the import of the scripts by `scripts`): through the resolver,
+   * each behind its `capabilities` flag, never a write.
+   */
+  readonly platformReads: PlatformReads;
   /** `/v1/creators/:creatorId/avatar`, behind the guard given here (owner, operator, creator). */
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
@@ -260,6 +287,11 @@ export interface ConnectorsDeps {
    * is the module's own.
    */
   readonly avatars?: Omit<AvatarPorts, 'records'> | null;
+  /**
+   * Told of each `connector.vault_sync` the owner's « Synchroniser » queued, once per account, just after its enqueue
+   * (fiche vault-sync; asked by `media`, wired by the composition root). Never a write of this module's tables.
+   */
+  readonly onVaultSyncAsked?: (input: VaultSyncAsked) => Promise<void>;
 }
 
 const systemClock: Clock = { now: () => new Date() };
@@ -310,6 +342,15 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     dailyStats: createDrizzleDailyStatsStore(deps.adminDb),
   });
   const sender = createOutboundSender({ accounts, resolver, clock });
+  const accountJobQueue = createDrizzleAccountJobs(deps.adminDb);
+  const vaultStore = createDrizzleVaultStore(deps.db);
+  const vaultReads = createVaultReads(vaultStore);
+  const askVaultSync = createAskVaultSync({
+    accounts,
+    jobs: accountJobQueue,
+    platforms: resolver.platforms,
+    onAsked: deps.onVaultSyncAsked,
+  });
   return {
     name: 'connectors',
     outboundSender: sender,
@@ -319,7 +360,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     jobs: {
       dispatch: createDispatchJob({
         accounts,
-        jobs: createDrizzleAccountJobs(deps.adminDb),
+        jobs: accountJobQueue,
         resolver,
         clock,
         ...(deps.random === undefined ? {} : { random: deps.random }),
@@ -330,7 +371,11 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       checkSales: (payload, logger, correlationId) => salesFeeds.autoCheck(payload, logger, correlationId),
       readDailyStats: (logger, correlationId) => salesFeeds.readDailyStats(logger, correlationId),
       copyAvatar: (payload, logger) => salesFeeds.copyAvatar(payload, logger),
+      vaultSync: createVaultSyncJob({ accounts, resolver, store: vaultStore, clock }),
     },
+    vaultRoutes: (options) => createVaultRoutes(vaultReads, { ...options, askSync: askVaultSync }),
+    vault: vaultReads,
+    platformReads: createPlatformReads({ accounts, resolver, clock }),
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedTeamRoutes: (options) => createSalesFeedTeamRoutes(salesFeeds.team, options),

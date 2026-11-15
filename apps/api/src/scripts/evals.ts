@@ -40,10 +40,13 @@ import { READ_ONLY_POOL_OPTIONS } from '../key-check';
 import {
   activePersonaForModels,
   composeTurn,
+  type ComposedTurn,
   guardSettingsOf,
   holdDecision,
   measureDesire,
   readPersonaFile,
+  UNKNOWN_AVAILABILITY,
+  type FanAvailabilityRecord,
   type PersonaForModels,
 } from '../modules/agent/index';
 import { proposalsOfRead } from '../modules/fans/index';
@@ -54,6 +57,7 @@ import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './
 import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
+import { scriptsInputOf } from './evals/scripts-input';
 import { judgeSituationOf, scenarioFlags, scenarioMoment } from './evals/situation';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -239,6 +243,39 @@ async function readCard(scenario: CardScenario): Promise<{ failures: string[]; v
   };
 }
 
+/** His availability as the scenario stores it, set five minutes before his message. */
+function availabilityOf(situation: Scenario['situation'], now: Date): FanAvailabilityRecord {
+  const said = new Date(now.getTime() - 5 * 60_000);
+  const lapses = new Date(said.getTime() + 2 * HOUR_MS);
+  const record: FanAvailabilityRecord = {
+    ...UNKNOWN_AVAILABILITY,
+    ...(situation.sexualized && { sexualizedAt: said }),
+  };
+  if (situation.availability === 'confirmed') {
+    return {
+      ...record,
+      state: 'confirmed',
+      signal: 'free_now',
+      at: said,
+      expiresAt: lapses,
+      seen: ['alone', 'free_now'],
+    };
+  }
+  if (situation.availability === 'no') {
+    return { ...record, state: 'no', signal: 'someone_nearby', at: said, expiresAt: lapses };
+  }
+  return record;
+}
+
+/** What code decided with her scripts, as the scenario checks it. */
+function scriptOutcome(
+  decision: NonNullable<ComposedTurn['scripts']>['decision'],
+): NonNullable<Outcome['script']> {
+  return decision.kind === 'start' || decision.kind === 'send_step'
+    ? { decision: decision.kind, step: { script: decision.step.scriptRef, index: decision.step.stepIndex } }
+    : { decision: decision.kind };
+}
+
 /** One scenario, on the path a real fan's message takes; nothing leaves. */
 async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Record<string, number> }> {
   const { situation } = scenario;
@@ -319,6 +356,10 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         usedReplyIds: new Set(situation.objection_replies_used),
       },
       ...(alerts.length > 0 && { alerts: alerts.map(({ id, phrase }) => ({ id, phrase })) }),
+      // His availability and his sexualizing as stored a few minutes before (ADR 0103 § 9-13).
+      availability: availabilityOf(situation, now),
+      // Her made-up scripts, Reveal's history of his and his run (ADR 0098): a long sale, one message at a time.
+      ...(scenario.scripts !== undefined && { scripts: scriptsInputOf(scenario.scripts, now) }),
     },
   );
   const { brief } = composed;
@@ -337,6 +378,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
         action: brief.action,
         ...(brief.desireSignals !== undefined && { desireSignals: brief.desireSignals }),
         ...(brief.objection !== undefined && { objection: brief.objection }),
+        ...(brief.scriptReply !== undefined && { scriptReply: brief.scriptReply }),
         alertsSeen: alerts.filter((a) => brief.alertsSeen?.includes(a.id) === true).map((a) => a.name),
       },
     }),
@@ -345,6 +387,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
     desireBand: desireBandOf(composed.desire?.score ?? situation.desire),
     customOrder: composed.customOrder?.kind ?? 'none',
     objectionReply: composed.objectionReply?.replyId ?? null,
+    ...(composed.scripts !== undefined && { script: scriptOutcome(composed.scripts.decision) }),
     bubbles: composed.bubbles,
     blocking,
   };

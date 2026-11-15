@@ -45,7 +45,7 @@ export function trapLabel(kind: string, source: string): string {
   return `${TRAP_LABELS[kind] ?? kind}${where === undefined ? '' : `, ${where}`}`;
 }
 
-/** Why the policy refused the brain's offer (agent/domain/policy.ts `OfferBlock`, and no offer context at all). */
+/** Why the brain's offer was refused: the policy (`OfferBlock`), the gate before any sale, or no offer context at all. */
 const OFFER_REFUSAL_LABELS: Readonly<Record<string, string>> = {
   do_not_contact: 'Fan à ne plus contacter',
   risk: 'Un risque lu dans son message arrête toute vente',
@@ -55,6 +55,11 @@ const OFFER_REFUSAL_LABELS: Readonly<Record<string, string>> = {
   cooldown: 'Trop tôt après la dernière offre',
   low_desire: 'Désir sous le seuil du script',
   no_offer_context: 'Sa persona ne fixe aucun rythme de scripts',
+  // The gate before any sale (ADR 0103, amendement du 13/11, agent/domain/availability.ts `ScriptStartBlock`).
+  desire_below_threshold: 'Désir sous le seuil du script',
+  not_sexualizing: 'Il ne sexualise pas encore lui-même',
+  availability_unconfirmed: 'Il n’a pas dit être seul et libre',
+  no_script_step: 'Aucune étape de script à envoyer',
 };
 
 /** What the cursor decided on going sexual (agent/domain/sexualization.ts `SexualizationDecision`). */

@@ -1,7 +1,10 @@
-/* Créatrices › Accès: the plate breathes as Profil does; its sentence, her e-mail and the button each on their own line. */
+/*
+ * Créatrices › Accès: the plate breathes as Profil does, as wide as every sheet of hers (820px, ADM-14); its sentence,
+ * her e-mail and the button each on their own line.
+ */
 .ps-panel.cr-access {
   width: 100%;
-  max-width: 720px;
+  max-width: 820px;
   padding-top: 18px;
   gap: 12px;
 }

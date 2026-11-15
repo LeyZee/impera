@@ -96,6 +96,14 @@ export function CreatorsPage({
       );
     }
     if (query.isPending) {
+      // The list waits in the shape of its cards, so nothing jumps when they arrive (recette 11/11, ADM-21).
+      if (creatorId === null)
+        return (
+          <ul className="cl-grid" aria-busy="true" aria-label="Chargement des créatrices">
+            <li className="nv-plate cl-card cl-card--skeleton" />
+            <li className="nv-plate cl-card cl-card--skeleton" />
+          </ul>
+        );
       return (
         <section className="ps-page" aria-busy="true">
           <div className="nv-plate ps-head ps-skeleton" />

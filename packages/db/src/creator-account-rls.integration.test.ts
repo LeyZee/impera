@@ -179,10 +179,12 @@ const CREATOR_DECISIONS: Readonly<
   media_descriptions: 'readsOnly',
   media_assets: 'readsOnly',
   media_sends: 'readsOnly',
+  media_platform_refs: 'readsOnly',
   platform_accounts: 'readsOnly',
   // The connector's own sends (P2-03): written by the agent's connector only.
   connector_sends: 'closed',
   drafts: 'closed',
+  script_runs: 'closed',
   conversation_events: 'closed',
   llm_calls: 'closed',
   calibration_ratings: 'closed',

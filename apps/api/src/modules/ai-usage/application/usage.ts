@@ -1,4 +1,5 @@
 import {
+  AiCreditProviderSchema,
   DomainError,
   type AddAiCreditEntryBody,
   type AiCreditProvider,
@@ -49,14 +50,18 @@ export async function readUsage(deps: UsageDeps): Promise<AiUsage> {
     deps.reader.lastCallAt(from),
     deps.ledger.list(),
   ]);
+  const providers = AiCreditProviderSchema.options;
   const spent = await Promise.all(
-    (['xai', 'mistral', 'google'] as const).map(async (provider: AiCreditProvider) => {
+    providers.map(async (provider: AiCreditProvider) => {
       const start = countFrom(entries.filter((e) => e.provider === provider));
       return [
         provider,
         start === null ? 0 : await deps.reader.spentSince(provider, new Date(start.at)),
       ] as const;
     }),
+  );
+  const refused = await Promise.all(
+    providers.map(async (provider) => [provider, await deps.reader.quotaRefusedAt(provider)] as const),
   );
   const { day, hour } = wallClock(now, deps.timeZone);
   const firstDay = rows.reduce<string | null>(
@@ -75,17 +80,32 @@ export async function readUsage(deps: UsageDeps): Promise<AiUsage> {
     usdPerEur: deps.usdPerEur,
     entries,
     spentSinceUsd: Object.fromEntries(spent),
+    quotaRefusedAt: Object.fromEntries(refused),
   });
 }
 
 /**
- * The hourly check (`ai_usage.check_credits`, ADR 0091 § 4): a card amber, red or empty publishes `ai_credits_low`
- * for its level, once per latest line of the ledger. Returns the alerts published.
+ * The check every five minutes (`ai_usage.check_credits`, ADR 0091 § 4 and § 6): a card amber, red or empty publishes
+ * `ai_credits_low` for its level, once per latest line of the ledger; a provider that refused for lack of credits or
+ * quota and has not answered since publishes `ai_quota_exhausted`, once per first refusal, ledger line or not.
+ * Returns the alerts published.
  */
 export async function checkCredits(deps: UsageDeps): Promise<number> {
   const usage = await readUsage(deps);
   let published = 0;
+  for (const provider of AiCreditProviderSchema.options) {
+    const card = usage.credits.find((c) => c.provider === provider);
+    // A card already read it; a provider without a line in the ledger is asked here.
+    const refusedAt =
+      card === undefined
+        ? ((await deps.reader.quotaRefusedAt(provider))?.toISOString() ?? null)
+        : card.quotaRefusedAt;
+    if (refusedAt === null) continue;
+    const sent = await deps.alerts.publishQuota({ provider, mode: card?.mode ?? 'credits', refusedAt });
+    if (sent) published += 1;
+  }
   for (const card of usage.credits) {
+    if (card.mode === 'subscription') continue;
     if (card.state !== 'low' && card.state !== 'critical' && card.state !== 'empty') continue;
     const [latest] = card.entries;
     if (latest === undefined) continue;

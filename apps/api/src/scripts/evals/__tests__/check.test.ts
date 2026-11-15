@@ -152,6 +152,35 @@ expect: {}
     ).toThrow();
   });
 
+  it('checks what code did with her scripts and what the brain read of his reply (ADR 0098)', () => {
+    const sale = readScenario(`
+description: L’escalier dans la même session.
+persona_version: demo
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      description: un script fictif
+      steps: [{ kind: free }, { kind: paid, price_euros: 15 }]
+  run: { script: soiree-demo, steps: [{ index: 0, outcome: sent }] }
+  history: [{ script: soiree-demo, sent: [0] }]
+inbound: encore
+expect:
+  brief: { script_reply_in: [answers_step] }
+  decision: { script_in: [send_step], script_step: { script: soiree-demo, index: 1 } }
+`);
+    const sent: Outcome = {
+      ...fine,
+      brief: { ...fine.brief!, scriptReply: 'answers_step' },
+      script: { decision: 'send_step', step: { script: 'soiree-demo', index: 1 } },
+    };
+    expect(checkScenario(sale, sent)).toEqual([]);
+    expect(checkScenario(sale, fine)).toEqual([
+      'réponse à l’étape none, attendue parmi [answers_step]',
+      'script : none, attendu parmi [send_step]',
+      'étape aucune, attendue soiree-demo n° 1',
+    ]);
+  });
+
   it('fails when the brain did not answer', () => {
     expect(
       checkScenario(scenario, {
