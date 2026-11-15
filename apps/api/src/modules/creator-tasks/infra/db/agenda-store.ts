@@ -33,7 +33,7 @@ import {
 } from '../../domain/errors';
 import type { CreatorAgendaStore } from '../../domain/ports';
 import { reminderAt } from '../../domain/reminder';
-import { dayRecordOf, streakOf, type DueTask } from '../../domain/streak';
+import { dayRecordOf, streakOf, type DayRecord, type DueTask } from '../../domain/streak';
 import { decide, weekOf } from '../../domain/suggestions';
 
 import {
@@ -117,7 +117,7 @@ function isOver(when: CreatorTaskWhen, zone: string, now: Date): boolean {
   return false;
 }
 
-async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
+export async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
   const [creator] = await tx
     .select({ timeZone: schema.creators.timezone })
     .from(schema.creators)
@@ -136,23 +136,45 @@ function dueOn(row: TaskRow, day: string, zone: string): boolean {
   return row.archivedAt === null || calendarDayIn(row.archivedAt, zone) > day;
 }
 
-/** Her streak today: her routine of each day back to `STREAK_LOOKBACK_DAYS`, against her ticks of those days. */
-async function streakNow(tx: Transaction, zone: string, now: Date): Promise<CreatorStreak> {
+/**
+ * Her days back to `STREAK_LOOKBACK_DAYS`, today included: her routine of each day against her ticks of it. Under her
+ * own account the policies show her rows only; the game's job (ADR 0107) passes her creator, on the admin connection.
+ */
+export async function herDayRecords(
+  tx: Transaction,
+  zone: string,
+  now: Date,
+  creatorId: string | null = null,
+): Promise<{ readonly today: string; readonly records: DayRecord[] }> {
   const today = calendarDayIn(now, zone);
   const since = addDays(today, -STREAK_LOOKBACK_DAYS);
-  const routine = await tx.select().from(tasks).where(eq(tasks.kind, 'routine'));
+  const routine = await tx
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.kind, 'routine'), creatorId === null ? undefined : eq(tasks.creatorId, creatorId)));
   const done = await tx
     .select()
     .from(ticks)
-    .where(sql`${ticks.day} between ${since} and ${today}`);
+    .where(
+      and(
+        sql`${ticks.day} between ${since} and ${today}`,
+        creatorId === null ? undefined : eq(ticks.creatorId, creatorId),
+      ),
+    );
   const doneTicks: Tick[] = done.map((row) => ({ taskId: row.taskId, day: row.day, doneAt: row.doneAt }));
-  const records = [];
+  const records: DayRecord[] = [];
   for (let day = since; day <= today; day = addDays(day, 1)) {
     const due: DueTask[] = routine
       .filter((row) => dueOn(row, day, zone))
       .map((row) => ({ taskId: row.id, essential: row.essential }));
     records.push(dayRecordOf(day, due, doneTicks));
   }
+  return { today, records };
+}
+
+/** Her streak today, from her days. */
+async function streakNow(tx: Transaction, zone: string, now: Date): Promise<CreatorStreak> {
+  const { today, records } = await herDayRecords(tx, zone, now);
   return streakOf(records, today);
 }
 

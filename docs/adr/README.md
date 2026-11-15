@@ -78,7 +78,7 @@ Date : AAAA-MM-JJ
 | 0051 | Un second point d'entrée, pur, pour les règles qu'un module prête aux domaines qui en dépendent | accepted (précise 0002 pour l'ADR 0047 § 1) |
 | 0052 | Le chatteur sous l'œil de la persona : chaque message qu'il écrit dans Reveal est relu, chaque écart lui est signalé, rien n'est bloqué ni retenu sur sa paie | accepted (précise 0025 et 0043 § 6 ; au § 5 la phrase sur Telegram remplacée par 0059) |
 | 0053 | Clé d'accès (Face ID, empreinte) : un geste vaut mot de passe et code | accepted (précise 0046 § 1, 3, 5 à 8) |
-| 0054 | Gains de la créatrice : les chiffres de Reveal dès que son modèle est relié, sans attendre la bascule | accepted (remplace dans 0042 § 6 la phrase sur la source des ventes ; précise 0042 § 6 et 0050 § 8) |
+| 0054 | Gains de la créatrice : les chiffres de Reveal dès que son modèle est relié, sans attendre la bascule | accepted (remplace dans 0042 § 6 la phrase sur la source des ventes ; précise 0042 § 6 et 0050 § 8 ; amendée § 4 à § 8 le 14/11 : part de l'agence lue chez Reveal, pourcentage facultatif) |
 | 0055 | Dépôt de contenu : la créatrice range chaque dépôt dans sa catégorie, l'agence lui demande ce qui manque | accepted (remplace dans 0044 § 1 l'usage à deux valeurs, et § 2 le départ des 30 jours) |
 | 0056 | Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse | accepted (remplace 0030 § 2 et § 4 pour les scripts déposés ; § 3, phrase sur la palette, remplacée par 0064) |
 | 0057 | Instagram et Telegram : deux connecteurs de publication, par les API officielles, dans le même plan que le feed | accepted (§ 6 et § 7 précisés par 0082 : fenêtre visible d'une légende, aperçu) |
@@ -126,5 +126,7 @@ Date : AAAA-MM-JJ
 | 0105 | Le MCP d'Impera remis à jour : un agent connecté lit, freine et prépare, un humain confirme | accepted (amende 0026 § 2 à § 5, § 7 et § 9) |
 | 0106 | Le Dashboard de l'agence sépare chiffre d'affaires, net, part de la créatrice et part de l'agence, et estime la TVA des virements | accepted (précise 0078 et 0054 § 2) |
 | 0107 | La créatrice gagne des médailles de série et des trophées pour ce qu'elle fait pour l'agence | accepted (précise 0042 § 3 et § 7, 0055 § 4 et § 6, 0044 § 4 ; reprend les limites de 0104 § B) |
+| 0108 | Une vitrine des trophées commune au chatteur et à la créatrice : tout ce qui est gagné, ce qui reste, l'avancement vers le prochain | accepted (précise 0104 § B et 0107 § C) |
 | 0109 | L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre | accepted (précise 0066 § 7, 0086 § 8, 0085 et 0025) |
 | 0110 | L'agent tient compte des automatisations de Reveal | accepted (remplace la ligne « sans effet sur le bot » de l'inventaire du connecteur ; précise 0006, 0018, P3-10) |
+| 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
