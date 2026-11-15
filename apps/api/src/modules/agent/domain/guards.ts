@@ -37,6 +37,11 @@ export interface GuardContext {
    * his), oldest first; absent, neither `repetition` nor `closed_question_streak` is read.
    */
   readonly previousTurns?: readonly (readonly string[])[];
+  /**
+   * Every message of hers in the history she is written into, however far back: a bubble she already sent him is
+   * never sent again (recette AGR-05). Absent, only `previousTurns` is read for it.
+   */
+  readonly sentBefore?: readonly string[];
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -67,7 +72,7 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     code: 'ai_disclosure',
     // « je suis modèle photo », « je suis assistante dentaire » are jobs: the article is required for those words.
     pattern: new RegExp(
-      `\\b(je (ne )?suis|j'?suis|jsuis|moi c'est|i'?m)( qu'| que | juste | seulement | rien qu'| rien d'autre qu')?\\s?(une? |l'|an? )?${AI_WORD}(?![a-z])|\\b(je suis|jsuis|j'suis) (une?|un simple) (assistante?|programme|modele( de langage)?)\\b`,
+      `\\b(je (ne )?suis|j'?suis|jsuis|moi c'est|i'?m)( qu'| que | juste | seulement | rien qu'| rien d'autre qu')?\\s?(une? |l'|an? )?${AI_WORD}(?![a-z])|\\b(je suis|jsuis|j'suis) (une?|un simple) (assistante?|programme|modele de langage|modele(?! (photo|pour|nue?|lingerie|charme|glamour|insta|instagram|en |de |d')))\\b`,
     ),
   },
   {
@@ -77,7 +82,36 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'ai_disclosure',
     pattern:
-      /\b(prompt|language model|modele de langage|mes instructions|grok|openai|xai|chatgpt|gpt|llm|anthropic|gemini)\b/,
+      /\b(prompt|language model|modele de langage|mes instructions|grok|openai|xai|chatgpt|gpt|llm|anthropic|gemini|mistral ai|le chat de mistral|llama|copilot|deepseek|perplexity)\b/,
+  },
+  // Naming herself after a model: « je suis claude », « moi c'est mistral ».
+  {
+    code: 'ai_disclosure',
+    pattern:
+      /\b(je (ne )?suis|j'?suis|jsuis|chui|chuis|moi c'est|ici c'est)( qu'| que | juste | seulement | )(claude|mistral|grok|gemini|llama|copilot|deepseek|siri|alexa)\b/,
+  },
+  // A model, a program, a machine, or something not real, said of herself. A model with a trade after it (« un
+  // modèle photo ») is a job.
+  {
+    code: 'ai_disclosure',
+    pattern: new RegExp(
+      [
+        `\\b(je (ne )?suis|j'?suis|jsuis|chui|chuis|chu)( qu'| que | juste | seulement | rien qu'| rien d'autre qu')?\\s?(une? |un simple |une simple )(modele|programme|logiciel|application|appli|simulation)(?! (photo|pour|nue?|lingerie|charme|glamour|insta|instagram|en |de |d'))(?![a-z])`,
+        `\\b(je (ne )?suis|j'?suis|jsuis|chui|chuis|chu)( qu'| que | juste | seulement | )(une? |ta |ton )?((fille|femme|meuf|personne|copine|creature|amie) )?(artificielle?|virtuelle?|simulee?|generee? par)(?![a-z])`,
+      ].join('|'),
+    ),
+  },
+  // Saying that something else writes for her: « ce compte est géré par une IA », « mon assistant IA répond pour
+  // moi ».
+  {
+    code: 'ai_disclosure',
+    pattern: new RegExp(
+      [
+        `\\b(gere|geree|geres|tenu|tenue|anime|animee|pilote|pilotee|ecrit|ecrits|redige|rediges|automatise|automatisee)( \\w+)? (par|avec) (une? |l'|mon |ma |un )?${AI_WORD}(?![a-z])`,
+        `\\b(assistante?|agent|outil|logiciel) (ia|ai|virtuel|virtuelle)(?![a-z])`,
+        `\\b(une?|l'|mon|ma) ?(ia|bot|chatbot|robot|assistante?) (qui )?(repond|repondent|ecrit|parle|gere|tient|redige)s?\\b`,
+      ].join('|'),
+    ),
   },
   // Said of herself in the third person: « tu parles à une IA », « c'est un bot qui te répond ».
   {
@@ -128,6 +162,8 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
         `\\b(viens|venez|tu (peux|pourrais|veux) venir|passe|passes) me (voir|rejoindre|retrouver)(?!${ONLINE})\\b`,
         `\\bon (se|pourrait se|peut se|va se) (voit|voir|retrouve|retrouver|rejoint|rejoindre|rencontre|rencontrer) (a|au|aux|chez|dans|devant|en ville|quand tu veux|ou tu veux|ce soir|demain|cette semaine|ce week-end)(?!${ONLINE})\\b`,
         `\\bje t'?attends? (a|au|chez|devant)(?!${ONLINE})\\b`,
+        `\\bje te (retrouve|retrouverai|rejoins|rejoindrai|recois|recevrai) (a|au|aux|chez|devant|dans|en bas de)(?!${ONLINE})\\b`,
+        `\\b(viens|rejoins|retrouve)[ -]moi (a|au|dans|devant) (l'|un |une |mon |ma |la )?(hotel|airbnb|motel|chambre|gare)\\b`,
         `\\bon (se fait|prend|boit) (un|une) (cafe|verre|resto|date|diner|apero|biere)\\b`,
         `\\bje (viens|descends|monte|serai) (a|sur) ${CITY}\\b`,
         `\\b(come|coming) (to )?see me\\b|\\b(let'?s|we (can|could|should)) meet\\b|\\bmeet me\\b`,
@@ -153,6 +189,19 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   { code: 'contact_info', pattern: /\b[\w.+-]+ ?@ ?[\w-]+ ?\. ?[\w.]+\b/ },
   { code: 'contact_info', pattern: /(\+?\d[\s.,/-]{0,2}){9,}/ },
   { code: 'contact_info', pattern: /\b(snap(chat)?|whatsapp|insta(gram)?|telegram)\b/ },
+  // Another platform, where he could find or pay her elsewhere.
+  {
+    code: 'contact_info',
+    pattern:
+      /\b(fansly|discord|kik|only ?fans|mym( ?fans)?|linktree|beacons|allmylinks|patreon|fanvue|loyalfans)\b/,
+  },
+  // A link without its scheme: « monsite.com », « linktr.ee/lina », « t.me/lina ». Endings that are also French words
+  // (« .me », « .co », « .de ») are read only with a path.
+  {
+    code: 'contact_info',
+    pattern:
+      /(?<![\w@./-])[a-z0-9][a-z0-9-]*\.(com|fr|net|org|io|ly|ee|link|bio|tv|app|xyz|gg|page|site|club|fans|info|ch|eu|be|lu)\b|(?<![\w@./-])[a-z0-9][a-z0-9-]*\.(me|co|de|es|it|to|cc)\/\S+/,
+  },
   // « lina at gmail dot com », « lina (arobase) gmail point fr », « lina @ gmail point com ». A word on each side:
   // « ma chatte point ça » is not an address.
   {
@@ -500,16 +549,21 @@ function closedQuestion(turn: readonly string[]): boolean | undefined {
 }
 
 /**
- * Against what she already sent him: a bubble sent again, the same opening a third time in a row, a third closed
- * question in a row in her last turns. Soft: they serve the calibration first (P3-13).
+ * Against what she already sent him. A bubble sent again blocks: the same line twice to the same fan reads as a
+ * machine (recette AGR-05). The same opening a third time in a row, a third closed question in a row in her last
+ * turns stay soft: they serve the calibration first (P3-13).
  */
-function againstHistory(bubbles: readonly string[], turns: readonly (readonly string[])[]): GuardViolation[] {
+function againstHistory(
+  bubbles: readonly string[],
+  turns: readonly (readonly string[])[],
+  sentBefore: readonly string[],
+): GuardViolation[] {
   const violations: GuardViolation[] = [];
-  const sent = new Set(turns.flat().map(plain));
+  const sent = new Set([...turns.flat(), ...sentBefore].map(plain));
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = plain(bubble);
     if (text.length >= REPEATED_MIN_CHARS && sent.has(text)) {
-      violations.push({ code: 'repetition', severity: 'soft', bubbleIndex, match: text });
+      violations.push({ code: 'repetition', severity: 'blocking', bubbleIndex, match: text });
     }
   });
   const opening = openingOf(bubbles);
@@ -676,7 +730,8 @@ export function checkVoiceOutput(
     }
   });
   violations.push(...wholeMessage(bubbles, forbidden, violations));
-  if (context.previousTurns !== undefined) violations.push(...againstHistory(bubbles, context.previousTurns));
+  if (context.previousTurns !== undefined)
+    violations.push(...againstHistory(bubbles, context.previousTurns, context.sentBefore ?? []));
   if (bubbles.length > settings.maxBubbles) violations.push({ code: 'too_many_bubbles', severity: 'soft' });
   return violations;
 }

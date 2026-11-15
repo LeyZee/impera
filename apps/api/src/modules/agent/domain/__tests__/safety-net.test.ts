@@ -21,6 +21,16 @@ describe('safetySigns (recette AGT-01)', () => {
     'je suis en seconde',
     'j’ai pas 18 ans',
     'pas encore majeur',
+    'j’ai seize ans',
+    'jai dix-sept ans',
+    'moi 16 piges',
+    'je vais avoir 18 ans le mois prochain',
+    'bientôt 18 ans',
+    'en 4e',
+    'je suis lycéen',
+    'lycéenne et toi ?',
+    'je suis au lycée',
+    'je suis en terminale',
   ])('reads a minor in « %s »', (text) => {
     expect(safetySigns(text)).toEqual(['minor_suspected']);
   });
@@ -35,6 +45,9 @@ describe('safetySigns (recette AGT-01)', () => {
     'je vais me faire du mal',
     'mettre fin à mes jours',
     'I want to die',
+    'j’ai envie de me foutre en l’air',
+    'je pense à m’ouvrir les veines',
+    'j’ai des idées noires ce soir',
   ])('reads self-harm in « %s »', (text) => {
     expect(safetySigns(text)).toEqual(['self_harm']);
   });
@@ -50,8 +63,21 @@ describe('safetySigns (recette AGT-01)', () => {
     'je suis en seconde position dans la file',
     'il est 16h, tu fais quoi ?',
     'i’m 18',
+    'j’ai 30 piges',
+    'quand j’étais lycéen j’étais timide',
+    'je suis en 3e année de licence',
+    'on est arrivés en 3e position',
+    'je suis né en 1994',
+    'je suis en première ligne au boulot',
   ])('stays quiet on « %s »', (text) => {
     expect(safetySigns(text)).toEqual([]);
+  });
+
+  it('reads a birth year against the current year', () => {
+    const now = new Date('2026-11-15T12:00:00Z');
+    expect(safetySigns('je suis né en 2011', now)).toEqual(['minor_suspected']);
+    expect(safetySigns('née en 2008', now)).toEqual(['minor_suspected']);
+    expect(safetySigns('je suis né en 2007', now)).toEqual([]);
   });
 
   it('says both, the minor first, when he says both', () => {

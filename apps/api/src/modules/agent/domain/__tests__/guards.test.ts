@@ -100,6 +100,54 @@ describe('voice guards', () => {
     expect(codes(['Écris-moi à lina@example.com'])).toEqual(['contact_info']);
     expect(codes(['Mon 06 12 34 56 78'])).toEqual(['contact_info']);
     expect(codes(['Regarde https://example.com'])).toEqual(['contact_info']);
+    for (const elsewhere of [
+      'va voir monsite.com',
+      'tout est sur linktr.ee/lina',
+      'écris-moi sur t.me/lina',
+      'je suis aussi sur fansly',
+      'viens sur discord',
+      'ajoute moi sur kik',
+      'mon onlyfans est plus complet',
+      'je suis sur mym',
+    ]) {
+      expect(codes([elsewhere]), elsewhere).toEqual(['contact_info']);
+    }
+    for (const plain of ['Bon.Je file', 'ok.Merci toi', 'à 20 h.Tu es là ?', 'on se parle 1.5 h']) {
+      expect(codes([plain]), plain).toEqual([]);
+    }
+  });
+
+  it('blocks a concrete meeting place, and lets her bed and the platform through', () => {
+    expect(codes(['je te retrouve à l’hôtel'])).toEqual(['meeting_promise']);
+    expect(codes(['rejoins-moi à l’hôtel ce soir'])).toEqual(['meeting_promise']);
+    expect(codes(['je te reçois chez moi'])).toEqual(['meeting_promise']);
+    expect(codes(['je te retrouve dans mes messages ce soir'])).toEqual([]);
+    expect(codes(['j’ai bossé dans un hôtel avant'])).toEqual([]);
+  });
+
+  it('blocks her naming herself a model, a program, or something not real', () => {
+    for (const admission of [
+      'je suis claude',
+      'moi c’est mistral',
+      'je ne suis qu’un modèle',
+      'je suis juste un programme',
+      'je suis artificielle',
+      'je suis ta copine virtuelle',
+      'ce compte est géré par une IA',
+      'mon assistant IA répond pour moi',
+      'c’est mon assistante qui répond',
+    ]) {
+      expect(codes([admission]), admission).toEqual(['ai_disclosure']);
+    }
+    for (const plain of [
+      'je suis modèle photo',
+      'je suis un modèle de patience 😇',
+      'je suis une machine au lit',
+      'je l’ai écrit pour toi',
+      'Claude est mon voisin',
+    ]) {
+      expect(codes([plain]), plain).toEqual([]);
+    }
   });
 
   it('blocks the persona forbidden terms, accents and case ignored', () => {

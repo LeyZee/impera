@@ -352,7 +352,7 @@ describe('createDraftComposer', () => {
     });
   });
 
-  it('holds a media she says she sent, and warns on a bubble she already sent him (P3-13)', async () => {
+  it('holds a media she says she sent, and a bubble she already sent him (P3-13, recette AGR-05)', async () => {
     const announced = composer({ voice: { bubbles: ['Je t’envoie une photo 📸'] } });
     expect(await announced.draftComposer.compose(INPUT)).toMatchObject({
       kind: 'held',
@@ -369,8 +369,9 @@ describe('createDraftComposer', () => {
       ...INPUT.history,
     ];
     expect(await again.draftComposer.compose({ ...INPUT, history })).toMatchObject({
-      kind: 'draft',
-      softViolations: ['repetition'],
+      kind: 'held',
+      reason: 'guard_blocked',
+      detail: ['repetition'],
     });
   });
 
