@@ -18,6 +18,7 @@ import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
 import { RevealHelpPage } from './pwa/RevealHelpPage';
 import { CreatorRewardRevealGate } from './rewards/CreatorRewardRevealGate';
+import { playsTheGame } from './rewards/api';
 import { parseCalendarSearch } from './scheduling/calendar';
 import { myAwayOf } from './scheduling/model';
 import { AgendaPage } from './screens/agenda/AgendaPage';
@@ -40,6 +41,7 @@ import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { MyPreferencesPage } from './screens/me/MyPreferencesPage';
 import { MyProfilePage } from './screens/me/MyProfilePage';
 import { MySecurityPage } from './screens/me/MySecurityPage';
+import { MyTrophiesPage } from './screens/me/MyTrophiesPage';
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
 import { ExportsPage } from './screens/pay/ExportsPage';
@@ -718,6 +720,21 @@ const meProfile = createRoute({
     return <MyProfilePage user={user} />;
   },
 });
+// Moi › Trophées (ADR 0108): the chatter's trophy case, or the creator's; anyone else is sent to his profile.
+const meTrophies = createRoute({
+  getParentRoute: () => me,
+  path: '/trophees',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'creator' && !playsTheGame(context.user)) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: function MyTrophies() {
+    const { user } = rootRoute.useRouteContext();
+    return <MyTrophiesPage user={user} />;
+  },
+});
 const meFile = createRoute({
   getParentRoute: () => me,
   path: '/dossier',
@@ -1041,7 +1058,17 @@ const routeTree = rootRoute.addChildren([
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile, teamReveal]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
-  me.addChildren([meIndex, mePersona, meProfile, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),
+  me.addChildren([
+    meIndex,
+    mePersona,
+    meProfile,
+    meTrophies,
+    meFile,
+    meInvoices,
+    meCalendar,
+    meSecurity,
+    mePreferences,
+  ]),
   accountSecurity,
   settings.addChildren([
     settingsIndex,
