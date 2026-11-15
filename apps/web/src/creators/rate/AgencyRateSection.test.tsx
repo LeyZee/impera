@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
-import { CreateCreatorAgencyRateBodySchema, CreatorIdSchema } from '@impera/contracts';
+import {
+  CreateCreatorAgencyRateBodySchema,
+  CreatorIdSchema,
+  type CreatorAgencyRateList,
+} from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AgencyRateSection } from './AgencyRateSection';
@@ -26,11 +32,26 @@ const apiError = (code: string): unknown => ({
  * A fake `/v1/creators/:id/agency-rates` that keeps what it is sent, as the server would: the one in force is the
  * latest day at or before today. `refuse` answers a POST with that status and code instead.
  */
-function serve(rates: Rate[], refuse?: { status: number; code: string }): unknown[] {
+const NOTHING_READ: CreatorAgencyRateList['observed'] = {
+  linked: false,
+  last30Days: { from: '2026-10-05', to: TODAY, shares: [] },
+  fortnights: [],
+};
+
+function serve(
+  rates: Rate[],
+  refuse?: { status: number; code: string },
+  observed: object = NOTHING_READ,
+): unknown[] {
   const posts: unknown[] = [];
   const list = () => {
     const sorted = rates.toSorted((a, b) => b.fromDay.localeCompare(a.fromDay));
-    return { today: TODAY, current: sorted.find((one) => one.fromDay <= TODAY) ?? null, rates: sorted };
+    return {
+      today: TODAY,
+      current: sorted.find((one) => one.fromDay <= TODAY) ?? null,
+      rates: sorted,
+      observed,
+    };
   };
   vi.stubGlobal(
     'fetch',
@@ -54,9 +75,17 @@ function serve(rates: Rate[], refuse?: { status: number; code: string }): unknow
 
 function renderSection(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // A router of its own: the card links to Réglages › Ventes to link Reveal.
+  const root = createRootRoute({
+    component: (): JSX.Element => <AgencyRateSection creatorId={CREATOR} creatorName="Anna" />,
+  });
+  const router = createRouter({
+    routeTree: root,
+    history: createMemoryHistory({ initialEntries: ['/creatrices'] }),
+  });
   render(
     <QueryClientProvider client={client}>
-      <AgencyRateSection creatorId={CREATOR} creatorName="Anna" />
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }
@@ -75,9 +104,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     serve([]);
     renderSection();
     expect(
-      await screen.findByText(
-        'À régler : aucun pourcentage pour Anna, aucune part de l’agence n’est montrée.',
-      ),
+      await screen.findByText('À régler : relie Reveal ou règle un pourcentage pour Anna.'),
     ).toBeDefined();
     // Typed, never the system's calendar: a day before today is refused in words.
     type('À partir du', '2/11/2026');
@@ -85,6 +112,12 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     type('À partir du', TODAY);
     expect(screen.queryByText(/au plus tôt\.$/u)).toBeNull();
     expect(screen.queryByText('Historique')).toBeNull();
+    // Nothing linked: nothing is read, and the card says where to link Reveal.
+    const read = screen.getByRole('region', { name: 'Lue chez Reveal' });
+    expect(within(read).getByText(/^Aucun compte Reveal relié : aucune part lue\./u)).toBeDefined();
+    expect(within(read).getByRole('link', { name: 'Relier Reveal' }).getAttribute('href')).toBe(
+      '/reglages/ventes',
+    );
   });
 
   it('has the owner read the whole sentence before saving, then shows it in force', async () => {
@@ -164,6 +197,64 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
       'disabled',
       true,
     );
+  });
+
+  it('shows the agency’s share read at Reveal first, the percentage optional (ADR 0054 § 4 and § 6)', async () => {
+    const share = {
+      platform: 'reveal',
+      platformAccountId: '0192f3a0-0000-7000-8000-0000000000a1',
+      currency: 'EUR',
+      netMinor: 1800,
+      agencyMinor: 700,
+      agencyBps: 3889,
+    };
+    serve([], undefined, {
+      linked: true,
+      last30Days: { from: '2026-10-05', to: TODAY, shares: [share] },
+      fortnights: [
+        { from: '2026-11-01', to: TODAY, shares: [share] },
+        { from: '2026-10-16', to: '2026-10-31', shares: [] },
+        { from: '2026-10-01', to: '2026-10-15', shares: [] },
+      ],
+    });
+    renderSection();
+    expect(
+      await screen.findByText(
+        /^Lue chez Reveal : 38,89\s% du net sur 30 jours\. Le pourcentage est facultatif\.$/u,
+      ),
+    ).toBeDefined();
+    expect(screen.queryByText(/^À régler/u)).toBeNull();
+    const read = screen.getByRole('region', { name: 'Lue chez Reveal' });
+    expect(within(read).getAllByText(/^38,89\s% du net$/u)).toHaveLength(2);
+    expect(within(read).getAllByText(/^7,00\s€ pour l’agence sur 18,00\s€ nets$/u)).toHaveLength(2);
+    expect(within(read).getByText('du 16/10 au 31/10')).toBeDefined();
+    expect(within(read).getAllByText('aucune vente')).toHaveLength(2);
+    expect(screen.getByText('Son pourcentage, facultatif')).toBeDefined();
+    // Her one account in euros: the card's title names Reveal, no line repeats it.
+    expect(within(read).queryByText('Reveal')).toBeNull();
+  });
+
+  it('keeps the share read first when a percentage is set, and is not « à régler » for a linked account without a sale', async () => {
+    serve(
+      [
+        {
+          id: '0192f3a0-0000-7000-8000-0000000000f1',
+          creatorId: CREATOR,
+          fromDay: '2026-10-01',
+          agencyBps: 3500,
+          createdAt: '2026-10-01T08:00:00.000Z',
+        },
+      ],
+      undefined,
+      { ...NOTHING_READ, linked: true },
+    );
+    renderSection();
+    expect(
+      await screen.findByText(
+        /^Aucune vente lue chez Reveal sur 30 jours\. Pourcentage réglé : 35\s% depuis le 01\/10\/2026\.$/u,
+      ),
+    ).toBeDefined();
+    expect(screen.getByText('Nouveau pourcentage, facultatif')).toBeDefined();
   });
 
   it('says the server does not answer, with a way to try again', async () => {

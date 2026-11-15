@@ -1,4 +1,5 @@
 import type {
+  CreatorAgencyRateList,
   AccountPayRulesId,
   CreatorAgencyRateId,
   CalendarView,
@@ -219,6 +220,17 @@ export interface PlanningStore {
     status: TeamMemberStatus;
     shifts: (StoredShift & { platform: Platform; handle: string })[];
   } | null>;
+  /**
+   * The member's own shifts not cancelled that began in [`since`, `until`], the oldest first, read as the member
+   * himself creator by creator: when each began and ended, or will, nothing else. Empty for an account with no member
+   * row (ADR 0104 § 14).
+   */
+  ownShiftsBegun(
+    actor: UserId,
+    creatorIds: readonly CreatorId[],
+    since: Date,
+    until: Date,
+  ): Promise<{ startsAt: Date; endsAt: Date }[]>;
   /** Owner and active manager: each shift covering `at`, of an active member, with that member, on what he plans. */
   onDuty(
     actor: UserId,
@@ -650,8 +662,15 @@ interface NewAgencyRate {
  * transaction.
  */
 export interface AgencyRatesStore {
-  /** Her percentages newest first, and the day it is at `now` in the agency's zone. */
-  list(actor: UserId, creatorId: CreatorId, now: Date): Promise<{ today: string; rates: StoredAgencyRate[] }>;
+  /**
+   * Her percentages newest first, the day it is at `now` in the agency's zone, and the agency's share read on the
+   * register over the windows of ADR 0054 § 4, in the same transaction.
+   */
+  list(
+    actor: UserId,
+    creatorId: CreatorId,
+    now: Date,
+  ): Promise<{ today: string; rates: StoredAgencyRate[]; observed: CreatorAgencyRateList['observed'] }>;
   /** Owner; `created` is false when the same percentage was already recorded. */
   create(
     actor: Actor,

@@ -87,3 +87,26 @@ export function streakOf(records: readonly DayRecord[], today: string): Streak {
   const next = STREAK_MILESTONES.find((step) => days < step) ?? null;
   return { days, jokerUsed: savedByJoker, atRisk: todayOutcome === 'missed' && days > 0, milestone, next };
 }
+
+/**
+ * The longest streak her days held (ADR 0107 § 1): her streak as it stood at the end of each of them, the best kept.
+ * Her medals follow it, so a medal reached stays reached when the streak falls back.
+ */
+export function bestStreakOf(records: readonly DayRecord[], today: string): number {
+  let best = 0;
+  for (const { day } of records) {
+    if (day > today) continue;
+    best = Math.max(
+      best,
+      streakOf(
+        records.filter((record) => record.day <= day),
+        day,
+      ).days,
+    );
+  }
+  return best;
+}
+
+/** One of her days was « parfaite » (ADR 0107 § 3, « Journée parfaite »). */
+export const anyPerfectDay = (records: readonly DayRecord[]): boolean =>
+  records.some((record) => dayOutcome(record) === 'perfect');

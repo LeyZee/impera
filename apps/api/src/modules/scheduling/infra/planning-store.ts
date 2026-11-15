@@ -493,6 +493,39 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
         SNAPSHOT_READ,
       ),
 
+    // As `memberShifts`: his own rows on each creator, never the admin connection (audit RLS of the 06/11).
+    ownShiftsBegun: (actor, creatorIds, since, until) =>
+      withMember(
+        db,
+        actor,
+        async (tx) => {
+          const [member] = await tx
+            .select({ id: teamMembers.id })
+            .from(teamMembers)
+            .where(eq(teamMembers.userId, actor));
+          if (member === undefined) return [];
+          const begun: { startsAt: Date; endsAt: Date }[] = [];
+          for (const creatorId of creatorIds) {
+            await enterCreator(tx, creatorId, creatorIds);
+            begun.push(
+              ...(await tx
+                .select({ startsAt: shifts.startsAt, endsAt: shifts.endsAt })
+                .from(shifts)
+                .where(
+                  and(
+                    eq(shifts.memberId, member.id),
+                    sql`${shifts.cancelledAt} is null`,
+                    sql`${shifts.startsAt} >= ${since}`,
+                    sql`${shifts.startsAt} <= ${until}`,
+                  ),
+                )),
+            );
+          }
+          return begun.toSorted((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+        },
+        SNAPSHOT_READ,
+      ),
+
     onDuty: (actor, creatorIds, at) =>
       withMember(
         db,

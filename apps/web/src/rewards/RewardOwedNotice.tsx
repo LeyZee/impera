@@ -7,8 +7,11 @@ import { playsTheGame, useMyTrophyCase } from './api';
 /** Where a reveal plays by itself (`RewardRevealGate`): the notice has nothing to say there. */
 const REVEAL_SCREENS = ['/aujourdhui', '/commissions'] as const;
 
-const isRevealScreen = (pathname: string): boolean =>
-  REVEAL_SCREENS.some((screen) => pathname === screen || pathname === `${screen}/`);
+/** Where the owed gain already shows, marked « Nouveau » and opened at a touch: Moi › Trophées (ADR 0108). */
+const SHOWN_SCREENS = ['/moi/trophees'] as const;
+
+const isQuietScreen = (pathname: string): boolean =>
+  [...REVEAL_SCREENS, ...SHOWN_SCREENS].some((screen) => pathname === screen || pathname === `${screen}/`);
 
 /**
  * A gain noted while the chatter is elsewhere, on a conversation above all: a small notice says so and « Voir » takes
@@ -21,7 +24,7 @@ export function RewardOwedNotice({ user, pathname }: { user: Me; pathname: strin
   const owed = trophyCase === undefined ? 0 : owedReveals(trophyCase).length;
   return (
     <div className="rw-owed-region" role="status">
-      {plays && owed > 0 && !isRevealScreen(pathname) ? (
+      {plays && owed > 0 && !isQuietScreen(pathname) ? (
         <p className="rw-owed nv-glass nv-glass--thick">
           <span className="rw-owed__dot" aria-hidden="true" />
           <span>{owed === 1 ? 'Un gain t’attend.' : `${String(owed)} gains t’attendent.`}</span>

@@ -23,6 +23,7 @@ import { Avatar, StatusPill } from './parts';
 import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
 import { useGrowingArea } from '@/lib/growing-area';
+import { MemberGameBlock } from '@/rewards/MemberGameBlock';
 import { cityOf } from '@/scheduling/time';
 import { useAgencyToday } from '@/screens/pay/data';
 import { MemberSetupBlock } from '@/setup/SetupBlocks';
@@ -284,6 +285,11 @@ export function MemberSheet({
           ) : null}
         </section>
       )}
+
+      {/* The owner and a manager do not play: they read his rank, streak and trophies here (ADR 0104 § 20). */}
+      {member.teamRole === 'chatter' && !gone && !isSelf ? (
+        <MemberGameBlock memberId={member.id} name={member.displayName} />
+      ) : null}
 
       {isSelf ? null : <Notes memberId={member.id} name={member.displayName} />}
 

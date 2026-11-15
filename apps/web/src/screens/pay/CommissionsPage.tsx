@@ -56,6 +56,7 @@ import {
   signedAmountText,
 } from '@/reports/model';
 import { Medal } from '@/rewards/Medal';
+import { MyRankCard } from '@/rewards/MyRankCard';
 import { RewardRevealGate } from '@/rewards/RewardRevealGate';
 import { tierMedals } from '@/rewards/metals';
 import { platformName } from '@/scheduling/model';
@@ -261,6 +262,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
           )}
           <MyDaysCard />
           {plain ? <MyFiguresAside /> : null}
+          {plain ? <MyRankCard user={user} /> : null}
         </div>
         {plain ? null : (
           <div className="py-me__col">
@@ -333,6 +335,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
               </div>
             </Panel>
             <MyFiguresAside />
+            <MyRankCard user={user} />
           </div>
         )}
       </div>

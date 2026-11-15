@@ -201,6 +201,7 @@ const SCREENS = {
   '/paie/exports': 'Exports',
   '/commissions/factures': 'Factures',
   '/moi/profil': 'Profil',
+  '/moi/trophees': 'Trophées',
   '/moi/dossier': 'Dossier',
   '/moi/persona': 'Persona',
   '/moi/factures': 'Factures',

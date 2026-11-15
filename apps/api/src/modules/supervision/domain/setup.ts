@@ -35,6 +35,11 @@ export interface CreatorSetupFacts {
   readonly hasActivePersona: boolean;
   /** An agency percentage in force today or earlier. */
   readonly hasAgencyRate: boolean;
+  /**
+   * One of her Reveal accounts is linked to the sales feed: the agency's share is read there, the percentage is
+   * optional (ADR 0054 § 7).
+   */
+  readonly hasLinkedReveal: boolean;
   /** Her own account. */
   readonly access: Invitation;
   /** An urgent alert reaches a group for her now; `null` when Telegram is off (no key). */
@@ -64,7 +69,12 @@ export function creatorSetup(facts: CreatorSetupFacts): CreatorSetupStep[] {
   return [
     step('platform_account', doneIf(accounts > 0)),
     step('persona', doneIf(facts.hasActivePersona)),
-    step('agency_rate', doneIf(facts.hasAgencyRate)),
+    // Done by a percentage, or by her share read at Reveal: the percentage is then optional (ADR 0054 § 7).
+    step(
+      'agency_rate',
+      doneIf(facts.hasAgencyRate || facts.hasLinkedReveal),
+      !facts.hasAgencyRate && facts.hasLinkedReveal ? { kind: 'share_read_on_platform' } : null,
+    ),
     invitationStep('access', facts.access),
     // Every account: one without rules gets its end-of-shift reports refused.
     step(
