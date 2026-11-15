@@ -25,8 +25,11 @@ export interface ImportableMember {
   readonly lastName: string;
   /** His account's login e-mail. */
   readonly email: string;
-  /** `left` members are never proposed. */
-  readonly active: boolean;
+  /**
+   * The day he left the team (ADR 0072), `null` while he is in it. A member who left is proposed on his e-mail alone,
+   * marked as departed: his sales from before his departure go on his final statement; never by name, never invited.
+   */
+  readonly leftOn: string | null;
 }
 
 /** Who looks at the review: the owner, or an active manager with his own member record. */
@@ -51,29 +54,45 @@ const personKey = (first: string, last: string): string => creatorNameKey(`${fir
 const isBotName = (chatter: PlatformChatter): boolean =>
   creatorNameKey(`${chatter.firstName} ${chatter.lastName}`) === 'bot';
 
+/** The e-mail of an agency account (not a provider's) is a member's, whether he is still in the team or left. */
+const memberOfEmail = (
+  chatter: PlatformChatter,
+  members: readonly ImportableMember[],
+): ImportableMember | undefined => {
+  if (chatter.email === null || chatter.isExternal) return undefined;
+  const key = emailKey(chatter.email);
+  return (
+    members.find((member) => member.leftOn === null && emailKey(member.email) === key) ??
+    members.find((member) => emailKey(member.email) === key)
+  );
+};
+
 /**
  * The proposal for one account without a link and not dismissed (ADR 0076 § 1), in this order: the same e-mail, the
  * captured session's account or an API key's bot, the same first and last names, then an invitation for an agency
  * member with an e-mail, else nobody. A unique match is ticked in advance; two members of the same name, or a name only
  * read as « bot », are proposed unticked. A provider's account (`isExternal`) is never invited (§ 2).
+ *
+ * The same e-mail as a member who left gives that member, marked as departed and unticked: his sales from before his
+ * departure count on his final statement (ADR 0072), and inviting his e-mail again would fail. An account the platform
+ * removed (`removedAt`) is not a newcomer: it gets the e-mail's member or nothing, never an invitation (`null`).
  */
-export function proposeFor(chatter: PlatformChatter, inputs: SuggestionInputs): Proposal {
-  const active = inputs.members.filter((member) => member.active);
-  if (chatter.email !== null && !chatter.isExternal) {
-    const key = emailKey(chatter.email);
-    const same = active.find((member) => emailKey(member.email) === key);
-    if (same !== undefined) {
-      return {
-        suggestion: {
-          kind: 'member',
-          memberId: same.memberId,
-          memberDisplayName: same.displayName,
-          match: 'email',
-        },
-        preselected: true,
-      };
-    }
+export function proposeFor(chatter: PlatformChatter, inputs: SuggestionInputs): Proposal | null {
+  const same = memberOfEmail(chatter, inputs.members);
+  if (same !== undefined) {
+    return {
+      suggestion: {
+        kind: 'member',
+        memberId: same.memberId,
+        memberDisplayName: same.displayName,
+        match: 'email',
+        departedOn: same.leftOn,
+      },
+      preselected: same.leftOn === null,
+    };
   }
+  if (chatter.removedAt !== null) return null;
+  const active = inputs.members.filter((member) => member.leftOn === null);
   if (
     !chatter.isExternal &&
     inputs.sessionChatterId !== null &&
@@ -92,6 +111,7 @@ export function proposeFor(chatter: PlatformChatter, inputs: SuggestionInputs): 
         memberId: first.memberId,
         memberDisplayName: first.displayName,
         match: 'name',
+        departedOn: null,
       },
       preselected: named.length === 1,
     };
@@ -111,6 +131,11 @@ export interface RowRights {
   readonly link: TeamLink | null;
   /** The platform lists the account now; a linked account it no longer lists can only lose its link. */
   readonly listed: boolean;
+  /**
+   * An invitation makes sense: not an account the platform removed (it is no newcomer), nor one whose e-mail is
+   * already a member's, in the team or gone (it would be refused).
+   */
+  readonly invitable: boolean;
 }
 
 /**
@@ -129,7 +154,7 @@ export function actionsFor(row: RowRights, viewer: TeamImportViewer): TeamImport
   // A provider's account is linked to a member or to nobody, never to the agent (§ 2).
   if (!external) actions.push('link_agent');
   actions.push('link_none');
-  if (row.link === null && !external && row.chatter.email !== null) actions.push('invite');
+  if (row.link === null && !external && row.chatter.email !== null && row.invitable) actions.push('invite');
   if (row.link === null) actions.push('dismiss');
   return actions;
 }
@@ -233,6 +258,7 @@ export function teamImportOverview(context: TeamImportContext, live: LiveTeam): 
   const rows = [...listed, ...gone].map((chatter) => rowOf(chatter, context, live, members, seen));
   return {
     rows,
+    // An account the platform removed is no newcomer (§ 6): listed, to be linked or dismissed, never counted.
     newCount: rows.filter(
       (row) =>
         row.link === null && row.dismissedAt === null && !row.chatter.isBot && row.chatter.removedAt === null,
@@ -260,6 +286,7 @@ function rowOf(
   const proposal = open
     ? proposeFor(chatter, { sessionChatterId: live.sessionChatterId, members: context.members })
     : null;
+  const invitable = chatter.removedAt === null && memberOfEmail(chatter, context.members) === undefined;
   const models = chatter.platformModelIds.map((platformModelId) => {
     const creator = context.modelCreators.get(platformModelId);
     return {
@@ -286,7 +313,7 @@ function rowOf(
     dismissedAt: dismissed ? (review.decidedAt?.toISOString() ?? null) : null,
     suggestion: proposal?.suggestion ?? null,
     preselected: proposal?.preselected ?? false,
-    actions: actionsFor({ chatter, link: link ?? null, listed: seen.has(id) }, context.viewer),
+    actions: actionsFor({ chatter, link: link ?? null, listed: seen.has(id), invitable }, context.viewer),
     models,
     modelGap: {
       inImperaOnly:
@@ -306,7 +333,7 @@ function rowOf(
               .map((model) => model.handle),
     },
     removal:
-      linkedMember?.active === true && (removedAt !== null || absent)
+      linkedMember?.leftOn === null && (removedAt !== null || absent)
         ? { memberId: linkedMember.memberId, removedAt, absent }
         : null,
   };

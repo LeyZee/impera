@@ -294,6 +294,27 @@ export interface RetentionStore {
   ): Promise<boolean>;
   /** `content_media_erase_failed`, once per medium and date: the next run tries again. */
   eraseFailed(original: DueOriginal, now: Date, correlationId: string): Promise<void>;
+  /** The reduced pictures still held of each creator archived before `archivedBefore` (ADR 0089). */
+  dueThumbnails(archivedBefore: Date): Promise<DueThumbnail[]>;
+  /**
+   * The reduced picture erased by `remove`, then its key emptied, under the medium's row lock: checked again under it,
+   * one whose creator was reopened meanwhile, or already emptied, is left as it is (`false`). A `remove` that throws
+   * leaves it held.
+   */
+  eraseThumbnail(
+    thumbnail: DueThumbnail,
+    archivedBefore: Date,
+    remove: (key: string) => Promise<void>,
+  ): Promise<boolean>;
+  /** One audit line for a creator whose reduced pictures went this run: how many, never a key (ADR 0089 § 5). */
+  thumbnailsErased(creatorId: string, count: number): Promise<void>;
+}
+
+/** A reduced picture of an archived creator's medium that leaves the storage now (ADR 0089). */
+export interface DueThumbnail {
+  readonly mediaAssetId: string;
+  readonly creatorId: string;
+  readonly thumbnailKey: string;
 }
 
 /** The agency's side (`withTenantMember`): the owner and an active manager; a chatter is refused before any read. */
@@ -351,6 +372,31 @@ export interface AgencyContentStore {
    * its audit line; her originals of it go 30 days later (ADR 0044 § 2). Refused like `sentDrop`.
    */
   confirmDropExport(creatorId: string, userId: string, dropId: string, now: Date): Promise<ContentDrop>;
+  /**
+   * Her drops not withdrawn, newest first, at most `limit`, after the drop `after` when given (ADR 0026 § 1, MCP): a drop
+   * `after` she does not have gives none.
+   */
+  dropsPage(
+    creatorId: string,
+    userId: string,
+    after: string | null,
+    limit: number,
+  ): Promise<readonly ContentDrop[]>;
+  /** Her scripts asked and dropped (not withdrawn), newest first, each with what its request fixed (ADR 0026 § 1, MCP). */
+  scriptDrops(creatorId: string, userId: string): Promise<readonly ScriptDropEntry[]>;
+}
+
+/** A script drop of hers and its request: the frozen version it shoots, the moment and the day the request fixed. */
+export interface ScriptDropEntry {
+  readonly dropId: string;
+  readonly scriptNumber: number | null;
+  readonly state: DropState;
+  readonly exportedAt: Date | null;
+  readonly createdAt: Date;
+  readonly dueOn: string;
+  /** `null` for a script asked before SC-02 lot b, which names no frozen version. */
+  readonly versionId: string | null;
+  readonly moment: ShotMoment | null;
 }
 
 /** A sent script's facts for its archive (SC-03 c). */

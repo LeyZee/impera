@@ -221,3 +221,19 @@ export async function checkProviderKeys(
       .map((credential) => credential.provider),
   };
 }
+
+/**
+ * The saved keys this copy of CREDENTIALS_ENCRYPTION_KEYS opens, by service, for `pnpm evals --key-from-crm`: the owner
+ * pastes a key in Réglages › Modèles IA and never in a file (ADR 0016), so a run on his own computer reads it where
+ * he put it. Read only; a key that does not open is left out. The caller keeps the values in memory and never shows,
+ * logs or writes one.
+ */
+export async function readSavedProviderKeys(
+  adminDb: Database,
+  keys: readonly EncryptionKey[],
+): Promise<Partial<Record<AiProvider, string>>> {
+  const saved = await createPostgresCredentialStore({ adminDb, keys }).list();
+  return Object.fromEntries(
+    saved.flatMap((credential) => (credential.key === null ? [] : [[credential.provider, credential.key]])),
+  );
+}

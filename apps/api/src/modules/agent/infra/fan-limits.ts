@@ -42,6 +42,12 @@ export function createFanLimits(
         const value = { reason: 'money_trouble', since: at.toISOString() } satisfies FanFlags['salesFrozen'];
         await fans.setFlagIfUnset(creator, fan, { flag: 'salesFrozen', value }, command);
       }
+      // The care mode (ADR 0088 § 2): nothing sold, for distress, and nothing explicit; never « Ne plus lui écrire ».
+      if (protection.care) {
+        const value = { reason: 'distress', since: at.toISOString() } satisfies FanFlags['salesFrozen'];
+        await fans.setFlagIfUnset(creator, fan, { flag: 'salesFrozen', value }, command);
+        await fans.setFlag(creator, fan, { flag: 'noExplicit', value: true }, command);
+      }
     },
     async confirmAge(creatorId, fanId, correlationId, at) {
       await fans.confirmDeclaredAge(CreatorIdSchema.parse(creatorId), FanIdSchema.parse(fanId), at, {

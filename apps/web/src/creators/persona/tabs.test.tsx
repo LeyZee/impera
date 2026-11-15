@@ -9,7 +9,7 @@ import demoYaml from '../../../../../personas/demo/v0.3.0.yaml?raw';
 import { scoped, validate } from './model';
 import { ageLine } from './sheet';
 import { parsePersonaYaml } from './source';
-import { FollowUpsTab, NotificationsTab, orNull, RulesTab, StrategiesTab } from './tabs';
+import { FollowUpsTab, NotificationsTab, ObjectionRepliesTab, orNull, RulesTab, StrategiesTab } from './tabs';
 
 afterEach(() => {
   cleanup();
@@ -153,5 +153,32 @@ describe('Règles strictes (ADR 0079 § 4)', () => {
       '« Zones interdites » de sa fiche est lu par le modèle, sans garde',
     );
     expect(screen.getByLabelText('Émojis qu’elle n’utilise jamais')).toBeDefined();
+  });
+});
+
+describe('Réponses aux objections de prix (ADR 0090 § B)', () => {
+  it('adds a reply with an id of its own, edits it and removes it, kind by kind', () => {
+    const onChange = vi.fn<(value: PersonaV2['agent']['objection_replies']) => void>();
+    const bank = { too_expensive: [{ id: 'testaaaaaaaa', text: 'Réplique de test A' }] };
+    render(<ObjectionRepliesTab value={bank} onChange={onChange} issues={[]} />);
+    expect(screen.getByText('« C’est trop cher »')).toBeDefined();
+
+    const [add] = screen.getAllByRole('button', { name: 'Ajouter une réplique' });
+    if (add === undefined) throw new Error('each kind has its « Ajouter une réplique »');
+    fireEvent.click(add);
+    const [added] = onChange.mock.lastCall ?? [];
+    expect(added?.too_expensive).toHaveLength(2);
+    expect(added?.too_expensive?.[1]?.id).toMatch(/^[a-z0-9]{12}$/u);
+    expect(added?.too_expensive?.[1]?.id).not.toBe('testaaaaaaaa');
+
+    fireEvent.change(screen.getByLabelText('Réplique 1 à « C’est trop cher »'), {
+      target: { value: 'Réplique de test B' },
+    });
+    expect(onChange.mock.lastCall?.[0].too_expensive).toEqual([
+      { id: 'testaaaaaaaa', text: 'Réplique de test B' },
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer' }));
+    expect(onChange.mock.lastCall?.[0].too_expensive).toEqual([]);
   });
 });

@@ -402,7 +402,7 @@ describe('Réglages › Règles de paie', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
     expect((await within(dialog).findByRole('alert')).textContent).toBe(
-      'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, avec l’export, où tout concorde et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
+      'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
     );
   });
 
@@ -432,8 +432,8 @@ describe('Réglages › Règles de paie', () => {
       'Sans effet',
     );
 
-    expect(plain(within(dialog).getByText(/^Cette quinzaine a déjà commencé/u).textContent)).toBe(
-      'Cette quinzaine a déjà commencé : ses relevés en brouillon seront recalculés sur les ventes relevées, et les ventes déclarées dans ses rapports ne compteront plus.',
+    expect(plain(within(dialog).getByText(/^Cette quinzaine est déjà finie/u).textContent)).toBe(
+      'Cette quinzaine est déjà finie : ses relevés en brouillon seront recalculés sur les ventes relevées, et les ventes déclarées dans ses rapports ne compteront plus.',
     );
     expect(writes).toEqual([]);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
@@ -484,7 +484,7 @@ describe('Réglages › Règles de paie', () => {
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Rapports de fin de shift' }));
     expect(valuesOf(from)).not.toContain('2026-10-01');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
-    expect(within(dialog).queryByText(/^Cette quinzaine a déjà commencé/u)).toBeNull();
+    expect(within(dialog).queryByText(/^Cette quinzaine (a déjà commencé|est déjà finie)/u)).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }));
 
     const lea = screen.getByText('Léa Brun').closest<HTMLElement>('.rp-account');

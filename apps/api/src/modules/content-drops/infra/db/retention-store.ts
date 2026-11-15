@@ -1,9 +1,9 @@
-import { EventIdSchema, newId, type EventType } from '@impera/contracts';
+import { AuditEntryIdSchema, EventIdSchema, newId, type EventType } from '@impera/contracts';
 import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
-import type { DueOriginal, RetentionStore } from '../../domain/ports';
+import type { DueOriginal, DueThumbnail, RetentionStore } from '../../domain/ports';
 
-const { contentDropFiles, contentDrops, domainEvents, mediaAssets } = schema;
+const { auditLog, contentDropFiles, contentDrops, creators, domainEvents, mediaAssets } = schema;
 
 /** A medium a drop kept: one of her files names it in the `kept` state (a duplicate only points at it). */
 const keptByDrop = sql`exists (select 1 from ${contentDropFiles} k
@@ -154,6 +154,68 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
           createdAt: now,
         });
         return true;
+      }),
+
+    dueThumbnails: (archivedBefore) =>
+      withAdmin(adminDb, async (tx) => {
+        const rows = await tx
+          .select({
+            mediaAssetId: mediaAssets.id,
+            creatorId: mediaAssets.creatorId,
+            thumbnailKey: mediaAssets.thumbnailKey,
+          })
+          .from(mediaAssets)
+          .innerJoin(creators, eq(creators.id, mediaAssets.creatorId))
+          .where(
+            and(
+              sql`${mediaAssets.thumbnailKey} is not null`,
+              sql`${creators.archivedAt} < ${archivedBefore}`,
+            ),
+          );
+        return rows.flatMap(({ thumbnailKey, ...medium }): DueThumbnail[] =>
+          thumbnailKey === null ? [] : [{ ...medium, thumbnailKey }],
+        );
+      }),
+
+    eraseThumbnail: (thumbnail, archivedBefore, remove) =>
+      withAdmin(adminDb, async (tx) => {
+        await tx
+          .select({ id: mediaAssets.id })
+          .from(mediaAssets)
+          .where(eq(mediaAssets.id, thumbnail.mediaAssetId))
+          .for('update');
+        // Checked again once locked: reopened meanwhile, she keeps it; emptied meanwhile, nothing to do.
+        const [due] = await tx
+          .select({ id: mediaAssets.id })
+          .from(mediaAssets)
+          .innerJoin(creators, eq(creators.id, mediaAssets.creatorId))
+          .where(
+            and(
+              eq(mediaAssets.id, thumbnail.mediaAssetId),
+              eq(mediaAssets.thumbnailKey, thumbnail.thumbnailKey),
+              sql`${creators.archivedAt} < ${archivedBefore}`,
+            ),
+          );
+        if (due === undefined) return false;
+        await remove(thumbnail.thumbnailKey);
+        // `thumbnailed_at` stays: the picture is never made again (ADR 0089 § 1).
+        await tx
+          .update(mediaAssets)
+          .set({ thumbnailKey: null })
+          .where(eq(mediaAssets.id, thumbnail.mediaAssetId));
+        return true;
+      }),
+
+    thumbnailsErased: (creatorId, count) =>
+      withAdmin(adminDb, async (tx) => {
+        await tx.insert(auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId: null,
+          action: 'media.thumbnails_erased',
+          entity: 'creator',
+          entityId: creatorId,
+          details: { count },
+        });
       }),
 
     eraseFailed: (original, now, correlationId) =>

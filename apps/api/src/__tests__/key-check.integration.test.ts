@@ -44,7 +44,7 @@ describe('ops:check-keys', () => {
         sessionCiphertext: encryptSecret('{"cookie":"invented"}', session, accountId),
       });
     });
-    await createPostgresCredentialStore({ adminDb: test.admin.db, keys: credentials }).save({
+    await createPostgresCredentialStore({ adminDb: test.service.db, keys: credentials }).save({
       provider: 'xai',
       key: 'xai-FAKEFAKEFAKEFAKEFAKEFAKEFAKE0000',
       keyLabel: null,
@@ -58,7 +58,7 @@ describe('ops:check-keys', () => {
       lastErrorKind: null,
       revision: 0,
     });
-    await createPostgresTelegramStore({ adminDb: test.admin.db, keys: credentials }).bots.insertBot({
+    await createPostgresTelegramStore({ adminDb: test.service.db, keys: credentials }).bots.insertBot({
       id: newId(TelegramBotIdSchema),
       telegramBotId: '100000001',
       username: 'impera_demo_bot',
@@ -66,7 +66,7 @@ describe('ops:check-keys', () => {
       token: '100000001:FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAK',
       state: 'active',
     });
-    await createSalesFeedKeyStore(test.admin.db, credentials).save(
+    await createSalesFeedKeyStore(test.service.db, credentials).save(
       'reveal',
       'rvl_FAKEFAKEFAKEFAKEFAKE',
       ['sales'],

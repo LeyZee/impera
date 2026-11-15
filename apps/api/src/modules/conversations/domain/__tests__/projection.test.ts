@@ -64,6 +64,31 @@ describe('conversation projection', () => {
     expect(applyEvent(followUp, rejected(false), at(3)).state).toBe('idle');
   });
 
+  it('puts him at rest when the creator’s side answered him on the platform, as the event says (ADR 0110 § 2)', () => {
+    const fromTeam = (answersFan: boolean) =>
+      EventBodySchema.parse({
+        type: 'message_received',
+        payload: {
+          ...message,
+          direction: 'outbound',
+          author: 'human',
+          ...(answersFan && { answersFan: true }),
+        },
+      });
+    for (const state of ['pending', 'drafting', 'awaiting_approval'] as const) {
+      const waiting = { ...INITIAL_PROJECTION, state, lastInboundAt: at(1) };
+      expect(applyEvent(waiting, fromTeam(true), at(2))).toMatchObject({
+        state: 'idle',
+        lastOutboundAt: at(2),
+      });
+      // An event written before ADR 0110 replays as it was decided (ADR 0007).
+      expect(applyEvent(waiting, fromTeam(false), at(2)).state).toBe(state);
+    }
+    // A draft already leaving is never stopped by it.
+    const sending = { ...INITIAL_PROJECTION, state: 'sending' as const, lastInboundAt: at(1) };
+    expect(applyEvent(sending, fromTeam(true), at(2)).state).toBe('sending');
+  });
+
   it('clears the routing when a human hands the conversation back', () => {
     const routed = { ...INITIAL_PROJECTION, state: 'human' as const, routedToUserId: USER };
     const released = EventBodySchema.parse({
@@ -92,6 +117,42 @@ describe('conversation projection', () => {
       desireAt: at(3),
     });
     expect(INITIAL_PROJECTION).toMatchObject({ desireScore: null, desireBand: null, desireAt: null });
+  });
+
+  it('opens the care mode once, marks its help bubble, and closes it (ADR 0088)', () => {
+    const opened = EventBodySchema.parse({
+      type: 'care_opened',
+      payload: { conversationId: CONVERSATION, signs: ['self_harm'] },
+    });
+    const draft = (help: boolean) =>
+      EventBodySchema.parse({
+        type: 'draft_created',
+        payload: { draftId: DRAFT, status: 'pending', care: { help } },
+      });
+    const closed = EventBodySchema.parse({
+      type: 'care_closed',
+      payload: { conversationId: CONVERSATION, reason: 'Il va mieux' },
+    });
+    const open = rebuildProjection([
+      { body: inbound, at: at(1) },
+      { body: opened, at: at(2) },
+      { body: draft(true), at: at(3) },
+      { body: opened, at: at(4) },
+    ]);
+    expect(open).toMatchObject({
+      state: 'awaiting_approval',
+      careSince: at(2),
+      careHelpAt: at(3),
+      careClosedAt: null,
+    });
+    expect(applyEvent(open, closed, at(5))).toMatchObject({
+      state: 'awaiting_approval',
+      careSince: null,
+      careHelpAt: null,
+      careClosedAt: at(5),
+    });
+    // A help bubble outside an episode marks nothing: only an open episode gives it once.
+    expect(applyEvent(INITIAL_PROJECTION, draft(true), at(1)).careHelpAt).toBeNull();
   });
 
   it('ignores an event the state machine refuses, so a journal always folds', () => {

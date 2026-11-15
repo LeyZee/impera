@@ -1,13 +1,16 @@
-import type { CreatorId, CreatorOverview, CreatorSummary, CreatorTodoCount } from '@impera/contracts';
+import {
+  isSetupComplete,
+  type CreatorOverview,
+  type CreatorSetup,
+  type CreatorSummary,
+  type CreatorTodoCount,
+} from '@impera/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { CreatorFace } from '../CreatorFace';
-import { useCreatorAccount, usePersonaVersionCount } from '../api';
-import { useAgencyRates } from '../rate/api';
 import { creatorsSearch, type CreatorSheet } from '../search';
-import { isSetUp, setupSteps } from '../setup';
 
 import { useCreatorsOverview } from './api';
 import { modeOf, onShiftOf, requestOf, salesOf, todosOf, type Tone } from './model';
@@ -15,11 +18,14 @@ import './list.css';
 
 import { readerZone, dayOf } from '@/scheduling/time';
 import { todosAcrossQuery } from '@/screens/tracking/api';
+import { SetupLink } from '@/setup/SetupCard';
+import { useCreatorSetups } from '@/setup/api';
+import { creatorLines, nextOf, progressOf } from '@/setup/model';
 
 /**
  * The list of Créatrices (« ok liste-créatrices », Charles, 06/11): one card per creator, what the agency needs to know
  * of her before opening her sheet. Her agent's mode, the revenue of her fortnight, who is on shift on her now, the
- * content she still owes, what waits in « À traiter », and for the owner what is left to set up. A click opens her
+ * content she still owes, what waits in « À traiter », and for the owner how far her « Mise en route » is. A click opens her
  * sheet on `sheet`. What the reader may not see the server leaves out, and the card says nothing of it.
  */
 export function CreatorsList({
@@ -33,6 +39,8 @@ export function CreatorsList({
 }): JSX.Element {
   const overview = useCreatorsOverview();
   const queue = useQuery(todosAcrossQuery);
+  const setups = useCreatorSetups(isOwner);
+  const steps = new Map((setups.data ?? []).map((setup) => [setup.creatorId, setup] as const));
   const cards = new Map((overview.data ?? []).map((card) => [card.creatorId, card] as const));
   const counts = new Map((queue.data?.creators ?? []).map((count) => [count.creatorId, count] as const));
   return (
@@ -51,7 +59,7 @@ export function CreatorsList({
             loading={overview.isPending}
             count={counts.get(creator.id)}
             sheet={sheet}
-            isOwner={isOwner}
+            setup={isOwner ? steps.get(creator.id) : undefined}
           />
         ))}
       </ul>
@@ -65,14 +73,15 @@ function CreatorCard({
   loading,
   count,
   sheet,
-  isOwner,
+  setup,
 }: {
   creator: CreatorSummary;
   card: CreatorOverview | undefined;
   loading: boolean;
   count: CreatorTodoCount | undefined;
   sheet: CreatorSheet;
-  isOwner: boolean;
+  /** Her « Mise en route », the owner's alone. */
+  setup: CreatorSetup | undefined;
 }): JSX.Element {
   const mode = card === undefined ? null : modeOf(card.mode);
   const todos = todosOf(count);
@@ -83,7 +92,7 @@ function CreatorCard({
       <div className="cl-card__head">
         <CreatorFace creator={creator} className="cl-card__face" />
         <div className="cl-card__title">
-          {/* The whole card opens her sheet; the links of « À configurer » stay their own. */}
+          {/* The whole card opens her sheet; the link of « Mise en route » stays its own. */}
           <Link to="/creatrices" search={creatorsSearch(sheet, creator.id)} className="cl-card__name">
             {creator.displayName}
           </Link>
@@ -119,7 +128,7 @@ function CreatorCard({
         )}
         <Fact label="À traiter" value={todos.text} tone={todos.tone} />
       </dl>
-      {isOwner ? <Setup creatorId={creator.id} /> : null}
+      <Setup setup={setup} />
     </li>
   );
 }
@@ -164,51 +173,27 @@ function Fact({
   );
 }
 
-const SHORT: Readonly<Record<CreatorSheet, string>> = {
-  persona: 'Persona',
-  rate: 'Pourcentage',
-  access: 'Accès',
-  agenda: 'Agenda',
-  ideas: 'Idées du jour',
-  requests: 'Demandes',
-  scripts: 'Scripts',
-  content: 'Contenu',
-  telegram: 'Canal Telegram',
-  hours: 'Heures d’activité',
-  profile: 'Profil',
-};
-
 /**
- * What is left to set up (CRM-07 b2), the owner's: each step opens its tab. Nothing while a read is under way or
- * fails, rather than a wrong line; nothing once all is done.
+ * « Mise en route » (pilotage plan W1), the owner's: how far she is and her next step, which opens where it is done;
+ * the whole list is on her sheet. Nothing while the read is under way or fails, rather than a wrong line; nothing once
+ * all is done.
  */
-function Setup({ creatorId }: { creatorId: CreatorId }): JSX.Element | null {
-  const persona = usePersonaVersionCount(creatorId);
-  const rates = useAgencyRates(creatorId);
-  const account = useCreatorAccount(creatorId);
-  if (persona.data === undefined || rates.data === undefined || account.data === undefined) return null;
-  const steps = setupSteps({
-    personaVersions: persona.data,
-    hasRate: rates.data.current !== null,
-    account: account.data,
-  });
-  if (isSetUp(steps)) return null;
-  const left = steps.filter((step) => step.state !== 'done');
+function Setup({ setup }: { setup: CreatorSetup | undefined }): JSX.Element | null {
+  if (setup === undefined || isSetupComplete(setup.steps)) return null;
+  const lines = creatorLines(setup.creatorId, setup.steps);
+  const { done, total } = progressOf(lines);
+  const next = nextOf(lines);
   return (
     <p className="cl-card__setup">
-      <span className="cl-card__setup-label">À configurer</span>
-      {left.map((step) => (
-        <Link
-          key={step.sheet}
-          to="/creatrices"
-          search={creatorsSearch(step.sheet, creatorId)}
-          className="cl-card__step"
-          title={step.hint}
-        >
-          {SHORT[step.sheet]}
-          {step.state === 'waiting' ? ' · invitation envoyée' : null}
-        </Link>
-      ))}
+      <span className="cl-card__setup-label">Mise en route</span>
+      <span className="nv-num">
+        {done} sur {total}
+      </span>
+      {next === undefined || next.target === null ? null : (
+        <SetupLink target={next.target} className="cl-card__step" label={`Prochaine étape : ${next.label}`}>
+          {next.label}
+        </SetupLink>
+      )}
     </p>
   );
 }

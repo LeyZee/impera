@@ -200,6 +200,31 @@ describe('classification (ADR 0020 §2)', () => {
     });
   });
 
+  it('tells a change of the agency’s share at Reveal to the « pour toutes » groups, never a share (ADR 0054 § 5)', () => {
+    const creatorId = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
+    expect(
+      classify({
+        kind: 'agency_share_changed',
+        creatorId,
+        platform: 'reveal',
+        platformAccountId: '018f3e5c-0000-7000-8000-0000000000a1',
+        from: PayPeriodSchema.parse('2026-11-01'),
+      }),
+    ).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      allCreatorsOnly: true,
+      oncePerThread: true,
+      threadKey: 'agency_share_changed:018f3e5c-0000-7000-8000-0000000000a1:2026-11-01',
+      title: 'Important',
+      body: 'Part de l’agence chez Reveal : sur la quinzaine du 1er au 15 nov., elle a changé par rapport à la quinzaine d’avant. À titre d’information.',
+      link: {
+        label: 'Ouvrir la part de l’agence',
+        path: `/creatrices?onglet=pourcentage&creatrice=${creatorId}`,
+      },
+    });
+  });
+
   it('tells an outage per service and reason, never the key, and « Rétabli » in its thread', () => {
     expect(classify({ kind: 'connection_down', service: 'xai', reason: 'refused' })).toEqual({
       kind: 'notice',
@@ -241,6 +266,51 @@ describe('classification (ADR 0020 §2)', () => {
     const reached = classify({ kind: 'budget', threshold: 'reached', spentMinor: 2000, capMinor: 2000 });
     expect(reached).toMatchObject({ topic: 'urgent', title: 'URGENT', fallbackTopic: 'important' });
     expect(reached?.kind === 'notice' ? reached.body : '').toContain('Plafond IA atteint (20 €)');
+  });
+
+  it('says AI credits run low in their own currency, urgent once under two days or empty (ADR 0091 § 4)', () => {
+    const base = {
+      kind: 'ai_credits_low',
+      provider: 'xai',
+      currency: 'USD',
+      runsOutOn: '2026-11-15',
+    } as const;
+    expect(classify({ ...base, level: 'low', balanceMinor: 2340 })).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: null,
+      title: 'Important',
+      body: 'Crédits Grok (xAI) : moins de 5 jours au rythme actuel (23,4 $ restants, épuisés vers le 15 nov.). Pense à recharger.',
+      link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
+    });
+    expect(
+      classify({ ...base, level: 'critical', balanceMinor: 610, provider: 'mistral', currency: 'EUR' }),
+    ).toMatchObject({
+      topic: 'urgent',
+      fallbackTopic: 'important',
+      title: 'URGENT',
+      body: 'Crédits Mistral : moins de 2 jours au rythme actuel (6,1 € restants, épuisés vers le 15 nov.). Recharge maintenant.',
+    });
+    expect(classify({ ...base, level: 'empty', balanceMinor: -120, runsOutOn: null })).toMatchObject({
+      topic: 'urgent',
+      body: 'Crédits Grok (xAI) épuisés d’après le décompte du CRM : l’IA s’arrête sur ce service. Recharge, puis note-le dans Consommation IA.',
+    });
+  });
+
+  it('says a provider refuses for lack of quota or credits, urgent, the agent on its fallback (ADR 0091 § 6)', () => {
+    expect(classify({ kind: 'ai_quota_exhausted', provider: 'xai', mode: 'subscription' })).toEqual({
+      kind: 'notice',
+      topic: 'urgent',
+      fallbackTopic: 'important',
+      threadKey: null,
+      title: 'URGENT',
+      body: 'Grok (xAI) refuse les appels : le quota de ton abonnement est épuisé. L’agent répond avec son modèle de repli jusqu’à la remise à zéro du quota.',
+      link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
+    });
+    expect(classify({ kind: 'ai_quota_exhausted', provider: 'mistral', mode: 'credits' })).toMatchObject({
+      topic: 'urgent',
+      body: 'Mistral refuse les appels faute de crédits. L’agent répond avec son modèle de repli : recharge, puis note-le dans Consommation IA.',
+    });
   });
 
   it('says the database export is overdue, in Paris time, or has never succeeded', () => {

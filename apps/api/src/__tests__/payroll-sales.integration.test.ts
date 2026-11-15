@@ -221,7 +221,7 @@ describe('Équipe › Paie : les ventes de la plateforme comptées sur leur net 
       payouts: payoutGate,
       afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },
     });
-    const config = testConfig({ DATABASE_URL: team.test.appUrl, DATABASE_ADMIN_URL: team.test.adminUrl });
+    const config = testConfig({ DATABASE_URL: team.test.appUrl, DATABASE_SERVICE_URL: team.test.serviceUrl });
     const blindServer = await buildServer({
       config,
       logger: createLogger(config),

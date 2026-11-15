@@ -20,6 +20,7 @@ import { ScriptsSection } from './scripts/ScriptsSection';
 import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
 import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 
+import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 
 export type CreatorTab = CreatorSheet;
@@ -95,6 +96,14 @@ export function CreatorsPage({
       );
     }
     if (query.isPending) {
+      // The list waits in the shape of its cards, so nothing jumps when they arrive (recette 11/11, ADM-21).
+      if (creatorId === null)
+        return (
+          <ul className="cl-grid" aria-busy="true" aria-label="Chargement des créatrices">
+            <li className="nv-plate cl-card cl-card--skeleton" />
+            <li className="nv-plate cl-card cl-card--skeleton" />
+          </ul>
+        );
       return (
         <section className="ps-page" aria-busy="true">
           <div className="nv-plate ps-head ps-skeleton" />
@@ -245,7 +254,7 @@ export function CreatorsPage({
     telegram: 'Canal Telegram',
     hours: 'Heures d’activité',
     access: 'Accès',
-    rate: 'Pourcentage',
+    rate: 'Part de l’agence',
     profile: 'Profil',
   };
   // Her agenda right after her persona: the sheet a manager opens most (CR-05 lot c).
@@ -327,6 +336,10 @@ export function CreatorsPage({
       {/* One child of the page: the sheet follows the switch, never pushed to the foot of the screen (CREA-03). */}
       <div className="ps-sheet">
         {leaving ? <LeaveConfirm onLeave={leave} onStay={stay} /> : null}
+        {/* Her « Mise en route » (pilotage plan W1) above whichever sheet is open, until all is done. */}
+        {isOwner && current !== undefined && !showForm ? (
+          <CreatorSetupBlock key={`${current.id}:${shown}`} creatorId={current.id} />
+        ) : null}
         {body()}
         {/* The archived creators, folded at the foot of the list, the owner's alone (ADR 0071 § 2). */}
         {isOwner && listing && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}

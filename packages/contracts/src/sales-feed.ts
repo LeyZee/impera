@@ -481,8 +481,9 @@ export const SalesFeedCheckTotalsSchema = z.object({
 export type SalesFeedCheckTotals = z.infer<typeof SalesFeedCheckTotalsSchema>;
 
 /**
- * `match`: the three sources say the register's figures and nothing was left uncompared; `incomplete`: what was compared
- * matches, but a source, a model of the export or days before the register were not; `mismatch`: a net differs.
+ * `match`: the statistics, and the export when one was given, say the register's figures and nothing was left
+ * uncompared (ADR 0050 § 8: the export is optional); `incomplete`: what was compared matches, but the statistics, a model
+ * of the export or days before the register were not; `mismatch`: a net differs.
  */
 export const SalesFeedCheckVerdictSchema = z.enum(['match', 'mismatch', 'incomplete']);
 export type SalesFeedCheckVerdict = z.infer<typeof SalesFeedCheckVerdictSchema>;
@@ -544,7 +545,7 @@ export const SalesFeedCheckNoteSchema = z.discriminatedUnion('kind', [
 export type SalesFeedCheckNote = z.infer<typeof SalesFeedCheckNoteSchema>;
 
 /**
- * The reliability check of ADR 0050 § 8 (CRM-02): the register's `netAmount` against the statistics and the
+ * The reliability check of ADR 0050 § 8 (CRM-02): the register's `netAmount` against the statistics and, when given, the
  * dashboard's export, to the cent, per model and day, then per team member. It changes no amount and switches no
  * account; its report is kept, and the switch of an account (CRM-03) reads the latest one.
  */

@@ -16,6 +16,7 @@ import {
   DomainError,
   newId,
   SHIFT_REPORT_CHECK_LATE_MINUTES,
+  type EarningsSource,
   type PayPeriod,
   type ReportGapThreshold,
   type ShiftReportId,
@@ -54,11 +55,13 @@ import type { ShiftReportStore, StoredAccount, StoredShift, StoredShiftReport } 
 import { assertGapAnswered, validatesByItself } from '../domain/report-check';
 import {
   assertChanges,
+  assertDecidable,
   assertDeclarable,
   assertReportOpen,
   assertReportValues,
   assertReviews,
   assertTotalHolds,
+  earningsSourceFor,
   isAgency,
   makerOf,
   shiftPeriod,
@@ -78,6 +81,7 @@ import {
   ownMemberId,
   pgErrorOf,
   RatedRulesRowSchema,
+  reportSource,
   shiftColumns,
   StoredAccountSchema,
   toMember,
@@ -225,6 +229,23 @@ async function rulesOf(tx: Transaction, platformAccountId: string): Promise<Rate
   return rows.map((row) => RatedRulesRowSchema.parse(row));
 }
 
+/** The pay rules of each of `platformAccountIds`, every period, as `rulesOf` reads them. */
+async function rulesByAccount(
+  tx: Transaction,
+  platformAccountIds: readonly string[],
+): Promise<Map<string, RatedRulesRow[]>> {
+  const rules = new Map<string, RatedRulesRow[]>();
+  for (const id of new Set(platformAccountIds)) rules.set(id, await rulesOf(tx, id));
+  return rules;
+}
+
+/** Where pay reads `platformAccountId`'s amounts for `period`, from the rules read (`earningsSourceFor`). */
+const sourceIn = (
+  rules: ReadonlyMap<string, readonly RatedRulesRow[]>,
+  platformAccountId: string,
+  period: PayPeriod,
+): EarningsSource | null => earningsSourceFor(rules.get(platformAccountId) ?? [], period);
+
 const readerIn = async (tx: Transaction, userId: string, scope: TeamScope): Promise<Reader> => ({
   userId,
   scope,
@@ -264,23 +285,32 @@ export function createDrizzleShiftReportStore(
   }
 
   /**
-   * The reports with their check against the platform (ADR 0073), each against its shift among those given, in `tx`:
-   * the reader's policies govern what the connectors read for a screen.
+   * The reports with their check against the platform (ADR 0073), each against its shift among those given, and where
+   * pay reads their account's amounts for their period, in `tx`: the reader's policies govern what the connectors read
+   * for a screen. `rules` when the caller read them already.
    */
   async function withChecks(
     tx: Transaction,
     rows: readonly ReportRow[],
     shiftsById: ReadonlyMap<string, StoredShift>,
     now: Date,
+    rules?: ReadonlyMap<string, readonly RatedRulesRow[]>,
   ): Promise<StoredShiftReport[]> {
     if (rows.length === 0) return [];
     const settings = await checkSettingsIn(tx);
+    const sources =
+      rules ??
+      (await rulesByAccount(
+        tx,
+        rows.map((one) => one.platformAccountId),
+      ));
     const checked: StoredShiftReport[] = [];
     for (const { reviewCheck, ...row } of rows) {
       const shift = shiftsById.get(row.shiftId);
       checked.push({
         ...row,
         check: await checkOf(tx, { ...row, reviewCheck }, shift, readShiftSales, settings, now),
+        earningsSource: sourceIn(sources, row.platformAccountId, row.period),
       });
     }
     return checked;
@@ -316,12 +346,19 @@ export function createDrizzleShiftReportStore(
         const period =
           reports.find((one) => one.correctsId === null)?.period ??
           shiftPeriod(shift.startsAt, await agencyTimeZone(tx));
+        const rules = await rulesOf(tx, shift.platformAccountId);
         return {
           shift,
           account: StoredAccountSchema.parse(account),
           period,
-          rules: payRulesFor(await rulesOf(tx, shift.platformAccountId), period),
-          reports: await withChecks(tx, reports, new Map([[shift.id, shift]]), now),
+          rules: payRulesFor(rules, period),
+          reports: await withChecks(
+            tx,
+            reports,
+            new Map([[shift.id, shift]]),
+            now,
+            new Map([[shift.platformAccountId, rules]]),
+          ),
           reader,
         };
       });
@@ -516,11 +553,14 @@ export function createDrizzleShiftReportStore(
           throw new ShiftReportChanged();
         }
         assertReviews(report, version, reader);
+        const rules = await rulesOf(tx, report.platformAccountId);
+        // A report of a period whose pay reads the sales is neither validated nor sent back (ADR 0084 § 3).
+        assertDecidable(rules, report.period);
         const validating = review.decision === 'validate';
         let kept: { check: StoredShiftReport['check']; threshold: ReportGapThreshold } | null = null;
         if (validating) {
           // Pay reads it from now on: the rules it was made under, and the shift's total with it, once more.
-          assertDeclarable(await rulesOf(tx, report.platformAccountId), report.period, report.currency);
+          assertDeclarable(rules, report.period, report.currency);
           assertTotalHolds(await reportsOfShift(tx, report.shiftId), report);
           // Against the platform (ADR 0073 § 5): a gap waits for its member, until they answer or the delay ends.
           const shift = await shiftOf(tx, report.shiftId);
@@ -571,7 +611,7 @@ export function createDrizzleShiftReportStore(
           const accounts: StoredAccount[] = [];
           for (const creatorId of creatorIds) {
             await enterCreator(tx, creatorId, creatorIds);
-            const rows = (
+            const read = (
               await tx
                 .select(reportColumns)
                 .from(shiftReports)
@@ -584,6 +624,15 @@ export function createDrizzleShiftReportStore(
                   ),
                 )
             ).map(toReport);
+            const rules = await rulesByAccount(
+              tx,
+              read.map((one) => one.platformAccountId),
+            );
+            // The open list is what the agency has to decide: a report without effect on pay is not (ADR 0084 § 3).
+            const rows =
+              period === null
+                ? read.filter((one) => sourceIn(rules, one.platformAccountId, one.period) !== 'detected')
+                : read;
             const named = [...new Set(rows.map((one) => one.shiftId))];
             const which = named.length === 0 ? [] : [inArray(shifts.id, named)];
             if (span !== null) {
@@ -604,7 +653,21 @@ export function createDrizzleShiftReportStore(
                         own === null ? undefined : eq(shifts.memberId, own),
                       ),
                     );
-            const creatorShifts = found.map(toShift);
+            for (const shift of found) {
+              if (!rules.has(shift.platformAccountId)) {
+                rules.set(shift.platformAccountId, await rulesOf(tx, shift.platformAccountId));
+              }
+            }
+            // A shift of a period whose pay reads the sales takes the mini feedback, never a report: no « Sans
+            // rapport » line for it (ADR 0050 § 10, ADR 0084 § 3). One with a report keeps its line.
+            const creatorShifts = found
+              .map(toShift)
+              .filter(
+                (shift) =>
+                  period === null ||
+                  named.includes(shift.id) ||
+                  sourceIn(rules, shift.platformAccountId, period) !== 'detected',
+              );
             const accountIds = [...new Set(creatorShifts.map((one) => one.platformAccountId))];
             const creatorAccounts =
               accountIds.length === 0
@@ -615,7 +678,13 @@ export function createDrizzleShiftReportStore(
                     .where(inArray(platformAccounts.id, accountIds));
             // In her tenant: the connectors read her register under the reader's policies.
             reports.push(
-              ...(await withChecks(tx, rows, new Map(creatorShifts.map((shift) => [shift.id, shift])), now)),
+              ...(await withChecks(
+                tx,
+                rows,
+                new Map(creatorShifts.map((shift) => [shift.id, shift])),
+                now,
+                rules,
+              )),
             );
             shiftRows.push(...creatorShifts);
             accounts.push(...creatorAccounts.map((row) => StoredAccountSchema.parse(row)));
@@ -663,6 +732,8 @@ export function createDrizzleShiftReportStore(
               and(
                 eq(shiftReports.status, 'submitted'),
                 sql`${shiftReports.correctsId} is null`,
+                // Never a report without effect on pay (ADR 0084 § 3): nothing to validate there.
+                sql`${reportSource} is distinct from 'detected'`,
                 sql`${shifts.endsAt} + make_interval(mins => ${late}) <= ${now}`,
                 sql`${salesFeedCursors.caughtUpAt} >= ${shifts.endsAt} + make_interval(mins => ${late})`,
                 after === null

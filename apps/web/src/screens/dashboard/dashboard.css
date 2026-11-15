@@ -508,6 +508,12 @@
 .db-mode__dot {
   margin-right: 7px;
 }
+/* 36px seen, 44px to the finger, up and down only: « Arrêt » stands next to « Copilote » (ADM-22). */
+.db-mode .nv-seg__opt::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
 /* A mode not set keeps its dot, unlit: only the chosen mode shows its colour (red is for a real stop). */
 .db-mode__dot--rest {
   --_c: var(--nv-ink-faint);
@@ -617,7 +623,10 @@
   align-items: center;
   padding: var(--nv-space-3) var(--nv-space-4) var(--nv-space-3) var(--nv-space-3);
 }
-.db-backup__orb {
+/* The banners' one medallion (ADM-26): the backup's, then the reports', the invoices' and the AI budget's. */
+.db-backup__orb,
+.db-orb {
+  flex: none;
   width: var(--nv-space-10);
   height: var(--nv-space-10);
   border-radius: 50%;
@@ -626,7 +635,8 @@
   color: var(--_c);
   background: color-mix(in srgb, var(--_c) 14%, transparent);
 }
-.db-backup__orb svg {
+.db-backup__orb svg,
+.db-orb svg {
   width: var(--nv-space-5);
   height: var(--nv-space-5);
 }
@@ -647,13 +657,29 @@
   text-wrap: pretty;
 }
 
-/* The invoices' card (EQ-06 lot 8d): each line its own dot, so the red stays on what is late, the one urgency. */
-.db-paper {
+/*
+ * The invoices' card (EQ-06 lot 8d) and the reports' (ADR 0073): each line its own dot, so the red stays on what is
+ * late, the one urgency. The backup's face: medallion, title and lines, action on the right (ADM-26).
+ */
+.db-paper,
+.db-agency {
+  --_c: var(--nv-ink-muted);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--nv-space-3);
   align-items: center;
-  padding: var(--nv-space-3) var(--nv-space-4);
+  padding: var(--nv-space-3) var(--nv-space-4) var(--nv-space-3) var(--nv-space-3);
+}
+.db-paper[data-tone='warn'],
+.db-agency[data-tone='warn'] {
+  --_c: var(--nv-warning);
+}
+.db-paper[data-tone='danger'],
+.db-agency[data-tone='bad'] {
+  --_c: var(--nv-danger);
+}
+.db-agency[data-tone='ok'] {
+  --_c: var(--nv-success);
 }
 .db-paper__body {
   min-width: 0;
@@ -738,10 +764,10 @@ div.db-fan {
   color: var(--nv-ink);
 }
 /* The agency's part of her Dashboard (reco 18, PRO-10): quiet lines, said once, apart from her agent's health. */
-.db-agency {
+.db-agency__body {
   display: grid;
-  gap: var(--nv-space-2);
-  padding: var(--nv-space-3) var(--nv-space-4);
+  gap: var(--nv-space-1);
+  min-width: 0;
 }
 .db-agency__title {
   margin: 0;
@@ -751,22 +777,24 @@ div.db-fan {
 }
 .db-agency__line {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto minmax(64px, 120px);
+  grid-template-columns: minmax(0, 1fr) auto minmax(64px, 120px);
   align-items: center;
-  column-gap: var(--nv-space-2);
+  column-gap: var(--nv-space-3);
   row-gap: 2px;
   min-width: 0;
 }
 .db-agency__label {
   min-width: 0;
-  font-size: var(--nv-text-callout);
+  font-size: var(--nv-text-body);
+  font-weight: 650;
+  letter-spacing: -0.01em;
   color: var(--nv-ink);
   overflow-wrap: anywhere;
 }
-.db-agency__line[data-tone='warn'] .db-agency__label {
+.db-agency[data-tone='warn'] .db-agency__label {
   color: var(--nv-warning);
 }
-.db-agency__line[data-tone='bad'] .db-agency__label {
+.db-agency[data-tone='bad'] .db-agency__label {
   color: var(--nv-danger);
 }
 .db-agency__value {
@@ -774,21 +802,26 @@ div.db-fan {
   white-space: nowrap;
 }
 .db-agency__sub {
-  grid-column: 2 / -1;
+  grid-column: 1 / -1;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
-.db-agency__line:not(:has(.db-agency__gauge)) .db-agency__label {
-  grid-column: 2 / -1;
-}
 @media (max-width: 520px) {
   .db-agency__line {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
   .db-agency__gauge {
-    grid-column: 2 / -1;
+    grid-column: 1 / -1;
   }
+}
+/* A chip's place while the creators load (ADM-21). */
+.nv-chip.db-creators__ghost {
+  min-height: 0;
+  width: 120px;
+  height: var(--nv-target-min);
+  border-radius: var(--nv-radius-full);
+  pointer-events: none;
 }
 /* Another creator's urgencies, on her chip: red, they are urgencies (DASH-03). */
 .db-creators__grave {
@@ -814,10 +847,12 @@ div.db-fan {
     grid-column: 2;
     justify-self: start;
   }
-  .db-paper {
-    grid-template-columns: minmax(0, 1fr);
+  .db-paper,
+  .db-agency {
+    grid-template-columns: auto minmax(0, 1fr);
   }
-  .db-paper__go {
+  .db-banner__go {
+    grid-column: 2;
     justify-self: start;
   }
 }

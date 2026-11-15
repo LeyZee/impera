@@ -15,7 +15,14 @@ import type { LlmCallLog } from './call-log';
 import { classify, createCallRunner } from './call-runner';
 import { acceptsInput, MODELS, TRANSCRIPTION_MODEL } from './catalog';
 import type { ProviderId } from './config';
-import { alertsBlock, describeBrief, notesBlock, toMessages } from './conversation-messages';
+import {
+  alertsBlock,
+  describeBrief,
+  judgeSituationBlock,
+  notesBlock,
+  scriptsBlock,
+  toMessages,
+} from './conversation-messages';
 import type {
   ChannelPostInput,
   FanCardReadInput,
@@ -188,6 +195,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
         alerts: alertsBlock(input.alerts ?? []),
+        scripts: scriptsBlock(input.scripts ?? [], input.scriptStepWaiting === true),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
         canary,
@@ -208,7 +216,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         persona_sheet: input.personaSheet,
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
-        brief: describeBrief(input.brief),
+        brief: describeBrief(input.brief, input.objectionReply, input.scriptStep),
         canary,
       });
       return run(
@@ -226,7 +234,8 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
         fan_notes: notesBlock(input.fanNotes),
-        situation: input.situation ?? 'Pas d’information sur le moment.',
+        // What the agent saw (his age, his flags, the last offer): safety is read against it, not guessed.
+        situation: judgeSituationBlock(input.situation),
         criteria: input.criteria.join(', '),
         canary,
       });

@@ -161,6 +161,21 @@ export function sectionOf(pathname: string): Section | null {
   return SECTIONS.find((section) => section === first) ?? null;
 }
 
+/** Pages outside the rail that Moi › Préférences leads to (recette 11/11, CHA-26, CRE-28). */
+const OFF_RAIL_OF_MOI: ReadonlySet<string> = new Set([
+  '/notifications',
+  '/aide/installer',
+  '/aide/extension',
+]);
+
+/**
+ * The tab lit for an address of no section: Moi for those pages, when the rail holds it; none otherwise. Lit only: the
+ * route guard and the stage keep `sectionOf`.
+ */
+export function offRailSectionOf(pathname: string, rail: Rail): Section | null {
+  return OFF_RAIL_OF_MOI.has(pathname.replace(/\/+$/u, '')) && canOpen(rail, '/moi') ? '/moi' : null;
+}
+
 /** What a section is called, in the rail and in the tab's title. */
 export function sectionLabel(section: Section): string {
   return CRM_SECTION_LABELS[section];
@@ -186,6 +201,7 @@ const SCREENS = {
   '/paie/exports': 'Exports',
   '/commissions/factures': 'Factures',
   '/moi/profil': 'Profil',
+  '/moi/trophees': 'Trophées',
   '/moi/dossier': 'Dossier',
   '/moi/persona': 'Persona',
   '/moi/factures': 'Factures',
@@ -194,6 +210,7 @@ const SCREENS = {
   '/moi/preferences': 'Préférences',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/ventes': 'Ventes',
+  '/reglages/consommation-ia': 'Consommation IA',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',

@@ -17,6 +17,12 @@ const LlmRoleConfigSchema = ModelRefSchema.extend({
   maxOutputTokens: z.number().int().positive(),
   timeoutMs: z.number().int().positive(),
   fallback: ModelRefSchema.optional(),
+  /**
+   * How long an xAI model thinks before it answers, for every xAI model the role calls, its fallback included: Grok 4.7
+   * cannot stop thinking, and left at xAI's default (`high`) its answer took close to a minute on 11/11, past the
+   * role's timeout. Not sent to another provider.
+   */
+  reasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
 });
 export type LlmRoleConfig = z.infer<typeof LlmRoleConfigSchema>;
 
@@ -65,6 +71,7 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
       temperature: 0.9,
       maxOutputTokens: 400,
       timeoutMs: 30_000,
+      reasoningEffort: 'low',
       fallback: MISTRAL_FALLBACK,
     },
     brain: {
@@ -73,6 +80,7 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
       temperature: 0.3,
       maxOutputTokens: 800,
       timeoutMs: 30_000,
+      reasoningEffort: 'low',
       fallback: MISTRAL_FALLBACK,
     },
     // Gemini reads photo, video and sound natively (Charles, 17/10 18h20); when it refuses or blocks, Grok 4.7
@@ -84,8 +92,16 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
       maxOutputTokens: 1_200,
       timeoutMs: 90_000,
       fallback: { provider: 'xai', model: 'grok-4.7' },
+      reasoningEffort: 'low',
     },
-    judge: { provider: 'xai', model: 'grok-4.7', temperature: 0, maxOutputTokens: 600, timeoutMs: 60_000 },
+    judge: {
+      provider: 'xai',
+      model: 'grok-4.7',
+      temperature: 0,
+      maxOutputTokens: 600,
+      timeoutMs: 60_000,
+      reasoningEffort: 'medium',
+    },
   },
   maxTransientRetries: 2,
   dailyBudget: { capEur: 20, trendWatchCapEur: 1, alertRatio: 0.8, timeZone: 'Europe/Paris', usdPerEur: 1.1 },

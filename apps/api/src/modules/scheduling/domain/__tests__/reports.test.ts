@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assertChanges,
+  assertDecidable,
   assertDeclarable,
   assertFeedbackDue,
   assertReportOpen,
@@ -10,6 +11,7 @@ import {
   assertReviews,
   assertTotalHolds,
   canReview,
+  earningsSourceFor,
   makerOf,
   reportOpensAt,
   shiftPeriod,
@@ -77,6 +79,28 @@ describe('what a report declares in', () => {
     expect(codeOf(assertDeclarable, rules, period('2026-12-01'), 'EUR')).toBe(
       'shift_report_detected_conflict',
     );
+  });
+});
+
+describe('a report of a period switched to the sales read (ADR 0084 § 3)', () => {
+  // Rules switched after the fact: the fortnight of 16 November reads the sales, the one before the reports.
+  const rules = [
+    { fromPeriod: period('2026-10-01'), currency: 'EUR' as const, earningsSource: 'declared' as const },
+    { fromPeriod: period('2026-11-16'), currency: 'EUR' as const, earningsSource: 'detected' as const },
+  ];
+
+  it('says where pay reads the account for the report’s own period, nothing before any rules', () => {
+    expect(earningsSourceFor(rules, period('2026-11-01'))).toBe('declared');
+    expect(earningsSourceFor(rules, period('2026-11-16'))).toBe('detected');
+    expect(earningsSourceFor(rules, period('2026-12-01'))).toBe('detected');
+    expect(earningsSourceFor(rules, period('2026-09-16'))).toBeNull();
+  });
+
+  it('is neither validated nor sent back once its period reads the sales', () => {
+    expect(codeOf(assertDecidable, rules, period('2026-11-16'))).toBe('shift_report_detected_conflict');
+    expect(codeOf(assertDecidable, rules, period('2026-11-01'))).toBeNull();
+    // Without rules, the refusal stays the validation's own (`pay_rules_missing_conflict`).
+    expect(codeOf(assertDecidable, rules, period('2026-09-16'))).toBeNull();
   });
 });
 

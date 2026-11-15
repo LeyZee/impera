@@ -35,8 +35,8 @@ export interface WorkerHandle {
 }
 
 /**
- * Starts Graphile Worker on the owner pool (it owns the `graphile_worker` schema) with the composition root's
- * tasks. Jobs reach tenant data only through `withTenant` on the application pool, inside each task.
+ * Starts Graphile Worker on the service pool (the migrations make its `graphile_worker` schema, ADR 0087) with the
+ * composition root's tasks. Jobs reach tenant data only through `withTenant` on the application pool, inside each task.
  */
 export async function startWorker(app: App, options: WorkerOptions): Promise<WorkerHandle> {
   useFrenchValidationMessages();

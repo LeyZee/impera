@@ -39,6 +39,7 @@ import '@/contractors/contractors.css';
 import type { InvoiceOutcome, InvoiceRefusal } from '@/invoices/api';
 import { invoiceRefusalText } from '@/invoices/model';
 import { countryName } from '@/lib/country';
+import { useGrowingArea } from '@/lib/growing-area';
 import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { weightText } from '@/settings/billing/model';
 import { Dialog } from '@/shell/Dialog';
@@ -695,6 +696,7 @@ export function ReviewDialog({
   const { busy, refusal, send } = useFileSend(onClose);
   const [decision, setDecision] = useState<Decision | null>(null);
   const [reason, setReason] = useState('');
+  const reasonArea = useGrowingArea(reason);
   const [touched, setTouched] = useState(false);
   const trimmed = reason.trim();
   const reasonOk = trimmed !== '' && trimmed.length <= DOCUMENT_REFUSAL_REASON_MAX;
@@ -761,8 +763,9 @@ export function ReviewDialog({
               Motif
             </label>
             <textarea
+              ref={reasonArea}
               id={`${id}-reason`}
-              className="nv-field__control nv-glass sc-note"
+              className="nv-field__control nv-glass sc-note grow-area"
               rows={3}
               maxLength={DOCUMENT_REFUSAL_REASON_MAX}
               value={reason}

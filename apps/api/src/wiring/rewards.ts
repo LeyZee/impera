@@ -1,0 +1,59 @@
+import { JOB_PAYLOADS } from '@impera/contracts';
+
+import { defineTask } from '../jobs';
+import { dropsForGameUnscoped } from '../modules/content-drops';
+import { creatorDaysForGameUnscoped } from '../modules/creator-tasks';
+import { payGameFactsUnscoped } from '../modules/payroll';
+import { startRewardsModule, type RewardsModule } from '../modules/rewards';
+import { shiftsForGameUnscoped, type SchedulingModule } from '../modules/scheduling';
+
+import type { Routes, Shared, TasksOf } from './shared';
+
+export interface WiredRewards {
+  readonly module: RewardsModule;
+  readonly tasks: TasksOf<'rewards'>;
+  readonly routes: readonly Routes[];
+}
+
+/**
+ * The chatter's game (ADR 0104 § 12 to § 20) reads a member's pay and planning through the doors of those modules,
+ * plugged here, and writes neither: nothing of the game reaches a statement (§ 17).
+ */
+export function wireRewards(shared: Shared, deps: { readonly scheduling: SchedulingModule }): WiredRewards {
+  const { db, adminDb, logger, requireRole } = shared;
+  const module = startRewardsModule({
+    db,
+    adminDb,
+    reads: {
+      agencyTimeZone: deps.scheduling.pay.agencyTimeZone,
+      payFacts: payGameFactsUnscoped,
+      shifts: shiftsForGameUnscoped,
+      shiftsBegun: (userId, now) => deps.scheduling.reads.ownShiftsBegun(userId, now),
+    },
+    // ADR 0107: the creator's game reads her days and her drops through the doors of those modules, and writes neither.
+    creatorReads: { days: creatorDaysForGameUnscoped, drops: dropsForGameUnscoped },
+  });
+  return {
+    module,
+    tasks: {
+      'rewards.evaluate': defineTask(
+        'rewards.evaluate',
+        JOB_PAYLOADS['rewards.evaluate'],
+        logger,
+        async (_payload, context) => {
+          const { players, gained } = await module.jobs.evaluate();
+          if (gained > 0) context.logger.info({ players, gained }, 'rewards: gains noted');
+        },
+      ),
+    },
+    routes: [
+      module.routes({
+        guard: requireRole('operator'),
+        teamGuard: requireRole('owner', 'operator'),
+        ownerGuard: requireRole('owner'),
+        creatorGuard: requireRole('creator'),
+        agencyGuard: requireRole('owner', 'operator'),
+      }),
+    ],
+  };
+}

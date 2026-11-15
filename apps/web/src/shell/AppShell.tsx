@@ -22,6 +22,7 @@ import { seesHerMedia } from './media-blur';
 import {
   documentTitle,
   FAMILY_LABELS,
+  offRailSectionOf,
   railOf,
   sectionOf,
   securityPathOf,
@@ -34,6 +35,7 @@ import { InstallNudge } from '@/pwa/InstallNudge';
 import { useOnline } from '@/pwa/online';
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
+import { RewardOwedNotice } from '@/rewards/RewardOwedNotice';
 
 /** What the account is, under its name: a manager on leave has the chatter's rail, and stays a manager. */
 function roleLabel(user: Me): string {
@@ -84,6 +86,8 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
     },
   });
   const current = notFound ? null : sectionOf(pathname);
+  // Notifications and the guides light Moi, which leads to them, in the rail and the phone's bar (CHA-26, CRE-28).
+  const lit = notFound ? null : (current ?? offRailSectionOf(pathname, rail));
   const main = useRef<HTMLElement>(null);
   const shown = useRef(current);
 
@@ -143,7 +147,7 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
             <i />
             <i />
           </div>
-          <RailNav rail={rail} current={current} onSignOut={onSignOut} account={account}>
+          <RailNav rail={rail} current={lit} onSignOut={onSignOut} account={account}>
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
           <Stage key={current ?? 'none'} pathname={pathname} stage={main} />
@@ -166,6 +170,7 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
               </p>
             ) : null}
           </div>
+          <RewardOwedNotice user={user} pathname={pathname} />
           <p className="nv-notice-region" role="status">
             {said === null ? null : (
               <span className="nv-notice nv-glass nv-glass--thick" key={said.at}>
@@ -487,6 +492,7 @@ export function MoreSheet({
             style={{ '--nv-i': items.length + 6 }}
             onClick={onSignOut}
           >
+            <NavIcon name="sign-out" />
             Se déconnecter
           </button>
         )}
@@ -557,6 +563,7 @@ function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => v
               setOpen(false);
             }}
           >
+            <NavIcon name="bell" />
             Notifications
           </Link>
           <Link
@@ -566,6 +573,7 @@ function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => v
               setOpen(false);
             }}
           >
+            <NavIcon name="shield" />
             Sécurité
           </Link>
           {account.extension ? (
@@ -576,10 +584,12 @@ function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => v
                 setOpen(false);
               }}
             >
+              <NavIcon name="puzzle" />
               Extension
             </Link>
           ) : null}
           <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onSignOut}>
+            <NavIcon name="sign-out" />
             Se déconnecter
           </button>
         </div>

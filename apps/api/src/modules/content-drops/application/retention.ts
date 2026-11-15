@@ -1,6 +1,6 @@
 import { ContentDropStorageUnavailable } from '../domain/errors';
-import type { DropStorage, ReceiptStore, RetentionStore } from '../domain/ports';
-import { abandonedBefore, ABANDONED, noticeUntil } from '../domain/retention';
+import type { DropStorage, DueThumbnail, ReceiptStore, RetentionStore } from '../domain/ports';
+import { abandonedBefore, ABANDONED, noticeUntil, thumbnailsArchivedBefore } from '../domain/retention';
 
 export interface RetentionDeps {
   readonly storage: Pick<DropStorage, 'remove'>;
@@ -14,6 +14,9 @@ export interface RetentionRun {
   readonly announced: number;
   readonly erased: number;
   readonly failed: number;
+  /** Reduced pictures of archived creators erased (ADR 0089), and those the storage kept this time. */
+  readonly thumbnails: number;
+  readonly thumbnailsFailed: number;
 }
 
 /**
@@ -22,7 +25,9 @@ export interface RetentionRun {
  * 1. a file still waiting for its bytes 24 hours after its drop began is refused, and its drop follows as on any refusal;
  * 2. the agency is told of each original that goes within 7 days;
  * 3. each original due (its date passed, or every drop it came in by withdrawn) is erased from the storage, then marked,
- *    under the medium's row lock: one given again meanwhile stays held, bytes and row.
+ *    under the medium's row lock: one given again meanwhile stays held, bytes and row;
+ * 4. each reduced picture of a creator archived more than 90 days ago is erased (ADR 0089), with one audit line per
+ *    creator: one reopened meanwhile keeps hers.
  * A storage that refuses or does not answer leaves the original held and says it once in amber; the next run tries
  * again. Any other failure stops the run: the job's retry, the next hour, takes it again.
  */
@@ -47,5 +52,33 @@ export async function eraseOriginals(
       failed += 1;
     }
   }
-  return { abandoned: abandoned.length, announced, erased, failed };
+  const before = thumbnailsArchivedBefore(now);
+  const gone = new Map<string, number>();
+  let thumbnailsFailed = 0;
+  const byCreator = new Map<string, DueThumbnail[]>();
+  for (const thumbnail of await deps.retention.dueThumbnails(before))
+    byCreator.set(thumbnail.creatorId, [...(byCreator.get(thumbnail.creatorId) ?? []), thumbnail]);
+  for (const [creatorId, due] of byCreator) {
+    let count = 0;
+    try {
+      for (const thumbnail of due) {
+        try {
+          if (await deps.retention.eraseThumbnail(thumbnail, before, (key) => deps.storage.remove(key)))
+            count += 1;
+        } catch (error) {
+          if (!(error instanceof ContentDropStorageUnavailable)) throw error;
+          // Held: the next hour tries again. Nothing to tell the agency, she is gone.
+          thumbnailsFailed += 1;
+        }
+      }
+    } finally {
+      // Said as soon as her pictures are done, and even when the pass stops on her: what went is never unsaid.
+      if (count > 0) {
+        gone.set(creatorId, count);
+        await deps.retention.thumbnailsErased(creatorId, count);
+      }
+    }
+  }
+  const thumbnails = [...gone.values()].reduce((total, count) => total + count, 0);
+  return { abandoned: abandoned.length, announced, erased, failed, thumbnails, thumbnailsFailed };
 }

@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 
 import { createDbClient } from '@impera/db';
 
-import { loadConfig } from '../config';
+import { loadConfig, ownerDatabaseUrl } from '../config';
 import { revokeDashboardSessions } from '../ops';
 
 import { requireArguments } from './command-line';
@@ -24,7 +24,7 @@ if (values.all === (values.email !== undefined)) {
 }
 
 const config = loadConfig();
-const admin = createDbClient(config.DATABASE_ADMIN_URL);
+const admin = createDbClient(ownerDatabaseUrl(config));
 try {
   const revoked = await revokeDashboardSessions(admin.db, values.email ?? null);
   console.log(`${String(revoked)} session(s) révoquée(s).`);

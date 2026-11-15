@@ -1,6 +1,8 @@
 import {
   calendarDayAt,
+  SALE_WHOLE_BP,
   type Currency,
+  type MySaleGiven,
   type MySaleState,
   type PayPeriod,
   type PlatformAccountId,
@@ -15,13 +17,35 @@ import { saleIdOf, saleKeyOf, type SaleKey } from './sales';
  * whether they may signal it or take their signal back now.
  */
 
-/** A line as the member's statement keeps it: its account and currency are its statement line's. */
+/**
+ * A line as the member's statement keeps it: its account and currency are its statement line's; `shareBp`, their share
+ * of a line the validator shared (ADR 0101), `null` for a whole line.
+ */
 export interface OwnStatementSale extends SaleKey {
   readonly platformAccountId: PlatformAccountId;
   readonly currency: Currency;
   readonly netMinor: number;
   readonly lateFrom: PayPeriod | null;
   readonly occurredAt: Date | null;
+  readonly shareBp: number | null;
+}
+
+/**
+ * The latest decision on a sale of the member's that gives it (ADR 0101), as they read it: whether they made it or
+ * receive it, the recipient's share, the other side, the note, and the sale as the register had it, for an author whose
+ * sale left their statement. Read by its author and its recipient alone (the policies).
+ */
+export interface OwnGift {
+  readonly platform: SaleKey['platform'];
+  readonly platformSaleId: string;
+  readonly role: 'author' | 'recipient';
+  readonly recipientShareBp: number;
+  readonly other: MySaleGiven['other'];
+  readonly note: string;
+  readonly platformAccountId: PlatformAccountId;
+  readonly currency: Currency;
+  readonly netMinor: number;
+  readonly occurredAt: Date;
 }
 
 /** The member's latest signal on a line of the period, with what the line was on their statement when written. */
@@ -35,11 +59,28 @@ export interface OwnSignal extends SaleKey {
   readonly occurredAt: Date | null;
 }
 
-/** One of the member's lines, where it stands, their signal in force (or kept) and whether a gesture is open. */
+/**
+ * One of the member's lines, where it stands, their signal in force (or kept), the gift it comes from (`null`: none)
+ * and whether a gesture is open.
+ */
 export interface MyLine extends OwnStatementSale {
   readonly state: MySaleState;
   readonly signal: { readonly note: string | null; readonly signalledAt: Date } | null;
+  readonly given: MySaleGiven | null;
   readonly open: boolean;
+}
+
+/**
+ * What a line on the member's statement says of a gift (ADR 0101 § 6): a recipient's whole sale or share, an author's
+ * share. A gift the statement does not carry (a decision that lapsed, an author's whole sale back on it) says nothing:
+ * the statement is what pays.
+ */
+function givenOn(sale: OwnStatementSale, gift: OwnGift | undefined): MySaleGiven | null {
+  if (gift === undefined) return null;
+  const share = sale.shareBp ?? SALE_WHOLE_BP;
+  const expected = gift.role === 'recipient' ? gift.recipientShareBp : SALE_WHOLE_BP - gift.recipientShareBp;
+  if (share !== expected || (gift.role === 'author' && sale.shareBp === null)) return null;
+  return { role: gift.role, myShareBp: share, other: gift.other, note: gift.note };
 }
 
 /** A day of the member's lines on their statement, in the agency's zone (`null`: lines without an instant). */
@@ -76,9 +117,12 @@ export const placeOfLine = (line: SaleKey & { readonly occurredAt: Date | null }
 
 /**
  * The member's lines of the period (see above), in the order of `compareMine`:
- * - each line of their statement: `signalled` with their signal in force, `counted` otherwise;
- * - each line they signalled that has left it since (the signal in force kept): `excluded` when the latest decision
- *   they read on its sale excludes it, `removed` otherwise, as the signal kept it.
+ * - each line of their statement: `signalled` with their signal in force, `counted` otherwise, with the gift it
+ *   comes from when the validator gave it (a recipient's whole sale or share, an author's share);
+ * - each line they signalled that has left it since (the signal in force kept): `given` when the latest decision they
+ *   read gives the whole sale away, `excluded` when it excludes it, `removed` otherwise, as the signal kept it;
+ * - each sale of theirs the validator gave whole to another member (`gifts` of the period, as an author) and that
+ *   neither their statement nor a signal shows: `given`, as the decision kept the sale (ADR 0101 § 6).
  * A gesture is `open` on a line of the statement while the period is not closed and no closing counted the line.
  */
 export function myLines(input: {
@@ -88,26 +132,42 @@ export function myLines(input: {
   readonly excluded: ReadonlySet<string>;
   /** The member's lines a closing counted, by `saleKeyOf`. */
   readonly registered: ReadonlySet<string>;
+  /** The latest gifts the member reads on the sales of the period and of their statement, by `saleIdOf`. */
+  readonly gifts?: ReadonlyMap<string, OwnGift>;
   readonly closed: boolean;
 }): MyLine[] {
+  const gifts = input.gifts ?? new Map<string, OwnGift>();
   const signalOf = new Map(input.signals.map((one) => [saleKeyOf(one), one]));
   const lines: MyLine[] = [];
-  const onStatement = new Set<string>();
+  const shown = new Set<string>();
   for (const sale of input.statement) {
     const key = saleKeyOf(sale);
-    onStatement.add(key);
+    shown.add(key);
     const signal = signalOf.get(key);
     const inForce = signal?.kind === 'signal';
     lines.push({
       ...sale,
       state: inForce ? 'signalled' : 'counted',
       signal: inForce ? { note: signal.note, signalledAt: signal.createdAt } : null,
+      given: givenOn(sale, gifts.get(saleIdOf(sale))),
       open: !input.closed && !input.registered.has(key),
     });
   }
+  const givenAway = (one: { readonly platform: OwnGift['platform']; readonly platformSaleId: string }) => {
+    const gift = gifts.get(saleIdOf(one));
+    return gift?.role === 'author' && gift.recipientShareBp === SALE_WHOLE_BP ? gift : null;
+  };
+  const awayOf = (gift: OwnGift): MySaleGiven => ({
+    role: 'author',
+    myShareBp: 0,
+    other: gift.other,
+    note: gift.note,
+  });
   for (const signal of input.signals) {
     const key = saleKeyOf(signal);
-    if (signal.kind !== 'signal' || onStatement.has(key)) continue;
+    if (signal.kind !== 'signal' || shown.has(key)) continue;
+    shown.add(key);
+    const away = givenAway(signal);
     lines.push({
       platform: signal.platform,
       platformSaleId: signal.platformSaleId,
@@ -117,8 +177,29 @@ export function myLines(input: {
       netMinor: signal.netMinor,
       lateFrom: null,
       occurredAt: signal.occurredAt,
-      state: input.excluded.has(saleIdOf(signal)) ? 'excluded' : 'removed',
+      shareBp: null,
+      state: away !== null ? 'given' : input.excluded.has(saleIdOf(signal)) ? 'excluded' : 'removed',
       signal: { note: signal.note, signalledAt: signal.createdAt },
+      given: away === null ? null : awayOf(away),
+      open: false,
+    });
+  }
+  for (const gift of gifts.values()) {
+    const key = saleKeyOf({ ...gift, event: 'sale' });
+    if (shown.has(key) || givenAway(gift) === null) continue;
+    lines.push({
+      platform: gift.platform,
+      platformSaleId: gift.platformSaleId,
+      event: 'sale',
+      platformAccountId: gift.platformAccountId,
+      currency: gift.currency,
+      netMinor: gift.netMinor,
+      lateFrom: null,
+      occurredAt: gift.occurredAt,
+      shareBp: null,
+      state: 'given',
+      signal: null,
+      given: awayOf(gift),
       open: false,
     });
   }

@@ -1,6 +1,7 @@
 import type { CreatorAccountShift, CreatorAgenda, CreatorSuggestion, CreatorTask } from '@impera/contracts';
 import { CREATOR_TASK_CATEGORY_LABELS } from '@impera/contracts';
 import {
+  useId,
   useRef,
   useState,
   type JSX,
@@ -29,11 +30,16 @@ import {
 import { repliesOn } from './replies';
 
 import { useOnline } from '@/pwa/online';
+import { useHerTrophyCase } from '@/rewards/api';
+import { CREATOR_MEDALS, CreatorMedal, highestMedal } from '@/rewards/creator-art';
 import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { useFloatingTip } from '@/screens/dashboard/parts';
 
 const WEEKDAY_SHORT = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'] as const;
 const MINUTE_MS = 60_000;
+/** Her medal beside her streak: 28 px, the smallest a coin may stand without its name (ADR 0107 § 1). */
+const MEDAL_SIZE = 28;
 
 export interface DayActions {
   readonly onTick: (task: CreatorTask, on: boolean, day: string) => void;
@@ -76,6 +82,7 @@ export function DayView({
   // Suggestions at an hour sit in the Programme (CREA-22); the others, without an hour, stay as cards on top.
   const proposed = timedSuggestionsOf(plan, agenda.timeZone);
   const cards = plan.suggestions.filter((suggestion) => suggestion.when?.kind !== 'timed');
+  const decideId = useId();
   const swipe = useSwipe((step) => {
     onDay(addDays(day, step));
   });
@@ -88,7 +95,12 @@ export function DayView({
         <UndatedSuggestions agenda={agenda} onDecline={actions.onDecline} onPlace={actions.onPlace} />
       ) : null}
       {cards.length === 0 ? null : (
-        <section className="ag-sec" aria-label="Propositions de l’agence">
+        // Titled like « Sans date » above it, so that a dated card is never read as one of those (CRE-07).
+        <section className="ag-sec" aria-labelledby={decideId}>
+          <div className="ag-sec__head">
+            <h2 id={decideId}>{isToday ? 'Proposé pour aujourd’hui' : 'Proposé ce jour-là'}</h2>
+            <span className="ag-count nv-num">{cards.length}</span>
+          </div>
           {cards.map((suggestion) => (
             <SuggestionCard
               key={suggestion.id}
@@ -246,16 +258,23 @@ export function Glance({
   const { done, total } = progressOf(plan);
   const left = total - done;
   const first = firstOf(plan, nowMinute);
+  const proposed = plan.suggestions.length;
+  // Nothing of hers but a suggestion waiting: the title says the suggestion, never « Rien à faire » (CRE-05).
   const title =
     total === 0
-      ? 'Rien à faire'
+      ? proposed > 0
+        ? `${String(proposed)} ${proposed > 1 ? 'propositions' : 'proposition'} à regarder`
+        : 'Rien à faire'
       : left === 0
         ? 'Tout est fait'
         : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
-  const proposed = plan.suggestions.length;
+  const share = total === 0 ? 0 : done / total;
   // « Plus rien à heure » only when there was something at an hour: an empty day says it once, in the title.
   const moment = nowMinute === null || plan.timed.length === 0 ? null : momentOf(plan, nowMinute);
   const { streak } = agenda;
+  // Her highest streak medal beside the count (ADR 0107 § 9); none before her first, or while her case is not read.
+  const medal = highestMedal(useHerTrophyCase(true).data?.items ?? []);
+  const tip = useFloatingTip();
   return (
     <section className="nv-plate ag-glance nv-enter" aria-label="Ta journée">
       <div className="ag-glance__top">
@@ -267,13 +286,16 @@ export function Glance({
         >
           <svg viewBox="0 0 66 66" aria-hidden="true">
             <circle className="nv-ring__track" cx="33" cy="33" r={RING_RADIUS} />
-            <circle
-              className="nv-ring__value"
-              cx="33"
-              cy="33"
-              r={RING_RADIUS}
-              strokeDasharray={ringDash(total === 0 ? 0 : done / total)}
-            />
+            {/* At nothing done, no value at all: a round cap of length 0 still draws a lit dot (CRE-06). */}
+            {share === 0 ? null : (
+              <circle
+                className="nv-ring__value"
+                cx="33"
+                cy="33"
+                r={RING_RADIUS}
+                strokeDasharray={ringDash(share)}
+              />
+            )}
           </svg>
           <span className="nv-ring__label nv-num" aria-hidden="true">
             {total === 0 ? '–' : `${String(done)}/${String(total)}`}
@@ -284,7 +306,7 @@ export function Glance({
           <span>
             {total === 0 ? (
               proposed > 0 ? (
-                `${String(proposed)} ${proposed > 1 ? 'propositions' : 'proposition'} de l’agence à regarder.`
+                `Rien d’autre à faire ${nowMinute === null ? 'ce jour-là' : 'aujourd’hui'}.`
               ) : nowMinute === null ? (
                 'Aucune tâche ce jour-là.'
               ) : (
@@ -306,8 +328,26 @@ export function Glance({
             <span
               className="ag-streak"
               data-risk={streak.atRisk ? 'true' : undefined}
-              title={streak.next === null ? undefined : `Prochain palier : ${String(streak.next)} jours`}
+              {...(medal === null
+                ? {
+                    title:
+                      streak.next === null ? undefined : `Prochain palier : ${String(streak.next)} jours`,
+                  }
+                : {
+                    // The pill takes the focus and the tip, not the coin: its ring stays clear of the count (avis
+                    // Design, 14/11), and the pill is what will open her showcase.
+                    tabIndex: 0,
+                    ...tip.bind({
+                      title: `Médaille : série de ${String(CREATOR_MEDALS[medal].days)} jours`,
+                      ...(streak.next === null
+                        ? {}
+                        : { text: `Prochain palier : ${String(streak.next)} jours` }),
+                    }),
+                  })}
             >
+              {medal === null ? null : (
+                <CreatorMedal kind={medal} size={MEDAL_SIZE} className="ag-streak__medal" />
+              )}
               <b className="nv-num">{streak.days}</b> {streak.days > 1 ? 'jours' : 'jour'} de suite
             </span>
           )}
@@ -341,6 +381,7 @@ export function Glance({
         <p className="ag-glance__risk">Coche ta routine aujourd’hui pour garder ta série.</p>
       ) : null}
       {children}
+      {tip.element}
     </section>
   );
 }
@@ -411,7 +452,8 @@ function TaskRow({
           {task.title}
           {task.essential ? <span className="ag-ess">essentielle</span> : null}
         </b>
-        <span>{task.purpose ?? CREATOR_TASK_CATEGORY_LABELS[task.category]}</span>
+        {/* Without a purpose, the title stands alone: the category is the tag on the right (CRE-19). */}
+        {task.purpose === null ? null : <span>{task.purpose}</span>}
       </button>
       <span className="ag-tag">
         {task.when.kind === 'routine' ? 'Routine' : CREATOR_TASK_CATEGORY_LABELS[task.category]}

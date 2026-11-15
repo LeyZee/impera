@@ -53,6 +53,7 @@ const VALIDATED = {
   version: 1,
   byAgency: false,
   reviewKind: null,
+  earningsSource: 'declared',
   explanation: null,
   check: null,
   canReview: false,
@@ -62,7 +63,7 @@ const VALIDATED = {
   createdAt: '2026-11-02T14:10:00Z',
 };
 
-function serve(): void {
+function serve(reports: readonly object[] = [VALIDATED]): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: string) => {
@@ -73,7 +74,7 @@ function serve(): void {
           : url.pathname === '/v1/scheduling/shift-reports'
             ? url.searchParams.get('period') === '2026-11-01'
               ? {
-                  reports: [VALIDATED],
+                  reports,
                   shifts: [DONE, LEFT],
                   accounts: [
                     {
@@ -114,7 +115,9 @@ function renderCard(): void {
   );
 }
 
-beforeEach(serve);
+beforeEach(() => {
+  serve();
+});
 
 afterEach(() => {
   cleanup();
@@ -132,5 +135,34 @@ describe('Aujourd’hui › Mes rapports (recette 05/11)', () => {
     expect(
       screen.getByRole('link', { name: 'Ta commission est dans Commissions' }).getAttribute('href'),
     ).toBe('/commissions');
+  });
+
+  it('says his reports of a fortnight switched to the sales read without effect on pay, with nothing to do (ADR 0084 § 3)', async () => {
+    const switched = { ...VALIDATED, earningsSource: 'detected' };
+    const sentBack = {
+      ...VALIDATED,
+      id: id(602),
+      shiftId: id(102),
+      amount: { amountMinor: 5_000, currency: 'EUR' },
+      status: 'rejected',
+      reviewNote: 'Le pourboire',
+      earningsSource: 'detected',
+    };
+    serve([switched, sentBack]);
+    renderCard();
+    expect(
+      await screen.findByText(
+        'Cette quinzaine, ta paie suit les ventes relevées : tes rapports restent, sans effet sur la paie.',
+      ),
+    ).toBeTruthy();
+    expect(document.querySelectorAll('.rp-figures__label')).toHaveLength(0);
+    expect(screen.getByText('2 sans effet sur la paie')).toBeTruthy();
+    expect(
+      [...document.querySelectorAll('.rp-line .rp-chip')].map((one) => [one.textContent, one.className]),
+    ).toEqual([
+      ['Sans effet sur la paie', 'rp-chip rp-chip--neutral'],
+      ['Sans effet sur la paie', 'rp-chip rp-chip--neutral'],
+    ]);
+    expect(screen.getByRole('link', { name: 'Ta commission est dans Commissions' })).toBeTruthy();
   });
 });

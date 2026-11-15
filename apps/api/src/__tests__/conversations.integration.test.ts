@@ -201,8 +201,8 @@ describe('conversations module (P0-05)', () => {
     sender = new FakeSender();
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender,
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),
@@ -272,6 +272,52 @@ describe('conversations module (P0-05)', () => {
     });
   });
 
+  it('slows down to one answer every three minutes past 60 answers in the hour, and still answers', async () => {
+    const { conversationId } = await ingest('c-pace');
+    const [row] = await test.admin.db
+      .select({ creatorId: schema.conversations.creatorId })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.id, conversationId));
+    const lastReplyAt = new Date(clock.now().getTime() - 20_000);
+    await test.admin.db.insert(schema.drafts).values(
+      Array.from({ length: 60 }, (_, index) => ({
+        id: newId(DraftIdSchema),
+        creatorId: row!.creatorId,
+        conversationId,
+        status: 'sent',
+        idempotencyKey: `pace:${String(index)}`,
+        createdAt: new Date(lastReplyAt.getTime() - index * 30_000),
+      })),
+    );
+    await ingest('c-pace');
+    const pending = (await jobs('conversation.respond')).filter((job) => job.key?.endsWith(conversationId));
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.run_at.toISOString()).toBe(new Date(lastReplyAt.getTime() + 180_000).toISOString());
+
+    // An hour later the count is back under 60: her usual pace.
+    clock.advance(3_600);
+    await ingest('c-pace');
+    const after = (await jobs('conversation.respond')).filter((job) => job.key?.endsWith(conversationId));
+    expect(after[0]!.run_at.toISOString()).toBe(new Date(clock.now().getTime() + 45_000).toISOString());
+  });
+
+  it('keeps 4 000 characters and 20 media of a fan message, and still takes it', async () => {
+    const media = Array.from({ length: 25 }, (_, index) => ({
+      ref: { platform: 'reveal' as const, id: `m-${String(index)}` },
+      kind: 'image' as const,
+      isLocked: false,
+    }));
+    const message = { ...fanMessage('c-long', 'a'.repeat(9_000)), media };
+    const { conversationId, isNew } = await ingest('c-long', message);
+    expect(isNew).toBe(true);
+    const [stored] = await test.admin.db
+      .select({ text: schema.messages.text, media: schema.messages.platformMedia })
+      .from(schema.messages)
+      .where(eq(schema.messages.conversationId, conversationId));
+    expect(stored?.text).toHaveLength(4_000);
+    expect(stored?.media).toHaveLength(20);
+  });
+
   it('refuses a forbidden transition without writing anything', async () => {
     const { conversationId } = await ingest('c-forbidden');
     const draftId = await respond(conversationId);
@@ -328,8 +374,8 @@ describe('conversations module (P0-05)', () => {
     const creators: string[] = [];
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender,
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),
@@ -363,8 +409,8 @@ describe('conversations module (P0-05)', () => {
   it('approves nothing for a creator without an active persona: her guards cannot be read (fail closed)', async () => {
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender,
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),
@@ -381,8 +427,8 @@ describe('conversations module (P0-05)', () => {
     expect(draft).toMatchObject({ status: 'pending', finalBubbles: null });
     conversations = createConversationsModule({
       db: test.app.db,
-      adminDb: test.admin.db,
-      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
       sender,
       requireRole: () => () => Promise.resolve(),
       recentLogin: () => Promise.resolve(),
@@ -433,6 +479,52 @@ describe('conversations module (P0-05)', () => {
     await conversations.jobs.send({ creatorId, conversationId, draftId, correlationId: 'test' }, NO_LOG, 1);
     expect(sender.sent).toEqual([]);
     expect((await events(conversationId)).slice(-2)).toEqual(['message_received', 'draft_expired']);
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
+  });
+
+  /** A message written on the creator's side by someone else than the agent: a chatter, her, an automation. */
+  function teamMessage(conversation: string, text = 'coucou toi'): ExternalMessage {
+    return { ...fanMessage(conversation, text), direction: 'outbound', author: 'human' };
+  }
+
+  it('answers nothing over a reply written on the platform while he waited (ADR 0110 § 2)', async () => {
+    const { conversationId } = await ingest('c-answered');
+    const draftId = await respond(conversationId);
+    clock.advance(5);
+    await ingest('c-answered', teamMessage('c-answered'));
+
+    expect((await events(conversationId)).slice(-2)).toEqual(['draft_expired', 'message_received']);
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
+    await expect(
+      conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Coucou'] }),
+    ).rejects.toThrow();
+    // His next message is answered again, as always.
+    clock.advance(5);
+    await ingest('c-answered');
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
+  });
+
+  it('drops the pending answer when the platform answered before the debounce ended (ADR 0110 § 2)', async () => {
+    const { conversationId } = await ingest('c-auto-reply');
+    clock.advance(5);
+    await ingest('c-auto-reply', teamMessage('c-auto-reply'));
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
+
+    await conversations.jobs.respond({ creatorId, conversationId, correlationId: 'test' }, NO_LOG);
+    const drafts = await test.admin.db
+      .select()
+      .from(schema.drafts)
+      .where(eq(schema.drafts.conversationId, conversationId));
+    expect(drafts).toEqual([]);
+  });
+
+  it('still answers a fan whose words carry a safety sign, even answered on the platform (ADR 0110 § 2)', async () => {
+    const { conversationId } = await ingest(
+      'c-answered-sign',
+      fanMessage('c-answered-sign', "j'ai 15 ans tu sais"),
+    );
+    clock.advance(5);
+    await ingest('c-answered-sign', teamMessage('c-answered-sign'));
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
   });
 
@@ -537,6 +629,10 @@ describe('conversations module (P0-05)', () => {
       'desireScore',
       'desireBand',
       'desireAt',
+      'fanAvailability',
+      'careSince',
+      'careHelpAt',
+      'careClosedAt',
     ] as const;
     const pick = (row: typeof projected) => Object.fromEntries(keys.map((key) => [key, row[key]]));
     expect(rebuilt).toEqual(pick(projected));

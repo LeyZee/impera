@@ -151,7 +151,7 @@ describe('Rappel du rapport de fin de shift (ADR 0077)', () => {
     // A key for the push server's own key pair: without one, push is off and nothing is reminded.
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${randomBytes(32).toString('base64')}`,
     });
     app = await createApp(config, createLogger(config));
@@ -237,7 +237,7 @@ describe('Rappel du rapport de fin de shift (ADR 0077)', () => {
 
   it('rings nothing for a report sent between the read of the candidates and the reminder', async () => {
     const late = await shift(theo, declared, 95);
-    const source = createDrizzleReportReminderSource(test.admin.db);
+    const source = createDrizzleReportReminderSource(test.service.db);
     const asked: string[] = [];
     await remindReports(
       {

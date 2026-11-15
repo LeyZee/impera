@@ -311,9 +311,20 @@ export type TeamMembership = z.infer<typeof TeamMembershipSchema>;
  * `GET /v1/me` (ADR 0024): who is signed in, with his team role and the scope the server derives from it. The rail
  * and the route guards read it; the server's refusals stay the real barrier.
  */
+export const MePreferencesSchema = z.object({ sounds: z.boolean() });
+export type MePreferences = z.infer<typeof MePreferencesSchema>;
+
+/** What an account that chose nothing gets: the sounds of the game play. */
+export const DEFAULT_ME_PREFERENCES: MePreferences = { sounds: true };
+
+/** `PUT /v1/me/preferences`: the account's own preferences, whole. */
+export const UpdateMePreferencesBodySchema = z.strictObject({ sounds: z.boolean() });
+
 export const MeSchema = CurrentUserSchema.extend({
   team: TeamMembershipSchema.nullable(),
   teamScope: TeamScopeSchema,
+  /** The account's own preferences (`user_preferences`); the defaults while it chose nothing. */
+  preferences: MePreferencesSchema.default(DEFAULT_ME_PREFERENCES),
 });
 export type Me = z.infer<typeof MeSchema>;
 

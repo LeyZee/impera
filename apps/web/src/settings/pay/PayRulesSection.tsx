@@ -369,8 +369,11 @@ function RulesPanel({
           </div>
           {backdated ? (
             <p className="tm-warn nv-enter">
-              Cette quinzaine a déjà commencé : ses relevés en brouillon seront recalculés sur les ventes
-              relevées, et les ventes déclarées dans ses rapports ne compteront plus.
+              {fromPeriod < currentPeriod
+                ? 'Cette quinzaine est déjà finie'
+                : 'Cette quinzaine a déjà commencé'}
+              {'\u00a0'}: ses relevés en brouillon seront recalculés sur les ventes relevées, et les ventes
+              déclarées dans ses rapports ne compteront plus.
             </p>
           ) : null}
           <p className="tm-hint">

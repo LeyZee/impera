@@ -29,7 +29,7 @@ describe('llm_calls as the gateway journal (LlmCallStore)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    store = createDrizzleLlmCallStore(test.admin.db);
+    store = createDrizzleLlmCallStore(test.service.db);
   });
 
   afterAll(async () => {

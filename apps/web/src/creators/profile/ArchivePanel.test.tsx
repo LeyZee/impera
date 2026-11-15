@@ -57,6 +57,9 @@ describe('ArchivePanel (ADR 0071 § 2)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Archiver…' }));
     expect(screen.getByText('Archiver Nora ?')).toBeDefined();
     expect(screen.getByText(/Son agent s’arrête/)).toBeDefined();
+    expect(
+      screen.getByText(/Ses vignettes sont effacées dans 90 jours, le .+\. Rouverte avant, rien ne part\./),
+    ).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
     expect(screen.getByRole('button', { name: 'Archiver…' })).toBeDefined();
     expect(fetch).not.toHaveBeenCalled();

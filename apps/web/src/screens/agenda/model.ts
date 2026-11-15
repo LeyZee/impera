@@ -249,15 +249,25 @@ export function programOf(
   proposed: readonly ProposedAt[] = [],
 ): ProgramRow[] {
   const rows: ProgramRow[] = [];
+  // A free time is cut at the edges of her dispos (CRE-18): only the part a dispo covers is « dispo pour l'agence ».
   const free = (from: number, to: number): void => {
     const start = now !== null && from < now ? Math.ceil(now / 15) * 15 : from;
     if (to - start < SHORTEST_FREE) return;
-    rows.push({
-      kind: 'free',
-      start,
-      end: to,
-      open: plan.windows.some((window) => window.start < to && window.end > start),
-    });
+    const edges = plan.windows
+      .flatMap((window) => [window.start, window.end])
+      .filter((edge) => edge > start && edge < to);
+    const cuts = [...new Set([start, ...edges, to])].sort((a, b) => a - b);
+    for (let index = 0; index + 1 < cuts.length; index += 1) {
+      const [a, b] = [cuts[index] ?? start, cuts[index + 1] ?? to];
+      const open = plan.windows.some((window) => window.start < b && window.end > a);
+      // A short stretch is not worth a row of its own, unless it is all of a dispo she opened.
+      if (b - a < SHORTEST_FREE && !open) continue;
+      const last = rows.at(-1);
+      // Two stretches side by side that say the same thing are one row (a dispo after another, a short gap skipped).
+      if (last?.kind === 'free' && last.end === a && last.open === open)
+        rows[rows.length - 1] = { ...last, end: b };
+      else rows.push({ kind: 'free', start: a, end: b, open });
+    }
   };
   const placed = [
     ...plan.timed.map((item) => ({ start: item.start, end: item.end, row: { kind: 'task', item } as const })),

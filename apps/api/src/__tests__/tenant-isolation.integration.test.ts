@@ -121,6 +121,9 @@ const AGENCY_SCOPE: readonly string[] = [
   'manager of A: GET /v1/team/pay-rules → 200 shows Béa, bea-inventee',
   // The commission a report would earn (reco 19): the same reach as the report and the commission above.
   'manager of A: GET /v1/payroll/shifts/:shiftId/estimate → 200',
+  // The game of a member on their file (ADR 0104 § 20): rank, streak and trophies of anyone of the team, read only,
+  // with no amount; the same reach as the member's record above.
+  'manager of A: GET /v1/rewards/members/:memberId/trophy-case → 200',
 ];
 
 /** B's tables the manager changes through those routes: none, her planning included (Charles, 06/11). */
@@ -178,6 +181,8 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'DELETE /v1/script-structures/:structureId': 'the agency’s script library',
   'GET /v1/script-structures/:structureId/cards/:segmentKey': 'the agency’s script library',
   'DELETE /v1/trends/extension-links/:id': 'the person’s own extension link',
+  'DELETE /v1/settings/mcp-grants/:id': 'an agent access, agency-level and owner only: mcp-grants tests',
+  'DELETE /v1/settings/ai-usage/credits/:id': 'the agency’s AI credits ledger, owner only: ai-usage tests',
   'GET /v1/copilot/conversations/:platformConversationId/draft':
     'a platform’s conversation id, looked up only among the reader’s creators: copilot tests',
   'POST /v1/creator-space/content-requests/:id/refuse': 'creator space: content-drops tests',

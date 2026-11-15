@@ -1,6 +1,7 @@
 import {
   CONNECTOR_LINK_FORBIDDEN,
   CONNECTOR_SESSION_CONFLICT,
+  CONNECTOR_SESSION_MEMBER_CONFLICT,
   CONNECTOR_SESSION_UNPROCESSABLE,
   PlatformAccountIdSchema,
 } from '@impera/contracts';
@@ -64,6 +65,15 @@ describe('sendSession', () => {
     expect(
       await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, answer(409, errorBody(CONNECTOR_SESSION_CONFLICT))),
     ).toBe('other-model');
+    expect(
+      await sendSession(
+        ORIGIN,
+        TOKEN,
+        ACCOUNT,
+        SESSION,
+        answer(409, errorBody(CONNECTOR_SESSION_MEMBER_CONFLICT)),
+      ),
+    ).toBe('other-member');
     expect(
       await sendSession(
         ORIGIN,

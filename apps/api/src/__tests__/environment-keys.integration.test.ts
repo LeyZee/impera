@@ -15,7 +15,7 @@ describe('AI keys read from the development environment', () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       LLM_MISTRAL_API_KEY: 'mistral-dev-placeholder',
       LLM_VENICE_API_KEY: 'venice-dev-placeholder',
     });

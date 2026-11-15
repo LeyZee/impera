@@ -23,7 +23,7 @@ describe('dashboard authentication (P0-07a)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config));
     const ownerOnly: FastifyPluginAsyncZod = (routes) => {
       routes.post('/owner-only', { preValidation: app.requireRole('owner') }, () => ({ ok: true }));

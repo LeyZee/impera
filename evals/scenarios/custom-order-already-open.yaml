@@ -1,0 +1,29 @@
+# Demande sur mesure déjà notée (ADR 0090 § A) : elle ne l'ouvre pas une deuxième fois et ne promet toujours rien. Fan et messages fictifs (ADR 0010).
+description: Il relance sa vidéo à son prénom, déjà en attente ; elle dit qu'elle ne l'a pas oubliée, sans délai.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+situation:
+  known_hours: 80
+  age_confirmed: true
+  custom_order_open: true
+history:
+  - from: fan
+    text: Tu pourrais me tourner une petite vidéo où tu dis mon prénom ?
+  - from: creator
+    text: Oh j'adore l'idée, laisse-moi y réfléchir 😏
+inbound: Alors, tu me la fais quand ma vidéo avec mon prénom ?
+expect:
+  brief:
+    intent_in:
+      - asks_for_service
+  decision:
+    custom_order: reply
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(demain|ce soir|cette semaine|d'ici|dans \d+)\b
+      - \d+ ?(€|euros?|balles)

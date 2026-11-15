@@ -50,6 +50,7 @@ function sent(check: ShiftReportCheck | null, explanation: string | null = null)
     version: 1,
     byAgency: false,
     reviewKind: null,
+    earningsSource: 'declared',
     explanation,
     check,
     canReview: true,

@@ -14,6 +14,7 @@ const me = (over: Partial<Me>): Me => ({
   shiftCreatorIds: [],
   team: null,
   teamScope: 'owner',
+  preferences: { sounds: true },
   ...over,
 });
 

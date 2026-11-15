@@ -1,7 +1,7 @@
 import type { AppLlm } from '../llm';
 import type { ActivePersonaSource } from '../modules/agent';
 import type { PersonaModule } from '../modules/persona';
-import { startPlaygroundModule, type PlaygroundModule } from '../modules/playground';
+import { createDbDesireMarkStore, startPlaygroundModule, type PlaygroundModule } from '../modules/playground';
 
 import type { Routes, Shared } from './shared';
 
@@ -39,6 +39,7 @@ export async function wirePlayground(
         trainingDir: deps.trainingDir,
         activePersona: deps.activePersona,
         personaVersion: (creatorId, versionId) => deps.persona.versions.version(creatorId, versionId),
+        desireMarks: createDbDesireMarkStore(shared.db),
       }).catch((error: unknown) => {
         logger.warn({ err: error }, 'playground not started: persona unreadable');
         return null;

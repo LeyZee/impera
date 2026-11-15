@@ -38,6 +38,8 @@ import type { Notice, Outcome, Signal } from './signals';
 export const SCANNED_EVENT_TYPES = [
   'handoff_requested',
   'budget_threshold_crossed',
+  'ai_credits_low',
+  'ai_quota_exhausted',
   'session_state_changed',
   'kill_switch_toggled',
   'takeover_started',
@@ -61,6 +63,7 @@ export const SCANNED_EVENT_TYPES = [
   'sales_feed_mismatch',
   'connection_state_changed',
   'agency_share_mismatch',
+  'agency_share_changed',
   'sales_feed_signal',
 ] as const;
 
@@ -86,6 +89,7 @@ const CAUSE_TEXT: Readonly<Record<HandoffCause, string>> = {
   custom_alert: 'Une alerte personnalisée a sonné.',
   identity_doubt: 'Le fan doute de parler vraiment à la créatrice.',
   persona_inactive: 'La créatrice n’a pas de persona active : l’agent n’écrit rien.',
+  custom_order: 'Le fan demande quelque chose fait pour lui : un humain prend la commande.',
 };
 
 /**
@@ -104,6 +108,8 @@ const SYSTEM_ALERT_TEXT: Readonly<Record<SystemAlertCode, string>> = {
   service_request:
     'Le fan demande un service (contenu sur mesure, appel, cam, vocal) : un humain peut le lui vendre.',
   identity_doubt: CAUSE_TEXT.identity_doubt,
+  script_price:
+    'Le prix d’une étape de script a changé sur la plateforme : l’étape n’est pas partie, vérifiez le catalogue.',
 };
 
 /** An alert of hers is named, as Suivi › Historique des alertes names it; the system's by their label there. */
@@ -158,6 +164,17 @@ const alertTopic = (alert: AlertRef): TelegramTopic =>
   alert.kind === 'custom' ? CUSTOM_ALERT_TOPIC : SYSTEM_ALERT_TOPICS[alert.code];
 
 const KILL_REASON_MAX = 200;
+
+/** The services as the owner knows them, by the model he pays for. */
+const CREDIT_PROVIDER_NAME: Readonly<Record<'xai' | 'mistral' | 'google', string>> = {
+  xai: 'Grok (xAI)',
+  mistral: 'Mistral',
+  google: 'Gemini (Google)',
+};
+
+/** « 23,4 $ » or « 23,4 € »: the credits in the currency the provider bills them in. */
+const money = (minor: number, currency: 'EUR' | 'USD'): string =>
+  `${(minor / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency === 'EUR' ? '€' : '$'}`;
 
 const euros = (minor: number): string =>
   `${(minor / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
@@ -586,6 +603,43 @@ export function classify(
         link: { label: 'Ouvrir le Dashboard', path: '/' },
       };
     // Important, not urgent: nothing is paid on a wrong rate, a closing without a recent one is refused (ADR 0033).
+    // Red and empty are urgent: the agent stops on that provider when its credits run out (ADR 0091 § 4).
+    case 'ai_credits_low': {
+      const name = CREDIT_PROVIDER_NAME[signal.provider];
+      const left = money(Math.max(0, signal.balanceMinor), signal.currency);
+      const when = signal.runsOutOn === null ? '' : `, épuisés vers ${calendarDay(signal.runsOutOn)}`;
+      const urgent = signal.level !== 'low';
+      return {
+        kind: 'notice',
+        topic: urgent ? 'urgent' : 'important',
+        ...(urgent && { fallbackTopic: 'important' }),
+        threadKey: null,
+        title: urgent ? 'URGENT' : 'Important',
+        body:
+          signal.level === 'empty'
+            ? `Crédits ${name} épuisés d’après le décompte du CRM : l’IA s’arrête sur ce service. Recharge, puis note-le dans Consommation IA.`
+            : signal.level === 'critical'
+              ? `Crédits ${name} : moins de 2 jours au rythme actuel (${left} restants${when}). Recharge maintenant.`
+              : `Crédits ${name} : moins de 5 jours au rythme actuel (${left} restants${when}). Pense à recharger.`,
+        link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
+      };
+    }
+    // Urgent: the agent answers with its fallback model until the provider takes calls again (ADR 0091 § 6).
+    case 'ai_quota_exhausted': {
+      const name = CREDIT_PROVIDER_NAME[signal.provider];
+      return {
+        kind: 'notice',
+        topic: 'urgent',
+        fallbackTopic: 'important',
+        threadKey: null,
+        title: 'URGENT',
+        body:
+          signal.mode === 'subscription'
+            ? `${name} refuse les appels : le quota de ton abonnement est épuisé. L’agent répond avec son modèle de repli jusqu’à la remise à zéro du quota.`
+            : `${name} refuse les appels faute de crédits. L’agent répond avec son modèle de repli : recharge, puis note-le dans Consommation IA.`,
+        link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
+      };
+    }
     case 'exchange_rate_overdue':
       return {
         kind: 'notice',
@@ -724,6 +778,22 @@ export function classify(
         body: `Part créatrice chez ${PLATFORM_NAMES[signal.platform]} : sur ${periodText(signal.from)}, elle s’écarte du pourcentage de l’agence réglé pour elle. À titre d’information.`,
         link: {
           label: 'Ouvrir le pourcentage',
+          path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
+        },
+      };
+    // Important to the groups for all (ADR 0054 § 5), as the gap above: no amount, no share, once per account and
+    // fortnight.
+    case 'agency_share_changed':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        allCreatorsOnly: true,
+        oncePerThread: true,
+        threadKey: `agency_share_changed:${signal.platformAccountId}:${signal.from}`,
+        title: 'Important',
+        body: `Part de l’agence chez ${PLATFORM_NAMES[signal.platform]} : sur ${periodText(signal.from)}, elle a changé par rapport à la quinzaine d’avant. À titre d’information.`,
+        link: {
+          label: 'Ouvrir la part de l’agence',
           path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
         },
       };

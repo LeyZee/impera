@@ -45,8 +45,19 @@ const configSchema = z
     HOST: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).default('localhost')),
     /** Application role: RLS applies, every tenant access goes through `withTenant`. */
     DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
-    /** Owner role (BYPASSRLS): Graphile Worker's own schema, unscoped jobs, migration status for `/ready`. */
-    DATABASE_ADMIN_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+    /**
+     * Service role (ADR 0087): BYPASSRLS and rights on rows only, it owns nothing. `withAdmin`, the job queue and the
+     * migration status of `/ready` run on it; the API and the worker refuse to start on a role that can do more.
+     */
+    DATABASE_SERVICE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+    /**
+     * Owner role: the migrations, the backup and the `ops:*` scripts run by hand (`ownerDatabaseUrl`). Neither the
+     * API nor the worker connects with it, so it may be left out of their environment.
+     */
+    DATABASE_ADMIN_URL: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.url({ protocol: /^postgres(ql)?$/ }).optional(),
+    ),
     /** The dashboard origin: the only one CORS lets in and the only one a mutation may come from (security.md §6). */
     WEB_ORIGIN: z.url(),
     /** Signs the dashboard session cookies (Better Auth); `openssl rand -base64 32`. */
@@ -302,6 +313,16 @@ export function invoiceBucket(
 
 /** The prefix of the variables before the rename: one still set stops the start instead of being ignored. */
 const OLD_PREFIX = 'NIRVANA_'; // ADR 0062
+
+/** The owner connection of a script run by hand (`ops:*`); the API and the worker never ask for it (ADR 0087). */
+export function ownerDatabaseUrl(config: Config): string {
+  if (config.DATABASE_ADMIN_URL === undefined) {
+    throw new Error(
+      'Invalid configuration: DATABASE_ADMIN_URL is missing, this script runs as the owner role.',
+    );
+  }
+  return config.DATABASE_ADMIN_URL;
+}
 
 /** Parses the environment; throws with every invalid variable listed when the configuration is wrong. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {

@@ -4,6 +4,7 @@ import {
   DESIRE_WEIGHTS_VERSION,
   desireMoved,
   desireScore,
+  recountDesire,
   measureDesire,
   NO_MEASURE,
   type DesireTurn,
@@ -141,5 +142,27 @@ describe('measureDesire', () => {
       suggestiveEmojis: 0,
       inARow: 1,
     });
+  });
+});
+
+describe('recountDesire', () => {
+  it('gives back the score counted, from the score before and the signals kept (ADR 0103 § 6)', () => {
+    const counted = desireScore({
+      previous: { score: 30, at: new Date('2026-11-12T20:00:00Z') },
+      signals: ['states_desire', 'explicit_language'],
+      intent: 'sexting',
+      sentiment: 'aroused',
+      measured: { lengthRatio: 2, replySeconds: 30, suggestiveEmojis: 5, inARow: 1 },
+      risks: [],
+      ageDisputed: false,
+      now: new Date('2026-11-12T20:00:00Z'),
+    });
+    expect(recountDesire(counted)).toBe(counted.score);
+  });
+
+  it('keeps a reset at 0 and a frozen score as it stood', () => {
+    expect(recountDesire({ before: 60, signals: ['minor_suspected'] })).toBe(0);
+    expect(recountDesire({ before: 60, signals: ['frozen'] })).toBe(60);
+    expect(recountDesire({ before: null, signals: ['busy_now'] })).toBe(0);
   });
 });

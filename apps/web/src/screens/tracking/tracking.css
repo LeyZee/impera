@@ -276,13 +276,27 @@
   font-weight: 600;
   line-height: 1.25;
 }
+/* A state wider than what the button leaves (« Pas parti : à envoyer dans Reveal » on a phone) is cut with « … »
+ * inside its pill, never under the button: the thread right below says it in full (recette 11/11). */
+.tr-reader__state > .nv-status {
+  min-width: 0;
+  max-width: 100%;
+}
+.tr-reader__state-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* The state is a pill under the name, as wide as its words. */
 .tr-reader__state {
   display: flex;
   align-items: center;
   gap: var(--nv-space-2);
-  /* The state and the mode on one line, under the name (D-03). */
-  flex-wrap: nowrap;
+  /* The state and the mode on one line, under the name (D-03); when a long state (« Pas parti : à envoyer dans
+   * Reveal ») leaves no room, the mode goes under it instead of running under the button (recette 11/11). */
+  flex-wrap: wrap;
+  row-gap: 2px;
   white-space: nowrap;
 }
 .tr-reader__body {
@@ -844,6 +858,19 @@
   max-width: 380px;
 }
 
+/* The long state of a send that failed is read whole, on a phone as on a computer: the hand goes to its own line
+ * under it (recette 11/11, relecture de #690). */
+.tr-reader__head--long .tr-reader__who {
+  flex-basis: calc(100% - 44px - var(--nv-space-3));
+}
+.tr-reader__head--long > .nv-btn {
+  margin-left: calc(44px + var(--nv-space-3));
+}
+.tr-reader__head--long .tr-reader__state-label {
+  overflow: visible;
+  white-space: normal;
+}
+
 /* On a phone, reading takes the screen: the page's title and sub-tabs step aside, and the way back, the fan's name,
  * his state and the hand stay at the top while the thread scrolls. */
 @media (max-width: 899px) {
@@ -865,6 +892,9 @@
   }
   .tr-reader__top .tr-reader__head {
     flex-wrap: nowrap;
+  }
+  .tr-reader__top .tr-reader__head--long {
+    flex-wrap: wrap;
   }
   .tr-reader__top .tr-reader__who h2 {
     overflow: hidden;
@@ -890,6 +920,14 @@
 }
 .tr-draft .nv-draft-panel__actions > .nv-btn--neon {
   flex-grow: 1.6;
+}
+/* While retouching, the labels are longer (« Envoyer la retouche », « Annuler la retouche »): the send takes its own
+ * row and the two others share the next one, never a lone « Refuser », never labels over each other (recette 11/11). */
+.tr-draft .nv-draft-panel__actions.tr-draft__actions--editing {
+  flex-wrap: wrap;
+}
+.tr-draft .nv-draft-panel__actions.tr-draft__actions--editing > .nv-btn--neon {
+  flex-basis: 100%;
 }
 /* The emergency stop, said above the list before any decision (recette CHAT-07): a row of its own, as tall as its
  * sentence; the list and the reader keep the rest of the screen. */

@@ -28,10 +28,10 @@ export function useAgentMode(shown: string | null = null): AgentModeView {
     // The Dashboard's own rule: never read once means not linked yet, read then lost means disconnected.
     const stalled = !reveal.connected
       ? reveal.lastReadAt === null
-        ? 'Reveal n’est pas encore relié'
-        : 'Reveal est déconnecté'
+        ? 'la messagerie Reveal n’est pas encore reliée'
+        : 'la messagerie Reveal est déconnectée'
       : reveal.late
-        ? 'Reveal n’est plus lu depuis plusieurs minutes'
+        ? 'la messagerie Reveal n’est plus lue depuis plusieurs minutes'
         : voice.ok
           ? null
           : voice.keyMissing

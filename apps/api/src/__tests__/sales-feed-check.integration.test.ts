@@ -1,7 +1,12 @@
 import {
+  AccountPayRulesIdSchema,
+  AccountPayRulesSchema,
   CreatorIdSchema,
   newId,
+  payPeriodLastDay,
+  payPeriodOfDay,
   PlatformAccountIdSchema,
+  previousPayPeriod,
   SalesFeedCheckReportSchema,
   SalesFeedLastCheckSchema,
 } from '@impera/contracts';
@@ -18,6 +23,7 @@ import { buildServer, type Server } from '../server';
 import { createFakeCrm, FAKE_CRM_BASE_URL, FAKE_CRM_KEY, type FakeCrm } from './fake-reveal/crm';
 import { testConfig } from './support/config';
 import { LogSink } from './support/log-sink';
+import { parisDay } from './support/paris';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
@@ -80,7 +86,7 @@ describe('sales feed reliability check (CRM-02)', () => {
     crm.statsFromRegister();
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 9).toString('base64')}`,
     });
     const logger = createLogger(config, new LogSink());
@@ -174,8 +180,9 @@ describe('sales feed reliability check (CRM-02)', () => {
     const answer = await check({ ...DAYS, export: null });
     expect(answer.statusCode).toBe(200);
     const report = SalesFeedCheckReportSchema.parse(answer.json());
+    // No export: the register and the statistics agreeing are a match (ADR 0050 § 8, amended 11/11/2026).
     expect(report).toMatchObject({
-      verdict: 'incomplete',
+      verdict: 'match',
       timeZone: 'Europe/Paris',
       total: { export: null },
     });
@@ -219,11 +226,11 @@ describe('sales feed reliability check (CRM-02)', () => {
       kind: 'bot_not_linked_to_agent',
       platformChatterId: 'bot_test_01',
     });
-    // The report is kept as the owner saw it, by whom; not clean, as nothing would switch on it.
+    // The report is kept as the owner saw it, by whom; not clean, as a few days are not a whole fortnight.
     const kept = (await lastCheck()).body?.last;
     expect(kept).toMatchObject({
       clean: false,
-      report: { verdict: 'incomplete', generatedAt: report.generatedAt },
+      report: { verdict: 'match', generatedAt: report.generatedAt },
     });
     expect(kept?.report).toEqual(report);
     expect(kept?.checkedBy).not.toBeNull();
@@ -300,8 +307,45 @@ describe('sales feed reliability check (CRM-02)', () => {
     expect(report.chatters.find((one) => one.platformChatterId === 'chatter_test_01')?.differs).toBe(true);
 
     await read();
+    // Read again, the register has Reveal's sale; without the export that was off, the statistics agree.
     const again = SalesFeedCheckReportSchema.parse((await check({ ...DAYS, export: null })).json());
-    expect(again.verdict).toBe('incomplete');
+    expect(again.verdict).toBe('match');
+  });
+
+  it('opens the switch to the platform’s net on a whole past fortnight checked without an export (CRM-14)', async () => {
+    // Charles's path on 16/11: the check over the fortnight just over, no export, then the switch from that fortnight.
+    const checked = previousPayPeriod(payPeriodOfDay(parisDay(0)));
+    crm.sell({ id: 'sale_check_fortnight', createdAt: `${checked}T10:00:00.000Z` });
+    await read();
+    const answer = await check({ from: checked, to: payPeriodLastDay(checked), export: null });
+    expect(answer.statusCode, answer.body).toBe(200);
+    const report = SalesFeedCheckReportSchema.parse(answer.json());
+    expect(report).toMatchObject({ verdict: 'match', total: { export: null } });
+    expect((await lastCheck()).body?.last).toMatchObject({ clean: true, report: { verdict: 'match' } });
+
+    const [account] = await test.admin.db
+      .select({ id: schema.platformAccounts.id })
+      .from(schema.platformAccounts)
+      .where(eq(schema.platformAccounts.handle, 'creatrice_test'));
+    const switched = await server.inject({
+      method: 'POST',
+      url: '/v1/team/pay-rules',
+      headers: { cookie: owner, origin: DASHBOARD_ORIGIN },
+      payload: {
+        id: newId(AccountPayRulesIdSchema),
+        platformAccountId: account?.id,
+        fromPeriod: checked,
+        currency: 'EUR',
+        vatBps: 2000,
+        platformFeeBps: 2000,
+        earningsSource: 'detected',
+      },
+    });
+    expect(switched.statusCode, switched.body).toBe(201);
+    expect(AccountPayRulesSchema.parse(switched.json())).toMatchObject({
+      fromPeriod: checked,
+      earningsSource: 'detected',
+    });
   });
 
   it('refuses an export it cannot read, naming the column, never a cell', async () => {

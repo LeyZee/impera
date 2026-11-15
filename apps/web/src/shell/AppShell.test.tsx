@@ -25,6 +25,7 @@ const base = {
   creatorIds: [],
   routedCreatorIds: [],
   shiftCreatorIds: [],
+  preferences: { sounds: true },
 };
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 const manager: Me = {
@@ -201,6 +202,7 @@ describe('Réglages › Sauvegardes', () => {
     expect(await subTabs()).toEqual([
       'Modèles IA',
       'Ventes',
+      'Consommation IA',
       'Alertes',
       'Telegram',
       'Règles de paie',

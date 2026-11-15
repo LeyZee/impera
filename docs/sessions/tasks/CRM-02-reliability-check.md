@@ -2,7 +2,7 @@
 
 Statut : in-progress (ADR 0050, fiches acceptées par Charles le 02/11/2026)
 Phase : API CRM (ADR 0050)
-Dépend de : CRM-01, l'export du dashboard fourni par Charles hors dépôt
+Dépend de : CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 (ADR 0050 § 8 amendé le 11/11/2026 : le dashboard de Reveal n'en offre pas)
 Branche : task/crm-02-reliability-check
 Propriétaire proposé : Bilan et Équipe
 
@@ -16,7 +16,7 @@ ADR 0050 § 8, ADR 0023 (§ Une seule source), ADR 0032.
 
 ## À faire
 
-- [ ] Comparaison : somme de `netAmount` face à `/v1/stats/daily` et à l'export du dashboard, au centime, par modèle et par jour.
+- [ ] Comparaison : somme de `netAmount` face à `/v1/stats/daily`, et à l'export du dashboard quand il y en a un (facultatif, CRM-14), au centime, par modèle et par jour.
 - [ ] Commissions de chaque chatteur sur `netAmount` face à la chaîne de l'ADR 0023, avec l'écart et sa cause (frais de paiement, TVA).
 - [ ] Vérifier que le membre « bot » remonte sous son propre `chatterId`, et ce que `memberId` permet de relier.
 - [ ] Rapport hors dépôt, aucune donnée réelle dans git, présenté à Charles.

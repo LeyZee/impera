@@ -15,6 +15,7 @@ import {
   rangeProblem,
   readBefore,
   switchLine,
+  verdictOf,
 } from './check';
 
 describe('the days a check can cover', () => {
@@ -95,6 +96,16 @@ describe('what a report says of the switch (CRM-03)', () => {
   it('adds nothing to a verdict that already says it differs or misses a source', () => {
     expect(switchLine({ ...fortnight, verdict: 'mismatch' }, false)).toBeNull();
     expect(switchLine({ ...fortnight, verdict: 'incomplete' }, false)).toBeNull();
+  });
+
+  it('names the export in a match only when one was given, as it is optional', () => {
+    expect(verdictOf('match', false).line).toBe(
+      'Le registre et les statistiques disent la même chose, jour par jour puis membre par membre.',
+    );
+    expect(verdictOf('match', true).line).toMatch(/^Le registre, les statistiques et l’export disent/u);
+    expect(verdictOf('incomplete', false).line).toBe(
+      'Les statistiques manquent ou une partie n’a pas pu être comparée : les notes disent quoi.',
+    );
   });
 
   it('says how long before the check the register had been read', () => {
@@ -230,6 +241,12 @@ describe('the notes', () => {
         CHATTERS,
       ),
     ).toMatch(/^Le registre commence le 20 oct\. à \d\d:00 : les jours d’avant/u);
+  });
+
+  it('says the statistics are required, the export alone not enough', () => {
+    expect(noteText({ kind: 'stats_unavailable', errorKind: 'rate_limited' }, 'Reveal', CHATTERS)).toBe(
+      'Les statistiques de Reveal n’ont pas pu être lues : la vérification les exige, l’export seul ne suffit pas. Réessaie dans un moment.',
+    );
   });
 
   it('agrees in number', () => {

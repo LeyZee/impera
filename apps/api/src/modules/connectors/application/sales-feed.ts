@@ -30,6 +30,7 @@ import { fortnightBefore, mismatchDays, type CheckedAccount } from '../domain/au
 import type { AvatarPorts } from '../domain/avatar';
 import { isLastingOutage, nextUnreachableRun, type UnreachableRun } from '../domain/connection-outage';
 import {
+  chatterStatsRows,
   dailyStatsRange,
   dailyStatsRows,
   statsCallAllowed,
@@ -188,9 +189,9 @@ export interface SalesFeeds {
    */
   read(logger: JobLogger, correlationId: string, woken: boolean): Promise<void>;
   /**
-   * The reliability check of ADR 0050 § 8 (CRM-02): the register against the platform's statistics and the
-   * dashboard's export, read for this answer only. The report is kept, by `by`, for the switch of CRM-03; the export
-   * never is. A refusal of the platform is said, not recorded (the minute's reading records it). Throws
+   * The reliability check of ADR 0050 § 8 (CRM-02): the register against the platform's statistics and, when the
+   * owner gives one, the dashboard's export, read for this answer only. The report is kept, by `by`, for the switch of
+   * CRM-03; the export never is. A refusal of the platform is said, not recorded (the minute's reading records it). Throws
    * `SalesFeedExportUnprocessable` (422) for an export it cannot read.
    */
   check(
@@ -377,9 +378,45 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       await onFailure(platform, stored, read.failure, logger, correlationId);
       return;
     }
-    const rows = dailyStatsRows(platform, read.value, await store.links(platform));
+    const links = await store.links(platform);
+    const rows = dailyStatsRows(platform, read.value, links);
     await store.record(platform, rows, clock.now(), range.full);
     logger.info({ platform, from: range.from, to: range.to, rows: rows.length }, 'daily statistics read');
+
+    // The same days by member of the platform's team (ADR 0092 § 1): one more call, counted and kept under the same
+    // reserve. Missed, the days by account stay; the next hour reads today and yesterday again, the night the 31 days.
+    if (!statsCallAllowed(await store.callsOn(platform, day))) {
+      logger.warn({ platform, day }, 'chatter statistics not read: the day’s reserve of calls is reached');
+      return;
+    }
+    await store.countCall(platform, day);
+    const byChatter = await feed.chatterDailyStats(range);
+    if (!byChatter.ok) {
+      const { failure } = byChatter;
+      // The days by chatter only serve steering (ADR 0092 § 1): a refused key speaks for the whole feed, any other
+      // failure of this call alone leaves the feed, its cursor, its state and its alerts as they are. Paths only in the
+      // detail, never values (adapter); the next hour reads the same days again.
+      if (failure.kind === 'refused') {
+        await onFailure(platform, stored, failure, logger, correlationId);
+        return;
+      }
+      logger.warn(
+        {
+          platform,
+          reason: 'chatter_stats_unread',
+          kind: failure.kind,
+          ...(failure.kind === 'unexpected_answer' ? { detail: failure.detail } : {}),
+        },
+        'chatter statistics not read this time: the feed is left as it is',
+      );
+      return;
+    }
+    const chatterRows = chatterStatsRows(platform, byChatter.value, links);
+    await store.recordChatters(chatterRows, clock.now());
+    logger.info(
+      { platform, from: range.from, to: range.to, rows: chatterRows.length },
+      'chatter statistics read',
+    );
   }
 
   /** The feed of the saved key, or `null` when there is none that works. */

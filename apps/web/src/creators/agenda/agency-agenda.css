@@ -168,3 +168,35 @@
     transition: none;
   }
 }
+
+/*
+ * « Proposer à … » (ADM-15): the day and its hours on one line on a computer, and « Annuler » / « Proposer » held at
+ * the foot of the panel while the fields scroll under them (the scrim keeps the panel above the safe area). The foot
+ * is opaque, the raised surface of the reduced transparency, so nothing reads through it; a hairline above it.
+ */
+.aa-when {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+@media (min-width: 700px) {
+  .aa-when {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: start;
+    gap: var(--nv-space-3);
+  }
+  .aa-when .tm-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.aa-dialog .aa-dialog__foot {
+  position: sticky;
+  /* The scroller's own padding would leave the fields showing under the foot: it sits on the panel's very edge. */
+  bottom: calc(-1 * var(--nv-space-5));
+  z-index: 1;
+  margin: 0 calc(-1 * var(--nv-space-5)) calc(-1 * var(--nv-space-5));
+  padding: var(--nv-space-3) var(--nv-space-5) var(--nv-space-5);
+  border-top: 1px solid var(--nv-hairline);
+  background: var(--nv-surface-raised);
+}

@@ -166,6 +166,7 @@ const VALIDATED = {
   version: 1,
   byAgency: false,
   reviewKind: null,
+  earningsSource: 'declared',
   explanation: null,
   check: null,
   canReview: false,

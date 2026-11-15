@@ -135,7 +135,7 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config));
     server = await buildServer({
       config,
@@ -653,9 +653,10 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     });
     // Written straight in the table: two templates whose shifts were never made.
     await test.admin.db.insert(schema.shiftTemplates).values([templateOn(owed, 3), templateOn(ending, 4)]);
+    // Read as the service role: the job runs as it, and a role sees the wait of its own sessions only.
     const someoneWaitsOnALock = async () =>
       (
-        await test.admin.db.execute<{ waiting: number }>(
+        await test.service.db.execute<{ waiting: number }>(
           sql`select count(*)::int as waiting from pg_stat_activity where wait_event_type = 'Lock'`,
         )
       ).rows[0]?.waiting !== 0;

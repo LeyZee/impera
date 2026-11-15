@@ -276,36 +276,39 @@ export function RatePanel({
       >
         <div className="nv-field tm-field">
           <span className="nv-field__label">Nouveau taux</span>
-          <div className="tm-presets" role="radiogroup" aria-label="Préréglage de commission">
-            {presets.map((preset) => (
+          {/* No preset yet: no lone « Autre » to pick, the field straight away (GES-24). */}
+          {presets.length === 0 ? null : (
+            <div className="tm-presets" role="radiogroup" aria-label="Préréglage de commission">
+              {presets.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  role="radio"
+                  className="tm-preset"
+                  aria-checked={!byHand && presetId === preset.id}
+                  onClick={() => {
+                    setPresetId(preset.id);
+                    setByHand(false);
+                  }}
+                >
+                  <span className="tm-preset__name">{preset.name}</span>
+                  <span className="tm-preset__rate">{formatRate(preset.rateBps)}</span>
+                </button>
+              ))}
               <button
-                key={preset.id}
                 type="button"
                 role="radio"
                 className="tm-preset"
-                aria-checked={!byHand && presetId === preset.id}
+                aria-checked={byHand}
                 onClick={() => {
-                  setPresetId(preset.id);
-                  setByHand(false);
+                  setByHand(true);
                 }}
               >
-                <span className="tm-preset__name">{preset.name}</span>
-                <span className="tm-preset__rate">{formatRate(preset.rateBps)}</span>
+                <span className="tm-preset__name">Autre</span>
+                <span className="tm-preset__rate tm-preset__rate--word">À la main</span>
               </button>
-            ))}
-            <button
-              type="button"
-              role="radio"
-              className="tm-preset"
-              aria-checked={byHand}
-              onClick={() => {
-                setByHand(true);
-              }}
-            >
-              <span className="tm-preset__name">Autre</span>
-              <span className="tm-preset__rate tm-preset__rate--word">À la main</span>
-            </button>
-          </div>
+            </div>
+          )}
           {byHand ? (
             <span className="tm-percent nv-swap">
               <input

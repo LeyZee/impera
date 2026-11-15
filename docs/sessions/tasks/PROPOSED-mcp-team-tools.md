@@ -1,5 +1,5 @@
 # Serveur MCP, lot 3 : lectures de l'Équipe (planning, rapports, commissions)
-Statut : proposed
+Statut : superseded (repris dans `PROPOSED-mcp-read`, lot a, par l'ADR 0105 § 6)
 Phase : équipe, après EQ-05
 Dépend de : lot 1 du MCP, EQ-02, EQ-03, EQ-04, EQ-05
 Branche : task/<id>-mcp-team-tools

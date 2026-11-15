@@ -121,6 +121,10 @@ export interface FakeCrm {
   statsFromRegister(): void;
   /** `/v1/sales` answers without `pageInfo` this many times. */
   breakShape(times: number): void;
+  /** `/v1/stats/chatters/daily` answers with its lines under another name than `data` this many times. */
+  breakChatterStatsShape(times: number): void;
+  /** `/v1/stats/chatters/daily` alone answers 429 with this `Retry-After` this many times. */
+  rateLimitChatterStats(times: number, retryAfterSeconds: number): void;
   /** The register's position of a sale's line, `null` when none. */
   positionOf(saleId: string): string | null;
   readonly calls: { readonly method: string; readonly path: string; readonly status: number }[];
@@ -449,6 +453,8 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
     rateLimited: 0,
     retryAfterSeconds: 0,
     brokenShapes: 0,
+    brokenChatterStats: 0,
+    limitedChatterStats: 0,
     liveStats: false,
     nightlyDone: false,
     countTimeout: false,
@@ -568,6 +574,11 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
     const wait = limited(key, path);
     if (wait !== null) {
       void reply.header('retry-after', String(wait));
+      return answer(429, { error: 'rate_limited' });
+    }
+    if (path === '/v1/stats/chatters/daily' && state.limitedChatterStats > 0) {
+      state.limitedChatterStats -= 1;
+      void reply.header('retry-after', String(state.retryAfterSeconds));
       return answer(429, { error: 'rate_limited' });
     }
     calls.push({ method, path, status: 200 });
@@ -829,6 +840,10 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
     const asked = rangeOf(request.query, reply);
     if ('refused' in asked) return asked.refused;
     const { from, to, modelId } = asked.range;
+    if (state.brokenChatterStats > 0) {
+      state.brokenChatterStats -= 1;
+      return { from, to, timezone: 'Europe/Paris', currency: 'EUR', rows: [] };
+    }
     if (state.liveStats) {
       const data = liveChatters(from, to, modelId);
       return {
@@ -1228,6 +1243,13 @@ export function createFakeCrm(options: FakeCrmOptions = {}): FakeCrm {
     },
     breakShape(times) {
       state.brokenShapes = times;
+    },
+    breakChatterStatsShape(times) {
+      state.brokenChatterStats = times;
+    },
+    rateLimitChatterStats(times, retryAfterSeconds) {
+      state.limitedChatterStats = times;
+      state.retryAfterSeconds = retryAfterSeconds;
     },
     positionOf: (saleId) =>
       register.find((line) => line.sale.id === saleId && line.event === 'sale_created')?.cursor ?? null,

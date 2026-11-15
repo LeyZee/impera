@@ -30,7 +30,7 @@ describe('the sales feed read by pay', () => {
     platformChatterId: string,
     link: { kind: 'member'; memberId: string } | { kind: 'agent' },
   ): Promise<unknown> =>
-    createDrizzleTeamImportStore(test.admin.db).link(owner, 'reveal', [
+    createDrizzleTeamImportStore(test.service.db).link(owner, 'reveal', [
       { platformChatterId, link, isExternal: false },
     ]);
 

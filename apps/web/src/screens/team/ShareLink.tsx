@@ -1,20 +1,12 @@
 import type { InvitationLinkCreated, InvitationLinkPurpose } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useRef, useState, type JSX } from 'react';
 
 import { createInvitationLink, MEMBERS_KEY } from './api';
 import { deadline, ERROR_MESSAGES } from './model';
 import './team.css';
 
-import { CodeInput } from '@/auth/CodeInput';
-import { confirmIdentity, type ConfirmResult } from '@/settings/services/api';
-
-const PASSWORD_MESSAGES: Record<Exclude<ConfirmResult, 'ok'>, string> = {
-  wrong_credentials: 'Mot de passe ou code incorrect.',
-  too_many_attempts: 'Trop d’essais. Réessaie dans quelques minutes.',
-  unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
-  session_expired: 'Ta session a expiré. Reconnecte-toi.',
-};
+import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 
 const SHARE_TEXT: Record<InvitationLinkPurpose, (name: string) => string> = {
   invitation: (name) => `Bienvenue dans l’équipe, ${name} ! Choisis ton mot de passe ici :`,
@@ -47,6 +39,7 @@ export function ShareLink({
   label,
   initial = null,
   primary = false,
+  onAsking,
 }: {
   memberId: string;
   name: string;
@@ -57,6 +50,8 @@ export function ShareLink({
   initial?: InvitationLinkCreated | null;
   /** The panel's main action: « Copier le message » in neon (the add panel); soft on the member's sheet. */
   primary?: boolean;
+  /** Told when the password is asked and when it is no longer: the panel around hides its other way out meanwhile. */
+  onAsking?: (asking: boolean) => void;
 }): JSX.Element {
   const client = useQueryClient();
   return (
@@ -64,6 +59,7 @@ export function ShareLink({
       label={label}
       initial={initial}
       primary={primary}
+      onAsking={onAsking}
       welcome={SHARE_TEXT[purpose](name)}
       make={async () => {
         const outcome = await createInvitationLink(memberId, purpose);
@@ -88,6 +84,7 @@ export function LinkShare({
   initial = null,
   primary = false,
   disabled = false,
+  onAsking,
 }: {
   make: () => Promise<LinkOutcome>;
   /** The message's words before the link: « Bienvenue dans l’équipe, Théo ! Choisis ton mot de passe ici : ». */
@@ -97,18 +94,23 @@ export function LinkShare({
   primary?: boolean;
   /** Nothing to make the link with yet (an e-mail still to type). */
   disabled?: boolean;
+  onAsking?: ((asking: boolean) => void) | undefined;
 }): JSX.Element {
   const [step, setStep] = useState<Step>(
     initial === null ? { kind: 'idle' } : { kind: 'made', link: initial },
   );
+  const go = (next: Step): void => {
+    setStep(next);
+    onAsking?.(next.kind === 'password');
+  };
 
   const run = async (): Promise<void> => {
-    setStep({ kind: 'busy' });
+    go({ kind: 'busy' });
     const outcome = await make();
-    if (outcome.kind === 'ok') setStep({ kind: 'made', link: outcome.value });
-    else if (outcome.kind === 'reauth') setStep({ kind: 'password' });
+    if (outcome.kind === 'ok') go({ kind: 'made', link: outcome.value });
+    else if (outcome.kind === 'reauth') go({ kind: 'password' });
     else
-      setStep({
+      go({
         kind: 'error',
         message:
           outcome.kind === 'refused'
@@ -119,13 +121,16 @@ export function LinkShare({
 
   if (step.kind === 'made') return <Made link={step.link} welcome={welcome} primary={primary} />;
   if (step.kind === 'password') {
+    // The same prompt as every key and setting of the CRM: password and code, then « Confirmer » (GES-13).
     return (
-      <PasswordStep
+      <PasswordPrompt
+        lead="Pour créer un lien d’accès, confirme ton mot de passe et ton code."
+        passkey={false}
         onConfirmed={() => {
           void run();
         }}
         onCancel={() => {
-          setStep({ kind: 'idle' });
+          go({ kind: 'idle' });
         }}
       />
     );
@@ -223,97 +228,6 @@ function Made({
           </button>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-function PasswordStep({
-  onConfirmed,
-  onCancel,
-}: {
-  onConfirmed: () => void;
-  onCancel: () => void;
-}): JSX.Element {
-  const input = useRef<HTMLInputElement>(null);
-  const codeInput = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<Exclude<ConfirmResult, 'ok'> | null>(null);
-
-  useEffect(() => {
-    input.current?.focus();
-  }, []);
-
-  const confirm = async (password: string, code: string): Promise<void> => {
-    if (password === '') return;
-    if (code.trim() === '') {
-      codeInput.current?.focus();
-      return;
-    }
-    setBusy(true);
-    const result = await confirmIdentity(password, code).catch(() => 'unavailable' as const);
-    setBusy(false);
-    if (result === 'ok') {
-      onConfirmed();
-      return;
-    }
-    if (input.current !== null) input.current.value = '';
-    if (codeInput.current !== null) codeInput.current.value = '';
-    setFailure(result);
-  };
-
-  return (
-    <div
-      className="tm-share nv-enter"
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape') return;
-        // Leaves the prompt only, not the panel around it.
-        event.stopPropagation();
-        if (!busy) onCancel();
-      }}
-    >
-      <p className="tm-hint">Pour créer un lien d’accès, confirme ton mot de passe et ton code.</p>
-      <form
-        className="tm-inline"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void confirm(input.current?.value ?? '', codeInput.current?.value ?? '');
-        }}
-      >
-        <label className="nv-field">
-          <span className="nv-field__label">Mot de passe</span>
-          <input
-            ref={input}
-            className="nv-field__control nv-glass"
-            type="password"
-            autoComplete="current-password"
-            aria-invalid={failure !== null}
-            disabled={busy}
-          />
-        </label>
-        <CodeInput ref={codeInput} disabled={busy} invalid={failure !== null} />
-        <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={busy} aria-busy={busy}>
-          Confirmer
-        </button>
-        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" disabled={busy} onClick={onCancel}>
-          Annuler
-        </button>
-      </form>
-      {failure === null ? null : (
-        <p className="tm-warn nv-swap" role="alert">
-          {PASSWORD_MESSAGES[failure]}
-        </p>
-      )}
-      {failure === 'session_expired' ? (
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft nv-btn--sm tm-self-start"
-          onClick={() => {
-            window.location.reload();
-          }}
-        >
-          Se reconnecter
-        </button>
-      ) : null}
     </div>
   );
 }

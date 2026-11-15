@@ -63,7 +63,7 @@ describe('fan facts (P3-02), as the application role sees them', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    fans = createFansModule({ db: test.app.db, adminDb: test.admin.db });
+    fans = createFansModule({ db: test.app.db, adminDb: test.service.db });
     her = await seed('a', 2);
     other = await seed('b', 1);
   });

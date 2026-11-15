@@ -1,4 +1,5 @@
 import {
+  BANKED_OBJECTION_KINDS,
   desireBandOf,
   KycSlotSchema,
   PERSONA_SHEET,
@@ -13,6 +14,7 @@ import {
   type PersonaStrategies,
   type PersonaV2,
   type KycSlot,
+  type ObjectionReplies,
   type SheetQuestion,
 } from '@impera/contracts';
 import type { z } from 'zod';
@@ -590,10 +592,11 @@ export function refusedLineIssues(
   faults: readonly PersonaSampleReplyFault[],
   text: string | null,
 ): FieldIssue[] {
+  const onLines = faults.filter((fault) => fault.objection === undefined);
   const sent = (text ?? '').split('\n').length;
-  if (faults.some(({ index }) => index >= sent)) return [];
+  if (onLines.some(({ index }) => index >= sent)) return [];
   const byLine = new Map<number, string[]>();
-  for (const { index, code } of faults) {
+  for (const { index, code } of onLines) {
     const labels = byLine.get(index) ?? [];
     if (!labels.includes(GUARD_LABELS[code])) labels.push(GUARD_LABELS[code]);
     byLine.set(index, labels);
@@ -611,6 +614,38 @@ export function refusedLineIssues(
 }
 
 /**
+ * What the server refused at saving in her objection bank (ADR 0090 § B): each reply, counted from 1 in its kind, with
+ * the guards it trips. None when a reply it names is not in the bank as sent: that refusal does not read.
+ */
+export function refusedReplyIssues(
+  faults: readonly PersonaSampleReplyFault[],
+  bank: ObjectionReplies,
+): FieldIssue[] {
+  const onReplies = faults.flatMap((fault) =>
+    fault.objection === undefined ? [] : [{ ...fault, objection: fault.objection }],
+  );
+  if (onReplies.some(({ objection, index }) => index >= (bank[objection]?.length ?? 0))) return [];
+  return BANKED_OBJECTION_KINDS.flatMap((kind) => {
+    const byReply = new Map<number, string[]>();
+    for (const { index, code } of onReplies.filter((fault) => fault.objection === kind)) {
+      const labels = byReply.get(index) ?? [];
+      if (!labels.includes(GUARD_LABELS[code])) labels.push(GUARD_LABELS[code]);
+      byReply.set(index, labels);
+    }
+    if (byReply.size === 0) return [];
+    const replies = [...byReply]
+      .sort(([a], [b]) => a - b)
+      .map(([index, labels]) => `réplique ${String(index + 1)} (${labels.join(', ')})`);
+    return [
+      {
+        field: `agent.objection_replies.${kind}`,
+        message: `L’agent ne les dirait pas : ${replies.join(' ; ')}. Corrige ou retire ${byReply.size > 1 ? 'ces répliques' : 'cette réplique'}.`,
+      },
+    ];
+  });
+}
+
+/**
  * The canvas lines she collects, in her order: the brain and « À apprendre » follow it. Only every line in the
  * canvas's own order is « all » and leaves `collect` absent, as the schema reads it; any other order is kept.
  */
@@ -623,13 +658,20 @@ export const collectOrAll = (slots: KycSlot[]): KycSlot[] | undefined =>
 export interface RefusedLines {
   readonly issues: readonly FieldIssue[];
   readonly text: string | null;
+  /** Her objection replies refused, held until her bank changes (ADR 0090 § B). */
+  readonly replies?: { readonly issues: readonly FieldIssue[]; readonly bank: string };
 }
 
 export const NOTHING_REFUSED: RefusedLines = { issues: [], text: null };
 
 /** The refusal holds until « Réponses typiques » changes, whatever else is edited. */
 export function stillRefused(refused: RefusedLines, draft: Draft): FieldIssue[] {
-  return refused.issues.length > 0 && draft.sheet.conversation['typical_responses'] === refused.text
-    ? [...refused.issues]
-    : [];
+  const lines =
+    refused.issues.length > 0 && draft.sheet.conversation['typical_responses'] === refused.text
+      ? [...refused.issues]
+      : [];
+  const { replies } = refused;
+  return replies?.bank === JSON.stringify(draft.agent.objection_replies)
+    ? [...lines, ...replies.issues]
+    : lines;
 }

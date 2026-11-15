@@ -14,9 +14,11 @@ import './today.css';
 import { urgencies } from '@/agent/queue';
 import { MyReportsCard, useMyReports, type MyReports } from '@/reports/MyReports';
 import { ReportPanel } from '@/reports/ReportPanel';
-import { MEMBER_STATUS, reportOf, STATUS_TONES } from '@/reports/model';
+import { MEMBER_STATUS, reportOf, toneOf, WITHOUT_PAY_EFFECT, withoutPayEffect } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { RewardRevealGate } from '@/rewards/RewardRevealGate';
+import { ShiftChallengeCard } from '@/rewards/ShiftChallengeCard';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { useMyShifts } from '@/scheduling/api';
 import { accountLine, dayStateOf, myAwayOf, progressOf, type DayState } from '@/scheduling/model';
@@ -32,6 +34,7 @@ import {
   untilOf,
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { MyFortnightCard } from '@/screens/pay/MyFigures';
 import { useMembers } from '@/screens/team/api';
 import { todosAcrossQuery } from '@/screens/tracking/api';
 import { ServerSilent } from '@/shell/ServerSilent';
@@ -159,7 +162,13 @@ function Day({
       ) : (
         <MyAwayCard status={away} />
       )}
+      {/* The shift's challenge, right under the shift it is for (ADR 0104 § 14); nothing without one. */}
+      {away === null ? <ShiftChallengeCard user={user} /> : null}
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
+      {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}
+      {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}
+      {/* What he earned since his last visit greets him here, never over a conversation (ADR 0104 § 12). */}
+      <RewardRevealGate user={user} />
       <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
       {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
       <Link to="/planning" className="sc-more">
@@ -300,8 +309,10 @@ function Hero({
           </Link>
           {report.kind === 'made' ? (
             <button type="button" className="rp-hero__made nv-tap" onClick={onReport}>
-              <span className={`rp-chip rp-chip--${STATUS_TONES[report.report.status]}`}>
-                Rapport {MEMBER_STATUS[report.report.status].toLowerCase()}
+              <span className={`rp-chip rp-chip--${toneOf(report.report)}`}>
+                {withoutPayEffect(report.report)
+                  ? WITHOUT_PAY_EFFECT
+                  : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
               </span>
               <span className="rp-hero__see">Voir</span>
             </button>

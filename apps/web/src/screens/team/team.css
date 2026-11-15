@@ -166,6 +166,10 @@
 .tm-row .nv-convo__preview {
   font-variant-numeric: tabular-nums;
 }
+/* On the open member's light, the line under his name darkens a step: AA in Jour too (GES-11). */
+.tm-row[aria-current='true'] .nv-convo__preview {
+  color: color-mix(in srgb, var(--nv-ink-muted) 60%, var(--nv-ink));
+}
 .tm-name {
   display: flex;
   align-items: center;
@@ -396,7 +400,8 @@
 }
 .tm-facts > div {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
+  /* Wide enough for « Dans l’équipe depuis » on one line (GES-19). */
+  grid-template-columns: 168px minmax(0, 1fr);
   gap: var(--nv-space-3);
   align-items: baseline;
   padding: var(--nv-space-3) var(--nv-space-2);
@@ -553,7 +558,6 @@
 .tm-note-input {
   width: 100%;
   min-height: 64px;
-  resize: vertical;
 }
 
 .tm-steps {
@@ -929,4 +933,13 @@
 /* A removal on the platform, under the account's name: amber, a state to act on (ADR 0076 § 5). */
 .sf-imp__meta.rv-warn {
   color: var(--nv-warning);
+}
+
+/* « Nouveau membre » changes height from step to step: anchored by its top on a computer, its title and its steps
+   stay where the eye left them (GES-26). */
+@media (min-width: 700px) {
+  .tm-scrim.tm-scrim--top {
+    align-items: flex-start;
+    padding-top: clamp(var(--nv-space-6), 12vh, 112px);
+  }
 }

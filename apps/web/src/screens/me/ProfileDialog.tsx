@@ -24,6 +24,7 @@ import {
   type ProfileField,
 } from '@/contractors/model';
 import { countryName } from '@/lib/country';
+import { useGrowingArea } from '@/lib/growing-area';
 import { Dialog } from '@/shell/Dialog';
 
 const STATUSES: readonly (readonly [ContractorStatus, string])[] = [
@@ -100,6 +101,7 @@ export function ProfileDialog({
   const { busy, refusal, send } = useFileSend(onClose);
   const [draft, setDraft] = useState<ProfileDraft>(() => profileDraftOf(file.profile, file.country));
   const [tried, setTried] = useState(false);
+  const addressArea = useGrowingArea(draft.address);
   const french = isFrench(file.country);
   const fields = profileFields(draft, file.country);
   const problems = tried ? profileProblems(draft, file.country, taxIdRequired) : {};
@@ -179,8 +181,9 @@ export function ProfileDialog({
           >
             {field === 'address' ? (
               <textarea
+                ref={addressArea}
                 id={`${id}-${field}`}
-                className="nv-field__control nv-glass"
+                className="nv-field__control nv-glass grow-area"
                 rows={3}
                 maxLength={MAX[field]}
                 value={draft[field]}

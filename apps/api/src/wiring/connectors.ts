@@ -8,6 +8,7 @@ import {
   createAvatarFetch,
   createConnectorsModule,
   createS3AvatarStore,
+  revealApiConnectors,
   revealSalesFeed,
   type AvatarPorts,
   type ConnectorRegistry,
@@ -37,10 +38,18 @@ export function wireConnectors(
     readonly invite: InviteFromPlatform;
     /** The person an extension link names (ADR 0066 § 7), late bound: `trends` holds the links and is wired later. */
     readonly linkUser: ConnectorsDeps['linkUser'];
-    /** Reveal's adapter arrives with phase 1 (ADR 0008); until then no account is polled. */
-    readonly registry: ConnectorRegistry;
+    /**
+     * One adapter per platform. Reveal's private API by default (P2-02), read with each account's captured session: an
+     * account without one is never called. Tests hand a `FakeConnector` or FakeReveal over.
+     */
+    readonly registry?: ConnectorRegistry;
     /** Reveal's CRM API (ADR 0050) by default; FakeReveal's in the tests. */
     readonly salesFeeds?: SalesFeedRegistry;
+    /**
+     * Each account whose vault sync the owner asked (fiche vault-sync), late bound: `scripts`, wired after this module,
+     * queues the import of its native scripts behind it (ADR 0099 § 1 time 2).
+     */
+    readonly onVaultSyncAsked?: ConnectorsDeps['onVaultSyncAsked'];
     /** Tests only: the connectors' clock. */
     readonly now?: () => Date;
     /** Tests only: the photo copy's fetch and store (CRM-07 a2b). */
@@ -58,7 +67,16 @@ export function wireConnectors(
     db,
     adminDb,
     ingest: deps.ingest,
-    registry: deps.registry,
+    registry: deps.registry ?? {
+      // Reads only: sends stay off until P2-03, and the write guard (`writes`) refuses them first anyway.
+      reveal: revealApiConnectors({
+        fetch,
+        // The route's name, the status and the duration: never the token, a URL or a body (spec § 3).
+        log: (platformAccountId, entry) => {
+          logger.debug({ platformAccountId, ...entry }, 'reveal: call');
+        },
+      }),
+    },
     sessionKeys: sessionKeys === null ? null : parseEncryptionKeys(sessionKeys, 'SESSION_ENCRYPTION_KEYS'),
     linkUser: deps.linkUser,
     // The AI keys' encryption (ADR 0050 § 4): without it no sales feed key is kept, nothing is read.
@@ -86,6 +104,7 @@ export function wireConnectors(
             store,
           },
     ...(deps.now !== undefined && { clock: { now: deps.now } }),
+    ...(deps.onVaultSyncAsked !== undefined && { onVaultSyncAsked: deps.onVaultSyncAsked }),
   });
   return {
     module,
@@ -133,6 +152,12 @@ export function wireConnectors(
         logger,
         (payload, context) => module.jobs.copyAvatar(payload, context.logger),
       ),
+      'connector.vault_sync': defineTask(
+        'connector.vault_sync',
+        JOB_PAYLOADS['connector.vault_sync'],
+        logger,
+        (payload, context) => module.jobs.vaultSync(payload, context.logger),
+      ),
     },
     routes: [
       module.routes,
@@ -144,6 +169,7 @@ export function wireConnectors(
       }),
       module.salesFeedDeliveryRoutes,
       module.avatarRoutes(requireRole('owner', 'operator', 'creator')),
+      module.vaultRoutes({ teamGuard: requireRole('owner', 'operator'), ownerGuard: requireRole('owner') }),
     ],
   };
 }

@@ -22,7 +22,7 @@ describe('/v1/settings/providers in the app (P3-03)', () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({
       DATABASE_URL: test.appUrl,
-      DATABASE_ADMIN_URL: test.adminUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 7).toString('base64')}`,
     });
     app = await createApp(config, createLogger(config));

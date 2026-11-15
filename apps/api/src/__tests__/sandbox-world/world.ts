@@ -1,3 +1,4 @@
+import { INLINE_VIDEO_MAX_BYTES } from '@impera/llm';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -12,7 +13,7 @@ import {
   type FakeModel,
 } from '../fake-reveal/crm';
 
-import { registerGeneration } from './ai-generation';
+import { registerGeneration, registerTranscription } from './ai-generation';
 
 /**
  * The recette sandbox's fake world (ADR 0075, docs/recette/bac-a-sable.md): one local HTTP server that answers at the
@@ -30,6 +31,14 @@ import { registerGeneration } from './ai-generation';
  * on the world's clock, retried on failure. The clock can be moved forward (`/__/clock`) to play the retries or the
  * night without waiting. Deliveries go to this machine only.
  */
+
+/**
+ * The largest request the world takes: Impera sends a model one media of 20 MiB at most (the gateway's whole video,
+ * the same cap as xAI's image and a fan's media), in base64, 4/3 of its bytes, plus the 1 MiB that the prompts and
+ * every request without media fit in (Fastify's default). A phone's video, its keyframes or its sound fit; beyond,
+ * the world answers 413 as a real service would.
+ */
+export const WORLD_BODY_LIMIT = Math.ceil((INLINE_VIDEO_MAX_BYTES * 4) / 3) + 1024 * 1024;
 
 export const AI_SERVICES = ['xai', 'google', 'mistral', 'elevenlabs'] as const;
 export type AiService = (typeof AI_SERVICES)[number];
@@ -154,7 +163,7 @@ export function createWorld(
   const clock = options.now ?? (() => new Date());
   let offsetMs = 0;
   const now = () => new Date(clock().getTime() + offsetMs);
-  const app = Fastify();
+  const app = Fastify({ bodyLimit: WORLD_BODY_LIMIT });
   const crm = createFakeCrm({
     acceptKey: isAcceptedRevealKey,
     now,
@@ -259,8 +268,9 @@ export function createWorld(
     })),
   );
 
-  // xAI's generation, scripted (ADR 0075 § 3, phase 2): before the catch-all below.
+  // xAI's generation, scripted (ADR 0075 § 3, phase 2), and its speech to text: before the catch-all below.
   registerGeneration(app, (key) => outcome('xai', key));
+  registerTranscription(app, (key) => outcome('xai', key));
 
   // Any other route of an AI service: not simulated, answered as an outage.
   for (const service of AI_SERVICES) {

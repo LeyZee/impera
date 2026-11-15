@@ -37,6 +37,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { exportDrop } from '../../application/drop-export';
+import { agencyContent, type ContentReader } from '../../application/reads';
 import {
   fillScriptSlot,
   readScriptDrop,
@@ -70,6 +71,11 @@ class CreatorAccountForbidden extends DomainError {
 function signedIn(user: { readonly id: string } | null): string {
   if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
   return user.id;
+}
+
+function readerOf(user: { readonly id: string; readonly role: UserRole } | null): ContentReader {
+  if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+  return { userId: user.id, role: user.role };
 }
 
 async function asCreator<T>(run: () => Promise<T>): Promise<T> {
@@ -256,7 +262,7 @@ export function createContentDropRoutes(
     app.get(
       '/creators/:creatorId/content',
       { ...team, schema: { params: CreatorParamsSchema, response: { 200: CreatorContentSchema } } },
-      (request) => agency.content(request.params.creatorId, signedIn(request.user)),
+      (request) => agencyContent(agency, readerOf(request.user), request.params.creatorId),
     );
 
     app.post(

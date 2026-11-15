@@ -6,12 +6,15 @@ import { createDbClient, type DbClient } from '../client';
 import { runMigrations } from '../migrate';
 
 export interface TestDb {
-  /** Connected as `nirvana_admin` (owner, BYPASSRLS): seeding and `withAdmin`. */
+  /** Connected as `nirvana_admin` (owner, BYPASSRLS): migrations and seeding. */
   readonly admin: DbClient;
+  /** Connected as `impera_service` (BYPASSRLS, owns nothing; ADR 0087): what `withAdmin` runs on in the API. */
+  readonly service: DbClient;
   /** Connected as `nirvana_app` (RLS applies): what the application sees. */
   readonly app: DbClient;
-  /** Connection strings of the two roles, for code that builds its own pools (the API's composition root). */
+  /** Connection strings of the three roles, for code that builds its own pools (the API's composition root). */
   readonly adminUrl: string;
+  readonly serviceUrl: string;
   readonly appUrl: string;
   close(): Promise<void>;
 }
@@ -24,7 +27,7 @@ function asRole(superuserUrl: string, database: string, role: string, password: 
   return url.toString();
 }
 
-/** The password of the two test roles: `test`, or the one they already have on an existing server (recette MOT-12). */
+/** The password of the test roles: `test`, or the one they already have on an existing server (recette MOT-12). */
 export const testRolePassword = (): string => process.env['IMPERA_TEST_ROLE_PASSWORD'] ?? 'test';
 
 /**
@@ -39,17 +42,21 @@ export async function createTestDb(superuserUrl: string, password = testRolePass
   await root.end();
 
   const adminUrl = asRole(superuserUrl, database, 'nirvana_admin', password);
+  const serviceUrl = asRole(superuserUrl, database, 'impera_service', password);
   const appUrl = asRole(superuserUrl, database, 'nirvana_app', password);
   const admin = createDbClient(adminUrl, { max: 2 });
-  await runMigrations(admin.db);
+  await runMigrations(admin);
+  const service = createDbClient(serviceUrl, { max: 2 });
   const app = createDbClient(appUrl, { max: 4 });
   return {
     admin,
+    service,
     app,
     adminUrl,
+    serviceUrl,
     appUrl,
     async close() {
-      await Promise.all([admin.close(), app.close()]);
+      await Promise.all([admin.close(), service.close(), app.close()]);
     },
   };
 }

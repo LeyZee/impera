@@ -7,7 +7,14 @@ import { createLogger } from '../logger';
 
 import { testConfig } from './support/config';
 
-const role = (name: string, superuser: boolean, bypassRls: boolean) => ({ name, superuser, bypassRls });
+const role = (name: string, superuser: boolean, bypassRls: boolean, powers: { owned?: number } = {}) => ({
+  name,
+  superuser,
+  bypassRls,
+  createRole: superuser,
+  createDb: superuser,
+  owned: powers.owned ?? 0,
+});
 
 describe('database roles at startup', () => {
   let test: TestDb;
@@ -20,10 +27,9 @@ describe('database roles at startup', () => {
     await test.close();
   });
 
-  it('accepts an admin role that crosses tenants, superuser or not, and an app role that does not', () => {
+  it('accepts a service role that crosses tenants and owns nothing, and an app role that does not cross them', () => {
     const app = role('nirvana_app', false, false);
-    expect(databaseRoleProblems(app, role('nirvana_admin', false, true))).toEqual([]);
-    expect(databaseRoleProblems(app, role('postgres', true, true))).toEqual([]);
+    expect(databaseRoleProblems(app, role('impera_service', false, true))).toEqual([]);
   });
 
   it('names each role that would make row-level security silent or moot', () => {
@@ -32,26 +38,44 @@ describe('database roles at startup', () => {
       role('neon_owner', false, false),
     );
     expect(problems).toHaveLength(2);
-    expect(problems[0]).toMatch(/DATABASE_ADMIN_URL connects as "neon_owner", which lacks BYPASSRLS/);
+    expect(problems[0]).toMatch(/DATABASE_SERVICE_URL connects as "neon_owner", which lacks BYPASSRLS/);
     expect(problems[1]).toMatch(
       /DATABASE_URL connects as "nirvana_admin", which bypasses row-level security/,
     );
   });
 
-  it('reads the roles the two connections really use', async () => {
-    await expect(assertDatabaseRoles(test.app.db, test.admin.db)).resolves.toBeUndefined();
-    await expect(assertDatabaseRoles(test.app.db, test.app.db)).rejects.toThrow(/lacks BYPASSRLS/);
+  it('names a service role that could do more than read and write rows (ADR 0087)', () => {
+    const app = role('nirvana_app', false, false);
+    expect(databaseRoleProblems(app, role('postgres', true, true))[0]).toMatch(
+      /"postgres", which is a superuser, can create roles, can create databases: it must be the service role/,
+    );
+    expect(databaseRoleProblems(app, role('nirvana_admin', false, true, { owned: 200 }))[0]).toMatch(
+      /"nirvana_admin", which owns tables, or belongs to the role that owns them/,
+    );
   });
 
-  it('refuses to start the API or the worker on an admin connection without BYPASSRLS', async () => {
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.appUrl });
+  it('reads the roles the two connections really use', async () => {
+    await expect(assertDatabaseRoles(test.app.db, test.service.db)).resolves.toBeUndefined();
+    await expect(assertDatabaseRoles(test.app.db, test.app.db)).rejects.toThrow(/lacks BYPASSRLS/);
+    await expect(assertDatabaseRoles(test.app.db, test.admin.db)).rejects.toThrow(/owns tables/);
+  });
+
+  it('refuses to start the API or the worker on a service connection without BYPASSRLS', async () => {
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.appUrl });
     await expect(createApp(config, createLogger(config), { withPlayground: false })).rejects.toThrow(
       /deploy\.md § 1\.1.*"nirvana_app", which lacks BYPASSRLS/,
     );
   });
 
+  it('refuses to start the API or the worker on the owner of the tables', async () => {
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.adminUrl });
+    await expect(createApp(config, createLogger(config), { withPlayground: false })).rejects.toThrow(
+      /"nirvana_admin", which .*owns tables/,
+    );
+  });
+
   it('refuses to start on an app connection that bypasses row-level security', async () => {
-    const config = testConfig({ DATABASE_URL: test.adminUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.adminUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     await expect(createApp(config, createLogger(config), { withPlayground: false })).rejects.toThrow(
       /"nirvana_admin", which bypasses row-level security/,
     );

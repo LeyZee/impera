@@ -42,6 +42,19 @@ const BudgetSchema = z.object({
   capMinor: z.number().int().min(0),
 });
 
+const CreditsLowSchema = z.object({
+  provider: z.enum(['xai', 'mistral', 'google']),
+  level: z.enum(['low', 'critical', 'empty']),
+  balanceMinor: z.number().int(),
+  currency: z.enum(['EUR', 'USD']),
+  runsOutOn: z.iso.date().nullable(),
+});
+
+const QuotaExhaustedSchema = z.object({
+  provider: z.enum(['xai', 'mistral', 'google']),
+  mode: z.enum(['credits', 'subscription']),
+});
+
 const SessionSchema = z.object({
   platformAccountId: z.string().min(1),
   from: z.string(),
@@ -146,6 +159,14 @@ const AgencyShareMismatchSchema = EVENT_PAYLOADS.agency_share_mismatch.pick({
   from: true,
 });
 
+// Her account and fortnight (ADR 0054 § 5): both shares stay in Impera.
+const AgencyShareChangedSchema = EVENT_PAYLOADS.agency_share_changed.pick({
+  creatorId: true,
+  platform: true,
+  platformAccountId: true,
+  from: true,
+});
+
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
     case 'handoff_requested': {
@@ -185,6 +206,16 @@ function signalOf(type: string, payload: unknown): Signal | null {
         spentMinor: parsed.data.spentMinor,
         capMinor: parsed.data.capMinor,
       };
+    }
+    case 'ai_credits_low': {
+      const parsed = CreditsLowSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'ai_credits_low', ...parsed.data };
+    }
+    case 'ai_quota_exhausted': {
+      const parsed = QuotaExhaustedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'ai_quota_exhausted', ...parsed.data };
     }
     case 'session_state_changed': {
       const parsed = SessionSchema.safeParse(payload);
@@ -294,6 +325,11 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = AgencyShareMismatchSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'agency_share_mismatch', ...parsed.data };
+    }
+    case 'agency_share_changed': {
+      const parsed = AgencyShareChangedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'agency_share_changed', ...parsed.data };
     }
     case 'connection_state_changed': {
       const parsed = EVENT_PAYLOADS.connection_state_changed.safeParse(payload);

@@ -93,9 +93,24 @@ describe('her day (CR-05)', () => {
       'maintenant',
       'libre 735-840',
       'Tournage tenue rouge',
-      'libre 960-1260 ouvert',
+      'libre 960-1020',
+      'libre 1020-1200 ouvert',
+      'libre 1200-1260',
       'Live du soir',
       'libre 1320-1440',
+    ]);
+  });
+
+  it('cuts a free time at the edges of her dispos: only what a dispo covers is open to the agency (CRE-18)', () => {
+    const thursdays = AvailabilitySchema.parse({
+      id: '01936f00-0000-7000-8000-000000000998',
+      when: { kind: 'weekly', weekday: 4, startMinute: 14 * 60, endMinute: 20 * 60 },
+    });
+    const rows = programOf(planOf(agendaOf({ tasks: [], availabilities: [thursdays] }), '2026-11-05'), null);
+    expect(rows).toEqual([
+      { kind: 'free', start: 8 * 60, end: 14 * 60, open: false },
+      { kind: 'free', start: 14 * 60, end: 20 * 60, open: true },
+      { kind: 'free', start: 20 * 60, end: 24 * 60, open: false },
     ]);
   });
 
@@ -178,7 +193,13 @@ describe('her day (CR-05)', () => {
             ? `libre ${String(row.start)}-${String(row.end)}`
             : row.kind,
       ),
-    ).toEqual(['libre 480-1020', 'proposé Répondre aux commentaires', 'libre 1080-1440']);
+    ).toEqual([
+      'libre 480-1020',
+      'proposé Répondre aux commentaires',
+      // The rest of her dispo, then the evening outside it (CRE-18).
+      'libre 1080-1200',
+      'libre 1200-1440',
+    ]);
   });
 
   it('shows a proposed routine once: in Jour on its first day from today, at the top of Ma semaine (CREA-15)', () => {

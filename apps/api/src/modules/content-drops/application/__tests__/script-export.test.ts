@@ -60,6 +60,8 @@ function agencyWith(sent: SentScript): AgencyContentStore {
     confirmExport: refuse('confirmExport'),
     sentDrop: refuse('sentDrop'),
     confirmDropExport: refuse('confirmDropExport'),
+    dropsPage: refuse('dropsPage'),
+    scriptDrops: refuse('scriptDrops'),
   };
 }
 

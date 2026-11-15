@@ -733,8 +733,22 @@
   justify-content: flex-start;
   width: 100%;
 }
+/* Each line has its icon, as the phone's « Plus » sheet (recette 11/11, GES-23). */
+.nv-user__menu .nv-btn svg {
+  width: 16px;
+  height: 16px;
+}
 .nv-user__menu .nv-appearance {
   padding: 6px 6px 8px;
+}
+/* The rail is narrow: the segment takes the menu's whole width, so « Appareil » keeps air before its edge (recette
+   11/11, CHA-28). The label and the hint stay in line with the menu's lines. */
+.nv-user__menu .nv-appearance__seg {
+  width: calc(100% + 12px);
+  margin-inline: -6px;
+}
+.nv-user__menu .nv-seg__opt {
+  font-size: 12px;
 }
 
 /* Nuit, Jour, Appareil: the browser's own choice, in the account's menu and the phone's sheet (NAV-03). */
@@ -954,6 +968,11 @@
   font-weight: 600;
   color: var(--nv-ink-faint);
 }
+/* A way back in the eyebrow (« ← Créatrices », « ← Moi › Préférences ») is a plain button: its padding is pulled back so
+   its text starts on the same line as the title below, the padding staying as the pressed and hovered surface. */
+.nv-eyebrow > .nv-btn--plain {
+  margin-inline-start: calc(-1 * var(--nv-space-4));
+}
 
 /* ── Panels: content plates, not glass ── */
 .nv-panel {
@@ -1066,6 +1085,42 @@
   display: inline-flex;
   gap: 2px;
   padding: 4px;
+  /* Never wider than its place: what does not fit scrolls (below), on any screen. */
+  min-width: 0;
+  max-width: 100%;
+}
+/* Wider than its place, on a phone or on a laptop (a creator's eleven tabs at 1280 px): the bar scrolls, as SubNav
+   marks it with data-more, instead of running off the page with the lit tab cut in two. overflow-x makes overflow-y
+   scroll too: 5 px above and below keep each tab's 44 px hit area inside the pill. */
+.nv-subnav[data-more]:not([data-more='none']) {
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-block: 5px;
+}
+/* A bar that scrolls clips what passes its edge: the thumb's shadow stays inside the bar's padding. */
+.nv-subnav[data-more]:not([data-more='none']) .nv-subnav__thumb {
+  box-shadow:
+    inset 0 1px 0 var(--nv-glass-edge),
+    0 1px 3px rgb(0 0 0 / 0.18);
+}
+/* More tabs past an edge: that edge fades out instead of cutting a tab in two, so a tab half out of view reads as
+   « more », never as a word cut (« Expor… », capture de #573). The clear part is the chevron's glass, which sits over
+   it: no letter shows beside the round (« rimes et malus », recette 11/11, GES-16); a chevron's page then ends on a
+   whole tab just past the fade (SubNav, pageTarget). */
+.nv-subnav[data-more='end'] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 64px), transparent calc(100% - 44px));
+}
+.nv-subnav[data-more='start'] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 64px), transparent calc(100% - 44px));
+}
+.nv-subnav[data-more='both'] {
+  mask-image: linear-gradient(
+    to right,
+    transparent 44px,
+    #000 64px,
+    #000 calc(100% - 64px),
+    transparent calc(100% - 44px)
+  );
 }
 .nv-subnav__item {
   position: relative;
@@ -1162,6 +1217,40 @@
   color: var(--nv-ink-muted);
   font-size: 14px;
   line-height: 20px;
+}
+
+/* ── A page that leads nowhere: a card the height of its words, under a compass (CRE-35) ── */
+.nv-notfound {
+  align-self: start;
+}
+.nv-notfound .nv-coming__in {
+  align-items: center;
+  padding-block: var(--nv-space-10);
+}
+.nv-notfound__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 1px 0 var(--nv-glass-edge);
+  color: var(--nv-ink-muted);
+}
+.nv-notfound__icon .nav-icon {
+  width: 26px;
+  height: 26px;
+}
+.nv-notfound__text {
+  margin: 0;
+  text-wrap: balance;
+  color: var(--nv-ink-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.nv-notfound__back {
+  margin-top: var(--nv-space-3);
 }
 
 /* ── Narrow screens: the sidebar keeps its icons only ── */
@@ -1264,7 +1353,7 @@
     --_blur: var(--nv-blur-thick);
     background:
       linear-gradient(180deg, var(--nv-glass-fill-strong) 0%, transparent 46%),
-      color-mix(in srgb, var(--nv-void) 90%, transparent);
+      color-mix(in srgb, var(--nv-void) 96%, transparent);
   }
   .nv-rail__brand,
   .nv-rail__sp,
@@ -1332,23 +1421,6 @@
        uncut and without a 1 px vertical scroll (relecture d'Extension, #417). */
     padding-block: 5px;
   }
-  /* More tabs past an edge: that edge fades out instead of cutting a tab in two. Its last 20 px are clear and the fade
-     runs 72 px, so a tab half out of view reads as « more », never as a word cut (« Expor… », capture de #573). */
-  .nv-subnav[data-more='end'] {
-    mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent calc(100% - 20px));
-  }
-  .nv-subnav[data-more='start'] {
-    mask-image: linear-gradient(to left, #000 calc(100% - 72px), transparent calc(100% - 20px));
-  }
-  .nv-subnav[data-more='both'] {
-    mask-image: linear-gradient(
-      to right,
-      transparent 20px,
-      #000 72px,
-      #000 calc(100% - 72px),
-      transparent calc(100% - 20px)
-    );
-  }
   .nv-subnav__item {
     padding: 0 12px;
   }
@@ -1390,6 +1462,11 @@
   align-items: center;
   align-self: start;
   max-width: 720px;
+}
+/* The orb's warning ring grows to 1.35 times the orb: the orb keeps that room on its left, so the ring stays inside
+   the page's column instead of passing its edge (recette 11/11, lot A2). */
+.nv-silent > .nv-orb {
+  margin-inline-start: 8px;
 }
 .nv-silent__body {
   min-width: 0;

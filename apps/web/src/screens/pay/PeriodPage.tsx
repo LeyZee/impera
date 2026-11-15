@@ -13,9 +13,11 @@ import { useId, useState, type JSX, type ReactNode } from 'react';
 import { CloseDialog } from './CloseDialog';
 import { HeldSalesPanel } from './HeldSalesPanel';
 import { PayNav } from './PayNav';
+import { SalesToGivePanel } from './SalesToGivePanel';
 import { StatementDialog } from './StatementDialog';
 import {
   useAgencySettingsDown,
+  useAgencyToday,
   useCurrentPeriod,
   usePayNames,
   usePeriodBlock,
@@ -150,6 +152,7 @@ function PeriodView({
   const owner = user.role === 'owner';
   const me = { id: user.id, name: user.name };
   const now = useNow();
+  const today = useAgencyToday();
   const current = useCurrentPeriod();
   const down = useAgencySettingsDown();
   const read = usePayPeriod(period);
@@ -521,9 +524,19 @@ function PeriodView({
           period={data.period}
           names={names}
           me={me}
-          owner={owner}
           reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
         />
+        {today === null ? null : (
+          <SalesToGivePanel
+            period={data.period}
+            open={data.closing === null}
+            today={today}
+            names={names}
+            me={me}
+            reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
+            owner={user.teamScope === 'owner'}
+          />
+        )}
       </div>
       {openedStatement === undefined || opened === null ? null : (
         <StatementDialog
@@ -569,10 +582,13 @@ function leadOf(data: PayrollPeriod | undefined, blocked: boolean, owner: boolea
     return 'Avant la première clôture de l’équipe : la quinzaine est close sans relevé.';
   if (data.blocked !== null)
     return 'Rien ne se valide pour l’instant : les relevés se recalculeront seuls une fois le blocage levé.';
-  if (!data.ended)
+  if (!data.ended) {
+    const reads = data.statements.some((one) => one.lines.some((line) => line.base === 'platform_net'));
+    const when = reads ? 'à chaque vente lue et à chaque rapport validé' : 'à chaque rapport validé';
     return data.window === null
-      ? 'Les relevés se calculent dès qu’un rapport est validé.'
-      : `Les relevés se calculent à chaque rapport validé. La quinzaine se valide à partir du ${longDay(opensOn(data.window))}.`;
+      ? `Les relevés se calculent ${reads ? when : 'dès qu’un rapport est validé'}.`
+      : `Les relevés se calculent ${when}. La quinzaine se valide à partir du ${longDay(opensOn(data.window))}.`;
+  }
   if (blocked) return 'Lève d’abord ce qui bloque : la quinzaine se valide ensuite.';
   const phase = phaseOf(periodHeadOf(data));
   if (phase === 'to_validate')

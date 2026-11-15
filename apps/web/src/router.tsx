@@ -17,6 +17,8 @@ import { ExtensionPage } from './pwa/ExtensionPage';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
 import { RevealHelpPage } from './pwa/RevealHelpPage';
+import { CreatorRewardRevealGate } from './rewards/CreatorRewardRevealGate';
+import { playsTheGame } from './rewards/api';
 import { parseCalendarSearch } from './scheduling/calendar';
 import { myAwayOf } from './scheduling/model';
 import { AgendaPage } from './screens/agenda/AgendaPage';
@@ -39,6 +41,7 @@ import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { MyPreferencesPage } from './screens/me/MyPreferencesPage';
 import { MyProfilePage } from './screens/me/MyProfilePage';
 import { MySecurityPage } from './screens/me/MySecurityPage';
+import { MyTrophiesPage } from './screens/me/MyTrophiesPage';
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
 import { ExportsPage } from './screens/pay/ExportsPage';
@@ -52,6 +55,7 @@ import { CreatorSalesPage } from './screens/sales/CreatorSalesPage';
 import { parseSalesSearch } from './screens/sales/view';
 import {
   AiModelsPage,
+  AiUsagePage,
   AlertsPage,
   BackupsPage,
   BillingPage,
@@ -291,7 +295,14 @@ const today = createRoute({
   // A creator's day is who chats for her (ADR 0042 § 8); a chatter's, his own shift.
   component: function Today() {
     const { user } = rootRoute.useRouteContext();
-    return user.role === 'creator' ? <CreatorTodayPage /> : <TodayPage user={user} />;
+    return user.role === 'creator' ? (
+      <>
+        <CreatorTodayPage />
+        <CreatorRewardRevealGate user={user} />
+      </>
+    ) : (
+      <TodayPage user={user} />
+    );
   },
 });
 /**
@@ -303,30 +314,34 @@ const agenda = createRoute({
   path: '/agenda',
   validateSearch: parseAgendaSearch,
   component: function Agenda() {
+    const { user } = rootRoute.useRouteContext();
     const search = agenda.useSearch();
     const navigate = agenda.useNavigate();
     return (
-      <AgendaPage
-        day={search.jour ?? null}
-        view={viewOf(search)}
-        onDay={(day) =>
-          void navigate({
-            search: ({ vue }) => ({
-              ...(day === null ? {} : { jour: day }),
-              ...(vue === undefined ? {} : { vue }),
-            }),
-            replace: true,
-          })
-        }
-        onView={(view) =>
-          void navigate({
-            search: ({ jour }) => ({
-              ...(jour === undefined ? {} : { jour }),
-              ...vueOf(view),
-            }),
-          })
-        }
-      />
+      <>
+        <CreatorRewardRevealGate user={user} />
+        <AgendaPage
+          day={search.jour ?? null}
+          view={viewOf(search)}
+          onDay={(day) =>
+            void navigate({
+              search: ({ vue }) => ({
+                ...(day === null ? {} : { jour: day }),
+                ...(vue === undefined ? {} : { vue }),
+              }),
+              replace: true,
+            })
+          }
+          onView={(view) =>
+            void navigate({
+              search: ({ jour }) => ({
+                ...(jour === undefined ? {} : { jour }),
+                ...vueOf(view),
+              }),
+            })
+          }
+        />
+      </>
     );
   },
 });
@@ -357,11 +372,15 @@ const content = createRoute({
   getParentRoute: () => rootRoute,
   path: '/contenu',
   component: function Content() {
+    const { user } = rootRoute.useRouteContext();
     const navigate = content.useNavigate();
     return (
-      <ContentPage
-        onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
-      />
+      <>
+        <ContentPage
+          onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
+        />
+        <CreatorRewardRevealGate user={user} />
+      </>
     );
   },
 });
@@ -476,6 +495,7 @@ const teamMembers = createRoute({
         tab={onglet === 'managers' ? 'manager' : 'chatter'}
         selected={membre ?? null}
         canManage={user.role === 'owner'}
+        seesSetup={user.role === 'owner' || user.teamScope === 'agency'}
         viewerId={user.id}
         onTab={(tab) =>
           void navigate({
@@ -700,6 +720,21 @@ const meProfile = createRoute({
     return <MyProfilePage user={user} />;
   },
 });
+// Moi › Trophées (ADR 0108): the chatter's trophy case, or the creator's; anyone else is sent to his profile.
+const meTrophies = createRoute({
+  getParentRoute: () => me,
+  path: '/trophees',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'creator' && !playsTheGame(context.user)) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: function MyTrophies() {
+    const { user } = rootRoute.useRouteContext();
+    return <MyTrophiesPage user={user} />;
+  },
+});
 const meFile = createRoute({
   getParentRoute: () => me,
   path: '/dossier',
@@ -826,6 +861,18 @@ const aiModels = createRoute({
     }
   },
   component: AiModelsPage,
+});
+const aiUsage = createRoute({
+  getParentRoute: () => settings,
+  path: '/consommation-ia',
+  // The owner's alone (ADR 0091), as the server serves the spend and the credits: anyone else is sent to Réglages.
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: AiUsagePage,
 });
 const salesFeeds = createRoute({
   getParentRoute: () => settings,
@@ -1011,12 +1058,23 @@ const routeTree = rootRoute.addChildren([
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile, teamReveal]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
-  me.addChildren([meIndex, mePersona, meProfile, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),
+  me.addChildren([
+    meIndex,
+    mePersona,
+    meProfile,
+    meTrophies,
+    meFile,
+    meInvoices,
+    meCalendar,
+    meSecurity,
+    mePreferences,
+  ]),
   accountSecurity,
   settings.addChildren([
     settingsIndex,
     aiModels,
     salesFeeds,
+    aiUsage,
     alerts,
     telegram,
     payRules,

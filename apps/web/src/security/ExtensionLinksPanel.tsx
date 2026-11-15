@@ -11,6 +11,7 @@ import {
 import { ago, dayText } from './view';
 
 import { CopyButton } from '@/auth/BackupCodesList';
+import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Panel, PanelSection } from '@/shell/layout';
 
 /** Three browsers at most (`EXTENSION_LINKS_LIVE_MAX` on the server). */
@@ -49,6 +50,7 @@ export function ExtensionLinksPanel(): JSX.Element {
   const [created, setCreated] = useState<ExtensionLinkCreated | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reauth, setReauth] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const labelId = useId();
@@ -72,8 +74,10 @@ export function ExtensionLinksPanel(): JSX.Element {
     if (step === 'naming') labelInput.current?.select();
   }, [step]);
 
-  async function link(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
+  async function link(event?: SyntheticEvent<HTMLFormElement>): Promise<void> {
+    event?.preventDefault();
+    // While the confirmation is open, Enter in the name (one field: an implicit submission) asks nothing again.
+    if (event !== undefined && reauth) return;
     const wrong = labelProblem(label);
     if (wrong !== null) {
       setProblem(wrong);
@@ -89,7 +93,9 @@ export function ExtensionLinksPanel(): JSX.Element {
       setStep('idle');
       await load();
     } catch (failure) {
-      setError(failureOf(failure));
+      // A link is a lasting credential: its creation asks for the password and a code again (ADR 0046 § 3).
+      if (failure instanceof ExtensionLinkError && failure.kind === 'reauth') setReauth(true);
+      else setError(failureOf(failure));
     } finally {
       setBusy(false);
     }
@@ -202,59 +208,83 @@ export function ExtensionLinksPanel(): JSX.Element {
       {links === null || loadError !== null ? null : (
         <PanelSection>
           {step === 'naming' ? (
-            <form
-              className="flex flex-col gap-2"
-              noValidate
-              onSubmit={(event) => void link(event)}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape' && !busy) setStep('idle');
-              }}
-            >
-              <div className="flex flex-wrap items-end gap-3">
-                <label className="nv-field min-w-[12rem] flex-1" htmlFor={labelId}>
-                  <span className="nv-field__label">Nom de ce navigateur</span>
-                  <input
-                    ref={labelInput}
-                    id={labelId}
-                    className="nv-field__control"
-                    value={label}
-                    maxLength={60}
-                    autoComplete="off"
-                    aria-invalid={problem !== null}
-                    aria-describedby={`${labelId}-hint`}
-                    readOnly={busy}
-                    onChange={(event) => {
-                      setLabel(event.target.value);
-                      setProblem(null);
-                    }}
-                  />
-                </label>
-                <div className="flex gap-2">
-                  <button type="submit" className="nv-btn nv-btn--neon nv-btn--sm" disabled={busy}>
-                    {busy ? 'Liaison…' : 'Relier'}
-                  </button>
-                  <button
-                    type="button"
-                    className="nv-btn nv-btn--plain nv-btn--sm"
-                    disabled={busy}
-                    onClick={() => {
-                      setStep('idle');
-                      setProblem(null);
-                    }}
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </div>
-              <p
-                id={`${labelId}-hint`}
-                className={
-                  problem === null ? 'text-xs text-[var(--nv-ink-muted)]' : 'text-xs text-[var(--nv-warning)]'
-                }
+            <>
+              <form
+                className="flex flex-col gap-2"
+                noValidate
+                onSubmit={(event) => void link(event)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && !busy) {
+                    setStep('idle');
+                    setReauth(false);
+                  }
+                }}
               >
-                {problem ?? 'Un navigateur déjà relié sous ce nom reçoit un nouveau code.'}
-              </p>
-            </form>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="nv-field min-w-[12rem] flex-1" htmlFor={labelId}>
+                    <span className="nv-field__label">Nom de ce navigateur</span>
+                    <input
+                      ref={labelInput}
+                      id={labelId}
+                      className={
+                        reauth ? 'nv-field__control nv-field__control--readonly' : 'nv-field__control'
+                      }
+                      value={label}
+                      maxLength={60}
+                      autoComplete="off"
+                      aria-invalid={problem !== null}
+                      aria-describedby={`${labelId}-hint`}
+                      readOnly={busy || reauth}
+                      onChange={(event) => {
+                        setLabel(event.target.value);
+                        setProblem(null);
+                      }}
+                    />
+                  </label>
+                  {reauth ? null : (
+                    <div className="flex gap-2">
+                      <button type="submit" className="nv-btn nv-btn--neon nv-btn--sm" disabled={busy}>
+                        {busy ? 'Liaison…' : 'Relier'}
+                      </button>
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--plain nv-btn--sm"
+                        disabled={busy}
+                        onClick={() => {
+                          setStep('idle');
+                          setProblem(null);
+                          setReauth(false);
+                        }}
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p
+                  id={`${labelId}-hint`}
+                  className={
+                    problem === null
+                      ? 'text-xs text-[var(--nv-ink-muted)]'
+                      : 'text-xs text-[var(--nv-warning)]'
+                  }
+                >
+                  {problem ?? 'Un navigateur déjà relié sous ce nom reçoit un nouveau code.'}
+                </p>
+              </form>
+              {reauth ? (
+                <PasswordPrompt
+                  lead="Pour relier ce navigateur, confirme ton mot de passe et ton code."
+                  onConfirmed={() => {
+                    setReauth(false);
+                    void link();
+                  }}
+                  onCancel={() => {
+                    setReauth(false);
+                  }}
+                />
+              ) : null}
+            </>
           ) : full ? (
             <p className={MUTED}>
               {String(EXTENSION_LINKS_MAX)} navigateurs sont reliés&nbsp;: délies-en un pour en relier un

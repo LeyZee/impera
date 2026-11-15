@@ -15,6 +15,10 @@ import {
   DomainError,
   ExchangeRatesSchema,
   HeldSalesSchema,
+  MyFiguresSchema,
+  SaleGiftCountsSchema,
+  SalesToGiveQuerySchema,
+  SalesToGiveSchema,
   MySalesQuerySchema,
   MySalesSchema,
   PageQuerySchema,
@@ -120,6 +124,29 @@ export function createPayrollRoutes(
       (request) => decisions.heldSales(userOf(request), request.params.period),
     );
 
+    // ADR 0101 §§ 1, 2, 17: the sales of a day the validator may give, and how many each validator gave in the month.
+    app.get(
+      '/payroll/periods/:period/sales-to-give',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: PeriodParamsSchema,
+          querystring: SalesToGiveQuerySchema,
+          response: { 200: SalesToGiveSchema },
+        },
+      },
+      (request) => decisions.salesToGive(userOf(request), request.params.period, request.query.day),
+    );
+
+    app.get(
+      '/payroll/periods/:period/sale-gifts',
+      {
+        preValidation: ownerOrMember,
+        schema: { params: PeriodParamsSchema, response: { 200: SaleGiftCountsSchema } },
+      },
+      (request) => decisions.saleGifts(userOf(request), request.params.period),
+    );
+
     app.post(
       '/payroll/sale-decisions',
       {
@@ -143,6 +170,13 @@ export function createPayrollRoutes(
         schema: { querystring: MySalesQuerySchema, response: { 200: MySalesSchema } },
       },
       (request) => signals.mySales(userOf(request), request.query),
+    );
+
+    // CHF-01, ADR 0104 § A: one's own figures, from one's own statements only; never a ranking nor another's sale.
+    app.get(
+      '/payroll/my-figures',
+      { preValidation: ownerOrMember, schema: { response: { 200: MyFiguresSchema } } },
+      (request) => signals.myFigures(userOf(request)),
     );
 
     // Reco 19 of the recette (05/11): what the amount typed in a shift's report brings its member, as pay counts it.

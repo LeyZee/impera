@@ -1,0 +1,34 @@
+# Réplique déjà reçue (ADR 0090 § B) : jamais deux fois la même au même fan, la suivante de la banque. Fan et messages fictifs (ADR 0010).
+description: Il trouve encore trop cher après avoir déjà reçu la première réplique ; il reçoit la deuxième.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Kevin (fictif)'
+situation:
+  known_hours: 50
+  age_confirmed: true
+  last_offer_hours_ago: 0.2
+  objection_replies_used:
+    - testtooexpa
+history:
+  - from: creator
+    text: Je t’ai préparé un petit pack rien que pour toi 😏
+  - from: fan
+    text: C'est cher quand même
+  - from: creator
+    text: Je l'ai fait avec soin celui-là 😌
+inbound: Oui mais c'est trop cher pour moi, vraiment
+expect:
+  brief:
+    intent_in:
+      - price_objection
+    objection_in:
+      - too_expensive
+  decision:
+    handoff: false
+    offer: false
+    objection_reply: testtooexpb
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(réduction|remise|promo|moitié prix|moins cher)\b

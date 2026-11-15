@@ -148,7 +148,7 @@ describe('the agent writes with her active persona version (recette G4, M13; ADR
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
     app = await createApp(config, createLogger(config));
     anna = (await app.modules.persona.creators.create({ displayName: 'Anna' })).id;
     bea = (await app.modules.persona.creators.create({ displayName: 'Bea' })).id;
