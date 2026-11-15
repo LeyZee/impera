@@ -13,6 +13,8 @@ import {
 } from './install';
 
 const INSTALL_GUIDE = '/aide/installer';
+/** The pages that offer the install themselves. */
+const SAID_ON_PAGE: readonly string[] = [INSTALL_GUIDE, '/notifications'];
 
 /** Dismissed for this opening of the app (module state: a reload or a new opening offers it again). */
 let dismissedThisOpening = false;
@@ -34,10 +36,13 @@ export function InstallNudge(): JSX.Element | null {
     });
   });
   const canPrompt = useSyncExternalStore(onInstallPrompt, canPromptInstall, () => false);
-  // The guide itself says it all: no card on top of it.
-  const onGuide = useLocation({ select: (location) => location.pathname.startsWith(INSTALL_GUIDE) });
+  // The guide itself says it all: no card on top of it. Nor on Notifications, whose « Cet appareil » offers the same
+  // « Installer Impera » a little lower (recette 11/11, CRE-36).
+  const saidOnPage = useLocation({
+    select: (location) => SAID_ON_PAGE.some((path) => location.pathname.startsWith(path)),
+  });
   const card = useRef<HTMLElement>(null);
-  const visible = shown && !onGuide;
+  const visible = shown && !saidOnPage;
   // The room the card takes at the head of a phone's page, for a fill page (Suivi) to give it back (SOC-14).
   useLayoutEffect(() => {
     const element = card.current;
