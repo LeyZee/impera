@@ -97,7 +97,6 @@ Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed
 ## Lecture des ventes par la paie (CRM-03, ADR 0050 §§ 5, 7 et 8)
 
 `salesFeedReadsForPay`, exporté par `index.ts` (`infra/db/pay-reads.ts`), lit le registre dans la transaction de l'appelant, ligne par ligne, jamais une somme :
-
 - `linesOfSalesBetween` : les ventes dont l'instant tombe dans la plage, et leurs remboursements quel que soit leur jour. Un remboursement compte au jour de sa vente ; celui d'une vente plus ancienne que le registre compte à son propre instant, avec `saleDay` à `null`.
 - `linesRecordedBetween` : les lignes enregistrées dans la plage, quel que soit le jour de leur vente, c'est-à-dire les lignes tardives après une clôture (ADR 0032).
 - `linesRelinkedBetween` : les lignes dont le lien du chatteur a pris sa version actuelle dans la plage. Relier un chatteur après une clôture est une attribution, qui compte dans la première quinzaine encore ouverte (§ 5).
@@ -108,7 +107,6 @@ Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed
 Ces lectures se recouvrent exprès : un remboursement tardif sort dans la quinzaine de sa vente et dans celle où il a été enregistré. Un lecteur indexe donc les lignes par `platform`, `platformSaleId` et `event`, et compte chaque clé une seule fois.
 
 Chaque ligne porte :
-
 - l'id de la plateforme et l'événement, le compte, le type de vente ;
 - l'instant de la ligne et celui de sa vente, avec son jour dans le fuseau que donne l'appelant (celui de l'agence) ;
 - `recordedAt`, la devise, le net signé (négatif pour un remboursement) et le statut à la première lecture (`other` inconnu, `refund_asked` à signaler) ;
