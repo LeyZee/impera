@@ -55,6 +55,31 @@ export function useMarkRevealed(): (kinds: readonly string[]) => void {
   };
 }
 
+const HER_CASE_KEY = ['rewards', 'creator-space', 'trophy-case'] as const;
+
+/** Her own trophy case (ADR 0107 § 10), the creator's; read again every minute, a gain is noted by a job. */
+export function useHerTrophyCase(enabled: boolean): UseQueryResult<TrophyCase> {
+  return useQuery({
+    queryKey: HER_CASE_KEY,
+    queryFn: () => send('GET', '/v1/creator-space/trophy-case', null, (json) => TrophyCaseSchema.parse(json)),
+    enabled,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+}
+
+/** Marks her reveals as seen (§ 11); her case as the server answers it replaces the one in hand. */
+export function useMarkHerRevealed(): (kinds: readonly string[]) => void {
+  const client = useQueryClient();
+  return (kinds) => {
+    void send('POST', '/v1/creator-space/trophy-case/reveals', { kinds }, (json) =>
+      TrophyCaseSchema.parse(json),
+    )
+      .then((next) => client.setQueryData(HER_CASE_KEY, next))
+      .catch(() => undefined);
+  };
+}
+
 /** The account's preferences, as the session read them, then as it last saved them. */
 export function usePreferences(user: Me): {
   readonly preferences: MePreferences;

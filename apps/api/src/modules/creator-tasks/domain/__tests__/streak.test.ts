@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dayOutcome, streakOf, type DayRecord } from '../streak';
+import { anyPerfectDay, bestStreakOf, dayOutcome, streakOf, type DayRecord } from '../streak';
 
 /** A day of hers: `e` essentials done out of `of`, every daily task done when `perfect`. */
 const day = (date: string, done: number, of = 2, perfect = false): DayRecord => ({
@@ -76,5 +76,28 @@ describe('her streak (ADR 0042 § 3)', () => {
     });
     expect(streakOf(days, today)).toMatchObject({ days: 14, milestone: 14, next: 30 });
     expect(streakOf(days.slice(0, 6), today)).toMatchObject({ days: 6, milestone: null, next: 7 });
+  });
+});
+
+describe('her best streak and her perfect days (ADR 0107 § 1 and § 3)', () => {
+  const today = '2026-11-09';
+  it('keeps the longest run her days held, after it broke', () => {
+    const days = [
+      day('2026-11-01', 2),
+      day('2026-11-02', 2),
+      day('2026-11-03', 2),
+      day('2026-11-04', 0),
+      day('2026-11-05', 0),
+      day('2026-11-08', 2),
+      day('2026-11-09', 1),
+    ];
+    expect(streakOf(days, today).days).toBe(1);
+    expect(bestStreakOf(days, today)).toBe(3);
+    expect(bestStreakOf([], today)).toBe(0);
+  });
+
+  it('finds a « parfaite » day among them', () => {
+    expect(anyPerfectDay([day('2026-11-01', 2), day('2026-11-02', 2, 2, true)])).toBe(true);
+    expect(anyPerfectDay([day('2026-11-01', 2)])).toBe(false);
   });
 });

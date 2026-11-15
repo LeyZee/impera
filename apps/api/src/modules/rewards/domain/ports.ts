@@ -1,5 +1,6 @@
 import type { TeamMemberId } from '@impera/contracts';
 
+import type { CreatorFacts, CreatorGainKind, StoredCreatorGain } from './creator-game';
 import type { Gain, GamePay, GameShift } from './gains';
 import type { Streak } from './streak';
 import type { StoredGain } from './trophy-case';
@@ -31,4 +32,28 @@ export interface RewardsStore {
     keys: readonly { readonly kind: string; readonly scopeKey: string }[],
     now: Date,
   ): Promise<void>;
+}
+
+/** A creator the game counts for (ADR 0107): her account, linked to her one creator. */
+export interface CreatorPlayer {
+  readonly userId: string;
+  readonly creatorId: string;
+}
+
+export interface CreatorRewardsStore {
+  /** The creator accounts, on the admin connection. */
+  players(): Promise<CreatorPlayer[]>;
+  /** What the game reads of her agenda and her drops, on the admin connection, bounded to her creator. */
+  facts(player: CreatorPlayer, now: Date): Promise<CreatorFacts>;
+  /** Writes the gains not written yet, each once under its kind; answers how many are new. */
+  record(player: CreatorPlayer, gains: readonly CreatorGainKind[], now: Date): Promise<number>;
+  /** Her own account as a player; `CreatorTrophiesForbidden` when it is not a creator linked to one creator. */
+  herself(userId: string): Promise<CreatorPlayer>;
+  /**
+   * Her account as a player for one of the agency reading her profile (§ 12): the owner or an active manager,
+   * `null` for anyone else, including a chatter, and for a creator with no account.
+   */
+  forAgency(readerId: string, creatorId: string): Promise<CreatorPlayer | null>;
+  /** Her gains, read as `readerId` under the table's policies: herself, the owner or an active manager. */
+  gains(readerId: string, player: CreatorPlayer): Promise<StoredCreatorGain[]>;
 }

@@ -17,6 +17,7 @@ import { ExtensionPage } from './pwa/ExtensionPage';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
 import { RevealHelpPage } from './pwa/RevealHelpPage';
+import { CreatorRewardRevealGate } from './rewards/CreatorRewardRevealGate';
 import { parseCalendarSearch } from './scheduling/calendar';
 import { myAwayOf } from './scheduling/model';
 import { AgendaPage } from './screens/agenda/AgendaPage';
@@ -292,7 +293,14 @@ const today = createRoute({
   // A creator's day is who chats for her (ADR 0042 § 8); a chatter's, his own shift.
   component: function Today() {
     const { user } = rootRoute.useRouteContext();
-    return user.role === 'creator' ? <CreatorTodayPage /> : <TodayPage user={user} />;
+    return user.role === 'creator' ? (
+      <>
+        <CreatorTodayPage />
+        <CreatorRewardRevealGate user={user} />
+      </>
+    ) : (
+      <TodayPage user={user} />
+    );
   },
 });
 /**
@@ -304,30 +312,34 @@ const agenda = createRoute({
   path: '/agenda',
   validateSearch: parseAgendaSearch,
   component: function Agenda() {
+    const { user } = rootRoute.useRouteContext();
     const search = agenda.useSearch();
     const navigate = agenda.useNavigate();
     return (
-      <AgendaPage
-        day={search.jour ?? null}
-        view={viewOf(search)}
-        onDay={(day) =>
-          void navigate({
-            search: ({ vue }) => ({
-              ...(day === null ? {} : { jour: day }),
-              ...(vue === undefined ? {} : { vue }),
-            }),
-            replace: true,
-          })
-        }
-        onView={(view) =>
-          void navigate({
-            search: ({ jour }) => ({
-              ...(jour === undefined ? {} : { jour }),
-              ...vueOf(view),
-            }),
-          })
-        }
-      />
+      <>
+        <CreatorRewardRevealGate user={user} />
+        <AgendaPage
+          day={search.jour ?? null}
+          view={viewOf(search)}
+          onDay={(day) =>
+            void navigate({
+              search: ({ vue }) => ({
+                ...(day === null ? {} : { jour: day }),
+                ...(vue === undefined ? {} : { vue }),
+              }),
+              replace: true,
+            })
+          }
+          onView={(view) =>
+            void navigate({
+              search: ({ jour }) => ({
+                ...(jour === undefined ? {} : { jour }),
+                ...vueOf(view),
+              }),
+            })
+          }
+        />
+      </>
     );
   },
 });
@@ -358,11 +370,15 @@ const content = createRoute({
   getParentRoute: () => rootRoute,
   path: '/contenu',
   component: function Content() {
+    const { user } = rootRoute.useRouteContext();
     const navigate = content.useNavigate();
     return (
-      <ContentPage
-        onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
-      />
+      <>
+        <ContentPage
+          onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
+        />
+        <CreatorRewardRevealGate user={user} />
+      </>
     );
   },
 });

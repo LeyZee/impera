@@ -38,7 +38,10 @@ export const userPreferences = pgTable(
   ],
 );
 
-/** The kinds a chatter earns (ADR 0104 § 12 and § 15). `tier` is one row a fortnight and threshold (`scope_key`). */
+/**
+ * The kinds a chatter earns (ADR 0104 § 12 and § 15), then those a creator earns (ADR 0107). `tier` is one row a
+ * fortnight and threshold (`scope_key`).
+ */
 export const REWARD_GAIN_KINDS = [
   'tier',
   'first_sale',
@@ -49,6 +52,21 @@ export const REWARD_GAIN_KINDS = [
   'streak_10',
   'streak_25',
   'ten_ppv_shift',
+  // The creator's (ADR 0107 § 1 and § 3): her streak medals, then her trophies, each earned once (`scope_key` empty).
+  'day_streak_7',
+  'day_streak_14',
+  'day_streak_30',
+  'day_streak_50',
+  'day_streak_100',
+  'first_drop',
+  'first_on_time_delivery',
+  'delivery_streak_5',
+  'delivery_streak_10',
+  'delivery_streak_25',
+  'perfect_day',
+  'first_script',
+  'full_stock',
+  'hit_content',
 ] as const;
 
 /**

@@ -1044,6 +1044,13 @@
       "when": 1794770688874,
       "tag": "0207_agency_share_changed",
       "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "7",
+      "when": 1794776506284,
+      "tag": "0208_creator_trophies",
+      "breakpoints": true
     }
   ]
 }
