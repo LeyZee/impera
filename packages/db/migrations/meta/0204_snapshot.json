@@ -1,6 +1,6 @@
 {
-  "id": "3782d2e0-44c0-4e85-a554-9d748aa43f74",
-  "prevId": "772e5c6e-0c85-40f3-840f-1dc3d5e29b19",
+  "id": "d1ceeb68-b70d-4e30-85b6-2cedbdc32916",
+  "prevId": "1a19ede2-9013-4ebc-9f26-d959963ef03f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2592,7 +2592,7 @@
       "checkConstraints": {
         "conversation_events_type_check": {
           "name": "conversation_events_type_check",
-          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -4770,7 +4770,7 @@
       "checkConstraints": {
         "domain_events_type_check": {
           "name": "domain_events_type_check",
-          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -7184,7 +7184,7 @@
         },
         "ai_credit_entries_kind_check": {
           "name": "ai_credit_entries_kind_check",
-          "value": "\"ai_credit_entries\".\"kind\" in ('topup', 'balance')"
+          "value": "\"ai_credit_entries\".\"kind\" in ('topup', 'balance', 'subscription')"
         },
         "ai_credit_entries_currency_check": {
           "name": "ai_credit_entries_currency_check",
@@ -7192,7 +7192,7 @@
         },
         "ai_credit_entries_amount_check": {
           "name": "ai_credit_entries_amount_check",
-          "value": "\"ai_credit_entries\".\"amount_minor\" between 0 and 1000000 and (\"ai_credit_entries\".\"kind\" = 'balance' or \"ai_credit_entries\".\"amount_minor\" > 0)"
+          "value": "\"ai_credit_entries\".\"amount_minor\" between 0 and 1000000 and (\"ai_credit_entries\".\"kind\" = 'balance' or (\"ai_credit_entries\".\"kind\" = 'subscription') = (\"ai_credit_entries\".\"amount_minor\" = 0))"
         }
       },
       "isRLSEnabled": false
@@ -7340,6 +7340,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "llm_calls_provider_status_created_idx": {
+          "name": "llm_calls_provider_status_created_idx",
+          "columns": [
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -7392,7 +7419,7 @@
         },
         "llm_calls_status_check": {
           "name": "llm_calls_status_check",
-          "value": "\"llm_calls\".\"status\" in ('ok', 'invalid_output', 'refused', 'timeout', 'rate_limited', 'auth', 'unavailable', 'missing_key', 'unknown_model', 'unsupported_input', 'prompt_leak', 'error')"
+          "value": "\"llm_calls\".\"status\" in ('ok', 'invalid_output', 'refused', 'timeout', 'rate_limited', 'quota_exhausted', 'auth', 'unavailable', 'missing_key', 'unknown_model', 'unsupported_input', 'prompt_leak', 'error')"
         },
         "llm_calls_currency_check": {
           "name": "llm_calls_currency_check",
@@ -8003,6 +8030,271 @@
         "media_descriptions_review_reasons_check": {
           "name": "media_descriptions_review_reasons_check",
           "value": "\"media_descriptions\".\"review_reasons\" <@ array['back_reference', 'not_alone', 'unsure', 'flagged']::text[]"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.media_platform_refs": {
+      "name": "media_platform_refs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_media_id": {
+          "name": "platform_media_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "media_asset_id": {
+          "name": "media_asset_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "folder_ref": {
+          "name": "folder_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "folder_name": {
+          "name": "folder_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "folder_moment": {
+          "name": "folder_moment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "folder_position": {
+          "name": "folder_position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_created_at": {
+          "name": "platform_created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duration_seconds": {
+          "name": "duration_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform_description": {
+          "name": "platform_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suggested_min_minor": {
+          "name": "suggested_min_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suggested_max_minor": {
+          "name": "suggested_max_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "removed_at": {
+          "name": "removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "media_platform_refs_order_idx": {
+          "name": "media_platform_refs_order_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "folder_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "folder_position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_media_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "media_platform_refs_creator_id_creators_id_fk": {
+          "name": "media_platform_refs_creator_id_creators_id_fk",
+          "tableFrom": "media_platform_refs",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "media_platform_refs_media_asset_id_media_assets_id_fk": {
+          "name": "media_platform_refs_media_asset_id_media_assets_id_fk",
+          "tableFrom": "media_platform_refs",
+          "tableTo": "media_assets",
+          "columnsFrom": ["media_asset_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "media_platform_refs_account_fk": {
+          "name": "media_platform_refs_account_fk",
+          "tableFrom": "media_platform_refs",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "media_platform_refs_account_media_unique": {
+          "name": "media_platform_refs_account_media_unique",
+          "nullsNotDistinct": false,
+          "columns": ["platform_account_id", "platform_media_id"]
+        }
+      },
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"media_platform_refs\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "\"media_platform_refs\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_no_insert": {
+          "name": "creator_no_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_update": {
+          "name": "creator_no_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_delete": {
+          "name": "creator_no_delete",
+          "as": "RESTRICTIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "media_platform_refs_platform_check": {
+          "name": "media_platform_refs_platform_check",
+          "value": "\"media_platform_refs\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        },
+        "media_platform_refs_kind_check": {
+          "name": "media_platform_refs_kind_check",
+          "value": "\"media_platform_refs\".\"kind\" in ('image', 'video', 'audio')"
+        },
+        "media_platform_refs_folder_check": {
+          "name": "media_platform_refs_folder_check",
+          "value": "(\"media_platform_refs\".\"folder_ref\" is null) = (\"media_platform_refs\".\"folder_name\" is null) and (\"media_platform_refs\".\"folder_ref\" is not null or \"media_platform_refs\".\"folder_moment\" is null)"
+        },
+        "media_platform_refs_folder_moment_check": {
+          "name": "media_platform_refs_folder_moment_check",
+          "value": "\"media_platform_refs\".\"folder_moment\" in ('day', 'night')"
+        },
+        "media_platform_refs_folder_position_check": {
+          "name": "media_platform_refs_folder_position_check",
+          "value": "\"media_platform_refs\".\"folder_position\" >= 0"
+        },
+        "media_platform_refs_suggested_check": {
+          "name": "media_platform_refs_suggested_check",
+          "value": "(\"media_platform_refs\".\"suggested_min_minor\" is null) = (\"media_platform_refs\".\"suggested_max_minor\" is null) and coalesce(\"media_platform_refs\".\"suggested_min_minor\", 0) >= 0 and coalesce(\"media_platform_refs\".\"suggested_max_minor\", 0) >= 0"
+        },
+        "media_platform_refs_text_check": {
+          "name": "media_platform_refs_text_check",
+          "value": "char_length(\"media_platform_refs\".\"folder_name\") <= 200 and char_length(\"media_platform_refs\".\"platform_description\") <= 2000"
+        },
+        "media_platform_refs_duration_check": {
+          "name": "media_platform_refs_duration_check",
+          "value": "\"media_platform_refs\".\"duration_seconds\" is null or \"media_platform_refs\".\"duration_seconds\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -12265,96 +12557,15 @@
       "checkConstraints": {
         "reward_gains_kind_check": {
           "name": "reward_gains_kind_check",
-          "value": "\"reward_gains\".\"kind\" in ('tier', 'level', 'first_sale', 'day_record', 'fortnight_record', 'fortnight_on_time', 'streak_5', 'streak_10', 'streak_25', 'ten_ppv_shift')"
+          "value": "\"reward_gains\".\"kind\" in ('tier', 'first_sale', 'day_record', 'fortnight_record', 'fortnight_on_time', 'streak_5', 'streak_10', 'streak_25', 'ten_ppv_shift')"
         },
         "reward_gains_scope_check": {
           "name": "reward_gains_scope_check",
-          "value": "(\"reward_gains\".\"kind\" in ('tier', 'level')) = (\"reward_gains\".\"scope_key\" <> '')"
+          "value": "(\"reward_gains\".\"kind\" = 'tier') = (\"reward_gains\".\"scope_key\" <> '')"
         },
         "reward_gains_reveal_check": {
           "name": "reward_gains_reveal_check",
           "value": "\"reward_gains\".\"revealed_at\" is null or \"reward_gains\".\"revealed_at\" >= \"reward_gains\".\"earned_at\""
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.reward_level_settings": {
-      "name": "reward_level_settings",
-      "schema": "",
-      "columns": {
-        "singleton": {
-          "name": "singleton",
-          "type": "boolean",
-          "primaryKey": true,
-          "notNull": true,
-          "default": true
-        },
-        "thresholds_minor": {
-          "name": "thresholds_minor",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "reward_level_settings_updated_by_user_id_fk": {
-          "name": "reward_level_settings_updated_by_user_id_fk",
-          "tableFrom": "reward_level_settings",
-          "tableTo": "user",
-          "columnsFrom": ["updated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.user_id', true), '') is not null"
-        },
-        "owner_insert": {
-          "name": "owner_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner'"
-        },
-        "owner_update": {
-          "name": "owner_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner'",
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner'"
-        }
-      },
-      "checkConstraints": {
-        "reward_level_settings_singleton_check": {
-          "name": "reward_level_settings_singleton_check",
-          "value": "\"reward_level_settings\".\"singleton\""
-        },
-        "reward_level_settings_array_check": {
-          "name": "reward_level_settings_array_check",
-          "value": "jsonb_typeof(\"reward_level_settings\".\"thresholds_minor\") = 'array'"
         }
       },
       "isRLSEnabled": false
@@ -20258,6 +20469,12 @@
         },
         "last_poll_at": {
           "name": "last_poll_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vault_synced_at": {
+          "name": "vault_synced_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

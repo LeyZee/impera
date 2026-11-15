@@ -43,6 +43,28 @@ function retryAfterMs(headers: Record<string, string> | undefined, now: number):
   return Number.isNaN(at) ? undefined : Math.max(0, at - now);
 }
 
+/**
+ * What a provider says when the account has nothing left to spend: prepaid credits run out, the monthly limit reached,
+ * or the usage included with a subscription used up (ADR 0091 § 6). Read in the answer's body, which is never kept: it
+ * names the team.
+ */
+const QUOTA_REFUSAL =
+  /insufficient[_ ]quota|resource has been exhausted|(?:spending|usage) limit (?:reached|exceeded)|reached its monthly spending limit|used all available credits|(?:no|out of|insufficient) credits?\b|(?:doesn't|does not) have any credits/iu;
+
+/**
+ * A 402, or a 403 or 429 whose body says the account is used up: not a bad key, not worth asking again. A 429 that
+ * says when to come back (`retry-after`) is a rate limit, whatever its body.
+ */
+function isQuotaRefusal(
+  status: number | undefined,
+  body: string | undefined,
+  headers: Record<string, string> | undefined,
+): boolean {
+  if (status === 402) return true;
+  if (status === 429 && headers?.['retry-after'] !== undefined) return false;
+  return (status === 403 || status === 429) && body !== undefined && QUOTA_REFUSAL.test(body);
+}
+
 export function classify(error: unknown): Classified {
   if (NoObjectGeneratedError.isInstance(error)) {
     // A block the SDK only reports as a failed object (see the finish check in `run`).
@@ -67,6 +89,8 @@ export function classify(error: unknown): Classified {
   }
   if (APICallError.isInstance(error)) {
     const status = error.statusCode;
+    if (isQuotaRefusal(status, error.responseBody, error.responseHeaders))
+      return { outcome: 'quota_exhausted', isTransient: false, message: `HTTP ${String(status)} quota` };
     if (status === 401 || status === 403)
       return {
         outcome: 'auth',

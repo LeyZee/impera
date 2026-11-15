@@ -42,7 +42,7 @@ Le chatteur lit ses propres chiffres dans le style du Dashboard de l'agence (gai
 - [x] Tests : rien du jeu n'entre dans un relevé (§ 17) ; chacun sa vitrine ; mouvement réduit (§ 19) ; aucune notification (§ 18 : le jeu n'en envoie aucune).
 - [x] Captures validées par Charles (lot `jeu-devoilement-2`), relectures Équipe, Bilan, Design, fusion (#740).
 
-### Lot 2b : défi du shift, rangs, fiche du membre (PR à part, une migration, 0203 provisoire)
+### Lot 2b : défi du shift, rangs, fiche du membre (PR à part, une migration, 0209 provisoire)
 
 - [x] Défi du shift (§ 14) : `GET /v1/rewards/my-shift-challenge`, carte sur Aujourd'hui.
 - [x] Rangs (§ 16) : huit rangs fixes et leurs insignes, seuils réglés par le propriétaire (`reward_level_settings`, Paie › Objectifs), carte « Mon rang » sur Commissions, dévoilement d'un rang gagné.

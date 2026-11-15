@@ -82,6 +82,11 @@ export const platformAccounts = pgTable(
     sessionCiphertext: bytea('session_ciphertext'),
     sessionUpdatedAt: timestampTz('session_updated_at'),
     lastPollAt: timestampTz('last_poll_at'),
+    /**
+     * The last vault sync that went through for this account (fiche vault-sync), changes or not: what « synchronisé à »
+     * shows. Written by `connector.vault_sync` only; the media themselves are in `media_platform_refs`.
+     */
+    vaultSyncedAt: timestampTz('vault_synced_at'),
     /** Circuit breaker (connectors.md): failed polls in a row, and until when the account stays quiet. */
     consecutiveErrors: integer('consecutive_errors').notNull().default(0),
     pausedUntil: timestampTz('paused_until'),

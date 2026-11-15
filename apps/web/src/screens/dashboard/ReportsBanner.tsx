@@ -51,7 +51,25 @@ export function ReportsBanner({ enabled }: { enabled: boolean }): JSX.Element | 
   if (lines.length === 0) return null;
 
   return (
-    <aside className="nv-plate db-paper nv-enter" aria-labelledby="db-reports-title">
+    <aside
+      className="nv-plate db-paper nv-enter"
+      data-tone={gaps === 0 ? 'quiet' : 'warn'}
+      aria-labelledby="db-reports-title"
+    >
+      {/* The banners' one face (ADM-26): a medallion, a title, its lines, the action on the right. */}
+      <span className="db-orb" aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="5" y="4" width="14" height="17" rx="2" />
+          <path d="M9 4.5V3h6v1.5M9 11h6M9 15h4" />
+        </svg>
+      </span>
       <div className="db-paper__body">
         <p id="db-reports-title" className="db-paper__title">
           Rapports de fin de shift
@@ -65,7 +83,7 @@ export function ReportsBanner({ enabled }: { enabled: boolean }): JSX.Element | 
           ))}
         </ul>
       </div>
-      <Link className="nv-btn nv-btn--soft nv-btn--sm db-paper__go" to="/equipe/rapports">
+      <Link className="nv-btn nv-btn--soft nv-btn--sm db-banner__go" to="/equipe/rapports">
         Voir les rapports
       </Link>
     </aside>

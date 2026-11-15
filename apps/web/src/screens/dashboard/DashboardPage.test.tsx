@@ -912,6 +912,25 @@ describe('DashboardPage, the fold of the agent', () => {
     expect(rate?.querySelector('.sr-only')?.textContent).toContain('Automatique : à partir de');
   });
 
+  it('says whose hour the header gives: hers (ADM-27)', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard(true);
+    await screen.findByText('Kévin');
+    expect(document.querySelector('.db-top__when')?.textContent).toMatch(/^Chez elle : /u);
+  });
+
+  it('offers the owner the guide to link Reveal while it is not linked (ADM-18)', async () => {
+    const body = apiDashboard();
+    serveDashboard({
+      status: 200,
+      body: { ...body, reveal: { ...body.reveal, connected: false, lastReadAt: null, conversations: 0 } },
+    });
+    renderDashboard(true);
+    expect((await screen.findByRole('link', { name: 'Comment relier Reveal' })).getAttribute('href')).toBe(
+      '/aide/reveal',
+    );
+  });
+
   it('says the AI budget once, for the whole agency, apart from her agent’s health (recette 05/11, reco 18)', async () => {
     serveDashboard({ status: 200, body: apiDashboard() });
     renderDashboard(true);

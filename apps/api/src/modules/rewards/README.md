@@ -6,7 +6,7 @@
 
 **Tables possédées.** `reward_gains` et `reward_streaks` (migration 0194), en FORCE RLS. Le job les écrit par la connexion admin ; l'application lit les lignes du compte (le propriétaire et un manager actif lisent celles de l'équipe) et ne peut changer que `revealed_at` de ses propres gains. Rien n'est supprimé. `user_preferences` (même migration) appartient à la session (`apps/api/src/auth.ts`, `PUT /v1/me/preferences`).
 
-`reward_level_settings` (migration 0203) : une seule ligne, les seuils des rangs ; FORCE RLS, l'équipe la lit (pas une créatrice), le propriétaire seul l'écrit, le rôle de service la lit.
+`reward_level_settings` (migration 0209) : une seule ligne, les seuils des rangs ; FORCE RLS, l'équipe la lit (pas une créatrice), le propriétaire seul l'écrit, le rôle de service la lit.
 
 **Job.** `rewards.evaluate`, toutes les 10 minutes (`crontab.ts`), rejouable : la contrainte `reward_gains_once` (compte, type, clé) fait qu'un gain n'est noté qu'une fois. Aucune notification n'est envoyée (§ 18).
 

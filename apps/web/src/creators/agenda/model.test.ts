@@ -90,7 +90,14 @@ describe('the week at a glance', () => {
     const items = [base, done, { ...base, state: 'declined' as const }];
     expect(groupsOf(items)).toEqual({ waiting: [base], accepted: [done], declined: [items[2]] });
     expect(summaryOf(items, ZONE)).toBe('3 proposées · 1 acceptée · 1 faite · 1 refusée');
-    expect(summaryOf([base], ZONE)).toBe('1 proposée');
+    // One standing only: the group's title counts it, no line says it twice (ADM-25).
+    expect(summaryOf([base], ZONE)).toBeNull();
+    expect(
+      summaryOf(
+        [base, { ...base, id: SuggestionIdSchema.parse('0192f3a0-0000-7000-8000-000000000102') }],
+        ZONE,
+      ),
+    ).toBeNull();
   });
 });
 

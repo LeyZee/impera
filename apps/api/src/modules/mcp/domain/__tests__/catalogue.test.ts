@@ -5,9 +5,17 @@ import { MCP_CATALOGUE, MCP_CATALOGUE_VERSION, toolNamed } from '../catalogue';
 import { NEVER_EXPOSED, neverExposedHits } from '../never-exposed';
 
 describe('MCP catalogue (ADR 0026 § 5 and § 9, ADR 0105 § 4)', () => {
-  it('is pinned: a change of a name, a capability or a scope shows in the PR', () => {
+  it('is pinned: a change of a name, a capability, a scope or a restriction shows in the PR', () => {
     expect(
-      MCP_CATALOGUE.map((tool) => `${tool.name} ${tool.capability ?? '-'} ${tool.scope}`),
+      MCP_CATALOGUE.map((tool) =>
+        [
+          tool.name,
+          tool.capability ?? '-',
+          tool.scope,
+          ...(tool.ownerOnly === true ? ['owner-only'] : []),
+          ...(tool.agencyOnly === true ? ['agency-only'] : []),
+        ].join(' '),
+      ),
     ).toMatchSnapshot();
   });
 
