@@ -1066,6 +1066,40 @@
   display: inline-flex;
   gap: 2px;
   padding: 4px;
+  /* Never wider than its place: what does not fit scrolls (below), on any screen. */
+  min-width: 0;
+  max-width: 100%;
+}
+/* Wider than its place, on a phone or on a laptop (a creator's eleven tabs at 1280 px): the bar scrolls, as SubNav
+   marks it with data-more, instead of running off the page with the lit tab cut in two. overflow-x makes overflow-y
+   scroll too: 5 px above and below keep each tab's 44 px hit area inside the pill. */
+.nv-subnav[data-more]:not([data-more='none']) {
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-block: 5px;
+}
+/* A bar that scrolls clips what passes its edge: the thumb's shadow stays inside the bar's padding. */
+.nv-subnav[data-more]:not([data-more='none']) .nv-subnav__thumb {
+  box-shadow:
+    inset 0 1px 0 var(--nv-glass-edge),
+    0 1px 3px rgb(0 0 0 / 0.18);
+}
+/* More tabs past an edge: that edge fades out instead of cutting a tab in two. Its last 20 px are clear and the fade
+   runs 72 px, so a tab half out of view reads as « more », never as a word cut (« Expor… », capture de #573). */
+.nv-subnav[data-more='end'] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent calc(100% - 20px));
+}
+.nv-subnav[data-more='start'] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 72px), transparent calc(100% - 20px));
+}
+.nv-subnav[data-more='both'] {
+  mask-image: linear-gradient(
+    to right,
+    transparent 20px,
+    #000 72px,
+    #000 calc(100% - 72px),
+    transparent calc(100% - 20px)
+  );
 }
 .nv-subnav__item {
   position: relative;
@@ -1331,23 +1365,6 @@
     /* overflow-x makes overflow-y scroll too: 5 px above and below keep each tab's 44 px hit area inside the pill,
        uncut and without a 1 px vertical scroll (relecture d'Extension, #417). */
     padding-block: 5px;
-  }
-  /* More tabs past an edge: that edge fades out instead of cutting a tab in two. Its last 20 px are clear and the fade
-     runs 72 px, so a tab half out of view reads as « more », never as a word cut (« Expor… », capture de #573). */
-  .nv-subnav[data-more='end'] {
-    mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent calc(100% - 20px));
-  }
-  .nv-subnav[data-more='start'] {
-    mask-image: linear-gradient(to left, #000 calc(100% - 72px), transparent calc(100% - 20px));
-  }
-  .nv-subnav[data-more='both'] {
-    mask-image: linear-gradient(
-      to right,
-      transparent 20px,
-      #000 72px,
-      #000 calc(100% - 72px),
-      transparent calc(100% - 20px)
-    );
   }
   .nv-subnav__item {
     padding: 0 12px;
