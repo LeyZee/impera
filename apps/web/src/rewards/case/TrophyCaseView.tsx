@@ -179,6 +179,7 @@ export function TrophyCaseView({
   level,
   sound,
   readOnly = false,
+  shelfTitles,
   onRevealed,
 }: {
   trophyCase: TrophyCase;
@@ -192,6 +193,8 @@ export function TrophyCaseView({
   sound: boolean;
   /** The agency's look at a member's case (ADR 0108 § 19): no entrance, no « Revoir », nothing marked seen. */
   readOnly?: boolean;
+  /** A role's own name for a shelf, where the default would say the same word twice (the creator's deliveries). */
+  shelfTitles?: Partial<Readonly<Record<ShelfFamily, string>>>;
   /** An owed reveal was played here: its caller marks it seen. */
   onRevealed?: (item: TrophyCaseItem) => void;
 }): JSX.Element {
@@ -252,7 +255,9 @@ export function TrophyCaseView({
         return (
           <section key={shelf.family} className="tc-shelf" aria-labelledby={`${id}-${shelf.family}`}>
             <header className="tc-shelf__head" style={{ '--tc-i': index++ }}>
-              <h3 id={`${id}-${shelf.family}`}>{SHELF_TITLES[shelf.family]}</h3>
+              <h3 id={`${id}-${shelf.family}`}>
+                {shelfTitles?.[shelf.family] ?? SHELF_TITLES[shelf.family]}
+              </h3>
               <span className="tc-shelf__count">
                 {shelf.earned} sur {shelf.items.length}
                 {folded.hidden > 0 && !all ? (

@@ -408,6 +408,11 @@
   .tc-cell__name {
     margin-top: -4px;
     font-size: 13px;
+    /* Two lines kept for every name, so the meters of a row stand level. */
+    min-height: calc(2 * 1.25em);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
   }
   .tc-wide {
     display: none;

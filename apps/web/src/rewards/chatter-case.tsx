@@ -17,6 +17,10 @@ import { roundAmountText } from '@/payroll/model';
 
 /** What the view says and draws for one object: the shape of `TrophyCaseEntry` (apps/web/src/rewards/case/). */
 
+/** What is left before a streak, with its unit, as « Encore 3 jours » for the creator (ADR 0108 § 6). */
+const shiftsLeft = (missing: number): string =>
+  `Encore ${String(missing)} ${missing > 1 ? 'shifts' : 'shift'}`;
+
 const TROPHY_HOW: Readonly<Record<TrophyKind, string>> = {
   first_sale: 'Ta première vente relevée.',
   day_record: 'Bats ton meilleur jour.',
@@ -108,7 +112,7 @@ export function chatterCase(
       const kind = item.kind;
       const left =
         item.earnedAt === null && item.progress !== null
-          ? `Encore ${String(item.progress.target - item.progress.current)}`
+          ? shiftsLeft(item.progress.target - item.progress.current)
           : undefined;
       return {
         name: TROPHY_NAMES[kind],

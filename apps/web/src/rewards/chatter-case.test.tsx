@@ -47,7 +47,7 @@ describe('chatterCase', () => {
       earnedNote: '2 fois · dernière le 9 nov.',
     });
     expect(shown.entry(argent)?.left).toMatch(/^Encore 380/u);
-    expect(shown.entry(streak)).toMatchObject({ name: 'Série de 5', left: 'Encore 2' });
+    expect(shown.entry(streak)).toMatchObject({ name: 'Série de 5', left: 'Encore 2 shifts' });
   });
 
   it('marks as seen the server’s own kinds, the unseen fortnights of a medal', () => {

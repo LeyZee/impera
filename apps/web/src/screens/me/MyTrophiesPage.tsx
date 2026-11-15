@@ -45,7 +45,7 @@ export function MyTrophiesPage({ user }: { user: Me }): JSX.Element {
           level={
             shown.trophyCase.level === null
               ? null
-              : `Niveau ${String(shown.trophyCase.level.rank)} · ${shown.trophyCase.level.name} : il monte avec ton net depuis ton arrivée et ne redescend jamais`
+              : `Rang ${shown.trophyCase.level.name} : il monte avec ton net depuis ton arrivée et ne redescend jamais`
           }
           sound={preferences.sounds}
           onRevealed={(item) => {
