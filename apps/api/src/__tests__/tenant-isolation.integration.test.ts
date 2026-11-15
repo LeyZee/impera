@@ -121,6 +121,9 @@ const AGENCY_SCOPE: readonly string[] = [
   'manager of A: GET /v1/team/pay-rules → 200 shows Béa, bea-inventee',
   // The commission a report would earn (reco 19): the same reach as the report and the commission above.
   'manager of A: GET /v1/payroll/shifts/:shiftId/estimate → 200',
+  // The game of a member on their file (ADR 0104 § 20): rank, streak and trophies of anyone of the team, read only,
+  // with no amount; the same reach as the member's record above.
+  'manager of A: GET /v1/rewards/members/:memberId/trophy-case → 200',
 ];
 
 /** B's tables the manager changes through those routes: none, her planning included (Charles, 06/11). */

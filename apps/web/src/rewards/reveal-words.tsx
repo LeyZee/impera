@@ -1,6 +1,7 @@
 import type { BonusTier, PayPeriod, TrophyCaseItem } from '@impera/contracts';
 import type { ReactNode } from 'react';
 
+import { LevelInsignia, levelName } from './LevelInsignia';
 import { Medal } from './Medal';
 import { TROPHY_NAMES, TrophyBadge, type TrophyKind } from './TrophyBadge';
 import { tierMedals } from './metals';
@@ -8,7 +9,7 @@ import { tierMedals } from './metals';
 import { amountText } from '@/reports/model';
 
 /*
- * What a reveal says and shows for each thing a chatter earns (ADR 0104 § 12 and § 15). A tier's bonus is the one its
+ * What a reveal says and shows for each thing a chatter earns (ADR 0104 § 12, § 15 and § 16). A tier's bonus is the one its
  * statement's tiers give, never worked out here (§ 17); no trophy shows an amount.
  */
 
@@ -46,6 +47,12 @@ export function tierOfKind(
     : { period, thresholdMinor: Number(threshold) };
 }
 
+/** The rank a level item names (`level:<rank>`), or `null` for anything else. */
+export function rankOfKind(kind: string): number | null {
+  const match = /^level:(\d{1,2})$/u.exec(kind);
+  return match?.[1] === undefined ? null : Number(match[1]);
+}
+
 const OBJECT_SIZE = 220;
 
 /**
@@ -64,6 +71,21 @@ export function revealWordsOf(
       kicker: item.kind.startsWith('streak_') ? 'Série' : 'Trophée gagné',
       title: TROPHY_NAMES[item.kind],
       text: TROPHY_TEXTS[item.kind],
+      tone: 'neon',
+    };
+  }
+  const rank = rankOfKind(item.kind);
+  if (rank !== null) {
+    const name = levelName(rank);
+    if (name === null) return null;
+    return {
+      object: <LevelInsignia rank={rank} size={OBJECT_SIZE} glow />,
+      kicker: 'Nouveau rang',
+      title: name,
+      text:
+        rank === 1
+          ? 'Ton premier rang. Il monte avec ton net cumulé et ne redescend jamais.'
+          : 'Ton net cumulé a passé le seuil. Un rang gagné ne se perd pas.',
       tone: 'neon',
     };
   }

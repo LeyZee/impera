@@ -30,11 +30,16 @@ import {
 import { repliesOn } from './replies';
 
 import { useOnline } from '@/pwa/online';
+import { useHerTrophyCase } from '@/rewards/api';
+import { CREATOR_MEDALS, CreatorMedal, highestMedal } from '@/rewards/creator-art';
 import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { useFloatingTip } from '@/screens/dashboard/parts';
 
 const WEEKDAY_SHORT = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'] as const;
 const MINUTE_MS = 60_000;
+/** Her medal beside her streak: 28 px, the smallest a coin may stand without its name (ADR 0107 § 1). */
+const MEDAL_SIZE = 28;
 
 export interface DayActions {
   readonly onTick: (task: CreatorTask, on: boolean, day: string) => void;
@@ -267,6 +272,9 @@ export function Glance({
   // « Plus rien à heure » only when there was something at an hour: an empty day says it once, in the title.
   const moment = nowMinute === null || plan.timed.length === 0 ? null : momentOf(plan, nowMinute);
   const { streak } = agenda;
+  // Her highest streak medal beside the count (ADR 0107 § 9); none before her first, or while her case is not read.
+  const medal = highestMedal(useHerTrophyCase(true).data?.items ?? []);
+  const tip = useFloatingTip();
   return (
     <section className="nv-plate ag-glance nv-enter" aria-label="Ta journée">
       <div className="ag-glance__top">
@@ -320,8 +328,26 @@ export function Glance({
             <span
               className="ag-streak"
               data-risk={streak.atRisk ? 'true' : undefined}
-              title={streak.next === null ? undefined : `Prochain palier : ${String(streak.next)} jours`}
+              {...(medal === null
+                ? {
+                    title:
+                      streak.next === null ? undefined : `Prochain palier : ${String(streak.next)} jours`,
+                  }
+                : {
+                    // The pill takes the focus and the tip, not the coin: its ring stays clear of the count (avis
+                    // Design, 14/11), and the pill is what will open her showcase.
+                    tabIndex: 0,
+                    ...tip.bind({
+                      title: `Médaille : série de ${String(CREATOR_MEDALS[medal].days)} jours`,
+                      ...(streak.next === null
+                        ? {}
+                        : { text: `Prochain palier : ${String(streak.next)} jours` }),
+                    }),
+                  })}
             >
+              {medal === null ? null : (
+                <CreatorMedal kind={medal} size={MEDAL_SIZE} className="ag-streak__medal" />
+              )}
               <b className="nv-num">{streak.days}</b> {streak.days > 1 ? 'jours' : 'jour'} de suite
             </span>
           )}
@@ -355,6 +381,7 @@ export function Glance({
         <p className="ag-glance__risk">Coche ta routine aujourd’hui pour garder ta série.</p>
       ) : null}
       {children}
+      {tip.element}
     </section>
   );
 }

@@ -454,7 +454,7 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Persona', 'Sécurité', 'Préférences']);
+    ).toEqual(['Persona', 'Trophées', 'Sécurité', 'Préférences']);
     // She reads her sheet; the agency changes it (recette CREA-01).
     await screen.findByText(/Ta fiche/);
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
