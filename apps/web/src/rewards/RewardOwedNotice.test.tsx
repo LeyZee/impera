@@ -59,10 +59,11 @@ describe('RewardOwedNotice', () => {
     expect(await screen.findByText('2 gains t’attendent.')).toBeTruthy();
   });
 
-  it('stays silent where the reveal plays, when nothing is owed, and for who does not play', async () => {
+  it('stays silent where the reveal plays or the case shows it, when nothing is owed, and for who does not play', async () => {
     for (const [pathname, trophyCase, user] of [
       ['/aujourdhui', owing(1), THEO_ME],
       ['/commissions', owing(1), THEO_ME],
+      ['/moi/trophees', owing(1), THEO_ME],
       ['/suivi', owing(0), THEO_ME],
       ['/suivi', owing(1), OWNER],
     ] as const) {
