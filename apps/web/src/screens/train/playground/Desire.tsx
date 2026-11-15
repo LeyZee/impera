@@ -98,7 +98,7 @@ export function AvailabilityLines({ availability }: { availability: PlaygroundAv
       {availability.asked ? (
         <li>
           <span>Elle a demandé s’il est tranquille</span>
-          <span className="pg-availability__value">ici</span>
+          <span className="pg-availability__value">oui</span>
         </li>
       ) : null}
       <li className="pg-availability__gate">

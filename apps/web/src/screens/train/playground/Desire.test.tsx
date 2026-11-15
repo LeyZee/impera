@@ -102,6 +102,7 @@ describe('desire in the playground', () => {
     fireEvent.click(screen.getByRole('button'));
     expect(screen.getByText('il est seul, il est chez lui')).toBeTruthy();
     expect(screen.getByText('Elle a demandé s’il est tranquille')).toBeTruthy();
+    expect(screen.getByText('oui', { selector: '.pg-availability__value' })).toBeTruthy();
     expect(screen.getByText('fermée')).toBeTruthy();
     expect(screen.getByText('Il n’a pas dit être seul et libre')).toBeTruthy();
 
