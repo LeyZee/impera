@@ -162,6 +162,23 @@ describe('GET /v1/dashboard/setup/creators and /members, « Mise en route »', (
     });
   });
 
+  it('takes her Reveal account linked to the sales feed for the percentage, then optional (ADR 0054 § 7)', async () => {
+    const rate = async () =>
+      (await creators()).find((c) => c.creatorId === nora)?.steps.find((s) => s.key === 'agency_rate');
+    expect(await rate()).toEqual({ key: 'agency_rate', state: 'todo', note: null });
+    await test.admin.db.insert(schema.salesFeedModels).values({
+      platform: 'reveal',
+      platformModelId: 'model_test_setup',
+      platformAccountId: account,
+      creatorId: nora,
+    });
+    expect(await rate()).toEqual({
+      key: 'agency_rate',
+      state: 'done',
+      note: { kind: 'share_read_on_platform' },
+    });
+  });
+
   it('ticks a step as soon as the base holds it', async () => {
     await test.admin.db
       .insert(schema.creatorAgencyRates)

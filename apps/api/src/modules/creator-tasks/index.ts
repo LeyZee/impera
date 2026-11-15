@@ -13,6 +13,8 @@ import { createDrizzleSuggestionStore } from './infra/db/suggestion-store';
 import { createCreatorTaskRoutes, type RequireRole } from './infra/http/routes';
 
 export type { GuardedShoot, ShootGuardFault, ShootSuggestion } from './domain/ports';
+/** @public Her days as the creator's game counts them (ADR 0107), for the composition root. */
+export { creatorDaysForGameUnscoped, type CreatorDaysForGame } from './infra/db/game-reads';
 
 export interface CreatorTasksModule {
   readonly name: 'creator-tasks';

@@ -5,6 +5,7 @@ import {
   type CreatorId,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { Field } from '../persona/fields';
@@ -17,7 +18,19 @@ import {
   useAgencyRates,
   type RateErrorKind,
 } from './api';
-import { bpsOfPercent, confirmSentence, dayLabel, earliestDay, percentOf, standing } from './model';
+import {
+  bpsOfPercent,
+  confirmSentence,
+  dayLabel,
+  earliestDay,
+  percentOf,
+  readAt,
+  shareText,
+  sheetHead,
+  shareWhere,
+  standing,
+  windowLabel,
+} from './model';
 import './rate.css';
 
 import { DayField } from '@/scheduling/DayField';
@@ -27,7 +40,8 @@ import { SignInAgain } from '@/settings/services/PasswordPrompt';
  * Créatrices › Pourcentage (CR-04, ADR 0042 § 6), the owner's alone: what the agency takes of her net, from a day on,
  * never backwards. No value is made up: without one, « À régler ». A percentage is never changed once saved, so the
  * owner reads the whole sentence before sending it; a mistake is put right by the next one. On Reveal her part is the
- * figure Reveal gives, and the percentage only flags a gap to the owner (ADR 0054 § 2).
+ * figure Reveal gives, and the percentage only flags a gap to the owner (ADR 0054 § 2). The agency's share as Reveal
+ * reads it comes first, needing no percentage, which is then optional (ADR 0054 § 4 and § 6).
  */
 export function AgencyRateSection({
   creatorId,
@@ -65,7 +79,7 @@ export function AgencyRateSection({
       );
     }
     return (
-      <section className="ps-page" aria-busy="true" aria-label="Pourcentage de l’agence">
+      <section className="ps-page" aria-busy="true" aria-label="Part de l’agence">
         <div className="nv-plate ps-head ps-skeleton" />
         <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" />
       </section>
@@ -153,26 +167,25 @@ function RateSheet({
     }
   }
 
-  const current = list.current;
+  const head = sheetHead(list, creatorName);
   return (
     <section className="ps-page">
       <div className="nv-plate ps-head">
         <div className="ps-head__top">
           <div className="ps-head__who">
-            <h2 className="ps-title">Pourcentage de l’agence</h2>
+            <h2 className="ps-title">Part de l’agence</h2>
           </div>
         </div>
         <div className="ps-head__state" aria-live="polite">
-          <span className="ps-dot" data-dot={current === null ? 'warn' : 'ok'} />
+          <span className="ps-dot" data-dot={head.dot} />
           <span className="ps-head__text">
-            {current === null
-              ? `À régler : aucun pourcentage pour ${creatorName}, aucune part de l’agence n’est montrée.`
-              : `${percentOf(current.agencyBps)} pour l’agence aujourd’hui, depuis le ${dayLabel(current.fromDay)}.`}
+            {head.lead}
+            {head.then === null ? null : ` ${head.then}`}
           </span>
         </div>
         <p className="ps-muted">
-          La part de l’agence est son net (hors TVA, après la plateforme) multiplié par ce pourcentage. Sur
-          Reveal, sa part est celle que donne Reveal : le pourcentage sert seulement à te signaler un écart.
+          Sur Reveal, la part de l’agence est celle que donne Reveal, lue ci-dessous et jamais recalculée. Le
+          pourcentage est facultatif : s’il est réglé, un écart avec la part lue t’est signalé.
         </p>
         {notice === null ? null : (
           <p className="ps-muted ar-notice" role="status">
@@ -180,6 +193,8 @@ function RateSheet({
           </p>
         )}
       </div>
+
+      <ObservedPanel list={list} />
 
       <div className="nv-plate ps-panel">
         <form
@@ -191,7 +206,7 @@ function RateSheet({
           }}
         >
           <p className="nv-eyebrow" id={`${id}-new`}>
-            {current === null && list.rates.length === 0 ? 'Son premier pourcentage' : 'Nouveau pourcentage'}
+            {list.rates.length === 0 ? 'Son pourcentage, facultatif' : 'Nouveau pourcentage, facultatif'}
           </p>
           <div className="ar-fields">
             <Field
@@ -317,6 +332,64 @@ function RateSheet({
               })}
             </ul>
           </section>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The agency's share as Reveal reads it (ADR 0054 § 4): the 30 days, then each of the last three fortnights, per
+ * account and currency, the platform's sums and their ratio. Read only: nothing here is typed nor computed again.
+ */
+function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
+  const id = useId();
+  const { last30Days, fortnights } = list.observed;
+  const all = [last30Days, ...fortnights].flatMap((window) => window.shares);
+  const windows = [
+    { ...last30Days, label: '30 derniers jours' },
+    ...fortnights.map((window) => ({ ...window, label: windowLabel(window) })),
+  ];
+  return (
+    <section className="nv-plate ps-panel ar-read-panel" aria-labelledby={`${id}-read`}>
+      <div className="ps-block">
+        <p className="nv-eyebrow" id={`${id}-read`}>
+          Lue chez {readAt(all)}
+        </p>
+        {!list.observed.linked && all.length === 0 ? (
+          <p className="ps-muted">
+            Aucun compte Reveal relié : aucune part lue.{' '}
+            <Link to="/reglages/ventes" className="ar-read__link">
+              Relier Reveal
+            </Link>
+          </p>
+        ) : all.length === 0 ? (
+          <p className="ps-muted">Aucune vente lue ces 30 derniers jours : aucune part à montrer.</p>
+        ) : (
+          <ul className="ar-read">
+            {windows.map((window) => (
+              <li key={`${window.from}:${window.to}`} className="ar-read__window">
+                <span className="ar-read__label">{window.label}</span>
+                {window.shares.length === 0 ? (
+                  <span className="ar-read__empty">aucune vente</span>
+                ) : (
+                  <ul className="ar-read__shares">
+                    {window.shares.map((share) => {
+                      const text = shareText(share);
+                      const where = shareWhere(share, all);
+                      return (
+                        <li key={`${share.platformAccountId}:${share.currency}`} className="ar-read__share">
+                          {where === null ? null : <span className="ar-read__where">{where}</span>}
+                          <span className="ar-read__value">{text.value}</span>
+                          <span className="ar-read__detail">{text.detail}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </section>
