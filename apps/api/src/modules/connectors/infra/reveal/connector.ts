@@ -511,14 +511,17 @@ export class RevealApiConnector implements PlatformConnector {
     const media: VaultMedia[] = [];
     const seen = new Set<string>();
     for (const folder of wanted) {
-      for (const item of await this.vaultPages(folder.id)) {
+      for (const [position, item] of (await this.vaultPages(folder.id)).entries()) {
         seen.add(item.id);
-        media.push(vaultMediaOf(item, folder));
+        media.push(vaultMediaOf(item, folder, position));
       }
     }
     if (asked === undefined) {
+      let position = 0;
       for (const item of await this.vaultPages(null)) {
-        if (!seen.has(item.id)) media.push(vaultMediaOf(item, null));
+        if (seen.has(item.id)) continue;
+        media.push(vaultMediaOf(item, null, position));
+        position += 1;
       }
     }
     return media;

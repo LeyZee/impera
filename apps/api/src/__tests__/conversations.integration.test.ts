@@ -482,6 +482,52 @@ describe('conversations module (P0-05)', () => {
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
   });
 
+  /** A message written on the creator's side by someone else than the agent: a chatter, her, an automation. */
+  function teamMessage(conversation: string, text = 'coucou toi'): ExternalMessage {
+    return { ...fanMessage(conversation, text), direction: 'outbound', author: 'human' };
+  }
+
+  it('answers nothing over a reply written on the platform while he waited (ADR 0110 § 2)', async () => {
+    const { conversationId } = await ingest('c-answered');
+    const draftId = await respond(conversationId);
+    clock.advance(5);
+    await ingest('c-answered', teamMessage('c-answered'));
+
+    expect((await events(conversationId)).slice(-2)).toEqual(['draft_expired', 'message_received']);
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
+    await expect(
+      conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Coucou'] }),
+    ).rejects.toThrow();
+    // His next message is answered again, as always.
+    clock.advance(5);
+    await ingest('c-answered');
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
+  });
+
+  it('drops the pending answer when the platform answered before the debounce ended (ADR 0110 § 2)', async () => {
+    const { conversationId } = await ingest('c-auto-reply');
+    clock.advance(5);
+    await ingest('c-auto-reply', teamMessage('c-auto-reply'));
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
+
+    await conversations.jobs.respond({ creatorId, conversationId, correlationId: 'test' }, NO_LOG);
+    const drafts = await test.admin.db
+      .select()
+      .from(schema.drafts)
+      .where(eq(schema.drafts.conversationId, conversationId));
+    expect(drafts).toEqual([]);
+  });
+
+  it('still answers a fan whose words carry a safety sign, even answered on the platform (ADR 0110 § 2)', async () => {
+    const { conversationId } = await ingest(
+      'c-answered-sign',
+      fanMessage('c-answered-sign', "j'ai 15 ans tu sais"),
+    );
+    clock.advance(5);
+    await ingest('c-answered-sign', teamMessage('c-answered-sign'));
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
+  });
+
   it('goes to error after the last failed attempt, and a human release brings it back', async () => {
     const { conversationId } = await ingest('c-error');
     const draftId = await respond(conversationId);

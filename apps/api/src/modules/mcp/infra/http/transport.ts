@@ -136,7 +136,7 @@ export function createMcpTransport(options: McpTransportOptions): FastifyPluginA
           { capabilities: { tools: {} } },
         );
         server.server.setRequestHandler(ListToolsRequestSchema, () => ({
-          tools: dispatcher.list(grant).map((tool) => ({
+          tools: dispatcher.list(grant, actor).map((tool) => ({
             name: tool.name,
             description: tool.description,
             inputSchema: { type: 'object' as const, ...z.toJSONSchema(tool.input, { io: 'input' }) },

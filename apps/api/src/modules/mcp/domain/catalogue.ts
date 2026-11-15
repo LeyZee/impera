@@ -27,6 +27,11 @@ export interface McpToolSpec {
    * of the agency only, never one bound to a creator, whose agent has no business with them.
    */
   readonly ownerOnly?: true;
+  /**
+   * The agency's as a whole, never cut by creator (the team imported from a platform, the commission statements): an
+   * access bound to a creator never calls nor lists it, whoever its person is.
+   */
+  readonly agencyOnly?: true;
 }
 
 /** Semver of the catalogue, announced in `serverInfo` (`impera-mcp`). */
@@ -55,8 +60,14 @@ export const MCP_CATALOGUE: readonly McpToolSpec[] = [
   { name: 'shifts_list', capability: 'read:team', kind: 'read', scope: 'agency' },
   { name: 'on_shift_now', capability: 'read:team', kind: 'read', scope: 'agency' },
   { name: 'shift_reports_list', capability: 'read:team', kind: 'read', scope: 'agency' },
-  { name: 'team_import_list', capability: 'read:team', kind: 'read', scope: 'agency' },
-  { name: 'commission_statements_list', capability: 'read:payroll', kind: 'read', scope: 'agency' },
+  { name: 'team_import_list', capability: 'read:team', kind: 'read', scope: 'agency', agencyOnly: true },
+  {
+    name: 'commission_statements_list',
+    capability: 'read:payroll',
+    kind: 'read',
+    scope: 'agency',
+    agencyOnly: true,
+  },
   // Sales read from the platform, and by chatter (ADR 0073, 0078).
   { name: 'sales_list', capability: 'read:sales', kind: 'read', scope: 'agency' },
   { name: 'sales_by_chatter', capability: 'read:sales', kind: 'read', scope: 'agency' },

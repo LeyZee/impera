@@ -28,7 +28,7 @@ export interface AccountJobDeps {
 
 /** The account if a job may talk to its platform now; the reason it may not, otherwise. */
 export async function loadActiveAccount(
-  deps: AccountJobDeps,
+  deps: Pick<AccountJobDeps, 'accounts'>,
   payload: JobPayload<'connector.poll'>,
   now: Date,
 ): Promise<ConnectorAccount | string> {

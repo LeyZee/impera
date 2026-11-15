@@ -147,6 +147,7 @@ Branche : task/<id>-<slug>
 | OPS-06 | Grok 4.7 réfléchit moins longtemps que ses délais | exploitation | done | ADR 0009, OPS-05 |
 | OPS-07 | Le juge des évaluations lit le moment que l'agent a vu | exploitation | done | ADR 0009, OPS-06 |
 | OPS-08 | La consommation IA et les crédits prépayés dans le CRM | exploitation | done | ADR 0091 |
+| OPS-09 | Un fournisseur d'IA payé par l'abonnement, alerte au quota épuisé | exploitation | in_progress | OPS-08, ADR 0091 § 6 |
 | OPS-10 | Les images Docker ne se disputent plus le cache pnpm | exploitation | done | OPS-03 |
 | OPS-11 | Les évaluations tirent trois fois et passent sur la persona en vigueur | exploitation | in_progress | OPS-07 |
 | OPS-12 | Le premier relevé répond aux messages frais | exploitation | done | P2-02 |
@@ -175,3 +176,4 @@ Branche : task/<id>-<slug>
 | PIL-01 | « Mise en route » d'une créatrice et d'un membre, cochée par le serveur | exploitation | done | CRM-07 |
 | CHF-01 | Chiffres et jeu du chatteur : ses chiffres, puis un jeu fait de faits réels | équipe | in_progress | ADR 0104, CRM-03, EQ-05 |
 | CRB-01 | Trophées et médailles de série de la créatrice | créatrice | todo | ADR 0107, CHF-01 |
+| AUT-01 | L'agent tient compte des automatisations de Reveal | agent | in_progress | ADR 0110 |

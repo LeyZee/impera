@@ -1,16 +1,18 @@
-import type {
-  ConversationSnapshot,
-  Currency,
-  ExternalMessage,
-  ExternalRef,
-  ExternalTransaction,
-  FanPpvStats,
-  FanProfile,
-  PlatformMedia,
-  PlatformScript,
-  PlatformScriptStep,
-  SentScriptStep,
-  VaultMedia,
+import {
+  VAULT_DESCRIPTION_MAX,
+  VAULT_FOLDER_NAME_MAX,
+  type ConversationSnapshot,
+  type Currency,
+  type ExternalMessage,
+  type ExternalRef,
+  type ExternalTransaction,
+  type FanPpvStats,
+  type FanProfile,
+  type PlatformMedia,
+  type PlatformScript,
+  type PlatformScriptStep,
+  type SentScriptStep,
+  type VaultMedia,
 } from '@impera/contracts';
 
 import type { RevealAnswer as Answer } from './wire';
@@ -251,13 +253,41 @@ export function sentStepsOf(items: readonly ScriptItem[]): SentScriptStep[] {
     }));
 }
 
-/** `listVaultMedia`: one media of the vault, with the folder it was listed in (`null` for the vault's root). */
-export function vaultMediaOf(media: VaultItem, folder: VaultFolder | null): VaultMedia {
+/** At most `max` UTF-16 units, never half of an emoji: the platform's text is cut, not refused (VaultMediaSchema). */
+function cut(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const head = text.slice(0, max);
+  const last = head.charCodeAt(head.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? head.slice(0, -1) : head;
+}
+
+/**
+ * `listVaultMedia`: one media of the vault, with the folder it was listed in (`null` for the vault's root) and its rank
+ * in that folder's list as Reveal returned it (ADR 0099 § 3). The suggested range is kept only when both ends are given;
+ * a folder's name and a description longer than the contract's bounds are cut.
+ */
+export function vaultMediaOf(media: VaultItem, folder: VaultFolder | null, position: number): VaultMedia {
+  const min = media.suggestedMinPrice;
+  const max = media.suggestedMaxPrice;
   return {
     ref: ref(media.id),
     kind: KINDS[media.type],
-    folder: folder === null ? null : { ref: ref(folder.id), name: folder.name },
+    folder:
+      folder === null
+        ? null
+        : {
+            ref: ref(folder.id),
+            name: cut(folder.name, VAULT_FOLDER_NAME_MAX),
+            // Read in the whole name, before it is cut.
+            moment: momentOf(folder.name, []),
+          },
+    folderPosition: position,
     durationSeconds: media.durationSeconds ?? null,
     createdAt: media.createdAt,
+    description:
+      media.description === null || media.description.trim() === ''
+        ? null
+        : cut(media.description, VAULT_DESCRIPTION_MAX),
+    suggestedPriceMinor: min === null || max === null || min < 0 || max < 0 ? null : { min, max },
   };
 }
