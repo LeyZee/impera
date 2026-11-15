@@ -1051,6 +1051,13 @@
       "when": 1794776506284,
       "tag": "0208_creator_trophies",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1794779671713,
+      "tag": "0209_rewards_levels",
+      "breakpoints": true
     }
   ]
 }

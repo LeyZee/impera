@@ -12,7 +12,16 @@ import {
   markHerRevealed,
   type CreatorRewardsDeps,
 } from './application/creator-rewards';
-import { evaluateRewards, markRevealed, myTrophyCase, type RewardsDeps } from './application/rewards';
+import {
+  evaluateRewards,
+  levelSettings,
+  markRevealed,
+  memberTrophyCase,
+  myShiftChallenge,
+  myTrophyCase,
+  saveLevelThresholds,
+  type RewardsDeps,
+} from './application/rewards';
 import { createDrizzleCreatorRewardsStore, type CreatorRewardsReads } from './infra/creator-store';
 import { createRewardsRoutes, type RewardsRoutesOptions } from './infra/routes';
 import { createDrizzleRewardsStore, type RewardsReads } from './infra/store';
@@ -28,7 +37,10 @@ export interface RewardsModule {
     /** What each chatter and each creator earned since the last run; replayable. */
     readonly evaluate: () => Promise<{ players: number; gained: number }>;
   };
-  /** The chatter's case, the creator's own, and hers on her profile, behind the guards given here. */
+  /**
+   * The chatter's case, reveals and challenge, a member's case on their file, the owner's thresholds, the creator's
+   * own case, and hers on her profile, behind the guards given here.
+   */
   readonly routes: (options: RewardsRoutesOptions) => FastifyPluginAsyncZod;
 }
 
@@ -68,6 +80,10 @@ export function startRewardsModule(options: RewardsStartOptions): RewardsModule 
         {
           myTrophyCase: (userId) => myTrophyCase(deps, userId),
           markRevealed: (userId, body) => markRevealed(deps, userId, body),
+          myShiftChallenge: (userId) => myShiftChallenge(deps, userId),
+          memberTrophyCase: (viewerId, memberId) => memberTrophyCase(deps, viewerId, memberId),
+          levelSettings: (userId) => levelSettings(deps, userId),
+          saveLevelThresholds: (userId, body) => saveLevelThresholds(deps, userId, body),
           herTrophyCase: (userId) => herTrophyCase(creatorDeps, userId),
           markHerRevealed: (userId, body) => markHerRevealed(creatorDeps, userId, body),
           creatorTrophyCase: (readerId, creatorId) =>

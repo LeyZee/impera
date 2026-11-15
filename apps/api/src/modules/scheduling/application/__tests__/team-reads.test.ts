@@ -73,14 +73,19 @@ const planningRead = (patch: Partial<PlanningRead>): PlanningRead => ({
 function planningStore(answer: PlanningRead) {
   const asked: { actor: string; creatorIds: readonly CreatorId[] }[] = [];
   const ranges: { from: Date; to: Date }[] = [];
-  const store: Pick<PlanningStore, 'read'> = {
+  const begun: { actor: string; creatorIds: readonly CreatorId[]; since: Date; until: Date }[] = [];
+  const store: Pick<PlanningStore, 'read' | 'ownShiftsBegun'> = {
     read: (actor, creatorIds, range) => {
       asked.push({ actor, creatorIds });
       ranges.push({ from: range.from, to: range.to });
       return Promise.resolve(answer);
     },
+    ownShiftsBegun: (actor, creatorIds, since, until) => {
+      begun.push({ actor, creatorIds, since, until });
+      return Promise.resolve([]);
+    },
   };
-  return { asked, ranges, store };
+  return { asked, ranges, begun, store };
 }
 
 const report = (patch: Partial<StoredShiftReport>): StoredShiftReport => ({
@@ -143,6 +148,18 @@ describe('createSchedulingReads (ADR 0026 § 1)', () => {
     });
     expect(planning.asked).toEqual([]);
     expect(reports.asked).toEqual([]);
+  });
+
+  it('asks the planning for a member’s own shifts begun in the nine weeks before, on every creator (ADR 0104 § 14)', async () => {
+    const planning = planningStore(planningRead({}));
+    const reads = createSchedulingReads(planning.store, noReports, directory);
+    const at = new Date('2026-11-12T20:30:00Z');
+    expect(await reads.ownShiftsBegun(owner.userId, at)).toEqual([]);
+    const everyCreator = (await directory.list()).map((creator) => creator.id);
+    expect(planning.begun).toEqual([
+      { actor: owner.userId, creatorIds: everyCreator, since: new Date('2026-09-10T20:30:00Z'), until: at },
+    ]);
+    expect(planning.asked).toEqual([]);
   });
 
   it('reads only the creators named that exist, archived ones included, and nothing for none', async () => {

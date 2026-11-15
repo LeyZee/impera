@@ -18,6 +18,7 @@ import { MEMBER_STATUS, reportOf, toneOf, WITHOUT_PAY_EFFECT, withoutPayEffect }
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
 import { RewardRevealGate } from '@/rewards/RewardRevealGate';
+import { ShiftChallengeCard } from '@/rewards/ShiftChallengeCard';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { useMyShifts } from '@/scheduling/api';
 import { accountLine, dayStateOf, myAwayOf, progressOf, type DayState } from '@/scheduling/model';
@@ -161,6 +162,8 @@ function Day({
       ) : (
         <MyAwayCard status={away} />
       )}
+      {/* The shift's challenge, right under the shift it is for (ADR 0104 § 14); nothing without one. */}
+      {away === null ? <ShiftChallengeCard user={user} /> : null}
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}
       {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}
