@@ -16,6 +16,7 @@ import { schema, sql, withAdmin, type Database, type Transaction } from '@impera
 import { z } from 'zod';
 
 import { agencyShareGaps } from '../domain/agency-shares';
+import { agencyShareChanges } from '../domain/observed-shares';
 import { calendarDayIn } from '../domain/time';
 
 import { agencyTimeZone } from './rows';
@@ -28,6 +29,8 @@ export type SalesTotalsRead = (
   tx: Transaction,
   query: { readonly creatorId: CreatorId; readonly from: string; readonly to: string },
 ) => Promise<SalesTotals>;
+
+const CreatorRowSchema = z.object({ id: CreatorIdSchema });
 
 const RateRowSchema = z.object({
   creator_id: CreatorIdSchema,
@@ -45,8 +48,10 @@ function fortnightBefore(now: Date, timeZone: string): { readonly from: PayPerio
  * The automatic check of the agency's percentages (CRM-04 lot d3), on the admin connection: each creator with a
  * percentage in force on some day of the fortnight just over, her totals read on the register, and one
  * `agency_share_mismatch` per account and currency that differs (index `domain_events_agency_share_mismatch_unique`,
- * so a run again publishes nothing new). One transaction per creator. It reads the register and writes nothing but
- * the outbox: no amount, no rule, no pay.
+ * so a run again publishes nothing new). Then each creator, with a percentage or without: her share as the platform
+ * reads it on that fortnight against the one before, and one `agency_share_changed` per account and currency whose
+ * share moved by more than a point (ADR 0054 § 5, index `domain_events_agency_share_changed_unique`). One transaction
+ * per creator and check. It reads the register and writes nothing but the outbox: no amount, no rule, no pay.
  */
 export function createDrizzleAgencyShareCheck(
   adminDb: Database,
@@ -54,7 +59,7 @@ export function createDrizzleAgencyShareCheck(
 ): { run(now: Date, correlationId: string): Promise<number> } {
   return {
     async run(now, correlationId) {
-      const { from, to, rates } = await withAdmin(adminDb, async (tx) => {
+      const { from, to, rates, creators } = await withAdmin(adminDb, async (tx) => {
         const fortnight = fortnightBefore(now, await agencyTimeZone(tx));
         // Every percentage that starts by the fortnight's last day: an older one may still be in force on its days.
         const result = await tx.execute(sql`
@@ -62,7 +67,13 @@ export function createDrizzleAgencyShareCheck(
             from creator_agency_rates
            where from_day <= ${fortnight.to}::date
            order by creator_id, from_day`);
-        return { ...fortnight, rates: result.rows.map((row) => RateRowSchema.parse(row)) };
+        // Archived ones too: a fortnight of sales read before her archiving is still hers to compare.
+        const all = await tx.execute(sql`select id from creators order by created_at, id`);
+        return {
+          ...fortnight,
+          rates: result.rows.map((row) => RateRowSchema.parse(row)),
+          creators: all.rows.map((row) => CreatorRowSchema.parse(row).id),
+        };
       });
       const byCreator = new Map<CreatorId, { fromDay: string; agencyBps: number }[]>();
       for (const rate of rates) {
@@ -83,6 +94,31 @@ export function createDrizzleAgencyShareCheck(
                 creatorId,
                 type: 'agency_share_mismatch',
                 payload: EVENT_PAYLOADS.agency_share_mismatch.parse({ creatorId, from, to, ...gap }),
+                actor: 'system',
+                correlationId,
+              })
+              .onConflictDoNothing()
+              .returning({ id: schema.domainEvents.id });
+            inserted += rows.length;
+          }
+          return inserted;
+        });
+      }
+      // The fortnight before the one just over, to compare her share with (ADR 0054 § 5).
+      const before = previousPayPeriod(from);
+      for (const creatorId of creators) {
+        published += await withAdmin(adminDb, async (tx) => {
+          const earlier = await totalsOf(tx, { creatorId, from: before, to: payPeriodLastDay(before) });
+          const latest = await totalsOf(tx, { creatorId, from, to });
+          let inserted = 0;
+          for (const change of agencyShareChanges(earlier.rows, latest.rows)) {
+            const rows = await tx
+              .insert(schema.domainEvents)
+              .values({
+                id: newId(EventIdSchema),
+                creatorId,
+                type: 'agency_share_changed',
+                payload: EVENT_PAYLOADS.agency_share_changed.parse({ creatorId, from, to, ...change }),
                 actor: 'system',
                 correlationId,
               })
