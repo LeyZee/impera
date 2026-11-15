@@ -3,7 +3,7 @@ import type { DesireMarkVerdict, PlaygroundDesire } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { DesireTag, desireVerdict, pointsLabel } from './Desire';
+import { availabilityReason, DesireGauge, DesireTag, desireVerdict, gateLine, pointsLabel } from './Desire';
 
 const DESIRE: PlaygroundDesire = {
   before: 70,
@@ -75,5 +75,59 @@ describe('desire in the playground', () => {
     expect(desireVerdict(20, thresholds)).toBe('Elle n’ouvre pas l’intime elle-même');
     expect(desireVerdict(30, thresholds)).toBe('Elle peut ouvrir l’intime, pas encore de script');
     expect(desireVerdict(60, thresholds)).toBe('Assez chaud pour un script');
+  });
+
+  it('says his availability beside the score, what set it, and which condition of the gate is missing (ADR 0103 § 14)', () => {
+    const availability: NonNullable<PlaygroundDesire['availability']> = {
+      state: 'unknown',
+      signal: 'alone',
+      seen: ['alone', 'at_home'],
+      expiresAt: new Date('2026-11-15T22:00:00Z'),
+      sexualized: true,
+      asked: true,
+      gate: {
+        open: false,
+        missing: [{ code: 'availability_unconfirmed', label: 'Il n’a pas dit être seul et libre' }],
+      },
+    };
+    render(<DesireTag desire={{ ...DESIRE, availability }} />);
+    expect(screen.getByRole('button').textContent).toBe('Désir 40−30· Disponible : inconnue');
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByText('il est seul, il est chez lui')).toBeTruthy();
+    expect(screen.getByText('Elle lui a demandé s’il est tranquille')).toBeTruthy();
+    expect(screen.getByText('Porte fermée : il n’a pas dit être seul et libre')).toBeTruthy();
+
+    expect(availabilityReason({ ...availability, state: 'no', signal: 'leaving_soon', seen: [] })).toBe(
+      'il doit partir',
+    );
+    expect(availabilityReason({ ...availability, seen: [] })).toBeNull();
+    expect(gateLine({ open: true })).toBe('Porte ouverte : un script peut démarrer');
+  });
+
+  it('shows his availability in « Pourquoi » under the gauge, and nothing without it', () => {
+    const { rerender } = render(<DesireGauge desire={DESIRE} thresholds={{ open: 40, script: 70 }} />);
+    expect(screen.queryByText(/Disponible/)).toBeNull();
+    rerender(
+      <DesireGauge
+        desire={{
+          ...DESIRE,
+          availability: {
+            state: 'confirmed',
+            signal: 'free_now',
+            seen: ['alone', 'free_now'],
+            expiresAt: null,
+            sexualized: false,
+            asked: false,
+            gate: {
+              open: false,
+              missing: [{ code: 'not_sexualizing', label: 'Il ne sexualise pas encore lui-même' }],
+            },
+          },
+        }}
+        thresholds={{ open: 40, script: 70 }}
+      />,
+    );
+    expect(screen.getByText('confirmée')).toBeTruthy();
+    expect(screen.getByText('pas encore')).toBeTruthy();
   });
 });

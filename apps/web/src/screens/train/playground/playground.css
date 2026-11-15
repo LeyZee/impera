@@ -1139,6 +1139,34 @@
 .pg-desire__verdict {
   color: var(--nv-ink);
 }
+/* His availability and the gate (ADR 0103 § 14): plain lines, the gate's verdict in ink, never a colour of its own. */
+.pg-availability {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--nv-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--nv-ink-muted);
+}
+.pg-availability li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pg-availability b {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.pg-availability__why {
+  text-align: right;
+}
+.pg-availability__gate {
+  color: var(--nv-ink);
+  font-weight: 500;
+}
 
 /* Medium screens: « Pourquoi » opens over the conversation. */
 @media (max-width: 1180px) {

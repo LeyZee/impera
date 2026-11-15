@@ -461,6 +461,20 @@ describe('playground session, the offer policy and the cursor', () => {
     expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply']);
   });
 
+  it('says his availability and the gate under his score, as the gate read them (ADR 0103 § 14)', async () => {
+    const closed = session([], true, 0, OFFER);
+    const first = await closed.handleFanMessage('J’ai 30 ans et t’es trop bonne');
+    expect(first.desire?.availability?.record.state).toBe('unknown');
+    expect(first.desire?.availability?.gate).toEqual({ open: false, missing: ['availability_unconfirmed'] });
+
+    const open = session([], true);
+    const turn = await open.handleFanMessage('J’ai 30 ans et t’es trop bonne');
+    expect(turn.desire?.availability?.record.state).toBe('confirmed');
+    expect(turn.desire?.availability?.record.seen).toEqual(['alone', 'free_now']);
+    expect(turn.desire?.availability?.gate).toEqual({ open: true });
+    expect(open.desireTrail[0]?.availability?.gate.open).toBe(true);
+  });
+
   it('counts his reply speed on the simulated clock, as production does (P3-12)', async () => {
     const quick = session([], true);
     await quick.handleFanMessage('Salut toi');

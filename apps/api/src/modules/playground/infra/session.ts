@@ -26,6 +26,7 @@ import {
   type OfferInput,
   type OfferLimits,
   type RatedMoment,
+  type ScriptStart,
   type SexualizationLimits,
   type Situation,
   type TrapAssessment,
@@ -61,6 +62,15 @@ export interface PlaygroundDesireReading {
   readonly band: DesireBand;
   readonly signals: readonly DesireSignal[];
   readonly weightsVersion: string;
+  /** His availability and the gate before the first teaser at this message (ADR 0103 § 14). */
+  readonly availability?: PlaygroundAvailabilityReading;
+}
+
+/** His availability as this message of his left it, the gate, and whether she asked him this time. */
+export interface PlaygroundAvailabilityReading {
+  readonly record: FanAvailabilityRecord;
+  readonly gate: ScriptStart;
+  readonly asked: boolean;
 }
 
 /** The last answer and what it was written from: what a rating records, and what a comparison replays. */
@@ -450,6 +460,14 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
               band: desireBandOf(read.score),
               signals: read.signals,
               weightsVersion: read.weightsVersion,
+              ...(composed.availability !== undefined &&
+                composed.scriptStart !== undefined && {
+                  availability: {
+                    record: composed.availability.record,
+                    gate: composed.scriptStart,
+                    asked: composed.availability.record.askedAt?.getTime() === situation.now.getTime(),
+                  },
+                }),
             };
       desireTrail[desireTrail.length - 1] = reading;
 

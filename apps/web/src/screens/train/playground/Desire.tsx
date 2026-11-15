@@ -1,4 +1,10 @@
-import type { DesireMarkVerdict, PlaygroundDesire, PlaygroundState } from '@impera/contracts';
+import type {
+  DesireMarkVerdict,
+  FanAvailabilityState,
+  PlaygroundAvailability,
+  PlaygroundDesire,
+  PlaygroundState,
+} from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import { DESIRE_BAND_LABELS, DESIRE_SIGNAL_LABELS, movementOf } from '@/agent/desire';
@@ -44,6 +50,60 @@ export function desireVerdict(score: number, thresholds: Thresholds): string {
   if (score >= thresholds.script) return 'Assez chaud pour un script';
   if (score >= thresholds.open) return 'Elle peut ouvrir l’intime, pas encore de script';
   return 'Elle n’ouvre pas l’intime elle-même';
+}
+
+/** « Disponible : confirmée / inconnue / non » (ADR 0103 § 14). */
+export const AVAILABILITY_STATE_WORDS: Readonly<Record<FanAvailabilityState, string>> = {
+  confirmed: 'confirmée',
+  unknown: 'inconnue',
+  no: 'non',
+};
+
+/**
+ * What set his availability, in his words as the brain read them: the « non » he gave, or the positive signs he gave in
+ * the session (« il est seul, il a du temps »); `null` when he said nothing of it that still holds.
+ */
+export function availabilityReason(availability: PlaygroundAvailability): string | null {
+  if (availability.state === 'no') {
+    return availability.signal === null ? null : DESIRE_SIGNAL_LABELS[availability.signal];
+  }
+  return availability.seen.length === 0
+    ? null
+    : availability.seen.map((signal) => DESIRE_SIGNAL_LABELS[signal]).join(', ');
+}
+
+/** The gate before the first teaser in a line: open, or what is missing (ADR 0103 § 11). */
+export function gateLine(gate: PlaygroundAvailability['gate']): string {
+  return gate.open
+    ? 'Porte ouverte : un script peut démarrer'
+    : `Porte fermée : ${gate.missing.map((m) => lowerFirst(m.label)).join(' · ')}`;
+}
+
+const lowerFirst = (text: string): string => text.charAt(0).toLowerCase() + text.slice(1);
+
+/** His availability and the gate at one message: what the gate reads, said as the server decided it. */
+export function AvailabilityLines({ availability }: { availability: PlaygroundAvailability }): JSX.Element {
+  const reason = availabilityReason(availability);
+  return (
+    <ul className="pg-availability">
+      <li>
+        <span>
+          Disponible : <b>{AVAILABILITY_STATE_WORDS[availability.state]}</b>
+        </span>
+        <span className="pg-availability__why">{reason ?? 'il n’en a rien dit'}</span>
+      </li>
+      <li>
+        <span>Il sexualise lui-même</span>
+        <span className="pg-availability__why">{availability.sexualized ? 'oui' : 'pas encore'}</span>
+      </li>
+      {availability.asked ? (
+        <li className="pg-availability__asked">Elle lui a demandé s’il est tranquille</li>
+      ) : null}
+      <li className="pg-availability__gate" data-open={availability.gate.open}>
+        {gateLine(availability.gate)}
+      </li>
+    </ul>
+  );
 }
 
 /** The owner's three words on a score (ADR 0103 § 6), in the order of the gauge: low, right, high. */
@@ -124,6 +184,9 @@ export function DesireTag({
         {/* His first score has nothing to move from: said in a word, never « Première note : 0 » after the 0. */}
         <span>{desire.before === null ? 'première note' : movementOf(desire)}</span>
         {desire.mark === undefined ? null : <span>· {DESIRE_MARK_WORDS[desire.mark]}</span>}
+        {desire.availability === undefined ? null : (
+          <span>· Disponible : {AVAILABILITY_STATE_WORDS[desire.availability.state]}</span>
+        )}
       </button>
       {open ? (
         lines.length === 0 ? (
@@ -138,6 +201,9 @@ export function DesireTag({
             ))}
           </ul>
         )
+      ) : null}
+      {open && desire.availability !== undefined ? (
+        <AvailabilityLines availability={desire.availability} />
       ) : null}
       {open && onMark !== undefined ? <MarkChoice mark={desire.mark} onMark={onMark} /> : null}
     </div>
@@ -180,6 +246,7 @@ export function DesireGauge({
         Intime à {thresholds.open} · Script à {thresholds.script}
       </p>
       <p className="pg-desire__verdict">{desireVerdict(desire.score, thresholds)}</p>
+      {desire.availability === undefined ? null : <AvailabilityLines availability={desire.availability} />}
       {lines.length === 0 ? null : (
         <ul className="pg-desire-lines">
           {lines.map((line) => (

@@ -7,6 +7,7 @@ import {
   type MediaDescription,
   type PlaygroundAnswer,
   type PlaygroundComparison,
+  type PlaygroundAvailability,
   type PlaygroundDesire,
   type PlaygroundMedia,
   type PlaygroundState,
@@ -375,8 +376,53 @@ function demoDesire(history: readonly Omit<Turn, 'index'>[], text: string): Play
     band: score >= 70 ? 'hot' : score >= 40 ? 'playful' : 'neutral',
     signals,
     weightsVersion: 'démo',
+    availability: demoAvailability(previous?.availability, text, score, signals.length > 0),
   };
 }
+
+/**
+ * The demo's availability and gate (ADR 0103 § 14): a few words of his, so the screen shows what the real one does.
+ * Nothing here is the real reading (agent/domain/availability.ts).
+ */
+function demoAvailability(
+  previous: PlaygroundAvailability | undefined,
+  text: string,
+  score: number,
+  sexualizes: boolean,
+): PlaygroundAvailability {
+  const no = /partir|quelqu.un (à côté|avec moi)|occup/i.test(text);
+  const said = [
+    ...(/\bseul\b/i.test(text) ? (['alone'] as const) : []),
+    ...(/chez moi/i.test(text) ? (['at_home'] as const) : []),
+    ...(/le temps|tranquille|libre/i.test(text) ? (['free_now'] as const) : []),
+  ];
+  const seen = no ? [] : [...new Set([...(previous?.state === 'no' ? [] : (previous?.seen ?? [])), ...said])];
+  const state = no ? 'no' : seen.includes('alone') && seen.includes('free_now') ? 'confirmed' : 'unknown';
+  const sexualized = (previous?.sexualized ?? false) || sexualizes;
+  const missing = [
+    ...(score < DEMO_SCRIPT_THRESHOLD ? (['desire_below_threshold'] as const) : []),
+    ...(sexualized ? [] : (['not_sexualizing'] as const)),
+    ...(state === 'confirmed' ? [] : (['availability_unconfirmed'] as const)),
+  ].map((code) => ({ code, label: DEMO_GATE_LABELS[code] }));
+  const changed = no || said.length > 0;
+  return {
+    state,
+    signal: no ? 'leaving_soon' : (said.at(-1) ?? (changed ? null : (previous?.signal ?? null))),
+    seen,
+    expiresAt: changed ? new Date(Date.now() + 2 * 60 * 60_000) : (previous?.expiresAt ?? null),
+    sexualized,
+    asked: false,
+    gate: missing.length === 0 ? { open: true } : { open: false, missing },
+  };
+}
+
+const DEMO_SCRIPT_THRESHOLD = 70;
+
+const DEMO_GATE_LABELS = {
+  desire_below_threshold: 'Désir sous le seuil du script',
+  not_sexualizing: 'Il ne sexualise pas encore lui-même',
+  availability_unconfirmed: 'Il n’a pas dit être seul et libre',
+} as const;
 
 function hourIn(date: Date, timeZone: string): number {
   return Number(
