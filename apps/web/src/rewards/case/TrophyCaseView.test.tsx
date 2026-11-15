@@ -159,5 +159,7 @@ describe('TrophyCaseView', () => {
       />,
     );
     expect(screen.getByText('3 fois · dernière le 9 nov.')).toBeDefined();
+    fireEvent.click(screen.getByText('Série de 5'));
+    expect(screen.getAllByText('3 fois · dernière le 9 nov.')).toHaveLength(2);
   });
 });

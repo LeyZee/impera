@@ -15,8 +15,6 @@ import { roundAmountText } from '@/payroll/model';
  * read on the statement and never worked out here (§ 17). Trophies pass through as the server gives them.
  */
 
-/** What the view says and draws for one object: the shape of `TrophyCaseEntry` (apps/web/src/rewards/case/). */
-
 /** What is left before a streak, with its unit, as « Encore 3 jours » for the creator (ADR 0108 § 6). */
 const shiftsLeft = (missing: number): string =>
   `Encore ${String(missing)} ${missing > 1 ? 'shifts' : 'shift'}`;
@@ -32,7 +30,7 @@ const TROPHY_HOW: Readonly<Record<TrophyKind, string>> = {
   ten_ppv_shift: 'Dix PPV achetés dans un même shift.',
 };
 
-const isTrophy = (kind: string): kind is TrophyKind => kind in TROPHY_NAMES;
+const isTrophy = (kind: string): kind is TrophyKind => Object.hasOwn(TROPHY_NAMES, kind);
 
 const shownKind = (thresholdMinor: number): string => `tier:${String(thresholdMinor)}`;
 
@@ -111,7 +109,7 @@ export function chatterCase(
     if (isTrophy(item.kind)) {
       const kind = item.kind;
       const left =
-        item.earnedAt === null && item.progress !== null
+        item.earnedAt === null && item.progress?.unit === 'shift'
           ? shiftsLeft(item.progress.target - item.progress.current)
           : undefined;
       return {

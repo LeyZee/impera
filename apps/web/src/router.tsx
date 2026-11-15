@@ -720,13 +720,12 @@ const meProfile = createRoute({
     return <MyProfilePage user={user} />;
   },
 });
-// Moi › Trophées (ADR 0108): the chatter's trophy case; anyone who does not play is sent to his profile.
+// Moi › Trophées (ADR 0108): the chatter's trophy case, or the creator's; anyone else is sent to his profile.
 const meTrophies = createRoute({
   getParentRoute: () => me,
   path: '/trophees',
   beforeLoad: ({ context }) => {
-    creatorAway({ context });
-    if (!playsTheGame(context.user)) {
+    if (context.user.role !== 'creator' && !playsTheGame(context.user)) {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
     }

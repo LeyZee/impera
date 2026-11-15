@@ -299,7 +299,7 @@ export function TrophyCaseView({
           <div className="tc-detail__object">{openEntry.art(200, open.earnedAt !== null)}</div>
           <p className="tc-detail__meta">
             {open.earnedAt !== null
-              ? `Gagné le ${DATE.format(new Date(open.earnedAt))}`
+              ? (openEntry.earnedNote ?? `Gagné le ${DATE.format(new Date(open.earnedAt))}`)
               : [percentOf(open.progress, false), openEntry.left]
                   .filter((part) => part !== null && part !== undefined)
                   .map((part) => (typeof part === 'number' ? `${String(part)} %` : part))

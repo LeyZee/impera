@@ -1,0 +1,133 @@
+// @vitest-environment jsdom
+import type { Me, TrophyCase } from '@impera/contracts';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { MyTrophiesPage } from './MyTrophiesPage';
+
+import { THEO_ME } from '@/test/pay';
+
+// Invented (ADR 0010).
+const NORA_ME: Me = {
+  ...THEO_ME,
+  id: 'creator-user-nora',
+  name: 'Nora',
+  role: 'creator',
+  team: null,
+  teamScope: 'self',
+  creatorIds: ['00000000-0000-4000-8000-0000000000aa'],
+  preferences: { sounds: false },
+};
+
+const HER_CASE: TrophyCase = {
+  items: [
+    {
+      kind: 'day_streak_7',
+      family: 'medal',
+      earnedAt: '2026-11-02T08:00:00.000Z',
+      revealedAt: '2026-11-02T08:00:00.000Z',
+      progress: null,
+    },
+    {
+      kind: 'day_streak_14',
+      family: 'medal',
+      earnedAt: null,
+      revealedAt: null,
+      progress: { current: 9, target: 14, unit: 'day' },
+    },
+    {
+      kind: 'delivery_streak_5',
+      family: 'streak',
+      earnedAt: null,
+      revealedAt: null,
+      progress: { current: 4, target: 5, unit: 'delivery' },
+    },
+    {
+      kind: 'first_drop',
+      family: 'trophy',
+      earnedAt: '2026-10-20T08:00:00.000Z',
+      revealedAt: '2026-10-20T08:00:00.000Z',
+      progress: null,
+    },
+  ],
+  streaks: [
+    { kind: 'day', current: 9, best: 12 },
+    { kind: 'delivery', current: 4, best: 4 },
+  ],
+  level: null,
+};
+
+beforeEach(() => {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: true,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+    },
+  );
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: string) =>
+      new URL(input, 'http://localhost').pathname === '/v1/creator-space/trophy-case'
+        ? Promise.resolve(Response.json(HER_CASE))
+        : Promise.resolve(new Response(null, { status: 404 })),
+    ),
+  );
+});
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+function renderPage(user: Me): void {
+  const root = createRootRoute();
+  const page = createRoute({
+    getParentRoute: () => root,
+    path: '/moi/trophees',
+    component: () => <MyTrophiesPage user={user} />,
+  });
+  const others = ['/moi/persona', '/moi/securite', '/moi/preferences'].map((path) =>
+    createRoute({ getParentRoute: () => root, path, component: () => null }),
+  );
+  const router = createRouter({
+    routeTree: root.addChildren([page, ...others]),
+    history: createMemoryHistory({ initialEntries: ['/moi/trophees'] }),
+  });
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
+describe('Moi › Trophées, the creator’s', () => {
+  it('shows her case with her streaks, and no level', async () => {
+    renderPage(NORA_ME);
+    const hero = await screen.findByRole('region', { name: '5 livraisons à l’heure' });
+    expect(hero.textContent).toContain('Encore 1 livraison à l’heure');
+    expect(screen.getByText('Encore 5 jours')).toBeDefined();
+    expect(hero.textContent).toContain('Série en cours : 9 jours');
+    expect(hero.textContent).toContain('Livraisons à l’heure : 4 de suite');
+    expect(screen.queryByText(/Niveau|Rang/)).toBeNull();
+    expect(screen.getAllByRole('heading', { level: 3 }).map((one) => one.textContent)).toEqual([
+      'Médailles',
+      'Livraisons à l’heure',
+      'Trophées',
+    ]);
+    expect(screen.getByRole('link', { name: 'Trophées' })).toBeDefined();
+  });
+});

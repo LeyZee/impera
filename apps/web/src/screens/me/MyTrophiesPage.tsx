@@ -1,6 +1,7 @@
 import type { Me } from '@impera/contracts';
 import type { JSX } from 'react';
 
+import { HerTrophiesPage } from './HerTrophiesPage';
 import { MeNav } from './MeNav';
 
 import { useMyFigures, usePayPeriod } from '@/payroll/api';
@@ -12,11 +13,18 @@ import { tiersOf } from '@/screens/pay/MyFigures';
 import { useCurrentPeriod } from '@/screens/pay/data';
 import { Page, PageHeader } from '@/shell/layout';
 
+const shifts = (count: number): string => `${String(count)} ${count > 1 ? 'shifts' : 'shift'}`;
+
+/** Moi › Trophées (ADR 0108): the creator's case, or the chatter's. */
+export function MyTrophiesPage({ user }: { user: Me }): JSX.Element {
+  return user.role === 'creator' ? <HerTrophiesPage user={user} /> : <ChatterTrophiesPage user={user} />;
+}
+
 /**
- * Moi › Trophées (ADR 0108): the chatter's case, on the shared view. His tiers' progress is read on his statement,
+ * The chatter's case, on the shared view. His tiers' progress is read on his statement,
  * as on Commissions; everything else is the server's trophy case. Nothing here is worked out by the screen.
  */
-export function MyTrophiesPage({ user }: { user: Me }): JSX.Element {
+function ChatterTrophiesPage({ user }: { user: Me }): JSX.Element {
   const read = useMyTrophyCase(true).data;
   const figures = useMyFigures().data;
   const current = useCurrentPeriod();
@@ -38,8 +46,8 @@ export function MyTrophiesPage({ user }: { user: Me }): JSX.Element {
             shift === undefined
               ? []
               : [
-                  { label: 'Série en cours', value: `${String(shift.current)} shifts` },
-                  { label: 'Meilleure série', value: `${String(shift.best)} shifts` },
+                  { label: 'Série en cours', value: shifts(shift.current) },
+                  { label: 'Meilleure série', value: shifts(shift.best) },
                 ]
           }
           level={
