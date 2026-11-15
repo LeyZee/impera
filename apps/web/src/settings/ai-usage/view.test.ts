@@ -4,6 +4,7 @@ import { usageFixture } from './fixture';
 import {
   capNote,
   capShare,
+  coveredText,
   creditText,
   dayColumns,
   eurText,
@@ -54,7 +55,18 @@ describe('Consommation IA, what the screen says (ADR 0091)', () => {
     expect(days.at(-1)?.title).toMatch(/^Aujourd’hui, /u);
     // xAI first, Mistral empty, Google third, Venice empty: the colours never move.
     expect(days[0]?.parts).toEqual([2, 0, 0.4, 0]);
-    expect(hourColumns(usage)[14]?.title).toBe('14h–15h');
+    expect(hourColumns(usage)[14]?.title).toBe(`14${NBSP}h–15${NBSP}h`);
+  });
+
+  it('says the part the subscription paid, per column and per provider (« ok 0091 chiffres »)', () => {
+    const usage = usageFixture();
+    const days = dayColumns(usage);
+    expect(days[0]?.covered).toEqual([0, 0, 0, 0]);
+    const today = days.at(-1);
+    expect(today?.covered[0]).toBe(today?.parts[0]);
+    expect(today?.covered[2]).toBe(0);
+    expect(coveredText(0)).toBeNull();
+    expect(coveredText(3.2)).toBe(`dont 3,20${NBSP}€ couverts par l’abonnement`);
   });
 
   it('colours each model by its provider and each use by itself, the most expensive first', () => {
@@ -80,12 +92,25 @@ describe('Consommation IA, what the screen says (ADR 0091)', () => {
     expect(runwayShare(card)).toBeCloseTo((3.26 / 30) * 100);
     expect(runwayText({ ...card, state: 'empty', balanceMinor: -20 })).toContain('Épuisés');
     expect(runwayShare({ ...card, state: 'empty' })).toBe(0);
-    expect(runwayText({ ...card, daysLeft: 0.4 })).toContain('moins d’un jour');
+    expect(runwayText({ ...card, daysLeft: 0.4 })).toMatch(/^Moins d’un jour au rythme actuel/u);
+    expect(runwayText({ ...card, daysLeft: 83.9 })).toMatch(/^Plus de deux mois au rythme actuel/u);
     expect(runwayText({ ...card, perDayMinor: 0, daysLeft: null, runsOutOn: null, state: 'ok' })).toContain(
       'le solde ne baisse pas',
     );
     expect(runwayText({ ...card, daysLeft: null, runsOutOn: null, state: 'unknown_pace' })).toContain(
       'Pas encore de rythme',
     );
+  });
+
+  it('tells a subscription holds its quota, or since when it is used up (ADR 0091 § 6)', () => {
+    const plan = usageFixture().credits.find((c) => c.mode === 'subscription');
+    if (plan === undefined) throw new Error('fixture has a subscription');
+    expect(runwayText(plan)).toContain('Les appels passent sur le quota de ton abonnement');
+    expect(runwayShare(plan)).toBe(100);
+    const reached = { ...plan, state: 'quota_reached', quotaRefusedAt: '2026-11-12T22:35:00.000Z' } as const;
+    expect(runwayText(reached)).toBe(
+      'Depuis jeudi 12 novembre à 23\u00a0h\u00a035, l’agent répond avec son modèle de repli jusqu’à la remise à zéro.',
+    );
+    expect(runwayShare(reached)).toBe(0);
   });
 });

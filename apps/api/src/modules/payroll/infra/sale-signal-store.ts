@@ -194,7 +194,7 @@ async function ownStatementSales(
  * Every line of the platform's net on the member's own statements, each at its statement's revision, with the period
  * that statement pays: what their figures are made of (ADR 0104 § 1), nothing of the register.
  */
-async function ownFigureLines(tx: Transaction, memberId: TeamMemberId): Promise<FigureLine[]> {
+export async function figureLinesOf(tx: Transaction, memberId: TeamMemberId): Promise<FigureLine[]> {
   const rows = await tx
     .select({
       period: commissionStatements.period,
@@ -551,7 +551,7 @@ export function createDrizzleSaleSignalStore(
         const memberZone = member === null ? null : await ownZoneOf(tx, member);
         return MyFiguresSchema.parse(
           myFigures({
-            lines: member === null ? [] : await ownFigureLines(tx, member),
+            lines: member === null ? [] : await figureLinesOf(tx, member),
             now: at,
             agencyZone,
             memberZone: memberZone ?? agencyZone,

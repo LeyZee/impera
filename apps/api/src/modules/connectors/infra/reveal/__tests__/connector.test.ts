@@ -1,4 +1,11 @@
-import { ConnectorConfigSchema, CreatorIdSchema, PlatformAccountIdSchema } from '@impera/contracts';
+import {
+  ConnectorConfigSchema,
+  CreatorIdSchema,
+  PlatformAccountIdSchema,
+  VAULT_DESCRIPTION_MAX,
+  VAULT_FOLDER_NAME_MAX,
+  VaultMediaSchema,
+} from '@impera/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createFakeReveal, type FakeReveal } from '../../../../../__tests__/fake-reveal/server';
@@ -312,13 +319,64 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     expect(vault).toHaveLength(15);
     expect(vault.find((m) => m.ref.id === 'media_03')).toMatchObject({
       kind: 'video',
-      folder: { ref: { id: 'folder_1' }, name: 'SCRIPT 1 | ☀️' },
+      folder: { ref: { id: 'folder_1' }, name: 'SCRIPT 1 | ☀️', moment: 'day' },
+      description: null,
+      suggestedPriceMinor: null,
     });
+    // Each folder in Reveal's own order (newest first on FakeReveal), ranked from 0 as the pages came.
+    expect(
+      vault.filter((m) => m.folder?.ref.id === 'folder_1').map((m) => [m.ref.id, m.folderPosition]),
+    ).toEqual([
+      ['media_05', 0],
+      ['media_04', 1],
+      ['media_03', 2],
+      ['media_02', 3],
+      ['media_01', 4],
+    ]);
     expect(
       await connector.listVaultMedia({ folderRef: { platform: 'reveal', id: 'folder_2' } }),
     ).toHaveLength(5);
     const missing = connector.listVaultMedia({ folderRef: { platform: 'reveal', id: 'folder_9' } });
     expect((await rejection(missing)).code).toBe('not_found');
+  });
+
+  it('keeps the vault’s own text, and its suggested range only when both ends are given', async () => {
+    const fake = world();
+    const media = fake.state().media;
+    const first = media.find((m) => m.id === 'media_01');
+    const second = media.find((m) => m.id === 'media_02');
+    if (first === undefined || second === undefined) throw new Error('fixture changed');
+    first.description = 'Texte inventé du coffre';
+    first.suggestedMinPrice = 1_000;
+    first.suggestedMaxPrice = 2_500;
+    second.description = '   ';
+    second.suggestedMinPrice = 1_000;
+    const vault = await connect(fake).listVaultMedia({});
+    expect(vault.find((m) => m.ref.id === 'media_01')).toMatchObject({
+      description: 'Texte inventé du coffre',
+      suggestedPriceMinor: { min: 1_000, max: 2_500 },
+    });
+    expect(vault.find((m) => m.ref.id === 'media_02')).toMatchObject({
+      description: null,
+      suggestedPriceMinor: null,
+    });
+  });
+
+  it('cuts a vault folder’s name and a description longer than the contract allows, never half an emoji', async () => {
+    const fake = world();
+    const state = fake.state();
+    const folder = state.folders.find((f) => f.id === 'folder_1');
+    const media = state.media.find((m) => m.id === 'media_01');
+    if (folder === undefined || media === undefined) throw new Error('fixture changed');
+    folder.name = `${'a'.repeat(VAULT_FOLDER_NAME_MAX - 1)}🌙 nuit`;
+    media.description = 'Texte inventé '.repeat(500);
+    const vault = await connect(fake).listVaultMedia({});
+    const cut = vault.find((m) => m.ref.id === 'media_01');
+    expect(cut?.folder?.name).toBe('a'.repeat(VAULT_FOLDER_NAME_MAX - 1));
+    // The moment is read in the whole name, before it is cut.
+    expect(cut?.folder?.moment).toBe('night');
+    expect(cut?.description).toHaveLength(VAULT_DESCRIPTION_MAX);
+    expect(() => VaultMediaSchema.array().parse(vault)).not.toThrow();
   });
 
   it('lists transactions, newest first, until `since`', async () => {

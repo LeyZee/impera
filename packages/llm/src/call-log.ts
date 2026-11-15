@@ -12,6 +12,7 @@ export const CALL_OUTCOMES = [
   'refused',
   'timeout',
   'rate_limited',
+  'quota_exhausted',
   'auth',
   'unavailable',
   'missing_key',

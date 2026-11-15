@@ -89,6 +89,15 @@ export type Signal =
       readonly runsOutOn: string | null;
     }
   | {
+      /**
+       * A provider refused a call for lack of credits or of its subscription's quota (ADR 0091 § 6): the agent goes on
+       * with its fallback model. Never the provider's answer.
+       */
+      readonly kind: 'ai_quota_exhausted';
+      readonly provider: 'xai' | 'mistral' | 'google';
+      readonly mode: 'credits' | 'subscription';
+    }
+  | {
       /** No export of the database succeeded for 26 hours (ADR 0028 § 5); null when none ever did. */
       readonly kind: 'backup_overdue';
       readonly lastSucceededAt: Date | null;

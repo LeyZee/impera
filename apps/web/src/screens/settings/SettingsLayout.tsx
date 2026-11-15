@@ -3,6 +3,7 @@ import { Outlet } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { SecuritySection } from '@/security/SecuritySection';
+import { BudgetSection } from '@/settings/ai-budget/BudgetSection';
 import { AiUsageSection } from '@/settings/ai-usage/AiUsageSection';
 import { AlertsSection } from '@/settings/alerts/AlertsSection';
 import { BackupsSection } from '@/settings/backups/BackupsSection';
@@ -62,7 +63,12 @@ export function SettingsLayout(): JSX.Element {
 
 /** Réglages › Modèles IA: the Services page of P3-03, as the Connecteurs thread built it. */
 export function AiModelsPage(): JSX.Element {
-  return <ServicesSection />;
+  return (
+    <div className="sv-page">
+      <ServicesSection />
+      <BudgetSection />
+    </div>
+  );
 }
 
 /** Réglages › Consommation IA (ADR 0091): what the AI costs, live, and when to recharge its credits. */

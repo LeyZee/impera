@@ -28,6 +28,7 @@ import {
   type FiredAlert,
   type PhraseAlert,
 } from '../domain/alerts';
+import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
 import { measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
@@ -43,10 +44,18 @@ import { withoutOrders } from '../domain/injection';
 import type { PickedObjectionReply } from '../domain/objections';
 import type { OfferLimits } from '../domain/policy';
 import { safetySigns } from '../domain/safety-net';
+import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
+import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
 import { handoffCauseOf } from '../domain/traps';
 
-import { composeTurn, type ComposedTurn, type ComposerPersona, type OfferInput } from './compose';
+import {
+  composeTurn,
+  type ComposedTurn,
+  type ComposerPersona,
+  type OfferInput,
+  type ScriptsInput,
+} from './compose';
 import type { FanLimits } from './fan-limits';
 
 /**
@@ -101,11 +110,21 @@ export interface AgentComposeInput {
   readonly customOrderOpen?: boolean;
   /** The replies of her objection bank he already received (ADR 0090 § B): never twice. */
   readonly usedObjectionReplies?: readonly string[];
+  /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
+  readonly scriptRun?: ScriptRun | null;
+  /** His availability as the conversation keeps it (ADR 0103, amendement du 13/11); `null` before the first. */
+  readonly fanAvailability?: FanAvailabilityRecord | null;
   /**
    * The care mode open on this conversation (ADR 0088), as `conversations` stores it: she answers him with care
    * whatever he writes, until a manager or the owner closes it. `helpGiven`: the help bubble already went out in it.
    */
   readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+}
+
+/** A run that changed at this message, with its journal (ADR 0098 § 2). */
+interface ScriptRunChange {
+  readonly run: ScriptRun;
+  readonly events: readonly ScriptJournalEvent[];
 }
 
 interface HistoryMedia {
@@ -173,6 +192,8 @@ type AgentComposeResult = (
     }
 ) & {
   readonly desire?: ScoredDesire;
+  /** His availability after this message, only when it changed (`fan_availability_changed`, ADR 0103). */
+  readonly fanAvailability?: FanAvailabilityRecord;
   /**
    * The care mode (ADR 0088), on a draft or a hold: the signs that opened or kept it, and whether this draft closes on
    * the help bubble. A care hold means the AI could not answer him: a human writes to him.
@@ -184,6 +205,15 @@ type AgentComposeResult = (
   readonly customOrderOpened?: true;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
+  /**
+   * His script runs after this message (ADR 0098): the stored run moved, a run opened, a paid step offered. Without a
+   * draft, only what his message and Reveal changed: a step not written was not sent.
+   */
+  readonly scriptRun?: {
+    readonly moved?: ScriptRunChange;
+    readonly opened?: ScriptRunChange;
+    readonly offer?: { readonly amountMinor: number; readonly currency: 'EUR' };
+  };
 };
 
 export interface AgentDraftComposer {
@@ -260,6 +290,85 @@ export interface DraftComposerDeps {
   readonly chatterOnShift?: (creatorId: string, at: Date) => Promise<boolean>;
   /** Lines of her notes kept out of the prompt for looking like an order: counted, never their text. */
   readonly onDroppedNotes?: (event: { readonly conversationId: string; readonly count: number }) => void;
+  /**
+   * Her scripts on the platform (ADR 0098, ADR 0018 § 5): her catalogue and Reveal's history of his. Without it, or
+   * with his history unreadable, no script moves and nothing is sold (fail closed); a brain's « offer » is written
+   * as a plain answer.
+   */
+  readonly scripts?: ScriptSource;
+}
+
+/**
+ * The connector's reads a script decision needs, as minimal views until the contract carries them (P2-02:
+ * `listPlatformScripts`, `getScriptHistory`). A failed read throws: the composer decides.
+ */
+export interface ScriptSource {
+  catalogue(creatorId: string, platformAccountId: string): Promise<readonly PlatformScriptView[]>;
+  history(
+    creatorId: string,
+    platformAccountId: string,
+    platformConversationId: string,
+  ): Promise<ScriptHistoryView>;
+}
+
+/** Her scripts for this message: what the source reads, and nothing readable when it cannot (fail closed). */
+async function scriptsInput(deps: DraftComposerDeps, input: AgentComposeInput): Promise<ScriptsInput> {
+  const { platformAccountId, platformConversationId } = input;
+  const closed: ScriptsInput = {
+    conversationRef: platformConversationId ?? input.conversationId,
+    catalogue: [],
+    history: null,
+    latest: input.scriptRun ?? null,
+    countsHisMessage: (input.waited ?? 0) === 0,
+  };
+  if (deps.scripts === undefined || platformAccountId === undefined || platformConversationId === undefined)
+    return closed;
+  try {
+    const [catalogue, history] = await Promise.all([
+      deps.scripts.catalogue(input.creatorId, platformAccountId),
+      deps.scripts.history(input.creatorId, platformAccountId, platformConversationId),
+    ]);
+    return { ...closed, catalogue, history };
+  } catch {
+    return closed;
+  }
+}
+
+/** The price alert of a step that did not go (ADR 0098 § 5): the team is told, the agent goes on. */
+const SCRIPT_PRICE: AlertNotice = {
+  trigger: { alert: { kind: 'system', code: 'script_price' }, matchedBy: 'rule' },
+  notify: true,
+};
+
+/** A result with what this message did to his script runs: the step decided goes only with a draft. */
+function withScripts(
+  result: AgentComposeResult,
+  turn: ScriptTurn | undefined,
+  settings: AlertSettings,
+): AgentComposeResult {
+  if (turn === undefined) return result;
+  const alerts =
+    turn.priceMismatch !== null && settings.systemOn.has('script_price')
+      ? [...(result.alerts ?? []), SCRIPT_PRICE]
+      : result.alerts;
+  const base = alerts === undefined ? result : { ...result, alerts };
+  if (result.kind !== 'draft') {
+    return turn.followed === null ? base : { ...base, scriptRun: { moved: turn.followed } };
+  }
+  const { decision } = turn;
+  const price =
+    (decision.kind === 'start' || decision.kind === 'send_step') && decision.step.priceMinor !== null
+      ? decision.step.priceMinor
+      : null;
+  // Reveal sells in euros: the catalogue's minor units are cents.
+  const offer: NonNullable<AgentComposeResult['scriptRun']>['offer'] =
+    price === null ? undefined : { amountMinor: price, currency: 'EUR' };
+  const scriptRun = {
+    ...(turn.moved !== null && { moved: turn.moved }),
+    ...(turn.opened !== null && { opened: turn.opened }),
+    ...(offer !== undefined && { offer }),
+  };
+  return Object.keys(scriptRun).length === 0 ? base : { ...base, scriptRun };
 }
 
 const failureDetail = (error: LlmFailure): readonly string[] =>
@@ -789,6 +898,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         };
       });
       const offer = await offerInput(withHer, input, stop.flags);
+      const scripts = await scriptsInput(deps, input);
       const waited = (input.waited ?? 0) >= 1;
       const composed = await composeTurn(deps.gateway, withHer.persona, {
         history,
@@ -846,6 +956,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
             usedReplyIds: new Set(input.usedObjectionReplies ?? []),
           },
         }),
+        scripts,
+        ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
       });
       const fired = firedWith(coded, composed.brief, asked, settings, chatter);
       const alerts = settleAlerts(fired);
@@ -854,13 +966,20 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         composed.brief !== undefined && holdDecision(composed.brief, waited).kind === 'handoff';
       const pause = composed.handoff !== undefined || riskFirst ? null : alerts.pause;
       const notices = pause === null ? fired.map(noticeOf) : alerts.notices;
-      const settled = withSales(
-        withNotices(await settle(withHer, input, composed, stop.flags, waited, pause, known), notices),
-        composed,
+      const settled = withScripts(
+        withSales(
+          withNotices(await settle(withHer, input, composed, stop.flags, waited, pause, known), notices),
+          composed,
+        ),
+        composed.scripts,
+        settings,
       );
-      if (composed.desire === undefined) return settled;
+      const availability = composed.availability?.changed === true ? composed.availability.record : undefined;
+      const withAvailability =
+        availability === undefined ? settled : { ...settled, fanAvailability: availability };
+      if (composed.desire === undefined) return withAvailability;
       const { before, score, signals, weightsVersion } = composed.desire;
-      return { ...settled, desire: { before, score, signals, weightsVersion } };
+      return { ...withAvailability, desire: { before, score, signals, weightsVersion } };
     },
   };
 }

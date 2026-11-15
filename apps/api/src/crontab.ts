@@ -150,10 +150,18 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '17 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['backups.check'] },
   },
-  // AI credits under five days, under two or empty alert the owner, once per level and line (ADR 0091 § 4).
+  // What each chatter earned in the game (ADR 0104 § 12 to § 15), noted within ten minutes of the fact; the reveal
+  // waits for them to open the app, and nothing is ever sent to bring them back (§ 18).
+  {
+    task: 'rewards.evaluate',
+    match: '*/10 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['rewards.evaluate'] },
+  },
+  // AI credits under five days, under two or empty alert the owner, once per level and line (ADR 0091 § 4); a provider
+  // that refuses for lack of credits or quota alerts once per episode, within five minutes (§ 6).
   {
     task: 'ai_usage.check_credits',
-    match: '23 * * * *',
+    match: '*/5 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['ai_usage.check_credits'] },
   },
   // The running templates make their shifts four weeks ahead (EQ-02); each occurrence is made once, so the hour that

@@ -32,6 +32,8 @@ import { createDrizzlePayrollValidationStore } from './infra/validation-store';
  * report, through the composition root (EQ-04). One key and one number of attempts for every writer.
  */
 export { enqueuePayRecalculation } from './infra/recalculation-queue';
+/** What the game reads of a member's pay, plugged into it by the composition root (ADR 0104 § 12, § 15): read only. */
+export { payGameFactsUnscoped } from './infra/game-reads';
 /** What the contractors' file reads of pay, plugged into it by the composition root (ARC-07). */
 export { payReadsForContractors } from './infra/contractor-reads';
 

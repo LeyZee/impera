@@ -2,6 +2,7 @@ import {
   AlertTriggerItemSchema,
   CustomAlertGroupIdSchema,
   CustomAlertIdSchema,
+  SYSTEM_ALERT_CODES,
   type AlertTriggerItem,
   type CustomAlertGroupId,
 } from '@impera/contracts';
@@ -155,6 +156,7 @@ describe('the alert filter', () => {
       'Mot-clé de sa persona',
       'Demande de service',
       'Doute sur la personne',
+      'Prix d’un script changé',
       'Appel',
       'Vidéo perso',
     ]);
@@ -191,7 +193,7 @@ describe('the alert filter', () => {
     ]);
     const custom = (creator: string | null, chosen: CustomAlertGroupId | null = null) =>
       alertChoices(known, creator, chosen)
-        .slice(3)
+        .slice(SYSTEM_ALERT_CODES.length)
         .map((one) => one.label);
     expect(custom(null)).toEqual(['Appel', 'Vidéo perso']);
     expect(custom(NORA)).toEqual(['Vidéo perso']);

@@ -27,6 +27,8 @@ const MODULE_DEPENDENCIES = {
   backups: [],
   // ADR 0091: reads the gateway's journal and keeps the credits ledger; imports no module.
   'ai-usage': [],
+  // Choix de Charles 12/11: the owner's caps the gateway reads (`ai_budget_settings`); imports no module.
+  'ai-budget': [],
   scheduling: [],
   scripts: [],
   alerts: [],
@@ -44,6 +46,9 @@ const MODULE_DEPENDENCIES = {
   'creator-tasks': ['scheduling'],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
   'content-drops': [],
+  // ADR 0104 § 12 to § 20: the game reads a member's pay and planning through the reads the composition root plugs
+  // (`payGameFactsUnscoped`, `shiftsForGameUnscoped`), and never writes them; it imports no module.
+  rewards: [],
   // ADR 0026, 0105: a second door on the modules' commands. Lot a so far: its pure rules and its own accesses
   // (`mcp_grants`); the modules it reads join this list with the tools' wiring.
   mcp: [],

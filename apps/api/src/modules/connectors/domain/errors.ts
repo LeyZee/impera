@@ -246,3 +246,35 @@ export class ConnectorReadsRangeUnprocessable extends DomainError {
     );
   }
 }
+
+/**
+ * Her vault as the CRM mirrors it (ADR 0099, fiche vault-sync) is the owner's and an active manager's for the creators
+ * of his list, as her media library is (403). Asking a sync is the owner's alone.
+ */
+export class VaultForbidden extends DomainError {
+  constructor() {
+    super('vault_forbidden', 'Réservé au propriétaire et au manager actif qui suit cette créatrice');
+  }
+}
+
+/**
+ * A platform read cannot be made now (503): no session, a session the platform refused, the breaker open, a connector
+ * that does not declare this read, or a platform that failed to answer it.
+ */
+export class PlatformReadUnavailable extends DomainError {
+  /** Why: no usable session, a read the platform does not give, or a platform that failed to answer. */
+  readonly reason: 'session' | 'unsupported' | 'failed';
+
+  constructor(reason: 'session' | 'unsupported' | 'failed') {
+    super(
+      'platform_read_unavailable',
+      reason === 'session'
+        ? 'La session de ce compte ne permet pas de lire la plateforme maintenant'
+        : reason === 'unsupported'
+          ? 'Cette plateforme ne donne pas cette lecture'
+          : 'La plateforme n’a pas répondu à cette lecture',
+      { details: { reason } },
+    );
+    this.reason = reason;
+  }
+}

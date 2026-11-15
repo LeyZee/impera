@@ -6,7 +6,11 @@ import {
   CurrentUserSchema,
   DomainError,
   isBackupCode,
+  DEFAULT_ME_PREFERENCES,
+  MePreferencesSchema,
   MeSchema,
+  UpdateMePreferencesBodySchema,
+  type MePreferences,
   DashboardSessionSchema,
   newId,
   PASSKEY_ADD_WINDOW_MINUTES,
@@ -788,6 +792,32 @@ function membership(db: Database, userId: string): Promise<Membership> {
   });
 }
 
+/** The account's own preferences, read as itself (`user_preferences`, own row only); the defaults without a row. */
+function preferencesOf(db: Database, userId: string): Promise<MePreferences> {
+  return withMember(db, userId, async (tx) => {
+    const [row] = await tx
+      .select({ sounds: schema.userPreferences.soundsEnabled })
+      .from(schema.userPreferences)
+      .where(eq(schema.userPreferences.userId, userId));
+    return row ?? DEFAULT_ME_PREFERENCES;
+  });
+}
+
+/** Writes the account's own row, made at its first choice, and answers what is stored. */
+function savePreferences(db: Database, userId: string, preferences: MePreferences): Promise<MePreferences> {
+  return withMember(db, userId, async (tx) => {
+    const [row] = await tx
+      .insert(schema.userPreferences)
+      .values({ userId, soundsEnabled: preferences.sounds })
+      .onConflictDoUpdate({
+        target: schema.userPreferences.userId,
+        set: { soundsEnabled: preferences.sounds, updatedAt: sql`now()` },
+      })
+      .returning({ sounds: schema.userPreferences.soundsEnabled });
+    return row ?? preferences;
+  });
+}
+
 /** Whether the account is a team member marked `left`; the owner and an account without a team row never are. */
 async function hasLeftTeam(db: Database, userId: string): Promise<boolean> {
   const { team } = await membership(db, userId);
@@ -818,7 +848,11 @@ async function isArchivedCreatorAccount(db: Database, userId: string): Promise<b
 export async function meOf(db: Database, shiftCreators: ShiftCreators, row: AccountRow): Promise<Me | null> {
   const signedIn = await userOf(db, shiftCreators, row);
   if (signedIn === null) return null;
-  return { ...signedIn.user, ...(signedIn.membership ?? (await membership(db, signedIn.user.id))) };
+  return {
+    ...signedIn.user,
+    ...(signedIn.membership ?? (await membership(db, signedIn.user.id))),
+    preferences: await preferencesOf(db, signedIn.user.id),
+  };
 }
 
 /**
@@ -1500,7 +1534,23 @@ export function createAuthRoutes(
       },
       async (request) => {
         if (request.user === null) throw new SessionUnauthenticated();
-        return { ...request.user, ...(request.membership ?? (await membership(db, request.user.id))) };
+        return {
+          ...request.user,
+          ...(request.membership ?? (await membership(db, request.user.id))),
+          preferences: await preferencesOf(db, request.user.id),
+        };
+      },
+    );
+    // The account's own preferences (ADR 0104, ADR 0107): every role writes its own row, and no other.
+    app.put(
+      '/me/preferences',
+      {
+        preValidation: requireRole(...UserRoleSchema.options),
+        schema: { body: UpdateMePreferencesBodySchema, response: { 200: MePreferencesSchema } },
+      },
+      async (request) => {
+        if (request.user === null) throw new SessionUnauthenticated();
+        return savePreferences(db, request.user.id, request.body);
       },
     );
     // The dashboard's first read (recette 05/11, SEC-13): 200 with or without a session, so that every public page
@@ -1509,7 +1559,11 @@ export function createAuthRoutes(
       const session = await currentUser(auth, db, shiftCreators, request);
       if (session === null) return { state: 'signed_out' as const };
       if (!session.secondFactorEnabled) return { state: 'second_factor_required' as const };
-      const me = { ...session.user, ...(session.membership ?? (await membership(db, session.user.id))) };
+      const me = {
+        ...session.user,
+        ...(session.membership ?? (await membership(db, session.user.id))),
+        preferences: await preferencesOf(db, session.user.id),
+      };
       return { state: 'signed_in' as const, me };
     });
     return Promise.resolve();

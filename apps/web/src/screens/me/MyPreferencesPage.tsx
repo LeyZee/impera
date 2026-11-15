@@ -4,6 +4,8 @@ import type { JSX } from 'react';
 
 import { MeNav } from './MeNav';
 
+import { SoundsToggle } from '@/rewards/SoundsToggle';
+import { playsTheGame } from '@/rewards/api';
 import { AppearanceChoice } from '@/shell/AppearanceChoice';
 import { MediaBlurToggle } from '@/shell/MediaBlurToggle';
 import { NavIcon } from '@/shell/NavIcon';
@@ -37,6 +39,14 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
                 Les photos et vidéos des créatrices, floutées ou nettes sur tes écrans.
               </p>
               <MediaBlurToggle variant="sheet" />
+            </div>
+          </Panel>
+        ) : null}
+        {playsTheGame(user) ? (
+          <Panel className="nv-enter" eyebrow="Mon compte" title="Sons">
+            <div className="me-prefs__body">
+              <p className="me-prefs__text">Le carillon qui accompagne un trophée ou un palier gagné.</p>
+              <SoundsToggle user={user} />
             </div>
           </Panel>
         ) : null}

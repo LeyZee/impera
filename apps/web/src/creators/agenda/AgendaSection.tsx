@@ -96,9 +96,10 @@ export function AgendaSection({
         </div>
       );
     const groups = groupsOf(items);
+    const summary = summaryOf(items, timezone);
     return (
       <>
-        <p className="aa-summary nv-num">{summaryOf(items, timezone)}</p>
+        {summary === null ? null : <p className="aa-summary nv-num">{summary}</p>}
         <Group title="En attente de sa réponse" items={groups.waiting} zone={timezone} />
         <Group title="Acceptées" items={groups.accepted} zone={timezone} />
         <Group title="Refusées" items={groups.declined} zone={timezone} />
@@ -330,7 +331,8 @@ function ProposeDialog({
   return (
     <Dialog
       title={`Proposer à ${creatorName}`}
-      className={forReel ? 'ag-scope aa-dialog--reel' : 'ag-scope'}
+      lead={'Elle accepte, place ou refuse ; elle lit «\u00a0Proposé par l’agence\u00a0», jamais qui.'}
+      className={forReel ? 'ag-scope aa-dialog aa-dialog--reel' : 'ag-scope aa-dialog'}
       onClose={onClose}
     >
       <form className="tm-dialog__body" noValidate onSubmit={submit}>
@@ -385,29 +387,34 @@ function ProposeDialog({
             }}
           />
         ) : (
-          <AgendaDay
-            value={draft.day}
-            invalid={tried && problems.includes('day')}
-            tried={tried}
-            onChange={(next) => {
-              set({ day: next });
-            }}
-            onUnreadable={onUnreadable}
-          />
-        )}
-        {draft.kind === 'timed' ? (
-          <>
-            <Hours
-              start={draft.start}
-              end={draft.end}
-              onStart={(minute) => {
-                set({ start: minute });
-              }}
-              onEnd={(minute) => {
-                set({ end: minute });
+          // Jour, Début and Fin on one line on a computer (ADM-15): the form is shorter than the window.
+          <div className={draft.kind === 'timed' ? 'aa-when' : undefined}>
+            <AgendaDay
+              value={draft.day}
+              invalid={tried && problems.includes('day')}
+              tried={tried}
+              onChange={(next) => {
+                set({ day: next });
               }}
               onUnreadable={onUnreadable}
             />
+            {draft.kind === 'timed' ? (
+              <Hours
+                start={draft.start}
+                end={draft.end}
+                onStart={(minute) => {
+                  set({ start: minute });
+                }}
+                onEnd={(minute) => {
+                  set({ end: minute });
+                }}
+                onUnreadable={onUnreadable}
+              />
+            ) : null}
+          </div>
+        )}
+        {draft.kind === 'timed' ? (
+          <>
             <p className="ag-explain">
               {elsewhere ? `Heure de ${cityOf(zone)}, la sienne. ` : ''}
               Elle tombe à cette heure seulement dans une de ses dispos et sans chevaucher une tâche ; sinon,
@@ -466,7 +473,8 @@ function ProposeDialog({
             {failed}
           </p>
         )}
-        <div className="tm-dialog__foot">
+        {/* Held at the foot of the panel while the fields scroll: the action is seen at the opening (ADM-15). */}
+        <div className="tm-dialog__foot aa-dialog__foot">
           <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
             Annuler
           </button>

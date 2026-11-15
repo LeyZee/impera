@@ -56,6 +56,7 @@ import {
   signedAmountText,
 } from '@/reports/model';
 import { Medal } from '@/rewards/Medal';
+import { RewardRevealGate } from '@/rewards/RewardRevealGate';
 import { tierMedals } from '@/rewards/metals';
 import { platformName } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
@@ -195,6 +196,8 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   return (
     <Page>
       {head()}
+      {/* What he earned since his last visit greets him here too (ADR 0104 § 12). */}
+      <RewardRevealGate user={user} />
       <div className="py-me" data-single={plain ? 'true' : undefined}>
         <div className="py-me__col">
           {heroData === undefined ? (

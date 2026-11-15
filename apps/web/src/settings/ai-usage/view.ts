@@ -117,13 +117,25 @@ export interface Column {
   readonly label: string;
   readonly title: string;
   readonly eur: number;
+  /** The part of `eur` the owner's subscription paid (ADR 0091 § 6). */
+  readonly coveredEur: number;
   readonly calls: number;
   /** Bottom to top, in `PROVIDERS`' order, one per provider (0 where it cost nothing). */
   readonly parts: readonly number[];
+  /** The same, the part of each the subscription paid: drawn hatched on top of what was paid. */
+  readonly covered: readonly number[];
 }
 
 const partsOf = (providers: readonly AiUsageProviderSpend[]): number[] =>
   PROVIDERS.map((p) => providers.find((one) => one.provider === p.key)?.eur ?? 0);
+
+const coveredOf = (providers: readonly AiUsageProviderSpend[]): number[] =>
+  PROVIDERS.map((p) => providers.find((one) => one.provider === p.key)?.coveredEur ?? 0);
+
+/** « dont 3,20 € couverts par l’abonnement », or nothing when the subscription paid nothing. */
+export function coveredText(eur: number): string | null {
+  return eur > 0 ? `dont ${eurText(eur)} couverts par l’abonnement` : null;
+}
 
 export function dayColumns(usage: AiUsage): Column[] {
   return usage.days.map((day) => ({
@@ -131,19 +143,23 @@ export function dayColumns(usage: AiUsage): Column[] {
     label: shortDay(day.day),
     title: day.day === usage.today.day ? `Aujourd’hui, ${dayLabel(day.day)}` : dayLabel(day.day),
     eur: day.eur,
+    coveredEur: day.coveredEur,
     calls: day.calls,
     parts: partsOf(day.providers),
+    covered: coveredOf(day.providers),
   }));
 }
 
 export function hourColumns(usage: AiUsage): Column[] {
   return usage.hours.map((hour) => ({
     key: String(hour.hour),
-    label: `${String(hour.hour)}h`,
-    title: `${String(hour.hour)}h–${String((hour.hour + 1) % 24)}h`,
+    label: `${String(hour.hour)}\u00a0h`,
+    title: `${String(hour.hour)}\u00a0h–${String((hour.hour + 1) % 24)}\u00a0h`,
     eur: hour.eur,
+    coveredEur: hour.coveredEur,
     calls: hour.calls,
     parts: partsOf(hour.providers),
+    covered: coveredOf(hour.providers),
   }));
 }
 
@@ -211,6 +227,20 @@ export const CONSOLE_HINT: Readonly<Record<AiCreditProvider, string>> = {
   google: 'aistudio.google.com › Billing',
 };
 
+/** Where each provider shows the usage its subscription includes (ADR 0091 § 6). */
+export const USAGE_HINT: Readonly<Record<AiCreditProvider, string>> = {
+  xai: 'console.x.ai › Usage',
+  mistral: 'console.mistral.ai › Usage',
+  google: 'aistudio.google.com › Usage',
+};
+
+/** Each provider's console, where its quota is read and credits are bought. */
+export const CONSOLE_URL: Readonly<Record<AiCreditProvider, string>> = {
+  xai: 'https://console.x.ai',
+  mistral: 'https://console.mistral.ai',
+  google: 'https://aistudio.google.com',
+};
+
 /** The tone of a card, as the rest of the CRM says it: amber a warning, red an urgency. */
 export const CREDIT_TONE: Readonly<Record<AiCreditState, 'ok' | 'warn' | 'bad' | 'idle'>> = {
   ok: 'ok',
@@ -218,6 +248,8 @@ export const CREDIT_TONE: Readonly<Record<AiCreditState, 'ok' | 'warn' | 'bad' |
   critical: 'bad',
   empty: 'bad',
   unknown_pace: 'idle',
+  included: 'ok',
+  quota_reached: 'bad',
 };
 
 const LONG_DAY = new Intl.DateTimeFormat('fr-FR', {
@@ -230,20 +262,45 @@ const LONG_DAY = new Intl.DateTimeFormat('fr-FR', {
 /** « samedi 14 novembre »: a calendar day in a sentence, never shifted by a zone. */
 export const longDay = (day: string): string => LONG_DAY.format(new Date(`${day}T12:00:00Z`));
 
-/** The card's headline about time: how long, and until when. */
+const REFUSED_DAY = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+});
+const REFUSED_TIME = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** « jeudi 12 novembre à 23 h 35 »: when the provider first refused, in Paris time, as the CRM writes an hour. */
+export function refusedText(at: string): string {
+  const date = new Date(at);
+  const [hour = '00', minute = '00'] = REFUSED_TIME.format(date).split(':');
+  return `${REFUSED_DAY.format(date)} à ${hour}\u00a0h\u00a0${minute}`;
+}
+
+/** The card's headline about time: how long, and until when; on a subscription, whether the quota holds. */
 export function runwayText(card: AiCredits): string {
+  if (card.state === 'quota_reached' && card.quotaRefusedAt !== null)
+    return `Depuis ${refusedText(card.quotaRefusedAt)}, l’agent répond avec son modèle de repli jusqu’à la remise à zéro.`;
+  if (card.mode === 'subscription')
+    return 'Les appels passent sur le quota de ton abonnement. S’il est épuisé, Telegram te prévient.';
   if (card.state === 'empty') return 'Épuisés d’après le décompte : recharge, puis note-le ici.';
   if (card.perDayMinor === 0) return 'Rien dépensé ces derniers jours : le solde ne baisse pas.';
   if (card.daysLeft === null || card.runsOutOn === null)
     return 'Pas encore de rythme : il faut une journée complète de dépense.';
   const days = card.daysLeft;
+  // « Environ » goes with a count of days only: « environ plus de deux mois » says two things at once.
   const span =
     days < 1
-      ? 'moins d’un jour'
+      ? 'Moins d’un jour'
       : days >= 60
-        ? 'plus de deux mois'
-        : `${String(Math.floor(days))} jour${Math.floor(days) > 1 ? 's' : ''}`;
-  return `Environ ${span} au rythme actuel, jusqu’au ${longDay(card.runsOutOn)}.`;
+        ? 'Plus de deux mois'
+        : `Environ ${String(Math.floor(days))} jour${Math.floor(days) > 1 ? 's' : ''}`;
+  return `${span} au rythme actuel, jusqu’au ${longDay(card.runsOutOn)}.`;
 }
 
 /** The badge beside the provider's name. */
@@ -253,11 +310,14 @@ export const CREDIT_BADGE: Readonly<Record<AiCreditState, string>> = {
   critical: 'Recharger maintenant',
   empty: 'Épuisés',
   unknown_pace: 'Rythme à venir',
+  included: 'Abonnement',
+  quota_reached: 'Quota épuisé',
 };
 
 /** Share of a 30-day bar the runway fills: the card's little gauge (0 to 100). */
 export function runwayShare(card: AiCredits): number {
-  if (card.state === 'empty') return 0;
+  if (card.state === 'empty' || card.state === 'quota_reached') return 0;
+  if (card.mode === 'subscription') return 100;
   if (card.daysLeft === null) return 100;
   return Math.min(100, (card.daysLeft / 30) * 100);
 }

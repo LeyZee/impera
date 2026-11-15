@@ -135,6 +135,8 @@ interface SyncableAccount {
 export interface AccountJobs {
   enqueuePoll(account: ConnectorAccount, runAt: Date, correlationId: string): Promise<void>;
   enqueueReconcile(account: ConnectorAccount, correlationId: string): Promise<void>;
+  /** Her vault's sync on the account's queue (fiche vault-sync); a sync already waiting is kept, never stacked. */
+  enqueueVaultSync(account: ConnectorAccount, correlationId: string): Promise<void>;
 }
 
 /** `conversations.ingestMessage`, injected by the composition root (connectors README). */

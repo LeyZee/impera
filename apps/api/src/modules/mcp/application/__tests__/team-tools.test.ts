@@ -2,6 +2,9 @@ import {
   CreatorIdSchema,
   McpGrantIdSchema,
   McpOnShiftNowSchema,
+  McpShiftsInputSchema,
+  McpShiftsListSchema,
+  McpTeamImportListSchema,
   newId,
   ShiftIdSchema,
   TeamMemberIdSchema,
@@ -10,7 +13,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import type { ActorView } from '../../domain/access';
-import type { ContentReaderView, GrantRecord, ShiftReader } from '../../domain/ports';
+import type { ContentReaderView, GrantRecord, ShiftReader, TeamImportReader } from '../../domain/ports';
 import { teamTools } from '../team-tools';
 
 const nora = newId(CreatorIdSchema);
@@ -33,13 +36,39 @@ const manager: ActorView = {
   readableCreatorIds: [lea],
 };
 const now = new Date('2026-11-14T21:00:00.000Z');
+const noTeam: TeamImportReader = { teamImport: () => Promise.reject(new Error('not read here')) };
 const shift = newId(ShiftIdSchema);
 const member = newId(TeamMemberIdSchema);
 
-function shifts(): ShiftReader & { asked: [ContentReaderView, 'all' | readonly string[], Date][] } {
+interface Range {
+  readonly from: Date;
+  readonly to: Date;
+}
+
+function shifts(): ShiftReader & {
+  asked: [ContentReaderView, 'all' | readonly string[], Date][];
+  ranges: [ContentReaderView, 'all' | readonly string[], Range][];
+} {
   const asked: [ContentReaderView, 'all' | readonly string[], Date][] = [];
+  const ranges: [ContentReaderView, 'all' | readonly string[], Range][] = [];
   return {
     asked,
+    ranges,
+    shifts(reader, creators, range) {
+      ranges.push([reader, creators, range]);
+      return Promise.resolve([
+        {
+          id: shift,
+          creatorId: lea,
+          memberId: member,
+          memberName: null,
+          startsAt: '2026-11-16T18:00:00.000Z',
+          endsAt: '2026-11-16T23:00:00.000Z',
+          stopped: true,
+          ...{ platformAccountId: 'compte-plateforme', rateBasisPoints: 2000, amountMinor: 45000 },
+        },
+      ]);
+    },
     onShiftNow(reader, creators, at) {
       asked.push([reader, creators, at]);
       return Promise.resolve([
@@ -59,7 +88,7 @@ function shifts(): ShiftReader & { asked: [ContentReaderView, 'all' | readonly s
 describe('on_shift_now (ADR 0026 § 5, read:team)', () => {
   it('reads as the access’s person: its creator, else those the person reads now', async () => {
     const source = shifts();
-    const tool = teamTools(source, () => now)['on_shift_now'];
+    const tool = teamTools(source, noTeam, () => now)['on_shift_now'];
     if (tool === undefined) throw new Error('no on_shift_now');
     await tool.run({ grant, actor: manager, creatorId: nora }, {});
     await tool.run({ grant, actor: manager, creatorId: null }, {});
@@ -75,7 +104,7 @@ describe('on_shift_now (ADR 0026 § 5, read:team)', () => {
   });
 
   it('gives the shift, its member by name and its end; never an account nor a rate', async () => {
-    const tool = teamTools(shifts(), () => now)['on_shift_now'];
+    const tool = teamTools(shifts(), noTeam, () => now)['on_shift_now'];
     if (tool === undefined) throw new Error('no on_shift_now');
     const value = McpOnShiftNowSchema.parse(await tool.run({ grant, actor: manager, creatorId: null }, {}));
     expect(value).toEqual({
@@ -90,5 +119,107 @@ describe('on_shift_now (ADR 0026 § 5, read:team)', () => {
       ],
     });
     expect(JSON.stringify(value)).not.toMatch(/compte-plateforme|2000|rate/u);
+  });
+});
+
+describe('shifts_list (ADR 0026 § 5, read:team)', () => {
+  const week = { from: '2026-11-16T00:00:00.000Z', to: '2026-11-23T00:00:00.000Z' };
+
+  it('reads the range as the access’s person: its creator, else those the person reads now', async () => {
+    const source = shifts();
+    const tool = teamTools(source, noTeam, () => now)['shifts_list'];
+    if (tool === undefined) throw new Error('no shifts_list');
+    await tool.run({ grant, actor: manager, creatorId: nora }, week);
+    await tool.run({ grant, actor: manager, creatorId: null }, week);
+    const range = { from: new Date(week.from), to: new Date(week.to) };
+    expect(source.ranges).toEqual([
+      [{ userId: grant.userId, role: 'operator' }, [nora], range],
+      [{ userId: grant.userId, role: 'operator' }, [lea], range],
+    ]);
+  });
+
+  it('gives each shift, its member by name, its times; never an account, a rate nor an amount', async () => {
+    const tool = teamTools(shifts(), noTeam, () => now)['shifts_list'];
+    if (tool === undefined) throw new Error('no shifts_list');
+    const value = McpShiftsListSchema.parse(await tool.run({ grant, actor: manager, creatorId: null }, week));
+    expect(value).toEqual({
+      shifts: [
+        {
+          shiftId: shift,
+          creatorId: lea,
+          memberId: member,
+          memberName: null,
+          startsAt: '2026-11-16T18:00:00.000Z',
+          endsAt: '2026-11-16T23:00:00.000Z',
+          stopped: true,
+        },
+      ],
+    });
+    expect(JSON.stringify(value)).not.toMatch(/compte-plateforme|2000|45000|rate|amount/u);
+  });
+
+  it('refuses a range backwards or longer than the planning reads', () => {
+    expect(McpShiftsInputSchema.safeParse(week).success).toBe(true);
+    expect(McpShiftsInputSchema.safeParse({ from: week.to, to: week.from }).success).toBe(false);
+    expect(McpShiftsInputSchema.safeParse({ ...week, to: '2026-12-28T00:00:01.000Z' }).success).toBe(false);
+    expect(McpShiftsInputSchema.safeParse({ ...week, to: '2026-12-28T00:00:00.000Z' }).success).toBe(true);
+    expect(McpShiftsInputSchema.safeParse({ ...week, rate: 1 }).success).toBe(false);
+  });
+});
+
+describe('team_import_list (ADR 0076, read:team)', () => {
+  it('reads the platform named, Reveal when none, as the access’s person', async () => {
+    const asked: [string, string][] = [];
+    const team: TeamImportReader = {
+      teamImport: (userId, platform) => {
+        asked.push([userId, platform]);
+        return Promise.resolve({ platform, accounts: [], newCount: 0, removalCount: 0, abnormalRead: false });
+      },
+    };
+    const tool = teamTools(shifts(), team, () => now)['team_import_list'];
+    if (tool === undefined) throw new Error('no team_import_list');
+    await tool.run({ grant, actor: manager, creatorId: null }, {});
+    await tool.run({ grant, actor: manager, creatorId: null }, { platform: 'onlyfans' });
+    expect(asked).toEqual([
+      [grant.userId, 'reveal'],
+      [grant.userId, 'onlyfans'],
+    ]);
+  });
+
+  it('gives each account’s link and whether it was removed; never its platform id, an amount nor a rate', async () => {
+    const team: TeamImportReader = {
+      teamImport: () =>
+        Promise.resolve({
+          platform: 'reveal',
+          accounts: [
+            {
+              platformChatterId: 'compte-chatteur-1',
+              link: { kind: 'member', memberId: member, memberDisplayName: 'Lou' },
+              removed: false,
+            },
+            { platformChatterId: 'compte-chatteur-2', link: { kind: 'agent' }, removed: true },
+          ],
+          newCount: 1,
+          removalCount: 1,
+          abnormalRead: false,
+          ...{ rateBasisPoints: 2000, amountMinor: 45000 },
+        }),
+    };
+    const tool = teamTools(shifts(), team, () => now)['team_import_list'];
+    if (tool === undefined) throw new Error('no team_import_list');
+    const value = McpTeamImportListSchema.parse(
+      await tool.run({ grant, actor: manager, creatorId: null }, {}),
+    );
+    expect(value).toEqual({
+      platform: 'reveal',
+      accounts: [
+        { link: { kind: 'member', memberId: member, memberName: 'Lou' }, removed: false },
+        { link: { kind: 'agent' }, removed: true },
+      ],
+      newCount: 1,
+      removalCount: 1,
+      abnormalRead: false,
+    });
+    expect(JSON.stringify(value)).not.toMatch(/compte-chatteur|2000|45000|rate|amount/u);
   });
 });
