@@ -16,6 +16,13 @@ import {
   TeamMemberIdSchema,
 } from './ids';
 import { CurrencySchema } from './money';
+import { PayPeriodSchema } from './pay-periods';
+import {
+  CommissionStatementStatusSchema,
+  PayPeriodBlockSchema,
+  PAYOUT_DELAY_MAX_BUSINESS_DAYS,
+  PayPeriodWindowSchema,
+} from './payroll';
 import { SaleTypeSchema } from './sales-feed';
 import { PLANNING_MAX_DAYS } from './scheduling';
 import {
@@ -535,3 +542,44 @@ export const McpSalesListSchema = z.strictObject({
   ),
 });
 export type McpSalesList = z.infer<typeof McpSalesListSchema>;
+
+/** `commission_statements_list`'s input: the period, by its first day (`2026-11-01` or `2026-11-16`). */
+export const McpPayPeriodInputSchema = z.strictObject({ period: PayPeriodSchema });
+
+/**
+ * `commission_statements_list` (ADR 0105 § 3 and § 4, `read:payroll`; Charles's decision A of 14/11): the state of a
+ * period, never an amount of a member. Its window, when the team closed it, why pay could not compute it, the payout
+ * delay the owner announced; for each statement the person may see, its member, status, revision and dates, whether
+ * its transfer waits (without why) and whether it is late (`null` without a delay announced). The team's sums
+ * (statements, total, payable) only for a person who sees the whole team and over two statements at least, else `null`. No net, commission, bonus, total nor payable of a member: neither a
+ * rate nor a member's pay can be read from it.
+ */
+export const McpPayPeriodStateSchema = z.strictObject({
+  period: PayPeriodSchema,
+  window: PayPeriodWindowSchema.strict().nullable(),
+  closedAt: z.iso.datetime().nullable(),
+  blocked: PayPeriodBlockSchema.nullable(),
+  payoutDelayBusinessDays: z.number().int().min(1).max(PAYOUT_DELAY_MAX_BUSINESS_DAYS).nullable(),
+  statements: z.array(
+    z.strictObject({
+      memberId: TeamMemberIdSchema,
+      status: CommissionStatementStatusSchema,
+      revision: z.number().int().min(1),
+      computedAt: z.iso.datetime(),
+      validatedAt: z.iso.datetime().nullable(),
+      paidAt: z.iso.datetime().nullable(),
+      payoutBlocked: z.boolean(),
+      /** `null` while the owner announced no payout delay: not known. */
+      payoutLate: z.boolean().nullable(),
+    }),
+  ),
+  counts: z.strictObject({
+    draft: counted,
+    validated: counted,
+    paid: counted,
+    payoutBlocked: counted,
+    payoutLate: counted.nullable(),
+  }),
+  team: z.strictObject({ statements: counted, totalMinor: cents, payableMinor: cents }).nullable(),
+});
+export type McpPayPeriodState = z.infer<typeof McpPayPeriodStateSchema>;

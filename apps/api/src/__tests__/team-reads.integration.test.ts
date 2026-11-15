@@ -44,22 +44,14 @@ const REPORT_KEYS = [
   'submittedAt',
 ];
 const STATEMENT_KEYS = [
-  'adjustmentsMinor',
-  'bonusesMinor',
-  'carryOverOutMinor',
-  'carryOversInMinor',
   'computedAt',
-  'id',
   'memberId',
   'paidAt',
-  'payableMinor',
-  'penaltiesMinor',
-  'period',
+  'payoutBlocked',
+  'payoutLate',
   'revision',
   'status',
-  'totalMinor',
   'validatedAt',
-  'writtenOffMinor',
 ];
 
 describe('Lectures pour une autre porte : shifts, rapports et relevés (ADR 0026 § 1, ADR 0105 § 4)', () => {
@@ -174,22 +166,29 @@ describe('Lectures pour une autre porte : shifts, rapports et relevés (ADR 0026
     expect((await reads().shiftReports(as(theo), 'all', P1)).map((one) => one.memberName)).toEqual(['Théo']);
   });
 
-  it('reads the statements as the screen does, cut to what tells no rate', async () => {
-    const all = await pay().statements(as('owner'), P1);
+  it('reads the period as the screen does, its state without an amount of a member (decision A)', async () => {
+    const read = await pay().periodState(as('owner'), P1);
     const stored = await team.test.admin.db
       .select()
       .from(schema.commissionStatements)
       .where(eq(schema.commissionStatements.period, P1));
-    expect(all.map((one) => one.memberId).toSorted()).toEqual(stored.map((one) => one.memberId).toSorted());
-    const theos = all.find((one) => one.memberId === theo.id);
+    expect(read.statements.map((one) => one.memberId).toSorted()).toEqual(
+      stored.map((one) => one.memberId).toSorted(),
+    );
     const written = await team.statementOf(theo, P1);
-    expect(theos).toMatchObject({
-      totalMinor: written.totalMinor,
-      payableMinor: written.payableMinor,
-      period: P1,
+    expect(read.statements.find((one) => one.memberId === theo.id)).toMatchObject({
+      status: written.status,
+      revision: written.revision,
     });
-    expect(all.every((one) => Object.keys(one).toSorted().join() === STATEMENT_KEYS.join())).toBe(true);
-    expect((await pay().statements(as(theo), P1)).map((one) => one.memberId)).toEqual([theo.id]);
+    expect(read.statements.every((one) => Object.keys(one).toSorted().join() === STATEMENT_KEYS.join())).toBe(
+      true,
+    );
+    // Théo's is the period's only statement (Lou's report waits): a sum would be his pay, so there is none.
+    expect(stored).toHaveLength(1);
+    expect(read.team).toBeNull();
+    const theos = await pay().periodState(as(theo), P1);
+    expect(theos.statements.map((one) => one.memberId)).toEqual([theo.id]);
+    expect(theos.team).toBeNull();
   });
 
   it('refuses a creator’s account, as the routes refuse her session', async () => {
@@ -199,6 +198,6 @@ describe('Lectures pour une autre porte : shifts, rapports et relevés (ADR 0026
     await expect(reads().onShiftNow(creator, 'all', RANGE.from)).rejects.toMatchObject({
       code: 'role_forbidden',
     });
-    await expect(pay().statements(creator, P1)).rejects.toMatchObject({ code: 'role_forbidden' });
+    await expect(pay().periodState(creator, P1)).rejects.toMatchObject({ code: 'role_forbidden' });
   });
 });
