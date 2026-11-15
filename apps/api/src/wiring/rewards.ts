@@ -1,6 +1,8 @@
 import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
+import { dropsForGameUnscoped } from '../modules/content-drops';
+import { creatorDaysForGameUnscoped } from '../modules/creator-tasks';
 import { payGameFactsUnscoped } from '../modules/payroll';
 import { startRewardsModule, type RewardsModule } from '../modules/rewards';
 import { shiftsForGameUnscoped, type SchedulingModule } from '../modules/scheduling';
@@ -28,6 +30,8 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
       shifts: shiftsForGameUnscoped,
       shiftsBegun: (userId, now) => deps.scheduling.reads.ownShiftsBegun(userId, now),
     },
+    // ADR 0107: the creator's game reads her days and her drops through the doors of those modules, and writes neither.
+    creatorReads: { days: creatorDaysForGameUnscoped, drops: dropsForGameUnscoped },
   });
   return {
     module,
@@ -47,6 +51,8 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
         guard: requireRole('operator'),
         teamGuard: requireRole('owner', 'operator'),
         ownerGuard: requireRole('owner'),
+        creatorGuard: requireRole('creator'),
+        agencyGuard: requireRole('owner', 'operator'),
       }),
     ],
   };

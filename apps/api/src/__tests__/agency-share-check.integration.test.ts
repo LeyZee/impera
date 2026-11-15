@@ -4,6 +4,8 @@ import {
   EVENT_PAYLOADS,
   newId,
   PlatformAccountIdSchema,
+  previousPayPeriod,
+  SalesLineIdSchema,
 } from '@impera/contracts';
 import { eq, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
@@ -144,5 +146,42 @@ describe('agency percentages against her part on the register (CRM-04 d3)', () =
     await run();
     expect(await test.admin.db.select().from(schema.platformSales)).toEqual(lines);
     expect(await test.admin.db.select().from(schema.creatorAgencyRates)).toEqual(rates);
+  });
+
+  it('publishes a change of her share from one fortnight to the next once, with both shares (ADR 0054 § 5)', async () => {
+    const changes = () =>
+      test.admin.db
+        .select()
+        .from(schema.domainEvents)
+        .where(eq(schema.domainEvents.type, 'agency_share_changed'));
+    expect(await changes()).toEqual([]);
+    // A sale of the fortnight before, 2,00 € for the agency and 6,00 € for her: 25 % of the net, where the
+    // fortnight just over reads 37,5 %.
+    const before = previousPayPeriod(from);
+    const [line] = await test.admin.db.select().from(schema.platformSales).limit(1);
+    if (line === undefined) throw new Error('no sale read');
+    await test.admin.db.insert(schema.platformSales).values({
+      ...line,
+      id: newId(SalesLineIdSchema),
+      platformSaleId: 'sale_share_00',
+      occurredAt: new Date(`${before}T10:00:00.000Z`),
+      agencyMinor: 200,
+      creatorMinor: 600,
+    });
+    expect(await run()).toBe(1);
+    expect(await run()).toBe(0);
+    const events = await changes();
+    expect(events).toHaveLength(1);
+    expect(EVENT_PAYLOADS.agency_share_changed.parse(events[0]?.payload)).toEqual({
+      creatorId: creator,
+      platform: 'reveal',
+      platformAccountId: account,
+      from,
+      to,
+      currency: 'EUR',
+      previousAgencyBps: 2500,
+      agencyBps: 3750,
+    });
+    expect(JSON.stringify(events[0]?.payload)).not.toMatch(/chatter|fan|seller|member|Minor/iu);
   });
 });

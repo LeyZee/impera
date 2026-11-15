@@ -52,6 +52,14 @@ export const domainEvents = pgTable(
         sql`(${t.payload}->>'currency')`,
       )
       .where(sql`${t.type} = 'agency_share_mismatch'`),
+    // Once per account, fortnight and currency (ADR 0054 § 5): the same job publishes it, and may run again.
+    uniqueIndex('domain_events_agency_share_changed_unique')
+      .on(
+        sql`(${t.payload}->>'platformAccountId')`,
+        sql`(${t.payload}->>'from')`,
+        sql`(${t.payload}->>'currency')`,
+      )
+      .where(sql`${t.type} = 'agency_share_changed'`),
     // « Is this service down already? » of `publishConnectionState` (Telegram P3-12): the latest row of one service,
     // read through this index rather than across the whole outbox.
     index('domain_events_connection_state_idx')

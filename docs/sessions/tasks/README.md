@@ -138,7 +138,8 @@ Branche : task/<id>-<slug>
 | CRM-08 | Revue de l'équipe Reveal : l'écran (ADR 0076) | API CRM | done | CRM-01, routes de Bilan (#626, #643), EQ-20 |
 | CRM-14 | Vérification de fiabilité sur deux sources : l'export devient facultatif | API CRM | done | CRM-02, ADR 0050 § 8 amendé le 11/11/2026 |
 | DSH-01 | Le Dashboard de l'agence : insights des ventes | API CRM | done (lots A et B) | CRM-01, ADR 0078 |
-| DSH-02 | Le Dashboard de l'agence : l'argent sur des tuiles séparées, et la TVA des virements | API CRM | review | DSH-01, ADR 0106 |
+| DSH-02 | Le Dashboard de l'agence : l'argent sur des tuiles séparées, et la TVA des virements | API CRM | done | DSH-01, ADR 0106 |
+| DSH-03 | La part de l'agence lue chez Reveal, le pourcentage facultatif | API CRM | review | CR-04, CRM-04 d3, ADR 0054 amendée le 14/11 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
@@ -175,5 +176,5 @@ Branche : task/<id>-<slug>
 | REC-PAIE-01 | Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis | exploitation | done | CRM-03, ADR 0076, ADR 0072 |
 | PIL-01 | « Mise en route » d'une créatrice et d'un membre, cochée par le serveur | exploitation | done | CRM-07 |
 | CHF-01 | Chiffres et jeu du chatteur : ses chiffres, puis un jeu fait de faits réels | équipe | in_progress | ADR 0104, CRM-03, EQ-05 |
-| CRB-01 | Trophées et médailles de série de la créatrice | créatrice | todo | ADR 0107, CHF-01 |
+| CRB-01 | Trophées et médailles de série de la créatrice | créatrice | review | ADR 0107, CHF-01 |
 | AUT-01 | L'agent tient compte des automatisations de Reveal | agent | in_progress | ADR 0110 |

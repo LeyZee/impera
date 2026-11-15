@@ -122,6 +122,8 @@ export interface ContentDropsModule {
 }
 
 export type { DropStorage, IdeaContentRequest, ScriptVersions } from './domain/ports';
+/** @public Her drops and requests as the creator's game counts them (ADR 0107), for the composition root. */
+export { dropsForGameUnscoped, type DropsForGame } from './infra/db/game-reads';
 
 export interface ContentDropsDeps {
   /** Application role: her own account's RLS, or the team's. */

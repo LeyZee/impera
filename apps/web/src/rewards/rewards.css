@@ -603,3 +603,9 @@
 .rw-member__none {
   margin: 0;
 }
+
+/* A creator's streak medal (ADR 0107 § 1): her days engraved in Arabic numerals, heavier than a trophy's digits. */
+.rw-engraved {
+  font-family: var(--nv-font-sans, Geist, system-ui, sans-serif);
+  font-weight: 800;
+}

@@ -84,8 +84,12 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
         );
       case 'agency_rate':
         return line(
-          'Le pourcentage de l’agence',
-          done ? null : 'Aucune part de l’agence n’est montrée sans lui.',
+          'La part de l’agence',
+          note?.kind === 'share_read_on_platform'
+            ? 'Lue chez Reveal : le pourcentage est facultatif.'
+            : done
+              ? null
+              : 'Relie son compte Reveal pour la lire, ou règle le pourcentage.',
           sheet('rate'),
         );
       case 'access':
