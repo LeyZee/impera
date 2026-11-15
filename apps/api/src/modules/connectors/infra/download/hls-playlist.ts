@@ -11,7 +11,7 @@ export interface HlsVariant {
   readonly height: number | null;
 }
 
-export interface HlsSegment {
+interface HlsSegment {
   readonly uri: string;
   /** Its key: `null` when the segment is in the clear. */
   readonly key: { readonly uri: string; readonly iv: Buffer } | null;
