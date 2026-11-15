@@ -1,5 +1,10 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import {
   CreatorNoteSchema,
+  FetchedMediaSchema,
   FanNoteSchema,
   FanPpvStatsSchema,
   FanProfileSchema,
@@ -104,6 +109,8 @@ function revealSubject(): ContractSubject {
       // FakeReveal's clock: an attempt and the message it made are dated alike.
       now: () => fake.now(),
       sends: new MemorySendJournal(),
+      fileFetch: fake.fileFetch,
+      fileHosts: ['fake-reveal.test'],
     }),
     conversation: (key) => ids[key],
     fanWrites: async (key, text) => {
@@ -247,6 +254,20 @@ describe.each(Object.entries(READERS))('PlatformConnector contract, reads: %s', 
       if (!flag) continue;
       const parsed = schema.safeParse(await call());
       expect(parsed.error).toBeUndefined();
+    }
+    expect('fetchMedia' in connector, 'fetchMedia').toBe(flags.mediaDownload);
+    const first = flags.mediaDownload ? (await connector.listVaultMedia?.({}))?.[0] : undefined;
+    if (first !== undefined) {
+      const dir = await mkdtemp(join(tmpdir(), 'contract-'));
+      try {
+        const fetched = await connector.fetchMedia?.(first.ref, {
+          folderRef: first.folder?.ref ?? null,
+          path: join(dir, 'file'),
+        });
+        expect(FetchedMediaSchema.safeParse(fetched).error).toBeUndefined();
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
     }
   });
 });

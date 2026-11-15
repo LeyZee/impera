@@ -209,4 +209,5 @@ export const REVEAL_EXPECTED_CAPABILITIES = {
   scripts: true,
   scriptHistory: true,
   vault: true,
+  mediaDownload: true,
 } as const;

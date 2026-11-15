@@ -10,6 +10,7 @@ import type {
   FanNote,
   FanPpvStats,
   FanProfile,
+  FetchedMedia,
   Money,
   OutboundMedia,
   Platform,
@@ -79,6 +80,15 @@ export interface PlatformConnector {
   getScriptHistory?(fanRef: ExternalRef): Promise<SentScriptStep[]>;
   /** `vault`: every media of the vault, or of one folder. */
   listVaultMedia?(opts: { folderRef?: ExternalRef }): Promise<VaultMedia[]>;
+  /**
+   * `mediaDownload`: reads one vault file to `path` (ADR 0113), the media named by its `ref` and its folder as
+   * `listVaultMedia` gave them (`null` at the vault's root). A link the platform no longer signs is read again from the
+   * folder once. The file at `path` is the caller's to remove, failed or not. Never writes to the platform.
+   */
+  fetchMedia?(
+    mediaRef: ExternalRef,
+    opts: { folderRef: ExternalRef | null; path: string },
+  ): Promise<FetchedMedia>;
 }
 
 /** The only error a connector throws. `retryAfterSeconds` comes with `rate_limited` when the platform says. */
