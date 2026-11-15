@@ -1,6 +1,6 @@
 # PROPOSED — Vitrine des trophées (« Mes trophées »)
 
-Statut : proposed (ADR 0108 acceptée ; code après les PR des médailles, du jeu du chatteur et des trophées de la créatrice)
+Statut : in_progress (côté chatteur dans cette PR ; côté créatrice après la fusion de #762)
 Branche : `claude/project-thread-6cim3j`
 ADR : 0108 (précise 0104 § B et 0107 § C)
 
@@ -24,4 +24,7 @@ Un seul écran « Mes trophées », dans Moi, pour le chatteur et la créatrice 
 
 ## Résultat
 
-(à remplir)
+- Composant commun `apps/web/src/rewards/case/` (`TrophyCaseView`, `arrange.ts`, `trophy-case.css`) : prochain trophée en tête (anneau bleu, pourcentage arrondi vers le bas, « Encore … »), trois étagères, fiche d'un objet, dévoilement dû ou « Revoir », lecture seule ; tout immobile en mouvement réduit ; « Voir tout » au téléphone seulement.
+- Moi › Trophées du chatteur (`/moi/trophees`, joueurs seulement) sur l'adaptateur `chatter-case.tsx` du fil Chiffres ; rang en texte (« Rang <nom du serveur> »).
+- Écrans réels validés par Charles (« ok captures vitrine-trophees-ecrans-2 », 15/11).
+- Reste : côté créatrice (adaptateur `creatorEntry`, sa page, son onglet ; prêt hors dépôt, après #762) ; insigne de rang après #763 (petit lot de captures) ; vue de l'agence en lecture seule (§ 19) plus tard.
