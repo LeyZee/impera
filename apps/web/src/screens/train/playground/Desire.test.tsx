@@ -3,7 +3,14 @@ import type { DesireMarkVerdict, PlaygroundDesire } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { availabilityReason, DesireGauge, DesireTag, desireVerdict, gateLine, pointsLabel } from './Desire';
+import {
+  availabilityReason,
+  DesireGauge,
+  DesireTag,
+  desireVerdict,
+  pointsLabel,
+  signalLines,
+} from './Desire';
 
 const DESIRE: PlaygroundDesire = {
   before: 70,
@@ -94,14 +101,16 @@ describe('desire in the playground', () => {
     expect(screen.getByRole('button').textContent).toBe('Désir 40−30· Disponible : inconnue');
     fireEvent.click(screen.getByRole('button'));
     expect(screen.getByText('il est seul, il est chez lui')).toBeTruthy();
-    expect(screen.getByText('Elle lui a demandé s’il est tranquille')).toBeTruthy();
-    expect(screen.getByText('Porte fermée : il n’a pas dit être seul et libre')).toBeTruthy();
+    expect(screen.getByText('Elle a demandé s’il est tranquille')).toBeTruthy();
+    expect(screen.getByText('fermée')).toBeTruthy();
+    expect(screen.getByText('Il n’a pas dit être seul et libre')).toBeTruthy();
 
     expect(availabilityReason({ ...availability, state: 'no', signal: 'leaving_soon', seen: [] })).toBe(
       'il doit partir',
     );
     expect(availabilityReason({ ...availability, seen: [] })).toBeNull();
-    expect(gateLine({ open: true })).toBe('Porte ouverte : un script peut démarrer');
+    // A sign that weighs nothing is said in « Disponible », not as a +0 among the points.
+    expect(signalLines({ ...DESIRE, signals: [{ signal: 'free_now', points: 0 }] })).toEqual([]);
   });
 
   it('shows his availability in « Pourquoi » under the gauge, and nothing without it', () => {
@@ -129,5 +138,6 @@ describe('desire in the playground', () => {
     );
     expect(screen.getByText('confirmée')).toBeTruthy();
     expect(screen.getByText('pas encore')).toBeTruthy();
+    expect(screen.queryByText('Elle a demandé s’il est tranquille')).toBeNull();
   });
 });

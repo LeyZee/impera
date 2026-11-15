@@ -403,7 +403,15 @@ function demoAvailability(
     ...(score < DEMO_SCRIPT_THRESHOLD ? (['desire_below_threshold'] as const) : []),
     ...(sexualized ? [] : (['not_sexualizing'] as const)),
     ...(state === 'confirmed' ? [] : (['availability_unconfirmed'] as const)),
-  ].map((code) => ({ code, label: DEMO_GATE_LABELS[code] }));
+  ].map((code) => ({
+    code,
+    label:
+      code === 'availability_unconfirmed' && state === 'no'
+        ? 'Il a dit ne pas être libre'
+        : code === 'availability_unconfirmed' && seen.includes('alone')
+          ? 'Il n’a pas dit qu’il a du temps'
+          : DEMO_GATE_LABELS[code],
+  }));
   const changed = no || said.length > 0;
   return {
     state,

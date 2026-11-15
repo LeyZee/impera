@@ -23,12 +23,14 @@ export function pointsLabel(points: number | null): string {
   return points >= 0 ? `+${String(points)}` : `−${String(-points)}`;
 }
 
-/** A repeated signal (an emoji counted per emoji) is one line, its points added up. */
+/** A repeated signal (an emoji counted per emoji) is one line, its points added up; a sign at 0 is left out. */
 export function signalLines(
   desire: PlaygroundDesire,
 ): { readonly key: string; readonly label: string; readonly points: number | null }[] {
   const lines = new Map<string, { label: string; points: number | null; count: number }>();
   for (const { signal, points } of desire.signals) {
+    // A sign that weighs nothing (« il a du temps ») is said in « Disponible », not as a +0 here.
+    if (points === 0) continue;
     const line = lines.get(signal);
     if (line === undefined) lines.set(signal, { label: DESIRE_SIGNAL_LABELS[signal], points, count: 1 });
     else
@@ -72,36 +74,44 @@ export function availabilityReason(availability: PlaygroundAvailability): string
     : availability.seen.map((signal) => DESIRE_SIGNAL_LABELS[signal]).join(', ');
 }
 
-/** The gate before the first teaser in a line: open, or what is missing (ADR 0103 § 11). */
-export function gateLine(gate: PlaygroundAvailability['gate']): string {
-  return gate.open
-    ? 'Porte ouverte : un script peut démarrer'
-    : `Porte fermée : ${gate.missing.map((m) => lowerFirst(m.label)).join(' · ')}`;
-}
-
-const lowerFirst = (text: string): string => text.charAt(0).toLowerCase() + text.slice(1);
-
-/** His availability and the gate at one message: what the gate reads, said as the server decided it. */
+/**
+ * His availability and the gate at one message: what the gate reads, said as the server decided it. One form for every
+ * line, the label on the left, the value on the right (Design, lot disponible).
+ */
 export function AvailabilityLines({ availability }: { availability: PlaygroundAvailability }): JSX.Element {
   const reason = availabilityReason(availability);
+  const { gate } = availability;
   return (
     <ul className="pg-availability">
-      <li className="pg-availability__state">
-        <span>
-          Disponible : <b>{AVAILABILITY_STATE_WORDS[availability.state]}</b>
-        </span>
-        <span className="pg-availability__why">{reason ?? 'il n’en a rien dit'}</span>
+      <li>
+        <span>Disponible</span>
+        <b>{AVAILABILITY_STATE_WORDS[availability.state]}</b>
+      </li>
+      <li>
+        <span>Il a dit</span>
+        <span className="pg-availability__value">{reason ?? 'rien encore'}</span>
       </li>
       <li>
         <span>Il sexualise lui-même</span>
-        <span className="pg-availability__why">{availability.sexualized ? 'oui' : 'pas encore'}</span>
+        <span className="pg-availability__value">{availability.sexualized ? 'oui' : 'pas encore'}</span>
       </li>
       {availability.asked ? (
-        <li className="pg-availability__asked">Elle lui a demandé s’il est tranquille</li>
+        <li>
+          <span>Elle a demandé s’il est tranquille</span>
+          <span className="pg-availability__value">ici</span>
+        </li>
       ) : null}
-      <li className="pg-availability__gate" data-open={availability.gate.open}>
-        {gateLine(availability.gate)}
+      <li className="pg-availability__gate">
+        <span>Porte</span>
+        <b>{gate.open ? 'ouverte' : 'fermée'}</b>
       </li>
+      {gate.open
+        ? null
+        : gate.missing.map((m) => (
+            <li key={m.code} className="pg-availability__missing">
+              {m.label}
+            </li>
+          ))}
     </ul>
   );
 }

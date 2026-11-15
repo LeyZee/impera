@@ -44,7 +44,14 @@ import {
   type PlaygroundEngine,
 } from '../application/engine';
 import { FAN_PRESETS, findPreset } from '../domain/fan-presets';
-import { cursorLabel, guardLabel, kycSlotWords, offerRefusalLabel, trapLabel } from '../domain/labels';
+import {
+  cursorLabel,
+  gateMissingLabel,
+  guardLabel,
+  kycSlotWords,
+  offerRefusalLabel,
+  trapLabel,
+} from '../domain/labels';
 import { completeMedia } from '../domain/media';
 
 import {
@@ -134,7 +141,7 @@ function toAvailability({ record, gate, asked }: PlaygroundAvailabilityReading):
       ? { open: true }
       : {
           open: false,
-          missing: gate.missing.map((code) => ({ code, label: offerRefusalLabel(code) })),
+          missing: gate.missing.map((code) => ({ code, label: gateMissingLabel(code, record) })),
         },
   };
 }
