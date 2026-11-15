@@ -73,6 +73,11 @@ export interface PlaygroundAvailabilityReading {
   readonly asked: boolean;
 }
 
+/** She asked him whether he is free in her answer to this message: `askedAt` set, and not the one he had before. */
+function askedNow(before: FanAvailabilityRecord | null, after: FanAvailabilityRecord): boolean {
+  return after.askedAt !== null && after.askedAt.getTime() !== before?.askedAt?.getTime();
+}
+
 /** The last answer and what it was written from: what a rating records, and what a comparison replays. */
 interface PlaygroundExchange {
   readonly fanMessage: string;
@@ -465,7 +470,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
                   availability: {
                     record: composed.availability.record,
                     gate: composed.scriptStart,
-                    asked: composed.availability.record.askedAt?.getTime() === situation.now.getTime(),
+                    // She asked on this message only if `askedAt` moved: the clock may stand still between two.
+                    asked: askedNow(availabilityBefore.at(-1) ?? null, composed.availability.record),
                   },
                 }),
             };

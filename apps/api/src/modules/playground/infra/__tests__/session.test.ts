@@ -475,6 +475,20 @@ describe('playground session, the offer policy and the cursor', () => {
     expect(open.desireTrail[0]?.availability?.gate.open).toBe(true);
   });
 
+  it('says she asked whether he is free on the message she asked it only, the clock standing still (ADR 0103 § 13)', async () => {
+    const playground = session([], true, 0, OFFER);
+    // His age is not confirmed yet on his first message: the cursor steers back, she asks nothing.
+    const first = await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
+    expect(first.desire?.availability?.asked).toBe(false);
+    playground.advance(3 * 60_000);
+    const second = await playground.handleFanMessage('Tu me rends fou');
+    const third = await playground.handleFanMessage('Encore');
+    expect(second.desire?.availability?.asked).toBe(true);
+    // Same instant, `askedAt` unchanged: she did not ask again.
+    expect(third.desire?.availability?.record.askedAt).toEqual(second.desire?.availability?.record.askedAt);
+    expect(third.desire?.availability?.asked).toBe(false);
+  });
+
   it('counts his reply speed on the simulated clock, as production does (P3-12)', async () => {
     const quick = session([], true);
     await quick.handleFanMessage('Salut toi');
