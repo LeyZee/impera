@@ -45,7 +45,7 @@ import { z } from 'zod';
 
 import { backupCodeOptions } from './backup-codes';
 import type { Config } from './config';
-import type { Logger } from './logger';
+import { authLibraryLogFrom, type Logger } from './logger';
 import type { ShiftCreators } from './modules/scheduling';
 import {
   alertOwnerPasskeySignIn,
@@ -397,6 +397,8 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
     // The API-wide limiter (and the tighter one on these routes) already applies; no anonymous telemetry.
     rateLimit: { enabled: false },
     telemetry: { enabled: false },
+    // Its own lines go through pino and its serializers, never to the console (security.md § Logs).
+    logger: { disableColors: true, log: authLibraryLogFrom(logger) },
     databaseHooks: {
       session: {
         create: {
