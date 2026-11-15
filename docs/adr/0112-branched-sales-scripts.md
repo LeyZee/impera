@@ -1,0 +1,100 @@
+# 0112. Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit
+
+Statut : accepted (« ok 0112 » de Charles le 16/11/2026, 0 h 37, après ses choix du 16/11 à 0 h 00, 0 h 01, 0 h 02, 0 h 05 et 0 h 07, fil « Concevoir les scripts de vente à branches » ; relu par Agent et Médias)
+Date : 2026-11-16
+Précise : l'ADR 0098 (déroulé d'un script par fan), l'ADR 0099 (coffre et scripts de Reveal), l'ADR 0100 (rôle `script_writer`), l'ADR 0090 (objections), l'ADR 0103 (porte, ventes fictives au playground). Ne remplace rien : un script sans branche reste celui de l'ADR 0098.
+
+## Contexte
+
+Le 15/11/2026 au soir, Charles veut que l'IA vende par des scripts à branches, avec médias, prix et textes prédéfinis, les textes et le déroulé étant générés à partir du synopsis du script et des médias. Il veut reprendre l'éditeur d'étapes de l'outil concurrent qu'il utilise, dans le design system d'Impera, et s'inspirer des branches de Reveal.
+
+**Ce que fait Reveal.** Une séquence est une liste d'**étapes** ; une étape tient **un ou plusieurs scripts** (un script de l'API = une étape envoyable : texte, médias vendus, aperçu, prix). Plusieurs scripts sur une même étape sont des **branches**, chacune avec une **condition en texte libre**, facultative, écrite pour le chatteur. Après l'envoi d'un script, le chat propose ceux de l'étape suivante ; rien n'est envoyé automatiquement. Le choix de la branche est donc humain.
+
+**Ce que font les outils du marché** (lecture de leurs connecteurs, rien créé ni modifié) : des scripts linéaires. Une étape y porte un teaser avant le média, un message, les médias, un message après le média, une description de l'étape pour l'IA, un prix, un prix réduit ou plancher que l'IA accorde quand le fan hésite, et un nombre de messages avant l'étape suivante. Le script est créé inactif tant qu'il manque quelque chose, avec la liste de ce qui manque. Un routeur IA choisit le script sur sa description.
+
+**Ce qui existe sur `main`** : le déroulé linéaire (ADR 0098, porte de l'ADR 0103) ; la synchronisation du coffre (#759) ; l'import des séquences (#761), qui lit aujourd'hui une séquence comme une liste plate d'étapes. Manquent, pour qu'un script soit proposable : la description des médias par la vision, l'identité de script validée (c8) et l'écran des scripts.
+
+## Décision
+
+### A. Le modèle : celui de Reveal, rendu jouable par une IA
+
+1. **Un script = une séquence d'étapes ; une étape = une ou plusieurs branches ; une branche = une étape envoyable de la plateforme** (`stepRef` : médias, aperçu, texte d'offre, prix). Une étape à une seule branche est l'étape linéaire de l'ADR 0098. C'est exactement le modèle de Reveal : un script importé garde ses branches, un script composé dans le CRM se crée dans Reveal tel quel (ADR 0099 temps 3), et les chatteurs le voient comme aujourd'hui.
+
+2. **Sorte d'une branche** : offerte, payante ou pont offert (ADR 0098 § 3). Toutes les branches d'une même étape n'ont pas à avoir le même prix, mais chacune a ses propres médias : jamais les mêmes médias à deux prix. **Une condition sur la dépense passée ne mène jamais à une branche moins chère que la branche par défaut de l'étape** (Charles, 16/11/2026 à 0 h 05 : seulement vers le haut, une branche premium aux autres médias) ; le code refuse à l'activation un tel script.
+
+3. **Anatomie d'une branche** (reprise de l'éditeur concurrent, sans le prix réduit) :
+   - figé, lu de la plateforme : **médias**, **aperçu**, **texte d'offre** (le message qui part avec le bundle), **prix** ;
+   - tenu par Impera : **teaser avant le média** et **message après le média** (voir § 4), **description de la branche** (synthèse des seules descriptions validées de ses médias, ADR 0083, sans prix, refaite quand une description change, jamais par-dessus une version validée ; la phrase d'intention de l'agence est gardée à part), **condition** (§ B), **rythme** (§ C 9).
+
+   **Une branche se nomme par son `stepRef`**, unique sur le compte, jamais par sa position : dans l'envoi (`sendScriptStep` reçoit l'étape et le `stepRef` de la branche), `script_runs`, `script_step_sent` et le journal. **La clé d'idempotence reste par conversation, script et étape**, jamais par branche : un rejeu ne peut jamais faire partir une deuxième branche de la même étape. Le rang lu chez Reveal (`platformIndex`) donne l'étape ; l'ordre dans l'étape donne la place de la branche. Pour un script linéaire, rang et position coïncident : ses clés ne changent pas. L'identité de script (c8) reste au niveau du script : elle sert à le choisir au démarrage (ADR 0098 § 6) et couvre toutes ses branches ; le choix d'une branche passe par sa condition et sa description, jamais par l'identité. Le moment Jour ou Nuit se contrôle par script.
+
+4. **Ce qui reste libre.** La voix écrit autour du bundle, dans la voix de la persona, sous ses gardes. Le teaser et le message après le média sont des **textes de base que la voix adapte** à la conversation sans en changer le sens ni rien promettre de plus que le média (Charles, 16/11/2026 à 0 h 01). Le texte d'offre qui part avec le bundle reste celui de la plateforme, mot pour mot. Elle ne dit jamais deux fois la même réplique au même fan (ADR 0090 § 8). Les textes de base arrivent à la voix dans le bloc typé `<script_step>` (ADR 0098 § 5), jamais dans le prompt.
+
+### B. Comment l'IA évalue une condition
+
+5. **Trois sortes de condition**, choisies dans l'éditeur (Charles, 16/11/2026 à 0 h 00 : structurée, puis texte, puis défaut) :
+   - **aucune** : la branche par défaut de l'étape ;
+   - **structurée**, évaluée par le code seul, sur une liste fermée : dépense passée chez la créatrice au-dessus d'un seuil (lue chez Reveal), une donnée de la fiche du fan (tranche d'âge connue, par exemple), la branche prise à l'étape précédente ;
+   - **en texte**, celle de Reveal (« s'il a dit aimer… »), lue par le cerveau : parmi les branches de l'étape, il dit laquelle colle à la conversation, ou aucune, avec une phrase de raison. Il ne choisit qu'une branche de la liste ; le code vérifie.
+     Le cerveau n'est interrogé qu'au tour où une étape est due (`send_step`), et ne voit que les conditions en texte des branches encore jouables de cette étape. S'il ne répond pas ou rend une branche hors de la liste, rien ne part à ce tour (fail closed, comme l'ADR 0098 § 6) : on ne retombe pas sur la branche par défaut.
+
+6. **Ordre de décision**, tenu par le code : une branche structurée vraie l'emporte, sans que le cerveau soit interrogé ; sinon la branche en texte retenue par le cerveau ; sinon la branche par défaut ; à égalité, l'ordre des branches dans l'étape, fixé par l'agence. **Si rien ne s'applique et qu'il n'y a pas de branche par défaut, le script s'arrête proprement** : le déroulé passe à l'état nouveau `no_branch` (aftercare si une étape a été achetée, jamais d'improvisation), et ce script ne se rejoue jamais à ce fan (ADR 0098 § 1).
+
+7. **Chaque choix laisse sa trace** : événement `script_branch_taken` (étape, branche, sorte de condition, raison du cerveau en une phrase, jamais le texte envoyé), montré dans « Pourquoi » au playground et dans la conversation côté agence.
+
+8. **Ce qui ne mène jamais à une autre branche** :
+   - un **refus**, dit ou par silence de deux messages : le déroulé passe à `refused` (ADR 0098 § 9) ; aucune branche « moins chère » ;
+   - une **objection de prix** : sa réplique (ADR 0090), sans changer de branche ;
+   - **l'heure** : Jour ou Nuit se fixe au niveau du script ;
+   - une **demande sur mesure** : alerte et passation (ADR 0090).
+
+### C. Le déroulé
+
+9. **Rythme** : chaque étape porte un nombre minimum de messages du fan avant la suivante (3 par défaut, Charles, 16/11/2026 à 0 h 02 ; réglable étape par étape par l'agence). C'est un plancher tenu par le code, jamais une obligation de proposer : la porte, la note de désir et la même session restent maîtres. **Ce qu'on compte** : les messages du fan depuis l'achat de l'étape payante précédente, ou depuis l'envoi de l'étape offerte précédente. Le plancher ne vaut que devant une étape payante : l'aftercare et le pont qui suivent un achat partent comme le dit l'ADR 0098 § 8 ; la 0112 précise ce paragraphe en ajoutant le plancher avant l'étape payante suivante. Les deux messages qui font d'une étape payante ignorée un refus ne comptent pas dans le rythme : le refus tombe avant. C'est un compteur de messages du fan tenu dans `script_runs`, pas un compteur d'offres (ADR 0098 § 17 inchangé). Le fan qui demande à acheter ne contourne ni la porte de l'ADR 0103 ni ce plancher.
+
+10. **Toutes les règles de l'ADR 0098 et de l'ADR 0103 tiennent branche par branche** : porte avant le premier teaser ; politique d'offre avant tout démarrage et toute étape payante ; étape payante ignorée deux messages = refus ; pas de teasing avant la fin du délai entre scripts ; même session, jamais de reprise le lendemain ; pont permis après une étape offerte ; prix revérifié à l'envoi, étape au prix changé retenue avec l'alerte `script_price`.
+
+11. **Média déjà reçu** (précise l'ADR 0098 § 6) : **au départ**, un script n'entre dans la liste permise que s'il reste au moins un chemin complet sans média déjà reçu, depuis une première étape qui a une branche jouable pour ce fan ; **en cours de route**, une branche dont un média a déjà été reçu est retirée des choix, et une étape sans branche jouable met le déroulé en `no_branch`.
+
+12. **`script_runs` garde, pour chaque étape, la branche prise (`stepRef`)** et le compteur du rythme. **Reveal gagne aussi sur la branche** : le `stepRef` lu dans l'historique donne l'étape et la branche ; si un chatteur a envoyé une autre branche, c'est celle de Reveal qui compte, et une branche que le déroulé croyait partie et que Reveal ne connaît pas est redécidée, pas renvoyée telle quelle. La porte de l'ADR 0103 passe avant le choix de branche de la première étape.
+
+### D. Un script prêt à l'emploi
+
+13. **Créé inactif, avec la liste de ce qui manque** (repris de l'éditeur concurrent) : nom, description du script, et pour chaque branche ses médias, ses descriptions validées, son texte d'offre, son prix si elle est payante. Un bouton mène au premier manque. Un script ne s'active que sans manque et par un humain.
+
+14. **Refusé à l'activation** : un même média deux fois sur un chemin, un mélange Jour et Nuit, une branche qui touche un dégoût de la persona, une condition structurée hors de la liste, deux branches par défaut dans une étape. **Avertissements** (pas des refus) : prix de P6-01 (plus du double de l'étape payante précédente, plus de 40 € TTC) calculés chemin par chemin ; une étape sans branche par défaut.
+
+### E. Écrire un script
+
+15. L'agence écrit un **synopsis** (thème, situation, envie servie, intensité finale) et choisit ses médias dans le coffre. Le rôle `script_writer` (ADR 0100) propose les étapes, au plus deux branches par étape au départ, leurs conditions, teasers, textes d'offre, messages après le média et la description du script. Ni prix, ni seuil : ils viennent de la grille de l'agence. `script_writer` est le seul générateur de ces textes : les textes de vente de SC-05 s'y rangent. Ses clés de segment (ADR 0100) deviennent le `stepRef` de la branche. Schéma Zod, gardes dures, puis relecture humaine : un script à branches est **toujours** relu, même si la créatrice est en automatique (ADR 0100 § 3). **Exigence d'écriture** (Charles, 16/11/2026 à 0 h 07 : un texte vécu, naturel, spontané, dans la personnalité de la créatrice, jamais le sentiment pour le fan d'être un portefeuille) : `script_writer` écrit à partir de vrais exemples de la créatrice (la banque d'exemples de l'ADR 0102 et les réponses typiques de sa persona), pas d'une seule consigne de style ; chaque texte s'ancre sur un détail concret des descriptions validées et sur la situation du synopsis ; il parle d'elle et de lui avant de parler du média, et ne nomme jamais un prix. Ce n'est qu'un **premier jet** : chaque branche se valide une par une, texte par texte (pas de « tout valider » pour un script), et chaque retouche est gardée pour mesurer (ADR 0100 § 4). Une fois validé, le texte d'offre est figé ; tout ce qui l'entoure est écrit en direct par la voix à partir de ce que le fan vient de dire. Un même fan ne relit jamais une phrase : un script ne se rejoue pas, et la voix ne reprend pas une tournure déjà envoyée à ce fan.
+
+16. Modifier un script actif crée une nouvelle version, et chez Reveal **un nouveau script** (nouveau `scriptRef`) : jamais une modification sur place tant qu'un déroulé est ouvert, puisqu'un déroulé se recolle à Reveal par `stepRef`. Un déroulé garde la version de son début.
+
+### F. L'écran
+
+17. **L'éditeur reprend l'anatomie de l'outil concurrent, dans le design system d'Impera** : en tête le nom, la description et le bandeau « ce qui manque » ; puis une carte par étape, repliable, déplaçable ; dans une carte, les branches côte à côte (onglets au téléphone), chacune avec sa condition en tête et ses champs dans l'ordre d'envoi : teaser, texte d'offre, médias (vignettes floutées, choisies dans le coffre synchronisé), message après le média, description, prix, rythme. Un rail montre l'escalier de prix de chaque chemin avec ses avertissements. Aucun contrôle natif.
+
+18. **Playground** : on joue le fan sur les vrais scripts (ADR 0103 § 15–18) ; « Pourquoi » dit l'étape, la branche et la condition qui l'a choisie.
+
+19. **Mesure** : par script, étape et branche, taux d'ouverture, taux d'achat et revenu.
+
+## Conséquences
+
+Positives :
+- Le modèle est celui de Reveal : import et création sans traduction, chatteurs et IA lisent les mêmes scripts.
+- L'IA suit ce que le fan exprime sans inventer ni prix ni contenu, et chaque choix se relit.
+
+Négatives :
+- Une branche demande ses propres médias.
+- Une migration (Bilan) : la branche et le compteur du rythme dans `script_runs`, le `stepRef` dans `script_step_sent`, l'état `no_branch` ; `script_branch_taken` entre au contrat.
+- L'import actuel (#761) lit une séquence comme une liste plate ; c8 marque déjà deux branches sur un même rang `branched_step`, jamais proposable. Il doit apprendre l'étape, l'ordre de la branche et sa condition (capture d'une séquence à branches nécessaire), et l'envoi doit viser le `stepRef` au lieu de la position.
+- Les avertissements de prix (`priceWarnings`, linéaire aujourd'hui) passent au calcul chemin par chemin ; les vignettes de l'éditeur attendent la lecture des fichiers du coffre.
+- La création dans Reveal attend la capture des écritures de séquence.
+
+## Alternatives rejetées
+
+- **Prix réduit ou plancher quand le fan hésite** (outils du marché) : une négociation ; Impera n'en fait jamais.
+- **Branche « moins cher » après un refus** : une remise déguisée.
+- **Condition en texte seule, sans sorte structurée** : le code ne pourrait rien vérifier sur la dépense ou la fiche.
+- **Graphe libre avec retours en arrière** : plus difficile à lire, incompatible avec Reveal, et un pack ne se repropose jamais.
+- **Laisser le modèle choisir librement l'étape suivante** : la vente vit dans le code.
