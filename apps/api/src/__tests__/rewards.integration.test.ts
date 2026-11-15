@@ -519,10 +519,10 @@ describe('Jeu du chatteur : défi du shift, niveaux, fiche du membre (ADR 0104 �
     await team.app.modules.rewards.jobs.evaluate();
     const karims = await caseOf(karimCookie);
     // 13 000 of net: the first two ranks, the third still ahead.
-    expect(karims.level).toEqual({ rank: 2, name: 'Légionnaire' });
+    expect(karims.level).toEqual({ rank: 2, name: 'Complice' });
     expect(karims.nextLevel).toEqual({
       rank: 3,
-      name: 'Décurion',
+      name: 'Charmeur',
       thresholdMinor: 50_000,
       currentMinor: 13_000,
       currency: 'EUR',
@@ -550,7 +550,7 @@ describe('Jeu du chatteur : défi du shift, niveaux, fiche du membre (ADR 0104 �
     });
     expect(raised.statusCode, raised.body).toBe(200);
     await team.app.modules.rewards.jobs.evaluate();
-    expect((await caseOf(karimCookie)).level).toEqual({ rank: 2, name: 'Légionnaire' });
+    expect((await caseOf(karimCookie)).level).toEqual({ rank: 2, name: 'Complice' });
   });
 
   it('shows his trophies, streak and rank on his file to the owner and a manager, never to a colleague (§ 20)', async () => {
@@ -558,7 +558,7 @@ describe('Jeu du chatteur : défi du shift, niveaux, fiche du membre (ADR 0104 �
       const response = await team.call('GET', `/rewards/members/${karim.id}/trophy-case`, cookie);
       expect(response.statusCode, response.body).toBe(200);
       const read = TrophyCaseSchema.parse(response.json());
-      expect(read.level).toEqual({ rank: 2, name: 'Légionnaire' });
+      expect(read.level).toEqual({ rank: 2, name: 'Complice' });
       expect(read.items.find((item) => item.kind === 'first_sale')?.earnedAt).not.toBeNull();
       // His net is not said here: the rank ahead is his own read.
       expect(read.nextLevel).toBeNull();

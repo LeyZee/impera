@@ -60,8 +60,8 @@ const CASE: TrophyCase = {
     },
   ],
   streaks: [{ kind: 'shift', current: 3, best: 9 }],
-  level: { rank: 1, name: 'Recrue' },
-  nextLevel: { rank: 2, name: 'Légionnaire', thresholdMinor: 200_000, currentMinor: 50_000, currency: 'EUR' },
+  level: { rank: 1, name: 'Novice' },
+  nextLevel: { rank: 2, name: 'Complice', thresholdMinor: 200_000, currentMinor: 50_000, currency: 'EUR' },
 };
 
 const CHALLENGE: ShiftChallenge = {
@@ -77,11 +77,11 @@ describe('LevelInsignia (ADR 0104 § 16)', () => {
   it('names each of the eight ranks, reached or not, and nothing past the list', () => {
     expect(LEVEL_NAMES).toHaveLength(8);
     render(<LevelInsignia rank={8} size={72} />);
-    expect(screen.getByRole('img', { name: 'Insigne du rang « Imperator »' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Insigne du rang « Légende »' })).toBeTruthy();
     cleanup();
     render(<LevelInsignia rank={2} size={28} earned={false} />);
     expect(
-      screen.getByRole('img', { name: 'Insigne du rang « Légionnaire », pas encore atteint' }),
+      screen.getByRole('img', { name: 'Insigne du rang « Complice », pas encore atteint' }),
     ).toBeTruthy();
     expect(levelName(0)).toBeNull();
     expect(levelName(9)).toBeNull();
@@ -93,7 +93,7 @@ describe('LevelInsignia (ADR 0104 § 16)', () => {
     expect(rankOfKind('tier:2026-11-01:100000')).toBeNull();
     const words = revealWordsOf({ kind: 'level:3' }, period, []);
     expect(words?.kicker).toBe('Nouveau rang');
-    expect(words?.title).toBe('Décurion');
+    expect(words?.title).toBe('Charmeur');
     expect(`${words?.text ?? ''}${words?.chip ?? ''}`).not.toMatch(/€|\$/u);
     expect(revealWordsOf({ kind: 'level:12' }, period, [])).toBeNull();
   });
@@ -141,13 +141,13 @@ describe('MyRankCard (ADR 0104 § 16)', () => {
   it('shows the rank held and the way to the next, and says a rank is honorary', async () => {
     serve(CASE);
     show(<MyRankCard user={THEO_ME} />);
-    expect(await screen.findByText('Recrue')).toBeTruthy();
+    expect(await screen.findByText('Novice')).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('25');
     expect(screen.getByText(/honorifique/u)).toBeTruthy();
   });
 
   it('shows the first rank ahead before any is held, and nothing while no threshold is set', async () => {
-    serve({ ...CASE, level: null, nextLevel: { ...CASE.nextLevel, rank: 1, name: 'Recrue' } });
+    serve({ ...CASE, level: null, nextLevel: { ...CASE.nextLevel, rank: 1, name: 'Novice' } });
     show(<MyRankCard user={THEO_ME} />);
     expect(await screen.findByText('Pas encore de rang')).toBeTruthy();
     cleanup();
@@ -164,14 +164,14 @@ describe('MemberGameBlock (ADR 0104 § 20)', () => {
   it('shows a member’s rank, streak and trophies earned, with no amount', async () => {
     const { sent } = serve({ ...CASE, nextLevel: null });
     show(<MemberGameBlock memberId="member-1" name="Théo" />);
-    expect(await screen.findByText('Recrue')).toBeTruthy();
+    expect(await screen.findByText('Novice')).toBeTruthy();
     expect(sent[0]?.url).toBe('/v1/rewards/members/member-1/trophy-case');
     expect(screen.getByText('3 shifts')).toBeTruthy();
     expect(screen.getByText('Première vente')).toBeTruthy();
     expect(screen.queryByText('Record du jour')).toBeNull();
     // The coin drawn on a trophy aside, no amount is written: the facts hold a rank, a streak and a count.
     expect(document.querySelector('.rw-member__facts')?.textContent).toBe(
-      'RangRecrueSérie en cours3 shifts · meilleure : 9Quinzaines avec un palier atteint1',
+      'RangNoviceSérie en cours3 shifts · meilleure : 9Quinzaines avec un palier atteint1',
     );
   });
 });
@@ -197,13 +197,13 @@ describe('LevelsPanel (ADR 0104 § 16)', () => {
     expect(await screen.findByText(/à 500,00\s€/u)).toBeTruthy();
     expect(screen.getAllByText('Pas de seuil')).toHaveLength(7);
     fireEvent.click(screen.getByRole('button', { name: 'Régler les seuils' }));
-    fireEvent.change(screen.getByLabelText('Net cumulé pour le rang Légionnaire'), {
+    fireEvent.change(screen.getByLabelText('Net cumulé pour le rang Complice'), {
       target: { value: '300' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer les seuils' }));
     expect(await screen.findByText(/plus haut que le précédent/u)).toBeTruthy();
     expect(sent.filter((one) => one.method === 'PUT')).toHaveLength(0);
-    fireEvent.change(screen.getByLabelText('Net cumulé pour le rang Légionnaire'), {
+    fireEvent.change(screen.getByLabelText('Net cumulé pour le rang Complice'), {
       target: { value: '2000' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer les seuils' }));

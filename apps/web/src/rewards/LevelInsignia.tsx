@@ -11,14 +11,14 @@ import './rewards.css';
 
 /** The closed list of ranks, the first first (`LEVEL_NAMES` on the server says the same names). */
 export const LEVEL_NAMES = [
-  'Recrue',
-  'Légionnaire',
-  'Décurion',
-  'Centurion',
-  'Tribun',
-  'Préfet',
-  'Légat',
-  'Imperator',
+  'Novice',
+  'Complice',
+  'Charmeur',
+  'Séducteur',
+  'Envoûteur',
+  'Virtuose',
+  'Maestro',
+  'Légende',
 ] as const;
 
 /** A rank's name, or `null` for a rank this screen does not draw (a newer server). */

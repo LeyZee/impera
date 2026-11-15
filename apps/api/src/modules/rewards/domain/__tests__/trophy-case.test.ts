@@ -69,7 +69,7 @@ describe('the rank in the case (ADR 0104 § 16)', () => {
 
   it('holds the highest rank noted and owes the reveal of a rank not played yet', () => {
     const trophyCase = trophyCaseOf(ranks, streak, null);
-    expect(trophyCase.level).toEqual({ rank: 2, name: 'Légionnaire' });
+    expect(trophyCase.level).toEqual({ rank: 2, name: 'Complice' });
     expect(trophyCase.nextLevel).toBeNull();
     expect(trophyCase.items.filter((item) => item.family === 'level').map((item) => item.kind)).toEqual([
       'level:1',
@@ -83,7 +83,7 @@ describe('the rank in the case (ADR 0104 § 16)', () => {
     const progress = { steps, cumulatedNetMinor: 800_000, currency: 'EUR' as const };
     expect(trophyCaseOf(ranks, streak, progress).nextLevel).toEqual({
       rank: 3,
-      name: 'Décurion',
+      name: 'Charmeur',
       thresholdMinor: 2_000_000,
       currentMinor: 800_000,
       currency: 'EUR',

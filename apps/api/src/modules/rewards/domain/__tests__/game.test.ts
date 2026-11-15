@@ -97,8 +97,8 @@ describe('the levels (ADR 0104 § 16)', () => {
 
   it('opens the ranks the owner gave a threshold to, by their names, the first first', () => {
     expect(steps).toEqual([
-      { rank: 1, name: 'Recrue', thresholdMinor: 100_000 },
-      { rank: 2, name: 'Légionnaire', thresholdMinor: 500_000 },
+      { rank: 1, name: 'Novice', thresholdMinor: 100_000 },
+      { rank: 2, name: 'Complice', thresholdMinor: 500_000 },
     ]);
     expect(levelSteps([])).toEqual([]);
     expect(levelSteps(Array.from({ length: 12 }, (_, index) => (index + 1) * 1_000))).toHaveLength(8);
@@ -113,7 +113,7 @@ describe('the levels (ADR 0104 § 16)', () => {
 
   it('names a rank by its number and finds the one ahead', () => {
     expect(levelOfRank(0)).toBeNull();
-    expect(levelOfRank(8)).toEqual({ rank: 8, name: 'Imperator' });
+    expect(levelOfRank(8)).toEqual({ rank: 8, name: 'Légende' });
     expect(levelOfRank(9)).toBeNull();
     expect(nextStep(0, steps)?.rank).toBe(1);
     expect(nextStep(1, steps)?.rank).toBe(2);
