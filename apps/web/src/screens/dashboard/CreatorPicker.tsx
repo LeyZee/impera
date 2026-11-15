@@ -27,7 +27,8 @@ export function CreatorPicker({
    */
   agency?: { readonly selected: boolean; readonly onChoose: () => void } | undefined;
 } = {}): JSX.Element | null {
-  const creators = useCreators().data ?? [];
+  const read = useCreators();
+  const creators = read.data ?? [];
   const { chosen, follow: followOnly } = useFollowedCreatorId();
   const follow = (creatorId: string): void => {
     followOnly(creatorId);
@@ -37,6 +38,15 @@ export function CreatorPicker({
   const several = creators.length >= 2;
   const shown = several || (agency !== undefined && creators.length >= 1);
   const queue = useQuery({ ...todosAcrossQuery, enabled: shown });
+  // While the creators load, the agency's chips keep their place: nothing jumps when they come (ADM-21).
+  if (read.isPending && agency !== undefined)
+    return (
+      <div className="db-creators" aria-busy="true" aria-label="Chargement des créatrices">
+        {[0, 1, 2].map((i) => (
+          <span key={i} className="nv-chip db-loading db-creators__ghost" aria-hidden="true" />
+        ))}
+      </div>
+    );
   if (!shown) return null;
   // Unread, the chips would say nothing of the others' urgencies, as if there were none: the line under them says so.
   const unread = queue.isError && queue.data === undefined;

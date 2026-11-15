@@ -13,6 +13,8 @@ import {
   dayStacks,
   deltaText,
   euros,
+  hourLabel,
+  hoursLabel,
   kindSlices,
   exactEuros,
   moneyParts,
@@ -23,6 +25,7 @@ import {
   sellerSlices,
   sharesOf,
   shortEuros,
+  slotLabel,
   STACKS,
   zoneLabel,
 } from './view';
@@ -94,6 +97,10 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
   it('finds when it sells: the busiest cell and the best slot of three hours', () => {
     expect(busiest(AGENCY_WEEK.hours)).toEqual({ day: 6, hour: 0, cents: 2_700 });
     expect(bestSlot(AGENCY_WEEK.hours)?.from).toBe(21);
+    // The CRM's way of writing the hour, never cut between two lines (ADM-08).
+    expect(slotLabel(21)).toBe('21\u00a0h\u00a0–\u00a00\u00a0h');
+    expect(hoursLabel(18)).toBe('18\u00a0h\u00a0–\u00a019\u00a0h');
+    expect(hourLabel(0)).toBe('0\u00a0h');
     expect(busiest(Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0)))).toBeNull();
   });
 

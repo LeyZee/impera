@@ -96,6 +96,11 @@ export function decideCall(
       return refuse('owner_only');
     if (!allowedFor(actor).includes(capability)) return refuse('role_forbidden');
   }
+  if (tool.ownerOnly === true) {
+    if (actor.role !== 'owner') return refuse('owner_only');
+    if (grant.creatorId !== null) return refuse('creator_forbidden');
+  }
+  if (tool.agencyOnly === true && grant.creatorId !== null) return refuse('creator_forbidden');
   if (tool.scope === 'access') return { ok: true, creatorId: grant.creatorId };
   if (grant.creatorId === null) {
     if (tool.scope === 'creator') return refuse('creator_required');

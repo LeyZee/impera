@@ -1,10 +1,14 @@
 import type {
+  AiUsage,
   CreatorId,
   FanId,
   McpCallRefusal,
   McpCapability,
   McpGrantId,
+  Platform,
+  SalesOfCreator,
   ScriptSegment,
+  TeamImportLinked,
   UserId,
 } from '@impera/contracts';
 
@@ -228,14 +232,55 @@ interface OnShiftEntry {
   readonly endsAt: string;
 }
 
+/** A shift of the planning, as `scheduling` reads it for its person (`ListedShift`); its account is never copied. */
+interface ShiftEntry {
+  readonly id: string;
+  readonly creatorId: string;
+  readonly memberId: string;
+  readonly memberName: string | null;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly stopped: boolean;
+}
+
 /**
- * The scheduling module's read of who is on shift (`reads.onShiftNow`, its `index.ts`, ADR 0026 § 1): as the person,
- * under the database's policies (a manager, only what he plans); a creator out of reach gives nothing.
+ * The scheduling module's reads of the planning (`reads.shifts`, `reads.onShiftNow`, its `index.ts`, ADR 0026 § 1):
+ * as the person, under the database's policies (a manager, only what he plans); a creator out of reach gives nothing.
  */
 export interface ShiftReader {
+  shifts(
+    reader: ContentReaderView,
+    creators: 'all' | readonly string[],
+    range: { readonly from: Date; readonly to: Date },
+  ): Promise<readonly ShiftEntry[]>;
   onShiftNow(
     reader: ContentReaderView,
     creators: 'all' | readonly string[],
     at: Date,
   ): Promise<readonly OnShiftEntry[]>;
+}
+
+/** The AI spend as `ai-usage` reads it for the screen (`AiUsage`, its `index.ts`): agency-wide, the owner's alone. */
+export interface AiUsageReader {
+  read(): Promise<AiUsage>;
+}
+
+/**
+ * The team imported from a platform as the connectors read it for the person (`reads.teamImport`, its `index.ts`,
+ * ADR 0076 § 8): the owner's and an active manager's, the agency's as a whole.
+ */
+export interface TeamImportReader {
+  teamImport(userId: string, platform: Platform): Promise<TeamImportLinked>;
+}
+
+/**
+ * The connectors' read of a creator's sales (`reads.sales`, its `index.ts`, ADR 0026 § 1): as the person, each creator
+ * checked in its own transaction, one refused refusing the call; never the agency's nor the creator's share.
+ */
+export interface SalesReader {
+  sales(
+    userId: string,
+    creatorIds: readonly CreatorId[],
+    range: { readonly from: string; readonly to: string },
+  ): Promise<readonly SalesOfCreator[]>;
 }

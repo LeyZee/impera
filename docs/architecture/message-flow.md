@@ -18,6 +18,9 @@ Plateforme ──(poll toutes les N s, ou WebSocket)──▶ Connector.listConv
                                          { queueName: 'conv:'+id, jobKey: 'respond:'+id, jobKeyMode: 'replace',
                                            runAt: now + debounceFor(conversation, persona) })
                                      • la relance en attente ne partira pas : son ancre (son dernier message) a bougé
+                                     • si outbound d'un humain ou d'un automatisme de la plateforme pendant qu'il attend
+                                       l'agent (ADR 0110 § 2) : brouillon ouvert expiré, conversation au repos
+                                       (`answersFan`), sauf signe du filet de sécurité ou soin ouvert
 ```
 
 Le debounce (30 à 90 s, selon la persona et l'heure) fait qu'un fan qui envoie trois messages d'affilée obtient une seule réponse qui les prend tous en compte. Le `queueName` garantit qu'aucun autre job ne touche la conversation en même temps. Passé 60 réponses à un même fan dans l'heure, la réponse suivante n'est écrite que 3 minutes après la précédente (`respondAt`) : le rythme ralentit, la conversation continue.

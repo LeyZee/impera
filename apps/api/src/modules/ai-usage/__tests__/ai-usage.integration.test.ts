@@ -12,7 +12,7 @@ import { createOwner } from '../../../auth';
 import { createApp, type App } from '../../../composition-root';
 import { createLogger } from '../../../logger';
 import { buildServer, type Server } from '../../../server';
-import { createPostgresCreditAlerts } from '../infra/postgres';
+import { createPostgresCreditAlerts, createPostgresUsageReader } from '../infra/postgres';
 
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
 const OPERATOR = { email: 'operator@example.test', name: 'Operator', password: 'staple battery horse' };
@@ -200,5 +200,72 @@ describe('/v1/settings/ai-usage', () => {
       .where(eq(schema.domainEvents.type, 'ai_credits_low'));
     expect(rows).toHaveLength(2);
     expect(rows.every((row) => row.creatorId === null)).toBe(true);
+  });
+  it('notes a subscription without an amount, and shows it as included (ADR 0091 § 6)', async () => {
+    const refused = await add({
+      id: randomUUID(),
+      provider: 'google',
+      kind: 'subscription',
+      amountMinor: 500,
+      currency: 'USD',
+    });
+    expect(refused.statusCode).toBe(400);
+    const created = await add({
+      id: randomUUID(),
+      provider: 'google',
+      kind: 'subscription',
+      amountMinor: 0,
+      currency: 'USD',
+    });
+    expect(created.statusCode).toBe(201);
+    const card = (await read()).body?.credits.find((c) => c.provider === 'google');
+    expect(card).toMatchObject({
+      mode: 'subscription',
+      state: 'included',
+      balanceMinor: 0,
+      quotaRefusedAt: null,
+    });
+  });
+
+  it('finds the first refusal for lack of quota since the last answer, and alerts once per episode', async () => {
+    const reader = createPostgresUsageReader(test.service.db);
+    const alerts = createPostgresCreditAlerts(test.service.db);
+    // Ahead of the calls the other tests journaled just now: this episode is the latest one.
+    const at = (s: number) => new Date(Date.now() + s * 1000);
+    await call({ provider: 'google', model: 'gemini-x', status: 'ok', createdAt: at(1) });
+    const firstRefusal = at(2);
+    await call({
+      provider: 'google',
+      model: 'gemini-x',
+      status: 'quota_exhausted',
+      costMicroUsd: null,
+      createdAt: firstRefusal,
+    });
+    await call({
+      provider: 'google',
+      model: 'gemini-x',
+      status: 'quota_exhausted',
+      costMicroUsd: null,
+      createdAt: at(3),
+    });
+    const first = await reader.quotaRefusedAt('google');
+    expect(first?.getTime()).toBe(firstRefusal.getTime());
+    const card = (await read()).body?.credits.find((c) => c.provider === 'google');
+    expect(card).toMatchObject({ state: 'quota_reached' });
+    const payload = {
+      provider: 'google',
+      mode: 'subscription',
+      refusedAt: first?.toISOString() ?? '',
+    } as const;
+    expect(await alerts.publishQuota(payload)).toBe(true);
+    expect(await alerts.publishQuota(payload)).toBe(false);
+    // An answer ends the episode.
+    await call({ provider: 'google', model: 'gemini-x', status: 'ok', createdAt: at(10) });
+    expect(await reader.quotaRefusedAt('google')).toBeNull();
+    const rows = await test.admin.db
+      .select()
+      .from(schema.domainEvents)
+      .where(eq(schema.domainEvents.type, 'ai_quota_exhausted'));
+    expect(rows).toHaveLength(1);
   });
 });

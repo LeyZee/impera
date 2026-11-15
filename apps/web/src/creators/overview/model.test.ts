@@ -68,9 +68,9 @@ describe('the words of a card of the list of Créatrices', () => {
   });
 
   it('counts « À traiter », red only when something urgent waits', () => {
-    expect(todosOf(undefined)).toEqual({ text: 'Rien à traiter', tone: 'calm' });
+    expect(todosOf(undefined)).toEqual({ text: 'Rien', tone: 'calm' });
     const count = { creatorId: CREATOR, name: 'Anna', todos: 2, grave: 0 };
-    expect(todosOf(count)).toEqual({ text: '2 à traiter', tone: 'warn' });
-    expect(todosOf({ ...count, grave: 2 })).toEqual({ text: '2 à traiter, dont 2 urgents', tone: 'bad' });
+    expect(todosOf(count)).toEqual({ text: '2', tone: 'warn' });
+    expect(todosOf({ ...count, grave: 2 })).toEqual({ text: '2, dont 2 urgents', tone: 'bad' });
   });
 });

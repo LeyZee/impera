@@ -49,7 +49,9 @@ export function AgencyPage({
       <BackupBanner enabled={forOwner} />
       <PaperworkBanner enabled={forOwner} />
       <ReportsBanner enabled={reviewsReports} />
-      {view.status === 'live' ? <AgencyStrip agency={view.data.agency} /> : null}
+      {view.status === 'live' ? (
+        <AgencyStrip agency={view.data.agency} onAgencyView opensSettings={forOwner} />
+      ) : null}
       <AgencyInsightsPanel
         period={period}
         onPeriod={onPeriod}

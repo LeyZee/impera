@@ -40,6 +40,12 @@ export const DESIRE_BRAIN_SIGNALS = [
   'busy_now',
   'slows_down',
   'discomfort',
+  // His availability (ADR 0103, amendement du 13/11): read here, held by code in `fan_availability`.
+  'alone',
+  'at_home',
+  'free_now',
+  'someone_nearby',
+  'leaving_soon',
 ] as const;
 
 /**

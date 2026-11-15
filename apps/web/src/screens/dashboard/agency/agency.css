@@ -322,6 +322,7 @@
   height: 100%;
 }
 .ins-col {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -337,6 +338,12 @@
 .ins-col:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
+}
+/* A column takes the finger over half the gap on each side: 44px wide on a phone's week (ADM-22). */
+.ins-col::after {
+  content: '';
+  position: absolute;
+  inset: 0 -5px;
 }
 .ins-col__stack {
   position: relative;
@@ -431,10 +438,6 @@
   letter-spacing: var(--nv-text-headline-tracking);
   font-weight: 650;
 }
-.ins-card__total {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 .ins-ring-row {
   display: flex;
   align-items: center;
@@ -506,6 +509,10 @@
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   color: var(--nv-ink);
+}
+/* « 1 234,56 € » keeps its cents inside the ring: a long total takes a smaller size (ADM-05). */
+.ins-ring__value.is-long {
+  font-size: var(--nv-text-headline);
 }
 .ins-ring__sub {
   margin-top: 2px;
@@ -666,6 +673,18 @@
 .ins-rank__row[data-kind='unlinked'] {
   --_c: var(--nv-data-2);
 }
+/* A chatter nobody linked: an amber line under his row, and « Relier » (ADM-06). */
+.ins-rank__fix {
+  grid-column: 3 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-warning);
+}
 .ins-rank__row[data-kind='none'] {
   --_c: var(--nv-series-other);
 }
@@ -793,14 +812,26 @@
   color: var(--nv-ink-faint);
 }
 .ins-heat__cell {
+  display: block;
+  width: 100%;
+  min-width: 0;
   height: 22px;
+  padding: 0;
+  border: 0;
   border-radius: 3px;
+  font: inherit;
+  cursor: default;
   background: color-mix(in srgb, var(--nv-data-1) calc(var(--_h) * 100%), var(--nv-fill-track));
   transition:
     transform var(--nv-dur-fast) var(--nv-ease-spring),
     box-shadow var(--nv-dur-fast);
 }
-.ins-heat__cell:hover {
+.ins-heat__cell:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 1px;
+}
+.ins-heat__cell:hover,
+.ins-heat__cell:focus-visible {
   transform: scale(1.25);
   box-shadow: 0 0 0 2px var(--nv-void);
 }
@@ -908,8 +939,16 @@
   margin: 0;
   color: var(--nv-ink-muted);
 }
-.ins-loading {
-  min-height: 320px;
+/* Loading in the shape of the figures (ADM-21): the lead as tall as its tiles, tiles of a tile's height, the card of
+   where the money goes between the two rows. */
+.db-loading.ins-loading {
+  min-height: 160px;
+}
+.db-loading.ins-loading--tile {
+  min-height: 110px;
+}
+.db-loading.ins-loading--split {
+  min-height: 120px;
 }
 
 @media (max-width: 1100px) {
@@ -1014,9 +1053,19 @@
   color: var(--nv-ink-muted);
 }
 
+/* The periods: 38px seen, 44px to the finger, up and down only (ADM-22). */
+.ins-period .nv-seg__opt::after {
+  content: '';
+  position: absolute;
+  inset: -3px 0;
+}
 @media (max-width: 720px) {
   .ins-period {
     width: 100%;
+  }
+  /* A legend row is a target too: 44px to the finger (ADM-22). */
+  .ins-legend__row {
+    min-height: 44px;
   }
   .ins-period .nv-seg__opt {
     flex: 1 1 0;
@@ -1083,6 +1132,9 @@
   .ins-rank__value {
     grid-area: value;
     min-width: 0;
+  }
+  .ins-rank__fix {
+    grid-column: 2 / -1;
   }
   .ins-creator {
     grid-template-columns: minmax(0, 1fr) auto auto;

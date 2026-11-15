@@ -286,3 +286,10 @@
     animation: none;
   }
 }
+
+/* « À toute heure » / « Par créneaux »: 38px seen, 44px to the finger, up and down only (ADM-22). */
+.hr-page .ps-seg .nv-seg__opt::after {
+  content: '';
+  position: absolute;
+  inset: -3px 0;
+}

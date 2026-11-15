@@ -22,6 +22,7 @@ import {
   measureDesire,
   type DesireMeasure,
   type DesireState,
+  type FanAvailabilityRecord,
   type OfferInput,
   type OfferLimits,
   type RatedMoment,
@@ -191,6 +192,9 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   let desire: DesireState | undefined;
   // His score before each of his messages: a branch goes back to it.
   const desireBefore: (DesireState | undefined)[] = [];
+  // His availability as `conversations` would keep it (ADR 0103, amendement du 13/11), and before each message.
+  let availability: FanAvailabilityRecord | null = null;
+  const availabilityBefore: (FanAvailabilityRecord | null)[] = [];
   // His score as each of his messages left it, shown under the message.
   const desireTrail: (PlaygroundDesireReading | undefined)[] = [];
   // When each turn was written, on the simulated clock: his reply speed counts in his score, as in production.
@@ -247,6 +251,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       followUpsSince = 0;
       desire = undefined;
       desireBefore.length = 0;
+      availability = null;
+      availabilityBefore.length = 0;
       desireTrail.length = 0;
       situation = { ...situation, relationshipStartedAt: situation.now, spentCents: 0 };
     },
@@ -288,6 +294,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       history.splice(index);
       desire = desireBefore[fanMessageNumber - 1];
       desireBefore.length = fanMessageNumber - 1;
+      availability = availabilityBefore[fanMessageNumber - 1] ?? null;
+      availabilityBefore.length = fanMessageNumber - 1;
       desireTrail.length = fanMessageNumber - 1;
       lastExchange = undefined;
       return { text: turn.text, media: (turn.media ?? []).map((m) => m.description) };
@@ -371,6 +379,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       lastFanAt = situation.now;
       followUpsSince = 0;
       desireBefore.push(desire);
+      availabilityBefore.push(availability);
       desireTrail.push(undefined);
       push({ from: 'fan', text, media: media.map((description) => ({ description })) });
       const moment: RatedMoment = {
@@ -410,6 +419,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
               noExplicit: false,
             },
           }),
+          availability,
           desire: {
             ...(desire !== undefined && { previous: desire }),
             measured: measuredOnClock(),
@@ -419,6 +429,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         },
       );
       if (composed.desire !== undefined) desire = { score: composed.desire.score, at: situation.now };
+      if (composed.availability !== undefined) availability = composed.availability.record;
       if (composed.customOrder?.kind === 'reply' && composed.customOrder.opens) customOrderOpen = true;
       if (composed.objectionReply !== undefined && !composed.isBlocked)
         usedObjectionReplies.push(composed.objectionReply.replyId);

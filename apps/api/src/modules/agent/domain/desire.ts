@@ -9,7 +9,7 @@ import { NO_SALE_RISKS } from './policy';
  */
 
 /** Bumped whenever a weight, a bound or the emoji list changes: each score says which counting it came from. */
-export const DESIRE_WEIGHTS_VERSION = 'desire-1';
+export const DESIRE_WEIGHTS_VERSION = 'desire-2';
 
 /** Defaults of the persona's thresholds, when her file sets none. */
 export const DEFAULT_MIN_DESIRE_TO_OPEN = DESIRE_BAND_FLOORS.playful;
@@ -38,6 +38,13 @@ const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
   busy_now: -30,
   slows_down: -20,
   discomfort: -30,
+  // His availability (ADR 0103, amendement du 13/11): a fan alone and free warms a little; someone beside him or an
+  // appointment cools him as much as being busy. The gate before a script reads the state code holds, not these.
+  alone: 6,
+  at_home: 3,
+  free_now: 6,
+  someone_nearby: -30,
+  leaving_soon: -25,
   // From the brief.
   'intent:flirt': 6,
   'intent:sexting': 12,

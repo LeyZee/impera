@@ -11,6 +11,7 @@ import { createReleaseUnavailableJob } from './application/jobs/release-unavaila
 import { createReopenJob } from './application/jobs/reopen';
 import { createRespondJob } from './application/jobs/respond';
 import { createSendJob } from './application/jobs/send';
+import { createConversationReads, type ConversationReads } from './application/reads';
 import type {
   AlertNames,
   BubbleGuard,
@@ -53,6 +54,11 @@ export interface ConversationsModule extends ConversationCommands {
   readonly name: 'conversations';
   /** Mounted under `/v1` by the server. */
   readonly routes: FastifyPluginAsyncZod;
+  /**
+   * The inbox reads with their access rule (ADR 0026 § 1), bounded by the viewer's creators: what the routes serve, and
+   * what an agent access will read through the MCP server, never more than the person it acts for.
+   */
+  readonly reads: ConversationReads;
   /**
    * Whether that account holds a conversation of this fan, routed to it or taken over by it (ADR 0024, ADR 0025): the
    * `fans` routes let the member who holds it read the fan's limits and what is left to learn, never write them
@@ -150,6 +156,7 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
   return {
     name: 'conversations',
     ...commands,
+    reads: createConversationReads(reader),
     isFanHeldBy: (creatorId, fanId, userId) => reader.isFanHeldBy(creatorId, fanId, userId),
     traceFanOpening: (creatorId, fanId, trace) => reader.traceFanOpening(creatorId, fanId, trace),
     fanMessageTexts: (creatorId, fanId, messageIds) => reader.fanMessageTexts(creatorId, fanId, messageIds),
