@@ -1160,8 +1160,13 @@
   color: var(--nv-ink);
   font-weight: 600;
 }
+/* The state, then what set it on its own line: a long « il est seul, il est chez lui, il a du temps » never squeezes it. */
+.pg-availability li.pg-availability__state {
+  flex-direction: column;
+  gap: 1px;
+}
 .pg-availability__why {
-  text-align: right;
+  color: var(--nv-ink-muted);
 }
 .pg-availability__gate {
   color: var(--nv-ink);

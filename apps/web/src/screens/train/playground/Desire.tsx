@@ -86,7 +86,7 @@ export function AvailabilityLines({ availability }: { availability: PlaygroundAv
   const reason = availabilityReason(availability);
   return (
     <ul className="pg-availability">
-      <li>
+      <li className="pg-availability__state">
         <span>
           Disponible : <b>{AVAILABILITY_STATE_WORDS[availability.state]}</b>
         </span>
