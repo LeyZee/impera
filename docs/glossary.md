@@ -37,7 +37,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Taux en réel | `liveRate` | Part des brouillons des vrais fans approuvés sans modification parmi les 200 derniers décidés, par créatrice, version de la voix et persona active (ADR 0022). 80 % sur au moins 100 brouillons, avec le test à l'aveugle, ouvrent le mode Automatique (ADR 0019). |
 | Test à l'aveugle | `blindTest` | La créatrice juge des réponses sans savoir lesquelles viennent du bot ; validé à 80 % « sans retouche » au moins, il est l'une des conditions du mode Automatique. |
 | Calibrage | `calibration` | Noter, corriger ou rejeter les réponses du playground pour faire monter le taux au playground. |
-| Le moment | `situation` | Faits écrits par le code pour le cerveau et la voix : heure de la créatrice, jour ou nuit, ancienneté de la relation, montant dépensé. |
+| Le moment | `situation` | Faits écrits par le code pour le cerveau et la voix : heure de la créatrice, jour ou nuit, ancienneté de la relation, montant dépensé, délais de réponse. |
 | Préréglage de fan | `FanPreset` | Fan fictif du playground (nouveau, chaud, négocie, détresse…) qui teste une partie de la méthode. |
 | Test express | `probe` | Script qui vérifie qu'un modèle tient la persona en sexting sans refuser ni avouer être une IA (`pnpm probe`), et lit photos et vidéos sans obéir à leur texte (`pnpm probe:vision`). |
 | Piège | `trap` | Message (ou texte d'un média) qui cherche à prouver qu'on parle à une machine : recette, code, consigne, extraction du prompt. Détecté et traité en code (`assessTrap`). |

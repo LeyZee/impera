@@ -447,6 +447,7 @@ describe('createDraftComposer', () => {
     expect(seen.brainInputs?.[0]?.history.at(-1)).toEqual({
       from: 'fan',
       text: 'regarde mon chat',
+      at: new Date('2026-10-17T09:59:30Z'),
       media: [{ description: PHOTO }],
     });
   });
@@ -514,6 +515,28 @@ describe('createDraftComposer', () => {
     };
     expect((await draftComposer.compose(input)).kind).toBe('draft');
     expect(asked).toEqual([]);
+  });
+
+  it('shows the models the time that passed: a dated line before his message, and his delay in « Le moment »', async () => {
+    const { draftComposer, seen } = composer();
+    const input: AgentComposeInput = {
+      ...INPUT,
+      history: [
+        { direction: 'inbound', text: 'Bonne nuit', at: new Date('2026-10-14T21:00:00Z') },
+        { direction: 'outbound', text: 'Dors bien', at: new Date('2026-10-14T21:05:00Z') },
+        { direction: 'inbound', text: 'Coucou toi', at: new Date('2026-10-17T09:59:00Z') },
+      ],
+    };
+    expect((await draftComposer.compose(input)).kind).toBe('draft');
+    const brain = seen.brainInputs?.[0];
+    expect(brain?.history.map((t) => t.timeNote)).toEqual([
+      undefined,
+      undefined,
+      '3 jours plus tard, samedi, 11 h 59',
+    ]);
+    expect(brain?.situation).toContain(
+      'Ta dernière réponse date d’il y a 2 jours : il ne t’avait pas répondu depuis.',
+    );
   });
 
   it('puts each description on the message that carried it', async () => {
