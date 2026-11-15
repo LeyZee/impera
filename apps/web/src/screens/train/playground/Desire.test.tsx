@@ -102,7 +102,8 @@ describe('desire in the playground', () => {
     fireEvent.click(screen.getByRole('button'));
     expect(screen.getByText('il est seul, il est chez lui')).toBeTruthy();
     expect(screen.getByText('Elle a demandé s’il est tranquille')).toBeTruthy();
-    expect(screen.getByText('oui', { selector: '.pg-availability__value' })).toBeTruthy();
+    // « oui » for his sexualizing and for her question: one word for both.
+    expect(screen.getAllByText('oui', { selector: '.pg-availability__value' })).toHaveLength(2);
     expect(screen.getByText('fermée')).toBeTruthy();
     expect(screen.getByText('Il n’a pas dit être seul et libre')).toBeTruthy();
 
