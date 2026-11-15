@@ -45,6 +45,16 @@ describe('« Mise en route » words', () => {
     expect(telegram?.hint).toBe('Telegram n’est pas branché : personne n’est prévenu la nuit.');
   });
 
+  it('takes the agency’s share read at Reveal for the percentage, or asks for one of the two (ADR 0054 § 7)', () => {
+    const [read, todo] = creatorLines(ANNA, [
+      { key: 'agency_rate', state: 'done', note: { kind: 'share_read_on_platform' } },
+      { key: 'agency_rate', state: 'todo', note: null },
+    ]);
+    expect(read?.label).toBe('La part de l’agence');
+    expect(read?.hint).toBe('Lue chez Reveal : le pourcentage est facultatif.');
+    expect(todo?.hint).toBe('Relie son compte Reveal pour la lire, ou règle le pourcentage.');
+  });
+
   it('names every member step', () => {
     const lines = memberLines(
       THEO,

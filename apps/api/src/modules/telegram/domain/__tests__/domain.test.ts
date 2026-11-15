@@ -200,6 +200,31 @@ describe('classification (ADR 0020 §2)', () => {
     });
   });
 
+  it('tells a change of the agency’s share at Reveal to the « pour toutes » groups, never a share (ADR 0054 § 5)', () => {
+    const creatorId = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
+    expect(
+      classify({
+        kind: 'agency_share_changed',
+        creatorId,
+        platform: 'reveal',
+        platformAccountId: '018f3e5c-0000-7000-8000-0000000000a1',
+        from: PayPeriodSchema.parse('2026-11-01'),
+      }),
+    ).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      allCreatorsOnly: true,
+      oncePerThread: true,
+      threadKey: 'agency_share_changed:018f3e5c-0000-7000-8000-0000000000a1:2026-11-01',
+      title: 'Important',
+      body: 'Part de l’agence chez Reveal : sur la quinzaine du 1er au 15 nov., elle a changé par rapport à la quinzaine d’avant. À titre d’information.',
+      link: {
+        label: 'Ouvrir la part de l’agence',
+        path: `/creatrices?onglet=pourcentage&creatrice=${creatorId}`,
+      },
+    });
+  });
+
   it('tells an outage per service and reason, never the key, and « Rétabli » in its thread', () => {
     expect(classify({ kind: 'connection_down', service: 'xai', reason: 'refused' })).toEqual({
       kind: 'notice',
