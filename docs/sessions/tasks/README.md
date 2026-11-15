@@ -178,3 +178,4 @@ Branche : task/<id>-<slug>
 | CHF-01 | Chiffres et jeu du chatteur : ses chiffres, puis un jeu fait de faits réels | équipe | in_progress | ADR 0104, CRM-03, EQ-05 |
 | CRB-01 | Trophées et médailles de série de la créatrice | créatrice | review | ADR 0107, CHF-01 |
 | AUT-01 | L'agent tient compte des automatisations de Reveal | agent | in_progress | ADR 0110 |
+| FNW-01 | L'agent écrit le prénom du membre et le canevas de la note client | connectors | in_progress | ADR 0117 |
