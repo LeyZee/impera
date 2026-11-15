@@ -286,6 +286,17 @@ describe('Équipe › Membres', () => {
     });
   });
 
+  it('says in words that a member has no rate yet, never with a dash drawn as a figure', async () => {
+    serve();
+    renderPage(`/equipe/membres?membre=${BASILE.id}`);
+    const sheet = await screen.findByRole('region', { name: 'Basile' });
+    const figure = within(sheet).getByText('Commission').parentElement;
+    if (figure === null) throw new Error('no figure');
+    const value = within(figure).getByText('Pas encore de taux');
+    expect(value.className).toContain('tm-figure__value--none');
+    expect(figure.textContent).not.toContain('—');
+  });
+
   it('gives the owner his « Mise en route », ticked by the server, gone once all is done', async () => {
     const step = (key: string, state: string) => ({ key, state, note: null });
     serve({

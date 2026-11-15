@@ -157,14 +157,17 @@ export function MemberSheet({
       <div className="tm-figures">
         <div className="tm-figure nv-enter" style={{ '--nv-i': 1 }}>
           <span className="nv-figure__label">Commission</span>
-          <span className="tm-figure__value">
-            {member.commission === null ? '—' : formatRate(member.commission.rateBps)}
-          </span>
-          <span className="tm-figure__note">
-            {member.commission === null
-              ? 'Pas encore de taux'
-              : `${preset === undefined ? 'Taux à la main' : preset.name} · depuis le ${longDay(member.commission.effectiveFrom)}`}
-          </span>
+          {/* No rate yet is said in words, in muted ink: never a dash drawn at the size of a figure. */}
+          {member.commission === null ? (
+            <span className="tm-figure__value tm-figure__value--none">Pas encore de taux</span>
+          ) : (
+            <>
+              <span className="tm-figure__value">{formatRate(member.commission.rateBps)}</span>
+              <span className="tm-figure__note">
+                {`${preset === undefined ? 'Taux à la main' : preset.name} · depuis le ${longDay(member.commission.effectiveFrom)}`}
+              </span>
+            </>
+          )}
           {ahead === null ? null : (
             <span className="tm-figure__note tm-figure__ahead">
               {formatRate(ahead.rateBps)} à partir du {longDay(ahead.effectiveFrom)}
