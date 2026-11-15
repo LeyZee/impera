@@ -25,15 +25,11 @@ export interface PayrollStatementReads {
   periodState(reader: PayStatementReader, period: PayPeriod): Promise<PeriodState>;
 }
 
-export function createPayrollStatementReads(
-  store: Pick<PayrollReadStore, 'period'>,
-  now: () => Date,
-): PayrollStatementReads {
+export function createPayrollStatementReads(store: Pick<PayrollReadStore, 'period'>): PayrollStatementReads {
   return {
     periodState: async (reader, period) => {
       if (!readsPay(reader.role)) throw new PayReadForbidden();
       const view = await store.period(reader.userId, period);
-      const at = now();
       const delay = view.settings.payoutDelayBusinessDays;
       const statements = view.statements.map(({ statement }) => statement);
       return {
@@ -43,7 +39,7 @@ export function createPayrollStatementReads(
         blocked: blockFor(view.blocked, view.reader),
         payoutDelayBusinessDays: delay,
         statements: statements
-          .map((statement) => statementStateOf(statement, delay, at))
+          .map((statement) => statementStateOf(statement, delay, view.agency))
           .sort((a, b) => (a.memberId < b.memberId ? -1 : a.memberId > b.memberId ? 1 : 0)),
         team: teamSumsFor(view.reader.scope, statements),
       };

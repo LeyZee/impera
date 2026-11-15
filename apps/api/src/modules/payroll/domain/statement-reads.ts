@@ -66,7 +66,6 @@ export interface TeamSums {
 type ReadStatement = Pick<
   CommissionStatement,
   | 'memberId'
-  | 'window'
   | 'status'
   | 'revision'
   | 'computedAt'
@@ -92,30 +91,35 @@ export function workingDaysSince(from: string, to: string): number {
   return count;
 }
 
+/** The agency's zone now and today in it, as the period was read: the day a transfer would be dated. */
+export interface AgencyToday {
+  readonly timeZone: string;
+  readonly today: string;
+}
+
 /**
  * A transfer is late (« Versement en retard ») once more working days than announced have gone by since the day of
- * its validation, today included, both days read in the period's zone: validated on a Monday with one day announced,
- * it is due on the Tuesday and late on the Wednesday. `null` while the owner announced no delay. Only a validated
- * statement with something to pay and nothing holding its transfer can be late.
+ * its validation, today included, both days read in the agency's zone now, as the route dates a transfer: validated
+ * on a Monday with one day announced, it is due on the Tuesday and late on the Wednesday. `null` while the owner
+ * announced no delay. Only a validated statement with something to pay and nothing holding its transfer can be late.
  */
 export function isPayoutLate(
-  statement: Pick<ReadStatement, 'status' | 'validatedAt' | 'payoutBlock' | 'payableMinor' | 'window'>,
+  statement: Pick<ReadStatement, 'status' | 'validatedAt' | 'payoutBlock' | 'payableMinor'>,
   delay: number | null,
-  now: Date,
+  agency: AgencyToday,
 ): boolean | null {
   if (delay === null) return null;
   if (statement.status !== 'validated' || statement.validatedAt === null) return false;
   if (statement.payoutBlock !== null || statement.payableMinor === 0) return false;
-  const zone = statement.window.timeZone;
   return (
-    workingDaysSince(calendarDayAt(new Date(statement.validatedAt), zone), calendarDayAt(now, zone)) > delay
+    workingDaysSince(calendarDayAt(new Date(statement.validatedAt), agency.timeZone), agency.today) > delay
   );
 }
 
 export const statementStateOf = (
   statement: ReadStatement,
   delay: number | null,
-  now: Date,
+  agency: AgencyToday,
 ): StatementState => ({
   memberId: statement.memberId,
   status: statement.status,
@@ -125,7 +129,7 @@ export const statementStateOf = (
   paidAt: statement.paidAt,
   payoutBlocked:
     statement.status === 'validated' && statement.payableMinor !== 0 && statement.payoutBlock !== null,
-  payoutLate: isPayoutLate(statement, delay, now),
+  payoutLate: isPayoutLate(statement, delay, agency),
 });
 
 /** Under two statements, a sum is one member's amount (decision A of 14/11). */

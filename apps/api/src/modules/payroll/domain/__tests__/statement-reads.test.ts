@@ -38,7 +38,8 @@ const validated = {
   payment: null,
 };
 
-const at = (iso: string): Date => new Date(iso);
+/** The agency in Paris, on that day. */
+const paris = (today: string) => ({ timeZone: 'Europe/Paris', today });
 
 describe('readsPay', () => {
   it('lets the owner and the team’s accounts read, never a creator', () => {
@@ -50,7 +51,7 @@ describe('readsPay', () => {
 
 describe('statementStateOf (ADR 0105 § 3 and § 4, decision A)', () => {
   it('gives the state, under these names only', () => {
-    expect(statementStateOf(validated, null, at('2025-03-18T08:00:00.000Z'))).toEqual({
+    expect(statementStateOf(validated, null, paris('2025-03-18'))).toEqual({
       memberId: validated.memberId,
       status: 'validated',
       revision: 3,
@@ -63,7 +64,7 @@ describe('statementStateOf (ADR 0105 § 3 and § 4, decision A)', () => {
   });
 
   it('gives no amount of the member: two statements of other amounts and rates read the same', () => {
-    const read = statementStateOf(validated, 2, at('2025-03-18T08:00:00.000Z'));
+    const read = statementStateOf(validated, 2, paris('2025-03-18'));
     const other = {
       ...validated,
       netMinor: 200_000,
@@ -73,7 +74,7 @@ describe('statementStateOf (ADR 0105 § 3 and § 4, decision A)', () => {
       payableMinor: 9_999,
       rules: { commission: { rateBps: 1_000 } },
     };
-    expect(statementStateOf(other, 2, at('2025-03-18T08:00:00.000Z'))).toEqual(read);
+    expect(statementStateOf(other, 2, paris('2025-03-18'))).toEqual(read);
     const text = JSON.stringify(read);
     for (const amount of ['25300', '100000', '20000', '6000', '1000', '400000', '80000', '2000'])
       expect(text).not.toContain(amount);
@@ -82,43 +83,48 @@ describe('statementStateOf (ADR 0105 § 3 and § 4, decision A)', () => {
 
   it('says a transfer waits without its reason, and never for a statement with nothing to pay', () => {
     const block = { reason: 'tax_residence_missing' as const, year: '2025' };
-    const read = statementStateOf({ ...validated, payoutBlock: block }, 1, at('2025-03-25T08:00:00.000Z'));
+    const read = statementStateOf({ ...validated, payoutBlock: block }, 1, paris('2025-03-25'));
     expect(read.payoutBlocked).toBe(true);
     expect(read.payoutLate).toBe(false);
     expect(JSON.stringify(read)).not.toContain('tax_residence');
     expect(
-      statementStateOf(
-        { ...validated, payoutBlock: block, payableMinor: 0 },
-        1,
-        at('2025-03-25T08:00:00.000Z'),
-      ).payoutBlocked,
+      statementStateOf({ ...validated, payoutBlock: block, payableMinor: 0 }, 1, paris('2025-03-25'))
+        .payoutBlocked,
     ).toBe(false);
   });
 });
 
 describe('isPayoutLate (PAIE-32)', () => {
-  it('is late once more working days than announced have gone by, today included, in the period’s zone', () => {
-    // Validated on Monday with one day announced: due Tuesday, late Wednesday (midnight in Paris).
-    expect(isPayoutLate(validated, 1, at('2025-03-18T22:00:00.000Z'))).toBe(false);
-    expect(isPayoutLate(validated, 1, at('2025-03-18T23:30:00.000Z'))).toBe(true);
+  it('is late once more working days than announced have gone by, today included', () => {
+    // Validated on Monday with one day announced: due Tuesday, late Wednesday.
+    expect(isPayoutLate(validated, 1, paris('2025-03-18'))).toBe(false);
+    expect(isPayoutLate(validated, 1, paris('2025-03-19'))).toBe(true);
     // Validated on Friday 21 with two days announced: Monday and Tuesday, late on Wednesday 26.
     const friday = { ...validated, validatedAt: '2025-03-21T10:00:00.000Z' };
-    expect(isPayoutLate(friday, 2, at('2025-03-23T10:00:00.000Z'))).toBe(false);
-    expect(isPayoutLate(friday, 2, at('2025-03-25T10:00:00.000Z'))).toBe(false);
-    expect(isPayoutLate(friday, 2, at('2025-03-26T10:00:00.000Z'))).toBe(true);
+    expect(isPayoutLate(friday, 2, paris('2025-03-23'))).toBe(false);
+    expect(isPayoutLate(friday, 2, paris('2025-03-25'))).toBe(false);
+    expect(isPayoutLate(friday, 2, paris('2025-03-26'))).toBe(true);
     // Validated on Thursday 20 with one day: Friday is the day, the weekend adds none, late on Monday 24.
     const thursday = { ...validated, validatedAt: '2025-03-20T10:00:00.000Z' };
-    expect(isPayoutLate(thursday, 1, at('2025-03-22T10:00:00.000Z'))).toBe(false);
-    expect(isPayoutLate(thursday, 1, at('2025-03-23T10:00:00.000Z'))).toBe(false);
-    expect(isPayoutLate(thursday, 1, at('2025-03-24T10:00:00.000Z'))).toBe(true);
+    expect(isPayoutLate(thursday, 1, paris('2025-03-22'))).toBe(false);
+    expect(isPayoutLate(thursday, 1, paris('2025-03-23'))).toBe(false);
+    expect(isPayoutLate(thursday, 1, paris('2025-03-24'))).toBe(true);
+  });
+
+  it('reads the day of validation in the agency’s zone now, not in the zone the period was written in', () => {
+    // 20:00 UTC on Monday 17 is Monday in Paris (the period's zone) but Tuesday 18 in Auckland, the agency's now.
+    const evening = { ...validated, validatedAt: '2025-03-17T20:00:00.000Z' };
+    expect(evening.window.timeZone).toBe('Europe/Paris');
+    expect(isPayoutLate(evening, 1, { timeZone: 'Pacific/Auckland', today: '2025-03-19' })).toBe(false);
+    expect(isPayoutLate(evening, 1, paris('2025-03-19'))).toBe(true);
   });
 
   it('is not known without a delay announced', () => {
-    expect(isPayoutLate(validated, null, at('2025-04-30T10:00:00.000Z'))).toBeNull();
+    expect(isPayoutLate(validated, null, paris('2025-04-30'))).toBeNull();
   });
 
   it('is never late once paid, held, before validation, or with nothing to pay', () => {
-    const later = at('2025-04-30T10:00:00.000Z');
+    const later = paris('2025-04-30');
     expect(isPayoutLate({ ...validated, status: 'paid' }, 1, later)).toBe(false);
     expect(
       isPayoutLate({ ...validated, payoutBlock: { reason: 'documents_not_issued', year: null } }, 1, later),

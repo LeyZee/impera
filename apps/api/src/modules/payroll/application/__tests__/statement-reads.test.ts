@@ -72,7 +72,7 @@ const stored = (memberId: TeamMemberId, totalMinor: number): StoredStatement => 
 /** The period's store in memory: who it was read as, and the statements the policies gave. */
 function store(
   statements: StoredStatement[],
-  view: Partial<Pick<PeriodView, 'reader' | 'blocked' | 'closing' | 'settings'>> = {},
+  view: Partial<Pick<PeriodView, 'reader' | 'blocked' | 'closing' | 'settings' | 'agency'>> = {},
 ) {
   const asked: string[] = [];
   const fake: Pick<PayrollReadStore, 'period'> = {
@@ -84,6 +84,8 @@ function store(
         firstClosed: null,
         closing: null,
         blocked: null,
+        // Wednesday 19 March 2025 in Paris, two days after the statements were validated.
+        agency: { timeZone: 'Europe/Paris', today: '2025-03-19' },
         statements,
         bonusTierSets: [],
         collectiveGoals: [],
@@ -94,9 +96,6 @@ function store(
   };
   return { asked, fake };
 }
-
-/** Wednesday 19 March 2025, two days after the statements were validated. */
-const now = (): Date => new Date('2025-03-19T10:00:00.000Z');
 
 describe('createPayrollStatementReads (ADR 0026 § 1, ADR 0105 § 4, decision A)', () => {
   const owner: PayStatementReader = { userId: newId(UserIdSchema), role: 'owner' };
@@ -109,7 +108,7 @@ describe('createPayrollStatementReads (ADR 0026 § 1, ADR 0105 § 4, decision A)
       closing: { period: P1, exchangeRates: [], closedBy: owner.userId, closedAt },
       settings: { minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: 1 },
     });
-    const read = await createPayrollStatementReads(period.fake, now).periodState(owner, P1);
+    const read = await createPayrollStatementReads(period.fake).periodState(owner, P1);
     expect(period.asked).toEqual([owner.userId]);
     expect(read).toMatchObject({ window, closedAt, blocked: null, payoutDelayBusinessDays: 1 });
     expect(read.statements.map((one) => [one.memberId, one.status, one.payoutLate])).toEqual([
@@ -131,7 +130,7 @@ describe('createPayrollStatementReads (ADR 0026 § 1, ADR 0105 § 4, decision A)
         since: '2025-03-16T10:00:00.000Z',
       },
     });
-    const read = await createPayrollStatementReads(period.fake, now).periodState(
+    const read = await createPayrollStatementReads(period.fake).periodState(
       { userId: owner.userId, role: 'operator' },
       P1,
     );
@@ -146,10 +145,7 @@ describe('createPayrollStatementReads (ADR 0026 § 1, ADR 0105 § 4, decision A)
   it('refuses a creator’s account before reading anything, as the routes refuse her session', async () => {
     const period = store([]);
     await expect(
-      createPayrollStatementReads(period.fake, now).periodState(
-        { userId: owner.userId, role: 'creator' },
-        P1,
-      ),
+      createPayrollStatementReads(period.fake).periodState({ userId: owner.userId, role: 'creator' }, P1),
     ).rejects.toMatchObject({ code: 'role_forbidden' });
     expect(period.asked).toEqual([]);
   });

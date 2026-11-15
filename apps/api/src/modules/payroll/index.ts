@@ -180,7 +180,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),
-    reads: createPayrollStatementReads(readStore, now),
+    reads: createPayrollStatementReads(readStore),
     correctContest: (tx, actor, correction) => writeContestCorrection(tx, deps.reads, now, actor, correction),
     jobs: {
       recalculate: (period, logger) => createRecalculation(jobStore, logger, now).recalculate(period),
