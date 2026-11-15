@@ -371,8 +371,10 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
       'Une description plus récente est arrivée entre-temps : recharge le script.',
     );
     fireEvent.click(within(region).getByRole('button', { name: 'Enregistrer et valider' }));
-    expect(await within(region).findByText('Une silhouette inventée, assise.')).toBeDefined();
-    expect(within(region).getByText('Corrigée')).toBeDefined();
+    // « Corrigée » comes with the server's answer. The text alone is already in the field while it saves: waiting on
+    // it read the mark before the answer on a slow runner.
+    expect(await within(region).findByText('Corrigée')).toBeDefined();
+    expect(within(region).getByText('Une silhouette inventée, assise.')).toBeDefined();
     expect(within(region).queryByRole('textbox')).toBeNull();
   });
   it('asks the AI again on a medium it gave up, or takes it written by hand with its level (recette créatrice 2)', async () => {
