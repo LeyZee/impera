@@ -113,6 +113,14 @@ export const ScenarioEventSchema = z.discriminatedUnion('type', [
   }),
   /** « Script retiré » (ADR 0099 § 1 time 2): the sequence leaves `scriptSequences.list`; its steps stay as loose steps. */
   z.object({ type: z.literal('sequence_removed'), atMs: AtSchema, sequenceId: z.string() }),
+  /** « Étape à branches » (ADR 0112): an existing step added to a sequence on the rank of one of its steps. */
+  z.object({
+    type: z.literal('sequence_branched'),
+    atMs: AtSchema,
+    sequenceId: z.string(),
+    scriptId: z.string(),
+    stepIndex: z.number().int().min(0),
+  }),
   z.object({
     type: z.literal('shape_changed'),
     endpoint: EndpointNameSchema,
@@ -208,6 +216,7 @@ class FakeRevealWorld {
       case 'conversation_gone':
       case 'script_changed':
       case 'sequence_removed':
+      case 'sequence_branched':
         this.pending.push({ dueMs: this.clockMs + event.atMs, event });
         this.fireDue();
         return;
@@ -282,6 +291,15 @@ class FakeRevealWorld {
       case 'sequence_removed':
         this.state.sequences = this.state.sequences.filter((sequence) => sequence.id !== event.sequenceId);
         return;
+      case 'sequence_branched': {
+        const sequence = this.state.sequences.find((each) => each.id === event.sequenceId);
+        if (sequence !== undefined)
+          sequence.branches = [
+            ...(sequence.branches ?? []),
+            { scriptId: event.scriptId, stepIndex: event.stepIndex },
+          ];
+        return;
+      }
     }
   }
 
@@ -1048,12 +1066,18 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
           createdAt: sequence.createdAt,
           updatedAt: sequence.createdAt,
         },
-        steps: sequence.scriptIds.flatMap((scriptId, stepIndex) => {
+        steps: [
+          ...sequence.scriptIds.map((scriptId, stepIndex) => ({ scriptId, stepIndex, branch: false })),
+          ...(sequence.branches ?? []).map((branch) => ({ ...branch, branch: true })),
+        ].flatMap(({ scriptId, stepIndex, branch }) => {
           const script = world.state.scripts.find((s) => s.id === scriptId);
           if (script === undefined) return [];
           return [
             {
-              step: { id: `${sequence.id}_step_${String(stepIndex)}`, stepIndex },
+              step: {
+                id: branch ? `${sequence.id}_branch_${scriptId}` : `${sequence.id}_step_${String(stepIndex)}`,
+                stepIndex,
+              },
               script: world.wireScriptCore(script),
               medias: script.mediaIds.map((mediaId) => world.wireMedia(world.media(mediaId))),
               teasingMedias: script.teasingMediaIds.map((mediaId) => world.wireMedia(world.media(mediaId))),

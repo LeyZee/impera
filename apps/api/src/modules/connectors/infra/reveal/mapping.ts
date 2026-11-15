@@ -188,10 +188,11 @@ export function momentOf(name: string, folderNames: readonly string[]): Platform
 
 type StepSource = Pick<ScriptItem, 'medias' | 'teasingMedias'> & { readonly script: ScriptItem['script'] };
 
-function stepOf(source: StepSource, index: number): PlatformScriptStep {
+function stepOf(source: StepSource, index: number, platformIndex: number): PlatformScriptStep {
   return {
     ref: ref(source.script.id),
     index,
+    platformIndex,
     name: source.script.name,
     text: source.script.content,
     media: source.medias.map(mediaOf),
@@ -218,7 +219,9 @@ export function scriptsOf(
   const scripts: PlatformScript[] = [];
   for (const { sequence, steps: ordered } of sequences) {
     const sorted = [...ordered].sort((a, b) => a.step.stepIndex - b.step.stepIndex);
-    const [first, ...rest] = sorted.map((source, index) => stepOf(source, index));
+    // Two steps on the same `stepIndex` are branches of one step (a human chooses): kept side by side with their rank,
+    // never read as one after the other by the core (SC-04 c8).
+    const [first, ...rest] = sorted.map((source, index) => stepOf(source, index, source.step.stepIndex));
     if (first === undefined) continue;
     for (const source of sorted) inSequence.add(source.script.id);
     scripts.push({
@@ -234,7 +237,7 @@ export function scriptsOf(
       ref: ref(step.script.id),
       name: step.script.name,
       moment: momentOf(step.script.name, folders([step])),
-      steps: [stepOf(step, 0)],
+      steps: [stepOf(step, 0, 0)],
     });
   }
   return scripts;

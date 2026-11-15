@@ -1058,6 +1058,13 @@
       "when": 1794779671713,
       "tag": "0209_rewards_levels",
       "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1794783864204,
+      "tag": "0210_script_identities",
+      "breakpoints": true
     }
   ]
 }
