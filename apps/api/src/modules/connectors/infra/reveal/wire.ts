@@ -17,7 +17,14 @@ export const RevealMediaTypeSchema = z.enum(['photo', 'video', 'audio']);
  * raises a typed error instead of swallowing it (fake-reveal.md, `shape_changed`).
  * ------------------------------------------------------------------------------------------------------------ */
 
-const PageInfoSchema = z.strictObject({ hasNextPage: z.boolean(), endCursor: id.nullable() });
+/** The last page's cursor is `null` or, since 2026-11-15, an empty string: both read as `null`. */
+const PageInfoSchema = z.strictObject({
+  hasNextPage: z.boolean(),
+  endCursor: z
+    .string()
+    .nullable()
+    .transform((cursor) => (cursor === '' ? null : cursor)),
+});
 
 const page = <T extends z.ZodType>(item: T) =>
   z.strictObject({ data: z.array(item), pageInfo: PageInfoSchema, totalCount: z.number().int().min(0) });
@@ -58,7 +65,8 @@ const WireConversationSchema = z.strictObject({
   id,
   modelIsUnread: z.boolean(),
   memberIsUnread: z.boolean(),
-  memberLastReadAt: iso.nullable(),
+  /** Absent on most conversations since 2026-11-15. */
+  memberLastReadAt: iso.nullable().optional(),
   isBlockedByModel: z.boolean(),
   isPinned: z.boolean(),
   pinnedAt: iso.nullable().optional(),
@@ -69,7 +77,8 @@ const WireConversationSchema = z.strictObject({
   lastMessageAt: iso.nullable(),
   createdAt: iso,
   updatedAt: iso,
-  lastMessageId: id.nullable(),
+  /** Absent on a conversation without any message (2026-11-15). */
+  lastMessageId: id.nullable().optional(),
   memberId: id,
   modelId: id,
   /** « Note client ». */
@@ -116,13 +125,29 @@ const WireMessageCoreSchema = z.strictObject({
   content: z.string(),
   /** Only `default` seen (380 messages). */
   type: z.string(),
+  /** A GIF sent instead of a text (2026-11-15). */
+  gif: z
+    .strictObject({
+      id,
+      url: z.string(),
+      webpUrl: z.string(),
+      posterUrl: z.string(),
+      width: z.number(),
+      height: z.number(),
+    })
+    .optional(),
 });
 
 const WireConversationItemSchema = z.strictObject({
   conversation: WireConversationSchema,
-  /** `{ member }` when the fan wrote last, `{}` otherwise. */
-  lastMessageAuthor: z.strictObject({ member: WireMemberSchema.optional() }),
-  lastMessage: WireMessageCoreSchema.nullable(),
+  /**
+   * `{ member }` when the fan wrote last, `{ model }` (since 2026-11-15) or `{}` when the team did; absent, like
+   * `lastMessage`, on a conversation without any message.
+   */
+  lastMessageAuthor: z
+    .strictObject({ member: WireMemberSchema.optional(), model: WireModelSummarySchema.optional() })
+    .optional(),
+  lastMessage: WireMessageCoreSchema.nullable().optional(),
   lastMessageHasMedia: z.boolean(),
   member: WireMemberSchema,
   model: WireModelSummarySchema,
@@ -181,6 +206,9 @@ const WireScriptItemSchema = z.strictObject({
     content: z.string(),
     /** Absent on a step without a price. */
     price: z.number().int().min(0).optional(),
+    /** A time-limited discount on a priced step (2026-11-15): both or neither. Read, never applied by us. */
+    discountedPrice: z.number().int().min(0).optional(),
+    discountDurationMinutes: z.number().int().min(0).optional(),
   }),
   tags: z.array(z.unknown()),
   medias: z.array(WireMediaSchema),
@@ -236,7 +264,7 @@ export const REVEAL_ENDPOINTS = {
   'messages.list': {
     method: 'GET',
     path: '/conversations/:id/messages',
-    shape: page(WireMessageItemSchema).extend({ memberLastReadAt: iso.nullable() }),
+    shape: page(WireMessageItemSchema).extend({ memberLastReadAt: iso.nullable().optional() }),
   },
   'messages.send': { method: 'POST', path: '/conversations/:id/messages', shape: WireMessageCoreSchema },
   'conversations.read': { method: 'PATCH', path: '/conversations/:id/read', shape: WireConversationSchema },
@@ -256,8 +284,9 @@ export const REVEAL_ENDPOINTS = {
     path: '/conversations/:id/ppv-history',
     shape: z.strictObject({
       buyRate: WireBuyRateSchema,
-      highestPrice: z.number().int().nullable(),
-      lowestPrice: z.number().int().nullable(),
+      /** No longer sent since 2026-11-15. */
+      highestPrice: z.number().int().nullable().optional(),
+      lowestPrice: z.number().int().nullable().optional(),
       bundles: z.array(
         z.strictObject({
           id,
@@ -287,8 +316,13 @@ export const REVEAL_ENDPOINTS = {
       subscriptionPeriodicity: z.string().nullable(),
       subscriptionExpireAt: iso.nullable(),
       autoRenew: z.boolean(),
-      buyingRate: WireBuyRateSchema,
-      paidMediaRates: z.strictObject({ imageCount: z.number().int(), videoCount: z.number().int() }),
+      /** No longer sent since 2026-11-15. */
+      buyingRate: WireBuyRateSchema.optional(),
+      paidMediaRates: z
+        .strictObject({ imageCount: z.number().int(), videoCount: z.number().int() })
+        .optional(),
+      /** Since 2026-11-15. */
+      refundAskedTotal: z.number().int().optional(),
     }),
   },
   'models.get': {
@@ -361,7 +395,8 @@ export const REVEAL_ENDPOINTS = {
         id,
         imageCount: z.number().int().min(0),
         videoCount: z.number().int().min(0),
-        mediaUrl: z.string().nullable(),
+        /** Absent on an empty folder (2026-11-15). */
+        mediaUrl: z.string().nullable().optional(),
         isSharedForSfs: z.boolean(),
         createdAt: iso,
         updatedAt: iso,
