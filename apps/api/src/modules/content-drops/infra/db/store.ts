@@ -87,8 +87,6 @@ type RequestRow = typeof contentRequests.$inferSelect;
 /** How many of her latest drops a read returns: her screen shows the recent ones, the rest stays in the base. */
 const DROPS_READ = 100;
 
-/** The Postgres error behind a failed query (Drizzle wraps it as `cause`). */
-
 /**
  * `rewards.evaluate_creator` for her, in the transaction of her gesture (ADR 0107 § 14, recette 16/11 CRE-06): the game
  * looks at once, so that a gain is revealed where she made it. One waiting run per creator, replaced by the next gesture
@@ -108,6 +106,7 @@ async function askHerGame(tx: Transaction, creatorId: string): Promise<void> {
   );
 }
 
+/** The Postgres error behind a failed query (Drizzle wraps it as `cause`). */
 export function pgErrorOf(error: unknown): { code: string; constraint: string | null } | null {
   for (let current = error; typeof current === 'object' && current !== null;) {
     if ('code' in current && typeof current.code === 'string') {
