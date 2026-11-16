@@ -282,7 +282,9 @@ async function describeOne(
       carried = true;
       return kept === 'fan' ? await toAgency() : 'described';
     } finally {
-      if (thumbnailKey !== null && !carried) await unpicture(deps, thumbnailKey);
+      // The key is the fingerprint's: a media of the same bytes kept meanwhile (a drop, a fan's) carries it, it stays.
+      if (thumbnailKey !== null && !carried && (await deps.store.assetOf(job.creatorId, sha256)) === null)
+        await unpicture(deps, thumbnailKey);
     }
   } finally {
     await rm(dir, { recursive: true, force: true });

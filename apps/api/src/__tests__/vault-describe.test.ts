@@ -469,6 +469,28 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
     expect(stored.size).toBe(1);
   });
 
+  it('keeps the picture when a media of the same bytes was kept meanwhile, the same key', async () => {
+    holding(pick('image').ref.id);
+    vision.answer = 'budget';
+    let asked = 0;
+    const meanwhile = {
+      ...deps(),
+      store: {
+        ...store,
+        // First asked before the vision (nothing yet), then before the removal: a drop of the same bytes now.
+        assetOf: (creatorId: string, sha256: string) =>
+          ++asked === 1
+            ? store.assetOf(creatorId, sha256)
+            : Promise.resolve({ id: 'asset_drop', fromFan: false }),
+      },
+    };
+    expect(
+      await describeVault(meanwhile, { platformAccountId: ACCOUNT, correlationId: 'test' }),
+    ).toMatchObject({ stop: 'budget' });
+    expect(stored.size).toBe(1);
+    expect(await readdir(scratch)).toEqual([]);
+  });
+
   it('fails the job, never naming the key, when a picture kept by no media cannot be removed', async () => {
     holding(pick('image').ref.id);
     vision.answer = 'budget';
