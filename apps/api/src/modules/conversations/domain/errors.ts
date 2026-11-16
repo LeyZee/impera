@@ -146,14 +146,17 @@ export class CreatorForbidden extends DomainError {
   }
 }
 
-/** A conversation of her that was not given to him, for a member who reads only what he holds (ADR 0024): 403. */
-/** « Il va mieux » is the owner's or a manager's (ADR 0088 § 7): a chatter is told so, not that she is out of reach. */
+/**
+ * « Il va mieux » is for whoever reads the whole creator (ADR 0088 § 7): the owner, or a manager she is given; never a
+ * chatter, even with an open access window. He is told so, not that she is out of reach.
+ */
 export class CareCloseForbidden extends DomainError {
   constructor() {
     super('care_close_forbidden', 'Seuls le propriétaire et un manager peuvent fermer le mode soin');
   }
 }
 
+/** A conversation of her that was not given to him, for a member who reads only what he holds (ADR 0024): 403. */
 export class ConversationForbidden extends DomainError {
   constructor() {
     super('conversation_forbidden', 'Cette conversation ne t’a pas été confiée');

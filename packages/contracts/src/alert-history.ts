@@ -82,21 +82,25 @@ export function safetyEventReason(event: SafetyEvent): string {
  * (a `handoff_requested`), and its line is in « À traiter » too. `seenAt`: when someone of the agency marked it
  * seen.
  */
-export const AlertTriggerItemSchema = z.object({
-  id: EventIdSchema,
-  creatorId: CreatorIdSchema,
-  conversationId: ConversationIdSchema,
-  fanId: FanIdSchema,
-  fanDisplayName: z.string(),
-  trigger: AlertTriggerSchema.nullable(),
-  safety: SafetyEventSchema.nullable(),
-  alertGroupId: CustomAlertGroupIdSchema.nullable(),
-  alertName: z.string(),
-  pausedAgent: z.boolean(),
-  reason: z.string(),
-  at: z.iso.datetime(),
-  seenAt: z.iso.datetime().nullable(),
-});
+export const AlertTriggerItemSchema = z
+  .object({
+    id: EventIdSchema,
+    creatorId: CreatorIdSchema,
+    conversationId: ConversationIdSchema,
+    fanId: FanIdSchema,
+    fanDisplayName: z.string(),
+    trigger: AlertTriggerSchema.nullable(),
+    safety: SafetyEventSchema.nullable(),
+    alertGroupId: CustomAlertGroupIdSchema.nullable(),
+    alertName: z.string(),
+    pausedAgent: z.boolean(),
+    reason: z.string(),
+    at: z.iso.datetime(),
+    seenAt: z.iso.datetime().nullable(),
+  })
+  .refine((item) => (item.trigger === null) !== (item.safety === null), {
+    message: 'Exactly one of trigger and safety',
+  });
 export type AlertTriggerItem = z.infer<typeof AlertTriggerItemSchema>;
 
 /**
