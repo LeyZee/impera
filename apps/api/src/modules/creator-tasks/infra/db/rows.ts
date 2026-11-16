@@ -68,6 +68,8 @@ export function taskOf(row: TaskRow): CreatorTask {
     essential: row.essential,
     reminderMinutes: row.reminderMinutes,
     createdAt: row.createdAt.toISOString(),
+    // Only a routine she removed is still read once removed, and only on the day she removed it.
+    removedAt: row.archivedAt === null ? null : row.archivedAt.toISOString(),
   });
 }
 

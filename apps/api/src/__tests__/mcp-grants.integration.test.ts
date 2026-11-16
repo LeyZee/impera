@@ -83,7 +83,10 @@ describe('/v1/settings/mcp-grants', () => {
       shifts: { shifts: () => Promise.resolve([]), onShiftNow: () => Promise.resolve([]) },
       aiUsage: { read: () => Promise.reject(new Error('not read here')) },
       teamImport: { teamImport: () => Promise.reject(new Error('not read here')) },
-      sales: { sales: () => Promise.reject(new Error('not read here')) },
+      sales: {
+        sales: () => Promise.reject(new Error('not read here')),
+        dailyStats: () => Promise.reject(new Error('not read here')),
+      },
       payroll: { periodState: () => Promise.reject(new Error('not read here')) },
     });
     nora = newId(CreatorIdSchema);

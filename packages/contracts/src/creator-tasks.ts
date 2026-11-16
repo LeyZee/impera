@@ -187,6 +187,11 @@ export const CreatorTaskSchema = z.strictObject({
    * agenda kept on her phone from before it was sent, read as always due.
    */
   createdAt: z.iso.datetime().nullable().default(null),
+  /**
+   * When she removed a routine today: the day keeps it due, and it leaves her agenda the next day (recette 16/11,
+   * Charles's choice), so that removing it never saves a streak. `null` for a task still in her agenda.
+   */
+  removedAt: z.iso.datetime().nullable().default(null),
 });
 export type CreatorTask = z.infer<typeof CreatorTaskSchema>;
 
