@@ -88,7 +88,7 @@ describe('her game on her sheet, agency side (ADR 0107 § 12)', () => {
     // An empty fact weighs less than a value, and every one says it the same way (avis Design, 16/11).
     const empties = within(block).getAllByText(/^Aucune? pour l’instant$/u);
     expect(empties.map((one) => one.textContent)).toEqual([
-      'Aucune pour l’instant',
+      'Aucun pour l’instant',
       'Aucune pour l’instant',
       'Aucune pour l’instant',
       'Aucun pour l’instant',

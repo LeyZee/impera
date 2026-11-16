@@ -13,7 +13,16 @@ const Empty = ({ words }: { words: string }): JSX.Element => (
   <span className="rw-member__empty">{words}</span>
 );
 
-function StreakFact({ label, streak }: { label: string; streak: TrophyCaseStreak | undefined }): JSX.Element {
+function StreakFact({
+  label,
+  streak,
+  none,
+}: {
+  label: string;
+  streak: TrophyCaseStreak | undefined;
+  /** Agreed with what is counted: « Aucun » day, « Aucune » delivery (avis Design, 16/11). */
+  none: string;
+}): JSX.Element {
   const current = streak?.current ?? 0;
   const best = streak?.best ?? 0;
   return (
@@ -21,7 +30,7 @@ function StreakFact({ label, streak }: { label: string; streak: TrophyCaseStreak
       <dt>{label}</dt>
       <dd className="nv-num">
         {current === 0 && best === 0 ? (
-          <Empty words="Aucune pour l’instant" />
+          <Empty words={none} />
         ) : (
           <>
             {current}
@@ -67,8 +76,8 @@ export function CreatorGameBlock({
         Ce que {name} a gagné. Ses séries viennent de ses routines et de ses livraisons, rien ne se règle ici.
       </p>
       <dl className="rw-member__facts">
-        <StreakFact label="Jours de routine d’affilée" streak={day} />
-        <StreakFact label="Livraisons à l’heure d’affilée" streak={delivery} />
+        <StreakFact label="Jours de routine d’affilée" streak={day} none="Aucun pour l’instant" />
+        <StreakFact label="Livraisons à l’heure d’affilée" streak={delivery} none="Aucune pour l’instant" />
         <div>
           <dt>Médaille</dt>
           <dd>
