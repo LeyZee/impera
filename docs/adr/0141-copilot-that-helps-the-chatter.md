@@ -1,6 +1,6 @@
 # 0141. Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande
 
-Statut : proposed (fil « Extension, connexion Reveal et playground », 16/11/2026 ; choix de Charles sur carte le 16/11 à 15 h 44 : « Gratuit + accroches » ; relu par Agent, Sécurité et Design le 16/11 ; attend « ok 0141 »)
+Statut : accepted (« ok 0141 » de Charles, 16/11/2026 à 15 h 54 ; choix « Gratuit + accroches » sur carte à 15 h 44 ; relu par Agent, Sécurité et Design le 16/11)
 Date : 2026-11-16
 Précise : ADR 0086 § 3 (ce que montre le panneau) et § 10 (un copilote qui fait gagner du temps). S'appuie sur ADR 0021 (rester en personnage), 0025 (accès pendant le shift), 0063 (la créatrice ne voit pas la fiche), 0098 (le cerveau choisit parmi ce que le code permet), 0112 (scripts à branches). Ne remplace aucun ADR.
 
