@@ -324,7 +324,7 @@ export function TrophyCaseView({
                 if (one === null) return null;
                 const extra = !folded.shown.includes(item);
                 return (
-                  <div key={item.kind} className="tc-slot" data-extra={extra}>
+                  <div key={item.kind} className="tc-place" data-extra={extra}>
                     <Cell item={item} entry={one} size={104} index={index++} onOpen={openItem} />
                   </div>
                 );
