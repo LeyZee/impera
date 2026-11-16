@@ -22,6 +22,7 @@ import {
   type ScriptStart,
   type ScriptStartBlock,
 } from '../domain/availability';
+import { bubbleBudget, fitBubbles } from '../domain/bubbles';
 import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
 import { checkNoCommitment, customOrderDecision, type CustomOrderDecision } from '../domain/custom-order';
 import {
@@ -415,9 +416,10 @@ async function writeFollowUp(
   brief: Brief,
   droppedNotes: readonly string[],
 ): Promise<ComposedTurn> {
-  const voiceInput: VoiceInput = { ...base, brief };
+  // A follow-up: nothing of his awaits, one bubble.
+  const voiceInput: VoiceInput = { ...base, brief, maxBubbles: 1 };
   const voice = await gateway.voice(voiceInput);
-  const written = voice.ok ? voice.value.output.bubbles : [];
+  const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(base.history)),
     ...checkExplicit(written),
@@ -696,15 +698,18 @@ export async function composeTurn(
       isSkipped: true,
     };
   }
+  const budget = bubbleBudget(input.history);
   const voiceInput: VoiceInput = {
     ...base,
     brief: voiceBrief,
+    maxBubbles: budget,
     ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
     ...(scriptStep !== undefined && { scriptStep }),
   };
   const voice = await gateway.voice(voiceInput);
-  const written = voice.ok ? voice.value.output.bubbles : [];
-  // Checked as written: the length and count guards read the voice's bubbles, not the joined message.
+  // Past the budget, left out, never glued nor sent at once (Charles 16/11 : « trois rarement »).
+  const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
+  // Checked as kept: the guards read the bubbles that leave.
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
     ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),

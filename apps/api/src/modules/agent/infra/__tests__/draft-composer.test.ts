@@ -259,6 +259,22 @@ describe('createDraftComposer', () => {
     });
   });
 
+  it('gives the voice the bubbles code allows, and leaves out what goes past them (Charles 16/11)', async () => {
+    const { draftComposer, seen } = composer({
+      voice: { bubbles: ['Salut toi', 'ça va et toi ?', 'je file'] },
+    });
+    const single = { ...INPUT, history: INPUT.history.slice(0, 1) };
+    expect(await draftComposer.compose(single)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Salut toi'],
+    });
+    // Two messages of his: two bubbles at most.
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      bubbles: ['Salut toi', 'ça va et toi ?'],
+    });
+    expect(seen.voiceInputs?.map((input) => input.maxBubbles)).toEqual([1, 2]);
+  });
+
   it('reads her clock from the creator of the conversation', async () => {
     const asked: string[] = [];
     const draftComposer = createDraftComposer({
