@@ -110,6 +110,8 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
     );
     expect(foldedRows(rows, 5).map((row) => row.name)).toEqual(['D0', 'D1', 'D2', 'D3', 'D4', 'D6']);
     expect(foldedRows(rows.slice(0, 3), 5)).toHaveLength(3);
+    // Only one left folded: all show, no button for one line.
+    expect(foldedRows(rows.slice(0, 7), 5)).toHaveLength(7);
   });
 
   it('gives the three figures: media still listed, folders, folders without ☀️ or 🌙', () => {

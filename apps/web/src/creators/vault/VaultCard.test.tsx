@@ -162,7 +162,7 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
   });
 
   it('marks each folder à classer, and keeps it on screen before « Voir les N dossiers »', async () => {
-    const many = Array.from({ length: 7 }, (_, at) =>
+    const many = Array.from({ length: 8 }, (_, at) =>
       folder(`f${String(at)}`, `Dossier ${String(at + 1)}`, at === 6 ? null : 'day'),
     );
     serve([viewOf({ folders: many })]);
@@ -172,7 +172,7 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
     expect(within(last).getByRole('img', { name: 'À classer' })).toBeDefined();
     expect(screen.queryByText('Dossier 6')).toBeNull();
     expect(screen.getAllByRole('img', { name: 'À classer' })).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Voir les 7 dossiers' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Voir les 8 dossiers' })).toBeDefined();
   });
 
   it('shows five folders, then all of them on demand', async () => {

@@ -59,10 +59,13 @@ export function folderRows(view: VaultView): FolderRow[] {
 
 /**
  * The folders shown before « Voir les N dossiers »: the first `count` in Reveal's order, and every folder à classer
- * wherever it stands, so that the figure « À classer » always points at lines on screen.
+ * wherever it stands, so that the figure « À classer » always points at lines on screen. When only one would stay
+ * folded, all of them show: a button for one line is not worth it.
  */
-export const foldedRows = (rows: readonly FolderRow[], count: number): FolderRow[] =>
-  rows.filter((row, at) => at < count || row.unmarked);
+export function foldedRows(rows: readonly FolderRow[], count: number): FolderRow[] {
+  const shown = rows.filter((row, at) => at < count || row.unmarked);
+  return rows.length - shown.length <= 1 ? [...rows] : shown;
+}
 
 /** The three figures at the head of the card: media still listed, folders, and those without ☀️ or 🌙 (« À classer »). */
 export function vaultFigures(view: VaultView): {
