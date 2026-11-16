@@ -133,3 +133,4 @@ Date : AAAA-MM-JJ
 | 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
 | 0120 | Lire avant de publier : les statistiques du compte Instagram et les clics des liens de redirection, le retour sur un Reel, l'entonnoir d'acquisition | accepted (précise 0057, 0060, 0080, 0082, 0042 ; amende 0057 § 2 et 0060 § 2) |
 | 0136 | Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait | proposed (amende 0044 § 3 et § 4, 0055 § 1 et § 5 ; précise 0044 § 6, 0083, 0126) |
+| 0137 | Le Mass DM part seul : une annonce après chaque publication du feed, un réveil quand plus personne ne parle, aux seuls fans silencieux | proposed (amende 0044 § 5 ; précise 0110 § 5 et § 6, 0136, 0126) |
