@@ -1,6 +1,6 @@
 # 0141. Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande
 
-Statut : proposed (fil « Extension, connexion Reveal et playground », 16/11/2026 ; choix de Charles sur carte le 16/11 à 15 h 44 : « Gratuit + accroches » ; relu par Agent et Sécurité le 16/11 ; à relire par Design ; attend « ok 0141 »)
+Statut : proposed (fil « Extension, connexion Reveal et playground », 16/11/2026 ; choix de Charles sur carte le 16/11 à 15 h 44 : « Gratuit + accroches » ; relu par Agent, Sécurité et Design le 16/11 ; attend « ok 0141 »)
 Date : 2026-11-16
 Précise : ADR 0086 § 3 (ce que montre le panneau) et § 10 (un copilote qui fait gagner du temps). S'appuie sur ADR 0021 (rester en personnage), 0025 (accès pendant le shift), 0063 (la créatrice ne voit pas la fiche), 0098 (le cerveau choisit parmi ce que le code permet), 0112 (scripts à branches). Ne remplace aucun ADR.
 
@@ -28,7 +28,7 @@ Charles a choisi, sur carte, d'afficher d'abord ce qui est déjà calculé (sans
 
 ### B. Deux boutons qui appellent l'IA, au clic seulement
 
-6. **« 3 accroches »** : trois débuts de message différents dans la voix de la créatrice, pour relancer ou ouvrir la conversation. **« Réponse à une objection »** : le chatteur choisit l'objection dans la liste fermée que le code connaît déjà (`OBJECTION_KINDS` : « C'est trop cher », « Pour ce prix j'ai du réel », « Ailleurs c'est gratuit », « Fais-moi un prix », « J'ai déjà payé la dernière fois ») et reçoit une réponse. Une réplique de la banque pas encore utilisée avec ce fan sort d'abord, sans appel d'IA ; l'IA n'écrit que s'il n'y en a pas. « Fais-moi un prix » ne donne jamais de remise. D'autres objections n'entrent dans la liste que sur décision de Charles. Chaque proposition se copie comme un brouillon (« Copier pour Reveal ») ; rien ne part sans le chatteur.
+6. **« 3 accroches »** : trois débuts de message différents dans la voix de la créatrice, pour relancer ou ouvrir la conversation. **« Répondre à une objection »** : le chatteur choisit l'objection dans la liste fermée que le code connaît déjà (`OBJECTION_KINDS` : « C'est trop cher », « Pour ce prix j'ai du réel », « Ailleurs c'est gratuit », « Fais-moi un prix », « J'ai déjà payé la dernière fois ») et reçoit une réponse. Une réplique de la banque pas encore utilisée avec ce fan sort d'abord, sans appel d'IA ; l'IA n'écrit que s'il n'y en a pas. « Fais-moi un prix » ne donne jamais de remise. D'autres objections n'entrent dans la liste que sur décision de Charles. Chaque proposition se copie comme un brouillon (« Copier pour Reveal ») ; rien ne part sans le chatteur.
 
 7. **Mêmes gardes que le brouillon** : chaque texte passe par les gardes de sortie du brouillon (rester en personnage, ADR 0021 ; pas de prix ni de remise inventés : un prix ne peut être que celui de l'étape décidée par le code ; pas de rendez-vous concret). Les accroches suivent le curseur de sexualisation de la créatrice (âge non confirmé : rien de sexuel), ne reprennent jamais une réplique déjà envoyée à ce fan, et passent par une réécriture comme le brouillon quand une garde bloque. Un texte encore refusé est retiré, jamais montré. Le corps de l'appel est fermé : la conversation, l'identifiant du message du fan, le bouton et, pour une objection, son type (liste fermée). Aucun texte libre du chatteur, et aucun texte du fan venu de l'extension : le serveur relit le message dans sa base, et ce message entre dans l'appel comme une donnée, dans un bloc délimité et typé. Les réécritures sont bornées comme pour le brouillon et comptées dans le coût.
 
@@ -43,9 +43,17 @@ Charles a choisi, sur carte, d'afficher d'abord ce qui est déjà calculé (sans
 
 10. **Bornes inchangées** : seulement pendant le shift, sur les créatrices du shift (ADR 0025), contrôlé à chaque appel ; jamais pour la créatrice (ADR 0063) ; les écritures et les appels passent par la liaison de l'extension, jamais par le cookie du CRM (ADR 0086 § 8). Chaque route nouvelle entre dans les balayages d'authentification et d'origine et dans le test d'isolation. Aucun texte de fan ni de proposition dans les journaux.
 
-### D. Qui fait quoi
+### D. La forme (avis de Design, 16/11/2026)
 
-11. Agent : les données de la vue (A), la route des boutons et leurs gardes (B), les coupures (C). Extension : le panneau. Design : la forme, avant l'avis de Charles sur les captures.
+11. **Ce qui se lit sans rien ouvrir** : panneau fermé, à 360 px de large et sans défiler, on lit dans l'ordre le fan, quoi faire, le brouillon et « Copier pour Reveal ». Tout le reste se replie.
+12. **« Quoi faire » et « pourquoi » forment un seul bloc de deux lignes** : le geste en gras, verbe d'abord, sur une ligne ; le pourquoi en petit, encre atténuée. Ton neutre, ambre quand la vente est bloquée, rouge seulement pour le doute d'âge et « Ne plus lui écrire ». Une coupure (§ 9) remplace ce bloc par une seule phrase qui dit pourquoi ; les boutons et gestes de vente disparaissent, jamais grisés.
+13. **« Copier pour Reveal » reste la seule action forte.** Les deux boutons d'IA sont discrets, sur une rangée sous le brouillon, jamais néon. Leur résultat s'ouvre sous la rangée, sans remplacer le brouillon ni le pousser hors de l'écran : au plus trois cartes courtes, chacune avec son « Copier pour Reveal », et une croix pour refermer. L'objection se choisit dans des puces à choix unique.
+14. **« Où en est la vente »** est un pli fermé par défaut dont la ligne de résumé dit l'étape en cours et la prochaine avec son prix. **« Où on en est »** montre trois signaux au plus, puis « +N ».
+15. **États** : en attente d'un clic, un squelette de trois lignes ; échec ou plafond atteint, une phrase sous la rangée. Le nombre de clics restants ne s'affiche que quand il en reste peu. Ni couleur ni composant nouveaux, aucune infobulle native, cibles de 44 px.
+
+### E. Qui fait quoi
+
+16. Agent : les données de la vue (A), la route des boutons et leurs gardes (B), les coupures (C). Extension : le panneau. Design : la forme (§ 11 à 15), et son avis sur les captures (panneau fermé, pli ouvert, accroches, objection, chaque coupure, Nuit et Jour, à 360 px) avant celui de Charles.
 
 ## Lots
 
@@ -55,7 +63,7 @@ Charles a choisi, sur carte, d'afficher d'abord ce qui est déjà calculé (sans
 ## Conséquences
 
 - Positives : le chatteur sait quoi faire et pourquoi en un coup d'œil, avec ce que l'agent sait déjà ; le lot a ne coûte rien en IA.
-- Négatives : le panneau porte plus d'informations, au risque de devenir lourd ; la règle de l'ADR 0086 § 10 (lisible en trois secondes) s'applique et Design tranche ce qui se replie.
+- Négatives : le panneau porte plus d'informations, au risque de devenir lourd ; la règle de l'ADR 0086 § 10 (lisible en trois secondes) s'applique et la forme du § D l'applique.
 - À surveiller : le nombre de clics par jour et leur coût (Conso IA) ; la part des accroches copiées puis envoyées, pour juger si le lot b sert.
 
 ## Alternatives rejetées
