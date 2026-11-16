@@ -547,7 +547,7 @@
   position: absolute;
   inset: 0;
 }
-.vx-sheet__close {
+.nv-close.vx-sheet__close {
   position: absolute;
   top: 8px;
   right: 8px;
