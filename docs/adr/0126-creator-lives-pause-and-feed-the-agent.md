@@ -1,6 +1,6 @@
 # 0126. Les lives de la créatrice : l'agent se tait pendant, en parle après, et se relaie avec les chatteurs
 
-Statut : accepted (« ok 0126 » de Charles le 16/11/2026, 12 h 48, heure de Paris ; demande du même jour, 02 h 55 et 02 h 57)
+Statut : accepted (« ok 0126 » de Charles le 16/11/2026, 12 h 48, redit à 12 h 50 avec ses réponses aux questions a–e, heure de Paris ; demande du même jour, 02 h 55 et 02 h 57)
 Date : 2026-11-16
 Précise : ADR 0042 § 3 et § 4 (son agenda : la catégorie « Live » existe déjà), ADR 0048 § 4 (le calendrier ne réglait pas les heures de l'agent), P3-14 (heures d'activité), ADR 0088 (mode soin), ADR 0021 (jamais d'aveu d'IA), ADR 0057 et 0120 (API officielles seulement). Ne remplace rien.
 
@@ -34,14 +34,19 @@ Ce qui existe au 16/11 (main `08ecb4d`) :
 4. **Fenêtre de live** : de 15 min avant le début prévu jusqu'à la fin prévue ; un début réel l'ouvre aussitôt, une fin réelle la ferme aussitôt ; un live lancé sans fin s'arrête au plus tard 4 h après son début. Le code la calcule dans son fuseau (`creators.timezone`) ; les deux marges sont des constantes du domaine.
 5. **Pendant la fenêtre, l'agent n'envoie rien** : pas de réponse, pas de relance, pas d'étape de script, sur toutes ses conversations. Un message reçu attend comme hors créneau (`reply_deferred`, raison `live`), et la fin de la fenêtre programme la même réouverture étalée (`conversation.reopen`), le plus ancien d'abord : jamais trente fans dans la même minute. Le live passe avant les créneaux de réponse et avant le mode Automatique.
 6. **Le mode soin reste prioritaire** (ADR 0088) : un fan en détresse a toujours un brouillon, validé par un humain qui sait qu'elle est en live.
-7. **Les chatteurs** voient un bandeau « En live jusqu'à 23 h » sur le compte (inbox, panneau de l'extension, calendrier). Le copilote ne propose aucun brouillon pendant la fenêtre. Rien ne peut bloquer un humain qui écrit dans Reveal ; le bandeau suffit.
+7. **Les chatteurs** voient un bandeau sur le compte (inbox, panneau de l'extension, calendrier) : « Elle est en live jusqu'à 23 h : n'écris pas. Si tu dois répondre, reste cohérent, elle est en live. » Le copilote ne propose aucun brouillon pendant la fenêtre. Rien ne peut bloquer un humain qui écrit dans Reveal ; la consigne est de ne rien écrire (Charles, 16/11 : « redoubler de cohérence »).
 
 ### C. Ce que l'agent en dit après
 
 8. **Seulement ce qui est fait.** Un live est fait s'il a un début réel ou une coche ; un tournage ou une publication, s'il est coché. Un événement seulement prévu n'est jamais dit. Calendrier vide = l'agent n'invente rien.
-9. **Le code écrit les faits, la voix les formule** (règle 3 de `CLAUDE.md`). Le contexte de l'agent reçoit un bloc typé `<her_day>` : au plus 3 faits des dernières 48 h, chacun réduit à une catégorie (`live`, `shoot`, `post`) et un moment relatif calculé par le code dans son fuseau (« hier soir », « cet après-midi »). Jamais le titre, le but, la fiche de tournage, une heure précise, un lieu, une autre catégorie (rendez-vous, perso), ni la plateforme (pas d'autre plateforme nommée à un fan).
+9. **Le code écrit les faits, la voix les formule** (règle 3 de `CLAUDE.md`). Le contexte de l'agent reçoit un bloc typé `<her_day>` : au plus 3 faits des dernières 48 h, chacun réduit à une catégorie (`live`, `shoot`, `post`) et un moment relatif calculé par le code dans son fuseau (« hier soir », « cet après-midi »). Jamais le titre, le but, la fiche de tournage, une heure précise, un lieu, une autre catégorie (rendez-vous, perso), La plateforme du fait peut être nommée (« j'ai fait un live sur TikTok hier »), jamais un pseudo dans ce bloc.
 10. **Pas de vente par ce biais.** « J'ai tourné cet aprèm » ne promet jamais le contenu : une vente ne passe que par un script (décision du 17/10). Un même fait n'est dit qu'une fois à un même fan. Après un live, l'agent peut s'excuser d'un silence (« j'étais en live 🙈 ») auprès des fans qui ont attendu.
 11. **Garde `invented_activity`** : une bulle qui dit un live, un tournage ou une publication absents du bloc est bloquée et renvoyée à un humain. Évals : calendrier vide, live seulement prévu, live fait hier.
+11 bis. **Ses réseaux, parfois** (Charles, 16/11 12 h 50 : « on est en bas de funnel, le but est de les garder sur Reveal, mais de temps en temps on peut dire suis-moi ici, je fais des lives ici »).
+   - Ses comptes publics (plateforme et nom d'utilisateur) se saisissent dans le CRM, fiche de la créatrice, par le propriétaire ou un manager ; jamais dans le dépôt ni dans un prompt versionné.
+   - **Le code décide quand** : il ne donne à la voix un bloc typé `<her_socials>` (un seul compte, celui des lives quand il y en a) que si le fan n'en a jamais reçu dans les 30 derniers jours, n'est pas dans une session chaude ni une course de script (ADR 0098, 0103), n'est pas en mode soin, et seulement après un fait de live dit ou une question du fan sur ses lives ou ses réseaux. La voix le dit en passant, comme un « suis-moi », jamais comme un départ de Reveal.
+   - Jamais une messagerie privée ni une autre plateforme payante, jamais d'annonce d'un live à venir. Hors de ce bloc, la garde `invented_activity` bloque un pseudo ou un lien cité par la voix.
+   - Les deux seuils (30 jours, un compte) sont des constantes du domaine ; à mesurer : fans qui écrivent encore sur Reveal 7 jours après l'avoir reçu.
 12. **Le playground** passe par le même chemin (ADR 0102) ; une session peut recevoir un agenda fictif, et l'horloge simulée ouvre et ferme la fenêtre de live.
 
 ### D. Les shifts de l'agent, en relais avec les chatteurs
@@ -49,23 +54,19 @@ Ce qui existe au 16/11 (main `08ecb4d`) :
 13. **L'agent se planifie comme un membre**, dans le calendrier des shifts (ADR 0045), compte par compte. Ses heures d'activité (P3-14) deviennent ses **shifts récurrents** ; le propriétaire ou un manager y ajoute des **shifts datés** et des **exceptions datées** (« pas d'IA ce soir »). Cela amende l'ADR 0048 § 4 : le calendrier règle désormais les heures de l'agent. Il n'a toujours ni charge, ni rapport, ni paie.
 14. **Un seul tient le compte à la fois.** Quand un chatteur a pris son shift sur le compte, l'agent ne répond pas en Automatique (il redevient Copilote pour ce chatteur). À la fin du shift, l'agent reprend si c'est son shift, avec la même réouverture étalée.
 15. **Passage de relais.** À chaque relais, celui qui arrive voit les conversations actives, les scripts en cours et ce qui a été promis ; un script en cours continue avec celui qui tient le compte. L'agent relit l'historique comme toujours.
-16. **Shift non pris** (EQ-12) : l'alerte existante part ; si l'interrupteur « Relais auto » du compte est allumé (éteint par défaut), l'agent prend le relais 15 min après le début prévu.
+16. **Jamais un fan laissé seul** (Charles, 16/11 12 h 50). Pendant le shift d'un chatteur, le code ne juge pas la présence du chatteur mais le résultat : un message de fan sans réponse humaine depuis 30 min est pris par l'agent, conversation par conversation, en Automatique, et une alerte part au manager en poste ou au propriétaire (la même que le shift non pris, EQ-12). Jamais pendant une fenêtre de live, ni en mode Arrêt ou arrêt global. Le chatteur reprend la conversation dès qu'il y écrit. Le seuil de 30 min est un réglage du compte.
 17. **Ordre de priorité** : fenêtre de live > arrêt global et mode Arrêt > shift d'un chatteur > shift daté de l'agent > heures d'activité.
 
-### Valeurs par défaut (réversibles, sans réponse de Charles au 16/11)
+### Réponses de Charles (16/11, 12 h 50)
 
-18. Les cinq questions posées avec l'ADR n'ont pas eu de réponse ; les recommandations valent par défaut, chacune réversible sans migration destructive :
-   - a) pendant un live, les chatteurs sont avertis par le bandeau, sans brouillon de l'agent, jamais bloqués (règle 7) ;
-   - b) l'agent n'annonce jamais un live à venir (règle 8) ;
-   - c) l'agent ne nomme jamais la plateforme du live (règle 9) ;
-   - d) shift non pris : l'agent reprend à +15 min (règle 16), derrière un interrupteur par compte, éteint tant que Charles ne l'a pas confirmé ;
-   - e) pas de détection YouTube dans cette ADR (règle 3).
+18. a) Chatteurs pendant un live : bandeau et consigne de ne rien écrire (règle 7). b) Jamais d'annonce d'un live à venir, mais ses réseaux donnés de temps en temps (règle 11 bis). c) La plateforme peut être nommée (règle 9). d) L'agent prend toute conversation sans réponse humaine depuis 30 min (règle 16). e) Détection YouTube plus tard (règle 3).
 
 ### Qui code quoi
 
 - Bilan : contrats et migration (`live_platform`, débuts et fins réels, shifts et exceptions de l'agent), job de fin de fenêtre.
 - Badges, Chiffres, Vitrine (routines et agenda de la créatrice) : boutons de live, plateforme dans les tâches et les suggestions.
-- Agent : règle de silence, relais, bloc `<her_day>`, garde `invented_activity`, évals.
+- Agent : règle de silence, relais, prise d'une conversation sans réponse depuis 30 min, blocs `<her_day>` et `<her_socials>`, garde `invented_activity`, évals.
+- Bilan aussi : ses comptes publics dans la fiche de la créatrice (CRM).
 - Équipe : shifts de l'agent dans le planning, relais, shift non pris.
 - Design : boutons, bandeau, calendrier.
 
