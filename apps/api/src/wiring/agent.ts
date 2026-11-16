@@ -93,7 +93,10 @@ export function wireAgent(
       const hers = await agentGuard.forCreator(creatorId);
       return hers === null
         ? null
-        : { check: (bubbles, { history }) => hers.check(bubbles, guardContextOf(history)) };
+        : {
+            check: (bubbles, { history, care }) =>
+              hers.check(bubbles, guardContextOf(history), care === true),
+          };
     },
   };
   return {

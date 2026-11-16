@@ -135,3 +135,26 @@ export function workerLoggerFrom(logger: Logger): WorkerLogger {
     logger[WORKER_LEVELS[level]]({ ...scope, ...fields, component: 'graphile-worker' }, message);
   });
 }
+
+/** What Better Auth's `logger.log` receives: its level, its message, then whatever the call site added. */
+type AuthLibraryLog = (
+  level: 'debug' | 'info' | 'warn' | 'error',
+  message: string,
+  ...args: unknown[]
+) => void;
+
+/**
+ * Routes Better Auth's own logs into pino, in place of its lines on the console: there they passed by no serializer,
+ * and an error of the database was written whole, the values of its query with it. Kept of a line: its level, its
+ * message reduced as an error's is (`storableError`: no values of a query, one bounded line) and the first error among
+ * its arguments, through the `err` serializer. Any other argument is dropped.
+ */
+export function authLibraryLogFrom(logger: Logger): AuthLibraryLog {
+  return (level, message, ...args) => {
+    const err = args.find((arg) => arg instanceof Error);
+    logger[level](
+      { component: 'better-auth', ...(err === undefined ? {} : { err }) },
+      storableError(new Error(message)).message,
+    );
+  };
+}
