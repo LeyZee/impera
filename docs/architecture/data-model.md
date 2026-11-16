@@ -521,7 +521,8 @@ platform_scripts          id, creator_id, platform_account_id → platform_accou
 platform_script_steps     platform_script_id, creator_id, position 0–49 (ordre de stepIndex), platform_index ≥ 0
                           (stepIndex tel quel : deux étapes au même rang sont des branches, ADR 0112, migration 0211),
                           platform_step_ref (≤ 200), name (≤ 200), text (≤ 4 000), price_minor ≥ 0 (centimes TTC, tel
-                          quel), currency
+                          quel), currency, discount_price_minor?, discount_minutes? (« Tarif réduit » lu tel quel,
+                          migration 0214 : une étape qui en a un n'est jamais envoyée, son script jamais proposé)
                           (clé : platform_script_id, position ; réécrites en entier quand le script change)
 platform_script_step_media platform_script_id, creator_id, position, role (sold|preview), rank 0–49,
                           platform_media_ref (≤ 200), kind
@@ -555,7 +556,7 @@ trend_readings    id, recorded_by → user, watch_session_id, post_code, path (p
                   first_seen_at, seen_at
                   (unique : recorded_by, watch_session_id, post_code ; chacun lit et met à jour les siens, le
                   propriétaire et un manager actif lisent tout ; la créatrice ne marque que pour elle)
-content_ideas     id, creator_id → creators, signal_id → trend_signals, title ≤ 120, category (catégorie de dépôt),
+content_ideas     id, creator_id → creators, signal_id → trend_signals, title ≤ 120, category (catégorie de dépôt hors script, migration 0214),
                   to_shoot ≤ 600, reason ≤ 200, shoot_minutes 1–600, state (proposed|validated|refused|suggested|
                   declined|deposited ; refused = l'agence, declined = elle dans son agenda), proposed_on, refusal_reason? (refus seulement), decided_by?, decided_at?
                   (propriétaire et manager actif ; ni le chatteur ni la créatrice)

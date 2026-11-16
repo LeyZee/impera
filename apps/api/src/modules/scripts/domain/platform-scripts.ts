@@ -61,7 +61,8 @@ export function priceWarnings(steps: readonly PricedStep[]): PlatformScriptWarni
 
 /**
  * What a script is, as the platform says it, in a stable form: its name, its moment, each step in order with its
- * text, its price and its media in order. Two reads that give the same fingerprint changed nothing.
+ * text, its price, its discount when it has one, and its media in order. Two reads that give the same fingerprint
+ * changed nothing.
  */
 export function platformScriptFingerprint(script: PlatformScript): string {
   const canonical = JSON.stringify([
@@ -77,6 +78,8 @@ export function platformScriptFingerprint(script: PlatformScript): string {
       step.currency,
       step.media.map((media) => [media.ref.id, media.kind]),
       step.previewMedia.map((media) => [media.ref.id, media.kind]),
+      // Only when there is one: the fingerprint of a step without a discount stays the one it had (recette 16/11).
+      ...(step.discount === null ? [] : [[step.discount.priceMinor, step.discount.minutes]]),
     ]),
   ]);
   return createHash('sha256').update(canonical).digest('hex');
@@ -200,10 +203,15 @@ export type PlatformScriptGap = (typeof PLATFORM_SCRIPT_GAPS)[number];
  * preview) absent from the vault makes its step incomplete; a photo or a video not described with a validated
  * description (a voice note is never described: ADR 0083 § 2); the identity of its current version (SC-04 c8) not
  * validated; two steps on the same platform rank, branches a human chooses between, which nothing offers until the
- * model of branched scripts exists (ADR 0112). Empty: it may be offered, when it is active.
+ * model of branched scripts exists (ADR 0112); a step with a « Tarif réduit » set on the platform, never sold at
+ * (recette 16/11, Charles: blocked and said, as a changed price). Empty: it may be offered, when it is active.
  */
 export function platformScriptGaps(
-  steps: readonly { readonly platformIndex: number; readonly media: readonly StepMediaState[] }[],
+  steps: readonly {
+    readonly platformIndex: number;
+    readonly discounted: boolean;
+    readonly media: readonly StepMediaState[];
+  }[],
   identityValidated: boolean,
 ): PlatformScriptGap[] {
   const media = steps.flatMap((step) => step.media);
@@ -213,5 +221,6 @@ export function platformScriptGaps(
     gaps.push('media_not_described');
   if (!identityValidated) gaps.push('identity_not_validated');
   if (hasBranches(steps)) gaps.push('branched_step');
+  if (steps.some((step) => step.discounted)) gaps.push('step_discounted');
   return gaps;
 }

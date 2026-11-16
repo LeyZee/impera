@@ -9,6 +9,7 @@ import type {
   PlatformScript,
   PlatformScriptId,
   PlatformScriptMoment,
+  PlatformStepDiscount,
   ScriptCadenceOutcome,
   ScriptIdentityAuthor,
   ScriptIdentityContent,
@@ -220,6 +221,8 @@ interface StoredPlatformStep {
   readonly text: string;
   readonly priceMinor: number;
   readonly currency: Currency;
+  /** A « Tarif réduit » set on the platform, as read; `null` when none (recette 16/11). */
+  readonly discount: PlatformStepDiscount | null;
   readonly media: readonly StoredStepMedia[];
   readonly previewMedia: readonly StoredStepMedia[];
 }

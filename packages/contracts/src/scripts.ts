@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { PlatformScriptMomentSchema } from './connector';
+import { PlatformScriptMomentSchema, PlatformStepDiscountSchema } from './connector';
 import { CreatorIdSchema, PlatformAccountIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
@@ -756,6 +756,8 @@ export const PLATFORM_SCRIPT_GAPS = [
   'identity_not_validated',
   /** Two steps on the same platform rank: branches a human chooses between, not offered until ADR 0112. */
   'branched_step',
+  /** A step carries a « Tarif réduit » on the platform: never sold at a discount (recette 16/11, Charles). */
+  'step_discounted',
 ] as const;
 
 const PlatformStepMediaViewSchema = z.object({
@@ -792,6 +794,8 @@ export const PlatformScriptViewSchema = z.object({
       /** Minor units, VAT included, as the platform gives it; 0 for an offered step. */
       priceMinor: z.number().int().min(0),
       currency: CurrencySchema,
+      /** A reduced price set on the platform, as read; `null` when none. Never sold at: the step is blocked. */
+      discount: PlatformStepDiscountSchema.nullable(),
       media: z.array(PlatformStepMediaViewSchema),
       previewMedia: z.array(PlatformStepMediaViewSchema),
       complete: z.boolean(),

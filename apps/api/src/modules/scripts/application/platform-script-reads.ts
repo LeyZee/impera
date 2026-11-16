@@ -1,4 +1,4 @@
-import type { CreatorId, Currency, MediaSlotKind, UserRole } from '@impera/contracts';
+import type { CreatorId, Currency, MediaSlotKind, PlatformStepDiscount, UserRole } from '@impera/contracts';
 
 import {
   platformScriptGaps,
@@ -44,6 +44,8 @@ interface PlatformStepView {
   /** As the platform gives it: minor units, VAT included; 0 for an offered step. Never recalculated. */
   readonly priceMinor: number;
   readonly currency: Currency;
+  /** A « Tarif réduit » set on the platform; `null` when none. The step is blocked while it has one. */
+  readonly discount: PlatformStepDiscount | null;
   readonly media: readonly PlatformStepMediaView[];
   readonly previewMedia: readonly PlatformStepMediaView[];
   /** Every media of the step is in the vault. */
@@ -114,6 +116,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
   const gaps = platformScriptGaps(
     steps.map((step) => ({
       platformIndex: step.platformIndex,
+      discounted: step.discount !== null,
       media: [...step.media, ...step.previewMedia],
     })),
     identity?.validatedAt != null,

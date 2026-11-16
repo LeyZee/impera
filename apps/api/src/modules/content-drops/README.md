@@ -35,7 +35,7 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 
 Le même job, une fois le fichier reçu, le télécharge dans un dossier temporaire, puis :
 
-- **lit ce qu'il est** par ses premiers octets (`domain/sniff.ts`), jamais par le type annoncé : un fichier qui n'est pas ce qu'il annonce est refusé (« Ce fichier n'est pas ce qu'il annonce : renvoie-le depuis ta galerie ») ;
+- **lit ce qu'il est** par ses premiers octets (`sniff` de `@impera/contracts`, que la feuille de dépôt lit aussi avant tout envoi), jamais par le type annoncé : un fichier qui n'est pas ce qu'il annonce est refusé (« Ce fichier n'est pas ce qu'il annonce : renvoie-le depuis ta galerie ») ;
 - **retire ses métadonnées** (`infra/cleaning/`) :
   - une photo octet par octet, sans la décoder ni la réencoder. JPEG : EXIF, XMP, commentaires et tout ce qui suit la fin de l'image (l'iPhone y met une seconde image avec son propre EXIF) ; l'orientation est réécrite seule dans un EXIF minimal ; le profil de couleur ICC, JFIF et Adobe restent. PNG : `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME`. WebP : `EXIF`, `XMP ` et leurs drapeaux. HEIC : les items EXIF et XMP recouverts de zéros sur place, aucun décalage ne bouge ;
   - une vidéo ou un vocal par ffmpeg, flux copiés sans réencodage dans un conteneur neuf : ni étiquettes globales (position ISO 6709, marque, modèle, logiciel, dates), ni celles des flux, ni chapitres, ni pistes de données (`mebx` d'Apple), ni ID3 ; la rotation, propriété du flux, reste ;

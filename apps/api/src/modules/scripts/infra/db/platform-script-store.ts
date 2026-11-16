@@ -60,6 +60,8 @@ async function writeSteps(
       text: step.text,
       priceMinor: step.priceMinor,
       currency: step.currency,
+      discountPriceMinor: step.discount?.priceMinor ?? null,
+      discountMinutes: step.discount?.minutes ?? null,
     })),
   );
   const media = script.steps.flatMap((step) => [
@@ -275,6 +277,10 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
         text: step.text,
         priceMinor: step.priceMinor,
         currency: CurrencySchema.parse(step.currency),
+        discount:
+          step.discountPriceMinor === null && step.discountMinutes === null
+            ? null
+            : { priceMinor: step.discountPriceMinor, minutes: step.discountMinutes },
         media: mediaOf(step, 'sold'),
         previewMedia: mediaOf(step, 'preview'),
       })),
