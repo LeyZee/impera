@@ -6,10 +6,12 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { PersonaSampleReplyUnprocessable } from './domain/errors';
 import type { CreatorDirectory } from './domain/ports';
+import type { SocialAccountStore } from './domain/social-accounts';
 import type { PersonaVersionStore } from './domain/versions';
 import { createDrizzleCreatorDirectory } from './infra/db/creator-directory';
 import { createDrizzlePersonaCorrectionStore } from './infra/db/persona-correction-store';
 import { createDrizzlePersonaVersionStore } from './infra/db/persona-version-store';
+import { createDrizzleSocialAccountStore } from './infra/db/social-account-store';
 import { createPersonaRoutes } from './infra/http/persona-routes';
 import {
   createCreatorArchiveRoutes,
@@ -27,6 +29,8 @@ export interface PersonaModule {
    * the port the agent writes with (her active version, read at each draft), wired by the composition root.
    */
   readonly versions: PersonaVersionStore;
+  /** « Ses comptes » (ADR 0143 § C): `socialAccounts.shareable` is the port the agent reads, wired by the composition root. */
+  readonly socialAccounts: SocialAccountStore;
   /** Mounted under `/v1` by the server: `/creators` and her `/agent-hours`, and each creator's `/persona` with its versions and her corrections. */
   readonly routes: FastifyPluginAsyncZod;
   /**
@@ -83,11 +87,19 @@ export function createPersonaModule(deps: PersonaDeps): PersonaModule {
   const stored = createDrizzlePersonaVersionStore(deps.db, check);
   const versions = check === undefined ? stored : withSampleReplyCheck(stored, check);
   const corrections = createDrizzlePersonaCorrectionStore(deps.db);
-  const personaRoutes = createPersonaRoutes(versions, corrections, deps.requireRole, deps.recentLogin);
+  const socialAccounts = createDrizzleSocialAccountStore(deps.db);
+  const personaRoutes = createPersonaRoutes(
+    versions,
+    corrections,
+    deps.requireRole,
+    deps.recentLogin,
+    socialAccounts,
+  );
   return {
     name: 'persona',
     creators,
     versions,
+    socialAccounts,
     routes: async (app) => {
       await app.register(creatorRoutes);
       await app.register(personaRoutes);

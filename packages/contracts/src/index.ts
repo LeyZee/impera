@@ -47,6 +47,7 @@ export * from './pay-periods';
 export * from './pay-rules';
 export * from './payroll';
 export * from './persona';
+export * from './social-accounts';
 export * from './persona-api';
 export * from './persona-sheet';
 export * from './playground';

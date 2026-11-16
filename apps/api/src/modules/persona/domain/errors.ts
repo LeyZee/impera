@@ -105,3 +105,10 @@ export class PersonaCorrectionNotFound extends DomainError {
     super('persona_correction_not_found' satisfies PersonaCorrectionErrorCode, 'Correction introuvable');
   }
 }
+
+/** « Ses comptes » read by someone outside her team (a chatter's own scope): never shown (403). */
+export class SocialAccountsForbidden extends DomainError {
+  constructor() {
+    super('creator_forbidden', 'Créatrice hors de ton périmètre');
+  }
+}

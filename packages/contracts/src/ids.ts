@@ -46,6 +46,10 @@ export type PersonaVersionId = z.infer<typeof PersonaVersionIdSchema>;
 export const PersonaCorrectionIdSchema = uuid.brand<'PersonaCorrectionId'>();
 export type PersonaCorrectionId = z.infer<typeof PersonaCorrectionIdSchema>;
 
+/** One of « Ses comptes » (ADR 0143 § 7): a creator's account elsewhere, kept in the CRM, never in the repository. */
+export const SocialAccountIdSchema = uuid.brand<'SocialAccountId'>();
+export type SocialAccountId = z.infer<typeof SocialAccountIdSchema>;
+
 export const UserIdSchema = uuid.brand<'UserId'>();
 export type UserId = z.infer<typeof UserIdSchema>;
 
