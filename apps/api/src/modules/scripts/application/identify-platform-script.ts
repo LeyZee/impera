@@ -19,7 +19,10 @@ export type IdentifyOutcome =
   | 'off'
   /** A photo or a video has no validated description yet: the hourly backlog asks again. */
   | 'waiting'
-  /** Branches (ADR 0112): never offered, so never told until the model of branched scripts exists. */
+  /**
+   * Branches (ADR 0112): its prompt reads the steps one after the other, so the agency writes such an identity by hand
+   * until the prompt knows ranks.
+   */
   | 'branched'
   /** Not hers, gone from the platform, or she is archived. */
   | 'gone'
