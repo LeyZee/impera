@@ -6,6 +6,7 @@ import {
   FanIdSchema,
   McpFanCardGetSchema,
   McpGrantCreatedSchema,
+  McpPayPeriodStateSchema,
   McpSalesListSchema,
   McpWhoamiSchema,
   newId,
@@ -259,7 +260,8 @@ describe('/v1/mcp', () => {
   });
 
   it('lists only the tools whose capability the access holds', async () => {
-    const grant = await createGrant({ capabilities: ['read:payroll'], creatorId: null });
+    // No conversation tool is served yet: an access holding only that capability lists whoami alone.
+    const grant = await createGrant({ capabilities: ['read:conversations'], creatorId: null });
     const listed = RpcSchema.parse(
       (await rpc(grant.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
     );
@@ -495,6 +497,33 @@ describe('/v1/mcp', () => {
       (await rpc(bound.token, callTool('sales_list', { ...week, creatorId: lea }))).json(),
     );
     expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+  });
+  it('gives the state of a pay period to an access of the agency, never to one bound to a creator', async () => {
+    const agency = await createGrant({ capabilities: ['read:payroll'], creatorId: null });
+    const listed = RpcSchema.parse(
+      (await rpc(agency.token, { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })).json(),
+    );
+    expect(listed.result?.tools?.map((tool) => tool.name)).toEqual(['whoami', 'commission_statements_list']);
+    const state = McpPayPeriodStateSchema.parse(
+      RpcSchema.parse(
+        (await rpc(agency.token, callTool('commission_statements_list', { period: '2026-11-01' }))).json(),
+      ).result?.structuredContent,
+    );
+    // No statement in this test's base: no sum either.
+    expect(state).toMatchObject({
+      period: '2026-11-01',
+      statements: [],
+      team: { statements: 0, totalMinor: null, payableMinor: null },
+    });
+    const notAPeriod = RpcSchema.parse(
+      (await rpc(agency.token, callTool('commission_statements_list', { period: '2026-11-02' }))).json(),
+    );
+    expect(notAPeriod.result?.structuredContent).toEqual({ refusal: 'arguments_invalid' });
+    const bound = await createGrant({ capabilities: ['read:payroll'] });
+    const refused = RpcSchema.parse(
+      (await rpc(bound.token, callTool('commission_statements_list', { period: '2026-11-01' }))).json(),
+    );
+    expect(refused.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
   });
   it('refuses the steps of a script to an access without read:script_content, even with read:media', async () => {
     const grant = await createGrant({ capabilities: ['read:media'] });

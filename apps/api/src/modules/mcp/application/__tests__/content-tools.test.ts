@@ -17,6 +17,10 @@ import type { ActorView } from '../../domain/access';
 import type { ContentReaderView, ContentReads, GrantRecord } from '../../domain/ports';
 import { contentTools } from '../content-tools';
 
+/** Every number the JSON of a value holds as a value: never digits inside an id, a date or a key. */
+const numbersIn = (value: unknown): number[] =>
+  (JSON.stringify(value).match(/(?<=[:,[])-?\d+(?:\.\d+)?(?=[,\]}])/gu) ?? []).map(Number);
+
 const nora = newId(CreatorIdSchema);
 const grant: GrantRecord = {
   id: newId(McpGrantIdSchema),
@@ -188,7 +192,8 @@ describe('the content tools (ADR 0105 § 4)', () => {
         bridges: 2,
       },
     ]);
-    expect(JSON.stringify(value)).not.toMatch(/version-figee|1500|priceMinor/u);
+    expect(JSON.stringify(value)).not.toMatch(/version-figee|priceMinor/u);
+    expect(numbersIn(value)).not.toContain(1500);
   });
 
   it('give the steps of a script of hers, every word untrusted, and null for another drop', async () => {

@@ -106,6 +106,7 @@ const read = (
           statements: [stored(goal)],
           bonusTierSets: [],
           collectiveGoals: [],
+          agency: { timeZone: 'Europe/Paris', today: '2025-03-19' },
           settings: { minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: null },
         }),
       periods: () => Promise.reject(new Error('not read here')),

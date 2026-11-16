@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyTicks, tickTimely, type Tick } from '../completion';
+import { applyTicks, tickTimely, untickTimely, type Tick } from '../completion';
 import { dayRecordOf, dayOutcome } from '../streak';
 
 const tick = (taskId: string, day: string, doneAt: string): Tick => ({
@@ -60,6 +60,22 @@ describe('a tick that may count (ADR 0042 § 8)', () => {
 
   it('lets a dated task be ticked ahead of its day', () => {
     expect(tickTimely(tick('post', '2026-11-05', '2026-11-04T09:00:00.000Z'), false, now, zone)).toBe(true);
+  });
+});
+
+describe('a tick taken back (recette 16/11, CRE-03)', () => {
+  // 10:00Z on the 4th is 11 h in Paris, still the 4th; 23:30Z on the 4th is already the 5th there.
+  const zone = 'Europe/Paris';
+
+  it('takes back a routine tick on her today only: a day that is over keeps its ticks, and her streak', () => {
+    expect(untickTimely('2026-11-04', true, new Date('2026-11-04T10:00:00.000Z'), zone)).toBe(true);
+    expect(untickTimely('2026-11-03', true, new Date('2026-11-04T10:00:00.000Z'), zone)).toBe(false);
+    expect(untickTimely('2026-11-04', true, new Date('2026-11-04T23:30:00.000Z'), zone)).toBe(false);
+    expect(untickTimely('2026-11-05', true, new Date('2026-11-04T10:00:00.000Z'), zone)).toBe(false);
+  });
+
+  it('takes back a dated task tick on any day it may be ticked: it moves no streak', () => {
+    expect(untickTimely('2026-10-28', false, new Date('2026-11-04T10:00:00.000Z'), zone)).toBe(true);
   });
 });
 
