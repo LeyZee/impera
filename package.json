@@ -22,7 +22,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write .",
     "test": "turbo run test && pnpm test:scripts",
-    "test:scripts": "node --test \"scripts/*.test.mjs\"",
+    "test:scripts": "node --test \"scripts/*.test.mjs\" \"ops/pc/*.test.mjs\"",
     "test:integration": "turbo run test:integration",
     "test:e2e": "turbo run test:e2e",
     "test:all": "pnpm test && pnpm test:integration",

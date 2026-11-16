@@ -23,6 +23,12 @@ personas/**/v[1-9]*.yaml
 *.sql.gz
 *.age
 
+# « Démarrer Impera » sur le PC de l'agence (ADR 0125, ops/pc/README.md) : réglages, état, statut et journal du
+# programme, puis les dossiers que l'API construite lit à côté de dist/ (copiés à chaque construction)
+/ops/pc/local/
+/apps/api/migrations/
+/apps/api/prompts/
+
 # Outils
 .DS_Store
 .idea/

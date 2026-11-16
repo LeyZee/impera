@@ -3,8 +3,8 @@
   "ignoreBinaries": ["ffmpeg", "fc-match", "gitleaks"],
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.mjs"],
-      "project": ["*.{js,ts}", "scripts/**/*.mjs"]
+      "entry": ["scripts/*.mjs", "ops/pc/start.mjs", "ops/pc/*.test.mjs"],
+      "project": ["*.{js,ts}", "scripts/**/*.mjs", "ops/**/*.mjs"]
     },
     "apps/api": {
       "entry": ["src/__tests__/**/*.ts"],

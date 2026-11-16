@@ -1,5 +1,7 @@
 # LF everywhere, Windows checkouts included: prompts, personas and scripts are read byte for byte.
 * text=auto eol=lf
+# Except what cmd.exe reads: a batch file in LF breaks its labels and long lines (ops/pc).
+*.cmd text eol=crlf
 
 *.png binary
 *.jpg binary
