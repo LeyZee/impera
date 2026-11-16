@@ -733,6 +733,7 @@
   align-self: flex-end;
   /* On her side, like « Elle écrit… », even on two lines on a phone. */
   text-align: right;
+  text-wrap: pretty;
   margin: 0;
   font-size: 13px;
   line-height: 18px;
