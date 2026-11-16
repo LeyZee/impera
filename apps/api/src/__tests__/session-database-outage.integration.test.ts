@@ -1,7 +1,8 @@
 import { createServer, Socket, type Server as TcpServer } from 'node:net';
+import { Writable } from 'node:stream';
 
 import { createTestDb, type TestDb } from '@impera/db/testing';
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
 
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
@@ -65,6 +66,14 @@ describe('a signed-in request while the database is down (recette 07/11, BIL-01)
   let server: Server;
   let relay: Awaited<ReturnType<typeof relayTo>>;
   let cookie = '';
+  /** Every line the API's logger wrote. */
+  const lines: string[] = [];
+  const logged = new Writable({
+    write(chunk: Buffer, _encoding, done) {
+      lines.push(chunk.toString());
+      done();
+    },
+  });
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
@@ -73,10 +82,11 @@ describe('a signed-in request while the database is down (recette 07/11, BIL-01)
       DATABASE_URL: relay.url(test.appUrl),
       DATABASE_SERVICE_URL: test.serviceUrl,
     });
-    app = await createApp(config, createLogger(config));
+    const logger = createLogger({ LOG_LEVEL: 'warn' }, logged);
+    app = await createApp(config, logger);
     server = await buildServer({
       config,
-      logger: createLogger(config),
+      logger,
       routes: app.routes,
       readiness: app.readiness,
     });
@@ -104,6 +114,30 @@ describe('a signed-in request while the database is down (recette 07/11, BIL-01)
       });
       expect(response.statusCode, `${url}: ${response.body}`).toBe(503);
       expect(response.json<{ error: { code: string } }>().error.code).toBe('service_unavailable');
+    }
+  });
+
+  it('writes its failed reads through the logger alone, without the value that names the session', async () => {
+    const token = decodeURIComponent(/session_token=([^;]+)/u.exec(cookie)?.[1] ?? '').split('.')[0] ?? '';
+    expect(token.length).toBeGreaterThan(16);
+    const consoles = (['log', 'warn', 'error'] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => undefined),
+    );
+    lines.length = 0;
+    try {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/v1/me',
+        headers: { cookie, origin: DASHBOARD_ORIGIN },
+      });
+      expect(response.statusCode, response.body).toBe(503);
+      const onConsole = consoles.flatMap((spy) => spy.mock.calls.map((call) => call.map(String).join(' ')));
+      expect(onConsole.filter((line) => line.includes('Better Auth'))).toEqual([]);
+      const written = lines.join('');
+      expect(written).toContain('"component":"better-auth"');
+      expect(`${written}\n${onConsole.join('\n')}`).not.toContain(token);
+    } finally {
+      for (const spy of consoles) spy.mockRestore();
     }
   });
 });

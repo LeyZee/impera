@@ -4,7 +4,7 @@ import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { createLogger, workerLoggerFrom } from '../logger';
+import { authLibraryLogFrom, createLogger, workerLoggerFrom } from '../logger';
 
 const LineSchema = z.record(z.string(), z.unknown());
 
@@ -116,6 +116,30 @@ describe('logged errors (relecture #584): name, message and code, never someoneâ
       maxAttempts: 3,
     });
     expect(failed?.['error']).toMatchObject({ code: '23505' });
+  });
+});
+
+describe('the auth libraryâ€™s own lines: through pino, never with the values of a query', () => {
+  it('keeps the level, the reduced message and the error, and none of the values', () => {
+    const { logger, lines } = memoryLogger();
+    const log = authLibraryLogFrom(logger);
+    log('error', 'Error', drizzleError(), { params: ['FanPseudo'] });
+    log('error', 'Failed query: select * from session where token = $1\nparams: FanPseudo');
+    log('warn', 'Invalid password');
+    const written = lines();
+    const text = JSON.stringify(written);
+    expect(text).not.toContain('FanPseudo');
+    expect(text).not.toContain('limites de la persona');
+    expect(written.map((line) => [line['level'], line['component'], line['msg']])).toEqual([
+      [50, 'better-auth', 'Error'],
+      [50, 'better-auth', 'Failed query: select * from session where token = $1'],
+      [40, 'better-auth', 'Invalid password'],
+    ]);
+    expect(written[0]?.['err']).toMatchObject({
+      message: 'Failed query: insert into fans values ($1, $2) [SQLSTATE 23505]',
+      code: '23505',
+    });
+    expect(Object.keys(written[1] ?? {})).not.toContain('err');
   });
 });
 
