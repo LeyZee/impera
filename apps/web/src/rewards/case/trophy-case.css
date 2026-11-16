@@ -294,6 +294,68 @@
   }
 }
 
+/* While the case is read, and when the server does not answer (recette 16/11, CHT-18) */
+.tc-skel i {
+  display: block;
+  width: var(--tc-w, 100%);
+  height: var(--tc-h, 14px);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-track);
+  animation: tc-wait var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+.tc-skel__hero {
+  display: grid;
+  grid-template-columns: 236px 1fr;
+  gap: var(--nv-space-8);
+  align-items: center;
+  padding: 30px 40px;
+  border-radius: 28px;
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+}
+.tc-skel__hero span {
+  display: grid;
+  gap: 14px;
+}
+.tc-skel .tc-skel__ring {
+  width: 236px;
+  height: 236px;
+  border-radius: 50%;
+  background: none;
+  box-shadow: inset 0 0 0 9px var(--nv-fill-track);
+}
+.tc-skel {
+  align-self: start;
+}
+.tc-skel .tc-skel__shelf {
+  height: 210px;
+  border-radius: 26px;
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+}
+@keyframes tc-wait {
+  to {
+    opacity: 0.45;
+  }
+}
+.tc-down {
+  display: grid;
+  align-self: start;
+  align-content: start;
+  justify-items: center;
+  gap: var(--nv-space-4);
+  padding: 40px 24px;
+  border-radius: 28px;
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  text-align: center;
+}
+.tc-down p {
+  margin: 0;
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+
 /* The detail */
 .tc-detail__object {
   display: grid;
@@ -421,7 +483,30 @@
     display: inline;
   }
   .tc-all {
-    display: inline;
+    /* A thumb's target, 44 px tall, around words that stay the size of the count (CRE-14). */
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    min-height: 44px;
+    margin: -14px -8px -14px 6px;
+    padding: 0 8px 0 0;
+  }
+  .tc-all::before {
+    /* A flex box drops the space after the dot: the gap holds it. */
+    content: '·';
+  }
+  .tc-skel__hero {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 22px 20px;
+  }
+  .tc-skel .tc-skel__ring {
+    width: 190px;
+    height: 190px;
+  }
+  .tc-skel__hero span {
+    width: 100%;
+    justify-items: center;
   }
 }
 

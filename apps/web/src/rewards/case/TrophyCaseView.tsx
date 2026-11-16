@@ -49,6 +49,25 @@ const SHELF_TITLES: Readonly<Record<ShelfFamily, string>> = {
 const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
 const SHORT_DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
 
+/** The entrance plays once a session (ADR 0108 § 10): coming back to the tab finds the case standing (CHT-19). */
+const ENTERED = 'impera.trophy-case.entered';
+
+function enteredBefore(): boolean {
+  try {
+    return window.sessionStorage.getItem(ENTERED) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markEntered(): void {
+  try {
+    window.sessionStorage.setItem(ENTERED, '1');
+  } catch {
+    // A browser that keeps nothing replays the entrance: nothing is lost.
+  }
+}
+
 const RING = 240;
 const STROKE = 9;
 const RADIUS = (RING - STROKE) / 2;
@@ -202,6 +221,10 @@ export function TrophyCaseView({
   const [open, setOpen] = useState<TrophyCaseItem | null>(null);
   const [playing, setPlaying] = useState<TrophyCaseItem | null>(null);
   const [unfolded, setUnfolded] = useState<ReadonlySet<ShelfFamily>>(new Set());
+  const [still] = useState(() => readOnly || enteredBefore());
+  useEffect(() => {
+    if (!readOnly) markEntered();
+  }, [readOnly]);
 
   const known = {
     ...trophyCase,
@@ -222,7 +245,7 @@ export function TrophyCaseView({
   const nextPercent = next === null ? null : percentOf(next.progress, false);
 
   return (
-    <div className="tc" data-still={readOnly}>
+    <div className="tc" data-still={still}>
       {next !== null && nextEntry !== null ? (
         <section className="tc-hero" aria-labelledby={`${id}-next`} style={{ '--tc-i': 0 }}>
           <div className="tc-hero__object">
@@ -346,6 +369,38 @@ export function TrophyCaseView({
           }}
         />
       ) : null}
+    </div>
+  );
+}
+
+/** The case's shapes while it is read: a plate for the next trophy, then a shelf (CHT-18). */
+export function TrophyCaseLoading(): JSX.Element {
+  return (
+    <div className="tc tc-skel" aria-busy="true" aria-label="Chargement de la vitrine">
+      <div className="tc-skel__hero">
+        <i className="tc-skel__ring" />
+        <span>
+          <i style={{ '--tc-w': '34%' }} />
+          <i style={{ '--tc-w': '62%', '--tc-h': '38px' }} />
+          <i style={{ '--tc-w': '22%', '--tc-h': '34px' }} />
+        </span>
+      </div>
+      <i className="tc-skel__shelf" />
+    </div>
+  );
+}
+
+/**
+ * A read that failed, whatever the cause (a silent server, a refusal, an answer of another shape): said in neutral
+ * words, with a retry, never an empty case that would lie (CHT-18; Design, 16/11).
+ */
+export function TrophyCaseDown({ onRetry }: { onRetry: () => void }): JSX.Element {
+  return (
+    <div className="tc-down" role="alert">
+      <p>Ta vitrine n’a pas pu être lue.</p>
+      <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onRetry}>
+        Réessayer
+      </button>
     </div>
   );
 }

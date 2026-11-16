@@ -68,12 +68,20 @@ export function nextTrophy(trophyCase: TrophyCase): TrophyCaseItem | null {
   return best;
 }
 
-/** On a phone, a shelf shows what was earned and the next object only; the rest waits behind « Voir tout ». */
+/** A phone lays a shelf three objects to a row. */
+export const PHONE_ROW = 3;
+
+/**
+ * On a phone, a shelf shows what was earned and the next object, in full rows of three, so no row stands half empty
+ * (recette 16/11, CRE-14). « Voir tout » only hides two rows or more: a single row left over is shown at once.
+ */
 export function foldedShelf(shelf: Shelf): { shown: readonly TrophyCaseItem[]; hidden: number } {
-  const shown = [
-    ...shelf.items.filter(isEarned),
-    ...shelf.items.filter((item) => !isEarned(item)).slice(0, 1),
-  ];
+  const earned = shelf.items.filter(isEarned);
+  const waiting = shelf.items.filter((item) => !isEarned(item));
+  const wanted = earned.length + Math.min(waiting.length, 1);
+  const rows = Math.max(1, Math.ceil(wanted / PHONE_ROW));
+  const count = shelf.items.length - rows * PHONE_ROW > PHONE_ROW ? rows * PHONE_ROW : shelf.items.length;
+  const shown = [...earned, ...waiting].slice(0, count);
   return { shown, hidden: shelf.items.length - shown.length };
 }
 
