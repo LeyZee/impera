@@ -146,7 +146,16 @@ describe('voice guards', () => {
     ]) {
       expect(codes([daydream]), daydream).toEqual([]);
     }
-    for (const meeting of ['on se fait un resto samedi ?', 'je te rejoins à 20 h', 'viens me voir à Lyon']) {
+    for (const meeting of [
+      'on se fait un resto samedi ?',
+      'je te rejoins à 20 h',
+      'viens me voir à Lyon',
+      'imagine, on se prend un verre samedi à Lyon',
+      'imagine on se boit un verre ce soir, je suis dispo',
+      'si on se voyait vraiment, on se fait un café demain ?',
+      'viens me retrouver dans la chambre d’hôtel',
+      'demain soir, imagine, on se fait un resto',
+    ]) {
       expect(codes([meeting]), meeting).toEqual(['meeting_promise']);
     }
   });

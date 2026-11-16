@@ -31,12 +31,12 @@ export function bubbleBudget(
 }
 
 /**
- * Her bubbles within the budget: what goes past it is joined to the last bubble allowed, never dropped, so that
- * nothing the guards read is lost and nothing leaves at once.
+ * Her bubbles within the budget: the first ones, what goes past it is left out. Glued to the last one, they would
+ * make one bubble without punctuation, sometimes with two questions, which no one writes; a reply a little short is
+ * human. The guards read what leaves, so nothing they should see escapes them.
  */
 export function fitBubbles(bubbles: readonly string[], budget: BubbleBudget): readonly string[] {
-  if (bubbles.length <= budget) return bubbles;
-  return [...bubbles.slice(0, budget - 1), bubbles.slice(budget - 1).join(' ')];
+  return bubbles.length <= budget ? bubbles : bubbles.slice(0, budget);
 }
 
 /** The pause before she starts typing a bubble, then her typing speed on a phone, then the longest wait. */

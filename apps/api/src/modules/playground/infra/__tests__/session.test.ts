@@ -82,7 +82,7 @@ describe('playground session', () => {
     expect(session.history).toHaveLength(0);
   });
 
-  it('joins what goes past her bubble budget: one bubble to a short message (Charles 16/11)', async () => {
+  it('leaves out what goes past her bubble budget: one bubble to a short message (Charles 16/11)', async () => {
     const session = createPlaygroundSession({
       gateway: fakeGateway({ bubbles: ['Enchantée Julien ✨', 'Et tu as quel âge'] }),
       creatorName: 'Lina',
@@ -93,7 +93,7 @@ describe('playground session', () => {
 
     const turn = await session.handleFanMessage('Moi c’est Julien');
 
-    expect(turn.bubbles).toEqual(['Enchantée Julien ✨ Et tu as quel âge']);
+    expect(turn.bubbles).toEqual(['Enchantée Julien ✨']);
     expect(turn.violations.map((v) => v.code)).toEqual([]);
   });
 
