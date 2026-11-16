@@ -115,7 +115,7 @@ export const rewardGains = pgTable(
     ),
     check(
       'reward_gains_basis_check',
-      sql`${t.basisMinor} is null or (${t.kind} = 'level' and ${t.basisMinor} > 0)`,
+      sql`${t.basisMinor} is null or (${t.kind} = 'level' and ${t.basisMinor} >= 0)`,
     ),
     index('reward_gains_user_idx').on(t.userId, t.earnedAt),
     check(

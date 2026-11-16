@@ -648,7 +648,9 @@ describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qu
 
   it('counts a validated report at its net: a first sale, a rank, the net toward the next one (§ 1)', async () => {
     await review('validated');
-    expect((await evaluate()).gained).toBe(2);
+    // Two runs at once after a take-back: the key among the gains that hold lets one of them write, never both.
+    const runs = await Promise.all([evaluate(), evaluate()]);
+    expect(runs[0].gained + runs[1].gained).toBe(2);
     const noras = await caseOf(noraCookie);
     expect(earned(noras)).toEqual(['first_sale', 'level:1']);
     expect(noras.level).toEqual({ rank: 1, name: 'Étincelle' });
@@ -723,7 +725,9 @@ describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qu
   it('gives it again, to be revealed again at its new date, when the net comes back (§ 5)', async () => {
     const before = await gainsOfNora();
     await review('validated');
-    expect((await evaluate()).gained).toBe(2);
+    // Two runs at once after a take-back: the key among the gains that hold lets one of them write, never both.
+    const runs = await Promise.all([evaluate(), evaluate()]);
+    expect(runs[0].gained + runs[1].gained).toBe(2);
     const noras = await caseOf(noraCookie);
     expect(earned(noras)).toEqual(['first_sale', 'level:1']);
     expect(
@@ -738,6 +742,20 @@ describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qu
       .from(schema.rewardGains)
       .where(and(eq(schema.rewardGains.userId, nora.userId), sql`${schema.rewardGains.takenBackAt} is null`));
     expect(held).toEqual([{ count: 2 }]);
+  });
+
+  it('never undoes a take-back, whoever asks: a gain earned again is a new row', async () => {
+    const [taken] = (await gainsOfNora()).filter((row) => row.takenBackAt !== null);
+    if (taken === undefined) throw new Error('no gain taken back');
+    for (const takenBackAt of [null, new Date()]) {
+      await expect(
+        team.test.admin.db
+          .update(schema.rewardGains)
+          .set({ takenBackAt })
+          .where(eq(schema.rewardGains.id, taken.id)),
+      ).rejects.toThrow();
+    }
+    expect((await gainsOfNora()).find((row) => row.id === taken.id)).toEqual(taken);
   });
 
   it('never reaches pay: taking back and giving again leave the statement as it was (§ 9)', async () => {

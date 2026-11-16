@@ -12698,7 +12698,7 @@
         },
         "reward_gains_basis_check": {
           "name": "reward_gains_basis_check",
-          "value": "\"reward_gains\".\"basis_minor\" is null or (\"reward_gains\".\"kind\" = 'level' and \"reward_gains\".\"basis_minor\" > 0)"
+          "value": "\"reward_gains\".\"basis_minor\" is null or (\"reward_gains\".\"kind\" = 'level' and \"reward_gains\".\"basis_minor\" >= 0)"
         },
         "reward_gains_kind_check": {
           "name": "reward_gains_kind_check",
