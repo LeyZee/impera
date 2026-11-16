@@ -126,12 +126,13 @@ describe('Équipe › Membres › Dossier', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(screen.getByText('De 2 à 8 majuscules ou chiffres, par exemple NORA.')).toBeTruthy();
     fireEvent.change(field, { target: { value: 'theo' } });
-    // The example follows what is typed (Design, recette of 16/11): never another prefix than the one in the field.
+    // The example follows what is typed (Design, recette of 16/11): never another prefix than the one in the field. The
+    // colon keeps to its number by a no-break space, which the text matcher reads as a space.
     expect(
       screen.getByText(
         `Ses numéros commencent par lui (THEO-${String(new Date().getFullYear())}-0001) : il se fige à sa première facture.`,
-      ),
-    ).toBeTruthy();
+      ).textContent,
+    ).toContain('-0001)\u00a0: il se fige');
     server.refusal = { status: 409, code: 'invoice_prefix_taken_conflict' };
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect((await screen.findByRole('alert')).textContent).toBe('Un autre prestataire a déjà ce préfixe.');
