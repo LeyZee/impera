@@ -108,10 +108,21 @@ function strayUnder18(text: string): boolean {
 // A school year written short (« 4eme », « 3e », « 2nde »): a minor's sign the safety net does not read glued.
 const SCHOOL_YEAR = /\b(?:[3-6](?:e|eme)|2nde)\b/u;
 
+// A word that takes his age back, read on the whole message (relecture Sécurité, 16/11): « j'ai 25 ans et je
+// rigole », « et c'est faux », « la moitié », « non ». It costs a needless doubt now and then, never a minor let in.
+const MOCKERY =
+  /\b(?:rigole|rigolais|rigoler|blague|blagues|blaguais|deconne|deconnais|deconner|faux|mens|mentais|menti|moitie|non|mon cul)\b/u;
+
 /** His message leaves his adult age in doubt: a minor's sign, a negation, a future, an approximation, a stray age. */
 function ageUnsure(text: string): boolean {
   if (safetySigns(text).includes('minor_suspected')) return true;
-  return NEGATED_ADULT.test(text) || UNSURE.test(text) || SCHOOL_YEAR.test(text) || strayUnder18(text);
+  return (
+    NEGATED_ADULT.test(text) ||
+    UNSURE.test(text) ||
+    SCHOOL_YEAR.test(text) ||
+    MOCKERY.test(text) ||
+    strayUnder18(text)
+  );
 }
 
 // 4. Only a plain positive clause of his confirms, whatever the age (relecture Sécurité, #798): « j'ai 25 ans »,
@@ -119,9 +130,11 @@ function ageUnsure(text: string): boolean {
 // 25 ans ? », « je fais 25 ans », « ma copine a 25 ans », « j'ai 25 ans ou pas ».
 const SPELLED_ADULT =
   '(?:dix[ -]?huit|dix[ -]?neuf|(?:vingt|trente|quarante|cinquante|soixante|quatre[ -]vingts?)(?:[ -](?:et[ -])?(?:un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|dix[ -](?:sept|huit|neuf)))?)';
+// A pet name he may end on: « j'ai 30 ans bb », « 25 ans ma belle ».
+const ENDEARMENT = '(?:\\s+(?:bb|bebe|ma belle|cherie))?';
 const PLAIN_AGE = new RegExp(
   `^\\s*(?:(?:et |bah |ben |ok |oui |moi )?(?:moi c'est|moi|j'ai|jai|j ai|je viens d'avoir|j'ai eu|perso|j'en ai)\\s+)?` +
-    `(?:\\d{2}|${SPELLED_ADULT})\\s*(?:ans?)?(?:\\s+(?:et toi|toi|et vous|t'as quel age|et\\b.*))?` +
+    `(?:\\d{2}|${SPELLED_ADULT})\\s*(?:ans?)?${ENDEARMENT}(?:\\s+(?:et toi|toi|et vous|t'as quel age|et\\b.*))?${ENDEARMENT}` +
     `(?:\\s|\\p{Extended_Pictographic}|\\u{200d}|\\u{fe0f})*$`,
   'u',
 );
