@@ -1,6 +1,6 @@
 /*
- * « Son coffre Reveal » (ADR 0099), at the head of Créatrices › Scripts, prefixed `vx-`. One card: when it was read,
- * three figures, her folders in Reveal's order, their names as Reveal gives them. Amber only for what asks her team to
+ * « Son coffre Reveal » (ADR 0099), prefixed `vx-`. One card: when it was read, three figures, her folders as tiles in
+ * Reveal's order, their names as Reveal gives them; a folder opened shows its media, each a blurred preview. Amber only for what asks her team to
  * act (a folder without ☀️ or 🌙, its dot the same as its figure's); never a coloured edge.
  */
 .vx-card {
@@ -33,6 +33,19 @@
   align-items: center;
   gap: 8px;
   flex: none;
+}
+.vx-sync__icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.vx-sync:hover:not(:disabled) .vx-sync__icon {
+  transform: rotate(180deg);
 }
 
 /* What the sync says, kept in place even when empty so the card never jumps. */
@@ -78,77 +91,525 @@
   color: var(--nv-warning);
 }
 
-.vx-folders {
+/* ───────────── Her folders: tiles with a cover of blurred previews ───────────── */
+
+.vx-grid {
   margin: 0;
   padding: 0;
   list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: var(--nv-space-3);
+}
+.vx-grid__cell {
+  min-width: 0;
+  animation: nv-rise var(--nv-dur-base) var(--nv-ease-spring) both;
+  animation-delay: min(calc(var(--vx-at, 0) * var(--nv-stagger)), 400ms);
+}
+.vx-grid__cell:nth-child(2) {
+  --vx-at: 1;
+}
+.vx-grid__cell:nth-child(3) {
+  --vx-at: 2;
+}
+.vx-grid__cell:nth-child(4) {
+  --vx-at: 3;
+}
+.vx-grid__cell:nth-child(5) {
+  --vx-at: 4;
+}
+.vx-grid__cell:nth-child(6) {
+  --vx-at: 5;
+}
+.vx-grid__cell:nth-child(n + 7) {
+  --vx-at: 6;
+}
+
+.vx-folder {
+  appearance: none;
+  width: 100%;
   display: flex;
   flex-direction: column;
-}
-.vx-folder {
-  position: relative;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--nv-space-3);
-  padding: 10px 8px;
-  border-radius: var(--nv-radius-md);
-  transition: background var(--nv-dur-fast) var(--nv-ease-out);
-  animation: nv-rise var(--nv-dur-base) var(--nv-ease-spring) both;
-}
-.vx-folder + .vx-folder::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 8px;
-  right: 8px;
-  height: 1px;
-  background: var(--nv-hairline);
+  gap: 10px;
+  padding: 8px 8px 12px;
+  border: 0;
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
 .vx-folder:hover {
-  background: var(--nv-glass-fill);
+  background: var(--nv-plate-hover);
+  box-shadow: var(--nv-shadow-lift);
+  transform: translateY(-3px);
 }
-.vx-folder:nth-child(2) {
-  animation-delay: 30ms;
+.vx-folder:active {
+  transform: scale(0.98);
+  transition-duration: var(--nv-dur-instant);
 }
-.vx-folder:nth-child(3) {
-  animation-delay: 60ms;
+.vx-folder:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
 }
-.vx-folder:nth-child(4) {
-  animation-delay: 90ms;
+
+/* One, two, three or four previews: one fills, two side by side, three and four in a square. */
+.vx-cover {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  aspect-ratio: 4 / 3;
+  border-radius: calc(var(--nv-radius-lg) - 8px);
+  overflow: hidden;
+  background: var(--nv-select);
+  isolation: isolate;
 }
-.vx-folder:nth-child(n + 5) {
-  animation-delay: 120ms;
+.vx-cover--2 {
+  grid-template-columns: 1fr 1fr;
 }
-.vx-folder__mark {
+.vx-cover--3,
+.vx-cover--4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.vx-cover--3 > .vx-preview:first-child {
+  grid-row: span 2;
+}
+.vx-cover .vx-preview {
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.vx-folder:hover .vx-cover .vx-preview {
+  transform: scale(1.08);
+}
+.vx-cover__empty {
+  display: grid;
+  place-items: center;
+  color: var(--nv-ink-faint);
+}
+.vx-cover__empty svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+/* « Ouvrir »: a small round chevron that slides in under the pointer. */
+.vx-cover__open {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--nv-void) 62%, transparent);
+  color: var(--nv-ink);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transform: translateX(-6px) scale(0.8);
+  transition:
+    opacity var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+.vx-folder:hover .vx-cover__open,
+.vx-folder:focus-visible .vx-cover__open {
+  opacity: 1;
+  transform: none;
+}
+.vx-cover__open svg,
+.vx-crumbs__chev svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vx-folder__body {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 6px;
 }
 .vx-folder__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+}
+.vx-folder__label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 560;
 }
 .vx-folder__line {
   font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
-  text-align: right;
 }
 .vx-folder__removed {
   color: var(--nv-ink-faint);
 }
+
+/* ───────────── A preview: the platform's blurhash, stretched and smoothed ───────────── */
+
+.vx-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  user-select: none;
+}
+.vx-preview--none {
+  background:
+    radial-gradient(
+      120% 90% at 20% 10%,
+      color-mix(in srgb, var(--nv-neon) 22%, transparent),
+      transparent 60%
+    ),
+    var(--nv-select);
+}
+
+/* ───────────── A folder opened ───────────── */
+
+.vx-open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  animation: nv-rise var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.vx-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.vx-crumbs__back {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  min-height: 32px;
+  padding: 4px 10px 4px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--nv-glass-fill);
+  color: var(--nv-ink);
+  font: inherit;
+  font-weight: 560;
+}
+.vx-crumbs__chev {
+  display: inline-grid;
+  transform: rotate(180deg);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+.vx-crumbs__back:hover .vx-crumbs__chev {
+  transform: rotate(180deg) translateX(3px);
+}
+.vx-crumbs__sep {
+  color: var(--nv-ink-faint);
+}
+.vx-crumbs__here {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--nv-ink-muted);
+}
+.vx-open__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vx-open__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.vx-open__title:focus {
+  outline: none;
+}
+.vx-open__title:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.vx-open__line {
+  margin: 0;
+}
+
+/* The grid of its media, and the sheet of the one picked beside it (under it on a phone). */
+.vx-browse {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--nv-space-4);
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .vx-browse--sheet {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+}
+
+.vx-media {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 8px;
+}
+.vx-media__cell {
+  min-width: 0;
+  animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+.vx-media__cell:nth-child(2) {
+  animation-delay: 25ms;
+}
+.vx-media__cell:nth-child(3) {
+  animation-delay: 50ms;
+}
+.vx-media__cell:nth-child(4) {
+  animation-delay: 75ms;
+}
+.vx-media__cell:nth-child(5) {
+  animation-delay: 100ms;
+}
+.vx-media__cell:nth-child(6) {
+  animation-delay: 125ms;
+}
+.vx-media__cell:nth-child(n + 7) {
+  animation-delay: 150ms;
+}
+
+.vx-tile {
+  appearance: none;
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nv-radius-sm);
+  overflow: hidden;
+  background: var(--nv-select);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
+}
+.vx-tile .vx-preview {
+  position: absolute;
+  inset: 0;
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    filter var(--nv-dur-base) var(--nv-ease-out);
+}
+.vx-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.28),
+    transparent 38%,
+    transparent 62%,
+    rgba(0, 0, 0, 0.36)
+  );
+  pointer-events: none;
+}
+.vx-tile:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: var(--nv-shadow-lift);
+}
+.vx-tile:hover .vx-preview {
+  transform: scale(1.1);
+  filter: saturate(1.25);
+}
+.vx-tile:active {
+  transform: scale(0.97);
+  transition-duration: var(--nv-dur-instant);
+}
+.vx-tile:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.vx-tile[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px var(--nv-void),
+    0 0 0 4px var(--nv-ink);
+}
+.vx-tile--removed .vx-preview {
+  filter: grayscale(1) brightness(0.7);
+}
+.vx-tile__kind {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(6px);
+}
+.vx-tile__kind svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vx-tile--video .vx-tile__kind svg {
+  fill: currentColor;
+  stroke: none;
+}
+.vx-tile__time,
+.vx-tile__gone {
+  position: absolute;
+  z-index: 1;
+  bottom: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+}
+.vx-tile__time {
+  right: 7px;
+}
+.vx-tile__gone {
+  left: 7px;
+}
+
+.vx-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill);
+  animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+@media (min-width: 900px) {
+  .vx-sheet {
+    position: sticky;
+    top: var(--nv-space-4);
+  }
+}
+.vx-sheet__top {
+  position: relative;
+}
+.vx-sheet__preview {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--nv-radius-md);
+  overflow: hidden;
+  color: #fff;
+  background: var(--nv-select);
+}
+.vx-sheet__preview .vx-preview {
+  position: absolute;
+  inset: 0;
+}
+.vx-sheet__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: color-mix(in srgb, var(--nv-void) 55%, transparent);
+  backdrop-filter: blur(8px);
+}
+.vx-sheet__what {
+  margin: 4px 4px 0;
+  font-weight: 650;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+}
+.vx-sheet__when {
+  margin: 0 4px;
+  font-size: var(--nv-text-footnote);
+}
+.vx-sheet__gone {
+  margin: 0 4px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-warning);
+}
+.vx-sheet__facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 4px 0;
+  border-top: 1px solid var(--nv-hairline);
+}
+.vx-sheet__fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vx-sheet__fact dt {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  letter-spacing: var(--nv-text-caption-tracking);
+  text-transform: uppercase;
+  color: var(--nv-ink-faint);
+  font-weight: 600;
+}
+.vx-sheet__fact dd {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.vx-sheet .vx-note {
+  padding: 0 4px;
+}
+
 @media (max-width: 560px) {
   .vx-tiles .nv-tile {
     padding: 10px 12px;
   }
-  .vx-folder {
-    grid-template-columns: 16px minmax(0, 1fr);
+  .vx-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
-  .vx-folder__line {
-    grid-column: 2;
-    text-align: left;
+  .vx-media {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
   }
 }
 
@@ -168,8 +629,19 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vx-folder,
+  .vx-grid__cell,
+  .vx-media__cell,
+  .vx-open,
+  .vx-sheet,
   .vx-phase:not(:empty) {
     animation: none;
+  }
+  .vx-folder,
+  .vx-folder:hover,
+  .vx-tile,
+  .vx-tile:hover,
+  .vx-folder:hover .vx-cover .vx-preview,
+  .vx-tile:hover .vx-preview {
+    transform: none;
   }
 }

@@ -218,6 +218,8 @@ const creators = createRoute({
         tab={tab}
         creatorId={creatrice ?? null}
         onCreator={(id) => void navigate({ search: creatorsSearch(tab, id) })}
+        folderId={search.dossier ?? null}
+        onFolder={(id) => void navigate({ search: creatorsSearch(tab, creatrice ?? null, id) })}
       />
     );
   },

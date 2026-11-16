@@ -38,11 +38,16 @@ export function CreatorsPage({
   tab,
   creatorId,
   onCreator,
+  folderId = null,
+  onFolder,
 }: {
   tab: CreatorTab;
   /** The creator in the address; none, or one the list does not hold, shows the list. */
   creatorId: CreatorId | null;
   onCreator: (id: CreatorId) => void;
+  /** Her vault folder opened in Scripts, from the address (`dossier`). */
+  folderId?: string | null;
+  onFolder?: (id: string | null) => void;
 }): JSX.Element {
   const { user } = useRouteContext({ from: '__root__' });
   const query = useCreators();
@@ -188,6 +193,8 @@ export function CreatorsPage({
           creatorName={current.displayName}
           timezone={current.timezone}
           isOwner={isOwner}
+          folderId={folderId}
+          {...(onFolder === undefined ? {} : { onFolder })}
         />
       );
     }

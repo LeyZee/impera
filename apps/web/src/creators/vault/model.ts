@@ -1,4 +1,4 @@
-import type { VaultFolderView, VaultView } from '@impera/contracts';
+import type { VaultFolderView, VaultMediaView, VaultView } from '@impera/contracts';
 
 /*
  * Créatrices › Scripts › « Son coffre Reveal » (ADR 0099 §§ 2-4): her vault as the last sync read it, and the owner's
@@ -37,34 +37,97 @@ export function mediaLine(media: VaultFolderView['media']): string {
  */
 const unmarked = (folder: VaultFolderView): boolean => folder.folderRef !== null && folder.moment === null;
 
-/** One folder of her vault as the card lists it, in the platform's order, its name as Reveal gives it. */
-export interface FolderRow {
+/** The value of `dossier` in the address for a folder: its platform id, `racine` for the vault's root. */
+export const ROOT_FOLDER_ID = 'racine';
+export const folderIdOf = (folder: Pick<VaultFolderView, 'folderRef'>): string =>
+  folder.folderRef ?? ROOT_FOLDER_ID;
+
+/**
+ * The folder an address opens; `null` when it names none, or one the last sync no longer lists: the card then shows
+ * the folders, never an error.
+ */
+export function findFolder(view: VaultView, id: string | null): VaultFolderView | null {
+  if (id === null) return null;
+  return view.folders.find((folder) => folderIdOf(folder) === id) ?? null;
+}
+
+/** A folder's name as the card shows it: Reveal's, or what stands for it. */
+export const folderName = (folder: Pick<VaultFolderView, 'folderName' | 'folderRef'>): string =>
+  folder.folderName ?? (folder.folderRef === null ? 'Racine du coffre' : 'Dossier sans nom');
+
+/** One folder of her vault as the card shows it, in the platform's order, its name as Reveal gives it. */
+export interface FolderTile {
+  readonly id: string;
   readonly key: string;
   readonly name: string;
+  readonly moment: VaultFolderView['moment'];
   readonly unmarked: boolean;
   readonly line: string;
   /** No longer listed by Reveal at the last sync, kept with their descriptions. */
   readonly removed: number;
+  /** The blurred previews of its first media still listed, at most four, for the tile's cover. */
+  readonly cover: readonly (string | null)[];
 }
 
-export function folderRows(view: VaultView): FolderRow[] {
+/** How many previews make a folder's cover. */
+const COVER = 4;
+
+export function folderTiles(view: VaultView): FolderTile[] {
   return view.folders.map((folder) => ({
+    id: folderIdOf(folder),
     key: `${folder.platformAccountId}:${folder.folderRef ?? ''}`,
-    name: folder.folderName ?? (folder.folderRef === null ? 'Racine du coffre' : 'Dossier sans nom'),
+    name: folderName(folder),
+    moment: folder.moment,
     unmarked: unmarked(folder),
     line: mediaLine(folder.media),
     removed: folder.media.filter((each) => each.removed).length,
+    cover: folder.media
+      .filter((each) => !each.removed)
+      .slice(0, COVER)
+      .map((each) => each.blurhash),
   }));
 }
 
-/**
- * The folders shown before « Voir les N dossiers »: the first `count` in Reveal's order, and every folder à classer
- * wherever it stands, so that the figure « À classer » always points at lines on screen. When only one would stay
- * folded, all of them show: a button for one line is not worth it.
- */
-export function foldedRows(rows: readonly FolderRow[], count: number): FolderRow[] {
-  const shown = rows.filter((row, at) => at < count || row.unmarked);
-  return rows.length - shown.length <= 1 ? [...rows] : shown;
+/** « 0:42 », « 12:05 », « 1:02:09 »: a video's or a voice note's length. */
+export function durationLine(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const two = (n: number): string => String(n).padStart(2, '0');
+  return h > 0 ? `${String(h)}:${two(m)}:${two(s)}` : `${String(m)}:${two(s)}`;
+}
+
+const KIND_NAMES = { image: 'Photo', video: 'Vidéo', audio: 'Vocal' } as const;
+
+/** « Photo », « Vidéo · 0:42 »: what a media is, as its tile and its sheet name it. */
+export function mediaKindLine(media: Pick<VaultMediaView, 'kind' | 'durationSeconds'>): string {
+  const name = KIND_NAMES[media.kind];
+  return media.kind === 'image' || media.durationSeconds === null
+    ? name
+    : `${name} · ${durationLine(media.durationSeconds)}`;
+}
+
+const DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+/** « Ajouté le 12 novembre 2026 », in the reader's own time zone. */
+export const uploadedLine = (uploadedAt: string): string => `Ajouté le ${DAY.format(new Date(uploadedAt))}`;
+
+const WHOLE = new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+});
+const CENTS = new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 2,
+});
+/** « 10 € », « 25,50 € »: cents only when there are some. */
+const euros = (minor: number): string => (minor % 100 === 0 ? WHOLE : CENTS).format(minor / 100);
+
+/** « 10 € – 25,50 € », Reveal's suggested range from its minor unit (cents); one figure when both ends meet. */
+export function suggestedLine(range: NonNullable<VaultMediaView['suggestedPriceMinor']>): string {
+  return range.min === range.max ? euros(range.min) : `${euros(range.min)} – ${euros(range.max)}`;
 }
 
 /** The three figures at the head of the card: media still listed, folders, and those without ☀️ or 🌙 (« À classer »). */

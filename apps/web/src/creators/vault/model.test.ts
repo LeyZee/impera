@@ -9,13 +9,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   SYNC_PATIENCE_MS,
-  foldedRows,
-  folderRows,
+  durationLine,
+  findFolder,
+  folderTiles,
+  mediaKindLine,
   mediaLine,
   phaseAfterRead,
   phaseLine,
   polls,
+  suggestedLine,
   syncedLine,
+  uploadedLine,
   vaultFigures,
 } from './model';
 
@@ -27,6 +31,7 @@ const mediaOf = (fields: Partial<VaultMediaView> = {}): VaultMediaView => ({
   uploadedAt: '2026-11-10T10:00:00.000Z',
   platformDescription: null,
   suggestedPriceMinor: null,
+  blurhash: null,
   removed: false,
   ...fields,
 });
@@ -75,7 +80,7 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
   });
 
   it('lists her folders in Reveal’s order, the root and an unnamed one said in words, those à classer marked', () => {
-    const rows = folderRows(
+    const tiles = folderTiles(
       viewOf([
         folderOf({ folderRef: null, folderName: null, moment: null }),
         folderOf({
@@ -88,30 +93,52 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
       ]),
     );
     // Her names as Reveal gives them, never an emoji added; the root, which has no name to change, is never à classer.
-    expect(rows.map((row) => [row.name, row.unmarked, row.line, row.removed])).toEqual([
-      ['Racine du coffre', false, '1 photo', 0],
-      ['Nuit 🌙', false, '1 photo', 1],
-      ['Dossier sans nom', true, 'Vide', 0],
+    expect(tiles.map((tile) => [tile.id, tile.name, tile.unmarked, tile.line, tile.removed])).toEqual([
+      ['racine', 'Racine du coffre', false, '1 photo', 0],
+      ['f2', 'Nuit 🌙', false, '1 photo', 1],
+      ['f3', 'Dossier sans nom', true, 'Vide', 0],
     ]);
-    expect(new Set(rows.map((row) => row.key)).size).toBe(3);
+    expect(new Set(tiles.map((tile) => tile.key)).size).toBe(3);
   });
 
-  it('keeps every folder à classer on screen before « Voir les N dossiers », in Reveal’s order', () => {
-    const rows = folderRows(
-      viewOf(
-        Array.from({ length: 8 }, (_, at) =>
-          folderOf({
-            folderRef: `f${String(at)}`,
-            folderName: `D${String(at)}`,
-            moment: at === 6 ? null : 'day',
-          }),
-        ),
-      ),
+  it('covers a folder with the previews of its first four media still listed', () => {
+    const [tile] = folderTiles(
+      viewOf([
+        folderOf({
+          media: [
+            mediaOf({ blurhash: 'LA' }),
+            mediaOf({ blurhash: 'LB', removed: true }),
+            mediaOf({ blurhash: null }),
+            mediaOf({ blurhash: 'LC' }),
+            mediaOf({ blurhash: 'LD' }),
+            mediaOf({ blurhash: 'LE' }),
+          ],
+        }),
+      ]),
     );
-    expect(foldedRows(rows, 5).map((row) => row.name)).toEqual(['D0', 'D1', 'D2', 'D3', 'D4', 'D6']);
-    expect(foldedRows(rows.slice(0, 3), 5)).toHaveLength(3);
-    // Only one left folded: all show, no button for one line.
-    expect(foldedRows(rows.slice(0, 7), 5)).toHaveLength(7);
+    expect(tile?.cover).toEqual(['LA', null, 'LC', 'LD']);
+  });
+
+  it('opens the folder the address names, and none when the last sync no longer lists it', () => {
+    const view = viewOf([folderOf(), folderOf({ folderRef: null, folderName: null, moment: null })]);
+    expect(findFolder(view, 'f1')?.folderName).toBe('Soirée ☀️');
+    expect(findFolder(view, 'racine')?.folderRef).toBeNull();
+    expect(findFolder(view, 'gone')).toBeNull();
+    expect(findFolder(view, null)).toBeNull();
+  });
+
+  it('says what a media is, how long, when it came and Reveal’s range', () => {
+    expect(durationLine(42)).toBe('0:42');
+    expect(durationLine(725)).toBe('12:05');
+    expect(durationLine(3_729)).toBe('1:02:09');
+    expect(mediaKindLine(mediaOf())).toBe('Photo');
+    expect(mediaKindLine(mediaOf({ kind: 'video', durationSeconds: 42 }))).toBe('Vidéo · 0:42');
+    expect(mediaKindLine(mediaOf({ kind: 'audio', durationSeconds: null }))).toBe('Vocal');
+    expect(uploadedLine('2026-11-10T10:00:00.000Z')).toBe('Ajouté le 10 novembre 2026');
+    // Intl puts a narrow no-break space before the euro sign: compared once spaces are made plain.
+    const plain = (text: string): string => text.replace(/\s/gu, ' ');
+    expect(plain(suggestedLine({ min: 1_000, max: 2_550 }))).toBe('10 € – 25,50 €');
+    expect(plain(suggestedLine({ min: 900, max: 900 }))).toBe('9 €');
   });
 
   it('gives the three figures: media still listed, folders, folders without ☀️ or 🌙', () => {

@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
-import { CreatorIdSchema, PlatformAccountIdSchema, type VaultView } from '@impera/contracts';
+import {
+  CreatorIdSchema,
+  PlatformAccountIdSchema,
+  type VaultMediaView,
+  type VaultView,
+} from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -9,14 +14,21 @@ import { VaultCard } from './VaultCard';
 /* An invented creator and vault (ADR 0010): no real creator, no real media. */
 const CREATOR = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000c1');
 const ACCOUNT = PlatformAccountIdSchema.parse('0192f3a0-0000-7000-8000-0000000000a1');
-const media = (kind: 'image' | 'video', removed = false) => ({
+const media = (
+  kind: 'image' | 'video',
+  removed = false,
+  fields: Partial<VaultMediaView> = {},
+): VaultMediaView => ({
   platformMediaId: `m-${kind}-${String(Math.random())}`,
   kind,
   durationSeconds: kind === 'video' ? 12 : null,
   uploadedAt: '2026-11-10T10:00:00.000Z',
   platformDescription: null,
   suggestedPriceMinor: null,
+  // Invented one-colour hash (rgb 200, 40, 90): never a real preview.
+  blurhash: '00M_Ai',
   removed,
+  ...fields,
 });
 const folder = (
   ref: string | null,
@@ -74,10 +86,13 @@ function serve(
   return calls;
 }
 
-function show(isOwner: boolean): void {
+function show(
+  isOwner: boolean,
+  address?: { folderId: string | null; onFolder: (id: string | null) => void },
+): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <VaultCard creatorId={CREATOR} creatorName="Lina" isOwner={isOwner} />
+      <VaultCard creatorId={CREATOR} creatorName="Lina" isOwner={isOwner} {...address} />
     </QueryClientProvider>,
   );
 }
@@ -99,7 +114,7 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
     const tiles = [...card.querySelectorAll('.nv-tile')].map((tile) => tile.textContent);
     expect(tiles).toEqual(['Médias5', 'Dossiers3', 'À classer1']);
     expect(within(card).getByText(/renomme-le dans Reveal/u)).toBeDefined();
-    const names = [...card.querySelectorAll('.vx-folder__name')].map((name) => name.textContent);
+    const names = [...card.querySelectorAll('.vx-folder__label')].map((name) => name.textContent);
     expect(names).toEqual(['Matin ☀️', 'Soirée 🌙', 'En vrac']);
     expect(within(card).getByText('2 photos · 1 vidéo')).toBeDefined();
     expect(within(card).getByText(/1 retiré de Reveal/u)).toBeDefined();
@@ -161,32 +176,83 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
     expect(await screen.findByText('Matin ☀️')).toBeDefined();
   });
 
-  it('marks each folder à classer, and keeps it on screen before « Voir les N dossiers »', async () => {
-    const many = Array.from({ length: 8 }, (_, at) =>
-      folder(`f${String(at)}`, `Dossier ${String(at + 1)}`, at === 6 ? null : 'day'),
-    );
-    serve([viewOf({ folders: many })]);
+  it('marks each folder à classer, on its tile and once opened', async () => {
+    serve([viewOf()]);
     show(false);
-    const last = (await screen.findByText('Dossier 7')).closest('li');
-    if (last === null) throw new Error('no line');
-    expect(within(last).getByRole('img', { name: 'À classer' })).toBeDefined();
-    expect(screen.queryByText('Dossier 6')).toBeNull();
+    const tile = await screen.findByRole('button', { name: 'Ouvrir En vrac' });
+    expect(within(tile).getByRole('img', { name: 'À classer' })).toBeDefined();
     expect(screen.getAllByRole('img', { name: 'À classer' })).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Voir les 8 dossiers' })).toBeDefined();
+    fireEvent.click(tile);
+    const title = await screen.findByRole('heading', { name: /En vrac/u });
+    expect(within(title).getByRole('img', { name: 'À classer' })).toBeDefined();
   });
 
-  it('shows five folders, then all of them on demand', async () => {
-    const many = Array.from({ length: 7 }, (_, at) =>
-      folder(`f${String(at)}`, `Dossier ${String(at + 1)} ☀️`, 'day'),
+  it('opens a folder: « Coffre / son nom », its media in Reveal’s order, each a blurred preview', async () => {
+    serve([viewOf()]);
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir Matin ☀️' }));
+    const grid = await screen.findByRole('list', { name: 'Médias de Matin ☀️' });
+    const tiles = within(grid).getAllByRole('button');
+    expect(tiles.map((tile) => tile.getAttribute('aria-label'))).toEqual([
+      '1. Photo',
+      '2. Photo',
+      '3. Vidéo · 0:12',
+    ]);
+    // The platform's blurhash drawn here, never a link to the file.
+    const previews = [...grid.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '');
+    expect(previews).toHaveLength(3);
+    expect(previews.every((src) => src.startsWith('data:image/bmp;base64,'))).toBe(true);
+    expect(screen.getByRole('navigation', { name: 'Chemin dans le coffre' }).textContent).toContain(
+      'Matin ☀️',
     );
-    serve([viewOf({ folders: many })]);
-    show(false);
-    await screen.findByText('Dossier 1 ☀️');
-    expect(screen.queryByText('Dossier 6 ☀️')).toBeNull();
-    const more = screen.getByRole('button', { name: 'Voir les 7 dossiers' });
-    expect(more.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(more);
-    expect(screen.getByText('Dossier 7 ☀️')).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Voir moins' }).getAttribute('aria-expanded')).toBe('true');
+    // Back to the folders.
+    fireEvent.click(screen.getByRole('button', { name: 'Coffre' }));
+    expect(await screen.findByRole('button', { name: 'Ouvrir Soirée 🌙' })).toBeDefined();
+    expect(screen.queryByRole('list', { name: 'Médias de Matin ☀️' })).toBeNull();
+  });
+
+  it('opens the sheet of a media: what it is, when it came, Reveal’s text and range; Échap closes it', async () => {
+    const described = media('video', false, {
+      durationSeconds: 75,
+      platformDescription: 'Texte inventé du coffre',
+      suggestedPriceMinor: { min: 1_000, max: 2_500 },
+      blurhash: null,
+    });
+    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [described, media('image', true)])] })]);
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir Matin ☀️' }));
+    const tile = await screen.findByRole('button', { name: '1. Vidéo · 1:15' });
+    // No preview from Reveal: the kind's own colour, no picture.
+    expect(tile.querySelector('img')).toBeNull();
+    expect(screen.getByRole('button', { name: '2. Photo, retiré de Reveal' })).toBeDefined();
+    fireEvent.click(tile);
+    expect(tile.getAttribute('aria-pressed')).toBe('true');
+    const sheet = screen.getByRole('complementary', { name: 'Fiche du média' });
+    expect(within(sheet).getByText('Vidéo · 1:15')).toBeDefined();
+    expect(within(sheet).getByText('Ajouté le 10 novembre 2026')).toBeDefined();
+    expect(within(sheet).getByText('Texte inventé du coffre')).toBeDefined();
+    expect(within(sheet).getByText('10 € – 25 €')).toBeDefined();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('complementary', { name: 'Fiche du média' })).toBeNull();
+    fireEvent.click(tile);
+    fireEvent.click(screen.getByRole('button', { name: 'Fermer la fiche' }));
+    expect(screen.queryByRole('complementary', { name: 'Fiche du média' })).toBeNull();
+  });
+
+  it('follows the address when the page passes it: the folder named opens, one gone shows the folders', async () => {
+    serve([viewOf()]);
+    const asked: (string | null)[] = [];
+    show(true, { folderId: 'f2', onFolder: (id) => asked.push(id) });
+    expect(await screen.findByRole('list', { name: 'Médias de Soirée 🌙' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Coffre' }));
+    expect(asked).toEqual([null]);
+    cleanup();
+    serve([viewOf()]);
+    const opened: (string | null)[] = [];
+    show(true, { folderId: 'gone', onFolder: (id) => opened.push(id) });
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir Matin ☀️' }));
+    expect(opened).toEqual(['f1']);
+    // The page owns the address: nothing opens until it says so.
+    expect(screen.queryByRole('list', { name: 'Médias de Matin ☀️' })).toBeNull();
   });
 });
