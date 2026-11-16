@@ -1,4 +1,4 @@
-import type { LinkPlacement } from '@impera/contracts';
+import { isRedirectUrl, labelHasAddress, type LinkPlacement } from '@impera/contracts';
 
 /** Where a link is placed, in the words both screens use (ADR 0120 § 3, ADR 0121 § 1). */
 export const PLACEMENT_LABELS: Readonly<Record<LinkPlacement, string>> = {
@@ -18,4 +18,25 @@ export function middleCut(address: string, max = 36): string {
   const head = Math.ceil((max - 1) / 2);
   const tail = Math.floor((max - 1) / 2);
   return `${bare.slice(0, head)}…${bare.slice(bare.length - tail)}`;
+}
+
+/** What the dialog says is wrong before anything is sent, by field; the server checks the same again. */
+export function linkProblems(draft: {
+  readonly name: string;
+  readonly url: string;
+  readonly destination: string;
+  readonly usageNote: string;
+}): Readonly<Partial<Record<'name' | 'url' | 'destination' | 'usageNote', string>>> {
+  return {
+    ...(draft.name.trim() === '' ? { name: 'Donne-lui un nom.' } : {}),
+    ...(isRedirectUrl(draft.url.trim())
+      ? {}
+      : { url: 'Une adresse complète qui commence par https://, sans espace.' }),
+    ...(labelHasAddress(draft.destination)
+      ? { destination: 'Dis l’endroit en mots, sans adresse : le lien s’ajoute seul.' }
+      : {}),
+    ...(labelHasAddress(draft.usageNote)
+      ? { usageNote: 'Dis-le en mots, sans adresse : elle copie le lien avec le bouton.' }
+      : {}),
+  };
 }
