@@ -120,8 +120,10 @@ describe('Moi › Trophées, the creator’s', () => {
     const hero = await screen.findByRole('region', { name: '5 livraisons à l’heure' });
     expect(hero.textContent).toContain('Encore 1 livraison à l’heure');
     expect(screen.getByText('Encore 5 jours')).toBeDefined();
-    expect(hero.textContent).toContain('Série en cours : 9 jours');
+    // Her best stays in sight after a break, never read as a loss (ADR 0108 § 9, recette 16/11 CRE-02).
+    expect(hero.textContent).toContain('Série en cours : 9 jours · meilleure : 12');
     expect(hero.textContent).toContain('Livraisons à l’heure : 4 de suite');
+    expect(hero.textContent).not.toContain('meilleure : 4');
     expect(screen.queryByText(/Niveau|Rang/)).toBeNull();
     expect(screen.getAllByRole('heading', { level: 3 }).map((one) => one.textContent)).toEqual([
       'Médailles',
@@ -129,5 +131,23 @@ describe('Moi › Trophées, the creator’s', () => {
       'Trophées',
     ]);
     expect(screen.getByRole('link', { name: 'Trophées' })).toBeDefined();
+  });
+
+  it('keeps her best run of deliveries beside the current one once it broke (CRE-02)', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(
+        Response.json({
+          ...HER_CASE,
+          streaks: [
+            { kind: 'day', current: 4, best: 16 },
+            { kind: 'delivery', current: 0, best: 6 },
+          ],
+        }),
+      ),
+    );
+    renderPage(NORA_ME);
+    const hero = await screen.findByRole('region', { name: '5 livraisons à l’heure' });
+    expect(hero.textContent).toContain('Série en cours : 4 jours · meilleure : 16');
+    expect(hero.textContent).toContain('Livraisons à l’heure : 0 de suite · meilleure : 6');
   });
 });
