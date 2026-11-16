@@ -306,6 +306,11 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                       >
                         <MyPeriodRow
                           summary={summary}
+                          running={
+                            summary.window.period === current && nowRead.data?.period === current
+                              ? nowRead.data.statements[0]
+                              : undefined
+                          }
                           onOpen={() => {
                             setOpened(summary.window.period);
                           }}
@@ -616,17 +621,35 @@ function MyBlockNotice({
 }
 
 /** One of the member's past periods: its state, its net and closing beneath, and one amount. */
-function MyPeriodRow({ summary, onOpen }: { summary: PayPeriodSummary; onOpen: () => void }): JSX.Element {
+function MyPeriodRow({
+  summary,
+  running,
+  onOpen,
+}: {
+  summary: PayPeriodSummary;
+  /** The member's statement of the period under way, when it is read. */
+  running?: CommissionStatement | undefined;
+  onOpen: () => void;
+}): JSX.Element {
   const { window } = summary;
   const chip = memberPhaseChip(summary);
+  // The period under way says what the member earned so far, as « Ma quinzaine » does, never what the minimum leaves
+  // to pay without a word: what it would carry is said under it (recette CHT-02).
+  const earning = running !== undefined && !summary.ended && summary.blocked === null ? running : undefined;
   // A period carried over pays nothing: its row says what went on the next one, the member's `carriedMinor` (#295).
   const amount =
-    chip.label === 'Reporté'
-      ? {
-          minor: summary.carriedMinor,
-          what: `reporté sur la quinzaine ${periodLine(followingPeriod(window.period))}`,
-        }
-      : memberPeriodAmount(summary);
+    earning !== undefined
+      ? { minor: earning.totalMinor, what: 'gagné à ce jour' }
+      : chip.label === 'Reporté'
+        ? {
+            minor: summary.carriedMinor,
+            what: `reporté sur la quinzaine ${periodLine(followingPeriod(window.period))}`,
+          }
+        : memberPeriodAmount(summary);
+  const carry =
+    earning === undefined || earning.carryOverOutMinor === 0
+      ? null
+      : `${earning.totalMinor < 0 ? 'sous zéro' : 'sous le minimum'} : reporté si elle finit ainsi`;
   const sub = `${amountText(summary.netMinor, 'EUR')} de net${summary.ended ? '' : ' à ce jour'}`;
   return (
     <button type="button" className="py-period nv-tap" onClick={onOpen}>
@@ -638,6 +661,7 @@ function MyPeriodRow({ summary, onOpen }: { summary: PayPeriodSummary; onOpen: (
       <span className="py-period__amount nv-num">
         {amountText(amount.minor, 'EUR')}
         <small>{amount.what}</small>
+        {carry === null ? null : <small>{carry}</small>}
       </span>
       <span className="py-period__go" aria-hidden="true" />
     </button>

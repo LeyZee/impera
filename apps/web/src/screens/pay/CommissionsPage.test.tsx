@@ -289,11 +289,29 @@ describe('CommissionsPage', () => {
 
     const rows = within(panel('Mes relevés')).getAllByRole('button');
     expect(rows.map(text)).toEqual([
-      '1er – 15 novembre300,00 € de net à ce jourEn cours21,25 €à ce jour',
+      '1er – 15 novembre300,00 € de net à ce jourEn cours21,25 €gagné à ce jour',
       '1er – 15 octobre85,00 € de netPayé21,25 €touché',
     ]);
     // A chatter reads their own line of the team, for their country, and never its rules.
     expect(asked).not.toContain('/v1/team/pay-rules');
+  });
+
+  it('says in « Mes relevés » what the period under way earned, as « Ma quinzaine », and what the minimum carries (recette CHT-02)', async () => {
+    const running = periods[NOV1];
+    if (running === undefined) throw new Error('No period under way');
+    const [statement] = running.statements;
+    if (statement === undefined) throw new Error('No statement');
+    periods[NOV1] = {
+      ...running,
+      statements: [{ ...statement, totalMinor: 860, payableMinor: 0, carryOverOutMinor: 860 }],
+    };
+    renderPage();
+    await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await waitFor(() => {
+      expect(text(within(panel('Mes relevés')).getAllByRole('button')[0])).toBe(
+        '1er – 15 novembre300,00 € de net à ce jourEn cours8,60 €gagné à ce joursous le minimum : reporté si elle finit ainsi',
+      );
+    });
   });
 
   it('says the payout delay the owner announced (PAIE-32)', async () => {
