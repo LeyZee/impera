@@ -301,12 +301,28 @@ describe('vault description on FakeReveal (ADR 0113)', () => {
     const calls = vision.calls;
     await sync();
     for (let lot = 0; lot < 3 && (await queued()).length > 0; lot++) await work();
+    // A photo at the vault's root that no script holds is never described (Charles, 16/11): the hour's catch-up
+    // queues nothing for it.
+    await test.admin.db.execute(sql`
+      insert into media_platform_refs
+        (id, creator_id, platform, platform_account_id, platform_media_id, kind, folder_ref, folder_position,
+         platform_created_at, last_synced_at)
+      values (gen_random_uuid(), ${creatorId}, 'reveal', ${accountId}, 'vault_root_loose', 'image', null, 0,
+              '2027-01-01T00:00:50.000Z', now())`);
     await test.admin.db.execute(
       sql`select public.enqueue_job(task => 'media.describe_vault_backlog', payload => '{}'::jsonb)`,
     );
-    await work();
+    // The catch-up alone: a run it queued would wait here.
+    await runOnce({
+      pgPool: test.admin.pool,
+      taskList: { 'media.describe_vault_backlog': app.tasks['media.describe_vault_backlog'] },
+    });
     expect(await queued()).toHaveLength(0);
     expect(vision.calls).toBe(calls);
+    expect((await refs()).find((ref) => ref.id === 'vault_root_loose')).toMatchObject({
+      asset: null,
+      failures: 0,
+    });
   });
 
   it('refuses an empty key anywhere but a vault media born erased (ADR 0113 § 1)', async () => {
