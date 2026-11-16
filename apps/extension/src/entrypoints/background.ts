@@ -6,12 +6,20 @@ import {
   type TrendReadingsBatch,
 } from '@impera/contracts';
 import { browser, type Browser } from 'wxt/browser';
+import { z } from 'zod';
 
 import { FromPanelSchema, sendVerdict, type VerdictSent } from '../lib/copilot/verdict';
 import { crmOriginOf, DEFAULT_CRM_ADDRESS } from '../lib/crm-address';
 import { fetchSyncableAccounts, sendSession } from '../lib/reveal/api';
 import { REVEAL_API_PATTERN } from '../lib/reveal/capture';
-import { captureSession, syncReveal, type RequestTap, type SeenRequest } from '../lib/reveal/sync';
+import {
+  captureSession,
+  readReveal,
+  sendHeld,
+  sessionHold,
+  type RequestTap,
+  type SeenRequest,
+} from '../lib/reveal/sync';
 import { placeOf } from '../lib/tab';
 import { fetchMarkableCreators, sendCaptures, sendReadings } from '../lib/watch/api';
 import { captureMarked } from '../lib/watch/captures';
@@ -28,7 +36,7 @@ import {
   type Marked,
   type OnScreen,
   type RevealAccounts,
-  type RevealSynced,
+  type RevealRead,
   type SeenPost,
   type ToReader,
   type WatchStatus,
@@ -55,6 +63,11 @@ import { injectInto, instagramAllowed, syncWatchScript } from '../lib/watch/watc
  */
 
 const STATE_KEY = 'watch';
+/** The model of each Reveal account's last sync, to check the next one against: an id, never a session. */
+const MODELS_KEY = 'revealModels';
+const ModelsSchema = z.record(z.string(), z.string());
+/** The popup's port: when it closes, a session it held is forgotten. */
+const POPUP_PORT = 'popup';
 const ADDRESS_KEY = 'crmOrigin';
 const FLUSH_ALARM = 'watch-flush';
 const MENU_PARENT = 'watch-mark';
@@ -382,6 +395,22 @@ export default defineBackground(() => {
     },
   };
 
+  /** The session read and not sent yet: this worker's memory alone (lib/reveal/sync.ts). */
+  const held = sessionHold();
+
+  async function revealModels(): Promise<Readonly<Record<string, string>>> {
+    const stored: Record<string, unknown> = await browser.storage.local.get(MODELS_KEY).catch(() => ({}));
+    return ModelsSchema.safeParse(stored[MODELS_KEY]).data ?? {};
+  }
+
+  // The popup closes: what it held is forgotten, sent or not.
+  browser.runtime.onConnect.addListener((port) => {
+    if (port.name !== POPUP_PORT || port.sender?.id !== browser.runtime.id) return;
+    port.onDisconnect.addListener(() => {
+      held.drop();
+    });
+  });
+
   async function fromPopup(message: FromPopup): Promise<unknown> {
     switch (message.type) {
       case 'popup/status': {
@@ -430,25 +459,45 @@ export default defineBackground(() => {
         return { ok: true };
       case 'popup/reveal-accounts':
         return revealAccounts();
-      case 'popup/reveal-sync': {
+      case 'popup/link-state':
+        return { link: await linkState() };
+      case 'popup/reveal-read': {
         const tab = await browser.tabs.get(message.tabId).catch(() => null);
         // Only from a Reveal tab: its requests are the ones read.
-        if (placeOf(tab?.url, '') !== 'reveal') return { state: 'no-session' } satisfies RevealSynced;
-        return syncReveal(
+        if (placeOf(tab?.url, '') !== 'reveal') return { state: 'no-session' } satisfies RevealRead;
+        return readReveal(
           {
             readLink,
-            markRevoked,
-            origin: crmOrigin,
             capture: () =>
               captureSession(revealTap, message.tabId, {
                 userAgent: navigator.userAgent,
                 now: () => new Date(),
               }),
-            send: sendSession,
+            lastModel: async (accountId) => (await revealModels())[accountId] ?? null,
           },
+          held,
           message.accountId,
         );
       }
+      case 'popup/reveal-send':
+        return sendHeld(
+          {
+            readLink,
+            markRevoked,
+            origin: crmOrigin,
+            send: sendSession,
+            remember: async (accountId, modelId) => {
+              await browser.storage.local.set({
+                [MODELS_KEY]: { ...(await revealModels()), [accountId]: modelId },
+              });
+            },
+          },
+          held,
+          message.accountId,
+        );
+      case 'popup/reveal-cancel':
+        held.drop();
+        return { ok: true };
     }
   }
 
