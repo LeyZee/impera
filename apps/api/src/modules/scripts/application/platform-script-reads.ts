@@ -7,6 +7,7 @@ import {
   type PlatformScriptWarning,
 } from '../domain/platform-scripts';
 import type {
+  DiscountedPlatformScript,
   IdentityReview,
   PlatformScriptReadStore,
   ScriptIdentityReviewStore,
@@ -149,6 +150,20 @@ export async function creatorPlatformScripts(
   const scripts = await deps.store.ofCreator(creatorId, reader.userId);
   if (scripts === null) return null;
   return scripts.map(viewOf);
+}
+
+/**
+ * Her active native scripts kept from being offered by a « Tarif réduit » on the platform (recette 16/11: bloquer et
+ * alerter), the longest waiting first: what « À traiter » warns of until the agency takes the discount off in Reveal.
+ * The owner and her active managers only, like `creatorPlatformScripts`; `null` for a reader who may not read her.
+ */
+export async function discountedPlatformScripts(
+  deps: Deps,
+  reader: PlatformScriptsReader,
+  creatorId: CreatorId,
+): Promise<readonly DiscountedPlatformScript[] | null> {
+  if (reader.role !== 'owner' && reader.role !== 'operator') return null;
+  return deps.store.discountedOf(creatorId, reader.userId);
 }
 
 /**

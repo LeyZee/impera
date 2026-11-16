@@ -247,6 +247,11 @@ export const platformScripts = pgTable(
     deactivatedAt: timestampTz('deactivated_at'),
     /** The last import that listed it. */
     syncedAt: timestampTz('synced_at').notNull(),
+    /**
+     * The import that wrote its current version: added, or rewritten because it changed on the platform (recette
+     * 16/11). Since when a « Tarif réduit » on one of its steps keeps it from being offered.
+     */
+    versionAt: timestampTz('version_at').notNull(),
     createdAt: createdAt(),
   },
   (t) => [

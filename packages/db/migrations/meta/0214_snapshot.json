@@ -1,5 +1,5 @@
 {
-  "id": "21c82ff9-6758-46bb-abc4-3f2e924f2183",
+  "id": "aef8da37-1f25-4918-b372-c8c5ca3553c7",
   "prevId": "b9feca79-2523-4108-abd6-0f01de03c7d7",
   "version": "7",
   "dialect": "postgresql",
@@ -17765,6 +17765,12 @@
         },
         "synced_at": {
           "name": "synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_at": {
+          "name": "version_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true

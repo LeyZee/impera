@@ -516,7 +516,8 @@ script_structure_queue    creator_id, position 1–20, structure_id (unique par 
                           (clé : creator_id, position ; RLS de la créatrice et portée de l'équipe ; remplacée en entier)
 platform_scripts          id, creator_id, platform_account_id → platform_accounts, platform_script_ref (unique par
                           compte, ≤ 200), name (celui de la plateforme, ≤ 200), moment? (day|night), fingerprint, active,
-                          deactivated_at? (présent si et seulement si inactif), synced_at, created_at
+                          deactivated_at? (présent si et seulement si inactif), synced_at, version_at (l'import qui a
+                          écrit sa version actuelle, migration 0214), created_at
                           (scripts natifs, ADR 0099 § 1 temps 2, migration 0206 ; jamais supprimés)
 platform_script_steps     platform_script_id, creator_id, position 0–49 (ordre de stepIndex), platform_index ≥ 0
                           (stepIndex tel quel : deux étapes au même rang sont des branches, ADR 0112, migration 0211),

@@ -267,6 +267,23 @@ export interface PlatformScriptReadStore {
    * (`forJobs.platformScript`). `null` when it is not hers.
    */
   oneForJob(creatorId: CreatorId, scriptId: string): Promise<StoredPlatformScript | null>;
+  /**
+   * Her active native scripts with a « Tarif réduit » on a step (recette 16/11), read as `ofCreator` is and under the
+   * same rights, without their texts nor their media: what « À traiter » warns of. `null` for a reader who may not
+   * read her.
+   */
+  discountedOf(creatorId: CreatorId, userId: string): Promise<readonly DiscountedPlatformScript[] | null>;
+}
+
+/** A native script of hers kept from being offered by a « Tarif réduit » on the platform, as long as it is there. */
+export interface DiscountedPlatformScript {
+  readonly id: PlatformScriptId;
+  /** As the platform names it. */
+  readonly name: string;
+  /** How many of its steps carry one (1 or more). */
+  readonly steps: number;
+  /** The import that wrote its current version, the one with the discount: since when it waits. */
+  readonly since: Date;
 }
 
 /** What the identity job reads of a script, as the service role. */

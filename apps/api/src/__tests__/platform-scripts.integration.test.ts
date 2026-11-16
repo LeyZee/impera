@@ -722,6 +722,26 @@ describe('the native scripts imported from the platform', () => {
     await importOf(noraAccount, nora, new Date('2026-11-15T12:00:00Z'));
     const view = await ownerView('sequence_4');
     expect(view?.gaps).toContain('step_discounted');
+    // « À traiter » warns of it, since the import that read the discount, for the owner and a manager of her list.
+    const warned = [{ id: view?.id, name: view?.name, steps: 1, since: new Date('2026-11-15T12:00:00Z') }];
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual(
+      warned,
+    );
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.manager, role: 'operator' })).toEqual(
+      warned,
+    );
+    expect(
+      await scripts().reads.discountedScripts(ines, { userId: ids.manager, role: 'operator' }),
+    ).toBeNull();
+    expect(
+      await scripts().reads.discountedScripts(nora, { userId: ids.chatter, role: 'operator' }),
+    ).toBeNull();
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.nora, role: 'creator' })).toBeNull();
+    // A later import that changes nothing keeps the day it began.
+    await importOf(noraAccount, nora, new Date('2026-11-15T12:30:00Z'));
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual(
+      warned,
+    );
     expect(view?.proposable).toBe(false);
     // Read as it is, on its step only; the price stays the full one.
     expect(await stepsOf()).toEqual([
@@ -735,5 +755,6 @@ describe('the native scripts imported from the platform', () => {
     await importOf(noraAccount, nora, new Date('2026-11-15T13:00:00Z'));
     expect((await ownerView('sequence_4'))?.gaps).not.toContain('step_discounted');
     expect((await stepsOf())?.every(([, discount]) => discount === null)).toBe(true);
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual([]);
   });
 });
