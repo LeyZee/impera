@@ -1,0 +1,11 @@
+# 2026-11-16 — Vitrine : insigne de rang et CHT-17 (PR B)
+
+- **Tâche** : PROPOSED-trophy-case (suite, recette du 16/11).
+- **Fait** :
+  - insigne de rang `LevelInsignia` (44 px, sans lueur) en tête de la vitrine du chatteur ;
+  - « Premier rang : X à N € de net cumulé » tiré de `nextLevel` quand aucun rang n'est atteint ;
+  - étagère Médailles gardée sans palier, avec le message « L'agence n'a pas encore posé de paliers de prime. » (prop `emptyShelves`, `shelvesOf(…, keepEmpty)`) ;
+  - mention du trophée PPV compté sur les ventes lues (ADR 0118).
+- **Tests** : `arrange.test.ts`, `HerTrophiesPage.test.tsx` (rang atteint, premier rang, aucun rang, étagère vide), `chatter-case.test.tsx`.
+- **Captures** : recette/2026-11-16/vitrine-rang-b-1 (12 images).
+- **Reste** : la phrase de rang de l'ADR 0118, à poser après la PR de Chiffres.
