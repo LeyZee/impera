@@ -3,6 +3,7 @@ import {
   DESCRIPTION_REVIEW_REASONS,
   PlatformSchema,
   PlatformScriptMomentSchema,
+  VAULT_BLURHASH_MAX,
   VAULT_DESCRIPTION_MAX,
   VAULT_FOLDER_NAME_MAX,
 } from '@impera/contracts';
@@ -127,6 +128,8 @@ export const mediaPlatformRefs = pgTable(
     /** The platform's suggested range, in its minor unit: shown to the agency, never applied (ADR 0099 § 4). */
     suggestedMinMinor: integer('suggested_min_minor'),
     suggestedMaxMinor: integer('suggested_max_minor'),
+    /** The platform's blurred preview (a blurhash, `BlurhashSchema`): a few colours, never the image (ADR 0030 § 4). */
+    previewBlurhash: text('preview_blurhash'),
     lastSyncedAt: timestampTz('last_synced_at').notNull(),
     removedAt: timestampTz('removed_at'),
     createdAt: createdAt(),
@@ -149,6 +152,10 @@ export const mediaPlatformRefs = pgTable(
     check(
       'media_platform_refs_text_check',
       sql`char_length(${t.folderName}) <= ${sql.raw(String(VAULT_FOLDER_NAME_MAX))} and char_length(${t.platformDescription}) <= ${sql.raw(String(VAULT_DESCRIPTION_MAX))}`,
+    ),
+    check(
+      'media_platform_refs_blurhash_check',
+      sql`char_length(${t.previewBlurhash}) <= ${sql.raw(String(VAULT_BLURHASH_MAX))}`,
     ),
     check(
       'media_platform_refs_duration_check',

@@ -23,6 +23,8 @@ export interface VaultRefFields {
   readonly platformDescription: string | null;
   readonly suggestedMinMinor: number | null;
   readonly suggestedMaxMinor: number | null;
+  /** The platform's blurred preview (`BlurhashSchema`): a few colours, never the image. */
+  readonly previewBlurhash: string | null;
 }
 
 /** A stored row: the fields, and whether the platform had stopped listing it. */
@@ -66,6 +68,7 @@ export function vaultRefsOf(read: readonly VaultMedia[]): VaultRefFields[] {
       platformDescription: media.description,
       suggestedMinMinor: media.suggestedPriceMinor?.min ?? null,
       suggestedMaxMinor: media.suggestedPriceMinor?.max ?? null,
+      previewBlurhash: media.blurhash,
     });
   }
   return rows;
@@ -82,6 +85,7 @@ const FIELDS = [
   'platformDescription',
   'suggestedMinMinor',
   'suggestedMaxMinor',
+  'previewBlurhash',
 ] as const satisfies readonly (keyof VaultRefFields)[];
 
 const sameFields = (a: VaultRefFields, b: VaultRefFields): boolean =>

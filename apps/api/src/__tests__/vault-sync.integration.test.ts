@@ -218,6 +218,7 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
       uploadedAt: '2027-01-01T00:00:30.000Z',
       platformDescription: 'Texte inventé du coffre',
       suggestedPriceMinor: { min: 1_000, max: 2_000 },
+      blurhash: 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH',
       removed: false,
     });
     // Folders by name, numbers read as numbers (« Divers » before « SCRIPT 1 »), the loose media last.

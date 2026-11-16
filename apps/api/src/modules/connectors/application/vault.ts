@@ -108,6 +108,7 @@ function mediaOf(row: VaultRefRow): VaultFolderView['media'][number] {
       row.suggestedMinMinor === null || row.suggestedMaxMinor === null
         ? null
         : { min: row.suggestedMinMinor, max: row.suggestedMaxMinor },
+    blurhash: row.previewBlurhash,
     removed: row.removedAt !== null,
   };
 }

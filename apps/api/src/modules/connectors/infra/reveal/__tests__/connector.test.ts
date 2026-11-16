@@ -350,6 +350,7 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       folder: { ref: { id: 'folder_1' }, name: 'SCRIPT 1 | ☀️', moment: 'day' },
       description: null,
       suggestedPriceMinor: null,
+      blurhash: 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH',
     });
     // Each folder in Reveal's own order (newest first on FakeReveal), ranked from 0 as the pages came.
     expect(

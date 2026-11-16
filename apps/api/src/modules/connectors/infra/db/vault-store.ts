@@ -44,6 +44,7 @@ const columns = {
   platformDescription: schema.mediaPlatformRefs.platformDescription,
   suggestedMinMinor: schema.mediaPlatformRefs.suggestedMinMinor,
   suggestedMaxMinor: schema.mediaPlatformRefs.suggestedMaxMinor,
+  previewBlurhash: schema.mediaPlatformRefs.previewBlurhash,
   lastSyncedAt: schema.mediaPlatformRefs.lastSyncedAt,
   removedAt: schema.mediaPlatformRefs.removedAt,
 };
@@ -67,6 +68,7 @@ function rowOf(row: Row): VaultRefRow {
     platformDescription: row.platformDescription,
     suggestedMinMinor: row.suggestedMinMinor,
     suggestedMaxMinor: row.suggestedMaxMinor,
+    previewBlurhash: row.previewBlurhash,
     lastSyncedAt: row.lastSyncedAt,
     removedAt: row.removedAt,
   };
@@ -108,6 +110,7 @@ export function createDrizzleVaultStore(db: Database): VaultStore {
             platformDescription: row.platformDescription,
             suggestedMinMinor: row.suggestedMinMinor,
             suggestedMaxMinor: row.suggestedMaxMinor,
+            previewBlurhash: row.previewBlurhash,
             lastSyncedAt: now,
             removedAt: null,
           };
