@@ -707,9 +707,9 @@ export async function composeTurn(
     ...(scriptStep !== undefined && { scriptStep }),
   };
   const voice = await gateway.voice(voiceInput);
-  // Past the budget, joined, never sent at once (Charles 16/11 : « trois rarement »).
+  // Past the budget, left out, never glued nor sent at once (Charles 16/11 : « trois rarement »).
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
-  // Checked as written: the length and count guards read the voice's bubbles, not the joined message.
+  // Checked as kept: the guards read the bubbles that leave.
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
     ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),

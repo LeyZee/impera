@@ -31,9 +31,9 @@ describe('fitBubbles', () => {
     expect(fitBubbles(['a', 'b'], 2)).toEqual(['a', 'b']);
   });
 
-  it('joins what goes past the budget to the last bubble allowed', () => {
-    expect(fitBubbles(['Coucou', 'ça va ?', 'moi trop'], 1)).toEqual(['Coucou ça va ? moi trop']);
-    expect(fitBubbles(['Coucou', 'ça va ?', 'moi trop'], 2)).toEqual(['Coucou', 'ça va ? moi trop']);
+  it('keeps the first bubbles and leaves out what goes past the budget, never gluing them', () => {
+    expect(fitBubbles(['Coucou', 'ça va ?', 'moi trop'], 1)).toEqual(['Coucou']);
+    expect(fitBubbles(['Coucou', 'ça va ?', 'moi trop'], 2)).toEqual(['Coucou', 'ça va ?']);
   });
 });
 
