@@ -11,10 +11,10 @@ export const JOURNAL_PATH = `${MIGRATIONS_DIR}/meta/_journal.json`;
  * to remove no rows, so a spelling it does not know is refused, never let through: a `DROP` is refused unless only
  * spaces separate it from CONSTRAINT, DEFAULT, NOT NULL, IDENTITY, EXPRESSION, INDEX, POLICY or TRIGGER (a comment
  * between the two refuses it too); `TRUNCATE` everywhere except in a GRANT or a REVOKE (the privilege of that name);
- * `DELETE` except as a foreign key's `ON DELETE`, a trigger's event (`… OR DELETE ON`), a policy's `FOR DELETE` or a
- * privilege. Comments are read like the rest: one that names these words in capitals refuses the migration, which only
- * costs a start on the present version and an alert, never data. The same word in lower case after `--` is prose (a
- * content « drop », « never delete ») and is not counted; in the SQL itself, any case counts.
+ * `DELETE` except as a foreign key's `ON DELETE`, a trigger's event (`… OR DELETE ON`, `TG_OP = 'DELETE'`), a policy's
+ * `FOR DELETE` or a privilege. A word on a line that is a whole `--` comment is prose (a content « drop », « no DELETE »), unless the line
+ * holds a quote, a `$` or a `*\/`; everywhere else, a comment at the end of a line included, the word counts, which
+ * only costs a start on the present version and an alert, never data.
  *
  * No rule on text sees what loses data without these words (`UPDATE … SET`, `ALTER COLUMN … TYPE … USING`, SQL built
  * in an `EXECUTE`): this guard catches the accident; against the rest stand the review on main and the backup taken
@@ -42,16 +42,34 @@ const TRUNCATE = /\bTRUNCATE\b/gi;
 const DELETE = /\bDELETE\b/gi;
 const RLS_OFF = /\b(?:DISABLE|NO\s+FORCE)\s+ROW\s+LEVEL\s+SECURITY\b/i;
 
-/** Whether the word at `index` is prose: not in capitals, after `--` on its line. */
-function inProse(sql, index, word) {
-  if (word === word.toUpperCase()) return false;
-  return sql.slice(sql.lastIndexOf('\n', index - 1) + 1, index).includes('--');
+/**
+ * Whether the word at `index` is prose: its line is a whole comment (`--` after spaces only) holding no quote, no `$`
+ * and no `*\/`, so no string, `$$` body or block comment opened above can close on it and run the rest. A comment at
+ * the end of a line of SQL counts as SQL: at worst one refusal too many.
+ */
+function inProse(sql, index) {
+  const start = sql.lastIndexOf('\n', index - 1) + 1;
+  const end = sql.indexOf('\n', index);
+  const line = sql.slice(start, end === -1 ? sql.length : end);
+  return /^\s*--/.test(line) && !/['"$]|\*\//.test(line);
 }
 
-/** Whether the statement holding `index` is a GRANT or a REVOKE: its text since the last `;`, comment lines aside. */
+/**
+ * Whether the statement holding `index` is a GRANT or a REVOKE. It starts after the last `;` or the last Drizzle
+ * `--> statement-breakpoint` line, the nearer of the two (a chunk between breakpoints needs no `;`), comment lines
+ * aside.
+ */
 function inPrivilegeStatement(sql, index) {
-  const statement = sql
-    .slice(sql.lastIndexOf(';', index - 1) + 1, index)
+  const before = sql.slice(0, index);
+  const breakpoint = [...before.matchAll(/^[ \t]*--> statement-breakpoint[^\n]*$/gm)].at(-1);
+  // A `;` on a whole comment line ends nothing.
+  const code = before.replace(/^[ \t]*--[^\n]*$/gm, (line) => ' '.repeat(line.length));
+  const start = Math.max(
+    code.lastIndexOf(';') + 1,
+    breakpoint === undefined ? 0 : breakpoint.index + breakpoint[0].length,
+  );
+  const statement = before
+    .slice(start)
     .split('\n')
     .filter((line) => !/^\s*--/.test(line))
     .join('\n');
@@ -102,12 +120,12 @@ export function destructiveKinds(sql) {
   };
   for (const match of sql.matchAll(DROP)) {
     const after = sql.slice(match.index + match[0].length);
-    if (DROP_KEEPS_ROWS.test(after) || inProse(sql, match.index, match[0])) continue;
+    if (DROP_KEEPS_ROWS.test(after) || inProse(sql, match.index)) continue;
     const word = /^\s+([A-Za-z]+)/.exec(after)?.[1]?.toUpperCase();
     add(word !== undefined && DROP_OBJECTS.has(word) ? `DROP ${word}` : 'DROP');
   }
   for (const match of sql.matchAll(TRUNCATE)) {
-    if (!inPrivilegeStatement(sql, match.index) && !inProse(sql, match.index, match[0])) add('TRUNCATE');
+    if (!inPrivilegeStatement(sql, match.index) && !inProse(sql, match.index)) add('TRUNCATE');
   }
   for (const match of sql.matchAll(DELETE)) {
     const before = sql.slice(0, match.index);
@@ -115,8 +133,9 @@ export function destructiveKinds(sql) {
     const keepsRows =
       /\b(?:ON|FOR)\s+$/i.test(before) ||
       /^\s+(?:ON|OR)\b/i.test(after) ||
+      (before.endsWith("'") && after.startsWith("'")) ||
       inPrivilegeStatement(sql, match.index) ||
-      inProse(sql, match.index, match[0]);
+      inProse(sql, match.index);
     if (!keepsRows) add('DELETE');
   }
   if (RLS_OFF.test(sql)) add('RLS OFF');

@@ -55,7 +55,15 @@ test('refuses what a list of forbidden words let through', () => {
     ['BEGIN; TRUNCATE jobs; COMMIT;', ['TRUNCATE']],
     ['ALTER TABLE fans DISABLE ROW LEVEL SECURITY;', ['RLS OFF']],
     ['ALTER TABLE fans NO FORCE ROW LEVEL SECURITY;', ['RLS OFF']],
-    ['-- we never DROP TABLE here\nCREATE TABLE x (id int);', ['DROP TABLE']],
+    ["SELECT '--'; drop table fans;", ['DROP TABLE']],
+    ['/* -- */ drop table fans;', ['DROP TABLE']],
+    ["COMMENT ON TABLE a IS 'x -- y'; truncate fans;", ['TRUNCATE']],
+    ["DO $$ BEGIN EXECUTE 'x -- ' || 'y'; delete from fans; END $$;", ['DELETE']],
+    ["DO $$ BEGIN EXECUTE 'DELETE FROM fans'; END $$;", ['DELETE']],
+    ['GRANT SELECT ON a TO r\n--> statement-breakpoint\nTRUNCATE fans;', ['TRUNCATE']],
+    ['GRANT SELECT ON a TO r\n--> statement-breakpoint\nDELETE FROM fans;', ['DELETE']],
+    ["-- it's DROP TABLE time\nCREATE TABLE x (id int);", ['DROP TABLE']],
+    ['CREATE TABLE x (id int); -- DROP TABLE later', ['DROP TABLE']],
     ['drop table fans; -- tidy', ['DROP TABLE']],
     ['CREATE TABLE x (id int); delete from x; -- one', ['DELETE']],
   ]) {
@@ -79,6 +87,9 @@ test('lets through what removes no rows', () => {
     'DROP TRIGGER IF EXISTS t ON fans;',
     'CREATE POLICY "no_delete" ON x AS RESTRICTIVE FOR DELETE TO public USING (false);',
     '-- a content drop is never deleted: delete and truncate stay revoked\nCREATE TABLE x (id int);',
+    '-- no UPDATE, no DELETE, a TRUNCATE would pass the RLS: we DROP TABLE nothing\nCREATE TABLE x (id int);',
+    '-- refuses every UPDATE\n-- and DELETE, whoever asks; the rights say the same\nREVOKE UPDATE, DELETE, TRUNCATE ON\n\t"a"\n\tFROM r;',
+    "CREATE FUNCTION f() RETURNS trigger AS $$ BEGIN RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END; END $$;",
     'ALTER TABLE fans ENABLE ROW LEVEL SECURITY;--> statement-breakpoint\nALTER TABLE fans FORCE ROW LEVEL SECURITY;',
   ]) {
     assert.deepEqual(destructiveKinds(sql), [], sql);
