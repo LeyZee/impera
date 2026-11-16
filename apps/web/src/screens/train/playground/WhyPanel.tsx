@@ -6,6 +6,8 @@ import { euros, needsAttention } from './logic';
 import {
   actionLabel,
   handoffReasons,
+  isCare,
+  isWaiting,
   intentLabel,
   isHandoff,
   riskLabel,
@@ -19,6 +21,8 @@ type Level = 'none' | 'ok' | 'warn' | 'blocked' | 'unanswered' | 'handoff';
 function levelOf(answer: PlaygroundAnswer | null): Level {
   if (answer === null) return 'none';
   if (isHandoff(answer)) return 'handoff';
+  // Waiting for him is the code's decision, not a failure: nothing was stopped.
+  if (isWaiting(answer)) return 'ok';
   if (unansweredReason(answer) !== null) return 'unanswered';
   if (answer.isBlocked) return 'blocked';
   return needsAttention(answer) ? 'warn' : 'ok';
@@ -127,6 +131,14 @@ export function WhyPanel({
               </p>
             </Sec>
           )}
+          {isCare(answer) ? (
+            <Sec label="Mode soin">
+              Il va mal : elle lui répond avec soin, rien n’est vendu, et en vrai un humain valide chaque mot.
+            </Sec>
+          ) : null}
+          {isWaiting(answer) ? (
+            <Sec label="Décision du code">Elle attend : il a dit qu’il revenait.</Sec>
+          ) : null}
           {answer.cursor === undefined ? null : <Sec label="Curseur">{answer.cursor.label}</Sec>}
           {risks.length > 0 ? (
             <Sec label="Risques">

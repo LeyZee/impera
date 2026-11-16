@@ -19,6 +19,7 @@ import {
   DESTINATION_HINTS,
   DESTINATION_LABELS,
   handoffReasons,
+  isWaiting,
   isHandoff,
   MEDIA_FLAG_LABELS,
   rejectedWords,
@@ -266,6 +267,37 @@ function Draft({
             }}
           >
             Pas nécessaire
+          </button>
+          <button
+            type="button"
+            className="nv-btn nv-btn--neon nv-btn--sm"
+            disabled={props.busy}
+            onClick={() => {
+              props.onHandoff(true);
+            }}
+          >
+            Bon réflexe
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isWaiting(answer)) {
+    return (
+      <div className="pg-relay" role="group" aria-label="Elle attend">
+        <p className="pg-relay__t">
+          <b>Elle attend : il a dit qu’il revenait</b>
+          Comme en vrai, rien n’est écrit. Elle lui redemande s’il est là plus tard s’il ne revient pas.
+        </p>
+        <div className="pg-gest">
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            disabled={props.busy}
+            onClick={props.onEdit}
+          >
+            Elle devait répondre
           </button>
           <button
             type="button"

@@ -20,6 +20,8 @@ import {
   type GuardViolation,
   type FollowUpDecision,
   measureDesire,
+  holdDecision,
+  type HoldDecision,
   type DesireMeasure,
   type DesireState,
   type FanAvailabilityRecord,
@@ -53,6 +55,11 @@ export interface PlaygroundTurn {
   readonly cursor?: { readonly kind: string; readonly reason?: string };
   /** The brain wanted to offer and the policy said no: the code of why. */
   readonly offerRefused?: string;
+  /**
+   * The brain read a risk, or he asked her to wait: what production does instead of a plain answer (agent/domain/hold.ts,
+   * AGE-01). A handoff or a wait writes nothing; care writes the care brief, a human validating every word (ADR 0088).
+   */
+  readonly hold?: Exclude<HoldDecision, { readonly kind: 'answer' }>;
 }
 
 /** His desire score as one message of his left it, with what moved it (P3-12). */
@@ -435,6 +442,12 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
             },
           }),
           availability,
+          // The risk policy as the composer runs it (agent/domain/hold.ts): a possible minor or a dangerous request
+          // hands over and the voice does not write; distress is answered with care; without the brain's reading
+          // nobody knows the risks, so the voice does not write either (AGE-01).
+          care: (brief) => brief !== undefined && holdDecision(brief).kind === 'care',
+          skipVoice: (brief) =>
+            brief === undefined || ['handoff', 'no_reply'].includes(holdDecision(brief).kind),
           desire: {
             ...(desire !== undefined && { previous: desire }),
             measured: measuredOnClock(),
@@ -443,6 +456,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           },
         },
       );
+      const decided = composed.brief === undefined ? undefined : holdDecision(composed.brief);
+      const hold = decided === undefined || decided.kind === 'answer' ? undefined : decided;
       if (composed.desire !== undefined) desire = { score: composed.desire.score, at: situation.now };
       if (composed.availability !== undefined) availability = composed.availability.record;
       if (composed.customOrder?.kind === 'reply' && composed.customOrder.opens) customOrderOpen = true;
@@ -498,6 +513,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           },
         }),
         ...(composed.offerRefused !== undefined && { offerRefused: composed.offerRefused }),
+        ...(hold !== undefined && { hold }),
       };
       lastExchange = {
         fanMessage: text,

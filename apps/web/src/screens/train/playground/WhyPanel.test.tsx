@@ -60,6 +60,19 @@ describe('WhyPanel', () => {
     expect(screen.queryByText(/rien qui ressemble à une IA/)).toBeNull();
   });
 
+  it('says she waits when he said he comes back, and answers him with care when he is in distress (AGE-01)', () => {
+    why({ ...ANSWER, hold: { kind: 'no_reply', detail: ['wait'] } });
+    expect(screen.getByText('Elle attend : il a dit qu’il revenait.')).toBeTruthy();
+    cleanup();
+    why({ ...ANSWER, bubbles: ['Je suis là'], hold: { kind: 'care', detail: ['distress'] } });
+    expect(screen.getByText('Mode soin')).toBeTruthy();
+  });
+
+  it('says a handoff decided by the code is one, even when the brain suggested to answer (AGE-01)', () => {
+    why({ ...ANSWER, hold: { kind: 'handoff', detail: ['minor_suspected'] } });
+    expect(screen.getByText('Relayée à un humain')).toBeTruthy();
+  });
+
   it('says a blocked answer is blocked, and lists a manipulation once, under the trap', () => {
     why({
       ...ANSWER,

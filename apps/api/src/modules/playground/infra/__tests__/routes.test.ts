@@ -382,6 +382,8 @@ describe('/v1/playground', () => {
       media: [{ kind: 'image', factualDescription: 'Un selfie.', flags: ['possible_minor'] }],
     });
     expect(answer.json()).toMatchObject({ handoff: ['possible_minor'], isBlocked: true, bubbles: [] });
+    // « Nécessaire » says the handoff was right: a decision to rate, not a blocked answer (AGE-01).
+    expect((await post('/rating', { verdict: { kind: 'validated' } })).statusCode).toBe(200);
   });
 
   it('asks for the Grok key when no voice model is reachable', async () => {

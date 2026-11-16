@@ -143,6 +143,49 @@ describe('playground session, when nothing is written', () => {
   });
 });
 
+describe('playground session, the risk policy as production runs it (AGE-01)', () => {
+  const run = async (brief: Brief, text = 'Coucou') => {
+    const voiceInputs: VoiceInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou toi ✨'] }, voiceInputs, [], brief),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+    });
+    const turn = await session.handleFanMessage(text);
+    return { turn, voiceInputs, session };
+  };
+
+  it('hands a possible minor over to a human: the voice writes nothing, even when the brain says to reply', async () => {
+    const { turn, voiceInputs, session } = await run({
+      ...BRIEF,
+      action: 'reply',
+      risks: ['minor_suspected'],
+    });
+    expect(turn.hold).toEqual({ kind: 'handoff', detail: ['minor_suspected'] });
+    expect(voiceInputs).toHaveLength(0);
+    expect(turn.bubbles).toEqual([]);
+    expect(session.history.map((t) => t.from)).toEqual(['fan']);
+  });
+
+  it('answers distress with care, as the composer does (ADR 0088)', async () => {
+    const { turn, voiceInputs } = await run({ ...BRIEF, action: 'offer', risks: ['distress'] });
+    expect(turn.hold).toEqual({ kind: 'care', detail: ['distress'] });
+    expect(voiceInputs).toHaveLength(1);
+    // Nothing is sold in care, whatever the brain suggested.
+    expect(voiceInputs[0]?.brief.action).not.toBe('offer');
+  });
+
+  it('stays quiet when he asks her to wait, and writes nothing without the brain’s reading', async () => {
+    const waiting = await run({ ...BRIEF, action: 'wait', risks: [] });
+    expect(waiting.turn.hold).toEqual({ kind: 'no_reply', detail: ['wait'] });
+    expect(waiting.voiceInputs).toHaveLength(0);
+    const plain = await run(BRIEF);
+    expect(plain.turn.hold).toBeUndefined();
+    expect(plain.voiceInputs).toHaveLength(1);
+  });
+});
+
 describe('playground session, calibration', () => {
   const make = (deps: Partial<Parameters<typeof createPlaygroundSession>[0]> = {}) =>
     createPlaygroundSession({
