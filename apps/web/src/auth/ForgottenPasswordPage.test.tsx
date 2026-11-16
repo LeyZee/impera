@@ -80,7 +80,11 @@ describe('« Mot de passe oublié » without a link (SEC-05 lot 3)', () => {
   it('tells whoever has no Telegram to ask the agency, before and after the request (CRE-05, CHT-16)', async () => {
     serve({ request: [[202, { message: PASSWORD_RESET_REQUESTED_MESSAGE }]] });
     open();
-    expect(screen.getByText(NO_TELEGRAM_HINT, { normalizer: asIs })).toBeDefined();
+    const hint = screen.getByText(NO_TELEGRAM_HINT, { normalizer: asIs });
+    // Under the send button, not between the field and the button (Design, #829), and nothing to click in it.
+    const send = screen.getByRole('button', { name: 'Envoyer le lien' });
+    expect(send.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hint.querySelector('a, button')).toBeNull();
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'nora@example.test' } });
     fireEvent.click(screen.getByRole('button', { name: 'Envoyer le lien' }));
     expect(await screen.findByRole('heading', { name: 'Demande reçue' })).toBeDefined();

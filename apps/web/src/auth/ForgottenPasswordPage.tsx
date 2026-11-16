@@ -214,7 +214,6 @@ function RequestForm({
           Donne l’adresse e-mail de ton compte. Le lien pour en choisir un nouveau part dans ton chat Telegram
           privé, celui que tu as relié dans Sécurité.
         </p>
-        <p className="text-sm text-[var(--nv-ink-muted)]">{NO_TELEGRAM_HINT}</p>
       </header>
       <label className="nv-field nv-enter" style={{ '--nv-i': 2 }}>
         <span className="nv-field__label">E-mail</span>
@@ -245,6 +244,10 @@ function RequestForm({
       >
         {isSending ? 'Un instant…' : 'Envoyer le lien'}
       </button>
+      {/* A help, not a warning (Design, #829): muted, under the button, with nothing to click. */}
+      <p className="nv-enter -mt-3 text-sm text-[var(--nv-ink-muted)]" style={{ '--nv-i': 3 }}>
+        {NO_TELEGRAM_HINT}
+      </p>
       <button
         type="button"
         className="nv-btn nv-btn--plain nv-btn--sm nv-enter self-center"
