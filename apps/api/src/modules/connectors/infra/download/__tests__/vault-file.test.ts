@@ -135,11 +135,14 @@ describe('downloadVaultFile against FakeReveal', () => {
   beforeAll(async () => {
     fake = createFakeReveal();
     dir = await mkdtemp(join(tmpdir(), 'vault-file-'));
-    const response = await fake.fetch(`http://fake-reveal.test/models/${fake.modelId}/medias?take=100`, {
-      method: 'GET',
-      headers: { authorization: fake.authorization },
-      signal: AbortSignal.timeout(10_000),
-    });
+    const response = await fake.fetch(
+      `http://fake-reveal.test/models/${fake.modelId}/medias?take=100&mediaType=All`,
+      {
+        method: 'GET',
+        headers: { authorization: fake.authorization },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
     const { data } = WireLinks.parse(JSON.parse(await response.text()));
     const firstPhoto = data.find((m) => m.type === 'photo');
     const firstVideo = data.find((m) => m.type === 'video');
@@ -302,11 +305,14 @@ describe('downloadVaultFile against FakeReveal', () => {
   it('stops at the size bound', async () => {
     const fresh = createFakeReveal();
     try {
-      const response = await fresh.fetch(`http://fake-reveal.test/models/${fresh.modelId}/medias?take=100`, {
-        method: 'GET',
-        headers: { authorization: fresh.authorization },
-        signal: AbortSignal.timeout(10_000),
-      });
+      const response = await fresh.fetch(
+        `http://fake-reveal.test/models/${fresh.modelId}/medias?take=100&mediaType=All`,
+        {
+          method: 'GET',
+          headers: { authorization: fresh.authorization },
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
       const { data } = WireLinks.parse(JSON.parse(await response.text()));
       const media = data.find((m) => m.type === 'video');
       if (media === undefined) throw new Error('video expected');
