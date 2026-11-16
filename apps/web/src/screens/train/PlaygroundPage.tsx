@@ -43,7 +43,7 @@ function fanName(notes: readonly string[]): string {
 }
 
 const ERRORS: Readonly<Record<PlaygroundErrorCode, string>> = {
-  llm_unavailable: 'Grok ne répond pas : ajoute ou vérifie sa clé dans Réglages > Modèles IA.',
+  llm_unavailable: 'Grok ne répond pas : ajoute ou vérifie sa clé dans Réglages › Modèles IA.',
   unreachable: 'Le serveur ne répond pas. Réessaie dans un instant.',
   not_deployed: 'Le playground n’est pas encore en ligne sur ce serveur.',
   still_writing: 'L’agent rédige encore la réponse précédente.',
@@ -56,7 +56,7 @@ const READING_POLL_MS = 1500;
 
 /** Under the first screen's title, only what to do: the title already says what went wrong (avis Design 16/11). */
 const LOADING_ACTIONS: Readonly<Record<PlaygroundErrorCode, string>> = {
-  llm_unavailable: 'Ajoute ou vérifie sa clé dans Réglages > Modèles IA.',
+  llm_unavailable: 'Ajoute ou vérifie sa clé dans Réglages › Modèles IA.',
   unreachable: 'Réessaie dans un instant.',
   not_deployed: 'Il arrive avec la prochaine mise à jour du serveur.',
   still_writing: 'Attends la fin de la réponse précédente.',
