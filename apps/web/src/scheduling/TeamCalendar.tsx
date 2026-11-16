@@ -318,8 +318,8 @@ export function TeamMonth({
               // An archived creator only on the days of her shifts: never a line of gaps (ADR 0071 § 2).
               const marks = rows
                 .filter((row) => shownOn(row, day))
-                .map((row) => ({ row, marks: monthMarks(row.days.get(day) ?? [], now) }));
-              const { said, mine } = dayWords(rows, day, me, now, fill);
+                .map((row) => ({ row, marks: monthMarks(row.days.get(day) ?? []) }));
+              const { said, mine } = dayWords(rows, day, me, fill);
               return (
                 <div key={day} role="cell" className="cal-month__cell">
                   <button
@@ -374,13 +374,16 @@ export function TeamMonth({
         ))}
       </div>
       {shown === null ? null : (
-        <DayDetail day={shown} rows={rows} members={members} me={me} zone={zone} now={now} />
+        <DayDetail day={shown} rows={rows} members={members} me={me} zone={zone} now={now} fill={fill} />
       )}
     </>
   );
 }
 
-/** A day of the month in detail: each creator, each créneau, who is on it and the agent, in words. */
+/**
+ * A day of the month in detail: each creator, each créneau, who is on it, what is left to fill and the agent, in
+ * words, as the week says them (recette EQU-02).
+ */
 function DayDetail({
   day,
   rows,
@@ -388,6 +391,7 @@ function DayDetail({
   me,
   zone,
   now,
+  fill,
 }: {
   day: string;
   rows: readonly CalendarRow[];
@@ -395,6 +399,7 @@ function DayDetail({
   me: string | null;
   zone: string;
   now: Date;
+  fill: boolean;
 }): JSX.Element {
   return (
     <section className="cal-detail nv-swap" key={day} aria-labelledby="cal-detail-title">
@@ -416,7 +421,7 @@ function DayDetail({
                   <span className="cal-detail__range nv-num">
                     {rangeAt(cell.from.toISOString(), cell.to.toISOString(), zone)}
                   </span>
-                  <span className="cal-detail__who">{cellWho(cell, members, me, zone, now)}</span>
+                  <span className="cal-detail__who">{cellWho(cell, members, me, zone, now, fill)}</span>
                 </li>
               ))}
             </ul>

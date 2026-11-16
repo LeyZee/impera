@@ -327,6 +327,14 @@ function renderPage(at = '/equipe/planning'): AnyRouter {
 
 const calendarReads: string[] = [];
 
+/** Thursday 29 October cut into four créneaux of 6 h in Paris (UTC+1): what the server counts to fill on it. */
+const THURSDAY_SLOTS = [
+  ['2026-10-28T23:00:00.000Z', '2026-10-29T05:00:00.000Z'],
+  ['2026-10-29T05:00:00.000Z', '2026-10-29T11:00:00.000Z'],
+  ['2026-10-29T11:00:00.000Z', '2026-10-29T17:00:00.000Z'],
+  ['2026-10-29T17:00:00.000Z', '2026-10-29T23:00:00.000Z'],
+] as const;
+
 /** The agency's calendar: Théo's night, Nora's agent in `mode` day and night (ADR 0048); no account when `bare`. */
 const agencyCalendar =
   (mode: 'auto' | 'copilot', slotStartMinute = 0, bare = false) =>
@@ -347,7 +355,19 @@ const agencyCalendar =
     ],
     agency: {
       accounts: bare ? [] : ACCOUNTS,
-      toFill: [],
+      // The server's count (`slotsToFill`): nobody on Thursday 29, the agent alone in Automatique only.
+      toFill:
+        bare || mode === 'auto'
+          ? []
+          : THURSDAY_SLOTS.map(([startsAt, endsAt]) => ({
+              platformAccountId: NORA_REVEAL,
+              creatorId: NORA,
+              startsAt,
+              endsAt,
+              seats: 1,
+              places: 1,
+              open: [{ startsAt, endsAt }],
+            })),
       aiAlone: [],
       workload: [{ memberId: THEO, minutes: 360 }],
       coverage: bare
@@ -476,6 +496,37 @@ describe('Équipe › Planning', () => {
     const sheet = await screen.findByRole('dialog', { name: 'Théo' });
     expect(within(sheet).getByRole('status').textContent).toBe(
       'Théo est suspendu : personne ne tiendra ce shift. Choisis un autre membre, ou annule-le.',
+    );
+  });
+
+  it('leaves to fill the shifts of a member whose creator was taken off his list, « Sans accès » (recette EQU-01)', async () => {
+    const thursday = {
+      ...night,
+      id: id(109),
+      startsAt: '2026-10-29T11:00:00Z',
+      endsAt: '2026-10-29T17:00:00Z',
+      templateId: null,
+    };
+    const served = planning([], [night, thursday]);
+    if (typeof served !== 'object' || served === null) throw new Error('no planning');
+    serve({ planning: { ...served, withoutAccess: [{ memberId: THEO, creatorId: NORA }] } });
+    renderPage();
+    const chip = await screen.findByRole(
+      'button',
+      { name: /^Théo, 12\sh – 18\sh, sans accès, à pourvoir$/u },
+      { timeout: 4_000 },
+    );
+    expect(chip.getAttribute('data-away')).toBe('true');
+    expect(chip.textContent).toContain('Sans accès');
+    // His two shifts hold nothing: as many places to fill as with none, and nobody « en poste » on the night.
+    expect(cornerLines()).toEqual(['2 shifts · 12 h', '20 places à pourvoir']);
+    for (const one of screen.getAllByRole('button', { name: /^Théo, 23\sh – 5\sh, / })) {
+      expect(one.getAttribute('aria-label')).not.toContain('en poste');
+    }
+    fireEvent.click(chip);
+    const sheet = await screen.findByRole('dialog', { name: 'Théo' });
+    expect(within(sheet).getByRole('status').textContent).toBe(
+      'Théo n’a plus Nora Vidal dans ses créatrices : personne ne tiendra ce shift. Choisis un autre membre, ou annule-le.',
     );
   });
 

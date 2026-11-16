@@ -14,7 +14,7 @@ import {
 
 import { countryName } from '@/lib/country';
 import { memberOf } from '@/lib/utils';
-import { platformName } from '@/scheduling/model';
+import { platformName, type Unheld } from '@/scheduling/model';
 import { mondayOf, withFirstOfMonth } from '@/scheduling/time';
 
 /**
@@ -31,6 +31,13 @@ export const STATUS_LABELS: Readonly<Record<TeamMemberStatus, string>> = {
   suspended: 'Suspendu',
   left: 'Parti',
 };
+
+/**
+ * What a shift nobody holds says on the planning (recette EQP-03, EQU-01): its member's status, « Suspendu », or « Sans
+ * accès » when its creator is no longer on his list.
+ */
+export const unheldLabel = (unheld: Unheld): string =>
+  unheld.kind === 'away' ? STATUS_LABELS[unheld.status] : 'Sans accès';
 
 /** A member away, in a sentence: « Théo est suspendu ». */
 export const AWAY_WORDS: Readonly<Record<Exclude<TeamMemberStatus, 'active'>, string>> = {

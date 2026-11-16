@@ -1,4 +1,4 @@
-import { DomainError } from '@impera/contracts';
+import { CreatorIdSchema, DomainError, newId, TeamMemberIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -12,12 +12,14 @@ import {
   covers,
   decideUpdate,
   firstStartOf,
+  holdsShift,
   myShiftsOf,
   occurrenceKey,
   occurrences,
   occurrencesAhead,
   plannedCreatorsOf,
   plansCreator,
+  unheldOf,
   type PlanningTemplate,
 } from '../shifts';
 
@@ -65,6 +67,42 @@ describe('who plans, who works', () => {
     expect(codeOf(assertCanWork, { ...member, creatorIds: ['c2'] }, 'c1', startsAt)).toBe(
       'member_creator_conflict',
     );
+  });
+
+  it('lets a member hold his shift while at work on a creator of his list, nobody else (recette EQP-03, EQU-01)', () => {
+    const member = { status: 'active', creatorIds: ['c1'] } as const;
+    expect(holdsShift(member, { creatorId: 'c1' })).toBe(true);
+    // Taken off his list after the shift was set: he no longer reads her, nobody holds it.
+    expect(holdsShift(member, { creatorId: 'c2' })).toBe(false);
+    expect(holdsShift({ ...member, status: 'suspended' }, { creatorId: 'c1' })).toBe(false);
+    expect(holdsShift(undefined, { creatorId: 'c1' })).toBe(false);
+  });
+
+  it('names who holds none of the shifts read: away with his status, a creator off his list, each once', () => {
+    const [lina, maya] = [newId(CreatorIdSchema), newId(CreatorIdSchema)];
+    const [kofi, iris, noa] = [
+      newId(TeamMemberIdSchema),
+      newId(TeamMemberIdSchema),
+      newId(TeamMemberIdSchema),
+    ];
+    const members = [
+      { id: kofi, status: 'active', creatorIds: [lina, maya] },
+      { id: iris, status: 'active', creatorIds: [maya] },
+      { id: noa, status: 'suspended', creatorIds: [lina] },
+    ] as const;
+    const shiftsRead = [
+      { memberId: kofi, creatorId: lina },
+      { memberId: iris, creatorId: lina },
+      { memberId: iris, creatorId: lina },
+      { memberId: iris, creatorId: maya },
+      { memberId: noa, creatorId: lina },
+    ];
+    expect(unheldOf(members, shiftsRead)).toEqual({
+      away: [{ memberId: noa, status: 'suspended' }],
+      withoutAccess: [{ memberId: iris, creatorId: lina }],
+    });
+    // A member no shift names is never said away.
+    expect(unheldOf(members, [{ memberId: kofi, creatorId: lina }])).toEqual({ away: [], withoutAccess: [] });
   });
 
   it('gives no shift before the member’s first day, read in the agency’s zone, where its report is paid', () => {

@@ -516,6 +516,16 @@ export const PlanningAwaySchema = z.object({
 });
 export type PlanningAway = z.infer<typeof PlanningAwaySchema>;
 
+/**
+ * A member of the planning and a creator of his shifts that is no longer on his list (recette EQU-01): he no longer
+ * reads her. His shifts on her stay on the planning, nobody holds them: their créneaux are to fill.
+ */
+export const PlanningWithoutAccessSchema = z.object({
+  memberId: TeamMemberIdSchema,
+  creatorId: CreatorIdSchema,
+});
+export type PlanningWithoutAccess = z.infer<typeof PlanningWithoutAccessSchema>;
+
 export const PlanningSchema = z.object({
   settings: SchedulingSettingsSchema,
   accounts: z.array(PlanningAccountSchema),
@@ -527,6 +537,8 @@ export const PlanningSchema = z.object({
    * too in a planning read before the field existed, still in a cache (relecture Bilan).
    */
   away: z.array(PlanningAwaySchema).default([]),
+  /** The same readers, the same cache: a member of these shifts and a creator he no longer works on (EQU-01). */
+  withoutAccess: z.array(PlanningWithoutAccessSchema).default([]),
 });
 export type Planning = z.infer<typeof PlanningSchema>;
 

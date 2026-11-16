@@ -599,6 +599,46 @@ describe('changing a member once added (EQ-10)', () => {
     ]);
   });
 
+  it('says the shifts left on a creator taken off his list before saving, and takes her off all the same (recette EQU-01)', async () => {
+    const at = (hours: number): string => new Date(Date.now() + hours * 3_600_000).toISOString();
+    const shift = (n: number, from: number, memberId: string = THEO.id): unknown => ({
+      id: id(60 + n),
+      creatorId: LEA.id,
+      platformAccountId: id(50),
+      memberId,
+      startsAt: at(from),
+      endsAt: at(from + 6),
+      templateId: null,
+      stoppedAt: null,
+    });
+    // One under way, one tomorrow, one gone by and Basile's: two left on his name.
+    const posted = serve({
+      shifts: [shift(1, -2), shift(2, 24), shift(3, -30), shift(4, 48, BASILE.id)],
+      post: () => ({ status: 200, body: { ...THEO, creatorIds: [] } }),
+    });
+    fireEvent.click(within(await sheet()).getByRole('button', { name: 'Modifier' }));
+    const panel = await screen.findByRole('dialog', { name: 'Modifier Théo' });
+    expect(within(panel).queryByText(/restent à son nom/u)).toBeNull();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Léa', pressed: true }));
+    const left = await within(panel).findByRole('status');
+    expect(left.textContent).toContain(
+      '1 shift en cours et 1 à venir sur Léa restent à son nom. Sans Léa dans ses créatrices, personne ne les tiendra et le planning les montre à pourvoir : donne-les à un autre membre ou annule-les.',
+    );
+    expect(within(left).getByRole('link', { name: 'Voir ses shifts' }).getAttribute('href')).toBe(
+      `/equipe/planning?membre=${THEO.id}`,
+    );
+    // Léa back on his list: nothing to say.
+    fireEvent.click(within(panel).getByRole('button', { name: 'Léa', pressed: false }));
+    expect(within(panel).queryByRole('status')).toBeNull();
+    // Taken off again and saved: the access goes at once, the shifts are the planning's to give.
+    fireEvent.click(within(panel).getByRole('button', { name: 'Léa', pressed: true }));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(posted).toEqual([{ path: `/v1/team/members/${THEO.id}`, body: { creatorIds: [] } }]);
+  });
+
   it('asks for the password and the code before a change of a member, then sends the same change again (EQ-15)', async () => {
     let fresh = false;
     const posted = serve({
