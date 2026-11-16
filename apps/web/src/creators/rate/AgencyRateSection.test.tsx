@@ -53,6 +53,7 @@ function serve(
   rates: Rate[],
   refuse?: Refusal | (() => Refusal | undefined),
   observed: object = NOTHING_READ,
+  alerts: unknown[] = [],
 ): unknown[] {
   const posts: unknown[] = [];
   const list = () => {
@@ -62,6 +63,7 @@ function serve(
       current: sorted.find((one) => one.fromDay <= TODAY) ?? null,
       rates: sorted,
       observed,
+      alerts,
     };
   };
   vi.stubGlobal(
@@ -339,6 +341,38 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     expect(document.querySelector('.ps-dot')?.getAttribute('data-dot')).toBe('warn');
     const read = screen.getByRole('region', { name: 'Lue chez Reveal' });
     expect(within(read).getAllByText(/^écart avec les 40\s% réglés$/u)).toHaveLength(2);
+  });
+
+  it('lists the alerts the automatic check published, in amber, above the shares read (PAY-04)', async () => {
+    serve([], undefined, { ...NOTHING_READ, linked: true }, [
+      {
+        id: '0192f3a0-0000-7000-8000-0000000000f3',
+        kind: 'changed',
+        at: '2026-11-02T05:30:00.000Z',
+        from: '2026-10-16',
+        to: '2026-10-31',
+        platform: 'reveal',
+        platformAccountId: '0192f3a0-0000-7000-8000-0000000000a1',
+        currency: 'EUR',
+        previousAgencyBps: 3333,
+        agencyBps: 3750,
+      },
+    ]);
+    renderSection();
+    const alerts = await screen.findByRole('list', { name: 'Alertes de la part de l’agence' });
+    expect(
+      within(alerts).getByText(
+        /^Quinzaine du 16 au 31 octobre : la part de l’agence est passée de 33,33\s% à 37,5\s%\.$/u,
+      ),
+    ).toBeDefined();
+    expect(alerts.querySelector('.ps-dot')?.getAttribute('data-dot')).toBe('warn');
+  });
+
+  it('shows no alert line while the automatic check published none', async () => {
+    serve([], undefined, { ...NOTHING_READ, linked: true });
+    renderSection();
+    expect(await screen.findByText(/^Aucune vente lue chez Reveal sur 30 jours\./u)).toBeDefined();
+    expect(screen.queryByRole('list', { name: 'Alertes de la part de l’agence' })).toBeNull();
   });
 
   it('says the server does not answer, with a way to try again', async () => {

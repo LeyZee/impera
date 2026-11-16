@@ -22,6 +22,7 @@ import {
   bpsOfPercent,
   confirmSentence,
   dayLabel,
+  alertText,
   gapText,
   earliestDay,
   percentOf,
@@ -370,6 +371,16 @@ function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
         <p className="nv-eyebrow" id={`${id}-read`}>
           Lue chez {readAt(all)}
         </p>
+        {list.alerts.length === 0 ? null : (
+          <ul className="ar-alerts" aria-label="Alertes de la part de l’agence">
+            {list.alerts.map((alert) => (
+              <li key={alert.id} className="ar-alert">
+                <span className="ps-dot" data-dot="warn" />
+                <span>{alertText(alert, list)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         {!list.observed.linked && all.length === 0 ? (
           <p className="ps-muted">
             Aucun compte Reveal relié : aucune part lue.{' '}

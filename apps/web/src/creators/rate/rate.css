@@ -130,6 +130,21 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* The alerts the automatic check published (PAY-04): one line each, an amber dot, no bar. */
+.ar-alerts {
+  display: grid;
+  gap: var(--nv-space-2);
+  margin: var(--nv-space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ar-alert {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink);
+}
+
 /* A share off her percentage (ADR 0054 § 6): amber, like every warning. */
 .ar-read__gap {
   color: var(--nv-warning);
