@@ -337,12 +337,17 @@ export interface LlmFailure {
   }[];
 }
 
+/** The owner's « Essai réel » of a provider (ADR 0091 § 7). */
 export interface ConnectionTest {
   readonly provider: ProviderId;
   readonly isOk: boolean;
   readonly model?: string;
+  /** The model as the screen names it (« Grok 4.7 »). */
+  readonly modelLabel?: string;
+  /** Absent when no call was made. */
   readonly latencyMs?: number;
-  readonly outcome: CallOutcome;
+  /** `budget_reached`: the day's cap stopped it before any call. */
+  readonly outcome: CallOutcome | 'budget_reached';
 }
 
 export interface LlmGateway {
@@ -381,6 +386,10 @@ export interface LlmGateway {
     readonly scriptIdentity: string;
   };
   health(): HealthReport;
+  /**
+   * One tiny real call (« Réponds seulement : ok ») on the model the config uses for this provider: the owner's
+   * « Essai réel » (ADR 0091 § 7). Journaled under the purpose `probe`, stopped by the day's cap. Never throws.
+   */
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */
   transcribe(audio: {

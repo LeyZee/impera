@@ -42,6 +42,7 @@ function input(overrides: Partial<UsageInput> = {}): UsageInput {
     hour: 14,
     firstDay: null,
     lastCallAt: null,
+    voice: null,
     readAt: new Date('2026-11-11T13:30:00Z'),
     timeZone: 'Europe/Paris',
     usdPerEur: 1.1,

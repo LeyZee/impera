@@ -2,6 +2,7 @@ import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { createElevenLabsProbe } from '../elevenlabs.probe';
 import { createElevenLabsVerifier } from '../elevenlabs.verifier';
 import { createGoogleVerifier } from '../google.verifier';
 import type { FetchLike } from '../http';
@@ -163,6 +164,25 @@ describe('ElevenLabs', () => {
     expect(seenHeaders[0]?.['xi-api-key']).toBe('sk_FAKE');
   });
 
+  it('reads the month: its limit, when it comes back, and whether the offer is the free one', async () => {
+    replies.set('/v1/user/subscription', {
+      status: 200,
+      body: {
+        character_count: 2_500,
+        character_limit: 10_000,
+        tier: 'free',
+        next_character_count_reset_unix: 1_796_000_000,
+      },
+    });
+    replies.set('/v1/voices', { status: 200, body: voices });
+    const outcome = await verifier().verify('sk_FAKE', {});
+    expect(outcome).toMatchObject({
+      ok: true,
+      charactersLeft: 7_500,
+      quota: { limit: 10_000, resetsAt: new Date(1_796_000_000_000), plan: 'free' },
+    });
+  });
+
   it('flags low credit under 10 % and keeps a voice already picked', async () => {
     replies.set('/v1/user/subscription', {
       status: 200,
@@ -281,5 +301,39 @@ describe('a rate limit (429) says nothing about the key', () => {
       kind: 'unreachable',
       reason: 'rate_limited',
     });
+  });
+});
+
+describe('ElevenLabs « Essai réel »', () => {
+  const probe = () => createElevenLabsProbe({ fetch: realFetch, baseUrl });
+
+  it('speaks « ok » with the chosen voice and says it answers', async () => {
+    replies.set('/v1/text-to-speech/v1', { status: 200, body: 'audio' });
+    expect(await probe().probe('sk_FAKE', 'v1')).toMatchObject({ outcome: 'answers', model: 'Flash v2.5' });
+    expect(seenHeaders[0]?.['xi-api-key']).toBe('sk_FAKE');
+  });
+
+  it('tells a month used up from a refused key, and makes no call without a voice', async () => {
+    replies.set('/v1/text-to-speech/v1', {
+      status: 401,
+      body: { detail: { status: 'quota_exceeded', message: 'invented' } },
+    });
+    expect((await probe().probe('sk_FAKE', 'v1')).outcome).toBe('no_credit');
+    replies.set('/v1/text-to-speech/v1', { status: 401, body: { detail: { status: 'invalid_api_key' } } });
+    expect((await probe().probe('sk_FAKE', 'v1')).outcome).toBe('key_refused');
+    replies.set('/v1/text-to-speech/v1', { status: 429, body: { detail: { status: 'too_many_requests' } } });
+    expect((await probe().probe('sk_FAKE', 'v1')).outcome).toBe('rate_limited');
+    seenHeaders = [];
+    expect(await probe().probe('sk_FAKE', null)).toEqual({
+      outcome: 'no_voice',
+      latencyMs: null,
+      model: null,
+    });
+    expect(seenHeaders).toHaveLength(0);
+  });
+
+  it('says the service does not answer when it cannot be reached', async () => {
+    const outcome = await createElevenLabsProbe({ fetch: unreachableFetch, baseUrl }).probe('sk_FAKE', 'v1');
+    expect(outcome.outcome).toBe('not_answering');
   });
 });
