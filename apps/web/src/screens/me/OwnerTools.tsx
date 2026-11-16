@@ -194,11 +194,18 @@ function PrefixForm({ file }: { file: ContractorFile }): JSX.Element {
             className={wrong ? 'tm-hint tm-hint--error' : 'tm-hint'}
             aria-live="polite"
           >
-            {wrong
-              ? 'De 2 à 8 majuscules ou chiffres, par exemple NORA.'
-              : saved
-                ? 'Préfixe enregistré.'
-                : `Ses numéros commencent par lui (${firstNumberOf(prefix)})\u00a0: il se fige à sa première facture.`}
+            {wrong ? (
+              'De 2 à 8 majuscules ou chiffres, par exemple NORA.'
+            ) : saved ? (
+              'Préfixe enregistré.'
+            ) : (
+              // The number never breaks at its hyphens, nor parts from its colon.
+              <>
+                Ses numéros commencent par lui (
+                <span className="cf-prefix__number">{firstNumberOf(prefix)}</span>){'\u00a0'}: il se fige à sa
+                première facture.
+              </>
+            )}
           </p>
         </div>
         <Refusal refusal={refusal} />
