@@ -26,6 +26,7 @@ import {
   type OfferInput,
   type OfferLimits,
   type RatedMoment,
+  type ScriptStart,
   type SexualizationLimits,
   type Situation,
   type TrapAssessment,
@@ -61,6 +62,20 @@ export interface PlaygroundDesireReading {
   readonly band: DesireBand;
   readonly signals: readonly DesireSignal[];
   readonly weightsVersion: string;
+  /** His availability and the gate before the first teaser at this message (ADR 0103 § 14). */
+  readonly availability?: PlaygroundAvailabilityReading;
+}
+
+/** His availability as this message of his left it, the gate, and whether she asked him this time. */
+export interface PlaygroundAvailabilityReading {
+  readonly record: FanAvailabilityRecord;
+  readonly gate: ScriptStart;
+  readonly asked: boolean;
+}
+
+/** She asked him whether he is free in her answer to this message: `askedAt` set, and not the one he had before. */
+function askedNow(before: FanAvailabilityRecord | null, after: FanAvailabilityRecord): boolean {
+  return after.askedAt !== null && after.askedAt.getTime() !== before?.askedAt?.getTime();
 }
 
 /** The last answer and what it was written from: what a rating records, and what a comparison replays. */
@@ -203,6 +218,9 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     writtenAt.set(turn, situation.now);
     history.push(turn);
   };
+  // The history as composeTurn reads it, each turn with its time: the trainer sees the gaps he made with `advance`.
+  const dated = (): ConversationTurn[] =>
+    history.map((t) => ({ ...t, at: writtenAt.get(t) ?? situation.now }));
   const offerAt = (now: Date): OfferInput | undefined =>
     deps.offerLimits === undefined
       ? undefined
@@ -345,7 +363,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
         },
         {
-          history: [...history],
+          history: dated(),
           fanText: '',
           media: [],
           fanNotes: fanNotes.join('\n'),
@@ -383,7 +401,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       desireTrail.push(undefined);
       push({ from: 'fan', text, media: media.map((description) => ({ description })) });
       const moment: RatedMoment = {
-        history: [...history],
+        history: dated(),
         fanNotes: fanNotes.join('\n'),
         situation,
       };
@@ -397,7 +415,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
         },
         {
-          history: [...history],
+          history: dated(),
           fanText: text,
           media,
           fanNotes: moment.fanNotes,
@@ -450,6 +468,15 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
               band: desireBandOf(read.score),
               signals: read.signals,
               weightsVersion: read.weightsVersion,
+              ...(composed.availability !== undefined &&
+                composed.scriptStart !== undefined && {
+                  availability: {
+                    record: composed.availability.record,
+                    gate: composed.scriptStart,
+                    // She asked on this message only if `askedAt` moved: the clock may stand still between two.
+                    asked: askedNow(availabilityBefore.at(-1) ?? null, composed.availability.record),
+                  },
+                }),
             };
       desireTrail[desireTrail.length - 1] = reading;
 
