@@ -262,10 +262,13 @@ export function Glance({
   agenda,
   now,
   nowMinute,
+  owes = false,
   children,
 }: {
   plan: DayPlan;
   agenda: CreatorAgenda;
+  /** Something of hers is due outside her agenda, said beside this card: an empty day is not a day off. */
+  owes?: boolean;
   now: Date;
   nowMinute: number | null;
   /** What closes the glance, at its foot. */
@@ -283,7 +286,9 @@ export function Glance({
     total === 0
       ? proposed > 0
         ? `${String(proposed)} ${proposed > 1 ? 'propositions' : 'proposition'} à regarder`
-        : 'Rien à faire'
+        : owes
+          ? 'Rien à l’agenda'
+          : 'Rien à faire'
       : left === 0
         ? 'Tout est fait'
         : ahead
@@ -336,6 +341,8 @@ export function Glance({
                 `Rien d’autre à faire ${nowMinute === null ? 'ce jour-là' : 'aujourd’hui'}.`
               ) : nowMinute === null ? (
                 'Aucune tâche ce jour-là.'
+              ) : owes ? (
+                'Tes envois sont juste au-dessus.'
               ) : (
                 'Profite de ta journée.'
               )

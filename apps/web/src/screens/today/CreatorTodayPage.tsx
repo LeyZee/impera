@@ -57,8 +57,9 @@ export function CreatorTodayPage(): JSX.Element {
             }}
           />
         ) : null}
-        <HerDay now={now} today={today} quiet={down} />
+        {/* What she owes first: an empty agenda under it is not a day off (recette visuelle 16/11, CRE-01). */}
         <ToSend today={today} />
+        <HerDay now={now} today={today} quiet={down} />
         <Fans now={now} today={today} />
       </div>
     </Page>
@@ -83,6 +84,8 @@ function HerDay({
   const sunday = addDays(monday, 6);
   const read = useAgenda(monday, sunday);
   const { agenda } = useWithPending(read.data);
+  const content = useContent().data;
+  const owes = content !== undefined && dueNow(toShoot(content.requests, content.drops), today).length > 0;
   if (agenda === undefined)
     // The page says the server is silent, once (ETA-05).
     return read.isError ? null : (
@@ -98,7 +101,7 @@ function HerDay({
     <>
       {/* A copy kept on her phone says so: being updated, or old, and why (CRE-02). */}
       <FreshnessNote read={read} from={monday} to={sunday} quiet={quiet} />
-      <Glance plan={plan} agenda={agenda} now={now} nowMinute={minuteOf(now, agenda.timeZone)}>
+      <Glance plan={plan} agenda={agenda} now={now} nowMinute={minuteOf(now, agenda.timeZone)} owes={owes}>
         <Link to="/agenda" className="nv-btn nv-btn--soft nv-btn--sm sc-day__open">
           Ouvrir l’agenda
         </Link>
@@ -157,7 +160,7 @@ function ToSend({ today }: { today: string }): JSX.Element | null {
           {rest > 1 ? `Et ${String(rest)} autres dans Contenu.` : 'Et une autre dans Contenu.'}
         </p>
       ) : null}
-      <SendAction item={first} />
+      <SendAction item={first} alone={due.length === 1} />
     </section>
   );
 }
@@ -179,7 +182,7 @@ function SendLine({ item, today }: { item: ToShoot; today: string }): JSX.Elemen
  * The first one's way: « Déposer » opens Contenu's sheet on its request; a script is begun or continued card by card
  * from its own page, so it opens Contenu, or the script she began.
  */
-function SendAction({ item }: { item: ToShoot }): JSX.Element {
+function SendAction({ item, alone }: { item: ToShoot; alone: boolean }): JSX.Element {
   const className = 'nv-btn nv-btn--neon nv-btn--sm sc-send__go';
   if (item.kind === 'script')
     return (
@@ -194,7 +197,7 @@ function SendAction({ item }: { item: ToShoot }): JSX.Element {
     </Link>
   ) : (
     <Link to="/contenu" search={{ demande: request.id }} className={className}>
-      Déposer
+      {alone ? 'Déposer' : 'Déposer la première'}
     </Link>
   );
 }

@@ -28,6 +28,10 @@
   border-radius: inherit;
 }
 .mp-fold__head .mp-block__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mp-fold__head .nv-disclosure__sum {
   flex: none;
 }
 .mp-fold__body {

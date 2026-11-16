@@ -99,7 +99,7 @@ describe('Aujourd’hui, the creator’s (CR-02)', () => {
       `✨${DROP_CATEGORY_LABELS.reveal_story}Pour aujourd’hui`,
     ]);
     expect(card.querySelector('.sc-send__due--late')?.textContent).toBe('En retard depuis dim. 25 oct.');
-    const go = screen.getByRole('link', { name: 'Déposer' });
+    const go = screen.getByRole('link', { name: 'Déposer la première' });
     expect(go.className).toContain('nv-btn--neon');
     expect(go.getAttribute('href')).toMatch(/^\/contenu\?demande=/u);
   });
@@ -202,6 +202,21 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
     expect(screen.getByText('Story du matin')).toBeDefined();
     expect(screen.getByText(/Ensuite :/u).textContent).toContain('Tournage tenue rouge');
     expect(screen.getByRole('link', { name: 'Ouvrir l’agenda' }).getAttribute('href')).toBe('/agenda');
+  });
+
+  it('puts what she owes first, and never calls an empty agenda a day off while she owes (CRE-01)', async () => {
+    serve({ current: [], next: [] }, 200, agendaOf({ tasks: [], suggestions: [] }), {
+      requests: [requestOf({ dueOn: '2026-11-01', reason: 'La séance promise' })],
+      drops: [],
+    });
+    show();
+    expect(await screen.findByText('Rien à l’agenda')).toBeDefined();
+    expect(screen.queryByText('Profite de ta journée.')).toBeNull();
+    const send = (await screen.findByRole('heading', { level: 2, name: 'À envoyer' })).closest('section');
+    const day = screen.getByRole('region', { name: 'Ta journée' });
+    expect(send?.compareDocumentPosition(day)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    // One request alone: the button needs no ordinal.
+    expect(screen.getByRole('link', { name: 'Déposer' })).toBeDefined();
   });
 
   it('counts what the agency waits on her for, and takes her to her week to answer', async () => {
