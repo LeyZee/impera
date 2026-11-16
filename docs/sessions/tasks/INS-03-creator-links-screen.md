@@ -41,3 +41,6 @@ Pour les fiches suivantes de l'ADR 0121 (à recopier à leur création) :
 Le rattachement à un lien de suivi, les paliers, l'écran « Trafic » et le récap (fiches suivantes de l'ADR 0121) ; le rappel de story.
 
 ## Notes de session
+
+- 16/11 : les liens de redirection vivent aujourd'hui dans le JSON du canal Telegram (lecture admin seule). Décidé avec le fil Bilan : table `redirect_links` dans un module à part `redirect-links` (domaine et port), lu par telegram et par le connecteur de liens via son `index.ts`. Conditions de Bilan : écritures dans la table seulement dès cette PR, JSON lu en repli une version (son vidage est une migration à part, destructive, sur le mot de Charles) ; recopie dans la migration, idempotente (`ON CONFLICT (id) DO NOTHING`, identifiants gardés) avec un test d'intégration qui la rejoue ; FORCE RLS, lecture par la créatrice sur ses lignes, écriture par le service, `GRANT SELECT … TO impera_service`, test d'isolation ; `url` en CHECK `^https://`, `placement` NULL ou dans la liste fermée, unique (creator_id, name). Numéro de migration provisoire 0219, fixé au signal.
+- Fait en local : contrats `creator-links` (cartes, phrase d'usage, ordre) et leurs tests.
