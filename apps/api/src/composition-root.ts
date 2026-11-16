@@ -77,7 +77,7 @@ import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
-import { wireMedia } from './wiring/media';
+import { wireMedia, wireVaultDescriptions } from './wiring/media';
 import { wireNotifications } from './wiring/notifications';
 import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
@@ -300,6 +300,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ingest: (input) => conversations.module.ingestMessage(input),
     // The import of her native scripts, queued behind each vault sync the owner asks (ADR 0099 § 1 time 2).
     onVaultSyncAsked: (input) => scripts.module.askImport(input),
+    // The description of the vault's media still without a file, queued behind each sync that went through (ADR 0113).
+    onVaultSynced: (input) => vaultDescriptions.vault.enqueue(input),
     // The member made by `team`, the account linked by this module's own write, in one transaction (ADR 0076 § 3).
     invite: (actor, input) =>
       team.module.invites(connectors.module.invitationChatterLinks).fromPlatform(actor, input),
@@ -370,6 +372,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     vision: options.dropVision ?? llm.gateway,
     brain: options.scriptBrain ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
+  });
+  // Her vault's files read by the connectors, described as her drops are, reduced by the drops' pictures (ADR 0113).
+  const vaultDescriptions = wireVaultDescriptions(shared, {
+    vision: options.dropVision ?? llm.gateway,
+    files: connectors.module.vaultFiles,
+    drops: contentDrops.module,
   });
   const scripts = wireScripts(shared, {
     persona: persona.module,
@@ -514,6 +522,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...invoicing.tasks,
     ...notifications.tasks,
     ...contentDrops.tasks,
+    ...vaultDescriptions.tasks,
     ...scripts.tasks,
     ...creatorTasks.tasks,
     ...trends.tasks,

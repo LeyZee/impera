@@ -85,6 +85,11 @@ export const FakeMessageSchema = z.object({
   createdAt: iso,
   /** Deleted on Reveal: still listed, with `deletedAt` (2026-11-16). */
   deletedAt: iso.nullable().optional(),
+  /** The fan answered one of her stories (2026-11-16): `replyToStoryId` and `storyReply` on the wire. */
+  storyReply: z
+    .object({ storyId: id, thumbnailUrl: z.string(), mediaType: z.string(), isExpired: z.boolean() })
+    .nullable()
+    .optional(),
 });
 export type FakeMessage = z.infer<typeof FakeMessageSchema>;
 
@@ -226,5 +231,6 @@ export const REVEAL_EXPECTED_CAPABILITIES = {
   scripts: true,
   scriptHistory: true,
   vault: true,
+  mediaDownload: true,
   vaultPreview: true,
 } as const;

@@ -37,6 +37,11 @@ export interface VaultDeps {
   readonly resolver: ConnectorResolver;
   readonly store: VaultStore;
   readonly clock: Clock;
+  /**
+   * Told of each sync that went through (ADR 0113 § 5), once its rows are written: `media` queues the description of
+   * the media still without a file behind it. Thrown, the job fails and is replayed: a sync writes nothing twice.
+   */
+  readonly onSynced?: ((input: VaultSyncAsked) => Promise<void>) | undefined;
 }
 
 /**
@@ -68,11 +73,17 @@ export function createVaultSyncJob(deps: VaultDeps) {
       logger.info({ platformAccountId: account.id, ...outcome }, 'vault sync: done');
     } catch (error) {
       await recordConnectorFailure(deps.accounts, account, error, { meta, logger, jobName: 'vault_sync' });
+      return;
     }
+    await deps.onSynced?.({
+      platformAccountId: account.id,
+      creatorId: account.creatorId,
+      correlationId: payload.correlationId,
+    });
   };
 }
 
-/** What `onVaultSyncAsked` is told: one account whose sync the owner's « Synchroniser » queued. */
+/** What `onVaultSyncAsked` is told: one account whose sync the owner's « Synchroniser » queued (or, `onSynced`, read). */
 export interface VaultSyncAsked {
   readonly platformAccountId: PlatformAccountId;
   readonly creatorId: CreatorId;

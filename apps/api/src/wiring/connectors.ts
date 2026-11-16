@@ -50,6 +50,8 @@ export function wireConnectors(
      * queues the import of its native scripts behind it (ADR 0099 § 1 time 2).
      */
     readonly onVaultSyncAsked?: ConnectorsDeps['onVaultSyncAsked'];
+    /** Each sync that went through (ADR 0113 § 5), late bound: `media`, wired after, queues the vault's description. */
+    readonly onVaultSynced?: ConnectorsDeps['onVaultSynced'];
     /** Tests only: the connectors' clock. */
     readonly now?: () => Date;
     /** Tests only: the photo copy's fetch and store (CRM-07 a2b). */
@@ -71,8 +73,6 @@ export function wireConnectors(
       // Reads only: sends stay off until P2-03, and the write guard (`writes`) refuses them first anyway.
       reveal: revealApiConnectors({
         fetch,
-        // The vault's small pictures (ADR 0138): read on demand, never kept, from the origins written in the adapter.
-        fetchFile: fetch,
         // The route's name, the status and the duration: never the token, a URL or a body (spec § 3).
         log: (platformAccountId, entry) => {
           logger.debug({ platformAccountId, ...entry }, 'reveal: call');
@@ -107,6 +107,7 @@ export function wireConnectors(
           },
     ...(deps.now !== undefined && { clock: { now: deps.now } }),
     ...(deps.onVaultSyncAsked !== undefined && { onVaultSyncAsked: deps.onVaultSyncAsked }),
+    ...(deps.onVaultSynced !== undefined && { onVaultSynced: deps.onVaultSynced }),
   });
   return {
     module,

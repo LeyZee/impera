@@ -20,7 +20,7 @@ import { createLogger } from '../logger';
 import { revealApiConnectors } from '../modules/connectors';
 import { buildServer, type Server } from '../server';
 
-import { FAKE_REVEAL_MEDIA_ORIGIN, createFakeReveal, type FakeReveal } from './fake-reveal/server';
+import { FAKE_REVEAL_FILE_HOST, createFakeReveal, type FakeReveal } from './fake-reveal/server';
 import { fixedComposer } from './support/composer';
 import { testConfig } from './support/config';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
@@ -114,8 +114,7 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
         reveal: revealApiConnectors({
           fetch: fake.fetch,
           baseUrl: 'https://reveal.test',
-          fetchFile: fake.fetchFile,
-          mediaOrigins: [FAKE_REVEAL_MEDIA_ORIGIN],
+          files: { transport: fake.fileTransport, hosts: [FAKE_REVEAL_FILE_HOST], httpForTests: true },
         }),
       },
     });

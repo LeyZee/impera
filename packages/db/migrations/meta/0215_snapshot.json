@@ -1,6 +1,6 @@
 {
-  "id": "5e909713-e392-4a81-9d91-98b7cfd3dc77",
-  "prevId": "8611faba-153c-4211-8189-86bf9f83e483",
+  "id": "954645ab-bbf8-46ba-bb2a-4d1e7bbde7bb",
+  "prevId": "b9c13c4c-06fa-49a5-8f58-ded911b4ce82",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7931,7 +7931,7 @@
         },
         "media_assets_origin_check": {
           "name": "media_assets_origin_check",
-          "value": "\"media_assets\".\"origin\" in ('creator', 'fan')"
+          "value": "\"media_assets\".\"origin\" in ('creator', 'fan', 'vault')"
         },
         "media_assets_thumbnail_check": {
           "name": "media_assets_thumbnail_check",
@@ -7940,6 +7940,10 @@
         "media_assets_description_failures_check": {
           "name": "media_assets_description_failures_check",
           "value": "\"media_assets\".\"description_failures\" >= 0"
+        },
+        "media_assets_storage_key_check": {
+          "name": "media_assets_storage_key_check",
+          "value": "(\"media_assets\".\"storage_key\" = '') = (\"media_assets\".\"origin\" = 'vault') and (\"media_assets\".\"origin\" <> 'vault' or \"media_assets\".\"erased_at\" is not null)"
         }
       },
       "isRLSEnabled": false
@@ -8138,7 +8142,7 @@
         },
         "media_descriptions_author_check": {
           "name": "media_descriptions_author_check",
-          "value": "\"media_descriptions\".\"author\" in ('sense', 'human')"
+          "value": "\"media_descriptions\".\"author\" in ('sense', 'human', 'platform')"
         },
         "media_descriptions_review_reasons_check": {
           "name": "media_descriptions_review_reasons_check",
@@ -8247,11 +8251,12 @@
           "primaryKey": false,
           "notNull": false
         },
-        "preview_blurhash": {
-          "name": "preview_blurhash",
-          "type": "text",
+        "description_failures": {
+          "name": "description_failures",
+          "type": "smallint",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": 0
         },
         "last_synced_at": {
           "name": "last_synced_at",
@@ -8411,9 +8416,9 @@
           "name": "media_platform_refs_text_check",
           "value": "char_length(\"media_platform_refs\".\"folder_name\") <= 200 and char_length(\"media_platform_refs\".\"platform_description\") <= 2000"
         },
-        "media_platform_refs_blurhash_check": {
-          "name": "media_platform_refs_blurhash_check",
-          "value": "char_length(\"media_platform_refs\".\"preview_blurhash\") <= 166"
+        "media_platform_refs_description_failures_check": {
+          "name": "media_platform_refs_description_failures_check",
+          "value": "\"media_platform_refs\".\"description_failures\" >= 0"
         },
         "media_platform_refs_duration_check": {
           "name": "media_platform_refs_duration_check",
@@ -17413,6 +17418,159 @@
         "shifts_template_check": {
           "name": "shifts_template_check",
           "value": "(\"shifts\".\"template_id\" is null) = (\"shifts\".\"template_starts_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.platform_script_branches": {
+      "name": "platform_script_branches",
+      "schema": "",
+      "columns": {
+        "platform_script_id": {
+          "name": "platform_script_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_step_ref": {
+          "name": "platform_step_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "branch_order": {
+          "name": "branch_order",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "condition": {
+          "name": "condition",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "platform_script_branches_creator_idx": {
+          "name": "platform_script_branches_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_script_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "platform_script_branches_creator_id_creators_id_fk": {
+          "name": "platform_script_branches_creator_id_creators_id_fk",
+          "tableFrom": "platform_script_branches",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platform_script_branches_updated_by_user_id_fk": {
+          "name": "platform_script_branches_updated_by_user_id_fk",
+          "tableFrom": "platform_script_branches",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platform_script_branches_script_creator_fk": {
+          "name": "platform_script_branches_script_creator_fk",
+          "tableFrom": "platform_script_branches",
+          "tableTo": "platform_scripts",
+          "columnsFrom": ["platform_script_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "platform_script_branches_pkey": {
+          "name": "platform_script_branches_pkey",
+          "columns": ["platform_script_id", "platform_step_ref"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"platform_script_branches\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "team_write": {
+          "name": "team_write",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"platform_script_branches\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"platform_script_branches\".\"updated_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "team_clear": {
+          "name": "team_clear",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "\"platform_script_branches\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "platform_script_branches_order_check": {
+          "name": "platform_script_branches_order_check",
+          "value": "\"platform_script_branches\".\"branch_order\" >= 0 and \"platform_script_branches\".\"branch_order\" < 50"
+        },
+        "platform_script_branches_ref_check": {
+          "name": "platform_script_branches_ref_check",
+          "value": "char_length(\"platform_script_branches\".\"platform_step_ref\") <= 200"
+        },
+        "platform_script_branches_condition_check": {
+          "name": "platform_script_branches_condition_check",
+          "value": "jsonb_typeof(\"platform_script_branches\".\"condition\") = 'object' and \"platform_script_branches\".\"condition\"->>'kind' in ('none', 'structured', 'text')"
         }
       },
       "isRLSEnabled": false

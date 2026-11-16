@@ -10,6 +10,7 @@ import type {
   FanNote,
   FanPpvStats,
   FanProfile,
+  FetchedMedia,
   Money,
   OutboundMedia,
   Platform,
@@ -71,12 +72,13 @@ export interface PlatformConnector {
    * `scripts`: sends one step of a platform script, priced as the platform lists it (never by us). The history is read
    * again just before: a step already sent in this conversation is refused for good (`ScriptStepAlreadySent`).
    * `expectedPrice` is the step's price as the person or the agent validated it: the platform listing another one
-   * just before sends nothing (`ScriptStepPriceChanged`).
+   * just before sends nothing (`ScriptStepPriceChanged`). The step is named by its own ref (`stepRef`), never by its
+   * place: the branches of a step share a rank and come in no stable order (ADR 0112 § 1).
    */
   sendScriptStep?(
     conversationRef: ExternalRef,
     scriptRef: ExternalRef,
-    stepIndex: number,
+    stepRef: ExternalRef,
     expectedPrice: Money,
     idempotencyKey: string,
   ): Promise<SendResult>;
@@ -84,6 +86,15 @@ export interface PlatformConnector {
   getScriptHistory?(fanRef: ExternalRef): Promise<SentScriptStep[]>;
   /** `vault`: every media of the vault, or of one folder. */
   listVaultMedia?(opts: { folderRef?: ExternalRef }): Promise<VaultMedia[]>;
+  /**
+   * `mediaDownload`: reads one vault file to `path` (ADR 0113), the media named by its `ref` and its folder as
+   * `listVaultMedia` gave them (`null` at the vault's root). A link the platform no longer signs is read again from the
+   * folder once. The file at `path` is the caller's to remove, failed or not. Never writes to the platform.
+   */
+  fetchMedia?(
+    mediaRef: ExternalRef,
+    opts: { folderRef: ExternalRef | null; path: string },
+  ): Promise<FetchedMedia>;
   /**
    * `vaultPreview` (ADR 0138): the small picture of one media of the vault (a photo's reduced size, a video's poster),
    * read now with links fresh from its folder (`null`: the vault's root), and handed back, never kept. `not_found`

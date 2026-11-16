@@ -237,11 +237,12 @@ describe('scriptsOf (spec § 6)', () => {
       [],
       () => null,
     );
-    // Each keeps its own place (`index`) and the platform's rank (`platformIndex`): nothing is merged nor lost.
+    // Each keeps its own place (`index`) and the platform's rank (`platformIndex`): nothing is merged nor lost, and the
+    // branches of a rank come by id, whatever order Reveal listed them in.
     expect(script?.steps.map((s) => [s.ref.id, s.index, s.platformIndex, s.priceMinor])).toEqual([
       ['step_a', 0, 0, 0],
-      ['step_c', 1, 1, 2000],
-      ['step_b', 2, 1, 1500],
+      ['step_b', 1, 1, 1500],
+      ['step_c', 2, 1, 2000],
     ]);
   });
 

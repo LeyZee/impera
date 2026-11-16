@@ -9,15 +9,15 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  FAKE_REVEAL_MEDIA_ORIGIN,
+  FAKE_REVEAL_FILE_HOST,
   createFakeReveal,
   type FakeReveal,
 } from '../../../../../__tests__/fake-reveal/server';
 import { ConnectorError } from '../../../domain/platform-connector';
 import { MemorySendJournal } from '../../__tests__/memory-send-journal';
+import type { FileTransport } from '../../download/vault-file';
 import type { RevealCallLog, RevealFetch } from '../client';
 import { RevealApiConnector, revealApiConnectors } from '../connector';
-import type { RevealFileFetch } from '../preview';
 import type { RevealSession } from '../session';
 
 /**
@@ -258,6 +258,29 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     await expect(connector.fetchMessages(fan('conv_02'), {})).resolves.not.toHaveLength(0);
   });
 
+  it("reads a fan's answer to one of her stories, in its conversation and in the list (2026-11-16)", async () => {
+    const fake = world();
+    const connector = connect(fake);
+    const newest = fake
+      .state()
+      .messages.filter((m) => m.conversationId === 'conv_02')
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const last = newest[0];
+    if (last === undefined) throw new Error('the default world has messages with fan 02');
+    last.storyReply = {
+      storyId: 'story_01',
+      thumbnailUrl: 'https://reveal.test/story',
+      mediaType: 'video',
+      isExpired: false,
+    };
+    const messages = await connector.fetchMessages(fan('conv_02'), {});
+    expect(messages.map((m) => m.ref.id)).toContain(last.id);
+    await expect(connector.listConversations({})).resolves.toHaveLength(12);
+    await expect(connector.getConversation(fan('conv_02'))).resolves.toMatchObject({
+      ref: { id: 'conv_02' },
+    });
+  });
+
   it('lists conversations, most recent first, with `since` and `limit`', async () => {
     const connector = connect(world());
     const all = await connector.listConversations({});
@@ -432,30 +455,44 @@ describe('RevealApiConnector: a vault media’s sharp preview (ADR 0138)', () =>
 
   function previewer(
     fake: FakeReveal,
-    extra: { fetchFile?: RevealFileFetch; mediaOrigins?: readonly string[]; listings?: string[] } = {},
+    extra: { transport?: FileTransport; hosts?: readonly string[]; listings?: string[] } = {},
   ): RevealApiConnector {
     return new RevealApiConnector({
       session: sessionOf(fake),
       fetch: fake.fetch,
       baseUrl: BASE,
       sleep: () => Promise.resolve(),
-      fetchFile: extra.fetchFile ?? fake.fetchFile,
-      mediaOrigins: extra.mediaOrigins ?? [FAKE_REVEAL_MEDIA_ORIGIN],
+      // The vault files' own reader and hosts (ADR 0113 § 2): one list, one transport.
+      fileTransport: extra.transport ?? fake.fileTransport,
+      fileHosts: extra.hosts ?? [FAKE_REVEAL_FILE_HOST],
+      fileHttpForTests: true,
       log: (entry) => {
         if (entry.route === 'vault.medias') extra.listings?.push(entry.route);
       },
     });
   }
 
-  it('reads a photo’s small picture and a video’s poster, its folder listed once, never with our headers', async () => {
+  /** FakeReveal's transport, every link it is asked recorded. */
+  function counting(fake: FakeReveal, asked: string[]): FileTransport {
+    return {
+      lookup: fake.fileTransport.lookup,
+      get: (url, signal, pinned) => {
+        asked.push(url);
+        return fake.fileTransport.get(url, signal, pinned);
+      },
+    };
+  }
+
+  /** A transport answering `response` to anything, FakeReveal's public test address looked up. */
+  function answering(fake: FakeReveal, response: () => Response): FileTransport {
+    return { lookup: fake.fileTransport.lookup, get: () => Promise.resolve(response()) };
+  }
+
+  it('reads a photo’s small picture and a video’s poster, its folder listed once, by the vault files’ reader', async () => {
     const fake = world();
     const listings: string[] = [];
-    const asked: object[] = [];
-    const spy: RevealFileFetch = (url, init) => {
-      asked.push(init);
-      return fake.fetchFile(url, init);
-    };
-    const connector = previewer(fake, { fetchFile: spy, listings });
+    const asked: string[] = [];
+    const connector = previewer(fake, { transport: counting(fake, asked), listings });
     const [photo, poster] = await Promise.all([
       connector.readVaultPreview({ mediaRef: ref('media_01'), folderRef: FOLDER_1 }),
       connector.readVaultPreview({ mediaRef: ref('media_03'), folderRef: FOLDER_1 }),
@@ -466,9 +503,10 @@ describe('RevealApiConnector: a vault media’s sharp preview (ADR 0138)', () =>
     }
     // Two pictures asked together: one listing of the folder, shared.
     expect(listings).toHaveLength(1);
-    // No authorization, no cookie, no origin: the session never leaves for the files' host; no redirect followed.
-    for (const init of asked) expect(Object.keys(init).sort()).toEqual(['method', 'redirect', 'signal']);
-    expect(asked[0]).toMatchObject({ method: 'GET', redirect: 'manual' });
+    // The poster, not the video's playlist: a picture, one GET each.
+    expect(asked).toHaveLength(2);
+    expect(asked.some((url) => url.includes('/poster?'))).toBe(true);
+    expect(asked.some((url) => url.includes('/hls/'))).toBe(false);
   });
 
   it('says not_found for a media its folder does not list, and for a voice note', async () => {
@@ -484,40 +522,40 @@ describe('RevealApiConnector: a vault media’s sharp preview (ADR 0138)', () =>
     expect((await rejection(voice)).code).toBe('not_found');
   });
 
-  it('refuses a picture from an origin the adapter does not name, and anything but an image', async () => {
+  it('refuses a picture from a host the files do not name, and anything but an image', async () => {
     const fake = world();
-    const calls: string[] = [];
-    const counted: RevealFileFetch = (url, init) => {
-      calls.push(url);
-      return fake.fetchFile(url, init);
-    };
-    // No origin written: refused before any call, the origin alone said, never the signed link.
-    const nowhere = previewer(fake, { fetchFile: counted, mediaOrigins: [] });
+    const asked: string[] = [];
+    // No host written: refused before any call, the host alone said, never the signed link.
+    const nowhere = previewer(fake, { transport: counting(fake, asked), hosts: [] });
     const refused = await rejection(
       nowhere.readVaultPreview({ mediaRef: ref('media_01'), folderRef: FOLDER_1 }),
     );
     expect(refused.code).toBe('fatal');
-    expect(refused.message).toContain(FAKE_REVEAL_MEDIA_ORIGIN);
+    expect(refused.message).toContain(FAKE_REVEAL_FILE_HOST);
     expect(refused.message).not.toContain('sig=');
-    expect(calls).toEqual([]);
+    expect(asked).toEqual([]);
     // A page instead of a picture.
-    const page: RevealFileFetch = () =>
-      Promise.resolve({
-        status: 200,
-        arrayBuffer: () => Promise.resolve(new TextEncoder().encode('<!doctype html><p>non</p>').buffer),
-      });
+    const page = answering(fake, () => new Response('<!doctype html><p>non</p>', { status: 200 }));
     const html = await rejection(
-      previewer(fake, { fetchFile: page }).readVaultPreview({
+      previewer(fake, { transport: page }).readVaultPreview({
         mediaRef: ref('media_01'),
         folderRef: FOLDER_1,
       }),
     );
     expect(html.code).toBe('fatal');
+    // Past the bound: refused, nothing kept.
+    const huge = answering(fake, () => new Response(new Uint8Array(3 * 1024 * 1024), { status: 200 }));
+    const big = await rejection(
+      previewer(fake, { transport: huge }).readVaultPreview({
+        mediaRef: ref('media_01'),
+        folderRef: FOLDER_1,
+      }),
+    );
+    expect(big.code).toBe('fatal');
     // A server error is transient: counted as any read's.
-    const down: RevealFileFetch = () =>
-      Promise.resolve({ status: 502, arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
+    const down = answering(fake, () => new Response(null, { status: 502 }));
     const failed = await rejection(
-      previewer(fake, { fetchFile: down }).readVaultPreview({
+      previewer(fake, { transport: down }).readVaultPreview({
         mediaRef: ref('media_01'),
         folderRef: FOLDER_1,
       }),
