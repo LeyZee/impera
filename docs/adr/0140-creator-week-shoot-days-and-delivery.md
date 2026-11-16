@@ -1,8 +1,8 @@
 # 0140. La semaine de la créatrice : deux jours de tournage qu'elle choisit, une livraison le dimanche, un agenda que le code remplit
 
-Statut : accepted (Charles, 16/11/2026, 16 h 17, « ok 0140 » ; cadrage de Charles, 16/11/2026, 16 h 08 : « une to-do list par semaine », « 2 jours de travail par semaine », « jusqu'à dimanche 23 h pour nous fournir le contenu », « il faut que ça soit vraiment fiable », « tout est en lien avec l'agenda »)
+Statut : accepted (Charles, 16/11/2026, 16 h 17, « ok 0140 », et ses trois choix à 16 h 19 ; cadrage de Charles, 16/11/2026, 16 h 08 : « une to-do list par semaine », « 2 jours de travail par semaine », « jusqu'à dimanche 23 h pour nous fournir le contenu », « il faut que ça soit vraiment fiable », « tout est en lien avec l'agenda »)
 Date : 2026-11-16
-Précise : l'ADR 0042 (§ 3 rien d'imposé, § 4 l'agenda, § 5 le topo de la semaine), l'ADR 0055 (§ 4 la demande et ses rappels, § 5 le stock), l'ADR 0056 (§ 2 la cadence des scripts), l'ADR 0126 (les lives), l'ADR 0136 (feed et stories publiés pour elle), l'ADR 0120 et l'ADR 0082 (ce que lit Instagram, la fiche reel).
+Précise : l'ADR 0042 (§ 3 rien d'imposé, § 4 l'agenda, § 5 le topo de la semaine), l'ADR 0055 (§ 4 la demande et ses rappels, § 5 le stock), l'ADR 0056 (§ 2 la cadence des scripts), l'ADR 0126 (les lives), l'ADR 0136 (feed et stories publiés pour elle), l'ADR 0137 (les Mass DM), l'ADR 0120 et l'ADR 0082 (ce que lit Instagram, la fiche reel).
 
 ## Contexte
 
@@ -31,8 +31,9 @@ Il insiste sur la fiabilité. Trop de tâches tuent la to-do : la semaine doit t
    - les publications du feed qui manquent pour tenir le rythme de l'ADR 0136 (au moins 3 par semaine), stock déjà déposé déduit ;
    - les stories qui manquent pour une story par jour (ADR 0136), stock déduit ;
    - les scripts dont la réserve passe sous son seuil (ADR 0055 § 5, ADR 0056 § 2), avec « Tourner le script X » (la structure demandée) ;
+   - les médias de **Relance** (photos ou vidéos sexy hors séance, catégorie `mass_dm` de l'ADR 0055) que demandent les Mass DM de la semaine suivante. Leur nombre vient du plan des Mass DM (ADR 0137), jamais de ce calcul. Ils se tournent vite, sur ses jours de tournage (Charles, 16/11 : « en dehors des séances, uniquement pour les Mass DM ») ;
    - les idées validées par l'agence (Veille, et les retours d'Instagram de l'ADR 0120, avec leur fiche reel de l'ADR 0082), au plus 2 par semaine.
-5. **Une charge plafonnée.** Chaque sorte de besoin a une durée de tournage estimée, et chaque jour de tournage a une capacité. Ces deux valeurs sont des réglages d'agence, avec des valeurs par défaut dans le code. Si les besoins dépassent ce que tiennent ses jours de tournage, le code garde d'abord ce qui bloque une vente : un script dont la réserve est vide, puis le feed, puis les idées, puis les stories. Le reste passe à la semaine d'après, et l'agence le voit. Jamais une semaine plus lourde que ses jours.
+5. **Une charge plafonnée.** Chaque sorte de besoin a une durée de tournage estimée, et chaque jour de tournage a une capacité. Ces deux valeurs sont des réglages d'agence, avec des valeurs par défaut dans le code. Si les besoins dépassent ce que tiennent ses jours de tournage, le code garde d'abord ce qui bloque une vente : un script dont la réserve est vide, puis le feed, puis les médias de Relance, puis les idées, puis les stories. Le reste passe à la semaine d'après, et l'agence le voit. Jamais une semaine plus lourde que ses jours.
 6. Les dégoûts et les limites de sa persona sont filtrés par le code avant toute proposition (règle 3 de `CLAUDE.md`). La règle « jamais de nu » vaut pour toutes les sorties publiques (ADR 0055 § 1).
 
 ### 3. Peu de lignes dans sa semaine
@@ -45,7 +46,7 @@ Il insiste sur la fiabilité. Trop de tâches tuent la to-do : la semaine doit t
 
 ### 4. L'échéance de livraison
 
-9. La livraison est due **le dimanche à 23 h, dans son fuseau** (`creators.timezone`, où se calculent aussi l'échéance et le rappel du matin ; ses écrans les montrent à l'heure de son téléphone), par défaut pour toutes les créatrices. Le jour et l'heure sont un réglage d'agence par créatrice (valeur par défaut à confirmer par Charles).
+9. La livraison est due **le dimanche à 23 h, dans son fuseau** (`creators.timezone`, où se calculent aussi l'échéance et le rappel du matin ; ses écrans les montrent à l'heure de son téléphone), pour toutes les créatrices. Le jour et l'heure restent un réglage d'agence par créatrice (Charles, 16/11 : « on peut le changer »).
 10. Les rappels respectent ses heures calmes et son plafond du jour (ADR 0042 § 7) :
     - le matin de chaque jour de tournage, à 9 h par défaut, un rappel : « Aujourd'hui, jour de tournage : 2 séances, 1 script ». Il ne sonne pas si la tâche a été déplacée, faite ou retirée ;
     - la veille de l'échéance et le jour même, s'il manque encore des dépôts (ADR 0055 § 4) ;
@@ -55,12 +56,12 @@ Il insiste sur la fiabilité. Trop de tâches tuent la to-do : la semaine doit t
 ### 5. Proposée, jamais imposée
 
 12. La semaine arrive avec le topo du dimanche (ADR 0042 § 5), comme **un bloc de suggestions**. Elle l'accepte d'un geste (« Accepter ma semaine ») ou tâche par tâche. Elle peut déplacer ou refuser sans se justifier. Une tâche refusée n'est pas reproposée la même semaine ni la suivante (règle existante).
-13. L'agence relit la semaine avant son départ, dans l'écran du topo. La règle de l'ADR 0042 § 5 s'applique : départ à la validation, ou le lundi à 8 h si personne n'y a touché, ou validation obligatoire si le réglage est mis. **Par défaut, la validation est obligatoire pendant les quatre premières semaines d'une créatrice**, puis la semaine part seule. Le réglage reste modifiable par créatrice (valeur par défaut à confirmer par Charles).
+13. L'agence relit la semaine avant son départ, dans l'écran du topo. La règle de l'ADR 0042 § 5 s'applique : départ à la validation, ou le lundi à 8 h si personne n'y a touché, ou validation obligatoire si le réglage est mis. **La validation est obligatoire** : le propriétaire relit, corrige si besoin, et valide chaque semaine avant qu'elle parte chez la créatrice (Charles, 16/11 : « ça me propose les trucs, je valide, je corrige »). Une semaine non validée ne part pas le lundi à 8 h. Le propriétaire est prévenu le dimanche soir qu'une semaine attend.
 14. **Le code décide, l'IA rédige.** Les besoins, les quantités, les jours et l'échéance viennent du code. Le modèle de langage ne rédige que le texte du topo et des fiches de tournage, à partir des seuls faits reçus (ADR 0042 § 5). Sans IA, par exemple avec un budget épuisé ou sans clé, la semaine part quand même, avec des fiches écrites par le code à partir de la catégorie et de la structure demandée.
 
 ### 6. Lives et stories
 
-15. **Lives.** Rien d'automatique pour l'instant : la cadence est un réglage d'agence par créatrice, à 0 par défaut (valeur à confirmer par Charles). Le code ne propose un live que si l'agence a réglé une cadence pour elle. Il le place dans une dispo en dehors de ses jours de tournage, à l'heure où ses fans sont le plus actifs (ADR 0044 § 3). C'est elle qui choisit la plateforme (ADR 0126 § 1). Le silence de l'agent pendant le live suit l'ADR 0126.
+15. **Lives.** Rien d'automatique : le code ne propose aucun live. C'est la créatrice qui planifie les siens dans son agenda, et qui choisit la plateforme (ADR 0126 §§ 1-2). Ses lives prévus apparaissent dans sa semaine, et le silence de l'agent pendant le live suit l'ADR 0126.
 16. **Stories.** Elles se tournent en lot pendant ses jours de tournage, puis l'ADR 0136 les publie pour elle, une par jour. Un rappel « Pense à ta story » ne part que les jours où le stock de stories est vide, une fois, sous ses heures calmes.
 
 ### 7. Un agenda commun
@@ -107,9 +108,9 @@ Négatives :
 - **Laisser l'IA choisir quoi tourner et quand** : ce n'est pas assez fiable pour de l'argent, et ça contredit la règle 3 de `CLAUDE.md`. L'IA rédige, elle ne décide pas.
 - **Imposer les jours de tournage** : ça contredit l'ADR 0042 § 3. Elle les choisit, et le code range la semaine dedans.
 
-## Valeurs par défaut (à confirmer par Charles)
+## Choix de Charles (16/11/2026, 16 h 19)
 
-Charles a accepté l'ADR sans trancher les trois choix. On part sur les recommandations suivantes, sauf avis contraire de sa part. Chacune est un réglage par créatrice :
-a) Échéance : le dimanche à 23 h pour toutes (§ 9).
-b) Validation : obligatoire pendant les quatre premières semaines, puis départ automatique (§ 13).
-c) Lives : rien d'automatique, cadence à 0 (§ 15).
+a) Échéance : le dimanche à 23 h pour toutes les créatrices, modifiable par créatrice (§ 9).
+b) Validation : il valide et corrige chaque semaine avant qu'elle parte, sans date de fin (§ 13).
+c) Lives : rien d'automatique, la créatrice planifie les siens (§ 15).
+d) Médias de Relance demandés chaque semaine, hors séances, pour les Mass DM (§ 4).
