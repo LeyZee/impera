@@ -8,13 +8,19 @@ import { LogSink } from './support/log-sink';
 /** A process that only records: its signal listeners, and the codes it was asked to exit with. */
 function fakeProcess(): ProcessSignals & {
   readonly signal: (name: 'SIGTERM' | 'SIGINT') => void;
+  readonly askToStop: () => void;
   readonly codes: number[];
 } {
   const listeners = new Map<string, (signal: NodeJS.Signals) => void>();
+  const stopListeners: (() => void)[] = [];
   const codes: number[] = [];
   return {
     once: (name, listener) => listeners.set(name, listener),
     exit: (code) => codes.push(code),
+    onStopMessage: (listener) => stopListeners.push(listener),
+    askToStop: () => {
+      for (const listener of stopListeners) listener();
+    },
     signal: (name) => {
       const listener = listeners.get(name);
       listeners.delete(name);
@@ -58,5 +64,22 @@ describe('graceful exit (operations.md)', () => {
     host.signal('SIGINT');
     await settled();
     expect([calls, host.codes]).toEqual([1, [1]]);
+  });
+
+  it('stops the same way on the supervisor’s stop message, which Windows sends instead of a signal (ADR 0125)', async () => {
+    const host = fakeProcess();
+    const sink = new LogSink();
+    const graceful = exitGracefully(createLogger({ LOG_LEVEL: 'info' }, sink), host);
+    const stopped: string[] = [];
+    graceful.stopWith(() => {
+      stopped.push('server', 'worker');
+      return Promise.resolve();
+    });
+    host.askToStop();
+    host.askToStop();
+    host.signal('SIGINT');
+    await settled();
+    expect([stopped, host.codes]).toEqual([['server', 'worker'], [0]]);
+    expect(sink.lines[0]).toMatchObject({ msg: 'shutting down', signal: 'stop-message' });
   });
 });
