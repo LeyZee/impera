@@ -229,6 +229,8 @@ export class RevealApiConnector implements PlatformConnector {
       const own = await this.ownOf(conversationRef.id, page.data);
       for (const item of page.data) {
         if (!isAfter(item.message.createdAt, opts.since)) return messages.reverse();
+        // Deleted on Reveal: never read, never answered, never shown to the agent.
+        if (item.message.deletedAt !== undefined) continue;
         messages.push(messageOf(item, conversationRef, own));
         if (opts.limit !== undefined && messages.length >= opts.limit) return messages.reverse();
       }

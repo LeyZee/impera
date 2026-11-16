@@ -111,6 +111,8 @@ export const ScenarioEventSchema = z.discriminatedUnion('type', [
     scriptId: z.string(),
     priceCents: z.number().int().min(0),
   }),
+  /** « Message supprimé » (2026-11-16): the message stays listed, with `deletedAt`. */
+  z.object({ type: z.literal('message_deleted'), atMs: AtSchema, messageId: z.string() }),
   /** « Script retiré » (ADR 0099 § 1 time 2): the sequence leaves `scriptSequences.list`; its steps stay as loose steps. */
   z.object({ type: z.literal('sequence_removed'), atMs: AtSchema, sequenceId: z.string() }),
   z.object({
@@ -208,6 +210,7 @@ class FakeRevealWorld {
       case 'conversation_gone':
       case 'script_changed':
       case 'sequence_removed':
+      case 'message_deleted':
         this.pending.push({ dueMs: this.clockMs + event.atMs, event });
         this.fireDue();
         return;
@@ -282,6 +285,11 @@ class FakeRevealWorld {
       case 'sequence_removed':
         this.state.sequences = this.state.sequences.filter((sequence) => sequence.id !== event.sequenceId);
         return;
+      case 'message_deleted': {
+        const deleted = this.state.messages.find((m) => m.id === event.messageId);
+        if (deleted !== undefined) deleted.deletedAt = this.now();
+        return;
+      }
     }
   }
 
@@ -432,6 +440,7 @@ class FakeRevealWorld {
       isUnread: m.isUnread,
       content: m.content,
       type: 'default',
+      ...(m.deletedAt == null ? {} : { deletedAt: m.deletedAt }),
     };
   }
 
@@ -483,6 +492,12 @@ class FakeRevealWorld {
                 updatedAt: bundle.paidAt ?? m.createdAt,
                 price: bundle.priceCents,
                 type: 'media',
+                ...(bundle.discount == null
+                  ? {}
+                  : {
+                      discountedPrice: bundle.discount.priceCents,
+                      discountDurationMinutes: bundle.discount.durationMinutes,
+                    }),
                 ...(bundle.paidAt === null ? {} : { isPaid: true }),
                 ...(bundle.transactionId === null ? {} : { transactionId: bundle.transactionId }),
                 modelId: this.state.model.id,
