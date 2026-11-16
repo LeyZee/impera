@@ -1,6 +1,6 @@
 # 0121. « Mes liens » chez la créatrice, et le pilotage du trafic côté agence : paliers réglables, entonnoir par endroit, récap du jour
 
-Statut : proposed (demandes de Charles du 16/11/2026, 2 h 08, 2 h 22 et 2 h 26 ; fil « Imaginer le système Instagram »)
+Statut : accepted (Charles, 16/11/2026, 2 h 30, « ok 0121 » ; demandes de Charles du 16/11/2026, 2 h 08, 2 h 22 et 2 h 26 ; fil « Imaginer le système Instagram »)
 Date : 2026-11-16
 Précise : l'ADR 0120 (§ 3 : l'endroit d'un lien ; § 4 : le retour sur un Reel ; § 5 : l'entonnoir d'acquisition ; § 6 : les alertes), l'ADR 0080 § 4 (le lien de redirection), l'ADR 0042 (ce que la créatrice voit).
 
