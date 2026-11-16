@@ -129,13 +129,12 @@ export function PlaygroundPage(): JSX.Element {
 
   // Her bubbles one by one, each after her typing time, as a fan sees them (Charles, 16/11).
   const delays = pending?.delaysMs;
-  const latency = pending?.latencyMs ?? 0;
   useEffect(() => {
     if (revealFrom === null || delays === undefined || delays.length < 1) {
       setShown(undefined);
       return;
     }
-    const times = revealTimes(delays, latency);
+    const times = revealTimes(delays);
     const elapsed = Date.now() - revealFrom;
     const timers: ReturnType<typeof setTimeout>[] = [];
     setShown(times.filter((t) => t <= elapsed).length);
@@ -159,7 +158,7 @@ export function PlaygroundPage(): JSX.Element {
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, [revealFrom, delays, latency]);
+  }, [revealFrom, delays]);
   const revealing = shown !== undefined && delays !== undefined && shown < delays.length ? shown : undefined;
 
   const reset = (): void => {
