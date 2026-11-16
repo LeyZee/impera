@@ -24,6 +24,19 @@ ADR 0121 § 1, ADR 0120 § 3, ADR 0080 § 4, ADR 0042, `packages/contracts/src/t
 - Un lien sans endroit ou éteint n'apparaît pas ; une phrase d'usage qui contient une adresse est refusée.
 - Aucune adresse ni domaine réel dans un test, une fixture ou une doc.
 
+## Exigences de la relecture Sécurité (PR #810)
+Pour cette fiche :
+- La route de « Mes liens » est derrière la porte de la créatrice, avec un cas dans le harnais d'isolation : une autre créatrice ne reçoit rien.
+- Schéma de sortie strict : nom, phrase d'usage, adresse à copier, endroit. Aucun compteur, aucun identifiant du service de redirection, aucun lien de suivi, aucun palier. Un test montre qu'un champ en plus ne sort pas.
+- La phrase d'usage est validée côté serveur (120 caractères, aucune adresse) et rendue comme du texte. Elle n'entre dans aucun prompt.
+
+Pour les fiches suivantes de l'ADR 0121 (à recopier à leur création) :
+- Rattachement d'un lien de suivi : unicité tenue par la base, même créatrice des deux côtés (clé composée), test d'isolation ; geste de l'agence seulement, avec sa ligne d'audit.
+- Paliers, récap, régularité, alertes : tables en FORCE RLS, droits du rôle de service, aucune politique pour la créatrice ; aucune route de la créatrice ne les rend.
+- Les valeurs des paliers et du délai ne sortent ni dans les journaux applicatifs ni dans un outil d'agent externe tant qu'une décision ne le dit pas.
+- Récap : le prompt reçoit les faits calculés et la position par rapport aux paliers, jamais leurs valeurs ; les légendes lues sur le compte y entrent comme texte non fiable et typé ; le refus d'un chiffre non reçu est fait par le code.
+- Notifications et tuile du Dashboard : propriétaire et managers seulement, pour les créatrices qu'ils ont le droit de lire.
+
 ## Hors périmètre
 Le rattachement à un lien de suivi, les paliers, l'écran « Trafic » et le récap (fiches suivantes de l'ADR 0121) ; le rappel de story.
 
