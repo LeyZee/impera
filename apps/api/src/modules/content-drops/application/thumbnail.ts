@@ -69,3 +69,36 @@ export async function makeThumbnail(
     release();
   }
 }
+
+/** A file read elsewhere and never kept (a vault media, ADR 0113 § 1), to reduce to its picture. */
+export interface PictureAsk {
+  readonly creatorId: string;
+  /** The fingerprint of the file as it was read: the picture's key, as a dropped medium's (`thumbnailKeyOf`). */
+  readonly sha256: string;
+  readonly path: string;
+  readonly kind: 'image' | 'video';
+}
+
+/**
+ * The reduced picture of a file on the worker's disk that never reached the storage (ADR 0113 § 1), made and kept
+ * exactly as a dropped medium's (ADR 0030 § 4): its key, or `null` when ffmpeg cannot read the file. The picture is
+ * written in a folder of its own, removed after; a storage that does not answer throws, and the caller's job retries.
+ */
+export async function pictureOf(
+  deps: Pick<ThumbnailDeps, 'thumbnailer' | 'scratchDir'> & { readonly storage: Pick<DropStorage, 'upload'> },
+  ask: PictureAsk,
+): Promise<string | null> {
+  const dir = await mkdtemp(join(deps.scratchDir, 'impera-picture-'));
+  try {
+    const out = join(dir, 'thumbnail.jpg');
+    if (!(await deps.thumbnailer.make(ask.path, ask.kind, out))) return null;
+    const key = thumbnailKeyOf(ask.creatorId, ask.sha256);
+    const sha256 = createHash('sha256')
+      .update(await readFile(out))
+      .digest('hex');
+    await deps.storage.upload(key, out, 'image/jpeg', sha256);
+    return key;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}

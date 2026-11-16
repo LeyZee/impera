@@ -156,12 +156,12 @@ export type PlatformScriptMoment = z.infer<typeof PlatformScriptMomentSchema>;
 export const PlatformScriptStepSchema = z.object({
   /** The step as the platform names it: what a send of this step refers to. */
   ref: ExternalRefSchema,
-  /** Its place in the script, from 0: what a send of this step names. */
+  /** Its place in the script, from 0: by rank, the branches of a rank by `ref` (a send names `ref`, never this). */
   index: z.number().int().min(0),
   /**
-   * The platform's own rank of the step (Reveal's `stepIndex`), kept as it is, never interpreted: two steps of a script
-   * with the same are branches of one step that a human chooses between (a condition the platform keeps in free text),
-   * never two steps one after the other. A script that has any is not offered (SC-04 c8, until ADR 0112).
+   * The platform's own rank of the step (Reveal's `stepIndex`), kept as it is: two steps of a script with the same are
+   * branches of one step (ADR 0112), never two steps one after the other. Their condition, default and order are
+   * Impera's, set in the CRM: Reveal's API gives none.
    */
   platformIndex: z.number().int().min(0),
   name: z.string(),
@@ -225,6 +225,16 @@ export const VaultMediaSchema = z.object({
 export type VaultMedia = z.infer<typeof VaultMediaSchema>;
 
 /**
+ * A vault file read by `fetchMedia` (ADR 0113): written to a temporary file the caller removes, never kept.
+ * `contentType` is what the platform said, `null` when it said nothing; the caller reads the true type from the bytes.
+ */
+export const FetchedMediaSchema = z.object({
+  bytes: z.number().int().min(0),
+  contentType: z.string().nullable(),
+});
+export type FetchedMedia = z.infer<typeof FetchedMediaSchema>;
+
+/**
  * What a connector can do; the core adapts to it, never the other way round. A reading of ADR 0018 is called only
  * when its flag is true, never because the method exists.
  */
@@ -251,6 +261,8 @@ export const ConnectorCapabilitiesSchema = z.object({
   scriptHistory: z.boolean(),
   /** `listVaultMedia`. */
   vault: z.boolean(),
+  /** `fetchMedia`: a vault file read to a temporary file, never kept (ADR 0113). */
+  mediaDownload: z.boolean(),
 });
 export type ConnectorCapabilities = z.infer<typeof ConnectorCapabilitiesSchema>;
 

@@ -39,6 +39,7 @@ import {
 import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { dayOf, longDay } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 
 type Mode = 'read' | 'pay' | 'check' | 'adjust';
@@ -375,6 +376,7 @@ function PayForm({
   const [reference, setReference] = useState('');
   const [touched, setTouched] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
+  const confirm = useConfirmAgain();
 
   const sentMinor = parseAmount(amount);
   const [dayUnreadable, setDayUnreadable] = useState(false);
@@ -411,6 +413,12 @@ function PayForm({
       onMode('read');
       return;
     }
+    if (outcome.kind === 'reauth') {
+      confirm.ask(() => {
+        void send();
+      });
+      return;
+    }
     setRefusal(outcome);
     onMode('pay');
   };
@@ -445,30 +453,32 @@ function PayForm({
             </p>
           ) : null}
           <p className="tm-hint">Payé, le relevé ne change plus. Une erreur se corrige par un ajustement.</p>
-          <div className="tm-dialog__foot">
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain"
-              disabled={busy}
-              onClick={() => {
-                onMode('pay');
-              }}
-            >
-              Modifier
-            </button>
-            <button
-              type="button"
-              className="nv-btn nv-btn--neon"
-              data-autofocus
-              disabled={busy}
-              aria-busy={busy}
-              onClick={() => {
-                void send();
-              }}
-            >
-              {busy ? 'Enregistrement…' : 'Marquer payé'}
-            </button>
-          </div>
+          {confirm.prompt({ lead: MONEY_LEAD, onBusyChange: onBusy }) ?? (
+            <div className="tm-dialog__foot">
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain"
+                disabled={busy}
+                onClick={() => {
+                  onMode('pay');
+                }}
+              >
+                Modifier
+              </button>
+              <button
+                type="button"
+                className="nv-btn nv-btn--neon"
+                data-autofocus
+                disabled={busy}
+                aria-busy={busy}
+                onClick={() => {
+                  void send();
+                }}
+              >
+                {busy ? 'Enregistrement…' : 'Marquer payé'}
+              </button>
+            </div>
+          )}
         </>
       ) : (
         <form

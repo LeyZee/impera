@@ -7,7 +7,7 @@ import {
   SessionShapeUnprocessable,
   SessionVaultMissing,
 } from '../domain/errors';
-import type { AccountStore, Clock, SessionShapes, SessionVault } from '../domain/ports';
+import type { AccountStore, Clock, JobLogger, SessionShapes, SessionVault } from '../domain/ports';
 
 export interface ConnectorSessions {
   /**
@@ -22,6 +22,8 @@ export interface ConnectorSessions {
     correlationId: string;
     /** Who synced it (the owner's link), for the audit. */
     userId: string | null;
+    /** The request's logger: told when the line of a refusal could not be written. */
+    logger?: JobLogger;
   }): Promise<void>;
   /** The decrypted session, or `null` when none was captured. Never logged, never sent to a client. */
   load(creatorId: CreatorId, platformAccountId: PlatformAccountId): Promise<string | null>;
@@ -34,7 +36,10 @@ export interface ConnectorSessions {
 
 /** Platform sessions at rest (security.md, ADR 0008): AES-256-GCM bound to the account id. */
 export function createConnectorSessions(deps: {
-  readonly accounts: AccountStore;
+  readonly accounts: Pick<
+    AccountStore,
+    'creatorOf' | 'sessionOf' | 'storeSession' | 'setSessionState' | 'recordRefusedSession'
+  >;
   readonly vault: SessionVault | null;
   readonly clock: Clock;
   /** How each platform's session reads; a platform without a reader takes no session. */
@@ -50,46 +55,88 @@ export function createConnectorSessions(deps: {
     if (deps.vault === null) throw new SessionVaultMissing();
     return deps.vault;
   };
+  const accept = async (
+    account: { creatorId: CreatorId; platform: Platform },
+    {
+      platformAccountId,
+      session,
+      correlationId,
+      userId,
+    }: {
+      platformAccountId: PlatformAccountId;
+      session: string;
+      correlationId: string;
+      userId: string | null;
+    },
+  ): Promise<void> => {
+    const { creatorId } = account;
+    const shape = deps.shapes[account.platform];
+    const read = shape === undefined ? null : shape(session);
+    if (shape === undefined || read === null) throw new SessionShapeUnprocessable();
+    // A session of another creator would make this account speak for her: refused, whatever the state.
+    const previous = await deps.accounts.sessionOf(creatorId, platformAccountId);
+    const before = previous === null ? null : openOrNull(vault(), platformAccountId, previous);
+    const stored = before === null ? null : shape(before);
+    if (stored !== null && stored.owner !== read.owner) throw new SessionOwnerConflict();
+    // The first « Sync » has nothing stored to compare with: the model the register links to this account answers.
+    const links = await deps.modelLinks(account.platform);
+    const linked = [...links].filter(([, to]) => to === platformAccountId).map(([model]) => model);
+    if (linked.length > 0 && !linked.includes(read.owner)) throw new SessionOwnerConflict();
+    // Nor a session the register gives to another account: one mistaken « Sync » would read her under this creator.
+    const elsewhere = links.get(read.owner);
+    if (elsewhere !== undefined && elsewhere !== platformAccountId) throw new SessionOwnerConflict();
+    // The member is pinned at the first « Sync » (P2-02): the owner's or a chatter's session is never the bot's.
+    if (stored?.member !== undefined && stored.member !== read.member) throw new SessionMemberConflict();
+    const sealed = vault().seal(platformAccountId, session);
+    await deps.accounts.storeSession(
+      creatorId,
+      platformAccountId,
+      {
+        ciphertext: sealed,
+        // One platform identity, one account: the store refuses an owner another account already holds.
+        owner: read.owner,
+        // Compared in clear: GCM seals the same session differently each time. One that no longer opens (a retired
+        // key) is not the same.
+        isSame: (stored) => openOrNull(vault(), platformAccountId, stored) === session,
+      },
+      {
+        correlationId,
+        at: deps.clock.now(),
+        userId,
+      },
+    );
+  };
   return {
-    async store({ platformAccountId, session, correlationId, userId }) {
-      const account = await deps.accounts.creatorOf(platformAccountId);
+    async store(input) {
+      const account = await deps.accounts.creatorOf(input.platformAccountId);
       if (account === null) throw new PlatformAccountNotFound();
-      const { creatorId } = account;
-      const shape = deps.shapes[account.platform];
-      const read = shape === undefined ? null : shape(session);
-      if (shape === undefined || read === null) throw new SessionShapeUnprocessable();
-      // A session of another creator would make this account speak for her: refused, whatever the state.
-      const previous = await deps.accounts.sessionOf(creatorId, platformAccountId);
-      const before = previous === null ? null : openOrNull(vault(), platformAccountId, previous);
-      const stored = before === null ? null : shape(before);
-      if (stored !== null && stored.owner !== read.owner) throw new SessionOwnerConflict();
-      // The first « Sync » has nothing stored to compare with: the model the register links to this account answers.
-      const links = await deps.modelLinks(account.platform);
-      const linked = [...links].filter(([, to]) => to === platformAccountId).map(([model]) => model);
-      if (linked.length > 0 && !linked.includes(read.owner)) throw new SessionOwnerConflict();
-      // Nor a session the register gives to another account: one mistaken « Sync » would read her under this creator.
-      const elsewhere = links.get(read.owner);
-      if (elsewhere !== undefined && elsewhere !== platformAccountId) throw new SessionOwnerConflict();
-      // The member is pinned at the first « Sync » (P2-02): the owner's or a chatter's session is never the bot's.
-      if (stored?.member !== undefined && stored.member !== read.member) throw new SessionMemberConflict();
-      const sealed = vault().seal(platformAccountId, session);
-      await deps.accounts.storeSession(
-        creatorId,
-        platformAccountId,
-        {
-          ciphertext: sealed,
-          // One platform identity, one account: the store refuses an owner another account already holds.
-          owner: read.owner,
-          // Compared in clear: GCM seals the same session differently each time. One that no longer opens (a retired
-          // key) is not the same.
-          isSame: (stored) => openOrNull(vault(), platformAccountId, stored) === session,
-        },
-        {
-          correlationId,
-          at: deps.clock.now(),
-          userId,
-        },
-      );
+      try {
+        await accept(account, input);
+      } catch (error) {
+        // A refused « Sync » leaves its line: who, which account, why. Nothing of the session, nor of the platform.
+        const reason =
+          error instanceof SessionOwnerConflict
+            ? 'owner_conflict'
+            : error instanceof SessionMemberConflict
+              ? 'member_conflict'
+              : null;
+        if (reason !== null) {
+          // The refusal stays the answer whatever happens to its line: a line that cannot be written is logged.
+          await deps.accounts
+            .recordRefusedSession(account.creatorId, input.platformAccountId, reason, {
+              correlationId: input.correlationId,
+              at: deps.clock.now(),
+              userId: input.userId,
+            })
+            .catch((err: unknown) => {
+              input.logger?.warn(
+                { platformAccountId: input.platformAccountId, reason, err },
+                'connector session: refusal not audited',
+              );
+            });
+        }
+        throw error;
+      }
     },
     async load(creatorId, platformAccountId) {
       const sealed = await deps.accounts.sessionOf(creatorId, platformAccountId);

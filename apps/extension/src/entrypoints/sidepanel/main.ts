@@ -195,7 +195,12 @@ function draftPart(): DraftPart {
 /** Draws only what changed: an answer equal to the last one leaves the panel as it is, under his eyes (§ 10). */
 function show(next: PanelScreen): void {
   screen = next;
-  const key = JSON.stringify(next, (name, value: unknown) =>
+  // The text being retouched is not drawn again: it lives in its field (render keeps that field in place).
+  const drawnPart =
+    next.kind === 'conversation' && next.draft.kind === 'ready'
+      ? { ...next, draft: { ...next.draft, text: null } }
+      : next;
+  const key = JSON.stringify(drawnPart, (name, value: unknown) =>
     name === 'now' ? undefined : value instanceof Set ? [...value] : value,
   );
   if (key === drawn || root === null) return;

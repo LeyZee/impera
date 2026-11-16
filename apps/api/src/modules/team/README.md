@@ -18,10 +18,10 @@
 - les notes internes et les préréglages se lisent par le propriétaire et les managers actifs, jamais par le membre dont parle la note : refusé (403) plutôt qu'une liste vide ;
 - un pays écrit est l'un des codes ISO 3166-1 (`KnownCountryCodeSchema`) ; une lecture garde la seule forme, pour qu'une ligne plus ancienne reste lisible.
 
-**Routes** (`routes(requireRole)`, montées sous `/v1`, contrats `packages/contracts/src/team-members.ts`) :
+**Routes** (`routes(requireRole, recentLogin)`, montées sous `/v1`, contrats `packages/contracts/src/team-members.ts`) :
 
 - lecture pour le propriétaire et les comptes de l'équipe, jamais pour une créatrice : `GET /team/members`, `GET /team/members/:memberId`, `GET /team/members/:memberId/commission`, `GET /team/members/:memberId/role`, `GET /team/commission-presets`, `GET /team/members/:memberId/notes` ;
-- écriture par le propriétaire seul : `POST /team/members`, `PATCH /team/members/:memberId` (sans le rôle : un `teamRole` y est refusé, `request_invalid`), `PUT /team/members/:memberId/status`, `POST /team/members/:memberId/commission`, `POST /team/members/:memberId/role` (`{ teamRole, effectiveFrom }`), `POST /team/commission-presets` ;
+- écriture par le propriétaire seul, avec une confirmation récente (mot de passe et code donnés sur la session depuis moins de 10 minutes, sinon 403 `reauthentication_forbidden` avant toute lecture du corps ; EQ-15, ADR 0046 § 3) : `POST /team/members`, `PATCH /team/members/:memberId` (sans le rôle : un `teamRole` y est refusé, `request_invalid`), `PUT /team/members/:memberId/status`, `POST /team/members/:memberId/commission`, `POST /team/members/:memberId/role` (`{ teamRole, effectiveFrom }`), `POST /team/commission-presets` ;
 - notes : `POST /team/members/:memberId/notes` par le propriétaire et les managers actifs ;
 - alerte de retrait (ADR 0076 § 5) : `GET /team/platform-removals`, les retraits que `connectors` laisse voir au lecteur, au propriétaire et aux managers actifs ; une liste vide pour un chatteur, 403 pour une créatrice. Équipe › Membres en fait une pastille ambre « Retiré de Reveal » sur la ligne du membre et une ligne ambre sur sa fiche, tant que dure l'état : rien n'est coupé, son lien et ses ventes passées restent, son départ se fait par « Changer le statut ».
 

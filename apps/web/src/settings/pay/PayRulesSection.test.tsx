@@ -8,6 +8,36 @@ import { PayRulesSection } from './PayRulesSection';
 import { SCHEDULING_SETTINGS } from '@/test/pay';
 import { chooseValue, valuesOf } from '@/test/select';
 
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
+vi.mock('@/settings/services/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/settings/services/api')>()),
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
+}));
+
+/** The server's answer to a write whose password and code are not recent (EQ-15). */
+const REAUTH = {
+  status: 403,
+  body: {
+    error: {
+      code: 'reauthentication_forbidden',
+      message: 'reauthentication_forbidden',
+      details: {},
+      requestId: 'req-1',
+    },
+  },
+};
+
+/** The password and the code typed in the prompt, then « Confirmer ». */
+function confirmInside(where: HTMLElement): void {
+  fireEvent.change(within(where).getByLabelText('Mot de passe'), {
+    target: { value: 'mot-de-passe-invente' },
+  });
+  fireEvent.change(within(where).getByLabelText('Code à 6 chiffres ou de secours'), {
+    target: { value: '123456' },
+  });
+  fireEvent.click(within(where).getByRole('button', { name: 'Confirmer' }));
+}
+
 /* Invented creators and accounts (ADR 0010); the rates are examples, not anyone's. */
 const id = (n: number): string => `0199f2a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
 const account = (n: number, creatorName: string, handle: string) => ({
@@ -170,6 +200,65 @@ describe('Réglages › Règles de paie', () => {
         earningsSource: 'declared',
       },
     });
+  });
+
+  it('asks for the password and the code when the confirmation is old, then posts the same rules (EQ-15)', async () => {
+    answer = REAUTH;
+    confirmIdentity.mockImplementation(() => {
+      answer = { status: 201, body: rules(9, 2, '2026-10-16') };
+      return Promise.resolve('ok');
+    });
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Poser les règles' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('TVA'), { target: { value: '20' } });
+    fireEvent.change(within(dialog).getByLabelText('Commission de la plateforme'), {
+      target: { value: '12,5' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
+    expect(
+      await within(dialog).findByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
+    ).toBeTruthy();
+    // The recap stays above the prompt, and nothing is said refused.
+    expect(
+      plain(within(dialog).getByText('Commission de la plateforme').nextElementSibling?.textContent),
+    ).toBe('12,5 %');
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    confirmInside(dialog);
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(writes).toHaveLength(2);
+    expect(writes[1]).toEqual(writes[0]);
+  });
+
+  it('asks for the password and the code before a payout delay, then saves it (EQ-15)', async () => {
+    answer = REAUTH;
+    confirmIdentity.mockImplementation(() => {
+      answer = {
+        status: 200,
+        body: { minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: 3 },
+      };
+      return Promise.resolve('ok');
+    });
+    renderSection();
+    const delay = (await screen.findByText('Délai de versement')).closest<HTMLElement>('.rp-account');
+    if (delay === null) throw new Error('No delay');
+    fireEvent.click(await within(delay).findByRole('button', { name: 'Changer' }));
+    const dialog = screen.getByRole('dialog', { name: 'Délai de versement' });
+    fireEvent.change(within(dialog).getByLabelText('Jours ouvrés après la validation'), {
+      target: { value: '3' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer le délai' }));
+    expect(
+      await within(dialog).findByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
+    ).toBeTruthy();
+    confirmInside(dialog);
+    await vi.waitFor(() => {
+      expect(writes).toHaveLength(2);
+    });
+    expect(writes[1]).toEqual({ path: '/v1/payroll/settings', body: { payoutDelayBusinessDays: 3 } });
   });
 
   it('changes the payout minimum from a period that has not begun, after a recap', async () => {

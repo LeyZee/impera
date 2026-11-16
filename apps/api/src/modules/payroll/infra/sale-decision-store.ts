@@ -82,45 +82,50 @@ const decisionOfRow = (row: typeof paySaleDecisions.$inferSelect): PaySaleDecisi
 /**
  * A line to decide as the owner and an active manager read it, with the decision in force and what may be decided, the
  * day its member left (`leftOn`, by member), and the members a give may name, less those the reader may not (`barred`:
- * the reader, the members gone with a validated final statement).
+ * the reader, the members gone with a validated final statement). Nothing may be decided by a reader the decision in
+ * force pays (`own`, four eyes): the server would refuse it.
  */
 const heldSaleOf = (
   one: SaleToDecide,
   leftOn: ReadonlyMap<TeamMemberId, string | null>,
   barred: ReadonlySet<TeamMemberId>,
-): HeldSales['sales'][number] => ({
-  platform: one.line.platform,
-  platformSaleId: one.line.platformSaleId,
-  event: one.line.event,
-  platformAccountId: one.line.platformAccountId,
-  status: one.line.status,
-  occurredAt: one.line.occurredAt.toISOString(),
-  saleOccurredAt: one.line.saleOccurredAt?.toISOString() ?? null,
-  salePeriod: one.line.salePeriod,
-  currency: one.line.currency,
-  netMinor: one.line.netMinor,
-  memberId: one.line.author.kind === 'member' ? one.line.author.memberId : null,
-  memberLeftOn: one.line.author.kind === 'member' ? (leftOn.get(one.line.author.memberId) ?? null) : null,
-  platformChatterId: one.line.platformChatterId,
-  byAgent: one.line.author.kind === 'agent',
-  reason: one.reason,
-  decision: one.decision?.outcome ?? null,
-  given:
-    one.decision?.outcome === 'give' && one.decision.memberId !== null && one.decision.note !== null
-      ? { recipientMemberId: one.decision.memberId, shareBp: one.decision.shareBp, note: one.decision.note }
-      : null,
-  excludeReason: one.decision?.outcome === 'exclude' ? one.decision.excludeReason : null,
-  outcomes: [...one.outcomes],
-  recipients: one.recipients.filter((member) => !barred.has(member)),
-  signal:
-    one.signal === null
-      ? null
-      : {
-          memberId: one.signal.memberId,
-          note: one.signal.note,
-          signalledAt: one.signal.signalledAt.toISOString(),
-        },
-});
+  own: TeamMemberId | null,
+): HeldSales['sales'][number] => {
+  const paidByDecision = own !== null && one.decision?.memberId === own;
+  return {
+    platform: one.line.platform,
+    platformSaleId: one.line.platformSaleId,
+    event: one.line.event,
+    platformAccountId: one.line.platformAccountId,
+    status: one.line.status,
+    occurredAt: one.line.occurredAt.toISOString(),
+    saleOccurredAt: one.line.saleOccurredAt?.toISOString() ?? null,
+    salePeriod: one.line.salePeriod,
+    currency: one.line.currency,
+    netMinor: one.line.netMinor,
+    memberId: one.line.author.kind === 'member' ? one.line.author.memberId : null,
+    memberLeftOn: one.line.author.kind === 'member' ? (leftOn.get(one.line.author.memberId) ?? null) : null,
+    platformChatterId: one.line.platformChatterId,
+    byAgent: one.line.author.kind === 'agent',
+    reason: one.reason,
+    decision: one.decision?.outcome ?? null,
+    given:
+      one.decision?.outcome === 'give' && one.decision.memberId !== null && one.decision.note !== null
+        ? { recipientMemberId: one.decision.memberId, shareBp: one.decision.shareBp, note: one.decision.note }
+        : null,
+    excludeReason: one.decision?.outcome === 'exclude' ? one.decision.excludeReason : null,
+    outcomes: paidByDecision ? [] : [...one.outcomes],
+    recipients: paidByDecision ? [] : one.recipients.filter((member) => !barred.has(member)),
+    signal:
+      one.signal === null
+        ? null
+        : {
+            memberId: one.signal.memberId,
+            note: one.signal.note,
+            signalledAt: one.signal.signalledAt.toISOString(),
+          },
+  };
+};
 
 const SignalRowSchema = z.object({
   platform: PlatformSchema,
@@ -247,6 +252,17 @@ async function barredOf(
   return barred;
 }
 
+/**
+ * Whether a sale concerns the reader's member (four eyes, ADR 0050 § 5, ADR 0101): they made it, a decision names them,
+ * or the decision in force pays them.
+ */
+const paysOwn = (
+  own: TeamMemberId,
+  authorMemberId: TeamMemberId | null,
+  named: TeamMemberId | null,
+  inForce: SaleToDecide['decision'],
+): boolean => own === authorMemberId || own === named || own === (inForce?.memberId ?? null);
+
 /** The signed-in account's member, `null` for the owner outside the team. */
 export async function ownMemberOf(tx: Transaction, userId: string): Promise<TeamMemberId | null> {
   const [own] = await tx
@@ -287,10 +303,10 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
     heldSales: (userId, period) =>
       withMember(db, userId, async (tx, scope) => {
         if (scope === 'self') throw new PayrollForbidden();
-        const { sales, place, signals, leftOn, barred } = await decidingOf(tx, reads, period, userId);
+        const { sales, place, signals, leftOn, barred, own } = await decidingOf(tx, reads, period, userId);
         return HeldSalesSchema.parse({
           period,
-          sales: salesToDecide(sales, place, signals).map((one) => heldSaleOf(one, leftOn, barred)),
+          sales: salesToDecide(sales, place, signals).map((one) => heldSaleOf(one, leftOn, barred, own)),
         });
       }),
 
@@ -304,7 +320,7 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
           period,
           day,
           sales: salesToGive(sales, place, day, timeZone, signals)
-            .map((one) => heldSaleOf(one, leftOn, barred))
+            .map((one) => heldSaleOf(one, leftOn, barred, own))
             .filter((one) => one.recipients.length > 0 && (own === null || one.memberId !== own)),
         });
       }),
@@ -376,7 +392,10 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
         const { author } = line;
         const authorMemberId = author.kind === 'member' ? author.memberId : null;
         const own = await ownMemberOf(tx, actor.userId);
-        if (own !== null && (own === authorMemberId || own === body.recipientMemberId)) {
+        // Four eyes: nobody decides on a sale that pays them, made by them, named in the decision sent, or paid by the
+        // decision in force (the member it counts for, or the one it gives to): taking it back or excluding it is a
+        // decision on their own pay too.
+        if (own !== null && paysOwn(own, authorMemberId, body.recipientMemberId, target.decision)) {
           throw new PayrollOwnForbidden();
         }
         if (body.outcome === 'give') {
