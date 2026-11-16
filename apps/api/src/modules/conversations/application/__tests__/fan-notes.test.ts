@@ -15,4 +15,16 @@ describe('her notes about the fan, split by who reads them (ADR 0085 § 9)', () 
     expect(notes).toEqual(['first_name : Hugo', 'Note : attend sa paie']);
     expect(brainNotes).toEqual(['payday : le 5 du mois', 'Attachment : jaloux', 'moods : seul le soir']);
   });
+
+  it('reads his age on the card, the youngest when several are active (recette AGE-13)', () => {
+    expect(fanNotesOf([{ category: 'identity', key: 'age', value: '17' }]).cardAge).toBe(17);
+    expect(
+      fanNotesOf([
+        { category: 'identity', key: 'age', value: '25 ans' },
+        { category: 'identity', key: 'age', value: '16' },
+      ]).cardAge,
+    ).toBe(16);
+    expect(fanNotesOf([{ category: 'identity', key: 'age', value: 'la trentaine' }]).cardAge).toBeUndefined();
+    expect(fanNotesOf([{ category: 'operator_note', key: 'note', value: '17' }]).cardAge).toBeUndefined();
+  });
 });

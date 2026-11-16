@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { JSX } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ExtensionPage } from './ExtensionPage';
 import { browserOf, EXTENSION_ZIP, isLocalCrm } from './extension';
@@ -10,6 +18,10 @@ const CHROME =
 const EDGE = `${CHROME} Edg/142.0.0.0`;
 const IPHONE =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 Version/19.0 Mobile/15E148 Safari/604.1';
+
+beforeEach(() => {
+  vi.stubGlobal('scrollTo', vi.fn());
+});
 
 afterEach(() => {
   cleanup();
@@ -28,33 +40,45 @@ describe('browserOf', () => {
   });
 });
 
-function renderAs(userAgent: string, watches = true): void {
+/** The page in a router, as the app draws it: its way back is a link. */
+async function renderPage(page: JSX.Element): Promise<void> {
+  const root = createRootRoute();
+  const route = createRoute({ getParentRoute: () => root, path: '/aide/extension', component: () => page });
+  const router = createRouter({
+    routeTree: root.addChildren([route]),
+    history: createMemoryHistory({ initialEntries: ['/aide/extension'] }),
+  });
+  render(<RouterProvider router={router} />);
+  await screen.findByRole('heading', { name: 'Installer l’extension' });
+}
+
+async function renderAs(userAgent: string, watches = true): Promise<void> {
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent);
-  render(<ExtensionPage watches={watches} />);
+  await renderPage(<ExtensionPage watches={watches} />);
 }
 
 describe('ExtensionPage', () => {
-  it('offers the file of the extension', () => {
-    renderAs(CHROME);
+  it('offers the file of the extension', async () => {
+    await renderAs(CHROME);
     expect(screen.getByRole('link', { name: 'Télécharger l’extension' }).getAttribute('href')).toBe(
       EXTENSION_ZIP,
     );
   });
 
-  it('puts the steps of the browser that opens the page first', () => {
-    renderAs(EDGE);
+  it('puts the steps of the browser that opens the page first', async () => {
+    await renderAs(EDGE);
     const titles = screen.getAllByRole('heading').map((heading) => heading.textContent);
     expect(titles.indexOf('Dans Edge')).toBeLessThan(titles.indexOf('Dans Chrome'));
     expect(screen.getByText(/edge:\/\/extensions/u)).toBeTruthy();
   });
 
-  it('sends a phone to the computer', () => {
-    renderAs(IPHONE);
+  it('sends a phone to the computer', async () => {
+    await renderAs(IPHONE);
     expect(screen.getByText(/marche sur ordinateur/u)).toBeTruthy();
   });
 
-  it('says what is not there yet in one line at the foot, not among what the extension does (PRO-24)', () => {
-    renderAs(CHROME);
+  it('says what is not there yet in one line at the foot, not among what the extension does (PRO-24)', async () => {
+    await renderAs(CHROME);
     expect(screen.queryByText('Bientôt')).toBeNull();
     expect(
       screen.getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent),
@@ -64,14 +88,14 @@ describe('ExtensionPage', () => {
     );
   });
 
-  it('keeps the trend watch for those who do it', () => {
-    renderAs(CHROME, false);
+  it('keeps the trend watch for those who do it', async () => {
+    await renderAs(CHROME, false);
     expect(screen.queryByText(/veille Instagram/u)).toBeNull();
     expect(screen.getByText(/^Bientôt dans l’extension : sur Reveal/u)).toBeTruthy();
   });
 
-  it('tells the popup nothing on localhost, its default address', () => {
-    renderAs(CHROME);
+  it('tells the popup nothing on localhost, its default address', async () => {
+    await renderAs(CHROME);
     expect(screen.queryByRole('button', { name: 'Copier l’adresse' })).toBeNull();
     expect(screen.getAllByText(/tu vois ton nom/u)).toHaveLength(2);
   });
@@ -80,7 +104,7 @@ describe('ExtensionPage', () => {
     vi.stubGlobal('location', new URL('https://crm.exemple.fr/aide/extension'));
     const writeText = vi.fn(() => Promise.resolve());
     vi.stubGlobal('navigator', { userAgent: CHROME, clipboard: { writeText } });
-    render(<ExtensionPage watches />);
+    await renderPage(<ExtensionPage watches />);
     expect(screen.getAllByText('https://crm.exemple.fr')).toHaveLength(2);
     const [copy] = screen.getAllByRole('button', { name: 'Copier l’adresse' });
     if (copy === undefined) throw new Error('no copy button');

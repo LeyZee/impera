@@ -305,6 +305,7 @@ describe('createDraftComposer', () => {
     expect(await draftComposer.compose(INPUT)).toEqual({
       kind: 'held',
       reason: 'handoff',
+      cause: 'minor',
       detail: ['minor_suspected'],
       costUsd: 0.002,
     });
@@ -368,7 +369,7 @@ describe('createDraftComposer', () => {
     });
   });
 
-  it('holds a media she says she sent, and warns on a bubble she already sent him (P3-13)', async () => {
+  it('holds a media she says she sent, and a bubble she already sent him (P3-13, recette AGR-05)', async () => {
     const announced = composer({ voice: { bubbles: ['Je t’envoie une photo 📸'] } });
     expect(await announced.draftComposer.compose(INPUT)).toMatchObject({
       kind: 'held',
@@ -385,8 +386,9 @@ describe('createDraftComposer', () => {
       ...INPUT.history,
     ];
     expect(await again.draftComposer.compose({ ...INPUT, history })).toMatchObject({
-      kind: 'draft',
-      softViolations: ['repetition'],
+      kind: 'held',
+      reason: 'guard_blocked',
+      detail: ['repetition'],
     });
   });
 
@@ -433,11 +435,27 @@ describe('createDraftComposer', () => {
     expect(brief?.toneHints).toContain('aucune allusion sexuelle, elle n’ouvre pas ce terrain');
   });
 
+  it('hands him to a chatter when his card gives an age under 18 (recette AGE-13)', async () => {
+    const { draftComposer, seen } = composer();
+    expect(await draftComposer.compose({ ...INPUT, fan: { ...INPUT.fan, cardAge: 17 } })).toEqual({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['card_age', 'minor_suspected'],
+      costUsd: 0,
+    });
+    expect(seen.voiceCalls).toBe(0);
+    expect((await draftComposer.compose({ ...INPUT, fan: { ...INPUT.fan, cardAge: 18 } })).kind).toBe(
+      'draft',
+    );
+  });
+
   it('still hands a risk to a human after a wait', async () => {
     const { draftComposer } = composer({ brief: { ...BRIEF, risks: ['minor_suspected'], action: 'wait' } });
     expect(await draftComposer.compose({ ...INPUT, waited: 1 })).toMatchObject({
       kind: 'held',
       reason: 'handoff',
+      cause: 'minor',
       detail: ['minor_suspected'],
     });
   });
@@ -823,6 +841,7 @@ describe('createDraftComposer, her alerts (P4-01)', () => {
     expect(await draftComposer.compose(wrote('je sors des cours, une vidéo pour moi ?'))).toEqual({
       kind: 'held',
       reason: 'handoff',
+      cause: 'minor',
       detail: ['minor_suspected'],
       costUsd: 0.002,
       alerts: [{ trigger: { alert: { kind: 'custom', id: VIDEO }, matchedBy: 'model' }, notify: true }],
