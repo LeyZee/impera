@@ -21,6 +21,9 @@ ADR 0120 § 3 et § 6, ADR 0080 (lien de redirection), ADR 0016, `docs/playbooks
 - [ ] Robots retirés par le code, leur part montrée à l'agence ; aucune donnée de visiteur en base.
 - [ ] Alerte rouge d'un lien « story » tombé à zéro (ADR 0120 § 6).
 
+- [ ] Réponses du service lues par un schéma strict : les champs de visite sont écartés à la frontière, avant tout journal ; les journaux ne portent ni clé ni adresse signée.
+- [ ] Tables nouvelles : FORCE RLS, `GRANT SELECT … TO impera_service`, test d'isolation ; les totaux ne sont lus que par l'agence.
+
 ## Critères d'acceptation
 - Tests contre le faux : relevé rejoué sans doublon, heure en cours relue puis figée une fois close, robots exclus, service injoignable en ambre.
 - Aucune adresse ni domaine réel dans un test, une fixture ou une doc.

@@ -22,9 +22,16 @@ ADR 0120 § 1 et § 2, ADR 0057 § 1 et § 2, ADR 0016, ADR 0082 § 1, `docs/arc
 - [ ] Hôtes de sortie écrits dans l'adaptateur, jamais tirés d'un réglage (ADR 0120 § 3, ADR 0113 § 2).
 - [ ] Des nombres seulement : jamais le texte ni le nom d'un commentateur.
 
+- [ ] Secret de l'application Meta de l'agence : saisi dans Réglages et scellé (ADR 0016), jamais dans le dépôt ni un `.env`.
+- [ ] Retour de connexion : lié à la session et à la créatrice qui l'a lancé, à usage unique, adresse de retour fixe, échange côté serveur.
+- [ ] Droits réellement accordés relus après l'échange : le drapeau de publication en découle, jamais d'un réglage ; un droit non demandé est refusé.
+- [ ] Débranchement par la créatrice : jeton effacé, job arrêté.
+- [ ] La légende de ses médias est un texte non fiable, typé et délimité dès qu'il entre dans un prompt.
+
 ## Critères d'acceptation
 - Tests contre le faux : job rejoué sans doublon, jeton expiré en ambre, compte en lecture seule sans drapeau de publication, quota atteint en ambre puis reprise, lecture tardive qui ne remplace pas un palier déjà relevé.
 - Route nouvelle : authentication-sweep, origin-sweep, test d'isolation.
+- Tests : retour de connexion rejoué refusé, droit non demandé refusé, débranchement qui efface le jeton.
 
 ## Hors périmètre
 La publication (PUB-02), le retour sur un Reel et l'entonnoir (lot suivant), les commentaires.
