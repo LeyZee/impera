@@ -1,4 +1,4 @@
-import { CustomAlertIdSchema } from '@impera/contracts';
+import { CustomAlertIdSchema, PersonaPracticeSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -7,6 +7,7 @@ import {
   keywordAlerts,
   MEETING_INSISTENCE_MAX,
   meetingAskOnly,
+  practiceAskOnly,
   phraseAlerts,
   settleAlerts,
   type AlertSettings,
@@ -177,5 +178,43 @@ describe('meetingAskOnly (ADR 0143 § 15, bounds 24 to 28)', () => {
   it('without the exception, her word pauses as before', () => {
     const fired = keywordAlerts('on pourrait se voir ?', words, { custom: [], systemOn: new Set() });
     expect(fired[0]?.pauses).toBe('keyword');
+  });
+});
+
+describe('practiceAskOnly (ADR 0143 § 10, 15, bounds 24 to 27)', () => {
+  // A fictional practice (ADR 0010).
+  const practice = PersonaPracticeSchema.parse({
+    name: 'Danse aérienne',
+    terms: ['tissu aérien', 'aérien'],
+    level: null,
+    how_she_talks: null,
+    vocabulary: null,
+    what_she_respects: null,
+    anecdotes: null,
+    offers: 'Des ateliers pour débutants.',
+    answers: null,
+    never_says: null,
+  });
+  const words = ['tissu aérien', 'rencontre', 'adresse'];
+
+  it('lets code answer a question about her practice named by its own words', () => {
+    expect(practiceAskOnly('Tu fais du tissu aérien depuis quand ?', words, [practice])).toBe(true);
+  });
+
+  it('pauses on any other word of hers in the same message, or a meeting ask', () => {
+    expect(practiceAskOnly('tissu aérien ? donne ton adresse', words, [practice])).toBe(false);
+    expect(practiceAskOnly('tissu aérien, on se voit pour une rencontre ?', words, [practice])).toBe(false);
+    expect(practiceAskOnly('tu m’apprends le tissu aérien, on se voit ?', words, [practice])).toBe(false);
+  });
+
+  it('pauses when he names a place or a date', () => {
+    expect(practiceAskOnly('tissu aérien samedi ?', words, [practice])).toBe(false);
+    expect(practiceAskOnly('tu fais du tissu aérien près de chez moi ?', words, [practice])).toBe(false);
+  });
+
+  it('pauses when her word is not one of a practice, or without a practice', () => {
+    expect(practiceAskOnly('on se fait une rencontre ?', words, [practice])).toBe(false);
+    expect(practiceAskOnly('Tu fais du tissu aérien ?', words, [])).toBe(false);
+    expect(practiceAskOnly('Tu fais du tissu aérien ?', [], [practice])).toBe(false);
   });
 });

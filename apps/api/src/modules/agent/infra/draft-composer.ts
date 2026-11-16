@@ -23,6 +23,7 @@ import {
   briefAlerts,
   keywordAlerts,
   meetingAskOnly,
+  practiceAskOnly,
   noticeOf,
   phraseAlerts,
   settleAlerts,
@@ -961,7 +962,16 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           withHer.alertKeywords ?? [],
           input.history.slice(0, lastAnswer + 1).flatMap((m) => (m.direction === 'inbound' ? [m.text] : [])),
         );
-      const coded = keywordAlerts(fanText, withHer.alertKeywords ?? [], settings, meetingOnly);
+      // A question about her practice, named by its own words: she answers it from her sheet, her word only lets the
+      // team know (§ 10, 15). Never past a sign of care, nor when he names a place or a date.
+      const practiceOnly =
+        !careForced && practiceAskOnly(fanText, withHer.alertKeywords ?? [], withHer.persona.practices ?? []);
+      const coded = keywordAlerts(
+        fanText,
+        withHer.alertKeywords ?? [],
+        settings,
+        meetingOnly || practiceOnly,
+      );
       const early = settleAlerts(coded);
       if (early.pause !== null)
         return withNotices(

@@ -3,6 +3,7 @@ import {
   DEFAULT_AGENT_HOURS,
   err,
   ok,
+  PersonaPracticeSchema,
   type FanAvailabilityRecord,
   type FanFlags,
   type MediaDescription,
@@ -1797,6 +1798,42 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
     });
     expect(result).not.toMatchObject({ kind: 'held', detail: ['alert_keyword'] });
     expect(seen.brainInputs).toHaveLength(1);
+  });
+
+  it('answers a question about her practice herself: its word lets the team know, no pause (ADR 0143 § 15)', async () => {
+    const aerial = PersonaPracticeSchema.parse({
+      name: 'Danse aérienne',
+      terms: ['tissu aérien'],
+      level: null,
+      how_she_talks: 'Avec fierté.',
+      vocabulary: null,
+      what_she_respects: null,
+      anecdotes: null,
+      offers: null,
+      answers: null,
+      never_says: null,
+    });
+    const withPractice: ComposerPersonaFields = {
+      ...NORA,
+      persona: { ...NORA.persona, practices: [aerial] },
+      alertKeywords: ['rendez-vous', 'tissu aérien'],
+    };
+    const { draftComposer, seen } = withPersonaOf(() => Promise.resolve(withPractice));
+    const asked = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'Tu fais du tissu aérien depuis longtemps ?', at: INPUT.now }],
+    });
+    expect(asked).toMatchObject({
+      kind: 'draft',
+      alerts: [{ notify: true, trigger: { keyword: 'tissu aérien' } }],
+    });
+    expect(seen.brainInputs).toHaveLength(1);
+
+    const elsewhere = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'Tu fais du tissu aérien près de chez moi ?', at: INPUT.now }],
+    });
+    expect(elsewhere).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['alert_keyword'] });
   });
 
   it('pauses on her meeting word while he is in care (ADR 0143 § 25)', async () => {

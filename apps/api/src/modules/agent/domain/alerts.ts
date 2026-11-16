@@ -5,8 +5,11 @@ import {
   type AlertTrigger,
   type CustomAlert,
   type HandoffCause,
+  type PersonaPractice,
   type SystemAlertCode,
 } from '@impera/contracts';
+
+import { practicesMentioned } from './practices';
 
 /**
  * Her alert keywords (`notifications.alert_keywords`, P4-01): read in code, never by a model, on what he wrote since
@@ -188,4 +191,29 @@ export function meetingAskOnly(
   if (!MEETING_ASK.test(read) || PLACE_OR_DATE.test(read) || DATE.test(normalise(text))) return false;
   const asked = earlierFanTexts.filter((earlier) => MEETING_ASK.test(words(earlier))).length;
   return asked < MEETING_INSISTENCE_MAX;
+}
+
+/**
+ * Code knows this message is about her practice and answers it itself, without the pause her word would set
+ * (ADR 0143 § 10, 15 and 24 to 27): every word of her persona he set off is the name or a word of one of her practices,
+ * he names that practice, and he names no place, date or address. Any doubt: false, and the pause holds. The caller
+ * checks the other guards first (age, care, minor).
+ */
+export function practiceAskOnly(
+  text: string,
+  personaKeywords: readonly string[],
+  practices: readonly PersonaPractice[],
+): boolean {
+  const matched = alertKeywordsIn(text, personaKeywords);
+  if (matched.length === 0) return false;
+  const named = practicesMentioned(practices, [text]);
+  if (named.length === 0) return false;
+  const practiceWords = new Set(
+    named
+      .flatMap((practice) => [practice.name, ...practice.terms].map(alertKeywordKey))
+      .filter((w) => w !== ''),
+  );
+  if (!matched.every((keyword) => practiceWords.has(alertKeywordKey(keyword)))) return false;
+  const read = words(text);
+  return !MEETING_ASK.test(read) && !PLACE_OR_DATE.test(read) && !DATE.test(normalise(text));
 }
