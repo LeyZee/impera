@@ -6,26 +6,57 @@ export const MIGRATIONS_DIR = 'packages/db/migrations';
 export const JOURNAL_PATH = `${MIGRATIONS_DIR}/meta/_journal.json`;
 
 /**
- * Statements that can lose data, refused unless the owner allowed the migration by its name. Deliberately broad: a
- * comment or a string that names one of them refuses the update too, which only costs a start on the present version
- * and an alert, never data. `DELETE` alone would match every `ON DELETE CASCADE`, hence `DELETE FROM`; `ALTER TABLE …
- * DROP <name>` without `COLUMN` is still a column (Postgres allows it), so any `DROP` not followed by a word that
- * removes no rows (constraint, default, not null, …) is refused. `TRUNCATE` counts where a statement starts: the
- * privilege of the same name, revoked by the append-only migrations (`REVOKE … TRUNCATE ON`), empties nothing.
+ * What an unattended update must never run without the owner's word: statements that can lose data, and those that
+ * lower a defence (row-level security turned off). The rule refuses by default and lets through only the forms known
+ * to remove no rows, so a spelling it does not know is refused, never let through: a `DROP` is refused unless only
+ * spaces separate it from CONSTRAINT, DEFAULT, NOT NULL, IDENTITY, EXPRESSION, INDEX, POLICY or TRIGGER (a comment
+ * between the two refuses it too); `TRUNCATE` everywhere except in a GRANT or a REVOKE (the privilege of that name);
+ * `DELETE` except as a foreign key's `ON DELETE`, a trigger's event (`… OR DELETE ON`), a policy's `FOR DELETE` or a
+ * privilege. Comments are read like the rest: one that names these words in capitals refuses the migration, which only
+ * costs a start on the present version and an alert, never data. The same word in lower case after `--` is prose (a
+ * content « drop », « never delete ») and is not counted; in the SQL itself, any case counts.
+ *
+ * No rule on text sees what loses data without these words (`UPDATE … SET`, `ALTER COLUMN … TYPE … USING`, SQL built
+ * in an `EXECUTE`): this guard catches the accident; against the rest stand the review on main and the backup taken
+ * first (ADR 0125 § 4).
  */
-const DESTRUCTIVE = [
-  { kind: 'DROP TABLE', pattern: /\bDROP\s+TABLE\b/i },
-  { kind: 'DROP COLUMN', pattern: /\bDROP\s+COLUMN\b/i },
-  { kind: 'DROP SCHEMA', pattern: /\bDROP\s+SCHEMA\b/i },
-  { kind: 'DROP DATABASE', pattern: /\bDROP\s+DATABASE\b/i },
-  { kind: 'TRUNCATE', pattern: /(?:^|;)\s*TRUNCATE\b/im },
-  { kind: 'DELETE FROM', pattern: /\bDELETE\s+FROM\b/i },
-  {
-    kind: 'ALTER TABLE DROP',
-    pattern:
-      /\bALTER\s+TABLE\b[^;]*\bDROP\s+(?!CONSTRAINT\b|DEFAULT\b|NOT\s+NULL\b|IDENTITY\b|EXPRESSION\b|COLUMN\b)("?[A-Za-z_]+"?)/i,
-  },
-];
+const DROP = /\bDROP\b/gi;
+const DROP_KEEPS_ROWS = /^\s+(?:CONSTRAINT|DEFAULT|NOT\s+NULL|IDENTITY|EXPRESSION|INDEX|POLICY|TRIGGER)\b/i;
+/** The word after a refused `DROP`, named in the journal when it is one of these; never a name from the SQL. */
+const DROP_OBJECTS = new Set([
+  'TABLE',
+  'COLUMN',
+  'SCHEMA',
+  'DATABASE',
+  'TYPE',
+  'OWNED',
+  'SEQUENCE',
+  'EXTENSION',
+  'MATERIALIZED',
+  'VIEW',
+  'FUNCTION',
+  'DOMAIN',
+  'ROLE',
+]);
+const TRUNCATE = /\bTRUNCATE\b/gi;
+const DELETE = /\bDELETE\b/gi;
+const RLS_OFF = /\b(?:DISABLE|NO\s+FORCE)\s+ROW\s+LEVEL\s+SECURITY\b/i;
+
+/** Whether the word at `index` is prose: not in capitals, after `--` on its line. */
+function inProse(sql, index, word) {
+  if (word === word.toUpperCase()) return false;
+  return sql.slice(sql.lastIndexOf('\n', index - 1) + 1, index).includes('--');
+}
+
+/** Whether the statement holding `index` is a GRANT or a REVOKE: its text since the last `;`, comment lines aside. */
+function inPrivilegeStatement(sql, index) {
+  const statement = sql
+    .slice(sql.lastIndexOf(';', index - 1) + 1, index)
+    .split('\n')
+    .filter((line) => !/^\s*--/.test(line))
+    .join('\n');
+  return /^\s*(?:GRANT|REVOKE)\b/i.test(statement);
+}
 
 /**
  * The migration tags of a Drizzle journal, in order. Throws on anything else than the journal's own shape: a journal
@@ -63,9 +94,33 @@ export function migrationDiff(oldTags, newTags) {
   return { rewritten, added: rewritten ? [] : newTags.slice(oldTags.length) };
 }
 
-/** The destructive statements of one migration's SQL, by kind, each once. */
+/** The refused statements of one migration's SQL, by kind, each once, in the order they first appear. */
 export function destructiveKinds(sql) {
-  return DESTRUCTIVE.filter(({ pattern }) => pattern.test(sql)).map(({ kind }) => kind);
+  const kinds = [];
+  const add = (kind) => {
+    if (!kinds.includes(kind)) kinds.push(kind);
+  };
+  for (const match of sql.matchAll(DROP)) {
+    const after = sql.slice(match.index + match[0].length);
+    if (DROP_KEEPS_ROWS.test(after) || inProse(sql, match.index, match[0])) continue;
+    const word = /^\s+([A-Za-z]+)/.exec(after)?.[1]?.toUpperCase();
+    add(word !== undefined && DROP_OBJECTS.has(word) ? `DROP ${word}` : 'DROP');
+  }
+  for (const match of sql.matchAll(TRUNCATE)) {
+    if (!inPrivilegeStatement(sql, match.index) && !inProse(sql, match.index, match[0])) add('TRUNCATE');
+  }
+  for (const match of sql.matchAll(DELETE)) {
+    const before = sql.slice(0, match.index);
+    const after = sql.slice(match.index + match[0].length);
+    const keepsRows =
+      /\b(?:ON|FOR)\s+$/i.test(before) ||
+      /^\s+(?:ON|OR)\b/i.test(after) ||
+      inPrivilegeStatement(sql, match.index) ||
+      inProse(sql, match.index, match[0]);
+    if (!keepsRows) add('DELETE');
+  }
+  if (RLS_OFF.test(sql)) add('RLS OFF');
+  return kinds;
 }
 
 /**
