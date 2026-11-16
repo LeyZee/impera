@@ -75,6 +75,8 @@ class FakeSender implements OutboundSender {
   readonly steps: { key: string; scriptRef: string; stepRef: string; priceMinor: number }[] = [];
   /** Refuses the next step for good, as the platform does for a step whose price changed. */
   refuseStep = false;
+  /** The platform takes the next step but its answer is lost: only `verifySent` can tell. */
+  loseStep = false;
   sendStep(
     _conversation: unknown,
     step: { scriptRef: string; stepRef: string },
@@ -86,13 +88,24 @@ class FakeSender implements OutboundSender {
       return Promise.reject(new SendRefused('script_price_changed', 'price changed'));
     }
     this.steps.push({ key, ...step, priceMinor: price.amountMinor });
+    if (this.loseStep) {
+      this.loseStep = false;
+      return Promise.reject(new DomainError('connector_timeout', 'timeout'));
+    }
     return Promise.resolve({
       messageRef: { platform: 'reveal', id: `out-${key}` },
       sentAt: new Date().toISOString(),
     });
   }
-  verifySent(): Promise<{ status: 'not_found' }> {
-    return Promise.resolve({ status: 'not_found' });
+  verifySent(
+    _conversation: unknown,
+    key: string,
+  ): Promise<{ status: 'not_found' } | { status: 'sent'; messageRef: { platform: 'reveal'; id: string } }> {
+    return Promise.resolve(
+      this.steps.some((step) => step.key === key)
+        ? { status: 'sent', messageRef: { platform: 'reveal', id: `out-${key}` } }
+        : { status: 'not_found' },
+    );
   }
 }
 
@@ -545,6 +558,28 @@ describe('conversations module (P0-05)', () => {
       'message_sent',
       'send_verified',
     ]);
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
+  });
+
+  it('records a step whose answer was lost once, as the platform shows it, without sending it again', async () => {
+    const { conversationId } = await ingest('c-step-lost');
+    const draftId = await respond(conversationId);
+    await withStep(draftId, 1_500, 'step:c-step-lost:0');
+    await conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Attends'] });
+    sender.loseStep = true;
+    const payload = { creatorId, conversationId, draftId, correlationId: 'test' };
+    await conversations.jobs.send(payload, NO_LOG, 1);
+    await conversations.jobs.send(payload, NO_LOG, 2);
+
+    expect(sender.steps.map((step) => step.key)).toEqual(['step:c-step-lost:0']);
+    const priced = await test.admin.db
+      .select({ priceMinor: schema.messages.priceMinor })
+      .from(schema.messages)
+      .where(
+        and(eq(schema.messages.conversationId, conversationId), eq(schema.messages.direction, 'outbound')),
+      );
+    expect(priced.filter((row) => row.priceMinor === 1_500)).toHaveLength(1);
+    expect((await outboxOf(conversationId)).some((row) => row.type === 'send_failed')).toBe(false);
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
   });
 
