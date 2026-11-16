@@ -15,7 +15,7 @@ Couper la queue des temps de réponse du cerveau et de la voix sans changer de m
 
 ## À faire (liste vérifiable)
 
-- [x] `hedgeAfterMs` par rôle, plus court que `timeoutMs` : 18 s pour `brain` et `voice`, rien pour `sense` et `judge`.
+- [x] `hedgeAfterMs` par rôle, plus court que `timeoutMs` : 22 s pour `brain` et `voice` (choix de Charles du 16/11 sur les chiffres du PC), rien pour `sense` et `judge`.
 - [x] Au-delà, une deuxième demande identique part au modèle principal (jamais au repli), la première bonne réponse gagne.
 - [x] L'autre demande va à son terme et se journalise avec son coût : plafond du jour et consommation IA la comptent. Le plafond peut refuser la deuxième demande.
 - [x] Un délai dépassé n'est plus relancé sur le même modèle : le repli répond.

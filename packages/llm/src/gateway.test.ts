@@ -993,8 +993,8 @@ const flush = (): Promise<void> =>
 describe('a slow request asked again in parallel (hedge)', () => {
   it('sets the hedge on brain and voice only, shorter than their delay', () => {
     const { brain, voice, sense, judge } = DEFAULT_LLM_CONFIG.roles;
-    expect(brain.hedgeAfterMs).toBe(18_000);
-    expect(voice.hedgeAfterMs).toBe(18_000);
+    expect(brain.hedgeAfterMs).toBe(22_000);
+    expect(voice.hedgeAfterMs).toBe(22_000);
     expect(sense.hedgeAfterMs).toBeUndefined();
     expect(judge.hedgeAfterMs).toBeUndefined();
   });
@@ -1009,7 +1009,7 @@ describe('a slow request asked again in parallel (hedge)', () => {
 
     expect((await gateway.voice(INPUT)).ok).toBe(true);
     expect(xai.doGenerateCalls).toHaveLength(1);
-    expect(asked).toEqual([18_000]);
+    expect(asked).toEqual([22_000]);
   });
 
   it('keeps the second answer when it lands first, and journals the late one with its cost', async () => {
