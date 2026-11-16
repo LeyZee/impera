@@ -200,6 +200,19 @@ describe('playground session, the risk policy as production runs it (AGE-01)', (
     expect(session.history.map((t) => t.from)).toEqual(['fan']);
   });
 
+  it('reads the safety net on all he wrote since her last answer, as production does', async () => {
+    const voiceInputs: VoiceInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou toi ✨'] }, voiceInputs, [], { ...BRIEF, action: 'wait' }),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+    });
+    expect((await session.handleFanMessage('j’ai')).hold?.kind).toBe('no_reply');
+    const turn = await session.handleFanMessage('15 ans');
+    expect(turn.hold).toEqual({ kind: 'handoff', detail: ['safety_net', 'minor_suspected'] });
+  });
+
   it('answers with care when he says he wants to end it, even when the brain missed it', async () => {
     const { turn, voiceInputs } = await run({ ...BRIEF, action: 'offer', risks: [] }, 'je veux en finir');
     expect(turn.hold).toEqual({ kind: 'care', detail: ['safety_net', 'self_harm'] });

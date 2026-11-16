@@ -413,7 +413,14 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       // The safety net in code, read before any model as production does (draft-composer.ts): he says plainly he is a
       // minor, a human answers him and no model is called; he says he wants to hurt himself, she answers with care
       // whatever the brain reads.
-      const signs = safetySigns(text);
+      // On all he wrote since her last answer, joined, as production reads it: an age said over two messages counts.
+      const lastAnswer = history.findLastIndex((t) => t.from === 'creator');
+      const signs = safetySigns(
+        history
+          .slice(lastAnswer + 1)
+          .map((t) => t.text)
+          .join('\n'),
+      );
       if (signs.includes('minor_suspected')) {
         const held: PlaygroundTurn = {
           bubbles: [],
