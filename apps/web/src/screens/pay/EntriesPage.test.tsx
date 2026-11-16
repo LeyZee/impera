@@ -37,6 +37,12 @@ import {
 } from '@/test/pay';
 import { chooseValue, openList } from '@/test/select';
 
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
+vi.mock('@/settings/services/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/settings/services/api')>()),
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
+}));
+
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
   readerZone: () => 'Europe/Paris',
@@ -376,6 +382,69 @@ describe('Paie › Primes et malus', () => {
       reason: 'Deux fans relancés trois fois le même soir.',
     });
     expect(second?.body).toEqual(first?.body);
+  });
+
+  it('asks for the password and the code when the confirmation is old, then sends the same entry again (EQ-15)', async () => {
+    let fresh = false;
+    answer = () =>
+      fresh
+        ? { status: 201, body: penaltyOf(9, LOU, NOV1, { amount: { kind: 'fixed', amountMinor: 2_000 } }) }
+        : { status: 403, body: refusal('reauthentication_forbidden') };
+    confirmIdentity.mockImplementation(() => {
+      fresh = true;
+      return Promise.resolve('ok');
+    });
+    renderPage(IRIS_ME);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Malus' }));
+    chooseValue(within(dialog).getByRole('combobox', { name: 'Pour' }), LOU.id);
+    fireEvent.change(within(dialog).getByLabelText('Montant'), { target: { value: '20' } });
+    fireEvent.change(within(dialog).getByLabelText('Motif'), {
+      target: { value: 'Deux fans relancés trois fois le même soir.' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Ajouter le malus' }));
+    // The recap stays; the password and the code take the place of its buttons, and nothing is said refused.
+    expect(
+      await within(dialog).findByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
+    ).toBeTruthy();
+    expect(text(within(dialog).getByText(/^Malus de/u))).toContain('20,00 € pour Lou');
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText('Mot de passe'), {
+      target: { value: 'staple battery horse' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmer' }));
+    expect(text(await screen.findByRole('status'))).toBe(
+      'Malus de 20,00 € pour Lou ajouté sur la quinzaine du 1er au 15 novembre.',
+    );
+    const [first, second] = writes;
+    expect(writes).toHaveLength(2);
+    expect(second?.body).toEqual(first?.body);
+  });
+
+  it('gives a cancel up when the password is not given, nothing cancelled (EQ-15)', async () => {
+    answer = () => ({ status: 403, body: refusal('reauthentication_forbidden') });
+    renderPage(OWNER);
+    await screen.findByText('« A formé Lou aux relances, deux soirs. »');
+    const theo = entry('Théo', 'Prime');
+    fireEvent.click(within(theo).getByRole('button', { name: /^Annuler la prime/u }));
+    fireEvent.click(within(theo).getByRole('button', { name: 'Annuler la prime' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(text(within(dialog).getByRole('heading'))).toBe('Annuler la saisie');
+    expect(
+      within(dialog).getByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(writes).toHaveLength(1);
+    expect(entry('Théo', 'Prime').dataset['cancelled']).toBeUndefined();
+    expect(within(entry('Théo', 'Prime')).queryByRole('alert')).toBeNull();
   });
 
   it('says where an adjustment goes before sending it — the member’s next statement to validate — and opens that period', async () => {

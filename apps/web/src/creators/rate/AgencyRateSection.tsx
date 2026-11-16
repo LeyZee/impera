@@ -34,6 +34,7 @@ import {
 import './rate.css';
 
 import { DayField } from '@/scheduling/DayField';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
 
 /**
@@ -144,6 +145,8 @@ function RateSheet({
     setNotice(null);
   };
 
+  const confirm = useConfirmAgain();
+
   async function save(): Promise<void> {
     if (bps === null || sending.current) return;
     sending.current = true;
@@ -159,8 +162,16 @@ function RateSheet({
       // The next percentage typed here is another one: a new id.
       setRateId(newId(CreatorAgencyRateIdSchema));
     } catch (error) {
-      setProblem(rateErrorKind(error));
-      setConfirming(false);
+      const kind = rateErrorKind(error);
+      if (kind === 'reauth') {
+        // Nothing was written: the password and the code, then the same percentage again.
+        confirm.ask(() => {
+          void save();
+        });
+      } else {
+        setProblem(kind);
+        setConfirming(false);
+      }
     } finally {
       sending.current = false;
       setSaving(false);
@@ -277,7 +288,7 @@ function RateSheet({
             </p>
           )}
           {problem === 'session_expired' ? <SignInAgain /> : null}
-          {confirming && bps !== null ? (
+          {confirm.asking ? null : confirming && bps !== null ? (
             <div className="nv-confirm" role="alertdialog" aria-labelledby={`${id}-confirm`}>
               <p id={`${id}-confirm`}>
                 <b>{confirmSentence(bps, fromDay)}</b> Il ne pourra plus être modifié, seulement remplacé par
@@ -311,6 +322,7 @@ function RateSheet({
             </button>
           )}
         </form>
+        {confirm.prompt({ lead: MONEY_LEAD, layout: 'inline', onBusyChange: setSaving })}
 
         {list.rates.length === 0 ? null : (
           <section className="ps-block" aria-labelledby={`${id}-history`}>

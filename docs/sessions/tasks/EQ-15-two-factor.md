@@ -29,3 +29,5 @@ Un compte qui valide de l'argent (propriétaire, manager) ne s'ouvre pas avec un
 Clés d'accès (passkeys), codes par e-mail ou SMS, authentification unique (SSO).
 
 ## Notes de session
+
+- 16/11 (fil Équipe, recette de l'espace agence) : la confirmation récente actuelle (`createRequireRecentLogin`, mot de passe et code de moins de 10 minutes) garde aussi les écritures d'un membre, d'un taux et de la paie ; `apps/api/src/__tests__/sensitive-gestures.integration.test.ts` les liste. L'écran redemande le mot de passe et le code puis rejoue le geste (`apps/web/src/settings/services/ConfirmAgain.tsx`). Reste à faire ici : le délai réglé par le propriétaire et la colonne de la dernière vérification par session décrite plus haut.

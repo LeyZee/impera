@@ -1,5 +1,6 @@
 import type { ExchangeRate, ForeignCurrency, PayPeriod, UserId } from '@impera/contracts';
 import type { Database } from '@impera/db';
+import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { JobLogger } from '../contractors/pure';
@@ -76,9 +77,10 @@ export interface PayrollModule {
   readonly name: 'payroll';
   /**
    * Mounted under `/v1` by the server: `/payroll/…` (contracts `payroll.ts`), and the estimate of a shift's report
-   * (`/payroll/shifts/:shiftId/estimate`, contract `shift-reports.ts`, reco 19).
+   * (`/payroll/shifts/:shiftId/estimate`, contract `shift-reports.ts`, reco 19); `recentLogin` guards what validates,
+   * pays or changes pay (EQ-15).
    */
-  routes(requireRole: RequireRole): FastifyPluginAsyncZod;
+  routes(requireRole: RequireRole, recentLogin: preValidationAsyncHookHandler): FastifyPluginAsyncZod;
   /**
    * The newest rate of a currency (ADR 0033), `null` before the first: the last ECB rate known, the one a draft of pay
    * keeps. Read under the reader's member context (`withMember`, policy `team_read`); the composition root gives it to
@@ -167,7 +169,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   };
   return {
     name: 'payroll',
-    routes: (requireRole) =>
+    routes: (requireRole, recentLogin) =>
       createPayrollRoutes(
         reads,
         validation,
@@ -177,6 +179,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         signals,
         createReportEstimate(deps.db, deps.reads.members, deps.shiftFacts),
         requireRole,
+        recentLogin,
       ),
     latestRate: createLatestRateRead(deps.db),
     reads: createPayrollStatementReads(readStore),

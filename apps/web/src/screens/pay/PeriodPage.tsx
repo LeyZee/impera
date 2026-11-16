@@ -97,6 +97,8 @@ import '@/scheduling/scheduling.css';
 import { addDays, dayOf, longDay } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import '@/screens/team/team.css';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
+import { Dialog } from '@/shell/Dialog';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /**
@@ -163,6 +165,7 @@ function PeriodView({
     before.data?.period === (period === null ? null : previousPeriod(period)) ? before.data : undefined;
   const block = usePeriodBlock(data);
   const appHold = useAppHold();
+  const confirm = useConfirmAgain();
   const refresh = useRefreshPayroll();
   const latest = useLatestPayPeriod();
   const [unchecked, setUnchecked] = useState<ReadonlySet<string>>(new Set());
@@ -208,11 +211,17 @@ function PeriodView({
     let done = 0;
     const refused: [CommissionStatement, PayRefusal][] = [];
     let halted: PayRefusal | null = null;
-    for (const one of batch) {
+    // What the password and the code must be given again for (EQ-15): the rest of the batch, from the first refused.
+    let unconfirmed: readonly CommissionStatement[] = [];
+    for (const [index, one] of batch.entries()) {
       const outcome = await validateStatement(one.id, one.revision);
       if (outcome.kind === 'ok') {
         done += 1;
         continue;
+      }
+      if (outcome.kind === 'reauth') {
+        unconfirmed = batch.slice(index);
+        break;
       }
       // Already validated by someone else: validating twice does nothing more, the period reads again.
       if (outcome.kind === 'refused' && outcome.code === 'commission_statement_status_conflict') continue;
@@ -233,7 +242,7 @@ function PeriodView({
       setStopped({ refusal: halted, seen: stateOf(now ?? data) });
     }
     setSending(new Set());
-    return { done, refused, halted };
+    return { done, refused, halted, unconfirmed };
   };
 
   const validate = (batch: readonly CommissionStatement[]): void => {
@@ -266,7 +275,25 @@ function PeriodView({
         },
       },
       async (): Promise<HoldResult> => {
-        const { done, refused, halted } = await run(batch);
+        const { done, refused, halted, unconfirmed } = await run(batch);
+        if (unconfirmed.length > 0) {
+          // Asked at once, the island says it too: « Confirmer » there opens the prompt again after « Annuler ».
+          const again = () => {
+            confirm.ask(() => {
+              hold(unconfirmed);
+            });
+          };
+          again();
+          return {
+            ok: false,
+            title:
+              done === 0
+                ? 'Rien n’a été validé'
+                : `${String(done)} validé${done > 1 ? 's' : ''}, la suite attend`,
+            text: 'Confirme ton mot de passe et ton code pour valider la suite.',
+            action: { label: 'Confirmer', run: again },
+          };
+        }
         const [first] = refused;
         if (first === undefined && halted === null)
           return {
@@ -558,6 +585,11 @@ function PeriodView({
           }}
         />
       )}
+      {confirm.asking ? (
+        <Dialog title="Valider les relevés" lead="Mot de passe et code" onClose={confirm.cancel}>
+          <div className="tm-dialog__body nv-swap">{confirm.prompt({ lead: MONEY_LEAD })}</div>
+        </Dialog>
+      ) : null}
       {closing === null ? null : (
         <CloseDialog
           period={data}
@@ -1262,7 +1294,7 @@ function StopNotice({
     <div className="rp-notice" data-tone="warn" role="alert">
       <div className="py-notice-row">
         <p className="rp-notice__text">{text}</p>
-        {refusal.kind === 'failed' ? (
+        {refusal.kind !== 'refused' ? (
           <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onRetry}>
             Réessayer
           </button>

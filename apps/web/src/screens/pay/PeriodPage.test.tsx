@@ -48,6 +48,12 @@ import {
   THEO,
 } from '@/test/pay';
 
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
+vi.mock('@/settings/services/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/settings/services/api')>()),
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
+}));
+
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
   readerZone: () => 'Europe/Paris',
@@ -1068,6 +1074,53 @@ describe('Paie › Quinzaine', () => {
       expect(writes).toHaveLength(1);
     });
     expect(within(row('Basile')).queryByRole('alert')).toBeNull();
+  });
+
+  it('asks for the password and the code when the confirmation is old, then validates the same statement (EQ-15)', async () => {
+    periods[OCT2] = periodOf(OCT2, [statementOf(BASILE, OCT2)], {
+      closing: {
+        period: OCT2,
+        exchangeRates: [],
+        closedBy: OWNER_USER,
+        closedAt: '2026-11-02T08:41:00.000Z',
+      },
+    });
+    let fresh = false;
+    answer = () =>
+      fresh
+        ? { status: 200, body: statementOf(BASILE, OCT2, { status: 'validated', canValidate: false }) }
+        : { status: 403, body: refusal('reauthentication_forbidden') };
+    confirmIdentity.mockImplementation(() => {
+      fresh = true;
+      return Promise.resolve('ok');
+    });
+    renderPage(OWNER);
+    fireEvent.click(await screen.findByRole('button', { name: 'Valider (1)' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    const dialog = await screen.findByRole('dialog', { name: 'Valider les relevés' });
+    expect(
+      within(dialog).getByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
+    ).toBeTruthy();
+    // Never a stop: nothing was refused, the password and the code are asked.
+    expect(screen.queryAllByRole('alert').some((one) => one.classList.contains('rp-notice'))).toBe(false);
+    fireEvent.change(within(dialog).getByLabelText('Mot de passe'), {
+      target: { value: 'mot-de-passe-invente' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmer' }));
+    // Held again as any validation, then sent.
+    expect(text(await screen.findByRole('status'))).toContain('Validation du relevé de Basile');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    await waitFor(() => {
+      expect(writes).toHaveLength(2);
+    });
+    expect(writes[1]).toEqual(writes[0]);
   });
 
   it('keeps saying a stop after a validation that passed: the server down after Basile, the others wait', async () => {

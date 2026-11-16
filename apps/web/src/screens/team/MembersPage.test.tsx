@@ -599,6 +599,55 @@ describe('changing a member once added (EQ-10)', () => {
     ]);
   });
 
+  it('asks for the password and the code before a change of a member, then sends the same change again (EQ-15)', async () => {
+    let fresh = false;
+    const posted = serve({
+      post: () =>
+        fresh
+          ? { status: 200, body: { ...THEO, displayName: 'Théo M.' } }
+          : { status: 403, body: apiError('reauthentication_forbidden') },
+    });
+    confirmIdentity.mockImplementation(() => {
+      fresh = true;
+      return Promise.resolve('ok');
+    });
+    fireEvent.click(within(await sheet()).getByRole('button', { name: 'Modifier' }));
+    const panel = await screen.findByRole('dialog', { name: 'Modifier Théo' });
+    fireEvent.change(within(panel).getByLabelText('Nom dans l’équipe'), { target: { value: 'Théo M.' } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Enregistrer' }));
+    // Never « le serveur ne répond pas »: the password and the code, in place of the fields.
+    expect(
+      await within(panel).findByText('Ce geste touche à un membre : confirme ton mot de passe et ton code.'),
+    ).toBeDefined();
+    expect(within(panel).queryByRole('alert')).toBeNull();
+    fireEvent.change(within(panel).getByLabelText('Mot de passe'), {
+      target: { value: 'mot-de-passe-invente' },
+    });
+    fireEvent.change(within(panel).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Confirmer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(posted).toEqual([
+      { path: `/v1/team/members/${THEO.id}`, body: { displayName: 'Théo M.' } },
+      { path: `/v1/team/members/${THEO.id}`, body: { displayName: 'Théo M.' } },
+    ]);
+  });
+
+  it('keeps the fields of a change given up at the password, nothing sent again (EQ-15)', async () => {
+    const posted = serve({ post: () => ({ status: 403, body: apiError('reauthentication_forbidden') }) });
+    fireEvent.click(within(await sheet()).getByRole('button', { name: 'Modifier' }));
+    const panel = await screen.findByRole('dialog', { name: 'Modifier Théo' });
+    fireEvent.change(within(panel).getByLabelText('Nom dans l’équipe'), { target: { value: 'Théo M.' } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Enregistrer' }));
+    await within(panel).findByLabelText('Mot de passe');
+    fireEvent.click(within(panel).getByRole('button', { name: 'Annuler' }));
+    expect(await within(panel).findByLabelText('Nom dans l’équipe')).toHaveProperty('value', 'Théo M.');
+    expect(posted).toHaveLength(1);
+  });
+
   it('picks the planning colour among the palette’s twelve shades, keeping one saved before it until another is chosen', async () => {
     const posted = serve({ post: () => ({ status: 200, body: { ...THEO, color: '#0a6fa3' } }) });
     fireEvent.click(within(await sheet()).getByRole('button', { name: 'Modifier' }));

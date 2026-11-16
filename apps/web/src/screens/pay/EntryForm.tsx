@@ -41,6 +41,7 @@ import {
   periodTitle,
   signedAmountText,
 } from '@/reports/model';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Select } from '@/shell/Select';
 
 const NBSP = '\u00a0';
@@ -225,6 +226,8 @@ export function EntryForm({
   const gone = member?.status === 'left';
   const leftTaking = kind === 'adjustment' && taking && gone;
 
+  const confirm = useConfirmAgain();
+
   const send = async (): Promise<void> => {
     if (member === null || period === null || typed === null || !reasonValid || busy) return;
     onBusy(true);
@@ -239,6 +242,13 @@ export function EntryForm({
     // Read again before the form is free: a second send would go on what is already written.
     await refresh();
     onBusy(false);
+    if (outcome.kind === 'reauth') {
+      // Nothing was written: the password and the code, then the same entry again.
+      confirm.ask(() => {
+        void send();
+      });
+      return;
+    }
     if (outcome.kind === 'ok') {
       onDone({
         period: outcome.value,
@@ -293,30 +303,32 @@ export function EntryForm({
                 : `Plafonné à sa part plus ses primes : son relevé reste au moins à 0${NBSP}€.`}{' '}
             {gone ? 'Le motif reste sur son relevé.' : `${name} le lira avec son relevé.`}
           </p>
-          <div className="tm-dialog__foot">
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain"
-              disabled={busy}
-              onClick={() => {
-                setChecking(false);
-              }}
-            >
-              Modifier
-            </button>
-            <button
-              type="button"
-              className="nv-btn nv-btn--neon"
-              data-autofocus
-              disabled={busy}
-              aria-busy={busy}
-              onClick={() => {
-                void send();
-              }}
-            >
-              {busy ? 'Enregistrement…' : ADD_LABELS[kind]}
-            </button>
-          </div>
+          {confirm.prompt({ lead: MONEY_LEAD, onBusyChange: onBusy }) ?? (
+            <div className="tm-dialog__foot">
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain"
+                disabled={busy}
+                onClick={() => {
+                  setChecking(false);
+                }}
+              >
+                Modifier
+              </button>
+              <button
+                type="button"
+                className="nv-btn nv-btn--neon"
+                data-autofocus
+                disabled={busy}
+                aria-busy={busy}
+                onClick={() => {
+                  void send();
+                }}
+              >
+                {busy ? 'Enregistrement…' : ADD_LABELS[kind]}
+              </button>
+            </div>
+          )}
         </>
       ) : (
         <form
