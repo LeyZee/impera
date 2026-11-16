@@ -20,11 +20,13 @@ import './rewards.css';
  */
 const EMBERS = Array.from({ length: 18 }, (_, index) => {
   const angle = (index / 18) * Math.PI * 2 + ((index * 23) % 7) / 14;
-  const reach = 150 + ((index * 31) % 9) * 8;
+  const reach = 230 + ((index * 31) % 9) * 10;
   return {
     x: Math.round(Math.cos(angle) * reach),
     y: Math.round(Math.sin(angle) * reach),
-    size: 3 + ((index * 17) % 4),
+    // Its trail points away from the heart it flies to.
+    turn: Math.round((angle * 180) / Math.PI),
+    size: 6 + ((index * 17) % 4) * 2,
     delay: 120 + ((index * 43) % 16) * 30,
   };
 });
@@ -141,6 +143,7 @@ export function RewardReveal({
                     '--_x': `${String(ember.x)}px`,
                     '--_y': `${String(ember.y)}px`,
                     '--_s': `${String(ember.size)}px`,
+                    '--_a': `${String(ember.turn)}deg`,
                     '--_d': `${String(ember.delay)}ms`,
                   }}
                 />
