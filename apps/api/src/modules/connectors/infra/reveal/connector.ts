@@ -65,7 +65,8 @@ const TAKE = { conversations: 20, messages: 10, ppv: 10, scripts: 20, vault: 10,
  * The hosts Reveal serves vault files from (ADR 0113 § 2), read on the real vault on 16/11 over 300 media of each kind,
  * each named whole, never its parent domain: the signed storage (photos, non-HLS videos, audios, their thumbnails),
  * the photo resizer (the smaller sizes), the HLS videos' CDN (playlists, segments, thumbnails). A host is added by a PR
- * Sécurité reads, never by a setting.
+ * Sécurité reads, never by a setting. The videos' CDN zone was seen on one account only and is not in the site's public
+ * code: it may differ from one account to another, so a `host_refused` on a second creator's videos reads that way.
  */
 const REVEAL_FILE_HOSTS: readonly string[] = [
   'dem02.fra1.digitaloceanspaces.com',

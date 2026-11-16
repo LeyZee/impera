@@ -176,11 +176,11 @@ export function createDrizzleVaultDescribeStore(adminDb: Database): VaultDescrib
     assetOf: (creatorId, sha256) =>
       withAdmin(adminDb, async (tx) => {
         const [row] = await tx
-          .select({ id: mediaAssets.id })
+          .select({ id: mediaAssets.id, origin: mediaAssets.origin })
           .from(mediaAssets)
           .where(and(eq(mediaAssets.creatorId, creatorId), eq(mediaAssets.sha256, sha256)))
           .limit(1);
-        return row?.id ?? null;
+        return row === undefined ? null : { id: row.id, fromFan: row.origin === 'fan' };
       }),
 
     link: (creatorId, ref, mediaAssetId) =>
@@ -213,14 +213,16 @@ export function createDrizzleVaultDescribeStore(adminDb: Database): VaultDescrib
         if (made === undefined) {
           // Written meanwhile under the same fingerprint: that one is hers, linked without a second description.
           const [known] = await tx
-            .select({ id: mediaAssets.id })
+            .select({ id: mediaAssets.id, origin: mediaAssets.origin })
             .from(mediaAssets)
             .where(and(eq(mediaAssets.creatorId, creatorId), eq(mediaAssets.sha256, asset.sha256)))
             .limit(1);
           if (known === undefined) throw new Error('media_assets: a fingerprint in conflict and not found');
+          // A media a fan sent is never linked to her vault: it would become proposable.
+          if (known.origin === 'fan') return 'fan';
           await keepPlatformText(tx, creatorId, known.id, ref);
           await linkRef(tx, ref, known.id);
-          return;
+          return 'kept';
         }
         // The platform's text first: the vision's row, written after, is the latest of the media (`createdAt`, `id`).
         await keepPlatformText(tx, creatorId, made.id, ref);
@@ -239,6 +241,7 @@ export function createDrizzleVaultDescribeStore(adminDb: Database): VaultDescrib
           })
           .onConflictDoNothing();
         await linkRef(tx, ref, made.id);
+        return 'kept';
       }),
 
     failed: (refId, count) =>

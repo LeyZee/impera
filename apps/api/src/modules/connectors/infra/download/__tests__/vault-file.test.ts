@@ -244,6 +244,8 @@ describe('downloadVaultFile against FakeReveal', () => {
       'https://203.0.113.10/a',
       'https://[2001:db8::1]/a',
       'ftp://fake-reveal.test/a',
+      'https://x.fake-reveal.test/a',
+      'https://fake-reveal.test.elsewhere.example/a',
     ]) {
       await expect(
         downloadVaultFile(spy, { url, isHls: false }, join(dir, 'z'), { ...BOUNDS, allowHttp: false }),

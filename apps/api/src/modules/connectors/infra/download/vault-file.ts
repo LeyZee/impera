@@ -70,7 +70,8 @@ function hostAllowed(url: string, bounds: DownloadBounds): string | null {
   const host = parsed.hostname.toLowerCase();
   // An address written as such is never one of the platform's file hosts.
   if (isIP(host.replace(/^\[|\]$/gu, '')) !== 0) return null;
-  return bounds.hosts.some((allowed) => host === allowed || host.endsWith(`.${allowed}`)) ? host : null;
+  // Named in full (ADR 0113 § 2): a subdomain of a listed host is another host.
+  return bounds.hosts.includes(host) ? host : null;
 }
 
 /**

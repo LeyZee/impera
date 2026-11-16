@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -67,7 +67,10 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
 
   /** The store's state, as the tables would hold it. */
   let refs: Map<string, VaultRef & { asset: string | null; failures: number }>;
-  let assets: Map<string, VaultAsset & { readonly id: string; readonly described: DropSensed | null }>;
+  let assets: Map<
+    string,
+    VaultAsset & { readonly id: string; readonly described: DropSensed | null; readonly fromFan?: boolean }
+  >;
   let platformTexts: { mediaAssetId: string; text: string }[];
   let scripts: VaultScript[];
   let queued: (Date | null)[];
@@ -83,8 +86,10 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
         refs: [...refs.values()].filter((ref) => ref.asset === null && ref.failures < DESCRIPTION_TRIES),
         scripts,
       }),
-    assetOf: (_creatorId, sha256) =>
-      Promise.resolve([...assets.values()].find((asset) => asset.sha256 === sha256)?.id ?? null),
+    assetOf: (_creatorId, sha256) => {
+      const asset = [...assets.values()].find((known) => known.sha256 === sha256);
+      return Promise.resolve(asset === undefined ? null : { id: asset.id, fromFan: asset.fromFan === true });
+    },
     link: (_creatorId, ref, mediaAssetId) => {
       const row = refs.get(ref.refId);
       if (row?.asset === null) row.asset = mediaAssetId;
@@ -99,7 +104,7 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
         platformTexts.push({ mediaAssetId: id, text: ref.platformDescription });
       const row = refs.get(ref.refId);
       if (row !== undefined) row.asset = id;
-      return Promise.resolve();
+      return Promise.resolve('kept');
     },
     failed: (refId, count) => {
       const row = refs.get(refId);
@@ -279,6 +284,44 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
     const [only] = [...assets.keys()];
     expect([...refs.values()].map((ref) => ref.asset)).toEqual([only, only]);
     expect(await readdir(scratch)).toEqual([]);
+  });
+
+  it('never links a vault file to the same bytes a fan sent: left to the agency, no vision', async () => {
+    const photos = vault.filter((item) => item.kind === 'image' && item.folder !== null).slice(0, 2);
+    const [first, second] = photos;
+    if (first === undefined || second === undefined) throw new Error('two photos expected');
+    holding(first.ref.id);
+    expect(await run()).toMatchObject({ described: 1 });
+    // The same bytes, as a fan's media this time.
+    for (const [id, asset] of assets) assets.set(id, { ...asset, fromFan: true });
+    holding(second.ref.id);
+    seen = [];
+
+    expect(await run()).toMatchObject({ stop: 'done', described: 0, linked: 0, toAgency: 1 });
+    expect(seen).toHaveLength(0);
+    expect([...refs.values()]).toMatchObject([{ asset: null, failures: DESCRIPTION_TRIES }]);
+    expect(await readdir(scratch)).toEqual([]);
+  });
+
+  it('removes the folders a killed run left behind, and only those old enough to be no running run’s', async () => {
+    const at = new Date('2027-03-01T12:00:00.000Z');
+    const leftovers = {
+      'impera-vault-old': 20,
+      'impera-picture-old': 30,
+      'impera-vault-busy': 1,
+      'other-old': 60,
+    };
+    for (const [name, minutes] of Object.entries(leftovers)) {
+      await mkdir(join(scratch, name));
+      await writeFile(join(scratch, name, 'original'), 'bytes');
+      const when = new Date(at.getTime() - minutes * 60_000);
+      await utimes(join(scratch, name), when, when);
+    }
+
+    await run();
+    expect((await readdir(scratch)).sort()).toEqual(['impera-vault-busy', 'other-old']);
+    await rm(join(scratch, 'impera-vault-busy'), { recursive: true });
+    await rm(join(scratch, 'other-old'), { recursive: true });
   });
 
   it('stops at the spent budget, puts itself off an hour, and the next run resumes without a double', async () => {

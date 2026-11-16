@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { mkdtemp, open, rm } from 'node:fs/promises';
+import { mkdtemp, open, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
@@ -35,16 +35,27 @@ export interface VaultDescribeStore {
     creatorId: string,
     platformAccountId: string,
   ): Promise<{ readonly refs: readonly VaultRef[]; readonly scripts: readonly VaultScript[] }>;
-  /** The media of hers that has this fingerprint, if any (`media_assets_creator_sha256_unique`). */
-  assetOf(creatorId: string, sha256: string): Promise<string | null>;
+  /**
+   * The media of hers that has this fingerprint, if any (`media_assets_creator_sha256_unique`), and whether a fan sent
+   * it: a media received is never sent back, so a vault file equal to one is never linked to it.
+   */
+  assetOf(
+    creatorId: string,
+    sha256: string,
+  ): Promise<{ readonly id: string; readonly fromFan: boolean } | null>;
   /** The link to a media already known, and the platform's text kept beside it; nothing for a ref already linked. */
   link(creatorId: string, ref: VaultRef, mediaAssetId: string): Promise<void>;
   /**
    * In one transaction: the media born erased (origin `vault`, no storage key), its vision description when there is
    * one (author `sense`, never validated), the platform's text (author `platform`), and the link. A media of the same
-   * fingerprint written meanwhile is linked instead.
+   * fingerprint written meanwhile is linked instead, unless a fan sent it: then nothing is written (`fan`).
    */
-  keep(creatorId: string, ref: VaultRef, asset: VaultAsset, described: DescribedDrop): Promise<void>;
+  keep(
+    creatorId: string,
+    ref: VaultRef,
+    asset: VaultAsset,
+    described: DescribedDrop,
+  ): Promise<'kept' | 'fan'>;
   /** `count` more tries that could not describe it, at most `DESCRIPTION_TRIES` in all; the count after. */
   failed(refId: string, count: number): Promise<number>;
   /** `media.describe_vault` for the account at `runAt` (`null`: now), under its key on the account's queue. */
@@ -187,9 +198,12 @@ async function describeOne(
 
     const sha256 = await sha256Of(original);
     const known = await deps.store.assetOf(job.creatorId, sha256);
+    // The same bytes as a media a fan sent: never linked to it, which would make it proposable (« média reçu jamais
+    // renvoyé »); the agency says what it is.
+    if (known?.fromFan === true) return await toAgency();
     if (known !== null) {
       // Already hers (another account, a media placed twice): linked, never shown to the vision again (§ 5).
-      await deps.store.link(job.creatorId, ref, known);
+      await deps.store.link(job.creatorId, ref, known.id);
       return 'linked';
     }
 
@@ -223,7 +237,7 @@ async function describeOne(
       path: file.path,
       kind: ref.kind,
     });
-    await deps.store.keep(
+    const kept = await deps.store.keep(
       job.creatorId,
       ref,
       {
@@ -237,7 +251,7 @@ async function describeOne(
       },
       described.value,
     );
-    return 'described';
+    return kept === 'fan' ? await toAgency() : 'described';
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -252,11 +266,36 @@ async function describeOne(
  * run and puts it off an hour; a lot that went through queues the next one. Replayable: a media linked is not taken
  * again, and a run stopped anywhere leaves nothing half written.
  */
+/** The folders a run makes: its own, and the picture's (content-drops), both removed in `finally`. */
+const LEFTOVER_PREFIXES = ['impera-vault-', 'impera-picture-'];
+/** A folder older than this is no run's: a run reads one file at a time, well under this. */
+const LEFTOVER_AGE_MS = 15 * 60_000;
+
+/**
+ * Removes what a run killed in the middle of a file left in `scratchDir` (the PC is turned off each night): « never
+ * kept » holds even then (ADR 0113 § 1). Only folders old enough to be no running run's, of another account included.
+ */
+export async function sweepVaultLeftovers(scratchDir: string, now: Date): Promise<number> {
+  let removed = 0;
+  const names = await readdir(scratchDir).catch(() => []);
+  for (const name of names) {
+    if (!LEFTOVER_PREFIXES.some((prefix) => name.startsWith(prefix))) continue;
+    const path = join(scratchDir, name);
+    const info = await stat(path).catch(() => null);
+    if (!info?.isDirectory()) continue;
+    if (now.getTime() - info.mtimeMs < LEFTOVER_AGE_MS) continue;
+    await rm(path, { recursive: true, force: true });
+    removed += 1;
+  }
+  return removed;
+}
+
 export async function describeVault(
   deps: VaultDescribeDeps,
   job: { readonly platformAccountId: string; readonly correlationId: string },
 ): Promise<VaultDescribeRun> {
   const counts = { described: 0, linked: 0, toAgency: 0, skipped: 0 };
+  await sweepVaultLeftovers(deps.scratchDir, deps.now());
   const account = await deps.store.account(job.platformAccountId);
   if (account === null) return { stop: 'unknown', ...counts };
   if (!account.describes) return { stop: 'off', ...counts };
