@@ -219,9 +219,13 @@ export function scriptsOf(
   const inSequence = new Set<string>();
   const scripts: PlatformScript[] = [];
   for (const { sequence, steps: ordered } of sequences) {
-    const sorted = [...ordered].sort((a, b) => a.step.stepIndex - b.step.stepIndex);
-    // Two steps on the same `stepIndex` are branches of one step (a human chooses): kept side by side with their rank,
-    // never read as one after the other by the core (SC-04 c8).
+    // Two steps on the same `stepIndex` are branches of one step (ADR 0112): kept side by side with their rank, never
+    // read as one after the other by the core, and in a stable order (by id), since Reveal lists them in none.
+    const sorted = [...ordered].sort(
+      (a, b) =>
+        a.step.stepIndex - b.step.stepIndex ||
+        (a.script.id < b.script.id ? -1 : a.script.id > b.script.id ? 1 : 0),
+    );
     const [first, ...rest] = sorted.map((source, index) => stepOf(source, index, source.step.stepIndex));
     if (first === undefined) continue;
     for (const source of sorted) inSequence.add(source.script.id);

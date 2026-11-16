@@ -156,12 +156,12 @@ export type PlatformScriptMoment = z.infer<typeof PlatformScriptMomentSchema>;
 export const PlatformScriptStepSchema = z.object({
   /** The step as the platform names it: what a send of this step refers to. */
   ref: ExternalRefSchema,
-  /** Its place in the script, from 0: what a send of this step names. */
+  /** Its place in the script, from 0: by rank, the branches of a rank by `ref` (a send names `ref`, never this). */
   index: z.number().int().min(0),
   /**
-   * The platform's own rank of the step (Reveal's `stepIndex`), kept as it is, never interpreted: two steps of a script
-   * with the same are branches of one step that a human chooses between (a condition the platform keeps in free text),
-   * never two steps one after the other. A script that has any is not offered (SC-04 c8, until ADR 0112).
+   * The platform's own rank of the step (Reveal's `stepIndex`), kept as it is: two steps of a script with the same are
+   * branches of one step (ADR 0112), never two steps one after the other. Their condition, default and order are
+   * Impera's, set in the CRM: Reveal's API gives none.
    */
   platformIndex: z.number().int().min(0),
   name: z.string(),
