@@ -115,6 +115,16 @@ export interface AccountStore {
     },
     meta: EventMeta & { readonly userId: string | null },
   ): Promise<void>;
+  /**
+   * The audit line of a refused « Sync » (`connector.session_refused`): the account, the reason and who, never a value
+   * of the session nor an identifier of the platform.
+   */
+  recordRefusedSession(
+    creatorId: CreatorId,
+    id: PlatformAccountId,
+    reason: 'owner_conflict' | 'member_conflict',
+    meta: EventMeta & { readonly userId: string | null },
+  ): Promise<void>;
   publish(creatorId: CreatorId, body: EventBody, meta: EventMeta): Promise<void>;
 }
 

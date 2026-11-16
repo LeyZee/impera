@@ -344,6 +344,19 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
       }
     },
 
+    recordRefusedSession: (creatorId, id, reason, meta) =>
+      withTenant(db, creatorId, async (tx) => {
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId: meta.userId,
+          action: 'connector.session_refused',
+          entity: 'platform_account',
+          entityId: id,
+          details: { correlationId: meta.correlationId, reason },
+          createdAt: meta.at,
+        });
+      }),
+
     publish: (creatorId, body, meta) =>
       withTenant(db, creatorId, (tx) => insertEvent(tx, creatorId, body, meta)),
   };

@@ -166,6 +166,7 @@ Branche : task/<id>-<slug>
 | SEC-10 | Rôle de service de la base : l'API et le worker ne se connectent plus en propriétaire (ADR 0087, lot a) | exploitation | done | SEC-08, ADR 0087 |
 | SEC-11 | Droits des tables en ajout seul et journaux de la bibliothèque d'authentification alignés sur la doc | exploitation | done | SEC-10 |
 | SEC-12 | Une identité de plateforme n'appartient qu'à un compte : la « Sync » d'une autre créatrice est refusée dès la première | exploitation | done | P2-01 |
+| SEC-13 | Une « Sync » refusée laisse sa ligne au journal d'audit | exploitation | done | SEC-12 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
