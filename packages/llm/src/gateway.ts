@@ -6,6 +6,7 @@ import {
   MEDIA_VOCABULARY_VERSION,
   ok,
   ScriptDropSummarySchema,
+  ScriptIdentityContentSchema,
   type LlmPurpose,
 } from '@impera/contracts';
 import { generateText, transcribe as transcribeAudio } from 'ai';
@@ -29,6 +30,7 @@ import type {
   LlmFailure,
   LlmGateway,
   LlmGatewayDeps,
+  ScriptIdentityInput,
   ScriptSummaryInput,
   VideoKeyframes,
 } from './gateway-types';
@@ -61,6 +63,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   const creatorDropPrompt = prompts.creatorDrop ?? loadPrompt('sense', 'creator-drop');
   const channelPostPrompt = prompts.channelPost ?? loadPrompt('voice', 'telegram-channel');
   const scriptSummaryPrompt = prompts.scriptSummary ?? loadPrompt('brain', 'script-summary');
+  const scriptIdentityPrompt = prompts.scriptIdentity ?? loadPrompt('brain', 'script-identity');
   const fanCardPrompt = prompts.fanCard ?? loadPrompt('brain', 'fan-card');
   const canary = deps.canary ?? `nv-${randomBytes(6).toString('hex')}`;
 
@@ -123,6 +126,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     reportRefusal,
     overBudget,
     ...(deps.sleep !== undefined && { sleep: deps.sleep }),
+    ...(deps.hedgeTimer !== undefined && { hedgeTimer: deps.hedgeTimer }),
   });
 
   return {
@@ -380,6 +384,19 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       );
     },
 
+    async identifyScript(input) {
+      const system = renderPrompt(scriptIdentityPrompt, { canary });
+      const content = scriptIdentityRequest(input);
+      return run(
+        'brain',
+        scriptIdentityPrompt,
+        system,
+        () => Promise.resolve([{ role: 'user', content }]),
+        ScriptIdentityContentSchema,
+        input.trace,
+      );
+    },
+
     async readCard(input) {
       // § 7: the card stops before a fan's answer would, from the day's alert on.
       const current = status();
@@ -397,7 +414,11 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       );
     },
 
-    promptHashes: { creatorDrop: creatorDropPrompt.hash, scriptSummary: scriptSummaryPrompt.hash },
+    promptHashes: {
+      creatorDrop: creatorDropPrompt.hash,
+      scriptSummary: scriptSummaryPrompt.hash,
+      scriptIdentity: scriptIdentityPrompt.hash,
+    },
 
     health() {
       return computeHealth(deps.config, deps.credentials, deps.log, now(), status(), trendWatchStatus());
@@ -483,6 +504,22 @@ function scriptSummaryRequest(input: ScriptSummaryInput): string {
   const moment = input.moment === null ? '' : `, tourné ${MOMENT_WORDS[input.moment]}`;
   return [
     `Écris la fiche de ce script${moment} : chacune de ses ${String(input.steps.length)} étapes, dans cet ordre, puis le contexte du tournage.`,
+    '',
+    wrapUntrusted('script_steps', [`# Script « ${input.scriptName} »`, ...steps].join('\n\n')),
+  ].join('\n');
+}
+
+/** The native script, step by step: each name, its offer's text and its media's descriptions, in one data block. */
+function scriptIdentityRequest(input: ScriptIdentityInput): string {
+  const steps = input.steps.map((step, index) =>
+    [
+      `## Étape ${String(index + 1)} « ${step.name} »`,
+      step.text.trim() === '' ? 'Texte : aucun.' : `Texte : ${step.text}`,
+      ...step.media.map(mediaLine),
+    ].join('\n'),
+  );
+  return [
+    `Écris l'identité de ce script de ${String(input.steps.length)} étapes.`,
     '',
     wrapUntrusted('script_steps', [`# Script « ${input.scriptName} »`, ...steps].join('\n\n')),
   ].join('\n');

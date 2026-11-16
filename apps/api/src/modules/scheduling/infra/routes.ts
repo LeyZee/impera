@@ -128,9 +128,13 @@ export function createSchedulingRoutes(
     agencyRates: AgencyRatesService;
   },
   requireRole: RequireRole,
+  recentLogin: preValidationAsyncHookHandler,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
   const owner = requireRole('owner');
+  // An account's pay rules and the agency's percentage of a creator are rates: the password and the code given on this
+  // session in the last 10 minutes (ADR 0046 § 3, EQ-15).
+  const ownerConfirmed = [owner, recentLogin];
   return (app) => {
     app.get(
       '/scheduling/settings',
@@ -538,7 +542,7 @@ export function createSchedulingRoutes(
     app.post(
       '/team/pay-rules',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           body: CreateAccountPayRulesBodySchema,
           response: { 200: AccountPayRulesSchema, 201: AccountPayRulesSchema },
@@ -564,7 +568,7 @@ export function createSchedulingRoutes(
     app.post(
       '/creators/:creatorId/agency-rates',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: CreatorParamsSchema,
           body: CreateCreatorAgencyRateBodySchema,

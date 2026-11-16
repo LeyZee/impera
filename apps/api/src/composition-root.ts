@@ -77,7 +77,7 @@ import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
-import { wireMedia } from './wiring/media';
+import { wireMedia, wireVaultDescriptions } from './wiring/media';
 import { wireNotifications } from './wiring/notifications';
 import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
@@ -191,6 +191,8 @@ export interface AppOptions {
   readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'>;
   /** Tests plug a brain with a fixed synthesis here, for her sent scripts (ADR 0083 § 6); the app's gateway otherwise. */
   readonly scriptBrain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
+  /** Tests plug a brain with a fixed identity here, for her native scripts (SC-04 lot c8); the app's gateway otherwise. */
+  readonly scriptIdentityBrain?: Pick<LlmGateway, 'identifyScript' | 'promptHashes'>;
   /** Tests plug a voice with a fixed post here, for her channel's posts (ADR 0080 § 5); the app's gateway otherwise. */
   readonly channelVoice?: Pick<LlmGateway, 'channelPost'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
@@ -298,6 +300,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ingest: (input) => conversations.module.ingestMessage(input),
     // The import of her native scripts, queued behind each vault sync the owner asks (ADR 0099 § 1 time 2).
     onVaultSyncAsked: (input) => scripts.module.askImport(input),
+    // The description of the vault's media still without a file, queued behind each sync that went through (ADR 0113).
+    onVaultSynced: (input) => vaultDescriptions.vault.enqueue(input),
     // The member made by `team`, the account linked by this module's own write, in one transaction (ADR 0076 § 3).
     invite: (actor, input) =>
       team.module.invites(connectors.module.invitationChatterLinks).fromPlatform(actor, input),
@@ -369,11 +373,18 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     brain: options.scriptBrain ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
   });
+  // Her vault's files read by the connectors, described as her drops are, reduced by the drops' pictures (ADR 0113).
+  const vaultDescriptions = wireVaultDescriptions(shared, {
+    vision: options.dropVision ?? llm.gateway,
+    files: connectors.module.vaultFiles,
+    drops: contentDrops.module,
+  });
   const scripts = wireScripts(shared, {
     persona: persona.module,
     contentDrops: contentDrops.module,
     connectors: connectors.module,
     cardFontsDir: CARD_FONTS_DIR,
+    brain: options.scriptIdentityBrain ?? llm.gateway,
   });
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
@@ -430,6 +441,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         return holder === null ? null : currentUserById(db.db, shiftCreators, holder.userId);
       },
       allCreatorIds: persona.allCreatorIds,
+      askRead: (ask) => connectors.module.askConversationRead(ask),
     },
   });
   const backups = wireBackups(shared);
@@ -447,6 +459,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scheduling.module,
     aiUsage.module,
     connectors.module,
+    payroll.module,
   );
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
@@ -509,6 +522,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...invoicing.tasks,
     ...notifications.tasks,
     ...contentDrops.tasks,
+    ...vaultDescriptions.tasks,
     ...scripts.tasks,
     ...creatorTasks.tasks,
     ...trends.tasks,

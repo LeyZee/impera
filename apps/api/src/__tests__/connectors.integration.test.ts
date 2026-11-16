@@ -450,23 +450,39 @@ describe('connectors module (P0-06)', () => {
 
   it('refuses a session of another creator, or of another member, than the one the account already holds', async () => {
     const id = await account('other-model', 'none');
-    expect((await sync(id, revealSession('reveal-bearer-first-aaaa', 'model-test-a'))).statusCode).toBe(204);
+    expect((await sync(id, revealSession('reveal-bearer-first-aaaa', 'model-test-pinned'))).statusCode).toBe(
+      204,
+    );
     const other = await sync(id, revealSession('reveal-bearer-second-bbb', 'model-test-b'));
     expect([other.statusCode, other.json<{ error: { code: string } }>().error.code]).toEqual([
       409,
       'connector_session_conflict',
     ]);
     // The same creator, a new token: a re-sync, taken.
-    expect((await sync(id, revealSession('reveal-bearer-third-cccc', 'model-test-a'))).statusCode).toBe(204);
+    expect((await sync(id, revealSession('reveal-bearer-third-cccc', 'model-test-pinned'))).statusCode).toBe(
+      204,
+    );
     // The « bot » member is pinned at the first sync (P2-02): the owner's or a chatter's session is refused.
     const member = await sync(
       id,
-      revealSession('reveal-bearer-owner-dddd', 'model-test-a', 'user-owner-test'),
+      revealSession('reveal-bearer-owner-dddd', 'model-test-pinned', 'user-owner-test'),
     );
     expect([member.statusCode, member.json<{ error: { code: string } }>().error.code]).toEqual([
       409,
       'connector_session_member_conflict',
     ]);
+    // Each refusal left its line: the account, the reason and who, nothing of the session nor of the platform.
+    const refused = await test.admin.db
+      .select({ userId: schema.auditLog.userId, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, 'connector.session_refused'), eq(schema.auditLog.entityId, id)))
+      .orderBy(schema.auditLog.createdAt);
+    expect(refused.map((one) => one.details)).toMatchObject([
+      { reason: 'owner_conflict' },
+      { reason: 'member_conflict' },
+    ]);
+    expect(refused.every((one) => one.userId !== null)).toBe(true);
+    expect(JSON.stringify(refused)).not.toMatch(/reveal-bearer|model-test|user-owner-test/);
   });
 
   it('refuses at the first sync a session of another model than the one the sales register links', async () => {
@@ -483,6 +499,114 @@ describe('connectors module (P0-06)', () => {
     expect((await accountRow(id)).sessionCiphertext).toBeNull();
     expect((await sync(id, revealSession('reveal-bearer-right-ffff', 'model-test-linked'))).statusCode).toBe(
       204,
+    );
+  });
+
+  it('refuses a session another account already holds, whatever its creator, and one the register links elsewhere', async () => {
+    const hers = await account('holds-the-model', 'none');
+    const other = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: other, nameKey: other, displayName: 'Autre', timezone: 'Europe/Paris' });
+    const second = newId(PlatformAccountIdSchema);
+    await test.admin.db.insert(schema.platformAccounts).values({
+      id: second,
+      creatorId: other,
+      platform: 'reveal',
+      handle: 'wrong-click',
+      sessionState: 'none',
+    });
+    expect((await sync(hers, revealSession('reveal-bearer-held-gggg', 'model-test-held'))).statusCode).toBe(
+      204,
+    );
+    // The same Reveal tab, « Sync » pressed on another creator's account: nothing stored to compare with there.
+    const wrong = await sync(second, revealSession('reveal-bearer-held-gggg', 'model-test-held'));
+    expect([wrong.statusCode, wrong.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'connector_session_conflict',
+    ]);
+    expect(await accountRow(second)).toMatchObject({ sessionCiphertext: null, sessionState: 'none' });
+    // The refusal of the constraint, raised by the store, leaves its line too.
+    expect(
+      await test.admin.db
+        .select({ details: schema.auditLog.details })
+        .from(schema.auditLog)
+        .where(
+          and(eq(schema.auditLog.action, 'connector.session_refused'), eq(schema.auditLog.entityId, second)),
+        ),
+    ).toMatchObject([{ details: { reason: 'owner_conflict' } }]);
+    // Her own account still takes her session, and an expired session keeps the account hers.
+    expect((await sync(hers, revealSession('reveal-bearer-held-hhhh', 'model-test-held'))).statusCode).toBe(
+      204,
+    );
+    await test.admin.db
+      .update(schema.platformAccounts)
+      .set({ sessionState: 'expired' })
+      .where(eq(schema.platformAccounts.id, hers));
+    expect((await sync(second, revealSession('reveal-bearer-held-iiii', 'model-test-held'))).statusCode).toBe(
+      409,
+    );
+
+    // A model the register links to her account, never synced there yet: refused on the other account too.
+    await test.admin.db.insert(schema.salesFeedModels).values({
+      platform: 'reveal',
+      platformModelId: 'model-test-registered',
+      platformAccountId: hers,
+      creatorId,
+    });
+    const registered = await sync(second, revealSession('reveal-bearer-reg-jjjj', 'model-test-registered'));
+    expect([registered.statusCode, registered.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'connector_session_conflict',
+    ]);
+    expect((await accountRow(second)).sessionCiphertext).toBeNull();
+  });
+
+  it('gives the identity of an archived creator back to the account that syncs it, and asks her for a « Sync » again', async () => {
+    const gone = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: gone, nameKey: gone, displayName: 'Partie', timezone: 'Europe/Paris' });
+    const old = newId(PlatformAccountIdSchema);
+    await test.admin.db.insert(schema.platformAccounts).values({
+      id: old,
+      creatorId: gone,
+      platform: 'reveal',
+      handle: 'left-the-agency',
+      sessionState: 'none',
+    });
+    expect((await sync(old, revealSession('reveal-bearer-gone-kkkk', 'model-test-gone'))).statusCode).toBe(
+      204,
+    );
+    const hers = await account('takes-over', 'none');
+    // While she is in the agency, the identity is hers.
+    expect((await sync(hers, revealSession('reveal-bearer-gone-kkkk', 'model-test-gone'))).statusCode).toBe(
+      409,
+    );
+
+    await test.admin.db
+      .update(schema.creators)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.creators.id, gone));
+    expect((await sync(hers, revealSession('reveal-bearer-gone-llll', 'model-test-gone'))).statusCode).toBe(
+      204,
+    );
+    expect(await accountRow(hers)).toMatchObject({ sessionOwner: 'model-test-gone', sessionState: 'valid' });
+    expect(await accountRow(old)).toMatchObject({
+      sessionOwner: null,
+      sessionCiphertext: null,
+      sessionState: 'expired',
+    });
+    const released = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, old));
+    expect(released.map((one) => one.action)).toContain('connector.session_released');
+
+    // Back in the agency, her old account no longer takes the identity another account holds.
+    await test.admin.db.update(schema.creators).set({ archivedAt: null }).where(eq(schema.creators.id, gone));
+    expect((await sync(old, revealSession('reveal-bearer-gone-mmmm', 'model-test-gone'))).statusCode).toBe(
+      409,
     );
   });
 
@@ -511,7 +635,7 @@ describe('connectors module (P0-06)', () => {
   it('dates the session only when it is new: the same one sent again does not hide a late read (recette 28/10)', async () => {
     const id = await account('resent', 'none');
     const send = async (session: string) => {
-      const sent = await sync(id, revealSession(session));
+      const sent = await sync(id, revealSession(session, 'model-test-dated'));
       expect(sent.statusCode, sent.body).toBe(204);
     };
     const longAgo = new Date('2026-01-01T00:00:00.000Z');

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { PlatformConversationIdSchema } from './copilot';
 import { PlatformSchema } from './enums';
 import {
   CommissionStatementIdSchema,
@@ -19,6 +20,7 @@ import {
   TeamMemberIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
+import { PlatformScriptIdSchema } from './scripts';
 import { TELEGRAM_JOB_PAYLOADS } from './telegram';
 
 /**
@@ -42,6 +44,7 @@ export const JOB_NAMES = [
   'connector.dispatch',
   'connector.poll',
   'connector.reconcile',
+  'connector.read_conversation',
   'connector.vault_sync',
   'fans.refresh_summary',
   'fans.read_card',
@@ -76,6 +79,8 @@ export const JOB_NAMES = [
   'payroll.settle_documents',
   'payroll.lock_payout_certificate',
   'media.describe',
+  'media.describe_vault',
+  'media.describe_vault_backlog',
   'content_drops.receive_file',
   'content_drops.convert_file',
   'content_drops.erase_originals',
@@ -87,6 +92,8 @@ export const JOB_NAMES = [
   'content_drops.thumbnail_backlog',
   'scripts.ask_scripts',
   'scripts.import_platform_scripts',
+  'scripts.identify_platform_script',
+  'scripts.identify_backlog',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
@@ -118,6 +125,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.dispatch': 'Lecture des comptes Reveal',
   'connector.poll': 'Lecture d’un compte Reveal',
   'connector.reconcile': 'Vérification des envois Reveal',
+  'connector.read_conversation': 'Lecture d’une conversation ouverte dans le copilote',
   'connector.vault_sync': 'Synchronisation du coffre Reveal',
   'fans.refresh_summary': 'Résumé des fans',
   'fans.read_card': 'Fiche des fans remplie par l’IA',
@@ -152,6 +160,8 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'payroll.settle_documents': 'Règlement des documents',
   'payroll.lock_payout_certificate': 'Attestation de paiement',
   'media.describe': 'Description des médias',
+  'media.describe_vault': 'Description des médias du coffre',
+  'media.describe_vault_backlog': 'Rattrapage des descriptions du coffre',
   'content_drops.receive_file': 'Réception des fichiers de contenu',
   'content_drops.convert_file': 'Conversion des vidéos',
   'content_drops.erase_originals': 'Nettoyage des originaux de contenu',
@@ -163,6 +173,8 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
   'scripts.import_platform_scripts': 'Import des scripts Reveal',
+  'scripts.identify_platform_script': 'Identité des scripts Reveal',
+  'scripts.identify_backlog': 'Rattrapage des identités de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
@@ -231,6 +243,16 @@ export const JOB_PAYLOADS = {
   'connector.reconcile': z.object({
     creatorId: CreatorIdSchema,
     platformAccountId: PlatformAccountIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
+   * One conversation read by its id (recette du 16/11) : the copilot panel opened one the polls never read, calm since
+   * before the account's first poll. On the account's queue; replayable, the ingestion is idempotent.
+   */
+  'connector.read_conversation': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    platformConversationId: PlatformConversationIdSchema,
     correlationId: z.string().min(1),
   }),
   /**
@@ -397,6 +419,19 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
+   * The media of an account's vault that have no file yet, described by lots (ADR 0113 § 1, § 5): each read from the
+   * platform into a folder of the job's own, described by the vision AI, reduced to its picture, then erased. On the
+   * account's queue under `vaultDescribeJobKey`: one waiting run per account. Queued at the end of each vault sync and
+   * by the hourly catch-up; a spent AI budget puts it off an hour. Replayable: a media linked is never taken again.
+   */
+  'media.describe_vault': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /** Each hour (ADR 0113 § 5): `media.describe_vault` queued for each account whose vault still waits, her switch on. */
+  'media.describe_vault_backlog': z.object({}),
+  /**
    * Her file's bytes are whole in the storage (CR-06 b): the job checks their size against what her phone declared and
    * marks the file received, then cleans it (metadata removed, format checked, fingerprint) into her library or finds
    * it a duplicate, and erases the raw bytes; its drop follows. One per file (job key), replayable step by step.
@@ -486,6 +521,19 @@ export const JOB_PAYLOADS = {
     platformAccountId: PlatformAccountIdSchema,
     correlationId: z.string().min(1),
   }),
+  /**
+   * A native script's identity (SC-04 lot c8), written by the brain once each of its media has a validated description,
+   * under her descriptions switch. Asked after each import that adds or changes a script, and by the hourly backlog;
+   * replayable: the same texts and descriptions with the same prompt are left alone, and a validated identity is
+   * never written over.
+   */
+  'scripts.identify_platform_script': z.object({
+    creatorId: CreatorIdSchema,
+    platformScriptId: PlatformScriptIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /** Each hour: every active native script of a creator whose switch is on, asked again; the job decides. */
+  'scripts.identify_backlog': z.object({}),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -541,6 +589,8 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.dispatch': 1,
   'connector.poll': 3,
   'connector.reconcile': 3,
+  // Asked again by the panel while it stays unknown: no retry of its own.
+  'connector.read_conversation': 1,
   'connector.vault_sync': 3,
   'fans.refresh_summary': 3,
   // Replayable: it reads from where the last read stopped (`conversations.card_read_through`).
@@ -598,6 +648,10 @@ export const JOB_MAX_ATTEMPTS = {
   // Replayable: a lock only lengthens, and the run records it once; the night's run takes again what failed.
   'payroll.lock_payout_certificate': 5,
   'media.describe': 3,
+  // A storage or an ffmpeg that does not answer: a few tries; a spent budget is not a failure, the run puts itself off.
+  'media.describe_vault': 3,
+  // Each hour: the next run is the retry.
+  'media.describe_vault_backlog': 1,
   // Graphile waits exp(n) seconds after the n-th failure: nine attempts span a little more than an hour, through a
   // short outage of the storage; a file left waiting is sent again by her phone.
   'content_drops.receive_file': 9,
@@ -621,6 +675,10 @@ export const JOB_MAX_ATTEMPTS = {
   'scripts.ask_scripts': 1,
   // A platform that did not answer: a few tries; a failed read changes nothing for the account.
   'scripts.import_platform_scripts': 3,
+  // A brain that failed: a few tries; the budget spent waits for the hourly backlog.
+  'scripts.identify_platform_script': 3,
+  // Each hour: the next run is the retry.
+  'scripts.identify_backlog': 1,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,
@@ -671,6 +729,11 @@ export function reopenJobKey(creatorId: string): string {
 
 export function accountQueueNameFor(platformAccountId: string): `account:${string}` {
   return `account:${platformAccountId}`;
+}
+
+/** The one waiting `media.describe_vault` of an account (ADR 0113 § 5): a sync, a lot or the hour never stack two. */
+export function vaultDescribeJobKey(platformAccountId: string): string {
+  return `media.describe_vault:${platformAccountId}`;
 }
 
 export function jobKeyFor(job: JobName, conversationId: string): string {

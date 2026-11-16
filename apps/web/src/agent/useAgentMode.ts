@@ -45,5 +45,6 @@ export function useAgentMode(shown: string | null = null): AgentModeView {
       creatorName: live.data.creator.name,
     };
   }
-  return { source: live.kind };
+  // The pill never asks for one creator and no other (`exact`): `missing` cannot come back here.
+  return { source: live.kind === 'missing' ? 'empty' : live.kind };
 }

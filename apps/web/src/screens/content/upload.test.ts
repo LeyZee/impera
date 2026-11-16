@@ -2,7 +2,7 @@ import { ContentDropFileIdSchema, type DropFileUpload } from '@impera/contracts'
 import { describe, expect, it, vi } from 'vitest';
 
 import { dropOf } from './fixtures';
-import { PARALLEL_PARTS, UploadStopped, sendFile, type UploadDoors } from './upload';
+import { PARALLEL_PARTS, ServerTrouble, UploadStopped, sendFile, type UploadDoors } from './upload';
 
 const FILE_ID = ContentDropFileIdSchema.parse('00000000-0000-4000-8000-0000000000ff');
 const PART = 4;
@@ -102,6 +102,17 @@ describe('One file’s send, in parts (CR-06 d, ADR 0070 § 3)', () => {
     expect(plan).toHaveBeenCalledTimes(2);
     expect(phases).toContain('waiting');
     expect(d.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('says « stalled », not « waiting », when the server answers with an error (recette CRE-10)', async () => {
+    const plan = vi
+      .fn<() => Promise<DropFileUpload>>()
+      .mockRejectedValueOnce(new ServerTrouble('503'))
+      .mockResolvedValue(planOf(8));
+    const phases: string[] = [];
+    await sendFile(blob(8), doors({ plan }), ({ phase }) => phases.push(phase), signal);
+    expect(phases).toContain('stalled');
+    expect(phases).not.toContain('waiting');
   });
 
   it('stops at once when the server refuses the file (withdrawn, settled)', async () => {

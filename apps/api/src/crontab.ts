@@ -125,12 +125,26 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '50 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['content_drops.thumbnail_backlog'] },
   },
+  // Her platform's vault (ADR 0113 § 5): the accounts whose media still wait for a description get their run again,
+  // one put off by a spent budget keeping its time. No backfill: the next run finds them.
+  {
+    task: 'media.describe_vault_backlog',
+    match: '55 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['media.describe_vault_backlog'] },
+  },
   // Her scripts (SC-02, ADR 0056 § 2): each creator's next one asked a week before it is due, in her own day; one
   // request per due day, so a replay or a missed hour asks nothing twice. No backfill: the next run catches up.
   {
     task: 'scripts.ask_scripts',
     match: '25 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.ask_scripts'] },
+  },
+  // The identities of her native scripts (SC-04 lot c8): those whose media were described and validated since, or
+  // spent the day's budget, asked again; the job writes only what changed. No backfill: the next run finds them.
+  {
+    task: 'scripts.identify_backlog',
+    match: '40 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.identify_backlog'] },
   },
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
   {

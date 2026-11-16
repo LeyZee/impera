@@ -1065,6 +1065,41 @@
       "when": 1794791701248,
       "tag": "0210_append_only_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1794805744963,
+      "tag": "0211_script_identities",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1794811334718,
+      "tag": "0212_session_owner",
+      "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1794831207318,
+      "tag": "0213_llm_calls_hedge",
+      "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1794834088526,
+      "tag": "0214_script_branches",
+      "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1794842526705,
+      "tag": "0215_vault_media",
+      "breakpoints": true
     }
   ]
 }

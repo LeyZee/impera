@@ -7,6 +7,7 @@ import {
   PLATFORM_SCRIPT_STEP_MEDIA_MAX,
   PLATFORM_SCRIPT_STEP_TEXT_MAX,
   PLATFORM_SCRIPT_STEPS_MAX,
+  SCRIPT_IDENTITY_AUTHORS,
   PlatformScriptMomentSchema,
   SCRIPT_CADENCE_DEFAULT_DAYS,
   SCRIPT_CADENCE_MAX_DAYS,
@@ -30,6 +31,7 @@ import {
   smallint,
   text,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -287,6 +289,11 @@ export const platformScriptSteps = pgTable(
     position: smallint('position').notNull(),
     /** What a send of this step names (`sendScriptStep`, `SentScriptStep.stepRef`). */
     platformStepRef: text('platform_step_ref').notNull(),
+    /**
+     * The platform's own rank of the step (`PlatformScriptStep.platformIndex`), kept as it is: two steps of a script on
+     * the same rank are branches a human chooses between, never read one after the other (SC-04 c8).
+     */
+    platformIndex: integer('platform_index').notNull(),
     name: text('name').notNull(),
     text: text('text').notNull(),
     priceMinor: integer('price_minor').notNull(),
@@ -304,6 +311,7 @@ export const platformScriptSteps = pgTable(
       'platform_script_steps_position_check',
       sql`${t.position} >= 0 and ${t.position} < ${sql.raw(String(PLATFORM_SCRIPT_STEPS_MAX))}`,
     ),
+    check('platform_script_steps_platform_index_check', sql`${t.platformIndex} >= 0`),
     check(
       'platform_script_steps_text_check',
       sql`char_length(${t.name}) <= ${sql.raw(String(PLATFORM_SCRIPT_NAME_MAX))} and char_length(${t.text}) <= ${sql.raw(String(PLATFORM_SCRIPT_STEP_TEXT_MAX))} and char_length(${t.platformStepRef}) <= ${sql.raw(String(PLATFORM_SCRIPT_REF_MAX))}`,
@@ -364,6 +372,135 @@ export const platformScriptStepMedia = pgTable(
     enumCheck('platform_script_step_media', t.kind, MEDIA_SLOT_KINDS),
     pgPolicy('team_read', {
       for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * A native script's identity (SC-04 lot c8, ADR 0056 § 6): what it is and when it fits (`ScriptIdentityContent`), for
+ * the version of the script it was written from (`input_hash`: its steps' names and texts, their media and the
+ * validated description of each, never a price). Written by the brain (`scripts.identify_platform_script`, as the
+ * service role) or by hand by the agency, a new row each time, validated once by a person and never changed after
+ * (`script_identities_kept`). Under her RLS and the team's scopes, closed to her account; the brain never writes over a
+ * validated identity of the same version.
+ */
+export const scriptIdentities = pgTable(
+  'script_identities',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformScriptId: uuid('platform_script_id').notNull(),
+    /** sha256 of what it was written from: a change of text, media or description asks for a new one. */
+    inputHash: text('input_hash').notNull(),
+    /** `SCRIPT_IDENTITY_SCHEMA_VERSION` of its content. */
+    schemaVersion: smallint('schema_version').notNull(),
+    content: jsonb('content').notNull(),
+    author: enumText('author').notNull(),
+    /** The brain's model and prompt; `null` for a hand's. */
+    model: text('model'),
+    promptHash: text('prompt_hash'),
+    /** Who validated it (ADR 0030 § 3): an account, set once with `validated_at`. */
+    validatedBy: text('validated_by').references(() => user.id),
+    validatedAt: timestampTz('validated_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'script_identities_script_creator_fk',
+      columns: [t.platformScriptId, t.creatorId],
+      foreignColumns: [platformScripts.id, platformScripts.creatorId],
+    }),
+    check('script_identities_validated_check', sql`(${t.validatedBy} is null) = (${t.validatedAt} is null)`),
+    check('script_identities_input_hash_check', sql`${t.inputHash} ~ '^[0-9a-f]{64}$'`),
+    check('script_identities_content_check', sql`jsonb_typeof(${t.content}) = 'object'`),
+    check('script_identities_schema_version_check', sql`${t.schemaVersion} >= 1`),
+    enumCheck('script_identities', t.author, SCRIPT_IDENTITY_AUTHORS),
+    // The brain's says its model and prompt; a hand's is validated by its writer, nothing left to look at.
+    check(
+      'script_identities_writer_check',
+      sql`case ${t.author} when 'brain' then ${t.model} is not null and ${t.promptHash} is not null else ${t.validatedAt} is not null and ${t.model} is null and ${t.promptHash} is null end`,
+    ),
+    // One by the brain per version and prompt: a replayed job writes nothing twice.
+    uniqueIndex('script_identities_brain_unique')
+      .on(t.platformScriptId, t.inputHash, t.promptHash)
+      .where(sql`${t.author} = 'brain'`),
+    index('script_identities_script_idx').on(t.creatorId, t.platformScriptId),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    // Her team validates the identity shown, in its own name; only the two columns of the stamp are granted.
+    pgPolicy('team_validate', {
+      for: 'update',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.validatedBy} = ${currentUser}`,
+    }),
+    // Her team writes one by hand: a row of its own, validated by the one who writes it.
+    pgPolicy('team_correct', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.author} = 'human' and ${t.validatedBy} = ${currentUser}`,
+    }),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * What Impera holds of a branch of a native script that Reveal does not give (ADR 0112 § A 3): its place among the
+ * branches of its step and its condition (`BranchCondition`), set by the agency in the CRM. Keyed by the branch's
+ * `stepRef`, so that it outlives the import, which rewrites the steps; a row of a branch Reveal no longer lists is
+ * ignored. Set a whole step at a time (rows of its branches deleted, then written) by the owner and the active managers
+ * of her list, under her RLS, closed to her account.
+ */
+export const platformScriptBranches = pgTable(
+  'platform_script_branches',
+  {
+    platformScriptId: uuid('platform_script_id').notNull(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformStepRef: text('platform_step_ref').notNull(),
+    branchOrder: smallint('branch_order').notNull(),
+    /** `BranchConditionSchema`, read through it. */
+    condition: jsonb('condition').notNull(),
+    updatedBy: text('updated_by')
+      .notNull()
+      .references(() => user.id),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'platform_script_branches_pkey', columns: [t.platformScriptId, t.platformStepRef] }),
+    foreignKey({
+      name: 'platform_script_branches_script_creator_fk',
+      columns: [t.platformScriptId, t.creatorId],
+      foreignColumns: [platformScripts.id, platformScripts.creatorId],
+    }),
+    index('platform_script_branches_creator_idx').on(t.creatorId, t.platformScriptId),
+    check(
+      'platform_script_branches_order_check',
+      sql`${t.branchOrder} >= 0 and ${t.branchOrder} < ${sql.raw(String(PLATFORM_SCRIPT_STEPS_MAX))}`,
+    ),
+    check(
+      'platform_script_branches_ref_check',
+      sql`char_length(${t.platformStepRef}) <= ${sql.raw(String(PLATFORM_SCRIPT_REF_MAX))}`,
+    ),
+    check(
+      'platform_script_branches_condition_check',
+      sql`jsonb_typeof(${t.condition}) = 'object' and ${t.condition}->>'kind' in ('none', 'structured', 'text')`,
+    ),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    pgPolicy('team_write', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.updatedBy} = ${currentUser}`,
+    }),
+    pgPolicy('team_clear', {
+      for: 'delete',
       using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
     }),
     closedToCreator(),

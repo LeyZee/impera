@@ -6,13 +6,15 @@ import { McpReadRefused } from '../modules/mcp';
 import { refusedAsMcp } from './mcp';
 
 describe('refusedAsMcp (ADR 0026 § 1: a module read that refuses the person)', () => {
-  it('turns the connectors’ refusals into a refusal of the call', async () => {
+  it('turns the connectors’ and pay’s refusals into a refusal of the call', async () => {
     const creator = refusedAsMcp(() =>
       Promise.reject(new DomainError('connector_reads_forbidden', 'Réservé')),
     );
     await expect(creator).rejects.toEqual(new McpReadRefused('creator_forbidden'));
     const team = refusedAsMcp(() => Promise.reject(new DomainError('sales_feed_team_forbidden', 'Réservé')));
     await expect(team).rejects.toEqual(new McpReadRefused('role_forbidden'));
+    const pay = refusedAsMcp(() => Promise.reject(new DomainError('role_forbidden', 'Réservé')));
+    await expect(pay).rejects.toEqual(new McpReadRefused('role_forbidden'));
   });
 
   it('leaves any other failure an error, and a read that answers as it is', async () => {

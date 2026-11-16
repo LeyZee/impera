@@ -478,3 +478,125 @@ describe('Équipe › Paie : donner ou partager une vente avec le chatteur déci
     );
   });
 });
+
+/**
+ * Four eyes on a sale already given (recette agence du 16/11): the manager it was given to decides nothing more on it,
+ * neither to take it back nor to exclude it nor to give it again. Théo (a chatter) sells off shift, Inès (a manager)
+ * holds the account; the owner gives her the sale. Invented (ADR 0010).
+ */
+describe('Équipe › Paie : quatre yeux sur une vente donnée à un manager (ADR 0101)', () => {
+  let team: PayrollTeam;
+  let theo: TeamMember;
+  let ines: TeamMember;
+  let inesCookie: string;
+
+  const decide = (
+    values: { outcome: 'exclude' | 'give' | 'withdraw'; to?: TeamMember },
+    cookie = team.owner,
+  ) =>
+    team.call('POST', '/payroll/sale-decisions', cookie, {
+      id: newId(PaySaleDecisionIdSchema),
+      period: P1,
+      platform: 'reveal',
+      platformSaleId: 'sale_given',
+      outcome: values.outcome,
+      note: values.outcome === 'give' ? 'Elle a relancé le fan et l’a convaincu' : null,
+      recipientMemberId: values.to?.id ?? null,
+      shareBp: values.outcome === 'give' ? 10_000 : null,
+      excludeReason: values.outcome === 'exclude' ? 'other' : null,
+    });
+
+  const heldAs = async (cookie: string) => {
+    const response = await team.call('GET', `/payroll/periods/${P1}/held-sales`, cookie);
+    expect(response.statusCode, response.body).toBe(200);
+    return HeldListSchema.parse(response.json()).sales.map((one) => [
+      one.platformSaleId,
+      one.given?.recipientMemberId ?? null,
+      one.outcomes,
+      one.recipients,
+    ]);
+  };
+
+  beforeAll(async () => {
+    team = await startPayrollTeam(inject('pgSuperuserUrl'));
+    ({ member: theo } = await team.addMember('theo@example.test', 'Théo'));
+    ({ member: ines, cookie: inesCookie } = await team.addMember('ines@example.test', 'Inès', 'manager'));
+    const db = team.test.admin.db;
+    await db.insert(schema.accountPayRules).values({
+      id: newId(AccountPayRulesIdSchema),
+      creatorId: team.anna,
+      platformAccountId: team.annas,
+      fromPeriod: P1,
+      currency: 'EUR',
+      vatBps: 0,
+      platformFeeBps: 0,
+      earningsSource: 'detected',
+      createdBy: team.ownerId,
+    });
+    const linked = new Date('2025-01-01T00:00:00Z');
+    await db.insert(schema.salesFeedChatters).values({
+      platform: 'reveal',
+      platformChatterId: 'chatter_theo',
+      kind: 'member',
+      memberId: theo.id,
+      linkVersionAt: linked,
+      linkedAt: linked,
+    });
+    await db.insert(schema.shifts).values({
+      id: newId(ShiftIdSchema),
+      creatorId: team.anna,
+      platformAccountId: team.annas,
+      memberId: ines.id,
+      startsAt: new Date('2025-05-05T18:00:00Z'),
+      endsAt: new Date('2025-05-05T23:00:00Z'),
+      createdBy: team.ownerId,
+      updatedBy: team.ownerId,
+    });
+    const at = new Date('2025-05-05T20:00:00Z');
+    await db.insert(schema.platformSales).values({
+      id: newId(SalesLineIdSchema),
+      creatorId: team.anna,
+      platformAccountId: team.annas,
+      platform: 'reveal',
+      platformSaleId: 'sale_given',
+      event: 'sale',
+      saleType: 'ppv',
+      status: 'paid',
+      occurredAt: at,
+      platformModelId: 'model_test_01',
+      platformChatterId: 'chatter_theo',
+      platformFanId: null,
+      currency: 'EUR',
+      grossInclVatMinor: 6_000,
+      grossExclVatMinor: 6_000,
+      netMinor: 3_000,
+      agencyMinor: 3_000,
+      creatorMinor: 0,
+      position: 'sale_given:sale',
+      inputsHash: 'hash_test',
+      recordedAt: at,
+    });
+  });
+
+  afterAll(async () => {
+    await team.close();
+  });
+
+  it('lets the manager the sale was given to decide nothing more on it, and offers her no gesture', async () => {
+    expect((await decide({ outcome: 'give', to: ines })).statusCode).toBe(201);
+    for (const outcome of ['withdraw', 'exclude'] as const) {
+      const refused = await decide({ outcome }, inesCookie);
+      expect([outcome, refused.statusCode, team.refusal(refused).code]).toEqual([
+        outcome,
+        403,
+        'payroll_own_forbidden',
+      ]);
+    }
+    expect(await heldAs(inesCookie)).toEqual([['sale_given', ines.id, [], []]]);
+    // The owner still may: four eyes, not none.
+    expect(await heldAs(team.owner)).toEqual([
+      ['sale_given', ines.id, ['count', 'exclude', 'give', 'withdraw'], [ines.id]],
+    ]);
+    expect((await decide({ outcome: 'withdraw' })).statusCode).toBe(201);
+  });
+});

@@ -172,6 +172,22 @@ describe('Créatrices › Demandes (MED-09)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('counts her sentence, and never cuts a long one in silence (recette CRE-32)', async () => {
+    const calls = serve(base());
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Demander un contenu' }));
+    const dialog = screen.getByRole('dialog', { name: 'Demander un contenu' });
+    expect(within(dialog).getByText('0 / 160')).toBeDefined();
+    const long = 'Une séance en lingerie noire, '.repeat(6);
+    fireEvent.change(within(dialog).getByLabelText('Pourquoi'), { target: { value: long } });
+    // The whole paste stays in the field, the count says how far over it is, and the bound is said at once.
+    expect(within(dialog).getByLabelText('Pourquoi')).toHaveProperty('value', long);
+    expect(within(dialog).getByText(`${String(long.trim().length)} / 160`)).toBeDefined();
+    expect(within(dialog).getByText('160 caractères au plus.')).toBeDefined();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Demander' }));
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+  });
+
   it('asks a script’s structure, and says the moment is fixed for her', async () => {
     serve(base());
     show();
