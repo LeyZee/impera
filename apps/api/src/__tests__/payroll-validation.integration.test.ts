@@ -14,6 +14,7 @@ import { eq, schema, sql } from '@impera/db';
 import type { TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
+import { createRequireRecentLogin } from '../auth';
 import type { App } from '../composition-root';
 import { createLogger } from '../logger';
 import { enqueuePayoutCertificateLock } from '../modules/contractors';
@@ -305,7 +306,7 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
     const blindServer = await buildServer({
       config,
       logger: createLogger(config),
-      routes: [blind.routes(app.requireRole)],
+      routes: [blind.routes(app.requireRole, createRequireRecentLogin(app.auth, app.db.db))],
       readiness: app.readiness,
     });
     try {

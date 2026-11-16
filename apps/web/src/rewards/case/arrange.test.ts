@@ -44,6 +44,8 @@ describe('percentOf', () => {
 
   it('says nothing for an object without a count, and 100 % once earned', () => {
     expect(percentOf(null, false)).toBeNull();
+    // An object of one gesture, still ahead: nothing to draw (CRE-14).
+    expect(percentOf({ current: 0, target: 1, unit: 'once' }, false)).toBeNull();
     expect(percentOf(null, true)).toBe(100);
   });
 });
@@ -90,12 +92,53 @@ describe('nextTrophy', () => {
 });
 
 describe('foldedShelf', () => {
-  it('shows the earned objects and the next one, and counts the rest', () => {
+  const shelf = (earned: number, waiting: number): Parameters<typeof foldedShelf>[0] => ({
+    family: 'medal',
+    earned,
+    items: [
+      ...Array.from({ length: earned }, (_, at) =>
+        item({ kind: `won_${String(at)}`, family: 'medal', earnedAt: '2026-10-02T10:00:00.000Z' }),
+      ),
+      ...Array.from({ length: waiting }, (_, at) =>
+        item({
+          kind: `next_${String(at)}`,
+          family: 'medal',
+          progress: { current: 1, target: 9, unit: 'day' },
+        }),
+      ),
+    ],
+  });
+
+  it('shows a short shelf whole, with nothing behind « Voir tout »', () => {
     const streaks = shelvesOf(CASE)[1];
     if (!streaks) throw new Error('no streak shelf');
     const { shown, hidden } = foldedShelf(streaks);
-    expect(shown.map((one) => one.kind)).toEqual(['streak_5', 'streak_10']);
-    expect(hidden).toBe(1);
+    expect(shown.map((one) => one.kind)).toEqual(['streak_5', 'streak_10', 'streak_25']);
+    expect(hidden).toBe(0);
+  });
+
+  it('fills a full row of three for a newcomer, the rest behind « Voir tout » (CRE-14)', () => {
+    const { shown, hidden } = foldedShelf(shelf(0, 8));
+    expect(shown.map((one) => one.kind)).toEqual(['next_0', 'next_1', 'next_2']);
+    expect(hidden).toBe(5);
+  });
+
+  it('shows every earned object and the next one, rounded up to full rows', () => {
+    const { shown, hidden } = foldedShelf(shelf(4, 6));
+    expect(shown).toHaveLength(6);
+    expect(shown.slice(0, 4).every((one) => one.earnedAt !== null)).toBe(true);
+    expect(hidden).toBe(4);
+  });
+
+  it('never hides a single row: up to three left over are shown at once', () => {
+    expect(foldedShelf(shelf(1, 5)).hidden).toBe(0);
+    expect(foldedShelf(shelf(0, 3)).hidden).toBe(0);
+  });
+
+  it('earned objects come first, whatever the order of the shelf', () => {
+    const mixed = shelf(2, 5);
+    const { shown } = foldedShelf({ ...mixed, items: [...mixed.items].reverse() });
+    expect(shown.slice(0, 2).every((one) => one.earnedAt !== null)).toBe(true);
   });
 });
 
@@ -106,5 +149,44 @@ it('counts what was earned', () => {
 describe('onShelf', () => {
   it('lays medals, streaks and trophies on shelves, and leaves any other family to the role', () => {
     expect(SHELF_ORDER.every((family) => onShelf({ family }))).toBe(true);
+  });
+});
+
+describe('nextTrophy, an object of one gesture (recette 16/11, CRE-14)', () => {
+  it('puts a first gesture before a streak at nothing: on a tie, the least left to do', () => {
+    const ahead = (kind: string, target: number, unit: 'day' | 'once'): TrophyCaseItem => ({
+      kind,
+      family: unit === 'once' ? 'trophy' : 'medal',
+      earnedAt: null,
+      revealedAt: null,
+      progress: { current: 0, target, unit },
+    });
+    expect(
+      nextTrophy({
+        items: [ahead('day_streak_7', 7, 'day'), ahead('first_drop', 1, 'once')],
+        streaks: [],
+        level: null,
+      })?.kind,
+    ).toBe('first_drop');
+  });
+
+  it('keeps a streak under way before a first gesture', () => {
+    const items: TrophyCaseItem[] = [
+      {
+        kind: 'first_drop',
+        family: 'trophy',
+        earnedAt: null,
+        revealedAt: null,
+        progress: { current: 0, target: 1, unit: 'once' },
+      },
+      {
+        kind: 'day_streak_7',
+        family: 'medal',
+        earnedAt: null,
+        revealedAt: null,
+        progress: { current: 3, target: 7, unit: 'day' },
+      },
+    ];
+    expect(nextTrophy({ items, streaks: [], level: null })?.kind).toBe('day_streak_7');
   });
 });

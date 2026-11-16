@@ -45,6 +45,15 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
           if (gained > 0) context.logger.info({ players, gained }, 'rewards: gains noted');
         },
       ),
+      'rewards.evaluate_creator': defineTask(
+        'rewards.evaluate_creator',
+        JOB_PAYLOADS['rewards.evaluate_creator'],
+        logger,
+        async (payload, context) => {
+          const { gained } = await module.jobs.evaluateCreator(payload.creatorId);
+          if (gained > 0) context.logger.info({ gained }, 'rewards: her gains noted after her gesture');
+        },
+      ),
     },
     routes: [
       module.routes({

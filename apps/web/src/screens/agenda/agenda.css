@@ -322,6 +322,13 @@
   background: var(--nv-glass-fill);
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
+.ag-streak {
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+.ag-streak:hover {
+  background: var(--nv-glass-fill-strong);
+}
 .ag-streak b {
   color: var(--nv-ink);
 }
@@ -336,7 +343,19 @@
   flex: none;
   margin: -6px 0;
 }
-.ag-streak[tabindex]:focus-visible {
+.ag-streak__go {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-left: 2px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -1px;
+}
+.ag-streak:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
 }
@@ -540,6 +559,20 @@
 .ag-check:active {
   transform: scale(0.88);
 }
+/* A routine's check on a day that is not hers today (CRE-03, CRE-07): drawn, never pressed, a little quieter. */
+.ag-check[data-closed] {
+  cursor: default;
+  opacity: 0.55;
+}
+.ag-check[data-closed]::before {
+  content: none;
+}
+.ag-check[data-closed][data-done] {
+  background: var(--ag-c, var(--nv-ink-muted));
+}
+.ag-check[data-closed][data-done] svg {
+  stroke-dashoffset: 0;
+}
 .ag-check:focus-visible {
   outline: none;
   box-shadow:
@@ -586,6 +619,13 @@
 }
 .ag-explain .ag-ess {
   margin: 0 6px 0 0;
+}
+/* A state said, not a weight: « Retirée » (recette 16/11). */
+.ag-ess[data-tone='info'] {
+  background: var(--nv-fill-soft);
+}
+.ag-task-foot__consequence {
+  color: var(--nv-ink);
 }
 .ag-tag {
   flex: none;

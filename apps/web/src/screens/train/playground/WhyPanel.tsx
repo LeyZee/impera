@@ -1,4 +1,4 @@
-import type { PlaygroundAnswer, PlaygroundState } from '@impera/contracts';
+import type { PlaygroundAnswer, PlaygroundBrief, PlaygroundState } from '@impera/contracts';
 import type { JSX, ReactNode } from 'react';
 
 import { DesireGauge } from './Desire';
@@ -61,10 +61,13 @@ export function WhyPanel({
   state,
   open,
   onToggle,
+  reading,
 }: {
   state: PlaygroundState;
   open: boolean;
   onToggle: () => void;
+  /** While the voice writes: the brain's reading, already done. */
+  reading?: PlaygroundBrief | undefined;
 }): JSX.Element {
   const answer = state.pending;
   const level = levelOf(answer);
@@ -110,7 +113,21 @@ export function WhyPanel({
           ×
         </button>
       </div>
-      {answer === null ? (
+      {answer === null && reading !== undefined ? (
+        <div className="nv-scroll">
+          <Sec label="Ce qu’elle a compris">
+            {intentLabel(reading.intent)}, {sentimentLabel(reading.sentiment)}
+          </Sec>
+          <Sec label="Décision">
+            <b>{actionLabel(reading.action)}</b>
+            {reading.replyBrief === '' ? null : <p>{reading.replyBrief}</p>}
+          </Sec>
+          {reading.risks.length === 0 ? null : (
+            <Sec label="Risques">{reading.risks.map(riskLabel).join(', ')}</Sec>
+          )}
+          <p className="pg-why__empty">La voix écrit sa réponse…</p>
+        </div>
+      ) : answer === null ? (
         <p className="pg-why__empty">Le raisonnement de la prochaine réponse s’affichera ici.</p>
       ) : (
         <div className="nv-scroll">

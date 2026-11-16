@@ -67,7 +67,8 @@ function roleHealth(
   now: Date,
 ): RoleHealth {
   const roleConfig = config.roles[role];
-  const records = today.filter((r) => r.role === role);
+  // A hedge's loser (OPS-15) was waited for by nobody: its cost counts in the day, not its latency nor its failure.
+  const records = today.filter((r) => r.role === role && r.hedge !== 'loser');
   const lastHour = records.filter((r) => now.getTime() - r.at.getTime() <= HOUR_MS);
   const successes = records.filter((r) => r.outcome === 'ok');
   const failures = records.filter((r) => r.outcome !== 'ok');

@@ -50,3 +50,12 @@ export function tickTimely(tick: Tick, routine: boolean, now: Date, timeZone: st
   if (age > TICK_MAX_AGE_HOURS * 3_600_000 || age < -TICK_CLOCK_SKEW_MS) return false;
   return !routine || calendarDayIn(tick.doneAt, timeZone) === tick.day;
 }
+
+/**
+ * Whether her tick on `day` may still be taken back (recette 16/11, CRE-03): a routine's only on her today in her zone,
+ * the one day a routine tick can still be made, so her streak never changes after the day is over. A dated task's tick
+ * moves no streak, and is taken back on its own day as it is made, ahead or late.
+ */
+export function untickTimely(day: string, routine: boolean, now: Date, timeZone: string): boolean {
+  return !routine || calendarDayIn(now, timeZone) === day;
+}

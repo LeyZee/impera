@@ -212,6 +212,22 @@
   resize: none;
   min-height: 84px;
 }
+/* Under her sentence: what it is for (or what is wrong), and how long it is against its bound (recette CRE-32). */
+.rq-reason-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.rq-count {
+  flex: none;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  transition: color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rq-count[data-near='true'] {
+  color: var(--nv-warning);
+}
 .rq-hint,
 .rq-error {
   margin: 0;

@@ -72,6 +72,8 @@ export function dueOn(task: CreatorTask, day: string, zone: string): boolean {
   if (task.when.kind === 'day') return task.when.day === day;
   if (task.when.kind === 'timed') return dayOf(task.when.startsAt, zone) === day;
   if (task.createdAt !== null && dayOf(task.createdAt, zone) > day) return false;
+  // Removed today, a routine stays due today and leaves her agenda from tomorrow (recette 16/11).
+  if (task.removedAt !== null && dayOf(task.removedAt, zone) < day) return false;
   return task.when.weekdays.includes(weekdayOf(day));
 }
 
@@ -148,6 +150,18 @@ export function suggestedOn(
   if (when.kind === 'timed') return dayOf(when.startsAt, zone) === day;
   return routineDayOf(suggestion, today) === day;
 }
+
+/**
+ * Whether her tick on `day` may still change, either way (ADR 0042 § 8, recette 16/11 CRE-03 and CRE-07): a routine's
+ * only on her today, as the server holds, so a day that is over keeps its ticks and her streak; a dated task's on its own
+ * day, ahead or late.
+ */
+export const tickOpen = (task: CreatorTask, day: string, today: string): boolean =>
+  task.when.kind !== 'routine' || day === today;
+
+/** Why a routine's tick does not change on `day`, said to her where the check would be. */
+export const closedTickWords = (day: string, today: string): string =>
+  day < today ? 'Journée finie : la coche ne bouge plus.' : 'Une routine se coche le jour même.';
 
 export function planOf(agenda: CreatorAgenda, day: string): DayPlan {
   const zone = agenda.timeZone;

@@ -471,6 +471,18 @@ describe('connectors module (P0-06)', () => {
       409,
       'connector_session_member_conflict',
     ]);
+    // Each refusal left its line: the account, the reason and who, nothing of the session nor of the platform.
+    const refused = await test.admin.db
+      .select({ userId: schema.auditLog.userId, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, 'connector.session_refused'), eq(schema.auditLog.entityId, id)))
+      .orderBy(schema.auditLog.createdAt);
+    expect(refused.map((one) => one.details)).toMatchObject([
+      { reason: 'owner_conflict' },
+      { reason: 'member_conflict' },
+    ]);
+    expect(refused.every((one) => one.userId !== null)).toBe(true);
+    expect(JSON.stringify(refused)).not.toMatch(/reveal-bearer|model-test|user-owner-test/);
   });
 
   it('refuses at the first sync a session of another model than the one the sales register links', async () => {
@@ -514,6 +526,15 @@ describe('connectors module (P0-06)', () => {
       'connector_session_conflict',
     ]);
     expect(await accountRow(second)).toMatchObject({ sessionCiphertext: null, sessionState: 'none' });
+    // The refusal of the constraint, raised by the store, leaves its line too.
+    expect(
+      await test.admin.db
+        .select({ details: schema.auditLog.details })
+        .from(schema.auditLog)
+        .where(
+          and(eq(schema.auditLog.action, 'connector.session_refused'), eq(schema.auditLog.entityId, second)),
+        ),
+    ).toMatchObject([{ details: { reason: 'owner_conflict' } }]);
     // Her own account still takes her session, and an expired session keeps the account hers.
     expect((await sync(hers, revealSession('reveal-bearer-held-hhhh', 'model-test-held'))).statusCode).toBe(
       204,

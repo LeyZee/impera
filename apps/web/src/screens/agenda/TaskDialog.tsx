@@ -5,6 +5,7 @@ import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 import { ShootBrief } from './ShootBrief';
 import { AGENDA_KEY, archiveTask, moveTask, NOT_SENT } from './api';
 import { dayInReach, OUT_OF_REACH, spanOf } from './draft';
+import { closedTickWords, tickOpen } from './model';
 import { whenWords } from './words';
 
 import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
@@ -77,6 +78,15 @@ export function TaskDialog({
         />
       ) : (
         <div className="tm-dialog__body">
+          {/* Its state first: a routine removed today stays due today (recette 16/11, avis Design). */}
+          {task.removedAt === null ? null : (
+            <p className="ag-explain">
+              <span className="ag-ess" data-tone="info">
+                Retirée
+              </span>{' '}
+              {REMOVED_TODAY}
+            </p>
+          )}
           {task.purpose === null ? null : <p className="ag-explain">{task.purpose}</p>}
           {task.shootBrief === null && task.reelBrief === null ? null : (
             <ShootBrief brief={task.shootBrief} reel={task.reelBrief} folded={false} />
@@ -87,7 +97,12 @@ export function TaskDialog({
               prévu.
             </p>
           ) : null}
-          <p className="tm-hint">{done ? 'Faite ce jour-là.' : 'Pas encore faite ce jour-là.'}</p>
+          <p className="tm-hint">{doneWords(done, day, agenda.today, tickOpen(task, day, agenda.today))}</p>
+          {/* A routine removed today stays due today: removing it never saves her streak (recette 16/11). */}
+          {/* The gesture's consequence, read before the red button: full ink, never grey (avis Design). */}
+          {mode === 'remove' && task.when.kind === 'routine' ? (
+            <p className="tm-hint ag-task-foot__consequence">{LEAVES_TOMORROW}</p>
+          ) : null}
           {failed === null ? null : (
             <p className="tm-hint tm-hint--error" role="alert">
               {failed}
@@ -120,15 +135,17 @@ export function TaskDialog({
             ) : (
               <>
                 {/* Retirer apart, on the left and in red; the gesture the dialog talks about, ticking, is the one néon. */}
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--destructive ag-task-foot__remove"
-                  onClick={() => {
-                    setMode('remove');
-                  }}
-                >
-                  Retirer
-                </button>
+                {task.removedAt === null ? (
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain nv-btn--destructive ag-task-foot__remove"
+                    onClick={() => {
+                      setMode('remove');
+                    }}
+                  >
+                    Retirer
+                  </button>
+                ) : null}
                 {movable ? (
                   <button
                     type="button"
@@ -140,16 +157,19 @@ export function TaskDialog({
                     Changer le moment
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  className={done ? 'nv-btn nv-btn--soft' : 'nv-btn nv-btn--neon'}
-                  onClick={() => {
-                    onTick(task, !done, day);
-                    onClose();
-                  }}
-                >
-                  {done ? 'Pas faite' : 'C’est fait'}
-                </button>
+                {/* A routine on another day than hers: no gesture, why in words above (CRE-03, CRE-07). */}
+                {tickOpen(task, day, agenda.today) ? (
+                  <button
+                    type="button"
+                    className={done ? 'nv-btn nv-btn--soft' : 'nv-btn nv-btn--neon'}
+                    onClick={() => {
+                      onTick(task, !done, day);
+                      onClose();
+                    }}
+                  >
+                    {done ? 'Pas faite' : 'C’est fait'}
+                  </button>
+                ) : null}
               </>
             )}
           </div>
@@ -270,4 +290,15 @@ function MoveForm({
       </div>
     </form>
   );
+}
+
+const LEAVES_TOMORROW = 'Elle compte encore aujourd’hui et part de ton agenda demain.';
+const REMOVED_TODAY = 'Elle compte encore aujourd’hui et part de ton agenda demain.';
+
+/** What the dialog says of her tick that day; when the tick is closed (CRE-03, CRE-07), why it stays as it is. */
+function doneWords(done: boolean, day: string, today: string, open: boolean): string {
+  if (open && day === today) return done ? 'Faite aujourd’hui.' : 'Pas encore faite aujourd’hui.';
+  if (open) return done ? 'Faite ce jour-là.' : 'Pas encore faite ce jour-là.';
+  if (day > today) return closedTickWords(day, today);
+  return `${done ? 'Faite' : 'Pas faite'} ce jour-là. ${closedTickWords(day, today)}`;
 }
