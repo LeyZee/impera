@@ -600,6 +600,16 @@ describe('failures and connection tests', () => {
     expect(gateway.health().roles.find((r) => r.role === 'voice')?.lastSuccessAt).toBeUndefined();
   });
 
+  it('reports a key the « Essai réel » sees refused, like a refusal in production (ADR 0091 § 7)', async () => {
+    // On purpose, not a side effect: the key is truly refused, the agent must stop using it too.
+    const refusals: KeyRefusal[] = [];
+    const { gateway } = setup({ xai: scripted([{ status: 401 }]) }, ALL_KEYS, (refusal) =>
+      refusals.push(refusal),
+    );
+    expect(await gateway.testConnection('xai')).toMatchObject({ isOk: false, outcome: 'auth' });
+    expect(refusals).toEqual([{ provider: 'xai', status: 401 }]);
+  });
+
   it('tells an account with nothing left from a refused key, and never calls past the cap', async () => {
     const mistral = scripted([{ status: 402, body: '{"message":"no credits"}' }]);
     const { gateway } = setup({ mistral });
