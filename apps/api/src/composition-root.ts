@@ -83,6 +83,7 @@ import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
 import { wirePlayground } from './wiring/playground';
 import { wireProviders } from './wiring/providers';
+import { wireRedirectLinks } from './wiring/redirect-links';
 import { wireRewards } from './wiring/rewards';
 import { wireScheduling } from './wiring/scheduling';
 import { wireScripts } from './wiring/scripts';
@@ -601,6 +602,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...scheduling.routes,
       ...scripts.routes,
       ...trends.routes,
+      ...wireRedirectLinks(shared).routes,
       ...creatorTasks.routes,
       ...contentDrops.routes,
       ...contractors.routes,

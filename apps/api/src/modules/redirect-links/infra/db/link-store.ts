@@ -8,6 +8,7 @@ import {
 import {
   and,
   eq,
+  onCreatorList,
   schema,
   sql,
   withAdmin,
@@ -67,7 +68,7 @@ async function linksOf(tx: Transaction, creatorId: string): Promise<StoredRedire
 
 /**
  * The person's right on the creator, read in the base and never from the session: the owner and an active manager,
- * for a creator that exists. A chatter, a creator's account or a member who left is refused.
+ * for a creator that exists, a manager for the creators on his list only. A chatter, a creator's account or a member who left is refused.
  */
 async function assertAgency<T>(
   db: Database,
@@ -80,6 +81,9 @@ async function assertAgency<T>(
     // `creators` is the tenant root, without RLS: a creator that does not exist is refused, not a foreign key error.
     const [creator] = await tx.select({ id: creators.id }).from(creators).where(eq(creators.id, creatorId));
     if (creator === undefined) throw new RedirectLinkError('forbidden');
+    // An active manager reaches only the creators on his own list (recette 05/11).
+    if (scope === 'agency' && !(await onCreatorList(tx, actor.userId, creatorId)))
+      throw new RedirectLinkError('forbidden');
     return fn(tx);
   });
 }

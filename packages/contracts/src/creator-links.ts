@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
 import { LINK_PLACEMENTS, LinkPlacementSchema, type LinkPlacement } from './link-stats';
-import { RedirectLinkIdSchema, RedirectUrlSchema, labelHasAddress } from './telegram-channel';
+import {
+  RedirectLinkIdSchema,
+  RedirectLinkSchema,
+  RedirectUrlSchema,
+  labelHasAddress,
+} from './telegram-channel';
 
 /**
  * « Mes liens » (ADR 0121 § 1): what the creator sees of her redirect links. A tool, not a dashboard: a name, what
@@ -76,3 +81,21 @@ export function creatorLinkCards(candidates: readonly CreatorLinkCandidate[]): C
 
 /** Every place has its rank: a place added to the list without one would sort first by accident. */
 export const PLACEMENTS_WITHOUT_ORDER = LINK_PLACEMENTS.filter((place) => !PLACEMENT_ORDER.includes(place));
+
+/**
+ * What the agency writes of a redirect link (INS-03): the link of ADR 0080 § 4 without its identity, where it is
+ * placed (null: not said yet, she does not see it), what it is for, and whether it is on.
+ */
+export const AgencyRedirectLinkWriteSchema = RedirectLinkSchema.omit({ id: true }).extend({
+  placement: LinkPlacementSchema.nullable(),
+  usageNote: LinkUsageNoteSchema,
+  enabled: z.boolean(),
+});
+export type AgencyRedirectLinkWrite = z.infer<typeof AgencyRedirectLinkWriteSchema>;
+
+/** A redirect link as the owner and an active manager read it: placed or not, on or off. */
+export const AgencyRedirectLinkSchema = AgencyRedirectLinkWriteSchema.extend({ id: RedirectLinkIdSchema });
+export type AgencyRedirectLink = z.infer<typeof AgencyRedirectLinkSchema>;
+
+export const AgencyRedirectLinksResponseSchema = z.object({ links: z.array(AgencyRedirectLinkSchema) });
+export type AgencyRedirectLinksResponse = z.infer<typeof AgencyRedirectLinksResponseSchema>;
