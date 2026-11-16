@@ -1,4 +1,10 @@
-import type { Destination, PlaygroundComparison, PlaygroundMedia, Verdict } from '@impera/contracts';
+import type {
+  Destination,
+  PlaygroundBrief,
+  PlaygroundComparison,
+  PlaygroundMedia,
+  Verdict,
+} from '@impera/contracts';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { Composer, Conversation, LessonCard, type LocalMode } from './playground/Conversation';
@@ -43,6 +49,9 @@ const ERRORS: Readonly<Record<PlaygroundErrorCode, string>> = {
   failed: 'Le serveur n’a pas répondu. Réessaie dans un instant.',
 };
 
+/** How often the screen asks for the brain's reading while the voice writes. */
+const READING_POLL_MS = 1500;
+
 /**
  * Entraîner > Playground (spec moteur-ia/playground-entrainement.md): the same path as production with no
  * connection, one number on top, three gestures under each answer, every correction becomes a lesson.
@@ -58,6 +67,8 @@ export function PlaygroundPage(): JSX.Element {
   const [revealFrom, setRevealFrom] = useState<number | null>(null);
   /** How many of its bubbles are shown while they appear; undefined: all of them. */
   const [shown, setShown] = useState<number | undefined>(undefined);
+  /** While the voice writes: the brain's reading of his message, asked of the server as soon as it is done. */
+  const [reading, setReading] = useState<PlaygroundBrief | undefined>(undefined);
   const [whyManual, setWhyManual] = useState<boolean | undefined>(undefined);
   /** Where the last lesson went, said until the next message. */
   const [filed, setFiled] = useState<Destination | undefined>(undefined);
@@ -92,6 +103,29 @@ export function PlaygroundPage(): JSX.Element {
   useEffect(() => {
     setWhyManual(undefined);
   }, [pending]);
+
+  // Two steps: the brain reads him in a few seconds, the voice takes longer; its reading shows as soon as it is done.
+  const client = pg.client;
+  useEffect(() => {
+    if (!writing) {
+      setReading(undefined);
+      return;
+    }
+    let live = true;
+    const ask = (): void => {
+      client
+        .state()
+        .then((s) => {
+          if (live && s.reading !== undefined) setReading(s.reading);
+        })
+        .catch(() => undefined);
+    };
+    const timer = setInterval(ask, READING_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [writing, client]);
 
   // Her bubbles one by one, each after her typing time, as a fan sees them (Charles, 16/11).
   const delays = pending?.delaysMs;
@@ -319,6 +353,7 @@ export function PlaygroundPage(): JSX.Element {
           busy={pg.busy}
           writing={writing}
           revealing={revealing}
+          reading={reading}
           error={pg.error === undefined ? undefined : ERRORS[pg.error]}
           errorTone={pg.error === 'llm_unavailable' ? 'warn' : 'bad'}
           lesson={lesson?.verdict}
@@ -393,6 +428,7 @@ export function PlaygroundPage(): JSX.Element {
       </section>
       <WhyPanel
         state={state}
+        reading={writing ? reading : undefined}
         open={whyOpen}
         onToggle={() => {
           setWhyManual(!whyOpen);

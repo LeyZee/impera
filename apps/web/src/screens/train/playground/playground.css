@@ -725,6 +725,16 @@
   font-size: 12px;
   color: var(--nv-ink-muted);
 }
+.pg-reading {
+  align-self: flex-end;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--nv-ink-muted);
+}
+.pg-reading span {
+  color: var(--nv-ink-faint);
+}
 .pg-error {
   align-self: center;
   margin: 6px 0;

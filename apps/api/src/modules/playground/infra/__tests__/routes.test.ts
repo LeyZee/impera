@@ -471,6 +471,22 @@ describe('/v1/playground', () => {
     expect((await first).statusCode).toBe(200);
   });
 
+  it('shows the brain’s reading while the voice writes, and nothing once she has answered', async () => {
+    let release = (): void => undefined;
+    const control: GatewayControl = { hasKey: true, hold: new Promise((resolve) => (release = resolve)) };
+    const { app, headers, post } = await server({ control });
+    const first = Promise.resolve(post('/messages', { text: 'Salut' }));
+    // A few ticks for the brain to read him and the voice to start.
+    for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve));
+    const writing = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(writing.reading).toMatchObject({ intent: BRIEF.intent, action: BRIEF.action });
+    expect(writing.pending).toBeNull();
+    release();
+    expect((await first).statusCode).toBe(200);
+    const answered = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(answered.reading).toBeUndefined();
+  });
+
   it('has nothing to compare after a handoff', async () => {
     const { post } = await server();
     await post('/messages', {

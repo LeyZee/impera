@@ -3,6 +3,7 @@ import {
   type DesireMarkVerdict,
   type Destination,
   type PlaygroundAnswer as Answer,
+  type PlaygroundBrief,
   type PlaygroundComparison as Comparison,
   type PlaygroundMedia as Media,
   type PlaygroundState,
@@ -22,6 +23,7 @@ import {
   isWaiting,
   isHandoff,
   MEDIA_FLAG_LABELS,
+  readingLine,
   rejectedWords,
   type MediaKind,
   type Turn,
@@ -39,6 +41,8 @@ export interface ConversationProps {
   readonly writing: boolean;
   /** While her bubbles appear one by one: how many are shown yet. */
   readonly revealing?: number | undefined;
+  /** While the voice writes: the brain's reading of his message, already done. */
+  readonly reading?: PlaygroundBrief | undefined;
   readonly error: string | undefined;
   /** A missing setting (no key) is a warning, amber; a failure stays red. */
   readonly errorTone: 'warn' | 'bad';
@@ -119,6 +123,11 @@ export function Conversation(props: ConversationProps): JSX.Element {
         })}
         {pending !== null && draftAt === -1 ? (
           <Draft answer={pending} text={pending.bubbles.join('\n')} {...props} />
+        ) : null}
+        {writing && props.reading !== undefined ? (
+          <p className="pg-reading">
+            <span>Elle a lu :</span> {readingLine(props.reading)}
+          </p>
         ) : null}
         {writing ? <Typing /> : null}
         {props.error === undefined ? null : (
