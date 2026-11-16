@@ -458,7 +458,7 @@ describe('CommissionsPage', () => {
     });
   });
 
-  it('opens on the period under way once nothing is on its way, and spares a manager the team’s goal', async () => {
+  it('opens on the period under way once nothing is on its way, and spares a manager the tiers and the team’s goal', async () => {
     const october = periods[OCT2];
     if (october === undefined) throw new Error('No October');
     periods[OCT2] = periodOf(
@@ -478,13 +478,11 @@ describe('CommissionsPage', () => {
     expect(text(hero)).toContain('validation par l’agence à partir du lun. 16 nov.');
     expect(text(hero)).toContain('Calculé le lun. 2 nov. à 10 h 07 sur tes rapports validés.');
     expect(text(hero.querySelector('.py-mehero__period'))).toBe('1er – 15 novembre');
-    const performance = panel('Ma performance');
-    expect(within(performance).queryByRole('heading')).toBeNull();
-    await waitFor(() => {
-      expect(text(performance)).toContain('Palier Bronze');
-    });
-    expect(text(performance)).not.toContain('Objectif de l’équipe');
+    // A manager, on leave too, takes neither a tier nor the team's goal: no card promises one (recette CHT-03).
     expect(within(panel('Mes relevés')).getAllByRole('button').map(text)[0]).toContain('Payé31,20 €touché');
+    expect(screen.queryByText('Ma performance')).toBeNull();
+    expect(screen.queryByText(/Palier Bronze/u)).toBeNull();
+    expect(screen.queryByText(/Objectif de l’équipe/u)).toBeNull();
   });
 
   it('says of a period carried over what went on the next one, never « 0,00 € touché »', async () => {
@@ -898,6 +896,31 @@ describe('CommissionsPage', () => {
       ),
     ).toBeDefined();
     expect(document.querySelector('.py-me')?.getAttribute('data-single')).toBe('true');
+  });
+
+  it('says a commission without tier grows sale after sale once the account is paid on its net (recette CHT-14)', async () => {
+    const onNet = euroLine({
+      vatBps: 0,
+      platformFeeBps: 0,
+      grossMinor: 8_500,
+      grossEurMinor: 8_500,
+      exclVatMinor: 8_500,
+      shiftReportIds: [],
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 0, late: 0, lateNetMinor: 0 },
+    });
+    periods = {
+      [OCT2]: periodOf(OCT2, [statementOf(THEO, OCT2)]),
+      [NOV1]: periodOf(NOV1, [statementOf(THEO, NOV1, { canValidate: false, lines: [onNet] })]),
+    };
+    renderPage();
+    const performance = await waitFor(() => panel('Ma performance'));
+    await waitFor(() => {
+      expect(text(performance)).toContain(
+        'Pas de palier ni d’objectif d’équipe sur cette quinzaine : ta commission suit ton net, vente après vente.',
+      );
+    });
+    expect(text(performance)).not.toContain('rapport après rapport');
   });
 
   it('tells a new chatter where their first statement comes from', async () => {

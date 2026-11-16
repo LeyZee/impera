@@ -1620,6 +1620,19 @@ function basisWords(lines: readonly Pick<CommissionStatementLine, 'base'>[]): st
     : 'tes ventes lues';
 }
 
+/**
+ * How a member's commission grows through a period without tier nor goal, by what it is computed on: report after
+ * report on validated reports, sale after sale on the sales read, both when an account changed base (recette CHT-14).
+ * Nothing when the member has no statement yet: the base is not known.
+ */
+export function growthWords(lines: readonly Pick<CommissionStatementLine, 'base'>[]): string | null {
+  const onNet = lines.some((line) => line.base === 'platform_net');
+  const onReports = lines.some((line) => line.base === 'gross_chain');
+  if (onNet && onReports) return 'vente après vente et rapport après rapport';
+  if (onNet) return 'vente après vente';
+  return onReports ? 'rapport après rapport' : null;
+}
+
 /** A member's carry-over, said as what it is while the period runs: what would go on the next one if it ended now. */
 function myCarryLine(statement: CommissionStatement, ended: boolean): string | null {
   if (ended || statement.carryOverOutMinor === 0) return carryLine(statement, ended);

@@ -31,6 +31,7 @@ import {
   fcfaText,
   gaugePercent,
   goalSpanBps,
+  growthWords,
   heroPeriodOf,
   mainLine,
   memberFacts,
@@ -182,6 +183,9 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   const heroData = heroRead.data?.period === hero ? heroRead.data : undefined;
   const statement = heroData?.statements[0];
   const nowData = nowRead.data?.period === current ? nowRead.data : undefined;
+  // A manager, on leave too, takes neither a tier nor the team's goal (the pay engine gives them none): no card that
+  // promises one (recette CHT-03).
+  const chatter = user.team?.role !== 'manager';
   const past = summaries.filter((summary) => summary.window.period !== hero);
 
   // Nothing to follow in the period under way and no statement before: one quiet line under the path rather than a
@@ -190,7 +194,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
     hero === current &&
     statement !== undefined &&
     nowData !== undefined &&
-    !hasPerformance(nowData, user.team?.role !== 'manager') &&
+    !hasPerformance(nowData, chatter) &&
     past.length === 0 &&
     !periods.hasNextPage &&
     !periods.isError;
@@ -256,7 +260,8 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
               />
               {plain ? (
                 <p className="py-quiet py-me__none">
-                  Pas de palier ni d’objectif d’équipe sur cette quinzaine. Tes relevés passés viendront ici.
+                  {chatter ? 'Pas de palier ni d’objectif d’équipe sur cette quinzaine. ' : ''}Tes relevés
+                  passés viendront ici.
                 </p>
               ) : null}
             </>
@@ -267,30 +272,28 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
         </div>
         {plain ? null : (
           <div className="py-me__col">
-            <Panel
-              className="nv-enter"
-              eyebrow="Ma performance"
-              title={hero === current ? undefined : `Quinzaine ${periodLine(current)}`}
-            >
-              {nowData === undefined ? (
-                nowRead.isError ? (
-                  <Unreachable
-                    what="la quinzaine en cours"
-                    onRetry={() => {
-                      void nowRead.refetch();
-                    }}
-                  />
+            {chatter ? (
+              <Panel
+                className="nv-enter"
+                eyebrow="Ma performance"
+                title={hero === current ? undefined : `Quinzaine ${periodLine(current)}`}
+              >
+                {nowData === undefined ? (
+                  nowRead.isError ? (
+                    <Unreachable
+                      what="la quinzaine en cours"
+                      onRetry={() => {
+                        void nowRead.refetch();
+                      }}
+                    />
+                  ) : (
+                    <Loading rows={1} />
+                  )
                 ) : (
-                  <Loading rows={1} />
-                )
-              ) : (
-                <Performance
-                  period={nowData}
-                  account={nowNames.account}
-                  chatter={user.team?.role !== 'manager'}
-                />
-              )}
-            </Panel>
+                  <Performance period={nowData} account={nowNames.account} />
+                )}
+              </Panel>
+            ) : null}
             <Panel className="nv-enter" eyebrow="Mes relevés">
               <div className="rp-sec">
                 {past.length === 0 ? (
@@ -399,11 +402,12 @@ function Hero({
   );
 }
 
-/** Whether the period under way has a tier or, for a chatter, a team goal to follow. */
+/** Whether the period under way has, for a chatter, a tier or a team goal to follow; never for a manager. */
 function hasPerformance(period: PayrollPeriod, chatter: boolean): boolean {
+  if (!chatter) return false;
   const statement = period.statements[0];
   const tiers = statement?.rules.bonusTiers ?? period.bonusTiers?.tiers ?? [];
-  const goal = chatter ? (statement?.rules.collectiveGoal ?? period.collectiveGoal) : null;
+  const goal = statement?.rules.collectiveGoal ?? period.collectiveGoal;
   return tiers.length > 0 || goal !== null;
 }
 
@@ -426,31 +430,31 @@ function MyHoldNotice({ hold }: { hold: MyPayoutHold }): JSX.Element {
 }
 
 /**
- * What is left to do in the period under way: the next individual tier, in net and roughly in sales on the account
- * that brings the most, then for a chatter their share of the team's goal, in percent only.
+ * What is left to do in the period under way, for a chatter: the next individual tier, in net and roughly in sales on
+ * the account that brings the most, then their share of the team's goal, in percent only.
  */
 function Performance({
   period,
   account,
-  chatter,
 }: {
   period: PayrollPeriod;
   account: (platformAccountId: string) => PlanningAccount | null;
-  chatter: boolean;
 }): JSX.Element {
   const statement = period.statements[0];
   const net = statement?.netMinor ?? 0;
   const tiers = statement?.rules.bonusTiers ?? period.bonusTiers?.tiers ?? [];
-  const goal = chatter ? (statement?.rules.collectiveGoal ?? period.collectiveGoal) : null;
-  if (tiers.length === 0 && goal === null)
+  const goal = statement?.rules.collectiveGoal ?? period.collectiveGoal;
+  if (tiers.length === 0 && goal === null) {
+    const growth = growthWords(statement?.lines ?? []);
     return (
       <div className="rp-sec">
         <p className="py-quiet">
-          Pas de palier ni d’objectif d’équipe sur cette quinzaine : ta commission suit ton net, rapport après
-          rapport.
+          Pas de palier ni d’objectif d’équipe sur cette quinzaine : ta commission suit ton net
+          {growth === null ? '' : `, ${growth}`}.
         </p>
       </div>
     );
+  }
   return (
     <div className="rp-sec">
       {tiers.length === 0 ? null : (
