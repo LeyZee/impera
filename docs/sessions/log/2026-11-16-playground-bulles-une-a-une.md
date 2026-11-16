@@ -1,0 +1,7 @@
+# 2026-11-16 : les bulles une à une et la lecture en deux temps au playground
+
+- **Fiche** : demande de Charles du 16/11 (« tu envoies le premier, tu écris le deuxième, un temps réaliste »), fil Playground.
+- **Fait** : chaque réponse porte le temps de frappe de chaque bulle (`delaysMs`, calculé par `bubbleDelays` d'Agent, la même règle que l'envoi réel : 1,5 s + 150 ms par caractère, plafond 12 s). L'écran montre la première bulle dès la réponse, comme l'envoi réel, puis chaque suivante après son temps de frappe, « Elle écrit… » entre deux ; les boutons de note n'arrivent qu'avec la dernière bulle. Deux temps : pendant que la voix écrit, le serveur expose la lecture du cerveau (`reading` de `PlaygroundStateSchema`) et l'écran l'affiche (« Elle a lu : … » et « Pourquoi »). Son message s'affiche dès l'envoi et quitte la boîte. Avis Design (lot 2 validé) : « Elle écrit… » partout, « Elle a lu » à droite, pas de mot ni d'emoji seul en fin de ligne.
+- **Tests** : route (temps de frappe, rien sur un relais, lecture pendant que la voix écrit), écran (bulles une à une, lecture, message affiché à l'envoi, consigne de la boîte), `revealTimes`.
+- **Reste** : rien pour cette demande ; l'horloge simulée partagée reste à faire.
+- **Découvertes** : le serveur de dev Vite peut servir une version périmée de `packages/contracts` après des changements de branche : le relancer avant des captures.

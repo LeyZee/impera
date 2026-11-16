@@ -143,6 +143,12 @@ export interface AccountJobs {
   enqueueReconcile(account: ConnectorAccount, correlationId: string): Promise<void>;
   /** Her vault's sync on the account's queue (fiche vault-sync); a sync already waiting is kept, never stacked. */
   enqueueVaultSync(account: ConnectorAccount, correlationId: string): Promise<void>;
+  /** One conversation read by its id (recette du 16/11); the same one already waiting is kept, never stacked. */
+  enqueueConversationRead(
+    account: ConnectorAccount,
+    platformConversationId: string,
+    correlationId: string,
+  ): Promise<void>;
 }
 
 /** `conversations.ingestMessage`, injected by the composition root (connectors README). */

@@ -14,13 +14,18 @@ import { ContentPage } from './ContentPage';
 import { dropOf, fileOf, requestOf, scriptDropOf } from './fixtures';
 
 const queueSend = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const retryNow = vi.hoisted(() => vi.fn());
+const sendAgain = vi.hoisted(() => vi.fn());
 const openScript = vi.hoisted(() => vi.fn());
-const live = vi.hoisted(() => ({ map: new Map<string, unknown>() }));
+const live = vi.hoisted(() => ({ map: new Map<string, unknown>(), held: new Set<string>() }));
 
 vi.mock('./sends', () => ({
   useLiveSends: () => live.map,
   isSending: () => false,
+  holds: (id: string) => live.held.has(id),
   queueSend,
+  retryNow,
+  sendAgain,
 }));
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -67,8 +72,17 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
   queueSend.mockClear();
+  retryNow.mockClear();
+  sendAgain.mockClear();
   openScript.mockClear();
   live.map = new Map();
+  live.held = new Set();
+  // jsdom draws nothing: the page's scroll to a drop just sent, and its reduced-motion query, are stubbed.
+  Element.prototype.scrollIntoView = vi.fn();
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({ matches: true })),
+  );
 });
 
 afterEach(() => {
@@ -137,16 +151,24 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(openScript).toHaveBeenCalledWith(z.object({ id: z.string() }).parse(start?.body).id);
   });
 
-  it('lets her continue a script she began, or withdraw it', async () => {
-    const drop = dropOf({ category: 'script', state: 'filling', files: [] });
-    serve({ requests: [], drops: [drop] });
+  it('keeps a script she began in « À tourner », its name, day and progress, « Continuer » alone (CRE-12)', async () => {
+    const request = requestOf({ category: 'script', dueOn: '2026-11-07', dropId: null });
+    const script = scriptDropOf({ requestId: request.id, files: [fileOf({ slotKey: 'salon::0' })] });
+    serve(
+      { requests: [{ ...request, dropId: script.drop.id }], drops: [script.drop] },
+      { [`GET /v1/creator-space/content/script-drops/${script.drop.id}`]: () => Response.json(script) },
+    );
     show();
-    expect(await screen.findByText(/Rien d’ajouté encore/u)).toBeDefined();
-    expect(screen.getByText('En cours')).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
-    expect(openScript).toHaveBeenCalledWith(drop.id);
-    fireEvent.click(screen.getByRole('button', { name: 'Retirer' }));
-    expect(screen.getByText('Retirer ce dépôt ?')).toBeDefined();
+    const section = (await screen.findByRole('heading', { name: 'À tourner' })).closest('section');
+    if (section === null) throw new Error('no section');
+    expect(await within(section).findByText('Script · Soirée au salon')).toBeDefined();
+    expect(within(section).getByText('Pour samedi')).toBeDefined();
+    expect(within(section).getByText('1 / 4 médias')).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'En route' })).toBeNull();
+    // « Retirer » lives in the script itself, away from « Continuer ».
+    expect(within(section).queryByRole('button', { name: 'Retirer' })).toBeNull();
+    fireEvent.click(within(section).getByRole('button', { name: 'Continuer' }));
+    expect(openScript).toHaveBeenCalledWith(script.drop.id);
   });
 
   it('refuses before sending a file the category does not take, and says why', async () => {
@@ -159,6 +181,24 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     pick(input, [new File(['x'], 'photo.jpg', { type: 'image/jpeg' })]);
     expect(within(dialog).getByText(/prend seulement des vidéos/u)).toBeDefined();
     expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toHaveProperty('disabled', true);
+    // Why it stays grey, beside it, even when the refused line is out of sight (CRE-16).
+    expect(within(dialog).getByText('Retire le fichier refusé pour envoyer.')).toBeDefined();
+  });
+
+  it('says « Photo » or « Vidéo », never a file name, and marks a video’s thumbnail (CRE-16)', async () => {
+    serve({ requests: [], drops: [] });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Séance boudoir/u }));
+    const dialog = screen.getByRole('dialog');
+    const input = dialog.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    pick(input, [
+      new File(['a'], 'IMG_4032.HEIC', { type: '' }),
+      new File(['bb'], 'IMG_4033.MOV', { type: 'video/quicktime' }),
+    ]);
+    const labels = [...dialog.querySelectorAll('.ct-chosen__name')].map((name) => name.textContent);
+    expect(labels).toEqual(['Photo', 'Vidéo']);
+    expect(dialog.querySelectorAll('.ct-thumb__play')).toHaveLength(1);
   });
 
   it('drops the files she chose, then sends each one in the background', async () => {
@@ -200,26 +240,56 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(queueSend).toHaveBeenCalledTimes(1);
   });
 
-  it('shows each file of a drop on its way, « En préparation » while it is cleaned, « Reprendre » when cut', async () => {
-    serve({
-      requests: [],
-      drops: [
-        dropOf({
-          state: 'uploading',
-          files: [
-            fileOf({ position: 0, kind: 'video', mime: 'video/quicktime', state: 'received' }),
-            fileOf({ position: 1, kind: 'video', mime: 'video/quicktime', state: 'awaiting' }),
-          ],
-        }),
-      ],
+  it('shows each file on its way, one « Reprendre l’envoi » for a cut drop, and puts it above « Déposer »', async () => {
+    const cutA = fileOf({ position: 1, kind: 'video', mime: 'video/quicktime', state: 'awaiting', bytes: 7 });
+    const cutB = fileOf({ position: 2, kind: 'image', state: 'awaiting', bytes: 3 });
+    const drop = dropOf({
+      state: 'uploading',
+      files: [fileOf({ position: 0, kind: 'video', mime: 'video/quicktime', state: 'received' }), cutA, cutB],
     });
+    serve({ requests: [], drops: [drop] });
     show();
     const section = (await screen.findByRole('heading', { name: 'En route' })).closest('section');
     if (section === null) throw new Error('no section');
     expect(within(section).getByText('En préparation')).toBeDefined();
-    expect(within(section).getByText('Envoi interrompu')).toBeDefined();
-    expect(within(section).getByRole('button', { name: 'Reprendre' })).toBeDefined();
+    expect(within(section).getAllByText('Envoi interrompu')).toHaveLength(2);
     expect(within(section).getByText('En envoi')).toBeDefined();
+    // One button for the drop, never one per file, and the sentence that says what to do (CRE-10).
+    expect(within(section).getAllByRole('button', { name: 'Reprendre l’envoi' })).toHaveLength(1);
+    expect(within(section).getByText(/Rechoisis les mêmes fichiers dans ta galerie/u)).toBeDefined();
+    const input = section.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    pick(input, [
+      new File(['abc'], 'IMG_1.HEIC'),
+      new File(['abcdefg'], 'IMG_2.MOV'),
+      new File(['x'], 'autre.jpg'),
+    ]);
+    expect(queueSend).toHaveBeenCalledTimes(2);
+    expect(within(section).getByText(/Un fichier choisi n’est pas de ce dépôt/u)).toBeDefined();
+    // Still to go up: « En route » comes before « Déposer » (CRE-09).
+    const titles = [...document.querySelectorAll('h2')].map((title) => title.textContent);
+    expect(titles.indexOf('En route')).toBeLessThan(titles.indexOf('Déposer'));
+  });
+
+  it('tells a server that refuses from a cut network, with « Réessayer » (CRE-10)', async () => {
+    const stalled = fileOf({ position: 0, state: 'awaiting' });
+    const held = fileOf({ position: 1, state: 'awaiting' });
+    live.map = new Map<string, unknown>([[stalled.id, { sent: 0, total: 4, rate: null, phase: 'stalled' }]]);
+    serve({ requests: [], drops: [dropOf({ state: 'uploading', files: [stalled] })] });
+    show();
+    expect(await screen.findByText('L’envoi n’aboutit pas pour l’instant')).toBeDefined();
+    expect(screen.queryByText(/Réseau coupé/u)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+    expect(retryNow).toHaveBeenCalledWith(stalled.id);
+    expect(screen.getByRole('status').textContent).toContain('garde l’appli ouverte');
+    cleanup();
+    // Cut while the page was open: the phone still holds it, it goes again without the gallery.
+    live.map = new Map<string, unknown>([[held.id, { sent: 0, total: 4, rate: null, phase: 'failed' }]]);
+    live.held = new Set([held.id]);
+    serve({ requests: [], drops: [dropOf({ state: 'uploading', files: [held] })] });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Réessayer' }));
+    expect(sendAgain).toHaveBeenCalledWith([held.id], expect.any(Function));
   });
 
   it('keeps the files in the order she sets: numbered, moved up or down, sent in that order', async () => {
@@ -237,16 +307,14 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     ]);
     // The same file picked again goes once.
     pick(input, [first]);
+    // Her file names are kept for a computer's screen only (CSS), in the order she sets.
     const names = (): (string | null)[] =>
-      [...dialog.querySelectorAll('.ct-chosen__name')].map((name) => name.textContent);
-    expect(names()).toEqual(['IMG_1.HEIC', 'IMG_2.HEIC', 'IMG_3.HEIC']);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Monter IMG_3.HEIC' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Monter IMG_3.HEIC' }));
-    expect(names()).toEqual(['IMG_3.HEIC', 'IMG_1.HEIC', 'IMG_2.HEIC']);
-    expect(within(dialog).getByRole('button', { name: 'Monter IMG_3.HEIC' })).toHaveProperty(
-      'disabled',
-      true,
-    );
+      [...dialog.querySelectorAll('.ct-chosen__file')].map((name) => name.textContent);
+    expect(names()).toEqual([' · IMG_1.HEIC', ' · IMG_2.HEIC', ' · IMG_3.HEIC']);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Monter Photo 3' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Monter Photo 2' }));
+    expect(names()).toEqual([' · IMG_3.HEIC', ' · IMG_1.HEIC', ' · IMG_2.HEIC']);
+    expect(within(dialog).getByRole('button', { name: 'Monter Photo 1' })).toHaveProperty('disabled', true);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer' }));
     await waitFor(() => {
       expect(calls.some((call) => call.method === 'POST')).toBe(true);

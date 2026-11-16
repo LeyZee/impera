@@ -127,6 +127,12 @@ export function wireConnectors(
         logger,
         (payload, context) => module.jobs.reconcile(payload, context.logger),
       ),
+      'connector.read_conversation': defineTask(
+        'connector.read_conversation',
+        JOB_PAYLOADS['connector.read_conversation'],
+        logger,
+        (payload, context) => module.jobs.readConversation(payload, context.logger),
+      ),
       'connector.read_sales': defineTask(
         'connector.read_sales',
         JOB_PAYLOADS['connector.read_sales'],

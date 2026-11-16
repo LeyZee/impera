@@ -435,6 +435,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         return holder === null ? null : currentUserById(db.db, shiftCreators, holder.userId);
       },
       allCreatorIds: persona.allCreatorIds,
+      askRead: (ask) => connectors.module.askConversationRead(ask),
     },
   });
   const backups = wireBackups(shared);

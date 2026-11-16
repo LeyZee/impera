@@ -389,5 +389,25 @@ export function createDrizzleAccountJobs(adminDb: Database): AccountJobs {
       enqueue('connector.reconcile', account, { runAt: null, jobKeyMode: 'replace' }, correlationId),
     enqueueVaultSync: (account, correlationId) =>
       enqueue('connector.vault_sync', account, { runAt: null, jobKeyMode: 'preserve_run_at' }, correlationId),
+    enqueueConversationRead: async (account, platformConversationId, correlationId) => {
+      const job = 'connector.read_conversation';
+      const payload: unknown = JOB_PAYLOADS[job].parse({
+        creatorId: account.creatorId,
+        platformAccountId: account.id,
+        platformConversationId,
+        correlationId,
+      });
+      await adminDb.execute(
+        sql`select public.enqueue_job(
+          task => ${job},
+          payload => ${JSON.stringify(payload)}::jsonb,
+          queue_name => ${accountQueueNameFor(account.id)},
+          run_at => ${null}::timestamptz,
+          max_attempts => ${JOB_MAX_ATTEMPTS[job]}::int,
+          job_key => ${`read:${account.id}:${platformConversationId}`},
+          job_key_mode => 'preserve_run_at'
+        )`,
+      );
+    },
   };
 }
