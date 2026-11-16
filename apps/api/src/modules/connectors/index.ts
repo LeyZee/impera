@@ -1,9 +1,10 @@
-import type {
-  ConnectionService,
-  ConnectionSignal,
-  JobPayload,
-  SalesFeedStatus,
-  TeamPlatformRemoval,
+import {
+  PlatformAccountIdSchema,
+  type ConnectionService,
+  type ConnectionSignal,
+  type JobPayload,
+  type SalesFeedStatus,
+  type TeamPlatformRemoval,
 } from '@impera/contracts';
 import type { Database, EncryptionKey } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
@@ -312,10 +313,13 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     vault,
     clock,
     shapes: { reveal: revealSessionShape },
-    linkedModels: async (platform, platformAccountId) =>
-      [...(await ledger.modelLinks(platform))]
-        .filter(([, link]) => link.platformAccountId === platformAccountId)
-        .map(([platformModelId]) => platformModelId),
+    modelLinks: async (platform) =>
+      new Map(
+        [...(await ledger.modelLinks(platform))].map(([platformModelId, link]) => [
+          platformModelId,
+          PlatformAccountIdSchema.parse(link.platformAccountId),
+        ]),
+      ),
   });
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
   const avatars: AvatarPorts | null =

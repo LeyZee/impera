@@ -93,6 +93,19 @@
 .rw-stop-neon {
   stop-color: var(--rw-neon);
 }
+/* A rank's fire (ADR 0104 § 16): its ember and its halo burn lower on a pale ground. */
+.rw-level__ember {
+  opacity: 0.6;
+}
+.rw-level__glow {
+  opacity: 0.34;
+}
+[data-theme='light'] .rw-level__ember {
+  opacity: 0.35;
+}
+[data-theme='light'] .rw-level__glow {
+  opacity: 0.1;
+}
 .rw-mid {
   fill: none;
   stroke: var(--rw-mid);

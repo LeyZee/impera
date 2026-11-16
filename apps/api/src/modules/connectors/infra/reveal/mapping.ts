@@ -52,7 +52,7 @@ export function snapshotOf(item: ConversationItem): ConversationSnapshot {
     fanDisplayName: conversation.memberFirstname ?? member.userName,
     unreadCount: conversation.modelIsUnread ? 1 : 0,
     lastMessageAt: lastMessage?.createdAt ?? conversation.lastMessageAt,
-    ...(lastMessage === null ? {} : { lastMessagePreview: lastMessage.content }),
+    ...(lastMessage === null || lastMessage === undefined ? {} : { lastMessagePreview: lastMessage.content }),
   };
 }
 
@@ -148,8 +148,9 @@ export function ppvStatsOf(
   return {
     purchased: paid.first.buyRate.purchased,
     offered: paid.first.buyRate.total,
-    highestPriceMinor: paid.first.highestPrice,
-    lowestPriceMinor: paid.first.lowestPrice,
+    // No longer sent by Reveal since 2026-11-15: unknown then, never guessed from the bundles of one page.
+    highestPriceMinor: paid.first.highestPrice ?? null,
+    lowestPriceMinor: paid.first.lowestPrice ?? null,
     currency: REVEAL_CURRENCY,
     // The newest `createdAt` of the priced bundles (`kind=paid`): Reveal gives no field of its own for it.
     lastOfferAt: paid.bundles.reduce<string | null>(
@@ -188,10 +189,11 @@ export function momentOf(name: string, folderNames: readonly string[]): Platform
 
 type StepSource = Pick<ScriptItem, 'medias' | 'teasingMedias'> & { readonly script: ScriptItem['script'] };
 
-function stepOf(source: StepSource, index: number): PlatformScriptStep {
+function stepOf(source: StepSource, index: number, platformIndex: number): PlatformScriptStep {
   return {
     ref: ref(source.script.id),
     index,
+    platformIndex,
     name: source.script.name,
     text: source.script.content,
     media: source.medias.map(mediaOf),
@@ -218,7 +220,9 @@ export function scriptsOf(
   const scripts: PlatformScript[] = [];
   for (const { sequence, steps: ordered } of sequences) {
     const sorted = [...ordered].sort((a, b) => a.step.stepIndex - b.step.stepIndex);
-    const [first, ...rest] = sorted.map((source, index) => stepOf(source, index));
+    // Two steps on the same `stepIndex` are branches of one step (a human chooses): kept side by side with their rank,
+    // never read as one after the other by the core (SC-04 c8).
+    const [first, ...rest] = sorted.map((source, index) => stepOf(source, index, source.step.stepIndex));
     if (first === undefined) continue;
     for (const source of sorted) inSequence.add(source.script.id);
     scripts.push({
@@ -234,7 +238,7 @@ export function scriptsOf(
       ref: ref(step.script.id),
       name: step.script.name,
       moment: momentOf(step.script.name, folders([step])),
-      steps: [stepOf(step, 0)],
+      steps: [stepOf(step, 0, 0)],
     });
   }
   return scripts;

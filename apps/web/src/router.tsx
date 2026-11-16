@@ -160,6 +160,7 @@ const dashboard = createRoute({
           reviewsReports={canOpen(rail, '/equipe')}
           opensTracking={canOpen(rail, '/suivi')}
           canAddCreator={canOpen(rail, '/creatrices')}
+          asked={search.creatrice}
           agency={{
             period,
             onPeriod: (next) =>
@@ -179,6 +180,8 @@ const dashboard = createRoute({
         reviewsReports={canOpen(rail, '/equipe')}
         opensTracking={canOpen(rail, '/suivi')}
         canAddCreator={canOpen(rail, '/creatrices')}
+        asked={search.creatrice}
+        onLeave={() => void navigate({ search: dashboardSearch(periodOf(search)), replace: true })}
       />
     );
   },

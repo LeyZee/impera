@@ -6,6 +6,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { contentTools } from './application/content-tools';
 import { createDispatcher, whoami } from './application/dispatch';
 import { createGrants } from './application/grants';
+import { payrollTools } from './application/payroll-tools';
 import { creatorTools, fanTools } from './application/read-tools';
 import { salesTools } from './application/sales-tools';
 import { statusTools } from './application/status-tools';
@@ -17,6 +18,7 @@ import type {
   CreatorReader,
   FanReader,
   GrantRecord,
+  PayrollReader,
   SalesReader,
   ShiftReader,
   TeamImportReader,
@@ -69,6 +71,8 @@ export interface McpDeps {
   readonly teamImport: TeamImportReader;
   /** A creator's sales (`connectors.reads.sales`), for `sales_list`: never a share, summed over sellers here. */
   readonly sales: SalesReader;
+  /** A pay period's state (`payroll.reads.periodState`), for `commission_statements_list`: never an amount of a member. */
+  readonly payroll: PayrollReader;
   /** The AI spend (`ai-usage`), for `ai_usage_get`, the owner's alone. */
   readonly aiUsage: AiUsageReader;
 }
@@ -100,6 +104,7 @@ export function createMcpModule(deps: McpDeps): McpModule {
               ...teamTools(deps.shifts, deps.teamImport),
               ...statusTools(deps.aiUsage),
               ...salesTools(deps.sales, deps.creators),
+              ...payrollTools(deps.payroll),
             },
           }),
         allowedOrigins: [],

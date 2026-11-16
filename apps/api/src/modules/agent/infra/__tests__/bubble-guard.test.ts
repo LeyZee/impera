@@ -19,4 +19,19 @@ describe('bubble guard (approval of edited bubbles)', () => {
     const long = 'Coucou '.repeat(60);
     expect(guard.check([long, 'a', 'b', 'c', 'd'])).toEqual({ isBlocked: false, codes: [] });
   });
+
+  it('lets a line she already sent him through: sending it again is the chatter’s call', () => {
+    const line = 'Tu fais quoi de beau ce soir ?';
+    expect(guard.check([line], { previousTurns: [[line]], sentBefore: [line] })).toEqual({
+      isBlocked: false,
+      codes: [],
+    });
+  });
+
+  it('reads the care guard on a chatter’s words while a care episode is open (ADR 0088 § 3, § 5)', () => {
+    const explicit = ['Viens on se change les idées, je suis toute mouillée'];
+    expect(guard.check(explicit)).toEqual({ isBlocked: false, codes: [] });
+    expect(guard.check(explicit, {}, true)).toEqual({ isBlocked: true, codes: ['care_breach'] });
+    expect(guard.check(['Je suis là, parle-moi'], {}, true)).toEqual({ isBlocked: false, codes: [] });
+  });
 });

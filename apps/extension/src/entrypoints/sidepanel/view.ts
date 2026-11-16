@@ -446,7 +446,7 @@ function draftPart(draft: DraftPart, actions: PanelActions): HTMLElement | null 
   return section;
 }
 
-function wire(root: HTMLElement, actions: PanelActions): void {
+function wire(root: ParentNode, actions: PanelActions): void {
   root.querySelector('[data-action="crm"]')?.addEventListener('click', actions.openCrm);
   const on = (gesture: string, run: () => void): void => {
     root.querySelector(`[data-gesture="${gesture}"]`)?.addEventListener('click', run);
@@ -473,15 +473,35 @@ function wire(root: HTMLElement, actions: PanelActions): void {
   }
 }
 
+/** What a drawn draft shows, but the text being retouched: that text lives in its field, under his fingers. */
+const drawnDrafts = new WeakMap<Element, string>();
+const draftKey = (draft: DraftPart): string =>
+  JSON.stringify(draft.kind === 'ready' ? { ...draft, text: null } : draft);
+
 export function render(root: HTMLElement, screen: PanelScreen, actions: PanelActions): void {
   // The card scrolls; « où on en est » above it and the draft under it stay in view (§ 10).
   const scroller = root.querySelector('.cp-scroll');
   const scroll = scroller?.scrollTop ?? 0;
-  const note = root.querySelector<HTMLInputElement>('.cp-draft__note')?.value ?? '';
   if (screen.kind === 'conversation') {
     const body = h('div', { class: 'cp-scroll' }, ...cardPart(screen, actions));
+    const standing = standingLine(screen.standing);
+    const key = draftKey(screen.draft);
+    const shown = root.querySelector(':scope > .cp-draft');
+    if (shown !== null && drawnDrafts.get(shown) === key) {
+      // The same draft in the same state: it stays in place, never detached, so a field he types in keeps its focus,
+      // its text and its caret while the card above it is drawn again (recette du 16/11, EXT-01).
+      for (const child of [...root.children]) if (child !== shown) child.remove();
+      shown.before(standing, body);
+      body.scrollTop = scroll;
+      wire(standing, actions);
+      wire(body, actions);
+      return;
+    }
+    // A reason picked draws the draft again: the note he started stays.
+    const note = root.querySelector<HTMLInputElement>('.cp-draft__note')?.value ?? '';
     const draft = draftPart(screen.draft, actions);
-    root.replaceChildren(standingLine(screen.standing), body, ...(draft === null ? [] : [draft]));
+    if (draft !== null) drawnDrafts.set(draft, key);
+    root.replaceChildren(standing, body, ...(draft === null ? [] : [draft]));
     // Kept open groups keep their place: the panel draws over itself, without scrolling back up (§ 10).
     body.scrollTop = scroll;
     const kept = root.querySelector<HTMLInputElement>('.cp-draft__note');

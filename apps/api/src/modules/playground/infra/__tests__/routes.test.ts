@@ -86,8 +86,9 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
+    identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
-    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
+    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
     brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
     voice: async () => {
       await control.hold;
@@ -271,6 +272,21 @@ describe('/v1/playground', () => {
     const { app, headers, post } = await server();
     const first = PlaygroundAnswerSchema.parse((await post('/messages', { text: 'Salut' })).json());
     expect(first.desire).toMatchObject({ before: null, score: 0, band: 'neutral', signals: [] });
+    // Beside it, his availability and the gate, each missing condition in French (ADR 0103 § 14).
+    expect(first.desire?.availability).toMatchObject({
+      state: 'unknown',
+      signal: null,
+      seen: [],
+      sexualized: false,
+    });
+    expect(first.desire?.availability?.gate).toEqual({
+      open: false,
+      missing: [
+        { code: 'desire_below_threshold', label: 'Désir sous le seuil du script' },
+        { code: 'not_sexualizing', label: 'Il ne sexualise pas encore lui-même' },
+        { code: 'availability_unconfirmed', label: 'Il n’a pas dit être seul et libre' },
+      ],
+    });
     // What she still has to learn, in her words, never a slot's code.
     expect(first.brief?.kycMissing).toEqual(['prénom']);
     await post('/rating', { verdict: { kind: 'validated' } });
@@ -367,6 +383,8 @@ describe('/v1/playground', () => {
       media: [{ kind: 'image', factualDescription: 'Un selfie.', flags: ['possible_minor'] }],
     });
     expect(answer.json()).toMatchObject({ handoff: ['possible_minor'], isBlocked: true, bubbles: [] });
+    // « Nécessaire » says the handoff was right: a decision to rate, not a blocked answer (AGE-01).
+    expect((await post('/rating', { verdict: { kind: 'validated' } })).statusCode).toBe(200);
   });
 
   it('asks for the Grok key when no voice model is reachable', async () => {

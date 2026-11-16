@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MyProfilePage } from './MyProfilePage';
 
-import { LEA_ONLYFANS, NORA_REVEAL, SCHEDULING_SETTINGS, THEO, THEO_ME } from '@/test/pay';
+import { IRIS_ME, LEA_ONLYFANS, NORA_REVEAL, SCHEDULING_SETTINGS, THEO, THEO_ME } from '@/test/pay';
 
 const NBSP = /[\u00a0\u202f]/gu;
 
@@ -123,5 +123,16 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual(['Profil', 'Trophées', 'Dossier', 'Calendrier', 'Sécurité', 'Préférences']);
+  });
+
+  it('gives a manager on leave no « Trophées » tab, which his routes would not open (recette 16/11, CHT-05)', async () => {
+    serve([THEO_HERE]);
+    renderPage({ ...IRIS_ME, team: { role: 'manager', status: 'on_leave' }, teamScope: 'self' });
+    const tabs = await screen.findByRole('navigation', { name: 'Moi' });
+    expect(
+      within(tabs)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Profil', 'Dossier', 'Calendrier', 'Sécurité', 'Préférences']);
   });
 });

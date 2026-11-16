@@ -17,12 +17,14 @@ import { useWaiting } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { timedSuggestionsOf } from './grid';
 import {
+  closedTickWords,
   firstOf,
   momentOf,
   ownTimed,
   planOf,
   programOf,
   progressOf,
+  tickOpen,
   type DayPlan,
   type DayTask,
   type ProposedAt,
@@ -121,7 +123,7 @@ export function DayView({
             </div>
             <ul className="ag-list">
               {plan.todo.map((item) => (
-                <TaskRow key={item.task.id} item={item} day={day} {...actions} />
+                <TaskRow key={item.task.id} item={item} day={day} today={agenda.today} {...actions} />
               ))}
             </ul>
           </section>
@@ -140,6 +142,7 @@ export function DayView({
           )}
           <Program
             plan={plan}
+            today={agenda.today}
             now={now}
             nowMinute={nowMinute}
             proposed={proposed}
@@ -398,16 +401,37 @@ function Emoji({ category }: { category: CreatorTask['category'] }): JSX.Element
 function Check({
   item,
   day,
+  today,
   onTick,
 }: {
   item: DayTask;
   day: string;
+  today: string;
   onTick: DayActions['onTick'];
 }): JSX.Element {
   // Offline, a tick that waits for the network says so with an amber dot; online, it leaves at once (CREA-24).
   const kept = useWaiting(item.task.id, day);
   const online = useOnline();
   const waiting = kept && !online;
+  // A routine's check on another day than hers is never pressed: the server would refuse it (CRE-03, CRE-07). A day to
+  // come draws none, since an empty ring reads as a box to tick; a day that is over draws what she did, dimmed.
+  if (!tickOpen(item.task, day, today))
+    return day > today ? (
+      <span className="sr-only">{closedTickWords(day, today)}</span>
+    ) : (
+      <span
+        className="ag-check"
+        data-cat={item.task.category}
+        data-closed="true"
+        data-done={item.done ? 'true' : undefined}
+        role="img"
+        aria-label={`${item.task.title}, ${item.done ? 'faite' : 'pas faite'}. ${closedTickWords(day, today)}`}
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m3.5 8.5 3 3 6-7" />
+        </svg>
+      </span>
+    );
   const label = item.done ? `Décocher ${item.task.title}` : `Cocher ${item.task.title}`;
   return (
     <button
@@ -431,11 +455,13 @@ function Check({
 function TaskRow({
   item,
   day,
+  today,
   onTick,
   onTask,
 }: {
   item: DayTask;
   day: string;
+  today: string;
 } & DayActions): JSX.Element {
   const { task } = item;
   return (
@@ -458,7 +484,7 @@ function TaskRow({
       <span className="ag-tag">
         {task.when.kind === 'routine' ? 'Routine' : CREATOR_TASK_CATEGORY_LABELS[task.category]}
       </span>
-      <Check item={item} day={day} onTick={onTick} />
+      <Check item={item} day={day} today={today} onTick={onTick} />
     </li>
   );
 }
@@ -466,6 +492,7 @@ function TaskRow({
 /** Her timed tasks and the free times between them, in order; a free time is a button to add a task there. */
 function Program({
   plan,
+  today,
   now,
   nowMinute,
   proposed,
@@ -473,6 +500,8 @@ function Program({
   ...actions
 }: {
   plan: DayPlan;
+  /** Her today: a routine's check is a button on that day only. */
+  today: string;
   now: Date;
   nowMinute: number | null;
   proposed: readonly ProposedAt[];
@@ -575,7 +604,7 @@ function Program({
                   </span>
                 )}
               </button>
-              <Check item={item} day={item.day} onTick={actions.onTick} />
+              <Check item={item} day={item.day} today={today} onTick={actions.onTick} />
             </div>
           </li>
         );

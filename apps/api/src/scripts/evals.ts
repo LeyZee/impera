@@ -282,9 +282,18 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
   // Paris in October is UTC+2: her local time as the scenario says.
   const now = new Date(`${today}T${situation.local_time}:00+02:00`);
   const inbound = Array.isArray(scenario.inbound) ? scenario.inbound : [scenario.inbound];
+  // A turn dated by the scenario carries its time; his new messages are written now. Undated scenarios say none.
+  const dated =
+    scenario.inbound_minutes_ago !== undefined ||
+    scenario.history.some((turn) => turn.minutes_ago !== undefined);
+  const writtenAt = new Date(now.getTime() - (scenario.inbound_minutes_ago ?? 0) * 60_000);
   const history: ConversationTurn[] = [
-    ...scenario.history,
-    ...inbound.map((text): ConversationTurn => ({ from: 'fan', text })),
+    ...scenario.history.map(({ from, text, minutes_ago }): ConversationTurn => ({
+      from,
+      text,
+      ...(minutes_ago !== undefined && { at: new Date(now.getTime() - minutes_ago * 60_000) }),
+    })),
+    ...inbound.map((text): ConversationTurn => ({ from: 'fan', text, ...(dated && { at: writtenAt }) })),
   ];
   // Her alerts as the composer gives them: short ids, in her order (P4-01).
   const alerts = scenario.alerts.map(({ name, phrase }, index) => ({
