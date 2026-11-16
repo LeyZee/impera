@@ -39,6 +39,7 @@ describe('GET /v1/creator-space/earnings', () => {
   let operatorCookie: string;
   let today: string;
   let previous: string;
+  let current: string;
 
   const get = (cookie: string) =>
     server.inject({ method: 'GET', url: URL, headers: { cookie, origin: DASHBOARD_ORIGIN } });
@@ -60,12 +61,15 @@ describe('GET /v1/creator-space/earnings', () => {
       readiness: app.readiness,
     });
     const seeded: { creatorId: CreatorId; accountId: string }[] = [];
-    for (const label of ['nora', 'ines']) {
+    for (const [label, timezone] of [
+      ['nora', 'Europe/Paris'],
+      ['ines', 'Asia/Tokyo'],
+    ] as const) {
       const creatorId = newId(CreatorIdSchema);
       const accountId = newId(PlatformAccountIdSchema);
       await test.admin.db
         .insert(schema.creators)
-        .values({ id: creatorId, nameKey: creatorId, displayName: label, timezone: 'Europe/Paris' });
+        .values({ id: creatorId, nameKey: creatorId, displayName: label, timezone });
       await test.admin.db
         .insert(schema.platformAccounts)
         .values({ id: accountId, creatorId, platform: 'reveal', handle: `${label}-reveal` });
@@ -107,6 +111,10 @@ describe('GET /v1/creator-space/earnings', () => {
     const minuteAgo = new Date(now.getTime() - 60_000);
     // Noon in Paris on the first day of the fortnight before, whatever the season.
     const beforeAt = new Date(`${previous}T10:00:00Z`);
+    // 21:00 UTC the eve of the fortnight in course: 22:00 or 23:00 in Paris, still the fortnight before for pay; 06:00
+    // the next morning in Tokyo, her first day of the fortnight in course.
+    current = payPeriodOfDay(today);
+    const nearBound = new Date(Date.parse(`${current}T00:00:00Z`) - 3 * 3_600_000);
     await test.admin.db.insert(schema.platformSales).values([
       line(nora, 'sale_earn_01', minuteAgo, 500),
       line(nora, 'sale_earn_02', minuteAgo, 300),
@@ -114,6 +122,7 @@ describe('GET /v1/creator-space/earnings', () => {
       line(nora, 'sale_earn_03', beforeAt, 1_200),
       // Another creator's: never hers to see.
       line(ines, 'sale_earn_04', minuteAgo, 9_900),
+      line(ines, 'sale_earn_05', nearBound, 700),
     ]);
     noraCookie = await account('nora@example.test', { role: 'creator', creatorIds: [nora.creatorId] });
     inesCookie = await account('ines@example.test', { role: 'creator', creatorIds: [ines.creatorId] });
@@ -150,14 +159,20 @@ describe('GET /v1/creator-space/earnings', () => {
     expect(response.body).not.toMatch(/agency|net|gross|fan|sale_earn/iu);
   });
 
-  it('gives each creator her own sales only', async () => {
+  it('gives each creator her own sales only, in pay’s fortnights, each on her own day', async () => {
     const response = await get(inesCookie);
     expect(response.statusCode, response.body).toBe(200);
-    const [inCourse, before] = CreatorEarningsSchema.parse(response.json()).periods;
+    const body = CreatorEarningsSchema.parse(response.json());
+    expect(body.timeZone).toBe('Asia/Tokyo');
+    const [inCourse, before] = body.periods;
     expect(inCourse?.totals).toEqual([
       { currency: 'EUR', shareMinor: 9_900, sales: 1, refunds: 0, refundedMinor: 0 },
     ]);
-    expect(before?.totals).toEqual([]);
+    // The sale on the eve of the bound stays in pay's fortnight before, said on her day in Tokyo, one past its end.
+    expect(before?.totals).toEqual([
+      { currency: 'EUR', shareMinor: 700, sales: 1, refunds: 0, refundedMinor: 0 },
+    ]);
+    expect(before?.days.map((day) => day.day)).toEqual([current]);
   });
 
   it('is for a creator’s account only', async () => {

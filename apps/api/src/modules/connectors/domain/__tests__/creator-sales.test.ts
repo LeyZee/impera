@@ -120,12 +120,32 @@ describe('a creator’s own sales (CRM-04 lot d)', () => {
       // 22:30 UTC on the 20th: 00:30 on the 21st in Paris (summer time), 23:30 on the 20th in Porto-Novo.
       expect(days({ ...OCTOBER, timeZone: 'Europe/Paris' })[0]).toEqual(['2026-10-21', 1, 1]);
       expect(days({ ...OCTOBER, timeZone: 'Africa/Porto-Novo' })[0]).toEqual(['2026-10-20', 1, 1]);
+      expect(days({ ...OCTOBER, dayTimeZone: 'Africa/Porto-Novo' })[0]).toEqual(['2026-10-20', 1, 1]);
+      const [refund] = creatorSales(lines, { ...OCTOBER, dayTimeZone: 'Africa/Porto-Novo' }).lines.filter(
+        (one) => one.event === 'refund',
+      );
+      expect(refund?.saleDay).toBe('2026-10-20');
+    });
+
+    it('chooses the sales in the range’s zone and says their day in hers (ADR 0106 § 16 and § 19)', () => {
+      // 22:30 UTC on the 15th: 00:30 on the 16th in Paris, the second fortnight; 23:30 on the 15th in Porto-Novo.
+      const nearBound = [line({ platformSaleId: 'sale_9', occurredAt: new Date('2026-10-15T22:30:00Z') })];
+      const ofFortnight = (from: string, to: string) =>
+        creatorSales(nearBound, {
+          from,
+          to,
+          timeZone: 'Europe/Paris',
+          dayTimeZone: 'Africa/Porto-Novo',
+        }).rows.map((row) => row.day);
+      expect(ofFortnight('2026-10-16', '2026-10-31')).toEqual(['2026-10-15']);
+      expect(ofFortnight('2026-10-01', '2026-10-15')).toEqual([]);
     });
 
     it('follows the change of hour at the end of October', () => {
       // 22:30 UTC on the 25th, after the clocks went back: 23:30 on the 25th in Paris, still the 25th.
       expect(days({ ...OCTOBER, timeZone: 'Europe/Paris' })[1]).toEqual(['2026-10-25', 1, 0]);
       expect(days({ ...OCTOBER, timeZone: 'Asia/Tokyo' })[1]).toEqual(['2026-10-26', 1, 0]);
+      expect(days({ ...OCTOBER, dayTimeZone: 'Asia/Tokyo' })[1]).toEqual(['2026-10-26', 1, 0]);
     });
   });
 });

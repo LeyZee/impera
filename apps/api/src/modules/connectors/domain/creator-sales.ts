@@ -1,12 +1,13 @@
-import type {
-  CreatorSaleLine,
-  CreatorSales,
-  CreatorSalesRow,
-  Currency,
-  FanId,
-  Platform,
-  PlatformAccountId,
-  SaleType,
+import {
+  calendarDayAt,
+  type CreatorSaleLine,
+  type CreatorSales,
+  type CreatorSalesRow,
+  type Currency,
+  type FanId,
+  type Platform,
+  type PlatformAccountId,
+  type SaleType,
 } from '@impera/contracts';
 
 import { onSaleDays, salesFeedTimeZone, sumsBy, type SaleDayLine } from './sale-days';
@@ -30,11 +31,14 @@ export interface CreatorLine extends SaleDayLine {
 type RowHead = Pick<CreatorSalesRow, 'day' | 'platform' | 'platformAccountId' | 'currency' | 'saleType'>;
 
 /**
- * Her range, and the zone her days are read in: by default each platform's own, as the agency's totals; her own zone
- * when her earnings are said day by day (ADR 0106 § 19). A refund stays on its sale's day, in the same zone.
+ * Her range, the zone it is read in, and the zone her days are said in. `timeZone`: which sales the range holds, by
+ * default each platform's own, as the agency's totals; the agency's when her share follows the team's fortnights
+ * (ADR 0106 § 16). `dayTimeZone`: the day each row and line is said on, by default the range's; her own when her
+ * earnings are said day by day (ADR 0106 § 19). A refund stays on its sale's day, in each zone.
  */
 export interface CreatorSalesRange extends TotalsRange {
   readonly timeZone?: string;
+  readonly dayTimeZone?: string;
 }
 
 /**
@@ -53,9 +57,15 @@ export function creatorSales(lines: readonly CreatorLine[], range: CreatorSalesR
     const timeZone = range.timeZone ?? salesFeedTimeZone(platform);
     // A line exists only through a feed, and a feed has its zone: a platform without one is a programming error.
     if (timeZone === null) throw new Error(`creator sales: no zone for the platform ${platform}`);
-    const placed = onSaleDays(ofPlatform, { from: range.from, to: range.to, timeZone });
-    refundsWithoutSale += placed.refundsWithoutSale.length;
-    const sums = sumsBy(placed.placed, ({ sale, day }) => {
+    const inRange = onSaleDays(ofPlatform, { from: range.from, to: range.to, timeZone });
+    refundsWithoutSale += inRange.refundsWithoutSale.length;
+    // Chosen in the range's zone, said on the sale's day in `dayTimeZone`: a sale near a bound keeps its fortnight.
+    const { dayTimeZone } = range;
+    const placed =
+      dayTimeZone === undefined
+        ? inRange.placed
+        : inRange.placed.map((one) => ({ ...one, day: calendarDayAt(one.sale.occurredAt, dayTimeZone) }));
+    const sums = sumsBy(placed, ({ sale, day }) => {
       const key = [day, sale.platform, sale.platformAccountId, sale.currency, sale.saleType].join('|');
       if (!heads.has(key)) {
         heads.set(key, {
@@ -85,7 +95,7 @@ export function creatorSales(lines: readonly CreatorLine[], range: CreatorSalesR
         },
       });
     }
-    for (const { line, day } of placed.placed) {
+    for (const { line, day } of placed) {
       placedLines.push({
         platform: line.platform,
         platformAccountId: line.platformAccountId,

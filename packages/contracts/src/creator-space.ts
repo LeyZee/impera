@@ -103,9 +103,11 @@ export const CreatorEarningsDaySchema = z.strictObject({
 export type CreatorEarningsDay = z.infer<typeof CreatorEarningsDaySchema>;
 
 /**
- * One fortnight of the team's pay (from the 1st to the 15th, from the 16th to the month's end), read up to today when
- * it is the one in course. `totals` by currency, then her days with a sale or a refund, newest first.
- * `refundsWithoutSale` counts the refunds of those days whose sale is older than the register: in no sum.
+ * One fortnight of the team's pay (from the 1st to the 15th, from the 16th to the month's end), bounded in the
+ * agency's zone as pay is, so that its total is what pay reads, up to the agency's today when it is the one in course.
+ * `totals` by currency, then her days with a sale or a refund, newest first, each sale on its day in HER zone: near a
+ * bound, a day may be one past the fortnight's. `refundsWithoutSale` counts the refunds of those days whose sale is
+ * older than the register: in no sum.
  */
 export const CreatorEarningsPeriodSchema = z.strictObject({
   from: PayPeriodSchema,
@@ -118,7 +120,7 @@ export type CreatorEarningsPeriod = z.infer<typeof CreatorEarningsPeriodSchema>;
 
 /**
  * `GET /v1/creator-space/earnings` (creator, ADR 0106 amendment of 16/11): her share, the fortnight in course then the
- * one before, her days in `timeZone`, her own. Read on her view `creator_sales` through her account, never a request.
+ * one before, her days in `timeZone`, her own, and `today` her day there. Read on her view `creator_sales` through her account, never a request.
  */
 export const CreatorEarningsSchema = z.strictObject({
   timeZone: z.string().min(1),

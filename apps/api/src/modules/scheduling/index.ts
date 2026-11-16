@@ -324,7 +324,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
         {
           onDuty: createDrizzleCreatorOnDuty(deps.db),
           shifts: createDrizzleCreatorAccountShifts(deps.db),
-          earnings: createDrizzleCreatorEarnings(deps.db, deps.creatorSalesOf),
+          earnings: createDrizzleCreatorEarnings(deps.db, deps.adminDb, deps.creatorSalesOf),
         },
         requireRole,
         now,
