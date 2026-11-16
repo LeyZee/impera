@@ -372,7 +372,17 @@ const datedOf = (turn: ConversationTurn) => ({
 
 /** « Le moment », with what code reads of the last exchanges' times (audit du naturel, A2). */
 function describeMoment(situation: Situation, history: readonly ConversationTurn[]): string {
-  return [describeSituation(situation), ...timingLines(history.map(datedOf), situation.now)].join('\n');
+  // Her messages an automation wrote (ADR 0110 § 3): said once here, never as a bracket in her own turn.
+  const automated = new Set(
+    history.flatMap((turn) =>
+      turn.from === 'creator' && turn.originNote !== undefined ? [turn.originNote] : [],
+    ),
+  );
+  return [
+    describeSituation(situation),
+    ...timingLines(history.map(datedOf), situation.now),
+    ...automated,
+  ].join('\n');
 }
 
 /** Each message of his after a silence carries the time that passed, written by code on her clock. */

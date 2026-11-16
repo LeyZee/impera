@@ -10,6 +10,7 @@ import {
   JOB_PAYLOADS,
   LIVE_WINDOW,
   MessageAuthorSchema,
+  MessageOriginSchema,
   MessageDirectionSchema,
   MessageIdSchema,
   newId,
@@ -141,6 +142,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
             platformMediaId: media.ref.id,
             isLocked: media.isLocked,
           })),
+          origin: row.origin === null ? null : MessageOriginSchema.parse(row.origin),
         }));
       },
       async fanStats(fanId) {

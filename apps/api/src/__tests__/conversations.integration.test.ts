@@ -569,6 +569,27 @@ describe('conversations module (P0-05)', () => {
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
   });
 
+  it('keeps what an automation wrote, and a reply to a story, on the message (ADR 0110)', async () => {
+    const { conversationId } = await ingest('c-origin', {
+      ...fanMessage('c-origin', 'Salut, ton profil'),
+      origin: 'hook',
+    });
+    clock.advance(5);
+    await ingest('c-origin', { ...teamMessage('c-origin', 'Bienvenue'), origin: 'welcome' });
+    clock.advance(5);
+    await ingest('c-origin', fanMessage('c-origin', 'et toi ?'));
+    const rows = await test.admin.db
+      .select({ text: schema.messages.text, origin: schema.messages.origin })
+      .from(schema.messages)
+      .where(eq(schema.messages.conversationId, conversationId))
+      .orderBy(schema.messages.platformCreatedAt);
+    expect(rows).toEqual([
+      { text: 'Salut, ton profil', origin: 'hook' },
+      { text: 'Bienvenue', origin: 'welcome' },
+      { text: 'et toi ?', origin: null },
+    ]);
+  });
+
   it('goes to error after the last failed attempt, and a human release brings it back', async () => {
     const { conversationId } = await ingest('c-error');
     const draftId = await respond(conversationId);

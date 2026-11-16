@@ -57,7 +57,8 @@ export function toMessages(history: readonly ConversationTurn[]): ModelMessage[]
       const text = turn.text.trim() === '' ? [] : [wrapUntrusted('fan_message', turn.text)];
       // Written by code, outside his block: he cannot forge it, and her turns never carry one to imitate.
       const time = turn.timeNote === undefined ? [] : [`[${turn.timeNote}]`];
-      return { role: 'user', content: [...time, ...text, ...media].join('\n') };
+      const origin = turn.originNote === undefined ? [] : [`[${turn.originNote}]`];
+      return { role: 'user', content: [...time, ...origin, ...text, ...media].join('\n') };
     }
     return { role: 'assistant', content: [turn.text, ...media].filter((part) => part !== '').join('\n') };
   });

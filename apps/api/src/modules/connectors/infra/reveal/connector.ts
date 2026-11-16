@@ -35,7 +35,9 @@ import {
   type RevealFetch,
 } from './client';
 import {
+  automationPattern,
   messageOf,
+  NO_AUTOMATIONS,
   ppvStatsOf,
   profileOf,
   scriptsOf,
@@ -43,6 +45,7 @@ import {
   snapshotOf,
   transactionOf,
   vaultMediaOf,
+  type Automations,
   type OwnMessages,
 } from './mapping';
 import { withAgencyBlock } from './note';
@@ -56,6 +59,8 @@ const TAKE = { conversations: 20, messages: 10, ppv: 10, scripts: 20, vault: 10,
 const MAX_PAGES = 500;
 /** `health` warns this long before a readable expiry (spec § 2): the token lives 24 h only (V1). */
 const WARNING_BEFORE_MS = 2 * 3_600_000;
+/** Her automations are read again past this age (ADR 0110): two calls, not one per conversation read. */
+const AUTOMATIONS_TTL_MS = 15 * 60_000;
 /**
  * `verifySent` reads this many of the newest messages (spec § 5, point 3): two pages of the official client's ten.
  * A watch point (spec § 5): over 20 messages written in the conversation between the attempt and its check, the
@@ -161,6 +166,8 @@ export class RevealApiConnector implements PlatformConnector {
   private readonly lastSendIn = new Map<string, number>();
   /** Fan → conversation, as `listConversations` read them: Reveal has one conversation per fan and model. */
   private readonly conversationOfFan = new Map<string, string>();
+  /** Her automations as last read (ADR 0110), and when. */
+  private automationsRead: { readonly at: number; readonly value: Automations } | null = null;
 
   constructor(options: RevealApiConnectorOptions) {
     const { session } = options;
@@ -238,11 +245,12 @@ export class RevealApiConnector implements PlatformConnector {
         [['take', String(TAKE.messages)], ...(cursor === null ? [] : [['cursor', cursor] as const])],
       );
       const own = await this.ownOf(conversationRef.id, page.data);
+      const automations = await this.automations();
       for (const item of page.data) {
         if (!isAfter(item.message.createdAt, opts.since)) return messages.reverse();
         // Deleted on Reveal: never read, never answered, never shown to the agent.
         if (item.message.deletedAt !== undefined) continue;
-        messages.push(messageOf(item, conversationRef, own));
+        messages.push(messageOf(item, conversationRef, own, automations));
         if (opts.limit !== undefined && messages.length >= opts.limit) return messages.reverse();
       }
       if (!page.pageInfo.hasNextPage || page.pageInfo.endCursor === null) return messages.reverse();
@@ -548,6 +556,40 @@ export class RevealApiConnector implements PlatformConnector {
   private journal(): SendJournal {
     if (this.sends === null) throw new ConnectorError('fatal', 'no send journal: reveal writes refused');
     return this.sends;
+  }
+
+  /**
+   * Her openers, welcome and reminder before expiry, read on Reveal at most every 15 minutes (ADR 0110). A read that
+   * fails marks nothing and never stops the messages from being read; only an expired session stops everything.
+   */
+  private async automations(): Promise<Automations> {
+    const now = this.now().getTime();
+    if (this.automationsRead !== null && now - this.automationsRead.at < AUTOMATIONS_TTL_MS) {
+      return this.automationsRead.value;
+    }
+    const client = this.session();
+    try {
+      const hello = await client.get(
+        'models.sayHello',
+        REVEAL_ENDPOINTS['models.sayHello'].shape,
+        this.modelId,
+      );
+      const model = await client.get('models.get', REVEAL_ENDPOINTS['models.get'].shape, this.modelId);
+      const value: Automations = {
+        hooks: hello.enabled
+          ? hello.openers
+              .map((opener) => automationPattern(opener.fanText))
+              .filter((pattern) => pattern !== null)
+          : [],
+        welcome: automationPattern(model.welcomeMessage),
+        expirationReminder: automationPattern(model.expirationReminderMessage),
+      };
+      this.automationsRead = { at: now, value };
+      return value;
+    } catch (error) {
+      if (error instanceof ConnectorError && error.code === 'session_expired') throw error;
+      return NO_AUTOMATIONS;
+    }
   }
 
   /** Our own messages of a page: those whose id `connector_sends` holds, the « bot » member's name as a fallback. */

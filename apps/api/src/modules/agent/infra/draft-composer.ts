@@ -5,6 +5,7 @@ import type {
   HandoffCause,
   MediaDescription,
   MediaFlag,
+  MessageOrigin,
   ObjectionReplies,
   Result,
 } from '@impera/contracts';
@@ -43,6 +44,7 @@ import {
 } from '../domain/hold';
 import { withoutOrders } from '../domain/injection';
 import type { PickedObjectionReply } from '../domain/objections';
+import { originNote } from '../domain/origin';
 import type { OfferLimits } from '../domain/policy';
 import { safetySigns } from '../domain/safety-net';
 import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
@@ -63,6 +65,20 @@ import type { FanLimits } from './fan-limits';
  * The agent seen by `conversation.respond` (conversations' `DraftComposer` port, matched by shape: `agent` does
  * not import `conversations`). The draft waits for a human: the composer never sends anything.
  */
+/** When an automation of the platform last wrote to him (ADR 0110 § 6); nothing when none did in the history. */
+function lastAutomationOf(history: AgentComposeInput['history']): { lastAutomationAt?: Date } {
+  const last = history.findLast(
+    (m) => m.direction === 'outbound' && (m.origin === 'welcome' || m.origin === 'expiration_reminder'),
+  );
+  return last === undefined ? {} : { lastAutomationAt: last.at };
+}
+
+/** His turn or hers, with what code says of an automation or a story reply (ADR 0110). */
+function withOriginNote(origin: MessageOrigin | null | undefined): { originNote?: string } {
+  const note = originNote(origin);
+  return note === undefined ? {} : { originNote: note };
+}
+
 export interface AgentComposeInput {
   readonly creatorId: string;
   readonly conversationId: string;
@@ -82,6 +98,8 @@ export interface AgentComposeInput {
     readonly platformMessageId?: string;
     /** The media the message carries (photo, video, voice note), as `conversations` read them. */
     readonly media?: readonly HistoryMedia[];
+    /** Which automation of the platform wrote it, or his reply to a story (ADR 0110); absent or null otherwise. */
+    readonly origin?: MessageOrigin | null;
   }[];
   readonly fan: {
     readonly notes: readonly string[];
@@ -397,7 +415,13 @@ async function seeHisMedia(
 ): Promise<
   { readonly unseen: AgentComposeResult } | { readonly seen: readonly (readonly MediaDescription[])[] }
 > {
-  if (sinceAnswer.some((m) => m.text.trim() === '' && (m.media?.length ?? 0) === 0))
+  // An empty message may carry a media nobody listed; an empty reply to her story is his reaction to it, answered
+  // like any other (ADR 0110 § 4).
+  if (
+    sinceAnswer.some(
+      (m) => m.text.trim() === '' && (m.media?.length ?? 0) === 0 && m.origin !== 'story_reply',
+    )
+  )
     return { unseen: UNSEEN() };
   if (sinceAnswer.every((m) => (m.media?.length ?? 0) === 0)) return { seen: sinceAnswer.map(() => []) };
   if (sight === undefined) return { unseen: UNSEEN() };
@@ -591,6 +615,7 @@ async function followUp(
     now: input.now,
     timeZone,
     ...(input.hours !== undefined && { hours: input.hours }),
+    ...lastAutomationOf(input.history),
   });
   if (decision.kind === 'skip') return NOT_FOLLOWED_UP(decision.reason);
   if (decision.kind === 'later') return { ...NOT_FOLLOWED_UP(decision.reason), retryAt: decision.at };
@@ -603,6 +628,7 @@ async function followUp(
       from: m.direction === 'inbound' ? 'fan' : 'creator',
       text: m.text,
       at: m.at,
+      ...withOriginNote(m.origin),
     })),
     fanText: '',
     media: [],
@@ -907,6 +933,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           from: m.direction === 'inbound' ? 'fan' : 'creator',
           text: m.text,
           at: m.at,
+          ...withOriginNote(m.origin),
           ...(described.length > 0 && { media: described.map((description) => ({ description })) }),
         };
       });

@@ -418,3 +418,56 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     expect(await connector.listTransactions({ since: new Date(all[1]?.createdAt ?? 0) })).toHaveLength(1);
   });
 });
+
+describe('RevealApiConnector: her automations (ADR 0110)', () => {
+  it('marks the opener he chose, his reply to a story, her welcome and her reminder; reads them once', async () => {
+    const fake = world();
+    const state = fake.state();
+    state.model.hooks = ['Salut %NAME%, je passe te dire coucou', 'Hello toi'];
+    state.model.welcomeMessage = 'Bienvenue chez moi, %NAME% !';
+    state.model.expirationReminderMessage = 'Ton abonnement finit dans trois jours';
+    const ofConversation = state.messages.filter((m) => m.conversationId === 'conv_01');
+    const [first, second, third, fourth] = [
+      ofConversation.find((m) => m.direction === 'in'),
+      ofConversation.find((m) => m.direction === 'out'),
+      ofConversation.findLast((m) => m.direction === 'in'),
+      ofConversation.findLast((m) => m.direction === 'out'),
+    ];
+    if (first === undefined || second === undefined || third === undefined || fourth === undefined)
+      throw new Error('the default world has messages both ways in conv_01');
+    first.content = 'Salut Léa, je passe te dire coucou';
+    second.content = 'Bienvenue chez moi, Max !';
+    third.storyId = 'story_test';
+    fourth.content = 'Ton abonnement finit dans trois jours';
+    const paths: string[] = [];
+    const connector = connect(fake, { log: (entry) => paths.push(entry.route) });
+
+    const all = await connector.fetchMessages(fan('conv_01'), {});
+    const originOfId = (id: string) => all.find((m) => m.ref.id === id)?.origin;
+    expect([first, second, third, fourth].map((m) => originOfId(m.id))).toEqual([
+      'hook',
+      'welcome',
+      'story_reply',
+      'expiration_reminder',
+    ]);
+    expect(all.filter((m) => m.origin !== undefined)).toHaveLength(4);
+
+    await connector.fetchMessages(fan('conv_01'), { limit: 5 });
+    expect(paths.filter((route) => route === 'models.sayHello')).toHaveLength(1);
+  });
+
+  it('reads the messages without marks when her automations cannot be read', async () => {
+    const fake = world();
+    fake.state().model.hooks = ['Hello toi'];
+    const first = fake.state().messages.find((m) => m.conversationId === 'conv_01' && m.direction === 'in');
+    if (first === undefined) throw new Error('the default world has a fan message in conv_01');
+    first.content = 'Hello toi';
+    const fetch: RevealFetch = (url, init) =>
+      url.includes('/say-hello')
+        ? Promise.resolve(new Response('{}', { status: 500 }))
+        : fake.fetch(url, init);
+    const all = await connect(fake, { fetch }).fetchMessages(fan('conv_01'), {});
+    expect(all).toHaveLength(320);
+    expect(all.some((m) => m.origin !== undefined)).toBe(false);
+  });
+});

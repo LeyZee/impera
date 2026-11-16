@@ -35,6 +35,7 @@ Spécification § 5. Toute écriture passe d'abord par la garde `writes` du comp
 - **Note client** (`setFanNote`) : relue juste avant, seules les lignes du canevas (Prénom… Situation, `infra/reveal/note.ts`) sont remplacées à leur place ou ajoutées ; toute autre ligne reste mot pour mot. Rien n'est écrit quand la note le dit déjà ; une ligne hors canevas est refusée. Jamais gardée ni journalisée.
 - `markRead` : `PATCH …/read` ; `setTyping(true)` : `POST …/typing` (Reveal n'a pas de route pour arrêter, l'appelant répète toutes les 3 s).
 - Lecture : `fetchMessages` marque `ai` les sortants dont l'id est dans `connector_sends` ; `ingestMessage` (module `conversations`) garde cet auteur.
+- Origine (ADR 0110) : `fetchMessages` marque l'accroche choisie par le fan, sa réponse à une story, la bienvenue et le rappel d'expiration de la créatrice (`origin`), d'après ses automatisations relues au plus tous les quarts d'heure (`models.sayHello`, `models.get`). Une lecture qui échoue ne marque rien et n'empêche jamais la lecture des messages.
 
 Table possédée : `connector_sends` (migration 0189). Tests : `infra/reveal/__tests__/connector-writes.test.ts` et `note.test.ts` contre FakeReveal, `application/__tests__/outbound-sender.test.ts` (la garde sur chaque écriture), le contrat commun (`infra/__tests__/contract.test.ts`, FakeConnector et Reveal), `src/__tests__/reveal-connector-write.integration.test.ts` (vraie table).
 

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { MessageAuthorSchema, MessageDirectionSchema, PlatformSchema, SessionStateSchema } from './enums';
+import {
+  MessageAuthorSchema,
+  MessageDirectionSchema,
+  MessageOriginSchema,
+  PlatformSchema,
+  SessionStateSchema,
+} from './enums';
 import { PlatformAccountIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
@@ -51,6 +57,8 @@ export const ExternalMessageSchema = z.object({
    * creator's side (`human`: the creator herself or a chatter). Absent when the platform does not say.
    */
   author: MessageAuthorSchema.optional(),
+  /** Written by an automation of the platform, or his answer to a story (ADR 0110); absent otherwise. */
+  origin: MessageOriginSchema.optional(),
   createdAt: z.iso.datetime(),
 });
 export type ExternalMessage = z.infer<typeof ExternalMessageSchema>;

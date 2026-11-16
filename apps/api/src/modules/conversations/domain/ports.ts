@@ -41,6 +41,7 @@ import type {
   MessageAuthor,
   MessageDirection,
   MessageId,
+  MessageOrigin,
   MessageView,
   OutboundMedia,
   PlatformAccountId,
@@ -90,6 +91,8 @@ interface NewMessage {
   readonly draftId: DraftId | null;
   /** The media the platform listed on it; empty for what we send. */
   readonly platformMedia: readonly ExternalMedia[];
+  /** Which automation of the platform wrote it, or a fan's reply to a story (ADR 0110); absent otherwise. */
+  readonly origin?: MessageOrigin;
 }
 
 export interface Draft {
@@ -502,6 +505,8 @@ interface HistoryMessage {
    * alone (vision obligatoire). `kind` from the platform; locked when it sits behind a price.
    */
   readonly media: readonly HistoryMedia[];
+  /** Which automation of the platform wrote it, or a fan's reply to a story (ADR 0110); null otherwise. */
+  readonly origin: MessageOrigin | null;
 }
 
 interface FanStats {
