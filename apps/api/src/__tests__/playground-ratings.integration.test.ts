@@ -73,8 +73,29 @@ describe('playground ratings in the database (ADR 0103, AGE-06)', () => {
     expect(rows).toHaveLength(3);
     expect(rows.every((r) => r.exampleState === 'active' && r.source === 'playground')).toBe(true);
 
-    await test.admin.db.update(schema.calibrationRatings).set({ exampleState: 'withdrawn' });
-    expect((await table.list()).some((r) => r.destination !== undefined)).toBe(false);
+    // A withdrawn example (the table refuses any change but the purge until `Retirer`, ADR 0102 § 5).
+    const withdrawn = record('w', lina, 7);
+    const withdrawnAt = new Date(withdrawn.at);
+    await test.admin.db.insert(schema.calibrationRatings).values({
+      id: newId(CreatorIdSchema),
+      creatorId: lina,
+      source: 'playground',
+      sessionId: withdrawn.sessionId,
+      ratedAt: withdrawnAt,
+      voicePrompt: withdrawn.version.voicePrompt,
+      voiceModel: withdrawn.version.voiceModel,
+      verdictKind: 'corrected',
+      verdict: withdrawn.verdict,
+      destination: 'voice_example',
+      fanMessage: withdrawn.fanMessage,
+      bubbles: [...withdrawn.bubbles],
+      moment: withdrawn.moment,
+      exampleState: 'withdrawn',
+      exampleStateAt: withdrawnAt,
+    });
+    const after = await table.list();
+    expect(after).toHaveLength(4);
+    expect(after.filter((r) => r.destination === undefined).map((r) => r.at)).toEqual([withdrawn.at]);
   });
 
   it('counts as refused a rating whose persona version no longer exists', async () => {
