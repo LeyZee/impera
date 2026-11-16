@@ -515,16 +515,18 @@ function CreatorShiftsLeft({
 }): JSX.Element | null {
   const left = useShiftsLeft(member);
   const toPlanning = (
-    <Link to="/equipe/planning" search={{ membre: member.id }}>
+    <Link className="tm-warn__link" to="/equipe/planning" search={{ membre: member.id }}>
       {left.failed ? 'Vérifier au planning' : 'Voir ses shifts'}
     </Link>
   );
   if (left.failed) {
     return (
-      <p className="tm-warn nv-swap">
-        Ses shifts sur {removed.map((creator) => creator.displayName).join(' et ')} n’ont pas pu être lus.{' '}
+      <div className="tm-warn nv-swap" role="status">
+        <p>
+          Ses shifts sur {removed.map((creator) => creator.displayName).join(' et ')} n’ont pas pu être lus.
+        </p>
         {toPlanning}
-      </p>
+      </div>
     );
   }
   const lines = removed.flatMap((creator) => {

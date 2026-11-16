@@ -8,6 +8,7 @@ import {
   calendarRows,
   cellAgentWords,
   cellWho,
+  cellWhoParts,
   dayWords,
   monthMarks,
   monthMarksKey,
@@ -359,9 +360,19 @@ describe('the agency’s month, as its week (recette EQU-01, EQU-02)', () => {
       },
       wholeDay,
     );
-    const { marks, who } = read(calendar);
+    const { cells, marks, who } = read(calendar);
     expect(marks[2]).toEqual({ kind: 'gap', ahead: true });
     expect(who[2]).toBe('Kofi, 12 h – 18 h, sans accès ; à pourvoir');
+    // The day's detail marks the status alone, in amber as the week does (Design, 16/11).
+    const members = new Map(calendar.members.map((member) => [member.id, member]));
+    const cell = cells[2];
+    const parts = cell === undefined ? [] : cellWhoParts(cell, members, null, PARIS, BEFORE, true);
+    expect(parts.map((part) => ({ ...part, text: words(part.text) }))).toEqual([
+      { text: 'Kofi, 12 h – 18 h', unheld: false },
+      { text: ', ', unheld: false },
+      { text: 'sans accès', unheld: true },
+      { text: ' ; à pourvoir', unheld: false },
+    ]);
   });
 
   it('keeps a shift gone by as it was planned, whoever left since; the one under way is unheld from now', () => {

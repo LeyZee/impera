@@ -406,11 +406,48 @@ function toFillWords(cell: CalendarCell, toFill: CellToFill, zone: string, now: 
   return `${what} ${hours.join(' et ')}`;
 }
 
+/** A piece of what a créneau says: `unheld` for a status that keeps a member from holding it, said in amber. */
+export interface WhoPart {
+  readonly text: string;
+  readonly unheld: boolean;
+}
+
 /**
  * Who holds a créneau, in words, then what is left to fill and the agent: « Kofi, 12 h – 18 h, en poste, reste 3 h 40 ;
  * l’IA en automatique dès 14 h », « Théo, 16 h – 22 h, suspendu ; à pourvoir », « à pourvoir », « libre ». `fill`: the
- * reader can fill it (the agency).
+ * reader can fill it (the agency). In pieces, so that the day's detail marks « suspendu » or « sans accès » in amber, as
+ * the week does (Design, 16/11).
  */
+export function cellWhoParts(
+  cell: CalendarCell,
+  members: ReadonlyMap<string, PlanningMember>,
+  me: string | null,
+  zone: string,
+  now: Date,
+  fill = false,
+): WhoPart[] {
+  if (cell.aiAlone) return [{ text: 'l’IA seule', unheld: false }];
+  const parts: WhoPart[] = [];
+  const say = (text: string, unheld = false): void => {
+    if (text !== '') parts.push({ text, unheld });
+  };
+  cell.shifts.forEach((shift, index) => {
+    say(
+      `${index === 0 ? '' : ' ; '}${nameFor(members.get(shift.memberId), me)}, ${clockAt(shift.startsAt, zone)} – ${clockAt(shift.endsAt, zone)}`,
+    );
+    if (shift.unheld !== null) {
+      say(', ');
+      say(unheldLabel(shift.unheld).toLowerCase(), true);
+    } else if (phaseOf(shift, now) === 'live') say(`, en poste, ${leftOf(shift, now)}`);
+  });
+  const open = cell.toFill === null ? null : toFillWords(cell, cell.toFill, zone, now, fill);
+  if (open !== null) say(`${parts.length === 0 ? '' : ' ; '}${open}`);
+  if (parts.length === 0) say('personne');
+  say(cellAgentWords(cell.agent, cell, zone));
+  return parts;
+}
+
+/** `cellWhoParts` as one sentence, for a label read aloud. */
 export function cellWho(
   cell: CalendarCell,
   members: ReadonlyMap<string, PlanningMember>,
@@ -419,20 +456,9 @@ export function cellWho(
   now: Date,
   fill = false,
 ): string {
-  if (cell.aiAlone) return 'l’IA seule';
-  const named = cell.shifts.map(
-    (shift) =>
-      `${nameFor(members.get(shift.memberId), me)}, ${clockAt(shift.startsAt, zone)} – ${clockAt(shift.endsAt, zone)}${
-        shift.unheld !== null
-          ? `, ${unheldLabel(shift.unheld).toLowerCase()}`
-          : phaseOf(shift, now) === 'live'
-            ? `, en poste, ${leftOf(shift, now)}`
-            : ''
-      }`,
-  );
-  const open = cell.toFill === null ? null : toFillWords(cell, cell.toFill, zone, now, fill);
-  const who = [...named, ...(open === null ? [] : [open])].join(' ; ');
-  return `${who === '' ? 'personne' : who}${cellAgentWords(cell.agent, cell, zone)}`;
+  return cellWhoParts(cell, members, me, zone, now, fill)
+    .map((part) => part.text)
+    .join('');
 }
 
 /** What a créneau says out loud (CR-12, Extension 02/11): its hours when nobody's name gives them, then who. */

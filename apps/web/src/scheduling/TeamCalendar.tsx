@@ -7,7 +7,7 @@ import {
   agentRowLabel,
   agentSlotLabel,
   calendarRows,
-  cellWho,
+  cellWhoParts,
   cellWords,
   dayWords,
   minutesOn,
@@ -421,7 +421,18 @@ function DayDetail({
                   <span className="cal-detail__range nv-num">
                     {rangeAt(cell.from.toISOString(), cell.to.toISOString(), zone)}
                   </span>
-                  <span className="cal-detail__who">{cellWho(cell, members, me, zone, now, fill)}</span>
+                  <span className="cal-detail__who">
+                    {cellWhoParts(cell, members, me, zone, now, fill).map((part, index) =>
+                      part.unheld ? (
+                        // Keyed by place: the same words may come twice in a créneau.
+                        <span key={index} className="cal-detail__unheld">
+                          {part.text}
+                        </span>
+                      ) : (
+                        part.text
+                      ),
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
