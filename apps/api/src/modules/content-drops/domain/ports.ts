@@ -22,12 +22,12 @@ import type {
   ScriptVariantLetter,
   SlotLengths,
   StartScriptDropBody,
+  FileFamily,
 } from '@impera/contracts';
 
 import type { DropMediaContext } from './describe';
 import type { SentDrop } from './drop-export';
 import type { ExportedFile } from './script-export';
-import type { FileFamily } from './sniff';
 import type { StoredPart } from './upload';
 
 /**

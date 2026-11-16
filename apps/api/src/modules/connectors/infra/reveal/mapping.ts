@@ -201,6 +201,14 @@ function stepOf(source: StepSource, index: number, platformIndex: number): Platf
     // Absent = free (spec § 6).
     priceMinor: source.script.price ?? 0,
     currency: REVEAL_CURRENCY,
+    // « Tarif réduit » (2026-11-15): both or neither, but one alone is a discount all the same (never sold at).
+    discount:
+      source.script.discountedPrice === undefined && source.script.discountDurationMinutes === undefined
+        ? null
+        : {
+            priceMinor: source.script.discountedPrice ?? null,
+            minutes: source.script.discountDurationMinutes ?? null,
+          },
   };
 }
 

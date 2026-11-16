@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import {
   PLATFORM_SCRIPT_NAME_MAX,
   PLATFORM_SCRIPT_REF_MAX,
@@ -35,6 +37,7 @@ function script(id: string, prices: readonly number[] = [0, 1_500, 3_000]): Plat
       previewMedia: [],
       priceMinor,
       currency: 'EUR' as const,
+      discount: null,
     })),
   };
 }
@@ -176,6 +179,7 @@ describe('what keeps a native script from being proposable', () => {
     ...media: (typeof inVault | { kind: 'image' | 'audio'; inVault: boolean; described: boolean })[]
   ) => ({
     platformIndex,
+    discounted: false,
     media,
   });
 
@@ -199,6 +203,12 @@ describe('what keeps a native script from being proposable', () => {
     );
   });
 
+  it('never offers a script with a « Tarif réduit » on a step: never sold at a discount (recette 16/11)', () => {
+    expect(platformScriptGaps([step(0, inVault), { ...step(1, inVault), discounted: true }], true)).toEqual([
+      'step_discounted',
+    ]);
+  });
+
   it('never offers a script whose steps share a platform rank: branches, until ADR 0112', () => {
     expect(platformScriptGaps([step(0, inVault), step(1, inVault), step(1, inVault)], true)).toEqual([
       'branched_step',
@@ -207,6 +217,34 @@ describe('what keeps a native script from being proposable', () => {
 });
 
 describe('the fingerprint of a native script', () => {
+  it('changes when a « Tarif réduit » is set or taken off, and stays the same for a step without one', () => {
+    const plain = script('s1');
+    const discounted: PlatformScript = {
+      ...plain,
+      steps: plain.steps.map((each, index) =>
+        index === 1 ? { ...each, discount: { priceMinor: 1_000, minutes: 60 } } : each,
+      ),
+    };
+    expect(platformScriptFingerprint(discounted)).not.toBe(platformScriptFingerprint(plain));
+    // The fingerprint of a script without one is the one it had before discounts were read: no rewrite for nothing.
+    const canonical = JSON.stringify([
+      plain.name,
+      plain.moment,
+      plain.steps.map((step) => [
+        step.ref.id,
+        step.index,
+        step.platformIndex,
+        step.name,
+        step.text,
+        step.priceMinor,
+        step.currency,
+        step.media.map((media) => [media.ref.id, media.kind]),
+        step.previewMedia.map((media) => [media.ref.id, media.kind]),
+      ]),
+    ]);
+    expect(platformScriptFingerprint(plain)).toBe(createHash('sha256').update(canonical).digest('hex'));
+  });
+
   it('changes with the platform rank of a step, so that branches appearing rewrite the script', () => {
     const plain = script('s1');
     const branched: PlatformScript = {
