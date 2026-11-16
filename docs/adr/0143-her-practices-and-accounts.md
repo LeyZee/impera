@@ -1,6 +1,6 @@
 # 0143. Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte
 
-Statut : proposed (demande de Charles du 16/11/2026, 16 h 13 à 17 h 05, fils du projet et Bilan ; numéro attribué par le coordinateur le 16/11 ; à relire par Sécurité pour le mot-clé et l'orientation ; attend « ok 0143 »)
+Statut : accepted (demande de Charles du 16/11/2026, 16 h 13 à 17 h 05, fils du projet et Bilan ; acceptée par Charles le 16/11/2026, « ok 0143 » ; relecture Sécurité des § 9, 10 et 15 avant fusion)
 Date : 2026-11-16
 Précise : ADR 0079 (fiche persona au format 2), ADR 0021 (rester en personnage), ADR 0088 (mode soin), ADR 0126 (lives), P4-01 (alertes par mot-clé). Amende la règle « ne jamais renvoyer hors de la plateforme » pour les seuls comptes que le propriétaire marque comme transmissibles. Ne remplace aucun ADR.
 
