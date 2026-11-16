@@ -43,7 +43,7 @@ export function wireVaultDescriptions(
   deps: {
     readonly vision: Pick<LlmGateway, 'describeDrop' | 'transcribe'>;
     readonly files: VaultFiles;
-    readonly drops: Pick<ContentDropsModule, 'picture'>;
+    readonly drops: Pick<ContentDropsModule, 'picture' | 'unpicture'>;
   },
 ): WiredVaultDescriptions {
   const { adminDb, logger } = shared;
@@ -60,6 +60,7 @@ export function wireVaultDescriptions(
         logger,
       ),
     picture: (ask) => deps.drops.picture(ask),
+    unpicture: (key) => deps.drops.unpicture(key),
   });
   return {
     vault,

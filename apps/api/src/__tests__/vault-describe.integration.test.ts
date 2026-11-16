@@ -85,7 +85,11 @@ const storage: DropStorage = {
   partUrl: unexpected('partUrl'),
   completeUpload: unexpected('completeUpload'),
   sizeOf: unexpected('sizeOf'),
-  remove: unexpected('remove'),
+  // A picture no media came to carry (a spent budget, the models failing) is removed (ADR 0113 § 1).
+  remove: (key) => {
+    STORED.delete(key);
+    return Promise.resolve();
+  },
   download: unexpected('download'),
   read: unexpected('read'),
   upload: async (key, path) => {
