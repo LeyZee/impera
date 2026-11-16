@@ -62,7 +62,7 @@ export function captureSession(
 }
 
 /** A session read stays held one minute at most, then it is forgotten (demande de Sécurité). */
-export const HOLD_MS = 60_000;
+const HOLD_MS = 60_000;
 
 /**
  * The session read in a Reveal tab, between the reading and the owner's « Envoyer la session ». It lives in the

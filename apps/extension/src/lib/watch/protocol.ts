@@ -126,7 +126,7 @@ export const LinkStateSchema = z.strictObject({ link: z.enum(['none', 'linked', 
  * The model the Reveal tab shows against the one of this account's last sync: `unknown` before its first one.
  * Only the model's id is kept for that, never the session.
  */
-export const RevealSeenSchema = z.enum(['same', 'other', 'unknown']);
+const RevealSeenSchema = z.enum(['same', 'other', 'unknown']);
 export type RevealSeen = z.infer<typeof RevealSeenSchema>;
 
 /**
