@@ -21,7 +21,7 @@ import {
   personaShort,
   stepOf,
 } from './playground/logic';
-import { filedAck, isHandoff, isWaiting, suggestedDestination } from './playground/model';
+import { filedAck, isFiledWarning, isHandoff, isWaiting, suggestedDestination } from './playground/model';
 import { revealTimes } from './playground/reveal';
 import { usePlayground } from './playground/usePlayground';
 
@@ -442,7 +442,10 @@ export function PlaygroundPage(): JSX.Element {
         />
         <div className="pg-dock">
           {filed === undefined || mode === 'lesson' ? null : (
-            <p className="pg-ack" role="status">
+            <p
+              className={`pg-ack${isFiledWarning(filed, filedBlockedBy) ? ' pg-ack--warn' : ''}`}
+              role="status"
+            >
               {filedAck(filed, pg.client.isDemo, filedBlockedBy)}
             </p>
           )}

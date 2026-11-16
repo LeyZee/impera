@@ -2,6 +2,7 @@ import type { PlaygroundState, VoiceBank, VoiceBankExample } from '@impera/contr
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
+import { inSentence } from './model';
 import type { Playground } from './usePlayground';
 
 /*
@@ -20,20 +21,21 @@ export function bankSummary(bank: Pick<VoiceBank, 'examples'>): string {
   return `${String(read)} lu${read > 1 ? 's' : ''} sur ${String(bank.examples.length)}`;
 }
 
-/** Where the example stands: read by her voice, waiting behind the twelve, or stopped by a guard and why. */
+/** Where the example stands: read by her voice, waiting behind the twelve (the intro says so), or stopped and why. */
 export function exampleStatus(example: Pick<VoiceBankExample, 'state' | 'isRead' | 'blockedBy'>): string {
   if (example.state === 'blocked') {
-    const why = example.blockedBy.map((v) => v.label).join(', ');
+    const why = example.blockedBy.map((v) => inSentence(v.label)).join(', ');
     return why === '' ? 'Arrêté par une garde' : `Arrêté : ${why}`;
   }
-  return example.isRead ? 'Lu par sa voix' : 'En réserve, derrière les douze plus récents';
+  return example.isRead ? 'Lu par sa voix' : 'En réserve';
 }
 
 export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playground }): JSX.Element | null {
   const played = state.persona.played ?? null;
   const queryClient = useQueryClient();
   const [asked, setAsked] = useState<string | null>(null);
-  const [withdrawn, setWithdrawn] = useState(false);
+  // Said until the next action: the rating that follows, or another « Retirer ».
+  const [withdrawnAt, setWithdrawnAt] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   // A lesson filed on screen asks for the bank again.
   const key = ['playground', 'bank', played?.creatorId, played?.versionId, state.rate.rated];
@@ -55,7 +57,7 @@ export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playg
     try {
       const next = await pg.client.withdrawExample(played.creatorId, played.versionId, id);
       queryClient.setQueryData(key, next);
-      setWithdrawn(true);
+      setWithdrawnAt(state.rate.rated);
     } catch {
       setFailed(true);
     } finally {
@@ -64,7 +66,7 @@ export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playg
   };
 
   return (
-    <details className="nv-disclosure pg-fold">
+    <details className="nv-disclosure pg-fold pg-fold--sticky">
       <summary>
         <span className="nv-disclosure__title">Sa banque</span>
         <span className="nv-disclosure__sum">
@@ -76,9 +78,12 @@ export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playg
           Tes corrections rangées en Exemple de voix, pour cette version. Les douze plus récentes que ses
           gardes laissent passer sont lues par sa voix, ici et avec ses vrais fans.
         </p>
-        {withdrawn ? (
-          <p className="pg-hint" role="status">
-            Retiré : ses vrais brouillons ne le lisent plus. Ici, à la prochaine conversation.
+        {withdrawnAt === state.rate.rated ? (
+          <p className="pg-bank__done" role="status">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3.5 8.5l3 3 6-7" />
+            </svg>
+            Exemple retiré. Ses vrais brouillons ne le lisent plus ; ici, ce sera à la prochaine conversation.
           </p>
         ) : null}
         {failed ? (
@@ -113,7 +118,7 @@ export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playg
                       </button>
                       <button
                         type="button"
-                        className="nv-btn nv-btn--neon nv-btn--sm"
+                        className="nv-btn nv-btn--soft nv-btn--destructive nv-btn--sm"
                         onClick={() => void withdraw(example.id)}
                       >
                         Retirer
@@ -128,6 +133,7 @@ export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playg
                       className="nv-btn nv-btn--soft nv-btn--sm"
                       disabled={asked !== null}
                       onClick={() => {
+                        setWithdrawnAt(null);
                         setAsked(example.id);
                       }}
                     >

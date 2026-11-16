@@ -757,6 +757,9 @@
   color: var(--nv-ink-muted);
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
+.pg-ack--warn {
+  color: var(--nv-warning);
+}
 .pg-dock {
   display: flex;
   flex-direction: column;
@@ -1114,7 +1117,7 @@
     background-color 160ms ease;
 }
 .pg-bank__item:hover {
-  border-color: var(--nv-ink-muted);
+  background: var(--nv-select);
 }
 .pg-bank__text {
   color: var(--nv-ink);
@@ -1133,7 +1136,16 @@
 .pg-bank__item[data-state='blocked'] .pg-bank__status {
   color: var(--nv-warning);
 }
-.pg-bank__foot,
+.pg-bank__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+.pg-bank__foot .nv-btn {
+  flex: none;
+}
 .pg-bank__confirm {
   display: flex;
   align-items: center;
@@ -1141,6 +1153,52 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 2px;
+}
+/* What « Retirer » did: a status line of its own, with its check, gone at the next action. */
+.pg-bank__done {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--nv-radius-sm);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink);
+  font-size: 12px;
+  line-height: 16px;
+  animation: pg-bank-done var(--nv-dur-slow, 240ms) var(--nv-ease-out, ease-out);
+}
+.pg-bank__done svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@keyframes pg-bank-done {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pg-bank__done {
+    animation: none;
+  }
+}
+/* Open and scrolled, the fold keeps its name in view: where one is, and how to close it. */
+.pg-fold--sticky[open] > summary {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--nv-surface-raised);
+}
+/* The sheet's close on a phone: the same round button by day as by night, a tint on its glass. */
+.pg-setup .nv-close {
+  background: var(--nv-fill-soft);
 }
 .pg-bank__confirm {
   color: var(--nv-ink-muted);

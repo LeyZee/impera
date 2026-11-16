@@ -32,7 +32,7 @@ const READ = example('00000000-0000-4000-8000-000000000001', 'Hey toi, tu fais q
 const STOPPED = example('00000000-0000-4000-8000-000000000002', 'Phrase arrêtée', {
   state: 'blocked',
   isRead: false,
-  blockedBy: [{ code: 'ai_disclosure', label: 'elle se dit IA', severity: 'blocking' }],
+  blockedBy: [{ code: 'ai_disclosure', label: 'Elle se dit IA', severity: 'blocking' }],
 });
 
 const STATE: PlaygroundState = {
@@ -128,7 +128,7 @@ describe('Sa banque (ADR 0102 § 5)', () => {
     expect(bankSummary({ examples: [] })).toBe('vide');
     expect(bankSummary({ examples: [READ, STOPPED] })).toBe('1 lu sur 2');
     expect(exampleStatus(READ)).toBe('Lu par sa voix');
-    expect(exampleStatus({ ...READ, isRead: false })).toBe('En réserve, derrière les douze plus récents');
+    expect(exampleStatus({ ...READ, isRead: false })).toBe('En réserve');
     expect(exampleStatus(STOPPED)).toBe('Arrêté : elle se dit IA');
   });
 
@@ -155,9 +155,8 @@ describe('Sa banque (ADR 0102 § 5)', () => {
     await waitFor(() => {
       expect(asked).toEqual([READ.id]);
     });
-    expect(await screen.findByRole('status')).toHaveProperty(
-      'textContent',
-      'Retiré : ses vrais brouillons ne le lisent plus. Ici, à la prochaine conversation.',
+    expect((await screen.findByRole('status')).textContent).toBe(
+      'Exemple retiré. Ses vrais brouillons ne le lisent plus ; ici, ce sera à la prochaine conversation.',
     );
     await waitFor(() => {
       expect(screen.queryByText('Hey toi, tu fais quoi ?')).toBeNull();

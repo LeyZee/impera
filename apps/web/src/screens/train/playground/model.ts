@@ -40,6 +40,13 @@ const DESTINATION_ACKS: Readonly<Record<Destination, string>> = {
   test: 'Rangée en Test : gardée pour être rejouée à la main.',
 };
 
+/** A guard's label inside a sentence, after a colon: « elle dit être une IA ». */
+export const inSentence = (label: string): string => label.charAt(0).toLocaleLowerCase('fr') + label.slice(1);
+
+/** Whether the line under the conversation warns: a correction kept out of her bank (ADR 0102 § 4). */
+export const isFiledWarning = (destination: Destination, blockedBy: readonly string[]): boolean =>
+  destination === 'voice_example' && blockedBy.length > 0;
+
 /**
  * The line under the conversation once a lesson is filed; the demo saves nothing, and says so as its bar does. A
  * correction a hard guard stops stays a correction, out of her bank, and the line says which guard (ADR 0102 § 4).
@@ -50,8 +57,8 @@ export const filedAck = (
   blockedBy: readonly string[] = [],
 ): string => {
   if (isDemo) return 'Démo : rien n’est rangé pour de vrai.';
-  if (destination === 'voice_example' && blockedBy.length > 0)
-    return `Gardée comme correction, mais pas dans sa banque : ${blockedBy.join(', ')}.`;
+  if (isFiledWarning(destination, blockedBy))
+    return `Gardée comme correction, mais pas dans sa banque : ${blockedBy.map(inSentence).join(', ')}.`;
   return DESTINATION_ACKS[destination];
 };
 
