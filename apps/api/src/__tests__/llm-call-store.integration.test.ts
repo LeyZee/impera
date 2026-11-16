@@ -70,6 +70,15 @@ describe('llm_calls as the gateway journal (LlmCallStore)', () => {
     expect(new Set(rows.map((row) => row.purpose))).toEqual(new Set(['chatting', 'trend_watch']));
   });
 
+  it('keeps which request of a hedged attempt nobody waited for (OPS-15)', async () => {
+    const start = new Date(Date.now() - 1_000);
+    await store.insert(call({ promptHash: 'hedge-w', hedge: 'winner' }));
+    await store.insert(call({ promptHash: 'hedge-l', hedge: 'loser', latencyMs: 29_000 }));
+    await store.insert(call({ promptHash: 'hedge-n' }));
+    const since = (await store.listSince(start)).filter((record) => record.promptHash.startsWith('hedge-'));
+    expect(since.map((record) => record.hedge)).toEqual(['winner', 'loser', undefined]);
+  });
+
   it('gives each call a UUID v7, like every other row (ADR 0011)', async () => {
     await store.insert(call());
     const rows = await test.admin.db.select({ id: schema.llmCalls.id }).from(schema.llmCalls);
