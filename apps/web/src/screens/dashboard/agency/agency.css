@@ -1199,7 +1199,9 @@
   .ins-meter > span {
     animation: none;
   }
-  .ins-spark {
+  /* Without its drawing-in, the curve is there at once: the clip it grows out of would hide it for good. */
+  .ins-spark,
+  .ins-subs__plot svg {
     clip-path: none;
   }
   .ins-ring__arc {
