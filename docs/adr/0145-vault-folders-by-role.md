@@ -1,6 +1,6 @@
 # 0145. Les dossiers du coffre ont un rôle : un dossier par script, des dossiers Mass DM et feed, le code lit le rôle et jamais le nom
 
-Statut : proposed (demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
+Statut : accepted (Charles, 16/11/2026, 17 h 36, « ok 0145 » ; demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
 Date : 2026-11-16
 Amende : l'ADR 0099 § 2 (« le CRM ne crée aucun dossier du coffre »), pour les seuls dossiers de cette ADR.
 Précise : l'ADR 0056 (§ 5 la nomenclature, § 7 vers Reveal dans l'ordre), l'ADR 0113 § 5 (ce qui est décrit), l'ADR 0018 (garde d'écriture), l'ADR 0136 (feed) et l'ADR 0137 (Mass DM).

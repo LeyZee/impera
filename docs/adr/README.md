@@ -136,3 +136,4 @@ Date : AAAA-MM-JJ
 | 0131 | Choisir le script qui colle aux goûts du fan : familles de fantasme, goûts des scripts et de la fiche, le code classe et l'IA choisit | accepted (précise 0098 § 6, 0056 § 6, 0085 et 0112 § 5) |
 | 0138 | Aperçu net du coffre : la petite image de Reveal lue à la demande, servie sans être gardée | accepted (précise 0099 § 7, 0030 § 4, 0018 ; amende 0099 : l'écran du coffre montre l'image à la demande) |
 | 0140 | La semaine de la créatrice : deux jours de tournage qu'elle choisit, une livraison le dimanche, un agenda que le code remplit | accepted (précise 0042 §§ 3-5, 0055 §§ 4-5, 0056 § 2, 0126, 0136, 0137, 0120, 0082) |
+| 0145 | Les dossiers du coffre ont un rôle : un dossier par script, les dossiers Mass DM et Feed de Reveal, le code lit le rôle et jamais le nom | accepted (amende 0099 § 2 ; précise 0056 §§ 5 et 7, 0113 § 5, 0018, 0136, 0137) |
