@@ -61,6 +61,8 @@ const MAX_PAGES = 500;
 const WARNING_BEFORE_MS = 2 * 3_600_000;
 /** Her automations are read again past this age (ADR 0110): two calls, not one per conversation read. */
 const AUTOMATIONS_TTL_MS = 15 * 60_000;
+/** After a failed read, none are marked for this long: Reveal's window is not spent on a route that answers badly. */
+const AUTOMATIONS_FAILED_TTL_MS = 5 * 60_000;
 /**
  * `verifySent` reads this many of the newest messages (spec § 5, point 3): two pages of the official client's ten.
  * A watch point (spec § 5): over 20 messages written in the conversation between the attempt and its check, the
@@ -167,7 +169,7 @@ export class RevealApiConnector implements PlatformConnector {
   /** Fan → conversation, as `listConversations` read them: Reveal has one conversation per fan and model. */
   private readonly conversationOfFan = new Map<string, string>();
   /** Her automations as last read (ADR 0110), and when. */
-  private automationsRead: { readonly at: number; readonly value: Automations } | null = null;
+  private automationsRead: { readonly until: number; readonly value: Automations } | null = null;
 
   constructor(options: RevealApiConnectorOptions) {
     const { session } = options;
@@ -561,11 +563,12 @@ export class RevealApiConnector implements PlatformConnector {
 
   /**
    * Her openers, welcome and reminder before expiry, read on Reveal at most every 15 minutes (ADR 0110). A read that
-   * fails marks nothing and never stops the messages from being read; only an expired session stops everything.
+   * fails marks nothing for 5 minutes and never stops the messages from being read; only an expired session stops
+   * everything.
    */
   private async automations(): Promise<Automations> {
     const now = this.now().getTime();
-    if (this.automationsRead !== null && now - this.automationsRead.at < AUTOMATIONS_TTL_MS) {
+    if (this.automationsRead !== null && now < this.automationsRead.until) {
       return this.automationsRead.value;
     }
     const client = this.session();
@@ -585,10 +588,11 @@ export class RevealApiConnector implements PlatformConnector {
         welcome: automationPattern(model.welcomeMessage),
         expirationReminder: automationPattern(model.expirationReminderMessage),
       };
-      this.automationsRead = { at: now, value };
+      this.automationsRead = { until: now + AUTOMATIONS_TTL_MS, value };
       return value;
     } catch (error) {
       if (error instanceof ConnectorError && error.code === 'session_expired') throw error;
+      this.automationsRead = { until: now + AUTOMATIONS_FAILED_TTL_MS, value: NO_AUTOMATIONS };
       return NO_AUTOMATIONS;
     }
   }

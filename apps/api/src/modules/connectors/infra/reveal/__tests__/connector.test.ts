@@ -456,18 +456,34 @@ describe('RevealApiConnector: her automations (ADR 0110)', () => {
     expect(paths.filter((route) => route === 'models.sayHello')).toHaveLength(1);
   });
 
-  it('reads the messages without marks when her automations cannot be read', async () => {
+  it('reads the messages without marks when her automations cannot be read, and asks again 5 min later', async () => {
     const fake = world();
     fake.state().model.hooks = ['Hello toi'];
     const first = fake.state().messages.find((m) => m.conversationId === 'conv_01' && m.direction === 'in');
     if (first === undefined) throw new Error('the default world has a fan message in conv_01');
     first.content = 'Hello toi';
-    const fetch: RevealFetch = (url, init) =>
-      url.includes('/say-hello')
-        ? Promise.resolve(new Response('{}', { status: 500 }))
-        : fake.fetch(url, init);
-    const all = await connect(fake, { fetch }).fetchMessages(fan('conv_01'), {});
+    let failing = true;
+    let sayHelloCalls = 0;
+    const fetch: RevealFetch = (url, init) => {
+      if (!url.includes('/say-hello')) return fake.fetch(url, init);
+      sayHelloCalls += 1;
+      return failing ? Promise.resolve(new Response('{}', { status: 500 })) : fake.fetch(url, init);
+    };
+    let now = new Date('2026-11-16T12:00:00.000Z');
+    const connector = connect(fake, { fetch, now: () => now });
+    const all = await connector.fetchMessages(fan('conv_01'), {});
     expect(all).toHaveLength(320);
     expect(all.some((m) => m.origin !== undefined)).toBe(false);
+
+    // Not asked again for 5 minutes, then read again.
+    const calls = sayHelloCalls;
+    failing = false;
+    now = new Date('2026-11-16T12:04:59.000Z');
+    await connector.fetchMessages(fan('conv_01'), { limit: 5 });
+    expect(sayHelloCalls).toBe(calls);
+    now = new Date('2026-11-16T12:05:01.000Z');
+    const later = await connector.fetchMessages(fan('conv_01'), {});
+    expect(sayHelloCalls).toBe(calls + 1);
+    expect(later.filter((m) => m.origin === 'hook')).toHaveLength(1);
   });
 });
