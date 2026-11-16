@@ -120,7 +120,9 @@ describe('Réglages › Modèles IA', () => {
     expect(await screen.findByText('3 appels, sans erreur')).toBeTruthy();
     expect(screen.getByText('En relais de Grok')).toBeTruthy();
     const button = screen.getByRole('button', { name: 'Essai réel' });
-    expect(button.getAttribute('title')).toMatch(/moins d’un centime/);
+    // The cost is written beside the button, never in a tooltip the phone and the keyboard cannot reach.
+    expect(button.hasAttribute('title')).toBe(false);
+    expect(screen.getByText(/moins d’un centime/)).toBeTruthy();
     fireEvent.click(button);
     expect(vi.mocked(probeNow)).toHaveBeenCalledWith('mistral');
     expect(await screen.findByText('Plus de crédit')).toBeTruthy();

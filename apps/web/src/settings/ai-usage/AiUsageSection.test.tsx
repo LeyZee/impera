@@ -107,7 +107,7 @@ describe('Réglages › Consommation IA (ADR 0091)', () => {
     renderPage();
     expect(await screen.findByRole('heading', { name: 'ElevenLabs' })).toBeTruthy();
     expect(screen.getByRole('meter', { name: 'Caractères du mois encore disponibles' })).toBeTruthy();
-    expect(screen.getByText(/Environ 75 vocaux encore, le mois revient le 1 décembre/u)).toBeTruthy();
+    expect(screen.getByText(/Environ 75 vocaux encore, le mois revient le 1er décembre/u)).toBeTruthy();
     expect(screen.getByText(/l’usage commercial n’y est pas autorisé/u)).toBeTruthy();
     expect(
       screen.getByText(/2.480 sur 10.000 caractères utilisés ce mois · lu chez ElevenLabs il y a 9 min/u),

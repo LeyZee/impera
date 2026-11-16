@@ -197,6 +197,15 @@ function isBlockedInUse(status: ProviderStatus): boolean {
   return status.probe !== null && PROBE_CHIP[status.probe.outcome].tone === 'bad';
 }
 
+/**
+ * The tone shown on a service still connected: its dot is amber when it cannot generate (a relay with no credit is
+ * a warning, nothing urgent), so its chip and its last error say amber too. Red stays for a service no longer
+ * connected, its key to enter again.
+ */
+export function inUseTone(status: ProviderStatus, tone: Tone): Tone {
+  return tone === 'bad' && (status.state === 'connected' || status.state === 'low_credit') ? 'warn' : tone;
+}
+
 /** Red for what stops the service until someone acts, amber for what passes on its own. */
 export function troubleTone(kind: ProviderTrouble): Tone {
   return kind === 'no_credit' || kind === 'key_refused' || kind === 'model_missing' ? 'bad' : 'warn';
@@ -275,7 +284,7 @@ export function quotaText(quota: ProviderQuota): { readonly used: string; readon
   const resets =
     quota.resetsAt === null
       ? null
-      : `revient le ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(new Date(quota.resetsAt))}`;
+      : `revient le ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(new Date(quota.resetsAt)).replace(/^1 /u, '1er ')}`;
   return {
     used: `${quota.used.toLocaleString('fr-FR')} sur ${quota.limit.toLocaleString('fr-FR')} caractères ce mois`,
     resets,

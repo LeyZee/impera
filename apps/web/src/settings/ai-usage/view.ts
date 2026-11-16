@@ -385,7 +385,7 @@ export function voiceRunway(voice: AiUsageVoice): string {
   const reset =
     voice.resetsAt === null
       ? ''
-      : `, le mois revient le ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(new Date(voice.resetsAt))}`;
+      : `, le mois revient le ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(new Date(voice.resetsAt)).replace(/^1 /u, '1er ')}`;
   return notes === 0
     ? `Plus aucun vocal possible ce mois${reset}`
     : `Environ ${notes.toLocaleString('fr-FR')} ${notes > 1 ? 'vocaux' : 'vocal'} encore${reset}`;

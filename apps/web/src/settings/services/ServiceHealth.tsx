@@ -15,6 +15,7 @@ import {
   quotaTone,
   TROUBLE_TEXT,
   troubleTone,
+  inUseTone,
   troubleToShow,
 } from './view';
 
@@ -60,7 +61,7 @@ export function ServiceHealth({
       )}
 
       {trouble === null ? null : (
-        <p className="sv-trouble" data-tone={troubleTone(trouble.kind)}>
+        <p className="sv-trouble" data-tone={inUseTone(status, troubleTone(trouble.kind))}>
           <TroubleIcon />
           <span>
             Dernière erreur {agoText(trouble.at, now)} : {TROUBLE_TEXT[trouble.kind]}.
@@ -96,7 +97,6 @@ export function ServiceHealth({
             className="sv-probe__btn"
             data-busy={isProbing || undefined}
             disabled={isProbing}
-            title={PROBE_COST[provider]}
             onClick={onProbe}
           >
             <ProbeIcon />
@@ -106,7 +106,7 @@ export function ServiceHealth({
             <span className="sv-probe__cost">{PROBE_COST[provider]}</span>
           ) : (
             <span className="sv-probe__result" key={`result-${probe.at}`}>
-              <span className="sv-chip" data-tone={chip.tone}>
+              <span className="sv-chip" data-tone={inUseTone(status, chip.tone)}>
                 <span className="sv-chip__dot" aria-hidden="true" />
                 {chip.text}
               </span>

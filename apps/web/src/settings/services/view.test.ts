@@ -20,6 +20,7 @@ import {
   quotaTone,
   troubleTone,
   troubleToShow,
+  inUseTone,
 } from './view';
 
 function status(provider: ProviderStatus['provider'], state: ProviderStatus['state']): ProviderStatus {
@@ -211,7 +212,7 @@ describe('the health of a service (ADR 0091 § 7)', () => {
     const quota = { used: 9_500, limit: 10_000, resetsAt: '2026-12-01T00:00:00Z', plan: 'free' as const };
     expect(quotaText(quota)).toEqual({
       used: '9 500 sur 10 000 caractères ce mois',
-      resets: 'revient le 1 décembre',
+      resets: 'revient le 1er décembre',
     });
     expect(quotaShare(quota)).toBe(95);
     expect(quotaTone(quota)).toBe('warn');
@@ -237,5 +238,11 @@ describe('a service that passes its check but cannot pay (ADR 0091 § 7)', () =>
     expect(troubleToShow({ ...connected, activity })).toEqual(trouble);
     const answered = { ...probe, outcome: 'answers' as const, at: '2026-11-16T13:59:00Z' };
     expect(dotOf({ ...connected, probe: answered, activity }, false)).toBe('ok');
+  });
+
+  it('says its chip in the amber of its dot, and keeps red for a service no longer connected', () => {
+    expect(inUseTone(connected, 'bad')).toBe('warn');
+    expect(inUseTone(connected, 'ok')).toBe('ok');
+    expect(inUseTone(status('mistral', 'needs_reconnect'), 'bad')).toBe('bad');
   });
 });
