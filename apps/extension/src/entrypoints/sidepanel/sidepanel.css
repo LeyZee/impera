@@ -39,7 +39,8 @@ body {
   gap: var(--nv-space-3);
 }
 /* Above the draft, the rows fade out instead of being cut flat under it; the bottom padding keeps the last row clear. */
-.cp-scroll:has(+ .cp-draft) {
+.cp-scroll:has(+ .cp-draft),
+.cp-scroll:has(+ .cp-move) {
   mask-image: linear-gradient(to bottom, #000 calc(100% - var(--nv-space-5)), transparent);
 }
 
@@ -92,6 +93,77 @@ body {
 }
 .cp-standing__dot {
   color: var(--nv-ink-faint);
+}
+.cp-standing__signal {
+  color: var(--nv-ink);
+}
+/* « +N » (ADR 0141 § 14): a word of the line, its target grown to 44 px around it without moving the line. */
+.cp-standing__more {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  cursor: pointer;
+}
+.cp-standing__more::before {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+.cp-standing__more:hover {
+  color: var(--nv-ink);
+}
+.cp-standing__more:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: var(--nv-radius-xs);
+}
+
+/* ───────────── Quoi faire (ADR 0141 § 12) ───────────── */
+
+/* Two lines right above the draft: the gesture in bold, verb first; why, small and muted. Pinned, never scrolled. */
+.cp-move {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--cp-gutter) var(--cp-gutter) var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+  background: var(--nv-glass-fill);
+}
+.cp-move + .cp-draft {
+  border-top: 0;
+  padding-top: var(--nv-space-1);
+}
+.cp-move__what,
+.cp-move__cut {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+  color: var(--nv-ink);
+  text-wrap: pretty;
+}
+.cp-move__why {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+  text-wrap: pretty;
+}
+.cp-move[data-tone='amber'] .cp-move__what,
+.cp-move[data-tone='amber'] .cp-move__cut {
+  color: var(--nv-warning);
+}
+.cp-move[data-tone='red'] .cp-move__what,
+.cp-move[data-tone='red'] .cp-move__cut {
+  color: var(--nv-danger);
 }
 /* One part and the dot before it never part at a line's end (V-EXT). */
 .cp-standing__item {
@@ -175,6 +247,7 @@ body {
   line-height: var(--nv-text-callout-leading);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+  text-wrap: pretty;
   user-select: text;
 }
 /* A bubble already placed for Reveal says so in words and steps back: the next one is the one to place (EXT-13). */
@@ -549,4 +622,22 @@ body {
 .cp-group .cp-fields {
   padding: 0 var(--nv-space-3) var(--nv-space-1);
   border-top: 1px solid var(--nv-hairline);
+}
+
+/* ───────────── Où en est la vente (ADR 0141 § 14) ───────────── */
+
+/* A card's fold, on top of the card: its line says the step in progress and the next one with its price. */
+.cp-sale > summary {
+  min-height: 44px;
+  padding-block: var(--nv-space-1);
+}
+.cp-sale__top {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cp-sale .cp-group__sum {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  text-wrap: pretty;
 }

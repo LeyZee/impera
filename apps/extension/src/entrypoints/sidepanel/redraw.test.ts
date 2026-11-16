@@ -22,6 +22,9 @@ const screen = (now: string, text = ''): PanelScreen => ({
     reason: null,
     done: null,
   },
+  assist: null,
+  saleOpen: false,
+  signalsOpen: false,
   now: new Date(now),
 });
 

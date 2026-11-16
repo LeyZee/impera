@@ -75,6 +75,9 @@ interface Gesture {
 }
 let gesture: Gesture | null = null;
 let openGroups = new Set<FanCardGroup>();
+/** « Où en est la vente » open, and « où on en est » past its three signals: for this conversation only (ADR 0141). */
+let saleOpen = false;
+let signalsOpen = false;
 let screen: PanelScreen = { kind: 'loading' };
 let drawn = '';
 /** Each read carries the turn it started on: a late answer for a conversation left since is dropped. */
@@ -144,6 +147,14 @@ const actions = {
     if (open) openGroups.add(group);
     else openGroups.delete(group);
     void browser.storage.local.set({ [GROUPS_KEY]: [...openGroups] }).catch(() => undefined);
+  },
+  toggleSale: (open: boolean) => {
+    // Kept without a redraw, as a card's group: the fold is already as he left it.
+    saleOpen = open;
+  },
+  showSignals: () => {
+    signalsOpen = true;
+    redraw();
   },
   place: (edited: boolean) => void place(edited),
   copyNext: () => void copyNext(),
@@ -269,6 +280,10 @@ function cardScreen(cardOn: boolean): PanelScreen {
     openGroups,
     newSince,
     draft: draftPart(),
+    // A server that does not send it yet draws the panel as before (ADR 0141).
+    assist: view?.state === 'none' || view?.state === 'ready' ? (view.assist ?? null) : null,
+    saleOpen,
+    signalsOpen,
     now: new Date(),
   };
 }
@@ -295,6 +310,8 @@ async function refresh(): Promise<void> {
     newSince = null;
     view = null;
     gesture = null;
+    saleOpen = false;
+    signalsOpen = false;
   }
   if (conversationId === null) {
     show({ kind: 'no_conversation' });

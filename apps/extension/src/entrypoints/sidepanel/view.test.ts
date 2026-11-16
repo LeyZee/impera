@@ -2,6 +2,7 @@
 import {
   FAN_CARD_FIELDS,
   FanIdSchema,
+  type CopilotAssist,
   type FanCardEntry,
   type FanCardValue,
   type FanCardView,
@@ -42,6 +43,8 @@ function draw(screen: PanelScreen): { root: HTMLElement; actions: PanelActions }
   const actions: PanelActions = {
     openCrm: vi.fn(),
     toggleGroup: vi.fn(),
+    toggleSale: vi.fn(),
+    showSignals: vi.fn(),
     place: vi.fn(),
     copyNext: vi.fn(),
     edit: vi.fn(),
@@ -65,17 +68,23 @@ const onCard = (
     fanName?: string | null;
     newSince?: string | null;
     now?: Date;
+    assist?: CopilotAssist | null;
+    saleOpen?: boolean;
+    signalsOpen?: boolean;
   } = {},
 ): PanelScreen => ({
   kind: 'conversation',
   fanName: patch.fanName ?? null,
-  standing: patch.standing ?? standingOf({}, null),
+  standing: patch.standing === undefined ? standingOf({}, null) : patch.standing,
   cardOn: true,
   opensCreators: true,
   card: view,
   openGroups: new Set(open.filter((g) => g === 'him' || g === 'about_her' || g === 'intimate')),
   newSince: patch.newSince ?? null,
   draft: patch.draft ?? { kind: 'hidden' },
+  assist: patch.assist ?? null,
+  saleOpen: patch.saleOpen ?? false,
+  signalsOpen: patch.signalsOpen ?? false,
   now: patch.now ?? now,
 });
 type PanelScreenStanding = Extract<PanelScreen, { kind: 'conversation' }>['standing'];
@@ -614,5 +623,200 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(root.querySelector('[title]')).toBeNull();
     for (const kind of ['signed_out', 'no_conversation', 'unknown', 'off_shift', 'down'] as const)
       expect(draw({ kind }).root.querySelector('.cp-notice__icon svg')).not.toBeNull();
+  });
+});
+
+describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
+  /* Invented data (ADR 0010). */
+  const base = (patch: Partial<CopilotAssist> = {}): CopilotAssist => ({
+    nextMove: { kind: 'offer_step', label: 'Proposer Étape 3 à 15 €', priceMinor: 1500, block: null },
+    reasons: [{ code: 'rewritten_once', label: 'Réécrit une fois par une garde' }],
+    sale: {
+      script: { name: 'Soirée d’essai', stepIndex: 1, stepCount: 4 },
+      nextStep: { name: 'Étape 3', priceMinor: 1500 },
+      refusedSteps: ['Étape 2 bis'],
+      usedObjections: ['C’est trop cher'],
+      customOrderOpen: false,
+      offerPending: false,
+    },
+    signals: { desireTrend: null, followUpDue: false },
+    cuts: [],
+    buttons: ['hooks', 'objection'],
+    clicksLeftToday: 30,
+    ...patch,
+  });
+  const with_ = (
+    assist: CopilotAssist | null,
+    patch: Parameters<typeof onCard>[2] = {},
+  ): ReturnType<typeof draw>['root'] =>
+    draw(onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot'), assist, ...patch })).root;
+
+  it('draws the panel as before for a server that does not send it yet', () => {
+    const before = draw(onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot') })).root;
+    expect(before.querySelector('.cp-move')).toBeNull();
+    expect(before.querySelector('.cp-sale')).toBeNull();
+    expect(before.querySelector('.cp-standing')?.textContent).toBe('Rien à signaler·désir chaud');
+    expect([...before.children].map((node) => node.className)).toEqual([
+      'cp-standing',
+      'cp-scroll',
+      'cp-draft',
+    ]);
+  });
+
+  it('says the gesture in bold and why in small, right above the draft, in a neutral tone', () => {
+    const root = with_(base());
+    expect([...root.children].map((node) => node.className)).toEqual([
+      'cp-standing',
+      'cp-scroll',
+      'cp-move',
+      'cp-draft',
+    ]);
+    const move = root.querySelector<HTMLElement>('.cp-move');
+    expect(move?.dataset['tone']).toBe('neutral');
+    expect(move?.querySelector('.cp-move__what')?.textContent).toBe('Proposer Étape 3 à 15 €');
+    expect(move?.querySelector('.cp-move__why')?.textContent).toBe('Réécrit une fois par une garde');
+    // « Copier pour Reveal » stays the one strong action; lot b's buttons are not drawn yet.
+    expect(root.querySelectorAll('.cp-send')).toHaveLength(1);
+    expect(root.querySelector('[data-assist]')).toBeNull();
+  });
+
+  it.each([
+    ['reply', 'Répondre'],
+    ['answer_objection', 'Répondre à son objection'],
+    ['custom_order_accept', 'Commande perso : accepter'],
+    ['custom_order_decline', 'Commande perso : refuser'],
+    ['custom_order_wait', 'Commande perso : attendre'],
+    ['wait', 'Attendre avant de répondre'],
+    ['hand_over', 'Rendre la main à un humain'],
+  ] as const)('draws the gesture %s, and still without a draft waiting', (kind, label) => {
+    const assist = base({ nextMove: { kind, label, priceMinor: null, block: null }, reasons: [] });
+    for (const draft of [ready(), { kind: 'hidden' } as const]) {
+      const root = with_(assist, { draft });
+      expect(root.querySelector<HTMLElement>('.cp-move')?.dataset['move']).toBe(kind);
+      expect(root.querySelector('.cp-move__what')?.textContent).toBe(label);
+      expect(root.querySelector('.cp-move__why')).toBeNull();
+    }
+  });
+
+  it('says « ne rien vendre » in amber with the block, and in red only for « Ne plus lui écrire »', () => {
+    const low = with_(
+      base({ nextMove: { kind: 'no_sale', label: 'Ne rien vendre', priceMinor: null, block: 'low_desire' } }),
+    );
+    expect(low.querySelector<HTMLElement>('.cp-move')?.dataset['tone']).toBe('amber');
+    expect(low.querySelector('.cp-move__why')?.textContent).toBe(
+      'Désir encore trop bas · Réécrit une fois par une garde',
+    );
+    const blocked = with_(
+      base({
+        nextMove: { kind: 'no_sale', label: 'Ne rien vendre', priceMinor: null, block: 'do_not_contact' },
+      }),
+    );
+    expect(blocked.querySelector<HTMLElement>('.cp-move')?.dataset['tone']).toBe('red');
+  });
+
+  it.each([
+    ['age_doubt', 'red', 'Doute sur son âge\u00a0: un humain doit le lever avant tout.'],
+    ['care', 'amber', 'Fan en difficulté\u00a0: on ne vend pas, on prend soin de lui.'],
+    ['care_exit', 'amber', 'Il sort d’une passe difficile\u00a0: ni vente ni rien de coquin.'],
+    ['sales_frozen', 'amber', 'Ventes gelées\u00a0: on ne lui vend rien.'],
+  ] as const)('replaces what to do with one sentence under the cut %s, the sale gone', (cut, tone, text) => {
+    const root = with_(
+      base({ cuts: [cut], sale: null, buttons: [], signals: { desireTrend: 'up', followUpDue: true } }),
+    );
+    const move = root.querySelector<HTMLElement>('.cp-move');
+    expect(move?.dataset['cut']).toBe(cut);
+    expect(move?.dataset['tone']).toBe(tone);
+    expect(move?.textContent).toBe(text);
+    expect(root.querySelector('.cp-move__what')).toBeNull();
+    expect(root.querySelector('.cp-sale')).toBeNull();
+    // No signal pushes to write or to sell under a cut.
+    expect(root.querySelector('.cp-standing')?.textContent).toBe('Rien à signaler·désir chaud');
+  });
+
+  it('cuts the sale on its own when his limits are not read or forbid a word, said once with the draft', () => {
+    // A server that still offers a step: the panel's own reading of his limits wins.
+    const unread = with_(base(), { standing: standingOf('unread', null) });
+    expect(unread.querySelector('.cp-move')).toBeNull();
+    expect(unread.querySelector('.cp-sale')).toBeNull();
+    expect(unread.querySelector('.cp-draft__warn')).not.toBeNull();
+    const stop = with_(base(), { standing: standingOf({ doNotContact: true }, null) });
+    expect(stop.querySelector('.cp-move')).toBeNull();
+    expect(stop.querySelector('.cp-draft__stop')?.textContent).toContain('Ne plus lui écrire');
+    // With no draft to say it, the cut stands alone, in red.
+    const alone = with_(base(), {
+      standing: standingOf({ doNotContact: true }, null),
+      draft: { kind: 'hidden' },
+    });
+    expect(alone.querySelector<HTMLElement>('.cp-move')?.dataset['cut']).toBe('do_not_contact');
+    expect(alone.querySelector<HTMLElement>('.cp-move')?.dataset['tone']).toBe('red');
+    const unreadAlone = with_(base(), { standing: standingOf('unread', null), draft: { kind: 'hidden' } });
+    expect(unreadAlone.querySelector<HTMLElement>('.cp-move')?.dataset['cut']).toBe('limits_unread');
+    // Nothing of the sale while « où on en est » is read the first time.
+    const reading = draw(onCard(card({}), [], { draft: ready(), standing: null, assist: base() })).root;
+    expect(reading.querySelector('.cp-move')).toBeNull();
+    expect(reading.querySelector('.cp-sale')).toBeNull();
+  });
+
+  it('folds « Où en est la vente », closed, its line saying the step and the next one with its price', () => {
+    const { root, actions } = draw(
+      onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot'), assist: base() }),
+    );
+    const fold = root.querySelector<HTMLDetailsElement>('.cp-sale');
+    expect(fold?.open).toBe(false);
+    expect(root.querySelector('.cp-scroll')?.firstElementChild).toBe(fold);
+    expect(fold?.querySelector('.cp-group__title')?.textContent).toBe('Où en est la vente');
+    expect(fold?.querySelector('.cp-group__sum')?.textContent).toBe(
+      'Soirée d’essai, étape 2 sur 4 · ensuite Étape 3 à 15\u00a0€',
+    );
+    expect([...(fold?.querySelectorAll('.cp-field__label') ?? [])].map((n) => n.textContent)).toEqual([
+      'Script en cours',
+      'Prochaine étape',
+      'Étapes refusées',
+      'Objections déjà servies, à ne pas resservir',
+    ]);
+    fold?.setAttribute('open', '');
+    fold?.dispatchEvent(new Event('toggle'));
+    expect(actions.toggleSale).toHaveBeenCalledWith(true);
+    const open = with_(base(), { saleOpen: true });
+    expect(open.querySelector<HTMLDetailsElement>('.cp-sale')?.open).toBe(true);
+  });
+
+  it('adds the signals to « où on en est », three parts at most, then « +N »', () => {
+    const pending = base();
+    if (pending.sale === null) throw new Error('sale');
+    const lively = base({
+      signals: { desireTrend: 'up', followUpDue: true },
+      sale: { ...pending.sale, offerPending: true },
+    });
+    const calm = with_(lively);
+    expect(calm.querySelector('.cp-standing')?.textContent).toBe(
+      'Rien à signaler·désir chaud, en hausse·Relance due·Offre sans réponse',
+    );
+    expect(calm.querySelector('.cp-standing__more')).toBeNull();
+    const { root, actions } = draw(
+      onCard(card({}), [], {
+        draft: ready(),
+        standing: standingOf({ fragile: true }, 'hot'),
+        assist: lively,
+      }),
+    );
+    expect(root.querySelector('.cp-standing')?.textContent).toBe(
+      'Fan fragile·désir chaud, en hausse·Relance due·+1',
+    );
+    const more = root.querySelector<HTMLButtonElement>('.cp-standing__more');
+    expect(more?.getAttribute('aria-label')).toBe('Voir 1 de plus');
+    more?.click();
+    expect(actions.showSignals).toHaveBeenCalledOnce();
+    const opened = with_(lively, { standing: standingOf({ fragile: true }, 'hot'), signalsOpen: true });
+    expect(opened.querySelector('.cp-standing')?.textContent).toBe(
+      'Fan fragile·désir chaud, en hausse·Relance due·Offre sans réponse',
+    );
+    // What forbids or holds back is never folded, even past three.
+    const many = with_(lively, {
+      standing: standingOf({ fragile: true, noExplicit: true, spendingLimitMinor: 5_000 }, 'hot'),
+    });
+    expect(many.querySelectorAll('.cp-standing__care')).toHaveLength(3);
+    expect(many.querySelector('.cp-standing__more')?.textContent).toBe('+2');
+    expect(many.querySelector('[title]')).toBeNull();
   });
 });

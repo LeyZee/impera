@@ -1,5 +1,7 @@
 import {
   REJECT_REASONS,
+  type CopilotAssist,
+  type CopilotCut,
   type FanCardEntry,
   type FanCardFieldSpec,
   type FanCardGroup,
@@ -7,6 +9,7 @@ import {
   type RejectReason,
 } from '@impera/contracts';
 
+import { CUT_LINES, cutOf, moveLines, saleRows, saleSummary, signalWords } from '../../lib/copilot/assist';
 import {
   entryOf,
   ESSENTIALS,
@@ -67,6 +70,12 @@ export type PanelScreen =
       /** A value noted after this moment is marked « nouveau » (§ 10, EXT-14); null marks nothing. */
       readonly newSince: string | null;
       readonly draft: DraftPart;
+      /** What the agent computed (ADR 0141, lot a); null from a server that does not send it yet. */
+      readonly assist: CopilotAssist | null;
+      /** « Où en est la vente », closed by default (§ 14). */
+      readonly saleOpen: boolean;
+      /** « Où on en est » past its first three signals (§ 14). */
+      readonly signalsOpen: boolean;
       readonly now: Date;
     };
 
@@ -107,6 +116,9 @@ export type DraftPart =
 export interface PanelActions {
   readonly openCrm: () => void;
   readonly toggleGroup: (group: FanCardGroup, open: boolean) => void;
+  readonly toggleSale: (open: boolean) => void;
+  /** « +N »: the signals past the first three. */
+  readonly showSignals: () => void;
   /** `a`, or the retouched text with `e` (§ 4). */
   readonly place: (edited: boolean) => void;
   /** `a` again: the next bubble of what was placed. */
@@ -372,35 +384,132 @@ function cardNodes(
 }
 
 /**
- * « Où on en est », one line (§ 3.1): red for what forbids the sale, amber for what holds it back, then his desire.
- * Nothing to say is said, so a chatter knows it was read.
+ * « Où on en est », one line (§ 3.1): red for what forbids the sale, amber for what holds it back, then his desire and
+ * the signals not to miss (ADR 0141 § 4). Nothing to say is said, so a chatter knows it was read. Three parts at most,
+ * then « +N » (§ 14): only the new signals fold, what forbids or holds back is always said.
  */
-function standingLine(standing: Standing | null): HTMLElement {
+function standingLine(standing: Standing | null, signals: Signals, open: boolean): HTMLElement {
   if (standing === null) return h('p', { class: 'cp-standing', 'aria-busy': 'true' }, '…');
   const parts: HTMLElement[] = [
     ...standing.stops.map((text) => h('span', { class: 'cp-standing__stop' }, text)),
     ...standing.cares.map((text) => h('span', { class: 'cp-standing__care' }, text)),
   ];
   if (standing.unread) parts.push(h('span', { class: 'cp-standing__care' }, 'Limites non lues'));
-  if (parts.length === 0) parts.push(h('span', { class: 'cp-standing__calm' }, 'Rien à signaler'));
+  const calm = parts.length === 0;
+  if (calm) parts.push(h('span', { class: 'cp-standing__calm' }, 'Rien à signaler'));
   // Words of the application, without an emoji (V-EXT-08): the emojis are the creator's voice, in the bubbles.
-  if (standing.band !== null)
-    parts.push(h('span', { class: 'cp-standing__band' }, `désir ${DESIRE_WORDS[standing.band]}`));
+  const desire = [standing.band === null ? null : DESIRE_WORDS[standing.band], signals.trend].filter(
+    (word): word is string => word !== null,
+  );
+  if (desire.length > 0) parts.push(h('span', { class: 'cp-standing__band' }, `désir ${desire.join(', ')}`));
+  // What forbids, what holds back and his desire are never folded; the new signals fill up to three parts, the rest
+  // waits behind « +N ». « Rien à signaler » is not a signal and takes no place.
+  const room = Math.max(0, 3 - (parts.length - (calm ? 1 : 0)));
+  const more = signals.more.map((text) => h('span', { class: 'cp-standing__signal' }, text));
+  const hidden = open ? 0 : Math.max(0, more.length - room);
+  const shown = [...parts, ...(hidden === 0 ? more : more.slice(0, room))];
   const line = h('p', { class: 'cp-standing', 'aria-label': 'Où on en est' });
   // Each dot goes with what follows it, never alone at the end of a line (V-EXT-18).
-  parts.forEach((part, index) => {
-    line.append(
-      index === 0
-        ? part
-        : h(
-            'span',
-            { class: 'cp-standing__item' },
-            h('span', { class: 'cp-standing__dot', 'aria-hidden': 'true' }, '·'),
-            part,
-          ),
+  const item = (part: HTMLElement): HTMLElement =>
+    h(
+      'span',
+      { class: 'cp-standing__item' },
+      h('span', { class: 'cp-standing__dot', 'aria-hidden': 'true' }, '·'),
+      part,
     );
+  shown.forEach((part, index) => {
+    line.append(index === 0 ? part : item(part));
   });
+  if (hidden > 0)
+    line.append(
+      item(
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'cp-standing__more',
+            'data-action': 'more-signals',
+            'aria-label': `Voir ${String(hidden)} de plus`,
+          },
+          `+${String(hidden)}`,
+        ),
+      ),
+    );
   return line;
+}
+
+interface Signals {
+  readonly trend: string | null;
+  readonly more: readonly string[];
+}
+
+/**
+ * « Quoi faire » and « pourquoi », one block of two lines above the draft (ADR 0141 § 1, § 2, § 12): the gesture the
+ * code decided, in bold, verb first; why, small and muted. A cut replaces it with one sentence that says why (§ 9):
+ * the sale gestures are gone, never greyed.
+ */
+function moveBand(assist: CopilotAssist | null, cut: CopilotCut | null): HTMLElement | null {
+  if (cut !== null) {
+    const { text, tone } = CUT_LINES[cut];
+    return h(
+      'section',
+      { class: 'cp-move', 'data-tone': tone, 'data-cut': cut, role: 'status', 'aria-label': 'Quoi faire' },
+      h('p', { class: 'cp-move__cut' }, text),
+    );
+  }
+  if (assist?.nextMove == null) return null;
+  const { what, why, tone } = moveLines(assist.nextMove, assist.reasons);
+  return h(
+    'section',
+    { class: 'cp-move', 'data-tone': tone, 'data-move': assist.nextMove.kind, 'aria-label': 'Quoi faire' },
+    h('p', { class: 'cp-move__what' }, what),
+    why === null ? null : h('p', { class: 'cp-move__why' }, why),
+  );
+}
+
+/** « Où en est la vente » (ADR 0141 § 3, § 14): a fold closed by default, its line says the step and the next one. */
+function saleFold(
+  assist: CopilotAssist | null,
+  cut: CopilotCut | null,
+  open: boolean,
+  actions: PanelActions,
+): HTMLElement | null {
+  const sale = assist?.sale ?? null;
+  if (sale === null || cut !== null) return null;
+  const rows = saleRows(sale);
+  const details = h(
+    'details',
+    { class: 'cp-group cp-sale', 'data-group': 'sale', open },
+    h(
+      'summary',
+      {},
+      h(
+        'span',
+        { class: 'cp-sale__top' },
+        h('span', { class: 'cp-group__title' }, 'Où en est la vente'),
+        h('span', { class: 'cp-group__sum' }, saleSummary(sale)),
+      ),
+      h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
+    ),
+    h(
+      'ul',
+      { class: 'cp-fields' },
+      ...(rows.length === 0
+        ? [h('li', { class: 'cp-field cp-field--unknown' }, 'Rien de vendu ni proposé pour l’instant.')]
+        : rows.map(({ label, value }) =>
+            h(
+              'li',
+              { class: 'cp-field' },
+              h('span', { class: 'cp-field__top' }, h('span', { class: 'cp-field__label' }, label)),
+              h('span', { class: 'cp-field__value' }, value),
+            ),
+          )),
+    ),
+  );
+  details.addEventListener('toggle', () => {
+    actions.toggleSale(details.open);
+  });
+  return details;
 }
 
 function cardPart(
@@ -725,6 +834,7 @@ function draftPart(
 
 function wire(root: ParentNode, actions: PanelActions): void {
   root.querySelector('[data-action="crm"]')?.addEventListener('click', actions.openCrm);
+  root.querySelector('[data-action="more-signals"]')?.addEventListener('click', actions.showSignals);
   const on = (gesture: string, run: () => void): void => {
     root.querySelector(`[data-gesture="${gesture}"]`)?.addEventListener('click', run);
   };
@@ -796,29 +906,58 @@ function whoBand(fanName: string | null): HTMLElement | null {
     : h('header', { class: 'cp-who' }, h('span', { class: 'cp-who__fan' }, fanName));
 }
 
+/**
+ * A cut the draft already says in its own line, right under it (« Ne plus lui écrire », limits not read): said once.
+ * With no draft shown, the cut stands alone.
+ */
+function sameAsDraft(cut: CopilotCut | null, draft: DraftPart, withheld: Withheld | null): boolean {
+  if (draft.kind !== 'ready' || withheld === null) return false;
+  const saysIt = draft.mode === 'editing' || (draft.mode === 'idle' && draft.done === null && !draft.placed);
+  if (!saysIt) return false;
+  return (
+    (cut === 'do_not_contact' && withheld === 'no_contact') ||
+    (cut === 'limits_unread' && withheld === 'unread')
+  );
+}
+
 export function render(root: HTMLElement, screen: PanelScreen, actions: PanelActions): void {
   // The card scrolls; « où on en est » above it and the draft under it stay in view (§ 10).
   const scroller = root.querySelector('.cp-scroll');
   const scroll = scroller?.scrollTop ?? 0;
   const focused = focusOf(root);
   if (screen.kind === 'conversation') {
-    const body = h('div', { class: 'cp-scroll' }, ...cardPart(screen, actions));
+    // Nothing of the sale while « où on en est » is read the first time: it may hold a cut (§ 9).
+    const cut = screen.standing === null ? null : cutOf(screen.assist, screen.standing);
+    const assist = screen.standing === null ? null : screen.assist;
+    const fold = saleFold(assist, cut, screen.saleOpen, actions);
+    const body = h(
+      'div',
+      { class: 'cp-scroll' },
+      ...(fold === null ? [] : [fold]),
+      ...cardPart(screen, actions),
+    );
     const stops: DraftStops = {
       withheld: withheldOf(screen.standing),
       stops: screen.standing?.stops ?? [],
     };
-    const top = [whoBand(screen.fanName), standingLine(screen.standing)].filter(
-      (node): node is HTMLElement => node !== null,
-    );
+    const top = [
+      whoBand(screen.fanName),
+      standingLine(screen.standing, signalWords(assist, cut), screen.signalsOpen),
+    ].filter((node): node is HTMLElement => node !== null);
+    // Under the card, right above the draft, so fan, what to do, the draft and its copy are read without scrolling.
+    // A cut the draft already says is said once, by the draft; it never lets the sale gesture through.
+    const move =
+      cut !== null && sameAsDraft(cut, screen.draft, stops.withheld) ? null : moveBand(assist, cut);
+    const pinned = move === null ? [] : [move];
     const key = draftKey(screen.draft, stops);
     const shown = root.querySelector(':scope > .cp-draft');
     if (shown !== null && drawnDrafts.get(shown) === key) {
       // The same draft in the same state: it stays in place, never detached, so a field he types in keeps its focus,
       // its text and its caret while the card above it is drawn again (recette du 16/11, EXT-01).
       for (const child of [...root.children]) if (child !== shown) child.remove();
-      shown.before(...top, body);
+      shown.before(...top, body, ...pinned);
       body.scrollTop = scroll;
-      for (const node of [...top, body]) wire(node, actions);
+      for (const node of [...top, body, ...pinned]) wire(node, actions);
       refocus(root, focused);
       return;
     }
@@ -826,7 +965,7 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
     const note = root.querySelector<HTMLInputElement>('.cp-draft__note')?.value ?? '';
     const draft = draftPart(screen.draft, stops, actions);
     if (draft !== null) drawnDrafts.set(draft, key);
-    root.replaceChildren(...top, body, ...(draft === null ? [] : [draft]));
+    root.replaceChildren(...top, body, ...pinned, ...(draft === null ? [] : [draft]));
     // Kept open groups keep their place: the panel draws over itself, without scrolling back up (§ 10).
     body.scrollTop = scroll;
     const kept = root.querySelector<HTMLInputElement>('.cp-draft__note');
