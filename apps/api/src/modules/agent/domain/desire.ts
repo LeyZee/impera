@@ -62,7 +62,7 @@ const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
 /** At most this many suggestive emojis count in one message: a row of 🔥 is not ten times hotter. */
 const MAX_EMOJIS_COUNTED = 3;
 // Suggestive on their own; a heart or a laugh says nothing of his heat.
-const SUGGESTIVE_EMOJIS = ['🔥', '😈', '😏', '🥵', '💦', '🍑', '🍆', '👅', '🤤'] as const;
+export const SUGGESTIVE_EMOJIS = ['🔥', '😈', '😏', '🥵', '💦', '🍑', '🍆', '👅', '🤤'] as const;
 
 const LONG_RATIO = 1.5;
 const SHORT_RATIO = 0.5;
