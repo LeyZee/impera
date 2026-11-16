@@ -1,6 +1,6 @@
 {
-  "id": "aef8da37-1f25-4918-b372-c8c5ca3553c7",
-  "prevId": "b9feca79-2523-4108-abd6-0f01de03c7d7",
+  "id": "4a57b6a9-7f7b-4237-bb5e-06cea17bdccc",
+  "prevId": "cb39cfba-f879-41b6-8f39-3067113b1347",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -21332,6 +21332,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "session_owner": {
+          "name": "session_owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "session_updated_at": {
           "name": "session_updated_at",
           "type": "timestamp with time zone",
@@ -21412,6 +21418,11 @@
           "name": "platform_accounts_platform_handle_unique",
           "nullsNotDistinct": false,
           "columns": ["platform", "handle"]
+        },
+        "platform_accounts_platform_session_owner_unique": {
+          "name": "platform_accounts_platform_session_owner_unique",
+          "nullsNotDistinct": false,
+          "columns": ["platform", "session_owner"]
         },
         "platform_accounts_id_creator_unique": {
           "name": "platform_accounts_id_creator_unique",

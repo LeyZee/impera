@@ -13,7 +13,7 @@ export interface ConnectorSessions {
   /**
    * Stores the session the extension captured, encrypted; the account becomes `valid` and its breaker closes. Refused
    * when it is not a session of the account's platform, when it belongs to another creator than the one stored or the
-   * model the sales register links to the account, or to
+   * model the sales register links to the account, when another account already holds or is linked to her, or to
    * another team member than the one stored (the « bot » member, pinned at the first « Sync »).
    */
   store(input: {
@@ -40,13 +40,11 @@ export function createConnectorSessions(deps: {
   /** How each platform's session reads; a platform without a reader takes no session. */
   readonly shapes: SessionShapes;
   /**
-   * The platform models the sales register links to this account (Réglages › Relevé des ventes): a session of another
-   * model is refused even at the first « Sync », before any session is stored to compare it with.
+   * The account each platform model is linked to by the sales register (Réglages › Relevé des ventes): a session of
+   * another model than this account's is refused even at the first « Sync », before any session is stored to compare
+   * it with, and so is a session of a model the register links to another account.
    */
-  readonly linkedModels: (
-    platform: Platform,
-    platformAccountId: PlatformAccountId,
-  ) => Promise<readonly string[]>;
+  readonly modelLinks: (platform: Platform) => Promise<ReadonlyMap<string, PlatformAccountId>>;
 }): ConnectorSessions {
   const vault = (): SessionVault => {
     if (deps.vault === null) throw new SessionVaultMissing();
@@ -66,8 +64,12 @@ export function createConnectorSessions(deps: {
       const stored = before === null ? null : shape(before);
       if (stored !== null && stored.owner !== read.owner) throw new SessionOwnerConflict();
       // The first « Sync » has nothing stored to compare with: the model the register links to this account answers.
-      const linked = await deps.linkedModels(account.platform, platformAccountId);
+      const links = await deps.modelLinks(account.platform);
+      const linked = [...links].filter(([, to]) => to === platformAccountId).map(([model]) => model);
       if (linked.length > 0 && !linked.includes(read.owner)) throw new SessionOwnerConflict();
+      // Nor a session the register gives to another account: one mistaken « Sync » would read her under this creator.
+      const elsewhere = links.get(read.owner);
+      if (elsewhere !== undefined && elsewhere !== platformAccountId) throw new SessionOwnerConflict();
       // The member is pinned at the first « Sync » (P2-02): the owner's or a chatter's session is never the bot's.
       if (stored?.member !== undefined && stored.member !== read.member) throw new SessionMemberConflict();
       const sealed = vault().seal(platformAccountId, session);
@@ -76,6 +78,8 @@ export function createConnectorSessions(deps: {
         platformAccountId,
         {
           ciphertext: sealed,
+          // One platform identity, one account: the store refuses an owner another account already holds.
+          owner: read.owner,
           // Compared in clear: GCM seals the same session differently each time. One that no longer opens (a retired
           // key) is not the same.
           isSame: (stored) => openOrNull(vault(), platformAccountId, stored) === session,
