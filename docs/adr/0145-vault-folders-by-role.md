@@ -1,6 +1,6 @@
-# 0145. Les dossiers du coffre ont un rôle : un dossier par script, des dossiers Mass DM et feed, le code lit le rôle et jamais le nom
+# 0145. Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed, le code lit le rôle et jamais le nom
 
-Statut : accepted (Charles, 16/11/2026, 17 h 36, « ok 0145 » ; demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
+Statut : accepted (Charles, 16/11/2026, 17 h 36, « ok 0145 » ; amendée par Charles le même jour à 17 h 41 après la capture : réserves Mass DM et Feed à nous ; demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
 Date : 2026-11-16
 Amende : l'ADR 0099 § 2 (« le CRM ne crée aucun dossier du coffre »), pour les seuls dossiers de cette ADR.
 Précise : l'ADR 0056 (§ 5 la nomenclature, § 7 vers Reveal dans l'ordre), l'ADR 0113 § 5 (ce qui est décrit), l'ADR 0018 (garde d'écriture), l'ADR 0136 (feed) et l'ADR 0137 (Mass DM).
@@ -43,7 +43,7 @@ La garde vit dans le domaine. Elle est testée en unitaire et contre `FakeReveal
 ### 3. Les dossiers que le CRM crée
 
 - **Script** : à l'acceptation d'un script déposé par la créatrice (ADR 0056 § 7), le connecteur crée son dossier, puis téléverse les fichiers un à un, dans l'ordre des noms. Le dossier est nommé `S<nnn> · <thème> · <tenue> · ☀️` ou `🌙` (exemple inventé : « S014 · salon · nuisette noire · 🌙 »). Le numéro garde l'ordre, et l'emoji reste la convention que le code lit déjà pour le moment d'un script natif (glossaire, « Moment d'un script natif »). La tenue est un champ court du dépôt, que la créatrice remplit ; la description par la vision peut le pré-remplir, mais c'est elle qui le confirme. Sans tenue, le nom s'en passe. Le thème et la tenue sont coupés pour que le nom reste court, et un nom ne change plus une fois le dossier créé.
-- **Mass DM** et **feed** : le CRM ne crée rien. Ce sont les dossiers système de Reveal, « Mass DM » et « Feed », un seul pour chaque rôle. Ils reçoivent leur rôle une fois pour toutes : par le marqueur système que Reveal renvoie s'il existe, sinon de la main de Charles (§ 4). Condition (Charles, 16/11, 17 h 35) : la capture doit montrer qu'on peut y ajouter des médias directement, ou que Reveal y range seul ce qu'on téléverse pour un post ou un Mass DM. Sinon, la question revient à Charles avant tout code. La solution de repli serait un dossier « MASS DM » et un dossier « FEED » à nous, un seul de chaque. Le code suit chaque média par son identifiant et son état (publié, envoyé) : un dossier par mois n'apporterait rien au tri, et ferait plus de dossiers à déclarer. Les médias de relance demandés chaque semaine (ADR 0140) sont des médias de Mass DM.
+- **Mass DM** et **feed** : deux dossiers à nous, créés par le CRM, un seul de chaque : « RÉSERVE · Mass DM » et « RÉSERVE · Feed ». C'est là que vont les médias prévus pour un Mass DM ou pour un post, et le CRM les gère. La capture du 16/11 l'a tranché (amendement de Charles, 17 h 41) : on ne peut pas ajouter un média dans les dossiers système « Mass DM » et « Feed » de Reveal, qui se remplissent seuls quand on publie ou qu'on envoie un Mass DM. Ces dossiers système deviennent la **trace** de ce qui est parti : ils prennent eux aussi le rôle `mass_dm` ou `feed`, une fois pour toutes, par le marqueur système que Reveal renvoie, sinon de la main de Charles (§ 4). La garde du § 2 s'applique donc à un média, qu'il soit en réserve ou déjà parti. Le mot « RÉSERVE » les distingue des dossiers système dans le coffre. Le code suit chaque média par son identifiant et son état (publié, envoyé) : un dossier par mois n'apporterait rien au tri. Les médias de relance demandés chaque semaine (ADR 0140) vont dans « RÉSERVE · Mass DM ».
 - Le nom est calculé par le serveur, jamais par le modèle de langage. Un dossier créé reçoit son rôle au moment où il est créé.
 - Toutes ces écritures passent par la garde d'écriture (ADR 0018 § 3) et une clé d'idempotence. Une reprise repart de la position atteinte. Rien n'est jamais renommé, déplacé ni supprimé dans Reveal.
 
@@ -57,7 +57,7 @@ Par défaut, la description par la vision (ADR 0113 § 5, amendée le 16/11) ne 
 
 ### 6. Avant tout code d'écriture
 
-Il faut d'abord une capture ciblée sur le PC de Charles : la création d'un dossier, le téléversement dans un dossier, ce que Reveal fait d'un fichier téléversé pour un post ou un Mass DM, et la façon dont la liste des dossiers marque un dossier système. Il faut leurs formes, leurs réponses et leurs erreurs. Aucun `.har` ne quitte le PC. `FakeReveal` est écrit d'abord. Rien n'est créé sur un vrai compte sans le mot de Charles écrit dans le fil qui exécute.
+Il faut d'abord la capture ciblée sur le PC de Charles (faite le 16/11, lue sur le PC par le fil Bilan) : la création d'un dossier, le téléversement dans un dossier, ce que Reveal fait d'un média du coffre utilisé par un post ou un Mass DM (copié ou déplacé dans son dossier système), et la façon dont la liste des dossiers marque un dossier système. Il faut leurs formes, leurs réponses et leurs erreurs. Aucun `.har` ne quitte le PC. `FakeReveal` est écrit d'abord. Rien n'est créé sur un vrai compte sans le mot de Charles écrit dans le fil qui exécute.
 
 ## Conséquences
 
@@ -70,10 +70,10 @@ Il faut d'abord une capture ciblée sur le PC de Charles : la création d'un dos
 
 - **Déduire le rôle du nom du dossier.** Un nom se change à la main dans Reveal, et une faute de frappe suffirait pour vendre un média déjà offert.
 - **Un dossier Mass DM et un dossier feed par mois.** Plus lisible à l'œil dans Reveal, mais le code n'en a pas besoin, et chaque mois ajouterait un dossier à déclarer. Pour s'y retrouver à l'œil, le mois peut aller dans le nom du fichier.
-- **Créer nos propres dossiers Mass DM et feed d'emblée.** Reveal en a déjà, verrouillés ; en créer d'autres doublerait les endroits où chercher.
+- **Se servir des dossiers système « Mass DM » et « Feed » de Reveal comme réserve.** C'était le premier choix (Charles, 17 h 35), mais Reveal ne permet pas d'y ajouter un média (capture du 16/11).
 - **Ranger les médias existants dans les nouveaux dossiers.** Ce serait déplacer dans Reveal, ce que cette ADR exclut.
 
 ## Réponses de Charles (16/11/2026, 17 h 35)
 
 1. Le nom d'un dossier de script : « fais ce que tu me recommandes », avec la tenue que porte la modèle en plus du thème (§ 3).
-2. Les dossiers système « Mass DM » et « Feed » de Reveal : « si on peut directement ajouter des médias dans ces dossiers-là, alors go, on n'a pas besoin de créer les nôtres » (17 h 35, § 3). À vérifier à la capture.
+2. Les dossiers système « Mass DM » et « Feed » de Reveal : « si on peut directement ajouter des médias dans ces dossiers-là, alors go » (17 h 35). La capture a montré que non. Amendement de Charles (17 h 41) : « il va bien falloir qu'on les crée nous, comme ça on peut les ajouter nous et les gérer nous » (§ 3).
