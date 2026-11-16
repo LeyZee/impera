@@ -99,3 +99,54 @@ export function groupLine(entries: readonly FanCardEntry[], group: FanCardGroup)
 /** How many fields wait for a chatter (ADR 0085 § 6): said in amber, it stops nothing. */
 export const toCheckCount = (entries: readonly FanCardEntry[]): number =>
   entries.filter((entry) => entry.toCheck.length > 0).length;
+
+/** The three words that say who he is, on one line on top (recette du 16/11, EXT-04): « Alpha · 34 ans · Lyon ». */
+export const IDENTITY = ['first_name', 'age', 'location'] as const satisfies readonly FanCardField[];
+type IdentityField = (typeof IDENTITY)[number];
+
+/** Each part of the identity line by its short name, for its source and its doubt. */
+export const IDENTITY_WORDS: Readonly<Record<IdentityField, string>> = {
+  first_name: 'prénom',
+  age: 'âge',
+  location: 'ville',
+};
+
+/** A part of the identity line: an age of digits is said in years, the rest as it was noted. */
+export function identityText(field: IdentityField, items: readonly string[]): string {
+  const text = valueText(field, items);
+  return field === 'age' && /^\d{1,3}$/u.test(text.trim()) ? `${text.trim()} ans` : text;
+}
+
+const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr-FR') + text.slice(1);
+
+/**
+ * Where the identity line comes from, said once (EXT-04): one source when the three parts share it, else one line per
+ * source naming its parts, « prénom et âge : dit par lui, hier ».
+ */
+export function identitySources(entries: readonly FanCardEntry[], now: Date): string[] {
+  const bySource = new Map<string, string[]>();
+  for (const field of IDENTITY) {
+    const { current } = entryOf(entries, field);
+    if (current === null) continue;
+    const line = sourceLine(current, now);
+    bySource.set(line, [...(bySource.get(line) ?? []), IDENTITY_WORDS[field]]);
+  }
+  if (bySource.size <= 1) return [...bySource.keys()];
+  return [...bySource].map(([line, words]) => {
+    const named =
+      words.length === 1 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} et ${words.at(-1) ?? ''}`;
+    return `${named.charAt(0).toLocaleUpperCase('fr-FR')}${named.slice(1)} : ${lowerFirst(line)}`;
+  });
+}
+
+/**
+ * When the newest value of the card was noted, so that a value noted after the panel first read it is marked
+ * « nouveau » (ADR 0086 § 10, EXT-14); `null` for a card with no value yet.
+ */
+export function newestOf(entries: readonly FanCardEntry[]): string | null {
+  let newest: string | null = null;
+  for (const { current } of entries)
+    if (current !== null && (newest === null || Date.parse(current.observedAt) > Date.parse(newest)))
+      newest = current.observedAt;
+  return newest;
+}

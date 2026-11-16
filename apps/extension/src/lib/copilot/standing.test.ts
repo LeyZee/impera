@@ -1,0 +1,17 @@
+import { describe, expect, it } from 'vitest';
+
+import { standingOf } from './standing';
+
+describe('where things stand with him (ADR 0086 § 3.1)', () => {
+  // Recette du 16/11, EXT-05: « Ne plus lui écrire » forbids any word, the other stops forbid an offer.
+  it('says when nothing at all may go to him', () => {
+    expect(standingOf({ doNotContact: true }, null)).toMatchObject({
+      stops: ['Ne plus lui écrire'],
+      noContact: true,
+    });
+    expect(
+      standingOf({ salesFrozen: { reason: 'distress', since: '2026-11-08T18:00:00Z' } }, null).noContact,
+    ).toBe(false);
+    expect(standingOf('unread', null)).toMatchObject({ unread: true, noContact: false });
+  });
+});

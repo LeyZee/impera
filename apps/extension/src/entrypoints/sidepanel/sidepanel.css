@@ -36,6 +36,26 @@ body {
   gap: var(--nv-space-3);
 }
 
+/* ───────────── Which conversation (EXT-14) ───────────── */
+
+.cp-who {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--nv-space-3) var(--nv-space-3) 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.cp-who__fan {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
 /* ───────────── Où on en est ───────────── */
 
 .cp-standing {
@@ -69,12 +89,13 @@ body {
 
 /* ───────────── The agent's draft ───────────── */
 
+/* At most two fifths of the panel, so the essentials above stay read (EXT-04): the bubbles scroll inside it. */
 .cp-draft {
   flex: none;
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  max-height: 55%;
+  max-height: 40%;
   overflow-y: auto;
   padding: var(--nv-space-3);
   border-top: 1px solid var(--nv-hairline);
@@ -100,6 +121,11 @@ body {
   color: var(--nv-ink-muted);
 }
 .cp-bubbles {
+  flex: 0 1 auto;
+  min-height: 3em;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -107,6 +133,9 @@ body {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+.cp-draft > :not(.cp-bubbles) {
+  flex: none;
 }
 /* The design system's draft bubble, held still: dashed, nothing sent yet (§ 10, nothing moves). */
 .cp-bubble {
@@ -124,13 +153,25 @@ body {
   white-space: pre-wrap;
   user-select: text;
 }
+/* A bubble already copied for Reveal: its dash goes, the next one is the one to copy (EXT-13). */
+.cp-bubble[data-copied='true'] {
+  outline-style: solid;
+  color: var(--nv-ink-muted);
+}
+/* The main gesture on its own row, the two others sharing the next: nothing wraps alone at 320 px (EXT-21). */
 .cp-draft__actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--nv-space-2);
 }
 .cp-draft__actions .nv-btn {
   gap: 6px;
+  min-height: 40px;
+  justify-content: center;
+}
+.cp-draft__actions .cp-send,
+.cp-draft__actions .nv-btn:only-child {
+  grid-column: 1 / -1;
 }
 /* The gesture of the panel, in ink like a ticked chip: red stays for a limit that forbids the sale (§ 10). */
 .cp-draft__actions .cp-send {
@@ -150,10 +191,14 @@ body {
   opacity: 0.45;
   cursor: default;
 }
+/* The retouched text grows with what he types, up to ten lines, then scrolls (EXT-20). */
 .cp-draft__area {
   width: 100%;
   box-sizing: border-box;
   resize: none;
+  field-sizing: content;
+  min-height: 4.5em;
+  max-height: 15em;
 }
 .cp-draft__reasons {
   display: flex;
@@ -167,6 +212,11 @@ body {
 .cp-draft__next {
   margin: 0;
   color: var(--nv-ink-muted);
+}
+.cp-draft__stop {
+  margin: 0;
+  font-weight: 600;
+  color: var(--nv-danger);
 }
 .cp-draft__warn {
   margin: 0;
@@ -249,7 +299,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: var(--nv-space-2) 0;
+  padding: 6px 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   overflow-wrap: anywhere;
@@ -257,8 +307,49 @@ body {
 .cp-field + .cp-field {
   border-top: 1px solid var(--nv-hairline);
 }
+/* The label, then where the value comes from in small to its right (EXT-04): two lines a field, not three. */
+.cp-field__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--nv-space-2);
+}
 .cp-field__label {
   color: var(--nv-ink-muted);
+}
+.cp-field__top .cp-field__source {
+  margin-left: auto;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+/* « nouveau » in ink on a quiet chip: neither red (forbids) nor amber (waits for him), it only says it changed. */
+.cp-field__new {
+  padding: 0 6px;
+  border-radius: var(--nv-radius-xs);
+  background: var(--nv-glass-fill-strong);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+}
+.cp-ident__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  min-width: 0;
+}
+.cp-ident__line .cp-field__value,
+.cp-ident__line .cp-field__empty {
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.cp-ident__dot {
+  color: var(--nv-ink-faint);
+}
+.cp-ident > .cp-field__source {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
 }
 .cp-field__value {
   font-size: var(--nv-text-callout);
