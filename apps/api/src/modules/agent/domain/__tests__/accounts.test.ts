@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { accountAsked, accountDecision, usernamesIn, wantsToTry, type AccountCuts } from '../accounts';
+import {
+  accountAsked,
+  accountDecision,
+  accountViolations,
+  meetingYes,
+  usernamesIn,
+  wantsToTry,
+  withoutAllowedAccount,
+  type AccountCuts,
+} from '../accounts';
+import { DEFAULT_GUARD_SETTINGS, checkVoiceOutput } from '../guards';
 
 // Fictive accounts (ADR 0143 § 7): her real ones live in the CRM only.
 const practice = { platform: 'instagram', username: 'demo_atelier', usage: 'practice' } as const;
@@ -71,5 +81,43 @@ describe('usernamesIn (bound 19)', () => {
       'demo_atelier',
     ]);
     expect(usernamesIn('demo_atelier2', ['demo_atelier'])).toEqual([]);
+  });
+});
+
+describe('the contact guard on an account (bounds 19 and 29)', () => {
+  const names = [practice.username, lives.username, 'demo_perso'];
+  const contacts = (bubbles: readonly string[]) =>
+    checkVoiceOutput(bubbles, DEFAULT_GUARD_SETTINGS).filter((v) => v.code === 'contact_info');
+
+  it('blocks any of her names but the one code allowed at this turn', () => {
+    const answer = ['tape @demo_atelier sur insta 😊'];
+    expect(accountViolations(answer, names, practice)).toEqual([]);
+    expect(accountViolations(answer, names, lives)).toMatchObject([
+      { code: 'contact_info', match: 'demo_atelier' },
+    ]);
+    expect(accountViolations(answer, names, null)).toHaveLength(1);
+    expect(accountViolations(['et mon perso c’est Demo_Perso'], names, practice)).toHaveLength(1);
+  });
+
+  it('lets the allowed name and its platform pass the contact guard, and nothing else', () => {
+    expect(contacts(['tape @demo_atelier sur insta 😊'])).not.toEqual([]);
+    expect(contacts(withoutAllowedAccount(['tape @demo_atelier sur insta 😊'], practice))).toEqual([]);
+    expect(
+      contacts(withoutAllowedAccount(['mon insta c’est demo_atelier, ou mon snap'], practice)),
+    ).not.toEqual([]);
+    expect(
+      contacts(withoutAllowedAccount(['tape demo_atelier sur insta, demo-atelier.com'], practice)),
+    ).not.toEqual([]);
+    expect(contacts(withoutAllowedAccount(['tape @demo_atelier sur insta'], lives))).not.toEqual([]);
+    expect(withoutAllowedAccount(['tape @demo_atelier'], null)).toEqual(['tape @demo_atelier']);
+  });
+
+  it('refuses a yes to a meeting, never a soft no', () => {
+    expect(meetingYes(['Oui avec plaisir 😊'])).toMatchObject([{ code: 'meeting_promise' }]);
+    expect(meetingYes(['😏 ok quand tu veux'])).toHaveLength(1);
+    expect(meetingYes(['carrément, un jour'])).toHaveLength(1);
+    expect(meetingYes(['c’est trop tôt pour moi, j’ai besoin d’être en confiance'])).toEqual([]);
+    expect(meetingYes(['oula pas si vite 😅'])).toEqual([]);
+    expect(meetingYes([])).toEqual([]);
   });
 });

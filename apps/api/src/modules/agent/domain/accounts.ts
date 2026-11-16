@@ -1,4 +1,6 @@
-import { normaliseWords, type SocialAccountUsage } from '@impera/contracts';
+import { normalise, normaliseWords, type SocialAccountUsage } from '@impera/contracts';
+
+import type { GuardViolation } from './guards';
 
 /**
  * « Ses comptes » and what she offers around her practice (ADR 0143 § C, D, F, bounds 18 to 23): code decides, never
@@ -78,11 +80,81 @@ export function accountDecision(input: {
   return { kind: 'give', account, orient };
 }
 
+const nameReading = (text: string): string => ` ${normalise(text).replace(/[^\p{L}\p{N}._-]+/gu, ' ')} `;
+
 /**
- * Every user name of hers in a text (bound 19), as whole words, case and a leading « @ » aside: the guard reads it
- * against the one, if any, code allowed at this turn.
+ * Every user name of hers in a text (bound 19), as whole words, case, accents, look-alikes and a leading « @ » aside:
+ * the guard reads it against the one, if any, code allowed at this turn.
  */
 export function usernamesIn(text: string, usernames: readonly string[]): string[] {
-  const read = ` ${text.toLowerCase().replace(/[^\p{L}\p{N}._-]+/gu, ' ')} `;
-  return usernames.filter((name) => name !== '' && read.includes(` ${name.toLowerCase()} `));
+  const read = nameReading(text);
+  return usernames.filter((name) => name !== '' && read.includes(` ${normalise(name)} `));
+}
+
+// The words that name each platform in her answer: on the turn code gives an account, only its own pass (bound 19).
+const PLATFORM_WORDS: Readonly<Record<string, readonly string[]>> = {
+  instagram: ['instagram', 'insta', 'ig'],
+  tiktok: ['tiktok', 'tik tok'],
+  x: ['twitter'],
+  youtube: ['youtube'],
+  twitch: ['twitch'],
+  other: [],
+};
+
+const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Her answer as the contact guard reads it on the turn code gives `allowed` (bound 19): that user name, with or without
+ * its « @ », and the words of its platform are taken out, so they alone pass; anything else of a contact still blocks.
+ * With nothing allowed, the answer is read as written.
+ */
+export function withoutAllowedAccount(
+  bubbles: readonly string[],
+  allowed: ShareableAccount | null,
+): readonly string[] {
+  if (allowed === null) return bubbles;
+  const words = [allowed.username, ...(PLATFORM_WORDS[allowed.platform] ?? [])]
+    .map((word) => escape(normalise(word)))
+    .join('|');
+  const pattern = new RegExp(
+    `(?<![\\p{L}\\p{N}._-])@?(?:${words})(?![\\p{L}\\p{N}_-]|\\.[\\p{L}\\p{N}])`,
+    'gu',
+  );
+  return bubbles.map((bubble) => normalise(bubble).replace(pattern, ' '));
+}
+
+/**
+ * Bound 19: any user name of hers but the one code allowed at this turn blocks, as a contact. `usernames` are all of
+ * hers, given to the agent or not.
+ */
+export function accountViolations(
+  bubbles: readonly string[],
+  usernames: readonly string[],
+  allowed: ShareableAccount | null,
+): GuardViolation[] {
+  const others = usernames.filter(
+    (name) => allowed === null || normalise(name) !== normalise(allowed.username),
+  );
+  return [...new Set(bubbles.flatMap((bubble) => usernamesIn(bubble, others)))].map((match) => ({
+    code: 'contact_info',
+    severity: 'blocking',
+    match,
+  }));
+}
+
+// Her answer opens on a yes (bound 29): « oui », « ok », « avec plaisir », « carrément », « quand tu veux ».
+const MEETING_YES =
+  /^(?:\p{Extended_Pictographic}|\s|[.!,…])*(?:oui|ouais|ouiii+|ok|okay|d'accord|dac|carrement|avec plaisir|volontiers|grave|bien sur|pourquoi pas|quand tu veux|ca marche|vas ?y|go)\b/u;
+
+/**
+ * Bound 29: when he asks to see her for real, an answer that says yes blocks, as a promise of a meeting, whatever
+ * follows; « trop tôt », « pas encore » and a soft no pass. Read on the first bubble, where a yes is said.
+ */
+export function meetingYes(bubbles: readonly string[]): GuardViolation[] {
+  const first = bubbles[0];
+  if (first === undefined) return [];
+  const match = MEETING_YES.exec(normalise(first).trim())?.[0];
+  return match === undefined
+    ? []
+    : [{ code: 'meeting_promise', severity: 'blocking', bubbleIndex: 0, match }];
 }
