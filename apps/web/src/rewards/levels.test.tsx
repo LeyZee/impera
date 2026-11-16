@@ -212,16 +212,31 @@ describe('MyRankCard (ADR 0104 § 16)', () => {
 
 describe('MemberGameBlock (ADR 0104 § 20)', () => {
   it('shows a member’s rank, streak and trophies earned, with no amount', async () => {
-    const { sent } = serve({ ...CASE, nextLevel: null });
+    const later = { kind: 'streak_5', family: 'streak', progress: null, revealedAt: null } as const;
+    const { sent } = serve({
+      ...CASE,
+      items: [...CASE.items, { ...later, earnedAt: '2026-11-09T10:00:00.000Z' }],
+      nextLevel: null,
+    });
     show(<MemberGameBlock memberId="member-1" name="Théo" />);
     expect(await screen.findByText('Étincelle')).toBeTruthy();
     expect(sent[0]?.url).toBe('/v1/rewards/members/member-1/trophy-case');
-    expect(screen.getByText('3 shifts')).toBeTruthy();
     expect(screen.getByText('Première vente')).toBeTruthy();
     expect(screen.queryByText('Record du jour')).toBeNull();
-    // The coin drawn on a trophy aside, no amount is written: the facts hold a rank, a streak and a count.
+    // The rank comes first, then the two figures, then the trophies, the latest first (Charles, 16/11).
+    const block = document.querySelector('.rw-member');
+    const order = ['.rw-member__rank', '.rw-member__facts', '.rw-member__trophies'].map((selector) =>
+      [...(block?.querySelectorAll('*') ?? [])].indexOf(block?.querySelector(selector) ?? document.body),
+    );
+    expect(order).toEqual(order.toSorted((a, b) => a - b));
+    expect(order.every((at) => at >= 0)).toBe(true);
+    expect(block?.querySelector('.rw-member__label')?.textContent).toBe('Trophées 2 sur 3');
+    expect(
+      [...(block?.querySelectorAll('.rw-member__trophies li > span') ?? [])].map((one) => one.textContent),
+    ).toEqual(['Série de 5', 'Première vente']);
+    // The coin drawn on a trophy aside, no amount is written: the facts hold a streak and a count.
     expect(document.querySelector('.rw-member__facts')?.textContent).toBe(
-      'RangÉtincelleSérie en cours3 shifts · meilleure : 9Quinzaines avec un palier atteint1',
+      'Série en cours3shifts avec le rapport à l’heure · record 9Paliers atteints1quinzaine',
     );
   });
 });
