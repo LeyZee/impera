@@ -29,14 +29,14 @@ export const DESTINATION_LABELS: Readonly<Record<Destination, string>> = {
  * coded, and nothing takes up a rule or replays a test on its own yet. These words change with that work.
  */
 export const DESTINATION_HINTS: Readonly<Record<Destination, string>> = {
-  voice_example: 'Donnée en exemple à sa voix, au Playground seulement : pas encore aux vrais fans.',
-  rule: 'Gardée pour être relue : aucun écran ne la reprend encore, elle ne change rien seule.',
-  test: 'Gardé pour être rejoué à la main : pas encore dans les évaluations automatiques.',
+  voice_example: 'Sert d’exemple à sa voix, au Playground seulement pour l’instant.',
+  rule: 'Gardée pour être relue. Elle ne change rien toute seule pour l’instant.',
+  test: 'Gardé pour être rejoué à la main, pas encore automatiquement.',
 };
 /** Said once the lesson is filed: where it went and what it changes. */
 const DESTINATION_ACKS: Readonly<Record<Destination, string>> = {
-  voice_example: 'Rangée en Exemple de voix : donnée à sa voix au Playground, pas encore aux vrais fans.',
-  rule: 'Rangée en Règle : gardée pour être relue, elle ne change rien seule pour l’instant.',
+  voice_example: 'Rangée en Exemple de voix : elle sert au Playground, pas encore aux vrais fans.',
+  rule: 'Rangée en Règle : gardée pour être relue, elle ne change rien toute seule pour l’instant.',
   test: 'Rangée en Test : gardée pour être rejouée à la main.',
 };
 

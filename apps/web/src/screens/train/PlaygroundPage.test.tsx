@@ -318,7 +318,7 @@ describe('Playground', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     expect(
       await screen.findByText(
-        'Rangée en Exemple de voix : donnée à sa voix au Playground, pas encore aux vrais fans.',
+        'Rangée en Exemple de voix : elle sert au Playground, pas encore aux vrais fans.',
       ),
     ).toBeTruthy();
   });

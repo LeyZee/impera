@@ -16,7 +16,7 @@ const REASONS: PlaygroundState['rejectReasons'] = [{ id: 'too_early_sexual', lab
 describe('the playground’s words', () => {
   it('says where a filed lesson went, and in the demo that nothing was filed', () => {
     expect(filedAck('rule', false)).toBe(
-      'Rangée en Règle : gardée pour être relue, elle ne change rien seule pour l’instant.',
+      'Rangée en Règle : gardée pour être relue, elle ne change rien toute seule pour l’instant.',
     );
     expect(filedAck('rule', true)).toBe('Démo : rien n’est rangé pour de vrai.');
     expect(filedAck('voice_example', true)).toBe('Démo : rien n’est rangé pour de vrai.');

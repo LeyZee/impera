@@ -30,7 +30,7 @@ import {
 describe('lesson words', () => {
   it('names no one in the help of « Règle »', () => {
     expect(DESTINATION_HINTS.rule).toBe(
-      'Gardée pour être relue : aucun écran ne la reprend encore, elle ne change rien seule.',
+      'Gardée pour être relue. Elle ne change rien toute seule pour l’instant.',
     );
   });
 
