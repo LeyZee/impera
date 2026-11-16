@@ -1,6 +1,6 @@
 # 0137. Le Mass DM part seul : une annonce après chaque publication du feed, un réveil quand plus personne ne parle, aux seuls fans silencieux
 
-Statut : proposed (demande de Charles du 16/11/2026, 15 h 50 Paris, fil « Publier posts et stories automatiquement »)
+Statut : accepted (Charles, 16/11/2026, 16 h 13 Paris, « ok 0137 » ; demande du même jour, 15 h 50, fil « Publier posts et stories automatiquement »)
 Date : 2026-11-16
 Amende : ADR 0044 § 5 (le Mass DM ne part plus seulement d'un dépôt Relance : il peut être un texte qui accompagne une publication).
 Précise : ADR 0110 § 5 et § 6 (Mass DM marqué « envoyé à tous », pas de relance de l'agent dans les 6 h), ADR 0136 (publication du feed), ADR 0126 (silence pendant un live).

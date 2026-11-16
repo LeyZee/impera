@@ -447,7 +447,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Plan de publication | `post_plan` | Les publications et les Mass DM de la semaine qu'a préparés le code, acceptés d'un geste ou modifiés un par un par l'agence (ADR 0044). |
 | Mass DM | `mass_dm` | Un message envoyé par Reveal à une liste de fans ; un média n'y part jamais deux fois (ADR 0044). |
 | Story | `story` | Une photo ou une vidéo publique qui reste 24 h sur Reveal, programmée par le plan de publication, toujours avec une question ouverte (ADR 0055, ADR 0136). |
-| Média public | `public` (médiathèque) | Un média déjà publié sur le feed ou en story ; le code refuse qu'il soit vendu ou envoyé en payant, et refuse de publier un média déjà vendu (ADR 0136 § 5). |
+| Média publié | `published` (médiathèque) | Un média déjà publié sur le feed ou en story ; le code refuse qu'il soit vendu ou envoyé en payant, et refuse de publier un média déjà vendu (ADR 0136 § 5). |
 | Serveur MCP | `mcp` | La porte par laquelle des agents externes (Grok, ChatGPT, Claude…) lisent Impera et y freinent l'agent, sur les mêmes commandes que le CRM (ADR 0026). |
 | Agent connecté | `mcp_client` | Un agent externe branché sur le serveur MCP. À ne pas confondre avec l'agent de chatting (`agent`), qui écrit aux fans. |
 | Accès d'agent | `mcp_grant` | Ce qu'un agent connecté a le droit de faire : au nom de quelle personne, pour quelle créatrice (une au plus), avec quelles capacités, jusqu'à quand. Créé et révoqué dans Réglages › Agents connectés. |

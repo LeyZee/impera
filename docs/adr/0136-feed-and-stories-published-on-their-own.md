@@ -1,8 +1,8 @@
 # 0136. Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait
 
-Statut : proposed (demande de Charles du 16/11/2026, 15 h 45 et 15 h 50 Paris, fil « Publier posts et stories automatiquement » ; « une séance = un post », 16 h 02)
+Statut : accepted (Charles, 16/11/2026, 16 h 11 Paris, « OK 0136 », avec ses précisions : feed réservé aux abonnés, publications publiques laissées ouvertes ; demande du même jour, 15 h 45 et 15 h 50, fil « Publier posts et stories automatiquement » ; « une séance = un post », 16 h 02)
 Date : 2026-11-16
-Amende : ADR 0044 § 3 (cadence, acceptation humaine obligatoire), ADR 0044 § 4 (ce qu'on mesure), ADR 0055 § 1 (la story Reveal ne prend que sa catégorie) et § 5 (seuils du stock).
+Amende : ADR 0044 § 3 (cadence, visibilité, acceptation humaine obligatoire), ADR 0044 § 4 (ce qu'on mesure), ADR 0055 § 5 (seuils du stock).
 Précise : ADR 0044 § 6 (formes du connecteur, d'après la capture du 16/11), ADR 0083 (la légende part de la description), ADR 0126 (l'agent ne cite que ce qui est fait).
 Laisse à l'ADR 0137 : le Mass DM qui accompagne une publication et le Mass DM de réveil.
 
@@ -16,9 +16,10 @@ Le 16/11, Charles a fixé de nouvelles règles :
 - **des stories tous les jours** : elles sont publiques, vues par des gens qui ne sont pas abonnés, et doivent leur donner envie de venir ;
 - **une programmation pour toute la semaine** ;
 - **tout ce que la créatrice donne est d'abord décrit par une IA**, et la légende s'appuie sur cette description pour être fidèle ;
-- la légende du feed raconte un peu (la tenue, pourquoi elle avait envie de la partager), reste courte, dans sa voix, et finit par une question ouverte qui invite à lui écrire en privé ; la story pose toujours une question ouverte sur ce qu'on voit.
+- la légende du feed raconte un peu (la tenue, pourquoi elle avait envie de la partager), reste courte, dans sa voix, et finit par une question ouverte qui invite à lui écrire en privé ; la story pose toujours une question ouverte sur ce qu'on voit ;
+- (16 h 11) **les trois publications du feed sont pour les abonnés** : elles servent à faire revenir ceux qui se désintéressent et ne parlent plus (« la lingerie te va bien » relance la conversation) ; **les stories, quotidiennes, visent tous les fans** ; des publications publiques viendront peut-être, rares et plus habillées, mais leur stratégie n'est pas encore pensée.
 
-La capture du 16/11 (lue pour sa forme seulement) montre que Reveal sait créer, programmer et supprimer une publication et une story, téléverser un média, et qu'il donne des statistiques du feed public. Sur les publications passées de la créatrice : une publication est une séance entière (4 à 6 photos et 1 à 2 vidéos), le rythme a été d'environ une par semaine, et presque aucune n'était publique. Reveal classe pourtant les créatrices dans un feed de découverte d'après leurs publications publiques (impressions, clics, abonnés attribués, plafond de publications publiques par jour).
+La capture du 16/11 (lue pour sa forme seulement) montre que Reveal sait créer, programmer et supprimer une publication et une story, téléverser un média, et qu'il donne des statistiques du feed public. Sur les publications passées de la créatrice : une publication est une séance entière (4 à 6 photos et 1 à 2 vidéos), le rythme a été d'environ une par semaine, et presque aucune n'était publique. Reveal a aussi un feed de découverte public, qui classe les créatrices d'après leurs publications publiques (impressions, clics, abonnés attribués, plafond de publications publiques par jour) : c'est le sujet laissé ouvert au § 5.
 
 ## Décision
 
@@ -27,7 +28,7 @@ La capture du 16/11 (lue pour sa forme seulement) montre que Reveal sait créer,
 - **Feed : au moins 3 publications par semaine**, au plus une par jour, réglage par créatrice (plancher 3, plafond 7). Les jours sont étalés (jamais deux jours de suite quand le rythme est 3, par exemple lundi, mercredi et vendredi).
 - **Stories : une par jour**, deux au plus, réglage par créatrice. Deux stories du même jour sont séparées d'au moins 4 heures.
 - **Heure** : celle où ses fans ont été le plus actifs les semaines passées (ADR 0044 § 3, calculée par le code), 20 h pour le feed et 12 h 30 pour la story tant qu'il n'y a pas d'historique. Jamais pendant un live (ADR 0126) : une publication prévue dans la fenêtre d'un live est décalée après sa fin.
-- Le plafond de publications publiques par jour que Reveal annonce (`maxPublicPostsPerDay`) est lu à chaque plan et n'est jamais dépassé.
+- Quand une publication publique est prévue (§ 5), le plafond de publications publiques par jour que Reveal annonce (`maxPublicPostsPerDay`) est lu à chaque plan et n'est jamais dépassé.
 
 ### 2. Une séance, une publication
 
@@ -36,19 +37,21 @@ La capture du 16/11 (lue pour sa forme seulement) montre que Reveal sait créer,
 
 ### 3. La story
 
-- Une story vient d'un dépôt Story Reveal (`reveal_story`). Quand le stock de stories est vide un jour donné, le code peut prendre **une photo verticale d'une séance déjà publiée** sur le feed (jamais une photo encore à publier, jamais une vidéo de plus de 60 s). Ceci amende l'ADR 0055 § 1 pour ce seul cas : le média reste public dans les deux sorties, rien n'est vendu.
-- Si rien ne convient, aucune story ne part ce jour-là et l'alerte du § 7 se lève. Le code ne republie jamais une ancienne story.
+- Une story vient d'un dépôt Story Reveal (`reveal_story`) et de rien d'autre (ADR 0055 § 1) : une story est publique, une séance du feed est pour les abonnés, et le code ne fait jamais passer un média de l'une à l'autre.
+- Stock de stories vide : aucune story ne part ce jour-là et l'alerte du § 7 se lève. Le code ne republie jamais une ancienne story.
 
 ### 4. La légende
 
 - Le modèle de langage n'écrit que la légende (ADR 0044 § 3), à partir de la **description validée** de chaque média de la publication (ADR 0083) et de la phrase de la créatrice. Sans description d'un média, la publication n'est pas planifiée : elle attend, et l'écran le dit.
-- **Feed** : une à trois phrases, dans sa voix, un peu d'histoire (la tenue, l'envie de la partager, le moment), une question ouverte qui invite à lui écrire en privé. **Story** : une phrase au plus, une question ouverte sur ce qu'on voit.
+- **Feed** : une à trois phrases, dans sa voix, un peu d'histoire (la tenue, l'envie de la partager, le moment), une question ouverte qui invite à lui dire en privé ce qu'il en pense : le but est de rouvrir la conversation avec un abonné qui ne parle plus. **Story** : une phrase au plus, une question ouverte sur ce qu'on voit.
 - Gardes du code sur la sortie, en plus des gardes de voix : longueur maximale par sortie, une question présente, aucun prix, aucun lien, aucune promesse de rencontre, aucun mot qui dit l'IA, jamais deux fois la même légende pour la même créatrice (comparaison normalisée). Une légende refusée est redemandée une fois, puis la publication passe en ambre.
 
-### 5. Public ou abonnés, et ce qui ne se vend jamais
+### 5. Pour qui, et ce qui ne se vend jamais
 
-- **Le feed est public par défaut**, réglable par créatrice et par publication : c'est le feed public qui fait venir de nouveaux abonnés. La story est publique.
-- Un média publié (feed ou story) est marqué **public** dans la médiathèque, par son empreinte et par son identifiant Reveal. Le code refuse qu'un média public entre dans un script, une étape payante, un Mass DM payant ou une offre (garde dans les modules `scripts` et `agent`), et refuse de publier un média qui a déjà été vendu ou envoyé en payant. Comme les dépôts du feed ne vont jamais au coffre des scripts (ADR 0055 § 1), cette garde ne fait que fermer la porte aux erreurs de catégorie.
+- **Le feed est réservé aux abonnés** (`isPublic: false`) : ses trois publications par semaine servent à réengager les abonnés, pas à en recruter.
+- **La story est publique** : elle vise tous les fans, abonnés ou non.
+- **Une publication publique** du feed reste possible, posée à la main par le propriétaire, publication par publication ; elle n'entre jamais dans le plan automatique. Sa stratégie (rythme, tenues plus habillées, légende qui invite à s'abonner, demande à la créatrice par sa to-do) sera décidée à part, après un essai mesuré sur les abonnés attribués.
+- Un média publié (feed ou story) est marqué **publié** dans la médiathèque, par son empreinte et par son identifiant Reveal. Le code refuse qu'un média publié entre dans un script, une étape payante, un Mass DM payant ou une offre (garde dans les modules `scripts` et `agent`), et refuse de publier un média qui a déjà été vendu ou envoyé en payant. Comme les dépôts du feed ne vont jamais au coffre des scripts (ADR 0055 § 1), cette garde ne fait que fermer la porte aux erreurs de catégorie.
 - La règle « jamais de nu sur une sortie publique » (ADR 0055 § 1) reste l'affaire de la créatrice et de l'agence : aucun contrôle par la vision.
 
 ### 6. Qui valide
@@ -70,7 +73,8 @@ La capture du 16/11 (lue pour sa forme seulement) montre que Reveal sait créer,
 
 ### 9. Mesurer
 
-- 48 h après chaque publication, le code lit les j'aime de la publication, les vues de la story, et les statistiques du feed public sur 30 jours (impressions, clics, abonnés attribués, revenu attribué). Reveal ne donne ni commentaires ni vues par publication du feed : ce qui « marche » (ADR 0044 § 4) se juge sur les j'aime et, pour le compte, sur les abonnés attribués.
+- 48 h après chaque publication du feed, le code compte ses j'aime et **les abonnés silencieux depuis 7 jours qui ont réécrit dans les 48 h** : c'est la mesure de son but. Reveal ne donne ni commentaires ni vues par publication : ce qui « marche » (ADR 0044 § 4) se juge sur ces deux chiffres.
+- Pour une story : ses vues. Pour une publication publique : les statistiques du feed public sur 30 jours (impressions, clics, abonnés attribués, revenu attribué).
 
 ### 10. Le connecteur et les essais
 
@@ -82,13 +86,13 @@ La capture du 16/11 (lue pour sa forme seulement) montre que Reveal sait créer,
 
 Positives :
 - Chaque publication garde la richesse d'une séance entière, comme le feed d'aujourd'hui.
-- Le feed public, levier d'acquisition de Reveal, est enfin nourri.
-- Un média public ne peut plus être vendu, et l'inverse, par le code.
+- Les abonnés qui décrochent reçoivent trois occasions par semaine de reparler, et on mesure combien reviennent.
+- Un média publié ne peut plus être vendu, et l'inverse, par le code.
 
 Négatives, à surveiller :
 - Trois séances par semaine, c'est beaucoup pour la créatrice : si le stock tombe souvent à sec, cette règle sera revue (découper une séance en deux, recommandation écartée le 16/11).
 - Le mode automatique publie au nom de la créatrice sans regard humain : il reste au propriétaire seul et ne s'ouvre qu'après deux semaines validées.
-- La story prise dans une séance publiée montre deux fois la même photo à un abonné attentif.
+- La stratégie du feed public reste à écrire : tant qu'elle ne l'est pas, le feed n'attire pas de nouveaux abonnés.
 
 ## Alternatives rejetées
 
