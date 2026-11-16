@@ -44,6 +44,7 @@ function draw(screen: PanelScreen): { root: HTMLElement; actions: PanelActions }
     openCrm: vi.fn(),
     toggleGroup: vi.fn(),
     toggleSale: vi.fn(),
+    toggleDiscover: vi.fn(),
     showSignals: vi.fn(),
     place: vi.fn(),
     copyNext: vi.fn(),
@@ -70,6 +71,7 @@ const onCard = (
     now?: Date;
     assist?: CopilotAssist | null;
     saleOpen?: boolean;
+    discoverOpen?: boolean;
     signalsOpen?: boolean;
   } = {},
 ): PanelScreen => ({
@@ -84,6 +86,7 @@ const onCard = (
   draft: patch.draft ?? { kind: 'hidden' },
   assist: patch.assist ?? null,
   saleOpen: patch.saleOpen ?? false,
+  discoverOpen: patch.discoverOpen ?? false,
   signalsOpen: patch.signalsOpen ?? false,
   now: patch.now ?? now,
 });
@@ -100,9 +103,33 @@ const ready = (patch: Partial<Extract<DraftPart, { kind: 'ready' }>> = {}): Draf
   ...patch,
 });
 
-/** « Où on en est » as read: every part carries its dot, the first one is clipped out of the line (Design 16/11). */
-const standingText = (root: ParentNode): string | undefined =>
-  root.querySelector('.cp-standing')?.textContent.replace(/^·/, '');
+/* The agent's view (ADR 0141, lot a), invented (ADR 0010). */
+const assistOf = (patch: Partial<CopilotAssist> = {}): CopilotAssist => ({
+  nextMove: {
+    kind: 'offer_step',
+    label: 'Proposer «\u00a0Étape 3\u00a0» à 15 €',
+    priceMinor: 1500,
+    block: null,
+  },
+  reasons: [{ code: 'rewritten_once', label: 'Réécrit une fois par une garde' }],
+  sale: {
+    script: { name: 'Soirée d’essai', stepIndex: 1, stepCount: 4 },
+    nextStep: { name: 'Étape 3', priceMinor: 1500 },
+    refusedSteps: ['Étape 2 bis'],
+    usedObjections: ['C’est trop cher'],
+    customOrderOpen: false,
+    offerPending: false,
+  },
+  signals: { desireTrend: null, followUpDue: false },
+  cuts: [],
+  buttons: ['hooks', 'objection'],
+  clicksLeftToday: 30,
+  ...patch,
+});
+
+/** The band's badges as a screen reader says them (Design 16/11, lot 0141-3). */
+const badgeLabels = (root: ParentNode): (string | null)[] =>
+  [...root.querySelectorAll('.cp-badge')].map((node) => node.getAttribute('aria-label'));
 
 describe('the copilot side panel (ADR 0086, lot b)', () => {
   it.each([
@@ -139,11 +166,17 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     const essentials = [...root.querySelectorAll('.cp-fields--essentials > .cp-field')].map((n) =>
       n.getAttribute('data-field'),
     );
-    expect(essentials).toEqual(['identity', 'desires', 'limits', 'life_events']);
+    // Only what is known (Design 16/11, lot 0141-3): no « Pas encore su » line in the brief.
+    expect(essentials).toEqual(['identity', 'desires']);
     const quote = root.querySelector('[data-field="desires"] q');
     expect(quote?.textContent).toBe('<b>j’adore</b> quand tu décides');
     expect(quote?.querySelector('b')).toBeNull();
-    expect(root.querySelector('[data-field="limits"] .cp-field__empty')?.textContent).toBe('Pas encore su');
+    expect(root.querySelector('.cp-brief')?.textContent).not.toContain('Pas encore');
+    // What he likes as short bullets, one per item.
+    expect(root.querySelectorAll('[data-field="desires"] .cp-items > li')).toHaveLength(1);
+    expect(draw(onCard(card({}))).root.querySelector('.cp-brief__none')?.textContent).toBe(
+      'Rien de su sur lui pour l’instant.',
+    );
   });
 
   // Recette du 16/11, EXT-04: prénom, âge et ville took nine lines, the same source said six times.
@@ -158,7 +191,9 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       }),
     );
     expect(same?.querySelector('.cp-ident__line')?.textContent).toBe('Alpha·34 ans·Lyon');
-    expect([...(same?.querySelectorAll('.cp-field__source') ?? [])].map((n) => n.textContent)).toEqual([
+    // Nothing in bold but the first name (Design 16/11, lot 0141-3).
+    expect(same?.querySelector('.cp-ident__name')?.textContent).toBe('Alpha');
+    expect([...(same?.querySelectorAll('.cp-ident__source') ?? [])].map((n) => n.textContent)).toEqual([
       'Dit par lui, il y a 3 jours',
     ]);
     const mixed = ident(
@@ -170,8 +205,9 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
         },
       }),
     );
-    expect(mixed?.querySelector('.cp-ident__line')?.textContent).toBe('Alpha·âge ?·Lyon');
-    expect([...(mixed?.querySelectorAll('.cp-field__source') ?? [])].map((n) => n.textContent)).toEqual([
+    // Only what is known: an age not known yet is left out of the line, it waits under « à découvrir ».
+    expect(mixed?.querySelector('.cp-ident__line')?.textContent).toBe('Alpha·Lyon');
+    expect([...(mixed?.querySelectorAll('.cp-ident__source') ?? [])].map((n) => n.textContent)).toEqual([
       'Prénom : dit par lui, il y a 3 jours',
       'Ville : noté par Inès, il y a 3 jours',
     ]);
@@ -179,10 +215,9 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(mixed?.querySelector('.cp-field__check')?.textContent).toBe(
       'À vérifier, ville : l’agent a lu « Villeurbanne »',
     );
-    expect(ident(card({}))?.textContent).toBe('Prénom, âge et ville pas encore sus');
+    expect(ident(card({}))).toBeNull();
 
-    // The other fields: the label and its source share the first row when there is room (CSS), the value under them;
-    // the source is not said again when it is the same.
+    // The other fields: the label as an overline with its source to the right, the value under them.
     const { root } = draw(
       onCard(
         card({
@@ -196,14 +231,92 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       ),
     );
     const sources = ['desires', 'limits', 'life_events'].map(
-      (name) => root.querySelector(`[data-field="${name}"] > .cp-field__source`)?.textContent ?? null,
+      (name) =>
+        root.querySelector(`[data-field="${name}"] .cp-field__top > .cp-field__source`)?.textContent ?? null,
     );
-    expect(sources).toEqual(['Dit par lui, il y a 3 jours', null, 'Noté par Inès, il y a 3 jours']);
-    // After the value in the reading order, so a narrow panel puts it under the value, never alone above it.
+    expect(sources).toEqual([
+      'Dit par lui, il y a 3 jours',
+      'Dit par lui, il y a 3 jours',
+      'Noté par Inès, il y a 3 jours',
+    ]);
     expect(
       [...(root.querySelector('[data-field="desires"]')?.children ?? [])].map((node) => node.className),
-    ).toEqual(['cp-field__top', 'cp-field__value', 'cp-field__source']);
+    ).toEqual(['cp-field__top', 'cp-items']);
     expect(root.querySelector('[data-field="desires"] .cp-field__value')?.textContent).toBe('les talons');
+  });
+
+  // Design 16/11 (lot -2, then lot 0141-3): the card never states as a fact an age that is contested.
+  it('says « contesté » in red on his age, in place of its source, while his age is contested', () => {
+    const view = card({
+      first_name: { current: value(['Alpha']), toCheck: [] },
+      age: { current: value(['34']), toCheck: [] },
+      location: { current: value(['Lyon']), toCheck: [] },
+    });
+    const contested = standingOf({ ageDisputed: { since: now.toISOString(), by: 'policy' } }, null);
+    const root = draw(onCard(view, [], { standing: contested })).root;
+    const ident = root.querySelector('[data-field="identity"]');
+    expect(ident?.querySelector('.cp-ident__line')?.textContent).toBe('Alpha·34 anscontesté·Lyon');
+    expect(ident?.querySelector('[data-field="age"] .cp-ident__contested')?.textContent).toBe('contesté');
+    expect(ident?.querySelector('.cp-ident__source')).toBeNull();
+    // An age not known at all still says it is contested.
+    const unknownAge = draw(
+      onCard(card({ first_name: { current: value(['Alpha']), toCheck: [] } }), [], { standing: contested }),
+    ).root;
+    expect(unknownAge.querySelector('.cp-ident__contested')?.textContent).toBe('âge contesté');
+  });
+
+  // Design 16/11, lot 0141-3: what is not known yet waits behind one muted line.
+  it('names what is left to discover behind « N à découvrir », closed, the masked part left out', () => {
+    const view = card({
+      first_name: { current: value(['Alpha']), toCheck: [] },
+      job: { current: value(['infirmier']), toCheck: [] },
+    });
+    const { root, actions } = draw(onCard(view));
+    const fold = root.querySelector<HTMLDetailsElement>('.cp-discover');
+    expect(fold?.open).toBe(false);
+    const total = FAN_CARD_FIELDS.length - 2;
+    expect(fold?.querySelector('.cp-discover__count')?.textContent).toBe(`${String(total)} à découvrir`);
+    // After the brief, before the folds.
+    const order = [...(root.querySelector('.cp-scroll')?.children ?? [])].map(
+      (node) => node.getAttribute('data-group') ?? node.className,
+    );
+    expect(order).toEqual(['cp-brief', 'discover', 'him', 'about_her', 'intimate']);
+    const titles = [...(fold?.querySelectorAll('li > .cp-overline') ?? [])].map((n) => n.textContent);
+    expect(titles).toEqual(['En bref', 'Lui', 'Elle, vue par lui', 'Intime']);
+    expect(fold?.querySelector('li .cp-discover__labels')?.textContent).toMatch(/^son âge, .*\.$/u);
+    fold?.setAttribute('open', '');
+    fold?.dispatchEvent(new Event('toggle'));
+    expect(actions.toggleDiscover).toHaveBeenCalledWith(true);
+    expect(
+      draw(onCard(view, [], { discoverOpen: true })).root.querySelector<HTMLDetailsElement>('.cp-discover')
+        ?.open,
+    ).toBe(true);
+    // While his age is contested, what is intimate is not even named.
+    const contested = standingOf({ ageDisputed: { since: now.toISOString(), by: 'policy' } }, null);
+    const masked = draw(onCard(view, [], { standing: contested })).root.querySelector('.cp-discover');
+    expect(
+      [...(masked?.querySelectorAll('li > .cp-overline') ?? [])].map((n) => n.textContent),
+    ).not.toContain('Intime');
+    expect(masked?.textContent).not.toContain('fantasmes');
+  });
+
+  // Design 16/11, lot 0141-3: at a new message of his, only the core refreshes, in a short fade.
+  it('fades in the core when a new draft takes the place of another, and only then', () => {
+    const { root, actions } = draw(onCard(card({}), [], { draft: ready(), assist: assistOf() }));
+    expect(root.querySelector('[data-fresh]')).toBeNull();
+    render(root, onCard(card({}), [], { draft: ready({ mode: 'rejecting' }), assist: assistOf() }), actions);
+    expect(root.querySelector('[data-fresh]')).toBeNull();
+    render(root, onCard(card({}), [], { draft: { kind: 'writing' }, assist: assistOf() }), actions);
+    render(
+      root,
+      onCard(card({}), [], { draft: ready({ bubbles: ['et toi ?'] }), assist: assistOf() }),
+      actions,
+    );
+    expect([...root.querySelectorAll('[data-fresh]')].map((n) => n.className)).toEqual([
+      'cp-move',
+      'cp-draft',
+    ]);
+    expect(root.querySelector('.cp-scroll [data-fresh]')).toBeNull();
   });
 
   // EXT-14: a value noted in the CRM while the panel is open appears with a sign.
@@ -262,11 +375,11 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       'Elle, vue par lui',
       'Intime',
     ]);
-    // What is not known yet is said in one line, not as a column of « Pas encore su ».
+    // What is not known yet waits under « à découvrir », never in the folds (Design 16/11, lot 0141-3).
     const him = groups[0];
-    expect(him?.querySelectorAll('.cp-field:not(.cp-field--unknown)').length).toBe(1);
-    expect(him?.querySelector('.cp-field--unknown')?.textContent).toMatch(/^Pas encore su : [^A-Z].*\.$/u);
-    expect(him?.querySelector('.cp-field__empty')).toBeNull();
+    expect(him?.querySelectorAll('.cp-field').length).toBe(1);
+    expect(him?.textContent).not.toContain('Pas encore su');
+    expect(groups[1]?.querySelector('.cp-field--unknown')?.textContent).toBe('Rien de su pour l’instant.');
     expect(root.querySelector('[data-field="job"] .cp-field__check')?.textContent).toBe(
       'À vérifier : l’agent a lu « aide-soignant »',
     );
@@ -294,21 +407,31 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     );
   });
 
-  // EXT-14: the panel says which conversation it shows.
-  it('names the fan of the open conversation in a band that does not scroll', () => {
-    const { root } = draw(onCard(card({}), [], { fanName: '<i>marc_lyon</i>', draft: ready() }));
+  // EXT-14: the panel says which conversation it shows. Design 16/11, lot 0141-3: top to bottom, the order of his
+  // questions: who, may I write, what to do, the text; the card under it scrolls.
+  it('stacks the band, the core and the card, in the order of the chatter’s questions', () => {
+    const { root } = draw(
+      onCard(card({}), [], { fanName: '<i>marc_lyon</i>', draft: ready(), assist: assistOf() }),
+    );
     expect([...root.children].map((node) => node.className)).toEqual([
-      'cp-who',
-      'cp-standing',
-      'cp-scroll',
+      'cp-band',
+      'cp-move',
       'cp-draft',
+      'cp-scroll',
     ]);
-    expect(root.querySelector('.cp-who__fan')?.textContent).toBe('<i>marc_lyon</i>');
-    expect(root.querySelector('.cp-who i')).toBeNull();
+    expect(root.querySelector('.cp-band__fan')?.textContent).toBe('<i>marc_lyon</i>');
+    expect(root.querySelector('.cp-band i')).toBeNull();
+    // The button is in the core, above everything that scrolls: a long draft pushes the sale line, never the button.
+    const place = root.querySelector('[data-gesture="place"]');
+    const scroll = root.querySelector('.cp-scroll');
+    if (place === null || scroll === null) throw new Error('missing');
+    expect(place.compareDocumentPosition(scroll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(scroll.contains(place)).toBe(false);
+    expect(scroll.firstElementChild?.classList.contains('cp-sale')).toBe(true);
   });
 
-  it('says where things stand in one line: red forbids, amber holds back, then his desire', () => {
-    const line = (screen: PanelScreen): string | undefined => standingText(draw(screen).root);
+  it('says where things stand as badges: red forbids, amber holds back, then his desire', () => {
+    const labels = (screen: PanelScreen): (string | null)[] => badgeLabels(draw(screen).root);
     const { root } = draw(
       onCard(card({}), [], {
         standing: standingOf(
@@ -317,24 +440,27 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
         ),
       }),
     );
-    expect(root.querySelector('.cp-standing__stop')?.textContent).toBe('Ventes gelées');
-    expect(root.querySelector('.cp-standing__care')?.textContent).toBe('Fan fragile');
-    // No emoji in the interface (V-EXT): his desire is said in words.
-    expect(standingText(root)).toBe('Ventes gelées·Fan fragile·désir joueur');
-    // A part and the dot before it hold together at a line's end; the first part's dot falls in the clipped strip.
-    expect([...root.querySelectorAll('.cp-standing__item')].map((n) => n.textContent)).toEqual([
-      '·Ventes gelées',
-      '·Fan fragile',
-      '·désir joueur',
+    expect([...root.querySelectorAll<HTMLElement>('.cp-badge')].map((n) => n.dataset['tone'])).toEqual([
+      'red',
+      'amber',
+      'neutral',
     ]);
-    expect(root.querySelector('.cp-standing > .cp-standing__flow')).not.toBeNull();
-    // « Rien à signaler » only when nothing at all is said (Design 16/11).
-    expect(line(onCard(card({}), [], { standing: standingOf({}, 'neutral') }))).toBe('désir neutre');
-    expect(line(onCard(card({}), [], { standing: standingOf({}, null) }))).toBe('Rien à signaler');
-    expect(line(onCard(card({}), [], { standing: standingOf('unread', null) }))).toBe('Limites non lues');
-    expect(line(onCard(card({}), [], { standing: standingOf({ spendingLimitMinor: 15_000 }, null) }))).toBe(
-      'Plafond 150\u00a0€',
-    );
+    // Each badge has its icon, and is said in words to a screen reader; no emoji in the interface (V-EXT).
+    expect(badgeLabels(root)).toEqual(['Ventes gelées', 'Fan fragile', 'Désir joueur']);
+    expect([...root.querySelectorAll('.cp-badge')].every((n) => n.querySelector('svg') !== null)).toBe(true);
+    expect(root.querySelector('.cp-badge[data-kind="desire"]')?.textContent).toBe('joueur');
+    // No badge when there is nothing to say (Design 16/11, lot 0141-3).
+    expect(labels(onCard(card({}), [], { standing: standingOf({}, null) }))).toEqual([]);
+    expect(labels(onCard(card({}), [], { standing: standingOf('unread', null) }))).toEqual([
+      'Limites non lues',
+    ]);
+    expect(
+      labels(onCard(card({}), [], { standing: standingOf({ spendingLimitMinor: 15_000 }, null) })),
+    ).toEqual(['Plafond 150\u00a0€']);
+    // While « où on en est » is read the first time, the band waits, quietly.
+    expect(
+      draw(onCard(card({}), [], { standing: null })).root.querySelector('.cp-badges [aria-busy]'),
+    ).not.toBeNull();
   });
 
   it('shows no draft when her drafts are off or none waits, and « L’agent écrit… » while it writes', () => {
@@ -343,14 +469,10 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(writing.querySelector('.cp-draft')?.textContent).toBe('L’agent écrit…');
   });
 
-  it('puts the draft at the foot, under the card, with its three gestures and their keys', () => {
+  it('puts the draft in the core, above the card, with its three gestures and their keys', () => {
     const { root, actions } = draw(onCard(card({}), [], { draft: ready() }));
-    // The card scrolls between the line on top and the draft at the foot: a draft pushes nothing (§ 10).
-    expect([...root.children].map((node) => node.className)).toEqual([
-      'cp-standing',
-      'cp-scroll',
-      'cp-draft',
-    ]);
+    // A server without the agent's view: the band, the draft, then the card that scrolls.
+    expect([...root.children].map((node) => node.className)).toEqual(['cp-band', 'cp-draft', 'cp-scroll']);
     expect([...root.querySelectorAll('.cp-bubble')].map((n) => n.textContent)).toEqual([
       'coucou toi 😘',
       'tu rentres quand de ta garde ?',
@@ -359,6 +481,8 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     // Charles's word (recette visuelle V-EXT-02): the button says what it does, one verb for the gesture, « copier ».
     expect(buttons.map((b) => b.textContent)).toEqual(['Copier pour Reveal A', 'Retoucher E', 'Refuser R']);
     expect(buttons[0]?.classList.contains('cp-send')).toBe(true);
+    // « Copier pour Reveal » is the one filled button, the two others light (Design 16/11, lot 0141-3).
+    expect(buttons.slice(1).every((b) => b.classList.contains('nv-btn--plain'))).toBe(true);
     expect(root.querySelector('.cp-draft__stop')).toBeNull();
     buttons[0]?.click();
     buttons[1]?.click();
@@ -632,29 +756,7 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
 });
 
 describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
-  /* Invented data (ADR 0010). */
-  const base = (patch: Partial<CopilotAssist> = {}): CopilotAssist => ({
-    nextMove: {
-      kind: 'offer_step',
-      label: 'Proposer «\u00a0Étape 3\u00a0» à 15 €',
-      priceMinor: 1500,
-      block: null,
-    },
-    reasons: [{ code: 'rewritten_once', label: 'Réécrit une fois par une garde' }],
-    sale: {
-      script: { name: 'Soirée d’essai', stepIndex: 1, stepCount: 4 },
-      nextStep: { name: 'Étape 3', priceMinor: 1500 },
-      refusedSteps: ['Étape 2 bis'],
-      usedObjections: ['C’est trop cher'],
-      customOrderOpen: false,
-      offerPending: false,
-    },
-    signals: { desireTrend: null, followUpDue: false },
-    cuts: [],
-    buttons: ['hooks', 'objection'],
-    clicksLeftToday: 30,
-    ...patch,
-  });
+  const base = assistOf;
   const with_ = (
     assist: CopilotAssist | null,
     patch: Parameters<typeof onCard>[2] = {},
@@ -665,21 +767,17 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     const before = draw(onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot') })).root;
     expect(before.querySelector('.cp-move')).toBeNull();
     expect(before.querySelector('.cp-sale')).toBeNull();
-    expect(standingText(before)).toBe('désir chaud');
-    expect([...before.children].map((node) => node.className)).toEqual([
-      'cp-standing',
-      'cp-scroll',
-      'cp-draft',
-    ]);
+    expect(badgeLabels(before)).toEqual(['Désir chaud']);
+    expect([...before.children].map((node) => node.className)).toEqual(['cp-band', 'cp-draft', 'cp-scroll']);
   });
 
   it('says the gesture in bold and why in small, right above the draft, in a neutral tone', () => {
     const root = with_(base());
     expect([...root.children].map((node) => node.className)).toEqual([
-      'cp-standing',
-      'cp-scroll',
+      'cp-band',
       'cp-move',
       'cp-draft',
+      'cp-scroll',
     ]);
     const move = root.querySelector<HTMLElement>('.cp-move');
     expect(move?.dataset['tone']).toBe('neutral');
@@ -755,7 +853,7 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     expect(root.querySelector('.cp-move__what')).toBeNull();
     expect(root.querySelector('.cp-sale')).toBeNull();
     // No signal pushes to write or to sell under a cut; a contested age silences his desire too (Design 16/11).
-    expect(standingText(root)).toBe(cut === 'age_doubt' ? 'Rien à signaler' : 'désir chaud');
+    expect(badgeLabels(root)).toEqual(cut === 'age_doubt' ? [] : ['Désir chaud']);
   });
 
   // Design 16/11: each cut said once. Under the sentence, the draft adds no line of its own.
@@ -838,20 +936,25 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     expect(reading.querySelector('.cp-sale')).toBeNull();
   });
 
-  it('folds « Où en est la vente », closed, its line saying the step and the next one with its price', () => {
+  it('says the sale in one line under the core, with its step dots, the detail behind a click', () => {
     const { root, actions } = draw(
       onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot'), assist: base() }),
     );
     const fold = root.querySelector<HTMLDetailsElement>('.cp-sale');
     expect(fold?.open).toBe(false);
     expect(root.querySelector('.cp-scroll')?.firstElementChild).toBe(fold);
-    expect(fold?.querySelector('.cp-group__title')?.textContent).toBe('Où en est la vente');
-    expect(fold?.querySelector('.cp-group__sum')?.textContent).toBe(
-      'Soirée d’essai, étape 2 sur 4 · ensuite «\u00a0Étape 3\u00a0» à 15\u00a0€',
+    expect(fold?.querySelector('.cp-sale__line')?.textContent).toBe(
+      'Soirée d’essai 2/4 · ensuite «\u00a0Étape 3\u00a0» 15\u00a0€',
+    );
+    // One dot per step, read by the eye; the line says it in words to a screen reader.
+    expect(
+      [...(fold?.querySelectorAll<HTMLElement>('.cp-step') ?? [])].map((n) => n.dataset['step']),
+    ).toEqual(['done', 'now', 'next', 'next']);
+    expect(fold?.querySelector('.cp-steps')?.getAttribute('aria-hidden')).toBe('true');
+    expect(fold?.querySelector('summary')?.getAttribute('aria-label')).toBe(
+      'Où en est la vente : Soirée d’essai 2/4 · ensuite «\u00a0Étape 3\u00a0» 15\u00a0€',
     );
     expect([...(fold?.querySelectorAll('.cp-field__label') ?? [])].map((n) => n.textContent)).toEqual([
-      'Script en cours',
-      'Prochaine étape',
       'Étapes refusées',
       'Objections déjà servies, à ne pas resservir',
     ]);
@@ -862,7 +965,7 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     expect(open.querySelector<HTMLDetailsElement>('.cp-sale')?.open).toBe(true);
   });
 
-  it('adds the signals to « où on en est », three parts at most, then « +N »', () => {
+  it('adds the signals to the band, three badges at most, then « +N »', () => {
     const pending = base();
     if (pending.sale === null) throw new Error('sale');
     const lively = base({
@@ -870,8 +973,10 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
       sale: { ...pending.sale, offerPending: true },
     });
     const calm = with_(lively);
-    expect(standingText(calm)).toBe('désir chaud, en hausse·Relance due·Offre sans réponse');
-    expect(calm.querySelector('.cp-standing__more')).toBeNull();
+    expect(badgeLabels(calm)).toEqual(['Désir chaud, en hausse', 'Relance due', 'Offre sans réponse']);
+    // His desire's direction is an arrow by the flame, never a sentence.
+    expect(calm.querySelectorAll('.cp-badge[data-kind="desire"] svg')).toHaveLength(2);
+    expect(calm.querySelector('.cp-badges__more')).toBeNull();
     const { root, actions } = draw(
       onCard(card({}), [], {
         draft: ready(),
@@ -879,19 +984,25 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
         assist: lively,
       }),
     );
-    expect(standingText(root)).toBe('Fan fragile·désir chaud, en hausse·Relance due·+1');
-    const more = root.querySelector<HTMLButtonElement>('.cp-standing__more');
+    expect(badgeLabels(root)).toEqual(['Fan fragile', 'Désir chaud, en hausse', 'Relance due']);
+    const more = root.querySelector<HTMLButtonElement>('.cp-badges__more');
+    expect(more?.textContent).toBe('+1');
     expect(more?.getAttribute('aria-label')).toBe('Voir 1 de plus');
     more?.click();
     expect(actions.showSignals).toHaveBeenCalledOnce();
     const opened = with_(lively, { standing: standingOf({ fragile: true }, 'hot'), signalsOpen: true });
-    expect(standingText(opened)).toBe('Fan fragile·désir chaud, en hausse·Relance due·Offre sans réponse');
+    expect(badgeLabels(opened)).toEqual([
+      'Fan fragile',
+      'Désir chaud, en hausse',
+      'Relance due',
+      'Offre sans réponse',
+    ]);
     // What forbids or holds back is never folded, even past three.
     const many = with_(lively, {
       standing: standingOf({ fragile: true, noExplicit: true, spendingLimitMinor: 5_000 }, 'hot'),
     });
-    expect(many.querySelectorAll('.cp-standing__care')).toHaveLength(3);
-    expect(many.querySelector('.cp-standing__more')?.textContent).toBe('+2');
+    expect(many.querySelectorAll('.cp-badge[data-tone="amber"]')).toHaveLength(3);
+    expect(many.querySelector('.cp-badges__more')?.textContent).toBe('+2');
     expect(many.querySelector('[title]')).toBeNull();
   });
 });

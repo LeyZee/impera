@@ -15,10 +15,11 @@ import {
   cutOf,
   draftNotes,
   moveLines,
+  saleLine,
   saleRows,
-  saleSummary,
-  signalWords,
+  stepDots,
 } from '../../lib/copilot/assist';
+import { bandBadges, type Badge } from '../../lib/copilot/band';
 import {
   entryOf,
   ESSENTIALS,
@@ -28,21 +29,15 @@ import {
   IDENTITY_WORDS,
   identitySources,
   identityText,
-  lowerFirst,
   PANEL_GROUPS,
   restOf,
   sourceLine,
   specOf,
   toCheckCount,
+  toDiscover,
   valueText,
 } from '../../lib/copilot/card';
-import {
-  DESIRE_WORDS,
-  REJECT_WORDS,
-  withheldOf,
-  type Standing,
-  type Withheld,
-} from '../../lib/copilot/standing';
+import { REJECT_WORDS, withheldOf, type Standing, type Withheld } from '../../lib/copilot/standing';
 import type { VerdictSent } from '../../lib/copilot/verdict';
 import { h } from '../../lib/dom';
 import { icon, type IconName } from '../../lib/icons';
@@ -81,9 +76,11 @@ export type PanelScreen =
       readonly draft: DraftPart;
       /** What the agent computed (ADR 0141, lot a); null from a server that does not send it yet. */
       readonly assist: CopilotAssist | null;
-      /** « Où en est la vente », closed by default (§ 14). */
+      /** The sale line's detail, closed by default (§ 14). */
       readonly saleOpen: boolean;
-      /** « Où on en est » past its first three signals (§ 14). */
+      /** « N à découvrir », closed by default (Design 16/11, lot 0141-3). */
+      readonly discoverOpen: boolean;
+      /** The band past its first three badges (§ 14). */
       readonly signalsOpen: boolean;
       readonly now: Date;
     };
@@ -104,7 +101,8 @@ export interface GestureDone {
 }
 
 /**
- * The agent's draft at the foot of the panel (§ 3.3), never above the card: a draft that arrives pushes nothing (§ 10).
+ * The agent's draft, in the core right under the band (Design 16/11, lot 0141-3): what to do, the text, its copy. While
+ * the agent writes, it holds the room of a draft, so a draft that arrives pushes the card little (ADR 0086 § 10).
  * `hidden`: her drafts are off, or none is waiting.
  */
 export type DraftPart =
@@ -126,7 +124,8 @@ export interface PanelActions {
   readonly openCrm: () => void;
   readonly toggleGroup: (group: FanCardGroup, open: boolean) => void;
   readonly toggleSale: (open: boolean) => void;
-  /** « +N »: the signals past the first three. */
+  readonly toggleDiscover: (open: boolean) => void;
+  /** « +N »: the signals past the first three badges. */
   readonly showSignals: () => void;
   /** `a`, or the retouched text with `e` (§ 4). */
   readonly place: (edited: boolean) => void;
@@ -233,8 +232,8 @@ const isNew = (observedAt: string, marks: Marks): boolean =>
 const newMark = (): HTMLElement => h('span', { class: 'cp-field__new' }, 'nouveau');
 
 /**
- * A field in two lines (EXT-04): its label with where the value comes from, then the value. A source the field above
- * already said is not said again: `said` carries the last one shown in the list.
+ * A field of the card in a group (EXT-04): its label as a muted overline with where the value comes from to its right,
+ * then the value in ink. A source the field above already said is not said again: `said` carries the last one shown.
  */
 function field(
   spec: FanCardFieldSpec,
@@ -254,67 +253,81 @@ function field(
       { class: 'cp-field__top' },
       h('span', { class: 'cp-field__label' }, spec.label),
       current !== null && isNew(current.observedAt, marks) ? newMark() : null,
+      sayIt ? h('span', { class: 'cp-field__source' }, source) : null,
     ),
-    current === null
-      ? h(
-          'span',
-          { class: 'cp-field__empty' },
-          spec.learning === 'observe' ? 'Pas encore deviné' : 'Pas encore su',
-        )
-      : h('span', { class: 'cp-field__value' }, valueText(spec.field, current.items)),
-    // Right of the label when the panel is wide, under the value when it is not (CSS): never alone between the two.
-    sayIt ? h('span', { class: 'cp-field__source' }, source) : null,
+    current === null ? null : h('span', { class: 'cp-field__value' }, valueText(spec.field, current.items)),
     current === null ? null : quote(current.sourceQuote),
-    ...toCheck.map((value) =>
-      h(
-        'span',
-        { class: 'cp-field__check' },
-        `À vérifier : l’agent a lu « ${valueText(spec.field, value.items)} »`,
-        quote(value.sourceQuote),
-      ),
-    ),
+    ...checksOf(spec.field, toCheck),
   );
 }
 
+/** What the agent read and a chatter must check (ADR 0085 § 6), with his words. */
+const checksOf = (
+  name: FanCardEntry['field'],
+  toCheck: FanCardEntry['toCheck'],
+  part?: string,
+): HTMLElement[] =>
+  toCheck.map((value) =>
+    h(
+      'span',
+      { class: 'cp-field__check' },
+      part === undefined
+        ? `À vérifier : l’agent a lu « ${valueText(name, value.items)} »`
+        : `À vérifier, ${part} : l’agent a lu « ${valueText(name, value.items)} »`,
+      quote(value.sourceQuote),
+    ),
+  );
+
 /**
- * Who he is in one line, « Alpha · 34 ans · Lyon », and where it comes from said once (EXT-04): three words read in
- * one glance instead of nine lines. A part not known yet is said as a question, in the faint ink.
+ * Who he is in one line, « Alpha · 34 ans · Lyon », only what is known, the first name in bold (Design 16/11, lot
+ * 0141-3). Where it comes from is said once under it; while his age is contested, a red « contesté » next to his age
+ * takes the place of that source, so the line never states as a fact what is in doubt.
  */
-function identity(card: FanCardView, marks: Marks): HTMLElement {
+function identity(card: FanCardView, marks: Marks, ageDisputed: boolean): HTMLElement | null {
   const entries = IDENTITY.map((name) => ({ name, entry: entryOf(card.fields, name) }));
+  const known = entries.filter(({ entry }) => entry.current !== null);
+  if (known.length === 0 && !ageDisputed) {
+    const checks = entries.flatMap(({ name, entry }) => checksOf(name, entry.toCheck, IDENTITY_WORDS[name]));
+    return checks.length === 0
+      ? null
+      : h('li', { class: 'cp-field cp-ident', 'data-field': 'identity' }, ...checks);
+  }
   const line = h('span', { class: 'cp-ident__line' });
-  if (entries.every(({ entry }) => entry.current === null))
-    line.append(h('span', { class: 'cp-field__empty' }, 'Prénom, âge et ville pas encore sus'));
-  else
-    entries.forEach(({ name, entry }, index) => {
-      if (index > 0) line.append(h('span', { class: 'cp-ident__dot', 'aria-hidden': 'true' }, '·'));
-      line.append(
-        entry.current === null
-          ? h('span', { class: 'cp-field__empty', 'data-field': name }, `${IDENTITY_WORDS[name]} ?`)
-          : h(
-              'span',
-              { class: 'cp-field__value', 'data-field': name },
-              identityText(name, entry.current.items),
-            ),
-      );
-    });
-  const fresh = entries.some(({ entry }) => entry.current !== null && isNew(entry.current.observedAt, marks));
+  const parts: HTMLElement[] = [];
+  for (const { name, entry } of entries) {
+    const contested = name === 'age' && ageDisputed;
+    if (entry.current === null && !contested) continue;
+    const text = entry.current === null ? null : identityText(name, entry.current.items);
+    parts.push(
+      h(
+        'span',
+        {
+          class: name === 'first_name' ? 'cp-ident__name' : 'cp-ident__part',
+          'data-field': name,
+        },
+        text,
+        contested
+          ? h('span', { class: 'cp-ident__contested' }, text === null ? 'âge contesté' : 'contesté')
+          : null,
+      ),
+    );
+  }
+  parts.forEach((part, index) => {
+    if (index > 0) line.append(h('span', { class: 'cp-ident__dot', 'aria-hidden': 'true' }, '·'));
+    line.append(part);
+  });
+  const fresh = known.some(({ entry }) => entry.current !== null && isNew(entry.current.observedAt, marks));
   return h(
     'li',
     { class: 'cp-field cp-ident', 'data-field': 'identity', 'aria-label': 'Prénom, âge et ville' },
     h('span', { class: 'cp-field__top' }, line, fresh ? newMark() : null),
-    ...identitySources(card.fields, marks.now).map((text) => h('span', { class: 'cp-field__source' }, text)),
+    ...(ageDisputed
+      ? []
+      : identitySources(card.fields, marks.now).map((text) =>
+          h('span', { class: 'cp-ident__source' }, text),
+        )),
     ...entries.map(({ name, entry }) => quote(entry.current?.sourceQuote ?? null, IDENTITY_WORDS[name])),
-    ...entries.flatMap(({ name, entry }) =>
-      entry.toCheck.map((value) =>
-        h(
-          'span',
-          { class: 'cp-field__check' },
-          `À vérifier, ${IDENTITY_WORDS[name]} : l’agent a lu « ${valueText(name, value.items)} »`,
-          quote(value.sourceQuote),
-        ),
-      ),
-    ),
+    ...entries.flatMap(({ name, entry }) => checksOf(name, entry.toCheck, IDENTITY_WORDS[name])),
   );
 }
 
@@ -349,160 +362,221 @@ const maskedGroup = (group: FanCardGroup, title: string): HTMLElement =>
  */
 const isMasked = (masked: boolean, spec: FanCardFieldSpec): boolean => masked && spec.group === 'intimate';
 
-function cardNodes(
-  card: FanCardView,
-  openGroups: ReadonlySet<FanCardGroup>,
-  marks: Marks,
-  actions: PanelActions,
-  masked: boolean,
-): HTMLElement[] {
+/**
+ * A field of the brief (Design 16/11, lot 0141-3): its label as a muted overline, its source to the right, then what
+ * is known as short bullets, one per item. Nothing when nothing is known: no « Pas encore su » here.
+ */
+function briefField(spec: FanCardFieldSpec, entry: FanCardEntry, marks: Marks): HTMLElement | null {
+  const { current, toCheck } = entry;
+  if (current === null && toCheck.length === 0) return null;
+  return h(
+    'li',
+    { class: 'cp-field', 'data-field': spec.field },
+    h(
+      'span',
+      { class: 'cp-field__top' },
+      h('span', { class: 'cp-field__label' }, spec.label),
+      current !== null && isNew(current.observedAt, marks) ? newMark() : null,
+      current === null ? null : h('span', { class: 'cp-field__source' }, sourceLine(current, marks.now)),
+    ),
+    current === null
+      ? null
+      : h(
+          'ul',
+          { class: 'cp-items' },
+          ...current.items.map((item) =>
+            h('li', { class: 'cp-field__value' }, valueText(spec.field, [item])),
+          ),
+        ),
+    current === null ? null : quote(current.sourceQuote),
+    ...checksOf(spec.field, toCheck),
+  );
+}
+
+/**
+ * Him, in brief (Design 16/11, lot 0141-3): a short card of what is known and helps to answer, first name, age and
+ * town, what he likes, what he does not want, what happens in his life. What is not known waits behind « à découvrir ».
+ */
+function briefCard(card: FanCardView, marks: Marks, masked: boolean, ageDisputed: boolean): HTMLElement {
   const checks = toCheckCount(
     card.fields.filter((entry) => {
       const spec = specOf(entry.field);
       return spec === undefined || !isMasked(masked, spec);
     }),
   );
-  const said: { last: string | null } = { last: null };
-  const essentials = [
-    identity(card, marks),
-    ...ESSENTIALS.filter((name) => !IDENTITY.some((part) => part === name))
-      .map((name) => {
-        const spec = specOf(name);
-        if (spec === undefined) return null;
-        // « Ses fantasmes » is masked; « Ce qu'il ne veut pas » stays read: it protects him (Agent 16/11).
-        return spec.field === 'desires' && isMasked(masked, spec)
-          ? maskedField(spec)
-          : field(spec, entryOf(card.fields, name), marks, said);
-      })
-      .filter((node): node is HTMLElement => node !== null),
-  ];
-  return [
+  const rows = [
+    identity(card, marks, ageDisputed),
+    ...ESSENTIALS.filter((name) => !IDENTITY.some((part) => part === name)).map((name) => {
+      const spec = specOf(name);
+      if (spec === undefined) return null;
+      // « Ses fantasmes » is masked; « Ce qu'il ne veut pas » stays read: it protects him (Agent 16/11).
+      return spec.field === 'desires' && isMasked(masked, spec)
+        ? maskedField(spec)
+        : briefField(spec, entryOf(card.fields, name), marks);
+    }),
+  ].filter((node): node is HTMLElement => node !== null);
+  return h(
+    'section',
+    { class: 'cp-brief', 'aria-label': 'Fiche du fan' },
     h(
       'header',
-      { class: 'cp-head' },
-      h('h1', { class: 'cp-head__title' }, 'Fiche du fan'),
+      { class: 'cp-brief__head' },
+      h('h1', { class: 'cp-overline' }, 'Fiche du fan'),
       checks === 0 ? null : h('span', { class: 'cp-head__check' }, `${String(checks)} à vérifier`),
     ),
-    h('ul', { class: 'cp-fields cp-fields--essentials', 'aria-label': 'L’essentiel' }, ...essentials),
-    ...PANEL_GROUPS.map(({ group, title }) => {
-      if (masked && group === 'intimate') return maskedGroup(group, title);
-      const groupSaid: { last: string | null } = { last: null };
-      const toCheck = groupChecks(card.fields, group);
-      // A group shows what is known or waits for a check; the rest is named on one faint line (V-EXT-29).
-      const shown = restOf(group).filter((spec) => {
-        const entry = entryOf(card.fields, spec.field);
-        return entry.current !== null || entry.toCheck.length > 0;
-      });
-      const unknown = restOf(group).filter((spec) => !shown.includes(spec));
-      const details = h(
-        'details',
-        { class: 'cp-group', 'data-group': group, open: openGroups.has(group) },
+    rows.length === 0
+      ? h('p', { class: 'cp-brief__none' }, 'Rien de su sur lui pour l’instant.')
+      : h('ul', { class: 'cp-fields cp-fields--essentials', 'aria-label': 'L’essentiel' }, ...rows),
+  );
+}
+
+/** « N à découvrir » (Design 16/11, lot 0141-3): one muted line that opens what is not known of him yet. */
+function discoverFold(
+  card: FanCardView,
+  masked: boolean,
+  open: boolean,
+  actions: PanelActions,
+): HTMLElement | null {
+  const sections = toDiscover(card.fields, masked);
+  const count = sections.reduce((total, { labels }) => total + labels.length, 0);
+  if (count === 0) return null;
+  const details = h(
+    'details',
+    { class: 'cp-discover', 'data-group': 'discover', open },
+    h(
+      'summary',
+      {},
+      h('span', { class: 'cp-discover__count' }, `${String(count)} à découvrir`),
+      h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
+    ),
+    h(
+      'ul',
+      { class: 'cp-discover__list' },
+      ...sections.map(({ title, labels }) =>
         h(
-          'summary',
+          'li',
           {},
-          h('span', { class: 'cp-group__title' }, title),
-          h(
-            'span',
-            { class: 'cp-group__sum' },
-            groupLine(card.fields, group),
-            // Where the count on top sends him (V-EXT-07).
-            toCheck === 0
-              ? null
-              : h('span', { class: 'cp-group__check' }, ` · ${String(toCheck)} à vérifier`),
-          ),
-          // The fold says it opens (V-EXT-06).
-          h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
+          h('span', { class: 'cp-overline' }, title),
+          h('span', { class: 'cp-discover__labels' }, `${labels.join(', ')}.`),
         ),
+      ),
+    ),
+  );
+  details.addEventListener('toggle', () => {
+    actions.toggleDiscover(details.open);
+  });
+  return details;
+}
+
+/** The groups « Lui », « Elle, vue par lui », « Intime », folded at the very bottom with their counts. */
+function groupFolds(
+  card: FanCardView,
+  openGroups: ReadonlySet<FanCardGroup>,
+  marks: Marks,
+  actions: PanelActions,
+  masked: boolean,
+): HTMLElement[] {
+  return PANEL_GROUPS.map(({ group, title }) => {
+    if (masked && group === 'intimate') return maskedGroup(group, title);
+    const groupSaid: { last: string | null } = { last: null };
+    const toCheck = groupChecks(card.fields, group);
+    // A group shows what is known or waits for a check; what is not known is named under « à découvrir ».
+    const shown = restOf(group).filter((spec) => {
+      const entry = entryOf(card.fields, spec.field);
+      return entry.current !== null || entry.toCheck.length > 0;
+    });
+    const details = h(
+      'details',
+      { class: 'cp-group', 'data-group': group, open: openGroups.has(group) },
+      h(
+        'summary',
+        {},
+        h('span', { class: 'cp-group__title' }, title),
         h(
-          'ul',
-          { class: 'cp-fields' },
-          ...shown.map((spec) => field(spec, entryOf(card.fields, spec.field), marks, groupSaid)),
-          unknown.length === 0
-            ? null
-            : h(
-                'li',
-                { class: 'cp-field cp-field--unknown' },
-                `Pas encore su : ${unknown.map((spec) => lowerFirst(spec.label)).join(', ')}.`,
-              ),
+          'span',
+          { class: 'cp-group__sum' },
+          groupLine(card.fields, group),
+          // Where the count on top sends him (V-EXT-07).
+          toCheck === 0 ? null : h('span', { class: 'cp-group__check' }, ` · ${String(toCheck)} à vérifier`),
         ),
-      );
-      details.addEventListener('toggle', () => {
-        actions.toggleGroup(group, details.open);
-      });
-      return details;
-    }),
-  ];
+        // The fold says it opens (V-EXT-06).
+        h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
+      ),
+      h(
+        'ul',
+        { class: 'cp-fields' },
+        ...(shown.length === 0
+          ? [h('li', { class: 'cp-field cp-field--unknown' }, 'Rien de su pour l’instant.')]
+          : shown.map((spec) => field(spec, entryOf(card.fields, spec.field), marks, groupSaid))),
+      ),
+    );
+    details.addEventListener('toggle', () => {
+      actions.toggleGroup(group, details.open);
+    });
+    return details;
+  });
+}
+
+/** A badge of the band: its icon and one or two words, the whole said in words to a screen reader. */
+function badgeNode(badge: Badge): HTMLElement {
+  return h(
+    'span',
+    {
+      class: 'nv-status cp-badge',
+      role: 'img',
+      'aria-label': badge.label,
+      'data-tone': badge.tone,
+      'data-kind': badge.kind,
+    },
+    icon(badge.icon, 14),
+    h('span', { class: 'cp-badge__words' }, badge.words),
+    badge.trend === null ? null : icon(badge.trend === 'up' ? 'arrowUp' : 'arrowDown', 14),
+  );
 }
 
 /**
- * « Où on en est », one line (§ 3.1): red for what forbids the sale, amber for what holds it back, then his desire and
- * the signals not to miss (ADR 0141 § 4). Nothing to say is said, so a chatter knows it was read, but never next to
- * something said (Design 16/11). Three parts at most, then « +N » (§ 14): only the new signals fold, what forbids or
- * holds back is always said. While his age is contested, nothing of his desire is said (§ 9).
+ * The status band, stuck on top, one line (Design 16/11, lot 0141-3): his name on the platform on the left, so the
+ * panel says which conversation it shows (EXT-14), and on the right at most three badges, what forbids or holds back
+ * first, then his desire, then the signals not to miss (ADR 0141 § 4). Nothing to say draws no badge.
  */
-function standingLine(
+function statusBand(
+  fanName: string | null,
   standing: Standing | null,
-  signals: Signals,
+  assist: CopilotAssist | null,
+  cut: CopilotCut | null,
   open: boolean,
-  ageCut: boolean,
 ): HTMLElement {
-  if (standing === null) return h('p', { class: 'cp-standing', 'aria-busy': 'true' }, '…');
-  const parts: HTMLElement[] = [
-    ...standing.stops.map((text) => h('span', { class: 'cp-standing__stop' }, text)),
-    ...standing.cares.map((text) => h('span', { class: 'cp-standing__care' }, text)),
-  ];
-  if (standing.unread) parts.push(h('span', { class: 'cp-standing__care' }, 'Limites non lues'));
-  // Words of the application, without an emoji (V-EXT-08): the emojis are the creator's voice, in the bubbles.
-  const desire = ageCut
-    ? []
-    : [standing.band === null ? null : DESIRE_WORDS[standing.band], signals.trend].filter(
-        (word): word is string => word !== null,
-      );
-  if (desire.length > 0) parts.push(h('span', { class: 'cp-standing__band' }, `désir ${desire.join(', ')}`));
-  // What forbids, what holds back and his desire are never folded; the new signals fill up to three parts, the rest
-  // waits behind « +N ».
-  const room = Math.max(0, 3 - parts.length);
-  const more = signals.more.map((text) => h('span', { class: 'cp-standing__signal' }, text));
-  const hidden = open ? 0 : Math.max(0, more.length - room);
-  const shown = [...parts, ...(hidden === 0 ? more : more.slice(0, room))];
-  if (shown.length === 0) shown.push(h('span', { class: 'cp-standing__calm' }, 'Rien à signaler'));
-  // Each dot goes with what follows it, never alone at the end of a line (V-EXT-18); the dot of the first part of each
-  // line falls outside the clipped flow, so no line starts with « · » (Design 16/11).
-  const item = (part: HTMLElement): HTMLElement =>
-    h(
-      'span',
-      { class: 'cp-standing__item' },
-      h('span', { class: 'cp-standing__dot', 'aria-hidden': 'true' }, '·'),
-      part,
-    );
-  const flow = h('span', { class: 'cp-standing__flow' }, ...shown.map(item));
-  if (hidden > 0)
-    flow.append(
-      item(
+  const badges = h('div', { class: 'cp-badges', 'aria-label': 'Où on en est' });
+  if (standing === null) badges.append(h('span', { class: 'cp-badges__wait', 'aria-busy': 'true' }, '…'));
+  else {
+    const { badges: shown, hidden } = bandBadges(standing, assist, cut, open);
+    badges.append(...shown.map(badgeNode));
+    if (hidden > 0)
+      badges.append(
         h(
           'button',
           {
             type: 'button',
-            class: 'cp-standing__more',
+            class: 'cp-badges__more',
             'data-action': 'more-signals',
             'aria-label': `Voir ${String(hidden)} de plus`,
           },
           `+${String(hidden)}`,
         ),
-      ),
-    );
-  return h('p', { class: 'cp-standing', 'aria-label': 'Où on en est' }, flow);
-}
-
-interface Signals {
-  readonly trend: string | null;
-  readonly more: readonly string[];
+      );
+  }
+  return h(
+    'header',
+    { class: 'cp-band' },
+    fanName === null ? null : h('span', { class: 'cp-band__fan' }, fanName),
+    badges,
+  );
 }
 
 /**
- * « Quoi faire » and « pourquoi », one block of two lines above the draft (ADR 0141 § 1, § 2, § 12): the gesture the
- * code decided, in bold, verb first; why, small and muted. A cut replaces it with one sentence that says why (§ 9):
- * the sale gestures are gone, never greyed.
+ * « Quoi faire » and « pourquoi », on top of the core (ADR 0141 § 1, § 2, § 12; Design 16/11, lot 0141-3): the gesture
+ * the code decided, the largest text of the panel, verb first; why, small and muted. A cut replaces it in the same
+ * place with one sentence in its tone (§ 9): the sale gestures are gone, never greyed.
  */
 function moveBand(
   assist: CopilotAssist | null,
@@ -527,7 +601,10 @@ function moveBand(
   );
 }
 
-/** « Où en est la vente » (ADR 0141 § 3, § 14): a fold closed by default, its line says the step and the next one. */
+/**
+ * The sale in one line under the core (ADR 0141 § 3, § 14; Design 16/11, lot 0141-3): one dot per step, the script and
+ * its step, the next step and its price. A click opens the detail: refused steps, objections served, an open order.
+ */
 function saleFold(
   assist: CopilotAssist | null,
   cut: CopilotCut | null,
@@ -537,25 +614,34 @@ function saleFold(
   const sale = assist?.sale ?? null;
   if (sale === null || cut !== null) return null;
   const rows = saleRows(sale);
+  const dots = stepDots(sale);
   const details = h(
     'details',
-    { class: 'cp-group cp-sale', 'data-group': 'sale', open },
+    { class: 'cp-sale', 'data-group': 'sale', open },
     h(
       'summary',
-      {},
-      h(
-        'span',
-        { class: 'cp-sale__top' },
-        h('span', { class: 'cp-group__title' }, 'Où en est la vente'),
-        h('span', { class: 'cp-group__sum' }, saleSummary(sale)),
-      ),
+      { 'aria-label': `Où en est la vente : ${saleLine(sale)}` },
+      dots.length === 0
+        ? null
+        : h(
+            'span',
+            { class: 'cp-steps', 'aria-hidden': 'true' },
+            ...dots.map((state) => h('span', { class: 'cp-step', 'data-step': state })),
+          ),
+      h('span', { class: 'cp-sale__line' }, saleLine(sale)),
       h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
     ),
     h(
       'ul',
       { class: 'cp-fields' },
       ...(rows.length === 0
-        ? [h('li', { class: 'cp-field cp-field--unknown' }, 'Rien de vendu ni proposé pour l’instant.')]
+        ? [
+            h(
+              'li',
+              { class: 'cp-field cp-field--unknown' },
+              'Rien de refusé ni d’objection servie pour l’instant.',
+            ),
+          ]
         : rows.map(({ label, value }) =>
             h(
               'li',
@@ -598,13 +684,14 @@ function cardPart(
     return [h('p', { class: 'cp-loading', 'aria-busy': 'true' }, 'Lecture de la fiche…')];
   if (screen.card === 'forbidden') return [notice('forbidden')];
   if (screen.card === 'down') return [notice('down')];
-  return cardNodes(
-    screen.card,
-    screen.openGroups,
-    { now: screen.now, newSince: screen.newSince },
-    actions,
-    masked,
-  );
+  const marks = { now: screen.now, newSince: screen.newSince };
+  const ageDisputed = screen.standing?.ageDisputed === true;
+  const discover = discoverFold(screen.card, masked, screen.discoverOpen, actions);
+  return [
+    briefCard(screen.card, marks, masked, ageDisputed),
+    ...(discover === null ? [] : [discover]),
+    ...groupFolds(screen.card, screen.openGroups, marks, actions, masked),
+  ];
 }
 
 const key = (letter: string): HTMLElement => h('span', { class: 'nv-kbd' }, letter);
@@ -729,7 +816,7 @@ function draftPart(
   const head = h(
     'header',
     { class: 'cp-draft__head' },
-    h('span', { class: 'cp-draft__title' }, 'Brouillon de l’agent'),
+    h('span', { class: 'cp-overline' }, 'Brouillon de l’agent'),
     notes.length === 0 ? null : h('span', { class: 'cp-draft__about' }, notes.join(' · ')),
   );
   const section = h('section', {
@@ -893,9 +980,10 @@ function draftPart(
         'Copier pour Reveal ',
         key('A'),
       ),
+      // « Copier pour Reveal » is the one filled button; the two others are light (Design 16/11, lot 0141-3).
       h(
         'button',
-        { type: 'button', class: 'nv-btn nv-btn--soft nv-btn--sm', 'data-gesture': 'edit' },
+        { type: 'button', class: 'nv-btn nv-btn--plain nv-btn--sm', 'data-gesture': 'edit' },
         'Retoucher ',
         key('E'),
       ),
@@ -972,13 +1060,6 @@ function refocus(root: HTMLElement, selector: string | null): void {
   if (target !== null && root.ownerDocument.activeElement !== target) target.focus({ preventScroll: true });
 }
 
-/** Which conversation the panel shows: his name on the platform (EXT-14), in a band that never scrolls. */
-function whoBand(fanName: string | null): HTMLElement | null {
-  return fanName === null
-    ? null
-    : h('header', { class: 'cp-who' }, h('span', { class: 'cp-who__fan' }, fanName));
-}
-
 /**
  * A cut the draft already says in its own line, right under it (« Ne plus lui écrire », limits not read): said once.
  * With no draft shown, the cut stands alone.
@@ -993,8 +1074,13 @@ function sameAsDraft(cut: CopilotCut | null, draft: DraftPart, withheld: Withhel
   );
 }
 
+/** What makes a draft new to his eyes: its bubbles. Picking a reason or retouching draws it again, it stays the same. */
+const drawnBubbles = new WeakMap<Element, string>();
+const bubblesOf = (draft: DraftPart): string =>
+  draft.kind === 'ready' ? JSON.stringify(draft.bubbles) : draft.kind;
+
 export function render(root: HTMLElement, screen: PanelScreen, actions: PanelActions): void {
-  // The card scrolls; « où on en est » above it and the draft under it stay in view (§ 10).
+  // The card scrolls; the band and the core above it stay in view (Design 16/11, lot 0141-3).
   const scroller = root.querySelector('.cp-scroll');
   const scroll = scroller?.scrollTop ?? 0;
   const focused = focusOf(root);
@@ -1005,6 +1091,8 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
     const fold = saleFold(assist, cut, screen.saleOpen, actions);
     // While his age is contested, what is intimate is masked, by the panel itself too (§ 9, closed by default).
     const ageCut = cut === 'age_doubt';
+    // Under the core: the sale line, then him in brief, what is left to discover, the folded groups. With a long
+    // draft, the sale line is what goes under the fold, never the button.
     const body = h(
       'div',
       { class: 'cp-scroll' },
@@ -1012,9 +1100,9 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       ...cardPart(screen, actions, ageCut),
     );
     const withheld = withheldOf(screen.standing);
-    // Under the card, right above the draft, so fan, what to do, the draft and its copy are read without scrolling.
-    // A cut is said once: by the draft when its own line already says it, otherwise by the sentence above it, and the
-    // draft then adds no line. It never lets the sale gesture through.
+    // The core, right under the band: what to do, the draft and its copy, read without scrolling. A cut is said once:
+    // by the draft when its own line already says it, otherwise by the sentence in the gesture's place, and the draft
+    // then adds no line. It never lets the sale gesture through.
     const draftSaysCut = cut !== null && sameAsDraft(cut, screen.draft, withheld);
     const move = draftSaysCut ? null : moveBand(assist, cut, screen.standing?.band ?? null);
     const stops: DraftStops = {
@@ -1023,28 +1111,36 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       saidAbove: cut !== null && !draftSaysCut,
       notes: assist === null ? [] : draftNotes(assist.reasons),
     };
-    const top = [
-      whoBand(screen.fanName),
-      standingLine(screen.standing, signalWords(assist, cut), screen.signalsOpen, ageCut),
-    ].filter((node): node is HTMLElement => node !== null);
+    const band = statusBand(screen.fanName, screen.standing, assist, cut, screen.signalsOpen);
     const pinned = move === null ? [] : [move];
     const key = draftKey(screen.draft, stops);
     const shown = root.querySelector(':scope > .cp-draft');
     if (shown !== null && drawnDrafts.get(shown) === key) {
       // The same draft in the same state: it stays in place, never detached, so a field he types in keeps its focus,
-      // its text and its caret while the card above it is drawn again (recette du 16/11, EXT-01).
+      // its text and its caret while the rest is drawn again (recette du 16/11, EXT-01).
       for (const child of [...root.children]) if (child !== shown) child.remove();
-      shown.before(...top, body, ...pinned);
+      shown.before(band, ...pinned);
+      shown.after(body);
       body.scrollTop = scroll;
-      for (const node of [...top, body, ...pinned]) wire(node, actions);
+      for (const node of [band, body, ...pinned]) wire(node, actions);
       refocus(root, focused);
       return;
     }
     // A reason picked draws the draft again: the note he started stays.
     const note = root.querySelector<HTMLInputElement>('.cp-draft__note')?.value ?? '';
     const draft = draftPart(screen.draft, stops, actions);
-    if (draft !== null) drawnDrafts.set(draft, key);
-    root.replaceChildren(...top, body, ...pinned, ...(draft === null ? [] : [draft]));
+    if (draft !== null) {
+      drawnDrafts.set(draft, key);
+      drawnBubbles.set(draft, bubblesOf(screen.draft));
+      // A new draft after another (his new message): only the core refreshes, in a short fade; the card stays still.
+      if (
+        shown !== null &&
+        screen.draft.kind === 'ready' &&
+        drawnBubbles.get(shown) !== bubblesOf(screen.draft)
+      )
+        for (const node of [draft, ...pinned]) node.dataset['fresh'] = 'true';
+    }
+    root.replaceChildren(band, ...pinned, ...(draft === null ? [] : [draft]), body);
     // Kept open groups keep their place: the panel draws over itself, without scrolling back up (§ 10).
     body.scrollTop = scroll;
     const kept = root.querySelector<HTMLInputElement>('.cp-draft__note');

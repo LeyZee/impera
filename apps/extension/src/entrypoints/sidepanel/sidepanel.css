@@ -1,7 +1,8 @@
 /*
- * The copilot side panel (ADR 0086). Design system tokens only; `cp-` is local to this page. Read in three seconds:
- * the essentials on top in plain rows, the rest folded by group. Amber for what waits for a chatter, never red here:
- * red is kept for a limit that forbids the sale (§ 10). Nothing moves, nothing blinks.
+ * The copilot side panel (ADR 0086). Design system tokens only; `cp-` is local to this page. Top to bottom, the order of
+ * the chatter's questions (Design 16/11, lot 0141-3): who he is and whether one may write (the band), what to do and the
+ * text (the core), then the sale line and him in brief, the rest folded. Colour lives in the band's badges and the core
+ * only: red for a limit that forbids the sale, amber for what holds it back. Nothing blinks.
  */
 
 html,
@@ -16,7 +17,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Three bands: « où on en est » on top, the card scrolling between, the agent's draft at the foot. Only the card moves. */
+/* The band on top, the core under it, then the card that scrolls: only the card moves. */
 .cp {
   /* The panel's one margin, written once (V-EXT-15): 12 px, the panel is narrow; the popup keeps its 16 px. */
   --cp-gutter: var(--nv-space-3);
@@ -38,86 +39,81 @@ body {
   flex-direction: column;
   gap: var(--nv-space-3);
 }
-/* Above the draft, the rows fade out instead of being cut flat under it; the bottom padding keeps the last row clear. */
-.cp-scroll:has(+ .cp-draft),
-.cp-scroll:has(+ .cp-move) {
-  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--nv-space-5)), transparent);
-}
 
-/* ───────────── Which conversation (EXT-14) ───────────── */
+/* ───────────── The status band (Design 16/11, lot 0141-3) ───────────── */
 
-.cp-who {
+/* Stuck on top, one line: his name on the left, at most three badges on the right; they wrap under it only if needed. */
+.cp-band {
   flex: none;
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-  padding: var(--cp-gutter) var(--cp-gutter) 0;
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--nv-space-2);
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 6px var(--cp-gutter);
+  border-bottom: 1px solid var(--nv-hairline);
 }
-.cp-who__fan {
+.cp-band__fan {
+  flex: 0 1 auto;
   min-width: 0;
+  margin-right: auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 500;
 }
-
-/* ───────────── Où on en est ───────────── */
-
-.cp-standing {
-  flex: none;
-  margin: 0;
-  padding: var(--cp-gutter) var(--cp-gutter) var(--nv-space-2);
-  border-bottom: 1px solid var(--nv-hairline);
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  color: var(--nv-ink-muted);
-}
-/*
- * Every part carries the dot before it; the flow starts one dot to the left of the line and that strip is clipped, so
- * the first part of each line shows no dot (Design 16/11: a line never starts with « · »). Clipped on the left only:
- * the 44 px target of « +N » still reaches above, below and to the right.
- */
-.cp-standing__flow {
-  --cp-dot-room: 18px;
+.cp-badges {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  row-gap: 2px;
-  margin-left: calc(-1 * var(--cp-dot-room));
-  clip-path: inset(-24px -24px -24px var(--cp-dot-room));
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
 }
-.cp-standing__stop {
-  font-weight: 600;
+.cp-badges__wait {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+/* The design system's status pill, its dot replaced by an icon; read without reading, never bold. */
+.cp-badge {
+  gap: 4px;
+  padding: 0 8px 0 6px;
+  font-weight: 500;
+}
+.cp-badge[data-tone='red'] {
+  --_c: var(--nv-danger);
   color: var(--nv-danger);
 }
-.cp-standing__care {
-  font-weight: 600;
+.cp-badge[data-tone='amber'] {
+  --_c: var(--nv-warning);
   color: var(--nv-warning);
 }
-.cp-standing__band {
+.cp-badge[data-tone='neutral'] {
+  --_c: var(--nv-ink-faint);
   color: var(--nv-ink);
 }
-.cp-standing__dot {
-  color: var(--nv-ink-faint);
+.cp-badge svg {
+  flex: none;
 }
-.cp-standing__signal {
-  color: var(--nv-ink);
+.cp-badge[data-kind='desire'] svg:first-child {
+  color: var(--nv-ink-muted);
 }
-/* « +N » (ADR 0141 § 14): a word of the line, its target grown to 44 px around it without moving the line. */
-.cp-standing__more {
+/* « +N » (ADR 0141 § 14): a word of the band, its target grown to 44 px around it without moving the line. */
+.cp-badges__more {
   position: relative;
-  padding: 0;
+  padding: 0 4px;
   border: 0;
   background: none;
   font: inherit;
-  font-weight: 600;
+  font-size: var(--nv-text-caption);
+  font-weight: 500;
   color: var(--nv-ink-muted);
   cursor: pointer;
 }
-.cp-standing__more::before {
+.cp-badges__more::before {
   content: '';
   position: absolute;
   inset: 50% auto auto 50%;
@@ -125,44 +121,57 @@ body {
   height: 44px;
   transform: translate(-50%, -50%);
 }
-.cp-standing__more:hover {
+.cp-badges__more:hover {
   color: var(--nv-ink);
 }
-.cp-standing__more:focus-visible {
+.cp-badges__more:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
   border-radius: var(--nv-radius-xs);
 }
 
-/* ───────────── Quoi faire (ADR 0141 § 12) ───────────── */
+/* A label read as an overline: small, muted, spaced capitals, never bold (Design 16/11, lot 0141-3). */
+.cp-overline {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nv-ink-muted);
+}
 
-/* Two lines right above the draft: the gesture in bold, verb first; why, small and muted. Pinned, never scrolled. */
+/* ───────────── The core: quoi faire (ADR 0141 § 12) ───────────── */
+
+/* On the background, right under the band: the gesture is the largest text of the panel, why small and muted. */
 .cp-move {
   flex: none;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--cp-gutter) var(--cp-gutter) var(--nv-space-2);
-  border-top: 1px solid var(--nv-hairline);
-  background: var(--nv-glass-fill);
+  padding: var(--cp-gutter) var(--cp-gutter) var(--nv-space-1);
 }
-.cp-move + .cp-draft {
-  border-top: 0;
-  padding-top: var(--nv-space-1);
-}
-.cp-move__what,
-.cp-move__cut {
+.cp-move__what {
   margin: 0;
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  letter-spacing: var(--nv-text-headline-tracking);
   font-weight: 600;
   color: var(--nv-ink);
   text-wrap: pretty;
 }
+/* A cut takes the gesture's place, in its tone: a sentence, so a size under the gesture's. */
+.cp-move__cut {
+  margin: 0;
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  font-weight: 600;
+  text-wrap: pretty;
+}
 .cp-move__why {
   margin: 0;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
   text-wrap: pretty;
 }
@@ -174,42 +183,58 @@ body {
 .cp-move[data-tone='red'] .cp-move__cut {
   color: var(--nv-danger);
 }
-/* One part and the dot before it never part at a line's end (V-EXT). */
-.cp-standing__item {
-  display: inline-flex;
-  align-items: baseline;
-  white-space: nowrap;
+/* At a new message of his, only the core refreshes, in a short fade; the card under it stays still. */
+.cp-move[data-fresh],
+.cp-draft[data-fresh] {
+  animation: cp-fade var(--nv-dur-fast) var(--nv-ease-out);
 }
-.cp-standing__dot {
-  display: inline-block;
-  width: var(--cp-dot-room);
-  text-align: center;
+@keyframes cp-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-move[data-fresh],
+  .cp-draft[data-fresh] {
+    animation: none;
+  }
 }
 
 /* ───────────── The agent's draft ───────────── */
 
-/* At most two fifths of the panel, so the essentials above stay read (EXT-04): the bubbles scroll inside it. */
+/*
+ * In the core, on the background, at most three fifths of the panel: past that the bubbles scroll inside it, so its
+ * buttons are never pushed out of view (Design 16/11, lot 0141-3).
+ */
 .cp-draft {
   flex: none;
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  max-height: 40%;
+  max-height: 60%;
   overflow-y: auto;
-  padding: var(--cp-gutter);
-  border-top: 1px solid var(--nv-hairline);
-  background: var(--nv-glass-fill);
+  padding: var(--nv-space-2) var(--cp-gutter) var(--cp-gutter);
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
+}
+.cp-band + .cp-draft {
+  padding-top: var(--cp-gutter);
+}
+/* While the agent writes, the draft holds the room of a short one: a draft that arrives pushes the card little (§ 10). */
+.cp-draft[data-state='writing'] {
+  min-height: 11.5rem;
+  box-sizing: border-box;
+}
+/* The core sits on the background; one hairline parts it from what scrolls under it. */
+.cp-move + .cp-scroll,
+.cp-draft + .cp-scroll {
+  border-top: 1px solid var(--nv-hairline);
 }
 .cp-draft__head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--nv-space-2);
-}
-.cp-draft__title {
-  font-weight: 600;
 }
 /* A note on the draft's text (« Réécrit une fois par une garde »): with the draft, small and faint. */
 .cp-draft__about {
@@ -301,7 +326,7 @@ body {
 }
 .cp-draft__actions .nv-btn {
   gap: 6px;
-  min-height: 40px;
+  min-height: 44px;
   justify-content: center;
 }
 .cp-draft__actions .cp-send,
@@ -382,12 +407,12 @@ body {
 }
 .cp-draft__stop {
   margin: 0;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--nv-danger);
 }
 .cp-draft__warn {
   margin: 0;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--nv-warning);
 }
 
@@ -448,24 +473,34 @@ body {
   margin-top: var(--nv-space-2);
 }
 
-/* ───────────── The card ───────────── */
+/* ───────────── Him, in brief (Design 16/11, lot 0141-3) ───────────── */
 
-.cp-head {
+/* One card level only: the brief and the folds are cards on the background, nothing nested in a card. */
+.cp-brief {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  padding: var(--nv-space-2) var(--nv-space-3) var(--nv-space-1);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+.cp-brief__head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--nv-space-2);
 }
-.cp-head__title {
-  margin: 0;
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-  font-weight: 600;
-}
 .cp-head__check {
   color: var(--nv-warning);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 500;
+}
+.cp-brief__none {
+  margin: 0;
+  padding-bottom: var(--nv-space-2);
+  color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
-  font-weight: 600;
 }
 
 .cp-fields {
@@ -475,18 +510,11 @@ body {
   padding: 0;
   list-style: none;
 }
-.cp-fields--essentials {
-  padding: 0 var(--nv-space-3);
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
-}
 .cp-field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  column-gap: var(--nv-space-2);
-  row-gap: 1px;
-  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   overflow-wrap: anywhere;
@@ -494,26 +522,7 @@ body {
 .cp-field + .cp-field {
   border-top: 1px solid var(--nv-hairline);
 }
-/* The label, then where the value comes from in small to its right (EXT-04): two lines a field, not three. Below
-   360 px the source goes under the value, so it never falls alone between the label and the value (Design, lot -1). */
-.cp-field > * {
-  grid-column: 1 / -1;
-}
-.cp-field > .cp-field__top {
-  grid-column: 1;
-}
-.cp-field > .cp-field__source {
-  grid-column: 2;
-  grid-row: 1;
-  text-align: right;
-}
-@container cp-panel (max-width: 359px) {
-  .cp-field > .cp-field__source {
-    grid-column: 1 / -1;
-    grid-row: auto;
-    text-align: left;
-  }
-}
+/* The label as an overline, where the value comes from on its right: one line, the value under it in ink. */
 .cp-field__top {
   display: flex;
   flex-wrap: wrap;
@@ -521,11 +530,19 @@ body {
   column-gap: var(--nv-space-2);
 }
 .cp-field__label {
-  color: var(--nv-ink-muted);
-}
-.cp-field > .cp-field__source {
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nv-ink-muted);
+}
+.cp-field__source {
+  margin-left: auto;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  text-align: right;
 }
 /* « nouveau » in ink on a quiet chip: neither red (forbids) nor amber (waits for him), it only says it changed. */
 .cp-field__new {
@@ -535,35 +552,68 @@ body {
   color: var(--nv-ink);
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
-  font-weight: 600;
+  font-weight: 500;
 }
+.cp-field__value {
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-ink);
+}
+/* What he likes and does not want, as short bullets. */
+.cp-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-items > li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+}
+.cp-items > li::before {
+  content: '';
+  flex: none;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--nv-ink-faint);
+  transform: translateY(-3px);
+}
+/* Who he is, one line: the first name is the one value in bold. */
 .cp-ident__line {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: 6px;
   min-width: 0;
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  color: var(--nv-ink);
 }
-.cp-ident__line .cp-field__value,
-.cp-ident__line .cp-field__empty {
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
+.cp-ident__name {
+  font-weight: 600;
+}
+.cp-ident__part {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
 }
 .cp-ident__dot {
   color: var(--nv-ink-faint);
 }
-.cp-ident > .cp-field__source {
+/* An age in doubt says so in red where its source would be: the line never states it as a fact. */
+.cp-ident__contested {
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
+  font-weight: 500;
+  color: var(--nv-danger);
 }
-.cp-field__value {
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-  font-weight: 600;
-  color: var(--nv-ink);
-}
-.cp-field__empty,
-.cp-field__source {
+.cp-ident__source {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
   color: var(--nv-ink-faint);
 }
 .cp-field__quote {
@@ -583,9 +633,66 @@ body {
   color: var(--nv-warning);
   background: color-mix(in oklab, var(--nv-warning) 12%, transparent);
 }
+.cp-field__masked {
+  color: var(--nv-ink-muted);
+}
+.cp-field--unknown {
+  padding: var(--nv-space-2) 0;
+  color: var(--nv-ink-faint);
+  text-wrap: pretty;
+}
+
+/* ───────────── À découvrir ───────────── */
+
+/* One muted line, no card: it opens what is not known of him yet. */
+.cp-discover > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-height: 44px;
+  padding: 0 var(--nv-space-1);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.cp-discover > summary::-webkit-details-marker {
+  display: none;
+}
+.cp-discover > summary:hover {
+  color: var(--nv-ink);
+}
+.cp-discover > summary:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+  border-radius: var(--nv-radius-md);
+}
+.cp-discover[open] .cp-group__chevron {
+  transform: rotate(90deg);
+}
+.cp-discover__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0 var(--nv-space-1) var(--nv-space-2);
+  list-style: none;
+}
+.cp-discover__list > li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cp-discover__labels {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
 
 /* ───────────── Folded groups ───────────── */
 
+/* At the very bottom, closed, with their count. */
 .cp-group {
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);
@@ -596,7 +703,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: var(--nv-space-2);
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 var(--nv-space-3);
   cursor: pointer;
   list-style: none;
@@ -606,9 +713,6 @@ body {
 .cp-group__row {
   justify-content: flex-start;
   cursor: default;
-}
-.cp-field__masked {
-  color: var(--nv-ink-muted);
 }
 .cp-group > summary::-webkit-details-marker {
   display: none;
@@ -622,13 +726,13 @@ body {
   border-radius: var(--nv-radius-md);
 }
 .cp-group__title {
-  font-weight: 600;
+  color: var(--nv-ink);
 }
 .cp-group__sum {
   color: var(--nv-ink-muted);
 }
 .cp-group__check {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--nv-warning);
 }
 .cp-group__chevron {
@@ -645,30 +749,64 @@ body {
     transition: none;
   }
 }
-.cp-field--unknown {
-  padding: var(--nv-space-2) 0;
-  color: var(--nv-ink-faint);
-  text-wrap: pretty;
-}
 .cp-group .cp-fields {
   padding: 0 var(--nv-space-3) var(--nv-space-1);
   border-top: 1px solid var(--nv-hairline);
 }
 
-/* ───────────── Où en est la vente (ADR 0141 § 14) ───────────── */
+/* ───────────── The sale line (ADR 0141 § 14; Design 16/11, lot 0141-3) ───────────── */
 
-/* A card's fold, on top of the card: its line says the step in progress and the next one with its price. */
+/* One line under the core, no card: a dot per step, the script and its step, the next one with its price. */
 .cp-sale > summary {
-  min-height: 44px;
-  padding-block: var(--nv-space-1);
-}
-.cp-sale__top {
   display: flex;
-  flex-direction: column;
-  min-width: 0;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-height: 44px;
+  padding: 0 var(--nv-space-1);
+  cursor: pointer;
+  list-style: none;
 }
-.cp-sale .cp-group__sum {
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
+.cp-sale > summary::-webkit-details-marker {
+  display: none;
+}
+.cp-sale > summary:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+  border-radius: var(--nv-radius-md);
+}
+.cp-sale[open] .cp-group__chevron {
+  transform: rotate(90deg);
+}
+.cp-sale__line {
+  min-width: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink);
   text-wrap: pretty;
+}
+.cp-steps {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cp-step {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1px solid var(--nv-ink-faint);
+}
+.cp-step[data-step='done'] {
+  border: 0;
+  background: var(--nv-ink-muted);
+}
+.cp-step[data-step='now'] {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  background: var(--nv-ink);
+}
+.cp-sale .cp-fields {
+  padding: 0 var(--nv-space-1) var(--nv-space-1);
 }

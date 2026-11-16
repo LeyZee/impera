@@ -13,6 +13,38 @@ const SHAPES = {
     ['path', { d: 'm12 5 7 7-7 7' }],
   ],
   chevronRight: [['path', { d: 'm9 18 6-6-6-6' }]],
+  arrowUp: [
+    ['path', { d: 'm5 12 7-7 7 7' }],
+    ['path', { d: 'M12 19V5' }],
+  ],
+  arrowDown: [
+    ['path', { d: 'M12 5v14' }],
+    ['path', { d: 'm19 12-7 7-7-7' }],
+  ],
+  /** A limit that forbids: a struck circle (the panel's status band, Design 16/11). */
+  ban: [
+    ['circle', { cx: '12', cy: '12', r: '10' }],
+    ['path', { d: 'm4.9 4.9 14.2 14.2' }],
+  ],
+  /** His desire, in the status band: a flame, its direction said by an arrow. */
+  flame: [
+    [
+      'path',
+      {
+        d: 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z',
+      },
+    ],
+  ],
+  clock: [
+    ['circle', { cx: '12', cy: '12', r: '10' }],
+    ['path', { d: 'M12 6v6l4 2' }],
+  ],
+  hourglass: [
+    ['path', { d: 'M5 22h14' }],
+    ['path', { d: 'M5 2h14' }],
+    ['path', { d: 'M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22' }],
+    ['path', { d: 'M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2' }],
+  ],
   check: [['path', { d: 'M20 6 9 17l-5-5' }]],
   link: [
     ['path', { d: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' }],

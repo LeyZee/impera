@@ -1,16 +1,7 @@
 import { CopilotAssistSchema, type CopilotAssist, type CopilotNextMove } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import {
-  CUT_LINES,
-  cutOf,
-  draftNotes,
-  eurosOf,
-  moveLines,
-  saleRows,
-  saleSummary,
-  signalWords,
-} from './assist';
+import { CUT_LINES, cutOf, draftNotes, eurosOf, moveLines, saleLine, saleRows, stepDots } from './assist';
 import { standingOf } from './standing';
 
 /* Invented data (ADR 0010). */
@@ -163,59 +154,44 @@ describe('what the agent computed, said to the chatter (ADR 0141, lot a)', () =>
     expect(eurosOf(0)).toBe('0\u00a0€');
   });
 
-  it('sums the sale up in one line: the step in progress, then the next one and its price', () => {
+  it('says the sale in one line: the script and its step, then the next step and its price', () => {
     const { sale } = assist();
     if (sale === null) throw new Error('sale');
-    // A step's name between guillemets (Design 16/11).
-    expect(saleSummary(sale)).toBe(
-      'Soirée d’essai, étape 2 sur 4 · ensuite «\u00a0Étape 3\u00a0» à 15\u00a0€',
+    // A step's name between guillemets (Design 16/11), the step as « 2/4 » (Design, lot 0141-3).
+    expect(saleLine(sale)).toBe('Soirée d’essai 2/4 · ensuite «\u00a0Étape 3\u00a0» 15\u00a0€');
+    expect(saleLine({ ...sale, nextStep: null })).toBe('Soirée d’essai 2/4');
+    expect(saleLine({ ...sale, script: null })).toBe('Prochaine étape «\u00a0Étape 3\u00a0» 15\u00a0€');
+    expect(saleLine({ ...sale, script: null, nextStep: null })).toBe(
+      'Rien de vendu ni proposé pour l’instant',
     );
-    expect(saleSummary({ ...sale, script: null, nextStep: null })).toBe('Pas de script en cours');
-    expect(
-      saleRows({
-        ...sale,
-        offerPending: true,
-        refusedSteps: ['Étape 2'],
-        usedObjections: ['C’est trop cher'],
-        customOrderOpen: true,
-      }).map(({ label }) => label),
-    ).toEqual([
-      'Script en cours',
-      'Prochaine étape',
+  });
+
+  it('draws one dot per step, past, in progress and to come, none without a script or for a long one', () => {
+    const { sale } = assist();
+    const script = sale?.script;
+    if (sale === null || script === null || script === undefined) throw new Error('sale');
+    expect(stepDots(sale)).toEqual(['done', 'now', 'next', 'next']);
+    expect(stepDots({ ...sale, script: null })).toEqual([]);
+    expect(stepDots({ ...sale, script: { ...script, stepCount: 12 } })).toEqual([]);
+  });
+
+  it('opens on what the line does not say, step names quoted', () => {
+    const { sale } = assist();
+    if (sale === null) throw new Error('sale');
+    expect(saleRows(sale)).toEqual([]);
+    const rows = saleRows({
+      ...sale,
+      offerPending: true,
+      refusedSteps: ['Étape 2'],
+      usedObjections: ['C’est trop cher'],
+      customOrderOpen: true,
+    });
+    expect(rows.map(({ label }) => label)).toEqual([
       'Offre faite',
       'Étapes refusées',
       'Objections déjà servies, à ne pas resservir',
       'Commande perso',
     ]);
-  });
-
-  it('quotes the step names in the fold', () => {
-    const { sale } = assist();
-    if (sale === null) throw new Error('sale');
-    const rows = saleRows({ ...sale, refusedSteps: ['Étape 2'] });
-    expect(rows.find(({ label }) => label === 'Prochaine étape')?.value).toBe(
-      '«\u00a0Étape 3\u00a0» à 15\u00a0€',
-    );
     expect(rows.find(({ label }) => label === 'Étapes refusées')?.value).toBe('«\u00a0Étape 2\u00a0»');
-  });
-
-  it('gives the signals, the direction of his desire only, and none under a cut', () => {
-    const lively = assist({
-      signals: { desireTrend: 'up', followUpDue: true },
-    });
-    expect(signalWords(lively, null)).toEqual({ trend: 'en hausse', more: ['Relance due'] });
-    expect(signalWords(assist({ signals: { desireTrend: 'down', followUpDue: false } }), null).trend).toBe(
-      'en baisse',
-    );
-    expect(
-      signalWords(assist({ signals: { desireTrend: 'flat', followUpDue: false } }), null).trend,
-    ).toBeNull();
-    const pending = assist();
-    if (pending.sale === null) throw new Error('sale');
-    expect(signalWords({ ...pending, sale: { ...pending.sale, offerPending: true } }, null).more).toEqual([
-      'Offre sans réponse',
-    ]);
-    expect(signalWords(lively, 'care')).toEqual({ trend: null, more: [] });
-    expect(signalWords(null, null)).toEqual({ trend: null, more: [] });
   });
 });

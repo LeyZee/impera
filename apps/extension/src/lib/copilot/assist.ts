@@ -155,30 +155,43 @@ export function eurosOf(minor: number): string {
 /** A step's name as the panel says it, between guillemets (Design 16/11): « La suite ». */
 const step = (name: string): string => `«\u00a0${name}\u00a0»`;
 
-/** The fold's summary line (§ 14): the step in progress, and the next one with its price. */
-export function saleSummary(sale: CopilotSaleState): string {
+/**
+ * The sale in one line under the core (Design 16/11, lot 0141-3): « Soirée d'essai 2/4 · ensuite « La suite » 15 € ».
+ * The script and its step, then the next step and its price; the detail opens under it.
+ */
+export function saleLine(sale: CopilotSaleState): string {
   const now =
     sale.script === null
-      ? 'Pas de script en cours'
-      : `${sale.script.name}, étape ${String(sale.script.stepIndex + 1)} sur ${String(sale.script.stepCount)}`;
-  return sale.nextStep === null
-    ? now
-    : `${now} · ensuite ${step(sale.nextStep.name)} à ${eurosOf(sale.nextStep.priceMinor)}`;
+      ? null
+      : `${sale.script.name} ${String(sale.script.stepIndex + 1)}/${String(sale.script.stepCount)}`;
+  const next =
+    sale.nextStep === null ? null : `${step(sale.nextStep.name)} ${eurosOf(sale.nextStep.priceMinor)}`;
+  if (now === null && next === null) return 'Rien de vendu ni proposé pour l’instant';
+  if (now === null) return `Prochaine étape ${next ?? ''}`;
+  return next === null ? now : `${now} · ensuite ${next}`;
 }
 
-/** The fold's rows (§ 3): what is known of the sale, each said once. */
+/** Where a step stands among the script's, for its dot: past, the one in progress, still to come. */
+export type StepDot = 'done' | 'now' | 'next';
+
+/** Most steps a line of dots says; past it, the words « 5/12 » say it alone. */
+const MAX_DOTS = 8;
+
+/** One dot per step of the script in progress (Design 16/11): none without a script, nor for a long one. */
+export function stepDots(sale: CopilotSaleState): readonly StepDot[] {
+  if (sale.script === null || sale.script.stepCount > MAX_DOTS) return [];
+  const { stepIndex, stepCount } = sale.script;
+  return Array.from({ length: stepCount }, (_, index) =>
+    index < stepIndex ? 'done' : index === stepIndex ? 'now' : 'next',
+  );
+}
+
+/**
+ * The detail under the sale line (§ 3): what the line does not say, each said once. The script and the next step are
+ * on the line itself.
+ */
 export function saleRows(sale: CopilotSaleState): { readonly label: string; readonly value: string }[] {
   const rows: { label: string; value: string }[] = [];
-  if (sale.script !== null)
-    rows.push({
-      label: 'Script en cours',
-      value: `${sale.script.name}, étape ${String(sale.script.stepIndex + 1)} sur ${String(sale.script.stepCount)}`,
-    });
-  if (sale.nextStep !== null)
-    rows.push({
-      label: 'Prochaine étape',
-      value: `${step(sale.nextStep.name)} à ${eurosOf(sale.nextStep.priceMinor)}`,
-    });
   if (sale.offerPending) rows.push({ label: 'Offre faite', value: 'Pas encore de réponse' });
   if (sale.refusedSteps.length > 0)
     rows.push({ label: 'Étapes refusées', value: sale.refusedSteps.map(step).join(', ') });
@@ -189,28 +202,4 @@ export function saleRows(sale: CopilotSaleState): { readonly label: string; read
     });
   if (sale.customOrderOpen) rows.push({ label: 'Commande perso', value: 'Ouverte' });
   return rows;
-}
-
-const TREND_WORDS = { up: 'en hausse', down: 'en baisse' } as const;
-
-/**
- * The signals not to miss (§ 4), added after his desire: its direction only (the figure stays in the CRM), a follow-up
- * due, an offer without an answer. None under a cut: nothing there must push to write or to sell.
- */
-export function signalWords(
-  assist: CopilotAssist | null,
-  cut: CopilotCut | null,
-): {
-  readonly trend: string | null;
-  readonly more: readonly string[];
-} {
-  if (assist === null || cut !== null) return { trend: null, more: [] };
-  const { desireTrend, followUpDue } = assist.signals;
-  return {
-    trend: desireTrend === 'up' || desireTrend === 'down' ? TREND_WORDS[desireTrend] : null,
-    more: [
-      ...(followUpDue ? ['Relance due'] : []),
-      ...(assist.sale?.offerPending === true ? ['Offre sans réponse'] : []),
-    ],
-  };
 }
