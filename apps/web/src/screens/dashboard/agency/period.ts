@@ -210,7 +210,11 @@ export function compareChoices(
   const count = unit === 'month' ? 24 : unit === 'week' ? 26 : 35;
   // The one just before is « previous »: the list goes on from the one before it.
   const earlier = Array.from({ length: count - 1 }, (_, i) => stepPeriod(unit, start, -(i + 2)));
-  const named = earlier.map((value) => ({ value, label: `vs ${periodName(unit, value, today)}` }));
+  // In the list, a month is a word in a sentence: « vs septembre 2026 »; the pastille, a title, keeps its capital.
+  const named = earlier.map((value) => {
+    const name = periodName(unit, value, today);
+    return { value, label: `vs ${name.charAt(0).toLocaleLowerCase('fr') + name.slice(1)}` };
+  });
   if (unit === 'day') {
     // The same weekday a week before reads first: a Saturday compares with a Saturday.
     const week = shiftDay(start, -7);

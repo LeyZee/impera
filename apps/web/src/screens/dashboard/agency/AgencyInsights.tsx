@@ -98,6 +98,11 @@ function Delta({
   return <span className={`nv-delta${tone}`}>{deltaText(change)}</span>;
 }
 
+/** Under 640px the curve's tip is the compact one. */
+function narrowTip(): boolean {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches;
+}
+
 /** One point of the curve: its label, its revenue, and the compared day's when the register holds it. */
 interface CurvePoint {
   readonly key: string;
@@ -187,12 +192,20 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
     return tip.bind(
       {
         title: one.title,
-        rows: [
-          ['Chiffre d’affaires', euros(one.cents)],
-          ...(one.compared === null
-            ? []
-            : [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]),
-        ],
+        // A phone's tip says only the amounts and the day compared: the labels took half the curve (recette DSH-04).
+        rows: narrowTip()
+          ? [
+              [euros(one.cents), ''],
+              ...(one.compared === null
+                ? []
+                : [[`${euros(one.compared.cents)} · ${one.compared.title}`, ''] as const]),
+            ]
+          : [
+              ['Chiffre d’affaires', euros(one.cents)],
+              ...(one.compared === null
+                ? []
+                : [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]),
+            ],
         rowKeys: one.compared === null ? ['solid'] : ['solid', 'dashed'],
       },
       { marker: x },

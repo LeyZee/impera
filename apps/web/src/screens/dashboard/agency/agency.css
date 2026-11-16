@@ -1300,6 +1300,12 @@
     font-size: 22px;
     line-height: 28px;
   }
+  /* A half-width tile has no room for a long amount and its change side by side: always under it, every tile alike. */
+  .ins-tile dd:first-of-type {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
   .ins-lead {
     padding: 18px 18px 14px;
   }

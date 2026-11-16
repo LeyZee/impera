@@ -240,6 +240,7 @@ export function PeriodBar({
           <Select
             className="ins-when__select"
             ariaLabel="Période lue"
+            search="never"
             value={periodStart(selection.unit, shown.from)}
             options={periodChoices(selection.unit, today, CHOICES[selection.unit])}
             onChange={(start) => {
@@ -252,6 +253,7 @@ export function PeriodBar({
       <Select
         className="ins-when__select ins-when__compare"
         ariaLabel="Période comparée"
+        search="never"
         value={compareValue(selection)}
         options={compare}
         onChange={(value) => {

@@ -7,7 +7,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFloatingTip } from '../parts';
@@ -458,9 +458,24 @@ describe('the days read and their comparison (ADR 0146)', () => {
     // To the far right: the last day.
     fireEvent.pointerMove(layer, { clientX: 10, clientY: 10 });
     const bubble = await screen.findByRole('tooltip');
-    expect(bubble.textContent).toContain('Chiffre d’affaires');
-    expect(bubble.textContent).toContain('Comparé, 30 oct.');
+    // Every media query matches here, a phone's: the compact tip, amounts and the day compared only.
+    expect(bubble.textContent).toMatch(/270\s€ · 30 oct\./u);
+    expect(bubble.textContent).not.toContain('Chiffre d’affaires');
     expect(plot.querySelector('.ins-curve__hair')).not.toBeNull();
+    // A wide screen: each amount with its label.
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+    fireEvent.pointerMove(layer, { clientX: 12, clientY: 10 });
+    await waitFor(() => {
+      expect(screen.getByRole('tooltip').textContent).toContain('Comparé, 30 oct.');
+    });
+    expect(screen.getByRole('tooltip').textContent).toContain('Chiffre d’affaires');
   });
 
   it('shows no percentage when the register starts after the days compared, and says so (§ 4)', async () => {
