@@ -95,8 +95,8 @@ export const AgencyShareAlertSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('changed'),
     ...alertFields,
-    previousAgencyBps: z.number().int().min(0).max(10_000),
-    agencyBps: z.number().int().min(0).max(10_000),
+    previousAgencyBps: BasisPointsSchema,
+    agencyBps: BasisPointsSchema,
   }),
 ]);
 export type AgencyShareAlert = z.infer<typeof AgencyShareAlertSchema>;

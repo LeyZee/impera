@@ -362,7 +362,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     const alerts = await screen.findByRole('list', { name: 'Alertes de la part de l’agence' });
     expect(
       within(alerts).getByText(
-        /^Quinzaine du 16 au 31 octobre : la part de l’agence est passée de 33,33\s% à 37,5\s%\.$/u,
+        /^Alerte du 2 novembre, quinzaine du 16 au 31 octobre : la part de l’agence est passée de 33,33\s% à 37,5\s%\.$/u,
       ),
     ).toBeDefined();
     expect(alerts.querySelector('.ps-dot')?.getAttribute('data-dot')).toBe('warn');

@@ -31,7 +31,7 @@ const AGENCY_SHARE_CHANGE_BPS = 100;
 /**
  * Below this net on a fortnight, in the account's currency's cents, a cent of rounding moves the share by more than a
  * point: such a fortnight is compared with nothing (PAY-04 of the recette of 16/11: 0,03 € of net raised the alert).
- * The value, 20 in the currency, is the one proposed to Charles and awaits his word before the merge.
+ * 20 in the currency: Charles's choice of 16/11.
  */
 export const AGENCY_SHARE_CHANGE_MIN_NET_MINOR = 2_000;
 

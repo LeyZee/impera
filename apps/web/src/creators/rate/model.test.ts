@@ -283,10 +283,10 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
       agencyBps: 3750,
     });
     expect(alertText(mismatch, list([mismatch]))).toBe(
-      'Quinzaine du 16 au 31 octobre : sa part lue s’écarte du pourcentage réglé.',
+      'Alerte du 2 novembre, quinzaine du 16 au 31 octobre : sa part lue s’écartait du pourcentage réglé.',
     );
     expect(alertText(changed, list([changed]))).toBe(
-      'Quinzaine du 16 au 31 octobre : la part de l’agence est passée de 33,33\u00a0% à 37,5\u00a0%.',
+      'Alerte du 2 novembre, quinzaine du 16 au 31 octobre : la part de l’agence est passée de 33,33\u00a0% à 37,5\u00a0%.',
     );
     // Two accounts: each alert names its own.
     const other = AgencyShareAlertSchema.parse({
@@ -296,7 +296,7 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
       platformAccountId: B,
     });
     expect(alertText(other, list([mismatch, other]))).toBe(
-      'Quinzaine du 16 au 31 octobre, Reveal 2 : sa part lue s’écarte du pourcentage réglé.',
+      'Alerte du 2 novembre, quinzaine du 16 au 31 octobre, Reveal 2 : sa part lue s’écartait du pourcentage réglé.',
     );
   });
 });

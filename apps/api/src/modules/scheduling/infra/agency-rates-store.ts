@@ -147,6 +147,8 @@ export function createDrizzleAgencyRatesStore(db: Database, totalsOf: SalesTotal
             select id, type, payload, created_at
               from domain_events
              where type in ('agency_share_mismatch', 'agency_share_changed')
+               -- Published after its fortnight: bounded by time, as the table is never purged nor indexed by type.
+               and created_at >= ${periods.at(-1) ?? today}::date
                and payload->>'from' in (${sql.join(
                  periods.map((period) => sql`${period}`),
                  sql`, `,

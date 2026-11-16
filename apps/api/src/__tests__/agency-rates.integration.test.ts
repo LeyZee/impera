@@ -309,6 +309,9 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
 
   it('lists the alerts the automatic check published on the fortnights shown, hers only, newest first (PAY-04)', async () => {
     const account = newId(PlatformAccountIdSchema);
+    // Published a little while ago: the sheet reads only what was published since its oldest fortnight began.
+    const AT = new Date(Date.now() - 3_600_000).toISOString();
+    const LATER = new Date(Date.now() - 3_540_000).toISOString();
     const current = payPeriodOfDay(parisDay(0));
     const previous = previousPayPeriod(current);
     const long = previousPayPeriod(previousPayPeriod(previous));
@@ -331,7 +334,7 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
       createdAt: new Date(at),
     });
     const mismatch = {
-      ...changed(anna, previous, '2026-01-02T05:30:00.000Z'),
+      ...changed(anna, previous, AT),
       type: 'agency_share_mismatch' as const,
       payload: {
         creatorId: anna,
@@ -347,13 +350,15 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
         differenceMinor: -40,
       },
     };
-    const recent = changed(anna, previous, '2026-01-02T05:31:00.000Z');
+    const recent = changed(anna, previous, LATER);
     await test.admin.db.insert(schema.domainEvents).values([
       mismatch,
       recent,
-      // Out of the three fortnights shown, and another creator's: neither is listed.
-      changed(anna, long, '2025-12-02T05:30:00.000Z'),
-      changed(ines, previous, '2026-01-02T05:30:00.000Z', newId(PlatformAccountIdSchema)),
+      // Out of the three fortnights shown, another creator's, and one published too long ago: none is listed.
+      changed(anna, long, AT),
+      changed(ines, previous, AT, newId(PlatformAccountIdSchema)),
+      // Published before the oldest fortnight shown began: out of the bound, whatever its fortnight says.
+      changed(anna, current, '2025-12-02T05:30:00.000Z', newId(PlatformAccountIdSchema)),
     ]);
     const { alerts } = await list(anna);
     const common = {
@@ -368,11 +373,11 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
         ...common,
         id: recent.id,
         kind: 'changed',
-        at: '2026-01-02T05:31:00.000Z',
+        at: LATER,
         previousAgencyBps: 3333,
         agencyBps: 3750,
       },
-      { ...common, id: mismatch.id, kind: 'mismatch', at: '2026-01-02T05:30:00.000Z' },
+      { ...common, id: mismatch.id, kind: 'mismatch', at: AT },
     ]);
     // Never an amount of a sale on the sheet's alerts, nor a fan.
     expect(JSON.stringify(alerts)).not.toMatch(/Minor|fan|chatter/iu);
