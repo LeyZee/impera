@@ -50,6 +50,8 @@ export function CountUp({
 interface TipContent {
   readonly title: string;
   readonly rows?: readonly (readonly [string, string])[];
+  /** A line chart's rows: each row's series drawn as a short stroke before its label (dataviz: line keys). */
+  readonly rowKeys?: readonly ('solid' | 'dashed')[];
   readonly text?: string;
   readonly note?: string;
 }
@@ -281,9 +283,14 @@ export function useFloatingTip(): FloatingTip {
         <>
           <h4 className="nv-tip__title">{content.title}</h4>
           {content.text === undefined ? null : <p className="m-0">{content.text}</p>}
-          {content.rows?.map(([label, value]) => (
+          {content.rows?.map(([label, value], i) => (
             <div className="nv-tip__row" key={label}>
-              <span>{label}</span>
+              <span>
+                {content.rowKeys?.[i] === undefined ? null : (
+                  <i className="db-tip-key" data-key={content.rowKeys[i]} aria-hidden="true" />
+                )}
+                {label}
+              </span>
               <b>{value}</b>
             </div>
           ))}

@@ -98,7 +98,7 @@ function Delta({
   return <span className={`nv-delta${tone}`}>{deltaText(change)}</span>;
 }
 
-/** One point of the curve: its label, its revenue, and the compared one's when there is one. */
+/** One point of the curve: its label, its revenue, and the compared day's when the register holds it. */
 interface CurvePoint {
   readonly key: string;
   readonly title: string;
@@ -108,7 +108,8 @@ interface CurvePoint {
 
 /**
  * The points under the lead figure (ADR 0146 § 5): every day from the register's first day when it falls in the period
- * (the line no longer sinks to the right), each with the day compared, aligned day for day; one day read hour by hour.
+ * (the line no longer sinks to the right), each with the day compared, aligned day for day, when the register holds
+ * that day (the compared line stops where the register begins, never falls to zero); one day read hour by hour.
  */
 export function curvePoints(insights: AgencyInsights): CurvePoint[] {
   if (insights.from === insights.to) {
@@ -121,16 +122,21 @@ export function curvePoints(insights: AgencyInsights): CurvePoint[] {
   }
   const since = insights.registerSince;
   const first =
-    since === null || since <= insights.from ? 0 : insights.days.findIndex((one) => one.day >= since);
+    since === null || since <= insights.from
+      ? 0
+      : Math.max(
+          0,
+          insights.days.findIndex((one) => one.day >= since),
+        );
   const today = insights.span.today;
-  return insights.days.slice(Math.max(0, first)).map((one, i) => {
-    const before = insights.previousDays[i + Math.max(0, first)];
+  return insights.days.slice(first).map((one, i) => {
+    const before = insights.previousDays[i + first];
     return {
       key: one.day,
       title: dayLabel(one.day),
       cents: one.revenueMinor,
       compared:
-        before === undefined
+        before === undefined || (since !== null && before.day < since)
           ? null
           : { title: spanText(before.day, before.day, today), cents: before.revenueMinor },
     };
@@ -138,46 +144,68 @@ export function curvePoints(insights: AgencyInsights): CurvePoint[] {
 }
 
 /**
- * The revenue day by day under the lead figure, the comparison as a discreet line behind, aligned day for day. A
- * hairline follows the pointer to the nearest day and the tip says both amounts (dataviz: one tip, every series).
+ * The revenue day by day under the lead figure, the comparison as a discreet dashed line behind, aligned day for day.
+ * A hairline and a dot follow the pointer or the finger to the nearest day, and the tip gives the date, then both
+ * amounts with their strokes (dataviz: one tip, every series). The subtitle says the days compared: no legend.
  */
 function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element | null {
   const [hover, setHover] = useState<number | null>(null);
   const points = curvePoints(insights);
   if (points.length < 2 || points.every((one) => one.cents === 0 && (one.compared?.cents ?? 0) === 0))
     return null;
-  const withCompare = comparable(insights) && points.some((one) => one.compared !== null);
   const frame = { width: 600, height: 96, padTop: 10, padBottom: 6 };
-  const top = Math.max(
-    1,
-    ...points.map((one) => Math.max(one.cents, withCompare ? (one.compared?.cents ?? 0) : 0)),
-  );
+  const top = Math.max(1, ...points.map((one) => Math.max(one.cents, one.compared?.cents ?? 0)));
   const line = chartPoints(
     points.map((one) => one.cents),
     frame,
     { min: 0, max: top },
   );
-  const behind = withCompare
-    ? chartPoints(
-        points.map((one) => one.compared?.cents ?? 0),
-        frame,
-        { min: 0, max: top },
-      ).slice(0, points.filter((one) => one.compared !== null).length)
-    : [];
+  const all = chartPoints(
+    points.map((one) => one.compared?.cents ?? 0),
+    frame,
+    { min: 0, max: top },
+  );
+  // The compared line where the register holds its days only: one run, from its first held day.
+  const behind = all.filter((_, i) => points[i]?.compared !== null);
   const last = line.at(-1);
-  const lit = hover === null ? null : line[hover];
+  const lit = hover === null ? undefined : line[hover];
+  const dot = lit ?? last;
   const area =
     last === undefined || line[0] === undefined
       ? ''
       : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(line[0].x)},${String(frame.height)} Z`;
   const since = insights.registerSince;
   const shortened = since !== null && since > insights.from && insights.from !== insights.to;
+  const pick = (event: ReactPointerEvent<HTMLDivElement>): number => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const at = Math.round(((event.clientX - box.left) / Math.max(1, box.width)) * (points.length - 1));
+    const index = Math.min(points.length - 1, Math.max(0, Number.isFinite(at) ? at : 0));
+    setHover(index);
+    return index;
+  };
+  const tipAt = (index: number): ReturnType<FloatingTip['bind']> => {
+    const one = points[index];
+    if (one === undefined) return tip.bind({ title: '' });
+    return tip.bind(
+      {
+        title: one.title,
+        rows: [
+          ['Chiffre d’affaires', euros(one.cents)],
+          ...(one.compared === null
+            ? []
+            : [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]),
+        ],
+        rowKeys: one.compared === null ? ['solid'] : ['solid', 'dashed'],
+      },
+      { above: true },
+    );
+  };
   return (
     <div className="ins-curve">
       <div
         className="ins-curve__plot"
         role="img"
-        aria-label={`Chiffre d’affaires ${insights.from === insights.to ? 'heure par heure' : 'jour par jour'}, de ${points[0]?.title ?? ''} à ${points.at(-1)?.title ?? ''}${withCompare ? ', avec la période comparée' : ''}`}
+        aria-label={`Chiffre d’affaires ${insights.from === insights.to ? 'heure par heure' : 'jour par jour'}, de ${points[0]?.title ?? ''} à ${points.at(-1)?.title ?? ''}${behind.length > 0 ? ', avec la période comparée' : ''}`}
       >
         <svg
           viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
@@ -186,8 +214,8 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
         >
           <defs>
             <linearGradient id="ins-curve-fill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0" stopColor="var(--nv-data-1)" stopOpacity="0.22" />
-              <stop offset="1" stopColor="var(--nv-data-1)" stopOpacity="0" />
+              <stop offset="0" className="ins-curve__fill-top" />
+              <stop offset="1" className="ins-curve__fill-bottom" />
             </linearGradient>
           </defs>
           {behind.length > 1 ? (
@@ -196,75 +224,41 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
           <path className="ins-curve__area" d={area} fill="url(#ins-curve-fill)" />
           <path className="ins-curve__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
         </svg>
-        {lit === undefined || lit === null ? null : (
+        {lit === undefined ? null : (
           <span
             className="ins-curve__hair"
             style={{ '--_x': `${String((lit.x / frame.width) * 100)}%` }}
             aria-hidden="true"
           />
         )}
-        {[lit ?? last].map((dot) =>
-          dot === undefined ? null : (
-            <span
-              key="dot"
-              className="ins-curve__dot"
-              style={{
-                '--_x': `${String((dot.x / frame.width) * 100)}%`,
-                '--_y': `${String((dot.y / frame.height) * 100)}%`,
-              }}
-              aria-hidden="true"
-            />
-          ),
+        {dot === undefined ? null : (
+          <span
+            className="ins-curve__dot"
+            style={{
+              '--_x': `${String((dot.x / frame.width) * 100)}%`,
+              '--_y': `${String((dot.y / frame.height) * 100)}%`,
+            }}
+            aria-hidden="true"
+          />
         )}
-        <div className="ins-curve__hits" aria-hidden="true">
-          {points.map((one, i) => (
-            <span
-              key={one.key}
-              className="ins-curve__hit"
-              {...(() => {
-                const bound = tip.bind(
-                  {
-                    title: one.title,
-                    rows: [
-                      ['Chiffre d’affaires', euros(one.cents)],
-                      ...(withCompare && one.compared !== null
-                        ? [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]
-                        : []),
-                    ],
-                  },
-                  { above: true },
-                );
-                return {
-                  ...bound,
-                  onPointerMove: (event: ReactPointerEvent) => {
-                    setHover(i);
-                    bound.onPointerMove(event);
-                  },
-                  onPointerLeave: (event: ReactPointerEvent) => {
-                    setHover(null);
-                    bound.onPointerLeave(event);
-                  },
-                };
-              })()}
-            />
-          ))}
-        </div>
+        {/* One layer for the pointer and the finger alike: the nearest day follows it (dataviz: the crosshair finds
+            the X), a tap shows it, a glide moves it. */}
+        <div
+          className="ins-curve__hits"
+          aria-hidden="true"
+          onPointerMove={(event) => {
+            tipAt(pick(event)).onPointerMove(event);
+          }}
+          onPointerDown={(event) => {
+            tipAt(pick(event)).onPointerDown(event);
+          }}
+          onPointerLeave={(event) => {
+            setHover(null);
+            tip.bind({ title: '' }).onPointerLeave(event);
+          }}
+        />
       </div>
-      {withCompare || shortened ? (
-        <p className="ins-curve__keys">
-          {withCompare ? (
-            <>
-              <span className="ins-curve__key" aria-hidden="true" />
-              {readName(insights)}
-              <span className="ins-curve__key ins-curve__key--compared" aria-hidden="true" />
-              {spanText(insights.previousFrom, insights.previousTo, insights.span.today)}
-            </>
-          ) : null}
-          {shortened ? (
-            <span className="ins-curve__since">registre lu depuis le {shortDate(since)}</span>
-          ) : null}
-        </p>
-      ) : null}
+      {shortened ? <p className="ins-curve__since">registre lu depuis le {shortDate(since)}</p> : null}
     </div>
   );
 }

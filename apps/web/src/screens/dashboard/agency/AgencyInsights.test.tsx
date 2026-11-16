@@ -453,11 +453,10 @@ describe('the days read and their comparison (ADR 0146)', () => {
     const plot = document.querySelector('.ins-curve__plot');
     if (plot === null) throw new Error('curve');
     expect(plot.querySelector('.ins-curve__compared')).not.toBeNull();
-    const hits = plot.querySelectorAll('.ins-curve__hit');
-    expect(hits).toHaveLength(7);
-    const last = hits[6];
-    if (last === undefined) throw new Error('hit');
-    fireEvent.pointerMove(last, { clientX: 10, clientY: 10 });
+    const layer = plot.querySelector('.ins-curve__hits');
+    if (layer === null) throw new Error('layer');
+    // To the far right: the last day.
+    fireEvent.pointerMove(layer, { clientX: 10, clientY: 10 });
     const bubble = await screen.findByRole('tooltip');
     expect(bubble.textContent).toContain('Chiffre d’affaires');
     expect(bubble.textContent).toContain('Comparé, 30 oct.');

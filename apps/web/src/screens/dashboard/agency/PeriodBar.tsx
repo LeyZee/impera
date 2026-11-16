@@ -216,16 +216,19 @@ export function PeriodBar({
   return (
     <div className="ins-when">
       {unit}
-      <div className="ins-when__nav nv-glass nv-glass--thin">
-        <Arrow toward="previous" target={around.previous} label="Période précédente" onChange={onChange} />
-        {selection.unit === 'custom' ? (
+      {selection.unit === 'custom' ? (
+        // The days chosen replace the name, and the arrows go: a span is typed, not stepped.
+        <div className="ins-when__nav nv-glass nv-glass--thin">
           <CustomDays
             key={`${selection.from}:${selection.to}`}
             selection={selection}
             today={today}
             onChange={onChange}
           />
-        ) : (
+        </div>
+      ) : (
+        <div className="ins-when__nav nv-glass nv-glass--thin">
+          <Arrow toward="previous" target={around.previous} label="Période précédente" onChange={onChange} />
           <Select
             className="ins-when__select"
             ariaLabel="Période lue"
@@ -235,9 +238,9 @@ export function PeriodBar({
               onChange({ unit: selection.unit, at: start });
             }}
           />
-        )}
-        <Arrow toward="next" target={around.next} label="Période suivante" onChange={onChange} />
-      </div>
+          <Arrow toward="next" target={around.next} label="Période suivante" onChange={onChange} />
+        </div>
+      )}
       <Select
         className="ins-when__select ins-when__compare"
         ariaLabel="Période comparée"

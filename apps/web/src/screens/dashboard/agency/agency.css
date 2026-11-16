@@ -93,47 +93,32 @@
   position: absolute;
   left: var(--_x);
   top: var(--_y);
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--nv-data-1);
-  box-shadow:
-    0 0 0 2px var(--nv-surface-raised),
-    0 0 12px var(--nv-data-1);
+  box-shadow: 0 0 0 2px var(--nv-surface-raised);
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+.ins-curve__fill-top {
+  stop-color: var(--nv-data-1);
+  stop-opacity: 0.16;
+}
+.ins-curve__fill-bottom {
+  stop-color: var(--nv-data-1);
+  stop-opacity: 0;
 }
 .ins-curve__hits {
   position: absolute;
   inset: -8px 0;
-  display: flex;
+  touch-action: pan-y;
+  cursor: crosshair;
 }
-.ins-curve__hit {
-  flex: 1 1 0;
-}
-.ins-curve__keys {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
+.ins-curve__since {
   margin: 0;
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink-muted);
-}
-.ins-curve__key {
-  display: inline-block;
-  width: 14px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--nv-data-1);
-}
-.ins-curve__key--compared {
-  margin-left: 6px;
-  background: repeating-linear-gradient(90deg, var(--nv-ink-faint) 0 3px, transparent 3px 7px);
-}
-.ins-curve__since {
-  margin-left: auto;
   color: var(--nv-ink-faint);
 }
 @keyframes ins-draw {
@@ -1195,12 +1180,21 @@
   text-align: center;
 }
 .ins-when__compare {
-  width: 15em;
+  width: 13.5em;
 }
+/* The comparison is a quieter choice than the period: no plate, muted ink until hovered or opened. */
 .ins-when__compare .nv-select__field {
   --_radius: var(--nv-radius-full);
   min-height: 40px;
   padding-block: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--nv-ink-muted);
+}
+.ins-when__compare .nv-select__field:hover,
+.ins-when__compare .nv-select__field[aria-expanded='true'] {
+  background: var(--nv-plate-hover);
+  color: var(--nv-ink);
 }
 .ins-when__days {
   display: inline-flex;
