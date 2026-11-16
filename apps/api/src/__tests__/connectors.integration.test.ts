@@ -541,6 +541,50 @@ describe('connectors module (P0-06)', () => {
     expect((await accountRow(second)).sessionCiphertext).toBeNull();
   });
 
+  it('gives the identity of an archived creator back to the account that syncs it, and asks her for a « Sync » again', async () => {
+    const gone = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: gone, nameKey: gone, displayName: 'Partie', timezone: 'Europe/Paris' });
+    const old = newId(PlatformAccountIdSchema);
+    await test.admin.db.insert(schema.platformAccounts).values({
+      id: old,
+      creatorId: gone,
+      platform: 'reveal',
+      handle: 'left-the-agency',
+      sessionState: 'none',
+    });
+    expect((await sync(old, revealSession('reveal-bearer-gone-kkkk', 'model-test-gone'))).statusCode).toBe(
+      204,
+    );
+    const hers = await account('takes-over', 'none');
+    // While she is in the agency, the identity is hers.
+    expect((await sync(hers, revealSession('reveal-bearer-gone-kkkk', 'model-test-gone'))).statusCode).toBe(
+      409,
+    );
+
+    await test.admin.db
+      .update(schema.creators)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.creators.id, gone));
+    expect((await sync(hers, revealSession('reveal-bearer-gone-llll', 'model-test-gone'))).statusCode).toBe(
+      204,
+    );
+    expect(await accountRow(hers)).toMatchObject({ sessionOwner: 'model-test-gone', sessionState: 'valid' });
+    expect(await accountRow(old)).toMatchObject({ sessionOwner: null, sessionState: 'expired' });
+    const released = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, old));
+    expect(released.map((one) => one.action)).toContain('connector.session_released');
+
+    // Back in the agency, her old account no longer takes the identity another account holds.
+    await test.admin.db.update(schema.creators).set({ archivedAt: null }).where(eq(schema.creators.id, gone));
+    expect((await sync(old, revealSession('reveal-bearer-gone-mmmm', 'model-test-gone'))).statusCode).toBe(
+      409,
+    );
+  });
+
   it("lists the accounts to sync for the owner's link only, never a session", async () => {
     const id = await account('listed', 'none');
     const list = (link: string | null) =>
