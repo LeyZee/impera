@@ -6,4 +6,4 @@
 - **Second amendement 0137** (« ok 0137 ter », 17 h 26) : réveil « en ligne », gros dépensier endormi, merci de fidélité ; aucun Mass DM payant ; 3 par semaine et par fan tous types, 36 h d'écart, priorité, pause de 14 jours après 3 sans réponse, liste créée 10 min avant puis supprimée.
 - **Tests** : aucun (documentation seule).
 - **Reste** : stratégie du feed public ; fiches de lots (connecteur, plan, écran).
-- **Découvertes** : Reveal ne montre pas la modification d'une publication programmée (on supprime et on recrée) ; pas de filtre « anciens abonnés » ni « sans échange récent » vu dans le Mass DM ; ni retrait d'un fan d'une liste, ni suppression d'une liste (elle existe d'après Charles : à capturer), ni retrait d'un Mass DM déjà reçu.
+- **Découvertes** : Reveal ne montre pas la modification d'une publication programmée (on supprime et on recrée) ; pas de filtre « anciens abonnés » ni « sans échange récent » vu dans le Mass DM ; ni retrait d'un fan d'une liste, ni retrait d'un Mass DM déjà reçu.

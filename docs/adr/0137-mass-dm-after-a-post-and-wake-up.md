@@ -72,7 +72,7 @@ Le même jour, à 17 h 19 et 17 h 20, Charles a précisé : l'annonce d'une nouv
 
 - Clé d'idempotence par Mass DM. Si la réponse de Reveal se perd, le code relit la liste des Mass DM avant toute nouvelle tentative et ne renvoie jamais à l'aveugle : ambre avec sa raison (ADR 0044 § 5).
 - **Une liste par envoi** : chaque Mass DM part vers une liste statique créée pour lui (nom daté), remplie par le code 10 minutes avant, puis supprimée après l'envoi. Les filtres de Reveal (« en ligne », dépense, ancienneté, listes dynamiques) s'ajoutent seulement quand ils disent exactement ce que veut la règle, par exemple « en ligne » pour le réveil « en ligne ». Nos exclusions (§ 2) passent toujours par la liste du code, jamais par un filtre de Reveal.
-- La suppression d'une liste existe dans Reveal (Charles, 16/11), mais sa requête n'est pas dans la capture du 16/11 : tant qu'elle n'est pas vue, les listes restent avec leur nom daté. Créer, remplir ou supprimer une liste est une écriture sur le compte : rien sur le vrai compte avant le mot de Charles, et les essais se font avec le seul compte fan « test ».
+- Formes vues dans les captures du 16/11 : création d'une liste (`POST /fan-lists`), ajout d'un fan (`POST /fan-lists/:id/members`), suppression (`DELETE /fan-lists/:id`, une liste supprimée répond ensuite « introuvable »). Créer, remplir ou supprimer une liste est une écriture sur le compte : rien sur le vrai compte avant le mot de Charles, et les essais se font avec le seul compte fan « test ».
 - Un ajout de fan qui échoue retire ce fan de l'envoi : la liste envoyée est toujours celle que le code a vérifiée.
 
 ### 7. Mesurer
