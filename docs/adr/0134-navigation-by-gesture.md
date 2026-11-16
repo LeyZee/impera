@@ -1,6 +1,6 @@
 # 0134. Navigation du CRM : une section Scripts, un sélecteur de créatrice, une fiche créatrice en quatre onglets, des icônes qui disent l'onglet
 
-Statut : proposed
+Statut : accepted (Charles, 16/11/2026, « ok 0134 »)
 Date : 2026-11-16
 Précise : 0024 (§ « Le rail dépend du rôle », § « Ce que contient chaque onglet »), 0042 § 8 (le rail de la créatrice est inchangé), 0066 § 6 (la table des menus reste partagée avec la popup)
 
