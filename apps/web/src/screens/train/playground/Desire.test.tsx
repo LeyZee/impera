@@ -37,6 +37,11 @@ describe('desire in the playground', () => {
     expect(screen.getByRole('button').textContent).toBe('Désir 0première note');
   });
 
+  it('says an unchanged score in a word, never « Désir 0 0 » (avis Design 16/11)', () => {
+    render(<DesireTag desire={{ ...DESIRE, before: 0, score: 0, signals: [] }} />);
+    expect(screen.getByRole('button').textContent).toBe('Désir 0inchangé');
+  });
+
   it('says when nothing moved, and gives no points to a reset', () => {
     render(<DesireTag desire={{ ...DESIRE, before: 40, signals: [] }} />);
     fireEvent.click(screen.getByRole('button'));

@@ -185,6 +185,7 @@ function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
     ...(turn.offerRefused !== undefined && {
       offerRefused: { code: turn.offerRefused, label: offerRefusalLabel(turn.offerRefused) },
     }),
+    ...(turn.hold !== undefined && { hold: { kind: turn.hold.kind, detail: [...turn.hold.detail] } }),
     ...(turn.model !== undefined && { model: turn.model }),
     latencyMs: turn.latencyMs,
     costEur: turn.costUsd / usdPerEur,
@@ -354,8 +355,10 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       exclusive(async () => {
         const exchange = session.lastExchange;
         if (exchange === undefined || isRated) throw new NothingToRate();
-        // Nothing was written, or the guards stopped it: there is nothing to validate as it stands.
-        if (verdict.kind === 'validated' && exchange.turn.isBlocked) throw new BlockedAnswer();
+        // The guards stopped it, or a model failed: there is nothing to validate as it stands. A handoff, care or a
+        // wait decided by the risk policy is itself the answer: the trainer says it was right (AGE-01).
+        const decided = exchange.turn.handoff !== undefined || exchange.turn.hold !== undefined;
+        if (verdict.kind === 'validated' && exchange.turn.isBlocked && !decided) throw new BlockedAnswer();
         const destination =
           verdict.kind === 'validated' ? undefined : (override ?? suggestDestination(verdict));
         ratings += 1;
