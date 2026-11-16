@@ -44,6 +44,7 @@ import {
   checkExplicit,
   checkVoiceOutput,
   previousTurnsOf,
+  touchesTerm,
   type GuardContext,
   isBlocked,
   type GuardSettings,
@@ -53,7 +54,13 @@ import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { paceHints } from '../domain/pace';
-import { offerDecision, offerSignals, type OfferBlock, type OfferContext } from '../domain/policy';
+import {
+  NO_SALE_RISKS,
+  offerDecision,
+  offerSignals,
+  type OfferBlock,
+  type OfferContext,
+} from '../domain/policy';
 import {
   paidWaiting,
   permittedScripts,
@@ -236,9 +243,47 @@ export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'risks
  */
 type OfferRefusal = OfferBlock | ScriptStartBlock | 'no_offer_context' | 'no_script_step';
 
+/** Why her first answer was refused, as the voice reads it once more (M1): the fault, never the words she wrote. */
+const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
+  repetition: 'elle répétait une phrase déjà envoyée',
+  explicit_before_age: 'elle était trop explicite pour le moment',
+  meeting_promise: 'elle acceptait une rencontre concrète',
+  contact_info: 'elle donnait un contact',
+  off_platform_payment: 'elle parlait de payer ailleurs',
+  price_outside_offer: 'elle écrivait un prix',
+  no_commitment: 'elle s’engageait sur sa demande',
+  care_breach: 'elle n’était pas assez douce pour ce moment',
+  media_not_sent: 'elle annonçait un média qu’elle n’envoie pas',
+  stage_direction: 'elle décrivait un geste entre astérisques ou parenthèses',
+};
+
+function rewriteHint(violations: readonly GuardViolation[]): string {
+  const blocking = violations.filter((violation) => violation.severity === 'blocking');
+  const reasons = [...new Set(blocking.map((violation) => REWRITE_REASONS[violation.code]))].filter(
+    (reason) => reason !== undefined,
+  );
+  return reasons.length === 0
+    ? 'sa première réponse a été refusée : réécris-la autrement, plus simple et plus naturelle'
+    : `sa première réponse a été refusée (${reasons.join(', ')}) : réécris-la autrement`;
+}
+
 /** What the voice writes instead of an offer the policy refused: an answer, nothing to buy. */
 const NO_OFFER_BRIEF =
   'Réponds à ce qu’il vient de dire et garde la complicité, sans rien proposer de payant, sans parler de prix ni de contenu à acheter.';
+
+/**
+ * He asks for her content and no offer may go now (audit du 16/11, M4): she says yes with desire, keeps the mystery, and
+ * promises no date, no price, nothing sent now. Never when a risk forbids any sale: then nothing of her content.
+ */
+const MEDIA_LATER_BRIEF =
+  'Il demande de son contenu : elle lui répond avec envie que oui, elle en a, et garde le mystère, sans rien envoyer ni proposer maintenant, sans prix ni date.';
+
+/** What she answers in place of an offer the policy refused. */
+function refusedOfferBrief(brief: Brief): string {
+  return brief.intent === 'asks_for_media' && !brief.risks.some((risk) => NO_SALE_RISKS.includes(risk))
+    ? MEDIA_LATER_BRIEF
+    : NO_OFFER_BRIEF;
+}
 
 function offerRefusal(brief: Brief, offer: OfferInput | undefined, desire: number): OfferRefusal | undefined {
   if (offer === undefined) return 'no_offer_context';
@@ -594,6 +639,8 @@ export async function composeTurn(
           orderOpen: input.customOrder?.orderOpen === true,
           risks: brief.risks,
           flags: input.customOrder?.flags,
+          ageConfirmed: ageConfirmed || input.customOrder?.flags?.ageConfirmedAt !== undefined,
+          neverDoes: (persona.guardSettings.neverDo ?? []).some((term) => touchesTerm(input.fanText, term)),
         });
   const customOrder = order?.kind === 'none' ? undefined : order;
   // His price objection: a reply of her bank he never received, said in her words (ADR 0090 § B).
@@ -671,7 +718,9 @@ export async function composeTurn(
       ? cursored
       : { ...cursored, action: scriptStep.kind === 'paid' ? 'offer' : 'reply' };
   const offered: Brief =
-    offerRefused === undefined ? decidedBrief : { ...cursored, action: 'reply', replyBrief: NO_OFFER_BRIEF };
+    offerRefused === undefined
+      ? decidedBrief
+      : { ...cursored, action: 'reply', replyBrief: refusedOfferBrief(cursored) };
   const answered: Brief = care
     ? careBrief(read)
     : customOrder?.kind === 'reply'
@@ -750,16 +799,31 @@ export async function composeTurn(
     ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
     ...(scriptStep !== undefined && { scriptStep }),
   };
-  const voice = await gateway.voice(voiceInput);
-  // Past the budget, left out, never glued nor sent at once (Charles 16/11 : « trois rarement »).
-  const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
-  // Checked as kept: the guards read the bubbles that leave.
-  const violations = [
-    ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
-    ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
-    ...(care ? checkCare(written) : []),
-    ...(customOrder === undefined ? [] : checkNoCommitment(written)),
-  ];
+  // Past the budget, left out, never glued nor sent at once (Charles 16/11 : « trois rarement »). Checked as kept:
+  // the guards read the bubbles that leave.
+  const attempt = async (asked: VoiceInput) => {
+    const voice = await gateway.voice(asked);
+    const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
+    const violations = [
+      ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
+      ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
+      ...(care ? checkCare(written) : []),
+      ...(customOrder === undefined ? [] : checkNoCommitment(written)),
+    ];
+    return { voice, written, violations };
+  };
+  const first = await attempt(voiceInput);
+  // A guard blocked her answer: the voice writes it once more, told what was wrong, before a human is called (audit
+  // du 16/11, M1). The second answer is read by the same guards; still blocked, a human answers.
+  const retried =
+    first.voice.ok && isBlocked(first.violations)
+      ? await attempt({
+          ...voiceInput,
+          brief: { ...voiceBrief, toneHints: [...voiceBrief.toneHints, rewriteHint(first.violations)] },
+        })
+      : undefined;
+  const { voice, written, violations } = retried ?? first;
+  const firstCostUsd = retried !== undefined && first.voice.ok ? (first.voice.value.meta.costUsd ?? 0) : 0;
   const bubbles = asSent(written, persona.splitMessages);
   return {
     ...(customOrder !== undefined && { customOrder }),
@@ -787,7 +851,7 @@ export async function composeTurn(
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
     isBlocked: isBlocked(violations) || !voice.ok,
-    costUsd: brainCostUsd + (voice.ok ? (voice.value.meta.costUsd ?? 0) : 0),
+    costUsd: brainCostUsd + firstCostUsd + (voice.ok ? (voice.value.meta.costUsd ?? 0) : 0),
     latencyMs: brainLatencyMs + (voice.ok ? voice.value.meta.latencyMs : 0),
     ...(voice.ok && { model: voice.value.meta.model }),
     isFallback: voice.ok && voice.value.meta.isFallback,
