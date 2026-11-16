@@ -107,6 +107,28 @@ describe('TrophyCaseView', () => {
     expect(hero.textContent).toContain('Meilleure série : 14 shifts');
   });
 
+  it('tops an object of one gesture with how to earn it, never « 0 % » (recette 16/11, CRE-14)', () => {
+    renderCase({
+      trophyCase: {
+        items: [
+          {
+            kind: 'first_sale',
+            family: 'trophy',
+            earnedAt: null,
+            revealedAt: null,
+            progress: { current: 0, target: 1, unit: 'once' },
+          },
+        ],
+        streaks: [],
+        level: null,
+      },
+    });
+    const hero = screen.getByRole('region', { name: 'Première vente' });
+    expect(hero.textContent).toContain('Comment gagner Première vente');
+    expect(hero.textContent).not.toContain('%');
+    expect(screen.queryByRole('meter', { name: /Première vente/ })).toBeNull();
+  });
+
   it('lays the shelves out in their order and leaves out what the screen does not know', () => {
     renderCase();
     expect(screen.getAllByRole('heading', { level: 3 }).map((one) => one.textContent)).toEqual([

@@ -44,6 +44,8 @@ describe('percentOf', () => {
 
   it('says nothing for an object without a count, and 100 % once earned', () => {
     expect(percentOf(null, false)).toBeNull();
+    // An object of one gesture, still ahead: nothing to draw (CRE-14).
+    expect(percentOf({ current: 0, target: 1, unit: 'once' }, false)).toBeNull();
     expect(percentOf(null, true)).toBe(100);
   });
 });
@@ -106,5 +108,44 @@ it('counts what was earned', () => {
 describe('onShelf', () => {
   it('lays medals, streaks and trophies on shelves, and leaves any other family to the role', () => {
     expect(SHELF_ORDER.every((family) => onShelf({ family }))).toBe(true);
+  });
+});
+
+describe('nextTrophy, an object of one gesture (recette 16/11, CRE-14)', () => {
+  it('puts a first gesture before a streak at nothing: on a tie, the least left to do', () => {
+    const ahead = (kind: string, target: number, unit: 'day' | 'once'): TrophyCaseItem => ({
+      kind,
+      family: unit === 'once' ? 'trophy' : 'medal',
+      earnedAt: null,
+      revealedAt: null,
+      progress: { current: 0, target, unit },
+    });
+    expect(
+      nextTrophy({
+        items: [ahead('day_streak_7', 7, 'day'), ahead('first_drop', 1, 'once')],
+        streaks: [],
+        level: null,
+      })?.kind,
+    ).toBe('first_drop');
+  });
+
+  it('keeps a streak under way before a first gesture', () => {
+    const items: TrophyCaseItem[] = [
+      {
+        kind: 'first_drop',
+        family: 'trophy',
+        earnedAt: null,
+        revealedAt: null,
+        progress: { current: 0, target: 1, unit: 'once' },
+      },
+      {
+        kind: 'day_streak_7',
+        family: 'medal',
+        earnedAt: null,
+        revealedAt: null,
+        progress: { current: 3, target: 7, unit: 'day' },
+      },
+    ];
+    expect(nextTrophy({ items, streaks: [], level: null })?.kind).toBe('day_streak_7');
   });
 });
