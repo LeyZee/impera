@@ -164,6 +164,9 @@
   gap: var(--nv-space-2);
   align-items: center;
 }
+.cf-prefix__number {
+  white-space: nowrap;
+}
 .cf-prefix__input {
   width: 10rem;
   text-transform: uppercase;
