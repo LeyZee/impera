@@ -1,13 +1,14 @@
 import type { PlatformAccountId } from '@impera/contracts';
 
 import { h } from '../../lib/dom';
+import { hourOf } from '../../lib/hour';
 import { icon } from '../../lib/icons';
 import { revealMark } from '../../lib/reveal-mark';
 import type { RevealAccounts, RevealSeen, RevealSynced } from '../../lib/watch/protocol';
 
 import { button, card, pill, text } from './card';
 import { withTip } from './tip';
-import { hourOf, linkForm, notice, type WatchActions, type WatchNotice } from './watch-view';
+import { linkForm, notice, type WatchActions, type WatchNotice } from './watch-view';
 
 /**
  * The cards of a Reveal tab (recette du 16/11, EXT-02, 09, 11, 12, V-EXT-05, 09). The copilot, for every member who
