@@ -14,6 +14,17 @@ const CARE_RISKS = ['distress', 'self_harm'] as const;
 
 const isHandoffRisk = (risk: string): boolean => HANDOFF_RISKS.some((r) => r === risk);
 
+/**
+ * Why a human takes over after the brain read a risk: it ranks the alert and names it in « À traiter » (recette
+ * AGE-02). The gravest first: a possible minor outranks everything.
+ */
+export function riskCauseOf(risks: readonly string[]): 'minor' | 'non_consent' | 'other' {
+  if (risks.includes('minor_suspected')) return 'minor';
+  // An abuse he tells of having committed (Charles, 12/11: a victim's story is `distress`, answered with care).
+  if (risks.includes('real_abuse')) return 'non_consent';
+  return 'other';
+}
+
 /** A risk that opens the care mode (ADR 0088 § 1). */
 export const isCareRisk = (risk: string): boolean => CARE_RISKS.some((r) => r === risk);
 

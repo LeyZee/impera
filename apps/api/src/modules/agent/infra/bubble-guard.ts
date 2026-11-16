@@ -1,3 +1,4 @@
+import { checkCare } from '../domain/care';
 import { checkVoiceOutput, type GuardCode, type GuardContext, type GuardSettings } from '../domain/guards';
 
 /**
@@ -11,13 +12,15 @@ export interface AgentBubbleGuard {
   check(
     bubbles: readonly string[],
     context?: GuardContext,
+    /** A care episode is open (ADR 0088 § 3, § 5): what a care answer never carries blocks a chatter's words too. */
+    care?: boolean,
   ): { readonly isBlocked: boolean; readonly codes: readonly GuardCode[] };
 }
 
 export function createBubbleGuard(settings: GuardSettings): AgentBubbleGuard {
   return {
-    check(bubbles, context = {}) {
-      const codes = checkVoiceOutput(bubbles, settings, context)
+    check(bubbles, context = {}, care = false) {
+      const codes = [...checkVoiceOutput(bubbles, settings, context), ...(care ? checkCare(bubbles) : [])]
         // A line she already sent him blocks the engine's draft only: sending it again is the chatter's call.
         .filter((v) => v.severity === 'blocking' && v.code !== 'repetition')
         .map((v) => v.code);

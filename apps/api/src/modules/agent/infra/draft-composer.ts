@@ -34,6 +34,7 @@ import { measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
 import {
   holdDecision,
+  riskCauseOf,
   isCareRisk,
   protectionFor,
   protectionWhileAnswering,
@@ -84,6 +85,8 @@ export interface AgentComposeInput {
   }[];
   readonly fan: {
     readonly notes: readonly string[];
+    /** The age his card gives, a whole number (`fans`, field `age`); absent when it gives none. */
+    readonly cardAge?: number;
     /** Read by the brain alone (ADR 0085 § 9): when he has money, his attachment, his moods. */
     readonly brainNotes?: readonly string[];
     readonly spentMinor: number;
@@ -443,6 +446,9 @@ function voiceUnavailable(gateway: LlmGateway): boolean {
 
 type Held = Extract<AgentComposeResult, { kind: 'held' }>;
 
+/** Under this age on his card, a human answers him (recette AGE-13). */
+const ADULT_AGE = 18;
+
 const HANDOFF: Held = { kind: 'held', reason: 'handoff', detail: [], costUsd: 0 };
 
 /**
@@ -769,7 +775,7 @@ async function settle(
   }
   const decision: HoldDecision = decision0 ?? holdDecision(composed.brief, waited);
   if (decision.kind === 'handoff') {
-    const held: Held = { ...HANDOFF, detail: decision.detail, costUsd };
+    const held: Held = { ...HANDOFF, cause: riskCauseOf(decision.detail), detail: decision.detail, costUsd };
     return protect(deps.limits, input, composed.brief.risks, held);
   }
   // One of her alerts pauses the agent (P4-01): a human answers him, the voice did not write.
@@ -857,6 +863,11 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       if (signs.includes('minor_suspected')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
+      }
+      // His card gives an age under 18 (recette AGE-13): the same, until a human corrects it.
+      if (input.fan.cardAge !== undefined && input.fan.cardAge < ADULT_AGE) {
+        const held: Held = { ...HANDOFF, cause: 'minor', detail: ['card_age', 'minor_suspected'] };
+        return protect(deps.limits, input, ['minor_suspected'], held);
       }
       const known: CareKnown = {
         signs: [...signs, ...(input.care !== undefined ? ['care_open'] : [])],
