@@ -128,6 +128,12 @@ export interface AskDraft {
 
 export type AskField = 'category' | 'dueOn' | 'reason' | 'structureId';
 
+/** Her request's sentence, at most: she reads it whole, never cut (recette CRE-32). */
+export const REASON_MAX = 160;
+
+/** Said as soon as the sentence is too long, a paste included: nothing is cut in silence (recette CRE-32). */
+export const REASON_TOO_LONG = `${String(REASON_MAX)} caractères au plus.`;
+
 /** What is missing or wrong before « Demander », in the form's words. */
 export function askProblems(draft: AskDraft, today: string): Partial<Record<AskField, string>> {
   return {
@@ -139,8 +145,8 @@ export function askProblems(draft: AskDraft, today: string): Partial<Record<AskF
         : {}),
     ...(draft.reason.trim() === ''
       ? { reason: 'Dis-lui en une phrase ce que tu attends.' }
-      : draft.reason.trim().length > 160
-        ? { reason: '160 caractères au plus.' }
+      : draft.reason.trim().length > REASON_MAX
+        ? { reason: REASON_TOO_LONG }
         : {}),
     ...(draft.category === 'script' && draft.structureId === ''
       ? { structureId: 'Choisis la structure du script.' }
