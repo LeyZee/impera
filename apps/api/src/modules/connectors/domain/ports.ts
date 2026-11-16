@@ -127,7 +127,7 @@ export interface AccountStore {
   recordRefusedSession(
     creatorId: CreatorId,
     id: PlatformAccountId,
-    reason: 'owner_conflict' | 'member_conflict' | 'auto_unpinned',
+    reason: 'owner_conflict' | 'member_conflict' | 'auto_unpinned' | 'auto_member_unread',
     meta: SessionMeta,
   ): Promise<void>;
   publish(creatorId: CreatorId, body: EventBody, meta: EventMeta): Promise<void>;
@@ -142,6 +142,8 @@ export type SessionShape = (raw: string) => {
   readonly member?: string;
   /** The session's own expiry, when it carries one we can read (Reveal: the JWT's `exp`). */
   readonly expiresAt?: Date | null;
+  /** The member is read in the token itself, not only declared beside it (ADR 0147 § 4). */
+  readonly memberInToken?: boolean;
 } | null;
 
 /** One reader per platform whose sessions the extension captures; a platform without one takes no session. */

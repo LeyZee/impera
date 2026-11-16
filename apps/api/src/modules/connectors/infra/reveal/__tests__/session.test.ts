@@ -18,6 +18,7 @@ describe('revealSessionShape', () => {
       owner: 'model-test-a',
       member: session.userId,
       expiresAt: null,
+      memberInToken: false,
     });
   });
 
@@ -34,9 +35,9 @@ describe('revealSessionShape', () => {
   it('refuses a token that names another member than the session says (ADR 0147 § 4)', () => {
     const claims = (userId: string) =>
       `aaaa.${Buffer.from(JSON.stringify({ exp: 1_794_870_000, userId })).toString('base64url')}.cccc`;
-    expect(
-      revealSessionShape(JSON.stringify({ ...session, bearer: claims('user-bot-test') })),
-    ).not.toBeNull();
+    expect(revealSessionShape(JSON.stringify({ ...session, bearer: claims('user-bot-test') }))).toMatchObject(
+      { memberInToken: true },
+    );
     expect(revealSessionShape(JSON.stringify({ ...session, bearer: claims('user-owner-test') }))).toBeNull();
   });
 

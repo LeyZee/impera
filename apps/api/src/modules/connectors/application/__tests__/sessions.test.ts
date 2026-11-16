@@ -5,6 +5,7 @@ import {
   SessionAutoSyncUnprocessable,
   SessionMemberConflict,
   SessionOwnerConflict,
+  SessionShapeUnprocessable,
 } from '../../domain/errors';
 import type { AccountStore } from '../../domain/ports';
 import { createConnectorSessions } from '../sessions';
@@ -93,11 +94,19 @@ describe('a « Sync » of a token with an hour left (16/11)', () => {
   });
 });
 
-/** Invented sessions: `<member>|<model>|<expiry ISO or ->`, read by a test shape; the vault keeps them as they are. */
+/**
+ * Invented sessions: `<member>|<model>|<expiry ISO or ->[|declared]`, read by a test shape (`declared`: the member is not
+ * in the token, only beside it); the vault keeps them as they are.
+ */
 const testShape = (raw: string) => {
-  const [member, owner, expiry] = raw.split('|');
+  const [member, owner, expiry, declared] = raw.split('|');
   if (member === undefined || owner === undefined || expiry === undefined) return null;
-  return { owner, member, expiresAt: expiry === '-' ? null : new Date(expiry) };
+  return {
+    owner,
+    member,
+    expiresAt: expiry === '-' ? null : new Date(expiry),
+    memberInToken: declared === undefined,
+  };
 };
 const plainVault = {
   seal: (_id: unknown, session: string) => Buffer.from(session),
@@ -159,6 +168,19 @@ describe('a sync « à l’ouverture » (ADR 0147)', () => {
     expect(stored).toEqual([]);
   });
 
+  it('is refused when the token itself does not name the member, a click is not (ADR 0147 § 4)', async () => {
+    const pinned = 'member-test-a|model-test-a|2026-11-17T07:00:00Z';
+    const { send, stored, refused } = harness(pinned, 'expired');
+    await expect(
+      send('member-test-a|model-test-a|2026-11-18T07:00:00Z|declared', 'open'),
+    ).rejects.toBeInstanceOf(SessionAutoSyncUnprocessable);
+    expect(refused).toEqual([{ reason: 'auto_member_unread', trigger: 'open' }]);
+    expect(stored).toEqual([]);
+    expect(await send('member-test-a|model-test-a|2026-11-18T07:00:00Z|declared', 'click')).toMatchObject({
+      kept: false,
+    });
+  });
+
   it('renews an expired session of the pinned member', async () => {
     const { send, stored } = harness('member-test-a|model-test-a|2026-11-17T07:00:00Z', 'expired');
     expect(await send('member-test-a|model-test-a|2026-11-18T07:00:00Z', 'open')).toMatchObject({
@@ -196,12 +218,14 @@ describe('a session that still holds (ADR 0147 § 7)', () => {
         'click',
       ),
     ).toMatchObject({ kept: false });
-    // Its expiry passed: replaced.
-    expect(
-      await harness('member-test-a|model-test-a|2026-11-17T07:00:00Z').send(
-        'member-test-a|model-test-a|2026-11-17T06:00:00Z',
-        'click',
-      ),
-    ).toMatchObject({ kept: false, state: 'warning' });
+  });
+
+  it('refuses a token already past its expiry, whatever the gesture: nothing stored', async () => {
+    const { send, stored } = harness('member-test-a|model-test-a|2026-11-17T07:00:00Z', 'expired');
+    for (const trigger of ['click', 'open'] as const)
+      await expect(send('member-test-a|model-test-a|2026-11-17T08:00:00Z', trigger)).rejects.toBeInstanceOf(
+        SessionShapeUnprocessable,
+      );
+    expect(stored).toEqual([]);
   });
 });

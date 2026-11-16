@@ -54,11 +54,14 @@ export class SessionShapeUnprocessable extends DomainError {
  * identity of the AI's Reveal account is only ever set by a click, never by the extension alone. 422.
  */
 export class SessionAutoSyncUnprocessable extends DomainError {
-  constructor() {
+  /** Why, for the audit line: no pinned member yet, or a member the token itself does not name. */
+  readonly why: 'auto_unpinned' | 'auto_member_unread';
+  constructor(why: 'auto_unpinned' | 'auto_member_unread' = 'auto_unpinned') {
     super(
       CONNECTOR_SESSION_AUTO_UNPROCESSABLE,
       'Ce compte se branche d’abord par un clic sur « Synchroniser » : la synchronisation seule ne fixe jamais son membre',
     );
+    this.why = why;
   }
 }
 

@@ -64,5 +64,10 @@ export const revealSessionShape: SessionShape = (raw) => {
   if (session === null) return null;
   const { userId } = claimsOf(session.bearer);
   if (userId !== undefined && userId !== session.userId) return null;
-  return { owner: session.modelId, member: session.userId, expiresAt: revealTokenExpiry(session.bearer) };
+  return {
+    owner: session.modelId,
+    member: session.userId,
+    expiresAt: revealTokenExpiry(session.bearer),
+    memberInToken: userId !== undefined,
+  };
 };

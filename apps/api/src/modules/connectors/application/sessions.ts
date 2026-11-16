@@ -85,6 +85,13 @@ export function createConnectorSessions(deps: {
     const shape = deps.shapes[account.platform];
     const read = shape === undefined ? null : shape(session);
     if (shape === undefined || read === null) throw new SessionShapeUnprocessable();
+    // A token already past its expiry is no session: nothing stored, the breaker left as it is.
+    const now = deps.clock.now();
+    if ((read.expiresAt ?? null) !== null && (read.expiresAt?.getTime() ?? 0) <= now.getTime())
+      throw new SessionShapeUnprocessable();
+    // The extension alone sends only a session whose member the token itself names (ADR 0147 § 4).
+    if (trigger === 'open' && read.memberInToken !== true)
+      throw new SessionAutoSyncUnprocessable('auto_member_unread');
     // A session of another creator would make this account speak for her: refused, whatever the state.
     const previous = await deps.accounts.sessionOf(creatorId, platformAccountId);
     const before = previous === null ? null : openOrNull(vault(), platformAccountId, previous);
@@ -101,7 +108,7 @@ export function createConnectorSessions(deps: {
     if (elsewhere !== undefined && elsewhere !== platformAccountId) throw new SessionOwnerConflict();
     // The member is pinned at the first « Sync » (P2-02): the owner's or a chatter's session is never the bot's.
     if (stored?.member !== undefined && stored.member !== read.member) throw new SessionMemberConflict();
-    const at = deps.clock.now();
+    const at = now;
     // A session that still holds is not replaced by one that expires sooner (ADR 0147 § 7): yesterday's token copied
     // again from a browser never shortens today's.
     const storedExpiry = stored?.expiresAt ?? null;
@@ -148,7 +155,7 @@ export function createConnectorSessions(deps: {
             : error instanceof SessionMemberConflict
               ? 'member_conflict'
               : error instanceof SessionAutoSyncUnprocessable
-                ? 'auto_unpinned'
+                ? error.why
                 : null;
         if (reason !== null) {
           // The refusal stays the answer whatever happens to its line: a line that cannot be written is logged.
