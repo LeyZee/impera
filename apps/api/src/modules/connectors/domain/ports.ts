@@ -1,5 +1,6 @@
 import type {
   ConnectorConfig,
+  ConnectorWriteGuard,
   CreatorId,
   EventBody,
   ExternalMessage,
@@ -116,6 +117,16 @@ export interface AccountStore {
     meta: EventMeta & { readonly userId: string | null },
   ): Promise<void>;
   publish(creatorId: CreatorId, body: EventBody, meta: EventMeta): Promise<void>;
+  /**
+   * The owner sets the account's write guard (16/11): `writes` and `writesOnlyTo` merged into its configuration, the
+   * rest kept, and one `audit_log` line in the same transaction. `false` when the account is not hers.
+   */
+  setWriteGuard(
+    creatorId: CreatorId,
+    id: PlatformAccountId,
+    guard: ConnectorWriteGuard,
+    actor: { readonly userId: string; readonly ip: string },
+  ): Promise<boolean>;
 }
 
 /**

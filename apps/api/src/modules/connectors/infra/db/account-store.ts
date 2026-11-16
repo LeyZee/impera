@@ -346,6 +346,34 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
 
     publish: (creatorId, body, meta) =>
       withTenant(db, creatorId, (tx) => insertEvent(tx, creatorId, body, meta)),
+
+    setWriteGuard: (creatorId, id, guard, actor) =>
+      withTenant(db, creatorId, async (tx) => {
+        const [row] = await tx
+          .select({ config: schema.platformAccounts.connectorConfig })
+          .from(schema.platformAccounts)
+          .where(and(byId(id), eq(schema.platformAccounts.creatorId, creatorId)))
+          .for('update');
+        if (row === undefined) return false;
+        const before = ConnectorConfigSchema.catch(ConnectorConfigSchema.parse({})).parse(row.config);
+        const config = ConnectorConfigSchema.parse({ ...before, ...guard });
+        await tx.update(schema.platformAccounts).set({ connectorConfig: config }).where(byId(id));
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId: actor.userId,
+          action: 'connector.write_guard',
+          entity: 'platform_account',
+          entityId: id,
+          ip: actor.ip,
+          // How many conversations, never their ids: they name fans.
+          details: {
+            creatorId,
+            writes: config.writes,
+            only: config.writesOnlyTo === null ? null : config.writesOnlyTo.length,
+          },
+        });
+        return true;
+      }),
   };
 }
 

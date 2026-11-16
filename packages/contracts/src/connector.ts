@@ -291,8 +291,27 @@ export const ConnectorConfigSchema = z.object({
    * account is only read; turned on by hand once the account is the one meant to answer (the test fan account first).
    */
   writes: z.boolean().default(false),
+  /**
+   * With `writes` on, the only conversations Impera may write to on this account, by the platform's id; `null`, all
+   * of them. The first real sale goes to the test fan alone (16/11): a rule in the code, never one of use.
+   */
+  writesOnlyTo: z.array(z.string().min(1).max(128)).max(20).nullable().default(null),
 });
 export type ConnectorConfig = z.infer<typeof ConnectorConfigSchema>;
+
+/** The conversations a write guard may name, by the platform's id (`ConnectorConfig.writesOnlyTo`). */
+const WritesOnlyToSchema = z.array(z.string().trim().min(1).max(128)).max(20).nullable();
+
+/**
+ * `GET`/`PUT /v1/connector/accounts/:platformAccountId/write-guard` (16/11): the owner opens an account's sends, all of
+ * them or only to the conversations named; the first real sale goes to the test fan alone. The rest of the account's
+ * rhythm is not his to set here.
+ */
+export const ConnectorWriteGuardSchema = z.strictObject({
+  writes: z.boolean(),
+  writesOnlyTo: WritesOnlyToSchema,
+});
+export type ConnectorWriteGuard = z.infer<typeof ConnectorWriteGuardSchema>;
 
 /**
  * `POST /v1/connector/sessions`: the extension's « Sync » button sends the platform session it read, with the owner's

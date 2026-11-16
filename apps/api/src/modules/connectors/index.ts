@@ -56,6 +56,7 @@ import {
   type SalesFeedTeamRoutesOptions,
 } from './infra/http/sales-feed-team-routes';
 import { createVaultRoutes, type VaultRoutesOptions } from './infra/http/vault-routes';
+import { createWriteGuardRoutes, type WriteGuardRoutesOptions } from './infra/http/write-guard-routes';
 import { revealSessionShape } from './infra/reveal/session';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
@@ -195,6 +196,8 @@ export interface ConnectorsModule {
    * `/v1/creators/:creatorId/vault` and its owner's « Synchroniser » (fiche vault-sync), behind the guards given here.
    * Nothing else starts a read of the platform's vault: no cron.
    */
+  /** `/v1/connector/accounts/:id/write-guard` (16/11), behind the guards given here: the owner opens an account's sends. */
+  readonly writeGuardRoutes: (options: WriteGuardRoutesOptions) => FastifyPluginAsyncZod;
   readonly vaultRoutes: (options: Omit<VaultRoutesOptions, 'askSync'>) => FastifyPluginAsyncZod;
   /** Her vault as the last sync read it, as the person reading (the owner, an active manager of her list). */
   readonly vault: VaultReads;
@@ -377,6 +380,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       copyAvatar: (payload, logger) => salesFeeds.copyAvatar(payload, logger),
       vaultSync: createVaultSyncJob({ accounts, resolver, store: vaultStore, clock }),
     },
+    writeGuardRoutes: (options) => createWriteGuardRoutes(accounts, options),
     vaultRoutes: (options) => createVaultRoutes(vaultReads, { ...options, askSync: askVaultSync }),
     vault: vaultReads,
     platformReads: createPlatformReads({ accounts, resolver, clock }),

@@ -38,7 +38,11 @@ afterEach(async () => {
   fakes = [];
 });
 
-function senderOn(writes: boolean, connectorOf?: (fake: FakeReveal) => PlatformConnector) {
+function senderOn(
+  writes: boolean,
+  connectorOf?: (fake: FakeReveal) => PlatformConnector,
+  writesOnlyTo: string[] | null = null,
+) {
   const fake = createFakeReveal({ fixture: 'quiet' });
   fakes.push(fake);
   const calls: string[] = [];
@@ -70,7 +74,7 @@ function senderOn(writes: boolean, connectorOf?: (fake: FakeReveal) => PlatformC
     lastPollAt: null,
     consecutiveErrors: 0,
     pausedUntil: null,
-    config: ConnectorConfigSchema.parse({ writes }),
+    config: ConnectorConfigSchema.parse({ writes, writesOnlyTo }),
   };
   const sender = createOutboundSender({
     accounts: {
@@ -120,6 +124,30 @@ describe('outbound sender: the write guard before every write (ADR 0018 § 3)', 
     expect(fake.state().messages).toEqual([]);
     // Reading what was sent is not a write.
     expect(await sender.verifySent(conversation, 'k1', null)).toEqual({ status: 'not_found' });
+  });
+
+  // 16/11: the first real sale goes to the test fan alone; every other conversation of the account stays read only.
+  it('`writesOnlyTo` refuses each write to another conversation before any call, and lets its own through', async () => {
+    const { sender, calls, fake } = senderOn(true, undefined, ['conv_02']);
+    const writes: [string, () => Promise<unknown>][] = [
+      ['sendText', () => sender.sendText(conversation, 'Coucou', 'k1')],
+      ['sendScriptStep', () => sender.sendScriptStep(conversation, scriptRef, 0, price, 'k3')],
+      ['setFanNote', () => sender.setFanNote(conversation, 'fan_01', 'Prénom : Prénom01', 'k4')],
+      ['markRead', () => sender.markRead(conversation)],
+      ['setTyping', () => sender.setTyping(conversation, true)],
+    ];
+    for (const [method, write] of writes) {
+      const error: unknown = await write().catch((reason: unknown) => reason);
+      expect(error, method).toBeInstanceOf(SendRefused);
+      expect(error, method).toMatchObject({ code: 'connector_writes_not_allowed' });
+    }
+    expect(calls).toEqual([]);
+    expect(await sender.verifySent(conversation, 'k1', null)).toEqual({ status: 'not_found' });
+
+    const allowed = senderOn(true, undefined, ['conv_01']);
+    await allowed.sender.sendText(conversation, 'Coucou', 'k1');
+    expect(allowed.fake.state().messages).toHaveLength(1);
+    expect(fake.state().messages).toEqual([]);
   });
 
   it('`writes: true` lets each write through; a step already sent is refused for good, without a send', async () => {
