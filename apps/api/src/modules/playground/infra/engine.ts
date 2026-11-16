@@ -93,6 +93,7 @@ export interface EngineDeps {
 export function ratingRecord(input: {
   readonly id: string;
   readonly creatorId?: string | undefined;
+  readonly personaVersionId?: string | undefined;
   readonly sessionId: string;
   readonly at: Date;
   readonly version: AnswerVersion;
@@ -104,6 +105,7 @@ export function ratingRecord(input: {
   return {
     id: input.id,
     ...(input.creatorId !== undefined && { creatorId: input.creatorId }),
+    ...(input.personaVersionId !== undefined && { personaVersionId: input.personaVersionId }),
     sessionId: input.sessionId,
     at: input.at.toISOString(),
     version: input.version,
@@ -202,7 +204,15 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     personaSheet: deps.persona.personaSheet,
     guardSettings: guardSettingsOf(deps.persona),
     splitMessages: deps.persona.splitMessages,
-    voiceExamples: voiceExamples(deps.records),
+    // Her examples only when her own version is played: never the invented persona's, never another creator's.
+    voiceExamples:
+      deps.played === undefined
+        ? []
+        : voiceExamples(deps.records, {
+            creatorId: deps.played.creatorId,
+            personaVersionId: deps.played.versionId,
+            guardSettings: guardSettingsOf(deps.persona),
+          }),
     offerLimits: deps.persona.offerLimits,
     sexualizationLimits: deps.persona.sexualizationLimits,
     followUps: deps.persona.followUps,
@@ -355,6 +365,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         const record = ratingRecord({
           id: `${deps.sessionId}-${String(ratings)}`,
           creatorId: deps.played?.creatorId ?? (await deps.creatorId?.()) ?? undefined,
+          personaVersionId: deps.played?.versionId,
           sessionId: deps.sessionId,
           at: (deps.now ?? (() => new Date()))(),
           // The model that wrote it: an answer of the fallback counts for the fallback, not for Grok.

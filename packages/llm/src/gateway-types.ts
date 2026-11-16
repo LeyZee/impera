@@ -38,6 +38,13 @@ export interface ConversationTurn {
   readonly from: 'fan' | 'creator';
   readonly text: string;
   readonly media?: readonly TurnMedia[];
+  /** When it was written; absent where no clock runs (some evals), and nothing is said of the time then. */
+  readonly at?: Date;
+  /**
+   * The time that passed before this message of his, written by code on her clock (« le lendemain, mardi, 19 h 10 »):
+   * shown in brackets before his block, never inside it.
+   */
+  readonly timeNote?: string;
 }
 
 export interface VideoFrame {
@@ -169,6 +176,8 @@ export interface VoiceInput extends ConversationInput {
   readonly objectionReply?: string;
   /** The script step code decided to send now, in a typed block after the brief. Absent, none. */
   readonly scriptStep?: VoiceScriptStep;
+  /** The most bubbles she may write this turn, decided by code (1 to 3). Absent, the prompt's own rule. */
+  readonly maxBubbles?: number;
 }
 
 /**
