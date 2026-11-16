@@ -132,7 +132,16 @@ const ScenarioSchema = z
       .strict()
       .prefault({}),
     history: z
-      .array(z.object({ from: z.enum(['fan', 'creator']), text: z.string().min(1) }).strict())
+      .array(
+        z
+          .object({
+            from: z.enum(['fan', 'creator']),
+            text: z.string().min(1),
+            /** How long before his message this one was written (audit du naturel, A2); absent, no time is said. */
+            minutes_ago: z.number().int().positive().optional(),
+          })
+          .strict(),
+      )
       .default([]),
     /** Her alerts written as a phrase (P4-01), given to the brain as on a real message; names are the scenario's. */
     alerts: z

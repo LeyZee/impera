@@ -602,6 +602,7 @@ async function followUp(
     history: input.history.map((m) => ({
       from: m.direction === 'inbound' ? 'fan' : 'creator',
       text: m.text,
+      at: m.at,
     })),
     fanText: '',
     media: [],
@@ -905,6 +906,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         return {
           from: m.direction === 'inbound' ? 'fan' : 'creator',
           text: m.text,
+          at: m.at,
           ...(described.length > 0 && { media: described.map((description) => ({ description })) }),
         };
       });

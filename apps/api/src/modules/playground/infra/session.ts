@@ -218,6 +218,9 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     writtenAt.set(turn, situation.now);
     history.push(turn);
   };
+  // The history as composeTurn reads it, each turn with its time: the trainer sees the gaps he made with `advance`.
+  const dated = (): ConversationTurn[] =>
+    history.map((t) => ({ ...t, at: writtenAt.get(t) ?? situation.now }));
   const offerAt = (now: Date): OfferInput | undefined =>
     deps.offerLimits === undefined
       ? undefined
@@ -360,7 +363,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
         },
         {
-          history: [...history],
+          history: dated(),
           fanText: '',
           media: [],
           fanNotes: fanNotes.join('\n'),
@@ -398,7 +401,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       desireTrail.push(undefined);
       push({ from: 'fan', text, media: media.map((description) => ({ description })) });
       const moment: RatedMoment = {
-        history: [...history],
+        history: dated(),
         fanNotes: fanNotes.join('\n'),
         situation,
       };
@@ -412,7 +415,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
         },
         {
-          history: [...history],
+          history: dated(),
           fanText: text,
           media,
           fanNotes: moment.fanNotes,

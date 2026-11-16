@@ -32,6 +32,7 @@ import {
   type DesireReading,
   type DesireState,
 } from '../domain/desire';
+import { gapNotes, timingLines } from '../domain/elapsed';
 import {
   checkExplicit,
   checkVoiceOutput,
@@ -363,6 +364,25 @@ export function guardContextOf(history: readonly ConversationTurn[]): GuardConte
   };
 }
 
+const datedOf = (turn: ConversationTurn) => ({
+  fromFan: turn.from === 'fan',
+  ...(turn.at !== undefined && { at: turn.at }),
+});
+
+/** « Le moment », with what code reads of the last exchanges' times (audit du naturel, A2). */
+function describeMoment(situation: Situation, history: readonly ConversationTurn[]): string {
+  return [describeSituation(situation), ...timingLines(history.map(datedOf), situation.now)].join('\n');
+}
+
+/** Each message of his after a silence carries the time that passed, written by code on her clock. */
+function withTimeNotes(history: readonly ConversationTurn[], timeZone: string): readonly ConversationTurn[] {
+  const notes = gapNotes(history.map(datedOf), timeZone);
+  return history.map((turn, index) => {
+    const timeNote = notes[index];
+    return timeNote === null || timeNote === undefined ? turn : { ...turn, timeNote };
+  });
+}
+
 /** His messages before the ones she is answering: the history without its last run of fan turns. */
 function earlierFanTexts(history: readonly ConversationTurn[]): string[] {
   let end = history.length;
@@ -458,8 +478,8 @@ export async function composeTurn(
     creatorName: persona.creatorName,
     personaSheet: persona.personaSheet,
     fanNotes: notes.kept,
-    situation: describeSituation(input.situation),
-    history: input.history,
+    situation: describeMoment(input.situation, input.history),
+    history: withTimeNotes(input.history, input.situation.timeZone),
     ...(input.trace !== undefined && { trace: input.trace }),
   };
   if (input.followUp !== undefined)
