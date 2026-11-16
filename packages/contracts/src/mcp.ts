@@ -12,6 +12,7 @@ import {
   CreatorIdSchema,
   FanIdSchema,
   McpGrantIdSchema,
+  PlatformAccountIdSchema,
   ShiftIdSchema,
   TeamMemberIdSchema,
 } from './ids';
@@ -538,6 +539,44 @@ export const McpSalesListSchema = z.strictObject({
   ),
 });
 export type McpSalesList = z.infer<typeof McpSalesListSchema>;
+
+/**
+ * `platform_daily_stats_list`'s input: the same days as `sales_list`, both included, `MCP_SALES_MAX_DAYS` at most (the
+ * connectors read the daily statistics within the same bound).
+ */
+export const McpDailyStatsInputSchema = McpSalesInputSchema;
+
+/**
+ * `platform_daily_stats_list` (ADR 0081, ADR 0105 § 4, `read:status`): each creator account's day as the platform
+ * counted it, counters only, `null` while the platform has not computed one. No amount, no fan, no member.
+ */
+export const McpDailyStatsListSchema = z.strictObject({
+  from: z.iso.date(),
+  to: z.iso.date(),
+  creators: z.array(
+    z.strictObject({
+      creatorId: CreatorIdSchema,
+      days: z.array(
+        z.strictObject({
+          platform: PlatformSchema,
+          /** Impera's id of the creator's account, never the platform's: two accounts on one platform stay apart. */
+          platformAccountId: PlatformAccountIdSchema,
+          day: z.iso.date(),
+          newSubscribers: counted,
+          unsubscribes: counted.nullable(),
+          activeSubscribers: counted,
+          renewals: counted.nullable(),
+          ppvSent: counted.nullable(),
+          ppvPurchased: counted,
+          messagesSent: counted.nullable(),
+          messagesReceived: counted.nullable(),
+          readAt: z.iso.datetime(),
+        }),
+      ),
+    }),
+  ),
+});
+export type McpDailyStatsList = z.infer<typeof McpDailyStatsListSchema>;
 
 /** `commission_statements_list`'s input: the period, by its first day (`2026-11-01` or `2026-11-16`). */
 export const McpPayPeriodInputSchema = z.strictObject({ period: PayPeriodSchema });

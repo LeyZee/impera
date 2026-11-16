@@ -1,12 +1,16 @@
 import {
   CreatorIdSchema,
+  McpDailyStatsInputSchema,
+  McpDailyStatsListSchema,
   McpSalesInputSchema,
   McpSalesListSchema,
   type CreatorId,
+  type McpDailyStatsList,
   type McpSalesList,
   type SalesOfCreator,
 } from '@impera/contracts';
 
+import type { ActorView } from '../domain/access';
 import type { CreatorReader, SalesReader } from '../domain/ports';
 
 import type { ServedTool } from './dispatch';
@@ -49,7 +53,24 @@ function summed(rows: SalesOfCreator['rows']): SalesRow[] {
 }
 
 /**
- * The sales tools (ADR 0073, ADR 0105 § 3 and § 4, `read:sales`), read through `connectors` as the access's person,
+ * The creators a call reads: the access's creator, or the one named; else those the person reads now, without the
+ * archived.
+ */
+async function creatorsRead(
+  creators: CreatorReader,
+  actor: ActorView,
+  creatorId: string | null,
+): Promise<readonly CreatorId[]> {
+  if (creatorId !== null) return [CreatorIdSchema.parse(creatorId)];
+  const readable =
+    actor.readableCreatorIds === 'all'
+      ? 'all'
+      : actor.readableCreatorIds.map((id) => CreatorIdSchema.parse(id));
+  return (await creators.unarchived(readable)).map((creator) => CreatorIdSchema.parse(creator.id));
+}
+
+/**
+ * The sales tools (ADR 0073, ADR 0105 § 3 and § 4, `read:sales`) and the platform's daily statistics (ADR 0081, `read:status`), read through `connectors` as the access's person,
  * whose role `resolveActor` read for this call. Closed by Charles's decision A (14/11): no amount per member, no share.
  */
 export function salesTools(
@@ -64,17 +85,7 @@ export function salesTools(
       output: McpSalesListSchema,
       run: async ({ grant, actor, creatorId }, input): Promise<McpSalesList> => {
         const { from, to } = McpSalesInputSchema.parse(input);
-        // Confined to the access's creator, or the one named; else those the person reads now, without the archived.
-        const ids: readonly CreatorId[] =
-          creatorId !== null
-            ? [CreatorIdSchema.parse(creatorId)]
-            : (
-                await creators.unarchived(
-                  actor.readableCreatorIds === 'all'
-                    ? 'all'
-                    : actor.readableCreatorIds.map((id) => CreatorIdSchema.parse(id)),
-                )
-              ).map((creator) => CreatorIdSchema.parse(creator.id));
+        const ids = await creatorsRead(creators, actor, creatorId);
         const reads = ids.length === 0 ? [] : await sales.sales(grant.userId, ids, { from, to });
         return {
           from,
@@ -87,6 +98,38 @@ export function salesTools(
               platform: reading.platform,
               readAt: reading.readAt,
               pausedUntil: reading.pausedUntil,
+            })),
+          })),
+        };
+      },
+    },
+    platform_daily_stats_list: {
+      description:
+        'Les statistiques quotidiennes de la plateforme pour la créatrice de cet accès (un accès de l’agence est refusé : il n’en nomme aucune), du jour `from` au jour `to` inclus (93 jours au plus) : par compte de créatrice et par jour, nouveaux abonnés, désabonnements, abonnés actifs, renouvellements, PPV envoyés et achetés, messages envoyés et reçus, tels que la plateforme les compte, et quand ils ont été lus. Un compteur `null` n’a pas encore été calculé par la plateforme ; un jour absent n’a pas été lu. Aucun montant.',
+      input: McpDailyStatsInputSchema,
+      output: McpDailyStatsListSchema,
+      run: async ({ grant, actor, creatorId }, input): Promise<McpDailyStatsList> => {
+        const { from, to } = McpDailyStatsInputSchema.parse(input);
+        const ids = await creatorsRead(creators, actor, creatorId);
+        const reads = ids.length === 0 ? [] : await sales.dailyStats(grant.userId, ids, { from, to });
+        return {
+          from,
+          to,
+          creators: reads.map((read) => ({
+            creatorId: CreatorIdSchema.parse(read.creatorId),
+            days: read.days.map((one) => ({
+              platform: one.platform,
+              platformAccountId: one.platformAccountId,
+              day: one.day,
+              newSubscribers: one.newSubscribers,
+              unsubscribes: one.unsubscribes,
+              activeSubscribers: one.activeSubscribers,
+              renewals: one.renewals,
+              ppvSent: one.ppvSent,
+              ppvPurchased: one.ppvPurchased,
+              messagesSent: one.messagesSent,
+              messagesReceived: one.messagesReceived,
+              readAt: one.readAt,
             })),
           })),
         };

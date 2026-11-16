@@ -2,6 +2,7 @@ import type {
   AiUsage,
   CommissionStatementStatus,
   CreatorId,
+  DailyStatsOfCreator,
   FanId,
   McpCallRefusal,
   McpCapability,
@@ -280,8 +281,9 @@ export interface TeamImportReader {
 }
 
 /**
- * The connectors' read of a creator's sales (`reads.sales`, its `index.ts`, ADR 0026 § 1): as the person, each creator
- * checked in its own transaction, one refused refusing the call; never the agency's nor the creator's share.
+ * The connectors' reads of a creator's sales and daily statistics (`reads.sales`, `reads.dailyStats`, its `index.ts`,
+ * ADR 0026 § 1): as the person, each creator checked in its own transaction, one refused refusing the call; never the
+ * agency's nor the creator's share.
  */
 export interface SalesReader {
   sales(
@@ -289,6 +291,11 @@ export interface SalesReader {
     creatorIds: readonly CreatorId[],
     range: { readonly from: string; readonly to: string },
   ): Promise<readonly SalesOfCreator[]>;
+  dailyStats(
+    userId: string,
+    creatorIds: readonly CreatorId[],
+    range: { readonly from: string; readonly to: string },
+  ): Promise<readonly DailyStatsOfCreator[]>;
 }
 
 /** A statement's state as pay gives it to another door: never an amount of the member (decision A of 14/11). */
