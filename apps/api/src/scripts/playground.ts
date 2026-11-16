@@ -31,7 +31,6 @@ import {
   suggestDestination,
   RATE_TARGET,
   versionLabel,
-  voiceExamples,
   type CalibrationRecord,
   type Verdict,
 } from '../modules/agent/index';
@@ -100,7 +99,8 @@ const sessionId = `playground-${String(Date.now())}`;
 const voicePromptVersion = loadPrompt('voice').header.version;
 // The rate shown is the configured voice's: an answer written by the fallback counts for the fallback.
 const currentVersion = { voicePrompt: voicePromptVersion, voiceModel: DEFAULT_LLM_CONFIG.roles.voice.model };
-const examples = voiceExamples(records);
+// The demo persona is invented: no correction becomes an example of a creator's voice (recette AGE-07).
+const examples: string[] = [];
 
 const session = createPlaygroundSession({
   gateway,

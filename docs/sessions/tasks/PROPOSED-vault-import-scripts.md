@@ -16,7 +16,7 @@ ADR 0099 (§ 1, § 3), ADR 0098 (déroulé et clés de segment), P6-01, `docs/re
 - [x] Prix de chaque étape lu dans la séquence Reveal, repris tel quel par la synthèse (remarque Médias, point 5). Le prix Reveal est facultatif et lu en centimes TTC en euros ; le plafond de P6-01 vaut 40 € TTC (Charles, 14/11/2026). Avertissement à l'import pour un palier plus du double ou au-dessus du plafond, calculé à la lecture, jamais un blocage.
 - [x] Un média d'étape absent du coffre rend l'étape incomplète, donc le script non proposable.
 - [x] Un script importé garde le nom de Reveal.
-- [x] « Proposable » = chaque média a une description validée **et** l'identité du script (schéma c8, unique) est validée (remarque Médias, point 6). Tant que c8 n'existe pas, aucun script natif n'est proposable.
+- [x] « Proposable » = chaque média a une description validée **et** l'identité du script (schéma c8, unique) est validée (remarque Médias, point 6). Tant que c8 n'existe pas, aucun script natif n'est proposable. (15/11 : c8 écrit, voir SC-04 ; une étape à branches rend aussi un script non proposable avant l'ADR 0112.)
 - [x] Brancher le job `scripts.import_platform_scripts` (un compte, demandé avec chaque synchronisation du coffre, sans horloge) sur la lecture des scripts de `connectors` et les liaisons du coffre (`media_platform_refs`) quand la synchronisation du coffre (`PROPOSED-vault-sync.md`, Bilan, #759) est dans main.
 
 ## Critères d'acceptation
@@ -27,3 +27,4 @@ Création de scripts dans Reveal, écriture des textes par l'IA.
 
 ## Notes de session
 - 14/11/2026 (Médias) : domaine, tables, import et lectures écrits et testés contre FakeReveal (scénario `sequence_removed` ajouté). Branché ensuite sur la synchronisation du coffre (#759) : lecture des scripts par `connectors.platformReads`, liaisons de `media_platform_refs`, import mis en file derrière chaque synchronisation demandée par le propriétaire. Reste l'écran (fiche à part) et l'identité c8.
+- 15/11/2026 (Médias, SC-04 c8) : identité des scripts natifs (table `script_identities`, job et rattrapage, validation et correction par l'agence) ; le rang Reveal de chaque étape est gardé (`platform_index`) et un script à branches n'est jamais proposable. Reste l'écran (avec Design).

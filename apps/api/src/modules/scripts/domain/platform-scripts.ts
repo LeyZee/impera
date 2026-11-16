@@ -1,14 +1,18 @@
 import { createHash } from 'node:crypto';
 
 import {
+  PLATFORM_SCRIPT_GAPS,
   PLATFORM_SCRIPT_NAME_MAX,
   PLATFORM_SCRIPT_REF_MAX,
   PLATFORM_SCRIPT_STEP_MEDIA_MAX,
   PLATFORM_SCRIPT_STEP_TEXT_MAX,
   PLATFORM_SCRIPT_STEPS_MAX,
   type Currency,
+  type MediaSlotKind,
   type PlatformScript,
 } from '@impera/contracts';
+
+import { hasBranches } from './script-identity';
 
 /**
  * The import of the native scripts (ADR 0099 § 1, time 2; P6-01): each script the platform keeps for an account, its
@@ -66,6 +70,7 @@ export function platformScriptFingerprint(script: PlatformScript): string {
     script.steps.map((step) => [
       step.ref.id,
       step.index,
+      step.platformIndex,
       step.name,
       step.text,
       step.priceMinor,
@@ -180,6 +185,7 @@ export function planPlatformScripts(
 
 /** Where a media of a step stands in the vault, as the vault's link (`media_platform_refs`) and the descriptions say. */
 export interface StepMediaState {
+  readonly kind: MediaSlotKind;
   /** Listed by the last sync of the vault, and not removed since. */
   readonly inVault: boolean;
   /** Its media has a description a human validated (ADR 0083, ADR 0030 § 3); `false` while its file is not read. */
@@ -187,21 +193,25 @@ export interface StepMediaState {
 }
 
 /** Why a native script cannot be offered for sale yet. */
-export type PlatformScriptGap = 'media_absent' | 'media_not_described' | 'identity_not_validated';
+export type PlatformScriptGap = (typeof PLATFORM_SCRIPT_GAPS)[number];
 
 /**
  * What keeps a native script from being proposable (P6-01, ADR 0099 § 1, remark Médias 6): a media of a step (sold or
- * preview) absent from the vault makes its step incomplete; one not described with a validated description; the
- * script's identity (SC-04 c8) not validated. Empty: it may be offered, when it is active.
+ * preview) absent from the vault makes its step incomplete; a photo or a video not described with a validated
+ * description (a voice note is never described: ADR 0083 § 2); the identity of its current version (SC-04 c8) not
+ * validated; two steps on the same platform rank, branches a human chooses between, which nothing offers until the
+ * model of branched scripts exists (ADR 0112). Empty: it may be offered, when it is active.
  */
 export function platformScriptGaps(
-  steps: readonly { readonly media: readonly StepMediaState[] }[],
+  steps: readonly { readonly platformIndex: number; readonly media: readonly StepMediaState[] }[],
   identityValidated: boolean,
 ): PlatformScriptGap[] {
   const media = steps.flatMap((step) => step.media);
   const gaps: PlatformScriptGap[] = [];
   if (media.some((each) => !each.inVault)) gaps.push('media_absent');
-  if (media.some((each) => each.inVault && !each.described)) gaps.push('media_not_described');
+  if (media.some((each) => each.inVault && each.kind !== 'audio' && !each.described))
+    gaps.push('media_not_described');
   if (!identityValidated) gaps.push('identity_not_validated');
+  if (hasBranches(steps)) gaps.push('branched_step');
   return gaps;
 }

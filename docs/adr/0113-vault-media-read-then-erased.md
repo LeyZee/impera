@@ -1,6 +1,6 @@
 # 0113. Les fichiers du coffre : lus le temps de la description, jamais gardés
 
-Statut : proposed (numéro attribué par le coordinateur ; fiche `PROPOSED-vault-fetch-media.md` ; relecture Sécurité et Médias)
+Statut : accepted (« ok 0113 » de Charles le 16/11/2026, 12 h 48 heure de Paris, fil de coordination ; numéro attribué par le coordinateur ; fiche `PROPOSED-vault-fetch-media.md` ; relecture Sécurité et Médias)
 Date : 2026-11-16
 Précise : l'ADR 0018 (`fetchMedia`, drapeau `mediaDownload`), l'ADR 0030 § 3 et § 4 (l'original est lu puis effacé, la vignette reste), l'ADR 0099 § 4, § 5 et § 7 (description par lots dans le budget, la description de la plateforme est un point de départ). Ne remplace rien.
 

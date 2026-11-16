@@ -1,5 +1,6 @@
 import type { TeamMember } from '@impera/contracts';
 import type { Database, Transaction } from '@impera/db';
+import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createTeamService, type InviteFromPlatform } from './application/team';
@@ -21,8 +22,11 @@ const DEFAULT_AGENCY_TIME_ZONE = 'Europe/Paris';
 /** Public entry point of the `team` module (ADR 0002). Other modules import this file only. */
 export interface TeamModule {
   readonly name: 'team';
-  /** Mounted under `/v1` by the server: `/team/members` and `/team/commission-presets` (EQ-01). */
-  routes(requireRole: RequireRole): FastifyPluginAsyncZod;
+  /**
+   * Mounted under `/v1` by the server: `/team/members` and `/team/commission-presets` (EQ-01); `recentLogin` guards
+   * every write of the owner (EQ-15).
+   */
+  routes(requireRole: RequireRole, recentLogin: preValidationAsyncHookHandler): FastifyPluginAsyncZod;
   /**
    * What pay reads of the team (EQ-04), in pay's own transaction, given by the composition root: every member with
    * the rate in force on a day (pay's job on the admin connection, or a validation as its member).
@@ -71,7 +75,8 @@ export function createTeamModule(deps: TeamDeps): TeamModule {
   );
   return {
     name: 'team',
-    routes: (requireRole) => createTeamRoutes(service, requireRole, deps.platformRemovals),
+    routes: (requireRole, recentLogin) =>
+      createTeamRoutes(service, requireRole, deps.platformRemovals, recentLogin),
     pay: { members: membersForPay },
     invites: (links) => {
       const invites = createDrizzleTeamInvites(deps.db, links);

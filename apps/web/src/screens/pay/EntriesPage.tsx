@@ -31,6 +31,7 @@ import { useSchedulingSettings } from '@/reports/api';
 import { periodLine, previousPeriod } from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { readerZone } from '@/scheduling/time';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
@@ -79,12 +80,21 @@ export function EntriesPage({
           names.member(a.memberId).name.localeCompare(names.member(b.memberId).name, 'fr'),
         );
 
+  const confirm = useConfirmAgain();
+
   const cancel = async (row: EntryRow): Promise<void> => {
     setCancelling(row.id);
     const outcome = row.kind === 'bonus' ? await cancelBonus(row.id) : await cancelPenalty(row.id);
     // The row stays busy until the list is read again: « Annuler » never comes back on what is already cancelled.
     await refresh();
     setCancelling(null);
+    if (outcome.kind === 'reauth') {
+      // Nothing was cancelled: the password and the code, then the same cancel again.
+      confirm.ask(() => {
+        void cancel(row);
+      });
+      return;
+    }
     setArming(null);
     setRefusals((was) => {
       const next = new Map(was);
@@ -183,6 +193,11 @@ export function EntriesPage({
           )}
         </Panel>
       </div>
+      {confirm.asking ? (
+        <Dialog title="Annuler la saisie" onClose={confirm.cancel}>
+          <div className="tm-dialog__body nv-swap">{confirm.prompt({ lead: MONEY_LEAD })}</div>
+        </Dialog>
+      ) : null}
       {adding === null ? null : (
         <EntryDialog
           kind={adding}

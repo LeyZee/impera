@@ -2,6 +2,7 @@ import {
   ApiErrorSchema,
   CreatorAgencyRateListSchema,
   CreatorAgencyRateSchema,
+  REAUTHENTICATION_ERROR_CODE,
   type AgencyRateErrorCode,
   type CreateCreatorAgencyRateBody,
   type CreatorAgencyRate,
@@ -19,6 +20,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 export type RateErrorKind =
   | 'session_expired'
   | 'forbidden'
+  | 'reauth'
   | 'not_found'
   | 'day_invalid'
   | 'day_taken'
@@ -29,6 +31,7 @@ export type RateErrorKind =
 export const RATE_ERRORS: Readonly<Record<RateErrorKind, string>> = {
   session_expired: 'Ta session a expiré. Reconnecte-toi, puis recommence : rien n’a été enregistré.',
   forbidden: 'Seul le compte propriétaire lit et pose le pourcentage de l’agence.',
+  reauth: 'Confirme ton mot de passe et ton code : rien n’a été enregistré.',
   not_found: 'Cette créatrice n’existe plus.',
   day_invalid:
     'Ce jour a commencé : un nouveau pourcentage part de demain au plus tôt, jamais en arrière. Rien n’a été enregistré.',
@@ -72,7 +75,12 @@ async function call(creatorId: CreatorId, init: RequestInit = {}): Promise<unkno
   const detail = `${what}: ${String(response.status)}`;
   if (response.ok) return response.json().catch(() => null);
   if (response.status === 401) throw new RateError('session_expired', detail);
-  if (response.status === 403) throw new RateError('forbidden', detail);
+  if (response.status === 403) {
+    // The owner, but the password and the code are not recent (EQ-15): asked again, never « propriétaire seul ».
+    const body = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+    const reauth = body.success && body.data.error.code === REAUTHENTICATION_ERROR_CODE;
+    throw new RateError(reauth ? 'reauth' : 'forbidden', detail);
+  }
   if (response.status === 404) throw new RateError('not_found', detail);
   if (response.status === 400 || response.status === 409) {
     const body = ApiErrorSchema.safeParse(await response.json().catch(() => null));

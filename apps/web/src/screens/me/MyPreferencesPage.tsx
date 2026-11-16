@@ -4,6 +4,7 @@ import type { JSX } from 'react';
 
 import { MeNav } from './MeNav';
 
+import { isStandalone } from '@/pwa/install';
 import { SoundsToggle } from '@/rewards/SoundsToggle';
 import { playsTheGame } from '@/rewards/api';
 import { AppearanceChoice } from '@/shell/AppearanceChoice';
@@ -24,7 +25,13 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
       <PageHeader
         eyebrow="Moi"
         title="Préférences"
-        actions={<MeNav manager={user.teamScope === 'agency'} creator={user.role === 'creator'} />}
+        actions={
+          <MeNav
+            manager={user.teamScope === 'agency'}
+            creator={user.role === 'creator'}
+            trophies={playsTheGame(user)}
+          />
+        }
       />
       <div className="me-prefs">
         <Panel className="nv-enter" eyebrow="Ce navigateur" title="Apparence">
@@ -42,10 +49,15 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
             </div>
           </Panel>
         ) : null}
-        {playsTheGame(user) ? (
+        {/* Hers too: her reveals ring the same chime, « avec un interrupteur dans Moi » (ADR 0107 § 11, CRE-01). */}
+        {playsTheGame(user) || user.role === 'creator' ? (
           <Panel className="nv-enter" eyebrow="Mon compte" title="Sons">
             <div className="me-prefs__body">
-              <p className="me-prefs__text">Le carillon qui accompagne un trophée ou un palier gagné.</p>
+              <p className="me-prefs__text">
+                {user.role === 'creator'
+                  ? 'Le carillon qui accompagne une médaille ou un trophée gagné.'
+                  : 'Le carillon qui accompagne un trophée ou un palier gagné.'}
+              </p>
               <SoundsToggle user={user} />
             </div>
           </Panel>
@@ -59,6 +71,22 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
             </Link>
           </div>
         </Panel>
+        {/* The guide stays found once the card « Impera sur ton écran d’accueil » is set aside (recette 11/11, CRE-29);
+            not in the installed app, which has nothing left to install. */}
+        {isStandalone() ? null : (
+          <Panel className="nv-enter" eyebrow="Cet appareil" title="Application">
+            <div className="me-prefs__body">
+              <p className="me-prefs__text">
+                Impera sur l’écran d’accueil de ton téléphone : ouverture en un geste, plein écran, et les
+                notifications.
+              </p>
+              <Link to="/aide/installer" className="nv-btn nv-btn--soft nv-btn--sm me-prefs__go">
+                <NavIcon name="phone" />
+                Installer Impera
+              </Link>
+            </div>
+          </Panel>
+        )}
         <Panel className="nv-enter" eyebrow={user.name} title="Compte">
           <div className="me-prefs__body">
             <button type="button" className="nv-btn nv-btn--soft nv-btn--sm me-prefs__go" onClick={onSignOut}>

@@ -69,7 +69,7 @@ describe('the rank in the case (ADR 0104 § 16)', () => {
 
   it('holds the highest rank noted and owes the reveal of a rank not played yet', () => {
     const trophyCase = trophyCaseOf(ranks, streak, null);
-    expect(trophyCase.level).toEqual({ rank: 2, name: 'Complice' });
+    expect(trophyCase.level).toEqual({ rank: 2, name: 'Allumeur' });
     expect(trophyCase.nextLevel).toBeNull();
     expect(trophyCase.items.filter((item) => item.family === 'level').map((item) => item.kind)).toEqual([
       'level:1',

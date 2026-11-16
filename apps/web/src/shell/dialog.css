@@ -95,6 +95,17 @@
   flex-direction: column;
   animation: tm-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
 }
+/* The window holds the focus itself when it has nothing else to focus (CHT-20): no ring around the whole glass. */
+.tm-dialog:focus {
+  outline: none;
+}
+/* A window sits over a page full of text: its glass is near-opaque, so no line behind reads through its own words,
+   even where the browser draws no blur (recette design 11/11). The sheen of the glass stays on its top edge. */
+.tm-dialog.nv-glass {
+  background:
+    linear-gradient(180deg, var(--nv-glass-fill-strong) 0%, transparent 46%),
+    color-mix(in srgb, var(--nv-surface-raised) 94%, transparent);
+}
 .tm-dialog__scroll {
   flex: 1 1 auto;
   min-height: 0;
