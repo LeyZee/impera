@@ -13,8 +13,11 @@ export const TROPHY_CASE_FAMILIES = ['medal', 'streak', 'trophy', 'level'] as co
 export const TrophyCaseFamilySchema = z.enum(TROPHY_CASE_FAMILIES);
 export type TrophyCaseFamily = z.infer<typeof TrophyCaseFamilySchema>;
 
-/** What a progress counts in. `cents` is an amount read on a statement, never worked out by the game. */
-export const TROPHY_CASE_UNITS = ['shift', 'day', 'delivery', 'category', 'cents'] as const;
+/**
+ * What a progress counts in. `cents` is an amount read on a statement, never worked out by the game. `once` is an
+ * object earned by one gesture, still ahead (0 of 1): so that the showcase weighs it beside the others.
+ */
+export const TROPHY_CASE_UNITS = ['shift', 'day', 'delivery', 'category', 'cents', 'once'] as const;
 export const TrophyCaseUnitSchema = z.enum(TROPHY_CASE_UNITS);
 
 export const TrophyCaseProgressSchema = z.object({

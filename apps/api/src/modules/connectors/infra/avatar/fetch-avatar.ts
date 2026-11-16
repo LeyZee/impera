@@ -7,13 +7,15 @@ import { Readable } from 'node:stream';
 import { AVATAR_MAX_BYTES, type FetchedAvatar } from '../../domain/avatar';
 
 /** One address a name resolved to, already checked as public: the only one the request may connect to. */
-interface Pinned {
+export interface Pinned {
   readonly address: string;
   readonly family: number;
 }
 
 type FetchLike = (url: string, init: RequestInit, pinned: Pinned) => Promise<Response>;
-type Lookup = (hostname: string) => Promise<readonly { readonly address: string; readonly family: number }[]>;
+export type Lookup = (
+  hostname: string,
+) => Promise<readonly { readonly address: string; readonly family: number }[]>;
 
 /** A platform's image server that hangs is one that does not answer: the job tries again. */
 const FETCH_TIMEOUT_MS = 15_000;
@@ -53,7 +55,7 @@ export function isPrivateAddress(address: string): boolean {
   return PRIVATE.check(address, family === 4 ? 'ipv4' : 'ipv6');
 }
 
-const systemLookup: Lookup = (hostname) => dnsLookup(hostname, { all: true, verbatim: true });
+export const systemLookup: Lookup = (hostname) => dnsLookup(hostname, { all: true, verbatim: true });
 
 /**
  * The GET itself, connected to the address that was checked and to no other: the name is not resolved a second time,

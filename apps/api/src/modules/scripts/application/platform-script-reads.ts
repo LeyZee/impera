@@ -1,5 +1,6 @@
-import type { CreatorId, Currency, MediaSlotKind, UserRole } from '@impera/contracts';
+import type { BranchCondition, CreatorId, Currency, MediaSlotKind, UserRole } from '@impera/contracts';
 
+import { branchGaps, conditionOf, ranksOf, stepsWithoutDefault } from '../domain/branches';
 import {
   platformScriptGaps,
   priceWarnings,
@@ -7,8 +8,11 @@ import {
   type PlatformScriptWarning,
 } from '../domain/platform-scripts';
 import type {
+  BranchInput,
   IdentityReview,
   PlatformScriptReadStore,
+  ScriptBranchStore,
+  SetBranchesOutcome,
   ScriptIdentityReviewStore,
   StoredPlatformScript,
   StoredScriptIdentity,
@@ -48,10 +52,17 @@ interface PlatformStepView {
   readonly previewMedia: readonly PlatformStepMediaView[];
   /** Every media of the step is in the vault. */
   readonly complete: boolean;
+  /**
+   * Its condition when its step has several branches (ADR 0112 § 5): `null` while unset, and for the only branch of a
+   * step.
+   */
+  readonly condition: BranchCondition | null;
+  /** How many branches its step has: 1 for a step without branches. */
+  readonly branches: number;
 }
 
 /** A native script of hers, with what the agency should look at and why it cannot be offered yet. */
-export interface PlatformScriptView extends Omit<StoredPlatformScript, 'steps' | 'identities'> {
+export interface PlatformScriptView extends Omit<StoredPlatformScript, 'steps' | 'identities' | 'branches'> {
   readonly steps: readonly PlatformStepView[];
   readonly warnings: readonly PlatformScriptWarning[];
   readonly gaps: readonly PlatformScriptGap[];
@@ -100,24 +111,39 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     mediaAssetId: media.vault?.mediaAssetId ?? null,
     described: (media.vault?.descriptionId ?? null) !== null,
   });
-  const steps = script.steps.map((step): PlatformStepView => {
-    const media = step.media.map(mediaView);
-    const previewMedia = step.previewMedia.map(mediaView);
-    return {
-      ...step,
-      media,
-      previewMedia,
-      complete: [...media, ...previewMedia].every((each) => each.inVault),
-    };
-  });
-  const identity = currentIdentity(script.identities, currentInputHash(script));
-  const gaps = platformScriptGaps(
-    steps.map((step) => ({
-      platformIndex: step.platformIndex,
-      media: [...step.media, ...step.previewMedia],
-    })),
-    identity?.validatedAt != null,
+  // By rank, then the branches of a rank in the agency's order (ADR 0112 § 6): how the screen and the agent read them.
+  const ranks = ranksOf(script.steps, script.branches);
+  const steps = ranks.flatMap((rank) =>
+    rank.branches.map((step): PlatformStepView => {
+      const media = step.media.map(mediaView);
+      const previewMedia = step.previewMedia.map(mediaView);
+      return {
+        ...step,
+        media,
+        previewMedia,
+        complete: [...media, ...previewMedia].every((each) => each.inVault),
+        condition: conditionOf(rank, step.ref, script.branches),
+        branches: rank.branches.length,
+      };
+    }),
   );
+  const identity = currentIdentity(script.identities, currentInputHash(script));
+  const branchSteps = script.steps.map((step) => ({
+    ...step,
+    soldMediaRefs: step.media.map((media) => media.ref),
+  }));
+  const gaps = platformScriptGaps(
+    steps.map((step) => ({ media: [...step.media, ...step.previewMedia] })),
+    identity?.validatedAt != null,
+    branchGaps(branchSteps, script.branches),
+  );
+  const warnings = [
+    ...priceWarnings(script.steps),
+    ...stepsWithoutDefault(branchSteps, script.branches).map((position) => ({
+      code: 'step_without_default' as const,
+      position,
+    })),
+  ].sort((a, b) => a.position - b.position);
   return {
     id: script.id,
     creatorId: script.creatorId,
@@ -129,7 +155,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     deactivatedAt: script.deactivatedAt,
     syncedAt: script.syncedAt,
     steps,
-    warnings: priceWarnings(script.steps),
+    warnings,
     gaps,
     proposable: script.active && gaps.length === 0,
     identity,
@@ -176,4 +202,20 @@ export async function reviewScriptIdentity(
 ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'> {
   if (reader.role !== 'owner' && reader.role !== 'operator') return 'not_found';
   return deps.store.review(creatorId, scriptId, review, reader.userId, currentInputHash);
+}
+
+/**
+ * The agency sets every branch of one step, in its order, each with its condition (ADR 0112 §§ 5-6): the owner and the
+ * active managers of her list. The branches named must be exactly those the step has now (`stale` otherwise).
+ */
+export async function setScriptBranches(
+  deps: { readonly store: ScriptBranchStore },
+  reader: PlatformScriptsReader,
+  creatorId: CreatorId,
+  scriptId: string,
+  platformIndex: number,
+  branches: readonly BranchInput[],
+): Promise<SetBranchesOutcome> {
+  if (reader.role !== 'owner' && reader.role !== 'operator') return 'not_found';
+  return deps.store.setStep(creatorId, scriptId, platformIndex, branches, reader.userId);
 }

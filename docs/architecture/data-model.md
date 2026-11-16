@@ -160,7 +160,9 @@ llm_calls   id, creator_id (nullable), role (sense|brain|voice|judge), provider,
             input_tokens, output_tokens, cost_minor, currency, cost_micro_usd (coût exact), latency_ms,
             status (les 12 issues de la passerelle : ok, refused, timeout, rate_limited…), is_fallback,
             conversation_id (nullable), draft_id (nullable, sans clé étrangère : l'appel précède le brouillon),
-            trace_id (Langfuse), created_at. Journal de la passerelle (LlmCallStore), lu au démarrage pour le
+            trace_id (Langfuse), hedge (nullable : winner|loser d'une deuxième demande, OPS-15 ; loser = encore en
+            cours quand la réponse est partie, son coût compte, pas sa latence), error_code (nullable : où et de quel
+            type une sortie a échoué son schéma, « intent:invalid_value », « json », « truncated » ; jamais le contenu), created_at. Journal de la passerelle (LlmCallStore), lu au démarrage pour le
             plafond quotidien.
 ```
 
@@ -198,7 +200,7 @@ system_alert_settings  creator_id, code (keyword|service_request|identity_doubt)
 alert_seen      creator_id, event_id → conversation_events, seen_by, seen_at   (clé : creator_id, event_id)
 ```
 
-Une alerte personnalisée a une ligne par créatrice (RLS), et les lignes écrites ensemble partagent `group_id` : l'écran les montre comme une seule alerte. Il faut une phrase ou au moins un mot-clé (contrôle en base comme dans le contrat). Une alerte retirée est archivée (`archived_at`), jamais supprimée, pour que l'historique garde son nom (`nirvana_app` n'a pas `DELETE`). Une alerte système sans ligne dans `system_alert_settings` est active, et `keyword` ne peut pas être désactivée (contrôle en base). `alert_seen` porte le « vu » de l'historique, puisque le journal est en ajout seul : une marque par événement, partagée par l'agence. Elle appartient à `conversations`, qui possède le journal et sert l'historique (`/v1/alerts/triggers`) ; `alerts` lui donne les noms de ses alertes, archivées comprises, par le port `AlertNames`.
+Une alerte personnalisée a une ligne par créatrice (RLS), et les lignes écrites ensemble partagent `group_id` : l'écran les montre comme une seule alerte. Il faut une phrase ou au moins un mot-clé (contrôle en base comme dans le contrat). Une alerte retirée est archivée (`archived_at`), jamais supprimée, pour que l'historique garde son nom (`nirvana_app` n'a pas `DELETE`). Une alerte système sans ligne dans `system_alert_settings` est active, et `keyword` ne peut pas être désactivée (contrôle en base). `alert_seen` porte le « vu » de l'historique, puisque le journal est en ajout seul : une marque par événement, partagée par l'agence. Elle appartient à `conversations`, qui possède le journal et sert l'historique (`/v1/alerts/triggers`, qui montre aussi les `handoff_requested` de cause `minor` ou `budget` et les `care_opened`) ; `alerts` lui donne les noms de ses alertes, archivées comprises, par le port `AlertNames`.
 
 Les approbations et prises en main ne sont pas une table : ce sont des `conversation_events` (`draft_approved`, `takeover_started`, …) et l'état des `drafts`.
 

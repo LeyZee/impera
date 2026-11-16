@@ -162,6 +162,17 @@ export const PlaygroundMediaSchema = z.object({
 });
 export type PlaygroundMedia = z.infer<typeof PlaygroundMediaSchema>;
 
+/** The brain's reading of his message, in the playground's words. */
+export const PlaygroundBriefSchema = z.object({
+  intent: BriefIntentSchema,
+  sentiment: z.string(),
+  risks: z.array(z.string()),
+  action: z.string(),
+  replyBrief: z.string(),
+  kycMissing: z.array(z.string()),
+});
+export type PlaygroundBrief = z.infer<typeof PlaygroundBriefSchema>;
+
 export const PlaygroundAnswerSchema = z.object({
   bubbles: z.array(z.string()),
   isBlocked: z.boolean(),
@@ -171,16 +182,7 @@ export const PlaygroundAnswerSchema = z.object({
   trap: z
     .object({ signals: z.array(z.object({ kind: z.string(), source: z.string(), label: z.string() })) })
     .exactOptional(),
-  brief: z
-    .object({
-      intent: BriefIntentSchema,
-      sentiment: z.string(),
-      risks: z.array(z.string()),
-      action: z.string(),
-      replyBrief: z.string(),
-      kycMissing: z.array(z.string()),
-    })
-    .exactOptional(),
+  brief: PlaygroundBriefSchema.exactOptional(),
   /** His desire score after this message, when the brain read it. */
   desire: PlaygroundDesireSchema.exactOptional(),
   /** What the cursor decided on going sexual (P3-09), in French; absent when the brain did not read the moment. */
@@ -196,6 +198,11 @@ export const PlaygroundAnswerSchema = z.object({
     .object({ kind: z.enum(['handoff', 'care', 'no_reply']), detail: z.array(z.string()) })
     .exactOptional(),
   model: z.string().exactOptional(),
+  /**
+   * Her typing time before each bubble, in ms, the first included: the same delays the real send waits between
+   * bubbles (agent `bubbleDelays`), so the playground shows them one by one as a fan would see them.
+   */
+  delaysMs: z.array(z.number().nonnegative()).exactOptional(),
   latencyMs: z.number().nonnegative(),
   /** The cost in euros, at the daily budget's rate (ADR 0011); the journal keeps dollars. */
   costEur: z.number().nonnegative(),
@@ -222,6 +229,11 @@ export const PlaygroundRateSchema = z.object({
 export type PlaygroundRate = z.infer<typeof PlaygroundRateSchema>;
 
 export const PlaygroundStateSchema = z.object({
+  /**
+   * While an answer is being written: the brain's reading of his message, as soon as it has read it, so the screen
+   * shows it while the voice writes (a turn takes about 20 s). Absent otherwise.
+   */
+  reading: PlaygroundBriefSchema.exactOptional(),
   /**
    * The persona the playground plays: its first name, and `played`, the creator's version chosen at the head of the
    * screen (recette PRO-21), active or not; `null` for the invented persona (`PLAYGROUND_PERSONA_PATH`, the demo's by

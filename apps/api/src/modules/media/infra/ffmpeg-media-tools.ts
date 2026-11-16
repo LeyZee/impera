@@ -248,6 +248,54 @@ export function createFfmpegFileTools(
   };
 }
 
+/** A vault video's stream is copied, never decoded: generous for a long one, and the job's retry decides after. */
+const REMUX_TIMEOUT_MS = 120_000;
+
+/**
+ * A vault video read from its HLS segments (ADR 0113 § 3) is an MPEG-TS stream, which the media tools never open
+ * (`INPUT_FORMATS`). Here alone it is let in, read as MPEG-TS and nothing else (never a playlist, a list of files nor a
+ * URL), its streams copied as they are into an MP4 at `out`, so that the rest reads it as any phone's video. `false`
+ * when ffmpeg cannot read it: the media waits for the agency's text. A missing ffmpeg, or one killed by its time limit,
+ * throws and the job retries.
+ */
+export async function remuxVaultStream(path: string, out: string, binaries = BINARIES): Promise<boolean> {
+  try {
+    await run(
+      binaries.ffmpeg,
+      [
+        '-v',
+        'error',
+        '-y',
+        '-format_whitelist',
+        'mpegts',
+        '-protocol_whitelist',
+        'file',
+        '-f',
+        'mpegts',
+        '-i',
+        path,
+        '-map',
+        '0:v:0',
+        '-map',
+        '0:a:0?',
+        '-map_metadata',
+        '-1',
+        '-c',
+        'copy',
+        '-f',
+        'mp4',
+        out,
+      ],
+      { timeout: REMUX_TIMEOUT_MS },
+    );
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith(missingMessage(binaries.ffmpeg))) throw error;
+    if (isTimedOut(error)) throw error;
+    return false;
+  }
+}
+
 /** ffmpeg and ffprobe come with the Docker image (operations.md); files never leave a private temp folder. */
 export function createFfmpegMediaTools(
   binaries = BINARIES,
