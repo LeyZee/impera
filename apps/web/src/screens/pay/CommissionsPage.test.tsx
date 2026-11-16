@@ -314,6 +314,24 @@ describe('CommissionsPage', () => {
     });
   });
 
+  it('says beside the net of the period under way what its amount holds besides the commission (recette CHT-02, Design)', async () => {
+    const running = periods[NOV1];
+    if (running === undefined) throw new Error('No period under way');
+    const [statement] = running.statements;
+    if (statement === undefined) throw new Error('No statement');
+    periods[NOV1] = {
+      ...running,
+      statements: [{ ...statement, netMinor: 0, commissionMinor: 0, bonusesMinor: 3_000, totalMinor: 3_000 }],
+    };
+    renderPage();
+    await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await waitFor(() => {
+      expect(text(within(panel('Mes relevés')).getAllByRole('button')[0])).toContain(
+        'de net à ce jour · prime +30,00 €',
+      );
+    });
+  });
+
   it('says the payout delay the owner announced (PAIE-32)', async () => {
     delay = 3;
     renderPage();
