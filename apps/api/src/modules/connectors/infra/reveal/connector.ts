@@ -30,8 +30,9 @@ import type { ConnectorRegistry, ConnectorSend, SendJournal } from '../../domain
 import {
   downloadVaultFile,
   VaultFileError,
+  SYSTEM_FILE_TRANSPORT,
   type DownloadBounds,
-  type FileFetch,
+  type FileTransport,
   type VaultFileFailure,
 } from '../download/vault-file';
 
@@ -68,6 +69,9 @@ const REVEAL_FILE_HOSTS: readonly string[] = [];
 /** A vault file's bounds (ADR 0113 § 2): a 720-line video of an hour stays under it; past it, nothing is kept. */
 const FILE_MAX_BYTES = 2 * 1024 ** 3;
 const FILE_TIMEOUT_MS = 10 * 60_000;
+/** An HLS video of the vault: an hour in 6-second segments is 600; one key for a file, a few at most. */
+const FILE_MAX_SEGMENTS = 2_000;
+const FILE_MAX_KEYS = 8;
 /** What a failed download is, for the job: the link again later, the media gone, or a file we will never read. */
 const FILE_FAILURES: Record<VaultFileFailure, ConnectorError['code']> = {
   expired: 'transient',
@@ -139,10 +143,15 @@ export interface RevealApiConnectorOptions {
    * calling Reveal. Without it, every write is refused: a send nobody records could go twice.
    */
   readonly sends?: SendJournal;
-  /** The file downloads' `fetch` (ADR 0113 § 2), no header ever sent; the platform's own `fetch` by default. */
-  readonly fileFetch?: FileFetch;
-  /** The hosts a file link may name; `REVEAL_FILE_HOSTS` by default, FakeReveal's in the tests. */
+  /**
+   * How file links are reached (ADR 0113 § 2): never the session's client, no header ever sent; resolved and checked by
+   * the system by default. FakeReveal's in the tests.
+   */
+  readonly fileTransport?: FileTransport;
+  /** The hosts a file link may name; `REVEAL_FILE_HOSTS` by default. */
   readonly fileHosts?: readonly string[];
+  /** FakeReveal serves plain HTTP: the tests only, a real link is HTTPS. */
+  readonly fileHttpForTests?: boolean;
 }
 
 /** `exp` of a JWT bearer, when the token is one (spec § 2, V2); `null` otherwise. */
@@ -186,7 +195,7 @@ export class RevealApiConnector implements PlatformConnector {
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly botDisplayName: string | null;
   private readonly sends: SendJournal | null;
-  private readonly fileFetch: FileFetch;
+  private readonly fileTransport: FileTransport;
   private readonly fileBounds: DownloadBounds;
   /** When the sends of the last minute left, for our own pace (spec § 5). */
   private sentAt: number[] = [];
@@ -202,11 +211,14 @@ export class RevealApiConnector implements PlatformConnector {
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.botDisplayName = options.botDisplayName ?? null;
     this.sends = options.sends ?? null;
-    this.fileFetch = options.fileFetch ?? ((url, init) => fetch(url, init));
+    this.fileTransport = options.fileTransport ?? SYSTEM_FILE_TRANSPORT;
     this.fileBounds = {
       hosts: options.fileHosts ?? REVEAL_FILE_HOSTS,
       maxBytes: FILE_MAX_BYTES,
       timeoutMs: FILE_TIMEOUT_MS,
+      maxSegments: FILE_MAX_SEGMENTS,
+      maxKeys: FILE_MAX_KEYS,
+      ...(options.fileHttpForTests === true ? { allowHttp: true } : {}),
     };
     this.client =
       session === null
@@ -581,7 +593,7 @@ export class RevealApiConnector implements PlatformConnector {
         throw new ConnectorError('not_found', 'vault.medias: no such media in its folder');
       try {
         return await downloadVaultFile(
-          this.fileFetch,
+          this.fileTransport,
           { url: item.url, isHls: item.isHls ?? false },
           opts.path,
           this.fileBounds,

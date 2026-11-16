@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z, ZodError } from 'zod';
 
-import type { FileFetch, RevealFetch } from '../../modules/connectors';
+import type { FileTransport, RevealFetch } from '../../modules/connectors';
 
 import { FIXTURES, type FixtureName } from './fixtures';
 import {
@@ -709,7 +709,8 @@ export interface FakeReveal {
   /** `fetch` for the connector, served by `app.inject` (no port opened); any host reaches FakeReveal. */
   readonly fetch: RevealFetch;
   /** A file download's `fetch` (no header ever sent), served the same way; only FakeReveal's host answers. */
-  readonly fileFetch: FileFetch;
+  /** FakeReveal's file links, reached as the server reaches a real one (`downloadVaultFile`); its host resolves to a public test address. */
+  readonly fileTransport: FileTransport;
   /** FakeReveal's clock, moved only by `POST /__clock`: a connector under test reads the same time. */
   now(): Date;
 }
@@ -1387,30 +1388,26 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     };
   };
 
-  const fileFetch: FileFetch = async (url, init) => {
-    const target = new URL(url);
-    if (target.origin !== PUBLIC_URL) throw new TypeError('fetch failed');
-    const response = await app.inject({ method: init.method, url: `${target.pathname}${target.search}` });
-    return {
-      status: response.statusCode,
-      headers: {
-        get: (name) => {
-          const value = response.headers[name.toLowerCase()];
-          return value === undefined ? null : String(value);
-        },
-      },
-      arrayBuffer: () => {
-        const copy = new Uint8Array(response.rawPayload.byteLength);
-        copy.set(response.rawPayload);
-        return Promise.resolve(copy.buffer);
-      },
-    };
+  const fileTransport: FileTransport = {
+    lookup: () => Promise.resolve([{ address: '203.0.113.10', family: 4 }]),
+    get: async (url) => {
+      const target = new URL(url);
+      if (target.origin !== PUBLIC_URL) throw new TypeError('fetch failed');
+      const response = await app.inject({ method: 'GET', url: `${target.pathname}${target.search}` });
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(response.headers)) {
+        if (value !== undefined) headers.set(name, String(value));
+      }
+      const copy = new Uint8Array(response.rawPayload.byteLength);
+      copy.set(response.rawPayload);
+      return new Response(copy, { status: response.statusCode, headers });
+    },
   };
 
   return {
     app,
     fetch,
-    fileFetch,
+    fileTransport,
     state: () => world.state,
     get authorization() {
       return `Bearer ${world.state.sessionToken}`;

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -9,11 +9,46 @@ import { z } from 'zod';
 
 import { createFakeReveal, type FakeReveal } from '../../../../../__tests__/fake-reveal/server';
 import { defaultIv, HlsUnsupported, parseHlsPlaylist, variantForDescription } from '../hls-playlist';
-import { downloadVaultFile, VaultFileError, type DownloadBounds, type VaultFileLink } from '../vault-file';
+import {
+  downloadVaultFile,
+  VaultFileError,
+  type DownloadBounds,
+  type FileTransport,
+  type VaultFileLink,
+} from '../vault-file';
 
 const run = promisify(execFile);
 
-const BOUNDS: DownloadBounds = { hosts: ['fake-reveal.test'], maxBytes: 50 * 1024 * 1024, timeoutMs: 30_000 };
+const BOUNDS: DownloadBounds = {
+  hosts: ['fake-reveal.test'],
+  maxBytes: 50 * 1024 * 1024,
+  timeoutMs: 30_000,
+  maxSegments: 100,
+  maxKeys: 2,
+  allowHttp: true,
+};
+
+/** A transport that answers every GET with `body`, streamed in 1 KiB chunks and with no length announced. */
+function streaming(total: number, onGet?: () => void): FileTransport {
+  return {
+    lookup: () => Promise.resolve([{ address: '203.0.113.10', family: 4 }]),
+    get: () => {
+      onGet?.();
+      let sent = 0;
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (sent >= total) {
+            controller.close();
+            return;
+          }
+          sent += 1024;
+          controller.enqueue(new Uint8Array(1024));
+        },
+      });
+      return Promise.resolve(new Response(body, { status: 200 }));
+    },
+  };
+}
 
 const WireLinks = z.object({
   data: z.array(
@@ -121,15 +156,29 @@ describe('downloadVaultFile against FakeReveal', () => {
 
   it('downloads a photo in one GET', async () => {
     const path = join(dir, 'photo');
-    const file = await downloadVaultFile(fake.fileFetch, photo, path, BOUNDS);
+    const file = await downloadVaultFile(fake.fileTransport, photo, path, BOUNDS);
     expect(file.bytes).toBeGreaterThan(0);
     expect((await readFile(path)).byteLength).toBe(file.bytes);
+  });
+
+  it('connects to the address it checked, and sends nothing of a session', async () => {
+    const seen: { url: string; address: string; args: number }[] = [];
+    const watch: FileTransport = {
+      lookup: fake.fileTransport.lookup,
+      get: (...args) => {
+        const [url, signal, pinned] = args;
+        seen.push({ url, address: pinned.address, args: args.length });
+        return fake.fileTransport.get(url, signal, pinned);
+      },
+    };
+    await downloadVaultFile(watch, photo, join(dir, 'watched'), BOUNDS);
+    expect(seen).toEqual([{ url: photo.url, address: '203.0.113.10', args: 3 }]);
   });
 
   it('decrypts an HLS video into one MPEG-TS file ffprobe reads', async () => {
     expect(video.isHls).toBe(true);
     const path = join(dir, 'video.ts');
-    const file = await downloadVaultFile(fake.fileFetch, video, path, BOUNDS);
+    const file = await downloadVaultFile(fake.fileTransport, video, path, BOUNDS);
     expect(file.contentType).toBe('video/mp2t');
     const { stdout } = await run('ffprobe', [
       '-v',
@@ -145,11 +194,13 @@ describe('downloadVaultFile against FakeReveal', () => {
 
   it('says « expired » once the link is no longer signed', async () => {
     await fake.app.inject({ method: 'POST', url: '/__clock', payload: { advanceMs: 11 * 60_000 } });
-    await expect(downloadVaultFile(fake.fileFetch, photo, join(dir, 'late'), BOUNDS)).rejects.toMatchObject({
+    await expect(
+      downloadVaultFile(fake.fileTransport, photo, join(dir, 'late'), BOUNDS),
+    ).rejects.toMatchObject({
       reason: 'expired',
     });
     await expect(
-      downloadVaultFile(fake.fileFetch, video, join(dir, 'late.ts'), BOUNDS),
+      downloadVaultFile(fake.fileTransport, video, join(dir, 'late.ts'), BOUNDS),
     ).rejects.toMatchObject({
       reason: 'expired',
     });
@@ -157,9 +208,15 @@ describe('downloadVaultFile against FakeReveal', () => {
 
   it('refuses a host outside the list without calling it', async () => {
     let called = false;
-    const spy: typeof fake.fileFetch = (url, init) => {
-      called = true;
-      return fake.fileFetch(url, init);
+    const spy: FileTransport = {
+      lookup: (host) => {
+        called = true;
+        return fake.fileTransport.lookup(host);
+      },
+      get: (url, signal, pinned) => {
+        called = true;
+        return fake.fileTransport.get(url, signal, pinned);
+      },
     };
     const error = await downloadVaultFile(
       spy,
@@ -178,6 +235,68 @@ describe('downloadVaultFile against FakeReveal', () => {
         BOUNDS,
       ),
     ).rejects.toMatchObject({ reason: 'host_refused' });
+    for (const url of [
+      'http://fake-reveal.test/a',
+      'https://fake-reveal.test:8443/a',
+      'https://203.0.113.10/a',
+      'https://[2001:db8::1]/a',
+      'ftp://fake-reveal.test/a',
+    ]) {
+      await expect(
+        downloadVaultFile(spy, { url, isHls: false }, join(dir, 'z'), { ...BOUNDS, allowHttp: false }),
+      ).rejects.toMatchObject({ reason: 'host_refused' });
+    }
+    expect(called).toBe(false);
+  });
+
+  it('refuses a host that resolves to a private address, before any GET', async () => {
+    let got = false;
+    for (const address of ['10.0.0.5', '127.0.0.1', '::ffff:192.168.1.1', 'fd00::1']) {
+      const inside: FileTransport = {
+        lookup: () =>
+          Promise.resolve([
+            { address: '203.0.113.10', family: 4 },
+            { address, family: address.includes(':') ? 6 : 4 },
+          ]),
+        get: (url, signal, pinned) => {
+          got = true;
+          return fake.fileTransport.get(url, signal, pinned);
+        },
+      };
+      await expect(downloadVaultFile(inside, photo, join(dir, 'inside'), BOUNDS)).rejects.toMatchObject({
+        reason: 'host_refused',
+      });
+    }
+    expect(got).toBe(false);
+  });
+
+  it('cuts a body with no length announced at the bound, and leaves no file behind', async () => {
+    const path = join(dir, 'unbounded');
+    await expect(
+      downloadVaultFile(streaming(64 * 1024), { url: 'https://fake-reveal.test/big', isHls: false }, path, {
+        ...BOUNDS,
+        maxBytes: 8 * 1024,
+      }),
+    ).rejects.toMatchObject({ reason: 'too_large' });
+    await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('never writes over a file that is already there', async () => {
+    const path = join(dir, 'taken');
+    await writeFile(path, 'already here');
+    let got = false;
+    await expect(
+      downloadVaultFile(
+        streaming(1024, () => {
+          got = true;
+        }),
+        { url: 'https://fake-reveal.test/a', isHls: false },
+        path,
+        BOUNDS,
+      ),
+    ).rejects.toMatchObject({ code: 'EEXIST' });
+    expect(got).toBe(false);
+    expect(await readFile(path, 'utf8')).toBe('already here');
   });
 
   it('stops at the size bound', async () => {
@@ -192,7 +311,7 @@ describe('downloadVaultFile against FakeReveal', () => {
       const media = data.find((m) => m.type === 'video');
       if (media === undefined) throw new Error('video expected');
       await expect(
-        downloadVaultFile(fresh.fileFetch, { url: media.url, isHls: true }, join(dir, 'big.ts'), {
+        downloadVaultFile(fresh.fileTransport, { url: media.url, isHls: true }, join(dir, 'big.ts'), {
           ...BOUNDS,
           maxBytes: 1024,
         }),

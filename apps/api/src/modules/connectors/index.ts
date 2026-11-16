@@ -98,7 +98,7 @@ export { FakeConnector } from './infra/fake/FakeConnector';
 /** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
 export { revealApiConnectors } from './infra/reveal/connector';
 export type { RevealFetch } from './infra/reveal/client';
-export type { FileFetch } from './infra/download/vault-file';
+export type { FileTransport } from './infra/download/vault-file';
 /** @public The errors `platformReads` throws, for the adapter that reads through it (`reason` says why a read is refused). */
 export { PlatformAccountNotFound, PlatformReadUnavailable } from './domain/errors';
 /** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */

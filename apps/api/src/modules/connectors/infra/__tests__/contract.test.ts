@@ -109,8 +109,9 @@ function revealSubject(): ContractSubject {
       // FakeReveal's clock: an attempt and the message it made are dated alike.
       now: () => fake.now(),
       sends: new MemorySendJournal(),
-      fileFetch: fake.fileFetch,
+      fileTransport: fake.fileTransport,
       fileHosts: ['fake-reveal.test'],
+      fileHttpForTests: true,
     }),
     conversation: (key) => ids[key],
     fanWrites: async (key, text) => {

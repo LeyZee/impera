@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createFakeReveal, type FakeReveal } from '../../../../../__tests__/fake-reveal/server';
 import { ConnectorError } from '../../../domain/platform-connector';
-import type { FileFetch } from '../../download/vault-file';
+import type { FileTransport } from '../../download/vault-file';
 import { RevealApiConnector } from '../connector';
 
 const run = promisify(execFile);
@@ -20,7 +20,7 @@ describe('RevealApiConnector.fetchMedia against FakeReveal (ADR 0113)', () => {
   let vault: VaultMedia[];
 
   const connect = (
-    fileFetch: FileFetch,
+    fileTransport: FileTransport,
     fileHosts: readonly string[] = ['fake-reveal.test'],
   ): RevealApiConnector =>
     new RevealApiConnector({
@@ -36,8 +36,9 @@ describe('RevealApiConnector.fetchMedia against FakeReveal (ADR 0113)', () => {
       baseUrl: 'https://reveal.test',
       sleep: () => Promise.resolve(),
       now: () => fake.now(),
-      fileFetch,
+      fileTransport,
       fileHosts,
+      fileHttpForTests: true,
     });
 
   const pick = (kind: VaultMedia['kind']): VaultMedia => {
@@ -49,7 +50,7 @@ describe('RevealApiConnector.fetchMedia against FakeReveal (ADR 0113)', () => {
   beforeAll(async () => {
     fake = createFakeReveal();
     dir = await mkdtemp(join(tmpdir(), 'fetch-media-'));
-    vault = (await connect(fake.fileFetch).listVaultMedia({})).filter((media) => media.folder !== null);
+    vault = (await connect(fake.fileTransport).listVaultMedia({})).filter((media) => media.folder !== null);
   });
 
   afterAll(async () => {
@@ -58,7 +59,7 @@ describe('RevealApiConnector.fetchMedia against FakeReveal (ADR 0113)', () => {
   });
 
   it('reads a photo and a video of the vault to the given path', async () => {
-    const connector = connect(fake.fileFetch);
+    const connector = connect(fake.fileTransport);
     const photo = pick('image');
     const photoPath = join(dir, 'photo');
     const fetchedPhoto = await connector.fetchMedia(photo.ref, {
@@ -90,16 +91,15 @@ describe('RevealApiConnector.fetchMedia against FakeReveal (ADR 0113)', () => {
     const photo = pick('image');
     const target = { folderRef: photo.folder?.ref ?? null, path: join(dir, 'again') };
     let refused = 1;
-    const onceExpired: FileFetch = (url, init) => {
-      if (refused > 0) {
-        refused -= 1;
-        return Promise.resolve({
-          status: 403,
-          headers: { get: () => null },
-          arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-        });
-      }
-      return fake.fileFetch(url, init);
+    const onceExpired: FileTransport = {
+      lookup: fake.fileTransport.lookup,
+      get: (url, signal, pinned) => {
+        if (refused > 0) {
+          refused -= 1;
+          return Promise.resolve(new Response(null, { status: 403 }));
+        }
+        return fake.fileTransport.get(url, signal, pinned);
+      },
     };
     const fetched = await connect(onceExpired).fetchMedia(photo.ref, target);
     expect(fetched.bytes).toBeGreaterThan(0);
@@ -107,7 +107,7 @@ describe('RevealApiConnector.fetchMedia against FakeReveal (ADR 0113)', () => {
 
     refused = 2;
     const error = await connect(onceExpired)
-      .fetchMedia(photo.ref, target)
+      .fetchMedia(photo.ref, { ...target, path: join(dir, 'again-twice') })
       .catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ConnectorError);
     expect(error).toMatchObject({ code: 'transient' });
@@ -115,9 +115,15 @@ describe('RevealApiConnector.fetchMedia against FakeReveal (ADR 0113)', () => {
 
   it('refuses every download while no host is listed, before any call', async () => {
     let called = false;
-    const spy: FileFetch = (url, init) => {
-      called = true;
-      return fake.fileFetch(url, init);
+    const spy: FileTransport = {
+      lookup: (host) => {
+        called = true;
+        return fake.fileTransport.lookup(host);
+      },
+      get: (url, signal, pinned) => {
+        called = true;
+        return fake.fileTransport.get(url, signal, pinned);
+      },
     };
     const photo = pick('image');
     await expect(
@@ -132,7 +138,7 @@ describe('RevealApiConnector.fetchMedia against FakeReveal (ADR 0113)', () => {
   it('says not_found for a media no longer in its folder', async () => {
     const photo = pick('image');
     await expect(
-      connect(fake.fileFetch).fetchMedia(
+      connect(fake.fileTransport).fetchMedia(
         { platform: 'reveal', id: 'media_gone' },
         { folderRef: photo.folder?.ref ?? null, path: join(dir, 'gone') },
       ),
