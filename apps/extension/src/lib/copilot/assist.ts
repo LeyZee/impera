@@ -240,11 +240,46 @@ const CONDITION_WORDS: Readonly<Record<SaleCondition, string>> = {
   fan_asks_for_paid: 'Il demande du contenu lui-même',
 };
 
+/** A met condition in words, said positively in the sale's detail (Design 16/11, lot 0141-5). */
+const MET_WORDS: Readonly<Record<SaleCondition, string>> = {
+  desire_below_threshold: 'Son désir est là',
+  not_sexualizing: 'Il a pris le ton coquin',
+  availability_unconfirmed: 'Il est dispo',
+  cooldown: 'Pas d’offre trop récente',
+  no_budget: 'Pas de frein d’argent connu',
+  step_waiting: 'Pas d’offre en attente',
+  age_unconfirmed: 'Âge confirmé',
+  fan_messages: 'Il a assez écrit',
+  fan_asks_for_paid: 'Il demande du contenu lui-même',
+};
+
+/** What is missing, as a short noun group after « il manque », so the line under the gesture stays one line. */
+const MISSING_WORDS: Readonly<Record<SaleCondition, string>> = {
+  desire_below_threshold: 'son désir',
+  not_sexualizing: 'le ton coquin',
+  availability_unconfirmed: 'sa dispo',
+  cooldown: 'du temps depuis l’offre',
+  no_budget: 'un budget',
+  step_waiting: 'l’achat de l’étape',
+  age_unconfirmed: 'son âge confirmé',
+  fan_messages: 'des messages de lui',
+  fan_asks_for_paid: 'sa demande',
+};
+
 type SaleMomentCondition = SaleMoment['conditions'][number];
+
+/** « son désir », « son désir et le ton coquin », « son désir, le ton coquin… »: never more than two named. */
+function missingGroup(codes: readonly SaleCondition[]): string | null {
+  const [first, second] = codes.map((code) => MISSING_WORDS[code]);
+  if (first === undefined) return null;
+  if (second === undefined) return first;
+  return codes.length === 2 ? `${first} et ${second}` : `${first}, ${second}…`;
+}
 
 /** One condition in the panel's words, with the hour a cooldown ends and the count of messages still needed. */
 export function conditionWords(condition: SaleMomentCondition): string {
-  const { code, remaining, until } = condition;
+  const { code, met, remaining, until } = condition;
+  if (met) return MET_WORDS[code];
   if (code === 'fan_messages' && remaining != null)
     return `Il faut encore ${String(remaining)}\u00a0${remaining === 1 ? 'message' : 'messages'} de lui`;
   if (code === 'cooldown' && until != null)
@@ -263,9 +298,9 @@ const BLOCK_CONDITIONS: Readonly<Partial<Record<CopilotSaleBlock, SaleCondition>
 const lowerFirst = (words: string): string => words.charAt(0).toLowerCase() + words.slice(1);
 
 export interface MomentLine {
-  /** One notch per condition, filled when it is met. */
+  /** One notch per condition, filled when it is met, the met ones first. */
   readonly notches: readonly boolean[];
-  /** « Pas encore · il manque : son désir est encore bas », « Bon moment · il demande du contenu lui-même ». */
+  /** « Pas encore · il manque son désir », « Bon moment · il demande du contenu lui-même ». */
   readonly text: string;
   readonly verdict: SaleMomentVerdict;
 }
@@ -277,9 +312,7 @@ export interface MomentLine {
  */
 export function momentLine(moment: SaleMoment, move: CopilotNextMove | null): MomentLine {
   const sent = new Set(moment.conditions.map(({ code }) => code));
-  const missing = moment.conditions
-    .filter(({ met }) => !met)
-    .map((condition) => lowerFirst(conditionWords(condition)));
+  const missing = missingGroup(moment.conditions.filter(({ met }) => !met).map(({ code }) => code));
   const block = move?.kind === 'no_sale' ? move.block : null;
   const covering = block === null ? undefined : BLOCK_CONDITIONS[block];
   const blockWords =
@@ -295,10 +328,11 @@ export function momentLine(moment: SaleMoment, move: CopilotNextMove | null): Mo
     MOMENT_WORDS[moment.verdict],
     asks,
     blockWords,
-    missing.length === 0 ? null : `il manque\u00a0: ${missing.join(', ')}`,
+    missing === null ? null : `il manque ${missing}`,
   ].filter((part): part is string => part !== null);
   return {
-    notches: moment.conditions.map(({ met }) => met),
+    // The met ones first, the missing ones on the right: the notches fill from the left (Design 16/11, lot 0141-5).
+    notches: moment.conditions.map(({ met }) => met).sort((a, b) => Number(b) - Number(a)),
     text: parts.join(' · '),
     verdict: moment.verdict,
   };

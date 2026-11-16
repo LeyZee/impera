@@ -1049,10 +1049,11 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
     expect(root.querySelector('.cp-move__why')).toBeNull();
     const line = root.querySelector<HTMLElement>('.cp-moment');
     expect(line?.dataset['verdict']).toBe('not_yet');
-    expect(line?.textContent).toBe('Pas encore · il manque\u00a0: son désir est encore bas');
+    expect(line?.textContent).toBe('Pas encore · il manque son désir');
+    // Filled from the left: the met notches first, the missing one on the right.
     expect(
       [...(line?.querySelectorAll<HTMLElement>('.cp-notch') ?? [])].map((n) => n.dataset['met']),
-    ).toEqual(['false', 'true', 'true']);
+    ).toEqual(['true', 'true', 'false']);
     // Not a sale: the button keeps its ink.
     expect(place(root)).toContain('cp-send');
     expect(place(root)).not.toContain('nv-btn--neon');
@@ -1060,7 +1061,7 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
 
   it.each([
     ['good', [true, true, true], 'Bon moment'],
-    ['soon', [true, false, true], 'Bientôt · il manque\u00a0: il n’a pas encore pris le ton coquin'],
+    ['soon', [true, false, true], 'Bientôt · il manque le ton coquin'],
   ] as const)("words the verdict %s from the panel's closed list", (verdict, met, text) => {
     const root = drawn(assistOf({ saleMoment: moment(verdict, [...met]) }));
     expect(root.querySelector('.cp-moment__text')?.textContent).toBe(text);
@@ -1101,9 +1102,9 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
     const root = drawn(assistOf({ saleMoment: moment('soon', [true, false, true]) }));
     const rows = [...root.querySelectorAll('.cp-sale .cp-condition')].map((row) => row.textContent);
     expect(rows).toEqual([
-      'Son désir est encore basacquis',
+      'Son désir est làacquis',
       'Il n’a pas encore pris le ton coquinmanque',
-      'On ne sait pas s’il est dispoacquis',
+      'Il est dispoacquis',
     ]);
   });
 

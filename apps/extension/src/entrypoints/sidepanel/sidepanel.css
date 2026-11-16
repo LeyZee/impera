@@ -219,12 +219,15 @@ body {
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
-.cp-moment[data-verdict='now'] {
+.cp-moment[data-verdict='good'] {
   color: var(--nv-ink);
 }
+/* One line, always: a long line ends in an ellipsis rather than pushing the button down (Design 16/11, lot 0141-5). */
 .cp-moment__text {
   min-width: 0;
-  text-wrap: pretty;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .cp-notches {
   flex: none;
@@ -239,8 +242,12 @@ body {
   border-radius: var(--nv-radius-full);
   border: 1px solid var(--nv-ink-faint);
 }
+/* A met notch takes the text's colour; the neon is kept for « Bon moment » (Design 16/11, lot 0141-5). */
 .cp-notch[data-met='true'] {
   border: 0;
+  background: currentColor;
+}
+.cp-moment[data-verdict='good'] .cp-notch[data-met='true'] {
   background: var(--nv-neon);
   box-shadow: 0 0 6px -1px var(--nv-aura-neon);
 }
@@ -604,7 +611,8 @@ body {
 .cp-field__top {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  /* Centred, not on the baseline: the label's icon has none, and the source would drop under it. */
+  align-items: center;
   column-gap: var(--nv-space-2);
 }
 .cp-field__label {
@@ -677,7 +685,8 @@ body {
 /* The first name in the serif of the CRM's titles, not in colour (Design 16/11, lot 0141-5). */
 .cp-ident__name {
   font-family: var(--nv-font-serif);
-  font-size: 1.3em;
+  /* A quarter larger than at first, so its x-height matches « 34 ans · Nantes » (Design 16/11, lot 0141-5). */
+  font-size: 1.625em;
   font-weight: 400;
   line-height: 1;
   letter-spacing: 0;

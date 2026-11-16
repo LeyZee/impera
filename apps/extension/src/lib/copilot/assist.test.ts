@@ -234,13 +234,41 @@ describe('the moment to sell (ADR 0141 § 4 bis)', () => {
         null,
       ),
     ).toEqual({
-      notches: [false, false, true],
-      text: 'Pas encore · il manque\u00a0: son désir est encore bas, il n’a pas encore pris le ton coquin',
+      // The met ones first, the missing ones on the right.
+      notches: [true, false, false],
+      text: 'Pas encore · il manque son désir et le ton coquin',
       verdict: 'not_yet',
     });
     expect(
       momentLine({ verdict: 'soon', conditions: [{ code: 'step_waiting', met: false }] }, null).text,
-    ).toBe('Bientôt · il manque\u00a0: une étape attend son achat');
+    ).toBe('Bientôt · il manque l’achat de l’étape');
+  });
+
+  it('names two missing conditions at most, so the line stays one line', () => {
+    expect(
+      momentLine(
+        {
+          verdict: 'not_yet',
+          conditions: [
+            { code: 'desire_below_threshold', met: false },
+            { code: 'availability_unconfirmed', met: false },
+            { code: 'cooldown', met: false },
+          ],
+        },
+        null,
+      ).text,
+    ).toBe('Pas encore · il manque son désir, sa dispo…');
+  });
+
+  it('says a met condition positively in the detail', () => {
+    expect(conditionWords({ code: 'desire_below_threshold', met: true })).toBe('Son désir est là');
+    expect(conditionWords({ code: 'not_sexualizing', met: true })).toBe('Il a pris le ton coquin');
+    expect(conditionWords({ code: 'availability_unconfirmed', met: true })).toBe('Il est dispo');
+    expect(conditionWords({ code: 'cooldown', met: true })).toBe('Pas d’offre trop récente');
+    expect(conditionWords({ code: 'no_budget', met: true })).toBe('Pas de frein d’argent connu');
+    expect(conditionWords({ code: 'step_waiting', met: true })).toBe('Pas d’offre en attente');
+    expect(conditionWords({ code: 'age_unconfirmed', met: true })).toBe('Âge confirmé');
+    expect(conditionWords({ code: 'fan_messages', met: true, remaining: null })).toBe('Il a assez écrit');
   });
 
   it('says why the moment is good when he asks for content himself', () => {
@@ -256,8 +284,10 @@ describe('the moment to sell (ADR 0141 § 4 bis)', () => {
       verdict: 'not_yet' as const,
       conditions: [{ code: 'cooldown' as const, met: false, until }],
     };
-    expect(momentLine(moment, null).text).toBe(
-      'Pas encore · il manque\u00a0: une offre est trop récente, jusqu’à 18\u00a0h\u00a020',
+    // The line says it short; the detail gives the hour.
+    expect(momentLine(moment, null).text).toBe('Pas encore · il manque du temps depuis l’offre');
+    expect(conditionWords({ code: 'cooldown', met: false, until })).toBe(
+      'Une offre est trop récente, jusqu’à 18\u00a0h\u00a020',
     );
     expect(conditionWords({ code: 'cooldown', met: false, until: null })).toBe('Une offre est trop récente');
   });
@@ -276,7 +306,7 @@ describe('the moment to sell (ADR 0141 § 4 bis)', () => {
     expect(
       momentLine({ verdict: 'soon', conditions: [{ code: 'fan_messages', met: false, remaining: 2 }] }, null)
         .text,
-    ).toBe('Bientôt · il manque\u00a0: il faut encore 2\u00a0messages de lui');
+    ).toBe('Bientôt · il manque des messages de lui');
   });
 
   it('adds a block of the code that no condition sent says, never one it already says', () => {
@@ -287,15 +317,13 @@ describe('the moment to sell (ADR 0141 § 4 bis)', () => {
         { code: 'not_sexualizing' as const, met: true },
       ],
     };
-    expect(momentLine(moment, noSale('low_desire')).text).toBe(
-      'Pas encore · il manque\u00a0: son désir est encore bas',
-    );
+    expect(momentLine(moment, noSale('low_desire')).text).toBe('Pas encore · il manque son désir');
     expect(momentLine(moment, noSale('risk')).text).toBe(
-      'Pas encore · Un risque bloque la vente · il manque\u00a0: son désir est encore bas',
+      'Pas encore · Un risque bloque la vente · il manque son désir',
     );
     // A cooldown the server did not send as a condition is still said.
     expect(momentLine(moment, noSale('cooldown')).text).toBe(
-      'Pas encore · Offre trop récente · il manque\u00a0: son désir est encore bas',
+      'Pas encore · Offre trop récente · il manque son désir',
     );
   });
 });
