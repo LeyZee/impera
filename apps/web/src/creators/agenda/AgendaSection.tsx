@@ -25,6 +25,7 @@ import './agency-agenda.css';
 
 import { ReelBriefFields } from '@/creators/reel/ReelBriefFields';
 import { emptyReelDraft, reelBriefOf, reelProblems, type ReelDraft } from '@/creators/reel/model';
+import { CreatorGameBlock } from '@/rewards/CreatorGameBlock';
 import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { addDays, cityOf, dayOf, mondayOf, readerZone, weekdayOf, weekLabel } from '@/scheduling/time';
 import {
@@ -173,6 +174,8 @@ export function AgendaSection({
         </p>
       )}
       {list()}
+      {/* Her series and trophies, read only (ADR 0107 § 12): this sheet is the owner's and an active manager's. */}
+      <CreatorGameBlock creatorId={creatorId} name={creatorName} />
       {proposing ? (
         <ProposeDialog
           creatorId={creatorId}
