@@ -73,8 +73,7 @@
   list-style: none;
 }
 
-.tc-slot__fields,
-.tc-link__fields {
+.tc-slot__fields {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -119,8 +118,7 @@
 .tc-slot .ps-entry__remove::after {
   inset: -11px;
 }
-.tc-slot__end,
-.tc-link__end {
+.tc-slot__end {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -134,45 +132,39 @@
 .tc-slot[data-off='true'] .tc-time {
   color: var(--nv-ink-faint);
 }
-.tc-slot[data-invalid='true'] .nv-field__control,
-.tc-link [aria-invalid='true'] {
+.tc-slot[data-invalid='true'] .nv-field__control {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 70%, transparent);
 }
 
-/* Each link with where it leads is one card. */
+/* Each of her links that are on, read here: its name, where it leads, and the chip that makes it the channel's. */
 .tc-link {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
   padding: 12px;
   border-radius: var(--nv-radius-md);
   background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
 }
-.tc-link__fields {
-  row-gap: 10px;
+.tc-link__read {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
-
-/* One width for « Lien du canal » and « Choisir pour le canal », so the fields of every link line up. */
-.tc-link__end .nv-chip {
+.tc-link__read-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.tc-link__read-place {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+/* One width for « Lien du canal » and « Choisir pour le canal », so the chips of every link line up. */
+.tc-link .nv-chip {
   min-width: 10.75rem;
   justify-content: center;
-}
-.tc-link__field {
-  flex: 1 1 160px;
-  min-width: 0;
-}
-.tc-link__field--url {
-  flex: 3 1 260px;
-}
-.tc-link__field .nv-field__control {
-  width: 100%;
-}
-/* Its own line under the name and the address, as it comes in the page; on a phone, before the chip. */
-.tc-link__destination {
-  flex: 1 1 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px 12px;
-  min-width: 0;
 }
 /* One label style in the links block: « Où il mène » and « Texte du lien ». */
 .tc-field-label {
@@ -182,26 +174,10 @@
   font-weight: 600;
   color: var(--nv-ink-muted);
 }
-.tc-link__destination .nv-field__control {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-/* Grows to a second line rather than cutting a word; no handle, no scroll bar. */
-.tc-link__area.nv-field__control {
-  display: block;
-  min-height: var(--nv-target-min);
-  field-sizing: content;
-  resize: none;
-  overflow: hidden;
-}
 .tc-slot__state {
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
-}
-.tc-link__url {
-  font-family: var(--nv-font-mono);
-  font-size: var(--nv-text-footnote);
 }
 
 /* Her example posts: a field that grows with the post, the cross beside it. */
@@ -277,21 +253,8 @@
     flex: 1 1 0;
     min-width: 0;
   }
-  .tc-link__field,
-  .tc-link__field--url {
-    flex: 1 1 100%;
-  }
-  .tc-link__end .nv-chip {
+  .tc-link .nv-chip {
     min-width: 0;
-  }
-  .tc-link__destination {
-    order: 1;
-    flex-wrap: wrap;
-  }
-  .tc-link__end {
-    order: 2;
-  }
-  .tc-link__destination .nv-field__control {
-    flex-basis: 100%;
+    flex: 1 1 100%;
   }
 }
