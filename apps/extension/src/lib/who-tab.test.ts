@@ -53,17 +53,15 @@ describe('who is signed in', () => {
 
   it.each([
     [me({}), true],
-    [me({ role: 'operator', team: { role: 'manager', status: 'active' }, teamScope: 'agency' }), true],
+    // ADR 0024, amendement du 16/11: the manager no longer has the watch.
+    [me({ role: 'operator', team: { role: 'manager', status: 'active' }, teamScope: 'agency' }), false],
     [me({ role: 'operator', team: { role: 'manager', status: 'on_leave' }, teamScope: 'self' }), false],
     [me({ role: 'operator', team: { role: 'chatter', status: 'active' }, teamScope: 'self' }), false],
     [me({ role: 'operator', teamScope: 'self' }), false],
     [me({ role: 'creator', teamScope: 'self' }), false],
-  ])(
-    'offers the Instagram watch to the owner and an active manager only (ADR 0060 § 2)',
-    (account, watches) => {
-      expect(watchesInstagram(kindOf(account))).toBe(watches);
-    },
-  );
+  ])('offers the Instagram watch to the owner alone (ADR 0024, amendement du 16/11)', (account, watches) => {
+    expect(watchesInstagram(kindOf(account))).toBe(watches);
+  });
 
   it('takes the initials of the first and last names', () => {
     expect(initialsOf({ name: 'Alex de la Morel', email: 'a@exemple.fr' })).toBe('AM');

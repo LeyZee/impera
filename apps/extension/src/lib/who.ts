@@ -27,11 +27,11 @@ const LABELS: Readonly<Record<Kind, string>> = {
 };
 
 /**
- * Who takes part in the Instagram watch from the extension: the owner and an active manager (ADR 0060 § 2, amended
- * 07/11). A creator watches from her PWA; a chatter, or a manager away or gone, never sees it (the server refuses them
- * too: 403 at linking, 401 on a link they hold).
+ * Who takes part in the Instagram watch from the extension: the owner alone (ADR 0024, amendement du 16/11, point 2).
+ * A creator watches from her PWA; a manager or a chatter keeps the copilot and never sees the watch, and the server
+ * refuses them a watch link anyway.
  */
-export const watchesInstagram = (kind: Kind): boolean => kind === 'owner' || kind === 'manager';
+export const watchesInstagram = (kind: Kind): boolean => kind === 'owner';
 
 export function kindLabel(kind: Kind): string {
   return LABELS[kind];

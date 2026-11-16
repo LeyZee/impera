@@ -6,8 +6,8 @@ import type { MarkableCreators, WatchStatus } from '../../lib/watch/protocol';
 import { button, card, goLink, part, pill, text, type PillKind } from './card';
 
 /**
- * The « Veille Instagram » card of the popup (VEI-02, ADR 0060 § 2, source 6), on an Instagram tab, for the owner and
- * the managers. In order: the link to paste once (« Relier »), the browser's permission for instagram.com, then the
+ * The « Veille Instagram » card of the popup (VEI-02, ADR 0060 § 2, source 6), on an Instagram tab, for the owner
+ * alone (ADR 0024, amendement du 16/11). In order: the link to paste once (« Relier »), the browser's permission for instagram.com, then the
  * watch itself, with the marking of the post on screen. Pure: main.ts does the browser side.
  */
 

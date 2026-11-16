@@ -281,7 +281,8 @@ async function refresh(): Promise<void> {
     case 'signed_in': {
       const place = placeOf(tab.url, origin);
       const kind = kindOf(session.me);
-      // A member away from work has no copilot, no watch (EXT-10): the server refuses him anyway.
+      // A member away from work has no copilot, no watch (EXT-10): the server refuses him anyway. The watch is the
+      // owner's alone (ADR 0024, amendement du 16/11); a manager on Instagram is shown no card, and no error.
       const atWork = awayOf(session.me) === null;
       const watched = atWork && place === 'instagram' && watchesInstagram(kind);
       // The copilot is every member's but the creator's (EXT-09, ADR 0086 § 7); the « Sync » the owner's alone.
