@@ -42,7 +42,7 @@ La capture du 16/11 (lue pour sa forme seulement) montre que Reveal sait créer,
 
 ### 4. La légende
 
-- Le modèle de langage n'écrit que la légende (ADR 0044 § 3), à partir de la **description validée** de chaque média de la publication (ADR 0083) et de la phrase de la créatrice. Sans description d'un média, la publication n'est pas planifiée : elle attend, et l'écran le dit.
+- Le modèle de langage n'écrit que la légende (ADR 0044 § 3), à partir de la **description validée** de chaque média de la publication (ADR 0083) et de la phrase de la créatrice. Sans description validée d'un média, la publication n'est pas planifiée : elle attend, et l'écran dit pourquoi (« Descriptions pas encore ouvertes » tant que l'interrupteur de l'ADR 0083 § 9 est éteint, « Séance à valider » sinon). Une séance dont la description attend encore sa validation à moins de 48 h de son créneau lève une alerte ambre au propriétaire, pour qu'un créneau ne saute jamais en silence.
 - **Feed** : une à trois phrases, dans sa voix, un peu d'histoire (la tenue, l'envie de la partager, le moment), une question ouverte qui invite à lui dire en privé ce qu'il en pense : le but est de rouvrir la conversation avec un abonné qui ne parle plus. **Story** : une phrase au plus, une question ouverte sur ce qu'on voit.
 - Gardes du code sur la sortie, en plus des gardes de voix : longueur maximale par sortie, une question présente, aucun prix, aucun lien, aucune promesse de rencontre, aucun mot qui dit l'IA, jamais deux fois la même légende pour la même créatrice (comparaison normalisée). Une légende refusée est redemandée une fois, puis la publication passe en ambre.
 
@@ -51,19 +51,22 @@ La capture du 16/11 (lue pour sa forme seulement) montre que Reveal sait créer,
 - **Le feed est réservé aux abonnés** (`isPublic: false`) : ses trois publications par semaine servent à réengager les abonnés, pas à en recruter.
 - **La story est publique** : elle vise tous les fans, abonnés ou non.
 - **Une publication publique** du feed reste possible, posée à la main par le propriétaire, publication par publication ; elle n'entre jamais dans le plan automatique. Sa stratégie (rythme, tenues plus habillées, légende qui invite à s'abonner, demande à la créatrice par sa to-do) sera décidée à part, après un essai mesuré sur les abonnés attribués.
-- Un média publié (feed ou story) est marqué **publié** dans la médiathèque, par son empreinte et par son identifiant Reveal. Le code refuse qu'un média publié entre dans un script, une étape payante, un Mass DM payant ou une offre (garde dans les modules `scripts` et `agent`), et refuse de publier un média qui a déjà été vendu ou envoyé en payant. Comme les dépôts du feed ne vont jamais au coffre des scripts (ADR 0055 § 1), cette garde ne fait que fermer la porte aux erreurs de catégorie.
+- Un média publié (feed ou story) est marqué **publié** dans la médiathèque, par son empreinte et par son identifiant Reveal. La garde ne reconnaît que ce même fichier ou ce même média du coffre : Reveal réencode, et une même photo remise à part aurait une autre empreinte (une empreinte perceptuelle demanderait sa propre ADR, ADR 0030 § 1). Le code refuse qu'un média publié entre dans un script, une étape payante, un Mass DM payant ou une offre (garde dans les modules `scripts` et `agent`), et refuse de publier un média qui a déjà été vendu ou envoyé en payant. Comme les dépôts du feed ne vont jamais au coffre des scripts (ADR 0055 § 1), cette garde ne fait que fermer la porte aux erreurs de catégorie.
 - La règle « jamais de nu sur une sortie publique » (ADR 0055 § 1) reste l'affaire de la créatrice et de l'agence : aucun contrôle par la vision.
 
 ### 6. Qui valide
 
 - Le plan de la semaine est bâti chaque **dimanche à 18 h** (heure de la créatrice) pour la semaine qui suit, puis complété chaque jour quand un dépôt arrive.
-- **Mode « À valider »** (par défaut, et obligatoire pendant les deux premières semaines de chaque créatrice) : rien ne part sans l'acceptation d'un geste du propriétaire ou d'un manager actif (ADR 0044 § 3).
-- **Mode « Automatique avec droit de retrait »** : chaque publication est programmée dans Reveal 24 h avant son heure. Jusqu'à **1 h avant**, le propriétaire, un manager actif ou la créatrice peut la retirer ou corriger sa légende ; le code supprime alors la publication programmée dans Reveal et la recrée (Reveal ne montre pas la modification). Le passage en automatique est un réglage par créatrice, au propriétaire seul, journalisé.
+- **Mode « À valider »** (par défaut, et obligatoire pendant les deux premières semaines de chaque créatrice) : rien ne part sans l'acceptation d'un geste du propriétaire (ADR 0044 § 3, restreint ici au propriétaire et à la créatrice).
+- **Mode « Automatique avec droit de retrait »** : chaque publication est programmée dans Reveal 24 h avant son heure. Jusqu'à **1 h avant**, le propriétaire ou la créatrice peut la retirer ou corriger sa légende ; le code supprime alors la publication programmée dans Reveal et la recrée (Reveal ne montre pas la modification). Le passage en automatique est un réglage par créatrice, au propriétaire seul, journalisé.
+- **Le manager ne voit ni ne touche le plan du feed ni ses médias** : il ne voit du contenu des créatrices que ce qui sert le chatting (décision de Charles du 16/11 : Agenda, Scripts). Seul `<her_posts>` (§ 8) passe à l'agent.
+- Une publication retirée puis recréée garde ses originaux : les 30 jours avant leur effacement (ADR 0044 § 2, ADR 0055 § 7) partent de la sortie **réelle** confirmée par Reveal, jamais d'une programmation.
 - La créatrice voit tout ce qui est programmé dans « En route » (ADR 0055 § 8) et garde son droit de regard.
 
 ### 7. Le stock et la demande
 
 - Le stock se compte en jours au rythme réglé (ADR 0055 § 5). Seuils par défaut : **moins de 7 jours de feed** ou **moins de 4 jours de stories**, une demande « Déposer » de la bonne catégorie arrive dans son Agenda (ADR 0055 § 4).
+- Les seuils sont des réglages d'agence par créatrice et par catégorie (ADR 0055 § 5) ; la création des demandes « Déposer » relève de l'ADR 0140.
 - Stock vide : rien ne part, aucune ancienne publication n'est republiée, et une alerte ambre arrive au Dashboard de l'agence (« Feed à sec mercredi »).
 
 ### 8. Ce que l'agent de chatting sait
