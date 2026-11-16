@@ -72,6 +72,8 @@ export function dueOn(task: CreatorTask, day: string, zone: string): boolean {
   if (task.when.kind === 'day') return task.when.day === day;
   if (task.when.kind === 'timed') return dayOf(task.when.startsAt, zone) === day;
   if (task.createdAt !== null && dayOf(task.createdAt, zone) > day) return false;
+  // Removed today, a routine stays due today and leaves her agenda from tomorrow (recette 16/11).
+  if (task.removedAt !== null && dayOf(task.removedAt, zone) < day) return false;
   return task.when.weekdays.includes(weekdayOf(day));
 }
 

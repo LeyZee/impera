@@ -484,6 +484,32 @@ describe('Agenda, recette du 16/11', () => {
     expect(within(dialog).queryByRole('button', { name: 'C’est fait' })).toBeNull();
   });
 
+  it('says a routine removed today still counts today, and offers no second « Retirer » (choix du 16/11)', async () => {
+    serve(
+      () => true,
+      SHIFTS,
+      agendaOf({
+        tasks: [{ ...stretch, removedAt: '2026-11-04T10:00:00.000Z' }],
+      }),
+    );
+    show();
+    expect(await screen.findByRole('button', { name: 'Cocher Story du matin' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /^Story du matin/u }));
+    const dialog = screen.getByRole('dialog');
+    expect(
+      within(dialog).getByText('Retirée : elle compte encore aujourd’hui et part de ton agenda demain.'),
+    ).toBeDefined();
+    expect(within(dialog).queryByRole('button', { name: 'Retirer' })).toBeNull();
+  });
+
+  it('warns, before removing a routine, that it still counts today', async () => {
+    serve(() => true);
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /^Story du matin/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer' }));
+    expect(screen.getByText('Elle compte encore aujourd’hui et part de ton agenda demain.')).toBeDefined();
+  });
+
   it('keeps the check of today’s routine a button', async () => {
     serve(() => true);
     show();

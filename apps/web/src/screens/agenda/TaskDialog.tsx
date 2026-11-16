@@ -89,6 +89,11 @@ export function TaskDialog({
             </p>
           ) : null}
           <p className="tm-hint">{doneWords(done, day, agenda.today, tickOpen(task, day, agenda.today))}</p>
+          {/* A routine removed today stays due today: removing it never saves her streak (recette 16/11). */}
+          {task.removedAt === null ? null : <p className="tm-hint">{REMOVED_TODAY}</p>}
+          {mode === 'remove' && task.when.kind === 'routine' ? (
+            <p className="tm-hint">{LEAVES_TOMORROW}</p>
+          ) : null}
           {failed === null ? null : (
             <p className="tm-hint tm-hint--error" role="alert">
               {failed}
@@ -121,15 +126,17 @@ export function TaskDialog({
             ) : (
               <>
                 {/* Retirer apart, on the left and in red; the gesture the dialog talks about, ticking, is the one néon. */}
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--destructive ag-task-foot__remove"
-                  onClick={() => {
-                    setMode('remove');
-                  }}
-                >
-                  Retirer
-                </button>
+                {task.removedAt === null ? (
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain nv-btn--destructive ag-task-foot__remove"
+                    onClick={() => {
+                      setMode('remove');
+                    }}
+                  >
+                    Retirer
+                  </button>
+                ) : null}
                 {movable ? (
                   <button
                     type="button"
@@ -275,6 +282,9 @@ function MoveForm({
     </form>
   );
 }
+
+const LEAVES_TOMORROW = 'Elle compte encore aujourd’hui et part de ton agenda demain.';
+const REMOVED_TODAY = 'Retirée : elle compte encore aujourd’hui et part de ton agenda demain.';
 
 /** What the dialog says of her tick that day; when the tick is closed (CRE-03, CRE-07), why it stays as it is. */
 function doneWords(done: boolean, day: string, today: string, open: boolean): string {
