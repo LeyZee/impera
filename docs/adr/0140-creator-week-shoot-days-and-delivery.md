@@ -22,7 +22,7 @@ Il insiste sur la fiabilité. Trop de tâches tuent la to-do : la semaine doit t
 ### 1. Ses jours de tournage
 
 1. Dans son Agenda, elle choisit **ses jours de tournage** de la semaine (« Mes jours de tournage »). La valeur par défaut est 2, et c'est elle qui choisit lesquels.
-2. Elle peut les changer d'une semaine à l'autre, jusqu'à la veille du premier. Un jour de tournage n'a pas d'heure imposée. Si elle a ouvert une dispo ce jour-là (ADR 0042 § 4), la tâche s'y place, sinon elle reste « dans la journée ».
+2. Elle peut les changer d'une semaine à l'autre, jusqu'à la veille du premier. Un jour de tournage n'a pas d'heure : c'est une tâche d'un jour, jamais une tâche à heures, même si elle a ouvert une dispo ce jour-là. La dispo s'affiche à côté (ADR 0042 § 4). Ainsi, le jour de tournage ne heurte jamais ses tâches à heures.
 3. Le nombre de jours demandés est un réglage d'agence par créatrice (2 par défaut). Le code ne lui en propose jamais plus.
 
 ### 2. Ce qu'il faut tourner, calculé par le code
@@ -45,9 +45,9 @@ Il insiste sur la fiabilité. Trop de tâches tuent la to-do : la semaine doit t
 
 ### 4. L'échéance de livraison
 
-9. La livraison est due **le dimanche à 23 h, dans son fuseau**, par défaut pour toutes les créatrices. Le jour et l'heure sont un réglage d'agence par créatrice (valeur par défaut à confirmer par Charles).
+9. La livraison est due **le dimanche à 23 h, dans son fuseau** (`creators.timezone`, où se calculent aussi l'échéance et le rappel du matin ; ses écrans les montrent à l'heure de son téléphone), par défaut pour toutes les créatrices. Le jour et l'heure sont un réglage d'agence par créatrice (valeur par défaut à confirmer par Charles).
 10. Les rappels respectent ses heures calmes et son plafond du jour (ADR 0042 § 7) :
-    - le matin de chaque jour de tournage, un rappel : « Aujourd'hui, jour de tournage : 2 séances, 1 script » ;
+    - le matin de chaque jour de tournage, à 9 h par défaut, un rappel : « Aujourd'hui, jour de tournage : 2 séances, 1 script ». Il ne sonne pas si la tâche a été déplacée, faite ou retirée ;
     - la veille de l'échéance et le jour même, s'il manque encore des dépôts (ADR 0055 § 4) ;
     - puis plus rien.
 11. Après l'échéance, ce qui manque reste ouvert chez elle. Côté agence, ça passe en ambre : « Livraison en retard : 1 script, 2 stories ». Le code ne sanctionne rien et ne dit rien aux fans.
@@ -80,6 +80,15 @@ Il insiste sur la fiabilité. Trop de tâches tuent la to-do : la semaine doit t
     - le **taux de livraison à l'heure** ;
     - le **stock en jours** par catégorie.
     Rien de cela n'est montré à la créatrice comme une note.
+
+### 9. Comment c'est rangé dans le code (relu par Équipe)
+
+22. **Qui calcule, qui écrit.** Le calcul de la semaine (stock, scripts, persona, idées) vit hors de `creator-tasks`. Il écrit dans l'agenda par un port de son `index.ts` (`suggestWeek`, comme `suggestShoot`). `creator-tasks` ne lit ni stock, ni scripts, ni persona. L'identifiant de chaque suggestion se tire de (créatrice, semaine, besoin) : un job rejoué ne double rien.
+23. **La règle des refus.** Une tâche refusée n'est pas reproposée la même semaine ni la suivante (même catégorie, même titre). Cette règle ne doit pas bloquer le « Jour de tournage » de la semaine d'après : la clé du refus porte la semaine visée, ou le titre porte le jour.
+24. **La liste à cocher** d'un « Jour de tournage » est une table d'éléments liés au couple (tâche, créatrice). L'agence ou le job écrivent le texte et la fiche. Elle ne coche que l'état (`GRANT UPDATE` limité à cette colonne), dans la fenêtre de 48 h des coches (ADR 0042 § 8). La tâche est faite quand tous ses éléments le sont.
+25. **« Livrer ma semaine »** se fait par les dépôts arrivés, jamais par une coche. Pour les séries (ADR 0107), chaque demande compte seule dans la série de livraisons. Les publications faites pour elle (§ 18) sont une couche en lecture seule, comme les shifts. Ce ne sont pas des lignes de `creator_tasks` : elles ne se cochent pas et ne comptent pas.
+26. **Le rappel du matin** est un job nouveau (seules les tâches à heures sonnent aujourd'hui). Sa clé est une par tâche et par jour, et il relit la tâche avant de sonner.
+27. **« Accepter ma semaine »** est une route groupée et rejouable. Chaque suggestion y garde ses propres règles (placement, refus, passé). « Jour de tournage » et « Livrer ma semaine » entrent au glossaire avec le premier lot de code.
 
 ## Conséquences
 
