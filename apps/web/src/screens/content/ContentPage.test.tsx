@@ -343,7 +343,9 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     const section = (await screen.findByRole('heading', { name: 'À tourner' })).closest('section');
     if (section === null) throw new Error('no section');
     expect(within(section).getByText('La séance promise')).toBeDefined();
-    expect(within(section).getByText(/Ton dépôt est en route : il compte dès qu’il est reçu/u)).toBeDefined();
+    expect(
+      within(section).getByText('Ton dépôt est en route. S’il s’arrête, reprends-le dans « En route ».'),
+    ).toBeDefined();
     expect(within(section).queryByRole('button', { name: 'Déposer' })).toBeNull();
     expect(within(section).queryByRole('button', { name: 'Je ne peux pas' })).toBeNull();
   });

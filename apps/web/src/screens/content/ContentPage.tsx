@@ -330,8 +330,7 @@ function RequestCard({
       ) : (
         // Her drop for it still goes up (recette CRE-12): no second drop, she finishes the one on its way.
         <p className="ct-card__meta">
-          Ton dépôt est en route : il compte dès qu’il est reçu. S’il s’arrête, touche « Reprendre l’envoi »
-          dans « En route ».
+          Ton dépôt est en route. S’il s’arrête, reprends-le dans «&nbsp;En route&nbsp;».
         </p>
       )}
       {failed === null ? null : (
