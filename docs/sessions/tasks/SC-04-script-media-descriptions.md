@@ -1,5 +1,5 @@
 # SC-04 Descriptions des médias d'un script et validation rapide
-Statut : in_progress (lots a à c4 fusionnés ; c5 en PR ; la vraie vision attend sa clé, ADR 0083 § 9)
+Statut : in_progress (lots a à c5 fusionnés ; c8 en PR pour les scripts natifs ; la vraie vision attend sa clé, ADR 0083 § 9)
 Phase : scripts (ADR 0056)
 Dépend de : SC-02, le rôle `sense` (P3-04), ADR 0030 § 3
 Branche : task/sc-04-script-descriptions
@@ -23,7 +23,9 @@ ADR 0083 (tout dépôt décrit en détail, seul, règle solo, étapes et synthè
 - [ ] Prix de la grille à côté de chaque étape quand P6-01 existe (« Prix à fixer » d'ici là).
 - [ ] Contrôle du moment : lumière de nuit dans un script de jour (ou l'inverse) en ambre.
 - [ ] Couleur des cartons assortie à la tenue (choix de Charles, 03/11/2026, 15 h 57, « parfait applique ce que tu me recommandes », fil « Médias et scripts ») : au dépôt, la vision lit la couleur dominante de la tenue sur les photos et propose la palette lisible la plus proche (`SCRIPT_COLOR_PRESETS`, distance de teinte calculée en code, jamais par le modèle) ; la créatrice voit « Cartons en <nom>, assortis à ta tenue » avec « Garder » et « Changer » ; sans geste, la proposition s'applique. La couleur vaut pour ce script seul (la demande), la structure garde la sienne. Avant le tournage, les cartons sont dans la couleur de la structure.
-- [ ] Identité du script (moment, ambiance, énergie, décor, à utiliser quand, à éviter quand) par schéma de sortie ; lue par l'agent et l'écran des chatteurs.
+- [x] Lot c8 (scripts natifs, demandé le 15/11) : identité du script (ambiance, énergie, décor, à utiliser quand, à éviter quand ; le moment est celui du script) par schéma de sortie (`brain/script-identity`), migration 0211 (`script_identities`, `platform_script_steps.platform_index`), job `scripts.identify_platform_script` et rattrapage horaire, validation et correction par l'agence ; un script natif devient proposable avec l'identité validée de sa version ; un script à étape à branches ne l'est jamais avant l'ADR 0112.
+- [ ] Identité lue par l'agent (choix du script, ADR 0098 § 6) et l'écran des chatteurs ; écran des scripts natifs (Design, avec les données de c8).
+- [ ] Identité des scripts tournés à l'atelier (dépôts), même schéma, quand ils seront envoyés à la plateforme.
 
 ## Critères d'acceptation
 - Tests : script non envoyable sans descriptions validées ; nouvelle génération n'écrase jamais une description validée.
@@ -40,3 +42,4 @@ Les textes de vente (SC-05).
 - 08/11/2026 (lot c4) : migration 0158 (`media_assets.thumbnail_key`, `thumbnailed_at`), ffmpeg réduit l'image (première image parlante d'une vidéo), sans métadonnées, une seule tentative ; `GET …/drops/:id/files/:fileId/thumbnail` et `…/media` (plages `Range`, 416 au-delà, `media.opened` au journal). ADR 0030 § 4 amendé : la vignette a sa colonne `thumbnail_key`, `storage_key` ne désigne que l'original. La médiathèque n'a pas encore d'écran : elle réutilisera ces routes.
 - 11/11/2026 (lot c5) : migration 0160 (`script_drop_summaries.author`, `brain` par défaut ; une synthèse `human` est validée et sans raison, contrainte en base ; l'index unique ne vaut que pour celles du `brain` ; politique `team_correct` et droit d'insertion à `nirvana_app` pour la seule synthèse humaine que la personne valide elle-même). `summarized` du job compte une synthèse humaine des mêmes médias, quel que soit le prompt.
 - 11/11/2026 (recette, anomalie 2) : migration 0161 (`media_assets.description_failures`, compté par le job, au plus `DESCRIPTION_TRIES` = les essais du job) ; `POST …/files/:fileId/describe` (« Réessayer ») et `POST …/files/:fileId/description` (« Décrire à la main », `handDescription` dans le domaine) ; le rattrapage saute un média abandonné et ne raconte plus un script par-dessus une synthèse humaine.
+- 15/11/2026 (lot c8) : identité des scripts natifs. Empreinte d'entrée sans prix ; le cerveau n'écrit que sous l'interrupteur `describeDrops` et quand chaque photo et vidéo a sa description validée (une note vocale n'en a jamais, elle ne bloque plus `media_not_described`) ; la validation est celle de l'ADR 0030 § 3 (tampon seul accordé, déclencheur `refuse_description_change`). Le rang Reveal (`platform_index`) est gardé pour repérer les branches ; scénario FakeReveal `sequence_branched`.

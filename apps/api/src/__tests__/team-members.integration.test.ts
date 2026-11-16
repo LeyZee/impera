@@ -22,7 +22,7 @@ import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { createOwner } from '../auth';
+import { createOwner, createRequireRecentLogin } from '../auth';
 import { createApp, type App } from '../composition-root';
 import type { Config } from '../config';
 import { createLogger } from '../logger';
@@ -117,7 +117,7 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
     buildServer({
       config,
       logger: createLogger(config),
-      routes: [teamOn(day).routes(app.requireRole)],
+      routes: [teamOn(day).routes(app.requireRole, createRequireRecentLogin(app.auth, app.db.db))],
       readiness: app.readiness,
     });
 
