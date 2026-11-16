@@ -1,0 +1,175 @@
+/*
+ * « Son coffre Reveal » (ADR 0099), at the head of Créatrices › Scripts, prefixed `vx-`. One card: when it was read,
+ * three figures, her folders in Reveal's order. Amber only for what asks her team to act (a folder without ☀️ or 🌙);
+ * never a coloured edge.
+ */
+.vx-card {
+  --_radius: var(--nv-radius-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: 20px 22px;
+  border-radius: var(--nv-radius-xl);
+}
+
+.vx-head {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--nv-space-3);
+}
+.vx-head__who {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+.vx-synced {
+  font-variant-numeric: tabular-nums;
+}
+.vx-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/* What the sync says, kept in place even when empty so the card never jumps. */
+.vx-phase {
+  margin: 0;
+  min-height: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.vx-phase:empty {
+  display: none;
+}
+.vx-phase:not(:empty) {
+  animation: nv-rise var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.vx-phase--muted {
+  color: var(--nv-ink-muted);
+}
+.vx-phase--ok {
+  color: var(--nv-success);
+}
+.vx-phase--warn {
+  color: var(--nv-warning);
+}
+
+.vx-note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+
+.nv-tiles.vx-tiles {
+  /* Three small figures side by side, on a phone too: never three stacked plates. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.vx-tiles .nv-tile__value {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 650;
+}
+.vx-tiles .nv-tone--warn .nv-tile__value {
+  color: var(--nv-warning);
+}
+
+.vx-folders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.vx-folder {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-3);
+  padding: 10px 8px;
+  border-radius: var(--nv-radius-md);
+  transition: background var(--nv-dur-fast) var(--nv-ease-out);
+  animation: nv-rise var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.vx-folder + .vx-folder::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  background: var(--nv-hairline);
+}
+.vx-folder:hover {
+  background: var(--nv-glass-fill);
+}
+.vx-folder:nth-child(2) {
+  animation-delay: 30ms;
+}
+.vx-folder:nth-child(3) {
+  animation-delay: 60ms;
+}
+.vx-folder:nth-child(4) {
+  animation-delay: 90ms;
+}
+.vx-folder:nth-child(n + 5) {
+  animation-delay: 120ms;
+}
+.vx-folder__moment {
+  text-align: center;
+  color: var(--nv-ink-faint);
+}
+.vx-folder__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 560;
+}
+.vx-folder__line {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  text-align: right;
+}
+.vx-folder__removed {
+  color: var(--nv-ink-faint);
+}
+@media (max-width: 560px) {
+  .vx-tiles .nv-tile {
+    padding: 10px 12px;
+  }
+  .vx-folder {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .vx-folder__line {
+    grid-column: 2;
+    text-align: left;
+  }
+}
+
+.vx-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vx-empty__title {
+  margin: 0;
+  font-weight: 600;
+}
+.vx-skeleton {
+  min-height: 120px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vx-folder,
+  .vx-phase:not(:empty) {
+    animation: none;
+  }
+}

@@ -27,3 +27,4 @@ Trois lots, une PR chacun : (a) médiathèque, (b) composition, (c) relecture IA
 Écriture des textes (rôle `script_writer`), appel d'écriture Reveal.
 
 ## Notes de session
+- 16/11/2026 (Médias, demande de Charles) : en attendant cet écran, Créatrices › Scripts porte la carte « Son coffre Reveal » : dernière synchro, médias, dossiers et dossiers « À classer » (sans ☀️ ni 🌙), la liste des dossiers dans l'ordre de Reveal, et « Synchroniser le coffre » pour le propriétaire seul. La médiathèque (lot a) la remplacera ou la reprendra.

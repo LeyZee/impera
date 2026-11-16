@@ -15,6 +15,7 @@ import {
 } from './model';
 import './scripts.css';
 
+import { VaultCard } from '@/creators/vault/VaultCard';
 import { useStructures } from '@/scripts/api';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
@@ -22,7 +23,8 @@ import '@/creators/agenda/agency-agenda.css';
 /**
  * Créatrices › Scripts (SC-03 c2b, ADR 0056 § 7), the owner's and an active manager's: each script she sent, its
  * archive to download (the sheet first, then each card and each medium in the script's order) and « Copié dans
- * Reveal » once the team has copied it: her originals of it go 30 days later (ADR 0044 § 2).
+ * Reveal » once the team has copied it: her originals of it go 30 days later (ADR 0044 § 2). Above them, her Reveal
+ * vault as last read and, for the owner, « Synchroniser le coffre » (ADR 0099).
  */
 export function ScriptsSection({
   creatorId,
@@ -118,6 +120,8 @@ export function ScriptsSection({
           </div>
         </div>
       </div>
+      {/* Her Reveal vault first: what her scripts are built from, and the owner's sync (Charles, 16/11). */}
+      <VaultCard creatorId={creatorId} creatorName={creatorName} isOwner={isOwner} />
       {list()}
       {confirming === null ? null : (
         <ConfirmCopy
