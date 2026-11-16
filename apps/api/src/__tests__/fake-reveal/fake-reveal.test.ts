@@ -375,7 +375,7 @@ describe('FakeReveal: vault and media files (L10, L14)', () => {
     expect(folders.map((d) => d.name)).toEqual(['SCRIPT 1 | ☀️', 'SCRIPT 2 | 🌙', 'Divers']);
     const vault = shape(
       ENDPOINTS['vault.medias'].shape,
-      (await call(f, 'GET', `/models/${f.modelId}/medias?take=10&vaultFolderId=folder_3`)).json,
+      (await call(f, 'GET', `/models/${f.modelId}/medias?take=10&vaultFolderId=folder_3&mediaType=All`)).json,
     );
     expect(vault.totalCount).toBe(5);
     const photo = vault.data.find((m) => m.type === 'photo');

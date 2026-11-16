@@ -71,6 +71,7 @@ API de contrôle, absente du vrai Reveal, préfixée `/__` :
 | `conversation_gone` | La conversation disparaît (fan désabonné, bloqué ou supprimé) |
 | `script_changed` | Un script change d'étapes ou de prix entre deux lectures |
 | `sequence_removed` | Une séquence disparaît de `scriptSequences.list` ; ses étapes restent, comme des étapes hors séquence (import des scripts natifs, ADR 0099 § 1 temps 2) |
+| `sequence_branched` | Une étape existante entre dans une séquence au rang (`stepIndex`) d'une autre : une étape à branches, entre lesquelles une personne choisit. Forme provisoire tant qu'aucun enregistrement réel ne la montre ; un tel script n'est jamais proposable avant l'ADR 0112 (SC-04 lot c8) |
 | `shape_changed` | Un champ renommé ou ajouté dans une réponse : le connecteur doit lever une erreur typée, pas avaler la donnée (schémas Zod stricts aux frontières) |
 | `challenge` | Page anti-bot (403 avec HTML) à la place du JSON |
 | `send_answer_lost` (n fois) | « Envoi accepté puis coupure » : l'envoi est pris, le message est dans le fil, mais la réponse se perd (504 de la passerelle) ; le connecteur doit le retrouver par `verifySent` au lieu de renvoyer (P2-03) |

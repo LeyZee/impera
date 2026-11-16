@@ -24,7 +24,9 @@ export type LiveDashboard =
   | { readonly kind: 'loading' }
   | { readonly kind: 'live'; readonly data: ApiDashboard; readonly readAt: number }
   | { readonly kind: 'unavailable'; readonly creatorName: string | null }
-  | { readonly kind: 'empty' };
+  | { readonly kind: 'empty' }
+  /** The creator a link asked for is not listed (archived, unknown, not this account's): nothing of another one. */
+  | { readonly kind: 'missing' };
 
 /**
  * The Dashboard of the followed creator (`agent/followed.ts`: chosen on the Dashboard, the first one otherwise),
@@ -36,6 +38,11 @@ export function useLiveDashboard(
   period: DashboardPeriod = 'day',
   /** Another creator than the one followed: the one a screen shows (Créatrices' sheet, PRO-28). */
   shown: string | null = null,
+  /**
+   * A link named `shown` (the Dashboard's `?creatrice=`): she is shown or nothing is. Never the first of the list
+   * under her address, whose mode control would then write for another creator (recette 16/11, PIL-01).
+   */
+  exact = false,
 ): LiveDashboard {
   const creators = useQuery({
     ...creatorsQuery,
@@ -43,7 +50,9 @@ export function useLiveDashboard(
     refetchInterval: (query) => (query.state.status === 'error' ? REFRESH_MS : false),
   });
   const { chosen } = useFollowedCreatorId();
-  const creator = followedOf(creators.data ?? [], shown ?? chosen);
+  const listed = creators.data ?? [];
+  const asked = exact && shown !== null;
+  const creator = asked ? listed.find(({ id }) => id === shown) : followedOf(listed, shown ?? chosen);
   const dashboard = useQuery({
     queryKey: ['dashboard', creator?.id, period],
     queryFn: () => fetchDashboard(creator?.id ?? '', period),
@@ -56,7 +65,7 @@ export function useLiveDashboard(
     retry: 1,
   });
   if (creators.isError) return { kind: 'unavailable', creatorName: creator?.displayName ?? null };
-  if (creators.isSuccess && creator === undefined) return { kind: 'empty' };
+  if (creators.isSuccess && creator === undefined) return { kind: asked ? 'missing' : 'empty' };
   if (dashboard.isError) return { kind: 'unavailable', creatorName: creator?.displayName ?? null };
   if (dashboard.data !== undefined)
     return { kind: 'live', data: dashboard.data, readAt: dashboard.dataUpdatedAt };

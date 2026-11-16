@@ -83,6 +83,8 @@ function renderDashboard(
           forOwner={forOwner}
           opensTracking={opensTracking}
           canAddCreator={canAddCreator}
+          asked={search.creatrice}
+          onLeave={() => void navigate({ search: dashboardSearch(periodOf(search)), replace: true })}
         />
       );
     },
@@ -333,6 +335,33 @@ function serveModes(
 
 const checked = (name: string): string | null =>
   screen.getByRole('radio', { name }).getAttribute('aria-checked');
+
+describe('DashboardPage of a creator the address names (recette 16/11, PIL-01)', () => {
+  const GONE = '0192f3a0-0000-7000-8000-0000000000c9';
+
+  it('shows nothing of another creator when the one named is not listed, and reads no Dashboard', async () => {
+    const fake = serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard(false, true, `/?creatrice=${GONE}`);
+    await waitFor(() => {
+      expect(headline()).toBe('Créatrice introuvable');
+    });
+    // Neither her figures nor the mode control of the first creator of the list.
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.queryByText('Kévin')).toBeNull();
+    expect(fake.mock.calls.some(([url]) => String(url).startsWith('/v1/dashboard'))).toBe(false);
+    // One way out: the Dashboard of the creator followed, the address no longer naming the one not found.
+    fireEvent.click(screen.getByRole('button', { name: 'Revenir au Dashboard' }));
+    expect(await screen.findByText('Kévin')).toBeDefined();
+    expect(location()).not.toContain(GONE);
+  });
+
+  it('shows the creator named when she is listed', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard(false, true, `/?creatrice=${CREATOR.id}`);
+    expect(await screen.findByText('Kévin')).toBeDefined();
+    expect(headline()).not.toBe('Créatrice introuvable');
+  });
+});
 
 describe('DashboardPage, its period (recette 28/10, M11 and M12)', () => {
   it('reads the period from the address, so that a reload keeps it, and writes it back there', async () => {

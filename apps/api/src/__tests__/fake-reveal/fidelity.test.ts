@@ -52,7 +52,10 @@ const SAMPLES: Record<EndpointName, { method: Method; url: string; body?: object
   'scripts.list': { method: 'GET', url: '/scripts/model/model_test?take=20&withConversations=false' },
   'scriptSequences.list': { method: 'GET', url: '/script-sequences/model/model_test' },
   'vault.folders': { method: 'GET', url: '/models/model_test/vault-folders' },
-  'vault.medias': { method: 'GET', url: '/models/model_test/medias?take=10&vaultFolderId=folder_1' },
+  'vault.medias': {
+    method: 'GET',
+    url: '/models/model_test/medias?take=10&vaultFolderId=folder_1&mediaType=All',
+  },
   'transactions.list': { method: 'GET', url: '/transactions/model/model_test?take=10' },
   'notifications.list': { method: 'GET', url: '/users/user_bot/notifications?take=5' },
   'media.uploadUrl': { method: 'GET', url: '/medias/get-upload-url?name=a.mp3&type=audio&size=100' },

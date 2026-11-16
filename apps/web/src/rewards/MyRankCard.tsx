@@ -20,7 +20,9 @@ export function MyRankCard({ user }: { user: Me }): JSX.Element | null {
   const nextLevel = trophyCase.nextLevel ?? null;
   if (level === null && nextLevel === null) return null;
   const percent =
-    nextLevel === null ? 100 : Math.round((nextLevel.currentMinor / nextLevel.thresholdMinor) * 100);
+    nextLevel === null
+      ? 100
+      : Math.min(100, Math.max(0, Math.round((nextLevel.currentMinor / nextLevel.thresholdMinor) * 100)));
   return (
     <Panel className="nv-enter rw-rank" eyebrow="Mon rang">
       <div className="rw-rank__body">
