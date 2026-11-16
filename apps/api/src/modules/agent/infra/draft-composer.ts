@@ -65,6 +65,9 @@ import type { FanLimits } from './fan-limits';
  * The agent seen by `conversation.respond` (conversations' `DraftComposer` port, matched by shape: `agent` does
  * not import `conversations`). The draft waits for a human: the composer never sends anything.
  */
+/** His own words, not an opener he chose (ADR 0110 § 1): what code measures of him. */
+const ownWords = (m: { readonly origin?: MessageOrigin | null }): boolean => m.origin !== 'hook';
+
 /** When an automation of the platform last wrote to him (ADR 0110 § 6); nothing when none did in the history. */
 function lastAutomationOf(history: AgentComposeInput['history']): { lastAutomationAt?: Date } {
   const last = history.findLast(
@@ -754,6 +757,7 @@ async function settleCare(
   const help = signs.includes('self_harm') && !known.helpGiven;
   const fanText = input.history
     .slice(input.history.findLastIndex((m) => m.direction === 'outbound') + 1)
+    .filter(ownWords)
     .map((m) => m.text)
     .join('\n');
   return {
@@ -883,6 +887,12 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       }
       // What he wrote since her last answer: her alerts, the traps and the safety net read it as one message.
       const fanText = sinceAnswer.map((m) => m.text).join('\n');
+      // What code measures of him (his age, his desire, the traps): his own words only, never an opener he chose
+      // (ADR 0110 § 1). The safety net and her alerts read everything.
+      const ownText = sinceAnswer
+        .filter(ownWords)
+        .map((m) => m.text)
+        .join('\n');
       // He says plainly he is a minor (recette AGT-01): a human answers him before any model, whatever the brain would
       // have read, and his limits are set until a human decides. He says he wants to hurt himself: she answers him
       // with care, a human validating it (ADR 0088), as she does while a care episode is open.
@@ -942,7 +952,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const waited = (input.waited ?? 0) >= 1;
       const composed = await composeTurn(deps.gateway, withHer.persona, {
         history,
-        fanText,
+        fanText: ownText,
         media,
         fanNotes: input.fan.notes.join('\n'),
         ...(input.fan.brainNotes !== undefined &&
@@ -967,7 +977,9 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         desire: {
           ...(input.desire !== undefined && { previous: input.desire }),
           measured: measureDesire(
-            input.history.map((m) => ({ fromFan: m.direction === 'inbound', text: m.text, at: m.at })),
+            input.history
+              .filter(ownWords)
+              .map((m) => ({ fromFan: m.direction === 'inbound', text: m.text, at: m.at })),
           ),
           ageDisputed: stop.flags?.ageDisputed !== undefined,
           // Counted once per message of his: a second pass after a wait, or a replay, reads it as stored.

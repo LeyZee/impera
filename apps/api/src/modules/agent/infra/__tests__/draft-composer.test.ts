@@ -1301,6 +1301,21 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
     expect(written(seen)?.action).toBe('reply');
   });
 
+  it('measures nothing of an opener he chose: his desire reads his own words only (ADR 0110 § 1)', async () => {
+    const opener = {
+      direction: 'inbound' as const,
+      text: 'Hello, ton profil m’a vraiment donné envie de venir te parler, j’adore ce que tu fais',
+      at: new Date('2026-10-17T09:57:00Z'),
+      origin: 'hook' as const,
+    };
+    const plain = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
+    const withOpener = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
+    const expected = (await plain.draftComposer.compose(INPUT)).desire;
+    expect(
+      (await withOpener.draftComposer.compose({ ...INPUT, history: [opener, ...INPUT.history] })).desire,
+    ).toEqual(expected);
+  });
+
   it('gives no score before his first one: `before` is null', async () => {
     const { draftComposer } = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
     expect((await draftComposer.compose(INPUT)).desire).toMatchObject({ before: null, score: 34 });
@@ -1476,6 +1491,22 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(limits.confirmed).toEqual(['fan-1']);
     expect(written(seen)?.replyBrief).toContain('ralentit');
     expect(result).toMatchObject({ reason: 'guard_blocked', detail: ['explicit_before_age'] });
+  });
+
+  it('never confirms an age an opener he chose carries: not his words (ADR 0110 § 1)', async () => {
+    const AGE: Brief = {
+      ...HOT,
+      factsProposed: [{ category: 'identity', key: 'age', value: '25', kind: 'declared', confidence: 0.95 }],
+    };
+    const limits = limitsOf({});
+    const { draftComposer } = composer({ brief: AGE }, undefined, limits.limits, cursor);
+    await draftComposer.compose({
+      ...dayOld,
+      history: [
+        { direction: 'inbound', text: 'J’ai 25 ans', at: new Date('2026-10-17T09:59:00Z'), origin: 'hook' },
+      ],
+    });
+    expect(limits.confirmed).toEqual([]);
   });
 
   it('stays suggestive with a confirmed adult a human set to nothing explicit', async () => {
