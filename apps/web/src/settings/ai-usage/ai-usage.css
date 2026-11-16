@@ -153,7 +153,8 @@
   box-shadow: var(--nv-shadow-lift);
 }
 /* ElevenLabs' free offer: said in amber, never a block. */
-.cia-voice__plan {
+.cia-credit__runway.cia-voice__plan {
+  font-weight: 500;
   color: var(--nv-warning);
 }
 .cia-credit__head {
