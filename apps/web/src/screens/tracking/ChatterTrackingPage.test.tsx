@@ -8,13 +8,12 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatterTrackingPage } from './ChatterTrackingPage';
 
 import type { MyAwayStatus } from '@/scheduling/model';
-import { THEO } from '@/test/pay';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -59,7 +58,7 @@ const taken = ConversationSummarySchema.parse({
  * The chatter's shifts and what Suivi lists off shift (ADR 0025): no creator, or only the one whose handover he
  * took, with that conversation alone.
  */
-function serve(shifts: unknown, handover = false, members: unknown = null): void {
+function serve(shifts: unknown, handover = false): void {
   const creators = handover ? [{ id: id(1), displayName: 'Nora Vidal', timezone: 'Europe/Paris' }] : [];
   vi.stubGlobal(
     'fetch',
@@ -74,9 +73,7 @@ function serve(shifts: unknown, handover = false, members: unknown = null): void
               ? { items: [taken], nextCursor: null }
               : path === '/v1/dashboard/todos'
                 ? { items: [], creators: [] }
-                : path === '/v1/team/members' && members !== null
-                  ? { members }
-                  : null;
+                : null;
       return Promise.resolve(new Response(JSON.stringify(body), { status: body === null ? 404 : 200 }));
     }),
   );
@@ -94,7 +91,6 @@ function renderPage(away: MyAwayStatus | null = null): void {
         canDecide
         canAddCreator={false}
         away={away}
-        userId={THEO.userId}
       />
     ),
   });
@@ -132,18 +128,6 @@ describe('Suivi of a chatter (EQ-13)', () => {
     expect(off.closest('section')?.textContent).not.toContain('s’ouvrent');
     expect(screen.getByRole('link', { name: 'Mon planning' }).getAttribute('href')).toBe('/planning');
     expect(screen.queryByText('Rien pour toi pour l’instant')).toBeNull();
-  });
-
-  it('says his next shift in the zone of his record, not the device’s (recette 16/11, CHT-01)', async () => {
-    // The device reads Paris (mocked above); his record is in New York, where it is still the 27th, 20 h.
-    serve({ current: null, next: tomorrow, ended: null }, false, [{ ...THEO, timeZone: 'America/New_York' }]);
-    renderPage();
-    const off = await screen.findByRole('heading', { name: 'Tu n’es pas en poste' });
-    await waitFor(() => {
-      expect(off.closest('section')?.textContent.replace(/\s/gu, ' ')).toContain(
-        'Prochain shift demain, 18 h – 0 h sur Nora Vidal.',
-      );
-    });
   });
 
   it('promises nothing to read, unless he took a handover he has not given back', async () => {

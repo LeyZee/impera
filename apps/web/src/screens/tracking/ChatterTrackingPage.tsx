@@ -8,9 +8,8 @@ import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { useMyShifts } from '@/scheduling/api';
 import { accessOpen, type MyAwayStatus } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
-import { addDays, dayOf, longDay, rangeAt } from '@/scheduling/time';
+import { addDays, dayOf, longDay, rangeAt, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
-import { useMyZone } from '@/screens/team/api';
 import { Panel } from '@/shell/layout';
 
 /**
@@ -21,17 +20,13 @@ import { Panel } from '@/shell/layout';
  */
 export function ChatterTrackingPage({
   away = null,
-  userId,
   ...props
 }: Omit<ComponentProps<typeof TrackingPage>, 'offShift' | 'selfScope' | 'nothingListed'> & {
-  /** Whose Suivi: his next shift is said in the zone of his record, as on Aujourd'hui and Planning (CHT-01). */
-  userId: string;
   /** His status when he is away from the team (suspended, on leave…): said first and alone (CHAT-09). */
   away?: MyAwayStatus | null;
 }): JSX.Element {
   const mine = useMyShifts();
   const now = useNow();
-  const zone = useMyZone(userId);
   const off = mine.data !== undefined && !accessOpen(mine.data, now);
   return (
     <TrackingPage
@@ -43,7 +38,7 @@ export function ChatterTrackingPage({
           ? () => <MyAwayCard status={away} />
           : off
             ? (holdsHandover: boolean) => (
-                <OffShift next={mine.data.next} holdsHandover={holdsHandover} now={now} zone={zone} />
+                <OffShift next={mine.data.next} holdsHandover={holdsHandover} now={now} zone={readerZone()} />
               )
             : undefined
       }

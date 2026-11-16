@@ -10,8 +10,6 @@ import { createAppRouter, type AppRouter } from '../router';
 
 import { parsePersonaYaml } from './persona/source';
 
-import { settingsOf } from '@/test/settings';
-
 /** A version stored at format 2: the draft is the version itself, nothing moved (ADR 0079 § 5). */
 const asDraft = (persona: PersonaV2) => ({ draft: persona, moved: [] });
 
@@ -81,7 +79,7 @@ const card = (creator: typeof ANNA) =>
     : { creatorId: creator.id, mode: 'stop', sales: null, onShift: [], requests: { open: 0, next: null } };
 
 /** The creators the list answers (`null`: the list fails), each with the demo persona as her stored one. */
-async function serve(creators: readonly (typeof ANNA)[] | null, agencyZone?: string): Promise<void> {
+async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
   const persona = await parsePersonaYaml(demoYaml);
   const json = (body: unknown, status = 200) =>
     Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -92,10 +90,6 @@ async function serve(creators: readonly (typeof ANNA)[] | null, agencyZone?: str
       if (url === '/v1/creators' && init?.method === 'POST') return json(CLEO, 201);
       if (url === '/v1/creators') return creators === null ? json({}, 500) : json({ creators });
       // The cards of the list (« ok liste-créatrices »): Anna on Copilote with her fortnight, the others on Arrêt.
-      // The agency's zone, when the test sets one: « En poste » speaks in it (recette 16/11, CHT-01).
-      if (url === '/v1/scheduling/settings' && agencyZone !== undefined) {
-        return json(settingsOf({ timeZone: agencyZone }));
-      }
       if (url === '/v1/dashboard/creators') return json({ creators: (creators ?? []).map(card) });
       if (url === '/v1/dashboard/todos') {
         return json({
@@ -211,20 +205,6 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     fireEvent.click(screen.getByRole('link', { name: '← Créatrices' }));
     await cardOf('Anna');
     expect(router.state.location.search).toEqual({});
-  });
-
-  it('says until when a chatter is on shift in the agency’s hour, not the device’s (recette 16/11, CHT-01)', async () => {
-    // Théo's shift ends at 22:00 UTC: 11 h the next day at the agency, whatever the device says.
-    await serve([ANNA], 'Pacific/Auckland');
-    renderAt(owner, '/creatrices');
-    const anna = await cardOf('Anna');
-    await waitFor(() => {
-      expect(
-        within(anna)
-          .getByText(/^Théo jusqu’à/u)
-          .textContent.replace(/\s/gu, ' '),
-      ).toBe('Théo jusqu’à 11 h');
-    });
   });
 
   it('opens the creator the address names, and the list for one it does not hold', async () => {

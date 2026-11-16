@@ -13,12 +13,13 @@ import {
   minuteOf,
   mondayOf,
   rangeAt,
+  readerZone,
   untilOf,
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Glance } from '@/screens/agenda/DayView';
 import { FreshnessNote } from '@/screens/agenda/FreshnessNote';
-import { useAgenda, useHerClock, useWithPending } from '@/screens/agenda/api';
+import { useAgenda, useWithPending } from '@/screens/agenda/api';
 import '@/screens/agenda/agenda.css';
 import { planOf } from '@/screens/agenda/model';
 import { ServerSilent } from '@/shell/ServerSilent';
@@ -28,17 +29,17 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
  * Aujourd'hui, the creator's (CR-02, ADR 0042 § 8): the page she opens in the morning (CREA-19). Where her day stands
  * and what to start with, as at the top of her Agenda; what the agency proposes and waits on her; then who answers her
  * fans, in one line, by their display name alone (ADR 0023: nothing else of the team). Her last sales come once CR-04
- * exists. Agenda stays where she plans; this page only reads. Read in her own time, her agenda's zone (CRE-08).
+ * exists. Agenda stays where she plans; this page only reads. Read in her own time, the browser's.
  */
 export function CreatorTodayPage(): JSX.Element {
   const now = useNow();
-  const { zone, today } = useHerClock(now);
+  const today = dayOf(now, readerZone());
   return (
     <Page>
       <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" lead="Ta journée, et qui répond à tes fans." />
       <div className="sc-today">
         <HerDay now={now} today={today} />
-        <Fans now={now} today={today} zone={zone} />
+        <Fans now={now} today={today} />
       </div>
     </Page>
   );
@@ -110,8 +111,9 @@ function HerDay({ now, today }: { now: Date; today: string }): JSX.Element {
  * « Qui répond à tes fans »: who now, and until when; nobody now, then who starts and when, in one sentence (CREA-26:
  * « Léo à partir de 19 h 15 (dans 24 min), jusqu’à 23 h »), never the same shift said twice.
  */
-function Fans({ now, today, zone }: { now: Date; today: string; zone: string }): JSX.Element {
+function Fans({ now, today }: { now: Date; today: string }): JSX.Element {
   const onDuty = useCreatorOnDuty();
+  const zone = readerZone();
   if (onDuty.isError)
     return (
       <Panel className="sc-fans">

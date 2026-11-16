@@ -19,23 +19,14 @@ import { DeclineDialog, PlaceDialog } from './SuggestionDialogs';
 import { TaskDialog } from './TaskDialog';
 import { WeekGrid } from './WeekGrid';
 import { WeekList } from './WeekList';
-import {
-  moveTask,
-  tickTask,
-  useAgenda,
-  useFlushOnReconnect,
-  useHerClock,
-  useWithPending,
-  type Flushed,
-} from './api';
+import { moveTask, tickTask, useAgenda, useFlushOnReconnect, useWithPending, type Flushed } from './api';
 import { monthLabel, monthOf, monthRange } from './grid';
 import { shiftRangeOf, useRepliesShown } from './replies';
 import { useWide } from './useWide';
 import './agenda.css';
 
 import { useCreatorShifts } from '@/scheduling/api';
-import { addDays, mondayOf, weekLabel, longDay } from '@/scheduling/time';
-import { useNow } from '@/scheduling/useNow';
+import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
 
@@ -95,8 +86,7 @@ export function AgendaPage({
   const wide = useWide();
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // Her day, in her own zone: a phone set elsewhere opens neither yesterday nor another week (CRE-08).
-  const { today } = useHerClock(useNow());
+  const today = dayOf(new Date(), readerZone());
   const shown = day ?? today;
   const monday = mondayOf(shown);
   // Mois is a computer's: on her phone, the same link shows her week.

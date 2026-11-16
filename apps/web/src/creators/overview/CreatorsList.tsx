@@ -16,7 +16,6 @@ import { useCreatorsOverview } from './api';
 import { modeOf, onShiftOf, requestOf, salesOf, todosOf, type Tone } from './model';
 import './list.css';
 
-import { useSchedulingSettings } from '@/reports/api';
 import { readerZone, dayOf } from '@/scheduling/time';
 import { todosAcrossQuery } from '@/screens/tracking/api';
 import { SetupLink } from '@/setup/SetupCard';
@@ -87,8 +86,6 @@ function CreatorCard({
   const mode = card === undefined ? null : modeOf(card.mode);
   const todos = todosOf(count);
   const today = dayOf(new Date(), creator.timezone);
-  // The agency's hour, as on Planning; the device's only while it is not read (recette 16/11, CHT-01).
-  const agencyZone = useSchedulingSettings().data?.timeZone ?? readerZone();
   const request = card?.requests == null ? null : requestOf(card.requests, today);
   return (
     <li className="cl-card nv-plate nv-enter" aria-busy={loading || undefined}>
@@ -116,7 +113,9 @@ function CreatorCard({
         {card === undefined || card.onShift === null ? null : (
           <Fact label="Chiffre d’affaires" {...salesOf(card.sales)} strong />
         )}
-        {card?.onShift == null ? null : <Fact label="En poste" value={onShiftOf(card.onShift, agencyZone)} />}
+        {card?.onShift == null ? null : (
+          <Fact label="En poste" value={onShiftOf(card.onShift, readerZone())} />
+        )}
         {card?.requests == null ? null : request === null ? (
           <Fact label="Contenu attendu" value="Rien en attente" tone="calm" />
         ) : (
