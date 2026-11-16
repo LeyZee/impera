@@ -1,5 +1,6 @@
 import type { CreatorAccountShift, CreatorAgenda, CreatorSuggestion, CreatorTask } from '@impera/contracts';
 import { CREATOR_TASK_CATEGORY_LABELS } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import {
   useId,
   useRef,
@@ -33,7 +34,13 @@ import { repliesOn } from './replies';
 
 import { useOnline } from '@/pwa/online';
 import { useHerTrophyCase } from '@/rewards/api';
-import { CREATOR_MEDALS, CreatorMedal, highestMedal } from '@/rewards/creator-art';
+import {
+  CREATOR_MEDALS,
+  CreatorMedal,
+  highestMedal,
+  medalName,
+  type CreatorMedalKind,
+} from '@/rewards/creator-art';
 import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { useFloatingTip } from '@/screens/dashboard/parts';
@@ -244,6 +251,10 @@ const ringDash = (share: number): string => {
  * Where her day stands: done out of all, where to start, and what is now or next. Her streak beside it. Aujourd'hui
  * shows the same, read only, with its way into Agenda under it (CREA-19).
  */
+/** The streak pill read aloud: the count, her medal's name the coin is too small to show, and where it leads. */
+const streakWords = (days: number, medal: CreatorMedalKind | null): string =>
+  `${String(days)} ${days > 1 ? 'jours' : 'jour'} de suite${medal === null ? '' : `, médaille ${medalName(medal)}`} : voir mes trophées`;
+
 export function Glance({
   plan,
   agenda,
@@ -328,31 +339,30 @@ export function Glance({
             )}
           </span>
           {streak.days === 0 ? null : (
-            <span
+            // The pill opens her showcase (ADR 0108 § 1, recette 16/11 CRE-13). At 28 px the coin shows no digit, so
+            // its name goes into the pill's accessible name (ADR 0107 § 1), and into its tip.
+            <Link
+              to="/moi/trophees"
               className="ag-streak"
               data-risk={streak.atRisk ? 'true' : undefined}
+              aria-label={streakWords(streak.days, medal)}
               {...(medal === null
                 ? {
                     title:
                       streak.next === null ? undefined : `Prochain palier : ${String(streak.next)} jours`,
                   }
-                : {
-                    // The pill takes the focus and the tip, not the coin: its ring stays clear of the count (avis
-                    // Design, 14/11), and the pill is what will open her showcase.
-                    tabIndex: 0,
-                    ...tip.bind({
-                      title: `Médaille : série de ${String(CREATOR_MEDALS[medal].days)} jours`,
-                      ...(streak.next === null
-                        ? {}
-                        : { text: `Prochain palier : ${String(streak.next)} jours` }),
-                    }),
-                  })}
+                : tip.bind({
+                    title: `Médaille : série de ${String(CREATOR_MEDALS[medal].days)} jours`,
+                    ...(streak.next === null
+                      ? {}
+                      : { text: `Prochain palier : ${String(streak.next)} jours` }),
+                  }))}
             >
               {medal === null ? null : (
                 <CreatorMedal kind={medal} size={MEDAL_SIZE} className="ag-streak__medal" />
               )}
               <b className="nv-num">{streak.days}</b> {streak.days > 1 ? 'jours' : 'jour'} de suite
-            </span>
+            </Link>
           )}
         </div>
       </div>

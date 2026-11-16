@@ -8,6 +8,16 @@ import { AgendaPage, type AgendaView } from './AgendaPage';
 import { agendaOf, post, shoot, stretch, WEDNESDAY } from './fixtures';
 import { keepSnapshot, rangeKey } from './offline';
 
+// The page is drawn alone, outside the app's router: its one link, the streak pill, is a plain anchor here.
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-router')>()),
+  Link: ({ to, children, ...rest }: { to: string; children?: React.ReactNode } & Record<string, unknown>) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
   readerZone: () => 'Europe/Paris',
@@ -36,6 +46,9 @@ interface Call {
   readonly url: string;
   readonly body: unknown;
 }
+
+/** Her trophy case as the server answers it; empty, the screen reads none. */
+let caseItems: readonly unknown[] = [];
 
 function serve(online: () => boolean, shifts: readonly unknown[] = SHIFTS, agenda = agendaOf()): Call[] {
   const calls: Call[] = [];
@@ -69,6 +82,10 @@ function serve(online: () => boolean, shifts: readonly unknown[] = SHIFTS, agend
         );
       if (url.startsWith('/v1/creator-space/shifts'))
         return Promise.resolve(new Response(JSON.stringify({ shifts }), { status: 200 }));
+      if (url === '/v1/creator-space/trophy-case' && caseItems.length > 0)
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: caseItems, streaks: [], level: null }), { status: 200 }),
+        );
       if (url === '/v1/creator-space/ticks')
         return Promise.resolve(
           new Response(JSON.stringify({ added: 1, streak: agendaOf().streak }), { status: 200 }),
@@ -120,6 +137,7 @@ function wide(): void {
 
 afterEach(() => {
   cleanup();
+  caseItems = [];
   vi.useRealTimers();
   vi.unstubAllGlobals();
   localStorage.clear();
@@ -508,6 +526,33 @@ describe('Agenda, recette du 16/11', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Story du matin/u }));
     fireEvent.click(screen.getByRole('button', { name: 'Retirer' }));
     expect(screen.getByText('Elle compte encore aujourd’hui et part de ton agenda demain.')).toBeDefined();
+  });
+
+  it('opens her trophies from her streak pill, its medal named aloud (CRE-13)', async () => {
+    serve(
+      () => true,
+      SHIFTS,
+      agendaOf({ streak: { days: 4, jokerUsed: false, atRisk: false, milestone: null, next: 7 } }),
+    );
+    show();
+    const pill = await screen.findByRole('link', { name: '4 jours de suite : voir mes trophées' });
+    expect(pill.getAttribute('href')).toBe('/moi/trophees');
+  });
+
+  it('names her medal in the pill’s accessible name, the coin too small for its digit (CRE-13)', async () => {
+    const at = '2026-11-03T10:00:00.000Z';
+    caseItems = [{ kind: 'day_streak_7', family: 'medal', earnedAt: at, progress: null, revealedAt: at }];
+    serve(
+      () => true,
+      SHIFTS,
+      agendaOf({ streak: { days: 9, jokerUsed: false, atRisk: false, milestone: 7, next: 14 } }),
+    );
+    show();
+    expect(
+      await screen.findByRole('link', {
+        name: '9 jours de suite, médaille Série de 7 jours : voir mes trophées',
+      }),
+    ).toBeDefined();
   });
 
   it('keeps the check of today’s routine a button', async () => {

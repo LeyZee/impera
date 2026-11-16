@@ -322,6 +322,13 @@
   background: var(--nv-glass-fill);
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
+.ag-streak {
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+.ag-streak:hover {
+  background: var(--nv-glass-fill-strong);
+}
 .ag-streak b {
   color: var(--nv-ink);
 }
@@ -336,7 +343,7 @@
   flex: none;
   margin: -6px 0;
 }
-.ag-streak[tabindex]:focus-visible {
+.ag-streak:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
 }
