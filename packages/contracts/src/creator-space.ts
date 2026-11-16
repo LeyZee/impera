@@ -4,6 +4,7 @@ import { MessageMediaViewSchema, PageQuerySchema } from './conversations';
 import { MessageDirectionSchema } from './enums';
 import { ConversationIdSchema, FanIdSchema, MessageIdSchema } from './ids';
 import { CurrencySchema } from './money';
+import { PayPeriodSchema } from './pay-periods';
 
 /**
  * What a creator reads of her own account in her space (CR-02, ADR 0042 § 2): her fans and their conversations, read
@@ -76,3 +77,52 @@ export const CreatorMessagePageSchema = z.strictObject({
   nextCursor: z.string().nullable(),
 });
 export type CreatorMessagePage = z.infer<typeof CreatorMessagePageSchema>;
+
+const signedCents = z.number().int();
+const count = z.number().int().min(0);
+
+/**
+ * Her share of one currency, over a day or a fortnight (ADR 0106 § 15 to § 19): the sum of the platform's own
+ * `creatorMinor` (Reveal's `modelRevenue`), refunds taken off, never computed again nor converted. `refundedMinor` is
+ * what the refunds took off it, for the detail she unfolds; never the fan, the seller nor the agency's share.
+ */
+export const CreatorEarningsSumSchema = z.strictObject({
+  currency: CurrencySchema,
+  shareMinor: signedCents,
+  sales: count,
+  refunds: count,
+  refundedMinor: z.number().int().min(0),
+});
+export type CreatorEarningsSum = z.infer<typeof CreatorEarningsSumSchema>;
+
+/** One day of her calendar, in her own zone, and its sums by currency. */
+export const CreatorEarningsDaySchema = z.strictObject({
+  day: z.iso.date(),
+  sums: z.array(CreatorEarningsSumSchema).min(1),
+});
+export type CreatorEarningsDay = z.infer<typeof CreatorEarningsDaySchema>;
+
+/**
+ * One fortnight of the team's pay (from the 1st to the 15th, from the 16th to the month's end), read up to today when
+ * it is the one in course. `totals` by currency, then her days with a sale or a refund, newest first.
+ * `refundsWithoutSale` counts the refunds of those days whose sale is older than the register: in no sum.
+ */
+export const CreatorEarningsPeriodSchema = z.strictObject({
+  from: PayPeriodSchema,
+  to: z.iso.date(),
+  totals: z.array(CreatorEarningsSumSchema),
+  days: z.array(CreatorEarningsDaySchema),
+  refundsWithoutSale: count,
+});
+export type CreatorEarningsPeriod = z.infer<typeof CreatorEarningsPeriodSchema>;
+
+/**
+ * `GET /v1/creator-space/earnings` (creator, ADR 0106 amendment of 16/11): her share, the fortnight in course then the
+ * one before, her days in `timeZone`, her own. Read on her view `creator_sales` through her account, never a request.
+ */
+export const CreatorEarningsSchema = z.strictObject({
+  timeZone: z.string().min(1),
+  today: z.iso.date(),
+  periods: z.array(CreatorEarningsPeriodSchema).length(2),
+});
+export type CreatorEarnings = z.infer<typeof CreatorEarningsSchema>;

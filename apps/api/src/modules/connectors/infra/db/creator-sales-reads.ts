@@ -10,8 +10,7 @@ import {
 import { sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
-import { creatorSales } from '../../domain/creator-sales';
-import type { TotalsRange } from '../../domain/sales-totals';
+import { creatorSales, type CreatorSalesRange } from '../../domain/creator-sales';
 
 const DAY_MS = 86_400_000;
 
@@ -39,10 +38,11 @@ const RowSchema = z.object({
  * @public
  * A creator's own sales (CRM-04 lot d, ADR 0054), in the caller's transaction, which is `withCreatorAccount`: the
  * view `creator_sales` gives any other transaction nothing, and her creator comes from her account, never from a
- * request. The route of her Ventes screen (CR-04) reads this and nothing else of `connectors`.
+ * request. The route of her Ventes screen (CR-04) reads this and nothing else of `connectors`. `range.timeZone` reads
+ * her days in her own zone (ADR 0106 § 19); the day padded on each side covers every zone.
  */
 export const creatorSalesReads = {
-  salesOf: async (tx: Transaction, range: TotalsRange): Promise<CreatorSales> => {
+  salesOf: async (tx: Transaction, range: CreatorSalesRange): Promise<CreatorSales> => {
     // As the totals read them: the lines whose sale happened in the days, a day padded on each side for the zones, the
     // rule placing them on their sale's day exactly. A refund comes after its sale, so `l.occurred_at` bounds every
     // line from below.

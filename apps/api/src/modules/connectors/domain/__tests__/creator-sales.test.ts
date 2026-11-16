@@ -100,4 +100,32 @@ describe('a creator’s own sales (CRM-04 lot d)', () => {
       CreatorSalesSchema.safeParse({ ...sales, lines: [{ ...one, platformChatterId: 'c-1' }] }).success,
     ).toBe(false);
   });
+
+  describe('her days in her own zone (ADR 0106 § 19)', () => {
+    const lines = [
+      line({ platformSaleId: 'sale_1', occurredAt: new Date('2026-10-20T22:30:00Z') }),
+      line({ platformSaleId: 'sale_1', event: 'refund', occurredAt: new Date('2026-10-28T09:00:00Z') }),
+      line({ platformSaleId: 'sale_2', occurredAt: new Date('2026-10-25T22:30:00Z') }),
+    ];
+    const days = (range: Parameters<typeof creatorSales>[1]) =>
+      creatorSales(lines, range).rows.map((row) => [row.day, row.sales, row.refunds]);
+
+    it('keeps the platform’s zone without one, to the byte', () => {
+      expect(creatorSales(lines, OCTOBER)).toEqual(
+        creatorSales(lines, { ...OCTOBER, timeZone: 'Europe/Paris' }),
+      );
+    });
+
+    it('puts a sale near midnight on her day, its refund with it', () => {
+      // 22:30 UTC on the 20th: 00:30 on the 21st in Paris (summer time), 23:30 on the 20th in Porto-Novo.
+      expect(days({ ...OCTOBER, timeZone: 'Europe/Paris' })[0]).toEqual(['2026-10-21', 1, 1]);
+      expect(days({ ...OCTOBER, timeZone: 'Africa/Porto-Novo' })[0]).toEqual(['2026-10-20', 1, 1]);
+    });
+
+    it('follows the change of hour at the end of October', () => {
+      // 22:30 UTC on the 25th, after the clocks went back: 23:30 on the 25th in Paris, still the 25th.
+      expect(days({ ...OCTOBER, timeZone: 'Europe/Paris' })[1]).toEqual(['2026-10-25', 1, 0]);
+      expect(days({ ...OCTOBER, timeZone: 'Asia/Tokyo' })[1]).toEqual(['2026-10-26', 1, 0]);
+    });
+  });
 });

@@ -30,6 +30,7 @@ import { createDrizzleAgencyShareCheck, type SalesTotalsRead } from './infra/age
 import { createDrizzleCalendarLinkStore } from './infra/calendar-link-store';
 import { createDrizzleCalendarReads } from './infra/calendar-reads';
 import { createDrizzleColleagueReads } from './infra/colleague-reads';
+import { createDrizzleCreatorEarnings, type CreatorSalesRead } from './infra/creator-earnings-store';
 import {
   createCreatorOnDutyRoutes,
   createDrizzleCreatorAccountShifts,
@@ -225,6 +226,11 @@ export interface SchedulingDeps {
    * read in the reports' own transaction.
    */
   readonly shiftSalesOf: ShiftSalesReader;
+  /**
+   * Her own sales, read in her account's transaction on her view (ADR 0106 § 15 to § 20): the `connectors` module's
+   * `creatorSalesReads.salesOf`, her days in her zone.
+   */
+  readonly creatorSalesOf: CreatorSalesRead;
   /** A creator's agenda in her calendar link's feed (CR-05 lot c2): the `creator-tasks` module's `feedOf`. */
   readonly creatorAgendaFeed: CreatorAgendaFeed;
   /**
@@ -312,10 +318,14 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
     },
     routes: (requireRole, recentLogin) => async (app, options) => {
       await createSchedulingRoutes(services, requireRole, recentLogin)(app, options);
-      // Her « qui est en poste » (CR-02) and her accounts' shifts in her Agenda (CR-05 c3): the creator's own door,
-      // never the team's routes.
+      // Her « qui est en poste » (CR-02), her accounts' shifts in her Agenda (CR-05 c3) and her share (ADR 0106
+      // § 20): the creator's own door, never the team's routes.
       await createCreatorOnDutyRoutes(
-        { onDuty: createDrizzleCreatorOnDuty(deps.db), shifts: createDrizzleCreatorAccountShifts(deps.db) },
+        {
+          onDuty: createDrizzleCreatorOnDuty(deps.db),
+          shifts: createDrizzleCreatorAccountShifts(deps.db),
+          earnings: createDrizzleCreatorEarnings(deps.db, deps.creatorSalesOf),
+        },
         requireRole,
         now,
       )(app, options);

@@ -1,12 +1,14 @@
 import {
   CreatorAccountShiftsQuerySchema,
   CreatorAccountShiftsSchema,
+  CreatorEarningsSchema,
   CreatorOnDutyListSchema,
   DomainError,
   PlatformSchema,
   UserIdSchema,
   type CreatorAccountShifts,
   type CreatorAccountShiftsQuery,
+  type CreatorEarnings,
   type CreatorOnDutyList,
   type UserId,
 } from '@impera/contracts';
@@ -133,11 +135,13 @@ export function createDrizzleCreatorShiftsFeed(db: Database): CreatorShiftsFeed 
 export interface CreatorOnDutyReads {
   readonly onDuty: (userId: UserId, now: Date) => Promise<CreatorOnDutyList>;
   readonly shifts: (userId: UserId, range: CreatorAccountShiftsQuery) => Promise<CreatorAccountShifts>;
+  readonly earnings: (userId: UserId, now: Date) => Promise<CreatorEarnings>;
 }
 
 /**
  * Her doors to the team's calendar (creator only): `GET /v1/creator-space/on-duty`, who chats for her now and in the
- * next 24 hours; `GET /v1/creator-space/shifts`, her accounts' shifts over a range of her Agenda.
+ * next 24 hours; `GET /v1/creator-space/shifts`, her accounts' shifts over a range of her Agenda;
+ * `GET /v1/creator-space/earnings`, her share of the fortnight in course and the one before (ADR 0106 § 20).
  */
 export function createCreatorOnDutyRoutes(
   reads: CreatorOnDutyReads,
@@ -172,6 +176,11 @@ export function createCreatorOnDutyRoutes(
         },
       },
       (request) => asCreator(request.user?.id, (userId) => reads.shifts(userId, request.query)),
+    );
+    app.get(
+      '/creator-space/earnings',
+      { preValidation: requireRole('creator'), schema: { response: { 200: CreatorEarningsSchema } } },
+      (request) => asCreator(request.user?.id, (userId) => reads.earnings(userId, now())),
     );
     return Promise.resolve();
   };

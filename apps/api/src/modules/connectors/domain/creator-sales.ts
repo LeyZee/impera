@@ -30,11 +30,19 @@ export interface CreatorLine extends SaleDayLine {
 type RowHead = Pick<CreatorSalesRow, 'day' | 'platform' | 'platformAccountId' | 'currency' | 'saleType'>;
 
 /**
+ * Her range, and the zone her days are read in: by default each platform's own, as the agency's totals; her own zone
+ * when her earnings are said day by day (ADR 0106 § 19). A refund stays on its sale's day, in the same zone.
+ */
+export interface CreatorSalesRange extends TotalsRange {
+  readonly timeZone?: string;
+}
+
+/**
  * Her sales over `range`: a row per day, account, currency and kind of sale, a refund taken off its sale's day, and
  * each line on that day. A refund of the range whose sale is older than the register is in no row and no line, only
  * counted. Rows come by day, then platform, account, currency and kind; lines by instant.
  */
-export function creatorSales(lines: readonly CreatorLine[], range: TotalsRange): CreatorSales {
+export function creatorSales(lines: readonly CreatorLine[], range: CreatorSalesRange): CreatorSales {
   const byPlatform = new Map<Platform, CreatorLine[]>();
   for (const line of lines) byPlatform.set(line.platform, [...(byPlatform.get(line.platform) ?? []), line]);
   const heads = new Map<string, RowHead>();
@@ -42,10 +50,10 @@ export function creatorSales(lines: readonly CreatorLine[], range: TotalsRange):
   const placedLines: CreatorSaleLine[] = [];
   let refundsWithoutSale = 0;
   for (const [platform, ofPlatform] of byPlatform) {
-    const timeZone = salesFeedTimeZone(platform);
+    const timeZone = range.timeZone ?? salesFeedTimeZone(platform);
     // A line exists only through a feed, and a feed has its zone: a platform without one is a programming error.
     if (timeZone === null) throw new Error(`creator sales: no zone for the platform ${platform}`);
-    const placed = onSaleDays(ofPlatform, { ...range, timeZone });
+    const placed = onSaleDays(ofPlatform, { from: range.from, to: range.to, timeZone });
     refundsWithoutSale += placed.refundsWithoutSale.length;
     const sums = sumsBy(placed.placed, ({ sale, day }) => {
       const key = [day, sale.platform, sale.platformAccountId, sale.currency, sale.saleType].join('|');

@@ -1,7 +1,12 @@
 import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
-import { salesFeedReadsForReports, salesFeedSwitchReads, salesFeedTotals } from '../modules/connectors';
+import {
+  creatorSalesReads,
+  salesFeedReadsForReports,
+  salesFeedSwitchReads,
+  salesFeedTotals,
+} from '../modules/connectors';
 import type { CreatorTasksModule } from '../modules/creator-tasks';
 import type { NotificationsModule } from '../modules/notifications';
 import { enqueuePayRecalculation, payReadsForPayRules } from '../modules/payroll';
@@ -49,6 +54,8 @@ export function wireScheduling(
     salesTotalsOf: salesFeedTotals.totalsOf,
     // A declared report against what the platform read during its shift (ADR 0073), in the reports' transaction.
     shiftSalesOf: salesFeedReadsForReports.shiftSales,
+    // Her share, read by her on her view in her own transaction (ADR 0106 § 15 to § 20).
+    creatorSalesOf: creatorSalesReads.salesOf,
     // A creator's calendar link shows her agenda (CR-05 lot c2, ADR 0042 § 4), read by her agenda's own module.
     creatorAgendaFeed: deps.creatorTasks.feedOf,
     // The reminders of the reports ring through the push notifications (ADR 0077), as her agenda's reminders do.
