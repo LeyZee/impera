@@ -316,12 +316,12 @@ describe('Équipe › Membres', () => {
       within(block)
         .getAllByRole('listitem')
         .map((row) => row.textContent);
-    expect(rows()).toEqual([expect.stringMatching(/^Porto-Novoà Paris16 nov\., \d{2}:02$/u)]);
+    expect(rows()).toEqual([expect.stringMatching(/^Porto-Novoà Paris16 nov\. à \d{1,2}\u00a0h\u00a002$/u)]);
     fireEvent.click(within(block).getByRole('button', { name: 'Changements plus anciens' }));
     await waitFor(() => {
       expect(rows()).toHaveLength(2);
     });
-    expect(rows()[1]).toMatch(/^Parisà Porto-Novo1er nov\., \d{2}:30$/u);
+    expect(rows()[1]).toMatch(/^Parisà Porto-Novo1er nov\. à \d{1,2}\u00a0h\u00a030$/u);
     expect(within(block).queryByRole('button', { name: 'Changements plus anciens' })).toBeNull();
   });
 

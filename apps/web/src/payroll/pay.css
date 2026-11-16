@@ -1240,6 +1240,13 @@
 .py-mehero__top .py-quiet {
   margin-left: auto;
 }
+/* On a phone the line goes under the period, at the left like the label under it: pushed right, it read as a fault. */
+@media (max-width: 640px) {
+  .py-mehero__top .py-quiet {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
 
 /* Paie › Quinzaine: the sales a period holds or a decision settles (CRM-03 lot b4b). One card a sale: who and when on
    the left, its net and its state on the right, the gestures under them. */
