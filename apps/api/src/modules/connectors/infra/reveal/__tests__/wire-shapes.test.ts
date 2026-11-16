@@ -103,6 +103,28 @@ describe('Reveal shapes of 2026-11-15', () => {
     expect(parsed.data?.pageInfo.endCursor).toBe('cursor_test');
   });
 
+  it('reads a step with three branches: one stepIndex, a condition on all but the default (2026-11-16)', () => {
+    const branch = (id: string, condition?: string) => ({
+      step: { id: `step_${id}`, stepIndex: 1, ...(condition === undefined ? {} : { condition }) },
+      script: { id: `script_${id}`, createdAt: AT, updatedAt: AT, name: `Branche ${id}`, content: 'texte' },
+      medias: [],
+      teasingMedias: [],
+      tags: [],
+    });
+    const parsed = REVEAL_ENDPOINTS['scriptSequences.list'].shape.safeParse([
+      {
+        sequence: { id: 'seq_test', name: 'test', createdAt: AT, updatedAt: AT },
+        steps: [branch('b', 'il parle de sport'), branch('a'), branch('c', 'il a déjà acheté')],
+      },
+    ]);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.data?.[0]?.steps.map(({ step }) => step.condition ?? null)).toEqual([
+      'il parle de sport',
+      null,
+      'il a déjà acheté',
+    ]);
+  });
+
   it('still refuses a key nobody has seen', () => {
     const parsed = REVEAL_ENDPOINTS['vault.folders'].shape.safeParse([
       {

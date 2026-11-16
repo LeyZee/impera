@@ -374,10 +374,18 @@ export const REVEAL_ENDPOINTS = {
     shape: z.array(
       z.strictObject({
         sequence: z.strictObject({ id, name: z.string(), createdAt: iso, updatedAt: iso }),
-        /** Empty in the capture: the step shape follows the analysis report, to confirm on a recording. */
+        /**
+         * One entry per branch (2026-11-16): the branches of a step share its `stepIndex`, each with its own script; the
+         * array's order is not the steps' order.
+         */
         steps: z.array(
           z.strictObject({
-            step: z.strictObject({ id, stepIndex: z.number().int().min(0) }),
+            step: z.strictObject({
+              id,
+              stepIndex: z.number().int().min(0),
+              /** The branch's condition as the agency wrote it, free text; absent on the default branch. */
+              condition: z.string().max(2_000).optional(),
+            }),
             script: WireScriptItemSchema.shape.script,
             medias: z.array(WireMediaSchema),
             teasingMedias: z.array(WireMediaSchema),
