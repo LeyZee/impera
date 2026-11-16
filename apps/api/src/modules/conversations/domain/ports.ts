@@ -42,6 +42,7 @@ import type {
   MessageDirection,
   MessageId,
   MessageView,
+  Money,
   OutboundMedia,
   PlatformAccountId,
   SafetyEvent,
@@ -102,6 +103,24 @@ export interface Draft {
   readonly createdAt: Date;
   /** What the brief learnt about the fan for this draft, written as facts once a human approves it (P3-02). */
   readonly facts: readonly DraftFact[];
+  /** The step of her script the code decided with this draft (ADR 0098): it leaves after the bubbles. */
+  readonly scriptStep: DraftScriptStep | null;
+}
+
+/**
+ * A step of a platform script that goes with a draft (ADR 0098 § 5): the platform sends its text, media and price, at
+ * the price the code decided (`priceMinor`, 0 for an offered step or a bridge), or nothing if that price changed.
+ */
+export interface DraftScriptStep {
+  readonly scriptRef: string;
+  readonly stepIndex: number;
+  /** The step as the platform names it: what is sent (ADR 0112, a branch has no stable index). */
+  readonly stepRef: string;
+  readonly priceMinor: number;
+  /** It sends a media of her vault: the bubbles may announce it (`media_not_sent` is not read). */
+  readonly hasMedia: boolean;
+  /** One key per conversation, script and step: a replay never sends it twice (ADR 0018 § 5). */
+  readonly idempotencyKey: string;
 }
 
 /** A fact read in the fan's messages, kept with the draft until a human approves it (P3-02). */
@@ -159,7 +178,8 @@ export interface AwayHolds {
 }
 
 interface MessageRepository {
-  /** `false` when the platform message is already known (unique per account): ingestion is idempotent. */
+  /** `false` when the platform message is already known (unique per account): ingestion is idempotent. A known outbound
+   * message still empty (a script step, recorded at send before the platform wrote it) takes the synced text and media. */
   insertIfNew(message: NewMessage): Promise<boolean>;
   /** Bubbles of this draft already on the platform; a retried send resumes after them. */
   countForDraft(draftId: DraftId): Promise<number>;
@@ -201,6 +221,8 @@ interface DraftRepository {
     personaVersionId?: string;
     /** Facts the brief proposed, confirmed when a human approves the draft (P3-02). */
     facts?: readonly DraftFact[];
+    /** The step of her script decided with it (ADR 0098). */
+    scriptStep?: DraftScriptStep;
   }): Promise<void>;
   setStatus(id: DraftId, status: DraftStatus, decision?: DraftDecision): Promise<void>;
   /**
@@ -424,6 +446,8 @@ export interface GuardReadContext {
   readonly history: readonly { readonly from: 'fan' | 'creator'; readonly text: string }[];
   /** A care episode is open (ADR 0088 § 3, § 5): the care guard reads the bubbles too, whoever wrote them. */
   readonly care?: boolean;
+  /** The draft leaves with a step of her script that sends a media (ADR 0098): announcing it is no lie. */
+  readonly hasMedia?: boolean;
 }
 
 /**
@@ -486,6 +510,17 @@ export interface FanDirectory {
 export interface OutboundSender {
   sendText(conversation: ConversationKey, text: string, idempotencyKey: string): Promise<SendResult>;
   sendMedia(conversation: ConversationKey, media: OutboundMedia, idempotencyKey: string): Promise<SendResult>;
+  /**
+   * One step of a platform script, its text, media and price as the platform lists them (ADR 0018 § 5): refused for
+   * good (`SendRefused`) when the platform already sent it to him or its price is no longer `expectedPrice`.
+   */
+  sendStep(
+    conversation: ConversationKey,
+    /** The script and its step (the branch that leaves) as the platform names them, on the conversation's account. */
+    step: { readonly scriptRef: string; readonly stepRef: string },
+    expectedPrice: Money,
+    idempotencyKey: string,
+  ): Promise<SendResult>;
   /** After a send whose outcome is unknown, whether the message reached the platform. */
   verifySent(
     conversation: ConversationKey,
@@ -607,6 +642,8 @@ interface ComposedScriptRun {
   readonly opened?: { readonly run: ScriptRunState; readonly events: readonly ScriptRunJournalEvent[] };
   /** A paid step went into the draft: one `offer_made` at its catalogue price. */
   readonly offer?: { readonly amountMinor: number; readonly currency: Currency };
+  /** The step decided, paid or not: it goes with the draft, once its run is written. */
+  readonly step?: DraftScriptStep;
 }
 
 /**

@@ -28,6 +28,7 @@ import {
   createConversationsModule,
   type Clock,
   type ConversationsModule,
+  SendRefused,
   type GuardReadContext,
   type OutboundSender,
 } from '../modules/conversations';
@@ -71,8 +72,40 @@ class FakeSender implements OutboundSender {
   sendMedia(): Promise<SendResult> {
     return Promise.reject(new Error('not used'));
   }
-  verifySent(): Promise<{ status: 'not_found' }> {
-    return Promise.resolve({ status: 'not_found' });
+  readonly steps: { key: string; scriptRef: string; stepRef: string; priceMinor: number }[] = [];
+  /** Refuses the next step for good, as the platform does for a step whose price changed. */
+  refuseStep = false;
+  /** The platform takes the next step but its answer is lost: only `verifySent` can tell. */
+  loseStep = false;
+  sendStep(
+    _conversation: unknown,
+    step: { scriptRef: string; stepRef: string },
+    price: { amountMinor: number },
+    key: string,
+  ): Promise<SendResult> {
+    if (this.refuseStep) {
+      this.refuseStep = false;
+      return Promise.reject(new SendRefused('script_price_changed', 'price changed'));
+    }
+    this.steps.push({ key, ...step, priceMinor: price.amountMinor });
+    if (this.loseStep) {
+      this.loseStep = false;
+      return Promise.reject(new DomainError('connector_timeout', 'timeout'));
+    }
+    return Promise.resolve({
+      messageRef: { platform: 'reveal', id: `out-${key}` },
+      sentAt: new Date().toISOString(),
+    });
+  }
+  verifySent(
+    _conversation: unknown,
+    key: string,
+  ): Promise<{ status: 'not_found' } | { status: 'sent'; messageRef: { platform: 'reveal'; id: string } }> {
+    return Promise.resolve(
+      this.steps.some((step) => step.key === key)
+        ? { status: 'sent', messageRef: { platform: 'reveal', id: `out-${key}` } }
+        : { status: 'not_found' },
+    );
   }
 }
 
@@ -401,7 +434,7 @@ describe('conversations module (P0-05)', () => {
     expect(seen).toEqual([
       {
         bubbles: ['Je pense à toi'],
-        context: { history: [{ from: 'fan', text: 'Tu fais quoi ce soir ?' }], care: false },
+        context: { history: [{ from: 'fan', text: 'Tu fais quoi ce soir ?' }], care: false, hasMedia: false },
       },
     ]);
   });
@@ -467,6 +500,136 @@ describe('conversations module (P0-05)', () => {
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle', unreadCount: 0 });
     const outbox = await test.admin.db.select({ type: schema.domainEvents.type }).from(schema.domainEvents);
     expect(outbox.map((row) => row.type)).toEqual(expect.arrayContaining(['draft_created', 'message_sent']));
+  });
+
+  /** The step of her script decided with the draft, as `respond` stores it (ADR 0098). */
+  async function withStep(draftId: DraftId, priceMinor: number, key: string): Promise<void> {
+    await test.admin.db
+      .update(schema.drafts)
+      .set({
+        policyTrace: {
+          scriptStep: {
+            scriptRef: 'sequence_1',
+            stepIndex: 0,
+            stepRef: 'script_1_1',
+            priceMinor,
+            hasMedia: true,
+            idempotencyKey: key,
+          },
+        },
+      })
+      .where(eq(schema.drafts.id, draftId));
+  }
+
+  it('sends the step of her script after the bubbles, priced, once, even replayed (ADR 0098)', async () => {
+    const { conversationId } = await ingest('c-step');
+    const draftId = await respond(conversationId);
+    await withStep(draftId, 1_500, 'step:c-step:0');
+    await conversations.approveDraft({
+      ...command(conversationId),
+      draftId,
+      bubbles: ['J’ai un truc pour toi'],
+    });
+    const payload = { creatorId, conversationId, draftId, correlationId: 'test' };
+    await conversations.jobs.send(payload, NO_LOG, 1);
+    await conversations.jobs.send(payload, NO_LOG, 2);
+
+    expect(sender.sent.map((bubble) => bubble.text)).toEqual(['J’ai un truc pour toi']);
+    expect(sender.steps).toEqual([
+      { key: 'step:c-step:0', scriptRef: 'sequence_1', stepRef: 'script_1_1', priceMinor: 1_500 },
+    ]);
+    const sentOut = await test.admin.db
+      .select({
+        priceMinor: schema.messages.priceMinor,
+        currency: schema.messages.currency,
+        author: schema.messages.author,
+      })
+      .from(schema.messages)
+      .where(
+        and(eq(schema.messages.conversationId, conversationId), eq(schema.messages.direction, 'outbound')),
+      )
+      .orderBy(schema.messages.platformCreatedAt);
+    expect(sentOut).toEqual([
+      { priceMinor: null, currency: null, author: 'human' },
+      { priceMinor: 1_500, currency: 'EUR', author: 'human' },
+    ]);
+    expect((await events(conversationId)).slice(-3)).toEqual([
+      'send_attempted',
+      'message_sent',
+      'send_verified',
+    ]);
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
+
+    // The platform wrote the step: its synced copy fills the empty record once, and is not a new message.
+    const media = [
+      { ref: { platform: 'reveal' as const, id: 'media-1' }, kind: 'image' as const, isLocked: true },
+    ];
+    const synced = await ingest('c-step', {
+      ...fanMessage('c-step', 'Rien que pour toi', 'out-step:c-step:0'),
+      direction: 'outbound',
+      author: 'ai',
+      media,
+      priceMinor: 1_500,
+      currency: 'EUR',
+    });
+    expect(synced.isNew).toBe(false);
+    await ingest('c-step', {
+      ...fanMessage('c-step', 'Autre texte', 'out-step:c-step:0'),
+      direction: 'outbound',
+      author: 'ai',
+    });
+    const [stepRow] = await test.admin.db
+      .select({ text: schema.messages.text, platformMedia: schema.messages.platformMedia })
+      .from(schema.messages)
+      .where(eq(schema.messages.platformMessageId, 'out-step:c-step:0'));
+    expect(stepRow).toEqual({ text: 'Rien que pour toi', platformMedia: media });
+  });
+
+  it('records a step whose answer was lost once, as the platform shows it, without sending it again', async () => {
+    const { conversationId } = await ingest('c-step-lost');
+    const draftId = await respond(conversationId);
+    await withStep(draftId, 1_500, 'step:c-step-lost:0');
+    await conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Attends'] });
+    sender.loseStep = true;
+    const payload = { creatorId, conversationId, draftId, correlationId: 'test' };
+    await conversations.jobs.send(payload, NO_LOG, 1);
+    await conversations.jobs.send(payload, NO_LOG, 2);
+
+    expect(sender.steps.map((step) => step.key)).toEqual(['step:c-step-lost:0']);
+    const priced = await test.admin.db
+      .select({ priceMinor: schema.messages.priceMinor })
+      .from(schema.messages)
+      .where(
+        and(eq(schema.messages.conversationId, conversationId), eq(schema.messages.direction, 'outbound')),
+      );
+    expect(priced.filter((row) => row.priceMinor === 1_500)).toHaveLength(1);
+    expect((await outboxOf(conversationId)).some((row) => row.type === 'send_failed')).toBe(false);
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
+  });
+
+  it('sends a step the platform refuses once, and fails the draft without trying again (ADR 0098 § 5)', async () => {
+    const { conversationId } = await ingest('c-step-refused');
+    const draftId = await respond(conversationId);
+    await withStep(draftId, 1_500, 'step:c-step-refused:0');
+    await conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Regarde'] });
+    sender.refuseStep = true;
+    const payload = { creatorId, conversationId, draftId, correlationId: 'test' };
+    await conversations.jobs.send(payload, NO_LOG, 1);
+    await conversations.jobs.send(payload, NO_LOG, 2);
+
+    expect(sender.sent.map((bubble) => bubble.text)).toEqual(['Regarde']);
+    expect(sender.steps).toEqual([]);
+    const failed = await outboxOf(conversationId);
+    expect(failed.find((row) => row.type === 'send_failed')?.payload).toMatchObject({
+      idempotencyKey: 'step:c-step-refused:0',
+      error: 'script_price_changed',
+      isFinal: true,
+    });
+    const [draft] = await test.admin.db
+      .select({ status: schema.drafts.status })
+      .from(schema.drafts)
+      .where(eq(schema.drafts.id, draftId));
+    expect(draft?.status).toBe('failed');
   });
 
   it('expires an approved draft when the fan writes again before it leaves', async () => {

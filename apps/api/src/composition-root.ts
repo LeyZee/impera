@@ -424,6 +424,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     fans: fans.module,
     alerts: alerts.module,
     scheduling: scheduling.module,
+    scripts: scripts.module,
+    connectors: connectors.module,
     ...(options.composer !== undefined && { composer: options.composer }),
   });
   const conversations = wireConversations(shared, {
