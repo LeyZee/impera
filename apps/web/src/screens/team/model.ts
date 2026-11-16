@@ -289,6 +289,12 @@ const NOTE_DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'shor
 /** « 27 oct. », « 1er nov. »: the day an internal note was written, in the reader's zone. */
 export const noteDay = (iso: string): string => withFirstOfMonth(NOTE_DAY.formatToParts(new Date(iso)));
 
+const ZONE_CHANGE_HOUR = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+/** « 16 nov., 17:02 »: when a phone moved a member's zone, in the reader's hour (recette CHT-01). */
+export const zoneChangeAt = (iso: string): string =>
+  `${noteDay(iso)}, ${ZONE_CHANGE_HOUR.format(new Date(iso))}`;
+
 /** The rate set to start after `day`, the nearest one: `member.commission` stays the one in force until then. */
 export const rateAhead = (rates: readonly CommissionRate[], day: string): CommissionRate | null =>
   rates

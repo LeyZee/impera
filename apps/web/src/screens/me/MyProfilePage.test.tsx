@@ -105,7 +105,7 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
     expect(text).not.toContain('Léa');
     expect(text).toContain('10 % · depuis le 1er octobre 2026');
     expect(text).toContain('Bénin');
-    expect(text).toContain('Porto-Novo');
+    expect(text).toContain('Porto-Novo · celui de ton téléphone, repris à chaque ouverture');
     expect(text).toContain('1er septembre 2026');
   });
 

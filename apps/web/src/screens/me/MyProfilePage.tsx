@@ -119,7 +119,7 @@ function Facts({ member }: { member: TeamMember }): JSX.Element {
           <dt>Fuseau</dt>
           <dd>
             {cityOf(member.timeZone)}
-            <span className="tm-muted"> · l’heure de tes shifts</span>
+            <span className="tm-muted"> · celui de ton téléphone, repris à chaque ouverture</span>
           </dd>
         </div>
         <div>

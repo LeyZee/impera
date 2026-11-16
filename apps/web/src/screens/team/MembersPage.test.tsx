@@ -102,6 +102,8 @@ function serve(
     removals?: readonly unknown[];
     setups?: readonly unknown[];
     presets?: readonly unknown[];
+    /** The trace of Théo's zone: the newest page, then the one before `before`. */
+    zones?: readonly { readonly changes: readonly unknown[]; readonly nextBefore: string | null }[];
   } = {},
 ): Posted[] {
   const posted: Posted[] = [];
@@ -142,7 +144,13 @@ function serve(
       else if (path === '/v1/dashboard/setup/members' && routes.setups !== undefined)
         reply = { status: 200, body: { members: routes.setups } };
       else if (path.endsWith('/notes')) reply = { status: 200, body: { notes: [] } };
-      else if (path === `/v1/team/members/${THEO.id}`) reply = { status: 200, body: THEO };
+      else if (path === `/v1/team/members/${THEO.id}/time-zones` && routes.zones !== undefined) {
+        const before = new URL(input, 'http://localhost').searchParams.get('before');
+        const page = routes.zones.findIndex(
+          (one, i) => i > 0 && routes.zones?.[i - 1]?.nextBefore === before,
+        );
+        reply = { status: 200, body: before === null ? routes.zones[0] : routes.zones[page] };
+      } else if (path === `/v1/team/members/${THEO.id}`) reply = { status: 200, body: THEO };
       else reply = { status: 404 };
       return Promise.resolve(new Response(JSON.stringify(reply.body ?? null), { status: reply.status }));
     }),
@@ -284,6 +292,45 @@ describe('Équipe › Membres', () => {
     await waitFor(() => {
       expect(screen.queryByRole('region', { name: 'Théo' })).toBeNull();
     });
+  });
+
+  it('shows the owner where his phone took a member’s hours, a page at a time (recette CHT-01)', async () => {
+    const change = (n: number, from: string, to: string, at: string) => ({ id: id(70 + n), from, to, at });
+    serve({
+      zones: [
+        {
+          changes: [change(1, 'Africa/Porto-Novo', 'Europe/Paris', '2026-11-16T16:02:00.000Z')],
+          nextBefore: id(71),
+        },
+        {
+          changes: [change(2, 'Europe/Paris', 'Africa/Porto-Novo', '2026-11-01T09:30:00.000Z')],
+          nextBefore: null,
+        },
+      ],
+    });
+    renderPage(`/equipe/membres?membre=${THEO.id}`);
+    const sheet = await screen.findByRole('region', { name: 'Théo' });
+    const block = await within(sheet).findByRole('region', { name: 'Fuseau du téléphone' });
+    expect(within(block).getByText(/sa paie reste à l’heure de l’agence/u)).toBeDefined();
+    const rows = () =>
+      within(block)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
+    expect(rows()).toEqual([expect.stringMatching(/^Porto-Novoà Paris16 nov\., \d{2}:02$/u)]);
+    fireEvent.click(within(block).getByRole('button', { name: 'Changements plus anciens' }));
+    await waitFor(() => {
+      expect(rows()).toHaveLength(2);
+    });
+    expect(rows()[1]).toMatch(/^Parisà Porto-Novo1er nov\., \d{2}:30$/u);
+    expect(within(block).queryByRole('button', { name: 'Changements plus anciens' })).toBeNull();
+  });
+
+  it('shows no zone block while the phone never moved it, nor to a manager', async () => {
+    serve({ zones: [{ changes: [], nextBefore: null }] });
+    renderPage(`/equipe/membres?membre=${THEO.id}`);
+    const sheet = await screen.findByRole('region', { name: 'Théo' });
+    await within(sheet).findByText('Lues par toi et les managers, jamais par Théo.');
+    expect(within(sheet).queryByRole('region', { name: 'Fuseau du téléphone' })).toBeNull();
   });
 
   it('says in words that a member has no rate yet, never with a dash drawn as a figure', async () => {
