@@ -865,6 +865,12 @@ export function revealApiConnectors(options: {
   readonly log?: (platformAccountId: string, entry: RevealCallLog) => void;
   /** Tests only: FakeReveal's clock, so an attempt and the message it made are dated alike. */
   readonly now?: () => Date;
+  /** Tests only: FakeReveal's file server, its host and its plain HTTP, in place of the system's (ADR 0113 § 2). */
+  readonly files?: {
+    readonly transport: FileTransport;
+    readonly hosts: readonly string[];
+    readonly httpForTests: boolean;
+  };
 }): NonNullable<ConnectorRegistry['reveal']> {
   return (account, session, context) =>
     new RevealApiConnector({
@@ -874,5 +880,12 @@ export function revealApiConnectors(options: {
       ...(options.baseUrl === undefined ? {} : { baseUrl: options.baseUrl }),
       ...(options.now === undefined ? {} : { now: options.now }),
       ...(options.log === undefined ? {} : { log: (entry) => options.log?.(account.id, entry) }),
+      ...(options.files === undefined
+        ? {}
+        : {
+            fileTransport: options.files.transport,
+            fileHosts: options.files.hosts,
+            fileHttpForTests: options.files.httpForTests,
+          }),
     });
 }
