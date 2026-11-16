@@ -371,6 +371,10 @@ export function Glance({
                 <CreatorMedal kind={medal} size={MEDAL_SIZE} className="ag-streak__medal" />
               )}
               <b className="nv-num">{streak.days}</b> {streak.days > 1 ? 'jours' : 'jour'} de suite
+              {/* Said by a chevron, as every line that opens something: a phone has no hover (avis Design). */}
+              <svg className="ag-streak__go" viewBox="0 0 12 12" aria-hidden="true">
+                <path d="m4.5 2.5 3.5 3.5-3.5 3.5" />
+              </svg>
             </Link>
           )}
         </div>

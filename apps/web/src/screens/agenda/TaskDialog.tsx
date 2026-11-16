@@ -78,6 +78,15 @@ export function TaskDialog({
         />
       ) : (
         <div className="tm-dialog__body">
+          {/* Its state first: a routine removed today stays due today (recette 16/11, avis Design). */}
+          {task.removedAt === null ? null : (
+            <p className="ag-explain">
+              <span className="ag-ess" data-tone="info">
+                Retirée
+              </span>{' '}
+              {REMOVED_TODAY}
+            </p>
+          )}
           {task.purpose === null ? null : <p className="ag-explain">{task.purpose}</p>}
           {task.shootBrief === null && task.reelBrief === null ? null : (
             <ShootBrief brief={task.shootBrief} reel={task.reelBrief} folded={false} />
@@ -90,9 +99,9 @@ export function TaskDialog({
           ) : null}
           <p className="tm-hint">{doneWords(done, day, agenda.today, tickOpen(task, day, agenda.today))}</p>
           {/* A routine removed today stays due today: removing it never saves her streak (recette 16/11). */}
-          {task.removedAt === null ? null : <p className="tm-hint">{REMOVED_TODAY}</p>}
+          {/* The gesture's consequence, read before the red button: full ink, never grey (avis Design). */}
           {mode === 'remove' && task.when.kind === 'routine' ? (
-            <p className="tm-hint">{LEAVES_TOMORROW}</p>
+            <p className="tm-hint ag-task-foot__consequence">{LEAVES_TOMORROW}</p>
           ) : null}
           {failed === null ? null : (
             <p className="tm-hint tm-hint--error" role="alert">
@@ -284,10 +293,11 @@ function MoveForm({
 }
 
 const LEAVES_TOMORROW = 'Elle compte encore aujourd’hui et part de ton agenda demain.';
-const REMOVED_TODAY = 'Retirée : elle compte encore aujourd’hui et part de ton agenda demain.';
+const REMOVED_TODAY = 'Elle compte encore aujourd’hui et part de ton agenda demain.';
 
 /** What the dialog says of her tick that day; when the tick is closed (CRE-03, CRE-07), why it stays as it is. */
 function doneWords(done: boolean, day: string, today: string, open: boolean): string {
+  if (open && day === today) return done ? 'Faite aujourd’hui.' : 'Pas encore faite aujourd’hui.';
   if (open) return done ? 'Faite ce jour-là.' : 'Pas encore faite ce jour-là.';
   if (day > today) return closedTickWords(day, today);
   return `${done ? 'Faite' : 'Pas faite'} ce jour-là. ${closedTickWords(day, today)}`;

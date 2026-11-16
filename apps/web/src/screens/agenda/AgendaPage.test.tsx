@@ -518,10 +518,17 @@ describe('Agenda, recette du 16/11', () => {
     expect(await screen.findByRole('button', { name: 'Cocher Story du matin' })).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: /^Story du matin/u }));
     const dialog = screen.getByRole('dialog');
-    expect(
-      within(dialog).getByText('Retirée : elle compte encore aujourd’hui et part de ton agenda demain.'),
-    ).toBeDefined();
+    // Its state comes first, as a pill like « essentielle », then why (avis Design, 16/11).
+    const state = within(dialog).getByText('Retirée');
+    expect(state.className).toBe('ag-ess');
+    expect(state.getAttribute('data-tone')).toBe('info');
+    const why = within(dialog).getByText('Elle compte encore aujourd’hui et part de ton agenda demain.');
+    expect(why).toBe(state.parentElement);
+    expect(dialog.querySelector('.ag-explain')).toBe(why);
     expect(within(dialog).queryByRole('button', { name: 'Retirer' })).toBeNull();
+    // Today is said as today.
+    expect(within(dialog).getByText('Pas encore faite aujourd’hui.')).toBeDefined();
+    expect(within(dialog).queryByText(/ce jour-là/u)).toBeNull();
   });
 
   it('warns, before removing a routine, that it still counts today', async () => {
@@ -529,7 +536,10 @@ describe('Agenda, recette du 16/11', () => {
     show();
     fireEvent.click(await screen.findByRole('button', { name: /^Story du matin/u }));
     fireEvent.click(screen.getByRole('button', { name: 'Retirer' }));
-    expect(screen.getByText('Elle compte encore aujourd’hui et part de ton agenda demain.')).toBeDefined();
+    // The gesture's consequence, in full ink before the red button (avis Design, 16/11).
+    expect(screen.getByText('Elle compte encore aujourd’hui et part de ton agenda demain.').className).toBe(
+      'tm-hint ag-task-foot__consequence',
+    );
   });
 
   it('opens her trophies from her streak pill, its medal named aloud (CRE-13)', async () => {
