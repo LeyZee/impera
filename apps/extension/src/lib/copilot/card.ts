@@ -29,7 +29,8 @@ export const ESSENTIALS: readonly FanCardField[] = [
 
 export const PANEL_GROUPS: readonly { readonly group: FanCardGroup; readonly title: string }[] = [
   { group: 'him', title: 'Lui' },
-  { group: 'about_her', title: 'Ce qu’il aime chez elle' },
+  // Not « Ce qu'il aime chez elle »: one of its fields has that name (V-EXT-28).
+  { group: 'about_her', title: 'Elle, vue par lui' },
   { group: 'intimate', title: 'Intime' },
 ];
 
@@ -95,6 +96,10 @@ export function groupLine(entries: readonly FanCardEntry[], group: FanCardGroup)
   const known = specs.filter((spec) => entryOf(entries, spec.field).current !== null).length;
   return `${String(known)} sur ${String(specs.length)}`;
 }
+
+/** How many fields of a group, among those it shows, wait for a chatter: said on its folded line (V-EXT-07). */
+export const groupChecks = (entries: readonly FanCardEntry[], group: FanCardGroup): number =>
+  restOf(group).filter((spec) => entryOf(entries, spec.field).toCheck.length > 0).length;
 
 /** How many fields wait for a chatter (ADR 0085 § 6): said in amber, it stops nothing. */
 export const toCheckCount = (entries: readonly FanCardEntry[]): number =>

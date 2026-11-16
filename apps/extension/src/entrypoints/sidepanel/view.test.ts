@@ -168,7 +168,8 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     );
     expect(ident(card({}))?.textContent).toBe('Prénom, âge et ville pas encore sus');
 
-    // The other fields: the label and the source on one line, the source not said again when it is the same.
+    // The other fields: the label and its source share the first row when there is room (CSS), the value under them;
+    // the source is not said again when it is the same.
     const { root } = draw(
       onCard(
         card({
@@ -182,10 +183,13 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       ),
     );
     const sources = ['desires', 'limits', 'life_events'].map(
-      (name) =>
-        root.querySelector(`[data-field="${name}"] .cp-field__top .cp-field__source`)?.textContent ?? null,
+      (name) => root.querySelector(`[data-field="${name}"] > .cp-field__source`)?.textContent ?? null,
     );
     expect(sources).toEqual(['Dit par lui, il y a 3 jours', null, 'Noté par Inès, il y a 3 jours']);
+    // After the value in the reading order, so a narrow panel puts it under the value, never alone above it.
+    expect(
+      [...(root.querySelector('[data-field="desires"]')?.children ?? [])].map((node) => node.className),
+    ).toEqual(['cp-field__top', 'cp-field__value', 'cp-field__source']);
     expect(root.querySelector('[data-field="desires"] .cp-field__value')?.textContent).toBe('les talons');
   });
 
@@ -233,10 +237,26 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       ['intimate', false],
     ]);
     expect(root.querySelector('.cp-head__check')?.textContent).toBe('1 à vérifier');
+    // The count on top says which fold holds it (V-EXT-07); each fold says it opens (V-EXT-06).
+    expect(groups.map((g) => g.querySelector('.cp-group__check')?.textContent ?? null)).toEqual([
+      ' · 1 à vérifier',
+      null,
+      null,
+    ]);
+    expect(groups.every((g) => g.querySelector('summary .cp-group__chevron svg') !== null)).toBe(true);
+    expect(groups.map((g) => g.querySelector('.cp-group__title')?.textContent)).toEqual([
+      'Lui',
+      'Elle, vue par lui',
+      'Intime',
+    ]);
+    // What is not known yet is said in one line, not as a column of « Pas encore su ».
+    const him = groups[0];
+    expect(him?.querySelectorAll('.cp-field:not(.cp-field--unknown)').length).toBe(1);
+    expect(him?.querySelector('.cp-field--unknown')?.textContent).toMatch(/^Pas encore su : [^A-Z].*\.$/u);
+    expect(him?.querySelector('.cp-field__empty')).toBeNull();
     expect(root.querySelector('[data-field="job"] .cp-field__check')?.textContent).toBe(
       'À vérifier : l’agent a lu « aide-soignant »',
     );
-    const him = groups[0];
     if (him === undefined) throw new Error('no group');
     him.open = true;
     him.dispatchEvent(new Event('toggle'));
@@ -287,7 +307,13 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     );
     expect(root.querySelector('.cp-standing__stop')?.textContent).toBe('Ventes gelées');
     expect(root.querySelector('.cp-standing__care')?.textContent).toBe('Fan fragile');
-    expect(root.querySelector('.cp-standing')?.textContent).toBe('Ventes gelées·Fan fragile·désir joueur 😏');
+    // No emoji in the interface (V-EXT): his desire is said in words.
+    expect(root.querySelector('.cp-standing')?.textContent).toBe('Ventes gelées·Fan fragile·désir joueur');
+    // A part and the dot before it hold together at a line's end.
+    expect([...root.querySelectorAll('.cp-standing__item')].map((n) => n.textContent)).toEqual([
+      '·Fan fragile',
+      '·désir joueur',
+    ]);
     expect(line(onCard(card({}), [], { standing: standingOf({}, 'neutral') }))).toBe(
       'Rien à signaler·désir neutre',
     );
@@ -303,7 +329,7 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(writing.querySelector('.cp-draft')?.textContent).toBe('L’agent écrit…');
   });
 
-  it('puts the draft at the foot, under the card, with its three gestures and their keys (EXT-13: it copies)', () => {
+  it('puts the draft at the foot, under the card, with its three gestures and their keys', () => {
     const { root, actions } = draw(onCard(card({}), [], { draft: ready() }));
     // The card scrolls between the line on top and the draft at the foot: a draft pushes nothing (§ 10).
     expect([...root.children].map((node) => node.className)).toEqual([
@@ -316,7 +342,10 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       'tu rentres quand de ta garde ?',
     ]);
     const buttons = [...root.querySelectorAll<HTMLButtonElement>('.cp-draft__actions button')];
-    expect(buttons.map((b) => b.textContent)).toEqual(['Copier pour Reveal A', 'Retoucher E', 'Refuser R']);
+    // Charles's word (recette visuelle V-EXT-02): one verb for the gesture, « placer ».
+    expect(buttons.map((b) => b.textContent)).toEqual(['Placer dans Reveal A', 'Retoucher E', 'Refuser R']);
+    expect(buttons[0]?.classList.contains('cp-send')).toBe(true);
+    expect(root.querySelector('.cp-draft__stop')).toBeNull();
     buttons[0]?.click();
     buttons[1]?.click();
     buttons[2]?.click();
@@ -331,6 +360,14 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     );
     const area = root.querySelector<HTMLTextAreaElement>('textarea');
     expect(area?.value).toBe('coucou toi 😘\ntu rentres quand ?');
+    // The gesture and « Annuler » share one line: no half-width orphan (EXT-21).
+    const row = root.querySelector('.cp-draft__actions');
+    expect(row?.classList.contains('cp-draft__actions--pair')).toBe(true);
+    // « Annuler » first and the gesture on the right, as in the CRM's confirmations (V-EXT-14).
+    expect([...(row?.children ?? [])].map((b) => b.textContent)).toEqual(['Annuler', 'Placer dans Reveal']);
+    expect(root.querySelector('.cp-draft__hint')?.textContent).toBe(
+      'Une bulle par ligne. Ctrl+Entrée place le texte.',
+    );
     root.querySelector<HTMLButtonElement>('[data-gesture="place-edited"]')?.click();
     expect(actions.place).toHaveBeenCalledWith(true);
   });
@@ -370,6 +407,9 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
   it('refuses with a reason of the closed list and an optional note, the button shut until a reason', () => {
     const shut = draw(onCard(card({}), [], { draft: ready({ mode: 'rejecting' }) })).root;
     expect(shut.querySelector<HTMLButtonElement>('[data-gesture="send-reject"]')?.disabled).toBe(true);
+    expect(
+      [...(shut.querySelector('.cp-draft__actions--pair')?.children ?? [])].map((b) => b.textContent),
+    ).toEqual(['Annuler', 'Refuser']);
     const { root, actions } = draw(
       onCard(card({}), [], { draft: ready({ mode: 'rejecting', reason: 'too_long' }) }),
     );
@@ -391,7 +431,7 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       }),
     ).root;
     expect(placed.querySelector('.cp-draft__next')?.textContent).toBe(
-      'Texte copié : colle-le dans Reveal (Ctrl+V), relis, et envoie.',
+      'Texte placé : colle-le dans Reveal (Ctrl+V), relis, et envoie.',
     );
     expect(placed.querySelector('.cp-draft__actions')).toBeNull();
     expect(placed.querySelector('.cp-draft__warn')).toBeNull();
@@ -408,8 +448,11 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
         }),
       }),
     ).root;
+    // A refused draft that stays on screen is put out: it never looks like one to place.
+    expect(unlinked.querySelector('.cp-bubbles')?.getAttribute('data-off')).toBe('true');
+    expect(placed.querySelector('.cp-bubbles')?.getAttribute('data-off')).toBeNull();
     expect(unlinked.querySelector('.cp-draft__warn')?.textContent).toBe(
-      'Ce geste n’a pas compté : relie l’extension dans son popup (« Relier »).',
+      'Ce geste n’a pas compté : relie l’extension (clique sur l’icône Impera, puis «\u00a0Relier\u00a0»).',
     );
   });
 
@@ -427,20 +470,23 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       });
     const { root, actions } = draw(onCard(card({}), [], { draft: done(1) }));
     expect(root.querySelector('.cp-draft__next')?.textContent).toBe(
-      'Bulle 1 sur 3 copiée : colle-la dans Reveal (Ctrl+V), envoie, puis copie la suivante.',
+      'Bulle 1 sur 3 placée : colle-la dans Reveal (Ctrl+V), envoie, puis place la suivante.',
     );
     expect([...root.querySelectorAll('.cp-bubble')].map((n) => n.getAttribute('data-copied'))).toEqual([
       'true',
       null,
       null,
     ]);
+    // The placed bubble says so in words, not only by its edge (Design, lot -1).
+    expect(root.querySelector('.cp-bubble[data-copied] .cp-bubble__done')?.textContent).toBe('placée');
+    expect(root.querySelector('.cp-bubble[data-copied] .cp-bubble__done svg')).not.toBeNull();
     const next = root.querySelector<HTMLButtonElement>('[data-gesture="copy-next"]');
-    expect(next?.textContent).toBe('Copier la bulle 2 A');
+    expect(next?.textContent).toBe('Placer la bulle 2 A');
     next?.click();
     expect(actions.copyNext).toHaveBeenCalledOnce();
     const last = draw(onCard(card({}), [], { draft: done(3) })).root;
     expect(last.querySelector('.cp-draft__next')?.textContent).toBe(
-      'Bulle 3 sur 3 copiée : colle-la dans Reveal (Ctrl+V) et envoie. C’était la dernière.',
+      'Bulle 3 sur 3 placée : colle-la dans Reveal (Ctrl+V) et envoie. C’était la dernière.',
     );
     expect(last.querySelector('[data-gesture="copy-next"]')).toBeNull();
   });
@@ -455,6 +501,12 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(root.querySelector('.cp-draft__stop')?.textContent).toBe(
       'Ne plus lui écrire : rien ne part vers lui. Refuse ce brouillon.',
     );
+    // Its bubbles are put out, and « Refuser », the one action, is on the secondary plate (Design, lot -1).
+    expect(root.querySelector('.cp-bubbles')?.getAttribute('data-off')).toBe('true');
+    expect(root.querySelector('[data-gesture="reject"]')?.classList.contains('nv-btn--soft')).toBe(true);
+    expect(
+      draw(onCard(card({}), [], { draft: ready() })).root.querySelector('.cp-bubbles[data-off]'),
+    ).toBeNull();
     const editing = draw(
       onCard(card({}), [], { standing: stop, draft: ready({ mode: 'editing', text: 'x' }) }),
     ).root;
@@ -491,5 +543,55 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     render(root, onCard(card({}), [], { draft: ready({ mode: 'rejecting', reason: 'too_long' }) }), actions);
     expect(document.activeElement).toBe(root.querySelector('[data-reason="too_long"]'));
     root.remove();
+  });
+  // V-EXT-03: a red stop said again next to the draft, and the send no longer the ink button.
+  it('says a red stop again above the bubbles and quiets the send, the rule staying the server’s', () => {
+    const { root, actions } = draw(
+      onCard(card({}), [], {
+        draft: ready(),
+        standing: standingOf({ salesFrozen: { reason: 'distress', since: now.toISOString() } }, null),
+      }),
+    );
+    const section = root.querySelector('.cp-draft');
+    const stop = section?.querySelector('.cp-draft__stop');
+    expect(stop?.textContent).toBe('Ventes gelées : relis-le avant de l’envoyer.');
+    expect(stop?.nextElementSibling?.classList.contains('cp-bubbles')).toBe(true);
+    const place = root.querySelector<HTMLButtonElement>('[data-gesture="place"]');
+    expect(place?.classList.contains('cp-send')).toBe(false);
+    expect(place?.classList.contains('nv-btn--soft')).toBe(true);
+    place?.click();
+    expect(actions.place).toHaveBeenCalledWith(false);
+  });
+
+  // V-EXT-20: the question is written, and the reasons are one stop of the keyboard, walked with the arrows.
+  it('asks why it is refused and walks the reasons with the arrows', () => {
+    const { root, actions } = draw(
+      onCard(card({}), [], { draft: ready({ mode: 'rejecting', reason: 'too_long' }) }),
+    );
+    const group = root.querySelector('[role="radiogroup"]');
+    const question = root.querySelector(`#${group?.getAttribute('aria-labelledby') ?? 'none'}`);
+    expect(question?.textContent).toBe('Pourquoi tu le refuses ?');
+    const chips = [...root.querySelectorAll<HTMLElement>('[data-reason]')];
+    expect(chips.filter((chip) => chip.tabIndex === 0).map((chip) => chip.dataset['reason'])).toEqual([
+      'too_long',
+    ]);
+    const picked = chips.findIndex((chip) => chip.dataset['reason'] === 'too_long');
+    chips[picked]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(actions.pickReason).toHaveBeenLastCalledWith(
+      chips[(picked + 1) % chips.length]?.dataset['reason'],
+    );
+    chips[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    expect(actions.pickReason).toHaveBeenLastCalledWith(chips.at(-1)?.dataset['reason']);
+    // With no reason yet, the first one takes the keyboard's stop.
+    const none = draw(onCard(card({}), [], { draft: ready({ mode: 'rejecting' }) })).root;
+    expect([...none.querySelectorAll<HTMLElement>('[data-reason]')].map((chip) => chip.tabIndex)[0]).toBe(0);
+  });
+
+  // V-EXT: no native tooltip anywhere, and each notice carries its picture.
+  it('draws no native tooltip and gives each notice its icon', () => {
+    const { root } = draw(onCard(card({ first_name: { current: value(['Marc']), toCheck: [] } })));
+    expect(root.querySelector('[title]')).toBeNull();
+    for (const kind of ['signed_out', 'no_conversation', 'unknown', 'off_shift', 'down'] as const)
+      expect(draw({ kind }).root.querySelector('.cp-notice__icon svg')).not.toBeNull();
   });
 });

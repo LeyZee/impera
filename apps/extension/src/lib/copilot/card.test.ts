@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ESSENTIALS,
+  groupChecks,
   identitySources,
   identityText,
   newestOf,
@@ -88,5 +89,19 @@ describe('the fan’s card in the panel (ADR 0086 § 10)', () => {
         { field: 'location', current: null, toCheck: [] },
       ]),
     ).toBe('2026-11-07T18:00:00.000Z');
+  });
+
+  // V-EXT-07: the fold that holds a field to check says how many; an essential on top counts in none.
+  it('counts what waits for a chatter in each fold, never an essential', () => {
+    const entries = [
+      { field: 'job' as const, current: null, toCheck: [value({ source: 'inferred' })] },
+      { field: 'location' as const, current: null, toCheck: [value({ source: 'inferred' })] },
+    ];
+    const group = FAN_CARD_FIELDS.find((spec) => spec.field === 'job')?.group;
+    if (group === undefined) throw new Error('no group');
+    expect(groupChecks(entries, group)).toBe(1);
+    expect(PANEL_GROUPS.filter((g) => g.group !== group).map((g) => groupChecks(entries, g.group))).toEqual([
+      0, 0,
+    ]);
   });
 });

@@ -10,6 +10,7 @@ import {
 import {
   entryOf,
   ESSENTIALS,
+  groupChecks,
   groupLine,
   IDENTITY,
   IDENTITY_WORDS,
@@ -25,6 +26,7 @@ import {
 import { DESIRE_WORDS, REJECT_WORDS, type Standing } from '../../lib/copilot/standing';
 import type { VerdictSent } from '../../lib/copilot/verdict';
 import { h } from '../../lib/dom';
+import { icon, type IconName } from '../../lib/icons';
 
 /**
  * One screen of the copilot side panel (ADR 0086). Pure: the same state draws the same nodes; main.ts follows the tab
@@ -113,39 +115,52 @@ export interface PanelActions {
 const NOTICES: Readonly<
   Record<
     Exclude<PanelScreen['kind'], 'conversation' | 'loading'>,
-    { title: string; text: string; tone?: 'amber' }
+    { title: string; text: string; icon: IconName; tone?: 'amber' }
   >
 > = {
   signed_out: {
+    icon: 'key',
     title: 'Connecte-toi au CRM',
     text: 'Le panneau lit la fiche du fan avec ta session du CRM.',
   },
   no_conversation: {
+    icon: 'message',
     title: 'Ouvre une conversation dans Reveal',
     text: 'Le panneau suit la conversation ouverte, sans clic de ta part.',
   },
   unknown: {
+    icon: 'eye',
     title: 'Impera n’a pas encore lu cette conversation',
     text: 'Elle apparaîtra ici dès qu’Impera l’aura lue.',
   },
   off_shift: {
+    icon: 'planning',
     title: 'Tu n’es pas en poste sur cette créatrice',
     text: 'Le panneau s’ouvre pendant ton shift.',
   },
   forbidden: {
+    icon: 'shield',
     title: 'Cette créatrice ne t’est pas ouverte',
     text: 'Demande à ton responsable si c’est une erreur.',
   },
   conflict: {
+    icon: 'alert',
     title: 'Deux créatrices ont cette conversation',
     text: 'Ouvre-la depuis le CRM pour savoir laquelle.',
     tone: 'amber',
   },
-  down: { title: 'Le CRM ne répond pas', text: 'Le panneau réessaie tout seul.', tone: 'amber' },
+  down: {
+    icon: 'alert',
+    title: 'Le CRM ne répond pas',
+    // The popup's voice for the same notice (V-EXT-15): what to check, then what the panel does.
+    text: 'Vérifie que le CRM est lancé. Le panneau réessaie tout seul.',
+    tone: 'amber',
+  },
 };
 
+/** A notice in the popup's shape (V-EXT-15): its icon in a tile, its title, one sentence, a full-width button. */
 function notice(kind: keyof typeof NOTICES): HTMLElement {
-  const { title, text, tone } = NOTICES[kind];
+  const { title, text, tone, icon: name } = NOTICES[kind];
   return h(
     'section',
     {
@@ -154,14 +169,12 @@ function notice(kind: keyof typeof NOTICES): HTMLElement {
       'data-tone': tone,
       role: tone === 'amber' ? 'status' : undefined,
     },
+    // The popup's form for a notice (V-EXT-15): its picture in a tile, its title, its sentence, a button across.
+    h('span', { class: 'cp-notice__icon', 'aria-hidden': 'true' }, icon(name, 18)),
     h('p', { class: 'cp-notice__title' }, title),
     h('p', { class: 'cp-notice__text' }, text),
     kind === 'signed_out'
-      ? h(
-          'button',
-          { type: 'button', class: 'nv-btn nv-btn--soft nv-btn--sm', 'data-action': 'crm' },
-          'Ouvrir le CRM',
-        )
+      ? h('button', { type: 'button', class: 'nv-btn nv-btn--soft', 'data-action': 'crm' }, 'Ouvrir le CRM')
       : null,
   );
 }
@@ -179,6 +192,7 @@ function quote(text: string | null, part?: string): HTMLElement | null {
 }
 
 const capital = (text: string): string => text.charAt(0).toLocaleUpperCase('fr-FR') + text.slice(1);
+const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr-FR') + text.slice(1);
 
 /** What the card shows of a value: when it is newer than the panel's first reading of the card, it says so (§ 10). */
 interface Marks {
@@ -213,7 +227,6 @@ function field(
       { class: 'cp-field__top' },
       h('span', { class: 'cp-field__label' }, spec.label),
       current !== null && isNew(current.observedAt, marks) ? newMark() : null,
-      sayIt ? h('span', { class: 'cp-field__source' }, source) : null,
     ),
     current === null
       ? h(
@@ -222,6 +235,8 @@ function field(
           spec.learning === 'observe' ? 'Pas encore deviné' : 'Pas encore su',
         )
       : h('span', { class: 'cp-field__value' }, valueText(spec.field, current.items)),
+    // Right of the label when the panel is wide, under the value when it is not (CSS): never alone between the two.
+    sayIt ? h('span', { class: 'cp-field__source' }, source) : null,
     current === null ? null : quote(current.sourceQuote),
     ...toCheck.map((value) =>
       h(
@@ -246,17 +261,12 @@ function identity(card: FanCardView, marks: Marks): HTMLElement {
   else
     entries.forEach(({ name, entry }, index) => {
       if (index > 0) line.append(h('span', { class: 'cp-ident__dot', 'aria-hidden': 'true' }, '·'));
-      const label = specOf(name)?.label;
       line.append(
         entry.current === null
-          ? h(
-              'span',
-              { class: 'cp-field__empty', 'data-field': name, title: label },
-              `${IDENTITY_WORDS[name]} ?`,
-            )
+          ? h('span', { class: 'cp-field__empty', 'data-field': name }, `${IDENTITY_WORDS[name]} ?`)
           : h(
               'span',
-              { class: 'cp-field__value', 'data-field': name, title: label },
+              { class: 'cp-field__value', 'data-field': name },
               identityText(name, entry.current.items),
             ),
       );
@@ -308,6 +318,13 @@ function cardNodes(
     h('ul', { class: 'cp-fields cp-fields--essentials', 'aria-label': 'L’essentiel' }, ...essentials),
     ...PANEL_GROUPS.map(({ group, title }) => {
       const groupSaid: { last: string | null } = { last: null };
+      const toCheck = groupChecks(card.fields, group);
+      // A group shows what is known or waits for a check; the rest is named on one faint line (V-EXT-29).
+      const shown = restOf(group).filter((spec) => {
+        const entry = entryOf(card.fields, spec.field);
+        return entry.current !== null || entry.toCheck.length > 0;
+      });
+      const unknown = restOf(group).filter((spec) => !shown.includes(spec));
       const details = h(
         'details',
         { class: 'cp-group', 'data-group': group, open: openGroups.has(group) },
@@ -315,12 +332,29 @@ function cardNodes(
           'summary',
           {},
           h('span', { class: 'cp-group__title' }, title),
-          h('span', { class: 'cp-group__sum' }, groupLine(card.fields, group)),
+          h(
+            'span',
+            { class: 'cp-group__sum' },
+            groupLine(card.fields, group),
+            // Where the count on top sends him (V-EXT-07).
+            toCheck === 0
+              ? null
+              : h('span', { class: 'cp-group__check' }, ` · ${String(toCheck)} à vérifier`),
+          ),
+          // The fold says it opens (V-EXT-06).
+          h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
         ),
         h(
           'ul',
           { class: 'cp-fields' },
-          ...restOf(group).map((spec) => field(spec, entryOf(card.fields, spec.field), marks, groupSaid)),
+          ...shown.map((spec) => field(spec, entryOf(card.fields, spec.field), marks, groupSaid)),
+          unknown.length === 0
+            ? null
+            : h(
+                'li',
+                { class: 'cp-field cp-field--unknown' },
+                `Pas encore su : ${unknown.map((spec) => lowerFirst(spec.label)).join(', ')}.`,
+              ),
         ),
       );
       details.addEventListener('toggle', () => {
@@ -343,18 +377,22 @@ function standingLine(standing: Standing | null): HTMLElement {
   ];
   if (standing.unread) parts.push(h('span', { class: 'cp-standing__care' }, 'Limites non lues'));
   if (parts.length === 0) parts.push(h('span', { class: 'cp-standing__calm' }, 'Rien à signaler'));
+  // Words of the application, without an emoji (V-EXT-08): the emojis are the creator's voice, in the bubbles.
   if (standing.band !== null)
-    parts.push(
-      h(
-        'span',
-        { class: 'cp-standing__band' },
-        `désir ${DESIRE_WORDS[standing.band]}${standing.band === 'playful' ? ' 😏' : standing.band === 'hot' ? ' 🔥' : ''}`,
-      ),
-    );
+    parts.push(h('span', { class: 'cp-standing__band' }, `désir ${DESIRE_WORDS[standing.band]}`));
   const line = h('p', { class: 'cp-standing', 'aria-label': 'Où on en est' });
+  // Each dot goes with what follows it, never alone at the end of a line (V-EXT-18).
   parts.forEach((part, index) => {
-    if (index > 0) line.append(h('span', { class: 'cp-standing__dot', 'aria-hidden': 'true' }, '·'));
-    line.append(part);
+    line.append(
+      index === 0
+        ? part
+        : h(
+            'span',
+            { class: 'cp-standing__item' },
+            h('span', { class: 'cp-standing__dot', 'aria-hidden': 'true' }, '·'),
+            part,
+          ),
+    );
   });
   return line;
 }
@@ -368,6 +406,7 @@ function cardPart(
       h(
         'section',
         { class: 'cp-notice', 'data-kind': 'card_off' },
+        h('span', { class: 'cp-notice__icon', 'aria-hidden': 'true' }, icon('eye', 18)),
         h('p', { class: 'cp-notice__title' }, 'La fiche du fan est éteinte pour cette créatrice'),
         h(
           'p',
@@ -397,18 +436,19 @@ function doneLines(done: GestureDone): HTMLElement[] {
   if (done.outcome === 'rejected')
     lines.push(h('p', { class: 'cp-draft__next' }, 'Refusé : écris ta propre réponse dans Reveal.'));
   else if (done.copyFailed)
+    // What blocks him, so in amber (V-EXT-19).
     lines.push(
       h(
         'p',
-        { class: 'cp-draft__next' },
+        { class: 'cp-draft__warn', role: 'status' },
         total > 1
-          ? `La bulle ${String(done.copied)} n’a pas pu être copiée : sélectionne-la ci-dessus, colle-la dans Reveal et envoie.`
-          : 'Le texte n’a pas pu être copié : sélectionne-le ci-dessus, colle-le dans Reveal et envoie.',
+          ? `La bulle ${String(done.copied)} n’a pas pu être placée : sélectionne-la ci-dessus, colle-la dans Reveal et envoie.`
+          : 'Le texte n’a pas pu être placé : sélectionne-le ci-dessus, colle-le dans Reveal et envoie.',
       ),
     );
   else if (total <= 1)
     lines.push(
-      h('p', { class: 'cp-draft__next' }, 'Texte copié : colle-le dans Reveal (Ctrl+V), relis, et envoie.'),
+      h('p', { class: 'cp-draft__next' }, 'Texte placé : colle-le dans Reveal (Ctrl+V), relis, et envoie.'),
     );
   else
     lines.push(
@@ -416,8 +456,8 @@ function doneLines(done: GestureDone): HTMLElement[] {
         'p',
         { class: 'cp-draft__next' },
         done.copied < total
-          ? `Bulle ${String(done.copied)} sur ${String(total)} copiée : colle-la dans Reveal (Ctrl+V), envoie, puis copie la suivante.`
-          : `Bulle ${String(total)} sur ${String(total)} copiée : colle-la dans Reveal (Ctrl+V) et envoie. C’était la dernière.`,
+          ? `Bulle ${String(done.copied)} sur ${String(total)} placée : colle-la dans Reveal (Ctrl+V), envoie, puis place la suivante.`
+          : `Bulle ${String(total)} sur ${String(total)} placée : colle-la dans Reveal (Ctrl+V) et envoie. C’était la dernière.`,
       ),
     );
   if (done.outcome === 'placed' && done.copied < total)
@@ -428,7 +468,7 @@ function doneLines(done: GestureDone): HTMLElement[] {
         h(
           'button',
           { type: 'button', class: 'nv-btn nv-btn--sm cp-send', 'data-gesture': 'copy-next' },
-          `Copier la bulle ${String(done.copied + 1)} `,
+          `Placer la bulle ${String(done.copied + 1)} `,
           key('A'),
         ),
       ),
@@ -436,7 +476,8 @@ function doneLines(done: GestureDone): HTMLElement[] {
   const status: Record<GestureDone['sent'], string | null> = {
     sending: null,
     sent: null,
-    unlinked: 'Ce geste n’a pas compté : relie l’extension dans son popup (« Relier »).',
+    unlinked:
+      'Ce geste n’a pas compté : relie l’extension (clique sur l’icône Impera, puis «\u00a0Relier\u00a0»).',
     refused: 'Ce brouillon n’est plus à jour : l’agent en refait un.',
     unreachable: 'Le CRM ne répond pas : ce geste n’a pas compté.',
   };
@@ -444,6 +485,13 @@ function doneLines(done: GestureDone): HTMLElement[] {
   if (text !== null) lines.push(h('p', { class: 'cp-draft__warn', role: 'status' }, text));
   return lines;
 }
+
+/**
+ * Another stop next to the draft (V-EXT-03): the line on top is 600 px away from the button, so it is said again here,
+ * in red, and the send is no longer the ink button. The rule itself is the server's.
+ */
+const stopsLine = (stops: readonly string[]): HTMLElement =>
+  h('p', { class: 'cp-draft__stop', role: 'status' }, `${stops.join(' · ')} : relis-le avant de l’envoyer.`);
 
 /** « Ne plus lui écrire » (EXT-05): red, the limit forbids; only the refusal is left to the chatter. */
 const noContactLine = (): HTMLElement =>
@@ -463,7 +511,17 @@ const rowsOf = (text: string): number =>
     ),
   );
 
-function draftPart(draft: DraftPart, noContact: boolean, actions: PanelActions): HTMLElement | null {
+/** What « où on en est » forbids, as the draft reads it. */
+interface DraftStops {
+  readonly noContact: boolean;
+  readonly stops: readonly string[];
+}
+
+function draftPart(
+  draft: DraftPart,
+  { noContact, stops }: DraftStops,
+  actions: PanelActions,
+): HTMLElement | null {
   if (draft.kind === 'hidden') return null;
   if (draft.kind === 'writing')
     return h(
@@ -497,10 +555,16 @@ function draftPart(draft: DraftPart, noContact: boolean, actions: PanelActions):
       area,
       noContact
         ? noContactLine()
-        : h('p', { class: 'cp-draft__hint' }, 'Une bulle par ligne. Ctrl+Entrée copie le texte.'),
+        : h('p', { class: 'cp-draft__hint' }, 'Une bulle par ligne. Ctrl+Entrée place le texte.'),
       h(
         'div',
-        { class: 'cp-draft__actions' },
+        { class: 'cp-draft__actions cp-draft__actions--pair' },
+        // « Annuler » first and the gesture on the right, as in the CRM's confirmations (V-EXT-14).
+        h(
+          'button',
+          { type: 'button', class: 'nv-btn nv-btn--plain nv-btn--sm', 'data-gesture': 'cancel' },
+          'Annuler',
+        ),
         noContact
           ? null
           : h(
@@ -511,24 +575,28 @@ function draftPart(draft: DraftPart, noContact: boolean, actions: PanelActions):
                 'data-gesture': 'place-edited',
                 disabled: empty,
               },
-              'Copier pour Reveal',
+              'Placer dans Reveal',
             ),
-        h(
-          'button',
-          { type: 'button', class: 'nv-btn nv-btn--plain nv-btn--sm', 'data-gesture': 'cancel' },
-          'Annuler',
-        ),
       ),
     );
     return section;
   }
   const shown = draft.done?.bubbles ?? draft.bubbles;
   const copied = draft.done?.outcome === 'placed' ? draft.done.copied : 0;
+  // A draft he may not or no longer use is put out, so it never looks like one to place (Design, lot -1).
+  const off = noContact || draft.done?.outcome === 'rejected';
   const bubbles = h(
     'ol',
-    { class: 'cp-bubbles' },
+    { class: 'cp-bubbles', 'data-off': off ? 'true' : undefined },
     ...shown.map((bubble, index) =>
-      h('li', { class: 'cp-bubble', 'data-copied': index < copied ? 'true' : undefined }, bubble),
+      index < copied
+        ? h(
+            'li',
+            { class: 'cp-bubble', 'data-copied': 'true' },
+            h('span', { class: 'cp-bubble__done' }, icon('check', 12), 'placée'),
+            bubble,
+          )
+        : h('li', { class: 'cp-bubble' }, bubble),
     ),
   );
   if (draft.mode === 'rejecting') {
@@ -539,12 +607,15 @@ function draftPart(draft: DraftPart, noContact: boolean, actions: PanelActions):
       placeholder: 'Note facultative',
       maxlength: 1000,
     });
+    // The question is written, and the reasons are one stop of the keyboard, walked with the arrows (V-EXT-20).
+    const picked = draft.reason ?? REJECT_REASONS[0];
     section.append(
       head,
       bubbles,
+      h('p', { class: 'cp-draft__hint', id: 'cp-reject-question' }, 'Pourquoi tu le refuses ?'),
       h(
         'div',
-        { class: 'cp-draft__reasons', role: 'radiogroup', 'aria-label': 'Pourquoi tu le refuses' },
+        { class: 'cp-draft__reasons', role: 'radiogroup', 'aria-labelledby': 'cp-reject-question' },
         ...REJECT_REASONS.map((reason) =>
           h(
             'button',
@@ -553,6 +624,7 @@ function draftPart(draft: DraftPart, noContact: boolean, actions: PanelActions):
               role: 'radio',
               class: 'nv-chip',
               'aria-checked': draft.reason === reason ? 'true' : 'false',
+              tabindex: reason === picked ? 0 : -1,
               'data-reason': reason,
             },
             REJECT_WORDS[reason],
@@ -562,7 +634,12 @@ function draftPart(draft: DraftPart, noContact: boolean, actions: PanelActions):
       note,
       h(
         'div',
-        { class: 'cp-draft__actions' },
+        { class: 'cp-draft__actions cp-draft__actions--pair' },
+        h(
+          'button',
+          { type: 'button', class: 'nv-btn nv-btn--plain nv-btn--sm', 'data-gesture': 'cancel' },
+          'Annuler',
+        ),
         h(
           'button',
           {
@@ -572,11 +649,6 @@ function draftPart(draft: DraftPart, noContact: boolean, actions: PanelActions):
             disabled: draft.reason === null,
           },
           'Refuser',
-        ),
-        h(
-          'button',
-          { type: 'button', class: 'nv-btn nv-btn--plain nv-btn--sm', 'data-gesture': 'cancel' },
-          'Annuler',
         ),
       ),
     );
@@ -600,18 +672,26 @@ function draftPart(draft: DraftPart, noContact: boolean, actions: PanelActions):
     key('R'),
   );
   if (noContact) {
+    // The one action left, on the secondary plate across the width: not a grey text that reads as off.
+    refuse.className = 'nv-btn nv-btn--soft nv-btn--sm';
     section.append(noContactLine(), h('div', { class: 'cp-draft__actions' }, refuse));
     return section;
   }
+  const stopped = stops.length > 0;
+  if (stopped) section.insertBefore(stopsLine(stops), bubbles);
   section.append(
     h(
       'div',
       { class: 'cp-draft__actions' },
-      // It copies, it does not send: the chatter sends in Reveal himself (EXT-13).
+      // Charles's word (recette visuelle V-EXT-02): the text is placed on the clipboard, the chatter sends in Reveal.
       h(
         'button',
-        { type: 'button', class: 'nv-btn nv-btn--sm cp-send', 'data-gesture': 'place' },
-        'Copier pour Reveal ',
+        {
+          type: 'button',
+          class: stopped ? 'nv-btn nv-btn--soft nv-btn--sm cp-place' : 'nv-btn nv-btn--sm cp-send cp-place',
+          'data-gesture': 'place',
+        },
+        'Placer dans Reveal ',
         key('A'),
       ),
       h(
@@ -645,19 +725,28 @@ function wire(root: ParentNode, actions: PanelActions): void {
     const note = root.querySelector<HTMLInputElement>('.cp-draft__note');
     actions.sendReject(note?.value ?? '');
   });
-  for (const chip of root.querySelectorAll<HTMLElement>('[data-reason]')) {
+  const chips = [...root.querySelectorAll<HTMLElement>('[data-reason]')];
+  chips.forEach((chip, index) => {
     const reason = REJECT_REASONS.find((one) => one === chip.dataset['reason']);
-    if (reason !== undefined)
-      chip.addEventListener('click', () => {
-        actions.pickReason(reason);
-      });
-  }
+    if (reason === undefined) return;
+    chip.addEventListener('click', () => {
+      actions.pickReason(reason);
+    });
+    // A radio group: the arrows pick the previous or the next reason, and the focus follows it.
+    chip.addEventListener('keydown', (event) => {
+      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+      if (step === undefined) return;
+      event.preventDefault();
+      const next = REJECT_REASONS[(index + step + REJECT_REASONS.length) % REJECT_REASONS.length];
+      if (next !== undefined) actions.pickReason(next);
+    });
+  });
 }
 
 /** What a drawn draft shows, but the text being retouched: that text lives in its field, under his fingers. */
 const drawnDrafts = new WeakMap<Element, string>();
-const draftKey = (draft: DraftPart, noContact: boolean): string =>
-  JSON.stringify([draft.kind === 'ready' ? { ...draft, text: null } : draft, noContact]);
+const draftKey = (draft: DraftPart, stops: DraftStops): string =>
+  JSON.stringify([draft.kind === 'ready' ? { ...draft, text: null } : draft, stops]);
 
 /**
  * Where the keyboard is in the panel, as a selector of the same control drawn again (EXT-16): a group's line, a gesture,
@@ -697,11 +786,14 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
   const focused = focusOf(root);
   if (screen.kind === 'conversation') {
     const body = h('div', { class: 'cp-scroll' }, ...cardPart(screen, actions));
-    const noContact = screen.standing?.noContact === true;
+    const stops: DraftStops = {
+      noContact: screen.standing?.noContact === true,
+      stops: screen.standing?.stops ?? [],
+    };
     const top = [whoBand(screen.fanName), standingLine(screen.standing)].filter(
       (node): node is HTMLElement => node !== null,
     );
-    const key = draftKey(screen.draft, noContact);
+    const key = draftKey(screen.draft, stops);
     const shown = root.querySelector(':scope > .cp-draft');
     if (shown !== null && drawnDrafts.get(shown) === key) {
       // The same draft in the same state: it stays in place, never detached, so a field he types in keeps its focus,
@@ -715,7 +807,7 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
     }
     // A reason picked draws the draft again: the note he started stays.
     const note = root.querySelector<HTMLInputElement>('.cp-draft__note')?.value ?? '';
-    const draft = draftPart(screen.draft, noContact, actions);
+    const draft = draftPart(screen.draft, stops, actions);
     if (draft !== null) drawnDrafts.set(draft, key);
     root.replaceChildren(...top, body, ...(draft === null ? [] : [draft]));
     // Kept open groups keep their place: the panel draws over itself, without scrolling back up (§ 10).

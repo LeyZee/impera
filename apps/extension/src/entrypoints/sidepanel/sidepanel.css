@@ -18,22 +18,29 @@ body {
 
 /* Three bands: « où on en est » on top, the card scrolling between, the agent's draft at the foot. Only the card moves. */
 .cp {
+  /* The panel's one margin, written once (V-EXT-15): 12 px, the panel is narrow; the popup keeps its 16 px. */
+  --cp-gutter: var(--nv-space-3);
   box-sizing: border-box;
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 .cp-scroll {
+  container: cp-panel / inline-size;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--nv-hairline) transparent;
-  padding: var(--nv-space-3) var(--nv-space-3) var(--nv-space-5);
+  padding: var(--cp-gutter) var(--cp-gutter) var(--nv-space-5);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
+}
+/* Above the draft, the rows fade out instead of being cut flat under it; the bottom padding keeps the last row clear. */
+.cp-scroll:has(+ .cp-draft) {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--nv-space-5)), transparent);
 }
 
 /* ───────────── Which conversation (EXT-14) ───────────── */
@@ -44,7 +51,7 @@ body {
   align-items: baseline;
   gap: 6px;
   min-width: 0;
-  padding: var(--nv-space-3) var(--nv-space-3) 0;
+  padding: var(--cp-gutter) var(--cp-gutter) 0;
   font-size: var(--nv-text-callout);
   line-height: var(--nv-text-callout-leading);
 }
@@ -66,7 +73,7 @@ body {
   column-gap: 6px;
   row-gap: 2px;
   margin: 0;
-  padding: var(--nv-space-3) var(--nv-space-3) var(--nv-space-2);
+  padding: var(--cp-gutter) var(--cp-gutter) var(--nv-space-2);
   border-bottom: 1px solid var(--nv-hairline);
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
@@ -86,6 +93,13 @@ body {
 .cp-standing__dot {
   color: var(--nv-ink-faint);
 }
+/* One part and the dot before it never part at a line's end (V-EXT). */
+.cp-standing__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
 
 /* ───────────── The agent's draft ───────────── */
 
@@ -97,7 +111,7 @@ body {
   gap: var(--nv-space-2);
   max-height: 40%;
   overflow-y: auto;
-  padding: var(--nv-space-3);
+  padding: var(--cp-gutter);
   border-top: 1px solid var(--nv-hairline);
   background: var(--nv-glass-fill);
   font-size: var(--nv-text-footnote);
@@ -137,6 +151,16 @@ body {
 .cp-draft > :not(.cp-bubbles) {
   flex: none;
 }
+/* Refusing or retouching, the draft is what he reads: it may take more room, and the bubbles are never squeezed
+   under one line; the whole draft scrolls instead (Design, lot -1). */
+.cp-draft[data-state='rejecting'],
+.cp-draft[data-state='editing'] {
+  max-height: 70%;
+}
+.cp-draft[data-state='rejecting'] .cp-bubbles {
+  flex: none;
+  overflow: visible;
+}
 /* The design system's draft bubble, held still: dashed, nothing sent yet (§ 10, nothing moves). */
 .cp-bubble {
   max-width: 88%;
@@ -153,10 +177,26 @@ body {
   white-space: pre-wrap;
   user-select: text;
 }
-/* A bubble already copied for Reveal: its dash goes, the next one is the one to copy (EXT-13). */
+/* A bubble already placed for Reveal says so in words and steps back: the next one is the one to place (EXT-13). */
 .cp-bubble[data-copied='true'] {
-  outline-style: solid;
+  outline: none;
+  background: var(--nv-plate);
+  color: var(--nv-ink-faint);
+}
+.cp-bubble__done {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
   color: var(--nv-ink-muted);
+}
+/* A draft he may not or no longer use is put out: no dash that says « to send », the text in the disabled ink. */
+.cp-bubbles[data-off='true'] .cp-bubble {
+  outline: none;
+  background: var(--nv-plate);
+  color: var(--nv-ink-faint);
 }
 /* The main gesture on its own row, the two others sharing the next: nothing wraps alone at 320 px (EXT-21). */
 .cp-draft__actions {
@@ -170,6 +210,7 @@ body {
   justify-content: center;
 }
 .cp-draft__actions .cp-send,
+.cp-draft__actions .cp-place,
 .cp-draft__actions .nv-btn:only-child {
   grid-column: 1 / -1;
 }
@@ -185,6 +226,20 @@ body {
 .cp-draft__actions .cp-send .nv-kbd {
   background: color-mix(in oklab, var(--nv-void) 24%, transparent);
   box-shadow: none;
+  opacity: 1;
+}
+/* Retouching or refusing: the gesture and « Annuler » share one line, no half-width orphan (EXT-21). */
+.cp-draft__actions--pair {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.cp-draft__actions--pair .cp-send {
+  grid-column: auto;
+}
+/* A quiet gesture keeps the secondary text's contrast, never paler. */
+.cp-draft__actions .nv-btn--plain {
+  color: var(--nv-ink-muted);
+}
+.cp-draft__actions .nv-btn--plain .nv-kbd {
   opacity: 1;
 }
 .cp-draft__actions .cp-send:disabled {
@@ -208,6 +263,17 @@ body {
 .cp-draft__note {
   width: 100%;
   box-sizing: border-box;
+}
+/* A field being typed in keeps the input plate: the selection tint read as a disabled field in Jour. */
+.cp-draft__area:focus,
+.cp-draft__note:focus {
+  background: var(--nv-plate-hover);
+}
+.cp-draft__next,
+.cp-draft__stop,
+.cp-draft__warn,
+.cp-draft__hint {
+  text-wrap: pretty;
 }
 .cp-draft__next {
   margin: 0;
@@ -236,15 +302,32 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-1);
-  padding: var(--nv-space-3);
+  padding: var(--cp-gutter);
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);
 }
 .cp-notice[data-tone='amber'] {
   background: color-mix(in oklab, var(--nv-warning) 12%, transparent);
 }
+.cp-notice__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: var(--nv-space-1);
+  border-radius: var(--nv-radius-sm);
+  background: var(--nv-glass-fill-strong);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  color: var(--nv-ink-muted);
+}
+.cp-notice[data-tone='amber'] .cp-notice__icon {
+  color: var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 30%, transparent);
+}
 .cp-notice__title {
   margin: 0;
+  text-wrap: balance;
   font-weight: 600;
   font-size: var(--nv-text-callout);
   line-height: var(--nv-text-callout-leading);
@@ -254,12 +337,13 @@ body {
 }
 .cp-notice__text {
   margin: 0;
+  text-wrap: pretty;
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
 }
 .cp-notice .nv-btn {
-  align-self: flex-start;
+  align-self: stretch;
   margin-top: var(--nv-space-2);
 }
 
@@ -296,9 +380,11 @@ body {
   background: var(--nv-glass-fill);
 }
 .cp-field {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--nv-space-2);
+  row-gap: 1px;
   padding: 6px 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
@@ -307,7 +393,26 @@ body {
 .cp-field + .cp-field {
   border-top: 1px solid var(--nv-hairline);
 }
-/* The label, then where the value comes from in small to its right (EXT-04): two lines a field, not three. */
+/* The label, then where the value comes from in small to its right (EXT-04): two lines a field, not three. Below
+   360 px the source goes under the value, so it never falls alone between the label and the value (Design, lot -1). */
+.cp-field > * {
+  grid-column: 1 / -1;
+}
+.cp-field > .cp-field__top {
+  grid-column: 1;
+}
+.cp-field > .cp-field__source {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+}
+@container cp-panel (max-width: 359px) {
+  .cp-field > .cp-field__source {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    text-align: left;
+  }
+}
 .cp-field__top {
   display: flex;
   flex-wrap: wrap;
@@ -317,8 +422,7 @@ body {
 .cp-field__label {
   color: var(--nv-ink-muted);
 }
-.cp-field__top .cp-field__source {
-  margin-left: auto;
+.cp-field > .cp-field__source {
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
 }
@@ -399,6 +503,9 @@ body {
 .cp-group > summary::-webkit-details-marker {
   display: none;
 }
+.cp-group > summary:hover .cp-group__title {
+  color: var(--nv-ink);
+}
 .cp-group > summary:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: -2px;
@@ -409,6 +516,29 @@ body {
 }
 .cp-group__sum {
   color: var(--nv-ink-muted);
+}
+.cp-group__check {
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+.cp-group__chevron {
+  flex: none;
+  margin-left: auto;
+  color: var(--nv-ink-faint);
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.cp-group[open] .cp-group__chevron {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-group__chevron {
+    transition: none;
+  }
+}
+.cp-field--unknown {
+  padding: var(--nv-space-2) 0;
+  color: var(--nv-ink-faint);
+  text-wrap: pretty;
 }
 .cp-group .cp-fields {
   padding: 0 var(--nv-space-3) var(--nv-space-1);
