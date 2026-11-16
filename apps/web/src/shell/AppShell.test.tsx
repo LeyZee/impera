@@ -267,7 +267,7 @@ describe('a page inside an open section that is not the account’s', () => {
       [manager, '/creatrices/structures', '/creatrices'],
       [chatter, '/suivi/alertes', '/suivi'],
       [manager, '/moi/persona', '/moi/profil'],
-      [creator, '/moi/profil', '/moi/persona'],
+      [creator, '/moi/dossier', '/moi/profil'],
     ];
     for (const [user, path, landing] of cases) {
       const router = renderApp(user, path);

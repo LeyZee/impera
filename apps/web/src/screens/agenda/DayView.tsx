@@ -290,8 +290,14 @@ export function Glance({
           ? `${String(left)} ${left > 1 ? 'choses prévues' : 'chose prévue'}`
           : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
   const share = total === 0 ? 0 : done / total;
-  // « Plus rien à heure » only when there was something at an hour: an empty day says it once, in the title.
-  const moment = nowMinute === null || plan.timed.length === 0 ? null : momentOf(plan, nowMinute);
+  // Her timed tasks whose time is over and that she has not ticked: said in amber, never left out of the glance
+  // (recette visuelle 16/11, CRE-05).
+  const missed =
+    nowMinute === null ? [] : ownTimed(plan).filter((item) => !item.done && item.end <= nowMinute);
+  // « Plus rien à heure » only when there was something at an hour, and nothing of it is left unticked behind her: an
+  // empty day says it once, in the title.
+  const found = nowMinute === null || plan.timed.length === 0 ? null : momentOf(plan, nowMinute);
+  const moment = found?.kind === 'none' && missed.length > 0 ? null : found;
   const { streak } = agenda;
   // Her highest streak medal beside the count (ADR 0107 § 9); none before her first, or while her case is not read.
   const medal = highestMedal(useHerTrophyCase(true).data?.items ?? []);
@@ -403,6 +409,21 @@ export function Glance({
           ) : (
             'Plus rien à heure aujourd’hui.'
           )}
+        </p>
+      )}
+      {missed.length === 0 ? null : (
+        <p className="ag-glance__missed">
+          {missed.length > 1
+            ? `${String(missed.length)} tâches passées pas cochées : `
+            : '1 tâche passée pas cochée : '}
+          {missed.map((item, index) => (
+            <span key={item.task.id}>
+              {index === 0 ? null : ', '}
+              <Emoji category={item.task.category} />
+              <b>{item.task.title}</b>
+            </span>
+          ))}
+          .
         </p>
       )}
       {streak.atRisk ? (
@@ -613,6 +634,8 @@ function Program({
                   ) : (
                     <span className="nv-num">{lengthOf(item.length)}</span>
                   )}
+                  {/* Its time over and not ticked: said, so that a greyed card is never read as done (CRE-05). */}
+                  {past && !item.done && !item.carried ? <span className="ag-missed">pas cochée</span> : null}
                   {liveAt === null ? null : (
                     <span className="ag-live nv-num">
                       en cours · reste {lengthOf(leftOf(item.task, now) ?? (item.end - liveAt) * MINUTE_MS)}
