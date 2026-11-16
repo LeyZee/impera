@@ -52,7 +52,7 @@ export function snapshotOf(item: ConversationItem): ConversationSnapshot {
     fanDisplayName: conversation.memberFirstname ?? member.userName,
     unreadCount: conversation.modelIsUnread ? 1 : 0,
     lastMessageAt: lastMessage?.createdAt ?? conversation.lastMessageAt,
-    ...(lastMessage === null ? {} : { lastMessagePreview: lastMessage.content }),
+    ...(lastMessage === null || lastMessage === undefined ? {} : { lastMessagePreview: lastMessage.content }),
   };
 }
 
@@ -148,8 +148,9 @@ export function ppvStatsOf(
   return {
     purchased: paid.first.buyRate.purchased,
     offered: paid.first.buyRate.total,
-    highestPriceMinor: paid.first.highestPrice,
-    lowestPriceMinor: paid.first.lowestPrice,
+    // No longer sent by Reveal since 2026-11-15: unknown then, never guessed from the bundles of one page.
+    highestPriceMinor: paid.first.highestPrice ?? null,
+    lowestPriceMinor: paid.first.lowestPrice ?? null,
     currency: REVEAL_CURRENCY,
     // The newest `createdAt` of the priced bundles (`kind=paid`): Reveal gives no field of its own for it.
     lastOfferAt: paid.bundles.reduce<string | null>(
