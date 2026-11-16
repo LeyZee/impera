@@ -19,7 +19,8 @@ export const onShelf = (item: Pick<TrophyCaseItem, 'family'>): boolean =>
  */
 export function percentOf(progress: TrophyCaseProgress | null, earned: boolean): number | null {
   if (earned) return 100;
-  if (progress === null) return null;
+  // An object of one gesture has no way along to draw: 0 of 1 only weighs it as the next trophy (recette 16/11, CRE-14).
+  if (progress === null || progress.unit === 'once') return null;
   const share = Math.floor((progress.current * 100) / progress.target);
   return Math.max(0, Math.min(99, share));
 }
