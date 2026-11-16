@@ -35,6 +35,7 @@ import {
   parseDashboardSearch,
   periodOf,
 } from './screens/dashboard/logic';
+import { FansPage } from './screens/fans/FansPage';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
@@ -237,6 +238,19 @@ const scriptStructures = createRoute({
   },
   component: StructuresPage,
 });
+// Every fan of a creator (ADR 0124), the owner's and an active manager's: anyone else is sent back home.
+const fansList = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/fans',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner' && context.user.teamScope !== 'agency') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: FansPage,
+});
+
 const tracking = createRoute({
   getParentRoute: () => rootRoute,
   path: '/suivi',
@@ -1052,6 +1066,7 @@ const routeTree = rootRoute.addChildren([
   train.addChildren([trainIndex, playground, channelPost, corrections, tests]),
   tracking,
   trackingAlerts,
+  fansList,
   today,
   agenda,
   sales,

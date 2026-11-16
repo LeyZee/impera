@@ -1,0 +1,234 @@
+/* Chatting › Fans (ADR 0124): lines in aligned columns on a computer, two lines a fan on a phone (avis Design 16/11). */
+.fa-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.fa-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.fa-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.fa-search input {
+  width: 100%;
+}
+.fa-select {
+  min-width: 0;
+}
+/* Single choice chips on one row that scrolls, faded at its edge. */
+.fa-chips {
+  display: flex;
+  gap: var(--nv-space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  padding-right: 24px;
+}
+.fa-chips::-webkit-scrollbar {
+  display: none;
+}
+.fa-chips .nv-chip {
+  flex: none;
+}
+.fa-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.fa-count {
+  margin: 0 auto 0 0;
+  font-size: 13px;
+  color: var(--nv-ink-muted);
+}
+.fa-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: var(--nv-space-4) var(--nv-space-2);
+  color: var(--nv-ink-muted);
+}
+.fa-empty p {
+  margin: 0;
+}
+.fa-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--nv-ink-faint);
+  text-wrap: pretty;
+}
+
+/* Columns: fan, states, holder, last message, last payment, the period, ever; then the chevron. */
+.fa-head,
+.fa-row {
+  display: grid;
+  grid-template-columns:
+    minmax(120px, 1.4fr) minmax(120px, 1.4fr) minmax(90px, 1fr) minmax(96px, 0.9fr) minmax(96px, 0.9fr)
+    minmax(90px, 0.9fr) minmax(100px, 1fr) 16px;
+  align-items: center;
+  column-gap: var(--nv-space-3);
+}
+.fa-head {
+  padding: 0 var(--nv-space-2);
+  font-size: 12px;
+  color: var(--nv-ink-faint);
+}
+.fa-head::after {
+  content: '';
+}
+.fa-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-list[aria-busy='true'] {
+  opacity: 0.6;
+}
+.fa-list > li + li {
+  border-top: 1px solid var(--nv-hairline);
+}
+.fa-row {
+  min-height: 44px;
+  padding: var(--nv-space-2);
+  color: var(--nv-ink);
+  text-decoration: none;
+  font-size: 14px;
+  border-radius: var(--nv-radius-md);
+}
+.fa-row--open {
+  cursor: pointer;
+}
+.fa-row--open:hover {
+  background: var(--nv-glass-fill);
+}
+.fa-row--open:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.fa-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fa-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.fa-tag {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+}
+.fa-tag--bad {
+  background: color-mix(in srgb, var(--nv-danger) 16%, transparent);
+  color: var(--nv-danger);
+}
+.fa-tag--warn {
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  color: var(--nv-warning);
+}
+.fa-holder,
+.fa-when,
+.fa-paid-at {
+  color: var(--nv-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fa-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fa-ever {
+  font-weight: 600;
+}
+.fa-zero {
+  font-weight: 400;
+  color: var(--nv-ink-faint);
+}
+.fa-chevron {
+  color: var(--nv-ink-faint);
+  text-align: right;
+}
+.fa-more {
+  display: flex;
+  justify-content: center;
+}
+.fa-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.fa-skeleton i {
+  height: 44px;
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill);
+  animation: fa-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+.fa-skeleton i:nth-child(2) {
+  animation-delay: calc(var(--nv-stagger) * 2);
+}
+.fa-skeleton i:nth-child(3) {
+  animation-delay: calc(var(--nv-stagger) * 4);
+}
+@keyframes fa-breathe {
+  to {
+    opacity: 0.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fa-skeleton i {
+    animation: none;
+  }
+}
+
+/* Phone: two lines a fan. Pseudonym and what he paid ever; then his last message and holder, two states at most. */
+@media (max-width: 720px) {
+  .fa-head {
+    display: none;
+  }
+  .fa-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name name ever'
+      'when holder states';
+    column-gap: var(--nv-space-2);
+    row-gap: 2px;
+  }
+  .fa-name {
+    grid-area: name;
+  }
+  .fa-ever {
+    grid-area: ever;
+  }
+  .fa-states {
+    grid-area: states;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+  .fa-when {
+    grid-area: when;
+    font-size: 13px;
+  }
+  .fa-holder {
+    grid-area: holder;
+    font-size: 13px;
+  }
+  .fa-holder::before {
+    content: '· ';
+  }
+  .fa-paid-at,
+  .fa-period,
+  .fa-chevron {
+    display: none;
+  }
+}
