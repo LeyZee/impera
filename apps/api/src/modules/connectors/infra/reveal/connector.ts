@@ -62,10 +62,16 @@ import { REVEAL_ENDPOINTS, type RevealAnswer } from './wire';
 /** Page sizes of the official client (reveal-api-observed.md § Pagination): no heavier than a chatter. */
 const TAKE = { conversations: 20, messages: 10, ppv: 10, scripts: 20, vault: 10, transactions: 10 } as const;
 /**
- * PROVISIONAL (L14, ADR 0113 § 2): the hosts Reveal serves vault files from, fixed on the first real read. Empty, every
- * download is refused before any call: a host is added by a PR Sécurité reads, never by a setting.
+ * The hosts Reveal serves vault files from (ADR 0113 § 2), read on the real vault on 16/11 over 300 media of each kind,
+ * each named whole, never its parent domain: the signed storage (photos, non-HLS videos, audios, their thumbnails),
+ * the photo resizer (the smaller sizes), the HLS videos' CDN (playlists, segments, thumbnails). A host is added by a PR
+ * Sécurité reads, never by a setting.
  */
-const REVEAL_FILE_HOSTS: readonly string[] = [];
+const REVEAL_FILE_HOSTS: readonly string[] = [
+  'dem02.fra1.digitaloceanspaces.com',
+  'resize.demoiselles.app',
+  'vz-90090929-421.b-cdn.net',
+];
 /** A vault file's bounds (ADR 0113 § 2): a 720-line video of an hour stays under it; past it, nothing is kept. */
 const FILE_MAX_BYTES = 2 * 1024 ** 3;
 const FILE_TIMEOUT_MS = 10 * 60_000;
