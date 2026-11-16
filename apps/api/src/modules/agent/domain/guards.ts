@@ -82,7 +82,7 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'ai_disclosure',
     pattern:
-      /\b(prompt|language model|modele de langage|mes instructions|grok|openai|xai|chatgpt|gpt|llm|anthropic|gemini|mistral ai|le chat de mistral|llama|copilot|deepseek|perplexity)\b/,
+      /\b(prompt|language model|modele de langage|mes instructions|grok|openai|xai|chatgpt|gpt|llm|anthropic|gemini|mistral ai|le chat de mistral|llama|deepseek|perplexity)\b/,
   },
   // Naming herself after a model: « je suis claude », « moi c'est mistral ».
   {
@@ -108,7 +108,7 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     pattern: new RegExp(
       [
         `\\b(gere|geree|geres|tenu|tenue|anime|animee|pilote|pilotee|ecrit|ecrits|redige|rediges|automatise|automatisee)( \\w+)? (par|avec) (une? |l'|mon |ma |un )?${AI_WORD}(?![a-z])`,
-        `\\b(assistante?|agent|outil|logiciel) (ia|ai|virtuel|virtuelle)(?![a-z])`,
+        `\\b(mon|ma|notre) (assistante?|agent|outil|logiciel) (ia|ai|virtuel|virtuelle)(?![a-z])`,
         `\\b(une?|l'|mon|ma) ?(ia|bot|chatbot|robot|assistante?) (qui )?(repond|repondent|ecrit|parle|gere|tient|redige)s?\\b`,
       ].join('|'),
     ),
@@ -162,8 +162,8 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
         `\\b(viens|venez|tu (peux|pourrais|veux) venir|passe|passes) me (voir|rejoindre|retrouver)(?!${ONLINE})\\b`,
         `\\bon (se|pourrait se|peut se|va se) (voit|voir|retrouve|retrouver|rejoint|rejoindre|rencontre|rencontrer) (a|au|aux|chez|dans|devant|en ville|quand tu veux|ou tu veux|ce soir|demain|cette semaine|ce week-end)(?!${ONLINE})\\b`,
         `\\bje t'?attends? (a|au|chez|devant)(?!${ONLINE})\\b`,
-        `\\bje te (retrouve|retrouverai|rejoins|rejoindrai|recois|recevrai) (a|au|aux|chez|devant|dans|en bas de)(?!${ONLINE})\\b`,
-        `\\b(viens|rejoins|retrouve)[ -]moi (a|au|dans|devant) (l'|un |une |mon |ma |la )?(hotel|airbnb|motel|chambre|gare)\\b`,
+        `\\bje te (retrouve|retrouverai|rejoins|rejoindrai|recois|recevrai) (chez (moi|toi|lui|elle)|devant|en bas de|(a|au|aux|dans) (la |le |l'|un |une |mon |ma |ton |ta )?(gare|hotel|bar|cafe|resto|restaurant|airbnb|motel|aeroport|metro|parc|cinema|plage|sortie)|a ${CITY})\\b`,
+        `\\b(viens|rejoins|retrouve)[ -]moi (a|au|dans|devant) (l'|un |une |mon |ma |la )?(hotel|airbnb|motel|gare)\\b`,
         `\\bon (se fait|prend|boit) (un|une) (cafe|verre|resto|date|diner|apero|biere)\\b`,
         `\\bje (viens|descends|monte|serai) (a|sur) ${CITY}\\b`,
         `\\b(come|coming) (to )?see me\\b|\\b(let'?s|we (can|could|should)) meet\\b|\\bmeet me\\b`,
@@ -524,6 +524,8 @@ function plain(text: string): string {
 
 /** Shorter than this, the same bubble twice is a « ok » or a « mdrr », not a repetition. */
 const REPEATED_MIN_CHARS = 15;
+// What she sent before the loaded history: a short ritual (« Dors bien toi ✨ ») comes back weeks later, as anyone's.
+const SENT_BEFORE_MIN_CHARS = 25;
 /** Her opening is its first two words: « coucou toi », « hey bébé ». */
 const OPENING_WORDS = 2;
 const OPENING_STREAK = 3;
@@ -559,10 +561,14 @@ function againstHistory(
   sentBefore: readonly string[],
 ): GuardViolation[] {
   const violations: GuardViolation[] = [];
-  const sent = new Set([...turns.flat(), ...sentBefore].map(plain));
+  const recent = new Set(turns.flat().map(plain));
+  const older = new Set(sentBefore.map(plain));
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = plain(bubble);
-    if (text.length >= REPEATED_MIN_CHARS && sent.has(text)) {
+    if (
+      (text.length >= REPEATED_MIN_CHARS && recent.has(text)) ||
+      (text.length >= SENT_BEFORE_MIN_CHARS && older.has(text))
+    ) {
       violations.push({ code: 'repetition', severity: 'blocking', bubbleIndex, match: text });
     }
   });

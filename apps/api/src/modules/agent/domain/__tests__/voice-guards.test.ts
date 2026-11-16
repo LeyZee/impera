@@ -115,6 +115,10 @@ describe('voice guards (P3-13)', () => {
         sentBefore: ['Tu fais quoi de beau ce soir ?', 'Hey'],
       }),
     ).toEqual([['repetition', 'blocking']]);
+    // A short ritual sent weeks ago comes back, as anyone's.
+    expect(
+      codes(['Dors bien toi ✨'], { previousTurns: [['Hey']], sentBefore: ['Dors bien toi ✨'] }),
+    ).toEqual([]);
     // Twice is a habit, a short bubble is a « ok ».
     expect(codes(['Coucou toi, ça va ?'], { previousTurns: previousTurns.slice(1) })).toEqual([]);
     expect(codes(['ok 😘'], { previousTurns: [['ok 😘']] })).toEqual([]);

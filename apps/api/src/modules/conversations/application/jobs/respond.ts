@@ -104,7 +104,8 @@ export function fanNotesOf(
   readonly brainNotes: string[];
   readonly cardAge?: number;
 } {
-  // His age on the card, in digits (the card refuses anything else): the youngest when several are active.
+  // His age on the card, in digits (the card refuses anything else): the youngest when several are active. A guessed
+  // age counts as much as a confirmed one: under 18, the doubt goes against him (relecture Bilan, #784).
   const ages = facts.flatMap((fact) => {
     const digits = fact.key === 'age' ? /^\s*(\d{1,2})\s*(?:ans?)?\s*$/u.exec(fact.value)?.[1] : undefined;
     return digits === undefined ? [] : [Number(digits)];

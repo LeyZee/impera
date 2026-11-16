@@ -123,6 +123,15 @@ describe('voice guards', () => {
     expect(codes(['je te reçois chez moi'])).toEqual(['meeting_promise']);
     expect(codes(['je te retrouve dans mes messages ce soir'])).toEqual([]);
     expect(codes(['j’ai bossé dans un hôtel avant'])).toEqual([]);
+    expect(codes(['je te retrouve au bar de la gare'])).toEqual(['meeting_promise']);
+    for (const time of [
+      'je te retrouve dans une heure',
+      'je te retrouve à mon retour',
+      'je te retrouve au réveil',
+      'rejoins-moi dans ma chambre en pensée',
+    ]) {
+      expect(codes([time]), time).toEqual([]);
+    }
   });
 
   it('blocks her naming herself a model, a program, or something not real', () => {
@@ -145,6 +154,8 @@ describe('voice guards', () => {
       'je suis une machine au lit',
       'je l’ai écrit pour toi',
       'Claude est mon voisin',
+      'un assistant virtuel m’a répondu à la banque',
+      'mon copilot en voiture',
     ]) {
       expect(codes([plain]), plain).toEqual([]);
     }

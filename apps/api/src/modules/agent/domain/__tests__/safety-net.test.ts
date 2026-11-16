@@ -31,6 +31,9 @@ describe('safetySigns (recette AGT-01)', () => {
     'lycéenne et toi ?',
     'je suis au lycée',
     'je suis en terminale',
+    'j’ai 16 balais',
+    'je suis en 4e, et toi ?',
+    'bientôt 18 ans 😏',
   ])('reads a minor in « %s »', (text) => {
     expect(safetySigns(text)).toEqual(['minor_suspected']);
   });
@@ -69,6 +72,21 @@ describe('safetySigns (recette AGT-01)', () => {
     'on est arrivés en 3e position',
     'je suis né en 1994',
     'je suis en première ligne au boulot',
+    'j’ai un fils en 4e',
+    'ma fille est lycéenne',
+    'ma fille est née en 2012',
+    'mon fils né en 2015',
+    'la boîte est née en 2020',
+    'je suis prof en 3e',
+    'bientôt 18 h, tu fais quoi ?',
+    'presque 18 degrés ici',
+    'j’ai presque 18 ans de mariage',
+    'j’ai bientôt 18 ans de boîte',
+    'on est en 4e de finale',
+    'je suis en terminale de ma formation',
+    'moi dix ans que j’habite ici',
+    'j’ai 5 balais devant la porte',
+    'j’ai des idées noires pour le scénario',
   ])('stays quiet on « %s »', (text) => {
     expect(safetySigns(text)).toEqual([]);
   });
