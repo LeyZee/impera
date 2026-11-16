@@ -54,7 +54,7 @@ export function MemberGameBlock({ memberId, name }: { memberId: string; name: st
         </div>
         <div>
           <dt>Quinzaines avec un palier atteint</dt>
-          <dd className="nv-num">{tiers === 0 ? <span className="tm-muted">Aucun</span> : tiers}</dd>
+          <dd className="nv-num">{tiers === 0 ? <span className="tm-muted">Aucune</span> : tiers}</dd>
         </div>
       </dl>
       <p className="rw-member__label">Trophées</p>
