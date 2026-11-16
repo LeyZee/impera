@@ -633,6 +633,8 @@ export const SCRIPT_ERROR_CODES = [
   'platform_script_not_found',
   /** Not an identity of this script's current version (its texts or media changed since): read the script again. */
   'script_identity_stale_conflict',
+  /** The branches given are not those the step has now (Reveal changed them since): read the script again. */
+  'platform_script_branches_stale_conflict',
 ] as const;
 export type ScriptErrorCode = (typeof SCRIPT_ERROR_CODES)[number];
 
@@ -749,14 +751,63 @@ export const ScriptIdentityViewSchema = z.object({
 });
 export type ScriptIdentityView = z.infer<typeof ScriptIdentityViewSchema>;
 
-export const PLATFORM_SCRIPT_WARNING_CODES = ['price_more_than_double', 'price_above_ceiling'] as const;
+export const PLATFORM_SCRIPT_WARNING_CODES = [
+  /** Path by path (ADR 0112 § 14): more than twice the paid step before it on some path. */
+  'price_more_than_double',
+  'price_above_ceiling',
+  /** A step with branches and none by default (ADR 0112 § 14): on a fan no condition fits, the run ends `no_branch`. */
+  'step_without_default',
+] as const;
 export const PLATFORM_SCRIPT_GAPS = [
   'media_absent',
   'media_not_described',
   'identity_not_validated',
-  /** Two steps on the same platform rank: branches a human chooses between, not offered until ADR 0112. */
-  'branched_step',
+  /** A branch of a step whose condition the agency has not set (ADR 0112 § 13): Reveal keeps its own unread. */
+  'branch_unsettled',
+  /** Two branches by default in one step (ADR 0112 § 14). */
+  'branch_two_defaults',
+  /** A condition on past spend leads to a branch cheaper than the step's default (ADR 0112 § 2). */
+  'branch_cheaper_on_spend',
+  /** A condition on the branch taken before names no branch of an earlier step. */
+  'branch_previous_unknown',
+  /** The same sold media in two steps or two branches (ADR 0112 § 14): a fan would pay twice for it. */
+  'media_twice',
 ] as const;
+
+/** The longest condition in text (ADR 0112 § 5), as Reveal's own: one sentence the brain reads. */
+export const BRANCH_CONDITION_TEXT_MAX = 500;
+/** The highest past spend a condition names, in minor units: 100 000 €. */
+const BRANCH_SPEND_MAX_MINOR = 10_000_000;
+
+/**
+ * A structured condition (ADR 0112 § 5): a closed list, evaluated by the code alone, never by a model. `spent_at_least`:
+ * what he paid her in all, read at Reveal, at or above the amount. `previous_branch`: the branch taken at an earlier
+ * step of the same run, by its `stepRef`.
+ */
+export const BranchRuleSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('spent_at_least'),
+    amountMinor: z.number().int().min(1).max(BRANCH_SPEND_MAX_MINOR),
+    currency: CurrencySchema,
+  }),
+  z.strictObject({
+    kind: z.literal('previous_branch'),
+    stepRef: z.string().min(1).max(PLATFORM_SCRIPT_REF_MAX),
+  }),
+]);
+export type BranchRule = z.infer<typeof BranchRuleSchema>;
+
+/**
+ * « Condition de branche » (ADR 0112 § 5), set by the agency in the CRM for each branch of a step that has several:
+ * `none`, the step's default branch; `structured`, a rule of the closed list; `text`, a sentence the brain reads at the
+ * turn the step is due. Reveal's own condition is never read (its API gives none).
+ */
+export const BranchConditionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('none') }),
+  z.strictObject({ kind: z.literal('structured'), rule: BranchRuleSchema }),
+  z.strictObject({ kind: z.literal('text'), text: z.string().trim().min(1).max(BRANCH_CONDITION_TEXT_MAX) }),
+]);
+export type BranchCondition = z.infer<typeof BranchConditionSchema>;
 
 const PlatformStepMediaViewSchema = z.object({
   ref: z.string(),
@@ -795,6 +846,13 @@ export const PlatformScriptViewSchema = z.object({
       media: z.array(PlatformStepMediaViewSchema),
       previewMedia: z.array(PlatformStepMediaViewSchema),
       complete: z.boolean(),
+      /**
+       * Its condition, when its step has several branches (ADR 0112 § 5): `null` while the agency has not set it, and
+       * for the only branch of a step. The steps come by rank, then in the agency's order of the branches.
+       */
+      condition: BranchConditionSchema.nullable(),
+      /** How many branches its step has: 1 for a step without branches. */
+      branches: z.number().int().min(1),
     }),
   ),
   warnings: z.array(
@@ -806,6 +864,23 @@ export const PlatformScriptViewSchema = z.object({
 });
 export type PlatformScriptViewDto = z.infer<typeof PlatformScriptViewSchema>;
 export const PlatformScriptListSchema = z.array(PlatformScriptViewSchema);
+
+/**
+ * `PUT …/platform-scripts/:scriptId/steps/:platformIndex/branches`: every branch of the step, in the agency's order,
+ * each with its condition (ADR 0112 §§ 5-6). The branches named must be exactly those the step has now.
+ */
+export const SetScriptBranchesBodySchema = z.strictObject({
+  branches: z
+    .array(
+      z.strictObject({
+        stepRef: z.string().min(1).max(PLATFORM_SCRIPT_REF_MAX),
+        condition: BranchConditionSchema,
+      }),
+    )
+    .min(2)
+    .max(PLATFORM_SCRIPT_STEPS_MAX),
+});
+export type SetScriptBranchesBody = z.infer<typeof SetScriptBranchesBodySchema>;
 
 /** `POST …/platform-scripts/:scriptId/identity/validate`: the identity shown, validated as it is. */
 export const ValidateScriptIdentityBodySchema = z.strictObject({ identityId: ScriptIdentityIdSchema });
