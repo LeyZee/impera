@@ -10,6 +10,7 @@ import {
   bpsOfPercent,
   confirmSentence,
   dayLabel,
+  gapText,
   earliestDay,
   nextDay,
   percentOf,
@@ -203,6 +204,37 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
     });
     expect(head([share(A, { differsFromRate: true }), share(B, { differsFromRate: false })]).lead).toBe(
       'Écart : un compte s’écarte des 40\u00a0% réglés, sur 30 jours (détail ci-dessous).',
+    );
+    // A window straddling a change of percentage names none: each of its days was compared with its own.
+    const later = rate('0192f3a0-0000-7000-8000-0000000000e2', '2026-11-10', 3500);
+    const straddling = sheetHead(
+      {
+        today: '2026-11-16',
+        current: later,
+        rates: [later, rateOf],
+        observed: {
+          ...NOTHING_READ,
+          linked: true,
+          last30Days: {
+            from: '2026-10-18',
+            to: '2026-11-16',
+            shares: [share(A, { agencyBps: 3750, differsFromRate: true })],
+          },
+        },
+      },
+      'Anna',
+    );
+    expect(straddling.lead).toBe(
+      'Écart : Reveal donne 37,5\u00a0% du net sur 30 jours, loin du pourcentage réglé sur ces jours.',
+    );
+    expect(gapText({ rates: [later, rateOf] }, { from: '2026-10-16', to: '2026-10-31' })).toBe(
+      'écart avec les 40\u00a0% réglés',
+    );
+    expect(gapText({ rates: [later, rateOf] }, { from: '2026-11-01', to: '2026-11-15' })).toBe(
+      'écart avec le pourcentage réglé',
+    );
+    expect(gapText({ rates: [rateOf] }, { from: '2026-09-20', to: '2026-10-05' })).toBe(
+      'écart avec le pourcentage réglé',
     );
     expect(head([share(A, { agencyBps: 4000, differsFromRate: false })]).dot).toBe('ok');
     expect(head([share(A, { differsFromRate: null })]).dot).toBe('ok');

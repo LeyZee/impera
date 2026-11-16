@@ -22,6 +22,7 @@ import {
   bpsOfPercent,
   confirmSentence,
   dayLabel,
+  gapText,
   earliestDay,
   percentOf,
   readAt,
@@ -382,10 +383,8 @@ function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
                           {where === null ? null : <span className="ar-read__where">{where}</span>}
                           <span className="ar-read__value">{text.value}</span>
                           <span className="ar-read__detail">{text.detail}</span>
-                          {share.differsFromRate === true && list.current !== null ? (
-                            <span className="ar-read__gap">
-                              écart avec les {percentOf(list.current.agencyBps)} réglés
-                            </span>
+                          {share.differsFromRate === true ? (
+                            <span className="ar-read__gap">{gapText(list, window)}</span>
                           ) : null}
                         </li>
                       );

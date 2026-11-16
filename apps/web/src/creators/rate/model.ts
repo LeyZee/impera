@@ -1,8 +1,9 @@
-import type {
-  CreatorAgencyRate,
-  CreatorAgencyRateList,
-  ObservedAgencyShare,
-  ObservedAgencyWindow,
+import {
+  agencyRateFor,
+  type CreatorAgencyRate,
+  type CreatorAgencyRateList,
+  type ObservedAgencyShare,
+  type ObservedAgencyWindow,
 } from '@impera/contracts';
 
 import { platformName } from '@/scheduling/model';
@@ -136,6 +137,28 @@ export const singleShare = (list: CreatorAgencyRateList): ObservedAgencyShare | 
 };
 
 /**
+ * The percentage a window was compared with, when one alone covers all its days, to name it beside a gap; `null` when
+ * the window straddles a change, or starts before her first: the gap is then said without a figure.
+ */
+export function windowRate(
+  list: Pick<CreatorAgencyRateList, 'rates'>,
+  window: Pick<ObservedAgencyWindow, 'from' | 'to'>,
+): number | null {
+  const first = agencyRateFor(list.rates, window.from);
+  const last = agencyRateFor(list.rates, window.to);
+  return first !== null && first.id === last?.id ? first.agencyBps : null;
+}
+
+/** The words beside a share off her percentage: the percentage of its window when one alone covers it. */
+export function gapText(
+  list: Pick<CreatorAgencyRateList, 'rates'>,
+  window: Pick<ObservedAgencyWindow, 'from' | 'to'>,
+): string {
+  const bps = windowRate(list, window);
+  return bps === null ? 'écart avec le pourcentage réglé' : `écart avec les ${percentOf(bps)} réglés`;
+}
+
+/**
  * Her accounts whose share of the 30 days differs from her percentage by more than rounding explains, as the server
  * reads it by the rule of the gap alert (ADR 0054 § 2 and § 6): the screen compares nothing itself.
  */
@@ -160,18 +183,23 @@ export function sheetHead(
   const second = rate === null ? 'Le pourcentage est facultatif.' : `Pourcentage réglé : ${rate}.`;
   const off = sharesOffRate(list);
   const [onlyOff] = off;
-  if (current !== null && onlyOff !== undefined) {
+  if (onlyOff !== undefined) {
     const check = 'Vérifie le partage chez ' + at + ' ou règle un nouveau pourcentage ci-dessous.';
+    // The percentage the 30 days were compared with, when one alone covers them; else the gap without a figure.
+    const agreed = windowRate(list, list.observed.last30Days);
     if (single !== null && single.agencyBps !== null) {
+      const set =
+        agreed === null ? 'loin du pourcentage réglé sur ces jours' : `tu as réglé ${percentOf(agreed)}`;
       return {
         dot: 'warn',
-        lead: `Écart : ${at} donne ${percentOf(single.agencyBps)} du net sur 30 jours, tu as réglé ${percentOf(current.agencyBps)}.`,
+        lead: `Écart : ${at} donne ${percentOf(single.agencyBps)} du net sur 30 jours, ${set}.`,
         then: check,
       };
     }
+    const from = agreed === null ? 'du pourcentage réglé' : `des ${percentOf(agreed)} réglés`;
     return {
       dot: 'warn',
-      lead: `Écart : ${off.length === 1 ? 'un compte s’écarte' : `${String(off.length)} comptes s’écartent`} des ${percentOf(current.agencyBps)} réglés, sur 30 jours (détail ci-dessous).`,
+      lead: `Écart : ${off.length === 1 ? 'un compte s’écarte' : `${String(off.length)} comptes s’écartent`} ${from}, sur 30 jours (détail ci-dessous).`,
       then: check,
     };
   }
