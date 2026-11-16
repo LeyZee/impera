@@ -167,6 +167,8 @@ async function tellOwners(adminDb: Database, notify: Notify, from: PayPeriod, no
         from domain_events e
         join creators c on c.id = e.creator_id
        where e.type in ('agency_share_mismatch', 'agency_share_changed')
+         -- Published after the fortnight ends: bounded by time, as the outbox is never purged.
+         and e.created_at >= ${from}::date
          and e.payload->>'from' = ${from}
        order by e.created_at, e.id`);
     return {

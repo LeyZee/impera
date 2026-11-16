@@ -130,11 +130,16 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-/* The alerts the automatic check published (PAY-04): one line each, an amber dot, no bar. */
+/* The head's dot on its first line, as the alerts' dots: one rule for every dot of the sheet (avis Design, 16/11). */
+.ar-page .ps-head__state {
+  align-items: baseline;
+}
+
+/* The alerts the automatic check sent (PAY-04): one line each, an amber dot, no bar, the size of the rows read. */
 .ar-alerts {
   display: grid;
   gap: var(--nv-space-2);
-  margin: 0 0 var(--nv-space-2);
+  margin: 0;
   padding: 0;
   list-style: none;
 }

@@ -359,7 +359,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
       },
     ]);
     renderSection();
-    const alerts = await screen.findByRole('list', { name: 'Alertes de la part de l’agence' });
+    const alerts = await screen.findByRole('region', { name: 'Alertes envoyées' });
     expect(
       within(alerts).getByText(
         /^Alerte du 2 novembre, quinzaine du 16 au 31 octobre : la part de l’agence est passée de 33,33\s% à 37,5\s%\.$/u,
@@ -368,11 +368,31 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     expect(alerts.querySelector('.ps-dot')?.getAttribute('data-dot')).toBe('warn');
   });
 
+  it('shows the three newest alerts, the others behind « Voir les précédentes »', async () => {
+    const alert = (n: number) => ({
+      id: `0192f3a0-0000-7000-8000-00000000001${String(n)}`,
+      kind: 'mismatch',
+      at: '2026-11-02T05:30:00.000Z',
+      from: '2026-10-16',
+      to: '2026-10-31',
+      platform: 'reveal',
+      platformAccountId: '0192f3a0-0000-7000-8000-0000000000a1',
+      currency: 'EUR',
+    });
+    serve([], undefined, { ...NOTHING_READ, linked: true }, [alert(1), alert(2), alert(3), alert(4)]);
+    renderSection();
+    const alerts = await screen.findByRole('region', { name: 'Alertes envoyées' });
+    expect(within(alerts).getAllByRole('listitem')).toHaveLength(3);
+    fireEvent.click(within(alerts).getByRole('button', { name: 'Voir les précédentes' }));
+    expect(within(alerts).getAllByRole('listitem')).toHaveLength(4);
+    expect(within(alerts).queryByRole('button', { name: 'Voir les précédentes' })).toBeNull();
+  });
+
   it('shows no alert line while the automatic check published none', async () => {
     serve([], undefined, { ...NOTHING_READ, linked: true });
     renderSection();
     expect(await screen.findByText(/^Aucune vente lue chez Reveal sur 30 jours\./u)).toBeDefined();
-    expect(screen.queryByRole('list', { name: 'Alertes de la part de l’agence' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Alertes envoyées' })).toBeNull();
   });
 
   it('says the server does not answer, with a way to try again', async () => {
