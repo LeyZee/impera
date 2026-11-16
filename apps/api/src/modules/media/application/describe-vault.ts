@@ -97,13 +97,18 @@ export interface VaultDescribeDeps {
   readonly tools: Pick<FileMediaTools, 'probe'>;
   /** A vault video's MPEG-TS stream copied into an MP4 at `out`; `false` when it does not read. */
   readonly remux: (path: string, out: string) => Promise<boolean>;
-  /** The content drops' reduced picture of the file (ADR 0030 § 4), its key, or `null` when ffmpeg cannot read it. */
+  /**
+   * The content drops' reduced picture of the file (ADR 0030 § 4), its key, or `null` when ffmpeg cannot read it or no
+   * storage is set; made before the vision, so a storage that fails costs no description.
+   */
   readonly picture: (ask: {
     readonly creatorId: string;
     readonly sha256: string;
     readonly path: string;
     readonly kind: 'image' | 'video';
   }) => Promise<string | null>;
+  /** The picture under this key removed from the storage; nothing to do when no storage is set. */
+  readonly unpicture: (key: string) => Promise<void>;
   /** Where the job makes its own folder for each file; removed, read or not. */
   readonly scratchDir: string;
   readonly now: () => Date;
@@ -168,6 +173,23 @@ async function readable(
   return { path, mime: sniffed, describedMime: sniffed };
 }
 
+/** A picture left in the storage without a media row: the job fails and is replayed, never swallowed. */
+export class VaultPictureNotRemoved extends Error {
+  constructor() {
+    // Never the key: it names her and the file's fingerprint.
+    super('media.describe_vault: a picture kept by no media could not be removed');
+    this.name = 'VaultPictureNotRemoved';
+  }
+}
+
+async function unpicture(deps: Pick<VaultDescribeDeps, 'unpicture'>, key: string): Promise<void> {
+  try {
+    await deps.unpicture(key);
+  } catch {
+    throw new VaultPictureNotRemoved();
+  }
+}
+
 type ItemOutcome = 'described' | 'linked' | 'to_agency' | 'skipped' | 'budget' | 'models' | 'unavailable';
 
 async function describeOne(
@@ -217,41 +239,53 @@ async function describeOne(
         return await toAgency();
       }
     }
-    const described = await deps.describer.describe({
-      creatorId: job.creatorId,
-      path: file.path,
-      mime: file.describedMime,
-      kind: ref.kind,
-      bytes: read.bytes,
-      context: { category: VAULT_CATEGORY, step: null },
-    });
-    if (!described.ok) {
-      if (described.error.code === 'budget') return 'budget';
-      if (described.error.code === 'unreadable') return await toAgency();
-      await deps.store.failed(ref.refId, 1);
-      return 'models';
-    }
+    // The picture before the vision: a storage that fails throws here, before a description is paid and then lost.
     const thumbnailKey = await deps.picture({
       creatorId: job.creatorId,
       sha256,
       path: file.path,
       kind: ref.kind,
     });
-    const kept = await deps.store.keep(
-      job.creatorId,
-      ref,
-      {
+    // Carried by a media row once `keep` answers: until then, a picture no erasure would ever find (ADR 0113 § 1), so
+    // every other way out removes it; the next run makes it again for the price of an ffmpeg.
+    let carried = false;
+    try {
+      const described = await deps.describer.describe({
+        creatorId: job.creatorId,
+        path: file.path,
+        mime: file.describedMime,
         kind: ref.kind,
-        mime: file.mime,
         bytes: read.bytes,
-        durationMs,
-        sha256,
-        thumbnailKey,
-        at: deps.now(),
-      },
-      described.value,
-    );
-    return kept === 'fan' ? await toAgency() : 'described';
+        context: { category: VAULT_CATEGORY, step: null },
+      });
+      if (!described.ok) {
+        if (described.error.code === 'budget') return 'budget';
+        if (described.error.code === 'unreadable') return await toAgency();
+        await deps.store.failed(ref.refId, 1);
+        return 'models';
+      }
+      const kept = await deps.store.keep(
+        job.creatorId,
+        ref,
+        {
+          kind: ref.kind,
+          mime: file.mime,
+          bytes: read.bytes,
+          durationMs,
+          sha256,
+          thumbnailKey,
+          at: deps.now(),
+        },
+        described.value,
+      );
+      // `fan`: a media a fan sent has these bytes, so the same key is its picture: it stays.
+      carried = true;
+      return kept === 'fan' ? await toAgency() : 'described';
+    } finally {
+      // The key is the fingerprint's: a media of the same bytes kept meanwhile (a drop, a fan's) carries it, it stays.
+      if (thumbnailKey !== null && !carried && (await deps.store.assetOf(job.creatorId, sha256)) === null)
+        await unpicture(deps, thumbnailKey);
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
