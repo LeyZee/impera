@@ -62,10 +62,13 @@ describe('WhyPanel', () => {
 
   it('says she waits when he said he comes back, and answers him with care when he is in distress (AGE-01)', () => {
     why({ ...ANSWER, hold: { kind: 'no_reply', detail: ['wait'] } });
+    expect(screen.getByText('Elle attend')).toBeTruthy();
     expect(screen.getByText('Elle attend : il a dit qu’il revenait.')).toBeTruthy();
+    expect(screen.queryByText('Relecture avant envoi')).toBeNull();
     cleanup();
     why({ ...ANSWER, bubbles: ['Je suis là'], hold: { kind: 'care', detail: ['distress'] } });
     expect(screen.getByText('Mode soin')).toBeTruthy();
+    expect(screen.getByText(/Il va mal : elle lui répond avec soin/)).toBeTruthy();
   });
 
   it('says a handoff decided by the code is one, even when the brain suggested to answer (AGE-01)', () => {

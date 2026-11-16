@@ -285,7 +285,7 @@ function Draft({
 
   if (isWaiting(answer)) {
     return (
-      <div className="pg-relay" role="group" aria-label="Elle attend">
+      <div className="pg-relay pg-relay--calm" role="group" aria-label="Elle attend">
         <p className="pg-relay__t">
           <b>Elle attend : il a dit qu’il revenait</b>
           Comme en vrai, rien n’est écrit. Elle lui redemande s’il est là plus tard s’il ne revient pas.
