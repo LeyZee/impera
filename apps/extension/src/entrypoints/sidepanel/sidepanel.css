@@ -155,6 +155,17 @@ body {
 .cp-badges__more:hover {
   color: var(--nv-ink);
 }
+/* The same plate as a count on the moment line: read, not pressed (Design 16/11, lot 0141-6). */
+.cp-badges__more--count {
+  flex: none;
+  cursor: default;
+}
+.cp-badges__more--count::before {
+  content: none;
+}
+.cp-badges__more--count:hover {
+  color: var(--nv-ink-muted);
+}
 .cp-badges__more:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
@@ -222,7 +233,7 @@ body {
 .cp-moment[data-verdict='good'] {
   color: var(--nv-ink);
 }
-/* One line, always: a long line ends in an ellipsis rather than pushing the button down (Design 16/11, lot 0141-5). */
+/* One line, always: the first missing condition is named, the others counted; the ellipsis stays as a last guard. */
 .cp-moment__text {
   min-width: 0;
   white-space: nowrap;

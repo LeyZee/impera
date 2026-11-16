@@ -268,14 +268,6 @@ const MISSING_WORDS: Readonly<Record<SaleCondition, string>> = {
 
 type SaleMomentCondition = SaleMoment['conditions'][number];
 
-/** « son désir », « son désir et le ton coquin », « son désir, le ton coquin… »: never more than two named. */
-function missingGroup(codes: readonly SaleCondition[]): string | null {
-  const [first, second] = codes.map((code) => MISSING_WORDS[code]);
-  if (first === undefined) return null;
-  if (second === undefined) return first;
-  return codes.length === 2 ? `${first} et ${second}` : `${first}, ${second}…`;
-}
-
 /** One condition in the panel's words, with the hour a cooldown ends and the count of messages still needed. */
 export function conditionWords(condition: SaleMomentCondition): string {
   const { code, met, remaining, until } = condition;
@@ -302,6 +294,8 @@ export interface MomentLine {
   readonly notches: readonly boolean[];
   /** « Pas encore · il manque son désir », « Bon moment · il demande du contenu lui-même ». */
   readonly text: string;
+  /** The missing conditions past the first one named, said as a count in a plate (« +1 »), never cut (Design 16/11, lot 0141-6). */
+  readonly more: number;
   readonly verdict: SaleMomentVerdict;
 }
 
@@ -312,7 +306,9 @@ export interface MomentLine {
  */
 export function momentLine(moment: SaleMoment, move: CopilotNextMove | null): MomentLine {
   const sent = new Set(moment.conditions.map(({ code }) => code));
-  const missing = missingGroup(moment.conditions.filter(({ met }) => !met).map(({ code }) => code));
+  // The first missing one is named, in the fold's order; the others are only counted.
+  const missingCodes = moment.conditions.filter(({ met }) => !met).map(({ code }) => code);
+  const missing = missingCodes[0] === undefined ? null : MISSING_WORDS[missingCodes[0]];
   const block = move?.kind === 'no_sale' ? move.block : null;
   const covering = block === null ? undefined : BLOCK_CONDITIONS[block];
   const blockWords =
@@ -334,6 +330,7 @@ export function momentLine(moment: SaleMoment, move: CopilotNextMove | null): Mo
     // The met ones first, the missing ones on the right: the notches fill from the left (Design 16/11, lot 0141-5).
     notches: moment.conditions.map(({ met }) => met).sort((a, b) => Number(b) - Number(a)),
     text: parts.join(' · '),
+    more: Math.max(0, missingCodes.length - 1),
     verdict: moment.verdict,
   };
 }

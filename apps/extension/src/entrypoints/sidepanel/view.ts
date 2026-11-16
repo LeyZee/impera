@@ -652,9 +652,24 @@ const notches = (met: readonly boolean[]): HTMLElement =>
 function momentNode(moment: MomentLine): HTMLElement {
   return h(
     'p',
-    { class: 'cp-moment', 'data-verdict': moment.verdict, 'aria-label': `Moment de vendre : ${moment.text}` },
+    {
+      class: 'cp-moment',
+      'data-verdict': moment.verdict,
+      'aria-label': `Moment de vendre : ${moment.text}${moment.more === 0 ? '' : `, et ${String(moment.more)} de plus`}`,
+    },
     notches(moment.notches),
     h('span', { class: 'cp-moment__text' }, moment.text),
+    // The others missing, counted in the band's « +N » plate, so the line is never cut (Design 16/11, lot 0141-6).
+    moment.more === 0
+      ? null
+      : h(
+          'span',
+          {
+            class: 'cp-badges__more cp-badges__more--count',
+            'aria-label': `et ${String(moment.more)} ${moment.more === 1 ? 'autre condition' : 'autres conditions'}`,
+          },
+          `+${String(moment.more)}`,
+        ),
   );
 }
 

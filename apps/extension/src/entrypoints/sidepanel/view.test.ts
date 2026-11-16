@@ -1059,6 +1059,25 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
     expect(place(root)).not.toContain('nv-btn--neon');
   });
 
+  it('counts the other missing conditions in the band plate, after the first one named', () => {
+    const root = drawn(assistOf({ saleMoment: moment('not_yet', [false, false, true]) }));
+    const line = root.querySelector<HTMLElement>('.cp-moment');
+    const plate = line?.querySelector<HTMLElement>('.cp-badges__more');
+    expect(plate?.textContent).toBe('+1');
+    expect(plate?.tagName).toBe('SPAN');
+    expect(plate?.getAttribute('aria-label')).toBe('et 1 autre condition');
+    expect(line?.querySelector('.cp-moment__text')?.textContent).not.toContain('…');
+    // The name shown is the first missing one of the fold, in the same order.
+    expect(line?.querySelector('.cp-moment__text')?.textContent).toBe('Pas encore · il manque son désir');
+    const missing = [...root.querySelectorAll<HTMLElement>('.cp-condition[data-met="false"]')];
+    expect(missing.map((row) => row.textContent)).toEqual([
+      'Son désir est encore basmanque',
+      'Il n’a pas encore pris le ton coquinmanque',
+    ]);
+    const one = drawn(assistOf({ saleMoment: moment('soon', [true, false, true]) }));
+    expect(one.querySelector('.cp-moment .cp-badges__more')).toBeNull();
+  });
+
   it.each([
     ['good', [true, true, true], 'Bon moment'],
     ['soon', [true, false, true], 'Bientôt · il manque le ton coquin'],

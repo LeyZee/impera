@@ -236,7 +236,8 @@ describe('the moment to sell (ADR 0141 § 4 bis)', () => {
     ).toEqual({
       // The met ones first, the missing ones on the right.
       notches: [true, false, false],
-      text: 'Pas encore · il manque son désir et le ton coquin',
+      text: 'Pas encore · il manque son désir',
+      more: 1,
       verdict: 'not_yet',
     });
     expect(
@@ -244,20 +245,36 @@ describe('the moment to sell (ADR 0141 § 4 bis)', () => {
     ).toBe('Bientôt · il manque l’achat de l’étape');
   });
 
-  it('names two missing conditions at most, so the line stays one line', () => {
+  it('names the first missing condition, in the fold order, and counts the others', () => {
+    const three = momentLine(
+      {
+        verdict: 'not_yet',
+        conditions: [
+          { code: 'not_sexualizing', met: false },
+          { code: 'cooldown', met: false },
+          { code: 'availability_unconfirmed', met: false },
+        ],
+      },
+      null,
+    );
+    expect(three.text).toBe('Pas encore · il manque le ton coquin');
+    expect(three.more).toBe(2);
+    const two = momentLine(
+      {
+        verdict: 'not_yet',
+        conditions: [
+          { code: 'cooldown', met: false },
+          { code: 'not_sexualizing', met: false },
+          { code: 'desire_below_threshold', met: true },
+        ],
+      },
+      null,
+    );
+    expect(two.text).toBe('Pas encore · il manque du temps depuis l’offre');
+    expect(two.more).toBe(1);
     expect(
-      momentLine(
-        {
-          verdict: 'not_yet',
-          conditions: [
-            { code: 'desire_below_threshold', met: false },
-            { code: 'availability_unconfirmed', met: false },
-            { code: 'cooldown', met: false },
-          ],
-        },
-        null,
-      ).text,
-    ).toBe('Pas encore · il manque son désir, sa dispo…');
+      momentLine({ verdict: 'good', conditions: [{ code: 'fan_asks_for_paid', met: true }] }, null).more,
+    ).toBe(0);
   });
 
   it('says a met condition positively in the detail', () => {
@@ -274,7 +291,12 @@ describe('the moment to sell (ADR 0141 § 4 bis)', () => {
   it('says why the moment is good when he asks for content himself', () => {
     expect(
       momentLine({ verdict: 'good', conditions: [{ code: 'fan_asks_for_paid', met: true }] }, null),
-    ).toEqual({ notches: [true], text: 'Bon moment · il demande du contenu lui-même', verdict: 'good' });
+    ).toEqual({
+      notches: [true],
+      text: 'Bon moment · il demande du contenu lui-même',
+      more: 0,
+      verdict: 'good',
+    });
     expect(momentLine({ verdict: 'good', conditions: [] }, null).text).toBe('Bon moment');
   });
 
