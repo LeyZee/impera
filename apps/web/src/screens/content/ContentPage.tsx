@@ -34,6 +34,7 @@ import {
 } from './model';
 import { isSending, queueSend, useLiveSends } from './sends';
 
+import { lookAgainAtHerCase } from '@/rewards/api';
 import { dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
@@ -80,6 +81,8 @@ export function ContentPage({
 
   const reread = (): void => {
     void client.invalidateQueries({ queryKey: CONTENT_KEY });
+    // A drop arrived may earn her something: her case is read again once the game has looked (CRE-06).
+    lookAgainAtHerCase(client);
   };
 
   const requests = content.data === undefined ? [] : openRequests(content.data.requests);

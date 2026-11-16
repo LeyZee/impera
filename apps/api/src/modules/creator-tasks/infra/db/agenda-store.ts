@@ -118,6 +118,25 @@ function isOver(when: CreatorTaskWhen, zone: string, now: Date): boolean {
   return false;
 }
 
+/**
+ * `rewards.evaluate_creator` for her, in the transaction of her gesture (ADR 0107 § 14, recette 16/11 CRE-06): the game
+ * looks at once, so that a gain is revealed where she made it. One waiting run per creator, replaced by the next gesture
+ * a few seconds later. The job is the game's (`wiring/rewards.ts`): only its name and attempts are shared, by the
+ * contracts, as for every job a module asks of another.
+ */
+async function askHerGame(tx: Transaction, creatorId: string): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => 'rewards.evaluate_creator',
+      payload => ${JSON.stringify({ creatorId })}::jsonb,
+      run_at => now() + interval '2 seconds',
+      max_attempts => ${JOB_MAX_ATTEMPTS['rewards.evaluate_creator']}::int,
+      job_key => ${`rewards.evaluate_creator:${creatorId}`},
+      job_key_mode => 'replace'
+    )`,
+  );
+}
+
 export async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
   const [creator] = await tx
     .select({ timeZone: schema.creators.timezone })
@@ -380,6 +399,8 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
                 // Two phones replaying at once: the first one stays.
                 .onConflictDoNothing()
                 .returning({ taskId: ticks.taskId });
+        // Her game looks at once, so that a gain is revealed where she ticked (ADR 0107 § 14, recette 16/11 CRE-06).
+        if (written.length > 0) await askHerGame(tx, creatorId);
         return { added: written.length, streak: await streakNow(tx, zone, now) };
       }),
 

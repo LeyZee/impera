@@ -13,7 +13,7 @@ import {
   TeamMemberIdSchema,
   type CreatorId,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -408,6 +408,11 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       ).json(),
     );
     expect(ticked.streak).toMatchObject({ days: 1, atRisk: false });
+    // Her game looks at once, so that a gain is revealed where she ticked (recette 16/11, CRE-06).
+    const asked = await test.admin.db.execute(
+      sql`select payload from graphile_worker._private_jobs where key = ${`rewards.evaluate_creator:${nora}`}`,
+    );
+    expect(asked.rows).toEqual([{ payload: { creatorId: nora } }]);
     // The agency sees the day she did it, then that she removed it.
     const followUp = async () =>
       AgencySuggestionListSchema.parse(

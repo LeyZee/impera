@@ -29,6 +29,7 @@ import {
 } from './script-model';
 import { isSending, queueSend, useLiveSends } from './sends';
 
+import { lookAgainAtHerCase } from '@/rewards/api';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
 
@@ -103,6 +104,8 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
   const reread = (): void => {
     void client.invalidateQueries({ queryKey: scriptDropKey(dropId) });
     void client.invalidateQueries({ queryKey: CONTENT_KEY });
+    // A drop arrived may earn her something: her case is read again once the game has looked (CRE-06).
+    lookAgainAtHerCase(client);
   };
   const show = (next: ContentDrop): void => {
     client.setQueryData(scriptDropKey(dropId), (old: typeof script.data) =>
