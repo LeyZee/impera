@@ -34,6 +34,7 @@ import {
   type VaultReads,
   type VaultSyncAsked,
 } from './application/vault';
+import { createVaultFiles, type VaultFiles } from './application/vault-files';
 import type { AvatarPorts } from './domain/avatar';
 import { connectionServiceOf } from './domain/connection-outage';
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
@@ -104,6 +105,8 @@ export { FakeConnector } from './infra/fake/FakeConnector';
 /** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
 export { revealApiConnectors } from './infra/reveal/connector';
 export type { RevealFetch } from './infra/reveal/client';
+export type { FileTransport } from './infra/download/vault-file';
+export type { VaultFiles } from './application/vault-files';
 /** @public The errors `platformReads` throws, for the adapter that reads through it (`reason` says why a read is refused). */
 export { PlatformAccountNotFound, PlatformReadUnavailable } from './domain/errors';
 /** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */
@@ -215,6 +218,11 @@ export interface ConnectorsModule {
    * each behind its `capabilities` flag, never a write.
    */
   readonly platformReads: PlatformReads;
+  /**
+   * One vault file read to a path of the caller's (ADR 0113), for `media.describe_vault`: through the resolver, behind
+   * `mediaDownload`, never a write. What became of it, typed; the file is the caller's to remove.
+   */
+  readonly vaultFiles: VaultFiles;
   /** `/v1/creators/:creatorId/avatar`, behind the guard given here (owner, operator, creator). */
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
@@ -305,6 +313,11 @@ export interface ConnectorsDeps {
    * (fiche vault-sync; asked by `media`, wired by the composition root). Never a write of this module's tables.
    */
   readonly onVaultSyncAsked?: (input: VaultSyncAsked) => Promise<void>;
+  /**
+   * Told of each `connector.vault_sync` that went through, once its rows are written (ADR 0113 § 5; `media` queues the
+   * description of the vault behind it, wired by the composition root). Never a write of this module's tables.
+   */
+  readonly onVaultSynced?: (input: VaultSyncAsked) => Promise<void>;
 }
 
 const systemClock: Clock = { now: () => new Date() };
@@ -388,7 +401,13 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       checkSales: (payload, logger, correlationId) => salesFeeds.autoCheck(payload, logger, correlationId),
       readDailyStats: (logger, correlationId) => salesFeeds.readDailyStats(logger, correlationId),
       copyAvatar: (payload, logger) => salesFeeds.copyAvatar(payload, logger),
-      vaultSync: createVaultSyncJob({ accounts, resolver, store: vaultStore, clock }),
+      vaultSync: createVaultSyncJob({
+        accounts,
+        resolver,
+        store: vaultStore,
+        clock,
+        onSynced: deps.onVaultSynced,
+      }),
     },
     askConversationRead: createAskConversationRead({
       accounts,
@@ -399,6 +418,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     vaultRoutes: (options) => createVaultRoutes(vaultReads, { ...options, askSync: askVaultSync }),
     vault: vaultReads,
     platformReads: createPlatformReads({ accounts, resolver, clock }),
+    vaultFiles: createVaultFiles({ accounts, resolver, clock }),
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedTeamRoutes: (options) => createSalesFeedTeamRoutes(salesFeeds.team, options),
