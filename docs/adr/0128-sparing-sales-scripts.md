@@ -1,6 +1,6 @@
 # 0128. Ménager les scripts : une pause après un achat, un script rejoué par une autre variante du teasing, l'IA qui réclame des scripts
 
-Statut : proposed (fil « Économiser les scripts de vente », 16/11/2026 ; relu par Médias ; attend « ok 0128 » de Charles et ses réponses aux questions ouvertes)
+Statut : accepted (« ok 0128 » de Charles le 16/11/2026 à 13 h 16, avec « ok recommandations » pour les quatre questions ; variante attachée à l'étape, 16/11 à 12 h 18 ; fil « Économiser les scripts de vente » ; relu par Médias, Bilan et le fil Mesurer)
 Date : 2026-11-16
 Précise : l'ADR 0098 (§ 1 un script ne se rejoue jamais, § 6 média déjà reçu, § 9 pack refusé, § 12 même session), l'ADR 0112 (§ 5 conditions de branche, § 11 média déjà reçu, § 15 « un script ne se rejoue pas »), l'ADR 0103 (porte), l'ADR 0056 (variantes A, B, C d'une étape, cadence de demande des scripts), la politique d'offre (`agent/domain/policy.ts`). Ne remplace aucun ADR en entier.
 
@@ -34,7 +34,7 @@ Ce qui existe déjà et sert : les **variantes** A, B et C d'une étape dans l'a
 
 6. **Un script peut se rejouer au même fan tant qu'il n'y a rien acheté** (précise ADR 0098 § 1 et ADR 0112 § 15). Dès qu'une étape payante de ce script est achetée par ce fan, le script est fini pour lui, pour toujours, comme aujourd'hui.
 
-7. **Ce qui permet le rejeu** : le premier déroulé s'est fermé sur `stalled` (sans réponse), `no_branch`, sur un refus **par silence** (étape payante ignorée deux messages, ADR 0098 § 9) ou sur la fin de session (ADR 0098 § 12), sans achat. **Ce qui l'interdit** : un refus dit (« non », « pas intéressé »), un manque d'argent avoué (`no_budget`, gel `money_trouble`), une reprise par un humain (`closed_by_human`), un risque. Question ouverte n° 2 : la place du refus dit.
+7. **Ce qui permet le rejeu** : le premier déroulé s'est fermé sur `stalled` (sans réponse), `no_branch`, sur un refus **par silence** (étape payante ignorée deux messages, ADR 0098 § 9) ou sur la fin de session (ADR 0098 § 12), sans achat. **Ce qui l'interdit** : un refus dit (« non », « pas intéressé »), un manque d'argent avoué (`no_budget`, gel `money_trouble`), une reprise par un humain (`closed_by_human`), un risque. Refus dit : pas de rejeu (Charles, 16/11/2026).
 
 8. **Le teasing rejoué est une autre variante, jamais le même média.** La variante de teasing est une **branche** de la première étape (ADR 0112 § A), avec ses propres médias : selfie, miroir, autre pièce, autre cadrage, choisis à la tournée (séries A, B, C de l'atelier, ADR 0056). Une condition structurée nouvelle, **`unseen_variant`** (évaluée par le code seul, ADR 0112 § 5), dit « une branche dont il n'a reçu aucun média ». Au premier passage, c'est la branche par défaut qui part ; au rejeu, la première variante qu'il n'a jamais reçue, dans l'ordre fixé par l'agence.
    - **Des séries de l'atelier aux branches de Reveal.** Les séries A, B, C vivent dans la structure (scripts demandés par Impera) ; le rejeu tourne sur les scripts natifs de Reveal par leurs branches. Le lien se fait quand l'équipe recopie le script dans Reveal (SC-03) : les séries du teasing y deviennent des branches au même rang que la première étape, dans l'ordre A, B, C. Reveal ne porte aucune lettre : « variante B » se lit par cet ordre de branches. Le guide de copie (fil Médias) le dit.
@@ -105,9 +105,9 @@ Négatives :
 - **Une tâche « Tourner un script » dans son agenda, à côté de la demande de script** : deux chemins pour la même chose ; la demande de script porte déjà la structure, les cartons et le dépôt.
 - **Une pause qui bloque aussi quand il sexualise** : on refuserait une vente qu'il demande.
 
-## Questions ouvertes (à trancher par Charles avant « ok 0128 »)
+## Décisions de Charles (16/11/2026, 13 h 16, « ok recommandations »)
 
-1. Pause après achat : 48 h par défaut, réglable de 24 à 72 h, levée s'il sexualise de lui-même ou demande du contenu (recommandé).
-2. Refus dit (« non ») sur la première étape payante : pas de rejeu, seulement après un silence ou une fin de session (recommandé) ; ou rejeu aussi après un refus dit.
-3. Délai avant de rejouer le même script : 14 jours par défaut, réglable de 7 à 60 (recommandé).
-4. Stock : demande avancée quand plus d'un quart des acheteurs actifs ont moins de deux scripts jouables, réglable (recommandé) ; ou seulement prévenir l'agence sans demander à la créatrice.
+1. Pause après achat : 48 h par défaut, réglable de 24 h à 3 jours par créatrice ; levée pour la session s'il sexualise de lui-même ou demande du contenu (§§ 1–3).
+2. Pas de rejeu après un refus dit (« non » net) ; rejeu seulement après un silence, un `stalled`, un `no_branch` ou une fin de session (§ 7).
+3. Délai avant de rejouer le même script : 14 jours par défaut, réglable de 7 à 60 (§ 10).
+4. Stock : la demande de script est avancée quand plus d'un quart des acheteurs actifs ont moins de deux scripts jouables, réglable par le propriétaire (§§ 15–16).
