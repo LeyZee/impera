@@ -482,6 +482,47 @@ describe('conversations module (P0-05)', () => {
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
   });
 
+  it('waits the time she takes to type each next bubble, and stops when he writes meanwhile (Charles 16/11)', async () => {
+    const waits: number[] = [];
+    let onWait: () => Promise<void> = () => Promise.resolve();
+    conversations = createConversationsModule({
+      db: test.app.db,
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
+      sender,
+      requireRole: () => () => Promise.resolve(),
+      recentLogin: () => Promise.resolve(),
+      voice: { voicePrompt: 'voice@test', voiceModel: 'model-test' },
+      guard: PASS_GUARD,
+      clock,
+      typing: {
+        delaysMs: (bubbles) => bubbles.map((_, index) => (index + 1) * 1_000),
+        wait: async (ms) => {
+          waits.push(ms);
+          await onWait();
+        },
+      },
+    });
+    const { conversationId } = await ingest('c-typing');
+    const draftId = await respond(conversationId);
+    await conversations.approveDraft({
+      ...command(conversationId),
+      draftId,
+      bubbles: ['Coucou', 'Ça va ?', 'Moi oui'],
+    });
+    // He writes while she types the second bubble: it never leaves.
+    onWait = async () => {
+      clock.advance(5);
+      await ingest('c-typing', fanMessage('c-typing', 'T’es là ?'));
+    };
+
+    await conversations.jobs.send({ creatorId, conversationId, draftId, correlationId: 'test' }, NO_LOG, 1);
+
+    expect(waits).toEqual([2_000]);
+    expect(sender.sent.map((bubble) => bubble.text)).toEqual(['Coucou']);
+    expect((await events(conversationId)).slice(-2)).toEqual(['message_received', 'draft_expired']);
+  });
+
   /** A message written on the creator's side by someone else than the agent: a chatter, her, an automation. */
   function teamMessage(conversation: string, text = 'coucou toi'): ExternalMessage {
     return { ...fanMessage(conversation, text), direction: 'outbound', author: 'human' };
