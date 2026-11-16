@@ -77,17 +77,17 @@ body {
 }
 /*
  * Every part carries the dot before it; the flow starts one dot to the left of the line and that strip is clipped, so
- * the first part of each line shows no dot (Design 16/11: a line never starts with « · »). Clipped across only: the
- * 44 px target of « +N » still reaches above and below.
+ * the first part of each line shows no dot (Design 16/11: a line never starts with « · »). Clipped on the left only:
+ * the 44 px target of « +N » still reaches above, below and to the right.
  */
 .cp-standing__flow {
+  --cp-dot-room: 18px;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   row-gap: 2px;
   margin-left: calc(-1 * var(--cp-dot-room));
-  overflow-x: clip;
-  --cp-dot-room: 18px;
+  clip-path: inset(-24px -24px -24px var(--cp-dot-room));
 }
 .cp-standing__stop {
   font-weight: 600;
@@ -604,6 +604,7 @@ body {
 }
 /* Masked while his age is contested (ADR 0141 § 9): the same row, which does not open. */
 .cp-group__row {
+  justify-content: flex-start;
   cursor: default;
 }
 .cp-field__masked {
