@@ -9,6 +9,12 @@ import { NewPasswordField, REFUSED_PASSWORD, Refused, missingOf, useNoReferrer }
 export const PASSWORD_CHANGED_NOTICE =
   'Mot de passe changé, connecte-toi. Ton code à 6\u00a0chiffres reste demandé.';
 
+/**
+ * For whoever has no Telegram linked, a creator or a chatter (recette CRE-05, CHT-16): the way back is the link the
+ * owner makes from their sheet (EQ-10, CR-02). Shown to everyone, so it says nothing about the address typed.
+ */
+export const NO_TELEGRAM_HINT = 'Pas de Telegram lié\u00a0? Demande un nouveau lien à ton agence.';
+
 type Step =
   | { readonly kind: 'ask' }
   | { readonly kind: 'requested'; readonly message: string }
@@ -98,6 +104,7 @@ export function ForgottenPasswordPage({
               <div className="flex flex-col gap-1">
                 <h1 className="text-xl font-semibold">Demande reçue</h1>
                 <p className="text-sm text-[var(--nv-ink-muted)]">{keepUnits(step.message)}</p>
+                <p className="text-sm text-[var(--nv-ink-muted)]">{NO_TELEGRAM_HINT}</p>
               </div>
             </div>
             <button
@@ -207,6 +214,7 @@ function RequestForm({
           Donne l’adresse e-mail de ton compte. Le lien pour en choisir un nouveau part dans ton chat Telegram
           privé, celui que tu as relié dans Sécurité.
         </p>
+        <p className="text-sm text-[var(--nv-ink-muted)]">{NO_TELEGRAM_HINT}</p>
       </header>
       <label className="nv-field nv-enter" style={{ '--nv-i': 2 }}>
         <span className="nv-field__label">E-mail</span>
