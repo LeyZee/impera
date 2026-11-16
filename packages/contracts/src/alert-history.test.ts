@@ -5,6 +5,9 @@ import {
   alertTriggerReason,
   AlertTriggerQuerySchema,
   MarkAlertTriggersSeenBodySchema,
+  SAFETY_EVENTS,
+  SAFETY_EVENT_LABELS,
+  safetyEventReason,
 } from './alert-history';
 import { AlertTriggerSchema } from './alerts';
 
@@ -41,6 +44,15 @@ describe('history of her alerts (P4-01)', () => {
     );
     expect(AlertTriggerQuerySchema.safeParse({ creatorId: CREATOR, alert: 'other' }).success).toBe(false);
     expect(AlertTriggerQuerySchema.safeParse({ seen: 'true' }).success).toBe(false);
+  });
+
+  it('names what the agent’s safety did, and filters on it (recette 16/11 AGE-05)', () => {
+    for (const event of SAFETY_EVENTS) {
+      expect(SAFETY_EVENT_LABELS[event].length).toBeGreaterThan(0);
+      expect(safetyEventReason(event)).toMatch(/^Le /u);
+      expect(AlertTriggerQuerySchema.parse({ creatorId: CREATOR, alert: event }).alert).toBe(event);
+    }
+    expect(safetyEventReason('care')).toContain('mode soin');
   });
 
   it('marks up to a trigger named by its id, never by a date', () => {

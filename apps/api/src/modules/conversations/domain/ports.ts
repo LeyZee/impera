@@ -44,6 +44,7 @@ import type {
   MessageView,
   OutboundMedia,
   PlatformAccountId,
+  SafetyEvent,
   ScriptRunId,
   ScriptRunStatus,
   ScriptStepKind,
@@ -889,13 +890,17 @@ export interface AlertNames {
   ): Promise<ReadonlyMap<CustomAlertId, { readonly groupId: CustomAlertGroupId; readonly name: string }>>;
 }
 
-/** One trigger of the history as the journal has it (P4-01): the alert's name is added by the route. */
+/**
+ * One line of the history as the journal has it (P4-01): the alert that rang, or what the agent's safety did (recette
+ * 16/11 AGE-05), one of the two. The alert's name is added by the route.
+ */
 export interface AlertTriggerRow {
   readonly id: EventId;
   readonly conversationId: ConversationId;
   readonly fanId: FanId;
   readonly fanDisplayName: string;
-  readonly trigger: AlertTrigger;
+  readonly trigger: AlertTrigger | null;
+  readonly safety: SafetyEvent | null;
   readonly pausedAgent: boolean;
   readonly at: Date;
   readonly seenAt: Date | null;
@@ -907,14 +912,16 @@ export interface AlertTriggerFilter {
   readonly alert?:
     | { readonly kind: 'custom'; readonly id: CustomAlertId }
     | { readonly kind: 'system'; readonly code: SystemAlertCode }
+    /** One kind of what the agent's safety did. */
+    | { readonly kind: 'safety'; readonly event: SafetyEvent }
     /** One of her alerts that never watched her: it has no trigger. */
     | { readonly kind: 'none' }
     | undefined;
 }
 
 /**
- * The history of her alerts (P4-01): her `alert_triggered` events and the `handoff_requested` that carry a trigger,
- * newest first, with the agency's « vu » (`alert_seen`, owned here: a mark on an event of the journal).
+ * The history of her alerts (P4-01): her `alert_triggered` events, the `handoff_requested` that carry a trigger, and
+ * what the agent's safety did (a hand-off for a minor or her budget, a care mode opened), newest first, with the agency's « vu » (`alert_seen`, owned here: a mark on an event of the journal).
  */
 export interface AlertHistory {
   list(creatorId: CreatorId, filter: AlertTriggerFilter, page: PageRequest): Promise<Page<AlertTriggerRow>>;

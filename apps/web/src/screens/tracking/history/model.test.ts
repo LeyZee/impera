@@ -2,6 +2,7 @@ import {
   AlertTriggerItemSchema,
   CustomAlertGroupIdSchema,
   CustomAlertIdSchema,
+  SAFETY_EVENTS,
   SYSTEM_ALERT_CODES,
   type AlertTriggerItem,
   type CustomAlertGroupId,
@@ -33,6 +34,7 @@ const item = (n: number, creatorId: string, at: string, patch: Partial<AlertTrig
     fanId: '0192f3a0-0000-7000-8000-0000000000f1',
     fanDisplayName: 'Théo',
     trigger: { alert: { kind: 'system', code: 'service_request' }, matchedBy: 'rule' },
+    safety: null,
     alertGroupId: null,
     alertName: 'Demande de service',
     pausedAgent: false,
@@ -141,7 +143,7 @@ describe('when a trigger rang', () => {
 });
 
 describe('the alert filter', () => {
-  it('offers the system’s alerts, then hers by name, each once', () => {
+  it('offers the system’s alerts, the agent’s safety, then hers by name, each once', () => {
     expect(
       alertChoices([
         { groupId: GROUP, name: 'Vidéo perso', creatorId: NORA },
@@ -157,6 +159,9 @@ describe('the alert filter', () => {
       'Demande de service',
       'Doute sur la personne',
       'Prix d’un script changé',
+      'Âge douteux',
+      'Mode soin',
+      'Budget IA atteint',
       'Appel',
       'Vidéo perso',
     ]);
@@ -165,6 +170,7 @@ describe('the alert filter', () => {
   it('reads its value back, and anything else as every alert', () => {
     expect(choiceOf('identity_doubt')).toBe('identity_doubt');
     expect(choiceOf(GROUP)).toBe(GROUP);
+    expect(choiceOf('care')).toBe('care');
     expect(choiceOf('')).toBeNull();
     expect(choiceOf('sale')).toBeNull();
   });
@@ -193,7 +199,7 @@ describe('the alert filter', () => {
     ]);
     const custom = (creator: string | null, chosen: CustomAlertGroupId | null = null) =>
       alertChoices(known, creator, chosen)
-        .slice(SYSTEM_ALERT_CODES.length)
+        .slice(SYSTEM_ALERT_CODES.length + SAFETY_EVENTS.length)
         .map((one) => one.label);
     expect(custom(null)).toEqual(['Appel', 'Vidéo perso']);
     expect(custom(NORA)).toEqual(['Vidéo perso']);
@@ -217,6 +223,18 @@ describe('the alert filter', () => {
             alert: { kind: 'custom', id: CustomAlertIdSchema.parse('0192f3a0-0000-7000-8000-0000000000b1') },
             matchedBy: 'model',
           },
+        }),
+      ),
+    ).toBe(true);
+    // What the agent's safety did says what it does now (recette 16/11 AGE-05).
+    expect(
+      reasonAddsSomething(
+        item(4, NORA, at, {
+          trigger: null,
+          safety: 'care',
+          alertName: 'Mode soin',
+          reason:
+            'Le fan semble aller mal : le mode soin est ouvert, chaque réponse attend la validation d’un humain.',
         }),
       ),
     ).toBe(true);
