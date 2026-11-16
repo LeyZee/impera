@@ -65,6 +65,7 @@ describe('WhyPanel', () => {
     expect(screen.getByText('Elle attend')).toBeTruthy();
     expect(screen.getByText('Elle attend : il a dit qu’il revenait.')).toBeTruthy();
     expect(screen.queryByText('Relecture avant envoi')).toBeNull();
+    expect(screen.queryByText('Décision')).toBeNull();
     cleanup();
     why({ ...ANSWER, bubbles: ['Je suis là'], hold: { kind: 'care', detail: ['distress'] } });
     expect(screen.getByText('Mode soin')).toBeTruthy();

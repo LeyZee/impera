@@ -170,6 +170,8 @@ export function handoffReasons(answer: PlaygroundAnswer): string[] {
   const risks = answer.brief?.action === 'handoff' ? answer.brief.risks.map(riskLabel) : [];
   // The risk policy's own reasons: a risk the brain read even while suggesting a plain reply.
   const held =
-    answer.hold?.kind === 'handoff' ? answer.hold.detail.filter((d) => d !== 'brain').map(riskLabel) : [];
+    answer.hold?.kind === 'handoff'
+      ? answer.hold.detail.filter((d) => d !== 'brain' && d !== 'safety_net').map(riskLabel)
+      : [];
   return [...new Set([...flags, ...risks, ...held])];
 }

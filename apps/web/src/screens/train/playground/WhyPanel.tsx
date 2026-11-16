@@ -119,10 +119,13 @@ export function WhyPanel({
               <Sec label="Ce qu’elle a compris">
                 {intentLabel(brief.intent)}, {sentimentLabel(brief.sentiment)}
               </Sec>
-              <Sec label="Décision">
-                <b>{actionLabel(brief.action)}</b>
-                {brief.replyBrief === '' ? null : <p>{brief.replyBrief}</p>}
-              </Sec>
+              {/* When the code decides she waits, « Décision du code » says it once (avis Design 16/11). */}
+              {isWaiting(answer) ? null : (
+                <Sec label="Décision">
+                  <b>{actionLabel(brief.action)}</b>
+                  {brief.replyBrief === '' ? null : <p>{brief.replyBrief}</p>}
+                </Sec>
+              )}
             </>
           )}
           {answer.desire === undefined ? null : (

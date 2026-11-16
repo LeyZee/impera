@@ -184,6 +184,28 @@ describe('playground session, the risk policy as production runs it (AGE-01)', (
     expect(plain.turn.hold).toBeUndefined();
     expect(plain.voiceInputs).toHaveLength(1);
   });
+
+  it('reads the safety net before any model, as production does: a plain « 15 ans » is handed over unread', async () => {
+    const brainInputs: ConversationInput[] = [];
+    const voiceInputs: VoiceInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou toi ✨'] }, voiceInputs, brainInputs, BRIEF),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+    });
+    const turn = await session.handleFanMessage('j’ai 15 ans');
+    expect(turn.hold).toEqual({ kind: 'handoff', detail: ['safety_net', 'minor_suspected'] });
+    expect([brainInputs.length, voiceInputs.length]).toEqual([0, 0]);
+    expect(session.history.map((t) => t.from)).toEqual(['fan']);
+  });
+
+  it('answers with care when he says he wants to end it, even when the brain missed it', async () => {
+    const { turn, voiceInputs } = await run({ ...BRIEF, action: 'offer', risks: [] }, 'je veux en finir');
+    expect(turn.hold).toEqual({ kind: 'care', detail: ['safety_net', 'self_harm'] });
+    expect(voiceInputs).toHaveLength(1);
+    expect(voiceInputs[0]?.brief.action).not.toBe('offer');
+  });
 });
 
 describe('playground session, calibration', () => {
