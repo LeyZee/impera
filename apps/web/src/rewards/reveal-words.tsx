@@ -20,6 +20,8 @@ export interface RevealWords {
   readonly text: string;
   readonly chip?: string;
   readonly tone: 'gold' | 'neon';
+  /** A rank's insignia is forged, not turned over (`RewardReveal`). */
+  readonly forge?: number;
 }
 
 const TROPHY_TEXTS: Readonly<Record<TrophyKind, string>> = {
@@ -87,6 +89,7 @@ export function revealWordsOf(
           ? 'Ton premier rang. Il monte avec ton net cumulé et ne redescend jamais.'
           : 'Ton net cumulé a passé le seuil. Un rang gagné ne se perd pas.',
       tone: 'neon',
+      forge: rank,
     };
   }
   const tier = tierOfKind(item.kind);
