@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { PlatformConversationIdSchema } from './copilot';
 import { PlatformSchema } from './enums';
 import {
   CommissionStatementIdSchema,
@@ -43,6 +44,7 @@ export const JOB_NAMES = [
   'connector.dispatch',
   'connector.poll',
   'connector.reconcile',
+  'connector.read_conversation',
   'connector.vault_sync',
   'fans.refresh_summary',
   'fans.read_card',
@@ -121,6 +123,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.dispatch': 'Lecture des comptes Reveal',
   'connector.poll': 'Lecture d’un compte Reveal',
   'connector.reconcile': 'Vérification des envois Reveal',
+  'connector.read_conversation': 'Lecture d’une conversation ouverte dans le copilote',
   'connector.vault_sync': 'Synchronisation du coffre Reveal',
   'fans.refresh_summary': 'Résumé des fans',
   'fans.read_card': 'Fiche des fans remplie par l’IA',
@@ -236,6 +239,16 @@ export const JOB_PAYLOADS = {
   'connector.reconcile': z.object({
     creatorId: CreatorIdSchema,
     platformAccountId: PlatformAccountIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
+   * One conversation read by its id (recette du 16/11) : the copilot panel opened one the polls never read, calm since
+   * before the account's first poll. On the account's queue; replayable, the ingestion is idempotent.
+   */
+  'connector.read_conversation': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    platformConversationId: PlatformConversationIdSchema,
     correlationId: z.string().min(1),
   }),
   /**
@@ -559,6 +572,8 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.dispatch': 1,
   'connector.poll': 3,
   'connector.reconcile': 3,
+  // Asked again by the panel while it stays unknown: no retry of its own.
+  'connector.read_conversation': 1,
   'connector.vault_sync': 3,
   'fans.refresh_summary': 3,
   // Replayable: it reads from where the last read stopped (`conversations.card_read_through`).

@@ -19,9 +19,10 @@ import {
 } from '@impera/db';
 
 import { addDays, calendarDayIn, isoWeekday, wallClockToInstant } from '../../../scheduling/pure';
-import { applyTicks, tickTimely, type Tick } from '../../domain/completion';
+import { applyTicks, tickTimely, untickTimely, type Tick } from '../../domain/completion';
 import {
   AvailabilityNotFound,
+  CreatorDayClosedUnprocessable,
   CreatorTaskChanged,
   CreatorTaskNotFound,
   CreatorTickDayUnprocessable,
@@ -382,7 +383,9 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
     untick: (userId, taskId, day, now) =>
       withCreatorAccount(db, userId, async (tx, creatorId) => {
         const zone = await zoneOf(tx, creatorId);
-        await liveTask(tx, taskId);
+        const task = await liveTask(tx, taskId);
+        if (!untickTimely(day, task.kind === 'routine', now, zone))
+          throw new CreatorDayClosedUnprocessable(taskId);
         await tx.delete(ticks).where(and(eq(ticks.taskId, taskId), eq(ticks.day, day)));
         return { streak: await streakNow(tx, zone, now) };
       }),

@@ -1,7 +1,7 @@
 # VEI-05 Statistiques du compte de la créatrice comme signaux
-Statut : blocked (PUB-02 : compte pro, appli Meta)
+Statut : blocked (INS-01 ; ADR 0120 : ne dépend plus de PUB-02)
 Phase : veille (ADR 0060)
-Dépend de : PUB-02, VEI-04
+Dépend de : INS-01, VEI-04
 Branche : task/vei-05-own-insights
 Propriétaire : Bilan (connecteur)
 

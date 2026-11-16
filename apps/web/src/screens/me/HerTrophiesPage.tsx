@@ -1,10 +1,10 @@
-import type { Me } from '@impera/contracts';
+import type { Me, TrophyCaseStreak } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { MeNav } from './MeNav';
 
 import { useHerTrophyCase, useMarkHerRevealed, usePreferences } from '@/rewards/api';
-import { TrophyCaseView } from '@/rewards/case/TrophyCaseView';
+import { TrophyCaseDown, TrophyCaseLoading, TrophyCaseView } from '@/rewards/case/TrophyCaseView';
 import { creatorEntry } from '@/rewards/creator-case';
 import { Page, PageHeader } from '@/shell/layout';
 
@@ -15,11 +15,38 @@ const plural = (count: number, one: string, many: string): string =>
 const HER_SHELVES = { streak: 'Livraisons à l’heure' } as const;
 
 /**
+ * A streak and, once it broke, her best beside it: a break is never read as a loss (ADR 0108 § 3 and § 9, recette 16/11
+ * CRE-02). One chip each, the view keeps two beside « gagnés ».
+ */
+const withBest = (streak: TrophyCaseStreak, current: string): string =>
+  streak.best > streak.current ? `${current} · meilleure : ${String(streak.best)}` : current;
+
+function chipsOf(
+  day: TrophyCaseStreak | undefined,
+  delivery: TrophyCaseStreak | undefined,
+): { label: string; value: string }[] {
+  return [
+    ...(day === undefined
+      ? []
+      : [{ label: 'Série en cours', value: withBest(day, plural(day.current, 'jour', 'jours')) }]),
+    ...(delivery === undefined
+      ? []
+      : [
+          {
+            label: 'Livraisons à l’heure',
+            value: withBest(delivery, `${String(delivery.current)} de suite`),
+          },
+        ]),
+  ];
+}
+
+/**
  * Moi › Trophées for the creator (ADR 0108): her case on the shared view, read as she is at a glance, her routine's
  * streak and her deliveries on time, with no level (§ 3). Everything is the server's; the screen only lays it out.
  */
 export function HerTrophiesPage({ user }: { user: Me }): JSX.Element {
-  const read = useHerTrophyCase(true).data;
+  const caseRead = useHerTrophyCase(true);
+  const read = caseRead.data;
   const markRevealed = useMarkHerRevealed();
   const { preferences } = usePreferences(user);
   const day = read?.streaks.find((streak) => streak.kind === 'day');
@@ -27,19 +54,18 @@ export function HerTrophiesPage({ user }: { user: Me }): JSX.Element {
   return (
     <Page>
       <PageHeader eyebrow="Moi" title="Mes trophées" actions={<MeNav creator />} />
-      {read === undefined ? null : (
+      {read === undefined ? (
+        caseRead.isError ? (
+          <TrophyCaseDown onRetry={() => void caseRead.refetch()} />
+        ) : (
+          <TrophyCaseLoading />
+        )
+      ) : (
         <TrophyCaseView
           trophyCase={{ ...read, level: null }}
           entry={creatorEntry}
           shelfTitles={HER_SHELVES}
-          chips={[
-            ...(day === undefined
-              ? []
-              : [{ label: 'Série en cours', value: plural(day.current, 'jour', 'jours') }]),
-            ...(delivery === undefined
-              ? []
-              : [{ label: 'Livraisons à l’heure', value: `${String(delivery.current)} de suite` }]),
-          ]}
+          chips={chipsOf(day, delivery)}
           sound={preferences.sounds}
           onRevealed={(item) => {
             markRevealed([item.kind]);

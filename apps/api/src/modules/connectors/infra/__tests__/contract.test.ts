@@ -313,8 +313,8 @@ describe.each(Object.entries(WRITERS))('PlatformConnector contract, writes: %s',
       const [first] = script.steps;
       if (first === undefined) throw new Error('a platform script has a step');
       const price = { amountMinor: first.priceMinor, currency: first.currency };
-      const sent = await connector.sendScriptStep?.(conversationRef, script.ref, 0, price, 'step-1');
-      const again = await connector.sendScriptStep?.(conversationRef, script.ref, 0, price, 'step-1');
+      const sent = await connector.sendScriptStep?.(conversationRef, script.ref, first.ref, price, 'step-1');
+      const again = await connector.sendScriptStep?.(conversationRef, script.ref, first.ref, price, 'step-1');
       expect(again?.messageRef).toEqual(sent?.messageRef);
       if (flags.scriptHistory) {
         const history = (await connector.getScriptHistory?.(fanRef)) ?? [];

@@ -31,6 +31,11 @@ export interface PlatformConnector {
   readonly capabilities: ConnectorCapabilities;
   health(): Promise<SessionState>;
   listConversations(opts: { since?: Date; limit?: number }): Promise<ConversationSnapshot[]>;
+  /**
+   * One conversation by its id, as the list would give it (recette du 16/11: the copilot opened one no poll read).
+   * One the account does not hold fails with `not_found`.
+   */
+  getConversation(conversationRef: ExternalRef): Promise<ConversationSnapshot>;
   fetchMessages(
     conversationRef: ExternalRef,
     opts: { since?: Date; limit?: number },
@@ -66,12 +71,13 @@ export interface PlatformConnector {
    * `scripts`: sends one step of a platform script, priced as the platform lists it (never by us). The history is read
    * again just before: a step already sent in this conversation is refused for good (`ScriptStepAlreadySent`).
    * `expectedPrice` is the step's price as the person or the agent validated it: the platform listing another one
-   * just before sends nothing (`ScriptStepPriceChanged`).
+   * just before sends nothing (`ScriptStepPriceChanged`). The step is named by its own ref (`stepRef`), never by its
+   * place: the branches of a step share a rank and come in no stable order (ADR 0112 § 1).
    */
   sendScriptStep?(
     conversationRef: ExternalRef,
     scriptRef: ExternalRef,
-    stepIndex: number,
+    stepRef: ExternalRef,
     expectedPrice: Money,
     idempotencyKey: string,
   ): Promise<SendResult>;

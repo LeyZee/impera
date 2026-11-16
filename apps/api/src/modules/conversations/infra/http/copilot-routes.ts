@@ -12,6 +12,7 @@ import {
   type CopilotDraftView,
   type CreatorId,
   type CurrentUser,
+  type Platform,
 } from '@impera/contracts';
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -38,6 +39,17 @@ export interface CopilotRouteDeps {
   readonly linkUser: LinkUser;
   /** Every creator not archived: where the owner's panel looks for the conversation open on the platform. */
   readonly allCreatorIds: () => Promise<readonly CreatorId[]>;
+  /**
+   * A conversation none of these creators holds yet: its read is asked of the platform (recette du 16/11, `connectors`'
+   * port, wired by the composition root), so that the panel's next reads find it. Without it, it stays unknown until
+   * a poll reads it.
+   */
+  readonly askRead?: (ask: {
+    readonly creatorIds: readonly CreatorId[];
+    readonly platform: Platform;
+    readonly platformConversationId: string;
+    readonly correlationId: string;
+  }) => Promise<number>;
 }
 
 class CreatorForbidden extends DomainError {
@@ -130,7 +142,15 @@ export function createCopilotRoutes(deps: CopilotRouteDeps): FastifyPluginAsyncZ
           if (read !== null) found.push({ creatorId: candidate, read });
         }
         const [match, other] = found;
-        if (match === undefined) return { state: 'unknown' as const };
+        if (match === undefined) {
+          // Never read, calm since before the account's first poll: read it now; the panel asks again in 5 s.
+          await deps
+            .askRead?.({ creatorIds: candidates, ...conversation, correlationId: request.id })
+            .catch((error: unknown) => {
+              request.log.warn({ err: error }, 'copilot: read of an unknown conversation not asked');
+            });
+          return { state: 'unknown' as const };
+        }
         if (other !== undefined) throw new CopilotCreatorConflict();
         assertCopilot(user, match.creatorId);
         if (readsWhole(user, match.creatorId)) return viewOf(match.creatorId, match.read);

@@ -3,8 +3,18 @@
  * Précédent / Suivant pinned at the foot of a phone. Pills for states, never a coloured bar (Charles, 05/11).
  */
 
-.sk-page {
+/* Its blocks, not the page (the stage bounds every page at 1 240 px): a phone's column, or on a computer the card
+   beside what she does with it (recette CRE-13). */
+.sk-page > .sk-top,
+.sk-page > .sk-body {
+  width: 100%;
   max-width: 560px;
+}
+@media (min-width: 900px) {
+  .sk-page > .sk-top,
+  .sk-page > .sk-body {
+    max-width: 1040px;
+  }
 }
 .sk-top {
   display: flex;
@@ -55,17 +65,30 @@
   color: var(--nv-ink-muted);
 }
 
-/* ---- One card ---- */
+/* ---- One card: on a phone, its image, then its title and slots; on a computer, side by side ---- */
 .sk-card {
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-3);
+  gap: var(--nv-space-4);
 }
-.sk-card__titles {
+.sk-card__work {
   display: flex;
-  align-items: center;
-  gap: var(--nv-space-2);
+  flex-direction: column;
+  gap: var(--nv-space-3);
   min-width: 0;
+}
+@media (min-width: 900px) {
+  .sk-card {
+    display: grid;
+    grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--nv-space-8);
+  }
+  /* The card stays in view while she goes down her slots. */
+  .sk-card__image {
+    position: sticky;
+    top: var(--nv-space-6);
+  }
 }
 .sk-card__title {
   margin: 0;
@@ -84,31 +107,17 @@
 .sk-card__image {
   display: block;
   width: 100%;
+  max-width: 420px;
   height: auto;
   aspect-ratio: 1;
-  margin-top: var(--nv-space-1);
   border-radius: var(--nv-radius-md);
   background: var(--nv-fill-soft);
-}
-
-/* The card's code, as the library writes it (E2A, P12): a quiet pill. */
-.sk-code {
-  flex: none;
-  display: inline-block;
-  padding: 2px var(--nv-space-2);
-  border-radius: var(--nv-radius-full);
-  background: var(--nv-fill-soft);
-  color: var(--nv-ink-muted);
-  font-size: var(--nv-text-caption);
-  font-weight: 650;
-  line-height: 18px;
-  vertical-align: 1px;
 }
 
 /* ---- Its slots ---- */
 .sk-slots {
   list-style: none;
-  margin: var(--nv-space-2) 0 0;
+  margin: var(--nv-space-1) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -177,6 +186,12 @@
 .sk-slot .nv-gauge {
   margin-left: calc(24px + var(--nv-space-3));
 }
+.sk-slot__resume {
+  margin: 0 0 0 calc(24px + var(--nv-space-3));
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
 .sk-slot__refusal {
   margin: 0 0 0 calc(24px + var(--nv-space-3));
   color: var(--nv-warning);
@@ -186,6 +201,7 @@
 .sk-slot__actions {
   display: flex;
   justify-content: flex-end;
+  gap: var(--nv-space-2);
 }
 
 /* ---- The preview ---- */
@@ -250,31 +266,46 @@
   flex-direction: column;
   gap: 2px;
 }
+/* Its whole title, on two lines if it must (recette CRE-14): the preview is where she reads them again. */
 .sk-row__name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
   font-weight: 650;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+.sk-row__number {
+  flex: none;
+  min-width: 22px;
+  color: var(--nv-ink-faint);
+  font-weight: 650;
 }
 .sk-row__meta {
+  padding-left: calc(22px + var(--nv-space-2));
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
 }
-.sk-pill {
-  flex: none;
-  padding: 2px var(--nv-space-2);
-  border-radius: var(--nv-radius-full);
-  font-size: var(--nv-text-caption);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.sk-pill--ok {
-  background: color-mix(in srgb, var(--nv-success) 14%, transparent);
-  color: var(--nv-success);
-}
-.sk-pill--warn {
-  background: color-mix(in srgb, var(--nv-warning) 16%, transparent);
+.sk-row__meta--warn {
   color: var(--nv-warning);
+  font-weight: 600;
+}
+.sk-row__done {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-success) 16%, transparent);
+}
+.sk-row__done svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-success);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* ---- Précédent / Suivant: at the end of the card, in the page's flow; nothing passes under them ---- */
@@ -295,9 +326,48 @@
   max-width: 260px;
   margin-left: auto;
 }
+.sk-withdraw {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nv-space-2);
+}
+.sk-withdraw__ask {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.sk-withdraw__row {
+  display: flex;
+  gap: var(--nv-space-2);
+}
+.nv-btn.sk-withdraw__open {
+  margin-left: calc(-1 * var(--nv-space-2));
+  color: var(--nv-ink-muted);
+}
 .sk-foot__alert {
   margin: 0;
   color: var(--nv-warning);
   font-size: var(--nv-text-footnote);
   font-weight: 600;
+}
+
+@media (min-width: 900px) {
+  /* A slot on one line: what it waits for on the left, its button on the right. */
+  .sk-slot {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--nv-space-3);
+  }
+  .sk-slot > * {
+    grid-column: 1 / -1;
+  }
+  .sk-slot > .sk-slot__head {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .sk-slot > .sk-slot__actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
 }

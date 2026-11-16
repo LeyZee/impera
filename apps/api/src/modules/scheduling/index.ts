@@ -7,6 +7,7 @@ import type {
   UserId,
 } from '@impera/contracts';
 import type { Database, Transaction } from '@impera/db';
+import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createAgencyRatesService } from './application/agency-rates';
@@ -96,8 +97,9 @@ export interface SchedulingModule {
    * Mounted under `/v1` by the server: `/scheduling/…` (contracts `scheduling.ts`, `shift-reports.ts` and `shift-feedback.ts`),
    * `/team/pay-rules` (contract `pay-rules.ts`): the reports read an account's rules in their own transaction, and
    * `/creators/:creatorId/agency-rates` (contract `agency-rates.ts`, CR-04): the agency's percentage of a creator.
+   * `recentLogin` guards the writes of rates (EQ-15).
    */
-  routes(requireRole: RequireRole): FastifyPluginAsyncZod;
+  routes(requireRole: RequireRole, recentLogin: preValidationAsyncHookHandler): FastifyPluginAsyncZod;
   /**
    * `onShift` (contract `scheduling.ts`): who is on shift on the creator's accounts at `at`, without the margin, read
    * from the database at each call. For the routing of a « sale » handover (EQ-13), which never goes to a chatter who
@@ -308,8 +310,8 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
         return { memberId: shift.memberId, period, rules };
       },
     },
-    routes: (requireRole) => async (app, options) => {
-      await createSchedulingRoutes(services, requireRole)(app, options);
+    routes: (requireRole, recentLogin) => async (app, options) => {
+      await createSchedulingRoutes(services, requireRole, recentLogin)(app, options);
       // Her « qui est en poste » (CR-02) and her accounts' shifts in her Agenda (CR-05 c3): the creator's own door,
       // never the team's routes.
       await createCreatorOnDutyRoutes(
