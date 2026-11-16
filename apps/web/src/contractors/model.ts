@@ -11,6 +11,7 @@ import {
   VAT_NUMBER_PATTERN,
   addressLines,
   legalFormWords,
+  legalNameReadsRight,
   rcsWords,
   type BillingRegime,
   type ContractAcceptance,
@@ -390,6 +391,11 @@ export function profileProblems(
       : 'Ton nom et ton prénom, tels que sur ta pièce d’identité.',
   );
   check(
+    'legalName',
+    legalNameReadsRight(draft.legalName),
+    'Sans emoji ni pictogramme : ce nom s’imprime sur tes factures.',
+  );
+  check(
     'address',
     filled(draft.address, POSTAL_ADDRESS_MAX),
     'Ton adresse complète, sur une ou plusieurs lignes.',
@@ -398,6 +404,11 @@ export function profileProblems(
     'taxId',
     draft.taxId.trim().length <= TAX_ID_MAX && (!taxIdRequired || draft.taxId.trim() !== ''),
     'Ton identifiant fiscal, celui que les impôts de ton pays t’ont donné.',
+  );
+  check(
+    'businessId',
+    digits(draft.businessId) !== '',
+    'Indique ton SIREN (9 chiffres) ou ton SIRET (14 chiffres).',
   );
   check(
     'businessId',
