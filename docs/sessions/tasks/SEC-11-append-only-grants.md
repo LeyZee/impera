@@ -17,7 +17,7 @@ Faire dire aux droits du rôle applicatif ce que `data-model.md` et les triggers
 
 ## À faire (liste vérifiable)
 
-- [x] Migration 0212 : `nirvana_app` n'a plus `UPDATE`, `DELETE` ni `TRUNCATE` sur `audit_log`, `conversation_events`, `domain_events` et `platform_sales`.
+- [x] Migration 0210 : `nirvana_app` n'a plus `UPDATE`, `DELETE` ni `TRUNCATE` sur `audit_log`, `conversation_events`, `domain_events` et `platform_sales`.
 - [x] `append-only.integration.test.ts` : sur le catalogue, aucune table qui porte un trigger `*_append_only` ne laisse `UPDATE`, `DELETE` ou `TRUNCATE` à `nirvana_app` ni à `impera_service`, sauf celles nommées dans le test avec leur raison.
 - [x] `authLibraryLogFrom` : les lignes de Better Auth sortent par pino (niveau, message réduit par `storableError`, erreur par le sérialiseur `err`), plus par la console.
 - [x] Docs : `data-model.md`, `security.md`, `coding.md`.
