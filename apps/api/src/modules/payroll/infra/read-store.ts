@@ -255,9 +255,11 @@ export function createDrizzlePayrollReadStore(
         const settings = await settingsFor(tx, period);
         // What would stop a transfer recorded today (ADR 0041 § 4): shown before the owner makes it.
         const toPay = statementRows.filter((row) => row.status === 'validated' && row.payableMinor > 0);
-        const today = toPay.length === 0 ? null : calendarDayAt(now(), await reads.agencyTimeZone(tx));
+        // Today in the agency's zone, read once: the transfer's day here, and the day a late payout counts to.
+        const agencyTimeZone = await reads.agencyTimeZone(tx);
+        const today = calendarDayAt(now(), agencyTimeZone);
         const payouts =
-          today === null
+          toPay.length === 0
             ? new Map<string, PayoutVerdict>()
             : await gate.verdicts(
                 tx,
@@ -380,6 +382,7 @@ export function createDrizzlePayrollReadStore(
                   closedAt: closingRow.closedAt.toISOString(),
                 }),
           blocked: blockRow === undefined ? null : blockOfRow(blockRow),
+          agency: { timeZone: agencyTimeZone, today },
           statements,
           bonusTierSets: tierRows.map(bonusTierSetOfRow),
           collectiveGoals: goalRows.map(collectiveGoalOfRow),

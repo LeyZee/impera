@@ -450,6 +450,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scheduling.module,
     aiUsage.module,
     connectors.module,
+    payroll.module,
   );
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,

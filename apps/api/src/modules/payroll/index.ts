@@ -69,8 +69,8 @@ export type { StatementForInvoicing } from './infra/invoicing-reads';
 export type { PayrollStatementReads } from './application/statement-reads';
 /** @public The person such a read is for. */
 export type { PayStatementReader } from './application/statement-reads';
-/** @public A statement as that door reads it, cut to what tells no rate. */
-export type { StatementAmounts } from './domain/statement-reads';
+/** @public A period as that door reads it: its state, no amount of a member (decision A of 14/11). */
+export type { PeriodState, StatementState, TeamSums } from './domain/statement-reads';
 /** Public entry point of the `payroll` module (EQ-04, ADR 0002). Other modules import this file only. */
 export interface PayrollModule {
   readonly name: 'payroll';
@@ -87,7 +87,8 @@ export interface PayrollModule {
   readonly latestRate: (userId: UserId, currency: ForeignCurrency) => Promise<ExchangeRate | null>;
   /**
    * The statements of a period for a door other than the routes (ADR 0026 § 1, ADR 0105 § 4, the MCP): as the person,
-   * under the same policies as the screen, never a creator's account (`role_forbidden`), cut to what tells no rate.
+   * under the same policies as the screen, never a creator's account (`role_forbidden`), cut to its state: no amount
+   * of a member (decision A of 14/11), the team's sums only for a person who sees the whole team.
    */
   readonly reads: PayrollStatementReads;
   /** The adjustments of an upheld contest's correction, in `invoicing`'s transaction (ADR 0039 § 3). */
