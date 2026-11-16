@@ -13,6 +13,7 @@ import { assignRegime, setPrefix, verifyProfile } from '@/contractors/api';
 import {
   askedText,
   earliestRegimeDay,
+  firstNumberOf,
   prefixOf,
   regimeAhead,
   regimeInForce,
@@ -197,7 +198,7 @@ function PrefixForm({ file }: { file: ContractorFile }): JSX.Element {
               ? 'De 2 à 8 majuscules ou chiffres, par exemple NORA.'
               : saved
                 ? 'Préfixe enregistré.'
-                : 'Ses numéros commencent par lui (NORA-2026-0001) : il se fige à sa première facture.'}
+                : `Ses numéros commencent par lui (${firstNumberOf(prefix)}) : il se fige à sa première facture.`}
           </p>
         </div>
         <Refusal refusal={refusal} />

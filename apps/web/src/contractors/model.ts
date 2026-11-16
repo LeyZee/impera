@@ -476,6 +476,14 @@ export function prefixOf(text: string): string | null {
 }
 
 /**
+ * The first number a prefix opens this year, as an invoice prints it (« INES-2026-0001 »): the hint beside the field
+ * follows what is typed, and shows the example's (NORA) while the field holds no prefix yet.
+ */
+export function firstNumberOf(prefix: string | null, now: Date = new Date()): string {
+  return `${prefix ?? 'NORA'}-${String(now.getFullYear())}-0001`;
+}
+
+/**
  * The first day a new regime may start (`assertRegimeChange` of the API): today at the earliest, and after the last
  * one given, in force or set ahead.
  */

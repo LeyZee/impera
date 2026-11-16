@@ -8,6 +8,7 @@ import {
   earliestRegimeDay,
   fileReminders,
   fileToDos,
+  firstNumberOf,
   identityLines,
   olderDocuments,
   prefixOf,
@@ -362,6 +363,13 @@ describe('the prefix', () => {
     expect(prefixOf(' nora ')).toBe('NORA');
     expect(prefixOf('N')).toBeNull();
     expect(prefixOf('NORA-1')).toBeNull();
+  });
+
+  it('opens the first number of the year with the prefix typed, the example’s while none is', () => {
+    const now = new Date('2026-11-16T12:00:00');
+    expect(firstNumberOf('INES', now)).toBe('INES-2026-0001');
+    expect(firstNumberOf(null, now)).toBe('NORA-2026-0001');
+    expect(firstNumberOf('INES', new Date('2027-01-02T12:00:00'))).toBe('INES-2027-0001');
   });
 });
 
