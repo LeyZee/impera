@@ -53,6 +53,6 @@ export function wireTeam(
         },
       ),
     },
-    routes: [module.routes(requireRole)],
+    routes: [module.routes(requireRole, shared.recentLogin)],
   };
 }

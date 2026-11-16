@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { CreatorSuggestionSchema, CreatorTaskSchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgendaPage, type AgendaView } from './AgendaPage';
@@ -447,5 +447,46 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
     fireEvent.click(decline);
     const why = await screen.findByLabelText(/Pourquoi \?/u);
     expect(why.className).toContain('ag-area');
+  });
+});
+
+describe('Agenda, recette du 16/11', () => {
+  it('draws a routine’s check of a day that is over, never pressed: her streak stays as it was (CRE-03)', async () => {
+    const calls = serve(
+      () => true,
+      SHIFTS,
+      agendaOf({ ticks: [{ taskId: stretch.id, day: '2026-11-02', doneAt: '2026-11-02T08:00:00.000Z' }] }),
+    );
+    show('day', '2026-11-02');
+    const check = await screen.findByRole('img', {
+      name: 'Story du matin, faite. Journée finie : la coche ne bouge plus.',
+    });
+    fireEvent.click(check);
+    expect(screen.queryByRole('button', { name: /cocher Story du matin/iu })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Story du matin/u }));
+    expect(screen.queryByRole('button', { name: 'Pas faite' })).toBeNull();
+    expect(screen.getByText('Faite ce jour-là. Journée finie : la coche ne bouge plus.')).toBeDefined();
+    expect(
+      calls.filter((call) => call.method === 'DELETE' || call.url === '/v1/creator-space/ticks'),
+    ).toEqual([]);
+  });
+
+  it('offers no tick on a routine of a day to come, and says why, while a task of that day is ticked (CRE-07)', async () => {
+    serve(() => true);
+    show('day', '2026-11-06');
+    // No ring at all: an empty one reads as a box to tick (Design, 16/11).
+    expect(await screen.findByText('Une routine se coche le jour même.')).toBeDefined();
+    expect(screen.queryByRole('img', { name: /^Story du matin/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cocher Story du matin' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Story du matin/u }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Une routine se coche le jour même.')).toBeDefined();
+    expect(within(dialog).queryByRole('button', { name: 'C’est fait' })).toBeNull();
+  });
+
+  it('keeps the check of today’s routine a button', async () => {
+    serve(() => true);
+    show();
+    expect(await screen.findByRole('button', { name: 'Cocher Story du matin' })).toBeDefined();
   });
 });

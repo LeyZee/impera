@@ -65,6 +65,7 @@ export {
   type FanCardReadMessage,
   type LlmFailure,
   type LlmGateway,
+  type ScriptIdentityInput,
   type ScriptSummaryInput,
   type ScriptSummaryMedia,
   type ScriptSummaryStep,

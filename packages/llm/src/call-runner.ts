@@ -184,9 +184,13 @@ type HedgeTimer = (ms: number, signal: AbortSignal) => Promise<void>;
 const realHedgeTimer: HedgeTimer = (ms, signal) =>
   new Promise((resolve) => {
     const timeout = setTimeout(resolve, ms);
-    signal.addEventListener('abort', () => {
-      clearTimeout(timeout);
-    });
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timeout);
+      },
+      { once: true },
+    );
   });
 
 export type CallRunner = <T>(

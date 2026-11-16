@@ -229,6 +229,8 @@ export class RevealApiConnector implements PlatformConnector {
       const own = await this.ownOf(conversationRef.id, page.data);
       for (const item of page.data) {
         if (!isAfter(item.message.createdAt, opts.since)) return messages.reverse();
+        // Deleted on Reveal: never read, never answered, never shown to the agent.
+        if (item.message.deletedAt !== undefined) continue;
         messages.push(messageOf(item, conversationRef, own));
         if (opts.limit !== undefined && messages.length >= opts.limit) return messages.reverse();
       }
@@ -264,7 +266,7 @@ export class RevealApiConnector implements PlatformConnector {
     }
     const prior = await this.prior(conversationRef, idempotencyKey);
     if (prior.done !== null) return prior.done;
-    const audio = await this.vaultPages(null, [['mediaType', 'audio']]);
+    const audio = await this.vaultPages(null, [['mediaType', 'Audio']]);
     if (!audio.some((item) => item.id === voice.id && item.type === 'audio')) {
       throw new ConnectorError('fatal', 'reveal sends voice notes of the vault only');
     }
@@ -738,6 +740,8 @@ export class RevealApiConnector implements PlatformConnector {
         [
           ['take', String(TAKE.vault)],
           ...(folderId === null ? [] : [['vaultFolderId', folderId] as const]),
+          // Required since 2026-11-15: `All`, `Photo`, `Video` or `Audio`.
+          ...(query.some(([key]) => key === 'mediaType') ? [] : [['mediaType', 'All'] as const]),
           ...query,
           ...(cursor === null ? [] : [['cursor', cursor] as const]),
         ],

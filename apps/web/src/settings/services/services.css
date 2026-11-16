@@ -713,10 +713,19 @@ input.sv-key__secret[data-shown='true'] {
   justify-content: flex-start;
   padding-top: var(--nv-space-1);
 }
-/* Nothing to say yet: the message takes no room under the foot, yet stays in place for the live region. */
+/* Nothing to say yet: the message is out of the flow, so the grid keeps no gap for it under the foot; it stays in
+   place, unseen, for the live region. */
+.sv-reauth[data-layout='dialog'] {
+  position: relative;
+}
 .sv-reauth[data-layout='dialog'] .sv-msg[data-kind='none'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   min-height: 0;
-  margin-top: calc(-1 * var(--nv-space-4));
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 @media (max-width: 639px) {
   /* On a phone the two buttons share the line, each a full target. */

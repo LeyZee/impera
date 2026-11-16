@@ -7,6 +7,7 @@ import type {
   Money,
   Result,
   ScriptDropSummary,
+  ScriptIdentityContent,
   ScriptStepKind,
   TrendCaptureDescription,
 } from '@impera/contracts';
@@ -38,6 +39,13 @@ export interface ConversationTurn {
   readonly from: 'fan' | 'creator';
   readonly text: string;
   readonly media?: readonly TurnMedia[];
+  /** When it was written; absent where no clock runs (some evals), and nothing is said of the time then. */
+  readonly at?: Date;
+  /**
+   * The time that passed before this message of his, written by code on her clock (« le lendemain, mardi, 19 h 10 »):
+   * shown in brackets before his block, never inside it.
+   */
+  readonly timeNote?: string;
 }
 
 export interface VideoFrame {
@@ -169,6 +177,8 @@ export interface VoiceInput extends ConversationInput {
   readonly objectionReply?: string;
   /** The script step code decided to send now, in a typed block after the brief. Absent, none. */
   readonly scriptStep?: VoiceScriptStep;
+  /** The most bubbles she may write this turn, decided by code (1 to 3). Absent, the prompt's own rule. */
+  readonly maxBubbles?: number;
 }
 
 /**
@@ -256,6 +266,25 @@ export interface ScriptSummaryInput {
   readonly trace?: CallTrace;
 }
 
+/** A step of a native script, as the identity is told it: its name, its offer's text and its media in order. */
+interface ScriptIdentityStep {
+  readonly name: string;
+  readonly text: string;
+  /** Each media's validated description (photo, video), in the platform's order; a voice note has none. */
+  readonly media: readonly ScriptSummaryMedia[];
+}
+
+/**
+ * A native script's identity (SC-04 lot c8, role `brain`, prompt `brain/script-identity`): from its steps' names and
+ * texts and its media's validated descriptions, never a price nor the moment, which the code holds. All are read as
+ * data.
+ */
+export interface ScriptIdentityInput {
+  readonly scriptName: string;
+  readonly steps: readonly ScriptIdentityStep[];
+  readonly trace?: CallTrace;
+}
+
 /** A message of the conversation the card is read in, numbered from 1 in the order they were written. */
 export interface FanCardReadMessage {
   readonly number: number;
@@ -335,6 +364,8 @@ export interface LlmGateway {
   channelPost(input: ChannelPostInput): Promise<Result<LlmSuccess<ChannelPostResult>, LlmFailure>>;
   /** A sent script's steps and synthesis (ADR 0083 § 6, prompt `brain/script-summary`), under the daily cap. */
   summarizeScript(input: ScriptSummaryInput): Promise<Result<LlmSuccess<ScriptDropSummary>, LlmFailure>>;
+  /** A native script's identity (SC-04 lot c8, prompt `brain/script-identity`), under the daily cap. */
+  identifyScript(input: ScriptIdentityInput): Promise<Result<LlmSuccess<ScriptIdentityContent>, LlmFailure>>;
   /**
    * What his new messages teach about him, field by field (ADR 0085 § 7). `budget_reached` as soon as the day's
    * spend is at its alert, so the card never takes what a fan's answer needs.
@@ -344,7 +375,11 @@ export interface LlmGateway {
    * The version of the prompts whose outputs are kept and redone when they change (ADR 0083 § 2): a drop's description
    * and a script's synthesis, as `meta.promptHash` gives them.
    */
-  readonly promptHashes: { readonly creatorDrop: string; readonly scriptSummary: string };
+  readonly promptHashes: {
+    readonly creatorDrop: string;
+    readonly scriptSummary: string;
+    readonly scriptIdentity: string;
+  };
   health(): HealthReport;
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */
@@ -373,6 +408,7 @@ export interface LlmGatewayDeps {
     readonly creatorDrop?: PromptTemplate;
     readonly channelPost?: PromptTemplate;
     readonly scriptSummary?: PromptTemplate;
+    readonly scriptIdentity?: PromptTemplate;
     readonly fanCard?: PromptTemplate;
   };
   /** Secret written in every system prompt: an output that contains it has leaked the prompt. */

@@ -22,6 +22,7 @@ import {
   bpsOfPercent,
   confirmSentence,
   dayLabel,
+  gapText,
   earliestDay,
   percentOf,
   readAt,
@@ -34,6 +35,7 @@ import {
 import './rate.css';
 
 import { DayField } from '@/scheduling/DayField';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
 
 /**
@@ -144,6 +146,8 @@ function RateSheet({
     setNotice(null);
   };
 
+  const confirm = useConfirmAgain();
+
   async function save(): Promise<void> {
     if (bps === null || sending.current) return;
     sending.current = true;
@@ -159,8 +163,16 @@ function RateSheet({
       // The next percentage typed here is another one: a new id.
       setRateId(newId(CreatorAgencyRateIdSchema));
     } catch (error) {
-      setProblem(rateErrorKind(error));
-      setConfirming(false);
+      const kind = rateErrorKind(error);
+      if (kind === 'reauth') {
+        // Nothing was written: the password and the code, then the same percentage again.
+        confirm.ask(() => {
+          void save();
+        });
+      } else {
+        setProblem(kind);
+        setConfirming(false);
+      }
     } finally {
       sending.current = false;
       setSaving(false);
@@ -221,7 +233,8 @@ function RateSheet({
                   inputMode="decimal"
                   autoComplete="off"
                   value={percent}
-                  disabled={saving}
+                  // Locked while the password and the code are asked: what is sent again is what was read.
+                  disabled={saving || confirm.asking}
                   aria-invalid={percentWrong}
                   aria-describedby={percentWrong ? `${id}-percent-error` : undefined}
                   onChange={(event) => {
@@ -252,7 +265,7 @@ function RateSheet({
                 id={`${id}-day`}
                 className="ps-input"
                 value={fromDay}
-                disabled={saving}
+                disabled={saving || confirm.asking}
                 invalid={dayWrong}
                 describedBy={dayWrong ? `${id}-day-error` : undefined}
                 onChange={(next) => {
@@ -277,7 +290,7 @@ function RateSheet({
             </p>
           )}
           {problem === 'session_expired' ? <SignInAgain /> : null}
-          {confirming && bps !== null ? (
+          {confirm.asking ? null : confirming && bps !== null ? (
             <div className="nv-confirm" role="alertdialog" aria-labelledby={`${id}-confirm`}>
               <p id={`${id}-confirm`}>
                 <b>{confirmSentence(bps, fromDay)}</b> Il ne pourra plus être modifié, seulement remplacé par
@@ -311,6 +324,7 @@ function RateSheet({
             </button>
           )}
         </form>
+        {confirm.prompt({ lead: MONEY_LEAD, onBusyChange: setSaving })}
 
         {list.rates.length === 0 ? null : (
           <section className="ps-block" aria-labelledby={`${id}-history`}>
@@ -348,7 +362,7 @@ function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
   const all = [last30Days, ...fortnights].flatMap((window) => window.shares);
   const windows = [
     { ...last30Days, label: '30 derniers jours' },
-    ...fortnights.map((window) => ({ ...window, label: windowLabel(window) })),
+    ...fortnights.map((window) => ({ ...window, label: windowLabel(window, list.today) })),
   ];
   return (
     <section className="nv-plate ps-panel ar-read-panel" aria-labelledby={`${id}-read`}>
@@ -382,6 +396,9 @@ function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
                           {where === null ? null : <span className="ar-read__where">{where}</span>}
                           <span className="ar-read__value">{text.value}</span>
                           <span className="ar-read__detail">{text.detail}</span>
+                          {share.differsFromRate === true ? (
+                            <span className="ar-read__gap">{gapText(list, window)}</span>
+                          ) : null}
                         </li>
                       );
                     })}

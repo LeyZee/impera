@@ -124,10 +124,12 @@ Branche : task/<id>-<slug>
 | VEI-02 | Capture passive dans l'extension, page « Veille » et écran « Idées du jour » | veille | done | VEI-01 |
 | VEI-03 | Le job du matin : signaux de Grok et idées du jour | veille | blocked (clé xAI) | VEI-01, P3-01 |
 | VEI-04 | Profil de contenu : ce qui marche chez elle et ce qu'elle sait faire | veille | blocked (clé de vision) | VEI-01, CR-06 |
-| VEI-05 | Statistiques du compte de la créatrice comme signaux | veille | blocked (PUB-02) | PUB-02, VEI-04 |
+| VEI-05 | Statistiques du compte de la créatrice comme signaux | veille | blocked (INS-01) | INS-01, VEI-04 |
 | VEI-06 | Comptes de référence par Business Discovery | veille | blocked (compte pro et page Facebook de l'agence, revue Meta) | VEI-01 |
 | VEI-07 | Relevés de l'extension devenus signaux, sur la médiane du compte, et l'écart visible par l'agence | veille | todo | VEI-01, VEI-02, ADR 0082 |
 | VEI-08 | Fiche reel : la créatrice tourne un reel depuis un dessin, l'agence l'écrit avec des compteurs | veille | done | VEI-01, ADR 0082 |
+| INS-01 | Instagram en lecture seule : branchement, relevés des médias et des stories | Instagram (ADR 0120) | todo (essai réel : compte pro, appli Meta) | ADR 0120, ADR 0057 |
+| INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | todo | ADR 0120, ADR 0080 |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
@@ -154,7 +156,7 @@ Branche : task/<id>-<slug>
 | OPS-12 | Le premier relevé répond aux messages frais | exploitation | done | P2-02 |
 | OPS-13 | L'essai de restauration connaît les rôles de l'ADR 0087 | exploitation | done | SEC-10 |
 | OPS-14 | Les lectures de connectors pour le MCP | exploitation | review | MCP lot a |
-| OPS-15 | Un appel d'IA lent n'est plus attendu deux minutes | exploitation | review | ADR 0009, OPS-06 |
+| OPS-15 | Un appel d'IA lent n'est plus attendu deux minutes | exploitation | done | ADR 0009, OPS-06 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -165,6 +167,8 @@ Branche : task/<id>-<slug>
 | SEC-08 | Lien d'extension : mot de passe et code redemandés à la création ; ADR 0087 proposée | exploitation | done | SEC-07, ADR 0046 |
 | SEC-09 | Message de fan borné, rythme ralenti passé 60 réponses dans l'heure | exploitation | done | SEC-07 |
 | SEC-10 | Rôle de service de la base : l'API et le worker ne se connectent plus en propriétaire (ADR 0087, lot a) | exploitation | done | SEC-08, ADR 0087 |
+| SEC-11 | Droits des tables en ajout seul et journaux de la bibliothèque d'authentification alignés sur la doc | exploitation | done | SEC-10 |
+| SEC-12 | Une identité de plateforme n'appartient qu'à un compte : la « Sync » d'une autre créatrice est refusée dès la première | exploitation | done | P2-01 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
