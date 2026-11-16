@@ -159,13 +159,18 @@ const step = (name: string): string => `«\u00a0${name}\u00a0»`;
  * The sale in one line under the core (Design 16/11, lot 0141-3): « Soirée d'essai 2/4 · ensuite « La suite » 15 € ».
  * The script and its step, then the next step and its price; the detail opens under it.
  */
-export function saleLine(sale: CopilotSaleState): string {
+export function saleLine(
+  sale: CopilotSaleState,
+  { withNext = true }: { readonly withNext?: boolean } = {},
+): string {
   const now =
     sale.script === null
       ? null
       : `${sale.script.name} ${String(sale.script.stepIndex + 1)}/${String(sale.script.stepCount)}`;
   const next =
-    sale.nextStep === null ? null : `${step(sale.nextStep.name)} ${eurosOf(sale.nextStep.priceMinor)}`;
+    sale.nextStep === null || !withNext
+      ? null
+      : `${step(sale.nextStep.name)} ${eurosOf(sale.nextStep.priceMinor)}`;
   if (now === null && next === null) return 'Rien de vendu ni proposé pour l’instant';
   if (now === null) return `Prochaine étape ${next ?? ''}`;
   return next === null ? now : `${now} · ensuite ${next}`;
@@ -190,16 +195,22 @@ export function stepDots(sale: CopilotSaleState): readonly StepDot[] {
  * The detail under the sale line (§ 3): what the line does not say, each said once. The script and the next step are
  * on the line itself.
  */
-export function saleRows(sale: CopilotSaleState): { readonly label: string; readonly value: string }[] {
+export function saleRows(
+  sale: CopilotSaleState,
+  { withNext = false }: { readonly withNext?: boolean } = {},
+): { readonly label: string; readonly value: string }[] {
   const rows: { label: string; value: string }[] = [];
+  // When the line leaves it out (« Ne rien vendre »), the next step and its price are said here instead.
+  if (withNext && sale.nextStep !== null)
+    rows.push({
+      label: 'Prochaine étape',
+      value: `${step(sale.nextStep.name)} ${eurosOf(sale.nextStep.priceMinor)}`,
+    });
   if (sale.offerPending) rows.push({ label: 'Offre faite', value: 'Pas encore de réponse' });
   if (sale.refusedSteps.length > 0)
     rows.push({ label: 'Étapes refusées', value: sale.refusedSteps.map(step).join(', ') });
   if (sale.usedObjections.length > 0)
-    rows.push({
-      label: 'Objections déjà servies, à ne pas resservir',
-      value: sale.usedObjections.join(', '),
-    });
+    rows.push({ label: 'Objections déjà servies', value: sale.usedObjections.join(', ') });
   if (sale.customOrderOpen) rows.push({ label: 'Commande perso', value: 'Ouverte' });
   return rows;
 }

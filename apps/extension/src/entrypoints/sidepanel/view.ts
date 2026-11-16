@@ -613,14 +613,16 @@ function saleFold(
 ): HTMLElement | null {
   const sale = assist?.sale ?? null;
   if (sale === null || cut !== null) return null;
-  const rows = saleRows(sale);
+  // Under « Ne rien vendre » the line does not announce the next step and its price; the detail still says it.
+  const lineSaysNext = assist?.nextMove?.kind !== 'no_sale';
+  const rows = saleRows(sale, { withNext: !lineSaysNext });
   const dots = stepDots(sale);
   const details = h(
     'details',
     { class: 'cp-sale', 'data-group': 'sale', open },
     h(
       'summary',
-      { 'aria-label': `Où en est la vente : ${saleLine(sale)}` },
+      { 'aria-label': `Où en est la vente : ${saleLine(sale, { withNext: lineSaysNext })}` },
       dots.length === 0
         ? null
         : h(
@@ -628,7 +630,7 @@ function saleFold(
             { class: 'cp-steps', 'aria-hidden': 'true' },
             ...dots.map((state) => h('span', { class: 'cp-step', 'data-step': state })),
           ),
-      h('span', { class: 'cp-sale__line' }, saleLine(sale)),
+      h('span', { class: 'cp-sale__line' }, saleLine(sale, { withNext: lineSaysNext })),
       h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
     ),
     h(
@@ -974,7 +976,11 @@ function draftPart(
         'button',
         {
           type: 'button',
-          class: stopped ? 'nv-btn nv-btn--soft nv-btn--sm cp-place' : 'nv-btn nv-btn--sm cp-send cp-place',
+          // Under a stop the gesture is the secondary plate (V-EXT-03), outlined so it never reads as off (Design, lot
+          // 0141-3): the sentence above asks to reread, the button still works.
+          class: stopped
+            ? 'nv-btn nv-btn--soft nv-btn--sm cp-place cp-place--quiet'
+            : 'nv-btn nv-btn--sm cp-send cp-place',
           'data-gesture': 'place',
         },
         'Copier pour Reveal ',

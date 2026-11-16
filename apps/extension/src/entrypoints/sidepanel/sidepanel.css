@@ -348,6 +348,14 @@ body {
   box-shadow: none;
   opacity: 1;
 }
+/* The gesture under a stop: the secondary plate with a clear outline and full ink, never a dull fill read as off. */
+.cp-draft__actions .cp-place--quiet {
+  color: var(--nv-ink);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--nv-ink) 55%, transparent);
+}
+.cp-draft__actions .cp-place--quiet .nv-kbd {
+  opacity: 1;
+}
 /* Retouching or refusing: the gesture and « Annuler » share one line, no half-width orphan (EXT-21). */
 .cp-draft__actions--pair {
   grid-template-columns: auto minmax(0, 1fr);

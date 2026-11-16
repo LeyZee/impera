@@ -718,6 +718,9 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     const place = root.querySelector<HTMLButtonElement>('[data-gesture="place"]');
     expect(place?.classList.contains('cp-send')).toBe(false);
     expect(place?.classList.contains('nv-btn--soft')).toBe(true);
+    // Outlined, in full ink: quiet, never read as off (Design, lot 0141-3).
+    expect(place?.classList.contains('cp-place--quiet')).toBe(true);
+    expect(place?.disabled).toBe(false);
     place?.click();
     expect(actions.place).toHaveBeenCalledWith(false);
   });
@@ -870,6 +873,7 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
       expect(root.querySelector('.cp-draft__warn')).toBeNull();
       // The copy is still not the ink button: the sentence above asks to reread.
       expect(root.querySelector('.cp-place')?.classList.contains('cp-send')).toBe(false);
+      expect(root.querySelector('.cp-place')?.classList.contains('cp-place--quiet')).toBe(true);
     }
     // Without a cut, a stop still says « relis-le » with the draft, as before.
     const stopped = with_(base(), {
@@ -956,13 +960,24 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     );
     expect([...(fold?.querySelectorAll('.cp-field__label') ?? [])].map((n) => n.textContent)).toEqual([
       'Étapes refusées',
-      'Objections déjà servies, à ne pas resservir',
+      'Objections déjà servies',
     ]);
     fold?.setAttribute('open', '');
     fold?.dispatchEvent(new Event('toggle'));
     expect(actions.toggleSale).toHaveBeenCalledWith(true);
     const open = with_(base(), { saleOpen: true });
     expect(open.querySelector<HTMLDetailsElement>('.cp-sale')?.open).toBe(true);
+    // Under « Ne rien vendre », the line drops the next step and its price; the detail says them (Design, lot 0141-3).
+    const noSale = with_(
+      base({ nextMove: { kind: 'no_sale', label: 'Ne rien vendre', priceMinor: null, block: 'low_desire' } }),
+      { saleOpen: true },
+    );
+    expect(noSale.querySelector('.cp-sale__line')?.textContent).toBe('Soirée d’essai 2/4');
+    expect(noSale.querySelectorAll('.cp-sale .cp-step')).toHaveLength(4);
+    expect(noSale.querySelector('.cp-sale .cp-field__label')?.textContent).toBe('Prochaine étape');
+    expect(noSale.querySelector('.cp-sale .cp-field__value')?.textContent).toBe(
+      '«\u00a0Étape 3\u00a0» 15\u00a0€',
+    );
   });
 
   it('adds the signals to the band, three badges at most, then « +N »', () => {

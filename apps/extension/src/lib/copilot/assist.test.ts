@@ -163,7 +163,8 @@ describe('what the agent computed, said to the chatter (ADR 0141, lot a)', () =>
     expect(saleLine({ ...sale, script: null })).toBe('Prochaine étape «\u00a0Étape 3\u00a0» 15\u00a0€');
     expect(saleLine({ ...sale, script: null, nextStep: null })).toBe(
       'Rien de vendu ni proposé pour l’instant',
-    );
+    ); // Under « Ne rien vendre », the line keeps the script and its step, not the next step and its price.
+    expect(saleLine(sale, { withNext: false })).toBe('Soirée d’essai 2/4');
   });
 
   it('draws one dot per step, past, in progress and to come, none without a script or for a long one', () => {
@@ -189,9 +190,13 @@ describe('what the agent computed, said to the chatter (ADR 0141, lot a)', () =>
     expect(rows.map(({ label }) => label)).toEqual([
       'Offre faite',
       'Étapes refusées',
-      'Objections déjà servies, à ne pas resservir',
+      'Objections déjà servies',
       'Commande perso',
     ]);
-    expect(rows.find(({ label }) => label === 'Étapes refusées')?.value).toBe('«\u00a0Étape 2\u00a0»');
+    expect(rows.find(({ label }) => label === 'Étapes refusées')?.value).toBe('«\u00a0Étape 2\u00a0»'); // What the line leaves out, the detail says: the next step first, quoted, with its price.
+    expect(saleRows(sale, { withNext: true })[0]).toEqual({
+      label: 'Prochaine étape',
+      value: '«\u00a0Étape 3\u00a0» 15\u00a0€',
+    });
   });
 });
