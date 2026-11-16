@@ -142,7 +142,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     type('À partir du', TODAY);
     fireEvent.click(check);
     const confirm = await screen.findByRole('alertdialog');
-    expect(confirm.textContent).toContain('35\u00a0% pour l’agence à partir du 03/11/2026.');
+    expect(confirm.textContent).toContain('35\u00a0% pour l’agence à partir du 3 novembre 2026.');
     expect(confirm.textContent).toContain(
       'Il ne pourra plus être modifié, seulement remplacé par un suivant.',
     );
@@ -150,14 +150,14 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     fireEvent.click(within(confirm).getByRole('button', { name: 'Enregistrer' }));
     expect(
       // The matcher reads the page's non-breaking spaces as plain ones.
-      await screen.findByText('35 % pour l’agence aujourd’hui, depuis le 03/11/2026.'),
+      await screen.findByText('35 % pour l’agence aujourd’hui, depuis le 3 novembre 2026.'),
     ).toBeDefined();
     expect(posts).toMatchObject([{ fromDay: TODAY, agencyBps: 3500 }]);
     const history = screen.getByRole('list');
     expect(within(history).getByText('En vigueur')).toBeDefined();
     // The next one starts tomorrow at the earliest.
     type('À partir du', TODAY);
-    expect(await screen.findByText('Le 04/11/2026 au plus tôt.')).toBeDefined();
+    expect(await screen.findByText('Le 4 novembre 2026 au plus tôt.')).toBeDefined();
   });
 
   it('asks the owner for the password and the code when the confirmation is old, then saves the same percentage (EQ-15)', async () => {
@@ -188,7 +188,9 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     type('Mot de passe', 'mot-de-passe-invente');
     type('Code à 6 chiffres ou de secours', '123456');
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
-    expect(await screen.findByText('35 % pour l’agence aujourd’hui, depuis le 03/11/2026.')).toBeDefined();
+    expect(
+      await screen.findByText('35 % pour l’agence aujourd’hui, depuis le 3 novembre 2026.'),
+    ).toBeDefined();
     expect(posts).toHaveLength(2);
     expect(posts[1]).toEqual(posts[0]);
   });
@@ -203,7 +205,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     };
     const posts = serve([current], { status: 409, code: 'agency_rate_day_conflict' });
     renderSection();
-    await screen.findByText('35 % pour l’agence aujourd’hui, depuis le 01/11/2026.');
+    await screen.findByText('35 % pour l’agence aujourd’hui, depuis le 1er novembre 2026.');
     type('Pourcentage de l’agence', '30,5');
     type('À partir du', '2026-11-20');
     fireEvent.click(screen.getByRole('button', { name: 'Vérifier avant d’enregistrer' }));
@@ -237,7 +239,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     expect(screen.getByText('Un pourcentage de 0 à 100, comme 35 ou 35,5.')).toBeDefined();
     type('Pourcentage de l’agence', '30');
     type('À partir du', TODAY);
-    expect(screen.getByText('Le 04/11/2026 au plus tôt.')).toBeDefined();
+    expect(screen.getByText('Le 4 novembre 2026 au plus tôt.')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Vérifier avant d’enregistrer' })).toHaveProperty(
       'disabled',
       true,
@@ -252,6 +254,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
       netMinor: 1800,
       agencyMinor: 700,
       agencyBps: 3889,
+      differsFromRate: null,
     };
     serve([], undefined, {
       linked: true,
@@ -272,7 +275,7 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     const read = screen.getByRole('region', { name: 'Lue chez Reveal' });
     expect(within(read).getAllByText(/^38,89\s% du net$/u)).toHaveLength(2);
     expect(within(read).getAllByText(/^7,00\s€ pour l’agence sur 18,00\s€ nets$/u)).toHaveLength(2);
-    expect(within(read).getByText('du 16/10 au 31/10')).toBeDefined();
+    expect(within(read).getByText('du 16 au 31 octobre')).toBeDefined();
     expect(within(read).getAllByText('aucune vente')).toHaveLength(2);
     expect(screen.getByText('Son pourcentage, facultatif')).toBeDefined();
     // Her one account in euros: the card's title names Reveal, no line repeats it.
@@ -296,10 +299,46 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     renderSection();
     expect(
       await screen.findByText(
-        /^Aucune vente lue chez Reveal sur 30 jours\. Pourcentage réglé : 35\s% depuis le 01\/10\/2026\.$/u,
+        /^Aucune vente lue chez Reveal sur 30 jours\. Pourcentage réglé : 35\s% depuis le 1er octobre 2026\.$/u,
       ),
     ).toBeDefined();
     expect(screen.getByText('Nouveau pourcentage, facultatif')).toBeDefined();
+  });
+
+  it('warns in amber when the share read differs from her percentage (V-PIL-25)', async () => {
+    const share = {
+      platform: 'reveal',
+      platformAccountId: '0192f3a0-0000-7000-8000-0000000000a1',
+      currency: 'EUR',
+      netMinor: 1_462_240,
+      agencyMinor: 548_344,
+      agencyBps: 3750,
+      differsFromRate: true,
+    };
+    serve(
+      [
+        {
+          id: '0192f3a0-0000-7000-8000-0000000000f1',
+          creatorId: CREATOR,
+          fromDay: '2026-10-01',
+          agencyBps: 4000,
+          createdAt: '2026-10-01T08:00:00.000Z',
+        },
+      ],
+      undefined,
+      {
+        linked: true,
+        last30Days: { from: '2026-10-05', to: TODAY, shares: [share] },
+        fortnights: [{ from: '2026-11-01', to: TODAY, shares: [share] }],
+      },
+    );
+    renderSection();
+    expect(
+      await screen.findByText(/^Écart : Reveal donne 37,5\s% du net sur 30 jours, tu as réglé 40\s%\./u),
+    ).toBeDefined();
+    expect(document.querySelector('.ps-dot')?.getAttribute('data-dot')).toBe('warn');
+    const read = screen.getByRole('region', { name: 'Lue chez Reveal' });
+    expect(within(read).getAllByText(/^écart avec les 40\s% réglés$/u)).toHaveLength(2);
   });
 
   it('says the server does not answer, with a way to try again', async () => {

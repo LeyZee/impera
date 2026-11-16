@@ -22,6 +22,7 @@ import {
   bpsOfPercent,
   confirmSentence,
   dayLabel,
+  gapText,
   earliestDay,
   percentOf,
   readAt,
@@ -361,7 +362,7 @@ function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
   const all = [last30Days, ...fortnights].flatMap((window) => window.shares);
   const windows = [
     { ...last30Days, label: '30 derniers jours' },
-    ...fortnights.map((window) => ({ ...window, label: windowLabel(window) })),
+    ...fortnights.map((window) => ({ ...window, label: windowLabel(window, list.today) })),
   ];
   return (
     <section className="nv-plate ps-panel ar-read-panel" aria-labelledby={`${id}-read`}>
@@ -395,6 +396,9 @@ function ObservedPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element {
                           {where === null ? null : <span className="ar-read__where">{where}</span>}
                           <span className="ar-read__value">{text.value}</span>
                           <span className="ar-read__detail">{text.detail}</span>
+                          {share.differsFromRate === true ? (
+                            <span className="ar-read__gap">{gapText(list, window)}</span>
+                          ) : null}
                         </li>
                       );
                     })}
