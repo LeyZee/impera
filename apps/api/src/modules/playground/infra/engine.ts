@@ -7,6 +7,7 @@ import {
   type MediaDescription,
   type PlaygroundAnswer,
   type PlaygroundAvailability,
+  type PlaygroundBrief,
   type PlaygroundDesire,
   type PlaygroundState,
   type Verdict,
@@ -14,6 +15,7 @@ import {
 import type { LlmGateway } from '@impera/llm';
 
 import {
+  bubbleDelays,
   desireSignalPoints,
   guardSettingsOf,
   isNight,
@@ -148,9 +150,23 @@ function toAvailability({ record, gate, asked }: PlaygroundAvailabilityReading):
   };
 }
 
+/** The brain's reading in the playground's words: what is still to discover, in French. */
+function toBrief(brief: NonNullable<PlaygroundTurn['brief']>): PlaygroundBrief {
+  return {
+    intent: brief.intent,
+    sentiment: brief.sentiment,
+    risks: [...brief.risks],
+    action: brief.action,
+    replyBrief: brief.replyBrief,
+    kycMissing: brief.kycMissing.map(kycSlotWords),
+  };
+}
+
 function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
   return {
     bubbles: [...turn.bubbles],
+    // The same typing time as the real send, so the trainer sees each bubble arrive as the fan would.
+    ...(turn.bubbles.length > 0 && { delaysMs: [...bubbleDelays(turn.bubbles)] }),
     isBlocked: turn.isBlocked,
     violations: turn.violations.map((v) => ({
       code: v.code,
@@ -168,16 +184,7 @@ function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
         })),
       },
     }),
-    ...(turn.brief !== undefined && {
-      brief: {
-        intent: turn.brief.intent,
-        sentiment: turn.brief.sentiment,
-        risks: [...turn.brief.risks],
-        action: turn.brief.action,
-        replyBrief: turn.brief.replyBrief,
-        kycMissing: turn.brief.kycMissing.map(kycSlotWords),
-      },
-    }),
+    ...(turn.brief !== undefined && { brief: toBrief(turn.brief) }),
     ...(turn.desire !== undefined && { desire: toDesire(turn.desire) }),
     ...(turn.cursor !== undefined && {
       cursor: { kind: turn.cursor.kind, label: cursorLabel(turn.cursor.kind, turn.cursor.reason) },
@@ -262,7 +269,9 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
   const state = (): PlaygroundState => {
     const { situation, lastExchange } = session;
     let fanNumber = 0;
+    const reading = isBusy ? session.reading : undefined;
     return {
+      ...(reading !== undefined && { reading: toBrief(reading) }),
       persona: { name: deps.persona.creatorName, played: deps.played ?? null },
       presets: FAN_PRESETS.map((p) => ({ id: p.id, label: p.label, tests: p.tests, opening: p.opening })),
       presetId,

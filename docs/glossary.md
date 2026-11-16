@@ -25,6 +25,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Juge | `judge` | Rôle LLM d'évaluation, jamais sur le chemin d'un vrai fan : évals, et retour aux recrues dans S'entraîner. |
 | Politique | `policy` | Règles déterministes en code appliquées entre le cerveau et la voix. |
 | Gardes | `guards` | Vérifications en code après la voix (dégoûts, répétition, longueur, argent, identité). |
+| Deuxième demande | `hedgeAfterMs` | La même demande envoyée une deuxième fois au modèle principal d'un rôle, en parallèle, quand la première n'a pas répondu après ce délai ; la première bonne réponse gagne et l'autre est journalisée avec son coût, marquée `loser` dans `llm_calls.hedge` (OPS-15). |
 | Budget de bulles | `bubbleBudget` | Le nombre de bulles qu'elle peut écrire à ce tour, fixé par le code : une par défaut, deux s'il a écrit deux messages ou un long, trois seulement s'il en a écrit trois ou plus. Les bulles partent l'une après l'autre, chacune après le temps de la taper (`bubbleDelays`). |
 | Repli | `fallback` | Le modèle de secours d'un rôle LLM, utilisé quand le modèle actif refuse, ne répond pas ou n'a pas de clé. |
 | Santé (des modèles) | `health` | État des rôles LLM (`ok`, `degraded`, `down`), latences, erreurs, coût du jour face au budget ; alimente le panneau « Modèles IA ». |
@@ -157,6 +158,11 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Conseil (de réécriture) | `rewrite_hint` | Quelques mots libres de l'agence qui orientent la réécriture d'un post du canal ; une donnée dans le prompt, jamais une garde levée (ADR 0080). |
 | Lien de redirection | `redirect_link` | Une adresse `https://` d'un service de redirection, nommée et enregistrée par créatrice dans le CRM ; le code l'ajoute aux posts du canal, le modèle ne l'écrit jamais (ADR 0080). |
 | Où il mène | `destination` | La phrase courte qu'un lien de redirection porte pour le modèle (« mon live TikTok ce soir 21 h ») : le post parle de cet endroit, jamais d'un autre ; jamais d'adresse (ADR 0080 § 4.5). |
+| Endroit d'un lien | `placement` | Où un lien de redirection est posé, liste fermée : story à la une, story du jour, canal Telegram, autre réseau ; c'est lui qui attribue un clic, jamais la provenance (ADR 0120 § 3). |
+| Connecteur de liens | `link_stats_connector` | Adaptateur en lecture seule sur l'API du service de redirection : pages vues et clics par lien et par heure, robots retirés par le code, aucune donnée de visiteur gardée (ADR 0120 § 3). |
+| Relevé d'un média | `media_insight_snapshot` | Les nombres d'une publication Instagram lus à un âge donné (1 h, 24 h, 48 h, 7 j) ; unique par média et par âge (ADR 0120 § 2). |
+| Retour sur un Reel | `reel_review` | Trois lignes et une leçon écrites à partir des seuls faits calculés par le code sur un Reel relevé à 48 h ; la créatrice le lit directement (ADR 0120 § 4). |
+| Entonnoir d'acquisition | `acquisition_funnel` | Par créatrice et par jour : vues, clics par endroit, nouveaux abonnés, ventes ; vu par l'agence seule (ADR 0120 § 5). |
 | Mode assisté | `assisted` | Publication Instagram préparée par Impera et postée à la main, pour ajouter un son (ADR 0057). |
 | Signal de tendance | `trend_signal` | Un format, un son, un thème ou une date qui monte, venu d'une des six sources de l'ADR 0060 ; a une péremption (14 jours par défaut). |
 | Capture passive | `passive_capture` | Le relevé par l'extension de ce qu'une personne regarde elle-même sur instagram.com ; ne fait jamais défiler, ne clique jamais, n'envoie aucune requête (ADR 0060). |

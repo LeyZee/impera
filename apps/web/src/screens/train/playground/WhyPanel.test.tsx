@@ -72,6 +72,26 @@ describe('WhyPanel', () => {
     expect(screen.getByText(/Il va mal : elle lui répond avec soin/)).toBeTruthy();
   });
 
+  it('shows the brain’s reading while the voice writes, before any answer', () => {
+    render(
+      <WhyPanel
+        state={STATE}
+        open
+        onToggle={() => undefined}
+        reading={{
+          intent: 'flirt',
+          sentiment: 'positive',
+          risks: [],
+          action: 'reply',
+          replyBrief: '',
+          kycMissing: [],
+        }}
+      />,
+    );
+    expect(screen.getByText('Ce qu’elle a compris')).toBeTruthy();
+    expect(screen.getByText('La voix écrit sa réponse…')).toBeTruthy();
+  });
+
   it('says a handoff decided by the code is one, even when the brain suggested to answer (AGE-01)', () => {
     why({ ...ANSWER, hold: { kind: 'handoff', detail: ['minor_suspected'] } });
     expect(screen.getByText('Relayée à un humain')).toBeTruthy();
