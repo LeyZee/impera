@@ -29,6 +29,7 @@ export * from './errors';
 export * from './events';
 export * from './fan-availability';
 export * from './fan-insights';
+export * from './fan-list';
 export * from './fan-card';
 export * from './fans';
 export * from './guards';

@@ -572,13 +572,18 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         conversations: conversations.module,
       }),
       ...alerts.routes,
-      fans.routes(agent.kycSlotsOf, {
-        holds: (creatorId, fanId, userId) => conversations.module.isFanHeldBy(creatorId, fanId, userId),
-        traceOpening: (creatorId, fanId, trace) =>
-          conversations.module.traceFanOpening(creatorId, fanId, trace),
-        messageTexts: (creatorId, fanId, messageIds) =>
-          conversations.module.fanMessageTexts(creatorId, fanId, messageIds),
-      }),
+      fans.routes(
+        agent.kycSlotsOf,
+        {
+          holds: (creatorId, fanId, userId) => conversations.module.isFanHeldBy(creatorId, fanId, userId),
+          traceOpening: (creatorId, fanId, trace) =>
+            conversations.module.traceFanOpening(creatorId, fanId, trace),
+          messageTexts: (creatorId, fanId, messageIds) =>
+            conversations.module.fanMessageTexts(creatorId, fanId, messageIds),
+        },
+        // The order of the list of fans in euros: dollars at pay's last ECB rate, as the Dashboard ranks them.
+        async (userId) => (await payroll.module.latestRate(userId, 'USD'))?.rateMicros ?? null,
+      ),
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,
