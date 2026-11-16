@@ -48,7 +48,7 @@ import {
 import './agency.css';
 
 import { initialOf } from '@/lib/utils';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { Failure } from '@/shell/states';
 
 /*
  * « L'agence en chiffres » (ADR 0078): what the registers of sales say about the agency, or about one creator, over a
@@ -1351,10 +1351,7 @@ export function AgencyInsightsPanel({
     return (
       <Section title={title} sub="lus dans le registre des ventes" index={index} control={control}>
         {query.isError ? (
-          <ServerSilent
-            text="Les chiffres reviennent dès qu’il répond."
-            onRetry={() => void query.refetch()}
-          />
+          <Failure onRetry={() => void query.refetch()} />
         ) : (
           // The shape of the figures, so nothing jumps when they come (ADM-21): the lead and its four tiles of money,
           // the card of where the money goes, the four tiles of fans and sales.

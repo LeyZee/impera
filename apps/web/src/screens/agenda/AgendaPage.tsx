@@ -28,8 +28,8 @@ import { lookAgainAtHerCase } from '@/rewards/api';
 import { useCreatorShifts } from '@/scheduling/api';
 import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
 import { NavIcon } from '@/shell/NavIcon';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 export type AgendaView = 'day' | 'week' | 'month';
 
@@ -146,9 +146,11 @@ export function AgendaPage({
         eyebrow={seen === 'day' ? longDay(shown) : seen === 'month' ? monthLabel(shown) : weekLabel(monday)}
         title="Agenda"
         actions={
+          // Unread (loading or the server silent), « Ajouter » cannot work: off, and not the screen's neon, so that the
+          // eye goes to « Réessayer » (ETA-23).
           <button
             type="button"
-            className="nv-btn nv-btn--neon"
+            className={agenda === undefined ? 'nv-btn nv-btn--soft' : 'nv-btn nv-btn--neon'}
             disabled={agenda === undefined}
             onClick={() => {
               setOpen({ kind: 'add', preset: { day: shown } });
@@ -247,18 +249,15 @@ export function AgendaPage({
       )}
       {agenda === undefined ? (
         read.isError ? (
-          <ServerSilent
-            text="Ton agenda n’a pas pu être lu, et ce téléphone n’en a pas encore de copie."
+          <Failure
             onRetry={() => {
               void read.refetch();
             }}
           />
         ) : (
-          <div className="ag-skeleton nv-plate" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
+          <Skeleton label="Chargement de ton agenda…">
+            <SkeletonCard lines={5} height={320} />
+          </Skeleton>
         )
       ) : (
         <Views

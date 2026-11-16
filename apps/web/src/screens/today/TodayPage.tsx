@@ -37,8 +37,8 @@ import { useNow } from '@/scheduling/useNow';
 import { MyFortnightCard } from '@/screens/pay/MyFigures';
 import { useMembers } from '@/screens/team/api';
 import { todosAcrossQuery } from '@/screens/tracking/api';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /**
  * Aujourd'hui (ADR 0024, EQ-02, EQ-03): the chatter's shift first, where to go and until when, and « Faire mon
@@ -70,8 +70,7 @@ export function TodayPage({ user }: { user: Me }): JSX.Element {
       {/* The title and the day say it all: no sentence under them (D-03). */}
       <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" />
       {mine.isError ? (
-        <ServerSilent
-          text="Tes shifts n’ont pas pu être lus. Rien ici n’est à jour en attendant."
+        <Failure
           onRetry={() => {
             void mine.refetch();
           }}

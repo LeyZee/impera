@@ -222,21 +222,12 @@ describe('section titles (T5: COH-05, GES-07, CRE-10, CRE-14, CHA-07, ETA-22)', 
   });
 
   /**
-   * The titles that are not a section's: an empty state's (lot 3 gives them their component), the reveal of a trophy
-   * and the name on the trophy case's stage (Charles's validated mock-ups). Counted per file.
+   * The titles that are not a section's: the reveal of a trophy and the name on the trophy case's stage (Charles's
+   * validated mock-ups). Counted per file. An empty state's sentence is `Empty`'s, never an h2 (lot 3, COH-04).
    */
   const NOT_SECTIONS: Readonly<Record<string, number>> = {
     'rewards/RewardReveal.tsx': 1,
     'rewards/case/TrophyCaseView.tsx': 1,
-    'scheduling/TeamCalendar.tsx': 2,
-    'screens/planning/MyPlanningPage.tsx': 2,
-    'screens/team/PlanningPage.tsx': 1,
-    'screens/team/parts.tsx': 1,
-    'screens/tracking/ChatterTrackingPage.tsx': 1,
-    'screens/tracking/TrackingPage.tsx': 1,
-    'screens/tracking/history/AlertHistoryPage.tsx': 1,
-    'shell/NotFoundPage.tsx': 1,
-    'shell/layout.tsx': 1,
   };
 
   /** Each h2 and h3 of the screens: its file and its classes. */
@@ -264,7 +255,6 @@ describe('section titles (T5: COH-05, GES-07, CRE-10, CRE-14, CHA-07, ETA-22)', 
   const KEPT: ReadonlySet<string> = new Set([
     ".ps-title[data-placeholder='true']",
     '.sc-hero--none .sc-hero__title',
-    '.nv-coming__in h2',
   ]);
 
   it('leave the size, weight and face of a title to its class, in every sheet', () => {
@@ -329,13 +319,10 @@ describe('section titles (T5: COH-05, GES-07, CRE-10, CRE-14, CHA-07, ETA-22)', 
   /** Instrument Serif: the empty states, a spoken line, the trophy's reveal and the name on its stage. */
   const SERIF_KEPT: ReadonlySet<string> = new Set([
     '.nv-calm',
-    '.nv-coming__in h2',
-    '.py-empty__whisper',
+    '.nv-empty__title',
     '.sc-hero--none .sc-hero__title',
-    '.tg-whisper',
     ".ps-title[data-placeholder='true']",
     '.fi-none',
-    '.fi-few',
     '.pg-empty__t',
     '.ag-reel__quote',
     '.rw-reveal__title',

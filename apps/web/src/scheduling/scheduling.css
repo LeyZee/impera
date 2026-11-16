@@ -13,13 +13,6 @@
   background: var(--sc-color);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc-color) 18%, transparent);
 }
-.sc-notice h2 {
-  text-wrap: balance;
-}
-.sc-notice .nv-btn {
-  align-self: center;
-  margin-top: var(--nv-space-2);
-}
 .sc-phase {
   flex: none;
 }
@@ -35,7 +28,7 @@
 .sc-skeleton i {
   height: 56px;
   border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
+  background: var(--nv-fill-soft);
   animation: sc-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
 }
 .sc-skeleton--grid i {

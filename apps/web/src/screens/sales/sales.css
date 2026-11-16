@@ -5,25 +5,11 @@
   gap: var(--nv-space-4);
   align-items: start;
 }
-.vt-note,
-.vt-empty,
-.vt-hint {
+.vt-note {
   margin: 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-faint);
-}
-/* The reading side before a fan is chosen: a plate of its own, not a line afloat on the page (recette CRE-04). */
-.vt-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--nv-space-2);
-  padding: var(--nv-space-8) var(--nv-plate-pad);
-  text-align: center;
-}
-.vt-hint > p {
-  margin: 0;
 }
 .vt-rows {
   display: flex;
@@ -81,29 +67,6 @@
 .vt-older {
   align-self: center;
 }
-.vt-skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-2);
-}
-.vt-skeleton i {
-  height: 48px;
-  border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
-  animation: vt-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
-}
-.vt-skeleton i:nth-child(2) {
-  animation-delay: calc(var(--nv-stagger) * 2);
-}
-.vt-skeleton i:nth-child(3) {
-  animation-delay: calc(var(--nv-stagger) * 4);
-}
-@keyframes vt-breathe {
-  to {
-    opacity: 0.4;
-  }
-}
-
 /* The reader. */
 .vt-reader {
   display: flex;
@@ -140,11 +103,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-}
-.vt-warn {
-  margin: 0;
-  color: var(--nv-warning);
-  font-weight: 600;
 }
 .vt-day {
   display: flex;

@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Outlet, useRouterState } from '@tanstack/react-router';
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { SecuritySection } from '@/security/SecuritySection';
 import { BudgetSection } from '@/settings/ai-budget/BudgetSection';
+import { aiBudgetQueryKey } from '@/settings/ai-budget/api';
 import { AiUsageSection } from '@/settings/ai-usage/AiUsageSection';
 import { AlertsSection } from '@/settings/alerts/AlertsSection';
 import { BackupsSection } from '@/settings/backups/BackupsSection';
@@ -72,10 +73,16 @@ export function SettingsLayout(): JSX.Element {
 
 /** Réglages › Modèles IA: the Services page of P3-03, as the Connecteurs thread built it. */
 export function AiModelsPage(): JSX.Element {
+  // One server, two reads: when it is silent, the keys' card says it once and the budget's keeps quiet (ETA-05).
+  const client = useQueryClient();
+  const [down, setDown] = useState(false);
   return (
     <div className="sv-page">
-      <ServicesSection />
-      <BudgetSection />
+      <ServicesSection
+        onDown={setDown}
+        onRetry={() => void client.refetchQueries({ queryKey: aiBudgetQueryKey })}
+      />
+      <BudgetSection quiet={down} />
     </div>
   );
 }

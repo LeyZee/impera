@@ -274,7 +274,9 @@ describe('Notifications, settings that cannot be read', () => {
     );
     deviceIs('off');
     renderPage();
-    expect(await screen.findByText('Tes réglages n’ont pas pu être lus.')).toBeTruthy();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    // One message for one silent server (ETA-05): this device's card says nothing of it.
+    expect(screen.queryByText(/rouvre cette page/u)).toBeNull();
     expect(screen.queryByText(/illisibles/u)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByLabelText('Début des heures calmes')).toBeTruthy();

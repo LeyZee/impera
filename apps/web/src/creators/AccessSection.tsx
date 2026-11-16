@@ -6,6 +6,7 @@ import { createCreatorLink, creatorAccountKey, useCreatorAccount } from './api';
 
 import { LinkShare, type LinkOutcome } from '@/screens/team/ShareLink';
 import { deadline, invitationState } from '@/screens/team/model';
+import { Failure } from '@/shell/states';
 import './access.css';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
@@ -32,19 +33,7 @@ export function AccessSection({
   const [made, setMade] = useState<InvitationLinkCreated | null>(null);
 
   if (query.isError) {
-    return (
-      <section className="nv-plate ps-panel" aria-label="Accès">
-        <p className="ps-title">Son accès ne se charge pas</p>
-        <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft ps-self-start"
-          onClick={() => void query.refetch()}
-        >
-          Réessayer
-        </button>
-      </section>
-    );
+    return <Failure onRetry={() => void query.refetch()} />;
   }
   if (query.isPending) return <section className="nv-plate ps-panel ps-skeleton" aria-busy="true" />;
 

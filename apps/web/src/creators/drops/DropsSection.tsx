@@ -12,6 +12,7 @@ import { dayLabel } from '@/creators/scripts/model';
 import '@/creators/scripts/scripts.css';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
+import { Failure } from '@/shell/states';
 
 /**
  * Créatrices › Contenu (recette créatrice 1 et 6), the owner's and an active manager's: every drop of hers but a
@@ -35,20 +36,7 @@ export function DropsSection({
 
   const list = (): JSX.Element => {
     if (content.data === undefined) {
-      if (content.isError)
-        return (
-          <div className="nv-plate aa-empty">
-            <p className="aa-empty__title">Son contenu ne se charge pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void content.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
-        );
+      if (content.isError) return <Failure onRetry={() => void content.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const rows = herDrops(content.data);

@@ -173,7 +173,7 @@ describe('Créatrices › Scripts (SC-03 c2b)', () => {
     cleanup();
     serve({});
     show();
-    expect(await screen.findByText('Ses scripts ne se chargent pas')).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
   });
 });
 

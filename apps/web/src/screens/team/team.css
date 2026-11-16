@@ -247,7 +247,7 @@
 .tm-skeleton i {
   height: 56px;
   border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
+  background: var(--nv-fill-soft);
   animation: tm-breathe calc(var(--nv-dur-slow) * 4) var(--nv-ease-out) infinite alternate;
 }
 .tm-skeleton i:nth-child(2) {
@@ -255,16 +255,6 @@
 }
 .tm-skeleton i:nth-child(3) {
   animation-delay: var(--nv-dur-slow);
-}
-.tm-notice p {
-  margin: 0;
-  color: var(--nv-ink-muted);
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-}
-.tm-notice .nv-btn {
-  align-self: center;
-  margin-top: var(--nv-space-2);
 }
 
 /* ───────────── The member's sheet ───────────── */

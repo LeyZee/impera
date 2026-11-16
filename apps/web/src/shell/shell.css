@@ -1221,66 +1221,14 @@
   flex: none;
 }
 
-/* ── A screen not built yet ── */
-.nv-coming {
+/* ── An empty state on a card of its own (`Empty plate`): the card the height of its words ── */
+.nv-empty-plate {
   justify-content: center;
-}
-.nv-coming__in {
-  max-width: 46ch;
-  margin: 0 auto;
-  padding: 64px 24px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.nv-coming__in h2 {
-  margin: 0;
-  font-family: var(--nv-font-serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: var(--nv-text-title-1);
-  line-height: var(--nv-text-title-1-leading);
-}
-.nv-coming__in p:last-child {
-  margin: 0;
-  color: var(--nv-ink-muted);
-  font-size: 14px;
-  line-height: 20px;
 }
 
 /* ── A page that leads nowhere: a card the height of its words, under a compass (CRE-35) ── */
 .nv-notfound {
   align-self: start;
-}
-.nv-notfound .nv-coming__in {
-  align-items: center;
-  padding-block: var(--nv-space-10);
-}
-.nv-notfound__icon {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  margin-bottom: var(--nv-space-2);
-  border-radius: var(--nv-radius-full);
-  background: var(--nv-glass-fill);
-  box-shadow: inset 0 1px 0 var(--nv-glass-edge);
-  color: var(--nv-ink-muted);
-}
-.nv-notfound__icon .nav-icon {
-  width: 26px;
-  height: 26px;
-}
-.nv-notfound__text {
-  margin: 0;
-  text-wrap: balance;
-  color: var(--nv-ink-muted);
-  font-size: 14px;
-  line-height: 20px;
-}
-.nv-notfound__back {
-  margin-top: var(--nv-space-3);
 }
 
 /* ── Narrow screens: the sidebar keeps its icons only ── */
@@ -1495,50 +1443,6 @@
 /* A sub-tab of the same section: the header stays put, only the content arrives (NAV-08). */
 .nv-stage[data-within] .nv-page > .nv-page__head {
   animation: none;
-}
-
-/* « Le serveur ne répond pas », one face on every screen (DASH-22): the orb, the sentence, « Réessayer ». */
-.nv-silent {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--nv-space-4);
-  align-items: center;
-  align-self: start;
-  max-width: 720px;
-}
-/* The orb's warning ring grows to 1.35 times the orb: the orb keeps that room on its left, so the ring stays inside
-   the page's column instead of passing its edge (recette 11/11, lot A2). */
-.nv-silent > .nv-orb {
-  margin-inline-start: 8px;
-}
-.nv-silent__body {
-  min-width: 0;
-}
-.nv-silent__title {
-  margin: 0;
-  font-size: var(--nv-text-title-1);
-  line-height: var(--nv-text-title-1-leading);
-  letter-spacing: var(--nv-text-title-1-tracking);
-  font-weight: 680;
-  text-wrap: balance;
-}
-.nv-silent__title em {
-  font-style: normal;
-  color: var(--nv-warning);
-}
-.nv-silent__text {
-  margin: var(--nv-space-1) 0 0;
-  color: var(--nv-ink-muted);
-  text-wrap: pretty;
-}
-@media (max-width: 560px) {
-  .nv-silent {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .nv-silent__retry {
-    grid-column: 2;
-    justify-self: start;
-  }
 }
 
 /* ── Installable app (CR-01) ── */

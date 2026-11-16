@@ -21,6 +21,7 @@ import { capabilityLabel, dotOf, lineOf, quarantineLine, webhookViewOf } from '.
 import { PasswordPrompt, SignInAgain } from '@/settings/services/PasswordPrompt';
 import { isForbidden, isSessionExpired, ReauthRequired, type ShownError } from '@/settings/services/api';
 import '@/settings/services/services.css';
+import { Failure } from '@/shell/states';
 import './sales-feed.css';
 
 /** The page refreshes on its own: a key revoked at Reveal turns red without a reload. */
@@ -79,27 +80,14 @@ function Failed({
   load: { error: ShownError; isForbidden: boolean };
   onRetry: () => void;
 }): JSX.Element {
+  if (!load.isForbidden && !load.error.isSessionExpired) return <Failure onRetry={onRetry} />;
   return (
     <div className="nv-plate sv-next">
       <p className="sv-lead">
-        {load.isForbidden
-          ? 'Seul le propriétaire règle la lecture des ventes'
-          : load.error.isSessionExpired
-            ? 'Ta session a expiré'
-            : 'Le serveur ne répond pas'}
+        {load.isForbidden ? 'Seul le propriétaire règle la lecture des ventes' : 'Ta session a expiré'}
       </p>
-      <p className="sv-muted">
-        {load.isForbidden || load.error.isSessionExpired
-          ? load.error.message
-          : 'L’état de la lecture des ventes n’a pas pu être lu. Réessaie dans un instant.'}
-      </p>
-      {load.isForbidden ? null : load.error.isSessionExpired ? (
-        <SignInAgain />
-      ) : (
-        <button type="button" className="nv-btn nv-btn--soft sv-self-start" onClick={onRetry}>
-          Réessayer
-        </button>
-      )}
+      <p className="sv-muted">{load.error.message}</p>
+      {load.isForbidden ? null : <SignInAgain />}
     </div>
   );
 }

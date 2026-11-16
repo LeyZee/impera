@@ -71,6 +71,7 @@ import {
 import { fullDay } from '@/scheduling/time';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 import './persona.css';
 
 /**
@@ -113,13 +114,7 @@ export function PersonaSection({
     return (
       <section className="ps-page" aria-busy={load.kind === 'loading'}>
         {load.kind === 'failed' ? (
-          <div className="nv-plate ps-head">
-            <p className="ps-title">La persona ne se charge pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button type="button" className="nv-btn nv-btn--soft ps-self-start" onClick={reload}>
-              Réessayer
-            </button>
-          </div>
+          <Failure onRetry={reload} />
         ) : (
           <>
             <div className="nv-plate ps-head ps-skeleton" />

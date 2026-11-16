@@ -1057,34 +1057,6 @@
   line-height: var(--nv-text-caption-leading);
 }
 
-/* Empty states: the serif whisper, then what to do. */
-.py-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--nv-space-3);
-  padding: var(--nv-space-10) var(--nv-space-6);
-  text-align: center;
-}
-.py-empty__whisper {
-  margin: 0;
-  max-width: 30ch;
-  font-family: var(--nv-font-serif);
-  font-style: italic;
-  font-size: var(--nv-text-whisper);
-  line-height: var(--nv-text-whisper-leading);
-  color: var(--nv-ink-muted);
-  text-wrap: balance;
-}
-.py-empty__text {
-  margin: 0;
-  max-width: 46ch;
-  color: var(--nv-ink-faint);
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  text-wrap: pretty;
-}
-
 /* A plate's own skeleton while the period loads: the shapes of what comes, breathing. */
 .py-skel {
   display: grid;
@@ -1096,7 +1068,7 @@
   height: var(--py-h, 18px);
   width: var(--py-w, 100%);
   border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
+  background: var(--nv-fill-soft);
   animation: py-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
 }
 @keyframes py-breathe {

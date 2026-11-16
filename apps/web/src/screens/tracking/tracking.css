@@ -74,16 +74,6 @@
   color: var(--nv-ink-faint);
   text-align: center;
 }
-.tr-notice p {
-  margin: 0;
-  color: var(--nv-ink-muted);
-  font-size: 14px;
-  line-height: 20px;
-}
-.tr-notice .nv-btn {
-  align-self: center;
-  margin-top: var(--nv-space-2);
-}
 .tr-skeleton {
   display: flex;
   flex-direction: column;
@@ -93,7 +83,7 @@
 .tr-skeleton i {
   height: 52px;
   border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
+  background: var(--nv-fill-soft);
   animation: tr-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
 }
 .tr-skeleton i:nth-child(2) {
@@ -333,25 +323,15 @@
 .tr-reader__foot {
   scroll-margin-bottom: var(--nv-tabbar-room, var(--nv-space-4));
 }
-.tr-reader__empty {
-  margin: 0;
-  padding: var(--nv-space-4);
-  color: var(--nv-ink-muted);
-  font-size: 14px;
-  line-height: 20px;
-}
-.tr-reader__empty p {
-  margin: 0;
-}
 /* Amber: the server does not answer, a decision did not go through. Red stays for urgencies. */
 .tr-warn {
   margin: 0;
   color: var(--nv-warning);
   font-weight: 600;
 }
-/* After .tr-warn, whose margin it overrides: « À traiter » unread keeps a gap above its Réessayer. */
+/* « À traiter » unread: its one line keeps the panel's inset. */
 .tr-queue-error {
-  margin: 0 0 8px;
+  padding: var(--nv-space-2) var(--nv-plate-pad) var(--nv-space-3);
 }
 .tr-line {
   font-size: var(--nv-text-footnote);
@@ -814,10 +794,6 @@
   place-items: center;
   text-align: center;
 }
-.tr-reader--idle .tr-reader__empty {
-  max-width: 22rem;
-  color: var(--nv-ink-faint);
-}
 @media (max-width: 899px) {
   .tr-reader--idle {
     display: none;
@@ -835,7 +811,7 @@
 .nv-page.tr-page:has(> .sc-off) {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
-.tr-page > .nv-coming {
+.tr-page > .nv-empty-plate {
   align-self: start;
   justify-self: center;
   width: 100%;

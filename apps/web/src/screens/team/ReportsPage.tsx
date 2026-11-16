@@ -54,6 +54,7 @@ import { useNow } from '@/scheduling/useNow';
 import { PeriodArrows, PeriodHeading } from '@/screens/pay/parts';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
+import { Failure } from '@/shell/states';
 
 /** The correction panel the agency opens on a validated report, for its shift. */
 interface Correcting {
@@ -210,6 +211,8 @@ export function ReportsPage({
     );
   };
 
+  // Both cards read one server: when it is silent, the page says it once, above them (recette visuelle 16/11, ETA-05).
+  const down = open.isError && (ofPeriod.isError || settings.isError);
   return (
     <Page>
       <PageHeader
@@ -218,10 +221,20 @@ export function ReportsPage({
         lead="Les rapports de fin de shift : valide-les en lot, renvoie-en un avec un mot."
         tabs={<TeamNav />}
       />
+      {down ? (
+        <Failure
+          onRetry={() => {
+            void open.refetch();
+            void settings.refetch();
+            void ofPeriod.refetch();
+          }}
+        />
+      ) : null}
       <div className="rp-board">
         <ToValidate
           list={open.data}
           isError={open.isError}
+          quiet={down}
           onRetry={() => {
             void open.refetch();
           }}
@@ -251,6 +264,7 @@ export function ReportsPage({
           current={current}
           list={ofPeriod.data}
           isError={ofPeriod.isError || settings.isError}
+          quiet={down}
           onRetry={() => {
             void settings.refetch();
             void ofPeriod.refetch();
@@ -340,6 +354,7 @@ function namesOf(list: ShiftReportList | undefined): {
 function ToValidate({
   list,
   isError,
+  quiet,
   onRetry,
   waiting,
   held,
@@ -359,6 +374,8 @@ function ToValidate({
 }: {
   list: ShiftReportList | undefined;
   isError: boolean;
+  /** The page says the server is silent: the card says nothing of its own. */
+  quiet: boolean;
   onRetry: () => void;
   waiting: readonly ShiftReport[];
   /** Reports whose validation is held: shown dimmed, out of the selection, until it is sent or taken back. */
@@ -381,18 +398,14 @@ function ToValidate({
   nudging: Nudging;
   onSelect: (next: ReadonlySet<string>) => void;
   onValidate: () => void;
-}): JSX.Element {
+}): JSX.Element | null {
   const id = useId();
   if (isError) {
+    if (quiet) return null;
     return (
       <Panel className="rp-validate" eyebrow="À valider">
         <div className="rp-sec">
-          <div className="sc-empty">
-            <p className="tm-warn">Le serveur ne répond pas : les rapports n’ont pas pu être lus.</p>
-            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onRetry}>
-              Réessayer
-            </button>
-          </div>
+          <Failure inline onRetry={onRetry} />
         </div>
       </Panel>
     );
@@ -867,6 +880,7 @@ function PeriodPanel({
   current,
   list,
   isError,
+  quiet,
   onRetry,
   zone,
   focus,
@@ -879,6 +893,8 @@ function PeriodPanel({
   current: PayPeriod | null;
   list: ShiftReportList | undefined;
   isError: boolean;
+  /** The page says the server is silent: the card says nothing of its own. */
+  quiet: boolean;
   onRetry: () => void;
   zone: string;
   /** The member whose fold opens, `null` for none. */
@@ -888,7 +904,7 @@ function PeriodPanel({
   nudging: Nudging;
   onPeriod: (period: PayPeriod | null) => void;
   onCorrect: (line: ShiftLine, memberName: string) => void;
-}): JSX.Element {
+}): JSX.Element | null {
   // The period is the panel's title, as on Paie: « Quinzaine » above it, the arrows on its right (recette #561, Charles:
   // the dates were too close to the arrows, the label under them on a phone).
   const title = period === null ? undefined : <PeriodHeading period={period} />;
@@ -911,15 +927,11 @@ function PeriodPanel({
     );
 
   if (isError) {
+    if (quiet) return null;
     return (
       <Panel className="rp-period" eyebrow="Quinzaine" title={title} actions={nav}>
         <div className="rp-sec">
-          <div className="sc-empty">
-            <p className="tm-warn">Le serveur ne répond pas : la quinzaine n’a pas pu être lue.</p>
-            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onRetry}>
-              Réessayer
-            </button>
-          </div>
+          <Failure inline onRetry={onRetry} />
         </div>
       </Panel>
     );

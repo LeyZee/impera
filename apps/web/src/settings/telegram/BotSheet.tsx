@@ -19,6 +19,8 @@ import {
   TOPICS,
 } from './model';
 
+import { Empty } from '@/shell/states';
+
 /** `add`: the four steps. `listen`: put a known bot in one more group (steps 3 and 4). `replace`: a new token. */
 export type SheetMode =
   { kind: 'add' } | { kind: 'listen'; bot: TelegramBot } | { kind: 'replace'; bot: TelegramBot };
@@ -422,12 +424,11 @@ function ListenStep({
               <path d="M3.5 19c.9-3 3-4.6 5.5-4.6s4.6 1.6 5.5 4.6M16 5.2a3 3 0 0 1 0 5.6M18 14.6c1.3.7 2.1 2.2 2.5 4.4" />
             </svg>
           </div>
-          <div className="tg-whisper">J’attends le groupe…</div>
-          <span className="tg-hint">
+          <Empty title="J’attends le groupe…">
             {isOffline
               ? 'Le serveur ne répond pas pour l’instant. La page réessaie toute seule.'
               : 'Garde cette fenêtre ouverte pendant que tu l’ajoutes.'}
-          </span>
+          </Empty>
         </div>
       ) : (
         <div className="tg-found-list" aria-live="polite">

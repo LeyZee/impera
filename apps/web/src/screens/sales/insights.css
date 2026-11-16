@@ -115,15 +115,6 @@
 .fi-waiting + .fi-note {
   margin-top: var(--nv-space-2);
 }
-/* Under ten fans everywhere: one calm sentence, never six empty rings. */
-.fi-few {
-  margin: 0;
-  font-family: var(--nv-font-serif);
-  font-style: italic;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  color: var(--nv-ink-muted);
-}
 .fi-card__foot {
   margin-top: auto;
 }
@@ -447,17 +438,6 @@
   to {
     opacity: 1;
   }
-}
-
-.fi-skeleton {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  gap: var(--nv-space-3);
-}
-.fi-skeleton > i {
-  height: 180px;
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-plate-hover);
 }
 
 /* A phone: the stats stay three across, a card a row, the ring above its legend when it is too narrow. */

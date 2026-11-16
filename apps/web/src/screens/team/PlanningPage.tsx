@@ -16,7 +16,6 @@ import { OnLeave, PendingLeaves, TeamSwaps, type InTheWay } from './TeamExchange
 import { TeamNav } from './TeamNav';
 import { useMembers } from './api';
 import { unheldLabel } from './model';
-import { Unread } from './parts';
 import './team.css';
 
 import { ReportPanel } from '@/reports/ReportPanel';
@@ -76,6 +75,7 @@ import { useNow } from '@/scheduling/useNow';
 import { Answers } from '@/screens/planning/Exchanges';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
+import { Empty, Failure } from '@/shell/states';
 
 type Open =
   | { readonly kind: 'add'; readonly start: ShiftStart }
@@ -259,8 +259,7 @@ export function PlanningPage({
         {...(data === undefined ? {} : { actions: add })}
       />
       {shown.isError && data === undefined ? (
-        <Unread
-          text="Le serveur ne répond pas : le planning n’a pas pu être lu."
+        <Failure
           onRetry={() => {
             void shown.refetch();
           }}
@@ -845,15 +844,10 @@ function Grid({
 }): JSX.Element {
   if (planning.accounts.length === 0) {
     return (
-      <Panel className="nv-coming">
-        <div className="nv-coming__in sc-notice">
-          <h2>Aucun compte à planifier</h2>
-          <p>
-            Une ligne apparaît ici pour chaque compte de créatrice : ajoute la créatrice et son compte Reveal
-            d’abord.
-          </p>
-        </div>
-      </Panel>
+      <Empty plate title="Aucun compte à planifier">
+        Une ligne apparaît ici pour chaque compte de créatrice : ajoute la créatrice et son compte Reveal
+        d’abord.
+      </Empty>
     );
   }
   const week = planning.shifts.filter((shift) =>

@@ -22,6 +22,7 @@ import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 export type CreatorTab = CreatorSheet;
 
@@ -86,17 +87,7 @@ export function CreatorsPage({
     if (query.isError) {
       return (
         <section className="ps-page">
-          <div className="nv-plate ps-head">
-            <p className="ps-title">La liste des créatrices ne se charge pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void query.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure onRetry={() => void query.refetch()} />
         </section>
       );
     }
@@ -104,10 +95,12 @@ export function CreatorsPage({
       // The list waits in the shape of its cards, so nothing jumps when they arrive (recette 11/11, ADM-21).
       if (creatorId === null)
         return (
-          <ul className="cl-grid" aria-busy="true" aria-label="Chargement des créatrices">
-            <li className="nv-plate cl-card cl-card--skeleton" />
-            <li className="nv-plate cl-card cl-card--skeleton" />
-          </ul>
+          <Skeleton label="Chargement des créatrices…">
+            <div className="cl-grid">
+              <SkeletonCard lines={2} height={136} />
+              <SkeletonCard lines={2} height={136} />
+            </div>
+          </Skeleton>
         );
       return (
         <section className="ps-page" aria-busy="true">

@@ -53,6 +53,7 @@ import type { TelegramTab } from './search';
 import './telegram.css';
 
 import { creatorsSearch } from '@/creators/search';
+import { Empty, Failure } from '@/shell/states';
 
 /** The topics of the Alertes tab, her own alerts with them: what « Dernières alertes » lists. */
 const ALERT_TOPIC_SET: ReadonlySet<TelegramTopic> = new Set(ALERT_TOPICS);
@@ -183,19 +184,7 @@ export function TelegramSection({
   if (load.kind !== 'ready') {
     return (
       <section className="tg-page" aria-busy={load.kind === 'loading'}>
-        {load.kind === 'failed' ? (
-          <div className="nv-plate tg-cover" data-state="warn">
-            <div>
-              <p className="tg-cover__title">Le serveur ne répond pas</p>
-              <p className="tg-cover__sub">
-                Les bots et les groupes n’ont pas pu être lus. Réessaie dans un instant.
-              </p>
-              <button type="button" className="nv-btn nv-btn--soft tg-top" onClick={() => void refresh()}>
-                Réessayer
-              </button>
-            </div>
-          </div>
-        ) : null}
+        {load.kind === 'failed' ? <Failure onRetry={() => void refresh()} /> : null}
         {load.kind === 'forbidden' ? (
           <div className="nv-plate tg-cover">
             <div>
@@ -247,19 +236,20 @@ export function TelegramSection({
     return (
       <section className="tg-page">
         {lede}
-        <section className="nv-plate tg-empty">
-          <div className="tg-bot__icon" aria-hidden="true">
-            <TelegramGlyph />
-          </div>
-          <p className="tg-cover__title">{coverOf(overview).title}</p>
-          <p className="tg-cover__sub">
-            Un bot Telegram se crée en une minute avec @BotFather, puis tu le mets dans un groupe : les
-            urgences y arriveront, même à 3 h du matin. Impera te guide pas à pas.
-          </p>
-          <button type="button" className="nv-btn nv-btn--neon" onClick={openAdd}>
-            Ajouter un bot
-          </button>
-        </section>
+        {/* The page's one action, so its neon (the empty state's button is soft elsewhere). */}
+        <Empty
+          plate
+          icon={<TelegramGlyph />}
+          title={coverOf(overview).title}
+          action={
+            <button type="button" className="nv-btn nv-btn--neon" onClick={openAdd}>
+              Ajouter un bot
+            </button>
+          }
+        >
+          Un bot Telegram se crée en une minute avec @BotFather, puis tu le mets dans un groupe : les urgences
+          y arriveront, même à 3 h du matin. Impera te guide pas à pas.
+        </Empty>
         {sheetView}
       </section>
     );

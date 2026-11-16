@@ -1,6 +1,6 @@
 import type { CollectiveTier, CommissionStatement, PayPeriod } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import type { PayNames } from './data';
 
@@ -19,6 +19,7 @@ import {
 } from '@/payroll/model';
 import { followingPeriod, percentText, periodTitle, previousPeriod } from '@/reports/model';
 import { accountLine } from '@/scheduling/model';
+import { Empty as StateEmpty, Failure } from '@/shell/states';
 
 /** The pieces Paie's screens and Commissions share (EQ-05). */
 
@@ -244,22 +245,27 @@ export function Loading({ rows = 3 }: { rows?: number }): JSX.Element {
 export function Unreachable({ what, onRetry }: { what: string; onRetry: () => void }): JSX.Element {
   return (
     <div className="rp-sec">
-      <div className="sc-empty">
-        <p className="tm-warn">Le serveur ne répond pas : {what} n’a pas pu être lue.</p>
-        <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onRetry}>
-          Réessayer
-        </button>
-      </div>
+      <Failure inline onRetry={onRetry}>
+        {`${what.charAt(0).toUpperCase()}${what.slice(1)} n’a pas pu être lue : réessaie dans un instant.`}
+      </Failure>
     </div>
   );
 }
 
-export function Empty({ whisper, text }: { whisper: string; text: string }): JSX.Element {
+/** Pay's empty state: the shell's `Empty` (COH-04), its sentence and one line, at most one soft button. */
+export function Empty({
+  whisper,
+  text,
+  action,
+}: {
+  whisper: string;
+  text: string;
+  action?: ReactNode;
+}): JSX.Element {
   return (
-    <div className="py-empty">
-      <p className="py-empty__whisper">{whisper}</p>
-      <p className="py-empty__text">{text}</p>
-    </div>
+    <StateEmpty title={whisper} action={action}>
+      {text}
+    </StateEmpty>
   );
 }
 

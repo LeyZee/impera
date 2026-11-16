@@ -22,8 +22,8 @@ import {
 } from './insights-view';
 import './insights.css';
 
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Panel, PanelSection } from '@/shell/layout';
+import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /*
  * « Qui sont tes fans » (CR-15, ADR 0065 § 2, ADR 0074 § 8): in front of Ventes, figures on all her fans, never one.
@@ -479,8 +479,7 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
   if (insights.isError && insights.data === undefined && silent) return null;
   if (insights.isError && insights.data === undefined)
     return (
-      <ServerSilent
-        text="Les chiffres de tes fans n’ont pas pu être lus."
+      <Failure
         onRetry={() => {
           void insights.refetch();
         }}
@@ -488,15 +487,9 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
     );
   if (insights.data === undefined)
     return (
-      <Panel className="fi-panel">
-        <PanelSection>
-          <div className="fi-skeleton" aria-busy="true" aria-label="Chargement des chiffres de tes fans">
-            <i />
-            <i />
-            <i />
-          </div>
-        </PanelSection>
-      </Panel>
+      <Skeleton label="Chargement des chiffres de tes fans…">
+        <SkeletonCard lines={4} />
+      </Skeleton>
     );
   const data = insights.data;
   const age = data.age;
@@ -508,12 +501,9 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
   if (waiting.length === 6 && data.fans.total === null)
     return (
       <Panel className="fi-panel nv-enter" title={<>Qui sont tes fans</>}>
-        <PanelSection>
-          <p className="fi-few">
-            Encore trop peu de fans pour le dire. Ça s’affichera à partir de dix, pour qu’aucun ne s’y
-            reconnaisse.
-          </p>
-        </PanelSection>
+        <Empty title="Encore trop peu de fans pour le dire.">
+          Ça s’affichera à partir de dix, pour qu’aucun ne s’y reconnaisse.
+        </Empty>
       </Panel>
     );
   const lines = waitingLines(waiting);

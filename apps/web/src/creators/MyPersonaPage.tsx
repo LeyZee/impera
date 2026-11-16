@@ -20,6 +20,7 @@ import '@/creators/persona/persona.css';
 import './my-persona.css';
 import { MeNav } from '@/screens/me/MeNav';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 const languageLabel = (value: string): string =>
   PERSONA_OPTIONS.languages.find((option) => option.value === value)?.label ?? value;
@@ -106,15 +107,7 @@ function Sheet({ sheet, correcting }: { sheet: PersonaSheet; correcting: Correct
 }
 
 function Failed({ retry }: { retry: () => void }): JSX.Element {
-  return (
-    <div className="nv-plate mp-block">
-      <p className="mp-block__title">Ta fiche ne se charge pas</p>
-      <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-      <button type="button" className="nv-btn nv-btn--soft ps-self-start" onClick={retry}>
-        Réessayer
-      </button>
-    </div>
-  );
+  return <Failure onRetry={retry} />;
 }
 
 const Loading = (): JSX.Element => (

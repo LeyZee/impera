@@ -619,14 +619,6 @@
 }
 
 /* Bots */
-.tg-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 32px var(--nv-plate-pad);
-  text-align: center;
-}
 .tg-bot {
   padding: 6px 0;
 }
@@ -1040,12 +1032,6 @@
 .tg-radar svg {
   width: 24px;
   height: 24px;
-}
-.tg-whisper {
-  font-family: var(--nv-font-serif);
-  font-style: italic;
-  font-size: 20px;
-  color: var(--nv-ink-muted);
 }
 .tg-found-list {
   display: flex;

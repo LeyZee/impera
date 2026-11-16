@@ -998,7 +998,7 @@ describe('Paie › Quinzaine', () => {
     settingsDown = true;
     renderPage(OWNER);
     const said = await screen.findByText(
-      'Le serveur ne répond pas : la quinzaine en cours n’a pas pu être lue.',
+      'La quinzaine en cours n’a pas pu être lue : réessaie dans un instant.',
     );
     settingsDown = false;
     fireEvent.click(
@@ -1249,7 +1249,7 @@ describe('Paie › Quinzaine', () => {
     periods[OCT2] = 'down';
     renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
     expect(
-      await screen.findByText('Le serveur ne répond pas : la quinzaine n’a pas pu être lue.'),
+      await screen.findByText('La quinzaine n’a pas pu être lue : réessaie dans un instant.'),
     ).toBeTruthy();
   });
 
@@ -1566,7 +1566,7 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     const list = await panel();
     expect(
       await within(list).findByText(
-        'Le serveur ne répond pas : la liste des ventes en attente n’a pas pu être lue.',
+        'La liste des ventes en attente n’a pas pu être lue : réessaie dans un instant.',
       ),
     ).toBeTruthy();
     held[OCT2] = [heldSaleOf()];

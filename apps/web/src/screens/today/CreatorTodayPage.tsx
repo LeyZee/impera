@@ -22,8 +22,8 @@ import { FreshnessNote } from '@/screens/agenda/FreshnessNote';
 import { useAgenda, useWithPending } from '@/screens/agenda/api';
 import '@/screens/agenda/agenda.css';
 import { planOf } from '@/screens/agenda/model';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /**
  * Aujourd'hui, the creator's (CR-02, ADR 0042 § 8): the page she opens in the morning (CREA-19). Where her day stands
@@ -34,11 +34,25 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
 export function CreatorTodayPage(): JSX.Element {
   const now = useNow();
   const today = dayOf(now, readerZone());
+  // Her agenda and who answers her fans are two reads of one server: when it is silent, the page says it once, on top,
+  // and each card keeps quiet (recette visuelle 16/11, ETA-05).
+  const monday = mondayOf(today);
+  const day = useAgenda(monday, addDays(monday, 6));
+  const onDuty = useCreatorOnDuty();
+  const down = (day.isError && day.data === undefined) || onDuty.isError;
   return (
     <Page width="narrow">
       <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" lead="Ta journée, et qui répond à tes fans." />
       <div className="sc-today">
-        <HerDay now={now} today={today} />
+        {down ? (
+          <Failure
+            onRetry={() => {
+              void day.refetch();
+              void onDuty.refetch();
+            }}
+          />
+        ) : null}
+        <HerDay now={now} today={today} quiet={down} />
         <Fans now={now} today={today} />
       </div>
     </Page>
@@ -49,26 +63,26 @@ export function CreatorTodayPage(): JSX.Element {
  * Her day from her agenda's week, the same read as Agenda's (her phone keeps it: offline too, CREA-04): the glance and
  * its way into Agenda, then « À décider » when the agency waits on her.
  */
-function HerDay({ now, today }: { now: Date; today: string }): JSX.Element {
+function HerDay({
+  now,
+  today,
+  quiet,
+}: {
+  now: Date;
+  today: string;
+  /** The page says the server is silent: the card's own line about it keeps quiet. */
+  quiet: boolean;
+}): JSX.Element | null {
   const monday = mondayOf(today);
   const sunday = addDays(monday, 6);
   const read = useAgenda(monday, sunday);
   const { agenda } = useWithPending(read.data);
   if (agenda === undefined)
-    return read.isError ? (
-      <ServerSilent
-        text="Ton agenda n’a pas pu être lu. Réessaie dans un instant."
-        onRetry={() => {
-          void read.refetch();
-        }}
-      />
-    ) : (
-      <Panel className="sc-fans">
-        <div className="sc-skeleton" aria-hidden="true">
-          <i />
-          <i />
-        </div>
-      </Panel>
+    // The page says the server is silent, once (ETA-05).
+    return read.isError ? null : (
+      <Skeleton label="Chargement de ta journée…">
+        <SkeletonCard lines={2} />
+      </Skeleton>
     );
   const plan = planOf(agenda, agenda.today);
   const waiting = agenda.suggestions.length;
@@ -77,7 +91,7 @@ function HerDay({ now, today }: { now: Date; today: string }): JSX.Element {
   return (
     <>
       {/* A copy kept on her phone says so: being updated, or old, and why (CRE-02). */}
-      <FreshnessNote read={read} from={monday} to={sunday} />
+      <FreshnessNote read={read} from={monday} to={sunday} quiet={quiet} />
       <Glance plan={plan} agenda={agenda} now={now} nowMinute={minuteOf(now, agenda.timeZone)}>
         <Link to="/agenda" className="nv-btn nv-btn--soft nv-btn--sm sc-day__open">
           Ouvrir l’agenda
@@ -111,33 +125,16 @@ function HerDay({ now, today }: { now: Date; today: string }): JSX.Element {
  * « Qui répond à tes fans »: who now, and until when; nobody now, then who starts and when, in one sentence (CREA-26:
  * « Léo à partir de 19 h 15 (dans 24 min), jusqu’à 23 h »), never the same shift said twice.
  */
-function Fans({ now, today }: { now: Date; today: string }): JSX.Element {
+function Fans({ now, today }: { now: Date; today: string }): JSX.Element | null {
   const onDuty = useCreatorOnDuty();
   const zone = readerZone();
-  if (onDuty.isError)
-    return (
-      <Panel className="sc-fans">
-        <h2 className="nv-h2 sc-fans__title">Qui répond à tes fans</h2>
-        <p className="sc-fans__line">Le planning n’a pas pu être lu.</p>
-        <button
-          type="button"
-          className="nv-btn nv-btn--plain nv-btn--sm sc-fans__retry"
-          onClick={() => {
-            void onDuty.refetch();
-          }}
-        >
-          Réessayer
-        </button>
-      </Panel>
-    );
+  // The page says the server is silent, once (ETA-05).
+  if (onDuty.isError) return null;
   if (onDuty.data === undefined)
     return (
-      <Panel className="sc-fans">
-        <div className="sc-skeleton" aria-hidden="true">
-          <i />
-          <i />
-        </div>
-      </Panel>
+      <Skeleton label="Chargement de qui répond à tes fans…">
+        <SkeletonCard lines={1} />
+      </Skeleton>
     );
   const { current, next } = onDuty.data;
   const handles = handlesShown(onDuty.data);

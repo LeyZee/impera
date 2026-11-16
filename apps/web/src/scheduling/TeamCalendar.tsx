@@ -25,6 +25,7 @@ import { accountLine, leftOf, phaseOf } from './model';
 import { dayNumber, lengthOf, longDay, rangeAt, shortDay, zonedInstant } from './time';
 
 import { Panel } from '@/shell/layout';
+import { Empty, Failure } from '@/shell/states';
 
 /**
  * The team's calendar (CR-12, ADR 0045 § 1, ADR 0048): every creator's créneaux, who is on each and the agent, read
@@ -178,10 +179,9 @@ export function TeamWeek({ calendar, days, today, now, me, focus, loading }: Cal
   const slotCount = slotLinesOf(rows.map((row) => row.days));
   if (rows.length === 0) {
     return (
-      <div className="nv-coming__in sc-notice">
-        <h2>Aucune créatrice à afficher</h2>
-        <p>Le planning de l’équipe apparaît ici dès qu’une créatrice a un compte.</p>
-      </div>
+      <Empty title="Aucune créatrice à afficher">
+        Le planning de l’équipe apparaît ici dès qu’une créatrice a un compte.
+      </Empty>
     );
   }
   return (
@@ -649,17 +649,7 @@ export function TeamPanel({
       ? read
       : { ...read, creators: read.creators.filter((creator) => creator.id === creatorId) };
   if ((calendar.isError && data === undefined) || failed) {
-    return (
-      <Panel className="nv-coming">
-        <div className="nv-coming__in sc-notice">
-          <h2>Le serveur ne répond pas</h2>
-          <p>Le planning de l’équipe n’a pas pu être lu. Réessaie dans un instant.</p>
-          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onRetry}>
-            Réessayer
-          </button>
-        </div>
-      </Panel>
-    );
+    return <Failure onRetry={onRetry} />;
   }
   if (data === undefined) {
     return (

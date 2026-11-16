@@ -37,6 +37,7 @@ import { useAlerts } from '@/settings/alerts/api';
 import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
+import { Empty, Failure } from '@/shell/states';
 
 /** The conversation a line opened, with its creator: the reader needs both, and the list may change under it. */
 interface Opened {
@@ -108,20 +109,11 @@ export function AlertHistoryPage({
         tabs={nav}
       />
       {creatorsQuery.isError ? (
-        <Notice
-          title="Le serveur ne répond pas"
-          text="La liste n’a pas pu être lue. Réessaie dans un instant."
-        >
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            onClick={() => {
-              void creatorsQuery.refetch();
-            }}
-          >
-            Réessayer
-          </button>
-        </Notice>
+        <Failure
+          onRetry={() => {
+            void creatorsQuery.refetch();
+          }}
+        />
       ) : creatorsQuery.isPending ? (
         <Skeleton />
       ) : creators.length === 0 ? (
@@ -171,11 +163,11 @@ export function AlertHistoryPage({
           </div>
           {selected === null ? (
             <section className="nv-plate tr-reader tr-reader--idle" aria-label="Conversation">
-              <p className="tr-reader__empty">Choisis une alerte à gauche : sa conversation s’ouvre ici.</p>
+              <Empty title="Choisis une alerte à gauche.">Sa conversation s’ouvre ici.</Empty>
             </section>
           ) : open === null ? (
             <section className="nv-plate tr-reader" aria-label="Conversation">
-              <p className="tr-reader__empty">Cette conversation n’est pas dans la liste.</p>
+              <Empty title="Cette conversation n’est pas dans la liste." />
             </section>
           ) : (
             <Reader
@@ -520,12 +512,8 @@ function Notice({
   children?: JSX.Element;
 }): JSX.Element {
   return (
-    <Panel className="nv-coming">
-      <div className="nv-coming__in tr-notice">
-        <h2>{title}</h2>
-        <p>{text}</p>
-        {children}
-      </div>
-    </Panel>
+    <Empty plate title={title} action={children}>
+      {text}
+    </Empty>
   );
 }

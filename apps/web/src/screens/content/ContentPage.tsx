@@ -44,8 +44,8 @@ import { lookAgainAtHerCase } from '@/rewards/api';
 import { dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 import './content.css';
 
@@ -122,8 +122,7 @@ export function ContentPage({
     <Page className="ct-page" width="narrow">
       <PageHeader title="Contenu" lead="Ce qu’on te demande, et ce que tu envoies." />
       {content.isError ? (
-        <ServerSilent
-          text="Ton contenu n’a pas pu être lu. Rien ici n’est à jour en attendant."
+        <Failure
           onRetry={() => {
             void content.refetch();
           }}

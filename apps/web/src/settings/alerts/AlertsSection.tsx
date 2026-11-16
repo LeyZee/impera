@@ -70,6 +70,7 @@ import { distinctNames } from '@/settings/names';
 import { fetchOverview, TelegramOff } from '@/settings/telegram/api';
 import { TOPICS } from '@/settings/telegram/model';
 import { searchOfTab, TAB_OF_TOPIC } from '@/settings/telegram/search';
+import { Failure } from '@/shell/states';
 
 /**
  * Réglages › Alertes (P4-01), the owner's alone: the alerts she writes herself (a phrase the brain reads, words the
@@ -85,28 +86,22 @@ export function AlertsSection(): JSX.Element {
   if (alerts.data === undefined || creators.data === undefined) {
     if (alerts.isError || creators.isError) {
       const kind = alertsErrorKind(alerts.error);
+      if (kind === 'unavailable')
+        return (
+          <section className="ps-page al-page">
+            <Failure
+              onRetry={() => {
+                void alerts.refetch();
+                void creators.refetch();
+              }}
+            />
+          </section>
+        );
       return (
         <section className="ps-page al-page">
           <div className="nv-plate ps-head nv-enter">
-            {/* One wording for a silent server across Réglages: what it is, then what could not be read (REG-21). */}
-            <p className="ps-title">
-              {kind === 'unavailable' ? 'Le serveur ne répond pas' : 'Les alertes ne se chargent pas'}
-            </p>
-            <p className="ps-muted">
-              {kind === 'unavailable' ? 'Les alertes n’ont pas pu être lues.' : ALERTS_ERRORS[kind]}
-            </p>
-            {kind === 'unavailable' ? (
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft ps-self-start"
-                onClick={() => {
-                  void alerts.refetch();
-                  void creators.refetch();
-                }}
-              >
-                Réessayer
-              </button>
-            ) : null}
+            <p className="ps-title">Les alertes ne se chargent pas</p>
+            <p className="ps-muted">{ALERTS_ERRORS[kind]}</p>
           </div>
         </section>
       );

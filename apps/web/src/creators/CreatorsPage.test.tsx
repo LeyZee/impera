@@ -260,8 +260,8 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'acces', creatrice: ANNA.id });
     });
-    // Her account: the list answers 404 here, so the sheet says it does not load, never a form to fill.
-    expect(await screen.findByText('Son accès ne se charge pas')).toBeDefined();
+    // Her account: the list answers 404 here, so the sheet says the server is silent, never a form to fill.
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
 
     cleanup();
     await serve([ANNA]);
@@ -396,8 +396,8 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
     });
-    // The suggestions answer 404 here: the sheet says they do not load, and still offers to propose.
-    expect(await screen.findByText('Ses propositions ne se chargent pas')).toBeDefined();
+    // The suggestions answer 404 here: the sheet says the server is silent, and still offers to propose.
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     expect(screen.getByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
   });
 
@@ -454,7 +454,7 @@ describe('Créatrices, what a member without the list reads', () => {
   it('says the list does not load, with a way to try again', async () => {
     await serve(null);
     renderAt(owner, '/creatrices');
-    expect(await screen.findByText('La liste des créatrices ne se charge pas')).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
   });
 });

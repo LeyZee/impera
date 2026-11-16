@@ -369,10 +369,8 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
     keepYesterday();
     serveAgenda(() => Promise.resolve(new Response('{}', { status: 500 })));
     show();
-    const silent = await screen.findByText(
-      /^Le serveur ne répond pas : tu vois ta dernière lecture, hier à 21\sh\.$/u,
-    );
-    expect(silent.closest('.ag-offline')).not.toBeNull();
+    const silent = await screen.findByText(/^Tu vois ta dernière lecture, hier à 21\sh\.$/u);
+    expect(silent.closest('[role="alert"]')?.textContent).toContain('Le serveur ne répond pas');
     expect(screen.queryByText(/Hors ligne/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
   });

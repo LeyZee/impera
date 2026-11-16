@@ -36,7 +36,7 @@ import './ai-usage.css';
 
 import { arcs, OTHER } from '@/screens/dashboard/agency/view';
 import { CountUp, Section, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { Failure } from '@/shell/states';
 
 /*
  * Réglages › Consommation IA (ADR 0091): what the AI costs, live, and when to recharge. Every figure is the server's,
@@ -619,10 +619,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
     return (
       <div className="ins-body cia-body">
         {query.isError ? (
-          <ServerSilent
-            text="La consommation revient dès qu’il répond."
-            onRetry={() => void query.refetch()}
-          />
+          <Failure onRetry={() => void query.refetch()} />
         ) : (
           <div
             className="db-loading nv-plate ins-loading"

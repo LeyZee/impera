@@ -11,6 +11,7 @@ import '@/scheduling/scheduling.css';
 import { addDays, dayOf, longDay, rangeAt, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Panel } from '@/shell/layout';
+import { Empty } from '@/shell/states';
 
 /**
  * Suivi of a chatter (ADR 0025, EQ-13): during his shift, widened by the planning's margin, he reads every conversation
@@ -101,17 +102,17 @@ function OffShift({
  */
 function NothingListed(): JSX.Element {
   return (
-    <Panel className="nv-coming">
-      <div className="nv-coming__in tr-notice" role="status">
-        <h2>Aucune conversation pour l’instant</h2>
-        <p>
-          Pendant ton shift, toutes les conversations de ta créatrice arrivent ici, ce qui attend une réponse
-          en tête. Tu y valides les brouillons de l’agent ; tu réponds aux fans dans Reveal.
-        </p>
-        <Link to="/aujourdhui" className="nv-btn nv-btn--soft nv-btn--sm">
+    <Empty
+      plate
+      title="Aucune conversation pour l’instant"
+      action={
+        <Link to="/aujourdhui" className="nv-btn nv-btn--soft">
           Voir mon shift
         </Link>
-      </div>
-    </Panel>
+      }
+    >
+      Pendant ton shift, toutes les conversations de ta créatrice arrivent ici, ce qui attend une réponse en
+      tête. Tu y valides les brouillons de l’agent ; tu réponds aux fans dans Reveal.
+    </Empty>
   );
 }

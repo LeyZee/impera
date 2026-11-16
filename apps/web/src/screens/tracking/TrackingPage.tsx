@@ -43,6 +43,7 @@ import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
+import { Empty, Failure } from '@/shell/states';
 
 const REFRESH_MS = 30_000;
 
@@ -211,14 +212,7 @@ export function TrackingPage({
         </Panel>
       ) : null}
       {creatorsQuery.isError || (failed.length > 0 && lines.length === 0) ? (
-        <Notice
-          title="Le serveur ne répond pas"
-          text="La liste n’a pas pu être lue. Réessaie dans un instant."
-        >
-          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={retry}>
-            Réessayer
-          </button>
-        </Notice>
+        <Failure onRetry={retry} />
       ) : isLoading && lines.length === 0 ? (
         <Panel className="tr-panel">
           <div className="tr-skeleton" aria-hidden="true">
@@ -257,12 +251,9 @@ export function TrackingPage({
             {/* An unread queue is never silent: an urgency may be missing from it. */}
             {queue.isError ? (
               <Panel className="tr-panel" eyebrow="À traiter">
-                <p className="tr-queue-error tr-warn">
-                  « À traiter » n’a pas pu être lu : une urgence peut manquer ici.
-                </p>
-                <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={retry}>
-                  Réessayer
-                </button>
+                <Failure inline className="tr-queue-error" onRetry={retry}>
+                  Une urgence peut manquer ici : réessaie dans un instant.
+                </Failure>
               </Panel>
             ) : null}
             {todos.length === 0 ? null : (
@@ -388,13 +379,13 @@ export function TrackingPage({
           </div>
           {selected === null ? (
             <section className="nv-plate tr-reader tr-reader--idle" aria-label="Conversation">
-              <p className="tr-reader__empty">
-                Choisis une conversation à gauche : elle s’ouvre ici, avec son brouillon s’il y en a un.
-              </p>
+              <Empty title="Choisis une conversation à gauche.">
+                Elle s’ouvre ici, avec son brouillon s’il y en a un.
+              </Empty>
             </section>
           ) : open === null ? (
             <section className="nv-plate tr-reader" aria-label="Conversation">
-              <p className="tr-reader__empty">Cette conversation n’est pas dans la liste.</p>
+              <Empty title="Cette conversation n’est pas dans la liste." />
             </section>
           ) : (
             <Reader
@@ -694,13 +685,9 @@ function Notice({
   children?: JSX.Element;
 }): JSX.Element {
   return (
-    <Panel className="nv-coming">
-      <div className="nv-coming__in tr-notice">
-        <h2>{title}</h2>
-        <p>{text}</p>
-        {children}
-      </div>
-    </Panel>
+    <Empty plate title={title} action={children}>
+      {text}
+    </Empty>
   );
 }
 

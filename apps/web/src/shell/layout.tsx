@@ -3,6 +3,7 @@ import { Link, useRouterState, type LinkProps } from '@tanstack/react-router';
 import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
+import { Empty } from '@/shell/states';
 
 /**
  * Layout pieces shared by every screen of the dashboard. A screen is a `Page`: a header that says where you are and
@@ -404,12 +405,8 @@ export function ComingSoon({
   when: string;
 }): JSX.Element {
   return (
-    <Panel className="nv-coming">
-      <div className="nv-coming__in">
-        <p className="nv-eyebrow">{when}</p>
-        <h2>{title}</h2>
-        <p>{what}</p>
-      </div>
-    </Panel>
+    <Empty plate title={title}>
+      {what} {when}
+    </Empty>
   );
 }

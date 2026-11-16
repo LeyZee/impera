@@ -1018,7 +1018,7 @@ describe('CommissionsPage', () => {
     await waitFor(
       () => {
         expect(
-          screen.getByText('Le serveur ne répond pas : la liste de tes relevés n’a pas pu être lue.'),
+          screen.getByText('La liste de tes relevés n’a pas pu être lue : réessaie dans un instant.'),
         ).toBeDefined();
       },
       { timeout: 5_000 },

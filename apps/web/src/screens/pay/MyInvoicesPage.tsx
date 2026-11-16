@@ -1,4 +1,5 @@
 import type { InvoiceListItem, TeamMemberId } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import { useState, type JSX, type ReactNode } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';
@@ -70,7 +71,16 @@ export function MyInvoicesPage({
               what="la liste de tes factures"
               hint="Ta première facture s’émet quand ton premier relevé est validé, une fois ton dossier complet."
               first="Aucune facture sur les dix dernières années : la première s’émet quand ton premier relevé est validé, une fois ton dossier complet."
-              older="Le serveur ne répond pas : les factures plus anciennes n’ont pas pu être lues."
+              older="Les factures plus anciennes n’ont pas pu être lues : réessaie dans un instant."
+              none={{
+                whisper: 'Pas encore de facture.',
+                text: 'Elle arrive avec ton premier relevé validé, une fois ton dossier rempli.',
+                action: (
+                  <Link to="/moi/dossier" className="nv-btn nv-btn--soft">
+                    Ouvrir mon dossier
+                  </Link>
+                ),
+              }}
               row={(item) => (
                 <InvoiceRow
                   item={item}

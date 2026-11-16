@@ -44,6 +44,7 @@ import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
 import '@/screens/agenda/agenda.css';
 import '@/screens/team/team.css';
+import { Failure } from '@/shell/states';
 
 /**
  * Créatrices › Agenda (CR-05 lot c, ADR 0042 § 4), the owner's and an active manager's: propose a task for her agenda,
@@ -68,20 +69,7 @@ export function AgendaSection({
 
   const list = (): JSX.Element => {
     if (query.data === undefined) {
-      if (query.isError)
-        return (
-          <div className="nv-plate aa-empty">
-            <p className="ps-title">Ses propositions ne se chargent pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void query.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
-        );
+      if (query.isError) return <Failure onRetry={() => void query.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const items = query.data.items;

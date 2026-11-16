@@ -173,7 +173,7 @@
   display: block;
   height: 18px;
   border-radius: var(--nv-radius-sm);
-  background: var(--nv-fill-track);
+  background: var(--nv-fill-soft);
   animation: ag-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
 }
 .ag-skeleton i:nth-child(2) {

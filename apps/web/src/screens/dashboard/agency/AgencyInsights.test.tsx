@@ -295,7 +295,8 @@ describe('L’agence en chiffres (ADR 0078)', () => {
   it('says the server is silent and offers to read again', async () => {
     serve(500, { error: 'internal' });
     show();
-    expect(await screen.findByText(/Les chiffres reviennent dès qu’il répond/u)).toBeTruthy();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
   });
 
   it('walks the chart’s columns with the arrows, one stop for the keyboard', async () => {

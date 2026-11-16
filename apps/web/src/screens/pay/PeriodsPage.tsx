@@ -24,6 +24,7 @@ import '@/scheduling/scheduling.css';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /**
  * Paie › Historique (EQ-05; « Relevés » until 29/10, a statement being one member's computation): the periods, the most recent first, each with its state and one amount — what was paid, or
@@ -62,18 +63,7 @@ export function PeriodsPage({
         <Panel className="nv-enter">
           {periods.isError && !lost && items.length === 0 ? (
             <div className="rp-sec">
-              <div className="sc-empty">
-                <p className="tm-warn">Le serveur ne répond pas : les quinzaines n’ont pas pu être lues.</p>
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--soft nv-btn--sm"
-                  onClick={() => {
-                    void periods.refetch();
-                  }}
-                >
-                  Réessayer
-                </button>
-              </div>
+              <Failure inline onRetry={() => void periods.refetch()} />
             </div>
           ) : periods.data === undefined ? (
             <Loading rows={4} />
@@ -118,9 +108,9 @@ export function PeriodsPage({
                 </button>
               ) : null}
               {periods.isError && !lost && items.length > 0 ? (
-                <p className="tm-warn" role="alert">
-                  Le serveur ne répond pas : les quinzaines plus anciennes n’ont pas pu être lues.
-                </p>
+                <Failure inline onRetry={() => void periods.fetchNextPage()}>
+                  Les quinzaines plus anciennes n’ont pas pu être lues : réessaie dans un instant.
+                </Failure>
               ) : null}
             </div>
           )}

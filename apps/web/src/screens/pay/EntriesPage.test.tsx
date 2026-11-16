@@ -499,7 +499,7 @@ describe('Paie › Primes et malus', () => {
     entries = { [NOV1]: 'down' };
     renderPage(OWNER);
     expect(
-      await screen.findByText('Le serveur ne répond pas : la liste des saisies n’a pas pu être lue.'),
+      await screen.findByText('La liste des saisies n’a pas pu être lue : réessaie dans un instant.'),
     ).toBeTruthy();
     expect(screen.queryByText('Aucune prime ni aucun malus sur cette quinzaine.')).toBeNull();
   });
