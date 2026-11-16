@@ -475,18 +475,16 @@ describe('playground session, the offer policy and the cursor', () => {
     expect(open.desireTrail[0]?.availability?.gate.open).toBe(true);
   });
 
-  it('says she asked whether he is free on the message she asked it only, the clock standing still (ADR 0103 § 13)', async () => {
+  it('says she asked whether he is free on the message she asked it only (ADR 0103 § 13)', async () => {
     const playground = session([], true, 0, OFFER);
-    // His age is not confirmed yet on his first message: the cursor steers back, she asks nothing.
+    // The adult age he states confirms it at once (Charles, 16/11): she asks on this very message.
     const first = await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
-    expect(first.desire?.availability?.asked).toBe(false);
+    expect(first.desire?.availability?.asked).toBe(true);
     playground.advance(3 * 60_000);
     const second = await playground.handleFanMessage('Tu me rends fou');
-    const third = await playground.handleFanMessage('Encore');
-    expect(second.desire?.availability?.asked).toBe(true);
-    // Same instant, `askedAt` unchanged: she did not ask again.
-    expect(third.desire?.availability?.record.askedAt).toEqual(second.desire?.availability?.record.askedAt);
-    expect(third.desire?.availability?.asked).toBe(false);
+    // `askedAt` unchanged: she did not ask again.
+    expect(second.desire?.availability?.record.askedAt).toEqual(first.desire?.availability?.record.askedAt);
+    expect(second.desire?.availability?.asked).toBe(false);
   });
 
   it('counts his reply speed on the simulated clock, as production does (P3-12)', async () => {
@@ -525,13 +523,11 @@ describe('playground session, the offer policy and the cursor', () => {
   it('says why the policy refused an offer, and what the cursor decided', async () => {
     const playground = session([], true, 70);
     const first = await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
-    // His age is confirmed only from his next message: the cursor slows her down before any offer.
-    expect(first.cursor).toEqual({ kind: 'steer_back', reason: 'age_unconfirmed' });
-    playground.advance(3 * 60_000);
-    const second = await playground.handleFanMessage('Tu me rends fou');
+    // The adult age he states confirms it at once (Charles, 16/11): the cursor lets her follow him.
+    expect(first.cursor).toEqual({ kind: 'free' });
     // The brain offers, his score is still under her 70: the gate before any sale says no, and why.
-    expect(second.desire?.score).toBeLessThan(70);
-    expect(second.offerRefused).toBe('desire_below_threshold');
+    expect(first.desire?.score).toBeLessThan(70);
+    expect(first.offerRefused).toBe('desire_below_threshold');
   });
 
   it('offers nothing without her pace of scripts', async () => {
