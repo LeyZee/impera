@@ -87,6 +87,15 @@ describe('the copilot panel’s contract (ADR 0086)', () => {
       clicksLeftToday: 30,
     };
     expect(CopilotAssistSchema.safeParse(assist).success).toBe(true);
+    const moment = {
+      verdict: 'soon',
+      conditions: [
+        { code: 'desire', label: 'Désir assez haut', met: true },
+        { code: 'fan_messages', label: '2 messages de lui', met: false },
+      ],
+    };
+    expect(CopilotAssistSchema.safeParse({ ...assist, saleMoment: moment }).success).toBe(true);
+    expect(CopilotAssistSchema.safeParse({ ...assist, saleMoment: null }).success).toBe(true);
     expect(CopilotDraftViewSchema.safeParse({ state: 'none', conversation, assist }).success).toBe(true);
     expect(CopilotDraftViewSchema.safeParse({ state: 'none', conversation, assist: null }).success).toBe(
       true,
@@ -100,6 +109,12 @@ describe('the copilot panel’s contract (ADR 0086)', () => {
       { ...assist, cuts: ['vip'] },
       { ...assist, buttons: ['free_text'] },
       { ...assist, signals: { desireTrend: 72, followUpDue: false } },
+      // § 4 bis: a verdict of a closed list, never a figure.
+      { ...assist, saleMoment: { verdict: 62, conditions: [] } },
+      {
+        ...assist,
+        saleMoment: { verdict: 'now', conditions: [{ code: 'score', label: 'Désir', met: true }] },
+      },
     ])
       expect(CopilotAssistSchema.safeParse(broken).success).toBe(false);
   });

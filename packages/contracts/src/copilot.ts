@@ -152,6 +152,27 @@ export const CopilotCutSchema = z.enum([
 ]);
 export type CopilotCut = z.infer<typeof CopilotCutSchema>;
 
+/**
+ * ADR 0141 § 4 bis: the moment to sell, a verdict of the code with the conditions it rests on, derived from the same
+ * guards as the paid step. Provisional (Agent's PR is authoritative); no desire figure, ever.
+ */
+export const CopilotSaleMomentVerdictSchema = z.enum(['now', 'soon', 'not_yet']);
+export type CopilotSaleMomentVerdict = z.infer<typeof CopilotSaleMomentVerdictSchema>;
+
+export const CopilotSaleMomentSchema = z.strictObject({
+  verdict: CopilotSaleMomentVerdictSchema,
+  conditions: z
+    .array(
+      z.strictObject({
+        code: z.enum(['desire', 'fan_messages', 'offer_cooldown']),
+        label: CopilotLabelSchema,
+        met: z.boolean(),
+      }),
+    )
+    .max(3),
+});
+export type CopilotSaleMoment = z.infer<typeof CopilotSaleMomentSchema>;
+
 export const CopilotAssistSchema = z.strictObject({
   nextMove: CopilotNextMoveSchema.nullable(),
   reasons: z.array(z.strictObject({ code: CopilotDraftReasonSchema, label: CopilotLabelSchema })).max(6),
@@ -162,6 +183,8 @@ export const CopilotAssistSchema = z.strictObject({
   /** Lot b: the buttons offered (empty when a cut removes them or at the cap). */
   buttons: z.array(z.enum(['hooks', 'objection'])).max(2),
   clicksLeftToday: z.number().int().nonnegative(),
+  /** § 4 bis; null under a cut, absent from a server that does not send it yet. */
+  saleMoment: CopilotSaleMomentSchema.nullable().exactOptional(),
 });
 export type CopilotAssist = z.infer<typeof CopilotAssistSchema>;
 
