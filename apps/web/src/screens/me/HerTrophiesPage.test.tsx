@@ -213,7 +213,7 @@ describe('Moi › Trophées, the chatter’s rank and medals (recette 16/11, CHT
     serve(HIS_CASE);
     renderPage(THEO_ME);
     const hero = await screen.findByRole('region', { name: 'Série de 10' });
-    expect(hero.textContent).toMatch(/Premier rang : Étincelle à 100,00\s€ de net cumulé/u);
+    expect(hero.textContent).toMatch(/Premier rang\u00a0: Étincelle, à 100\s€ de net depuis ton arrivée/u);
     expect(hero.querySelector('[data-earned="false"]')).not.toBeNull();
   });
 
@@ -236,7 +236,9 @@ describe('Moi › Trophées, the chatter’s rank and medals (recette 16/11, CHT
     serve(HIS_CASE);
     renderPage(THEO_ME);
     const medals = await screen.findByRole('region', { name: 'Médailles' });
-    expect(medals.textContent).toContain('L’agence n’a pas encore posé de paliers de prime.');
+    expect(medals.textContent).toContain(
+      'L’agence n’a pas encore posé de paliers de prime. Tes médailles apparaîtront ici.',
+    );
     expect(screen.getAllByRole('heading', { level: 3 }).map((one) => one.textContent)).toEqual([
       'Médailles',
       'Séries',

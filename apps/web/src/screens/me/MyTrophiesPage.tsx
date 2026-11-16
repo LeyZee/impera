@@ -5,8 +5,8 @@ import { HerTrophiesPage } from './HerTrophiesPage';
 import { MeNav } from './MeNav';
 
 import { useMyFigures, usePayPeriod } from '@/payroll/api';
+import { roundAmountText } from '@/payroll/model';
 import { figuresCurrency, netIn } from '@/payroll/my-figures';
-import { amountText } from '@/reports/model';
 import { LevelInsignia } from '@/rewards/LevelInsignia';
 import { useMarkRevealed, useMyTrophyCase, usePreferences } from '@/rewards/api';
 import { TrophyCaseDown, TrophyCaseLoading, TrophyCaseView } from '@/rewards/case/TrophyCaseView';
@@ -16,7 +16,9 @@ import { useCurrentPeriod } from '@/screens/pay/data';
 import { Page, PageHeader } from '@/shell/layout';
 
 /** Without tiers set by the agency, the medal shelf still stands and says why it is empty (CHT-17). */
-const NO_TIERS = { medal: 'L’agence n’a pas encore posé de paliers de prime.' } as const;
+const NO_TIERS = {
+  medal: 'L’agence n’a pas encore posé de paliers de prime. Tes médailles apparaîtront ici.',
+} as const;
 
 const shifts = (count: number): string => `${String(count)} ${count > 1 ? 'shifts' : 'shift'}`;
 
@@ -26,13 +28,13 @@ function rankLine(trophyCase: TrophyCase): { art: JSX.Element; text: string } | 
   if (level !== null)
     return {
       art: <LevelInsignia rank={level.rank} size={44} />,
-      text: `Rang ${level.name} : il monte avec ton net depuis ton arrivée et ne redescend jamais`,
+      text: `Rang ${level.name}\u00a0: il monte avec ton net depuis ton arrivée et ne redescend jamais`,
     };
   const next = trophyCase.nextLevel ?? null;
   if (next === null) return null;
   return {
     art: <LevelInsignia rank={next.rank} earned={false} size={44} />,
-    text: `Premier rang : ${next.name} à ${amountText(next.thresholdMinor, next.currency)} de net cumulé`,
+    text: `Premier rang\u00a0: ${next.name}, à ${roundAmountText(next.thresholdMinor, next.currency)} de net depuis ton arrivée`,
   };
 }
 
