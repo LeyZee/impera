@@ -10,6 +10,7 @@ import {
   SERVICE_DESCRIPTION_MAX,
   type AgencyLogo,
   type BillingSettingsView,
+  type UpdateBillingSettingsBody,
 } from '@impera/contracts';
 import { useId, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 
@@ -34,6 +35,7 @@ import {
   type StepKey,
 } from './model';
 
+import { BILLING_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
 
@@ -51,6 +53,8 @@ function refusalText(refusal: BillingRefusal): string {
       return 'Le serveur a refusé un champ : relis chaque étape, puis enregistre à nouveau.';
     case 'forbidden':
       return 'Seul le propriétaire de l’agence règle la facturation.';
+    case 'reauth':
+      return 'Confirme ton mot de passe et ton code : rien n’a été enregistré.';
     case 'failed':
       return 'Le serveur ne répond pas : rien n’a été enregistré. Réessaie dans un instant.';
   }
@@ -90,6 +94,7 @@ export function BillingDialog({
   // A logo being read by the server: nothing is saved nor left meanwhile, or the save would keep the logo before it.
   const [reading, setReading] = useState(false);
   const [refusal, setRefusal] = useState<BillingRefusal | null>(null);
+  const confirm = useConfirmAgain();
 
   const step = steps[index] ?? 'agency';
   const last = index === steps.length - 1;
@@ -112,15 +117,7 @@ export function BillingDialog({
     setDraft((before) => ({ ...before, [field]: value }));
   };
 
-  const save = async (): Promise<void> => {
-    const sent = bodyOf(draft);
-    if (sent === null) {
-      const wrong = wrongSteps(draft);
-      setShown(new Set(wrong));
-      const first = steps.findIndex((one) => wrong.includes(one));
-      if (first >= 0) setIndex(first);
-      return;
-    }
+  const send = async (sent: UpdateBillingSettingsBody): Promise<void> => {
     setBusy(true);
     setRefusal(null);
     const outcome = await saveBillingSettings(sent);
@@ -130,8 +127,28 @@ export function BillingDialog({
       onClose();
       return;
     }
+    if (outcome.kind === 'reauth') {
+      // Nothing was written: the password and the code (EQ-15), then the same settings again.
+      confirm.ask(() => {
+        void send(sent);
+      });
+      return;
+    }
     setRefusal(outcome);
   };
+
+  const save = async (): Promise<void> => {
+    const sent = bodyOf(draft);
+    if (sent === null) {
+      const wrong = wrongSteps(draft);
+      setShown(new Set(wrong));
+      const first = steps.findIndex((one) => wrong.includes(one));
+      if (first >= 0) setIndex(first);
+      return;
+    }
+    await send(sent);
+  };
+  const prompt = confirm.prompt({ lead: BILLING_LEAD, onBusyChange: setBusy });
 
   const next = (): void => {
     if (busy || reading) return;
@@ -154,78 +171,82 @@ export function BillingDialog({
       className="bf-dialog bf"
       onClose={onClose}
     >
-      <form
-        ref={body}
-        className="tm-dialog__body bf-step"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          next();
-        }}
-      >
-        {steps.length > 1 ? (
-          <ol className="bf-progress" aria-label="Étapes">
-            {steps.map((one, at) => (
-              <li
-                key={one}
-                data-state={at < index ? 'done' : at === index ? 'now' : 'later'}
-                aria-current={at === index ? 'step' : undefined}
-              >
-                <span className="bf-progress__num">{String(at + 1)}</span>
-                <span className="bf-progress__title">{STEP_TITLES[one]}</span>
-              </li>
-            ))}
-          </ol>
-        ) : null}
-        {step === 'agency' ? (
-          <AgencyStep id={id} draft={draft} problems={problems} set={set} />
-        ) : step === 'registration' ? (
-          <RegistrationStep id={id} draft={draft} problems={problems} set={set} />
-        ) : step === 'service' ? (
-          <ServiceStep id={id} draft={draft} problems={problems} set={set} />
-        ) : step === 'payment' ? (
-          <PaymentStep id={id} draft={draft} problems={problems} set={set} />
-        ) : step === 'reminder' ? (
-          <ReminderStep id={id} draft={draft} problems={problems} set={set} />
-        ) : (
-          <LogoStep
-            logo={draft.logoSha256 === null ? null : logo}
-            busy={busy}
-            reading={reading}
-            onReading={setReading}
-            onLogo={(kept) => {
-              setLogo(kept);
-              setDraft((before) => ({ ...before, logoSha256: kept?.sha256 ?? null }));
-            }}
-          />
-        )}
-        {refusal === null ? null : (
-          <p className="tm-warn nv-swap" role="alert">
-            {refusalText(refusal)}
-          </p>
-        )}
-        <div className="tm-dialog__foot">
-          {index === 0 ? (
-            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-              Annuler
-            </button>
+      {prompt === null ? (
+        <form
+          ref={body}
+          className="tm-dialog__body bf-step"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            next();
+          }}
+        >
+          {steps.length > 1 ? (
+            <ol className="bf-progress" aria-label="Étapes">
+              {steps.map((one, at) => (
+                <li
+                  key={one}
+                  data-state={at < index ? 'done' : at === index ? 'now' : 'later'}
+                  aria-current={at === index ? 'step' : undefined}
+                >
+                  <span className="bf-progress__num">{String(at + 1)}</span>
+                  <span className="bf-progress__title">{STEP_TITLES[one]}</span>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+          {step === 'agency' ? (
+            <AgencyStep id={id} draft={draft} problems={problems} set={set} />
+          ) : step === 'registration' ? (
+            <RegistrationStep id={id} draft={draft} problems={problems} set={set} />
+          ) : step === 'service' ? (
+            <ServiceStep id={id} draft={draft} problems={problems} set={set} />
+          ) : step === 'payment' ? (
+            <PaymentStep id={id} draft={draft} problems={problems} set={set} />
+          ) : step === 'reminder' ? (
+            <ReminderStep id={id} draft={draft} problems={problems} set={set} />
           ) : (
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain"
-              disabled={busy || reading}
-              onClick={() => {
-                setIndex(index - 1);
+            <LogoStep
+              logo={draft.logoSha256 === null ? null : logo}
+              busy={busy}
+              reading={reading}
+              onReading={setReading}
+              onLogo={(kept) => {
+                setLogo(kept);
+                setDraft((before) => ({ ...before, logoSha256: kept?.sha256 ?? null }));
               }}
-            >
-              Retour
-            </button>
+            />
           )}
-          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy || reading} aria-busy={busy}>
-            {busy ? 'Enregistrement…' : last ? 'Enregistrer' : 'Continuer'}
-          </button>
-        </div>
-      </form>
+          {refusal === null ? null : (
+            <p className="tm-warn nv-swap" role="alert">
+              {refusalText(refusal)}
+            </p>
+          )}
+          <div className="tm-dialog__foot">
+            {index === 0 ? (
+              <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+                Annuler
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain"
+                disabled={busy || reading}
+                onClick={() => {
+                  setIndex(index - 1);
+                }}
+              >
+                Retour
+              </button>
+            )}
+            <button type="submit" className="nv-btn nv-btn--neon" disabled={busy || reading} aria-busy={busy}>
+              {busy ? 'Enregistrement…' : last ? 'Enregistrer' : 'Continuer'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }
