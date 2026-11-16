@@ -25,6 +25,7 @@ import {
   isInterrupted,
   matchResumed,
   onTheirWay,
+  pickedHeadRefusal,
   outLine,
   published,
   mayWithdrawHere,
@@ -294,37 +295,45 @@ function RequestCard({
         </span>
       </div>
       <p className="ct-card__why">{request.reason}</p>
-      <div className="ct-card__foot">
-        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onRefuse}>
-          Je ne peux pas
-        </button>
-        {scripted ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              setFailed(null);
-              // Its id drawn once: a tap replayed after a cut network answers the same script.
-              startScriptDrop({ id: dropId, requestId: request.id })
-                .then((script) => {
-                  onOpenScript(script.drop.id);
-                })
-                .catch(() => {
-                  setFailed('Ton script n’a pas pu s’ouvrir : réessaie dans un instant.');
-                  setBusy(false);
-                });
-            }}
-          >
-            Commencer
+      {request.dropId === null ? (
+        <div className="ct-card__foot">
+          <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onRefuse}>
+            Je ne peux pas
           </button>
-        ) : (
-          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onDrop}>
-            Déposer
-          </button>
-        )}
-      </div>
+          {scripted ? (
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                setFailed(null);
+                // Its id drawn once: a tap replayed after a cut network answers the same script.
+                startScriptDrop({ id: dropId, requestId: request.id })
+                  .then((script) => {
+                    onOpenScript(script.drop.id);
+                  })
+                  .catch(() => {
+                    setFailed('Ton script n’a pas pu s’ouvrir : réessaie dans un instant.');
+                    setBusy(false);
+                  });
+              }}
+            >
+              Commencer
+            </button>
+          ) : (
+            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onDrop}>
+              Déposer
+            </button>
+          )}
+        </div>
+      ) : (
+        // Her drop for it still goes up (recette CRE-12): no second drop, she finishes the one on its way.
+        <p className="ct-card__meta">
+          Ton dépôt est en route : il compte dès qu’il est reçu. S’il s’arrête, touche « Reprendre l’envoi »
+          dans « En route ».
+        </p>
+      )}
       {failed === null ? null : (
         <p className="ct-card__blocked" role="alert">
           {failed}
@@ -433,6 +442,8 @@ function DropCard({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [unmatched, setUnmatched] = useState(0);
+  // A file picked again whose first bytes are not what it was declared as (recette CRE-12): never sent, said here.
+  const [notIt, setNotIt] = useState<string | null>(null);
   const tone = stateTone(drop);
   const refused = refusedOf(drop);
   const sending = drop.files.some((file) => {
@@ -500,7 +511,15 @@ function DropCard({
               event.target.value = '';
               const { pairs, unmatched: left } = matchResumed(interrupted, picked);
               setUnmatched(left);
-              for (const pair of pairs) void queueSend(drop.id, pair.fileId, pair.file, onSettled);
+              setNotIt(null);
+              for (const pair of pairs) {
+                const mime = interrupted.find((file) => file.id === pair.fileId)?.mime;
+                if (mime === undefined) continue;
+                void pickedHeadRefusal(pair.file, mime).then((refusal) => {
+                  if (refusal === null) void queueSend(drop.id, pair.fileId, pair.file, onSettled);
+                  else setNotIt(refusal);
+                });
+              }
             }}
           />
           {unmatched === 0 ? null : (
@@ -510,6 +529,7 @@ function DropCard({
                 : `${String(unmatched)} fichiers choisis ne sont pas de ce dépôt : choisis ceux que tu avais envoyés.`}
             </p>
           )}
+          {notIt === null ? null : <p className="ct-file__hint">{notIt}</p>}
         </div>
       )}
       {drop.state === 'blocked' && drop.blockedReason !== null ? (
