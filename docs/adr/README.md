@@ -131,4 +131,4 @@ Date : AAAA-MM-JJ
 | 0110 | L'agent tient compte des automatisations de Reveal | accepted (remplace la ligne « sans effet sur le bot » de l'inventaire du connecteur ; précise 0006, 0018, P3-10) |
 | 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
 | 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
-| 0125 | Le PC de l'agence se met à jour seul au démarrage du CRM, et le jeton Reveal se resynchronise seul | proposed (précise 0029 et 0087) |
+| 0125 | Le PC de l'agence se met à jour seul au démarrage du CRM, et le jeton Reveal se resynchronise seul | accepted (précise 0029 et 0087) |

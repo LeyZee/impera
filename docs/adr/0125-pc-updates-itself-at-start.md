@@ -1,6 +1,6 @@
 # 0125. Le PC de l'agence se met à jour seul au démarrage du CRM, et le jeton Reveal se resynchronise seul
 
-Statut : proposed (numéro attribué par le coordinateur le 16/11/2026 ; demande de Charles du 16/11/2026, 2 h 50 heure de Paris : ne plus dépendre de sa présence devant le PC pour les mises à jour ; relecture Sécurité et Extension, § 6 relu par Extension le 16/11)
+Statut : accepted (« ok 0125 » de Charles le 16/11/2026, 12 h 48 heure de Paris, fil de coordination ; numéro attribué par le coordinateur le 16/11/2026 ; demande de Charles du 16/11/2026, 2 h 50 heure de Paris : ne plus dépendre de sa présence devant le PC pour les mises à jour ; relecture Sécurité et Extension, § 6 relu par Extension le 16/11)
 Date : 2026-11-16
 Précise : l'ADR 0029 (sauvegarde chiffrée), l'ADR 0087 (rôle de service), la règle « jamais de migration destructive sans demande explicite » (CLAUDE.md § 12). Ne remplace aucune ADR.
 
