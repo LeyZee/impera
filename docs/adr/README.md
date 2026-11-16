@@ -132,4 +132,4 @@ Date : AAAA-MM-JJ
 | 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
 | 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
 | 0120 | Lire avant de publier : les statistiques du compte Instagram et les clics des liens de redirection, le retour sur un Reel, l'entonnoir d'acquisition | accepted (précise 0057, 0060, 0080, 0082, 0042 ; amende 0057 § 2 et 0060 § 2) |
-| 0132 | Paliers de dépense : l'IA plus proche et plus attentive avec les gros dépensiers, jamais plus pressante ; prix plus haut par branche de palier | proposed (précise 0085, 0086, 0088, 0128, 0131 ; amende 0112 § 2) |
+| 0132 | Paliers de dépense : l'IA plus proche et plus attentive avec les gros dépensiers, jamais plus pressante ; prix plus haut par branche de palier | accepted (précise 0085, 0086, 0088, 0128, 0131 ; amende 0112 § 2) |

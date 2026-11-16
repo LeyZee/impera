@@ -1,8 +1,8 @@
 # 0132. Paliers de dépense : l'IA est plus proche et plus attentive avec ceux qui ont beaucoup dépensé, jamais plus pressante ; un prix plus haut par une branche de palier
 
-Statut : proposed (fil « Adapter l'IA aux gros dépensiers », 16/11/2026 ; demande de Charles du 16/11/2026 à 13 h 56 ; attend « ok 0132 »)
+Statut : accepted (« ok 0132 » de Charles le 16/11/2026 à 15 h 38, heures de Paris dans tout le texte, fil « Adapter l'IA aux gros dépensiers » ; demande de Charles du 16/11/2026 à 14 h 56 ; relue par Agent, Bilan et Scripts à branches)
 Date : 2026-11-16
-Précise : ADR 0085 (fiche du fan, § 4 la tête lue chez la plateforme, § 9 la proposition « fragile »), ADR 0086 (panneau copilote), ADR 0088 (mode soin), ADR 0098 et 0112 (scripts, branches selon la dépense), ADR 0021 (rester en personnage), ADR 0063 (ce que voit la créatrice), ADR 0131 (goûts du fan), ADR 0128 (ménager les scripts). **Amende l'ADR 0112 § 2** (« jamais les mêmes médias à deux prix ») pour la seule branche de palier du § 12 bis, sur décision de Charles du 16/11/2026 à 14 h 10.
+Précise : ADR 0085 (fiche du fan, § 4 la tête lue chez la plateforme, § 9 la proposition « fragile »), ADR 0086 (panneau copilote), ADR 0088 (mode soin), ADR 0098 et 0112 (scripts, branches selon la dépense), ADR 0021 (rester en personnage), ADR 0063 (ce que voit la créatrice), ADR 0131 (goûts du fan), ADR 0128 (ménager les scripts). **Amende l'ADR 0112 § 2** (« jamais les mêmes médias à deux prix ») pour la seule branche de palier du § 12 bis, sur décision de Charles du 16/11/2026 à 15 h 10.
 
 ## Contexte
 
@@ -25,7 +25,7 @@ La méthode de l'agence pose des règles que ce sujet ne doit pas casser : la re
 
 2. **Les listes intelligentes de Reveal** (dont celle qui range un fan parmi les gros dépensiers) ne sont **jamais** la source du palier : leurs règles sont réglées chez Reveal, hors d'Impera, et peuvent changer sans qu'on le sache. Le connecteur ne les lit pas aujourd'hui (seul indice relevé : un filtre de la liste des conversations par liste) ; les lire demande une capture dédiée (profil d'un fan qui appartient à une liste, puis l'écran des listes), lancée seulement à la demande de Charles. Une fois lisibles, elles s'affichent en lecture sur la fiche, à côté du palier.
 
-3. **Dépense à vie.** Le palier se calcule sur toute la dépense du fan chez la créatrice, comme Reveal l'affiche (Charles, 16/11/2026 à 14 h 15). Il ne redescend que si un remboursement fait passer la dépense sous le seuil.
+3. **Dépense à vie.** Le palier se calcule sur toute la dépense du fan chez la créatrice, comme Reveal l'affiche (Charles, 16/11/2026 à 15 h 15). Il ne redescend que si un remboursement fait passer la dépense sous le seuil.
 
 ### B. Les paliers, réglés par créatrice
 
@@ -59,9 +59,9 @@ Le palier ne change que la façon d'être avec lui. Chaque effet est soit une va
     - **La persona** : ses limites, dégoûts et règles strictes (ADR 0079) restent le plafond ; aucun registre ni consigne ne les élargit.
     - **La sécurité** : âge, mineur possible, mode soin (ADR 0088), drapeaux du fan, budget IA, tout reste au-dessus du palier.
 
-12 bis. **Prix plus haut par palier** (décision de Charles, carte du 16/11/2026 à 14 h 10 ; amende l'ADR 0112 § 2). Règles :
+12 bis. **Prix plus haut par palier** (décision de Charles, carte du 16/11/2026 à 15 h 10 ; amende l'ADR 0112 § 2). Règles :
     1. Le prix plus haut passe **seulement par une branche de palier** du script, posée chez la plateforme avec son prix. La branche porte la condition `spender_tier_at_least { tierId }`, ajoutée à la liste fermée de l'ADR 0112 § 5 à côté de `spent_at_least` : l'agence change un seuil, les branches suivent. Un palier supprimé laisse le script proposable par sa branche par défaut : avertissement ambre `branch_tier_unknown` à l'écran (« Palier supprimé : cette branche n'est plus jamais choisie »), pas un manque, et la branche n'est jamais choisie.
-    1 bis. **Saisie à la création du script dans Impera** (Charles, 16/11/2026 à 14 h 11) : dans l'éditeur de script (ADR 0112, lot 4 des branches), chaque étape payante a son **prix normal** et, pour chaque palier choisi, un **prix gros dépensier** facultatif, côte à côte. **Impera ne crée ni ne modifie de script chez Reveal** (aucune capture d'écriture ; l'ouvrir demande une ADR de connecteur à part) : l'éditeur prépare les deux branches, l'agence pose chez Reveal la copie de l'étape au prix gros dépensier, et l'import (ADR 0099) la rattache comme branche de palier. Une branche préparée sans sa copie chez Reveal est un manque à l'écran, et le fan reçoit la branche par défaut. Le prix décidé est celui de chaque branche : « prix changé ou remise chez Reveal = bloquer et alerter » (ADR 0098 § 5) compare chaque branche à son propre prix et reste inchangée.
+    1 bis. **Saisie à la création du script dans Impera** (Charles, 16/11/2026 à 15 h 11) : dans l'éditeur de script (ADR 0112, lot 4 des branches), chaque étape payante a son **prix normal** et, pour chaque palier choisi, un **prix gros dépensier** facultatif, côte à côte. **Impera ne crée ni ne modifie de script chez Reveal** (aucune capture d'écriture ; l'ouvrir demande une ADR de connecteur à part) : l'éditeur prépare les deux branches, l'agence pose chez Reveal la copie de l'étape au prix gros dépensier, et l'import (ADR 0099) la rattache comme branche de palier. Une branche préparée sans sa copie chez Reveal est un manque à l'écran, et le fan reçoit la branche par défaut. Le prix décidé est celui de chaque branche : « prix changé ou remise chez Reveal = bloquer et alerter » (ADR 0098 § 5) compare chaque branche à son propre prix et reste inchangée.
     2. Une branche de palier **peut reprendre les médias de la branche par défaut** de la même étape (c'est l'amendement de 0112 § 2, et l'exception à `media_twice` entre branches d'un rang). Plusieurs branches de palier peuvent reprendre les mêmes médias ; un palier plus haut n'est jamais moins cher qu'un palier plus bas, sinon c'est un manque. Toute autre paire de branches garde la règle : jamais les mêmes médias à deux prix.
     3. Le prix d'une branche de palier est **strictement plus cher** que celui de la branche par défaut et **au plus trois fois** celui-ci. Le prix étant posé chez Reveal puis importé, le contrôle est un manque du script recalculé à chaque import (`branch_tier_price_out_of_range`) : le script n'est pas proposable tant qu'il existe.
     4. **Jamais de retour au prix de base** pour un fan qui refuse le prix de son palier : ce serait une remise. Le refus suit la règle de tous (refus final, pas de prix réduit).
@@ -95,8 +95,8 @@ Le palier ne change que la façon d'être avec lui. Chaque effet est soit une va
 
 ## Questions à Charles (toutes tranchées)
 
-1. ~~Prix plus hauts pour les gros dépensiers~~ : **tranché par Charles le 16/11/2026 à 14 h 10, oui** (§ 12 bis), contre la recommandation (risque de perte de confiance des meilleurs clients s'ils comparent les prix), avec les règles du § 12 bis pour le limiter.
-2. ~~Dépense à vie ou récente~~ : **tranché par Charles le 16/11/2026 à 14 h 15, à vie** (§ 3).
+1. ~~Prix plus hauts pour les gros dépensiers~~ : **tranché par Charles le 16/11/2026 à 15 h 10, oui** (§ 12 bis), contre la recommandation (risque de perte de confiance des meilleurs clients s'ils comparent les prix), avec les règles du § 12 bis pour le limiter.
+2. ~~Dépense à vie ou récente~~ : **tranché par Charles le 16/11/2026 à 15 h 15, à vie** (§ 3).
 
 ## Conséquences
 
