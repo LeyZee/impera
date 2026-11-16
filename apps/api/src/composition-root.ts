@@ -447,20 +447,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const backups = wireBackups(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
   const aiUsage = wireAiUsage(shared, llm);
-  const mcp = wireMcp(
-    shared,
-    shiftCreators,
-    persona.module,
-    fans.module,
-    {
-      drops: contentDrops.module,
-      scripts: scripts.module,
-    },
-    scheduling.module,
-    aiUsage.module,
-    connectors.module,
-    payroll.module,
-  );
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
     persona: persona.module,
@@ -478,6 +464,21 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     jobNames: () => Object.keys(tasks),
     salesFeeds: connectors.module.salesFeedStates,
   });
+  const mcp = wireMcp(
+    shared,
+    shiftCreators,
+    persona.module,
+    fans.module,
+    {
+      drops: contentDrops.module,
+      scripts: scripts.module,
+    },
+    scheduling.module,
+    aiUsage.module,
+    connectors.module,
+    payroll.module,
+    supervision.module,
+  );
 
   const modules: Modules = {
     alerts: alerts.module,

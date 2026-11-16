@@ -18,7 +18,7 @@ import { startOfLocalDay } from '@impera/llm';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
-import { agencyInsights, agencyRange, type AgencyCreatorRead } from '../../domain/agency-insights';
+import { readAgencyInsights } from '../../application/agency-reads';
 import { creatorOverview, fortnightDays } from '../../domain/creators-overview';
 import {
   assembleDashboard,
@@ -162,41 +162,26 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
         const { period, creatorId } = request.query;
         const { user } = request;
         if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
-        const userId = UserIdSchema.parse(user.id);
-        const every = await deps.allCreatorIds();
-        let asked: readonly CreatorId[];
-        if (creatorId !== undefined) {
-          if (user.role !== 'owner' && !user.creatorIds.includes(creatorId)) {
-            throw new DomainError('creator_forbidden', 'Créatrice hors de ton périmètre');
-          }
-          asked = [creatorId];
-        } else {
-          // The agency's order (Créatrices), restricted to the account's own list for anyone but the owner.
-          asked = user.role === 'owner' ? every : every.filter((id) => user.creatorIds.includes(id));
+        const answer = await readAgencyInsights(
+          deps,
+          {
+            userId: UserIdSchema.parse(user.id),
+            role: user.role,
+            creatorIds: user.creatorIds.map((id) => CreatorIdSchema.parse(id)),
+          },
+          period,
+          creatorId,
+        );
+        if (answer.kind === 'creator_out_of_scope') {
+          throw new DomainError('creator_forbidden', 'Créatrice hors de ton périmètre');
         }
-        const now = (deps.now ?? (() => new Date()))();
-        const range = agencyRange(period, now, deps.agencyTimeZone);
-        // One tenant transaction per creator (RLS), one after the other: a read holds one connection of the pool.
-        const reads: AgencyCreatorRead[] = [];
-        let outOfScope = 0;
-        for (const id of asked) {
-          const answer = await deps.agency.read(id, userId, range);
-          if (answer.kind === 'out_of_scope') outOfScope += 1;
-          if (answer.kind === 'read') reads.push(answer.read);
-        }
-        // Nothing read with the team's scope: these figures are not his (ADR 0043 § 7).
-        if (user.role !== 'owner' && (asked.length === 0 || outOfScope === asked.length)) {
+        if (answer.kind === 'team_out_of_scope') {
           throw new DomainError(
             'creator_forbidden',
             'Les chiffres de l’agence ne sont pas dans ton périmètre',
           );
         }
-        const [first] = reads;
-        const [names, rate] = await Promise.all([
-          first === undefined ? new Map<string, string>() : deps.agency.memberNames(first.creatorId, userId),
-          deps.usdRate.latest(userId),
-        ]);
-        return agencyInsights({ period, range, creators: reads, names, rate, timeZone: deps.agencyTimeZone });
+        return answer.insights;
       },
     );
 

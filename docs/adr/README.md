@@ -135,3 +135,4 @@ Date : AAAA-MM-JJ
 | 0120 | Lire avant de publier : les statistiques du compte Instagram et les clics des liens de redirection, le retour sur un Reel, l'entonnoir d'acquisition | accepted (précise 0057, 0060, 0080, 0082, 0042 ; amende 0057 § 2 et 0060 § 2) |
 | 0131 | Choisir le script qui colle aux goûts du fan : familles de fantasme, goûts des scripts et de la fiche, le code classe et l'IA choisit | accepted (précise 0098 § 6, 0056 § 6, 0085 et 0112 § 5) |
 | 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
+| 0144 | Le MCP suit le CRM de novembre : coffre, branches, Playground, copilote, semaine de la créatrice, trophées et liens, en lecture seule | accepted (précise 0105 § 4) |
