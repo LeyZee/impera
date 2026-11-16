@@ -180,6 +180,9 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
       await screen.findByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
     ).toBeDefined();
     expect(screen.queryByText(/^Seul le compte propriétaire/u)).toBeNull();
+    // What is sent again is what was read: the percentage and the day are locked meanwhile.
+    expect(screen.getByLabelText('Pourcentage de l’agence')).toHaveProperty('disabled', true);
+    expect(screen.getByLabelText('À partir du')).toHaveProperty('disabled', true);
     type('Mot de passe', 'mot-de-passe-invente');
     type('Code à 6 chiffres ou de secours', '123456');
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));

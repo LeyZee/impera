@@ -277,13 +277,13 @@ function PeriodView({
       async (): Promise<HoldResult> => {
         const { done, refused, halted, unconfirmed } = await run(batch);
         if (unconfirmed.length > 0) {
-          // Asked at once, the island says it too: « Confirmer » there opens the prompt again after « Annuler ».
+          // The island says it, and its « Confirmer » opens the prompt: never both at once, the island would cover
+          // the dialog's fields on a phone.
           const again = () => {
             confirm.ask(() => {
               hold(unconfirmed);
             });
           };
-          again();
           return {
             ok: false,
             title:
@@ -586,7 +586,7 @@ function PeriodView({
         />
       )}
       {confirm.asking ? (
-        <Dialog title="Valider les relevés" lead="Mot de passe et code" onClose={confirm.cancel}>
+        <Dialog title="Valider les relevés" onClose={confirm.cancel}>
           <div className="tm-dialog__body nv-swap">{confirm.prompt({ lead: MONEY_LEAD })}</div>
         </Dialog>
       ) : null}

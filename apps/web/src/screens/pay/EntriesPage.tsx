@@ -194,7 +194,7 @@ export function EntriesPage({
         </Panel>
       </div>
       {confirm.asking ? (
-        <Dialog title="Annuler la saisie" lead="Mot de passe et code" onClose={confirm.cancel}>
+        <Dialog title="Annuler la saisie" onClose={confirm.cancel}>
           <div className="tm-dialog__body nv-swap">{confirm.prompt({ lead: MONEY_LEAD })}</div>
         </Dialog>
       ) : null}

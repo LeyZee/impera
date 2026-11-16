@@ -1099,7 +1099,13 @@ describe('Paie › Quinzaine', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000);
     });
+    // The island says it first, alone: a dialog opened beside it would sit under it on a phone.
+    const island = (await screen.findByText('Rien n’a été validé')).closest('.rp-island');
+    if (!(island instanceof HTMLElement)) throw new Error('no island');
+    expect(screen.queryByRole('dialog', { name: 'Valider les relevés' })).toBeNull();
+    fireEvent.click(within(island).getByRole('button', { name: 'Confirmer' }));
     const dialog = await screen.findByRole('dialog', { name: 'Valider les relevés' });
+    expect(screen.queryByText('Rien n’a été validé')).toBeNull();
     expect(
       within(dialog).getByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
     ).toBeTruthy();

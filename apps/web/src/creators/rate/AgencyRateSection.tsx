@@ -232,7 +232,8 @@ function RateSheet({
                   inputMode="decimal"
                   autoComplete="off"
                   value={percent}
-                  disabled={saving}
+                  // Locked while the password and the code are asked: what is sent again is what was read.
+                  disabled={saving || confirm.asking}
                   aria-invalid={percentWrong}
                   aria-describedby={percentWrong ? `${id}-percent-error` : undefined}
                   onChange={(event) => {
@@ -263,7 +264,7 @@ function RateSheet({
                 id={`${id}-day`}
                 className="ps-input"
                 value={fromDay}
-                disabled={saving}
+                disabled={saving || confirm.asking}
                 invalid={dayWrong}
                 describedBy={dayWrong ? `${id}-day-error` : undefined}
                 onChange={(next) => {
