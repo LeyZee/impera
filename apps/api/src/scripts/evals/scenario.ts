@@ -1,4 +1,10 @@
-import { DesireBandSchema, ObjectionKindSchema, ObjectionReplyIdSchema } from '@impera/contracts';
+import {
+  DesireBandSchema,
+  ObjectionKindSchema,
+  ObjectionReplyIdSchema,
+  SocialAccountPlatformSchema,
+  SocialAccountUsageSchema,
+} from '@impera/contracts';
 import { BRAIN_ALERTS_MAX, BriefSchema, JudgeCriterionSchema, SCRIPT_REPLIES } from '@impera/llm';
 import { parse } from 'yaml';
 import { z } from 'zod';
@@ -128,6 +134,8 @@ const ScenarioSchema = z
         availability: z.enum(['confirmed', 'unknown', 'no']).default('unknown'),
         /** A message of his sexualized a few minutes ago, in this session (the gate before a script). */
         sexualized: z.boolean().default(false),
+        /** She already pointed him to her practice within the cooldown (ADR 0143, bound 23). */
+        oriented_recently: z.boolean().default(false),
       })
       .strict()
       .prefault({}),
@@ -150,6 +158,22 @@ const ScenarioSchema = z
       .refine((list) => new Set(list.map((a) => a.name)).size === list.length, 'alert name repeated')
       .default([]),
     scripts: ScriptsSchema.optional(),
+    /**
+     * « Ses comptes » (ADR 0143 § C), made up: never a real name. `shareable`: marked « l'agent peut le donner »; the
+     * others only reach the guard, which blocks them.
+     */
+    accounts: z
+      .array(
+        z
+          .object({
+            platform: SocialAccountPlatformSchema,
+            username: z.string().min(1),
+            usage: SocialAccountUsageSchema,
+            shareable: z.boolean().default(true),
+          })
+          .strict(),
+      )
+      .default([]),
     /** His message, or several in a row since her last answer. */
     inbound: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
     /**
@@ -196,6 +220,11 @@ const ScenarioSchema = z
               .optional(),
             /** The step decided, by its index, and of which script (`start`, `send_step`). */
             script_step: z.object({ script: ScriptRef, index: z.int().nonnegative() }).strict().optional(),
+            /**
+             * What code decided about her accounts (ADR 0143 § 8, 10): `stage_name`, she says to type her stage name;
+             * `give`, one account; `orient`, one account and her practice's offer; `none`, nothing.
+             */
+            account: z.enum(['none', 'stage_name', 'give', 'orient']).optional(),
           })
           .strict()
           .optional(),

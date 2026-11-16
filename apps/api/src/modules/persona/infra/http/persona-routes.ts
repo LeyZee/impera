@@ -11,6 +11,8 @@ import {
   PersonaOverviewSchema,
   PersonaVersionSummarySchema,
   ProposePersonaCorrectionBodySchema,
+  PutSocialAccountsBodySchema,
+  SocialAccountListSchema,
   type CreatorId,
   type CurrentUser,
 } from '@impera/contracts';
@@ -21,6 +23,7 @@ import { z } from 'zod';
 import type { PersonaCorrectionStore } from '../../domain/corrections';
 import { withoutObjectionReplies } from '../../domain/redact';
 import { answersOf, sheetOf } from '../../domain/sheet';
+import type { SocialAccountStore } from '../../domain/social-accounts';
 import type { PersonaVersionStore } from '../../domain/versions';
 
 import type { RequireRole } from './routes';
@@ -50,6 +53,7 @@ export function createPersonaRoutes(
   corrections: PersonaCorrectionStore,
   requireRole: RequireRole,
   recentLogin: preValidationAsyncHookHandler,
+  socialAccounts: SocialAccountStore,
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.get(
@@ -169,6 +173,38 @@ export function createPersonaRoutes(
         const { creatorId, correctionId } = request.params;
         const user = actorFor(request, creatorId);
         return corrections.markDone(creatorId, correctionId, user.id);
+      },
+    );
+
+    app.get(
+      '/creators/:creatorId/social-accounts',
+      {
+        // « Ses comptes » (ADR 0143 § 7): the owner and an active manager read them; never her account nor a chatter.
+        preValidation: requireRole('owner', 'operator'),
+        schema: { params: CreatorParamsSchema, response: { 200: SocialAccountListSchema } },
+      },
+      async (request) => {
+        const { creatorId } = request.params;
+        const user = actorFor(request, creatorId);
+        return { accounts: [...(await socialAccounts.list(creatorId, user.id))] };
+      },
+    );
+
+    app.put(
+      '/creators/:creatorId/social-accounts',
+      {
+        // The owner alone, after a recent sign-in: what the agent may give a fan (ADR 0143 § 20), each change audited.
+        preValidation: [requireRole('owner'), recentLogin],
+        schema: {
+          params: CreatorParamsSchema,
+          body: PutSocialAccountsBodySchema,
+          response: { 200: SocialAccountListSchema },
+        },
+      },
+      async (request) => {
+        const { creatorId } = request.params;
+        const user = actorFor(request, creatorId);
+        return { accounts: [...(await socialAccounts.replace(creatorId, request.body, user.id))] };
       },
     );
     return Promise.resolve();

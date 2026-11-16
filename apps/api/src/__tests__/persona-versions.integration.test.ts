@@ -340,7 +340,7 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     expect(body.sheet?.limits).toEqual(
       active === null || 'sheet' in active.persona ? null : active.persona.limits,
     );
-    // Her seven panels at format 2, never the agent's settings (ADR 0079 § 6).
+    // Her seven panels at format 2 and her practices (ADR 0143), never the agent's settings (ADR 0079 § 6).
     expect(Object.keys(body.answers ?? {})).toEqual([
       'identity',
       'lifestyle',
@@ -349,6 +349,7 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
       'relationships',
       'intimacy',
       'boundaries',
+      'practices',
     ]);
     expect(Object.keys(body.sheet ?? {})).not.toContain('strategies');
     expect((await mine(bea, creator)).statusCode).toBe(403);

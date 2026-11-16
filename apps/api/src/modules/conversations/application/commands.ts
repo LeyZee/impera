@@ -353,6 +353,13 @@ export function createConversationCommands({
     async approveDraft(input) {
       // Her guards, from her active persona, read before the transaction: no second connection held inside it.
       const herGuard = await guard.forCreator(input.creatorId);
+      // The account the agent's draft gave him, read again with his limits as they are now (ADR 0143 bound 21).
+      const shared = await uow.inTenant(input.creatorId, async (tx) => ({
+        fanId: (await lockConversation(tx, input.conversationId)).fanId,
+        usage: await tx.events.accountShared(input.conversationId, input.draftId),
+      }));
+      const fanCut =
+        shared.usage === null ? false : accountCutBy(await fans.flags(input.creatorId, shared.fanId));
       await uow.inTenant(input.creatorId, async (tx) => {
         const conversation = await lockConversation(tx, input.conversationId);
         const isEdited = input.bubbles !== undefined;
@@ -376,6 +383,10 @@ export function createConversationCommands({
             text: message.text,
           })),
           care: conversation.careSince !== null,
+          account:
+            shared.usage === null
+              ? null
+              : { usage: shared.usage, cut: fanCut || conversation.careSince !== null },
         });
         if (verdict.isBlocked) throw new DraftGuarded(verdict.codes);
         const meta = humanMeta(input);
@@ -687,4 +698,9 @@ export function createConversationCommands({
       });
     },
   };
+}
+
+/** His limits that let no account of hers leave (ADR 0143 § 16, bound 21): not to contact, sales frozen, age in doubt. */
+function accountCutBy(flags: Awaited<ReturnType<FanDirectory['flags']>>): boolean {
+  return flags.doNotContact === true || flags.salesFrozen !== undefined || flags.ageDisputed !== undefined;
 }

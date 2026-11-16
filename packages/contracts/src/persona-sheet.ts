@@ -313,6 +313,60 @@ export const PersonaBoundariesSchema = z.strictObject({
   off_limits: long,
 });
 
+/** « Ses pratiques et savoir-faire » (ADR 0143 § 1): at most five, each kept whole within a wider limit. */
+export const PRACTICES_MAX = 5;
+export const PRACTICE_MAX_CHARS = 8000;
+export const PRACTICE_TERMS_MAX = 30;
+
+/**
+ * One practice she masters and speaks of in her own words (ADR 0143 § A): read by the model in its own block, never
+ * with her intimacy, and only when the fan speaks of it. `terms` are the words the code looks for in his message.
+ */
+const PracticeFieldsSchema = z.strictObject({
+  name: z.string().trim().min(1).max(80),
+  /** The words that name it, hers or a fan's: the code finds the practice in his message by them and by its name. */
+  terms: z.array(z.string().trim().min(2).max(40)).max(PRACTICE_TERMS_MAX).default([]),
+  /** Her level, her role, since when. */
+  level: long,
+  /** How she speaks of it and what it means to her: why, in which circumstances. */
+  how_she_talks: long,
+  /** Her words and what they mean. */
+  vocabulary: long,
+  /** What she respects: her safety, her frame. */
+  what_she_respects: long,
+  anecdotes: long,
+  /** What she offers around it (workshops, sessions…) and to whom. */
+  offers: long,
+  /** What to answer someone curious, a beginner, a fan who wants to try. */
+  answers: long,
+  never_says: long,
+  /** Sexual for her or not: « non » by default, and a practice that is not is never sexualized by the model. */
+  sexual: z.boolean().default(false),
+});
+
+/** The characters of one practice, its name, its words and its free answers together. */
+export function practiceLength(practice: z.infer<typeof PracticeFieldsSchema>): number {
+  const { level, how_she_talks, vocabulary, what_she_respects, anecdotes, offers, answers, never_says } =
+    practice;
+  const answered = [
+    level,
+    how_she_talks,
+    vocabulary,
+    what_she_respects,
+    anecdotes,
+    offers,
+    answers,
+    never_says,
+  ];
+  return [practice.name, ...practice.terms, ...answered].reduce((sum, text) => sum + (text?.length ?? 0), 0);
+}
+
+export const PersonaPracticeSchema = PracticeFieldsSchema.refine(
+  (practice) => practiceLength(practice) <= PRACTICE_MAX_CHARS,
+  { message: `Une pratique tient en ${String(PRACTICE_MAX_CHARS)} caractères au plus` },
+);
+export type PersonaPractice = z.infer<typeof PersonaPracticeSchema>;
+
 /** The seven panels of the sheet, under their keys. */
 export const PersonaSheetSchema = z.strictObject({
   identity: PersonaIdentitySchema,
@@ -322,6 +376,8 @@ export const PersonaSheetSchema = z.strictObject({
   relationships: PersonaRelationshipsSchema,
   intimacy: PersonaIntimacySchema,
   boundaries: PersonaBoundariesSchema,
+  /** « Ses pratiques et savoir-faire » (ADR 0143): outside her intimacy; a version stored before reads none. */
+  practices: z.array(PersonaPracticeSchema).max(PRACTICES_MAX).default([]),
 });
 export type PersonaSheet = z.infer<typeof PersonaSheetSchema>;
 
@@ -638,6 +694,7 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
         no_go_zones: fit('intimacy', 'no_go_zones', limitsText, SHEET_LONG_MAX),
       },
       boundaries: { off_limits: null },
+      practices: [],
     },
     agent: {
       strategies: v1.strategies,

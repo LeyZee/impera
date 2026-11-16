@@ -1,0 +1,27 @@
+# Ses comptes (ADR 0143 § 8) : il cherche ses lives ; le compte marqué pour cet usage sort, et lui seul. Persona, comptes, fan et messages fictifs (ADR 0010).
+description: Il demande si elle fait des lives ; elle donne son compte de lives marqué, jamais l'autre, sans lien.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Théo (fictif)'
+situation:
+  known_hours: 24
+accounts:
+  - { platform: tiktok, username: demo.lives, usage: lives }
+  - { platform: instagram, username: demo_perso, usage: personal, shareable: false }
+history:
+  - from: creator
+    text: J'adore papoter le soir 😊
+inbound: Tu fais des lives sur tiktok ?
+expect:
+  decision:
+    handoff: false
+    offer: false
+    account: give
+  voice:
+    bubbles_max: 4
+    must_match_any:
+      - demo\.lives
+    must_not_match:
+      - demo_perso
+      - https?://

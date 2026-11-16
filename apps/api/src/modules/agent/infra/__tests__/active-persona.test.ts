@@ -96,6 +96,39 @@ describe('startBubbleGuard, at approval (recette G4)', () => {
   });
 });
 
+describe('startBubbleGuard, her accounts at approval (ADR 0143 bound 21)', () => {
+  const lives = { platform: 'tiktok', username: 'demo.lives', usage: 'lives' } as const;
+  const hersWith = (shareable: readonly (typeof lives)[]) =>
+    startBubbleGuard({
+      activePersona: sourceOf(DEMO),
+      socialAccounts: () => Promise.resolve({ shareable, usernames: ['demo.lives', 'demo_perso'] }),
+      now: () => NOW,
+    }).forCreator('creator-1');
+  const answer = ['tape demo.lives sur tiktok 😊'];
+  const blocked = { isBlocked: true, codes: ['contact_info'] };
+
+  it('lets the account the draft gave pass, for its use, while nothing cuts it', async () => {
+    const hers = await hersWith([lives]);
+    expect(hers?.check(answer, {}, false, { usage: 'lives', cut: false })).toEqual({
+      isBlocked: false,
+      codes: [],
+    });
+  });
+
+  it('blocks it when he is cut since the draft, when her switch was turned off, or with no account given', async () => {
+    const hers = await hersWith([lives]);
+    expect(hers?.check(answer, {}, false, { usage: 'lives', cut: true })).toMatchObject(blocked);
+    expect(hers?.check(answer, {}, false, null)).toMatchObject(blocked);
+    expect(hers?.check(answer)).toMatchObject(blocked);
+    const off = await hersWith([]);
+    expect(off?.check(answer, {}, false, { usage: 'lives', cut: false })).toMatchObject(blocked);
+    // A human edit naming another account of hers, on a draft that gave one.
+    expect(
+      hers?.check(['mon perso c’est demo_perso'], {}, false, { usage: 'lives', cut: false }),
+    ).toMatchObject(blocked);
+  });
+});
+
 describe('startKycSlots (recette G4)', () => {
   it('gives the lines her active version collects, none read without one', async () => {
     expect(await startKycSlots({ activePersona: sourceOf(DEMO), now: () => NOW })('creator-1')).toEqual([

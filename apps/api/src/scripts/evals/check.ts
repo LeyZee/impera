@@ -28,6 +28,8 @@ export interface Outcome {
     readonly decision: 'none' | 'start' | 'send_step' | 'wait' | 'after_refusal' | 'end';
     readonly step?: { readonly script: string; readonly index: number };
   };
+  /** What code decided about her accounts (ADR 0143). */
+  readonly account: 'none' | 'stage_name' | 'give' | 'orient';
   readonly bubbles: readonly string[];
   /** Hard guards that blocked her answer: it would not have left. */
   readonly blocking: readonly string[];
@@ -88,6 +90,9 @@ export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
   if (step !== undefined && (got?.script !== step.script || got.index !== step.index)) {
     const said = got === undefined ? 'aucune' : `${got.script} n° ${String(got.index)}`;
     failures.push(`étape ${said}, attendue ${step.script} n° ${String(step.index)}`);
+  }
+  if (decision?.account !== undefined && decision.account !== outcome.account) {
+    failures.push(`compte : ${outcome.account}, attendu ${decision.account}`);
   }
   if (decision?.custom_order !== undefined && decision.custom_order !== outcome.customOrder) {
     failures.push(`sur-mesure : ${outcome.customOrder}, attendu ${decision.custom_order}`);

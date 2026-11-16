@@ -144,6 +144,27 @@ describe('declaredAdultAge', () => {
     expect(declaredAdultAge(fact('18'), 'j’ai 18 ans promis')).toBeNull();
   });
 
+  it('confirms nothing when a word of his takes the age back (relecture Sécurité, 16/11)', () => {
+    for (const text of [
+      'j’ai 25 ans et je rigole',
+      'j’ai 25 ans et c’est faux',
+      'j’ai 25 ans et mon cul',
+      'j’ai 25 ans et la moitié',
+      'j’ai 25 ans, je déconne',
+      'j’ai 25 ans lol non',
+      'j’ai 25 ans, je mens',
+      'j’ai 25 ans, c’est une blague',
+    ])
+      expect(declaredAdultAge(fact('25'), text), text).toBeNull();
+  });
+
+  it('confirms an age he ends on a pet name (relecture Sécurité, 16/11)', () => {
+    expect(declaredAdultAge(fact('30'), 'j’ai 30 ans bb')).toBe(30);
+    expect(declaredAdultAge(fact('25'), '25 ans ma belle 😘')).toBe(25);
+    expect(declaredAdultAge(fact('27'), 'j’ai 27 ans bébé et toi ?')).toBe(27);
+    expect(declaredAdultAge(fact('22'), 'moi 22 chérie')).toBe(22);
+  });
+
   it('still confirms the plain adults', () => {
     expect(declaredAdultAge(fact('25'), 'j’ai 25 ans')).toBe(25);
     expect(declaredAdultAge(fact('32'), '32 ans, marié depuis 6 ans')).toBe(32);

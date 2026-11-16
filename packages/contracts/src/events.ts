@@ -45,6 +45,7 @@ import { BankedObjectionKindSchema, ObjectionReplyIdSchema } from './objections'
 import { PayPeriodSchema } from './pay-periods';
 import { SaleSellerSchema, SaleTypeSchema, SalesFeedSignalSchema } from './sales-feed';
 import { SecurityAlertPayloadSchema } from './security';
+import { SocialAccountUsageSchema } from './social-accounts';
 
 /**
  * The closed list of event types (data-model.md) and their payloads (camelCase, never media content, never a
@@ -236,6 +237,7 @@ export const EVENT_TYPES = [
   'alert_triggered',
   'custom_order_opened',
   'objection_reply_used',
+  'account_shared',
   'reply_skipped',
   'reply_deferred',
   'desire_scored',
@@ -376,6 +378,16 @@ export const EVENT_PAYLOADS = {
     conversationId: ConversationIdSchema,
     objection: BankedObjectionKindSchema,
     replyId: ObjectionReplyIdSchema,
+  }),
+  /**
+   * The agent's draft gave him one of her accounts, or pointed him to her practice's (`orient`, ADR 0143 § 13): its
+   * use only, never its name. The team reads it; the approval reads it again (bound 21); the orientation waits 30 days.
+   */
+  account_shared: z.object({
+    conversationId: ConversationIdSchema,
+    draftId: DraftIdSchema,
+    usage: SocialAccountUsageSchema,
+    orient: z.boolean(),
   }),
   /**
    * The engine answered nothing: the conversation goes back to `idle`. `llm_unavailable` is only read from older
@@ -741,6 +753,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('alert_triggered'),
   typedEvent('custom_order_opened'),
   typedEvent('objection_reply_used'),
+  typedEvent('account_shared'),
   typedEvent('reply_skipped'),
   typedEvent('reply_deferred'),
   typedEvent('desire_scored'),

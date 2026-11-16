@@ -1,10 +1,12 @@
-import type { KycSlot } from '@impera/contracts';
+import type { KycSlot, SocialAccountUsage } from '@impera/contracts';
 import { loadPrompt, type LlmGateway } from '@impera/llm';
 
 import type { FansModule } from '../fans';
 
+import type { ShareableAccount } from './domain/accounts';
+import type { GuardCode, GuardContext } from './domain/guards';
 import { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
-import { createBubbleGuard, type AgentBubbleGuard } from './infra/bubble-guard';
+import { createBubbleGuard } from './infra/bubble-guard';
 import { createCardReader, type AgentCardReader } from './infra/card-reader';
 import {
   createDraftComposer,
@@ -107,6 +109,8 @@ export type { AgentBubbleGuard } from './infra/bubble-guard';
 
 export interface DraftComposerStartOptions {
   readonly gateway: LlmGateway;
+  /** « Ses comptes » as the agent reads them (ADR 0143); absent, none is given and none of her names may leave. */
+  readonly socialAccounts?: DraftComposerDeps['socialAccounts'];
   /**
    * Her active persona version (`persona` module, `versions.active`), read at each draft: the agent writes with the
    * one the owner activated in Créatrices › Persona. Without one, nothing is written and a human answers (ADR 0022).
@@ -142,6 +146,7 @@ function composerFields(persona: PersonaForModels): ComposerPersonaFields {
       personaSheet: persona.personaSheet,
       guardSettings: guardSettingsOf(persona),
       splitMessages: persona.splitMessages,
+      ...(persona.practices !== undefined && { practices: persona.practices }),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,
@@ -171,6 +176,7 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     ...(options.onLimitsNotSaved !== undefined && { onLimitsNotSaved: options.onLimitsNotSaved }),
     ...(options.alertsOf !== undefined && { alertsOf: options.alertsOf }),
     ...(options.chatterOnShift !== undefined && { chatterOnShift: options.chatterOnShift }),
+    ...(options.socialAccounts !== undefined && { socialAccounts: options.socialAccounts }),
   });
 }
 
@@ -222,7 +228,18 @@ export function startKycSlots(options: {
 
 /** The guards of a creator's approvals: her active version's hard limits, `null` without one (fail closed). */
 export interface AgentApprovalGuard {
-  forCreator(creatorId: string): Promise<AgentBubbleGuard | null>;
+  forCreator(creatorId: string): Promise<AgentApprovalCheck | null>;
+}
+
+/** One creator's approval guards, with the account a draft gave, read again at the approval (ADR 0143 bound 21). */
+interface AgentApprovalCheck {
+  check(
+    bubbles: readonly string[],
+    context?: GuardContext,
+    care?: boolean,
+    /** The use of the account the agent's draft gave, and whether a cut stops it now; `null`: none may leave. */
+    account?: { readonly usage: SocialAccountUsage; readonly cut: boolean } | null,
+  ): { readonly isBlocked: boolean; readonly codes: readonly GuardCode[] };
 }
 
 /**
@@ -233,15 +250,35 @@ export interface AgentApprovalGuard {
  */
 export function startBubbleGuard(options: {
   readonly activePersona: ActivePersonaSource;
+  /** « Ses comptes » as the agent reads them (ADR 0143): absent, none of her names is known, none may pass. */
+  readonly socialAccounts?: (creatorId: string) => Promise<AgentSocialAccounts>;
   readonly now?: () => Date;
 }): AgentApprovalGuard {
   const now = options.now ?? (() => new Date());
   return {
     forCreator: async (creatorId) => {
       const persona = await activePersonaForModels(options.activePersona, creatorId, now());
-      return persona === null ? null : createBubbleGuard(guardSettingsOf(persona));
+      if (persona === null) return null;
+      const guard = createBubbleGuard(guardSettingsOf(persona));
+      const accounts = (await options.socialAccounts?.(creatorId)) ?? { shareable: [], usernames: [] };
+      return {
+        check: (bubbles, context, care, account) => {
+          // The switch read now, the cuts read now: a cut, or a switch turned off since the draft, lets none leave.
+          const allowed =
+            account === null || account === undefined || account.cut
+              ? null
+              : (accounts.shareable.find((candidate) => candidate.usage === account.usage) ?? null);
+          return guard.check(bubbles, context, care, { usernames: accounts.usernames, allowed });
+        },
+      };
     },
   };
+}
+
+/** Her accounts as the agent reads them (ADR 0143): the ones it may give, and every user name of hers. */
+export interface AgentSocialAccounts {
+  readonly shareable: readonly ShareableAccount[];
+  readonly usernames: readonly string[];
 }
 
 export interface AgentModule {

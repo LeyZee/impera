@@ -74,6 +74,8 @@ const SELF_HARM = [
   /\bme (?:faire du mal|scarifier|couper les veines|mutiler|pendre|jeter sous)\b/u,
   /\bkill myself\b|\bwant to die\b/u,
   /\bme foutre en l'?air\b/u,
+  // A threat on himself put as a condition: « on se voit ou je me tue » (relecture Sécurité, 16/11).
+  /\b(?:ou|sinon|ou sinon) je (?:me tue|me fais du mal|me supprime|me flingue)\b/u,
   /\bm'?ouvrir les veines\b/u,
   /\bidees noires\b(?!\s+pour)/u,
   /\bme (?:tirer une balle|jeter d'un pont|jeter par la fenetre|jeter sous un train)\b/u,

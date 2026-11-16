@@ -3,6 +3,7 @@ import {
   DEFAULT_AGENT_HOURS,
   err,
   ok,
+  PersonaPracticeSchema,
   type FanAvailabilityRecord,
   type FanFlags,
   type MediaDescription,
@@ -1779,10 +1780,108 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
     const { draftComposer, seen } = withPersonaOf(() => Promise.resolve(NORA));
     const result = await draftComposer.compose({
       ...INPUT,
-      history: [{ direction: 'inbound', text: 'On se donne rendez-vous ?', at: INPUT.now }],
+      history: [{ direction: 'inbound', text: 'On se donne rendez-vous samedi ?', at: INPUT.now }],
     });
     expect(result).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['alert_keyword'] });
     expect(seen.brainInputs).toHaveLength(0);
+  });
+
+  it('answers a plain meeting ask herself: her word lets the team know, no pause (ADR 0143 § 15)', async () => {
+    const { draftComposer, seen } = withPersonaOf(() => Promise.resolve(NORA));
+    const result = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'On se donne rendez-vous ?', at: INPUT.now }],
+    });
+    expect(result).toMatchObject({
+      kind: 'draft',
+      alerts: [{ notify: true, trigger: { keyword: 'rendez-vous' } }],
+    });
+    expect(result).not.toMatchObject({ kind: 'held', detail: ['alert_keyword'] });
+    expect(seen.brainInputs).toHaveLength(1);
+  });
+
+  it('answers a question about her practice herself: its word lets the team know, no pause (ADR 0143 § 15)', async () => {
+    const aerial = PersonaPracticeSchema.parse({
+      name: 'Danse aérienne',
+      terms: ['tissu aérien'],
+      level: null,
+      how_she_talks: 'Avec fierté.',
+      vocabulary: null,
+      what_she_respects: null,
+      anecdotes: null,
+      offers: null,
+      answers: null,
+      never_says: null,
+    });
+    const withPractice: ComposerPersonaFields = {
+      ...NORA,
+      persona: { ...NORA.persona, practices: [aerial] },
+      alertKeywords: ['rendez-vous', 'tissu aérien'],
+    };
+    const { draftComposer, seen } = withPersonaOf(() => Promise.resolve(withPractice));
+    const asked = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'Tu fais du tissu aérien depuis longtemps ?', at: INPUT.now }],
+    });
+    expect(asked).toMatchObject({
+      kind: 'draft',
+      alerts: [{ notify: true, trigger: { keyword: 'tissu aérien' } }],
+    });
+    expect(seen.brainInputs).toHaveLength(1);
+
+    const elsewhere = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'Tu fais du tissu aérien près de chez moi ?', at: INPUT.now }],
+    });
+    expect(elsewhere).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['alert_keyword'] });
+  });
+
+  it('pauses on a meeting ask with a sign of distress: its own guard holds (ADR 0143 § 25)', async () => {
+    const { draftComposer, seen } = withPersonaOf(() => Promise.resolve(NORA));
+    const result = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'On se donne rendez-vous ? ou je me tue', at: INPUT.now }],
+    });
+    expect(result).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['alert_keyword'] });
+    expect(seen.brainInputs).toHaveLength(0);
+  });
+
+  it('decides no account while his age is in doubt: her accounts are not even read (ADR 0143 § 16)', async () => {
+    const read: string[] = [];
+    const seen: Seen = { voiceCalls: 0, traces: [], brainInputs: [], voiceInputs: [] };
+    const disputed: FanFlags = { ageDisputed: { since: '2026-10-16T09:00:00Z', by: 'policy' } };
+    const draftComposer = createDraftComposer({
+      gateway: gateway({}, seen),
+      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+      limits: limitsOf(disputed).limits,
+      socialAccounts: (creatorId) => {
+        read.push(creatorId);
+        return Promise.resolve({
+          shareable: [{ platform: 'tiktok', username: 'demo.lives', usage: 'lives' }],
+          usernames: ['demo.lives'],
+        });
+      },
+    });
+    const result = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'Tu fais des lives sur tiktok ?', at: INPUT.now }],
+    });
+    expect(result).toMatchObject({ kind: 'held', reason: 'handoff', cause: 'minor' });
+    expect(result).not.toHaveProperty('accountShared');
+    expect(read).toEqual([]);
+    expect(seen.brainInputs).toHaveLength(0);
+  });
+
+  it('pauses on her meeting word while he is in care (ADR 0143 § 25)', async () => {
+    const { draftComposer } = withPersonaOf(() => Promise.resolve(NORA));
+    const result = await draftComposer.compose({
+      ...INPUT,
+      care: { since: INPUT.now, helpGiven: false },
+      history: [{ direction: 'inbound', text: 'On se donne rendez-vous ?', at: INPUT.now }],
+    });
+    expect(result).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['alert_keyword'] });
   });
 
   it('writes nothing without an active persona, nor on an unreadable one: a human answers, no model is called', async () => {

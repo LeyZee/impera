@@ -69,7 +69,7 @@ const AI_WORD =
 // bed: « en privé », « au prochain live », « au lit », « à 20 h ».
 const ONLINE =
   " ?(\\d|(le |un |mon |ton |ma |ta |mes |tes |la |du )?(lit|live|prochain|prochaine|plus|tout a l'heure|tout de suite|tchat|chat|prive|dm|mp|messages?|story|video|appel|sur|ici|en (live|prive|dm|mp|story|video))\\b)";
-const CITY =
+export const CITY =
   '(paris|lyon|marseille|geneve|bruxelles|lausanne|bordeaux|lille|nice|toulouse|nantes|montpellier|strasbourg)';
 
 /**

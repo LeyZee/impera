@@ -211,6 +211,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     personaSheet: deps.persona.personaSheet,
     guardSettings: guardSettingsOf(deps.persona),
     splitMessages: deps.persona.splitMessages,
+    ...(deps.persona.practices !== undefined && { practices: deps.persona.practices }),
     // Her examples only when her own version is played: never the invented persona's, never another creator's.
     voiceExamples:
       deps.played === undefined

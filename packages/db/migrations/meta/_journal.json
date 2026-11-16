@@ -1100,6 +1100,13 @@
       "when": 1794842526705,
       "tag": "0215_vault_media",
       "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "7",
+      "when": 1794851241695,
+      "tag": "0230_social_accounts",
+      "breakpoints": true
     }
   ]
 }

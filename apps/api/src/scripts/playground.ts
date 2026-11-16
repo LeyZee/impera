@@ -108,6 +108,7 @@ const session = createPlaygroundSession({
   personaSheet: persona.personaSheet,
   guardSettings: guardSettingsOf(persona),
   splitMessages: persona.splitMessages,
+  ...(persona.practices !== undefined && { practices: persona.practices }),
   voiceExamples: examples,
   timeZone: values.fuseau,
   offerLimits: persona.offerLimits,

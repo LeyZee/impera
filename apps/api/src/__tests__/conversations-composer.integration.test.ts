@@ -1,8 +1,10 @@
 import {
   CreatorIdSchema,
+  DraftIdSchema,
   newId,
   PersonaVersionIdSchema,
   PlatformAccountIdSchema,
+  UserIdSchema,
   type ConversationId,
   type CreatorId,
   type ExternalMedia,
@@ -18,12 +20,20 @@ import {
   createConversationsModule,
   type ConversationsModule,
   type DraftComposer,
+  type GuardReadContext,
 } from '../modules/conversations';
 import { createFansModule } from '../modules/fans';
 
 /** Lets every bubble through: the guards themselves are tested in `agent` and `approval-guard`. */
+const approvals: GuardReadContext[] = [];
 const PASS_GUARD = {
-  forCreator: () => Promise.resolve({ check: () => ({ isBlocked: false, codes: [] }) }),
+  forCreator: () =>
+    Promise.resolve({
+      check: (_bubbles: readonly string[], context: GuardReadContext) => {
+        approvals.push(context);
+        return { isBlocked: false, codes: [] };
+      },
+    }),
 };
 const NO_LOG = { info: () => undefined, warn: () => undefined };
 
@@ -366,6 +376,92 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       customOrderOpen: true,
       usedObjectionReplies: ['testaaaaaaaa'],
     });
+  });
+
+  it('journals the account a draft gives by its use, never its name, and gives the orientation back (ADR 0143)', async () => {
+    const id = await fanWrites('c-account', 'J’aimerais trop essayer, tu donnes des cours ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Postule sur mon compte dédié 😊'],
+      softViolations: [],
+      costUsd: 0,
+      accountShared: { usage: 'practice', orient: true },
+    };
+    await respond(id);
+    const journal = await events(id);
+    expect(journal.map((event) => event.type).slice(-2)).toEqual(['account_shared', 'draft_created']);
+    const [draft] = await drafts(id);
+    expect(journal.at(-2)?.payload).toEqual({
+      conversationId: id,
+      draftId: draft?.id,
+      usage: 'practice',
+      orient: true,
+    });
+
+    await fanWrites('c-account', 'Merci !');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await respond(id);
+    expect(composer.inputs.at(-1)?.lastOrientationAt).toBeInstanceOf(Date);
+  });
+
+  it('reads the account a draft gave again at approval, with his cuts and her care as they are now (bound 21)', async () => {
+    const approve = async (conversationId: ConversationId) => {
+      const [draft] = await drafts(conversationId);
+      if (draft === undefined) throw new Error('no draft');
+      await conversations.approveDraft({
+        creatorId,
+        conversationId,
+        draftId: DraftIdSchema.parse(draft.id),
+        userId: UserIdSchema.parse('0199f2a0-0000-7000-8000-000000000001'),
+        correlationId: 'test',
+      });
+      return approvals.at(-1)?.account;
+    };
+    const drafted = async (name: string, accountShared?: { usage: 'lives'; orient: boolean }) => {
+      const id = await fanWrites(name, 'Tu fais des lives ?');
+      composer.next = {
+        kind: 'draft',
+        bubbles: ['Tape demo.lives sur tiktok 😊'],
+        softViolations: [],
+        costUsd: 0,
+        ...(accountShared !== undefined && { accountShared }),
+      };
+      await respond(id);
+      return id;
+    };
+    const flag = async (conversationId: ConversationId, flags: Record<string, unknown>) => {
+      const [row] = await test.admin.db
+        .select({ fanId: schema.conversations.fanId })
+        .from(schema.conversations)
+        .where(eq(schema.conversations.id, conversationId));
+      if (row === undefined) throw new Error('no conversation');
+      await test.admin.db.update(schema.fans).set({ flags }).where(eq(schema.fans.id, row.fanId));
+    };
+
+    // Given, nothing cut since: the guard checks her switch for this use.
+    expect(await approve(await drafted('c-acc-ok', { usage: 'lives', orient: false }))).toEqual({
+      usage: 'lives',
+      cut: false,
+    });
+    // A human's draft, or the engine's without an account: no use, her names are all blocked.
+    expect(await approve(await drafted('c-acc-none'))).toBeNull();
+    // Cut since the draft: none may leave.
+    const since = '2026-10-16T09:00:00.000Z';
+    for (const [name, flags] of [
+      ['c-acc-dnc', { doNotContact: true }],
+      ['c-acc-frozen', { salesFrozen: { reason: 'operator', since } }],
+      ['c-acc-age', { ageDisputed: { since, by: 'human' } }],
+    ] as const) {
+      const id = await drafted(name, { usage: 'lives', orient: false });
+      await flag(id, flags);
+      expect(await approve(id), name).toEqual({ usage: 'lives', cut: true });
+    }
+    const cared = await drafted('c-acc-care', { usage: 'lives', orient: false });
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ careSince: new Date() })
+      .where(eq(schema.conversations.id, cared));
+    expect(await approve(cared)).toEqual({ usage: 'lives', cut: true });
   });
 
   it('keeps his script run with the draft, journals each step and the offer, and gives it back (ADR 0098)', async () => {
