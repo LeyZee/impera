@@ -13,11 +13,10 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PlanningPage } from './PlanningPage';
-import { parsePlanningSearch } from './model';
 
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
-import { parseCalendarSearch } from '@/scheduling/calendar';
+import { teamPlanningSearch } from '@/scheduling/calendar';
 import { settingsOf } from '@/test/settings';
 
 const reader = vi.hoisted(() => ({ zone: 'Europe/Paris' }));
@@ -286,10 +285,7 @@ function renderPage(at = '/equipe/planning'): AnyRouter {
   const page = createRoute({
     getParentRoute: () => root,
     path: '/equipe/planning',
-    validateSearch: (search: Record<string, unknown>) => ({
-      ...parsePlanningSearch(search),
-      ...parseCalendarSearch(search),
-    }),
+    validateSearch: teamPlanningSearch,
     component: function Page() {
       const { semaine, membre, affichage, mois } = page.useSearch();
       const navigate = page.useNavigate();
@@ -1523,6 +1519,25 @@ describe('Équipe › Planning', () => {
     await waitFor(() => {
       expect(router.state.location.search).toEqual({});
     });
+  });
+
+  it('opens this week on a broken link, never an error in English (recette CHT-06)', async () => {
+    const asked: string[] = [];
+    serve({
+      planningOf: (from) => {
+        asked.push(from);
+        return planning();
+      },
+    });
+    // The root keeps the raw address: the page's search says each of its keys, so « abc » never reaches it.
+    const router = renderPage('/equipe/planning?semaine=abc&mois=zz&membre=pas-un-id');
+    await screen.findByRole('row', { name: /Nora Vidal/u });
+    expect(router.state.matches.at(-1)?.search).toMatchObject({
+      semaine: undefined,
+      mois: undefined,
+      membre: undefined,
+    });
+    expect(asked.length).toBeGreaterThan(0);
   });
 
   it('names each + by its account, two accounts of a creator never the same', async () => {

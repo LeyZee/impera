@@ -315,10 +315,14 @@ export interface TeamSearch {
   readonly membre?: string | undefined;
 }
 
-/** Anything else in the address is ignored: a broken link opens the list, never an error. */
+/**
+ * Anything else in the address is ignored: a broken link opens the list, never an error. Each key is said, `undefined`
+ * when thrown away: a page's search is laid over the raw address, so a key left out would keep what the link said
+ * (recette CHT-06).
+ */
 export function parseTeamSearch(search: Record<string, unknown>): TeamSearch {
   const { onglet } = search;
-  return { ...(onglet === 'managers' ? { onglet } : {}), ...memberOf(search) };
+  return { onglet: onglet === 'managers' ? onglet : undefined, membre: memberOf(search).membre };
 }
 
 /**
@@ -330,14 +334,20 @@ export interface PlanningSearch {
   readonly membre?: string | undefined;
 }
 
-/** A real day, said as its week's Monday; anything else opens this week. */
+/**
+ * A real day, said as its week's Monday; anything else opens this week. Each key is said, `undefined` when thrown away
+ * (see `parseTeamSearch`): `?semaine=abc` no longer reaches the page and breaks it (recette CHT-06).
+ */
 export function parsePlanningSearch(search: Record<string, unknown>): PlanningSearch {
-  const { semaine } = search;
-  const member = memberOf(search);
-  if (typeof semaine !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(semaine)) return member;
+  return { semaine: weekOfAddress(search['semaine']), membre: memberOf(search).membre };
+}
+
+/** `?semaine=`: a real calendar day, said as its week's Monday, or nothing. */
+function weekOfAddress(semaine: unknown): string | undefined {
+  if (typeof semaine !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(semaine)) return undefined;
   const day = new Date(`${semaine}T12:00:00Z`);
-  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== semaine) return member;
-  return { semaine: mondayOf(semaine), ...member };
+  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== semaine) return undefined;
+  return mondayOf(semaine);
 }
 
 /** `/equipe/rapports?quinzaine=2026-10-16&membre=<id>`: the period shown and the member's fold open (EQ-11, EQ-13). */
@@ -348,7 +358,7 @@ export interface ReportsSearch {
 
 export function parseReportsSearch(search: Record<string, unknown>): ReportsSearch {
   const period = PayPeriodSchema.safeParse(search['quinzaine']);
-  return { ...(period.success ? { quinzaine: period.data } : {}), ...memberOf(search) };
+  return { quinzaine: period.success ? period.data : undefined, membre: memberOf(search).membre };
 }
 
 /**

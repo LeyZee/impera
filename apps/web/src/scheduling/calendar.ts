@@ -11,7 +11,7 @@ import {
 import { leftOf, phaseOf, unheldReader, type Unheld } from './model';
 import { addDays, clockAt, clockOf, mondayOf, zonedInstant } from './time';
 
-import { unheldLabel } from '@/screens/team/model';
+import { parsePlanningSearch, unheldLabel, type PlanningSearch } from '@/screens/team/model';
 
 /**
  * Équipe › Calendrier as the screens draw it (CR-12, ADR 0045 § 1, ADR 0048): each creator's day cut into the agency's
@@ -486,13 +486,26 @@ export interface CalendarSearch {
   readonly mois?: string | undefined;
 }
 
+/** Each key said, `undefined` when thrown away, so that a broken one never reaches the page (recette CHT-06). */
 export function parseCalendarSearch(search: Record<string, unknown>): CalendarSearch {
   const { vue, affichage, mois } = search;
   return {
-    ...(vue === 'equipe' ? { vue } : {}),
-    ...(affichage === 'mois' ? { affichage } : {}),
-    ...(typeof mois === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/u.test(mois) ? { mois } : {}),
+    vue: vue === 'equipe' ? vue : undefined,
+    affichage: affichage === 'mois' ? affichage : undefined,
+    mois: typeof mois === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/u.test(mois) ? mois : undefined,
   };
+}
+
+/** `/equipe/planning`: the planning's keys and the calendar's, each one said (recette CHT-06). */
+export function teamPlanningSearch(search: Record<string, unknown>): PlanningSearch & CalendarSearch {
+  return { ...parsePlanningSearch(search), ...parseCalendarSearch(search) };
+}
+
+/** `/planning`, a member's own: their week and the calendar's keys, each one said, never a member. */
+export function myPlanningSearch(
+  search: Record<string, unknown>,
+): CalendarSearch & { readonly semaine?: string | undefined } {
+  return { semaine: parsePlanningSearch(search).semaine, ...parseCalendarSearch(search) };
 }
 
 const counted = (count: number, one: string, many: string): string =>

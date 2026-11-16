@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 
 import {
+  myPlanningSearch,
   agentRowLabel,
   agentSlotLabel,
   calendarRows,
@@ -458,3 +459,19 @@ describe('the agency’s month, as its week (recette EQU-01, EQU-02)', () => {
 function never(): never {
   throw new Error('missing');
 }
+
+describe('myPlanningSearch (recette CHT-06)', () => {
+  it('says each of its keys, undefined when the link is broken, so the raw value never reaches the page', () => {
+    const search = myPlanningSearch({ semaine: 'abc', vue: 'autre', affichage: 'an', mois: '2026-13' });
+    expect(Object.keys(search).toSorted()).toEqual(['affichage', 'mois', 'semaine', 'vue']);
+    expect(Object.values(search)).toEqual([undefined, undefined, undefined, undefined]);
+  });
+
+  it('keeps a real day as its week’s Monday, and never a member', () => {
+    expect(
+      myPlanningSearch({ semaine: '2026-11-18', membre: '01a1e1bc-63b4-74fe-bd42-ccd56ee17942' }),
+    ).toEqual({
+      semaine: '2026-11-16',
+    });
+  });
+});
