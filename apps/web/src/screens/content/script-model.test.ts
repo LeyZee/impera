@@ -22,21 +22,32 @@ describe('her script, card by card (SC-02 lot b2)', () => {
 
   it('counts the slots she may not leave out, a refused file as empty, one still going up as filled', () => {
     const cards = scriptCards(scriptSegments);
-    expect(progressOf(cards, [])).toEqual({ filled: 0, required: 4 });
+    expect(progressOf(cards, [], new Map())).toEqual({ filled: 0, required: 4 });
+    const going = fileOf({ slotKey: 'salon::0', state: 'awaiting' });
+    const sends = new Map([[going.id, { sent: 1, total: 4, rate: null, phase: 'sending' as const }]]);
     const files = [
-      fileOf({ slotKey: 'salon::0', state: 'awaiting' }),
+      going,
       fileOf({ slotKey: 'pont::0', state: 'refused', refusal: 'Ce fichier est abîmé' }),
       fileOf({ slotKey: 'chambre:A:0', kind: 'audio', mime: 'audio/mpeg', state: 'kept' }),
     ];
-    expect(progressOf(cards, files)).toEqual({ filled: 2, required: 4 });
-    expect(cards.map((card) => cardDone(card, files))).toEqual([true, false, true, false]);
+    expect(progressOf(cards, files, sends)).toEqual({ filled: 2, required: 4 });
+    expect(cards.map((card) => cardDone(card, files, sends))).toEqual([true, false, true, false]);
     expect(fileOfSlot(files, 'salon::1')).toBeUndefined();
-    expect(cards.map((card) => cardMeta(card, files))).toEqual([
+    expect(cards.map((card) => cardMeta(card, files, sends))).toEqual([
       '1 / 1 média · 1 facultatif',
       '0 / 1 média',
       '1 / 1 média',
       '0 / 1 média',
     ]);
+  });
+
+  it('does not count a media whose send was cut, here or before a reload (recette CRE-10)', () => {
+    const cards = scriptCards(scriptSegments);
+    const cut = fileOf({ slotKey: 'salon::0', state: 'awaiting' });
+    expect(progressOf(cards, [cut], new Map())).toEqual({ filled: 0, required: 4 });
+    const failed = new Map([[cut.id, { sent: 1, total: 4, rate: null, phase: 'failed' as const }]]);
+    expect(progressOf(cards, [cut], failed)).toEqual({ filled: 0, required: 4 });
+    expect(cards.map((card) => cardDone(card, [cut], failed))[0]).toBe(false);
   });
 
   it('says what each slot waits for, in her words', () => {

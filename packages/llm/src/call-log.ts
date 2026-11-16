@@ -23,6 +23,13 @@ export const CALL_OUTCOMES = [
 ] as const;
 export type CallOutcome = (typeof CALL_OUTCOMES)[number];
 
+/**
+ * A request's part in a hedged attempt (OPS-15): `winner` was waited for, `loser` was still running when the answer
+ * went out. A loser's cost counts; its latency and outcome tell nothing of what anyone waited for.
+ */
+export const HEDGE_ROLES = ['winner', 'loser'] as const;
+export type HedgeRole = (typeof HEDGE_ROLES)[number];
+
 /** One provider call. Never holds prompt or message content: only what supervision and costs need. */
 export interface LlmCallRecord {
   readonly at: Date;
@@ -44,6 +51,8 @@ export interface LlmCallRecord {
   readonly draftId?: string;
   /** What it was for (ADR 0060 § 7); absent is `chatting`. */
   readonly purpose?: LlmPurpose;
+  /** Absent: the request was not hedged. */
+  readonly hedge?: HedgeRole;
 }
 
 /** Journal of calls; the llm_calls table implements it once the database exists (P0-03). */

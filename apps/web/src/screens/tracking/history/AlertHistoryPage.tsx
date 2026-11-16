@@ -455,8 +455,12 @@ function Line({
           <span className="nv-convo__name hi-line__name">
             {seen ? null : <span className="sr-only">Non vue : </span>}
             {item.alertName}
-            {item.pausedAgent ? <span className="nv-tag hi-line__tag">Agent en pause</span> : null}
           </span>
+          {item.pausedAgent ? (
+            <span className="hi-line__tags">
+              <span className="nv-tag nv-tag--declared">Agent en pause</span>
+            </span>
+          ) : null}
           {reasonAddsSomething(item) ? <span className="hi-line__reason">{item.reason}</span> : null}
           <span className="nv-convo__preview">
             {creatorName === undefined ? fan : `${fan} · ${creatorName}`}

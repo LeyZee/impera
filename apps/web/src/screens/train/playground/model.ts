@@ -2,6 +2,7 @@ import type {
   BriefIntent,
   Destination,
   PlaygroundAnswer,
+  PlaygroundBrief,
   PlaygroundMedia,
   PlaygroundState,
   RejectReason,
@@ -174,4 +175,9 @@ export function handoffReasons(answer: PlaygroundAnswer): string[] {
       ? answer.hold.detail.filter((d) => d !== 'brain' && d !== 'safety_net').map(riskLabel)
       : [];
   return [...new Set([...flags, ...risks, ...held])];
+}
+
+/** The brain's reading in one line, shown while the voice writes (a turn takes about 20 s). */
+export function readingLine(brief: PlaygroundBrief): string {
+  return `${intentLabel(brief.intent)}, ${sentimentLabel(brief.sentiment)} · ${actionLabel(brief.action)}`;
 }

@@ -2,7 +2,7 @@
 
 Statut : accepted (« ok 0126 » de Charles le 16/11/2026, 12 h 48, redit à 12 h 50 avec ses réponses aux questions a–e, heure de Paris ; demande du même jour, 02 h 55 et 02 h 57)
 Date : 2026-11-16
-Précise : ADR 0042 § 3 et § 4 (son agenda : la catégorie « Live » existe déjà), ADR 0048 § 4 (le calendrier ne réglait pas les heures de l'agent), P3-14 (heures d'activité), ADR 0088 (mode soin), ADR 0021 (jamais d'aveu d'IA), ADR 0057 et 0120 (API officielles seulement). Ne remplace rien.
+Précise : ADR 0143 § C (ses comptes, pour la règle 11 bis), ADR 0042 § 3 et § 4 (son agenda : la catégorie « Live » existe déjà), ADR 0048 § 4 (le calendrier ne réglait pas les heures de l'agent), P3-14 (heures d'activité), ADR 0088 (mode soin), ADR 0021 (jamais d'aveu d'IA), ADR 0057 et 0120 (API officielles seulement). Ne remplace rien.
 
 > Cette ADR ne contient aucune donnée réelle : ni créatrice, ni compte, ni horaire, ni plateforme réellement utilisée.
 
@@ -43,9 +43,9 @@ Ce qui existe au 16/11 (main `08ecb4d`) :
 10. **Pas de vente par ce biais.** « J'ai tourné cet aprèm » ne promet jamais le contenu : une vente ne passe que par un script (décision du 17/10). Un même fait n'est dit qu'une fois à un même fan. Après un live, l'agent peut s'excuser d'un silence (« j'étais en live 🙈 ») auprès des fans qui ont attendu.
 11. **Garde `invented_activity`** : une bulle qui dit un live, un tournage ou une publication absents du bloc est bloquée et renvoyée à un humain. Évals : calendrier vide, live seulement prévu, live fait hier.
 11 bis. **Ses réseaux, parfois** (Charles, 16/11 12 h 50 : « on est en bas de funnel, le but est de les garder sur Reveal, mais de temps en temps on peut dire suis-moi ici, je fais des lives ici »).
-   - Ses comptes publics (plateforme et nom d'utilisateur) se saisissent dans le CRM, fiche de la créatrice, par le propriétaire ou un manager ; jamais dans le dépôt ni dans un prompt versionné.
+   - Le compte donné est celui de « Ses comptes » (ADR 0143 § C) dont l'usage est « lives » et qui est marqué « l'agent peut le donner » ; aucun autre objet. Les règles de l'ADR 0143 (§ 16, coupures ; § 18 et § 19, le code décide et la garde de sortie bloque un nom non autorisé ou un lien) s'appliquent ; cette règle n'ajoute que l'occasion de le proposer sans que le fan le demande.
    - **Le code décide quand** : il ne donne à la voix un bloc typé `<her_socials>` (un seul compte, celui des lives quand il y en a) que si le fan n'en a jamais reçu dans les 30 derniers jours, n'est pas dans une session chaude ni une course de script (ADR 0098, 0103), n'est pas en mode soin, et seulement après un fait de live dit ou une question du fan sur ses lives ou ses réseaux. La voix le dit en passant, comme un « suis-moi », jamais comme un départ de Reveal.
-   - Jamais une messagerie privée ni une autre plateforme payante, jamais d'annonce d'un live à venir. Hors de ce bloc, la garde `invented_activity` bloque un pseudo ou un lien cité par la voix.
+   - Jamais une messagerie privée ni une autre plateforme payante, jamais d'annonce d'un live à venir.
    - Les deux seuils (30 jours, un compte) sont des constantes du domaine ; à mesurer : fans qui écrivent encore sur Reveal 7 jours après l'avoir reçu.
 12. **Le playground** passe par le même chemin (ADR 0102) ; une session peut recevoir un agenda fictif, et l'horloge simulée ouvre et ferme la fenêtre de live.
 
@@ -66,7 +66,6 @@ Ce qui existe au 16/11 (main `08ecb4d`) :
 - Bilan : contrats et migration (`live_platform`, débuts et fins réels, shifts et exceptions de l'agent), job de fin de fenêtre.
 - Badges, Chiffres, Vitrine (routines et agenda de la créatrice) : boutons de live, plateforme dans les tâches et les suggestions.
 - Agent : règle de silence, relais, prise d'une conversation sans réponse depuis 30 min, blocs `<her_day>` et `<her_socials>`, garde `invented_activity`, évals.
-- Bilan aussi : ses comptes publics dans la fiche de la créatrice (CRM).
 - Équipe : shifts de l'agent dans le planning, relais, shift non pris.
 - Design : boutons, bandeau, calendrier.
 
