@@ -21,17 +21,28 @@ export type ImportPlatformScriptsRun =
 interface ImportDeps {
   readonly store: PlatformScriptImportStore;
   readonly source: PlatformScriptSource;
+  /** Queues the identity of the scripts added or rewritten (SC-04 lot c8); the job decides whether to write one. */
+  readonly askIdentities: (
+    creatorId: CreatorId,
+    scriptIds: readonly string[],
+    correlationId: string,
+  ) => Promise<void>;
 }
 
 /**
  * `scripts.import_platform_scripts` (ADR 0099 § 1 time 2, P6-01): one account's native scripts read from the platform
  * and mirrored, replayable. A script read for the first time is added; one changed on the platform, or back after it
  * was gone, is rewritten whole and active; one gone is deactivated, never deleted. A failed read throws and changes
- * nothing for the account (the job's retry): nothing is deactivated because the platform did not answer.
+ * nothing for the account (the job's retry): nothing is deactivated because the platform did not answer. A script
+ * added or rewritten has its identity asked again (SC-04 lot c8), after the import is written.
  */
 export async function importPlatformScripts(
   deps: ImportDeps,
-  request: { readonly creatorId: CreatorId; readonly platformAccountId: PlatformAccountId },
+  request: {
+    readonly creatorId: CreatorId;
+    readonly platformAccountId: PlatformAccountId;
+    readonly correlationId: string;
+  },
   now: Date,
 ): Promise<ImportPlatformScriptsRun> {
   const account = await deps.store.account(request.creatorId, request.platformAccountId);
@@ -39,7 +50,8 @@ export async function importPlatformScripts(
   const listed = await deps.source(account);
   if (listed === null) return { outcome: 'skipped' };
   const plan = planPlatformScripts(await deps.store.known(account.id), listed);
-  await deps.store.apply(account, plan, now);
+  const written = await deps.store.apply(account, plan, now);
+  if (written.length > 0) await deps.askIdentities(account.creatorId, written, request.correlationId);
   return {
     outcome: 'imported',
     added: plan.added.length,

@@ -80,6 +80,12 @@ export const platformAccounts = pgTable(
     sessionState: enumText('session_state').notNull().default('none'),
     /** Captured platform session, AES-256-GCM (crypto.ts); never logged, never sent back to a client. */
     sessionCiphertext: bytea('session_ciphertext'),
+    /**
+     * Whose session the account holds, as the platform names her (on Reveal, the model id): written at each « Sync »
+     * beside the ciphertext, kept when the session expires. One platform identity belongs to one account: the unique
+     * constraint below refuses a second account, whatever the creator, even for two « Sync » at once.
+     */
+    sessionOwner: text('session_owner'),
     sessionUpdatedAt: timestampTz('session_updated_at'),
     lastPollAt: timestampTz('last_poll_at'),
     /**
@@ -97,6 +103,7 @@ export const platformAccounts = pgTable(
     enumCheck('platform_accounts', t.platform, PlatformSchema.options),
     enumCheck('platform_accounts', t.sessionState, SessionStateSchema.options),
     unique('platform_accounts_platform_handle_unique').on(t.platform, t.handle),
+    unique('platform_accounts_platform_session_owner_unique').on(t.platform, t.sessionOwner),
     /** The target of the planning's composite keys: a shift's account and creator always go together (EQ-02). */
     unique('platform_accounts_id_creator_unique').on(t.id, t.creatorId),
     index('platform_accounts_creator_idx').on(t.creatorId),

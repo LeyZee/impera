@@ -192,7 +192,14 @@ export function DesireTag({
       >
         Désir <b>{desire.score}</b>
         {/* His first score has nothing to move from: said in a word, never « Première note : 0 » after the 0. */}
-        <span>{desire.before === null ? 'première note' : movementOf(desire)}</span>
+        <span>
+          {desire.before === null
+            ? 'première note'
+            : // « 0 » after the score read as a defect (« Désir 0 0 », avis Design 16/11): said in a word.
+              desire.score === desire.before
+              ? 'inchangé'
+              : movementOf(desire)}
+        </span>
         {desire.mark === undefined ? null : <span>· {DESIRE_MARK_WORDS[desire.mark]}</span>}
         {desire.availability === undefined ? null : (
           <span>· Disponible : {AVAILABILITY_STATE_WORDS[desire.availability.state]}</span>

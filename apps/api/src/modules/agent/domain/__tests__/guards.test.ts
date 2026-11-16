@@ -100,6 +100,91 @@ describe('voice guards', () => {
     expect(codes(['Écris-moi à lina@example.com'])).toEqual(['contact_info']);
     expect(codes(['Mon 06 12 34 56 78'])).toEqual(['contact_info']);
     expect(codes(['Regarde https://example.com'])).toEqual(['contact_info']);
+    for (const elsewhere of [
+      'va voir monsite.com',
+      'tout est sur linktr.ee/lina',
+      'écris-moi sur t.me/lina',
+      'je suis aussi sur fansly',
+      'viens sur discord',
+      'ajoute moi sur kik',
+      'mon onlyfans est plus complet',
+      'je suis sur mym',
+    ]) {
+      expect(codes([elsewhere]), elsewhere).toEqual(['contact_info']);
+    }
+    for (const plain of ['Bon.Je file', 'ok.Merci toi', 'à 20 h.Tu es là ?', 'on se parle 1.5 h']) {
+      expect(codes([plain]), plain).toEqual([]);
+    }
+  });
+
+  it('blocks a concrete meeting place, and lets her bed and the platform through', () => {
+    expect(codes(['je te retrouve à l’hôtel'])).toEqual(['meeting_promise']);
+    expect(codes(['rejoins-moi à l’hôtel ce soir'])).toEqual(['meeting_promise']);
+    expect(codes(['je te reçois chez moi'])).toEqual(['meeting_promise']);
+    expect(codes(['je te retrouve dans mes messages ce soir'])).toEqual([]);
+    expect(codes(['j’ai bossé dans un hôtel avant'])).toEqual([]);
+    expect(codes(['je te retrouve au bar de la gare'])).toEqual(['meeting_promise']);
+    for (const time of [
+      'je te retrouve dans une heure',
+      'je te retrouve à mon retour',
+      'je te retrouve au réveil',
+      'rejoins-moi dans ma chambre en pensée',
+    ]) {
+      expect(codes([time]), time).toEqual([]);
+    }
+  });
+
+  it('lets her play along with a daydream, and still blocks a real meeting (Messa 16/11)', () => {
+    for (const daydream of [
+      'je te rejoins dans tes rêves 😏',
+      'je t’attends au tournant',
+      'viens me retrouver dans la chambre…',
+      'dans une autre vie on se fait un resto',
+      'imagine, on se fait un verre après la partie',
+      'on se ferait une partie de Warhammer et tu perdrais 😏',
+      'si on se voyait, je te battrais à plate couture',
+    ]) {
+      expect(codes([daydream]), daydream).toEqual([]);
+    }
+    for (const meeting of [
+      'on se fait un resto samedi ?',
+      'je te rejoins à 20 h',
+      'viens me voir à Lyon',
+      'imagine, on se prend un verre samedi à Lyon',
+      'imagine on se boit un verre ce soir, je suis dispo',
+      'si on se voyait vraiment, on se fait un café demain ?',
+      'viens me retrouver dans la chambre d’hôtel',
+      'demain soir, imagine, on se fait un resto',
+    ]) {
+      expect(codes([meeting]), meeting).toEqual(['meeting_promise']);
+    }
+  });
+
+  it('blocks her naming herself a model, a program, or something not real', () => {
+    for (const admission of [
+      'je suis claude',
+      'moi c’est mistral',
+      'je ne suis qu’un modèle',
+      'je suis juste un programme',
+      'je suis artificielle',
+      'je suis ta copine virtuelle',
+      'ce compte est géré par une IA',
+      'mon assistant IA répond pour moi',
+      'c’est mon assistante qui répond',
+    ]) {
+      expect(codes([admission]), admission).toEqual(['ai_disclosure']);
+    }
+    for (const plain of [
+      'je suis modèle photo',
+      'je suis un modèle de patience 😇',
+      'je suis une machine au lit',
+      'je l’ai écrit pour toi',
+      'Claude est mon voisin',
+      'un assistant virtuel m’a répondu à la banque',
+      'mon copilot en voiture',
+    ]) {
+      expect(codes([plain]), plain).toEqual([]);
+    }
   });
 
   it('blocks the persona forbidden terms, accents and case ignored', () => {

@@ -10,6 +10,9 @@ import type {
   PlatformScriptId,
   PlatformScriptMoment,
   ScriptCadenceOutcome,
+  ScriptIdentityAuthor,
+  ScriptIdentityContent,
+  ScriptIdentityId,
   ScriptCadenceSkip,
   ScriptDisgustBlock,
   ScriptStructure,
@@ -170,8 +173,11 @@ export interface PlatformScriptImportStore {
   /** Her account, when it is hers and she is not archived; `null` otherwise. */
   account(creatorId: CreatorId, platformAccountId: PlatformAccountId): Promise<ImportAccount | null>;
   known(accountId: PlatformAccountId): Promise<readonly KnownPlatformScript[]>;
-  /** The whole plan in one transaction: a cut import leaves the account as it was. */
-  apply(account: ImportAccount, plan: PlatformScriptsPlan, now: Date): Promise<void>;
+  /**
+   * The whole plan in one transaction: a cut import leaves the account as it was. Gives the ids of the scripts added
+   * or rewritten, whose identity is to write again.
+   */
+  apply(account: ImportAccount, plan: PlatformScriptsPlan, now: Date): Promise<readonly string[]>;
 }
 
 /**
@@ -185,8 +191,11 @@ export type PlatformScriptSource = (account: ImportAccount) => Promise<readonly 
 interface VaultLink {
   /** The media it is, once its file is read (ADR 0099 § 7); `null` before. */
   readonly mediaAssetId: string | null;
-  /** Its media has a validated description (ADR 0083, ADR 0030 § 3). */
-  readonly described: boolean;
+  /**
+   * The latest description of its media a human validated (ADR 0083, ADR 0030 § 3), by its row: what the script's
+   * identity is written from (SC-04 lot c8); `null` while there is none.
+   */
+  readonly descriptionId: string | null;
 }
 
 /** A media of a step, by the platform's id of the vault media. */
@@ -203,6 +212,8 @@ export interface StoredStepMedia {
 /** A step of a native script as the base keeps it, at its place in the platform's order. */
 interface StoredPlatformStep {
   readonly position: number;
+  /** The platform's own rank (`stepIndex`): two steps on the same are branches (ADR 0112), never offered. */
+  readonly platformIndex: number;
   /** What `sendScriptStep` names. */
   readonly ref: string;
   readonly name: string;
@@ -225,6 +236,21 @@ export interface StoredPlatformScript {
   readonly deactivatedAt: Date | null;
   readonly syncedAt: Date;
   readonly steps: readonly StoredPlatformStep[];
+  /** Every identity written for it, whatever the version (SC-04 lot c8); the domain picks the current one. */
+  readonly identities: readonly StoredScriptIdentity[];
+}
+
+/** An identity of a native script as the base keeps it (`script_identities`). */
+export interface StoredScriptIdentity {
+  readonly id: ScriptIdentityId;
+  /** sha256 of the version it was written for (`identityInputHash`). */
+  readonly inputHash: string;
+  readonly content: ScriptIdentityContent;
+  readonly author: ScriptIdentityAuthor;
+  /** The brain's prompt; `null` for a hand's. */
+  readonly promptHash: string | null;
+  readonly validatedAt: Date | null;
+  readonly createdAt: Date;
 }
 
 export interface PlatformScriptReadStore {
@@ -238,4 +264,83 @@ export interface PlatformScriptReadStore {
    * (`forJobs.platformScript`). `null` when it is not hers.
    */
   oneForJob(creatorId: CreatorId, scriptId: string): Promise<StoredPlatformScript | null>;
+}
+
+/** What the identity job reads of a script, as the service role. */
+export interface IdentityTarget {
+  readonly script: StoredPlatformScript;
+  /** Her descriptions switch (`creators.settings.describeDrops`): off, the brain writes nothing for her. */
+  readonly describes: boolean;
+  /** The `detailed` text of each validated description its media name, by row. */
+  readonly descriptions: ReadonlyMap<string, string>;
+}
+
+/** A brain's identity, for one version of the script. */
+export interface WrittenIdentity {
+  readonly inputHash: string;
+  readonly content: ScriptIdentityContent;
+  readonly model: string;
+  readonly promptHash: string;
+}
+
+/** The identity job's reads and writes (`scripts.identify_platform_script`), as the service role. */
+export interface ScriptIdentityJobStore {
+  /** Hers, active, and she is not archived; `null` otherwise. */
+  target(creatorId: CreatorId, scriptId: string): Promise<IdentityTarget | null>;
+  /** Kept once: the same version and prompt written again changes nothing. */
+  save(creatorId: CreatorId, scriptId: string, identity: WrittenIdentity): Promise<void>;
+  /**
+   * Each hour: every active native script of a creator whose switch is on and who is not archived, those with no
+   * identity first, queued for the job, which decides. Gives how many.
+   */
+  enqueueBacklog(correlationId: string): Promise<number>;
+  /** Queues the job for these scripts of hers, now. */
+  enqueue(creatorId: CreatorId, scriptIds: readonly string[], correlationId: string): Promise<void>;
+}
+
+/** The brain that writes an identity (`brain/script-identity`, `llm`, wired by the composition root). */
+export interface ScriptIdentifier {
+  /** The prompt's version: an identity of another is written again. */
+  readonly promptHash: string;
+  identify(input: {
+    readonly creatorId: CreatorId;
+    readonly scriptName: string;
+    readonly steps: readonly {
+      readonly name: string;
+      readonly text: string;
+      readonly media: readonly {
+        readonly kind: MediaSlotKind;
+        readonly description: string | null;
+      }[];
+    }[];
+  }): Promise<
+    | {
+        readonly kind: 'identified';
+        readonly content: ScriptIdentityContent;
+        readonly model: string;
+        readonly promptHash: string;
+      }
+    | { readonly kind: 'budget' }
+    | { readonly kind: 'failed' }
+  >;
+}
+
+/** What a person of the agency does to an identity, given the script as it is now in the same transaction. */
+export type IdentityReview =
+  | { readonly kind: 'validate'; readonly identityId: ScriptIdentityId }
+  | { readonly kind: 'correct'; readonly content: ScriptIdentityContent };
+
+/**
+ * The agency's validation and correction of an identity (SC-04 lot c8, ADR 0030 § 3), in the person's transaction,
+ * under her RLS and his scope, audited. `currentHash` reads the version of the script as the same transaction sees
+ * it: an identity of another version is `stale`.
+ */
+export interface ScriptIdentityReviewStore {
+  review(
+    creatorId: CreatorId,
+    scriptId: string,
+    review: IdentityReview,
+    userId: string,
+    currentHash: (script: StoredPlatformScript) => string,
+  ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'>;
 }
