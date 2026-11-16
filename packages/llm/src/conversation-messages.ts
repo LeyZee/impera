@@ -55,7 +55,9 @@ export function toMessages(history: readonly ConversationTurn[]): ModelMessage[]
     );
     if (isFan) {
       const text = turn.text.trim() === '' ? [] : [wrapUntrusted('fan_message', turn.text)];
-      return { role: 'user', content: [...text, ...media].join('\n') };
+      // Written by code, outside his block: he cannot forge it, and her turns never carry one to imitate.
+      const time = turn.timeNote === undefined ? [] : [`[${turn.timeNote}]`];
+      return { role: 'user', content: [...time, ...text, ...media].join('\n') };
     }
     return { role: 'assistant', content: [turn.text, ...media].filter((part) => part !== '').join('\n') };
   });
@@ -93,7 +95,12 @@ function scriptStepBlock(step: VoiceScriptStep): string {
  * The brief the voice follows; her objection reply, when code chose one, and the script step code decided, each in its
  * own typed block after it.
  */
-export function describeBrief(brief: Brief, objectionReply?: string, scriptStep?: VoiceScriptStep): string {
+export function describeBrief(
+  brief: Brief,
+  objectionReply?: string,
+  scriptStep?: VoiceScriptStep,
+  maxBubbles?: number,
+): string {
   const lines = [
     `Intention du fan : ${brief.intent} (humeur : ${brief.sentiment}).`,
     `À dire : ${brief.replyBrief}`,
@@ -107,9 +114,17 @@ export function describeBrief(brief: Brief, objectionReply?: string, scriptStep?
     wrapUntrusted('brief', lines),
     objectionReply === undefined ? '' : wrapUntrusted('objection_reply', objectionReply),
     scriptStep === undefined ? '' : scriptStepBlock(scriptStep),
+    maxBubbles === undefined ? '' : bubblesLine(maxBubbles),
   ]
     .filter((block) => block !== '')
     .join('\n');
+}
+
+/** How many bubbles she may write, written by code: never inside a block of untrusted text. */
+function bubblesLine(maxBubbles: number): string {
+  return maxBubbles <= 1
+    ? 'Bulles : une seule.'
+    : `Bulles : une, ou au plus ${String(maxBubbles)} si c'est naturel.`;
 }
 
 export function notesBlock(fanNotes: string): string {

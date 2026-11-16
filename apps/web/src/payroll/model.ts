@@ -691,6 +691,8 @@ const lowerFirst = (text: string): string => text.charAt(0).toLowerCase() + text
 /** What a refusal of pay says, in the screens' words (EQ-05, « Refus de l'API »). */
 export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string {
   if (refusal.kind === 'failed') return 'Le serveur ne répond pas : rien n’a été enregistré.';
+  // Each form asks for them first (EQ-15); said in words only where nothing asks.
+  if (refusal.kind === 'reauth') return 'Confirme ton mot de passe et ton code : rien n’a été enregistré.';
   const { details } = refusal;
   const named = PayPeriodSchema.safeParse(details.period);
   const period = named.success ? periodLine(named.data) : null;
@@ -1060,9 +1062,12 @@ const PERIOD_REFUSALS: ReadonlySet<PayRefusalCode> = new Set<PayRefusalCode>([
   'role_forbidden',
 ]);
 
-/** Whether a refusal stops a batch of validations: one of the period's, or a server that does not answer. */
+/**
+ * Whether a refusal stops a batch of validations: one of the period's, a server that does not answer, or the password
+ * and the code to give again (EQ-15).
+ */
 export const stopsThePeriod = (refusal: PayRefusal): boolean =>
-  refusal.kind === 'failed' || PERIOD_REFUSALS.has(refusal.code);
+  refusal.kind !== 'refused' || PERIOD_REFUSALS.has(refusal.code);
 
 /** The statements a reader may validate now, in the order given: drafts of an ended period, never their own. */
 export const validatable = (period: Pick<PayrollPeriod, 'ended' | 'statements'>): CommissionStatement[] =>

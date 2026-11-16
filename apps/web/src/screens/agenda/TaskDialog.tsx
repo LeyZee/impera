@@ -5,6 +5,7 @@ import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 import { ShootBrief } from './ShootBrief';
 import { AGENDA_KEY, archiveTask, moveTask, NOT_SENT } from './api';
 import { dayInReach, OUT_OF_REACH, spanOf } from './draft';
+import { closedTickWords, tickOpen } from './model';
 import { whenWords } from './words';
 
 import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
@@ -87,7 +88,7 @@ export function TaskDialog({
               prévu.
             </p>
           ) : null}
-          <p className="tm-hint">{done ? 'Faite ce jour-là.' : 'Pas encore faite ce jour-là.'}</p>
+          <p className="tm-hint">{doneWords(done, day, agenda.today, tickOpen(task, day, agenda.today))}</p>
           {failed === null ? null : (
             <p className="tm-hint tm-hint--error" role="alert">
               {failed}
@@ -140,16 +141,19 @@ export function TaskDialog({
                     Changer le moment
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  className={done ? 'nv-btn nv-btn--soft' : 'nv-btn nv-btn--neon'}
-                  onClick={() => {
-                    onTick(task, !done, day);
-                    onClose();
-                  }}
-                >
-                  {done ? 'Pas faite' : 'C’est fait'}
-                </button>
+                {/* A routine on another day than hers: no gesture, why in words above (CRE-03, CRE-07). */}
+                {tickOpen(task, day, agenda.today) ? (
+                  <button
+                    type="button"
+                    className={done ? 'nv-btn nv-btn--soft' : 'nv-btn nv-btn--neon'}
+                    onClick={() => {
+                      onTick(task, !done, day);
+                      onClose();
+                    }}
+                  >
+                    {done ? 'Pas faite' : 'C’est fait'}
+                  </button>
+                ) : null}
               </>
             )}
           </div>
@@ -270,4 +274,11 @@ function MoveForm({
       </div>
     </form>
   );
+}
+
+/** What the dialog says of her tick that day; when the tick is closed (CRE-03, CRE-07), why it stays as it is. */
+function doneWords(done: boolean, day: string, today: string, open: boolean): string {
+  if (open) return done ? 'Faite ce jour-là.' : 'Pas encore faite ce jour-là.';
+  if (day > today) return closedTickWords(day, today);
+  return `${done ? 'Faite' : 'Pas faite'} ce jour-là. ${closedTickWords(day, today)}`;
 }

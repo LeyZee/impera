@@ -1,7 +1,15 @@
 import type { PlaygroundAnswer, PlaygroundState } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { filedAck, rejectedWords, unansweredReason } from './model';
+import {
+  filedAck,
+  handoffReasons,
+  isCare,
+  isHandoff,
+  isWaiting,
+  rejectedWords,
+  unansweredReason,
+} from './model';
 
 const REASONS: PlaygroundState['rejectReasons'] = [{ id: 'too_early_sexual', label: 'Trop sexuel trop tôt' }];
 
@@ -53,5 +61,26 @@ describe('unansweredReason (recette AGT 06/11)', () => {
         violations: [{ code: 'assistant_output', label: 'Répond comme un assistant', severity: 'blocking' }],
       }),
     ).toBeNull();
+  });
+});
+
+describe('the risk policy as production runs it (AGE-01)', () => {
+  const plain: PlaygroundAnswer = {
+    bubbles: [],
+    isBlocked: false,
+    violations: [],
+    latencyMs: 1,
+    costEur: 0,
+    isFallback: false,
+  };
+
+  it('reads a handoff, a wait and the care mode from the code’s decision, not from the brain’s action', () => {
+    const minor = { ...plain, hold: { kind: 'handoff' as const, detail: ['minor_suspected'] } };
+    expect(isHandoff(minor)).toBe(true);
+    expect(handoffReasons(minor)).toHaveLength(1);
+    expect(handoffReasons({ ...plain, hold: { kind: 'handoff', detail: ['brain'] } })).toEqual([]);
+    expect(isWaiting({ ...plain, hold: { kind: 'no_reply', detail: ['wait'] } })).toBe(true);
+    expect(isCare({ ...plain, hold: { kind: 'care', detail: ['distress'] } })).toBe(true);
+    expect([isHandoff(plain), isWaiting(plain), isCare(plain)]).toEqual([false, false, false]);
   });
 });

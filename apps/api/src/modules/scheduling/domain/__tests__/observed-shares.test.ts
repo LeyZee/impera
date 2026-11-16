@@ -1,7 +1,13 @@
 import { PlatformAccountIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { agencyShareChanges, observedShares, shareBps, type ObservedTotalsRow } from '../observed-shares';
+import {
+  agencyShareChanges,
+  observedShares,
+  shareBps,
+  sharesAgainstRates,
+  type ObservedTotalsRow,
+} from '../observed-shares';
 
 // Everything below is invented (ADR 0010): the accounts, the amounts and the shares, never the agency's own.
 const ACCOUNT = PlatformAccountIdSchema.parse('0192f3a0-0000-7000-8000-0000000000b1');
@@ -100,5 +106,41 @@ describe('a change of share from one fortnight to the next (ADR 0054 § 5)', () 
       [row(), row({ currency: 'USD', agencyMinor: 2_000 })],
     );
     expect(changes.map((change) => change.currency)).toEqual(['USD']);
+  });
+});
+
+describe('the share read against her percentage (ADR 0054 § 2 and § 6)', () => {
+  // One sale a day: the net, the agency's part and hers, as the platform reads them.
+  const sale = (day: string, netMinor: number, agencyMinor: number) => ({
+    ...row({ netMinor, agencyMinor }),
+    day,
+    sales: 1,
+    refunds: 0,
+    creatorMinor: netMinor - agencyMinor,
+  });
+  const rate = (fromDay: string, agencyBps: number) => ({ fromDay, agencyBps });
+
+  it('flags a share far from the percentage, as the gap alert does', () => {
+    const rows = [sale('2026-11-02', 10_000, 3_750), sale('2026-11-03', 20_000, 7_500)];
+    const [share] = sharesAgainstRates(rows, [rate('2026-10-01', 4_000)]);
+    expect(share).toMatchObject({ agencyBps: 3_750, differsFromRate: true });
+  });
+
+  it('keeps a share the rounding of each sale explains in line', () => {
+    const rows = [sale('2026-11-02', 999, 400), sale('2026-11-03', 999, 399)];
+    const [share] = sharesAgainstRates(rows, [rate('2026-10-01', 4_000)]);
+    expect(share?.differsFromRate).toBe(false);
+  });
+
+  it('compares nothing without a percentage, nor on days before the first', () => {
+    const rows = [sale('2026-11-02', 10_000, 3_750)];
+    expect(sharesAgainstRates(rows, [])[0]?.differsFromRate).toBeNull();
+    expect(sharesAgainstRates(rows, [rate('2026-11-10', 4_000)])[0]?.differsFromRate).toBeNull();
+  });
+
+  it('reads each day with the percentage in force on it', () => {
+    const rows = [sale('2026-11-02', 10_000, 4_000), sale('2026-11-12', 10_000, 3_000)];
+    const rates = [rate('2026-10-01', 4_000), rate('2026-11-10', 3_000)];
+    expect(sharesAgainstRates(rows, rates)[0]?.differsFromRate).toBe(false);
   });
 });

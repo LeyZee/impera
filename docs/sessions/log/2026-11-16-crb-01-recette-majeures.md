@@ -1,0 +1,7 @@
+# 2026-11-16 — CRB-01 Recette du 16/11, majeures de la créatrice — in_review
+Fait : CRE-03 (décoche d'une routine refusée hors de son jour, 422 `creator_day_closed_unprocessable` ; coche dessinée sur un jour fini ou à venir, Agenda et fenêtre de la tâche), CRE-07 (même règle à l'écran pour un jour à venir), CRE-01 (« Sons » pour la créatrice), CRE-02 (meilleure série et meilleure suite de livraisons dans la vitrine), CHT-05 (onglet « Trophées » seulement pour qui joue le jeu du chatteur, `playsTheGame`).
+Pas fait : PR B (CRE-06, créatrice archivée, CRE-13, CHT-10/CRE-18, CRE-15, CRE-17, CRE-14 prochain trophée) et PR C (sa vitrine côté agence).
+Décisions : sur un jour à venir, aucune coche dessinée, et la raison passe dans le corps de la fenêtre (avis Design, lot `trophees-creatrice-recette-a2` validé par Charles) ; une coche de tâche datée se décoche toujours (elle ne fait aucune série) ; une routine ne se coche et ne se décoche que le jour même, dans son fuseau, côté serveur comme à l'écran.
+Découvertes : retirer une routine essentielle le jour même vidait la journée et sauvait la série ; Charles a choisi qu'elle reste due ce jour-là, à faire en PR B. Un manager en congé a `teamScope` différent de `agency`, d'où l'onglet qui apparaissait (CHT-05).
+Candidats à suppression : aucun.
+Vérifié : tests unitaires (api creator-tasks, web agenda et Moi), intégration `creator-agenda` et `creator-trophies`.

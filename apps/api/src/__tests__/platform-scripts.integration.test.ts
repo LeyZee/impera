@@ -4,16 +4,19 @@ import {
   CreatorIdSchema,
   MediaAssetIdSchema,
   newId,
+  ok,
   PLATFORM_SCRIPT_NAME_MAX,
   PLATFORM_SCRIPT_STEP_TEXT_MAX,
   PLATFORM_SCRIPT_STEPS_MAX,
   PlatformAccountIdSchema,
+  PlatformScriptViewSchema,
   TeamMemberIdSchema,
   type CreatorId,
   type PlatformAccountId,
 } from '@impera/contracts';
 import { and, eq, schema, sql, withCreatorAccount, withTenant } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
+import type { LlmGateway, ScriptIdentityInput } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
@@ -33,6 +36,34 @@ const PASSWORD = 'correct horse battery';
 const PARIS = 'Europe/Paris';
 
 const JobSchema = z.object({ key: z.string(), queue_name: z.string().nullable(), task: z.string() });
+
+/** What the fixed brain was told, in order. */
+const told: ScriptIdentityInput[] = [];
+const IDENTITY = {
+  ambiance: 'complice et taquine',
+  energy: 'rising' as const,
+  setting: 'un salon inventé',
+  useWhen: ['il raconte sa soirée'],
+  avoidWhen: [],
+};
+const identityBrain: Pick<LlmGateway, 'identifyScript' | 'promptHashes'> = {
+  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
+  identifyScript: (input) => {
+    told.push(input);
+    return Promise.resolve(
+      ok({
+        output: IDENTITY,
+        meta: {
+          provider: 'xai',
+          model: 'brain-test',
+          isFallback: false,
+          latencyMs: 1,
+          promptHash: 'identity-v1',
+        },
+      }),
+    );
+  },
+};
 
 /**
  * The import of the native scripts (ADR 0099 § 1 time 2, P6-01) on FakeReveal's invented world, through the owner's
@@ -70,7 +101,7 @@ describe('the native scripts imported from the platform', () => {
   }
 
   const importOf = (platformAccountId: PlatformAccountId, creatorId: CreatorId, at: Date) =>
-    scripts().jobs.importPlatformScripts({ creatorId, platformAccountId }, at);
+    scripts().jobs.importPlatformScripts({ creatorId, platformAccountId, correlationId: 'test' }, at);
 
   const vaultSync = () =>
     app.modules.connectors.jobs.vaultSync(
@@ -97,6 +128,7 @@ describe('the native scripts imported from the platform', () => {
     logger = createLogger(config);
     app = await createApp(config, logger, {
       composer: fixedComposer,
+      scriptIdentityBrain: identityBrain,
       connectorsClock: () => new Date(fake.state().now),
       connectorRegistry: {
         reveal: revealApiConnectors({ fetch: fake.fetch, baseUrl: 'https://reveal.test' }),
@@ -301,7 +333,7 @@ describe('the native scripts imported from the platform', () => {
       creatorId: nora,
       mediaAssetId: asset,
       vocabularyVersion: '1',
-      content: { factualDescription: 'Une photo inventée.' },
+      content: { detailed: 'Une photo inventée.' },
       model: 'test',
       promptHash: 'test',
       validatedBy: ids.owner,
@@ -399,6 +431,7 @@ describe('the native scripts imported from the platform', () => {
           platformScriptId: row.id,
           creatorId: nora,
           position: PLATFORM_SCRIPT_STEPS_MAX,
+          platformIndex: 0,
           platformStepRef: 'step_inventee',
           name: 'Étape',
           text: 'Texte',
@@ -413,6 +446,7 @@ describe('the native scripts imported from the platform', () => {
           platformScriptId: row.id,
           creatorId: nora,
           position: PLATFORM_SCRIPT_STEPS_MAX - 1,
+          platformIndex: 0,
           platformStepRef: 'step_inventee',
           name: 'Étape',
           text: 'c'.repeat(PLATFORM_SCRIPT_STEP_TEXT_MAX + 1),
@@ -421,5 +455,256 @@ describe('the native scripts imported from the platform', () => {
         }),
       ),
     ).toMatch(/platform_script_steps_text_check/u);
+  });
+
+  /** A vault media of hers read and described, its description validated by the owner; gives the description's id. */
+  async function described(ref: string, kind: 'image' | 'video', detailed: string): Promise<string> {
+    const asset = newId(MediaAssetIdSchema);
+    await test.admin.db.insert(schema.mediaAssets).values({
+      id: asset,
+      creatorId: nora,
+      kind,
+      origin: 'creator',
+      storageKey: `test/${asset}`,
+      mime: kind === 'image' ? 'image/jpeg' : 'video/mp4',
+      bytes: 1000,
+      sha256: asset,
+    });
+    const description = newId(z.uuid());
+    await test.admin.db.insert(schema.mediaDescriptions).values({
+      id: description,
+      creatorId: nora,
+      mediaAssetId: asset,
+      vocabularyVersion: '1',
+      content: { detailed },
+      model: 'test',
+      promptHash: 'test',
+      validatedBy: ids.owner,
+      validatedAt: new Date(),
+    });
+    await test.admin.db
+      .update(schema.mediaPlatformRefs)
+      .set({ mediaAssetId: asset })
+      .where(
+        and(
+          eq(schema.mediaPlatformRefs.platformAccountId, noraAccount),
+          eq(schema.mediaPlatformRefs.platformMediaId, ref),
+        ),
+      );
+    return description;
+  }
+
+  const identify = (ref: string) =>
+    ownerView(ref).then((view) => {
+      if (view === undefined) throw new Error(`no ${ref}`);
+      return scripts().jobs.identifyPlatformScript({ creatorId: nora, platformScriptId: view.id });
+    });
+
+  const switchOn = (on: boolean) =>
+    test.admin.db
+      .update(schema.creators)
+      .set({
+        settings: sql`${schema.creators.settings} || jsonb_build_object('describeDrops', ${on}::boolean)`,
+      })
+      .where(eq(schema.creators.id, nora));
+
+  const post = async (who: 'owner' | 'manager' | 'chatter' | 'nora', url: string, payload: object) =>
+    server.inject({
+      method: 'POST',
+      url,
+      headers: { cookie: await signIn(server, `${who}@example.test`, PASSWORD), origin: DASHBOARD_ORIGIN },
+      payload,
+    });
+
+  it('writes an identity once each photo and video of the script is described, under her switch, never a price', async () => {
+    // Sequence 4: a photo; a photo and a teaser video; a video and a teaser photo.
+    expect(await identify('sequence_4')).toBe('off');
+    await switchOn(true);
+    expect(await identify('sequence_4')).toBe('waiting');
+    for (const [ref, kind] of [
+      ['media_10', 'image'],
+      ['media_11', 'image'],
+      ['media_03', 'video'],
+      ['media_12', 'video'],
+      ['media_04', 'image'],
+    ] as const)
+      await described(ref, kind, `Une description inventée de ${ref}.`);
+    expect(await identify('sequence_4')).toBe('identified');
+    expect(await identify('sequence_4')).toBe('already');
+    expect(told).toHaveLength(1);
+    expect(told[0]?.steps.map((step) => [step.name, step.media.map((media) => media.description)])).toEqual([
+      ['Script de test 4 · étape 1', ['Une description inventée de media_10.']],
+      [
+        'Script de test 4 · étape 2',
+        ['Une description inventée de media_11.', 'Une description inventée de media_03.'],
+      ],
+      [
+        'Script de test 4 · étape 3',
+        ['Une description inventée de media_12.', 'Une description inventée de media_04.'],
+      ],
+    ]);
+    expect(JSON.stringify(told[0])).not.toMatch(/priceMinor|EUR/u);
+    const view = await ownerView('sequence_4');
+    expect(view?.identity).toMatchObject({ content: IDENTITY, author: 'brain', validatedAt: null });
+    expect(view).toMatchObject({ gaps: ['identity_not_validated'], proposable: false });
+  });
+
+  it('lets an active manager of her list validate it, once, and the script becomes proposable', async () => {
+    const view = await ownerView('sequence_4');
+    if (view?.identity == null) throw new Error('identified');
+    const url = `/v1/creators/${nora}/platform-scripts/${view.id}/identity/validate`;
+    // A chatter, her own account, a creator who is not on his list: never.
+    expect((await post('chatter', url, { identityId: view.identity.id })).statusCode).toBe(404);
+    expect((await post('nora', url, { identityId: view.identity.id })).statusCode).toBe(403);
+    expect(
+      (
+        await post('manager', `/v1/creators/${ines}/platform-scripts/${view.id}/identity/validate`, {
+          identityId: view.identity.id,
+        })
+      ).statusCode,
+    ).toBe(403);
+    const response = await post('manager', url, { identityId: view.identity.id });
+    expect(response.statusCode).toBe(200);
+    const validated = PlatformScriptViewSchema.parse(response.json());
+    expect(validated).toMatchObject({
+      gaps: [],
+      proposable: true,
+      identity: { id: view.identity.id, moment: 'night' },
+    });
+    expect(validated.identity?.validatedAt).not.toBeNull();
+    // Validated again: nothing changes, nothing is written twice.
+    const again = PlatformScriptViewSchema.parse(
+      (await post('owner', url, { identityId: view.identity.id })).json(),
+    );
+    expect(again.identity?.validatedAt).toBe(validated.identity?.validatedAt);
+    const audit = await test.admin.db
+      .select({ userId: schema.auditLog.userId, action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, view.id));
+    expect(audit).toEqual([{ userId: ids.manager, action: 'script_identity.validated' }]);
+    // The list reads the same, through its route.
+    const listed = await server.inject({
+      method: 'GET',
+      url: `/v1/creators/${nora}/platform-scripts`,
+      headers: { cookie: await signIn(server, 'manager@example.test', PASSWORD) },
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(
+      z
+        .array(PlatformScriptViewSchema)
+        .parse(listed.json())
+        .find((each) => each.ref === 'sequence_4')?.proposable,
+    ).toBe(true);
+  });
+
+  it('holds a validated identity to its version: a description corrected asks for a new one, the old is stale', async () => {
+    const before = await ownerView('sequence_4');
+    if (before?.identity == null) throw new Error('validated');
+    // The description of the first photo corrected and validated anew: another version of the script.
+    await described('media_10', 'image', 'Une description corrigée, inventée.');
+    const after = await ownerView('sequence_4');
+    expect(after?.identity).toBeNull();
+    expect(after).toMatchObject({ gaps: ['identity_not_validated'], proposable: false });
+    const url = `/v1/creators/${nora}/platform-scripts/${before.id}/identity/validate`;
+    const stale = await post('owner', url, { identityId: before.identity.id });
+    expect([stale.statusCode, stale.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'script_identity_stale_conflict',
+    ]);
+    // Written by hand for the version of now: validated by whoever writes it.
+    const corrected = await post(
+      'owner',
+      `/v1/creators/${nora}/platform-scripts/${before.id}/identity/correct`,
+      {
+        content: { ...IDENTITY, ambiance: 'douce et lente', energy: 'soft' },
+      },
+    );
+    expect(corrected.statusCode).toBe(200);
+    expect(PlatformScriptViewSchema.parse(corrected.json())).toMatchObject({
+      proposable: true,
+      identity: { author: 'human', content: { ambiance: 'douce et lente', energy: 'soft' } },
+    });
+    // A hand's identity stands for its version: the brain leaves it alone.
+    expect(await identify('sequence_4')).toBe('already');
+    // A body outside the schema is refused before anything is read.
+    expect(
+      (
+        await post('owner', `/v1/creators/${nora}/platform-scripts/${before.id}/identity/correct`, {
+          content: { ...IDENTITY, energy: 'wild' },
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
+
+  it('keeps the identities closed to her account and written by the job or a hand of the team only', async () => {
+    const hers = await withCreatorAccount(app.db.db, ids.nora, (tx) =>
+      tx.select().from(schema.scriptIdentities),
+    );
+    expect(hers).toEqual([]);
+    const view = await ownerView('sequence_4');
+    if (view?.identity == null) throw new Error('corrected');
+    // The application role cannot rewrite one, even in her tenant as the owner: only the stamp is granted, once.
+    const failure: unknown = await withTenant(app.db.db, nora, (tx) =>
+      tx
+        .update(schema.scriptIdentities)
+        .set({ content: IDENTITY })
+        .where(eq(schema.scriptIdentities.creatorId, nora)),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    const cause = failure instanceof Error && failure.cause instanceof Error ? failure.cause.message : '';
+    expect(cause).toMatch(/permission denied/u);
+  });
+
+  it('asks the identity again after an import that changes a script, and each hour for those of a switch on', async () => {
+    await test.admin.db.execute(
+      sql`delete from graphile_worker._private_jobs j using graphile_worker._private_tasks t
+          where t.id = j.task_id and t.identifier = 'scripts.identify_platform_script'`,
+    );
+    const identityJobs = async () =>
+      z
+        .array(z.object({ key: z.string() }))
+        .parse(
+          (
+            await test.admin.db.execute(
+              sql`select j.key from graphile_worker._private_jobs j
+                  join graphile_worker._private_tasks t on t.id = j.task_id
+                  where t.identifier = 'scripts.identify_platform_script' order by j.key`,
+            )
+          ).rows,
+        )
+        .map((row) => row.key);
+    await scenario([{ type: 'script_changed', scriptId: 'script_4_2', priceCents: 2_500 }]);
+    expect(await importOf(noraAccount, nora, new Date('2026-11-15T10:00:00Z'))).toMatchObject({ changed: 1 });
+    const changed = await ownerView('sequence_4');
+    expect(await identityJobs()).toEqual([`scripts.identify_platform_script:${changed?.id ?? ''}`]);
+    // A price is not in the identity: the one written by hand still stands, the script still proposable.
+    expect(changed).toMatchObject({ proposable: true, identity: { author: 'human' } });
+    const active = (await scriptRows()).filter((row) => row.active && row.creatorId === nora);
+    expect(await scripts().jobs.identifyBacklog('test')).toBe(active.length);
+    await switchOn(false);
+    expect(await scripts().jobs.identifyBacklog('test')).toBe(0);
+    await switchOn(true);
+  });
+
+  it('never offers a script whose step has branches, and never tells it to the brain (ADR 0112)', async () => {
+    // A loose step joins sequence 4 on the rank of its second step: a human would choose between the two.
+    await scenario([
+      { type: 'sequence_branched', sequenceId: 'sequence_4', scriptId: 'script_2_1', stepIndex: 1 },
+    ]);
+    await importOf(noraAccount, nora, new Date('2026-11-15T11:00:00Z'));
+    const view = await ownerView('sequence_4');
+    expect(view?.steps.map((step) => [step.ref, step.position, step.platformIndex])).toEqual([
+      ['script_4_1', 0, 0],
+      ['script_4_2', 1, 1],
+      ['script_2_1', 2, 1],
+      ['script_4_3', 3, 2],
+    ]);
+    expect(view?.gaps).toContain('branched_step');
+    expect(view?.proposable).toBe(false);
+    const before = told.length;
+    expect(await identify('sequence_4')).toBe('branched');
+    expect(told).toHaveLength(before);
   });
 });

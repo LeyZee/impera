@@ -14,7 +14,7 @@ import {
   personaShort,
   stepOf,
 } from './playground/logic';
-import { filedAck, isHandoff, suggestedDestination } from './playground/model';
+import { filedAck, isHandoff, isWaiting, suggestedDestination } from './playground/model';
 import { usePlayground } from './playground/usePlayground';
 
 import { initialOf } from '@/lib/utils';
@@ -338,7 +338,9 @@ export function PlaygroundPage(): JSX.Element {
                 ? 'Ajoute d’abord une clé'
                 : pending === null
                   ? `Écris comme ${name === FALLBACK_NAME ? 'le fan' : name}…`
-                  : 'Note d’abord la réponse'
+                  : isWaiting(pending)
+                    ? 'Note d’abord son réflexe'
+                    : 'Note d’abord la réponse'
             }
             onSend={send}
           />

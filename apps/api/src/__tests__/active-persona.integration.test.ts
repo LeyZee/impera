@@ -102,8 +102,9 @@ function recordingGateway() {
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
+    identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
-    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
+    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
     brain: (input) => {
       brain.push(input);
       return Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } });
@@ -213,12 +214,21 @@ describe('the agent writes with her active persona version (recette G4, M13; ADR
     try {
       const store = createJsonlCalibrationStore(join(dir, 'ratings.jsonl'));
       await store.append(correctedOnTheDemo('Okidoki, réponse corrigée sur la persona fictive'));
-      const examples = voiceExamples(await store.list());
       const { gateway, brain, voice } = recordingGateway();
 
       // The Playground gives them back to its voice, on its persona.
       const demo = await activePersonaForModels(activePersona, anna, new Date());
       if (demo === null) throw new Error('Anna has an active version');
+      // Never as hers: a correction of the fictional persona carries no version of hers (recette AGE-07).
+      const records = await store.list();
+      expect(
+        voiceExamples(records, {
+          creatorId: anna,
+          personaVersionId: 'her-active-version',
+          guardSettings: guardSettingsOf(demo),
+        }),
+      ).toEqual([]);
+      const examples = records.flatMap((r) => (r.verdict.kind === 'corrected' ? [r.verdict.text] : []));
       await createPlaygroundSession({
         gateway,
         creatorName: demo.creatorName,

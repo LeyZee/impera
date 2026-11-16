@@ -216,6 +216,13 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       ticks: [{ ...tick, taskId: daily.id, day: addDays(today, 1) }],
     });
     expect(ahead.json()).toMatchObject({ error: { code: 'creator_tick_late_unprocessable' } });
+    // CRE-03 (recette 16/11): a routine's tick of a day that is over stays; her streak never changes afterwards.
+    const closed = await call('DELETE', `/v1/creator-space/tasks/${id}/ticks/${addDays(today, -1)}`, 'nora');
+    expect(closed.statusCode).toBe(422);
+    expect(closed.json()).toMatchObject({
+      error: { code: 'creator_day_closed_unprocessable', details: { taskIds: [id] } },
+    });
+    expect((await agenda()).ticks.filter((one) => one.taskId === id)).toHaveLength(1);
     const back = await call('DELETE', `/v1/creator-space/tasks/${id}/ticks/${today}`, 'nora');
     expect(back.statusCode, back.body).toBe(200);
     CreatorStreakResultSchema.parse(back.json());
