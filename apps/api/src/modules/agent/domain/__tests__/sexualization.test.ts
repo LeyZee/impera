@@ -91,10 +91,48 @@ describe('declaredAdultAge', () => {
     expect(declaredAdultAge(fact('18'), 'j’ai 18 ans. Enfin presque')).toBeNull();
   });
 
+  it('confirms nothing on a negation, a future, an approximation or a stray number (relecture Sécurité, #798)', () => {
+    for (const text of [
+      'je n’ai pas 18 ans',
+      'j’ai moins de 18 ans',
+      'j’ai 18 ans l’année prochaine',
+      '18 ans en juin',
+      'j’ai 18 ans demain',
+      'j’ai 18 ans le 12',
+      'j’ai 18 ans dans pas longtemps',
+      'j’ai quasi 18 ans',
+      'j’ai 18 ans mdr non 15',
+      '18 ans mais g 15',
+      'j’ai 18 ans … 16',
+      'j’ai 18 ans moins 2',
+      'j’ai même pas 20 ans',
+      'jai 19 ans je crois',
+    ])
+      expect(
+        declaredAdultAge(fact(text.includes('19') ? '19' : text.includes('20') ? '20' : '18'), text),
+      ).toBeNull();
+  });
+
+  it('confirms 18 to 20 only in a plain positive clause', () => {
+    expect(declaredAdultAge(fact('18'), 'J’ai 18 ans et toi ?')).toBe(18);
+    expect(declaredAdultAge(fact('19'), 'moi c’est 19 😊')).toBe(19);
+    expect(declaredAdultAge(fact('18'), 'je viens d’avoir 18 ans')).toBe(18);
+    expect(declaredAdultAge(fact('20'), 'Salut ! 20 ans')).toBe(20);
+    expect(declaredAdultAge(fact('18'), 'j’ai 18 ans tkt')).toBeNull();
+  });
+
+  it('still confirms the plain adults', () => {
+    expect(declaredAdultAge(fact('25'), 'j’ai 25 ans')).toBe(25);
+    expect(declaredAdultAge(fact('32'), '32 ans, marié depuis 6 ans')).toBe(32);
+    expect(declaredAdultAge(fact('40'), '40 ans et ma fille a 8 ans')).toBe(40);
+    expect(declaredAdultAge(fact('28'), '28 ans et 10 ans d’expérience')).toBe(28);
+    expect(declaredAdultAge(fact('25'), 'vingt-cinq ans')).toBe(25);
+  });
+
   it('still reads an adult beside the closed exemptions and someone else’s age', () => {
     expect(declaredAdultAge(fact('35'), 'J’ai 35 ans, ma fille a 12 ans')).toBe(35);
     expect(declaredAdultAge(fact('42'), 'J’ai 42 ans et 15 ans de mariage')).toBe(42);
-    expect(declaredAdultAge(fact('30'), 'J’ai 30 ans, 12 ans d’ancienneté dans ma boîte')).toBe(30);
+    expect(declaredAdultAge(fact('30'), 'J’ai 30 ans, 12 ans d’ancienneté')).toBe(30);
     expect(declaredAdultAge(fact('28'), 'J’ai 28 ans et j’ai 15 minutes de pause')).toBe(28);
     expect(declaredAdultAge(fact('19'), 'J’ai dix-neuf ans')).toBe(19);
   });

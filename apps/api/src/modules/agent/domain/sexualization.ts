@@ -56,44 +56,57 @@ export function sexualizationDecision(context: SexualizationContext): Sexualizat
   return { kind: 'free' };
 }
 
-// An age under 18 in his message, unless it plainly is not his: a time (« marié depuis 6 ans », « ça fait 3 ans que »,
-// « 16 ans d'expérience ») or his child's (« ma fille a 8 ans »). Read clause by clause. Any doubt left, it counts
-// against him: « 25 ans… enfin 16 ans » is no adult's statement. The exemptions are a closed list (relecture Sécurité,
-// #798): « dans 2 ans » is a minor's future, never a time past; « 17 ans d'ailleurs » is his age.
-const UNDER_18 = '(?:1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix(?:[ -]?sept)?)';
-const UNDER_18_YEARS = new RegExp(
-  `(?<!depuis |fait |il y a |pendant |en )\\b${UNDER_18} ?(?:ans|an|yo|years?|piges?)\\b` +
-    `(?!\\s*(?:d'experience|de mariage|d'anciennete|de carriere|que je|que j'|que on|qu'on))`,
+// When his words do not plainly give an adult age, no age is confirmed this turn (relecture Sécurité, #798): a
+// closed rule, read on his whole message, rather than a list of what a minor writes. A refusal too many costs one
+// message; he says it again or a human notes it.
+const ADULT_NUMBER =
+  '(?:(?<!\\d)(?:1[89]|[2-9]\\d)(?!\\d)|dix[ -]?huit|dix[ -]?neuf|vingt|trente|quarante|cinquante|soixante|quatre[ -]?vingt)';
+// 1. A negation or a bound before an adult age: « je n'ai pas 18 ans », « moins de 18 », « même pas 20 ».
+const NEGATED_ADULT = new RegExp(
+  `\\b(?:pas|moins|sous|meme pas)\\b(?:\\s+[\\p{L}']+){0,2}\\s*${ADULT_NUMBER}`,
   'u',
 );
-// « J'en ai 15 », « jai 16 » without « ans »: his age all the same, unless a word follows (« j'ai 15 minutes »).
-const UNDER_18_BARE = new RegExp(
-  `\\bj(?:'| )?(?:en )?ai ${UNDER_18}(?!\\d|[ -]?(?:huit|neuf))(?=\\s*(?:$|[^\\p{L}\\s]|(?:et|mais|ok|lol|hein|perso|moi|toi)\\b))`,
-  'u',
-);
+// 2. A future, a due date or an approximation anywhere: « l'année prochaine », « en juin », « le 12 », « demain »,
+// « dans… », « quasi », « enfin », « en vrai ».
+const UNSURE =
+  /\b(?:aurai|aurais|vais avoir|vas avoir|va avoir|prochain|prochaine|demain|bientot|presque|quasi|quasiment|environ|a peu pres|pratiquement|pas encore|enfin|en vrai|dans|d'ici|en (?:janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)|le (?:\d{1,2}|1er|premier)\b)/u;
+// 3. Any other number under 18, in digits or in words, unless it plainly counts something else: a duration or a
+// quantity of a closed list, a time past (« depuis 6 ans »), or someone else's (a kin word before it).
+const SMALL_NUMBER =
+  /(?<![\d,.])(?<!(?:vingt|trente|quarante|cinquante|soixante|dix)[ -](?:et )?)\b(?:1[0-7]|[0-9]|onze|douze|treize|quatorze|quinze|seize|dix(?:[ -]?sept)?|deux|trois|quatre|cinq|six|sept|huit|neuf)\b(?![,.]?\d|[ -]?(?:huit|neuf|vingts?)\b)/gu;
+const COUNTED =
+  /^\s*(?:ans? (?:d'experience|de mariage|d'anciennete|de carriere|que je|que j'|que on|qu'on)|mois|minutes?|min|heures?|h\b|secondes?|sec|fois|cm|m\b|km|kg|g\b|euros?|€|%|jours?|semaines?|nuits?|enfants?|gosses?|chats?|chiens?|freres?|soeurs?|personnes?|potes?|amis?|messages?|photos?|videos?)/u;
+const TIME_PAST = /(?:depuis|fait|il y a|pendant|en)\s*$/u;
 const SOMEONE_ELSES =
   /\b(?:fils|fille|filles|gamin|gamine|gamins|enfant|enfants|neveu|niece|gosse|gosses|bebe|frere|soeur|eleve|eleves)\b/u;
-// A reserve beside an adult age: « 18 ans, enfin… », « en vrai », « bientôt », « dans 3 semaines ». No age is confirmed
-// on a message that holds one: a refusal too many only costs a confirmation at his next message.
-const ADULT_AGE_RESERVE =
-  /\b(?:enfin|en vrai|bientot|presque|pas encore|(?:dans|d'ici) (?:\d+|un|une|deux|trois|quelques) (?:ans?|mois|semaines?|jours?))\b/u;
 
-/** The clause gives someone else's age: a kin word before the age, never after (« 17 ans comme mon frère » is his). */
-function someoneElsesAge(clause: string): boolean {
-  const kin = SOMEONE_ELSES.exec(clause);
-  const age = UNDER_18_YEARS.exec(clause);
-  return kin !== null && age !== null && kin.index < age.index;
+function strayUnder18(text: string): boolean {
+  return text.split(/[.,;!?\n…]+/u).some((clause) => {
+    const kin = SOMEONE_ELSES.exec(clause)?.index ?? Number.POSITIVE_INFINITY;
+    for (const match of clause.matchAll(SMALL_NUMBER)) {
+      const before = clause.slice(0, match.index);
+      const after = clause.slice(match.index + match[0].length);
+      if (kin < match.index || COUNTED.test(after)) continue;
+      if (/^\s*(?:ans?|piges?)\b/u.test(after) && TIME_PAST.test(before)) continue;
+      return true;
+    }
+    return false;
+  });
 }
 
-function minorAgeIn(text: string): boolean {
+/** His message leaves his adult age in doubt: a minor's sign, a negation, a future, an approximation, a stray age. */
+function ageUnsure(text: string): boolean {
   if (safetySigns(text).includes('minor_suspected')) return true;
-  if (UNDER_18_BARE.test(text)) return true;
-  const adultAge =
-    /(?<!\d)(?:1[89]|[2-9]\d)(?!\d)|dix[ -]?huit|dix[ -]?neuf|vingt|trente|quarante|cinquante|soixante/u;
-  const reserved = adultAge.test(text) && ADULT_AGE_RESERVE.test(text);
-  if (reserved) return true;
-  return text.split(/[.,;!?\n…]+/u).some((clause) => UNDER_18_YEARS.test(clause) && !someoneElsesAge(clause));
+  return NEGATED_ADULT.test(text) || UNSURE.test(text) || strayUnder18(text);
 }
+
+// 4. For 18 to 20, the edge a minor lies on: only a plain positive clause confirms. « J'ai 19 ans », « moi c'est 18 »,
+// « 20 ans et toi ? », « je viens d'avoir 18 ans ».
+const PLAIN_EDGE_AGE =
+  /^\s*(?:(?:et |bah |ben |ok |oui |moi )?(?:moi c'est|moi|j'ai|jai|j ai|je viens d'avoir|j'ai eu|perso|j'en ai)\s+)?(?:18|19|20|dix[ -]?huit|dix[ -]?neuf|vingt)\s*(?:ans?)?(?:\s+(?:et toi|toi|et vous|et tu|t'as quel age))?(?:\s|\p{Extended_Pictographic}|\u{200d}|\u{fe0f})*$/u;
+
+const plainEdgeAge = (text: string): boolean =>
+  text.split(/[.,;!?\n…]+/u).some((clause) => PLAIN_EDGE_AGE.test(clause));
 
 const UNITS = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];
 const TEENS = [
@@ -167,7 +180,7 @@ export function declaredAdultAge(
   fanText: string,
 ): number | null {
   const text = normalise(fanText);
-  if (minorAgeIn(text)) return null;
+  if (ageUnsure(text)) return null;
   const inWords = agesInWords(text);
   for (const fact of facts) {
     if (fact.key !== 'age' || fact.kind !== 'declared' || fact.confidence < 0.8) continue;
@@ -178,6 +191,7 @@ export function declaredAdultAge(
     if (numbers.length + spelled.length !== 1) continue;
     const years = Number(numbers[0] ?? spelled[0]);
     if (years < 18 || years > 99) continue;
+    if (years <= 20 && !plainEdgeAge(text)) continue;
     const saidInDigits = new RegExp(`(^|\\D)${String(years)}(\\D|$)`).test(text);
     if (saidInDigits || inWords.includes(years)) return years;
   }
