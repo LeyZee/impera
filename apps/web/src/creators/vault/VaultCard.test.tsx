@@ -11,6 +11,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { VaultCard } from './VaultCard';
 
+import { setMediaBlur } from '@/shell/media-blur';
+
 /* An invented creator and vault (ADR 0010): no real creator, no real media. */
 const CREATOR = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000c1');
 const ACCOUNT = PlatformAccountIdSchema.parse('0192f3a0-0000-7000-8000-0000000000a1');
@@ -99,6 +101,7 @@ function show(
 
 afterEach(() => {
   cleanup();
+  setMediaBlur(true);
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -117,7 +120,8 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
     const names = [...card.querySelectorAll('.vx-folder__label')].map((name) => name.textContent);
     expect(names).toEqual(['Matin ☀️', 'Soirée 🌙', 'En vrac']);
     expect(within(card).getByText('2 photos · 1 vidéo')).toBeDefined();
-    expect(within(card).getByText(/1 retiré de Reveal/u)).toBeDefined();
+    // What Reveal removed is a chip on the cover, so every tile keeps one line and the same height.
+    expect(within(card).getByText('1 retiré')).toBeDefined();
   });
 
   it('gives « Synchroniser le coffre » to the owner, and waits for the sync to go through', async () => {
@@ -211,7 +215,7 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
     expect(screen.queryByRole('list', { name: 'Médias de Matin ☀️' })).toBeNull();
   });
 
-  it('opens the sheet of a media: what it is, when it came, Reveal’s text and range; Échap closes it', async () => {
+  it('opens the sheet of a media over the page: what it is, when it came, Reveal’s text and range; Échap closes it', async () => {
     const described = media('video', false, {
       durationSeconds: 75,
       platformDescription: 'Texte inventé du coffre',
@@ -221,22 +225,47 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
     serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [described, media('image', true)])] })]);
     show(true);
     fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir Matin ☀️' }));
+    // The folder's name is its title, once; its line says what Reveal removed too.
+    expect(screen.getByRole('heading', { name: 'Matin ☀️' })).toBeDefined();
+    expect(screen.getByText('1 vidéo · 1 retiré de Reveal')).toBeDefined();
     const tile = await screen.findByRole('button', { name: '1. Vidéo · 1:15' });
     // No preview from Reveal: the kind's own colour, no picture.
     expect(tile.querySelector('img')).toBeNull();
     expect(screen.getByRole('button', { name: '2. Photo, retiré de Reveal' })).toBeDefined();
     fireEvent.click(tile);
     expect(tile.getAttribute('aria-pressed')).toBe('true');
-    const sheet = screen.getByRole('complementary', { name: 'Fiche du média' });
-    expect(within(sheet).getByText('Vidéo · 1:15')).toBeDefined();
+    const sheet = screen.getByRole('dialog', { name: 'Vidéo · 1:15' });
     expect(within(sheet).getByText('Ajouté le 10 novembre 2026')).toBeDefined();
     expect(within(sheet).getByText('Texte inventé du coffre')).toBeDefined();
     expect(within(sheet).getByText('10 € – 25 €')).toBeDefined();
-    fireEvent.keyDown(window, { key: 'Escape' });
-    expect(screen.queryByRole('complementary', { name: 'Fiche du média' })).toBeNull();
+    expect(within(sheet).getByText('1 sur 2')).toBeDefined();
+    fireEvent.keyDown(sheet, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(tile);
-    fireEvent.click(screen.getByRole('button', { name: 'Fermer la fiche' }));
-    expect(screen.queryByRole('complementary', { name: 'Fiche du média' })).toBeNull();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Fermer' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('goes from one media to the next in the sheet, by its arrows and the keyboard’s', async () => {
+    const one = media('image', false, { platformMediaId: 'one' });
+    const two = media('audio', false, { platformMediaId: 'two', durationSeconds: 9 });
+    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [one, two])] })]);
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir Matin ☀️' }));
+    fireEvent.click(await screen.findByRole('button', { name: '1. Photo' }));
+    expect(
+      within(screen.getByRole('dialog'))
+        .getByRole('button', { name: 'Média précédent' })
+        .hasAttribute('disabled'),
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Média suivant' }));
+    const voice = screen.getByRole('dialog', { name: 'Vocal · 0:09' });
+    // A voice note has no picture: its drawn wave, never a blurred grey nor a read of Reveal.
+    expect(voice.querySelector('img')).toBeNull();
+    expect(voice.querySelectorAll('.vx-voice__wave rect').length).toBe(28);
+    expect(within(voice).queryByText(/jamais gardée par Impera/u)).toBeNull();
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(screen.getByRole('dialog', { name: 'Photo' })).toBeDefined();
   });
 
   it('follows the address when the page passes it: the folder named opens, one gone shows the folders', async () => {
@@ -275,6 +304,8 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
     const toggle = screen.getByRole('button', { name: 'Voir net' });
     fireEvent.click(toggle);
     expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    // The rail's « Flou des médias » itself: it never says « Floutés » over a sharp grid.
+    expect(document.documentElement.dataset['mediaBlur']).toBe('off');
     // The photo and the video's poster; never a media Reveal removed.
     expect(sharp()).toEqual([
       `/v1/creators/${CREATOR}/vault/media/photo_1/preview`,
@@ -294,7 +325,7 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
     expect(sharp()).toEqual([]);
     // The sheet always shows it sharp.
     fireEvent.click(tile);
-    const sheet = screen.getByRole('complementary', { name: 'Fiche du média' });
+    const sheet = screen.getByRole('dialog', { name: 'Photo' });
     expect(sheet.querySelector('img.vx-sharp')?.getAttribute('src')).toBe(
       `/v1/creators/${CREATOR}/vault/media/photo_1/preview`,
     );

@@ -102,6 +102,7 @@
   gap: var(--nv-space-3);
 }
 .vx-grid__cell {
+  display: flex;
   min-width: 0;
   animation: nv-rise var(--nv-dur-base) var(--nv-ease-spring) both;
   animation-delay: min(calc(var(--vx-at, 0) * var(--nv-stagger)), 400ms);
@@ -128,6 +129,7 @@
 .vx-folder {
   appearance: none;
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -257,12 +259,30 @@
   white-space: nowrap;
 }
 .vx-folder__line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
-.vx-folder__removed {
-  color: var(--nv-ink-faint);
+/* « 1 retiré »: a quiet chip on the cover, so the tile keeps the height of its neighbours. */
+.vx-cover__gone {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nv-surface-raised) 80%, transparent);
+  color: var(--nv-ink-muted);
+  backdrop-filter: blur(8px);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
 }
 
 /* ───────────── A preview: the platform's blurhash, stretched and smoothed ───────────── */
@@ -328,53 +348,46 @@
   color: var(--nv-ink-faint);
 }
 .vx-crumbs__here {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--nv-ink-muted);
-}
-.vx-open__head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.vx-open__title {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   margin: 0;
   font-size: var(--nv-text-title-2);
   line-height: var(--nv-text-title-2-leading);
   letter-spacing: var(--nv-text-title-2-tracking);
   font-weight: 650;
-  overflow-wrap: anywhere;
 }
-.vx-open__title:focus {
+.vx-crumbs__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vx-crumbs__here:focus {
   outline: none;
 }
-.vx-open__title:focus-visible {
+.vx-crumbs__here:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 4px;
   border-radius: 6px;
 }
+/* « Coffre / Soirée » on the left, « Voir net » on the right of the same line. */
+.vx-open__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  min-width: 0;
+}
+.vx-open__head .vx-crumbs {
+  flex: 1 1 auto;
+}
 .vx-open__line {
-  margin: 0;
+  margin: -6px 0 0;
 }
 
-/* The grid of its media, and the sheet of the one picked beside it (under it on a phone). */
-.vx-browse {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--nv-space-4);
-  align-items: start;
-}
-@media (min-width: 900px) {
-  .vx-browse--sheet {
-    grid-template-columns: minmax(0, 1fr) 300px;
-  }
-}
-
+/* The grid of its media: its columns never change, the sheet of a media opens over the page. */
 .vx-media {
   margin: 0;
   padding: 0;
@@ -468,8 +481,68 @@
     0 0 0 2px var(--nv-void),
     0 0 0 4px var(--nv-ink);
 }
+/* Gone from Reveal: the theme's own surface, its preview faded, a struck cloud; never a black block. */
+.vx-tile--removed {
+  background: var(--nv-select);
+  color: var(--nv-ink-muted);
+}
 .vx-tile--removed .vx-preview {
-  filter: grayscale(1) brightness(0.7);
+  opacity: 0.28;
+  filter: grayscale(1);
+}
+.vx-tile--removed::after,
+.vx-tile--audio::after {
+  display: none;
+}
+.vx-tile--removed .vx-tile__kind,
+.vx-tile--audio .vx-tile__kind,
+.vx-tile--audio .vx-tile__time {
+  background: var(--nv-glass-fill);
+  color: var(--nv-ink-muted);
+}
+
+/* A voice note: the theme's surface and a drawn wave that breathes under the pointer. */
+.vx-tile--audio {
+  color: var(--nv-ink);
+}
+.vx-voice {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22% 14%;
+  background:
+    radial-gradient(
+      110% 80% at 50% 110%,
+      color-mix(in srgb, var(--nv-neon) 18%, transparent),
+      transparent 70%
+    ),
+    var(--nv-select);
+  color: var(--nv-neon);
+}
+.vx-cover .vx-voice {
+  position: relative;
+  padding: 18% 12%;
+}
+.vx-voice__wave {
+  width: 100%;
+  height: 100%;
+  max-height: 64px;
+  fill: currentColor;
+  overflow: visible;
+}
+.vx-voice__wave rect {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.vx-tile--audio:hover .vx-voice__wave rect,
+.vx-folder:hover .vx-voice__wave rect {
+  animation: vx-breathe 900ms var(--nv-ease-out) infinite alternate;
+}
+@keyframes vx-breathe {
+  to {
+    transform: scaleY(0.55);
+  }
 }
 .vx-tile__kind {
   position: absolute;
@@ -497,8 +570,7 @@
   fill: currentColor;
   stroke: none;
 }
-.vx-tile__time,
-.vx-tile__gone {
+.vx-tile__time {
   position: absolute;
   z-index: 1;
   bottom: 7px;
@@ -514,26 +586,41 @@
   right: 7px;
 }
 .vx-tile__gone {
-  left: 7px;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.vx-gone {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vx-tile__gone .vx-gone {
+  width: 22px;
+  height: 22px;
 }
 
+.tm-dialog.vx-dialog {
+  max-width: 460px;
+}
 .vx-sheet {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
-  animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
-}
-@media (min-width: 900px) {
-  .vx-sheet {
-    position: sticky;
-    top: var(--nv-space-4);
-  }
-}
-.vx-sheet__top {
-  position: relative;
+  gap: 12px;
 }
 .vx-sheet__preview {
   position: relative;
@@ -542,30 +629,38 @@
   overflow: hidden;
   color: #fff;
   background: var(--nv-select);
+  animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
 }
 .vx-sheet__preview .vx-preview {
   position: absolute;
   inset: 0;
 }
-.nv-close.vx-sheet__close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: color-mix(in srgb, var(--nv-void) 55%, transparent);
-  backdrop-filter: blur(8px);
-}
-.vx-sheet__what {
-  margin: 4px 4px 0;
-  font-weight: 650;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-}
-.vx-sheet__when {
-  margin: 0 4px;
+.vx-sheet__steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: var(--nv-text-footnote);
 }
+.vx-sheet__step {
+  min-width: 40px;
+  justify-content: center;
+}
+.vx-sheet__step svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vx-sheet__back {
+  display: inline-grid;
+  transform: rotate(180deg);
+}
 .vx-sheet__gone {
-  margin: 0 4px;
+  margin: 0;
   font-size: var(--nv-text-footnote);
   color: var(--nv-warning);
 }
@@ -574,7 +669,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 4px 0;
+  padding: 12px 0 0;
   border-top: 1px solid var(--nv-hairline);
 }
 .vx-sheet__fact {
@@ -582,21 +677,10 @@
   flex-direction: column;
   gap: 2px;
 }
-.vx-sheet__fact dt {
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  letter-spacing: var(--nv-text-caption-tracking);
-  text-transform: uppercase;
-  color: var(--nv-ink-faint);
-  font-weight: 600;
-}
 .vx-sheet__fact dd {
   margin: 0;
   white-space: pre-line;
   overflow-wrap: anywhere;
-}
-.vx-sheet .vx-note {
-  padding: 0 4px;
 }
 
 @media (max-width: 560px) {
@@ -632,7 +716,7 @@
   .vx-grid__cell,
   .vx-media__cell,
   .vx-open,
-  .vx-sheet,
+  .vx-sheet__preview,
   .vx-phase:not(:empty) {
     animation: none;
   }
@@ -643,6 +727,10 @@
   .vx-folder:hover .vx-cover .vx-preview,
   .vx-tile:hover .vx-preview {
     transform: none;
+  }
+  .vx-tile--audio:hover .vx-voice__wave rect,
+  .vx-folder:hover .vx-voice__wave rect {
+    animation: none;
   }
 }
 
@@ -673,15 +761,11 @@
 .vx-tile:hover .vx-sharp[data-state='shown'] {
   transform: scale(1.06);
 }
-.vx-open__head {
-  position: relative;
-}
 .vx-open__sharp {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  align-self: flex-start;
-  margin-top: 8px;
+  flex: none;
 }
 .vx-eye {
   width: 15px;

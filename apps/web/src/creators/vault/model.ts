@@ -65,8 +65,14 @@ export interface FolderTile {
   readonly line: string;
   /** No longer listed by Reveal at the last sync, kept with their descriptions. */
   readonly removed: number;
-  /** The blurred previews of its first media still listed, at most four, for the tile's cover. */
-  readonly cover: readonly (string | null)[];
+  /** Its first media still listed, at most four, for the tile's cover: a voice note has no picture, only its wave. */
+  readonly cover: readonly CoverItem[];
+}
+
+export interface CoverItem {
+  readonly kind: VaultMediaView['kind'];
+  readonly hash: string | null;
+  readonly seed: string;
 }
 
 /** How many previews make a folder's cover. */
@@ -84,8 +90,39 @@ export function folderTiles(view: VaultView): FolderTile[] {
     cover: folder.media
       .filter((each) => !each.removed)
       .slice(0, COVER)
-      .map((each) => each.blurhash),
+      .map((each) => ({ kind: each.kind, hash: each.blurhash, seed: each.platformMediaId })),
   }));
+}
+
+/** « 1 retiré de Reveal », « 3 retirés de Reveal »; `null` when none. */
+export const removedLine = (count: number): string | null =>
+  count === 0 ? null : `${String(count)} ${count === 1 ? 'retiré' : 'retirés'} de Reveal`;
+
+/** A folder's whole line: what Reveal still lists, then what it removed (« 9 photos · 1 vocal · 1 retiré de Reveal »). */
+export function folderLine(media: VaultFolderView['media']): string {
+  const removed = removedLine(media.filter((each) => each.removed).length);
+  const listed = mediaLine(media);
+  if (removed === null) return listed;
+  return listed === 'Vide' ? removed : `${listed} · ${removed}`;
+}
+
+/**
+ * The bars of a voice note's drawn wave, each from 0.2 to 1: Reveal gives no wave, so it is drawn from the media's id,
+ * the same for the same note on every screen. A picture of a sound, never its sound.
+ */
+export function waveOf(seed: string, bars: number): number[] {
+  let state = 2166136261;
+  for (let at = 0; at < seed.length; at += 1) state = Math.imul(state ^ seed.charCodeAt(at), 16777619) >>> 0;
+  const heights: number[] = [];
+  for (let at = 0; at < bars; at += 1) {
+    state = Math.imul(state ^ (state >>> 15), 2246822507) >>> 0;
+    state = Math.imul(state ^ (state >>> 13), 3266489909) >>> 0;
+    state = (state ^ (state >>> 16)) >>> 0;
+    // A voice swells in the middle: an envelope over the noise, so the wave reads as speech, not as static.
+    const envelope = Math.sin((Math.PI * (at + 0.5)) / bars);
+    heights.push(Math.round((0.2 + 0.8 * envelope * (0.45 + 0.55 * (state / 4294967295))) * 100) / 100);
+  }
+  return heights;
 }
 
 /** « 0:42 », « 12:05 », « 1:02:09 »: a video's or a voice note's length. */

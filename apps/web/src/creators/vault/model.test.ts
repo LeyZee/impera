@@ -11,6 +11,7 @@ import {
   SYNC_PATIENCE_MS,
   durationLine,
   findFolder,
+  folderLine,
   folderTiles,
   mediaKindLine,
   mediaLine,
@@ -21,6 +22,7 @@ import {
   syncedLine,
   uploadedLine,
   vaultFigures,
+  waveOf,
 } from './model';
 
 /* An invented vault (ADR 0010): no real creator, no real media. */
@@ -116,7 +118,7 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
         }),
       ]),
     );
-    expect(tile?.cover).toEqual(['LA', null, 'LC', 'LD']);
+    expect(tile?.cover.map((item) => item.hash)).toEqual(['LA', null, 'LC', 'LD']);
   });
 
   it('opens the folder the address names, and none when the last sync no longer lists it', () => {
@@ -183,5 +185,24 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
     expect(phaseLine({ kind: 'none' })?.text).toContain('extension');
     expect(phaseLine({ kind: 'failed' })?.tone).toBe('warn');
     expect(phaseLine({ kind: 'waiting', since: null, askedAt: 0 })?.tone).toBe('muted');
+  });
+
+  it('says what a folder holds, then what Reveal removed from it', () => {
+    expect(folderLine([mediaOf({ kind: 'image' }), mediaOf({ kind: 'image', removed: true })])).toBe(
+      '1 photo · 1 retiré de Reveal',
+    );
+    expect(folderLine([mediaOf({ removed: true }), mediaOf({ removed: true })])).toBe('2 retirés de Reveal');
+    expect(folderLine([mediaOf({ kind: 'audio' })])).toBe('1 vocal');
+  });
+
+  it('draws the same wave for the same voice note, each bar between 0.2 and 1', () => {
+    const wave = waveOf('media_07', 14);
+    expect(wave).toHaveLength(14);
+    expect(waveOf('media_07', 14)).toEqual(wave);
+    expect(waveOf('media_08', 14)).not.toEqual(wave);
+    for (const bar of wave) {
+      expect(bar).toBeGreaterThanOrEqual(0.2);
+      expect(bar).toBeLessThanOrEqual(1);
+    }
   });
 });

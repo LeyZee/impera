@@ -6,17 +6,19 @@ import {
   SYNC_POLL_MS,
   durationLine,
   findFolder,
+  folderLine,
   folderName,
   folderTiles,
   mediaKindLine,
-  mediaLine,
   phaseAfterRead,
   phaseLine,
   polls,
+  removedLine,
   suggestedLine,
   syncedLine,
   uploadedLine,
   vaultFigures,
+  waveOf,
   type FolderTile,
   type SyncPhase,
 } from './model';
@@ -24,6 +26,8 @@ import { previewOf } from './preview';
 import './vault.css';
 
 import { useNow } from '@/scheduling/useNow';
+import { Dialog } from '@/shell/Dialog';
+import { setMediaBlur, useMediaBlur } from '@/shell/media-blur';
 
 /**
  * « Son coffre Reveal » (ADR 0099 §§ 2-4): when her vault was last read, her folders as tiles, and a folder opened as the
@@ -216,6 +220,7 @@ export function VaultCard({
 
 /** A folder's tile: its cover of up to four blurred previews, its name as Reveal gives it, what it holds. */
 function FolderButton({ tile, onOpen }: { tile: FolderTile; onOpen: () => void }): JSX.Element {
+  const gone = removedLine(tile.removed);
   return (
     <button type="button" className="vx-folder" onClick={onOpen} aria-label={`Ouvrir ${tile.name}`}>
       <span className={`vx-cover vx-cover--${String(Math.max(1, tile.cover.length))}`} aria-hidden="true">
@@ -224,7 +229,19 @@ function FolderButton({ tile, onOpen }: { tile: FolderTile; onOpen: () => void }
             <FolderIcon />
           </span>
         ) : (
-          tile.cover.map((hash, at) => <Preview key={at} hash={hash} />)
+          tile.cover.map((item) =>
+            item.kind === 'audio' ? (
+              <VoiceFace key={item.seed} seed={item.seed} bars={9} />
+            ) : (
+              <Preview key={item.seed} hash={item.hash} />
+            ),
+          )
+        )}
+        {gone === null ? null : (
+          <span className="vx-cover__gone nv-num">
+            <GoneIcon />
+            {tile.removed === 1 ? '1 retiré' : `${String(tile.removed)} retirés`}
+          </span>
         )}
         <span className="vx-cover__open">
           <ChevronIcon />
@@ -235,20 +252,17 @@ function FolderButton({ tile, onOpen }: { tile: FolderTile; onOpen: () => void }
           {tile.unmarked ? <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" /> : null}
           <span className="vx-folder__label">{tile.name}</span>
         </span>
-        <span className="vx-folder__line nv-num">
-          {tile.line}
-          {tile.removed > 0 ? (
-            <span className="vx-folder__removed">
-              {tile.removed === 1 ? ' · 1 retiré de Reveal' : ` · ${String(tile.removed)} retirés de Reveal`}
-            </span>
-          ) : null}
-        </span>
+        <span className="vx-folder__line nv-num">{tile.line}</span>
       </span>
     </button>
   );
 }
 
-/** A folder opened: « Coffre › son nom », then its media in Reveal's order, and the sheet of the one picked. */
+/**
+ * A folder opened: « Coffre / son nom » as its title, « Voir net » on the same line, then its media in Reveal's order.
+ * « Voir net » is the rail's « Flou des médias » itself (ADR 0030 § 4): one choice of this browser, so the rail never says
+ * « Floutés » over a sharp grid. A media picked opens its sheet over the page, the grid never moving under it.
+ */
 function FolderView({
   creatorId,
   folder,
@@ -259,100 +273,92 @@ function FolderView({
   onBack: () => void;
 }): JSX.Element {
   const [picked, setPicked] = useState<string | null>(null);
-  const [sharp, setSharp] = useState(false);
+  const blurred = useMediaBlur();
   const pictured = folder.media.some((each) => each.kind !== 'audio' && !each.removed);
   const title = useRef<HTMLHeadingElement>(null);
   const name = folderName(folder);
-  const media = picked === null ? undefined : folder.media.find((each) => each.platformMediaId === picked);
+  const at = picked === null ? -1 : folder.media.findIndex((each) => each.platformMediaId === picked);
+  const media = at < 0 ? undefined : folder.media[at];
 
   // Opened from a tile: the reader lands on the folder's name, not back at the page's top.
   useEffect(() => {
     title.current?.focus({ preventScroll: true });
   }, []);
 
-  useEffect(() => {
-    if (picked === null) return;
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setPicked(null);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [picked]);
+  const step = (by: -1 | 1): void => {
+    const next = folder.media[at + by];
+    if (next !== undefined) setPicked(next.platformMediaId);
+  };
 
   return (
     <div className="vx-open">
-      <nav className="vx-crumbs" aria-label="Chemin dans le coffre">
-        <button type="button" className="vx-crumbs__back nv-tap" onClick={onBack}>
-          <span className="vx-crumbs__chev" aria-hidden="true">
-            <ChevronIcon />
-          </span>
-          Coffre
-        </button>
-        <span className="vx-crumbs__sep" aria-hidden="true">
-          /
-        </span>
-        <span className="vx-crumbs__here" aria-current="page">
-          {name}
-        </span>
-      </nav>
       <div className="vx-open__head">
-        <h3 className="vx-open__title" ref={title} tabIndex={-1}>
-          {folder.folderRef !== null && folder.moment === null ? (
-            <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" />
-          ) : null}
-          {name}
-        </h3>
-        <p className="ps-muted vx-open__line nv-num">{mediaLine(folder.media)}</p>
+        <nav className="vx-crumbs" aria-label="Chemin dans le coffre">
+          <button type="button" className="vx-crumbs__back nv-tap" onClick={onBack}>
+            <span className="vx-crumbs__chev" aria-hidden="true">
+              <ChevronIcon />
+            </span>
+            Coffre
+          </button>
+          <span className="vx-crumbs__sep" aria-hidden="true">
+            /
+          </span>
+          <h3 className="vx-crumbs__here" ref={title} tabIndex={-1} aria-current="page">
+            {folder.folderRef !== null && folder.moment === null ? (
+              <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" />
+            ) : null}
+            <span className="vx-crumbs__name">{name}</span>
+          </h3>
+        </nav>
         {pictured ? (
           <button
             type="button"
-            className={`nv-btn nv-btn--soft nv-btn--sm vx-open__sharp${sharp ? ' vx-open__sharp--on' : ''}`}
-            aria-pressed={sharp}
+            className={`nv-btn nv-btn--soft nv-btn--sm vx-open__sharp${blurred ? '' : ' vx-open__sharp--on'}`}
+            aria-pressed={!blurred}
             onClick={() => {
-              setSharp((was) => !was);
+              setMediaBlur(!blurred);
             }}
           >
-            <EyeIcon open={sharp} />
-            {sharp ? 'Flouter' : 'Voir net'}
+            <EyeIcon open={!blurred} />
+            {blurred ? 'Voir net' : 'Flouter'}
           </button>
         ) : null}
       </div>
+      <p className="ps-muted vx-open__line nv-num">{folderLine(folder.media)}</p>
       {folder.media.length === 0 ? (
         <div className="vx-empty">
           <p className="vx-empty__title">Dossier vide</p>
           <p className="ps-muted">Reveal n’a listé aucun média dans ce dossier à la dernière synchro.</p>
         </div>
       ) : (
-        <div className={`vx-browse${media === undefined ? '' : ' vx-browse--sheet'}`}>
-          <ul className="vx-media" aria-label={`Médias de ${name}`}>
-            {folder.media.map((each, at) => (
-              <li key={each.platformMediaId} className="vx-media__cell">
-                <MediaButton
-                  creatorId={creatorId}
-                  sharp={sharp}
-                  media={each}
-                  rank={at + 1}
-                  picked={each.platformMediaId === picked}
-                  onPick={() => {
-                    setPicked((was) => (was === each.platformMediaId ? null : each.platformMediaId));
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
-          {media === undefined ? null : (
-            <MediaSheet
-              key={media.platformMediaId}
-              creatorId={creatorId}
-              media={media}
-              onClose={() => {
-                setPicked(null);
-              }}
-            />
-          )}
-        </div>
+        <ul className="vx-media" aria-label={`Médias de ${name}`}>
+          {folder.media.map((each, rank) => (
+            <li key={each.platformMediaId} className="vx-media__cell">
+              <MediaButton
+                creatorId={creatorId}
+                sharp={!blurred}
+                media={each}
+                rank={rank + 1}
+                picked={each.platformMediaId === picked}
+                onPick={() => {
+                  setPicked(each.platformMediaId);
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+      {media === undefined ? null : (
+        <MediaSheet
+          creatorId={creatorId}
+          media={media}
+          rank={at + 1}
+          count={folder.media.length}
+          onStep={step}
+          onClose={() => {
+            setPicked(null);
+          }}
+        />
       )}
     </div>
   );
@@ -389,8 +395,14 @@ function MediaButton({
         setPointed(false);
       }}
     >
-      <Preview hash={media.blurhash} />
-      {sharp || pointed ? <Sharp creatorId={creatorId} media={media} /> : null}
+      {media.kind === 'audio' ? (
+        <VoiceFace seed={media.platformMediaId} bars={14} />
+      ) : (
+        <>
+          <Preview hash={media.blurhash} />
+          {sharp || pointed ? <Sharp creatorId={creatorId} media={media} /> : null}
+        </>
+      )}
       <span className="vx-tile__kind" aria-hidden="true">
         <KindIcon kind={media.kind} />
       </span>
@@ -401,6 +413,7 @@ function MediaButton({
       ) : null}
       {media.removed ? (
         <span className="vx-tile__gone" aria-hidden="true">
+          <GoneIcon />
           Retiré
         </span>
       ) : null}
@@ -408,58 +421,142 @@ function MediaButton({
   );
 }
 
-/** What the CRM knows of one media: what it is, when it came, Reveal's own text and range. Never the image. */
+/**
+ * One media's sheet, over the page (the app's own `Dialog`: a sheet from the bottom on a phone, a panel on a computer):
+ * its sharp small picture, what it is, when it came, Reveal's own text and range, and the way to the one before or after
+ * (the arrows of the keyboard too).
+ */
 function MediaSheet({
   creatorId,
   media,
+  rank,
+  count,
+  onStep,
   onClose,
 }: {
   creatorId: CreatorId;
   media: VaultMediaView;
+  rank: number;
+  count: number;
+  onStep: (by: -1 | 1) => void;
   onClose: () => void;
 }): JSX.Element {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'ArrowLeft') onStep(-1);
+      if (event.key === 'ArrowRight') onStep(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onStep]);
+
   return (
-    <aside className="vx-sheet" aria-label="Fiche du média">
-      <div className="vx-sheet__top">
-        <div className={`vx-sheet__preview vx-tile--${media.kind}`}>
-          <Preview hash={media.blurhash} />
-          <Sharp creatorId={creatorId} media={media} />
-          <span className="vx-tile__kind" aria-hidden="true">
-            <KindIcon kind={media.kind} />
-          </span>
-        </div>
-        <button
-          type="button"
-          className="nv-close vx-sheet__close"
-          aria-label="Fermer la fiche"
-          onClick={onClose}
+    <Dialog
+      title={mediaKindLine(media)}
+      lead={uploadedLine(media.uploadedAt)}
+      className="vx-dialog"
+      onClose={onClose}
+    >
+      <div className="vx-sheet">
+        <div
+          key={media.platformMediaId}
+          className={`vx-sheet__preview vx-tile--${media.kind}${media.removed ? ' vx-tile--removed' : ''}`}
         >
-          <svg viewBox="0 0 14 14" aria-hidden="true">
-            <path d="M3 3l8 8M11 3l-8 8" />
-          </svg>
-        </button>
-      </div>
-      <p className="vx-sheet__what">{mediaKindLine(media)}</p>
-      <p className="ps-muted vx-sheet__when">{uploadedLine(media.uploadedAt)}</p>
-      {media.removed ? (
-        <p className="vx-sheet__gone">Retiré de Reveal : gardé ici avec ses descriptions.</p>
-      ) : null}
-      <dl className="vx-sheet__facts">
-        <div className="vx-sheet__fact">
-          <dt>Texte de Reveal</dt>
-          <dd>{media.platformDescription ?? <span className="ps-muted">Aucun texte dans Reveal.</span>}</dd>
+          {media.kind === 'audio' ? (
+            <VoiceFace seed={media.platformMediaId} bars={28} />
+          ) : (
+            <>
+              <Preview hash={media.blurhash} />
+              <Sharp creatorId={creatorId} media={media} />
+            </>
+          )}
+          {media.kind !== 'image' && media.durationSeconds !== null ? (
+            <span className="vx-tile__time nv-num" aria-hidden="true">
+              {durationLine(media.durationSeconds)}
+            </span>
+          ) : null}
+          {media.removed ? (
+            <span className="vx-tile__gone" aria-hidden="true">
+              <GoneIcon />
+              Retiré
+            </span>
+          ) : null}
         </div>
-        {media.suggestedPriceMinor === null ? null : (
+        <div className="vx-sheet__steps">
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm vx-sheet__step"
+            aria-label="Média précédent"
+            disabled={rank <= 1}
+            onClick={() => {
+              onStep(-1);
+            }}
+          >
+            <span className="vx-sheet__back" aria-hidden="true">
+              <ChevronIcon />
+            </span>
+          </button>
+          <span className="ps-muted nv-num">
+            {rank} sur {count}
+          </span>
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm vx-sheet__step"
+            aria-label="Média suivant"
+            disabled={rank >= count}
+            onClick={() => {
+              onStep(1);
+            }}
+          >
+            <span aria-hidden="true">
+              <ChevronIcon />
+            </span>
+          </button>
+        </div>
+        {media.removed ? (
+          <p className="vx-sheet__gone">Retiré de Reveal : gardé ici avec ses descriptions.</p>
+        ) : null}
+        <dl className="vx-sheet__facts">
           <div className="vx-sheet__fact">
-            <dt>Prix suggéré par Reveal</dt>
-            <dd className="nv-num">{suggestedLine(media.suggestedPriceMinor)}</dd>
+            <dt className="nv-eyebrow">Texte de Reveal</dt>
+            <dd>{media.platformDescription ?? <span className="ps-muted">Aucun texte dans Reveal.</span>}</dd>
           </div>
+          {media.suggestedPriceMinor === null ? null : (
+            <div className="vx-sheet__fact">
+              <dt className="nv-eyebrow">Prix suggéré par Reveal</dt>
+              <dd className="nv-num">{suggestedLine(media.suggestedPriceMinor)}</dd>
+            </div>
+          )}
+        </dl>
+        {media.kind === 'audio' || media.removed ? null : (
+          <p className="vx-note">Image lue dans Reveal à l’instant, jamais gardée par Impera.</p>
         )}
-      </dl>
-      {media.kind === 'audio' ? null : (
-        <p className="vx-note">Image lue dans Reveal à l’instant, jamais gardée par Impera.</p>
-      )}
-    </aside>
+      </div>
+    </Dialog>
+  );
+}
+
+/** A voice note's face: the theme's surface and a drawn wave (`waveOf`), never a grey blur that reads as disabled. */
+function VoiceFace({ seed, bars }: { seed: string; bars: number }): JSX.Element {
+  const wave = waveOf(seed, bars);
+  return (
+    <span className="vx-voice" aria-hidden="true">
+      <svg className="vx-voice__wave" viewBox={`0 0 ${String(bars * 4)} 20`} preserveAspectRatio="none">
+        {wave.map((height, at) => (
+          <rect
+            key={at}
+            x={at * 4 + 1}
+            y={10 - height * 9}
+            width="2"
+            height={height * 18}
+            rx="1"
+            style={{ animationDelay: `${String(at * 40)}ms` }}
+          />
+        ))}
+      </svg>
+    </span>
   );
 }
 
@@ -542,6 +639,16 @@ function ChevronIcon(): JSX.Element {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true">
       <path d="m6 3.5 4.5 4.5L6 12.5" />
+    </svg>
+  );
+}
+
+/** No longer in Reveal: a cloud struck through. */
+function GoneIcon(): JSX.Element {
+  return (
+    <svg className="vx-gone" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4.6 12.2h6.6a2.8 2.8 0 0 0 .5-5.6 4 4 0 0 0-7.6-.9A3.3 3.3 0 0 0 4.6 12.2Z" />
+      <path d="m2.5 2.5 11 11" />
     </svg>
   );
 }
