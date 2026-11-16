@@ -32,6 +32,11 @@ export interface PlatformConnector {
   readonly capabilities: ConnectorCapabilities;
   health(): Promise<SessionState>;
   listConversations(opts: { since?: Date; limit?: number }): Promise<ConversationSnapshot[]>;
+  /**
+   * One conversation by its id, as the list would give it (recette du 16/11: the copilot opened one no poll read).
+   * One the account does not hold fails with `not_found`.
+   */
+  getConversation(conversationRef: ExternalRef): Promise<ConversationSnapshot>;
   fetchMessages(
     conversationRef: ExternalRef,
     opts: { since?: Date; limit?: number },

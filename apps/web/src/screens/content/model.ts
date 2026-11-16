@@ -124,6 +124,38 @@ export const sameFile = (
 /** Said when a file is of no type we take, whatever its category. */
 export const UNKNOWN_TYPE = 'Ce type de fichier n’est pas pris : choisis une photo, une vidéo ou un vocal';
 
+/** A script she began and has not sent: it stays in « À tourner » until she sends it (recette CRE-12). */
+export const isStartedScript = (drop: ContentDrop): boolean =>
+  drop.category === 'script' && drop.state === 'filling';
+
+/** A line of « À tourner »: a request she has not begun, or a script she began, with the request it answers. */
+export type ToShoot =
+  | { readonly kind: 'request'; readonly request: ContentRequest }
+  | { readonly kind: 'script'; readonly drop: ContentDrop; readonly request: ContentRequest | null };
+
+/**
+ * « À tourner »: her open requests and the scripts she began, the nearest due first (recette CRE-12: a script begun
+ * keeps its place, its day and its progress until she sends it).
+ */
+export function toShoot(requests: readonly ContentRequest[], drops: readonly ContentDrop[]): ToShoot[] {
+  const open: ToShoot[] = openRequests(requests).map((request) => ({ kind: 'request', request }));
+  const begun: ToShoot[] = drops.filter(isStartedScript).map((drop) => ({
+    kind: 'script',
+    drop,
+    request: requests.find((request) => request.id === drop.requestId) ?? null,
+  }));
+  // A script begun without its request read (an old one) goes last: it has no day to be sorted by.
+  const dueOf = (item: ToShoot): string => item.request?.dueOn ?? '9999-12-31';
+  return [...open, ...begun].toSorted((a, b) => dueOf(a).localeCompare(dueOf(b)));
+}
+
+/**
+ * Whether « En route » goes above « Déposer »: while a file of it is still to go up (sending, or cut and to resume),
+ * she sees it without scrolling (recette CRE-09).
+ */
+export const routeFirst = (moving: readonly ContentDrop[]): boolean =>
+  moving.some((drop) => drop.files.some((file) => file.state === 'awaiting'));
+
 /** Her open requests, the nearest first (« À tourner »): those a drop already answers are on their way. */
 export function openRequests(requests: readonly ContentRequest[]): ContentRequest[] {
   return requests
@@ -134,9 +166,12 @@ export function openRequests(requests: readonly ContentRequest[]): ContentReques
 /** Out of her hands: published, or a script her team copied into Reveal (SC-03 c, recette créatrice 8). */
 const isOut = (drop: ContentDrop): boolean => drop.state === 'published' || drop.exportedAt !== null;
 
-/** « En route »: what she dropped and is not out yet, newest first; a withdrawn drop leaves her screen. */
+/**
+ * « En route »: what she dropped and is not out yet, newest first; a withdrawn drop leaves her screen, a script she is
+ * still filling stays in « À tourner ».
+ */
 export function onTheirWay(drops: readonly ContentDrop[]): ContentDrop[] {
-  return drops.filter((drop) => drop.state !== 'withdrawn' && !isOut(drop));
+  return drops.filter((drop) => drop.state !== 'withdrawn' && !isOut(drop) && !isStartedScript(drop));
 }
 
 /** « Publié »: what went out, newest first: a script copied into Reveal with it, where her fans will buy it. */
@@ -220,8 +255,42 @@ export interface LiveSend {
   readonly total: number;
   /** Bytes a second over the last seconds; `null` until it is known. */
   readonly rate: number | null;
-  /** `queued`: after the files before it. `waiting`: the network dropped, it tries again by itself. */
-  readonly phase: 'queued' | 'sending' | 'waiting' | 'done' | 'failed';
+  /**
+   * `queued`: after the files before it. `waiting`: the network dropped, it tries again by itself. `stalled`: the
+   * server keeps answering with an error, it tries again by itself and « Réessayer » tries at once (recette CRE-10).
+   */
+  readonly phase: 'queued' | 'sending' | 'waiting' | 'stalled' | 'done' | 'failed';
+}
+
+/** A file to go up that no send here carries any more: cut, or begun on a page since reloaded. */
+export const isInterrupted = (file: ContentDropFile, live: LiveSend | undefined): boolean =>
+  file.state === 'awaiting' && (live === undefined || live.phase === 'failed');
+
+/**
+ * The files she chose again for a cut drop, each matched to one of its interrupted files by its weight (the server
+ * checks the bytes anyway); those that match none are counted, so that she is told.
+ */
+export function matchResumed<F extends { readonly size: number }>(
+  interrupted: readonly { readonly id: ContentDropFile['id']; readonly bytes: number }[],
+  picked: readonly F[],
+): {
+  readonly pairs: readonly { readonly fileId: ContentDropFile['id']; readonly file: F }[];
+  readonly unmatched: number;
+} {
+  const left = [...interrupted];
+  const pairs: { fileId: ContentDropFile['id']; file: F }[] = [];
+  let unmatched = 0;
+  for (const file of picked) {
+    const index = left.findIndex((one) => one.bytes === file.size);
+    const match = left[index];
+    if (match === undefined) {
+      unmatched += 1;
+      continue;
+    }
+    left.splice(index, 1);
+    pairs.push({ fileId: match.id, file });
+  }
+  return { pairs, unmatched };
 }
 
 /** « 2 min », « 40 s », « 1 h 05 »: how long a send has left. */
@@ -261,6 +330,7 @@ export function fileLine(file: ContentDropFile, live: LiveSend | undefined): str
     if (live === undefined || live.phase === 'failed') return 'Envoi interrompu';
     if (live.phase === 'queued') return 'En attente';
     if (live.phase === 'waiting') return 'Réseau coupé : ça reprend tout seul';
+    if (live.phase === 'stalled') return 'L’envoi n’aboutit pas pour l’instant';
     if (live.phase === 'done') return 'Envoyé';
     const percent = live.total === 0 ? 0 : Math.floor((100 * live.sent) / live.total);
     const left = live.rate === null || live.rate <= 0 ? null : (live.total - live.sent) / live.rate;
@@ -271,6 +341,28 @@ export function fileLine(file: ContentDropFile, live: LiveSend | undefined): str
   if (file.state === 'kept') return 'Bien reçu';
   if (file.state === 'duplicate') return 'Déjà dans ta médiathèque';
   return file.refusal ?? 'Refusé';
+}
+
+const KIND_NAMES: Readonly<Record<DropMediaKind, string>> = {
+  image: 'Photo',
+  video: 'Vidéo',
+  audio: 'Vocal',
+};
+
+/** « 8 s », « 1 min 05 »: a video's or a vocal's length. */
+export function lengthOf(ms: number): string {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  if (seconds < 60) return `${String(seconds)} s`;
+  return `${String(Math.floor(seconds / 60))} min ${String(seconds % 60).padStart(2, '0')}`;
+}
+
+/**
+ * A chosen file as she reads it in the sheet (recette CRE-16): « Photo », « Vidéo · 8 s », « Vocal · 12 s »; never its
+ * name (« IMG_4032.HEIC » tells her nothing). « Fichier » for a type we do not take.
+ */
+export function mediaLabel(kind: DropMediaKind | null, ms: number | null): string {
+  if (kind === null) return 'Fichier';
+  return kind === 'image' || ms === null ? KIND_NAMES[kind] : `${KIND_NAMES[kind]} · ${lengthOf(ms)}`;
 }
 
 /** Above this, the sheet asks her to keep the screen on, on Wi-Fi if she can (ADR 0070 § 5). */

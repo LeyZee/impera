@@ -266,6 +266,17 @@ export class RevealApiConnector implements PlatformConnector {
     return snapshots;
   }
 
+  /** `GET /conversations/:id` (spec § 4): the same item as the list's; another model's answers `not_found`. */
+  async getConversation(conversationRef: ExternalRef): Promise<ConversationSnapshot> {
+    const item = await this.session().get(
+      'conversations.get',
+      REVEAL_ENDPOINTS['conversations.get'].shape,
+      conversationRef.id,
+    );
+    this.conversationOfFan.set(item.member.id, item.conversation.id);
+    return snapshotOf(item);
+  }
+
   /** Oldest first; pages read toward the past until `since`, `limit` or the first message (spec § 4). */
   async fetchMessages(
     conversationRef: ExternalRef,

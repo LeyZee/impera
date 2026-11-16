@@ -3,7 +3,7 @@ import type { JSX } from 'react';
 
 import { CreatorReader } from './CreatorReader';
 import { FanInsights } from './FanInsights';
-import { useCreatorFans } from './api';
+import { useCreatorFanInsights, useCreatorFans } from './api';
 import { fanName, seenOf, unlockedOf } from './view';
 import './sales.css';
 
@@ -28,6 +28,9 @@ export function CreatorSalesPage({
   onSelect: (conversationId: string | null) => void;
 }): JSX.Element {
   const fans = useCreatorFans();
+  // The same read as the panel's (one cache): when both fail, the page says it once (recette CRE-31).
+  const insights = useCreatorFanInsights();
+  const silent = fans.isError && fans.data === undefined && insights.isError && insights.data === undefined;
   const now = useNow();
   const zone = readerZone();
   const list = fans.data?.pages.flatMap((page) => page.items) ?? [];
@@ -39,81 +42,94 @@ export function CreatorSalesPage({
         title="Ventes"
         lead="Tes fans et ce qu’ils ont débloqué. Leur conversation s’ouvre ici, en lecture seule."
       />
-      <FanInsights />
-      <div className="vt-cols">
-        <div className="vt-list">
-          {fans.isError && fans.data === undefined ? (
-            <ServerSilent
-              text="Tes fans n’ont pas pu être lus. Rien ici n’est à jour en attendant."
-              onRetry={() => {
-                void fans.refetch();
-              }}
-            />
-          ) : fans.data === undefined ? (
-            <Panel>
-              <PanelSection>
-                <div className="vt-skeleton" aria-busy="true" aria-label="Chargement de tes fans">
-                  <i />
-                  <i />
-                  <i />
-                </div>
-              </PanelSection>
-            </Panel>
-          ) : (
-            <Panel className="nv-enter" title="Tes fans">
-              <PanelSection>
-                {list.length === 0 ? (
-                  <p className="vt-empty">
-                    Aucun fan pour l’instant : ils arrivent ici dès leur premier message.
-                  </p>
-                ) : (
-                  <>
-                    <p className="vt-note">
-                      À côté de chacun, le prix des messages qu’il a débloqués, TVA comprise, avant parts.
+      {silent ? (
+        <ServerSilent
+          text="Tes fans et leurs chiffres n’ont pas pu être lus. Rien ici n’est à jour en attendant."
+          onRetry={() => {
+            void fans.refetch();
+            void insights.refetch();
+          }}
+        />
+      ) : null}
+      <FanInsights silent={silent} />
+      {silent ? null : (
+        <div className="vt-cols">
+          <div className="vt-list">
+            {fans.isError && fans.data === undefined ? (
+              <ServerSilent
+                text="Tes fans n’ont pas pu être lus. Rien ici n’est à jour en attendant."
+                onRetry={() => {
+                  void fans.refetch();
+                }}
+              />
+            ) : fans.data === undefined ? (
+              <Panel>
+                <PanelSection>
+                  <div className="vt-skeleton" aria-busy="true" aria-label="Chargement de tes fans">
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                </PanelSection>
+              </Panel>
+            ) : (
+              <Panel className="nv-enter" title="Tes fans">
+                <PanelSection>
+                  {list.length === 0 ? (
+                    <p className="vt-empty">
+                      Aucun fan pour l’instant : ils arrivent ici dès leur premier message.
                     </p>
-                    <ul className="vt-rows">
-                      {list.map((fan) => (
-                        <li key={fan.id}>
-                          <FanRow
-                            fan={fan}
-                            seen={seenOf(fan.lastSeenAt, now, zone)}
-                            current={fan.conversationId !== null && fan.conversationId === selected}
-                            onOpen={onSelect}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                    {fans.hasNextPage ? (
-                      <button
-                        type="button"
-                        className="nv-btn nv-btn--plain nv-btn--sm vt-more"
-                        disabled={fans.isFetchingNextPage}
-                        onClick={() => void fans.fetchNextPage()}
-                      >
-                        {fans.isFetchingNextPage ? 'Chargement…' : 'Plus de fans'}
-                      </button>
-                    ) : null}
-                  </>
-                )}
-              </PanelSection>
-            </Panel>
-          )}
+                  ) : (
+                    <>
+                      <p className="vt-note">
+                        À côté de chacun, le prix des messages qu’il a débloqués, TVA comprise, avant parts.
+                      </p>
+                      <ul className="vt-rows">
+                        {list.map((fan) => (
+                          <li key={fan.id}>
+                            <FanRow
+                              fan={fan}
+                              seen={seenOf(fan.lastSeenAt, now, zone)}
+                              current={fan.conversationId !== null && fan.conversationId === selected}
+                              onOpen={onSelect}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                      {fans.hasNextPage ? (
+                        <button
+                          type="button"
+                          className="nv-btn nv-btn--plain nv-btn--sm vt-more"
+                          disabled={fans.isFetchingNextPage}
+                          onClick={() => void fans.fetchNextPage()}
+                        >
+                          {fans.isFetchingNextPage ? 'Chargement…' : 'Plus de fans'}
+                        </button>
+                      ) : null}
+                    </>
+                  )}
+                </PanelSection>
+              </Panel>
+            )}
+          </div>
+          <div className="vt-side">
+            {selected === null ? (
+              <div className="nv-plate vt-hint">
+                <p>Choisis un fan pour lire sa conversation.</p>
+              </div>
+            ) : (
+              <CreatorReader
+                key={selected}
+                conversationId={selected}
+                fallbackName={open === null ? null : fanName(open.displayName)}
+                onClose={() => {
+                  onSelect(null);
+                }}
+              />
+            )}
+          </div>
         </div>
-        <div className="vt-side">
-          {selected === null ? (
-            <p className="vt-hint">Choisis un fan pour lire sa conversation.</p>
-          ) : (
-            <CreatorReader
-              key={selected}
-              conversationId={selected}
-              fallbackName={open === null ? null : fanName(open.displayName)}
-              onClose={() => {
-                onSelect(null);
-              }}
-            />
-          )}
-        </div>
-      </div>
+      )}
     </Page>
   );
 }
