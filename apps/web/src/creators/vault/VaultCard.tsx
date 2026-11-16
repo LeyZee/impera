@@ -4,6 +4,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { askVaultSync, useVault } from './api';
 import {
   SYNC_POLL_MS,
+  foldedRows,
   folderRows,
   phaseAfterRead,
   phaseLine,
@@ -109,7 +110,7 @@ export function VaultCard({
       );
     const figures = vaultFigures(vault.data);
     const rows = folderRows(vault.data);
-    const shown = open ? rows : rows.slice(0, FOLDERS_SHOWN);
+    const shown = open ? rows : foldedRows(rows, FOLDERS_SHOWN);
     return (
       <>
         <div className="nv-tiles vx-tiles">
@@ -138,8 +139,10 @@ export function VaultCard({
         <ul className="vx-folders">
           {shown.map((row) => (
             <li key={row.key} className="vx-folder">
-              <span className="vx-folder__moment" aria-hidden="true">
-                {row.emoji ?? '·'}
+              <span className="vx-folder__mark">
+                {row.unmarked ? (
+                  <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" />
+                ) : null}
               </span>
               <span className="vx-folder__name">{row.name}</span>
               <span className="vx-folder__line nv-num">
@@ -155,7 +158,7 @@ export function VaultCard({
             </li>
           ))}
         </ul>
-        {rows.length > FOLDERS_SHOWN ? (
+        {shown.length < rows.length || open ? (
           <button
             type="button"
             className="nv-btn nv-btn--plain nv-btn--sm ps-self-start"
@@ -193,11 +196,12 @@ export function VaultCard({
           </button>
         ) : null}
       </div>
+      {!isOwner ? <p className="ps-muted vx-note">Seul le propriétaire lance une synchro.</p> : null}
+      {body()}
+      {/* Under the figures, never above them: they do not move when a sync starts. */}
       <p className={`vx-phase vx-phase--${said?.tone ?? 'muted'}`} role="status">
         {said?.text ?? ''}
       </p>
-      {!isOwner ? <p className="ps-muted vx-note">Seul le propriétaire lance une synchro.</p> : null}
-      {body()}
     </section>
   );
 }

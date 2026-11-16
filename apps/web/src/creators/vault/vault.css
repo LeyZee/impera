@@ -1,7 +1,7 @@
 /*
  * « Son coffre Reveal » (ADR 0099), at the head of Créatrices › Scripts, prefixed `vx-`. One card: when it was read,
- * three figures, her folders in Reveal's order. Amber only for what asks her team to act (a folder without ☀️ or 🌙);
- * never a coloured edge.
+ * three figures, her folders in Reveal's order, their names as Reveal gives them. Amber only for what asks her team to
+ * act (a folder without ☀️ or 🌙, its dot the same as its figure's); never a coloured edge.
  */
 .vx-card {
   --_radius: var(--nv-radius-xl);
@@ -120,9 +120,9 @@
 .vx-folder:nth-child(n + 5) {
   animation-delay: 120ms;
 }
-.vx-folder__moment {
-  text-align: center;
-  color: var(--nv-ink-faint);
+.vx-folder__mark {
+  display: flex;
+  justify-content: center;
 }
 .vx-folder__name {
   min-width: 0;
@@ -144,7 +144,7 @@
     padding: 10px 12px;
   }
   .vx-folder {
-    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-columns: 16px minmax(0, 1fr);
   }
   .vx-folder__line {
     grid-column: 2;

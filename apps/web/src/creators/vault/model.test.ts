@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   SYNC_PATIENCE_MS,
+  foldedRows,
   folderRows,
   mediaLine,
   phaseAfterRead,
@@ -73,7 +74,7 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
     expect(mediaLine([mediaOf({ kind: 'audio' }), mediaOf({ kind: 'audio' })])).toBe('2 vocaux');
   });
 
-  it('lists her folders in Reveal’s order, the root and an unnamed one said in words', () => {
+  it('lists her folders in Reveal’s order, the root and an unnamed one said in words, those à classer marked', () => {
     const rows = folderRows(
       viewOf([
         folderOf({ folderRef: null, folderName: null, moment: null }),
@@ -86,12 +87,29 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
         folderOf({ folderRef: 'f3', folderName: null, moment: null, media: [] }),
       ]),
     );
-    expect(rows.map((row) => [row.name, row.emoji, row.line, row.removed])).toEqual([
-      ['Racine du coffre', null, '1 photo', 0],
-      ['Nuit 🌙', '🌙', '1 photo', 1],
-      ['Dossier sans nom', null, 'Vide', 0],
+    // Her names as Reveal gives them, never an emoji added; the root, which has no name to change, is never à classer.
+    expect(rows.map((row) => [row.name, row.unmarked, row.line, row.removed])).toEqual([
+      ['Racine du coffre', false, '1 photo', 0],
+      ['Nuit 🌙', false, '1 photo', 1],
+      ['Dossier sans nom', true, 'Vide', 0],
     ]);
     expect(new Set(rows.map((row) => row.key)).size).toBe(3);
+  });
+
+  it('keeps every folder à classer on screen before « Voir les N dossiers », in Reveal’s order', () => {
+    const rows = folderRows(
+      viewOf(
+        Array.from({ length: 8 }, (_, at) =>
+          folderOf({
+            folderRef: `f${String(at)}`,
+            folderName: `D${String(at)}`,
+            moment: at === 6 ? null : 'day',
+          }),
+        ),
+      ),
+    );
+    expect(foldedRows(rows, 5).map((row) => row.name)).toEqual(['D0', 'D1', 'D2', 'D3', 'D4', 'D6']);
+    expect(foldedRows(rows.slice(0, 3), 5)).toHaveLength(3);
   });
 
   it('gives the three figures: media still listed, folders, folders without ☀️ or 🌙', () => {
@@ -100,9 +118,10 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
         viewOf([
           folderOf({ media: [mediaOf(), mediaOf({ removed: true })] }),
           folderOf({ folderRef: 'f2', moment: null, media: [mediaOf({ kind: 'video' })] }),
+          folderOf({ folderRef: null, folderName: null, moment: null, media: [] }),
         ]),
       ),
-    ).toEqual({ media: 2, folders: 2, unmarked: 1 });
+    ).toEqual({ media: 2, folders: 3, unmarked: 1 });
   });
 
   it('waits for the sync until its date moves, then says it is done', () => {

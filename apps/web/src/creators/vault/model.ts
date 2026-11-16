@@ -31,11 +31,17 @@ export function mediaLine(media: VaultFolderView['media']): string {
   return said.length === 0 ? 'Vide' : said.join(' · ');
 }
 
-/** One folder of her vault as the card lists it, in the platform's order. */
+/**
+ * A folder « À classer »: named, but with neither ☀️ nor 🌙 in its name, so it does not say whether its media are of
+ * the Day or the Night. The vault's root has no name to change: it is never one.
+ */
+const unmarked = (folder: VaultFolderView): boolean => folder.folderRef !== null && folder.moment === null;
+
+/** One folder of her vault as the card lists it, in the platform's order, its name as Reveal gives it. */
 export interface FolderRow {
   readonly key: string;
   readonly name: string;
-  readonly emoji: '☀️' | '🌙' | null;
+  readonly unmarked: boolean;
   readonly line: string;
   /** No longer listed by Reveal at the last sync, kept with their descriptions. */
   readonly removed: number;
@@ -45,11 +51,18 @@ export function folderRows(view: VaultView): FolderRow[] {
   return view.folders.map((folder) => ({
     key: `${folder.platformAccountId}:${folder.folderRef ?? ''}`,
     name: folder.folderName ?? (folder.folderRef === null ? 'Racine du coffre' : 'Dossier sans nom'),
-    emoji: folder.moment === 'day' ? '☀️' : folder.moment === 'night' ? '🌙' : null,
+    unmarked: unmarked(folder),
     line: mediaLine(folder.media),
     removed: folder.media.filter((each) => each.removed).length,
   }));
 }
+
+/**
+ * The folders shown before « Voir les N dossiers »: the first `count` in Reveal's order, and every folder à classer
+ * wherever it stands, so that the figure « À classer » always points at lines on screen.
+ */
+export const foldedRows = (rows: readonly FolderRow[], count: number): FolderRow[] =>
+  rows.filter((row, at) => at < count || row.unmarked);
 
 /** The three figures at the head of the card: media still listed, folders, and those without ☀️ or 🌙 (« À classer »). */
 export function vaultFigures(view: VaultView): {
@@ -60,7 +73,7 @@ export function vaultFigures(view: VaultView): {
   return {
     media: view.folders.reduce((sum, folder) => sum + folder.media.filter((each) => !each.removed).length, 0),
     folders: view.folders.length,
-    unmarked: view.folders.filter((folder) => folder.moment === null).length,
+    unmarked: view.folders.filter(unmarked).length,
   };
 }
 
