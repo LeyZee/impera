@@ -134,6 +134,23 @@ describe('voice guards', () => {
     }
   });
 
+  it('lets her play along with a daydream, and still blocks a real meeting (Messa 16/11)', () => {
+    for (const daydream of [
+      'je te rejoins dans tes rêves 😏',
+      'je t’attends au tournant',
+      'viens me retrouver dans la chambre…',
+      'dans une autre vie on se fait un resto',
+      'imagine, on se fait un verre après la partie',
+      'on se ferait une partie de Warhammer et tu perdrais 😏',
+      'si on se voyait, je te battrais à plate couture',
+    ]) {
+      expect(codes([daydream]), daydream).toEqual([]);
+    }
+    for (const meeting of ['on se fait un resto samedi ?', 'je te rejoins à 20 h', 'viens me voir à Lyon']) {
+      expect(codes([meeting]), meeting).toEqual(['meeting_promise']);
+    }
+  });
+
   it('blocks her naming herself a model, a program, or something not real', () => {
     for (const admission of [
       'je suis claude',

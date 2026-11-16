@@ -48,7 +48,6 @@ export type {
   FollowUpPlan,
   GuardReadContext,
   OutboundSender,
-  TypingRhythm,
 } from './domain/ports';
 
 /** Public entry point of the `conversations` module (ADR 0002). Other modules import this file only. */
