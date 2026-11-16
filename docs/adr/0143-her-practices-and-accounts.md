@@ -71,6 +71,28 @@ Charles décide aussi (16/11) :
 
 17. Sur persona fictive : une question sur un mot de son vocabulaire ; une question hors de la fiche (elle n'invente pas) ; un fan qui demande comment pratiquer seul (pas de mode d'emploi) ; un fan intéressé (orientation, questionnaire, pas d'acceptation) ; une demande de rencontre (pas de pause, pas de oui) ; un fan qui cherche son compte (nom de scène) ; un doute d'âge (rien de tout ça).
 
+### H. Bornes tenues par le code (relecture Sécurité, 16/11)
+
+Elles ne changent pas la décision : elles disent où le code tient la règle. Chaque borne a son test dans le lot a.
+
+Comptes (§ 8 et 9) :
+18. C'est le code, pas le modèle, qui décide qu'un nom de compte peut sortir à ce tour : usage reconnu, compte marqué, aucune coupure du § 16. Un compte non marqué n'entre dans aucun prompt.
+19. Garde de sortie : une réponse qui contient un nom de compte non autorisé à ce tour, ou un lien, est bloquée et réécrite.
+20. L'interrupteur « l'agent peut le donner » est éteint par défaut, changé par le propriétaire seul, et chaque changement est audité.
+
+Orientation (§ 10) :
+21. Les coupures du § 16 sont revérifiées par le code au moment de l'envoi, pas seulement à la décision.
+22. S'ajoute au § 11 : jamais de ville, de région ni d'indication de lieu, même vague.
+23. Pas d'orientation pour un fan qui porte un risque ouvert (menace, insistance, harcèlement), et une seule fois par fan sur une période fixée dans le code.
+
+Mot-clé sans pause (§ 15) :
+24. L'exception ne vaut que pour les mots-clés liés à ces deux cas. Tout autre mot-clé d'alerte présent dans le même message met en pause comme avant.
+25. Les autres gardes passent d'abord et l'emportent : doute d'âge, fan en difficulté, menace.
+26. En cas d'hésitation sur la nature du message, c'est la pause : l'exception demande une décision nette du code, jamais un « peut-être ».
+27. Un fan qui cite un lieu, une date ou une adresse, ou qui laisse entendre qu'il sait où elle se trouve : pause et alerte, pas de réponse de l'agent.
+28. Une insistance répétée sur la rencontre (seuil fixé dans le code) remet la pause.
+29. La garde de sortie refuse toute réponse qui dit oui ou qui fixe quoi que ce soit ; l'alerte part dans tous les cas.
+
 ## Lots
 
 - **a, Agent** : schéma de la section et de « Ses comptes » (contracts), rendu `<her_practices>`, règles B à F dans le code, `account_shared`, évals.
