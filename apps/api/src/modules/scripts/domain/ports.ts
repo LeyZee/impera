@@ -1,4 +1,5 @@
 import type {
+  BranchCondition,
   CreateScriptStructureBody,
   CreatorId,
   Currency,
@@ -21,6 +22,7 @@ import type {
   ScriptStructureVersion,
 } from '@impera/contracts';
 
+import type { BranchSetting } from './branches';
 import type { KnownPlatformScript, PlatformScriptsPlan } from './platform-scripts';
 
 /** A structure of a queue, with the version a request would take: the latest. */
@@ -212,7 +214,7 @@ export interface StoredStepMedia {
 /** A step of a native script as the base keeps it, at its place in the platform's order. */
 interface StoredPlatformStep {
   readonly position: number;
-  /** The platform's own rank (`stepIndex`): two steps on the same are branches (ADR 0112), never offered. */
+  /** The platform's own rank (`stepIndex`): two steps on the same are branches of one step (ADR 0112). */
   readonly platformIndex: number;
   /** What `sendScriptStep` names. */
   readonly ref: string;
@@ -236,6 +238,11 @@ export interface StoredPlatformScript {
   readonly deactivatedAt: Date | null;
   readonly syncedAt: Date;
   readonly steps: readonly StoredPlatformStep[];
+  /**
+   * What the agency set of its branches (ADR 0112 § A 3), by `stepRef`: their order and conditions. A row of a branch
+   * Reveal no longer lists is still here; the domain ignores it.
+   */
+  readonly branches: readonly BranchSetting[];
   /** Every identity written for it, whatever the version (SC-04 lot c8); the domain picks the current one. */
   readonly identities: readonly StoredScriptIdentity[];
 }
@@ -343,4 +350,34 @@ export interface ScriptIdentityReviewStore {
     userId: string,
     currentHash: (script: StoredPlatformScript) => string,
   ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'>;
+}
+
+/** One branch of a step, as the agency sets it: by its `stepRef`, in the order given. */
+export interface BranchInput {
+  readonly stepRef: string;
+  readonly condition: BranchCondition;
+}
+
+/** What setting a step's branches did. */
+export type SetBranchesOutcome =
+  /** Written. */
+  | 'set'
+  /** Not a step of hers with branches, or a reader who may not write her scripts. */
+  | 'not_found'
+  /** The branches named are not those the step has now (Reveal changed them since the reading). */
+  | 'stale';
+
+/** The agency's settings of a script's branches (ADR 0112 § A 3), in the person's transaction. */
+export interface ScriptBranchStore {
+  /**
+   * Every branch of one step at once, in the order given, each with its condition: under her RLS and the team's scope
+   * (the owner, an active manager of her list), audited. The step is read again in the same transaction.
+   */
+  setStep(
+    creatorId: CreatorId,
+    scriptId: string,
+    platformIndex: number,
+    branches: readonly BranchInput[],
+    userId: string,
+  ): Promise<SetBranchesOutcome>;
 }

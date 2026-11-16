@@ -302,11 +302,12 @@ export class RevealApiConnector implements PlatformConnector {
    * gives them, never a price of ours. The fan's history is read again just before: a step already sent in this
    * conversation is refused for good (`ScriptStepAlreadySent`), and a history that cannot be read sends nothing. The
    * price `scripts.list` gives must be the one validated (`expectedPrice`), or nothing is sent (`ScriptStepPriceChanged`).
+   * The step is found by its own id in the script (`stepRef`): a branch is never found by its place (ADR 0112 § 1).
    */
   async sendScriptStep(
     conversationRef: ExternalRef,
     scriptRef: ExternalRef,
-    stepIndex: number,
+    stepRef: ExternalRef,
     expectedPrice: Money,
     idempotencyKey: string,
   ): Promise<SendResult> {
@@ -320,7 +321,7 @@ export class RevealApiConnector implements PlatformConnector {
     );
     const steps = await this.scriptPages([['withConversations', 'false']]);
     const script = scriptsOf(sequences, steps, () => null).find((item) => item.ref.id === scriptRef.id);
-    const step = script?.steps[stepIndex];
+    const step = script?.steps.find((each) => each.ref.id === stepRef.id);
     if (step === undefined) throw new ConnectorError('not_found', 'scripts.list: no such script step');
     const history = sentStepsOf(await this.scriptPages([['conversationId', conversationRef.id]]));
     if (history.some((sent) => sent.stepRef.id === step.ref.id)) throw new ScriptStepAlreadySent();

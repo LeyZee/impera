@@ -40,6 +40,7 @@ function script(overrides: Partial<StoredPlatformScript> = {}): StoredPlatformSc
     active: true,
     deactivatedAt: null,
     syncedAt: new Date('2026-11-15T10:00:00Z'),
+    branches: [],
     steps: [
       {
         position: 0,

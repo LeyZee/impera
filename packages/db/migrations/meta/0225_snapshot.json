@@ -1,6 +1,6 @@
 {
-  "id": "1185ca3d-86de-4d4e-89a2-47510d64a961",
-  "prevId": "8611faba-153c-4211-8189-86bf9f83e483",
+  "id": "1676d596-da92-4c69-b98c-702969cc839c",
+  "prevId": "b9c13c4c-06fa-49a5-8f58-ded911b4ce82",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -17413,6 +17413,159 @@
         "shifts_template_check": {
           "name": "shifts_template_check",
           "value": "(\"shifts\".\"template_id\" is null) = (\"shifts\".\"template_starts_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.platform_script_branches": {
+      "name": "platform_script_branches",
+      "schema": "",
+      "columns": {
+        "platform_script_id": {
+          "name": "platform_script_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_step_ref": {
+          "name": "platform_step_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "branch_order": {
+          "name": "branch_order",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "condition": {
+          "name": "condition",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "platform_script_branches_creator_idx": {
+          "name": "platform_script_branches_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_script_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "platform_script_branches_creator_id_creators_id_fk": {
+          "name": "platform_script_branches_creator_id_creators_id_fk",
+          "tableFrom": "platform_script_branches",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platform_script_branches_updated_by_user_id_fk": {
+          "name": "platform_script_branches_updated_by_user_id_fk",
+          "tableFrom": "platform_script_branches",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platform_script_branches_script_creator_fk": {
+          "name": "platform_script_branches_script_creator_fk",
+          "tableFrom": "platform_script_branches",
+          "tableTo": "platform_scripts",
+          "columnsFrom": ["platform_script_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "platform_script_branches_pkey": {
+          "name": "platform_script_branches_pkey",
+          "columns": ["platform_script_id", "platform_step_ref"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"platform_script_branches\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "team_write": {
+          "name": "team_write",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"platform_script_branches\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"platform_script_branches\".\"updated_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "team_clear": {
+          "name": "team_clear",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "\"platform_script_branches\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "platform_script_branches_order_check": {
+          "name": "platform_script_branches_order_check",
+          "value": "\"platform_script_branches\".\"branch_order\" >= 0 and \"platform_script_branches\".\"branch_order\" < 50"
+        },
+        "platform_script_branches_ref_check": {
+          "name": "platform_script_branches_ref_check",
+          "value": "char_length(\"platform_script_branches\".\"platform_step_ref\") <= 200"
+        },
+        "platform_script_branches_condition_check": {
+          "name": "platform_script_branches_condition_check",
+          "value": "jsonb_typeof(\"platform_script_branches\".\"condition\") = 'object' and \"platform_script_branches\".\"condition\"->>'kind' in ('none', 'structured', 'text')"
         }
       },
       "isRLSEnabled": false
