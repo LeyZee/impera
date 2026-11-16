@@ -57,18 +57,42 @@ export function sexualizationDecision(context: SexualizationContext): Sexualizat
 }
 
 // An age under 18 in his message, unless it plainly is not his: a time (« marié depuis 6 ans », « ça fait 3 ans que »,
-// « 16 ans d'expérience ») or his child's (« deux enfants de 8 et 10 ans »). Read clause by clause. Any doubt left,
-// it counts against him: « 25 ans… enfin 16 ans » is no adult's statement. The safety net reads his words too.
-const UNDER_18_YEARS =
-  /(?<!depuis |fait |il y a |pendant |en |dans )\b(?:1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix(?:[ -]?sept)?) ?(?:ans|an|yo|years?|piges?)\b(?!\s*(?:d'|de |d |que |qu'))/u;
+// « 16 ans d'expérience ») or his child's (« ma fille a 8 ans »). Read clause by clause. Any doubt left, it counts
+// against him: « 25 ans… enfin 16 ans » is no adult's statement. The exemptions are a closed list (relecture Sécurité,
+// #798): « dans 2 ans » is a minor's future, never a time past; « 17 ans d'ailleurs » is his age.
+const UNDER_18 = '(?:1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix(?:[ -]?sept)?)';
+const UNDER_18_YEARS = new RegExp(
+  `(?<!depuis |fait |il y a |pendant |en )\\b${UNDER_18} ?(?:ans|an|yo|years?|piges?)\\b` +
+    `(?!\\s*(?:d'experience|de mariage|d'anciennete|de carriere|que je|que j'|que on|qu'on))`,
+  'u',
+);
+// « J'en ai 15 », « jai 16 » without « ans »: his age all the same, unless a word follows (« j'ai 15 minutes »).
+const UNDER_18_BARE = new RegExp(
+  `\\bj(?:'| )?(?:en )?ai ${UNDER_18}(?!\\d|[ -]?(?:huit|neuf))(?=\\s*(?:$|[^\\p{L}\\s]|(?:et|mais|ok|lol|hein|perso|moi|toi)\\b))`,
+  'u',
+);
 const SOMEONE_ELSES =
   /\b(?:fils|fille|filles|gamin|gamine|gamins|enfant|enfants|neveu|niece|gosse|gosses|bebe|frere|soeur|eleve|eleves)\b/u;
+// A reserve beside an adult age: « 18 ans, enfin… », « en vrai », « bientôt », « dans 3 semaines ». No age is confirmed
+// on a message that holds one: a refusal too many only costs a confirmation at his next message.
+const ADULT_AGE_RESERVE =
+  /\b(?:enfin|en vrai|bientot|presque|pas encore|(?:dans|d'ici) (?:\d+|un|une|deux|trois|quelques) (?:ans?|mois|semaines?|jours?))\b/u;
+
+/** The clause gives someone else's age: a kin word before the age, never after (« 17 ans comme mon frère » is his). */
+function someoneElsesAge(clause: string): boolean {
+  const kin = SOMEONE_ELSES.exec(clause);
+  const age = UNDER_18_YEARS.exec(clause);
+  return kin !== null && age !== null && kin.index < age.index;
+}
 
 function minorAgeIn(text: string): boolean {
   if (safetySigns(text).includes('minor_suspected')) return true;
-  return text
-    .split(/[.,;!?\n…]+/u)
-    .some((clause) => !SOMEONE_ELSES.test(clause) && UNDER_18_YEARS.test(clause));
+  if (UNDER_18_BARE.test(text)) return true;
+  const adultAge =
+    /(?<!\d)(?:1[89]|[2-9]\d)(?!\d)|dix[ -]?huit|dix[ -]?neuf|vingt|trente|quarante|cinquante|soixante/u;
+  const reserved = adultAge.test(text) && ADULT_AGE_RESERVE.test(text);
+  if (reserved) return true;
+  return text.split(/[.,;!?\n…]+/u).some((clause) => UNDER_18_YEARS.test(clause) && !someoneElsesAge(clause));
 }
 
 const UNITS = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];

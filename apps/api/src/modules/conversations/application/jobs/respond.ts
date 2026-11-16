@@ -15,7 +15,7 @@ import {
   type JobPayload,
 } from '@impera/contracts';
 
-import { safetySigns } from '../../../agent';
+import { declaredAdultAge, safetySigns } from '../../../agent';
 import type {
   Clock,
   ComposeInput,
@@ -94,6 +94,34 @@ const noteLine = (fact: {
 }): string => (fact.category === 'operator_note' ? `Note : ${fact.value}` : `${fact.key} : ${fact.value}`);
 
 /**
+ * An age on his card that confirms: noted by a human, or declared with the proof the direct path asks
+ * (`declaredAdultAge`): sure, and the number in his own message the brain cited, with no minor's age in it.
+ */
+function statedAge(
+  fact: {
+    readonly key: string;
+    readonly value: string;
+    readonly kind?: string;
+    readonly confidence?: number;
+    readonly sourceMessageId?: string | null;
+  },
+  history: readonly { readonly id: string; readonly author: string; readonly text: string }[],
+): boolean {
+  if (fact.kind === 'noted') return true;
+  if (
+    fact.kind !== 'declared' ||
+    fact.confidence === undefined ||
+    fact.sourceMessageId === undefined ||
+    fact.sourceMessageId === null
+  )
+    return false;
+  const source = history.find((message) => message.id === fact.sourceMessageId && message.author === 'fan');
+  if (source === undefined) return false;
+  const proof = { key: fact.key, value: fact.value, kind: fact.kind, confidence: fact.confidence };
+  return declaredAdultAge([proof], source.text) !== null;
+}
+
+/**
  * Her notes about the fan, split by who reads them (ADR 0085 § 9): when he has money, his attachment and his moods
  * go to the brain only (`brainNotes`), never to the voice; the rest to both.
  */
@@ -101,7 +129,11 @@ export function fanNotesOf(
   facts: readonly (Parameters<typeof isBrainOnlyFact>[0] & {
     readonly value: string;
     readonly kind?: string;
+    readonly confidence?: number;
+    readonly sourceMessageId?: string | null;
   })[],
+  /** The messages the engine reads: a declared age confirms only when the fan's own message that gave it is here. */
+  history: readonly { readonly id: string; readonly author: string; readonly text: string }[] = [],
 ): {
   readonly notes: string[];
   readonly brainNotes: string[];
@@ -110,12 +142,11 @@ export function fanNotesOf(
 } {
   // His age on the card, in digits (the card refuses anything else): the youngest when several are active. A guessed
   // age counts as much as a confirmed one: under 18, the doubt goes against him (relecture Bilan, #784).
-  // Only one he stated or a human noted confirms an adult age (Charles, 16/11): never the brain's guess alone.
+  // Only one a human noted, or one he stated with the same proof as at the message (relecture Sécurité, #798), confirms
+  // an adult age (Charles, 16/11): never the brain's guess alone.
   const ages = facts.flatMap((fact) => {
     const digits = fact.key === 'age' ? /^\s*(\d{1,2})\s*(?:ans?)?\s*$/u.exec(fact.value)?.[1] : undefined;
-    return digits === undefined
-      ? []
-      : [{ years: Number(digits), stated: fact.kind === 'declared' || fact.kind === 'noted' }];
+    return digits === undefined ? [] : [{ years: Number(digits), stated: statedAge(fact, history) }];
   });
   return {
     notes: facts.filter((fact) => !isBrainOnlyFact(fact)).map(noteLine),
@@ -399,7 +430,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       platformAccountId: read.conversation.platformAccountId,
       platformConversationId: read.conversation.platformConversationId,
       history: read.history,
-      fan: { ...read.stats, ...fanNotesOf(notes) },
+      fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
       ...(waitedFor !== null && { waited: 1 }),
       ...(hours !== null && { hours: hours.hours }),
       ...(read.conversation.desireScore !== null &&

@@ -79,6 +79,26 @@ describe('declaredAdultAge', () => {
     expect(declaredAdultAge(fact('25'), 'J’ai vingt-cinq ans… enfin seize ans')).toBeNull();
   });
 
+  it('never on a minor’s future, a kin word after his age, or a loose exemption (relecture Sécurité, #798)', () => {
+    expect(declaredAdultAge(fact('18'), 'J’ai 18 ans dans 2 ans')).toBeNull();
+    expect(declaredAdultAge(fact('18'), 'J’ai 18 ans, enfin 17 ans comme mon frère')).toBeNull();
+    expect(declaredAdultAge(fact('18'), 'J’ai 18 ans, enfin 17 ans de toute façon')).toBeNull();
+    expect(declaredAdultAge(fact('18'), 'Bon j’ai 17 ans d’ailleurs mais disons 18 ans')).toBeNull();
+    expect(declaredAdultAge(fact('18'), 'jai 18ans mais en vrai jen ai 15')).toBeNull();
+    expect(declaredAdultAge(fact('18'), '18 ans dans 3 semaines')).toBeNull();
+    expect(declaredAdultAge(fact('18'), '18 ans, enfin dans 6 mois')).toBeNull();
+    expect(declaredAdultAge(fact('18'), 'Bientôt 18 ans')).toBeNull();
+    expect(declaredAdultAge(fact('18'), 'j’ai 18 ans. Enfin presque')).toBeNull();
+  });
+
+  it('still reads an adult beside the closed exemptions and someone else’s age', () => {
+    expect(declaredAdultAge(fact('35'), 'J’ai 35 ans, ma fille a 12 ans')).toBe(35);
+    expect(declaredAdultAge(fact('42'), 'J’ai 42 ans et 15 ans de mariage')).toBe(42);
+    expect(declaredAdultAge(fact('30'), 'J’ai 30 ans, 12 ans d’ancienneté dans ma boîte')).toBe(30);
+    expect(declaredAdultAge(fact('28'), 'J’ai 28 ans et j’ai 15 minutes de pause')).toBe(28);
+    expect(declaredAdultAge(fact('19'), 'J’ai dix-neuf ans')).toBe(19);
+  });
+
   it('reads his age beside a time or his children’s ages, and in words (audit du 16/11, C4)', () => {
     expect(declaredAdultAge(fact('34'), 'J’ai 34 ans, marié depuis 6 ans')).toBe(34);
     expect(declaredAdultAge(fact('40'), '40 ans, deux enfants de 8 et 10 ans')).toBe(40);
