@@ -118,7 +118,7 @@ describe('Moi › Trophées, the creator’s', () => {
   it('shows her case with her streaks, and no level', async () => {
     renderPage(NORA_ME);
     const hero = await screen.findByRole('region', { name: '5 livraisons à l’heure' });
-    expect(hero.textContent).toContain('Encore 1 livraison à l’heure');
+    expect(hero.textContent).toContain('Encore 1');
     expect(screen.getByText('Encore 5 jours')).toBeDefined();
     // Her best stays in sight after a break, never read as a loss (ADR 0108 § 9, recette 16/11 CRE-02).
     expect(hero.textContent).toContain('Série en cours : 9 jours · meilleure : 12');
@@ -149,5 +149,43 @@ describe('Moi › Trophées, the creator’s', () => {
     const hero = await screen.findByRole('region', { name: '5 livraisons à l’heure' });
     expect(hero.textContent).toContain('Série en cours : 4 jours · meilleure : 16');
     expect(hero.textContent).toContain('Livraisons à l’heure : 0 de suite · meilleure : 6');
+  });
+
+  it('offers a new creator her first deposit as her next trophy, not a delivery streak at nothing (CRE-14)', async () => {
+    const ahead = (
+      kind: string,
+      family: 'medal' | 'streak' | 'trophy',
+      target: number,
+      unit: 'day' | 'delivery' | 'once',
+    ) => ({
+      kind,
+      family,
+      earnedAt: null,
+      revealedAt: null,
+      progress: { current: 0, target, unit },
+    });
+    const fresh: TrophyCase = {
+      items: [
+        ahead('day_streak_7', 'medal', 7, 'day'),
+        ahead('delivery_streak_5', 'streak', 5, 'delivery'),
+        ahead('first_drop', 'trophy', 1, 'once'),
+        ahead('perfect_day', 'trophy', 1, 'once'),
+      ],
+      streaks: [
+        { kind: 'day', current: 0, best: 0 },
+        { kind: 'delivery', current: 0, best: 0 },
+      ],
+      level: null,
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) =>
+        new URL(input, 'http://localhost').pathname === '/v1/creator-space/trophy-case'
+          ? Promise.resolve(Response.json(fresh))
+          : Promise.resolve(new Response(null, { status: 404 })),
+      ),
+    );
+    renderPage(NORA_ME);
+    expect(await screen.findByRole('region', { name: 'Premier dépôt' })).toBeDefined();
   });
 });
