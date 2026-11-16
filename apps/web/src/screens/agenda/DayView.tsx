@@ -1,5 +1,6 @@
 import type { CreatorAccountShift, CreatorAgenda, CreatorSuggestion, CreatorTask } from '@impera/contracts';
 import { CREATOR_TASK_CATEGORY_LABELS } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import {
   useId,
   useRef,
@@ -17,12 +18,14 @@ import { useWaiting } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { timedSuggestionsOf } from './grid';
 import {
+  closedTickWords,
   firstOf,
   momentOf,
   ownTimed,
   planOf,
   programOf,
   progressOf,
+  tickOpen,
   type DayPlan,
   type DayTask,
   type ProposedAt,
@@ -31,7 +34,13 @@ import { repliesOn } from './replies';
 
 import { useOnline } from '@/pwa/online';
 import { useHerTrophyCase } from '@/rewards/api';
-import { CREATOR_MEDALS, CreatorMedal, highestMedal } from '@/rewards/creator-art';
+import {
+  CREATOR_MEDALS,
+  CreatorMedal,
+  highestMedal,
+  medalName,
+  type CreatorMedalKind,
+} from '@/rewards/creator-art';
 import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { useFloatingTip } from '@/screens/dashboard/parts';
@@ -121,7 +130,7 @@ export function DayView({
             </div>
             <ul className="ag-list">
               {plan.todo.map((item) => (
-                <TaskRow key={item.task.id} item={item} day={day} {...actions} />
+                <TaskRow key={item.task.id} item={item} day={day} today={agenda.today} {...actions} />
               ))}
             </ul>
           </section>
@@ -140,6 +149,7 @@ export function DayView({
           )}
           <Program
             plan={plan}
+            today={agenda.today}
             now={now}
             nowMinute={nowMinute}
             proposed={proposed}
@@ -241,6 +251,10 @@ const ringDash = (share: number): string => {
  * Where her day stands: done out of all, where to start, and what is now or next. Her streak beside it. Aujourd'hui
  * shows the same, read only, with its way into Agenda under it (CREA-19).
  */
+/** The streak pill read aloud: the count, her medal's name the coin is too small to show, and where it leads. */
+const streakWords = (days: number, medal: CreatorMedalKind | null): string =>
+  `${String(days)} ${days > 1 ? 'jours' : 'jour'} de suite${medal === null ? '' : `, médaille ${medalName(medal)}`} : voir mes trophées`;
+
 export function Glance({
   plan,
   agenda,
@@ -257,7 +271,10 @@ export function Glance({
 }): JSX.Element {
   const { done, total } = progressOf(plan);
   const left = total - done;
-  const first = firstOf(plan, nowMinute);
+  // A day to come: nothing yet to do but what is dated, a routine waits for its day (Design, recette 16/11).
+  const ahead = plan.day > agenda.today;
+  const firstAny = firstOf(plan, nowMinute);
+  const first = ahead && firstAny?.task.when.kind === 'routine' ? null : firstAny;
   const proposed = plan.suggestions.length;
   // Nothing of hers but a suggestion waiting: the title says the suggestion, never « Rien à faire » (CRE-05).
   const title =
@@ -267,7 +284,9 @@ export function Glance({
         : 'Rien à faire'
       : left === 0
         ? 'Tout est fait'
-        : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
+        : ahead
+          ? `${String(left)} ${left > 1 ? 'choses prévues' : 'chose prévue'}`
+          : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
   const share = total === 0 ? 0 : done / total;
   // « Plus rien à heure » only when there was something at an hour: an empty day says it once, in the title.
   const moment = nowMinute === null || plan.timed.length === 0 ? null : momentOf(plan, nowMinute);
@@ -315,7 +334,11 @@ export function Glance({
             ) : left === 0 ? (
               `${String(done)} sur ${String(total)}, bravo.`
             ) : first === null ? (
-              `${String(done)} sur ${String(total)} fait.`
+              ahead ? (
+                'Ta routine se coche le jour même.'
+              ) : (
+                `${String(done)} sur ${String(total)} fait.`
+              )
             ) : (
               <>
                 Commence par : <Emoji category={first.task.category} />
@@ -325,31 +348,34 @@ export function Glance({
             )}
           </span>
           {streak.days === 0 ? null : (
-            <span
+            // The pill opens her showcase (ADR 0108 § 1, recette 16/11 CRE-13). At 28 px the coin shows no digit, so
+            // its name goes into the pill's accessible name (ADR 0107 § 1), and into its tip.
+            <Link
+              to="/moi/trophees"
               className="ag-streak"
               data-risk={streak.atRisk ? 'true' : undefined}
+              aria-label={streakWords(streak.days, medal)}
               {...(medal === null
                 ? {
                     title:
                       streak.next === null ? undefined : `Prochain palier : ${String(streak.next)} jours`,
                   }
-                : {
-                    // The pill takes the focus and the tip, not the coin: its ring stays clear of the count (avis
-                    // Design, 14/11), and the pill is what will open her showcase.
-                    tabIndex: 0,
-                    ...tip.bind({
-                      title: `Médaille : série de ${String(CREATOR_MEDALS[medal].days)} jours`,
-                      ...(streak.next === null
-                        ? {}
-                        : { text: `Prochain palier : ${String(streak.next)} jours` }),
-                    }),
-                  })}
+                : tip.bind({
+                    title: `Médaille : série de ${String(CREATOR_MEDALS[medal].days)} jours`,
+                    ...(streak.next === null
+                      ? {}
+                      : { text: `Prochain palier : ${String(streak.next)} jours` }),
+                  }))}
             >
               {medal === null ? null : (
                 <CreatorMedal kind={medal} size={MEDAL_SIZE} className="ag-streak__medal" />
               )}
               <b className="nv-num">{streak.days}</b> {streak.days > 1 ? 'jours' : 'jour'} de suite
-            </span>
+              {/* Said by a chevron, as every line that opens something: a phone has no hover (avis Design). */}
+              <svg className="ag-streak__go" viewBox="0 0 12 12" aria-hidden="true">
+                <path d="m4.5 2.5 3.5 3.5-3.5 3.5" />
+              </svg>
+            </Link>
           )}
         </div>
       </div>
@@ -398,16 +424,37 @@ function Emoji({ category }: { category: CreatorTask['category'] }): JSX.Element
 function Check({
   item,
   day,
+  today,
   onTick,
 }: {
   item: DayTask;
   day: string;
+  today: string;
   onTick: DayActions['onTick'];
 }): JSX.Element {
   // Offline, a tick that waits for the network says so with an amber dot; online, it leaves at once (CREA-24).
   const kept = useWaiting(item.task.id, day);
   const online = useOnline();
   const waiting = kept && !online;
+  // A routine's check on another day than hers is never pressed: the server would refuse it (CRE-03, CRE-07). A day to
+  // come draws none, since an empty ring reads as a box to tick; a day that is over draws what she did, dimmed.
+  if (!tickOpen(item.task, day, today))
+    return day > today ? (
+      <span className="sr-only">{closedTickWords(day, today)}</span>
+    ) : (
+      <span
+        className="ag-check"
+        data-cat={item.task.category}
+        data-closed="true"
+        data-done={item.done ? 'true' : undefined}
+        role="img"
+        aria-label={`${item.task.title}, ${item.done ? 'faite' : 'pas faite'}. ${closedTickWords(day, today)}`}
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m3.5 8.5 3 3 6-7" />
+        </svg>
+      </span>
+    );
   const label = item.done ? `Décocher ${item.task.title}` : `Cocher ${item.task.title}`;
   return (
     <button
@@ -431,11 +478,13 @@ function Check({
 function TaskRow({
   item,
   day,
+  today,
   onTick,
   onTask,
 }: {
   item: DayTask;
   day: string;
+  today: string;
 } & DayActions): JSX.Element {
   const { task } = item;
   return (
@@ -458,7 +507,7 @@ function TaskRow({
       <span className="ag-tag">
         {task.when.kind === 'routine' ? 'Routine' : CREATOR_TASK_CATEGORY_LABELS[task.category]}
       </span>
-      <Check item={item} day={day} onTick={onTick} />
+      <Check item={item} day={day} today={today} onTick={onTick} />
     </li>
   );
 }
@@ -466,6 +515,7 @@ function TaskRow({
 /** Her timed tasks and the free times between them, in order; a free time is a button to add a task there. */
 function Program({
   plan,
+  today,
   now,
   nowMinute,
   proposed,
@@ -473,6 +523,8 @@ function Program({
   ...actions
 }: {
   plan: DayPlan;
+  /** Her today: a routine's check is a button on that day only. */
+  today: string;
   now: Date;
   nowMinute: number | null;
   proposed: readonly ProposedAt[];
@@ -575,7 +627,7 @@ function Program({
                   </span>
                 )}
               </button>
-              <Check item={item} day={item.day} onTick={actions.onTick} />
+              <Check item={item} day={item.day} today={today} onTick={actions.onTick} />
             </div>
           </li>
         );

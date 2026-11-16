@@ -11,10 +11,12 @@ export {
 } from './budget';
 export {
   CALL_OUTCOMES,
+  HEDGE_ROLES,
   createInMemoryCallLog,
   createJsonlCallLog,
   createPersistentCallLog,
   type CallOutcome,
+  type HedgeRole,
   type LlmCallLog,
   type LlmCallRecord,
   type LlmCallStore,
@@ -63,6 +65,7 @@ export {
   type FanCardReadMessage,
   type LlmFailure,
   type LlmGateway,
+  type ScriptIdentityInput,
   type ScriptSummaryInput,
   type ScriptSummaryMedia,
   type ScriptSummaryStep,

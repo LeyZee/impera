@@ -1,4 +1,5 @@
 import {
+  BranchConditionSchema,
   CreatorIdSchema,
   CurrencySchema,
   MediaSlotKindSchema,
@@ -6,6 +7,9 @@ import {
   PlatformAccountIdSchema,
   PlatformScriptIdSchema,
   PlatformScriptMomentSchema,
+  ScriptIdentityAuthorSchema,
+  ScriptIdentityContentSchema,
+  ScriptIdentityIdSchema,
   type PlatformScript,
 } from '@impera/contracts';
 import {
@@ -37,6 +41,8 @@ import type {
 const scripts = schema.platformScripts;
 const steps = schema.platformScriptSteps;
 const stepMedia = schema.platformScriptStepMedia;
+const identities = schema.scriptIdentities;
+const branches = schema.platformScriptBranches;
 
 /** Its steps and their media, in the platform's order: `index` is the position kept (`stepIndex`, ADR 0099 § 3). */
 async function writeSteps(
@@ -50,6 +56,7 @@ async function writeSteps(
       platformScriptId: scriptId,
       creatorId,
       position: step.index,
+      platformIndex: step.platformIndex,
       platformStepRef: step.ref.id,
       name: step.name,
       text: step.text,
@@ -117,8 +124,10 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
 
     apply: (account, plan: PlatformScriptsPlan, now) =>
       withAdmin(adminDb, async (tx) => {
+        const written: string[] = [];
         for (const script of plan.added) {
           const id = newId(PlatformScriptIdSchema);
+          written.push(id);
           await tx.insert(scripts).values({
             id,
             creatorId: account.creatorId,
@@ -132,6 +141,7 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
           await writeSteps(tx, id, account.creatorId, script);
         }
         for (const { id, script } of plan.changed) {
+          written.push(id);
           await tx
             .update(scripts)
             .set({
@@ -157,6 +167,7 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
             .update(scripts)
             .set({ active: false, deactivatedAt: now })
             .where(and(inArray(scripts.id, [...plan.gone]), eq(scripts.platformAccountId, account.id)));
+        return written;
       }),
   };
 }
@@ -169,14 +180,14 @@ const LinkRowSchema = z.object({
   platform_account_id: z.uuid(),
   platform_media_id: z.string(),
   media_asset_id: z.uuid().nullable(),
-  described: z.boolean(),
+  description_id: z.uuid().nullable(),
 });
 
 /**
  * Where the media of these scripts stand in her vault (`media_platform_refs`, written by the vault sync, fiche
  * vault-sync), in the caller's transaction and so under its RLS: a link the platform no longer lists (`removed_at`) is
- * not in the vault. `described`: its media has a description a human validated (ADR 0083), as the drops read it. Keyed
- * by account and platform id.
+ * not in the vault. `description_id`: the latest description of its media a human validated (ADR 0083), with its
+ * `detailed` text, as the script sheet reads it (SC-04 lot c4). Keyed by account and platform id.
  */
 async function vaultLinksOf(
   tx: Transaction,
@@ -194,10 +205,10 @@ async function vaultLinksOf(
   );
   const result = await tx.execute(sql`
     select l.platform_account_id, l.platform_media_id, l.media_asset_id,
-      (l.media_asset_id is not null and exists (
-        select 1 from ${schema.mediaDescriptions} md
-        where md.media_asset_id = l.media_asset_id and md.validated_at is not null
-      )) as described
+      (select md.id from ${schema.mediaDescriptions} md
+        where md.media_asset_id = l.media_asset_id and md.validated_at is not null and md.content ? 'detailed'
+        order by md.validated_at desc, md.created_at desc, md.id desc
+        limit 1) as description_id
     from ${schema.mediaPlatformRefs} l
     where l.platform_account_id in (${accounts})
       and l.platform_media_id in (${refs})
@@ -208,13 +219,16 @@ async function vaultLinksOf(
       .parse(result.rows)
       .map((row) => [
         `${row.platform_account_id}:${row.platform_media_id}`,
-        { mediaAssetId: row.media_asset_id, described: row.described },
+        { mediaAssetId: row.media_asset_id, descriptionId: row.description_id },
       ]),
   );
 }
 
-/** Rows of a set of scripts, put back together in the platform's order, with their vault links. */
-async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<StoredPlatformScript[]> {
+/**
+ * Rows of a set of scripts, put back together in the platform's order, with their vault links, the settings of their
+ * branches (ADR 0112) and their identities.
+ */
+export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<StoredPlatformScript[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
   const stepRows = await tx
@@ -228,6 +242,16 @@ async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<St
     .where(inArray(stepMedia.platformScriptId, ids))
     .orderBy(stepMedia.platformScriptId, stepMedia.position, stepMedia.role, stepMedia.rank);
   const links = await vaultLinksOf(tx, rows, mediaRows);
+  const identityRows = await tx
+    .select()
+    .from(identities)
+    .where(inArray(identities.platformScriptId, ids))
+    .orderBy(identities.createdAt, identities.id);
+  const branchRows = await tx
+    .select()
+    .from(branches)
+    .where(inArray(branches.platformScriptId, ids))
+    .orderBy(branches.platformScriptId, branches.branchOrder, branches.platformStepRef);
   const accountOf = new Map(rows.map((row) => [row.id, row.platformAccountId]));
   const mediaOf = (step: StepRow, role: 'sold' | 'preview'): StoredStepMedia[] =>
     mediaRows
@@ -255,6 +279,7 @@ async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<St
       .filter((step) => step.platformScriptId === row.id)
       .map((step) => ({
         position: step.position,
+        platformIndex: step.platformIndex,
         ref: step.platformStepRef,
         name: step.name,
         text: step.text,
@@ -262,6 +287,24 @@ async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<St
         currency: CurrencySchema.parse(step.currency),
         media: mediaOf(step, 'sold'),
         previewMedia: mediaOf(step, 'preview'),
+      })),
+    branches: branchRows
+      .filter((branch) => branch.platformScriptId === row.id)
+      .map((branch) => ({
+        stepRef: branch.platformStepRef,
+        order: branch.branchOrder,
+        condition: BranchConditionSchema.parse(branch.condition),
+      })),
+    identities: identityRows
+      .filter((identity) => identity.platformScriptId === row.id)
+      .map((identity) => ({
+        id: ScriptIdentityIdSchema.parse(identity.id),
+        inputHash: identity.inputHash,
+        content: ScriptIdentityContentSchema.parse(identity.content),
+        author: ScriptIdentityAuthorSchema.parse(identity.author),
+        promptHash: identity.promptHash,
+        validatedAt: identity.validatedAt,
+        createdAt: identity.createdAt,
       })),
   }));
 }

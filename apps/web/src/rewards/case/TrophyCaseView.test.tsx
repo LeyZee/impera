@@ -3,7 +3,7 @@ import type { TrophyCase, TrophyCaseItem } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TrophyCaseView, type TrophyCaseEntry } from './TrophyCaseView';
+import { TrophyCaseDown, TrophyCaseLoading, TrophyCaseView, type TrophyCaseEntry } from './TrophyCaseView';
 
 // Reduced motion: the percentage is its final figure at once, the reveal its still picture.
 beforeEach(() => {
@@ -15,6 +15,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.sessionStorage.clear();
 });
 
 const NAMES: Readonly<Record<string, string>> = {
@@ -107,6 +108,28 @@ describe('TrophyCaseView', () => {
     expect(hero.textContent).toContain('Meilleure série : 14 shifts');
   });
 
+  it('tops an object of one gesture with how to earn it, never « 0 % » (recette 16/11, CRE-14)', () => {
+    renderCase({
+      trophyCase: {
+        items: [
+          {
+            kind: 'first_sale',
+            family: 'trophy',
+            earnedAt: null,
+            revealedAt: null,
+            progress: { current: 0, target: 1, unit: 'once' },
+          },
+        ],
+        streaks: [],
+        level: null,
+      },
+    });
+    const hero = screen.getByRole('region', { name: 'Première vente' });
+    expect(hero.textContent).toContain('Comment gagner Première vente');
+    expect(hero.textContent).not.toContain('%');
+    expect(screen.queryByRole('meter', { name: /Première vente/ })).toBeNull();
+  });
+
   it('lays the shelves out in their order and leaves out what the screen does not know', () => {
     renderCase();
     expect(screen.getAllByRole('heading', { level: 3 }).map((one) => one.textContent)).toEqual([
@@ -161,5 +184,61 @@ describe('TrophyCaseView', () => {
     expect(screen.getByText('3 fois · dernière le 9 nov.')).toBeDefined();
     fireEvent.click(screen.getByText('Série de 5'));
     expect(screen.getAllByText('3 fois · dernière le 9 nov.')).toHaveLength(2);
+  });
+});
+
+describe('TrophyCaseView, the recette of 16/11', () => {
+  const stage = (): HTMLElement => {
+    const one = document.querySelector<HTMLElement>('.tc');
+    if (one === null) throw new Error('no case');
+    return one;
+  };
+
+  it('plays its entrance once a session, and stands still when the tab is opened again (CHT-19)', () => {
+    renderCase();
+    expect(stage().dataset['still']).toBe('false');
+    cleanup();
+    renderCase();
+    expect(stage().dataset['still']).toBe('true');
+  });
+
+  it('never plays the entrance for the agency, nor spends the member’s', () => {
+    renderCase({ readOnly: true });
+    expect(stage().dataset['still']).toBe('true');
+    cleanup();
+    renderCase();
+    expect(stage().dataset['still']).toBe('false');
+  });
+
+  it('plays the entrance when the browser keeps nothing', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    renderCase();
+    expect(stage().dataset['still']).toBe('false');
+    vi.restoreAllMocks();
+  });
+
+  it('closes the detail of an object not yet earned with Échap (CHT-20)', () => {
+    renderCase();
+    fireEvent.click(screen.getByText('Palier Or'));
+    const dialog = screen.getByRole('dialog', { name: 'Palier Or' });
+    expect(document.activeElement).toBe(dialog);
+    fireEvent.keyDown(document.activeElement ?? dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('shows the shapes of the case while it is read, and says when the server does not answer (CHT-18)', () => {
+    render(<TrophyCaseLoading />);
+    expect(screen.getByLabelText('Chargement de la vitrine').getAttribute('aria-busy')).toBe('true');
+    cleanup();
+    const onRetry = vi.fn();
+    render(<TrophyCaseDown onRetry={onRetry} />);
+    expect(screen.getByRole('alert').textContent).toContain('Ta vitrine n’a pas pu être lue.');
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });

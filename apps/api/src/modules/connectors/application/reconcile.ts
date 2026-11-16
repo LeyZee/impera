@@ -12,9 +12,9 @@ const RECONCILE_WINDOW_HOURS = 24;
 const RECONCILE_MESSAGES = 20;
 
 /**
- * `connector.reconcile` (message-flow.md §7), every 10 minutes on the account's queue: re-reads the recent
- * conversations without a `since` cursor and ingests what the polls missed (idempotent). The safety net against
- * lost messages.
+ * `connector.reconcile` (message-flow.md §7), every 10 minutes on the account's queue: re-reads the conversations
+ * that moved in the last 24 hours, whatever the polls' cursor, and ingests what the polls missed (idempotent). The
+ * safety net against lost messages.
  */
 export function createReconcileJob(deps: AccountJobDeps) {
   return async (payload: JobPayload<'connector.reconcile'>, logger: JobLogger): Promise<void> => {
@@ -28,9 +28,11 @@ export function createReconcileJob(deps: AccountJobDeps) {
     if (connector === null) return;
     const meta = { correlationId: payload.correlationId, at: now };
     try {
-      const cutoff = now.getTime() - RECONCILE_WINDOW_HOURS * 3_600_000;
-      const snapshots = (await connector.listConversations({})).filter(
-        (snapshot) => snapshot.lastMessageAt !== null && new Date(snapshot.lastMessageAt).getTime() >= cutoff,
+      // The window goes to the platform: without it the list is read to its end, every page of every fan she ever had
+      // (recette du 16/11: past the adapter's page bound, the reconcile failed each time and fed the breaker).
+      const since = new Date(now.getTime() - RECONCILE_WINDOW_HOURS * 3_600_000);
+      const snapshots = (await connector.listConversations({ since })).filter(
+        (snapshot) => snapshot.lastMessageAt !== null && new Date(snapshot.lastMessageAt) >= since,
       );
       let created = 0;
       for (const snapshot of snapshots) {

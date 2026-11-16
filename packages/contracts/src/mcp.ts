@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { AgencyPeriodSchema, AgencySaleKindSchema } from './agency-insights';
 import { AiUsageCapStateSchema } from './ai-usage';
 import { DropCategorySchema, DropStateSchema } from './content-drops';
 import { FactCategorySchema, PlatformSchema, StoredFactKindSchema } from './enums';
@@ -12,10 +13,14 @@ import {
   CreatorIdSchema,
   FanIdSchema,
   McpGrantIdSchema,
+  PlatformAccountIdSchema,
   ShiftIdSchema,
   TeamMemberIdSchema,
 } from './ids';
 import { CurrencySchema } from './money';
+import { PayPeriodSchema } from './pay-periods';
+import { CommissionStatementStatusSchema, PAYOUT_DELAY_MAX_BUSINESS_DAYS } from './payroll';
+import { TimezoneSchema } from './persona';
 import { SaleTypeSchema } from './sales-feed';
 import { PLANNING_MAX_DAYS } from './scheduling';
 import {
@@ -535,3 +540,183 @@ export const McpSalesListSchema = z.strictObject({
   ),
 });
 export type McpSalesList = z.infer<typeof McpSalesListSchema>;
+
+/**
+ * `platform_daily_stats_list` (ADR 0081, ADR 0105 § 4, `read:status`): each creator account's day as the platform
+ * counted it, counters only, `null` while the platform has not computed one. No amount, no fan, no member.
+ */
+export const McpDailyStatsListSchema = z.strictObject({
+  from: z.iso.date(),
+  to: z.iso.date(),
+  creators: z.array(
+    z.strictObject({
+      creatorId: CreatorIdSchema,
+      days: z.array(
+        z.strictObject({
+          platform: PlatformSchema,
+          /** Impera's id of the creator's account, never the platform's: two accounts on one platform stay apart. */
+          platformAccountId: PlatformAccountIdSchema,
+          day: z.iso.date(),
+          newSubscribers: counted,
+          unsubscribes: counted.nullable(),
+          activeSubscribers: counted,
+          renewals: counted.nullable(),
+          ppvSent: counted.nullable(),
+          ppvPurchased: counted,
+          messagesSent: counted.nullable(),
+          messagesReceived: counted.nullable(),
+          readAt: z.iso.datetime(),
+        }),
+      ),
+    }),
+  ),
+});
+export type McpDailyStatsList = z.infer<typeof McpDailyStatsListSchema>;
+
+/** `commission_statements_list`'s input: the period, by its first day (`2026-11-01` or `2026-11-16`). */
+export const McpPayPeriodInputSchema = z.strictObject({ period: PayPeriodSchema });
+
+/** Why pay could not compute the period, its own strict copy for the tool: each code with its fields only. */
+const McpPayPeriodBlockSchema = z.discriminatedUnion('code', [
+  z.strictObject({
+    code: z.literal('commission_rate_missing_conflict'),
+    memberIds: z.array(TeamMemberIdSchema),
+    since: z.iso.datetime(),
+  }),
+  z.strictObject({
+    code: z.literal('exchange_rate_missing_conflict'),
+    currency: CurrencySchema.exclude(['EUR']),
+    since: z.iso.datetime(),
+  }),
+]);
+
+/**
+ * `commission_statements_list` (ADR 0105 § 3 and § 4, `read:payroll`; Charles's decision A of 14/11): the state of a
+ * period, never an amount of a member. Its window, when the team closed it, why pay could not compute it, the payout
+ * delay the owner announced; for each statement the person may see, its member, status, revision and dates, whether
+ * its transfer waits (without why) and whether it is late (`null` without a delay announced). The team's sums only for
+ * a person who sees the whole team, else `null`; the total and the payable each `null` unless two statements at least
+ * bring an amount to it. No net, commission, bonus, total nor payable of a member: neither a rate nor a member's pay
+ * can be read from it.
+ */
+export const McpPayPeriodStateSchema = z.strictObject({
+  period: PayPeriodSchema,
+  window: z
+    .strictObject({
+      period: PayPeriodSchema,
+      startsAt: z.iso.datetime(),
+      endsAt: z.iso.datetime(),
+      timeZone: TimezoneSchema,
+    })
+    .nullable(),
+  closedAt: z.iso.datetime().nullable(),
+  blocked: McpPayPeriodBlockSchema.nullable(),
+  payoutDelayBusinessDays: z.number().int().min(1).max(PAYOUT_DELAY_MAX_BUSINESS_DAYS).nullable(),
+  statements: z.array(
+    z.strictObject({
+      memberId: TeamMemberIdSchema,
+      status: CommissionStatementStatusSchema,
+      revision: z.number().int().min(1),
+      computedAt: z.iso.datetime(),
+      validatedAt: z.iso.datetime().nullable(),
+      paidAt: z.iso.datetime().nullable(),
+      payoutBlocked: z.boolean(),
+      /** `null` while the owner announced no payout delay: not known. */
+      payoutLate: z.boolean().nullable(),
+    }),
+  ),
+  counts: z.strictObject({
+    draft: counted,
+    validated: counted,
+    paid: counted,
+    payoutBlocked: counted,
+    payoutLate: counted.nullable(),
+  }),
+  team: z
+    .strictObject({ statements: counted, totalMinor: cents.nullable(), payableMinor: cents.nullable() })
+    .nullable(),
+});
+export type McpPayPeriodState = z.infer<typeof McpPayPeriodStateSchema>;
+
+/** `stats_get`'s input: the period, today included (`day`, `week`, `month` or `quarter`: 1, 7, 30 or 90 days). */
+export const McpStatsInputSchema = z.strictObject({ period: AgencyPeriodSchema });
+
+/** The agency's figures of a period without the shares (ADR 0105 § 3): no rate can be read back from them. */
+const McpStatsFiguresShape = {
+  revenueMinor: cents,
+  revenueExclVatMinor: cents,
+  netMinor: cents,
+  sales: counted,
+  refunds: counted,
+};
+const McpStatsFiguresSchema = z.strictObject(McpStatsFiguresShape);
+const McpStatsBreakdownShape = {
+  revenueMinor: cents,
+  byCreator: z.array(z.strictObject({ creatorId: CreatorIdSchema, revenueMinor: cents })),
+  byKind: z.array(z.strictObject({ kind: AgencySaleKindSchema, revenueMinor: cents })),
+};
+const McpStatsSubscriberFiguresSchema = z.strictObject({
+  activeAtEnd: counted.nullable(),
+  activeBefore: counted.nullable(),
+  newSubscribers: counted,
+  unsubscribes: counted.nullable(),
+  renewals: counted.nullable(),
+  ppvSent: counted.nullable(),
+  ppvPurchased: counted,
+  messagesSent: counted.nullable(),
+  messagesReceived: counted.nullable(),
+  daysRead: counted,
+  days: counted,
+});
+
+/**
+ * `stats_get` (ADR 0026 § 5, ADR 0078, `read:status`, the agency's access): the agency's figures as the Dashboard's
+ * « Agence » screen reads them, for the owner and an active manager (his list only), in a closed form. Never the
+ * agency's nor a creator's share, never the VAT on the agency's transfers, never who sold (Charles's decision A,
+ * 14/11: no amount of a member), never a fan. Each field is named here: a field the screen gains one day does not
+ * leave by the MCP without a review.
+ */
+export const McpStatsSchema = z.strictObject({
+  period: AgencyPeriodSchema,
+  from: z.iso.date(),
+  to: z.iso.date(),
+  previousFrom: z.iso.date(),
+  previousTo: z.iso.date(),
+  creators: z.array(z.strictObject({ creatorId: CreatorIdSchema, name: z.string().min(1) })),
+  totals: z.strictObject({ current: McpStatsFiguresSchema, previous: McpStatsFiguresSchema }),
+  days: z.array(z.strictObject({ day: z.iso.date(), ...McpStatsBreakdownShape })),
+  kinds: z.array(
+    z.strictObject({
+      kind: AgencySaleKindSchema,
+      revenueMinor: cents,
+      sales: counted,
+      previousRevenueMinor: cents,
+    }),
+  ),
+  byCreator: z.array(
+    z.strictObject({ creatorId: CreatorIdSchema, ...McpStatsFiguresShape, previousRevenueMinor: cents }),
+  ),
+  /** Sales by ISO day of the week (Monday first) and hour, in `timeZone`: 7 rows of 24 sums in cents. */
+  hours: z.array(z.array(cents).length(24)).length(7),
+  /** For `day` only, its 24 hours; empty otherwise. */
+  hourly: z.array(z.strictObject({ hour: z.number().int().min(0).max(23), ...McpStatsBreakdownShape })),
+  fans: z.strictObject({
+    paying: counted,
+    previousPaying: counted,
+    newPaying: counted,
+    topTenShare: z.number().int().min(0).max(100).nullable(),
+    averagePerPayingMinor: cents.nullable(),
+  }),
+  refundsWithoutSale: counted,
+  timeZone: z.string().min(1),
+  dollarsLeftOut: z.boolean(),
+  subscribers: z
+    .strictObject({
+      current: McpStatsSubscriberFiguresSchema,
+      previous: McpStatsSubscriberFiguresSchema,
+      days: z.array(z.strictObject({ day: z.iso.date(), active: counted.nullable() })),
+      readAt: z.iso.datetime(),
+    })
+    .nullable(),
+});
+export type McpStats = z.infer<typeof McpStatsSchema>;

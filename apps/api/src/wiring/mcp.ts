@@ -6,9 +6,11 @@ import type { ConnectorsModule } from '../modules/connectors';
 import type { ContentDropsModule } from '../modules/content-drops';
 import type { FansModule } from '../modules/fans';
 import { createMcpModule, McpReadRefused, type ActorView, type McpModule } from '../modules/mcp';
+import type { PayrollModule } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import type { SchedulingModule, ShiftCreators } from '../modules/scheduling';
 import type { ScriptsModule } from '../modules/scripts';
+import type { SupervisionModule } from '../modules/supervision';
 
 import type { Routes, Shared } from './shared';
 
@@ -40,8 +42,8 @@ async function actorOf(
 }
 
 /**
- * A connectors' read that refused the person in its own transaction becomes a refusal of the call (`McpReadRefused`),
- * written down as such; anything else stays an error.
+ * A connectors' or pay's read that refused the person in its own transaction becomes a refusal of the call
+ * (`McpReadRefused`), written down as such; anything else stays an error.
  */
 export async function refusedAsMcp<T>(read: () => Promise<T>): Promise<T> {
   try {
@@ -49,7 +51,10 @@ export async function refusedAsMcp<T>(read: () => Promise<T>): Promise<T> {
   } catch (error) {
     if (error instanceof DomainError && error.code === 'connector_reads_forbidden')
       throw new McpReadRefused('creator_forbidden');
-    if (error instanceof DomainError && error.code === 'sales_feed_team_forbidden')
+    if (
+      error instanceof DomainError &&
+      (error.code === 'sales_feed_team_forbidden' || error.code === 'role_forbidden')
+    )
       throw new McpReadRefused('role_forbidden');
     throw error;
   }
@@ -68,6 +73,8 @@ export function wireMcp(
   scheduling: Pick<SchedulingModule, 'reads'>,
   aiUsage: Pick<AiUsageModule, 'read'>,
   connectors: Pick<ConnectorsModule, 'reads'>,
+  payroll: Pick<PayrollModule, 'reads'>,
+  supervision: Pick<SupervisionModule, 'reads'>,
 ): WiredMcp {
   const module = createMcpModule({
     db: shared.db,
@@ -102,12 +109,21 @@ export function wireMcp(
         ),
     },
     aiUsage: { read: () => aiUsage.read() },
+    stats: {
+      agencyInsights: (reader, period, creatorId) =>
+        supervision.reads.agencyInsights(reader, period, creatorId),
+    },
     teamImport: {
       teamImport: (userId, platform) => refusedAsMcp(() => connectors.reads.teamImport(userId, platform)),
     },
     sales: {
       sales: (userId, creatorIds, range) =>
         refusedAsMcp(() => connectors.reads.sales(userId, creatorIds, range)),
+      dailyStats: (userId, creatorIds, range) =>
+        refusedAsMcp(() => connectors.reads.dailyStats(userId, creatorIds, range)),
+    },
+    payroll: {
+      periodState: (reader, period) => refusedAsMcp(() => payroll.reads.periodState(reader, period)),
     },
   });
   return {

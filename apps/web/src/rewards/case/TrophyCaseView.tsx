@@ -11,6 +11,7 @@ import {
   onShelf,
   percentOf,
   shelvesOf,
+  SHELF_ORDER,
   type ShelfFamily,
 } from './arrange';
 
@@ -48,6 +49,25 @@ const SHELF_TITLES: Readonly<Record<ShelfFamily, string>> = {
 
 const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
 const SHORT_DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
+
+/** The entrance plays once a session (ADR 0108 § 10): coming back to the tab finds the case standing (CHT-19). */
+const ENTERED = 'impera.trophy-case.entered';
+
+function enteredBefore(): boolean {
+  try {
+    return window.sessionStorage.getItem(ENTERED) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markEntered(): void {
+  try {
+    window.sessionStorage.setItem(ENTERED, '1');
+  } catch {
+    // A browser that keeps nothing replays the entrance: nothing is lost.
+  }
+}
 
 const RING = 240;
 const STROKE = 9;
@@ -180,6 +200,7 @@ export function TrophyCaseView({
   sound,
   readOnly = false,
   shelfTitles,
+  emptyShelves,
   onRevealed,
 }: {
   trophyCase: TrophyCase;
@@ -187,14 +208,19 @@ export function TrophyCaseView({
   entry: (item: TrophyCaseItem) => TrophyCaseEntry | null;
   /** The figures beside the next trophy, three at most (« Série en cours », « Meilleure série »). */
   chips: readonly { readonly label: string; readonly value: string }[];
-  /** The chatter's honorary rank, already said in words; the creator has none (ADR 0107 § 4). */
-  level?: string | null;
+  /**
+   * The chatter's honorary rank at the head of the case: its insignia and its line, already in words (the rank held,
+   * or the first one ahead); the creator has none (ADR 0107 § 4).
+   */
+  level?: { readonly art: ReactNode; readonly text: string } | null;
   /** The account's « Sons » preference. */
   sound: boolean;
   /** The agency's look at a member's case (ADR 0108 § 19): no entrance, no « Revoir », nothing marked seen. */
   readOnly?: boolean;
   /** A role's own name for a shelf, where the default would say the same word twice (the creator's deliveries). */
   shelfTitles?: Partial<Readonly<Record<ShelfFamily, string>>>;
+  /** A shelf kept even with nothing on it, and the words that say why (CHT-17: no tiers set yet). */
+  emptyShelves?: Partial<Readonly<Record<ShelfFamily, string>>>;
   /** An owed reveal was played here: its caller marks it seen. */
   onRevealed?: (item: TrophyCaseItem) => void;
 }): JSX.Element {
@@ -202,12 +228,19 @@ export function TrophyCaseView({
   const [open, setOpen] = useState<TrophyCaseItem | null>(null);
   const [playing, setPlaying] = useState<TrophyCaseItem | null>(null);
   const [unfolded, setUnfolded] = useState<ReadonlySet<ShelfFamily>>(new Set());
+  const [still] = useState(() => readOnly || enteredBefore());
+  useEffect(() => {
+    if (!readOnly) markEntered();
+  }, [readOnly]);
 
   const known = {
     ...trophyCase,
     items: trophyCase.items.filter((item) => onShelf(item) && entry(item) !== null),
   };
-  const shelves = shelvesOf(known);
+  const shelves = shelvesOf(
+    known,
+    SHELF_ORDER.filter((family) => emptyShelves?.[family] !== undefined),
+  );
   const next = nextTrophy(known);
   const nextEntry = next === null ? null : entry(next);
   const total = known.items.length;
@@ -219,13 +252,14 @@ export function TrophyCaseView({
   };
   const playingEntry = playing === null ? null : entry(playing);
   const openEntry = open === null ? null : entry(open);
+  const nextPercent = next === null ? null : percentOf(next.progress, false);
 
   return (
-    <div className="tc" data-still={readOnly}>
+    <div className="tc" data-still={still}>
       {next !== null && nextEntry !== null ? (
         <section className="tc-hero" aria-labelledby={`${id}-next`} style={{ '--tc-i': 0 }}>
           <div className="tc-hero__object">
-            <Ring percent={percentOf(next.progress, false) ?? 0} />
+            <Ring percent={nextPercent ?? 0} />
             <span className="tc-hero__art">{nextEntry.art(168, false)}</span>
           </div>
           <div className="tc-hero__text">
@@ -233,8 +267,15 @@ export function TrophyCaseView({
             <h2 id={`${id}-next`} className="tc-hero__name">
               {nextEntry.name}
             </h2>
-            <Percent value={percentOf(next.progress, false) ?? 0} />
-            {nextEntry.left === undefined ? null : <p className="tc-hero__left">{nextEntry.left}</p>}
+            {/* An object of one gesture: no figure, how to earn it instead (recette 16/11, CRE-14). */}
+            {nextPercent === null ? (
+              <p className="tc-hero__left">{nextEntry.how}</p>
+            ) : (
+              <>
+                <Percent value={nextPercent} />
+                {nextEntry.left === undefined ? null : <p className="tc-hero__left">{nextEntry.left}</p>}
+              </>
+            )}
             <ul className="tc-chips">
               <li>
                 {earnedCount(known)} sur {total} <b>gagnés</b>
@@ -245,7 +286,14 @@ export function TrophyCaseView({
                 </li>
               ))}
             </ul>
-            {level ? <p className="tc-level">{level}</p> : null}
+            {level ? (
+              <p className="tc-level">
+                <span className="tc-level__art" aria-hidden="true">
+                  {level.art}
+                </span>
+                <span>{level.text}</span>
+              </p>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -259,7 +307,9 @@ export function TrophyCaseView({
                 {shelfTitles?.[shelf.family] ?? SHELF_TITLES[shelf.family]}
               </h3>
               <span className="tc-shelf__count">
-                {shelf.earned} sur {shelf.items.length}
+                {shelf.items.length === 0
+                  ? null
+                  : `${String(shelf.earned)} sur ${String(shelf.items.length)}`}
                 {folded.hidden > 0 && !all ? (
                   <button
                     type="button"
@@ -274,12 +324,15 @@ export function TrophyCaseView({
               </span>
             </header>
             <div className="tc-case" data-all={all}>
+              {shelf.items.length === 0 ? (
+                <p className="tc-case__empty">{emptyShelves?.[shelf.family]}</p>
+              ) : null}
               {shelf.items.map((item) => {
                 const one = entry(item);
                 if (one === null) return null;
                 const extra = !folded.shown.includes(item);
                 return (
-                  <div key={item.kind} className="tc-slot" data-extra={extra}>
+                  <div key={item.kind} className="tc-place" data-extra={extra}>
                     <Cell item={item} entry={one} size={104} index={index++} onOpen={openItem} />
                   </div>
                 );
@@ -338,6 +391,38 @@ export function TrophyCaseView({
           }}
         />
       ) : null}
+    </div>
+  );
+}
+
+/** The case's shapes while it is read: a plate for the next trophy, then a shelf (CHT-18). */
+export function TrophyCaseLoading(): JSX.Element {
+  return (
+    <div className="tc tc-skel" aria-busy="true" aria-label="Chargement de la vitrine">
+      <div className="tc-skel__hero">
+        <i className="tc-skel__ring" />
+        <span>
+          <i style={{ '--tc-w': '34%' }} />
+          <i style={{ '--tc-w': '62%', '--tc-h': '38px' }} />
+          <i style={{ '--tc-w': '22%', '--tc-h': '34px' }} />
+        </span>
+      </div>
+      <i className="tc-skel__shelf" />
+    </div>
+  );
+}
+
+/**
+ * A read that failed, whatever the cause (a silent server, a refusal, an answer of another shape): said in neutral
+ * words, with a retry, never an empty case that would lie (CHT-18; Design, 16/11).
+ */
+export function TrophyCaseDown({ onRetry }: { onRetry: () => void }): JSX.Element {
+  return (
+    <div className="tc-down" role="alert">
+      <p>Ta vitrine n’a pas pu être lue.</p>
+      <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onRetry}>
+        Réessayer
+      </button>
     </div>
   );
 }

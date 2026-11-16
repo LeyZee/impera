@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { toMessages } from './conversation-messages';
+import { describeBrief, toMessages } from './conversation-messages';
+import type { Brief } from './schemas';
 
 describe('toMessages', () => {
   it('writes the time that passed before his message, outside his block (audit du naturel, A2)', () => {
@@ -21,5 +22,29 @@ describe('toMessages', () => {
     ]);
     expect(messages[0]?.content).toBe('<fan_message>\ncoucou\n</fan_message>');
     expect(messages[1]).toEqual({ role: 'assistant', content: 'hello' });
+  });
+});
+
+describe('describeBrief, the bubbles she may write', () => {
+  const brief: Brief = {
+    intent: 'small_talk',
+    sentiment: 'neutral',
+    factsProposed: [],
+    kycMissing: [],
+    risks: [],
+    action: 'reply',
+    replyBrief: 'Lui répondre.',
+    toneHints: [],
+  };
+
+  it('says the count code decided, after the brief, outside any block', () => {
+    expect(describeBrief(brief, undefined, undefined, 1).endsWith('\nBulles : une seule.')).toBe(true);
+    expect(describeBrief(brief, undefined, undefined, 3)).toContain(
+      "\nBulles : une, ou au plus 3 si c'est naturel.",
+    );
+  });
+
+  it('says nothing of them when code decided nothing', () => {
+    expect(describeBrief(brief)).not.toContain('Bulles');
   });
 });

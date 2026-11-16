@@ -13,7 +13,7 @@ import {
   TeamMemberIdSchema,
   type CreatorId,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -216,6 +216,13 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       ticks: [{ ...tick, taskId: daily.id, day: addDays(today, 1) }],
     });
     expect(ahead.json()).toMatchObject({ error: { code: 'creator_tick_late_unprocessable' } });
+    // CRE-03 (recette 16/11): a routine's tick of a day that is over stays; her streak never changes afterwards.
+    const closed = await call('DELETE', `/v1/creator-space/tasks/${id}/ticks/${addDays(today, -1)}`, 'nora');
+    expect(closed.statusCode).toBe(422);
+    expect(closed.json()).toMatchObject({
+      error: { code: 'creator_day_closed_unprocessable', details: { taskIds: [id] } },
+    });
+    expect((await agenda()).ticks.filter((one) => one.taskId === id)).toHaveLength(1);
     const back = await call('DELETE', `/v1/creator-space/tasks/${id}/ticks/${today}`, 'nora');
     expect(back.statusCode, back.body).toBe(200);
     CreatorStreakResultSchema.parse(back.json());
@@ -401,6 +408,11 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       ).json(),
     );
     expect(ticked.streak).toMatchObject({ days: 1, atRisk: false });
+    // Her game looks at once, so that a gain is revealed where she ticked (recette 16/11, CRE-06).
+    const asked = await test.admin.db.execute(
+      sql`select payload from graphile_worker._private_jobs where key = ${`rewards.evaluate_creator:${nora}`}`,
+    );
+    expect(asked.rows).toEqual([{ payload: { creatorId: nora } }]);
     // The agency sees the day she did it, then that she removed it.
     const followUp = async () =>
       AgencySuggestionListSchema.parse(
@@ -409,5 +421,42 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
     expect(await followUp()).toMatchObject({ doneDays: 1, removed: false });
     expect((await call('DELETE', `/v1/creator-space/tasks/${task.id}`, 'nora')).statusCode).toBe(204);
     expect(await followUp()).toMatchObject({ doneDays: 1, removed: true });
+  });
+
+  it('keeps an essential routine she removed today due today: removing it never saves her streak (recette 16/11)', async () => {
+    const created = AgencySuggestionSchema.parse(
+      (
+        await call('POST', `/v1/creators/${nora}/suggestions`, 'owner', {
+          id: newId(SuggestionIdSchema),
+          when: { kind: 'routine', weekdays: [1, 2, 3, 4, 5, 6, 7] },
+          category: 'socials',
+          title: 'Story du soir',
+        })
+      ).json(),
+    );
+    const task = CreatorTaskSchema.parse(
+      (await call('POST', `/v1/creator-space/suggestions/${created.id}/accept`, 'nora', {})).json(),
+    );
+    expect((await call('DELETE', `/v1/creator-space/tasks/${task.id}`, 'nora')).statusCode).toBe(204);
+    // Still in her today, said removed: her phone keeps it due today and drops it from tomorrow.
+    const kept = (await agenda()).tasks.find((one) => one.id === task.id);
+    expect(kept?.removedAt).not.toBeNull();
+    // Still hers to tick today, and the tick counts.
+    const tick = { taskId: task.id, day: today, doneAt: new Date().toISOString() };
+    const ticked = await call('POST', '/v1/creator-space/ticks', 'nora', { ticks: [tick] });
+    expect(ticked.statusCode).toBe(200);
+    expect(CreatorTicksResultSchema.parse(ticked.json()).added).toBe(1);
+    expect(
+      (await call('DELETE', `/v1/creator-space/tasks/${task.id}/ticks/${today}`, 'nora')).statusCode,
+    ).toBe(200);
+    // Tomorrow it is gone: no tick there.
+    const tomorrow = await call('POST', '/v1/creator-space/ticks', 'nora', {
+      ticks: [{ ...tick, day: addDays(today, 1) }],
+    });
+    expect(tomorrow.statusCode).toBe(422);
+    // Nothing more to change on it: moving it answers « not found ».
+    expect(
+      (await call('PATCH', `/v1/creator-space/tasks/${task.id}`, 'nora', { title: 'Autre' })).statusCode,
+    ).toBe(404);
   });
 });

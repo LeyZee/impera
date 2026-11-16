@@ -7,6 +7,7 @@ import {
   type MediaDescription,
   type PlaygroundAnswer,
   type PlaygroundAvailability,
+  type PlaygroundBrief,
   type PlaygroundDesire,
   type PlaygroundState,
   type Verdict,
@@ -14,6 +15,7 @@ import {
 import type { LlmGateway } from '@impera/llm';
 
 import {
+  bubbleDelays,
   desireSignalPoints,
   guardSettingsOf,
   isNight,
@@ -93,6 +95,7 @@ export interface EngineDeps {
 export function ratingRecord(input: {
   readonly id: string;
   readonly creatorId?: string | undefined;
+  readonly personaVersionId?: string | undefined;
   readonly sessionId: string;
   readonly at: Date;
   readonly version: AnswerVersion;
@@ -104,6 +107,7 @@ export function ratingRecord(input: {
   return {
     id: input.id,
     ...(input.creatorId !== undefined && { creatorId: input.creatorId }),
+    ...(input.personaVersionId !== undefined && { personaVersionId: input.personaVersionId }),
     sessionId: input.sessionId,
     at: input.at.toISOString(),
     version: input.version,
@@ -146,9 +150,23 @@ function toAvailability({ record, gate, asked }: PlaygroundAvailabilityReading):
   };
 }
 
+/** The brain's reading in the playground's words: what is still to discover, in French. */
+function toBrief(brief: NonNullable<PlaygroundTurn['brief']>): PlaygroundBrief {
+  return {
+    intent: brief.intent,
+    sentiment: brief.sentiment,
+    risks: [...brief.risks],
+    action: brief.action,
+    replyBrief: brief.replyBrief,
+    kycMissing: brief.kycMissing.map(kycSlotWords),
+  };
+}
+
 function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
   return {
     bubbles: [...turn.bubbles],
+    // The same typing time as the real send, so the trainer sees each bubble arrive as the fan would.
+    ...(turn.bubbles.length > 0 && { delaysMs: [...bubbleDelays(turn.bubbles)] }),
     isBlocked: turn.isBlocked,
     violations: turn.violations.map((v) => ({
       code: v.code,
@@ -166,16 +184,7 @@ function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
         })),
       },
     }),
-    ...(turn.brief !== undefined && {
-      brief: {
-        intent: turn.brief.intent,
-        sentiment: turn.brief.sentiment,
-        risks: [...turn.brief.risks],
-        action: turn.brief.action,
-        replyBrief: turn.brief.replyBrief,
-        kycMissing: turn.brief.kycMissing.map(kycSlotWords),
-      },
-    }),
+    ...(turn.brief !== undefined && { brief: toBrief(turn.brief) }),
     ...(turn.desire !== undefined && { desire: toDesire(turn.desire) }),
     ...(turn.cursor !== undefined && {
       cursor: { kind: turn.cursor.kind, label: cursorLabel(turn.cursor.kind, turn.cursor.reason) },
@@ -183,6 +192,7 @@ function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
     ...(turn.offerRefused !== undefined && {
       offerRefused: { code: turn.offerRefused, label: offerRefusalLabel(turn.offerRefused) },
     }),
+    ...(turn.hold !== undefined && { hold: { kind: turn.hold.kind, detail: [...turn.hold.detail] } }),
     ...(turn.model !== undefined && { model: turn.model }),
     latencyMs: turn.latencyMs,
     costEur: turn.costUsd / usdPerEur,
@@ -201,7 +211,15 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     personaSheet: deps.persona.personaSheet,
     guardSettings: guardSettingsOf(deps.persona),
     splitMessages: deps.persona.splitMessages,
-    voiceExamples: voiceExamples(deps.records),
+    // Her examples only when her own version is played: never the invented persona's, never another creator's.
+    voiceExamples:
+      deps.played === undefined
+        ? []
+        : voiceExamples(deps.records, {
+            creatorId: deps.played.creatorId,
+            personaVersionId: deps.played.versionId,
+            guardSettings: guardSettingsOf(deps.persona),
+          }),
     offerLimits: deps.persona.offerLimits,
     sexualizationLimits: deps.persona.sexualizationLimits,
     followUps: deps.persona.followUps,
@@ -251,7 +269,9 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
   const state = (): PlaygroundState => {
     const { situation, lastExchange } = session;
     let fanNumber = 0;
+    const reading = isBusy ? session.reading : undefined;
     return {
+      ...(reading !== undefined && { reading: toBrief(reading) }),
       persona: { name: deps.persona.creatorName, played: deps.played ?? null },
       presets: FAN_PRESETS.map((p) => ({ id: p.id, label: p.label, tests: p.tests, opening: p.opening })),
       presetId,
@@ -344,14 +364,17 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       exclusive(async () => {
         const exchange = session.lastExchange;
         if (exchange === undefined || isRated) throw new NothingToRate();
-        // Nothing was written, or the guards stopped it: there is nothing to validate as it stands.
-        if (verdict.kind === 'validated' && exchange.turn.isBlocked) throw new BlockedAnswer();
+        // The guards stopped it, or a model failed: there is nothing to validate as it stands. A handoff, care or a
+        // wait decided by the risk policy is itself the answer: the trainer says it was right (AGE-01).
+        const decided = exchange.turn.handoff !== undefined || exchange.turn.hold !== undefined;
+        if (verdict.kind === 'validated' && exchange.turn.isBlocked && !decided) throw new BlockedAnswer();
         const destination =
           verdict.kind === 'validated' ? undefined : (override ?? suggestDestination(verdict));
         ratings += 1;
         const record = ratingRecord({
           id: `${deps.sessionId}-${String(ratings)}`,
           creatorId: deps.played?.creatorId ?? (await deps.creatorId?.()) ?? undefined,
+          personaVersionId: deps.played?.versionId,
           sessionId: deps.sessionId,
           at: (deps.now ?? (() => new Date()))(),
           // The model that wrote it: an answer of the fallback counts for the fallback, not for Grok.

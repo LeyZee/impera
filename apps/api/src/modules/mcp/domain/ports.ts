@@ -1,15 +1,24 @@
 import type {
+  AgencyInsights,
+  AgencyPeriod,
   AiUsage,
+  CommissionStatementStatus,
   CreatorId,
+  DailyStatsOfCreator,
   FanId,
   McpCallRefusal,
   McpCapability,
   McpGrantId,
+  PayPeriod,
+  PayPeriodBlock,
+  PayPeriodWindow,
   Platform,
   SalesOfCreator,
   ScriptSegment,
   TeamImportLinked,
+  TeamMemberId,
   UserId,
+  UserRole,
 } from '@impera/contracts';
 
 /** The owner at the screen, for what he does to his agent accesses (each gesture enters the audit log). */
@@ -260,6 +269,19 @@ export interface ShiftReader {
   ): Promise<readonly OnShiftEntry[]>;
 }
 
+/**
+ * The agency's figures as `supervision` reads them for the Dashboard's « Agence » (`reads.agencyInsights`, its
+ * `index.ts`, ADR 0078 § 1): the owner's, and an active manager's for the creators of his list; `null` for anyone else.
+ */
+export interface StatsReader {
+  agencyInsights(
+    reader: { readonly userId: UserId; readonly role: UserRole; readonly creatorIds: readonly CreatorId[] },
+    period: AgencyPeriod,
+    /** The access's creator, when it is bound to one: her figures alone. */
+    creatorId?: CreatorId,
+  ): Promise<AgencyInsights | null>;
+}
+
 /** The AI spend as `ai-usage` reads it for the screen (`AiUsage`, its `index.ts`): agency-wide, the owner's alone. */
 export interface AiUsageReader {
   read(): Promise<AiUsage>;
@@ -274,8 +296,9 @@ export interface TeamImportReader {
 }
 
 /**
- * The connectors' read of a creator's sales (`reads.sales`, its `index.ts`, ADR 0026 § 1): as the person, each creator
- * checked in its own transaction, one refused refusing the call; never the agency's nor the creator's share.
+ * The connectors' reads of a creator's sales and daily statistics (`reads.sales`, `reads.dailyStats`, its `index.ts`,
+ * ADR 0026 § 1): as the person, each creator checked in its own transaction, one refused refusing the call; never the
+ * agency's nor the creator's share.
  */
 export interface SalesReader {
   sales(
@@ -283,4 +306,47 @@ export interface SalesReader {
     creatorIds: readonly CreatorId[],
     range: { readonly from: string; readonly to: string },
   ): Promise<readonly SalesOfCreator[]>;
+  dailyStats(
+    userId: string,
+    creatorIds: readonly CreatorId[],
+    range: { readonly from: string; readonly to: string },
+  ): Promise<readonly DailyStatsOfCreator[]>;
+}
+
+/** A statement's state as pay gives it to another door: never an amount of the member (decision A of 14/11). */
+interface StatementStateEntry {
+  readonly memberId: TeamMemberId;
+  readonly status: CommissionStatementStatus;
+  readonly revision: number;
+  readonly computedAt: string;
+  readonly validatedAt: string | null;
+  readonly paidAt: string | null;
+  readonly payoutBlocked: boolean;
+  /** `null` while the owner announced no payout delay. */
+  readonly payoutLate: boolean | null;
+}
+
+/** A period as pay gives it to another door: the team's sums only for a person who sees the whole team. */
+export interface PeriodStateEntry {
+  readonly window: PayPeriodWindow | null;
+  readonly closedAt: string | null;
+  readonly blocked: PayPeriodBlock | null;
+  readonly payoutDelayBusinessDays: number | null;
+  readonly statements: readonly StatementStateEntry[];
+  readonly team: {
+    readonly statements: number;
+    readonly totalMinor: number | null;
+    readonly payableMinor: number | null;
+  } | null;
+}
+
+/**
+ * Pay's read of a period (`payroll.reads.periodState`, its `index.ts`, ADR 0026 § 1): as the person and their role,
+ * under the screen's policies, never a creator's account; never an amount of a member.
+ */
+export interface PayrollReader {
+  periodState(
+    reader: { readonly userId: UserId; readonly role: UserRole },
+    period: PayPeriod,
+  ): Promise<PeriodStateEntry>;
 }

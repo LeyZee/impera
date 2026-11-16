@@ -23,6 +23,11 @@ export interface GuardSettings {
   readonly petNames?: readonly string[];
   /** Emojis she never uses (`writing_style.emojis_forbidden`, P5-01): one in her answer is a `forbidden_term`. */
   readonly forbiddenEmojis?: readonly string[];
+  /**
+   * What she never does (`never_do`): no guard of her answers reads it, the custom order does (ADR 0090 § A, audit du
+   * 16/11, M3). Carried here as her other limits are, to every composer.
+   */
+  readonly neverDo?: readonly string[];
 }
 
 /**
@@ -66,6 +71,12 @@ const ONLINE =
   " ?(\\d|(le |un |mon |ton |ma |ta |mes |tes |la |du )?(lit|live|prochain|prochaine|plus|tout a l'heure|tout de suite|tchat|chat|prive|dm|mp|messages?|story|video|appel|sur|ici|en (live|prive|dm|mp|story|video))\\b)";
 const CITY =
   '(paris|lyon|marseille|geneve|bruxelles|lausanne|bordeaux|lille|nice|toulouse|nantes|montpellier|strasbourg)';
+
+/**
+ * A day, a time, a city or « dispo » later in the same sentence: what turns a daydream into a real proposal, so the
+ * daydream's exceptions below never cover it.
+ */
+const CONCRETE = `[^.!?]*\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|ce soir|ce week-end|cette semaine|dispo|disponible|\\d{1,2} ?h|${CITY})\\b`;
 
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
@@ -153,18 +164,20 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'meeting_promise',
     pattern:
-      /\b(on se (voit|retrouve|rejoint) (demain|ce soir|ce week-end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|chez |a (la gare|l'hotel|paris|lyon)|au (cafe|bar|resto|restaurant))|je (viens|passe|monte) chez toi|viens chez moi|je te rejoins|mon adresse|rendez-vous (a |au |chez ))/,
+      /\b(on se (voit|retrouve|rejoint) (demain|ce soir|ce week-end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|chez |a (la gare|l'hotel|paris|lyon)|au (cafe|bar|resto|restaurant))|je (viens|passe|monte) chez toi|viens chez moi|je te rejoins(?! (dans (tes|mes) (reves|pensees|bras)|en (pensee|reve)|au lit|dans (ton|mon) lit|sous la couette))|mon adresse|rendez-vous (a |au |chez ))/,
   },
   {
     code: 'meeting_promise',
     pattern: new RegExp(
       [
-        `\\b(viens|venez|tu (peux|pourrais|veux) venir|passe|passes) me (voir|rejoindre|retrouver)(?!${ONLINE})\\b`,
+        `\\b(viens|venez|tu (peux|pourrais|veux) venir|passe|passes) me (voir|rejoindre|retrouver)(?!${ONLINE}|( dans (la|ma|ta) chambre(?! d'?hotel)| sous la couette)(?!${CONCRETE}))\\b`,
         `\\bon (se|pourrait se|peut se|va se) (voit|voir|retrouve|retrouver|rejoint|rejoindre|rencontre|rencontrer) (a|au|aux|chez|dans|devant|en ville|quand tu veux|ou tu veux|ce soir|demain|cette semaine|ce week-end)(?!${ONLINE})\\b`,
-        `\\bje t'?attends? (a|au|chez|devant)(?!${ONLINE})\\b`,
+        `\\bje t'?attends? (a|au|chez|devant)(?!${ONLINE}| tournant)\\b`,
         `\\bje te (retrouve|retrouverai|rejoins|rejoindrai|recois|recevrai) (chez (moi|toi|lui|elle)|devant|en bas de|(a|au|aux|dans) (la |le |l'|un |une |mon |ma |ton |ta )?(gare|hotel|bar|cafe|resto|restaurant|airbnb|motel|aeroport|metro|parc|cinema|plage|sortie)|a ${CITY})\\b`,
         `\\b(viens|rejoins|retrouve)[ -]moi (a|au|dans|devant) (l'|un |une |mon |ma |la )?(hotel|airbnb|motel|gare)\\b`,
-        `\\bon (se fait|prend|boit) (un|une) (cafe|verre|resto|date|diner|apero|biere)\\b`,
+        `(?<!(autre vie|tes reves|mes reves|en reve|imagine|imaginons|si on)[^.!?]{0,40})\\bon (se fait|se prend|se boit|prend|boit) (un|une) (cafe|verre|resto|date|diner|apero|biere)\\b`,
+        `\\bon (se fait|se prend|se boit|prend|boit) (un|une) (cafe|verre|resto|date|diner|apero|biere)\\b(?=${CONCRETE})`,
+        `(?<=${CONCRETE.slice('[^.!?]*'.length)}[^.!?]*)\\bon (se fait|se prend|se boit|prend|boit) (un|une) (cafe|verre|resto|date|diner|apero|biere)\\b`,
         `\\bje (viens|descends|monte|serai) (a|sur) ${CITY}\\b`,
         `\\b(come|coming) (to )?see me\\b|\\b(let'?s|we (can|could|should)) meet\\b|\\bmeet me\\b`,
       ].join('|'),
@@ -315,6 +328,10 @@ const AI_TICS: readonly RegExp[] = [
   /\boh la la\b/,
   /\bje suis la pour toi\b/,
   /\bjuste pour toi\b/,
+  // A note-taker's line, never hers (Playground, Charles 16/11): « je note ton âge », « c'est noté ».
+  /\bje (te |le |l'|ca |bien )?(note|retiens)\b/,
+  /\b(c'est|bien) note\b/,
+  /\bje prends note\b/,
   /—/,
   /^\s*([-*•]|\d+[.)])\s/m,
 ];

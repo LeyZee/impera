@@ -152,6 +152,11 @@ const ScenarioSchema = z
     scripts: ScriptsSchema.optional(),
     /** His message, or several in a row since her last answer. */
     inbound: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
+    /**
+     * How long ago he wrote it, when she answers late (audit du naturel, A2); absent, he wrote it now. Dates the
+     * scenario like `minutes_ago` in the history.
+     */
+    inbound_minutes_ago: z.number().int().nonnegative().optional(),
     expect: z
       .object({
         brief: z

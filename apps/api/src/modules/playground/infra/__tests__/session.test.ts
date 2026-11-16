@@ -43,8 +43,9 @@ function fakeGateway(
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
+    identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
-    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
+    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
     brain: (input) => {
       brainInputs.push(input);
       return Promise.resolve({ ok: true, value: { output: brief, meta: META } });
@@ -82,7 +83,7 @@ describe('playground session', () => {
     expect(session.history).toHaveLength(0);
   });
 
-  it('sends one message when she does not split hers, the guards reading the bubbles as written', async () => {
+  it('leaves out what goes past her bubble budget: one bubble to a short message (Charles 16/11)', async () => {
     const session = createPlaygroundSession({
       gateway: fakeGateway({ bubbles: ['Enchantée Julien ✨', 'Et tu as quel âge'] }),
       creatorName: 'Lina',
@@ -93,8 +94,8 @@ describe('playground session', () => {
 
     const turn = await session.handleFanMessage('Moi c’est Julien');
 
-    expect(turn.bubbles).toEqual(['Enchantée Julien ✨\nEt tu as quel âge']);
-    expect(turn.violations.map((v) => v.code)).toEqual(['too_many_bubbles']);
+    expect(turn.bubbles).toEqual(['Enchantée Julien ✨']);
+    expect(turn.violations.map((v) => v.code)).toEqual([]);
   });
 
   it('shows a blocked answer without adding it to the conversation', async () => {
@@ -140,6 +141,84 @@ describe('playground session, when nothing is written', () => {
       }).handleFanMessage('Coucou');
     expect((await ask(failing('budget_reached'))).briefFailure).toBe('plafond du jour atteint');
     expect((await ask(failing('all_models_failed'))).briefFailure).toBe('grok-4.7: unavailable');
+  });
+});
+
+describe('playground session, the risk policy as production runs it (AGE-01)', () => {
+  const run = async (brief: Brief, text = 'Coucou') => {
+    const voiceInputs: VoiceInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou toi ✨'] }, voiceInputs, [], brief),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+    });
+    const turn = await session.handleFanMessage(text);
+    return { turn, voiceInputs, session };
+  };
+
+  it('hands a possible minor over to a human: the voice writes nothing, even when the brain says to reply', async () => {
+    const { turn, voiceInputs, session } = await run({
+      ...BRIEF,
+      action: 'reply',
+      risks: ['minor_suspected'],
+    });
+    expect(turn.hold).toEqual({ kind: 'handoff', detail: ['minor_suspected'] });
+    expect(voiceInputs).toHaveLength(0);
+    expect(turn.bubbles).toEqual([]);
+    expect(session.history.map((t) => t.from)).toEqual(['fan']);
+  });
+
+  it('answers distress with care, as the composer does (ADR 0088)', async () => {
+    const { turn, voiceInputs } = await run({ ...BRIEF, action: 'offer', risks: ['distress'] });
+    expect(turn.hold).toEqual({ kind: 'care', detail: ['distress'] });
+    expect(voiceInputs).toHaveLength(1);
+    // Nothing is sold in care, whatever the brain suggested.
+    expect(voiceInputs[0]?.brief.action).not.toBe('offer');
+  });
+
+  it('stays quiet when he asks her to wait, and writes nothing without the brain’s reading', async () => {
+    const waiting = await run({ ...BRIEF, action: 'wait', risks: [] });
+    expect(waiting.turn.hold).toEqual({ kind: 'no_reply', detail: ['wait'] });
+    expect(waiting.voiceInputs).toHaveLength(0);
+    const plain = await run(BRIEF);
+    expect(plain.turn.hold).toBeUndefined();
+    expect(plain.voiceInputs).toHaveLength(1);
+  });
+
+  it('reads the safety net before any model, as production does: a plain « 15 ans » is handed over unread', async () => {
+    const brainInputs: ConversationInput[] = [];
+    const voiceInputs: VoiceInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou toi ✨'] }, voiceInputs, brainInputs, BRIEF),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+    });
+    const turn = await session.handleFanMessage('j’ai 15 ans');
+    expect(turn.hold).toEqual({ kind: 'handoff', detail: ['safety_net', 'minor_suspected'] });
+    expect([brainInputs.length, voiceInputs.length]).toEqual([0, 0]);
+    expect(session.history.map((t) => t.from)).toEqual(['fan']);
+  });
+
+  it('reads the safety net on all he wrote since her last answer, as production does', async () => {
+    const voiceInputs: VoiceInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou toi ✨'] }, voiceInputs, [], { ...BRIEF, action: 'wait' }),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+    });
+    expect((await session.handleFanMessage('j’ai')).hold?.kind).toBe('no_reply');
+    const turn = await session.handleFanMessage('15 ans');
+    expect(turn.hold).toEqual({ kind: 'handoff', detail: ['safety_net', 'minor_suspected'] });
+  });
+
+  it('answers with care when he says he wants to end it, even when the brain missed it', async () => {
+    const { turn, voiceInputs } = await run({ ...BRIEF, action: 'offer', risks: [] }, 'je veux en finir');
+    expect(turn.hold).toEqual({ kind: 'care', detail: ['safety_net', 'self_harm'] });
+    expect(voiceInputs).toHaveLength(1);
+    expect(voiceInputs[0]?.brief.action).not.toBe('offer');
   });
 });
 
@@ -475,18 +554,16 @@ describe('playground session, the offer policy and the cursor', () => {
     expect(open.desireTrail[0]?.availability?.gate.open).toBe(true);
   });
 
-  it('says she asked whether he is free on the message she asked it only, the clock standing still (ADR 0103 § 13)', async () => {
+  it('says she asked whether he is free on the message she asked it only (ADR 0103 § 13)', async () => {
     const playground = session([], true, 0, OFFER);
-    // His age is not confirmed yet on his first message: the cursor steers back, she asks nothing.
+    // The adult age he states confirms it at once (Charles, 16/11): she asks on this very message.
     const first = await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
-    expect(first.desire?.availability?.asked).toBe(false);
+    expect(first.desire?.availability?.asked).toBe(true);
     playground.advance(3 * 60_000);
     const second = await playground.handleFanMessage('Tu me rends fou');
-    const third = await playground.handleFanMessage('Encore');
-    expect(second.desire?.availability?.asked).toBe(true);
-    // Same instant, `askedAt` unchanged: she did not ask again.
-    expect(third.desire?.availability?.record.askedAt).toEqual(second.desire?.availability?.record.askedAt);
-    expect(third.desire?.availability?.asked).toBe(false);
+    // `askedAt` unchanged: she did not ask again.
+    expect(second.desire?.availability?.record.askedAt).toEqual(first.desire?.availability?.record.askedAt);
+    expect(second.desire?.availability?.asked).toBe(false);
   });
 
   it('counts his reply speed on the simulated clock, as production does (P3-12)', async () => {
@@ -525,13 +602,11 @@ describe('playground session, the offer policy and the cursor', () => {
   it('says why the policy refused an offer, and what the cursor decided', async () => {
     const playground = session([], true, 70);
     const first = await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
-    // His age is confirmed only from his next message: the cursor slows her down before any offer.
-    expect(first.cursor).toEqual({ kind: 'steer_back', reason: 'age_unconfirmed' });
-    playground.advance(3 * 60_000);
-    const second = await playground.handleFanMessage('Tu me rends fou');
+    // The adult age he states confirms it at once (Charles, 16/11): the cursor lets her follow him.
+    expect(first.cursor).toEqual({ kind: 'free' });
     // The brain offers, his score is still under her 70: the gate before any sale says no, and why.
-    expect(second.desire?.score).toBeLessThan(70);
-    expect(second.offerRefused).toBe('desire_below_threshold');
+    expect(first.desire?.score).toBeLessThan(70);
+    expect(first.offerRefused).toBe('desire_below_threshold');
   });
 
   it('offers nothing without her pace of scripts', async () => {

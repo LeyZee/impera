@@ -101,12 +101,28 @@ export interface AccountStore {
    * Stores an encrypted session, sets the state to `valid` and closes the breaker. `session_updated_at` moves only for
    * a new session: none was stored, the stored one is not `isSame`, or the state was `none` or `expired`. An identical
    * one sent again must not hide a read that is late (the Dashboard counts from the latest of the two dates).
-   * `isSame` reads the stored ciphertext under the account's row lock, so two sends at once date it once.
+   * `isSame` reads the stored ciphertext under the account's row lock, so two sends at once date it once. `owner`
+   * (whose session it is, as the platform names her) is written beside it; `SessionOwnerConflict` when another
+   * account of the platform already holds that owner, whatever its creator.
    */
   storeSession(
     creatorId: CreatorId,
     id: PlatformAccountId,
-    session: { readonly ciphertext: Buffer; readonly isSame: (stored: Buffer) => boolean },
+    session: {
+      readonly ciphertext: Buffer;
+      readonly owner: string;
+      readonly isSame: (stored: Buffer) => boolean;
+    },
+    meta: EventMeta & { readonly userId: string | null },
+  ): Promise<void>;
+  /**
+   * The audit line of a refused « Sync » (`connector.session_refused`): the account, the reason and who, never a value
+   * of the session nor an identifier of the platform.
+   */
+  recordRefusedSession(
+    creatorId: CreatorId,
+    id: PlatformAccountId,
+    reason: 'owner_conflict' | 'member_conflict',
     meta: EventMeta & { readonly userId: string | null },
   ): Promise<void>;
   publish(creatorId: CreatorId, body: EventBody, meta: EventMeta): Promise<void>;
@@ -137,6 +153,12 @@ export interface AccountJobs {
   enqueueReconcile(account: ConnectorAccount, correlationId: string): Promise<void>;
   /** Her vault's sync on the account's queue (fiche vault-sync); a sync already waiting is kept, never stacked. */
   enqueueVaultSync(account: ConnectorAccount, correlationId: string): Promise<void>;
+  /** One conversation read by its id (recette du 16/11); the same one already waiting is kept, never stacked. */
+  enqueueConversationRead(
+    account: ConnectorAccount,
+    platformConversationId: string,
+    correlationId: string,
+  ): Promise<void>;
 }
 
 /** `conversations.ingestMessage`, injected by the composition root (connectors README). */

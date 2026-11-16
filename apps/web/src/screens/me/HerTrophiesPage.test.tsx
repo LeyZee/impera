@@ -8,7 +8,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MyTrophiesPage } from './MyTrophiesPage';
@@ -118,10 +118,12 @@ describe('Moi › Trophées, the creator’s', () => {
   it('shows her case with her streaks, and no level', async () => {
     renderPage(NORA_ME);
     const hero = await screen.findByRole('region', { name: '5 livraisons à l’heure' });
-    expect(hero.textContent).toContain('Encore 1 livraison à l’heure');
+    expect(hero.textContent).toContain('Encore 1');
     expect(screen.getByText('Encore 5 jours')).toBeDefined();
-    expect(hero.textContent).toContain('Série en cours : 9 jours');
+    // Her best stays in sight after a break, never read as a loss (ADR 0108 § 9, recette 16/11 CRE-02).
+    expect(hero.textContent).toContain('Série en cours : 9 jours · meilleure : 12');
     expect(hero.textContent).toContain('Livraisons à l’heure : 4 de suite');
+    expect(hero.textContent).not.toContain('meilleure : 4');
     expect(screen.queryByText(/Niveau|Rang/)).toBeNull();
     expect(screen.getAllByRole('heading', { level: 3 }).map((one) => one.textContent)).toEqual([
       'Médailles',
@@ -129,5 +131,155 @@ describe('Moi › Trophées, the creator’s', () => {
       'Trophées',
     ]);
     expect(screen.getByRole('link', { name: 'Trophées' })).toBeDefined();
+  });
+
+  it('keeps her best run of deliveries beside the current one once it broke (CRE-02)', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(
+        Response.json({
+          ...HER_CASE,
+          streaks: [
+            { kind: 'day', current: 4, best: 16 },
+            { kind: 'delivery', current: 0, best: 6 },
+          ],
+        }),
+      ),
+    );
+    renderPage(NORA_ME);
+    const hero = await screen.findByRole('region', { name: '5 livraisons à l’heure' });
+    expect(hero.textContent).toContain('Série en cours : 4 jours · meilleure : 16');
+    expect(hero.textContent).toContain('Livraisons à l’heure : 0 de suite · meilleure : 6');
+  });
+
+  it('offers a new creator her first deposit as her next trophy, not a delivery streak at nothing (CRE-14)', async () => {
+    const ahead = (
+      kind: string,
+      family: 'medal' | 'streak' | 'trophy',
+      target: number,
+      unit: 'day' | 'delivery' | 'once',
+    ) => ({
+      kind,
+      family,
+      earnedAt: null,
+      revealedAt: null,
+      progress: { current: 0, target, unit },
+    });
+    const fresh: TrophyCase = {
+      items: [
+        ahead('day_streak_7', 'medal', 7, 'day'),
+        ahead('delivery_streak_5', 'streak', 5, 'delivery'),
+        ahead('first_drop', 'trophy', 1, 'once'),
+        ahead('perfect_day', 'trophy', 1, 'once'),
+      ],
+      streaks: [
+        { kind: 'day', current: 0, best: 0 },
+        { kind: 'delivery', current: 0, best: 0 },
+      ],
+      level: null,
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) =>
+        new URL(input, 'http://localhost').pathname === '/v1/creator-space/trophy-case'
+          ? Promise.resolve(Response.json(fresh))
+          : Promise.resolve(new Response(null, { status: 404 })),
+      ),
+    );
+    renderPage(NORA_ME);
+    expect(await screen.findByRole('region', { name: 'Premier dépôt' })).toBeDefined();
+  });
+});
+
+describe('Moi › Trophées while it is read, or when the server does not answer (recette 16/11, CHT-18)', () => {
+  it('shows the shapes of the case while it waits, never a blank page', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+    renderPage(NORA_ME);
+    expect(await screen.findByLabelText('Chargement de la vitrine')).toBeDefined();
+  });
+
+  it('says the server does not answer, and reads again on « Réessayer »', async () => {
+    let answer = (): Response => new Response(null, { status: 503 });
+    const fetch = vi.fn(() => Promise.resolve(answer()));
+    vi.stubGlobal('fetch', fetch);
+    renderPage(NORA_ME);
+    expect((await screen.findByRole('alert')).textContent).toContain('Ta vitrine n’a pas pu être lue.');
+    answer = () => Response.json(HER_CASE);
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+    expect(await screen.findByRole('region', { name: '5 livraisons à l’heure' })).toBeDefined();
+  });
+
+  it('does the same for the chatter', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(null, { status: 503 }))),
+    );
+    renderPage(THEO_ME);
+    expect((await screen.findByRole('alert')).textContent).toContain('Ta vitrine n’a pas pu être lue.');
+  });
+});
+
+describe('Moi › Trophées, the chatter’s rank and medals (recette 16/11, CHT-17)', () => {
+  const HIS_CASE: TrophyCase = {
+    items: [
+      {
+        kind: 'streak_10',
+        family: 'streak',
+        earnedAt: null,
+        revealedAt: null,
+        progress: { current: 8, target: 10, unit: 'shift' },
+      },
+    ],
+    streaks: [{ kind: 'shift', current: 8, best: 12 }],
+    level: null,
+    nextLevel: { rank: 1, name: 'Étincelle', thresholdMinor: 10_000, currentMinor: 4_000, currency: 'EUR' },
+  };
+  const serve = (trophyCase: TrophyCase): void => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) =>
+        new URL(input, 'http://localhost').pathname === '/v1/rewards/my-trophy-case'
+          ? Promise.resolve(Response.json(trophyCase))
+          : Promise.resolve(new Response(null, { status: 404 })),
+      ),
+    );
+  };
+
+  it('says the first rank ahead, with its insignia still to win, while none is held', async () => {
+    serve(HIS_CASE);
+    renderPage(THEO_ME);
+    const hero = await screen.findByRole('region', { name: 'Série de 10' });
+    expect(hero.textContent).toMatch(/Premier rang\u00a0: Étincelle, à 100\s€ de net depuis ton arrivée/u);
+    expect(hero.querySelector('[data-earned="false"]')).not.toBeNull();
+  });
+
+  it('says the rank held, with its insignia earned', async () => {
+    serve({ ...HIS_CASE, level: { rank: 3, name: 'Charmeur' } });
+    renderPage(THEO_ME);
+    const hero = await screen.findByRole('region', { name: 'Série de 10' });
+    expect(hero.textContent).toContain('Rang Charmeur');
+    expect(hero.querySelector('[data-earned="true"]')).not.toBeNull();
+  });
+
+  it('says nothing of a rank when the agency set none', async () => {
+    serve({ ...HIS_CASE, nextLevel: null });
+    renderPage(THEO_ME);
+    const hero = await screen.findByRole('region', { name: 'Série de 10' });
+    expect(hero.textContent).not.toMatch(/rang/iu);
+  });
+
+  it('keeps the medal shelf without tiers set, and says why it is empty', async () => {
+    serve(HIS_CASE);
+    renderPage(THEO_ME);
+    const medals = await screen.findByRole('region', { name: 'Médailles' });
+    expect(medals.textContent).toContain(
+      'L’agence n’a pas encore posé de paliers de prime. Tes médailles apparaîtront ici.',
+    );
+    expect(screen.getAllByRole('heading', { level: 3 }).map((one) => one.textContent)).toEqual([
+      'Médailles',
+      'Séries',
+    ]);
   });
 });

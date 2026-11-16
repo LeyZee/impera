@@ -85,6 +85,11 @@ export const FakeMessageSchema = z.object({
   createdAt: iso,
   /** Deleted on Reveal: still listed, with `deletedAt` (2026-11-16). */
   deletedAt: iso.nullable().optional(),
+  /** The fan answered one of her stories (2026-11-16): `replyToStoryId` and `storyReply` on the wire. */
+  storyReply: z
+    .object({ storyId: id, thumbnailUrl: z.string(), mediaType: z.string(), isExpired: z.boolean() })
+    .nullable()
+    .optional(),
 });
 export type FakeMessage = z.infer<typeof FakeMessageSchema>;
 
@@ -116,7 +121,17 @@ export const FakeScriptSchema = z.object({
 });
 export type FakeScript = z.infer<typeof FakeScriptSchema>;
 
-export const FakeSequenceSchema = z.object({ id, name: z.string(), scriptIds: z.array(id), createdAt: iso });
+export const FakeSequenceSchema = z.object({
+  id,
+  name: z.string(),
+  scriptIds: z.array(id),
+  /**
+   * « Étape à branches » (ADR 0112, provisional): more steps on the `stepIndex` of one of `scriptIds`, between which a
+   * human chooses. Listed after the ordered steps, with the rank they share.
+   */
+  branches: z.array(z.object({ scriptId: id, stepIndex: z.number().int().min(0) })).optional(),
+  createdAt: iso,
+});
 
 export const FakeTransactionSchema = z.object({
   id,
@@ -216,4 +231,5 @@ export const REVEAL_EXPECTED_CAPABILITIES = {
   scripts: true,
   scriptHistory: true,
   vault: true,
+  mediaDownload: true,
 } as const;

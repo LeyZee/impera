@@ -18,6 +18,7 @@ import type {
   JobLogger,
   OutboundSender,
   Transaction,
+  TypingRhythm,
   UnitOfWork,
 } from '../../domain/ports';
 import { bubbleIdempotencyKey, canSend, fanAwaitsAnswer } from '../../domain/rules';
@@ -31,6 +32,8 @@ export interface SendDeps {
   readonly sender: OutboundSender;
   /** Her follow-up delays (P3-10); without it, no follow-up is scheduled. */
   readonly followUps?: FollowUpPlan;
+  /** Her typing rhythm: before each bubble after the first, the time to type it. Without it, none. */
+  readonly typing?: TypingRhythm;
 }
 
 interface Sendable {
@@ -46,7 +49,7 @@ const SENDABLE: readonly DraftStatus[] = ['approved', 'edited'];
  * fan message or a takeover since the approval expires the draft and stops the send. A retry resumes after the
  * bubbles already recorded; an unknown outcome is checked with `verifySent` before trying again.
  */
-export function createSendJob({ uow, clock, sender, followUps }: SendDeps) {
+export function createSendJob({ uow, clock, sender, followUps, typing }: SendDeps) {
   const meta = (payload: JobPayload<'conversation.send'>): EventMeta => ({
     actor: 'system',
     correlationId: payload.correlationId,
@@ -130,10 +133,15 @@ export function createSendJob({ uow, clock, sender, followUps }: SendDeps) {
     }
     const bubbles = start.draft.finalBubbles ?? start.draft.bubbles;
     const author: MessageAuthor = start.draft.status === 'edited' ? 'human' : 'ai';
+    // The first bubble leaves when the reply is due; each next one after the time she takes to type it. A message of
+    // his meanwhile expires the draft at the check below, and the rest never leaves.
+    const typingMs = typing?.delaysMs(bubbles) ?? [];
 
     for (let index = start.alreadySent; index < bubbles.length; index += 1) {
       const idempotencyKey = bubbleIdempotencyKey(payload.draftId, index);
       const text = bubbles[index] ?? '';
+      const pause = index > 0 ? (typingMs[index] ?? 0) : 0;
+      if (pause > 0 && typing !== undefined) await typing.wait(pause);
       const conversation = await uow.inTenant(payload.creatorId, async (tx) => {
         const sendable = await lockSendable(tx, payload, true);
         if (sendable === null) return null;

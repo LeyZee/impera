@@ -187,6 +187,11 @@ export const CreatorTaskSchema = z.strictObject({
    * agenda kept on her phone from before it was sent, read as always due.
    */
   createdAt: z.iso.datetime().nullable().default(null),
+  /**
+   * When she removed a routine today: the day keeps it due, and it leaves her agenda the next day (recette 16/11,
+   * Charles's choice), so that removing it never saves a streak. `null` for a task still in her agenda.
+   */
+  removedAt: z.iso.datetime().nullable().default(null),
 });
 export type CreatorTask = z.infer<typeof CreatorTaskSchema>;
 
@@ -234,7 +239,10 @@ export type CreatorTick = z.infer<typeof CreatorTickSchema>;
 export const CreatorTicksBodySchema = z.strictObject({ ticks: z.array(CreatorTickSchema).min(1).max(200) });
 export type CreatorTicksBody = z.infer<typeof CreatorTicksBodySchema>;
 
-/** `DELETE /v1/creator-space/tasks/:id/ticks/:day` (creator): untick. Unticking a tick that is not there is no error. */
+/**
+ * `DELETE /v1/creator-space/tasks/:id/ticks/:day` (creator): untick. Unticking a tick that is not there is no error. A
+ * routine's tick is taken back only on her today: another day is over (422 `creator_day_closed_unprocessable`).
+ */
 export const CreatorTickParamsSchema = z.strictObject({ id: CreatorTaskIdSchema, day: CalendarDaySchema });
 
 /** A dispo: every week on a weekday, in her wall-clock time (a whole day when its end is its start), or once. */
@@ -412,6 +420,8 @@ export const CREATOR_TASK_NOT_FOUND = 'creator_task_not_found';
 export const CREATOR_TASK_CHANGED_CONFLICT = 'creator_task_changed_conflict';
 export const CREATOR_TICK_DAY_UNPROCESSABLE = 'creator_tick_day_unprocessable';
 export const CREATOR_TICK_LATE_UNPROCESSABLE = 'creator_tick_late_unprocessable';
+/** A routine's tick taken back on another day than her today: her day is over, its ticks stay (CRE-03). */
+export const CREATOR_DAY_CLOSED_UNPROCESSABLE = 'creator_day_closed_unprocessable';
 export const AVAILABILITY_NOT_FOUND = 'availability_not_found';
 export const SUGGESTION_NOT_FOUND = 'creator_suggestion_not_found';
 export const SUGGESTION_DECIDED_CONFLICT = 'creator_suggestion_decided_conflict';

@@ -3,6 +3,7 @@ import type { JSX } from 'react';
 
 import { MeNav } from './MeNav';
 
+import { playsTheGame } from '@/rewards/api';
 import { SecuritySection } from '@/security/SecuritySection';
 import { PrivateChat } from '@/settings/telegram/PrivateChat';
 import { Page, Panel, PanelSection, PageHeader } from '@/shell/layout';
@@ -25,7 +26,13 @@ export function MySecurityPage({ user }: { user: Me }): JSX.Element {
               ? 'Les appareils où ton compte est ouvert, tes codes de secours, ton chat Telegram et l’extension de veille.'
               : 'Les appareils où ton compte est ouvert, tes codes de secours et ton chat Telegram.'
         }
-        actions={<MeNav manager={user.teamScope === 'agency'} creator={user.role === 'creator'} />}
+        actions={
+          <MeNav
+            manager={user.teamScope === 'agency'}
+            creator={user.role === 'creator'}
+            trophies={playsTheGame(user)}
+          />
+        }
       />
       <div className="flex flex-col gap-4">
         <SecuritySection extensionLinks={user.teamScope === 'agency'} />

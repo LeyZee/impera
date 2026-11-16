@@ -223,6 +223,27 @@ describe('scriptsOf (spec § 6)', () => {
     expect(script?.steps[0]?.media).toEqual([{ ref: { platform: 'reveal', id: 'm_1' }, kind: 'image' }]);
   });
 
+  it('keeps two steps on the same `stepIndex` side by side with the rank they share: branches (ADR 0112)', () => {
+    const [script] = scriptsOf(
+      [
+        sequence('seq_1', 'Séquence à branches', [
+          { id: 'step_a', index: 0 },
+          { id: 'step_c', index: 1, price: 2000 },
+          { id: 'step_b', index: 1, price: 1500 },
+        ]),
+      ],
+      [],
+      () => null,
+    );
+    // Each keeps its own place (`index`) and the platform's rank (`platformIndex`): nothing is merged nor lost, and the
+    // branches of a rank come by id, whatever order Reveal listed them in.
+    expect(script?.steps.map((s) => [s.ref.id, s.index, s.platformIndex, s.priceMinor])).toEqual([
+      ['step_a', 0, 0, 0],
+      ['step_b', 1, 1, 1500],
+      ['step_c', 2, 1, 2000],
+    ]);
+  });
+
   it('makes a step in no sequence a script of one step, and leaves an empty sequence out', () => {
     const scripts = scriptsOf(
       [sequence('seq_empty', 'Vide', []), sequence('seq_1', 'Séquence', [{ id: 'step_a', index: 0 }])],
@@ -233,6 +254,7 @@ describe('scriptsOf (spec § 6)', () => {
       ['seq_1', 1, null],
       ['step_alone', 1, 'day'],
     ]);
+    expect(scripts.map((s) => s.steps[0]?.platformIndex)).toEqual([0, 0]);
   });
 });
 

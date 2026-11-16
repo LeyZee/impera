@@ -91,6 +91,26 @@ function Alone({
 }
 
 /**
+ * The address names a creator the account does not list, archived or unknown: the screen says so and shows nothing of
+ * another one, neither her figures nor her agent's mode control (recette 16/11, PIL-01). One way out, to a page that exists.
+ */
+function Missing({ label, onLeave }: { label: string; onLeave: (() => void) | undefined }): JSX.Element {
+  return (
+    <Alone
+      tone="idle"
+      headline="Créatrice **introuvable**"
+      lead="Elle est archivée, ou ce lien n’est plus bon. Rien d’une autre créatrice n’est affiché à sa place."
+    >
+      {onLeave === undefined ? null : (
+        <button type="button" className="nv-btn nv-btn--soft" onClick={onLeave}>
+          {label}
+        </button>
+      )}
+    </Alone>
+  );
+}
+
+/**
  * The server does not answer: one sentence, no figure, only « Réessayer », until it answers again. Amber, not red: a
  * warning, the red stays the urgencies'.
  */
@@ -174,6 +194,8 @@ export function DashboardPage({
   opensTracking = false,
   canAddCreator = false,
   agency,
+  asked,
+  onLeave,
 }: {
   /** The period of the sales, the fans' path, the best fans and the reply delay: from the address (`?periode=`). */
   period: Period;
@@ -190,8 +212,12 @@ export function DashboardPage({
   canAddCreator?: boolean;
   /** The owner's and an active manager's: her figures from the register lead the page (ADR 0078). */
   agency?: AgencyView;
+  /** The creator the address names (`?creatrice=`): her Dashboard, or the sentence that she is not found (PIL-01). */
+  asked?: string | undefined;
+  /** Out of a creator who is not found, to the Dashboard of the one followed. */
+  onLeave?: () => void;
 }): JSX.Element {
-  const view = useDashboard(period, forOwner ? 'owner' : 'team');
+  const view = useDashboard(period, forOwner ? 'owner' : 'team', asked ?? null);
   if (view.status === 'loading') {
     return (
       <div className="db" aria-busy="true">
@@ -208,6 +234,12 @@ export function DashboardPage({
   if (view.status === 'offline')
     return <Offline creatorName={view.creatorName} onCreator={onCreator} agency={agency} />;
   if (view.status === 'empty') return <NoCreator canAddCreator={canAddCreator} />;
+  if (view.status === 'missing')
+    return agency === undefined ? (
+      <Missing label="Revenir au Dashboard" onLeave={onLeave} />
+    ) : (
+      <Missing label="Voir toute l’agence" onLeave={agency.onAgency} />
+    );
   return (
     <Loaded
       view={view}

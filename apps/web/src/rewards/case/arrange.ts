@@ -19,7 +19,8 @@ export const onShelf = (item: Pick<TrophyCaseItem, 'family'>): boolean =>
  */
 export function percentOf(progress: TrophyCaseProgress | null, earned: boolean): number | null {
   if (earned) return 100;
-  if (progress === null) return null;
+  // An object of one gesture has no way along to draw: 0 of 1 only weighs it as the next trophy (recette 16/11, CRE-14).
+  if (progress === null || progress.unit === 'once') return null;
   const share = Math.floor((progress.current * 100) / progress.target);
   return Math.max(0, Math.min(99, share));
 }
@@ -39,12 +40,15 @@ export interface Shelf {
   readonly earned: number;
 }
 
-/** The three shelves, an empty one left out. The sort is stable: the server's order breaks a tie. */
-export function shelvesOf(trophyCase: TrophyCase): Shelf[] {
+/**
+ * The three shelves, an empty one left out unless the role keeps it to say why it is empty (recette 16/11, CHT-17).
+ * The sort is stable: the server's order breaks a tie.
+ */
+export function shelvesOf(trophyCase: TrophyCase, keepEmpty: readonly ShelfFamily[] = []): Shelf[] {
   return SHELF_ORDER.map((family) => {
     const items = trophyCase.items.filter((item) => item.family === family).toSorted(byShelfOrder);
     return { family, items, earned: items.filter(isEarned).length };
-  }).filter((shelf) => shelf.items.length > 0);
+  }).filter((shelf) => shelf.items.length > 0 || keepEmpty.includes(shelf.family));
 }
 
 /**
@@ -67,12 +71,20 @@ export function nextTrophy(trophyCase: TrophyCase): TrophyCaseItem | null {
   return best;
 }
 
-/** On a phone, a shelf shows what was earned and the next object only; the rest waits behind « Voir tout ». */
+/** A phone lays a shelf three objects to a row. */
+export const PHONE_ROW = 3;
+
+/**
+ * On a phone, a shelf shows what was earned and the next object, in full rows of three, so no row stands half empty
+ * (recette 16/11, CRE-14). « Voir tout » only hides two rows or more: a single row left over is shown at once.
+ */
 export function foldedShelf(shelf: Shelf): { shown: readonly TrophyCaseItem[]; hidden: number } {
-  const shown = [
-    ...shelf.items.filter(isEarned),
-    ...shelf.items.filter((item) => !isEarned(item)).slice(0, 1),
-  ];
+  const earned = shelf.items.filter(isEarned);
+  const waiting = shelf.items.filter((item) => !isEarned(item));
+  const wanted = earned.length + Math.min(waiting.length, 1);
+  const rows = Math.max(1, Math.ceil(wanted / PHONE_ROW));
+  const count = shelf.items.length - rows * PHONE_ROW > PHONE_ROW ? rows * PHONE_ROW : shelf.items.length;
+  const shown = [...earned, ...waiting].slice(0, count);
   return { shown, hidden: shelf.items.length - shown.length };
 }
 

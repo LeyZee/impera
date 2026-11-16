@@ -98,6 +98,8 @@ interface Script {
   readonly brain?: LlmFailure;
   readonly voice?: VoiceOutput | LlmFailure;
   readonly hasKey?: boolean;
+  /** What the voice writes from its second call on: her answer written once more after a guard refused it. */
+  readonly voiceAfter?: VoiceOutput;
 }
 
 interface Seen {
@@ -116,8 +118,9 @@ function gateway(script: Script, seen: Seen): LlmGateway {
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
+    identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
-    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
+    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
     brain: (input) => {
       seen.traces.push(input.trace);
       seen.brainInputs?.push(input);
@@ -130,7 +133,10 @@ function gateway(script: Script, seen: Seen): LlmGateway {
     voice: (input) => {
       seen.voiceCalls += 1;
       seen.voiceInputs?.push(input);
-      const voice = script.voice ?? { bubbles: ['Coucou toi ✨'] };
+      const voice =
+        seen.voiceCalls > 1 && script.voiceAfter !== undefined
+          ? script.voiceAfter
+          : (script.voice ?? { bubbles: ['Coucou toi ✨'] });
       return Promise.resolve(
         'bubbles' in voice ? { ok: true, value: { output: voice, meta: META } } : { ok: false, error: voice },
       );
@@ -257,6 +263,47 @@ describe('createDraftComposer', () => {
       conversationId: 'conversation-1',
       draftId: 'draft-1',
     });
+  });
+
+  it('gives the voice the bubbles code allows, and leaves out what goes past them (Charles 16/11)', async () => {
+    const { draftComposer, seen } = composer({
+      voice: { bubbles: ['Salut toi', 'ça va et toi ?', 'je file'] },
+    });
+    const single = { ...INPUT, history: INPUT.history.slice(0, 1) };
+    expect(await draftComposer.compose(single)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Salut toi'],
+    });
+    // A long message of his: two bubbles at most.
+    const long = {
+      ...INPUT,
+      history: [
+        ...INPUT.history.slice(0, 1),
+        { direction: 'inbound' as const, text: 'a'.repeat(140), at: new Date('2026-10-17T10:00:00Z') },
+      ],
+    };
+    expect(await draftComposer.compose(long)).toMatchObject({
+      bubbles: ['Salut toi', 'ça va et toi ?'],
+    });
+    expect(seen.voiceInputs?.map((input) => input.maxBubbles)).toEqual([1, 2]);
+  });
+
+  it('writes a blocked answer once more, told why, before a human is called (audit du 16/11, M1)', async () => {
+    const { draftComposer, seen } = composer({
+      voice: { bubbles: ['Écris-moi sur mon snap 😘'] },
+      voiceAfter: { bubbles: ['Je reste ici avec toi 😘'] },
+    });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Je reste ici avec toi 😘'],
+    });
+    expect(seen.voiceCalls).toBe(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('a été refusée');
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).not.toContain('snap');
+
+    const still = composer({ voice: { bubbles: ['Écris-moi sur mon snap 😘'] } });
+    expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
+    expect(still.seen.voiceCalls).toBe(2);
   });
 
   it('reads her clock from the creator of the conversation', async () => {
@@ -1165,6 +1212,25 @@ describe('createDraftComposer, the offer policy', () => {
     expect(written(seen)?.replyBrief).not.toContain('vidéo');
   });
 
+  it('says yes with desire to a fan who asks for her content inside the cooldown, nothing sold now (audit du 16/11, M4)', async () => {
+    const lastOffer = new Date(INPUT.now.getTime() - 3 * 3_600_000);
+    const asks: Brief = { ...OFFER, intent: 'asks_for_media', sentiment: 'positive' };
+    const { draftComposer, seen } = composer(
+      { brief: asks },
+      undefined,
+      limitsOf(ADULT).limits,
+      policy(lastOffer),
+    );
+    await draftComposer.compose(INPUT);
+    expect(written(seen)?.action).toBe('reply');
+    expect(written(seen)?.replyBrief).toContain('garde le mystère');
+
+    const broke: Brief = { ...asks, risks: ['money_trouble'] };
+    const second = composer({ brief: broke }, undefined, limitsOf(ADULT).limits, policy(lastOffer));
+    await second.draftComposer.compose(INPUT);
+    expect(written(second.seen)?.replyBrief).not.toContain('mystère');
+  });
+
   it('offers nothing to a fan whose age is not confirmed, or frozen for money', async () => {
     for (const flags of [
       {},
@@ -1236,7 +1302,7 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
         before: 59,
         score: 93,
         signals: ['states_desire', 'intent:sexting', 'sentiment:aroused'],
-        weightsVersion: 'desire-2',
+        weightsVersion: 'desire-3',
       },
     });
     expect(written(seen)?.action).toBe('offer');
@@ -1281,6 +1347,10 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
     const disputed: FanFlags = { ...ADULT, ageDisputed: { since: '2026-10-16T10:00:00Z', by: 'human' } };
     const reset = composer({ brief: OFFER }, undefined, limitsOf(disputed).limits, policy);
     expect(await reset.draftComposer.compose(stored(90, 3))).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['age_disputed'],
       desire: { before: 88, score: 0, signals: ['age_disputed'] },
     });
   });
@@ -1381,7 +1451,7 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(limits.confirmed).toEqual([]);
   });
 
-  it('never confirms an age taken back: explicit stays blocked and nothing is offered', async () => {
+  it('writes nothing while his age is in doubt: a human answers him, his stated age confirms nothing', async () => {
     const disputed: FanFlags = { ageDisputed: { since: '2026-10-16T09:00:00Z', by: 'policy' } };
     const AGE_HOT: Brief = {
       ...HOT,
@@ -1404,18 +1474,24 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
       history: [{ direction: 'inbound', text: 'J’ai 19 ans', at: new Date('2026-10-17T09:59:00Z') }],
     });
     expect(limits.confirmed).toEqual([]);
-    expect(result).toMatchObject({ kind: 'held', reason: 'guard_blocked', detail: ['explicit_before_age'] });
-    expect(written(seen)?.action).toBe('reply');
+    expect(result).toEqual({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['age_disputed'],
+      costUsd: 0,
+    });
+    expect(seen.traces).toHaveLength(0);
   });
 
-  it('keeps the answer to his stated age careful: it counts from his next message', async () => {
+  it('takes the adult age he states as confirmed at once, no doubt left (Charles, 16/11)', async () => {
     const AGE: Brief = {
       ...HOT,
       factsProposed: [{ category: 'identity', key: 'age', value: '25', kind: 'declared', confidence: 0.95 }],
     };
     const limits = limitsOf({});
     const { draftComposer, seen } = composer(
-      { brief: AGE, voice: { bubbles: ['Mmh j’ai envie de te sucer'] } },
+      { brief: AGE, voice: { bubbles: ['Mmh j’ai envie de toi'] } },
       undefined,
       limits.limits,
       cursor,
@@ -1425,8 +1501,60 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
       history: [{ direction: 'inbound', text: 'J’ai 25 ans', at: new Date('2026-10-17T09:59:00Z') }],
     });
     expect(limits.confirmed).toEqual(['fan-1']);
+    expect(written(seen)?.replyBrief).not.toContain('ralentit');
+    expect(written(seen)?.replyBrief).not.toContain('son âge');
+    expect(result.kind).toBe('draft');
+  });
+
+  it('takes an adult age stated on his card as confirmed (Charles, 16/11)', async () => {
+    const limits = limitsOf({});
+    const { draftComposer, seen } = composer({ brief: HOT }, undefined, limits.limits, cursor);
+    await draftComposer.compose({ ...dayOld, fan: { ...dayOld.fan, cardAge: 31, cardAgeStated: true } });
+    expect(limits.confirmed).toEqual(['fan-1']);
+    expect(written(seen)?.replyBrief).not.toContain('ralentit');
+  });
+
+  it('never confirms an age the brain only guessed on his card', async () => {
+    const limits = limitsOf({});
+    const { draftComposer, seen } = composer({ brief: HOT }, undefined, limits.limits, cursor);
+    await draftComposer.compose({ ...dayOld, fan: { ...dayOld.fan, cardAge: 31, cardAgeStated: false } });
+    expect(limits.confirmed).toEqual([]);
     expect(written(seen)?.replyBrief).toContain('ralentit');
-    expect(result).toMatchObject({ reason: 'guard_blocked', detail: ['explicit_before_age'] });
+  });
+
+  it('asks his age once in a conversation, never again (audit du 16/11, C2)', async () => {
+    const { draftComposer, seen } = composer({ brief: HOT }, undefined, limitsOf({}).limits, cursor);
+    await draftComposer.compose({
+      ...dayOld,
+      history: [
+        {
+          direction: 'outbound',
+          text: 'Doucement toi 😅 t’as quel âge au fait ?',
+          at: new Date('2026-10-17T09:50:00Z'),
+        },
+        { direction: 'inbound', text: 'Haha tu veux savoir quoi', at: new Date('2026-10-17T09:59:00Z') },
+      ],
+    });
+    expect(written(seen)?.replyBrief).toContain('ralentit');
+    expect(written(seen)?.replyBrief).not.toContain('son âge');
+  });
+
+  it('welcomes a compliment, never slows it down, before his age is known (Charles, 16/11)', async () => {
+    const COMPLIMENT: Brief = {
+      ...BRIEF,
+      intent: 'flirt',
+      sentiment: 'positive',
+      desireSignals: ['body_compliment'],
+    };
+    const { draftComposer, seen } = composer({ brief: COMPLIMENT }, undefined, limitsOf({}).limits, cursor);
+    await draftComposer.compose(INPUT);
+    expect(written(seen)?.replyBrief).not.toContain('ralentit');
+    expect(written(seen)?.toneHints).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('le reçoit avec plaisir'),
+        expect.stringContaining('aucune allusion sexuelle'),
+      ]),
+    );
   });
 
   it('stays suggestive with a confirmed adult a human set to nothing explicit', async () => {
@@ -1793,11 +1921,24 @@ describe('createDraftComposer, the care mode (ADR 0088)', () => {
 describe('createDraftComposer, a custom order and a price objection (ADR 0090)', () => {
   const ORDER: Brief = { ...BRIEF, intent: 'asks_for_service', replyBrief: 'Lui dire oui.' };
   const adult: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00.000Z' };
-  const ordering = (options: { readonly chatter?: boolean; readonly voice?: VoiceOutput } = {}) => {
+  const ordering = (
+    options: {
+      readonly chatter?: boolean;
+      readonly voice?: VoiceOutput;
+      readonly neverDo?: readonly string[];
+    } = {},
+  ) => {
     const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
     const draftComposer = createDraftComposer({
       gateway: gateway({ brief: ORDER, ...(options.voice !== undefined && { voice: options.voice }) }, seen),
-      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: {
+          ...DEFAULT_GUARD_SETTINGS,
+          ...(options.neverDo !== undefined && { neverDo: options.neverDo }),
+        },
+      },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',
       limits: limitsOf(adult).limits,
@@ -1834,6 +1975,17 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
       detail: ['no_commitment'],
       customOrderOpened: true,
     });
+  });
+
+  it('declines what she never does, with nobody called and no order opened (audit du 16/11, M3)', async () => {
+    const { draftComposer, seen } = ordering({ chatter: true, neverDo: ['appel vidéo'] });
+    const result = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'Tu me fais un appel vidéo ce soir ?', at: INPUT.now }],
+    });
+    expect(result).toMatchObject({ kind: 'draft' });
+    expect(result).not.toHaveProperty('customOrderOpened');
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('n’entre pas dans cette demande');
   });
 
   it('opens no second order while one waits', async () => {

@@ -135,7 +135,7 @@ const DESCRIBED: DropMediaDescription = {
 const seen: DropSenseInput[] = [];
 const vision = { fails: false };
 const dropVision: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'> = {
-  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
+  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
   describeDrop: (input) => {
     seen.push(input);
     // Every model failing (a refusal of adult content, an outage): the gateway's own error.
@@ -381,6 +381,11 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     expect(events).toEqual([{ creatorId: nora, payload: { dropId, requestId: null } }]);
     // A drop that answers no request announces nothing to the trend watch (VEI-01 d3).
     expect(await dropReceivedJobs(dropId)).toEqual([]);
+    // Her game looks at once, so that a first drop is revealed where she dropped (recette 16/11, CRE-06).
+    const asked = await test.admin.db.execute(
+      sql`select payload from graphile_worker._private_jobs where key = ${`rewards.evaluate_creator:${nora}`}`,
+    );
+    expect(asked.rows).toEqual([{ payload: { creatorId: nora } }]);
     // Replayed once kept, « complete » answers the drop as it is.
     const replay = await call('POST', `${base}/complete`, 'nora', { parts });
     expect(replay.statusCode).toBe(200);

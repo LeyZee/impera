@@ -53,6 +53,12 @@ export const ObservedAgencyShareSchema = z.object({
   netMinor: z.number().int(),
   agencyMinor: z.number().int(),
   agencyBps: z.number().int().nullable(),
+  /**
+   * Whether the part read differs from her percentage by more than rounding explains, by the rule of the gap alert
+   * (ADR 0054 § 2 and § 6), on the window's days a percentage covers, each with its own: `null` when no percentage
+   * covers any of them.
+   */
+  differsFromRate: z.boolean().nullable(),
 });
 export type ObservedAgencyShare = z.infer<typeof ObservedAgencyShareSchema>;
 
