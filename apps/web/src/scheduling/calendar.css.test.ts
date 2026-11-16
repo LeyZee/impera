@@ -34,6 +34,13 @@ describe('Équipe › Planning (recette visuelle 16/11)', () => {
     expect(grid).not.toMatch(/\[data-carried='true'\]::after/u);
   });
 
+  it('lists a phone’s day without the empty box of a créneau gone by, nor a « suite » (GES-05)', () => {
+    const phone =
+      /@media \(max-width: 820px\) \{\s*\/\*[^]*?\*\/\s*([^{]*)\{\s*display: none;/u.exec(grid)?.[1] ?? '';
+    expect(phone).toContain('.sc-slot:has(> .sc-slot__gone)');
+    expect(phone).toContain(".sc-slot > .sc-chip[data-carried='true']");
+  });
+
   it('breaks a member’s name on two lines rather than cut it, and gives the handles 160 px (GES-22)', () => {
     const name = rule('.sc-chip__name');
     expect(name).toContain('-webkit-line-clamp: 2');

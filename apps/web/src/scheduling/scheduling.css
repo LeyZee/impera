@@ -799,6 +799,12 @@ button.sc-duty__one:active {
 }
 
 @media (max-width: 820px) {
+  /* The day as one list: a créneau gone by and empty is an empty box, and a shift's « suite » follows the shift itself
+     on the line above. Neither says anything here (recette visuelle 16/11, GES-05). */
+  .sc-slot:has(> .sc-slot__gone),
+  .sc-slot > .sc-chip[data-carried='true'] {
+    display: none;
+  }
   .sc-days {
     display: flex;
     gap: 2px;
