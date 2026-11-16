@@ -253,3 +253,31 @@ describe('Notifications, when it rings', () => {
     expect(save()).toHaveProperty('disabled', true);
   });
 });
+
+// Recette 11/11 (GES-15): unreadable settings were a grey line with no way out but a reload.
+describe('Notifications, settings that cannot be read', () => {
+  it('says the server is silent, in amber, and reads them again on « Réessayer »', async () => {
+    let answers = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url !== '/v1/notifications/preferences') {
+          return Promise.resolve(new Response(null, { status: 500 }));
+        }
+        answers += 1;
+        return Promise.resolve(
+          answers === 1
+            ? new Response(null, { status: 503 })
+            : new Response(JSON.stringify(DEFAULTS), { status: 200 }),
+        );
+      }),
+    );
+    deviceIs('off');
+    renderPage();
+    expect(await screen.findByText('Tes réglages n’ont pas pu être lus.')).toBeTruthy();
+    expect(screen.queryByText(/illisibles/u)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+    expect(await screen.findByLabelText('Début des heures calmes')).toBeTruthy();
+    expect(answers).toBe(2);
+  });
+});

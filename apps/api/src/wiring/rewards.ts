@@ -28,6 +28,7 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
       agencyTimeZone: deps.scheduling.pay.agencyTimeZone,
       payFacts: payGameFactsUnscoped,
       shifts: shiftsForGameUnscoped,
+      shiftsBegun: (userId, now) => deps.scheduling.reads.ownShiftsBegun(userId, now),
     },
     // ADR 0107: the creator's game reads her days and her drops through the doors of those modules, and writes neither.
     creatorReads: { days: creatorDaysForGameUnscoped, drops: dropsForGameUnscoped },
@@ -48,6 +49,8 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
     routes: [
       module.routes({
         guard: requireRole('operator'),
+        teamGuard: requireRole('owner', 'operator'),
+        ownerGuard: requireRole('owner'),
         creatorGuard: requireRole('creator'),
         agencyGuard: requireRole('owner', 'operator'),
       }),

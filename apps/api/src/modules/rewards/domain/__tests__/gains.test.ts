@@ -2,12 +2,20 @@ import { PayPeriodSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { gainsOf, reportOf, type GamePay, type GameShift } from '../gains';
+import { levelSteps } from '../levels';
 
 const ZONE = 'Europe/Paris';
 const NOW = new Date('2026-11-20T12:00:00Z');
 const HOUR = 3_600_000;
 
-const NO_PAY: GamePay = { sales: 0, dayNetsMinor: [], closedPeriodNetsMinor: [], tiers: [] };
+const NO_PAY: GamePay = {
+  sales: 0,
+  dayNetsMinor: [],
+  closedPeriodNetsMinor: [],
+  tiers: [],
+  cumulatedNetMinor: 0,
+};
+const STEPS = levelSteps([100_000, 500_000, 2_000_000]);
 
 /** A shift ended at `end`, its report handed in `afterHours` later (`null`: never). */
 const shift = (end: string, afterHours: number | null): GameShift => {
@@ -15,8 +23,8 @@ const shift = (end: string, afterHours: number | null): GameShift => {
   return { endsAt, reportedAt: afterHours === null ? null : new Date(endsAt.getTime() + afterHours * HOUR) };
 };
 
-const kinds = (pay: GamePay, shifts: GameShift[] = []) =>
-  gainsOf({ pay, shifts, now: NOW, agencyZone: ZONE }).gains.map((gain) =>
+const kinds = (pay: GamePay, shifts: GameShift[] = [], steps = STEPS) =>
+  gainsOf({ pay, shifts, now: NOW, agencyZone: ZONE, levelSteps: steps }).gains.map((gain) =>
     gain.scopeKey === '' ? gain.kind : `${gain.kind}:${gain.scopeKey}`,
   );
 
@@ -35,7 +43,7 @@ describe('reportOf (ADR 0104 § 13)', () => {
 
 describe('gainsOf (ADR 0104 § 12 and § 15)', () => {
   it('gives nothing to a member with no fact', () => {
-    expect(gainsOf({ pay: NO_PAY, shifts: [], now: NOW, agencyZone: ZONE })).toEqual({
+    expect(gainsOf({ pay: NO_PAY, shifts: [], now: NOW, agencyZone: ZONE, levelSteps: STEPS })).toEqual({
       gains: [],
       streak: { current: 0, best: 0 },
     });
@@ -69,6 +77,7 @@ describe('gainsOf (ADR 0104 § 12 and § 15)', () => {
       shifts: [...held, shift('2026-11-07T20:00:00Z', 20), shift('2026-11-18T20:00:00Z', 1)],
       now: NOW,
       agencyZone: ZONE,
+      levelSteps: STEPS,
     });
     expect(streak).toEqual({ current: 1, best: 6 });
     expect(gains.map((gain) => gain.kind)).toEqual(['streak_5']);
@@ -80,5 +89,11 @@ describe('gainsOf (ADR 0104 § 12 and § 15)', () => {
     expect(kinds(NO_PAY, [...first, shift('2026-11-12T20:00:00Z', null)])).toEqual([]);
     // The fortnight under way proves nothing yet.
     expect(kinds(NO_PAY, [shift('2026-11-17T20:00:00Z', 1)])).toEqual([]);
+  });
+
+  it('gives every rank the cumulated net has reached, and none without thresholds (§ 16)', () => {
+    expect(kinds({ ...NO_PAY, cumulatedNetMinor: 99_999 })).toEqual([]);
+    expect(kinds({ ...NO_PAY, cumulatedNetMinor: 500_000 })).toEqual(['level:1', 'level:2']);
+    expect(kinds({ ...NO_PAY, cumulatedNetMinor: 9_000_000 }, [], [])).toEqual([]);
   });
 });
