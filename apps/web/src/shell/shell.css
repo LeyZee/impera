@@ -920,6 +920,12 @@
 .nv-page > * {
   max-width: var(--_page-width);
 }
+/* A state that is the page's whole body keeps its own height: the body's row would stretch its card down the screen
+   and part « Réessayer » from its sentence (ETA-04). */
+.nv-page > .nv-failure,
+.nv-page > .nv-empty {
+  align-self: start;
+}
 /* A screen that holds its own scroller (the Playground thread, composer pinned below) fills the stage instead. */
 .nv-page--fill {
   height: 100%;

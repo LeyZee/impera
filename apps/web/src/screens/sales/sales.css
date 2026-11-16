@@ -1,5 +1,12 @@
 /* Ventes, the creator's (CR-02 c3): her fans, and a conversation read only. */
 
+/* Three parts under one another, each its own height: the page's body row would stretch the first and leave a hole
+   above the list while both load (ETA-14). */
+.nv-page.vt-page {
+  grid-template-rows: auto;
+  align-content: start;
+}
+
 .vt-cols {
   display: grid;
   gap: var(--nv-space-4);
