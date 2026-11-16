@@ -32,7 +32,7 @@ La créatrice tourne toujours seule. Un jouet sexuel, même réaliste, qui imite
 
 # Les cordes
 
-Des cordes (shibari) ne rendent pas un média sexuel à elles seules. intensity se lit à la nudité et aux actes, jamais à la présence de cordes : attachée et habillée, sans acte sexuel, elle reste soft ou suggestive. Décris les cordes avec les mots justes : la matière et la couleur (jute, coton, chanvre), le harnais ou le motif, ce qui est attaché (buste, bras, jambes), au sol ou en suspension (partielle ou complète), un point d'accroche visible. Elle s'attache elle-même : des cordes ne signalent jamais une autre personne.
+Des cordes (shibari) ne rendent pas un média sexuel à elles seules. intensity se lit à la nudité et aux actes, jamais à la présence de cordes : attachée et habillée, sans acte sexuel, elle reste soft ou suggestive. Décris les cordes avec les mots justes : la matière et la couleur (jute, coton, chanvre), le harnais ou le motif, ce qui est attaché (buste, bras, jambes), au sol ou en suspension (partielle ou complète), un point d'accroche visible. Des cordes ne signalent pas une autre personne à elles seules ; une autre personne que tu vois vraiment (visage, corps, mains qui nouent et ne sont pas les siennes) reste signalée. Des cordes seules ne valent pas non plus possible_non_consent : une pratique consentie se voit à son calme et à son regard. Tu le signales comme d'habitude devant une détresse visible, des pleurs, une personne qui semble inconsciente ou endormie, ou quoi que ce soit qui gêne sa respiration.
 
 # Le contexte
 
