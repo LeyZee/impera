@@ -1,7 +1,10 @@
 import type {
+  AgencyInsights,
+  AgencyPeriod,
   AiUsage,
   CommissionStatementStatus,
   CreatorId,
+  DailyStatsOfCreator,
   FanId,
   McpCallRefusal,
   McpCapability,
@@ -266,6 +269,19 @@ export interface ShiftReader {
   ): Promise<readonly OnShiftEntry[]>;
 }
 
+/**
+ * The agency's figures as `supervision` reads them for the Dashboard's « Agence » (`reads.agencyInsights`, its
+ * `index.ts`, ADR 0078 § 1): the owner's, and an active manager's for the creators of his list; `null` for anyone else.
+ */
+export interface StatsReader {
+  agencyInsights(
+    reader: { readonly userId: UserId; readonly role: UserRole; readonly creatorIds: readonly CreatorId[] },
+    period: AgencyPeriod,
+    /** The access's creator, when it is bound to one: her figures alone. */
+    creatorId?: CreatorId,
+  ): Promise<AgencyInsights | null>;
+}
+
 /** The AI spend as `ai-usage` reads it for the screen (`AiUsage`, its `index.ts`): agency-wide, the owner's alone. */
 export interface AiUsageReader {
   read(): Promise<AiUsage>;
@@ -280,8 +296,9 @@ export interface TeamImportReader {
 }
 
 /**
- * The connectors' read of a creator's sales (`reads.sales`, its `index.ts`, ADR 0026 § 1): as the person, each creator
- * checked in its own transaction, one refused refusing the call; never the agency's nor the creator's share.
+ * The connectors' reads of a creator's sales and daily statistics (`reads.sales`, `reads.dailyStats`, its `index.ts`,
+ * ADR 0026 § 1): as the person, each creator checked in its own transaction, one refused refusing the call; never the
+ * agency's nor the creator's share.
  */
 export interface SalesReader {
   sales(
@@ -289,6 +306,11 @@ export interface SalesReader {
     creatorIds: readonly CreatorId[],
     range: { readonly from: string; readonly to: string },
   ): Promise<readonly SalesOfCreator[]>;
+  dailyStats(
+    userId: string,
+    creatorIds: readonly CreatorId[],
+    range: { readonly from: string; readonly to: string },
+  ): Promise<readonly DailyStatsOfCreator[]>;
 }
 
 /** A statement's state as pay gives it to another door: never an amount of the member (decision A of 14/11). */

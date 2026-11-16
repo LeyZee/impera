@@ -242,13 +242,14 @@ export function TrophyCaseView({
   };
   const playingEntry = playing === null ? null : entry(playing);
   const openEntry = open === null ? null : entry(open);
+  const nextPercent = next === null ? null : percentOf(next.progress, false);
 
   return (
     <div className="tc" data-still={still}>
       {next !== null && nextEntry !== null ? (
         <section className="tc-hero" aria-labelledby={`${id}-next`} style={{ '--tc-i': 0 }}>
           <div className="tc-hero__object">
-            <Ring percent={percentOf(next.progress, false) ?? 0} />
+            <Ring percent={nextPercent ?? 0} />
             <span className="tc-hero__art">{nextEntry.art(168, false)}</span>
           </div>
           <div className="tc-hero__text">
@@ -256,8 +257,15 @@ export function TrophyCaseView({
             <h2 id={`${id}-next`} className="tc-hero__name">
               {nextEntry.name}
             </h2>
-            <Percent value={percentOf(next.progress, false) ?? 0} />
-            {nextEntry.left === undefined ? null : <p className="tc-hero__left">{nextEntry.left}</p>}
+            {/* An object of one gesture: no figure, how to earn it instead (recette 16/11, CRE-14). */}
+            {nextPercent === null ? (
+              <p className="tc-hero__left">{nextEntry.how}</p>
+            ) : (
+              <>
+                <Percent value={nextPercent} />
+                {nextEntry.left === undefined ? null : <p className="tc-hero__left">{nextEntry.left}</p>}
+              </>
+            )}
             <ul className="tc-chips">
               <li>
                 {earnedCount(known)} sur {total} <b>gagnés</b>

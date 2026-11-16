@@ -26,6 +26,7 @@ import {
 
 import { safetySigns } from '../../agent';
 import {
+  AgeInDoubtConflict,
   AutomaticLocked,
   CreatorNotFound,
   DraftGuarded,
@@ -496,7 +497,14 @@ export function createConversationCommands({
       });
     },
 
-    release(input) {
+    async release(input) {
+      // His age in doubt: the agent may not answer him, so the hand stays with the team (Charles, 16/11).
+      const fanId = await uow.inTenant(
+        input.creatorId,
+        async (tx) => (await lockConversation(tx, input.conversationId)).fanId,
+      );
+      if ((await fans.flags(input.creatorId, fanId)).ageDisputed !== undefined)
+        throw new AgeInDoubtConflict();
       return uow.inTenant(input.creatorId, async (tx) => {
         const conversation = await lockConversation(tx, input.conversationId);
         const meta = humanMeta(input);

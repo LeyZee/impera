@@ -97,6 +97,8 @@ export interface ContentDropsModule {
    * not answer throws.
    */
   picture(ask: PictureAsk): Promise<string | null>;
+  /** That picture removed when no media came to carry it (ADR 0113 § 1); nothing when no storage is set. */
+  unpicture(key: string): Promise<void>;
   /**
    * The content request of a shoot she accepted from an idea (VEI-01 d2), written by the trend watch's job: origin
    * `idea`, under the idea's id, replayable.
@@ -243,7 +245,13 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       scripts: (creatorId, reader) => creatorScripts(scriptReads, reader, creatorId),
       scriptSteps: (creatorId, reader, dropId) => creatorScriptSteps(scriptReads, reader, creatorId, dropId),
     },
-    picture: (ask) => pictureOf({ storage, thumbnailer: createThumbnailer(), scratchDir }, ask),
+    // No storage set (`S3_*` unset, as on a PC without one): the vault's media are kept described, without a picture.
+    picture: (ask) =>
+      pictureOf(
+        { storage: storage === NO_STORAGE ? null : storage, thumbnailer: createThumbnailer(), scratchDir },
+        ask,
+      ),
+    unpicture: (key) => (storage === NO_STORAGE ? Promise.resolve() : storage.remove(key)),
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
     scriptRequests: {
       ask: (request) => requestScript(deps.adminDb, request),

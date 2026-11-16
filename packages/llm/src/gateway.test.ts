@@ -490,6 +490,91 @@ describe('LlmGateway', () => {
     expect(result.ok && result.value.output.replyBrief).toBe(BRIEF.replyBrief);
   });
 
+  it('reads a brief whose optional fields come back null or blank, as the fallback writes them', async () => {
+    const mistral = scripted([
+      {
+        text: JSON.stringify({
+          ...BRIEF,
+          objection: null,
+          callback: '',
+          selfDisclosure: '  ',
+          scriptPick: null,
+          scriptReply: null,
+          alertsSeen: null,
+          desireSignals: null,
+          toneHints: null,
+          risks: null,
+        }),
+      },
+    ]);
+    const { gateway, log } = setup({ xai: scripted([{ status: 400 }]), mistral });
+
+    const result = await gateway.brain(INPUT);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const brief = result.value.output;
+    expect(result.value.meta.provider).toBe('mistral');
+    for (const key of [
+      'objection',
+      'callback',
+      'selfDisclosure',
+      'scriptPick',
+      'scriptReply',
+      'alertsSeen',
+      'desireSignals',
+    ]) {
+      expect(brief).not.toHaveProperty(key);
+    }
+    expect(brief.toneHints).toEqual([]);
+    expect(brief.risks).toEqual([]);
+    expect(BriefSchema.safeParse(brief).success).toBe(true);
+    expect(log.since(new Date(0)).at(-1)?.outcome).toBe('ok');
+  });
+
+  it('still refuses a brief whose value is wrong, and logs where, never what', async () => {
+    const wrong = JSON.stringify({ ...BRIEF, intent: 'Salut toi' });
+    const { gateway, log } = setup({
+      xai: scripted([{ text: wrong }]),
+      mistral: scripted([{ text: wrong }]),
+    });
+
+    const result = await gateway.brain(INPUT);
+
+    expect(result.ok).toBe(false);
+    const failed = log.since(new Date(0)).filter((r) => r.outcome === 'invalid_output');
+    expect(failed.length).toBeGreaterThan(0);
+    for (const record of failed) expect(record.errorCode).toBe('intent:invalid_value');
+    expect(JSON.stringify(log.since(new Date(0)))).not.toContain('Salut');
+  });
+
+  it('tells a reply that is not JSON from one that is cut', async () => {
+    const { gateway, log } = setup({
+      xai: scripted([{ text: 'pas du json' }]),
+      mistral: scripted([{ text: '{"intent":' }]),
+    });
+
+    await gateway.brain(INPUT);
+
+    const codes = log
+      .since(new Date(0))
+      .filter((r) => r.outcome === 'invalid_output')
+      .map((r) => r.errorCode);
+    expect(codes.length).toBeGreaterThan(0);
+    for (const code of codes) expect(code).toBe('json');
+  });
+
+  it('shows the model a brief schema where the optional fields may be null', async () => {
+    const xai = scripted([{ text: JSON.stringify(BRIEF) }]);
+    const { gateway } = setup({ xai });
+
+    await gateway.brain(INPUT);
+
+    const format = JSON.stringify(xai.doGenerateCalls[0]?.responseFormat);
+    expect(format).toContain('"objection"');
+    expect(format).toContain('null');
+  });
+
   it('gives the brain her alerts as criteria in typed blocks, and reads the ids it saw (P4-01)', async () => {
     const xai = scripted([{ text: JSON.stringify({ ...BRIEF, alertsSeen: ['a2'] }) }]);
     const { gateway } = setup({ xai });
