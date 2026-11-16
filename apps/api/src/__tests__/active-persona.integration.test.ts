@@ -229,7 +229,9 @@ describe('the agent writes with her active persona version (recette G4, M13; ADR
           guardSettings: guardSettingsOf(demo),
         }),
       ).toEqual([]);
-      const examples = records.flatMap((r) => (r.verdict.kind === 'corrected' ? [r.verdict.text] : []));
+      const examples = records.flatMap((r) =>
+        r.verdict.kind === 'corrected' ? [{ id: r.id, text: r.verdict.text }] : [],
+      );
       await createPlaygroundSession({
         gateway,
         creatorName: demo.creatorName,

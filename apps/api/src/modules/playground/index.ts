@@ -116,7 +116,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
   };
   const now = deps.now ?? (() => new Date());
   const desireMarks = deps.desireMarks ?? createMemoryDesireMarkStore();
-  const engineFor = (persona: PersonaForModels, played?: PlayedVersion, examples?: readonly string[]) =>
+  const engineFor = (persona: PersonaForModels, played?: PlayedVersion, examples?: readonly VoiceExample[]) =>
     createPlaygroundEngine({
       gateway,
       gatewayForVoice: deps.gatewayForVoice ?? ((model) => createVoiceVariant(deps, model)),
@@ -143,7 +143,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
       if (persona === null) throw new PlaygroundPersonaNotFound();
       const bank = await deps.voiceExamplesOf?.(creatorId, versionId);
       const examples =
-        bank === undefined ? undefined : pickVoiceExamples(bank, guardSettingsOf(persona)).map((e) => e.text);
+        bank === undefined ? undefined : pickVoiceExamples(bank, guardSettingsOf(persona), bank.length);
       return engineFor(persona, { creatorId, versionId, version: stored.version }, examples);
     },
   });

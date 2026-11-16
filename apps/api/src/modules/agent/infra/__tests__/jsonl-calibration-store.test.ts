@@ -60,7 +60,7 @@ describe('JSONL calibration store', () => {
     const records = await store.list();
     expect(records.map((r) => r.id)).toEqual(['a', 'b', 'c']);
     expect(records[0]?.moment.situation.now).toEqual(new Date('2026-10-17T21:30:00Z'));
-    expect(voiceExamples(records, HERS)).toEqual(['Coucou toi ✨']);
+    expect(voiceExamples(records, HERS).map((e) => e.text)).toEqual(['Coucou toi ✨']);
     expect(replayableTests(records).map((r) => r.id)).toEqual(['b', 'c']);
   });
 
@@ -76,7 +76,7 @@ describe('JSONL calibration store', () => {
       corrected('d', 'Je suis une IA'),
       corrected('e', 'Et toi alors 😏'),
     ];
-    expect(voiceExamples(records, HERS)).toEqual(['Et toi alors 😏', 'Coucou toi ✨']);
+    expect(voiceExamples(records, HERS).map((e) => e.text)).toEqual(['Et toi alors 😏', 'Coucou toi ✨']);
     const invented = [record('f', { kind: 'corrected', text: 'Sur la persona inventée' }, false)];
     expect(voiceExamples(invented, HERS)).toEqual([]);
   });

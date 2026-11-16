@@ -7,7 +7,6 @@ import { activePersonaForModels, type ActivePersonaSource } from './infra/active
 import { createBubbleGuard, type AgentBubbleGuard } from './infra/bubble-guard';
 import { pickVoiceExamples, type VoiceExample } from './infra/calibration-record';
 import { createCardReader, type AgentCardReader } from './infra/card-reader';
-import { withExamples } from './infra/compose';
 import {
   createDraftComposer,
   type AgentDraftComposer,
@@ -161,17 +160,15 @@ export interface DraftComposerStartOptions {
  */
 function composerFields(persona: PersonaForModels, bank: readonly VoiceExample[]): ComposerPersonaFields {
   const guardSettings = guardSettingsOf(persona);
-  const examples = pickVoiceExamples(bank, guardSettings);
+  // Each turn takes the twelve this fan may read among them (`examplesForTurn`): his age decides the explicit ones.
+  const examples = pickVoiceExamples(bank, guardSettings, bank.length);
   return {
     persona: {
       creatorName: persona.creatorName,
-      personaSheet: withExamples(
-        persona.personaSheet,
-        examples.map((e) => e.text),
-      ),
+      personaSheet: persona.personaSheet,
       guardSettings,
       splitMessages: persona.splitMessages,
-      ...(examples.length > 0 && { voiceExampleIds: examples.map((e) => e.id) }),
+      ...(examples.length > 0 && { voiceExamples: examples }),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,

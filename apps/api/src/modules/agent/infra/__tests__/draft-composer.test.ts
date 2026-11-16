@@ -274,7 +274,10 @@ describe('createDraftComposer', () => {
         creatorName: 'Lina',
         personaSheet: 'fiche',
         guardSettings: DEFAULT_GUARD_SETTINGS,
-        voiceExampleIds: ['example-2', 'example-1'],
+        voiceExamples: [
+          { id: 'example-2', text: 'Hey toi' },
+          { id: 'example-1', text: 'Coucou toi' },
+        ],
       },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',

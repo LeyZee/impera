@@ -72,8 +72,8 @@ export function pickVoiceExamples(
 export function voiceExamples(
   records: readonly CalibrationRecord[],
   of: ExamplesOf,
-  max = VOICE_EXAMPLES_MAX,
-): string[] {
+  max = Number.POSITIVE_INFINITY,
+): VoiceExample[] {
   const bank = records
     .filter(
       (r) =>
@@ -84,7 +84,7 @@ export function voiceExamples(
     )
     .flatMap((r) => (r.verdict.kind === 'corrected' ? [{ id: r.id, text: r.verdict.text }] : []))
     .reverse();
-  return pickVoiceExamples(bank, of.guardSettings, max).map((e) => e.text);
+  return pickVoiceExamples(bank, of.guardSettings, max);
 }
 
 /** Every correction and rejection is a moment to replay after a change of prompt or model. */

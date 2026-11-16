@@ -31,6 +31,7 @@ import {
   type CalibrationRecord,
   type CalibrationStore,
   type PersonaForModels,
+  type VoiceExample,
 } from '../../agent/index';
 import type { DesireMarkStore } from '../application/desire-marks';
 import {
@@ -90,7 +91,7 @@ export interface EngineDeps {
    * Her bank of the version played, as her drafts read it (ADR 0102 § 2), already chosen by `pickVoiceExamples`.
    * Absent: chosen from the ratings kept here, as the terminal playground does.
    */
-  readonly voiceExamples?: readonly string[];
+  readonly voiceExamples?: readonly VoiceExample[];
   readonly timeZone?: string;
   readonly now?: () => Date;
   /** Where the owner's marks on the desire score are kept (ADR 0103 § 6). */
