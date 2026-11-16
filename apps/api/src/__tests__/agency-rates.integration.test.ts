@@ -277,6 +277,7 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
       netMinor: 1800,
       agencyMinor: 700,
       agencyBps: 3889,
+      differsFromRate: null,
     };
     expect(observed.last30Days.shares).toEqual([share]);
     expect(observed.fortnights[0]?.shares).toEqual([share]);
@@ -289,5 +290,16 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
         .from(schema.creatorAgencyRates)
         .where(eq(schema.creatorAgencyRates.creatorId, ines)),
     ).toEqual([]);
+    // A percentage of 40 % set before: 7,00 € read where 7,20 € was agreed, more than a cent a sale (V-PIL-25).
+    await test.admin.db.insert(schema.creatorAgencyRates).values({
+      id: newId(CreatorAgencyRateIdSchema),
+      creatorId: ines,
+      fromDay: parisDay(-3),
+      agencyBps: 4000,
+      createdBy: ownerId,
+    });
+    const after = await list(ines);
+    expect(after.observed.last30Days.shares).toEqual([{ ...share, differsFromRate: true }]);
+    expect(after.observed.fortnights.flatMap((window) => window.shares)).not.toContainEqual(share);
   });
 });

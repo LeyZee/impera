@@ -39,7 +39,7 @@ Choix de Charles du 15/11 (cartes de décision et message) : l'agent écrit **se
    - Le « (avant : …) » d'une correction n'est jamais retiré par l'agent : il reste tant qu'un humain ne l'a pas enlevé, et l'agent ne réécrit pas une ligne qu'il a corrigée.
    - Toutes les autres lignes de la note (hors canevas) restent mot pour mot, comme aujourd'hui.
 
-4. **Ce qui va dans la note.** Une ligne reçoit la valeur active de la case de même code dans la fiche, si sa source est « dit par lui » ou « noté par un chatteur » dans le CRM. Une valeur devinée reste dans la fiche d'Impera et n'entre pas dans Reveal. La ligne Envies suit la même règle (elle n'est jamais demandée au fan, ADR 0085 § 2, mais peut avoir été dite). Une liste s'écrit comme la fiche l'affiche, séparée par des virgules. Ce qui est exclu de la fiche (§ 8 de l'ADR 0085) n'est jamais écrit.
+4. **Ce qui va dans la note.** Une ligne reçoit la valeur active de la case de même code dans la fiche, si sa source est « dit par lui » ou « noté par un chatteur » dans le CRM. Une valeur devinée reste dans la fiche d'Impera et n'entre pas dans Reveal. La ligne Envies suit la même règle (elle n'est jamais demandée au fan, ADR 0085 § 2, mais peut avoir été dite). Une liste s'écrit comme la fiche l'affiche, séparée par des virgules. Ce qui est exclu de la fiche (§ 8 de l'ADR 0085) n'est jamais écrit. Tant que l'âge du fan est contesté, la ligne Âge n'est ni remplie, ni complétée, ni corrigée : un humain tranche. La note n'est jamais relue vers la fiche : si elle l'est un jour, une ligne qui porte la marque de l'agent est ignorée, pour qu'une valeur ne revienne pas sous la source « noté par un chatteur » (qui confirme l'âge).
 
 5. **Quand.** Un job par conversation (`connectors.sync_fan_platform_fields`), mis en file après chaque écriture de faits du fan, avec un délai de regroupement de 2 minutes et une seule exécution à la fois par conversation (ADR 0006). Il relit la note et le prénom juste avant d'écrire, calcule ce qui manque, et n'écrit rien quand Reveal dit déjà la même chose. Clé d'idempotence : marque à clé du bloc écrit. Le job est rejouable.
 
@@ -67,6 +67,7 @@ Négatives :
 
 - La forme de l'écriture du prénom chez Reveal (capture du lot b).
 - Les signalements « Reveal dit autre chose » : s'ils sont nombreux, la règle du § 2 est à revoir avec Charles.
+- Une rotation des clés de session : une marque d'une clé retirée ne se lit plus, les lignes de l'agent passent pour humaines et ne sont plus que complétées (le côté sûr). Garder l'ancienne clé le temps que les notes soient réécrites.
 
 ## Alternatives rejetées
 

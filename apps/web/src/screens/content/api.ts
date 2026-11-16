@@ -20,7 +20,7 @@ import {
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-import { UploadStopped } from './upload';
+import { ServerTrouble, UploadStopped } from './upload';
 
 /*
  * Her content's doors (CR-06, `/v1/creator-space`), parsed with the `strict` contracts. The server holds the truth:
@@ -93,7 +93,10 @@ export async function refuseRequest(id: ContentRequestId, reason: string | null)
   await post(`/content-requests/${id}/refuse`, { reason });
 }
 
-/** A 4xx stops a send for good (withdrawn, refused, settled); anything else is the network, tried again. */
+/**
+ * A 4xx stops a send for good (withdrawn, refused, settled); a 5xx is the server's trouble, tried again and said as such;
+ * anything else is the network, tried again.
+ */
 async function stopping<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
@@ -101,6 +104,7 @@ async function stopping<T>(run: () => Promise<T>): Promise<T> {
     if (error instanceof Refused && error.status >= 400 && error.status < 500) {
       throw new UploadStopped(error.message);
     }
+    if (error instanceof Refused) throw new ServerTrouble(error.message);
     throw error;
   }
 }

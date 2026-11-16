@@ -61,6 +61,17 @@ export type CardEdit = { readonly items: readonly string[] } | { readonly clear:
  * The value a chatter's items make for this field, or the refusal: a one-value field takes one item, `intensity` and
  * `lead` a value of their closed list, a list fits the 300 characters of a line, and nothing the card never keeps.
  */
+/** The oldest age the card takes; nobody writes on Reveal at 100. */
+const AGE_MAX = 99;
+
+/** His age as the card keeps it: « 25 » or « 25 ans » becomes « 25 »; anything else is refused. */
+function ageValue(value: string): string {
+  const digits = /^\s*(\d{1,2})\s*(?:ans?)?\s*$/u.exec(value)?.[1];
+  const age = digits === undefined ? NaN : Number(digits);
+  if (!Number.isInteger(age) || age < 1 || age > AGE_MAX) throw new FanCardValueInvalid();
+  return String(age);
+}
+
 export function checkedValue(field: FanCardField, items: readonly string[]): string {
   const spec = fanCardFieldSpec(field);
   if (spec.shape === 'one' && items.length !== 1) throw new FanCardValueInvalid();
@@ -68,6 +79,8 @@ export function checkedValue(field: FanCardField, items: readonly string[]): str
   if (field === 'intensity' && !FanCardIntensitySchema.safeParse(first).success)
     throw new FanCardValueInvalid();
   if (field === 'lead' && !FanCardLeadSchema.safeParse(first).success) throw new FanCardValueInvalid();
+  // His age is a whole number of years, in digits (recette AGE-13): the agent reads it, a human answers under 18.
+  if (field === 'age') return ageValue(first);
   const value = valueOf(items);
   if (value === '' || value.length > FAN_CARD_VALUE_MAX) throw new FanCardValueInvalid();
   if (items.some(neverKept)) throw new FanCardValueRefused();

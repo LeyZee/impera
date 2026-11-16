@@ -3,6 +3,7 @@ import {
   type DesireMarkVerdict,
   type Destination,
   type PlaygroundAnswer as Answer,
+  type PlaygroundBrief,
   type PlaygroundComparison as Comparison,
   type PlaygroundMedia as Media,
   type PlaygroundState,
@@ -19,8 +20,10 @@ import {
   DESTINATION_HINTS,
   DESTINATION_LABELS,
   handoffReasons,
+  isWaiting,
   isHandoff,
   MEDIA_FLAG_LABELS,
+  readingLine,
   rejectedWords,
   type MediaKind,
   type Turn,
@@ -36,6 +39,12 @@ export interface ConversationProps {
   readonly mode: LocalMode;
   readonly busy: boolean;
   readonly writing: boolean;
+  /** While her bubbles appear one by one: how many are shown yet. */
+  readonly revealing?: number | undefined;
+  /** While the voice writes: the brain's reading of his message, already done. */
+  readonly reading?: PlaygroundBrief | undefined;
+  /** His message while she answers it: shown as soon as he sends it, as a fan sees his own message leave. */
+  readonly sent?: string | undefined;
   readonly error: string | undefined;
   /** A missing setting (no key) is a warning, amber; a failure stays red. */
   readonly errorTone: 'warn' | 'bad';
@@ -76,7 +85,7 @@ export function Conversation(props: ConversationProps): JSX.Element {
     // The thread scrolls itself, never the page around it (on a phone the Playground's column scrolls too).
     const thread = threadRef.current;
     if (thread !== null) thread.scrollTop = thread.scrollHeight;
-  }, [state.history.length, pending, props.mode, writing]);
+  }, [state.history.length, pending, props.mode, writing, props.revealing]);
 
   return (
     <div className="pg-thread nv-scroll" ref={threadRef}>
@@ -117,16 +126,21 @@ export function Conversation(props: ConversationProps): JSX.Element {
         {pending !== null && draftAt === -1 ? (
           <Draft answer={pending} text={pending.bubbles.join('\n')} {...props} />
         ) : null}
-        {writing ? (
-          <span className="pg-writing">
-            <span className="nv-typing" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-            L’agent rédige
-          </span>
+        {writing && props.sent !== undefined && props.sent !== '' ? (
+          <div className="pg-m pg-m--fan">
+            {bubblesOf(props.sent).map((line, i) => (
+              <div key={i} className="nv-bubble nv-bubble--fan">
+                {line}
+              </div>
+            ))}
+          </div>
         ) : null}
+        {writing && props.reading !== undefined ? (
+          <p className="pg-reading">
+            <span>Elle a lu :</span> {readingLine(props.reading)}
+          </p>
+        ) : null}
+        {writing ? <Typing /> : null}
         {props.error === undefined ? null : (
           <p role="alert" className={`pg-error ${props.errorTone === 'warn' ? 'is-warn' : ''}`}>
             {props.error}
@@ -238,6 +252,20 @@ function MediaCard({
   );
 }
 
+/** She is writing: what a fan sees between two of her bubbles, and while the answer is being written. */
+function Typing(): JSX.Element {
+  return (
+    <span className="pg-writing" role="status">
+      <span className="nv-typing" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      Elle écrit…
+    </span>
+  );
+}
+
 function Draft({
   answer,
   text,
@@ -266,6 +294,37 @@ function Draft({
             }}
           >
             Pas nécessaire
+          </button>
+          <button
+            type="button"
+            className="nv-btn nv-btn--neon nv-btn--sm"
+            disabled={props.busy}
+            onClick={() => {
+              props.onHandoff(true);
+            }}
+          >
+            Bon réflexe
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isWaiting(answer)) {
+    return (
+      <div className="pg-relay pg-relay--calm" role="group" aria-label="Elle attend">
+        <p className="pg-relay__t">
+          <b>Elle attend : il a dit qu’il revenait</b>
+          Comme en vrai, rien n’est écrit. Elle lui redemande s’il est là plus tard s’il ne revient pas.
+        </p>
+        <div className="pg-gest">
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            disabled={props.busy}
+            onClick={props.onEdit}
+          >
+            Elle devait répondre
           </button>
           <button
             type="button"
@@ -366,7 +425,20 @@ function Draft({
     );
   }
 
-  const lines = answer.isBlocked ? answer.bubbles : bubblesOf(text);
+  const all = answer.isBlocked ? answer.bubbles : bubblesOf(text);
+  const revealing = answer.isBlocked ? undefined : props.revealing;
+  const lines = revealing === undefined ? all : all.slice(0, revealing);
+  if (revealing !== undefined)
+    return (
+      <div className="pg-draft">
+        {lines.map((line, i) => (
+          <div key={i} className="nv-bubble nv-bubble--draft nv-enter">
+            {line}
+          </div>
+        ))}
+        <Typing />
+      </div>
+    );
   const blocking = answer.violations.filter((v) => v.severity === 'blocking');
   const verdict = props.mode === 'lesson' ? props.lesson : undefined;
   const why = blocking.length > 0 ? blocking.map((v) => v.label).join(', ') : (answer.failure ?? 'relecture');
@@ -557,9 +629,13 @@ export function Composer({
 
   const send = async (): Promise<void> => {
     if (!ready) return;
-    // The message is cleared once it is sent: a failed send keeps it, ready to go again.
-    if (!(await onSend(text.trim(), media))) return;
+    // The message leaves the box as it is sent, as in any chat: a failed send puts it back, ready to go again.
+    const sent = text;
     setText('');
+    if (!(await onSend(sent.trim(), media))) {
+      setText(sent);
+      return;
+    }
     setDescribed('');
     setAttachOpen(false);
   };

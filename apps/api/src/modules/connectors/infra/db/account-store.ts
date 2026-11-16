@@ -15,9 +15,28 @@ import {
 } from '@impera/contracts';
 import { and, eq, schema, sql, withAdmin, withTenant, type Database, type Transaction } from '@impera/db';
 
+import { SessionOwnerConflict } from '../../domain/errors';
 import type { AccountJobs, AccountStore, ConnectorAccount, EventMeta } from '../../domain/ports';
 
 const POLLABLE_STATES = ['valid', 'warning'];
+
+const OWNER_UNIQUE = 'platform_accounts_platform_session_owner_unique';
+
+/** A unique constraint refused the row, raised by the driver directly or wrapped by Drizzle (`cause`). */
+function isUniqueViolation(error: unknown, constraint: string): boolean {
+  return (
+    error instanceof Error &&
+    [error, error.cause].some(
+      (e) =>
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        e.code === '23505' &&
+        'constraint' in e &&
+        e.constraint === constraint,
+    )
+  );
+}
 
 function toAccount(row: typeof schema.platformAccounts.$inferSelect): ConnectorAccount {
   return {
@@ -56,6 +75,76 @@ async function insertEvent(
  */
 export function createDrizzleAccountStore(db: Database, adminDb: Database): AccountStore {
   const byId = (id: string) => eq(schema.platformAccounts.id, id);
+  /**
+   * The account of an archived creator that holds `owner` on the platform of account `id` gives the identity back: its
+   * owner and its stored session are emptied and its state is expired, so that it asks for a « Sync » again if she ever comes back (one
+   * identity, one account). Found on the admin connection (no tenant sees another creator's account), written in the
+   * holder's own tenant. `false` when nobody archived holds it.
+   */
+  const releaseArchivedHolder = async (
+    id: string,
+    owner: string,
+    meta: EventMeta & { readonly userId: string | null },
+  ): Promise<boolean> => {
+    const holder = await withAdmin(adminDb, async (tx) => {
+      const [row] = await tx
+        .select({ id: schema.platformAccounts.id, creatorId: schema.platformAccounts.creatorId })
+        .from(schema.platformAccounts)
+        .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
+        .where(
+          and(
+            eq(schema.platformAccounts.sessionOwner, owner),
+            sql`${schema.platformAccounts.platform} = (select platform from platform_accounts where id = ${id})`,
+            sql`${schema.creators.archivedAt} is not null`,
+          ),
+        );
+      return row;
+    });
+    if (holder === undefined) return false;
+    await withTenant(db, holder.creatorId, async (tx) => {
+      const [row] = await tx
+        .select({ sessionState: schema.platformAccounts.sessionState })
+        .from(schema.platformAccounts)
+        .where(and(byId(holder.id), eq(schema.platformAccounts.sessionOwner, owner)))
+        .for('update');
+      if (row === undefined) return;
+      const expires = row.sessionState !== 'none' && row.sessionState !== 'expired';
+      await tx
+        .update(schema.platformAccounts)
+        .set({
+          sessionOwner: null,
+          sessionCiphertext: null,
+          ...(expires ? { sessionState: 'expired' as const } : {}),
+        })
+        .where(byId(holder.id));
+      if (expires) {
+        await insertEvent(
+          tx,
+          holder.creatorId,
+          {
+            type: 'session_state_changed',
+            payload: {
+              platformAccountId: holder.id,
+              from: SessionStateSchema.parse(row.sessionState),
+              to: 'expired',
+            },
+          },
+          meta,
+        );
+      }
+      await tx.insert(schema.auditLog).values({
+        id: newId(AuditEntryIdSchema),
+        userId: meta.userId,
+        action: 'connector.session_released',
+        entity: 'platform_account',
+        entityId: holder.id,
+        details: { correlationId: meta.correlationId, releasedTo: id },
+        createdAt: meta.at,
+      });
+    });
+    return true;
+  };
+
   return {
     listPollable: (platforms) =>
       withAdmin(adminDb, async (tx) => {
@@ -164,81 +253,96 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
         );
       }),
 
-    storeSession: (creatorId, id, session, meta) =>
-      withTenant(db, creatorId, async (tx) => {
-        const [row] = await tx
-          .select({
-            platform: schema.platformAccounts.platform,
-            sessionState: schema.platformAccounts.sessionState,
-            sessionCiphertext: schema.platformAccounts.sessionCiphertext,
-          })
-          .from(schema.platformAccounts)
-          .where(byId(id))
-          .for('update');
-        if (row === undefined) return;
-        const renewed =
-          row.sessionCiphertext === null ||
-          !session.isSame(row.sessionCiphertext) ||
-          row.sessionState === 'none' ||
-          row.sessionState === 'expired';
-        await tx
-          .update(schema.platformAccounts)
-          .set({
-            sessionCiphertext: session.ciphertext,
-            ...(renewed ? { sessionUpdatedAt: meta.at } : {}),
-            sessionState: 'valid',
-            consecutiveErrors: 0,
-            pausedUntil: null,
-          })
-          .where(byId(id));
-        if (row.sessionState !== 'valid') {
-          await insertEvent(
-            tx,
-            creatorId,
-            {
-              type: 'session_state_changed',
-              payload: {
-                platformAccountId: id,
-                from: SessionStateSchema.parse(row.sessionState),
-                to: 'valid',
+    storeSession: async (creatorId, id, session, meta) => {
+      const write = () =>
+        withTenant(db, creatorId, async (tx) => {
+          const [row] = await tx
+            .select({
+              platform: schema.platformAccounts.platform,
+              sessionState: schema.platformAccounts.sessionState,
+              sessionCiphertext: schema.platformAccounts.sessionCiphertext,
+            })
+            .from(schema.platformAccounts)
+            .where(byId(id))
+            .for('update');
+          if (row === undefined) return;
+          const renewed =
+            row.sessionCiphertext === null ||
+            !session.isSame(row.sessionCiphertext) ||
+            row.sessionState === 'none' ||
+            row.sessionState === 'expired';
+          await tx
+            .update(schema.platformAccounts)
+            .set({
+              sessionCiphertext: session.ciphertext,
+              sessionOwner: session.owner,
+              ...(renewed ? { sessionUpdatedAt: meta.at } : {}),
+              sessionState: 'valid',
+              consecutiveErrors: 0,
+              pausedUntil: null,
+            })
+            .where(byId(id));
+          if (row.sessionState !== 'valid') {
+            await insertEvent(
+              tx,
+              creatorId,
+              {
+                type: 'session_state_changed',
+                payload: {
+                  platformAccountId: id,
+                  from: SessionStateSchema.parse(row.sessionState),
+                  to: 'valid',
+                },
               },
-            },
-            meta,
-          );
-        }
-        // Audit without the session: who stored one, for which account, when (security.md).
-        await tx.insert(schema.auditLog).values({
-          id: newId(AuditEntryIdSchema),
-          userId: meta.userId,
-          action: 'connector.session_stored',
-          entity: 'platform_account',
-          entityId: id,
-          details: { correlationId: meta.correlationId },
-          createdAt: meta.at,
+              meta,
+            );
+          }
+          // Audit without the session: who stored one, for which account, when (security.md).
+          await tx.insert(schema.auditLog).values({
+            id: newId(AuditEntryIdSchema),
+            userId: meta.userId,
+            action: 'connector.session_stored',
+            entity: 'platform_account',
+            entityId: id,
+            details: { correlationId: meta.correlationId },
+            createdAt: meta.at,
+          });
+          // A valid session replaced by a different one (ADR 0046 § 8): the agent may now speak through another
+          // account. Renewing an expired session, or storing the same one again, is ordinary and says nothing.
+          if (
+            row.sessionState === 'valid' &&
+            row.sessionCiphertext !== null &&
+            !session.isSame(row.sessionCiphertext)
+          ) {
+            await insertEvent(
+              tx,
+              creatorId,
+              {
+                type: 'security_alert',
+                payload: EVENT_PAYLOADS.security_alert.parse({
+                  reason: 'platform_session_replaced',
+                  userId: meta.userId,
+                  platformAccountId: id,
+                  platform: PlatformSchema.parse(row.platform),
+                }),
+              },
+              meta,
+            );
+          }
         });
-        // A valid session replaced by a different one (ADR 0046 § 8): the agent may now speak through another
-        // account. Renewing an expired session, or storing the same one again, is ordinary and says nothing.
-        if (
-          row.sessionState === 'valid' &&
-          row.sessionCiphertext !== null &&
-          !session.isSame(row.sessionCiphertext)
-        ) {
-          await insertEvent(
-            tx,
-            creatorId,
-            {
-              type: 'security_alert',
-              payload: EVENT_PAYLOADS.security_alert.parse({
-                reason: 'platform_session_replaced',
-                userId: meta.userId,
-                platformAccountId: id,
-                platform: PlatformSchema.parse(row.platform),
-              }),
-            },
-            meta,
-          );
-        }
-      }),
+      try {
+        await write();
+      } catch (error) {
+        if (!isUniqueViolation(error, OWNER_UNIQUE)) throw error;
+        // Another account of the platform already holds this owner (the unique constraint): the session is hers,
+        // unless her creator left the agency (ADR 0071), whose account then gives the identity back.
+        if (!(await releaseArchivedHolder(id, session.owner, meta))) throw new SessionOwnerConflict();
+        await write().catch((again: unknown) => {
+          if (isUniqueViolation(again, OWNER_UNIQUE)) throw new SessionOwnerConflict();
+          throw again;
+        });
+      }
+    },
 
     publish: (creatorId, body, meta) =>
       withTenant(db, creatorId, (tx) => insertEvent(tx, creatorId, body, meta)),
@@ -285,5 +389,25 @@ export function createDrizzleAccountJobs(adminDb: Database): AccountJobs {
       enqueue('connector.reconcile', account, { runAt: null, jobKeyMode: 'replace' }, correlationId),
     enqueueVaultSync: (account, correlationId) =>
       enqueue('connector.vault_sync', account, { runAt: null, jobKeyMode: 'preserve_run_at' }, correlationId),
+    enqueueConversationRead: async (account, platformConversationId, correlationId) => {
+      const job = 'connector.read_conversation';
+      const payload: unknown = JOB_PAYLOADS[job].parse({
+        creatorId: account.creatorId,
+        platformAccountId: account.id,
+        platformConversationId,
+        correlationId,
+      });
+      await adminDb.execute(
+        sql`select public.enqueue_job(
+          task => ${job},
+          payload => ${JSON.stringify(payload)}::jsonb,
+          queue_name => ${accountQueueNameFor(account.id)},
+          run_at => ${null}::timestamptz,
+          max_attempts => ${JOB_MAX_ATTEMPTS[job]}::int,
+          job_key => ${`read:${account.id}:${platformConversationId}`},
+          job_key_mode => 'preserve_run_at'
+        )`,
+      );
+    },
   };
 }

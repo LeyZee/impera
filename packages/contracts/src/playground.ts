@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 import { BriefIntentSchema } from './brief';
 import { DESIRE_SIGNALS_MAX, DesireBandSchema, DesireScoreSchema, DesireSignalSchema } from './desire';
+import {
+  FAN_AVAILABILITY_POSITIVE_SIGNALS,
+  FanAvailabilitySignalSchema,
+  FanAvailabilityStateSchema,
+  ScriptStartBlockSchema,
+} from './fan-availability';
 import { CreatorIdSchema, DesireMarkIdSchema, PersonaVersionIdSchema } from './ids';
 import { MediaDescriptionSchema } from './media';
 
@@ -78,6 +84,35 @@ export const PlaygroundSituationSchema = z.object({
 export type PlaygroundSituation = z.infer<typeof PlaygroundSituationSchema>;
 
 /**
+ * His availability and the gate before the first teaser as one message of his left them (ADR 0103 § 14), shown beside
+ * his desire score: the state with the signal that set it and the positive ones he gave in the session, whether he
+ * sexualized himself in it, whether she asked him this time, and the gate, open or the conditions missing with their
+ * label. Computed by the server (agent/domain/availability.ts), never by the screen.
+ */
+export const PlaygroundAvailabilitySchema = z.object({
+  state: FanAvailabilityStateSchema,
+  /** The signal of his that set the state; `null` when nothing he said holds (none yet, or lapsed). */
+  signal: FanAvailabilitySignalSchema.nullable(),
+  seen: z.array(z.enum(FAN_AVAILABILITY_POSITIVE_SIGNALS)).max(FAN_AVAILABILITY_POSITIVE_SIGNALS.length),
+  /** When what he said lapses (2 hours after he said it). */
+  expiresAt: z.coerce.date().nullable(),
+  sexualized: z.boolean(),
+  /** She asked him, in passing, whether he is free, in her answer to this message (once per session, § 13). */
+  asked: z.boolean(),
+  gate: z.discriminatedUnion('open', [
+    z.object({ open: z.literal(true) }),
+    z.object({
+      open: z.literal(false),
+      missing: z
+        .array(z.object({ code: ScriptStartBlockSchema, label: z.string() }))
+        .min(1)
+        .max(3),
+    }),
+  ]),
+});
+export type PlaygroundAvailability = z.infer<typeof PlaygroundAvailabilitySchema>;
+
+/**
  * His desire score as it stood after one message of his (P3-12, glossary « Note de désir »), shown to calibrate it:
  * the score before and after, and each signal with what it weighed in the counting `weightsVersion`. A signal that
  * resets or freezes the score instead of counting has `points: null`. Computed by the server, never by the screen.
@@ -93,6 +128,8 @@ export const PlaygroundDesireSchema = z.object({
   weightsVersion: z.string(),
   /** The owner's mark on it in this conversation, once he gave one (ADR 0103 § 6). */
   mark: DesireMarkVerdictSchema.exactOptional(),
+  /** His availability and the gate at this message; absent without her script threshold (ADR 0103 § 14). */
+  availability: PlaygroundAvailabilitySchema.exactOptional(),
 });
 export type PlaygroundDesire = z.infer<typeof PlaygroundDesireSchema>;
 
@@ -125,6 +162,17 @@ export const PlaygroundMediaSchema = z.object({
 });
 export type PlaygroundMedia = z.infer<typeof PlaygroundMediaSchema>;
 
+/** The brain's reading of his message, in the playground's words. */
+export const PlaygroundBriefSchema = z.object({
+  intent: BriefIntentSchema,
+  sentiment: z.string(),
+  risks: z.array(z.string()),
+  action: z.string(),
+  replyBrief: z.string(),
+  kycMissing: z.array(z.string()),
+});
+export type PlaygroundBrief = z.infer<typeof PlaygroundBriefSchema>;
+
 export const PlaygroundAnswerSchema = z.object({
   bubbles: z.array(z.string()),
   isBlocked: z.boolean(),
@@ -134,23 +182,27 @@ export const PlaygroundAnswerSchema = z.object({
   trap: z
     .object({ signals: z.array(z.object({ kind: z.string(), source: z.string(), label: z.string() })) })
     .exactOptional(),
-  brief: z
-    .object({
-      intent: BriefIntentSchema,
-      sentiment: z.string(),
-      risks: z.array(z.string()),
-      action: z.string(),
-      replyBrief: z.string(),
-      kycMissing: z.array(z.string()),
-    })
-    .exactOptional(),
+  brief: PlaygroundBriefSchema.exactOptional(),
   /** His desire score after this message, when the brain read it. */
   desire: PlaygroundDesireSchema.exactOptional(),
   /** What the cursor decided on going sexual (P3-09), in French; absent when the brain did not read the moment. */
   cursor: z.object({ kind: z.string(), label: z.string() }).exactOptional(),
   /** The brain wanted to offer a script and the policy said no: why, in French. She wrote a plain answer. */
   offerRefused: z.object({ code: z.string(), label: z.string() }).exactOptional(),
+  /**
+   * What the risk policy decided instead of a plain answer, as production does (agent/domain/hold.ts): a handoff to a
+   * human (nothing written), care (the care brief, a human validating every word, ADR 0088), or a wait (« je reviens »,
+   * nothing written). `detail`: the brain's risk codes behind it, or `wait`, `brain`.
+   */
+  hold: z
+    .object({ kind: z.enum(['handoff', 'care', 'no_reply']), detail: z.array(z.string()) })
+    .exactOptional(),
   model: z.string().exactOptional(),
+  /**
+   * Her typing time before each bubble, in ms, the first included: the same delays the real send waits between
+   * bubbles (agent `bubbleDelays`), so the playground shows them one by one as a fan would see them.
+   */
+  delaysMs: z.array(z.number().nonnegative()).exactOptional(),
   latencyMs: z.number().nonnegative(),
   /** The cost in euros, at the daily budget's rate (ADR 0011); the journal keeps dollars. */
   costEur: z.number().nonnegative(),
@@ -177,6 +229,11 @@ export const PlaygroundRateSchema = z.object({
 export type PlaygroundRate = z.infer<typeof PlaygroundRateSchema>;
 
 export const PlaygroundStateSchema = z.object({
+  /**
+   * While an answer is being written: the brain's reading of his message, as soon as it has read it, so the screen
+   * shows it while the voice writes (a turn takes about 20 s). Absent otherwise.
+   */
+  reading: PlaygroundBriefSchema.exactOptional(),
   /**
    * The persona the playground plays: its first name, and `played`, the creator's version chosen at the head of the
    * screen (recette PRO-21), active or not; `null` for the invented persona (`PLAYGROUND_PERSONA_PATH`, the demo's by

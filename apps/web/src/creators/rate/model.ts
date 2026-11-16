@@ -1,11 +1,13 @@
-import type {
-  CreatorAgencyRate,
-  CreatorAgencyRateList,
-  ObservedAgencyShare,
-  ObservedAgencyWindow,
+import {
+  agencyRateFor,
+  type CreatorAgencyRate,
+  type CreatorAgencyRateList,
+  type ObservedAgencyShare,
+  type ObservedAgencyWindow,
 } from '@impera/contracts';
 
 import { platformName } from '@/scheduling/model';
+import { fullDay, withFirstOfMonth } from '@/scheduling/time';
 
 /**
  * Créatrices › Pourcentage (CR-04), pure: what the owner types read as whole basis points, and how a percentage and its
@@ -29,11 +31,8 @@ const PERCENT_FORMAT = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2
 /** « 35 % », « 35,5 % »: the sign after a non-breaking space, as French writes it. */
 export const percentOf = (bps: number): string => `${PERCENT_FORMAT.format(bps / 100)}\u00a0%`;
 
-/** `2026-11-10` → « 10/11/2026 ». */
-export function dayLabel(day: string): string {
-  const [year = '', month = '', date = ''] = day.split('-');
-  return `${date}/${month}/${year}`;
-}
+/** `2026-11-10` → « 10 novembre 2026 », `2026-10-01` → « 1er octobre 2026 »: as the rest of the sheet writes a day. */
+export const dayLabel = (day: string): string => fullDay(day);
 
 /** The day after `day` (`YYYY-MM-DD`), on the calendar, whatever the zone. */
 export function nextDay(day: string): string {
@@ -59,10 +58,20 @@ export function standing(
 export const confirmSentence = (bps: number, fromDay: string): string =>
   `${percentOf(bps)} pour l’agence à partir du ${dayLabel(fromDay)}.`;
 
-/** `2026-11-01` to `2026-11-14` → « du 01/11 au 14/11 »: a fortnight, its year said by the screen's title. */
-export function windowLabel(window: Pick<ObservedAgencyWindow, 'from' | 'to'>): string {
-  const short = (day: string): string => dayLabel(day).slice(0, 5);
-  return `du ${short(window.from)} au ${short(window.to)}`;
+const DAY_OF_MONTH = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', timeZone: 'UTC' });
+const DAY_MONTH = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+const atNoon = (day: string): Date => new Date(`${day}T12:00:00Z`);
+
+/**
+ * A fortnight read on the register, its year said by the screen's title: `2026-11-01` to `2026-11-15` → « du 1er au
+ * 15 novembre », across two months « du 16 octobre au 2 novembre », and the first day of one, today, « aujourd’hui ».
+ */
+export function windowLabel(window: Pick<ObservedAgencyWindow, 'from' | 'to'>, today: string): string {
+  const to = withFirstOfMonth(DAY_MONTH.formatToParts(atNoon(window.to)));
+  if (window.from === window.to) return window.to === today ? 'aujourd’hui' : `le ${to}`;
+  const sameMonth = window.from.slice(0, 7) === window.to.slice(0, 7);
+  const from = withFirstOfMonth((sameMonth ? DAY_OF_MONTH : DAY_MONTH).formatToParts(atNoon(window.from)));
+  return `du ${from} au ${to}`;
 }
 
 /** The platform the shares were read on: « Reveal » when all are, the only sales feed today, else « la plateforme ». */
@@ -128,9 +137,38 @@ export const singleShare = (list: CreatorAgencyRateList): ObservedAgencyShare | 
 };
 
 /**
+ * The percentage a window was compared with, when one alone covers all its days, to name it beside a gap; `null` when
+ * the window straddles a change, or starts before her first: the gap is then said without a figure.
+ */
+export function windowRate(
+  list: Pick<CreatorAgencyRateList, 'rates'>,
+  window: Pick<ObservedAgencyWindow, 'from' | 'to'>,
+): number | null {
+  const first = agencyRateFor(list.rates, window.from);
+  const last = agencyRateFor(list.rates, window.to);
+  return first !== null && first.id === last?.id ? first.agencyBps : null;
+}
+
+/** The words beside a share off her percentage: the percentage of its window when one alone covers it. */
+export function gapText(
+  list: Pick<CreatorAgencyRateList, 'rates'>,
+  window: Pick<ObservedAgencyWindow, 'from' | 'to'>,
+): string {
+  const bps = windowRate(list, window);
+  return bps === null ? 'écart avec le pourcentage réglé' : `écart avec les ${percentOf(bps)} réglés`;
+}
+
+/**
+ * Her accounts whose share of the 30 days differs from her percentage by more than rounding explains, as the server
+ * reads it by the rule of the gap alert (ADR 0054 § 2 and § 6): the screen compares nothing itself.
+ */
+export const sharesOffRate = (list: CreatorAgencyRateList): readonly ObservedAgencyShare[] =>
+  list.observed.last30Days.shares.filter((share) => share.differsFromRate === true);
+
+/**
  * The head of the sheet (ADR 0054 § 4 and § 6): the share read at the platform first, the percentage second and
- * optional; « à régler » only when nothing is linked nor set. `dot`: `ok` with a share or a percentage, `idle` for a
- * linked account without a sale, `warn` for « à régler ».
+ * optional; « à régler » only when nothing is linked nor set. `dot`: `warn` for a share off her percentage or for
+ * « à régler », `ok` with a share or a percentage, `idle` for a linked account without a sale.
  */
 export function sheetHead(
   list: CreatorAgencyRateList,
@@ -143,6 +181,28 @@ export function sheetHead(
   const rate =
     current === null ? null : `${percentOf(current.agencyBps)} depuis le ${dayLabel(current.fromDay)}`;
   const second = rate === null ? 'Le pourcentage est facultatif.' : `Pourcentage réglé : ${rate}.`;
+  const off = sharesOffRate(list);
+  const [onlyOff] = off;
+  if (onlyOff !== undefined) {
+    const check = 'Vérifie le partage chez ' + at + ' ou règle un nouveau pourcentage ci-dessous.';
+    // The percentage the 30 days were compared with, when one alone covers them; else the gap without a figure.
+    const agreed = windowRate(list, list.observed.last30Days);
+    if (single !== null && single.agencyBps !== null) {
+      const set =
+        agreed === null ? 'loin du pourcentage réglé sur ces jours' : `tu as réglé ${percentOf(agreed)}`;
+      return {
+        dot: 'warn',
+        lead: `Écart : ${at} donne ${percentOf(single.agencyBps)} du net sur 30 jours, ${set}.`,
+        then: check,
+      };
+    }
+    const from = agreed === null ? 'du pourcentage réglé' : `des ${percentOf(agreed)} réglés`;
+    return {
+      dot: 'warn',
+      lead: `Écart : ${off.length === 1 ? 'un compte s’écarte' : `${String(off.length)} comptes s’écartent`} ${from}, sur 30 jours (détail ci-dessous).`,
+      then: check,
+    };
+  }
   if (single !== null) {
     return { dot: 'ok', lead: `Lue chez ${at} : ${shareText(single).value} sur 30 jours.`, then: second };
   }

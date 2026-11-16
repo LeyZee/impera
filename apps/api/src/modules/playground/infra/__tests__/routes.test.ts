@@ -86,8 +86,9 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
+    identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
-    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
+    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
     brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
     voice: async () => {
       await control.hold;
@@ -250,6 +251,8 @@ describe('/v1/playground', () => {
     const { app, headers, post, stored } = await server();
     const answer = await post('/messages', { text: 'Salut' });
     expect(answer.json()).toMatchObject({ bubbles: ['Coucou toi ✨'], isBlocked: false, model: 'grok-4.7' });
+    // Her typing time, as the real send counts it: 1,5 s + 150 ms for each of the 12 characters (the emoji is one).
+    expect(answer.json()).toMatchObject({ delaysMs: [3300] });
     // Costs are journaled in USD and shown in euros, at the daily budget's rate (ADR 0011).
     const usdPerEur = DEFAULT_LLM_CONFIG.dailyBudget.usdPerEur;
     const { costEur } = PlaygroundAnswerSchema.parse(answer.json());
@@ -271,6 +274,21 @@ describe('/v1/playground', () => {
     const { app, headers, post } = await server();
     const first = PlaygroundAnswerSchema.parse((await post('/messages', { text: 'Salut' })).json());
     expect(first.desire).toMatchObject({ before: null, score: 0, band: 'neutral', signals: [] });
+    // Beside it, his availability and the gate, each missing condition in French (ADR 0103 § 14).
+    expect(first.desire?.availability).toMatchObject({
+      state: 'unknown',
+      signal: null,
+      seen: [],
+      sexualized: false,
+    });
+    expect(first.desire?.availability?.gate).toEqual({
+      open: false,
+      missing: [
+        { code: 'desire_below_threshold', label: 'Désir sous le seuil du script' },
+        { code: 'not_sexualizing', label: 'Il ne sexualise pas encore lui-même' },
+        { code: 'availability_unconfirmed', label: 'Il n’a pas dit être seul et libre' },
+      ],
+    });
     // What she still has to learn, in her words, never a slot's code.
     expect(first.brief?.kycMissing).toEqual(['prénom']);
     await post('/rating', { verdict: { kind: 'validated' } });
@@ -367,6 +385,9 @@ describe('/v1/playground', () => {
       media: [{ kind: 'image', factualDescription: 'Un selfie.', flags: ['possible_minor'] }],
     });
     expect(answer.json()).toMatchObject({ handoff: ['possible_minor'], isBlocked: true, bubbles: [] });
+    expect(answer.json()).not.toHaveProperty('delaysMs');
+    // « Nécessaire » says the handoff was right: a decision to rate, not a blocked answer (AGE-01).
+    expect((await post('/rating', { verdict: { kind: 'validated' } })).statusCode).toBe(200);
   });
 
   it('asks for the Grok key when no voice model is reachable', async () => {
@@ -452,6 +473,22 @@ describe('/v1/playground', () => {
     expect(codeOf(second)).toBe('answer_in_progress_conflict');
     release();
     expect((await first).statusCode).toBe(200);
+  });
+
+  it('shows the brain’s reading while the voice writes, and nothing once she has answered', async () => {
+    let release = (): void => undefined;
+    const control: GatewayControl = { hasKey: true, hold: new Promise((resolve) => (release = resolve)) };
+    const { app, headers, post } = await server({ control });
+    const first = Promise.resolve(post('/messages', { text: 'Salut' }));
+    // A few ticks for the brain to read him and the voice to start.
+    for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve));
+    const writing = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(writing.reading).toMatchObject({ intent: BRIEF.intent, action: BRIEF.action });
+    expect(writing.pending).toBeNull();
+    release();
+    expect((await first).statusCode).toBe(200);
+    const answered = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(answered.reading).toBeUndefined();
   });
 
   it('has nothing to compare after a handoff', async () => {

@@ -19,7 +19,7 @@ export function Thumb({ file, kind }: { file: File; kind: DropMediaKind | null }
   }, [file, kind]);
 
   return (
-    <span className="ct-thumb" aria-hidden="true">
+    <span className={kind === 'video' ? 'ct-thumb ct-thumb--video' : 'ct-thumb'} aria-hidden="true">
       {kind === 'audio' ? (
         '🎙️'
       ) : url === null || broken ? null : kind === 'video' ? (
@@ -41,6 +41,13 @@ export function Thumb({ file, kind }: { file: File; kind: DropMediaKind | null }
           }}
         />
       )}
+      {/* A video tells itself from a photo at a glance: a play mark on its first image (recette CRE-16). */}
+      {kind === 'video' ? (
+        <svg className="ct-thumb__play" viewBox="0 0 20 20">
+          <circle cx="10" cy="10" r="10" />
+          <path d="M8 6.2v7.6L14 10z" />
+        </svg>
+      ) : null}
     </span>
   );
 }

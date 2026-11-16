@@ -25,6 +25,7 @@ import type {
   MediaDescriptions,
   OutboundSender,
   ReplyHours,
+  TypingRhythm,
 } from './domain/ports';
 import { createDrizzleAlertHistory } from './infra/db/alert-history';
 import { createDrizzleAwayHolds } from './infra/db/away-holds';
@@ -118,6 +119,8 @@ export interface ConversationsDeps {
   readonly cardReader?: CardReader;
   /** Her follow-up delays (P3-10, agent module's adapter); without it, no follow-up is scheduled. */
   readonly followUps?: FollowUpPlan;
+  /** Her typing rhythm between bubbles (agent module's adapter); without it, her bubbles leave one after the other. */
+  readonly typing?: TypingRhythm;
   /** Her hours (P3-14, `persona`); without them she is always open and quiet from 23:00 to 9:00, as before. */
   readonly replyHours?: ReplyHours;
   /** Her own alerts' names (P4-01, `alerts` module's adapter); without them the history says « Alerte personnalisée ». */
@@ -125,10 +128,10 @@ export interface ConversationsDeps {
   /** What her media show (SUIVI-26, `media` module's adapter); without it, Suivi shows a media's kind only. */
   readonly mediaDescriptions?: MediaDescriptions;
   /**
-   * The copilot panel's doors (ADR 0086): the person an extension link names, and every creator the owner's panel looks
-   * in. Without them, `/v1/copilot` is not mounted.
+   * The copilot panel's doors (ADR 0086): the person an extension link names, every creator the owner's panel looks
+   * in, and the read of a conversation none of them holds yet. Without them, `/v1/copilot` is not mounted.
    */
-  readonly copilot?: Pick<CopilotRouteDeps, 'linkUser' | 'allCreatorIds'>;
+  readonly copilot?: Pick<CopilotRouteDeps, 'linkUser' | 'allCreatorIds' | 'askRead'>;
   readonly clock?: Clock;
 }
 
@@ -197,6 +200,7 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         clock,
         sender: deps.sender,
         ...(deps.followUps === undefined ? {} : { followUps: deps.followUps }),
+        ...(deps.typing === undefined ? {} : { typing: deps.typing }),
       }),
       recordFacts: createRecordFactsJob({ uow, clock, fans: deps.fans }),
       readCard:

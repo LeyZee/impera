@@ -60,8 +60,8 @@ const CASE: TrophyCase = {
     },
   ],
   streaks: [{ kind: 'shift', current: 3, best: 9 }],
-  level: { rank: 1, name: 'Novice' },
-  nextLevel: { rank: 2, name: 'Complice', thresholdMinor: 200_000, currentMinor: 50_000, currency: 'EUR' },
+  level: { rank: 1, name: 'Étincelle' },
+  nextLevel: { rank: 2, name: 'Allumeur', thresholdMinor: 200_000, currentMinor: 50_000, currency: 'EUR' },
 };
 
 const CHALLENGE: ShiftChallenge = {
@@ -77,14 +77,30 @@ describe('LevelInsignia (ADR 0104 § 16)', () => {
   it('names each of the eight ranks, reached or not, and nothing past the list', () => {
     expect(LEVEL_NAMES).toHaveLength(8);
     render(<LevelInsignia rank={8} size={72} />);
-    expect(screen.getByRole('img', { name: 'Insigne du rang « Légende »' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Insigne du rang « Incendiaire »' })).toBeTruthy();
     cleanup();
     render(<LevelInsignia rank={2} size={28} earned={false} />);
     expect(
-      screen.getByRole('img', { name: 'Insigne du rang « Complice », pas encore atteint' }),
+      screen.getByRole('img', { name: 'Insigne du rang « Allumeur », pas encore atteint' }),
     ).toBeTruthy();
     expect(levelName(0)).toBeNull();
     expect(levelName(9)).toBeNull();
+  });
+
+  it('burns with its glow from 40 px, keeps the fire alone under it, and a silhouette when not reached', () => {
+    const large = render(<LevelInsignia rank={4} size={72} glow />).container;
+    expect(large.querySelectorAll('filter')).toHaveLength(1);
+    expect(large.querySelectorAll('.rw-level__ember')).toHaveLength(1);
+    expect(large.querySelectorAll('.rw-level__glow')).toHaveLength(1);
+    cleanup();
+    const small = render(<LevelInsignia rank={8} size={28} glow />).container;
+    expect(small.querySelectorAll('.rw-level__ember, .rw-level__glow')).toHaveLength(0);
+    expect(small.querySelectorAll('[filter]')).toHaveLength(0);
+    expect(small.querySelectorAll('g[transform] path')).toHaveLength(1);
+    cleanup();
+    const locked = render(<LevelInsignia rank={5} size={44} earned={false} />).container;
+    expect(locked.querySelectorAll('defs')).toHaveLength(0);
+    expect(locked.querySelector('g[transform]')?.getAttribute('fill')).toBe('currentColor');
   });
 
   it('gives a new rank its reveal, with no amount, and none to a rank it does not know', () => {
@@ -141,13 +157,13 @@ describe('MyRankCard (ADR 0104 § 16)', () => {
   it('shows the rank held and the way to the next, and says a rank is honorary', async () => {
     serve(CASE);
     show(<MyRankCard user={THEO_ME} />);
-    expect(await screen.findByText('Novice')).toBeTruthy();
+    expect(await screen.findByText('Étincelle')).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('25');
     expect(screen.getByText(/honorifique/u)).toBeTruthy();
   });
 
   it('shows the first rank ahead before any is held, and nothing while no threshold is set', async () => {
-    serve({ ...CASE, level: null, nextLevel: { ...CASE.nextLevel, rank: 1, name: 'Novice' } });
+    serve({ ...CASE, level: null, nextLevel: { ...CASE.nextLevel, rank: 1, name: 'Étincelle' } });
     show(<MyRankCard user={THEO_ME} />);
     expect(await screen.findByText('Pas encore de rang')).toBeTruthy();
     cleanup();
@@ -164,14 +180,14 @@ describe('MemberGameBlock (ADR 0104 § 20)', () => {
   it('shows a member’s rank, streak and trophies earned, with no amount', async () => {
     const { sent } = serve({ ...CASE, nextLevel: null });
     show(<MemberGameBlock memberId="member-1" name="Théo" />);
-    expect(await screen.findByText('Novice')).toBeTruthy();
+    expect(await screen.findByText('Étincelle')).toBeTruthy();
     expect(sent[0]?.url).toBe('/v1/rewards/members/member-1/trophy-case');
     expect(screen.getByText('3 shifts')).toBeTruthy();
     expect(screen.getByText('Première vente')).toBeTruthy();
     expect(screen.queryByText('Record du jour')).toBeNull();
     // The coin drawn on a trophy aside, no amount is written: the facts hold a rank, a streak and a count.
     expect(document.querySelector('.rw-member__facts')?.textContent).toBe(
-      'RangNoviceSérie en cours3 shifts · meilleure : 9Quinzaines avec un palier atteint1',
+      'RangÉtincelleSérie en cours3 shifts · meilleure : 9Quinzaines avec un palier atteint1',
     );
   });
 });
@@ -197,13 +213,13 @@ describe('LevelsPanel (ADR 0104 § 16)', () => {
     expect(await screen.findByText(/à 500,00\s€/u)).toBeTruthy();
     expect(screen.getAllByText('Pas de seuil')).toHaveLength(7);
     fireEvent.click(screen.getByRole('button', { name: 'Régler les seuils' }));
-    fireEvent.change(screen.getByLabelText('Net cumulé pour le rang Complice'), {
+    fireEvent.change(screen.getByLabelText('Net cumulé pour le rang Allumeur'), {
       target: { value: '300' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer les seuils' }));
     expect(await screen.findByText(/plus haut que le précédent/u)).toBeTruthy();
     expect(sent.filter((one) => one.method === 'PUT')).toHaveLength(0);
-    fireEvent.change(screen.getByLabelText('Net cumulé pour le rang Complice'), {
+    fireEvent.change(screen.getByLabelText('Net cumulé pour le rang Allumeur'), {
       target: { value: '2000' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer les seuils' }));

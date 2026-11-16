@@ -14,7 +14,13 @@ import type {
 import { ConnectorError, type PlatformConnector } from '../../domain/platform-connector';
 
 type FailingMethod =
-  'health' | 'listConversations' | 'fetchMessages' | 'sendText' | 'sendMedia' | 'verifySent';
+  | 'health'
+  | 'listConversations'
+  | 'getConversation'
+  | 'fetchMessages'
+  | 'sendText'
+  | 'sendMedia'
+  | 'verifySent';
 
 interface FakeConversation {
   readonly ref: ExternalRef;
@@ -61,6 +67,7 @@ export class FakeConnector implements PlatformConnector {
   readonly calls: Record<FailingMethod, number> = {
     health: 0,
     listConversations: 0,
+    getConversation: 0,
     fetchMessages: 0,
     sendText: 0,
     sendMedia: 0,
@@ -131,6 +138,21 @@ export class FakeConnector implements PlatformConnector {
           ...(last === undefined ? {} : { lastMessagePreview: last.text.slice(0, 80) }),
         }));
       return snapshots.slice(0, opts.limit ?? snapshots.length);
+    });
+  }
+
+  getConversation(conversationRef: ExternalRef): Promise<ConversationSnapshot> {
+    return this.call('getConversation', () => {
+      const conversation = this.existing(conversationRef);
+      const last = conversation.messages.at(-1);
+      return {
+        ref: conversation.ref,
+        fanRef: conversation.fanRef,
+        fanDisplayName: conversation.fanDisplayName,
+        unreadCount: conversation.messages.filter((m) => m.direction === 'inbound').length,
+        lastMessageAt: last?.createdAt ?? null,
+        ...(last === undefined ? {} : { lastMessagePreview: last.text.slice(0, 80) }),
+      };
     });
   }
 
