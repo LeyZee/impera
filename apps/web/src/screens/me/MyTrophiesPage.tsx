@@ -37,7 +37,7 @@ function ChatterTrophiesPage({ user }: { user: Me }): JSX.Element {
   const shown = read === undefined ? null : chatterCase(read, current, net, currency, tiersOf(period));
   return (
     <Page>
-      <PageHeader eyebrow="Moi" title="Mes trophées" actions={<MeNav />} />
+      <PageHeader eyebrow="Moi" title="Mes trophées" actions={<MeNav trophies />} />
       {shown === null ? null : (
         <TrophyCaseView
           trophyCase={shown.trophyCase}

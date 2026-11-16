@@ -25,7 +25,13 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
       <PageHeader
         eyebrow="Moi"
         title="Préférences"
-        actions={<MeNav manager={user.teamScope === 'agency'} creator={user.role === 'creator'} />}
+        actions={
+          <MeNav
+            manager={user.teamScope === 'agency'}
+            creator={user.role === 'creator'}
+            trophies={playsTheGame(user)}
+          />
+        }
       />
       <div className="me-prefs">
         <Panel className="nv-enter" eyebrow="Ce navigateur" title="Apparence">
@@ -43,10 +49,15 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
             </div>
           </Panel>
         ) : null}
-        {playsTheGame(user) ? (
+        {/* Hers too: her reveals ring the same chime, « avec un interrupteur dans Moi » (ADR 0107 § 11, CRE-01). */}
+        {playsTheGame(user) || user.role === 'creator' ? (
           <Panel className="nv-enter" eyebrow="Mon compte" title="Sons">
             <div className="me-prefs__body">
-              <p className="me-prefs__text">Le carillon qui accompagne un trophée ou un palier gagné.</p>
+              <p className="me-prefs__text">
+                {user.role === 'creator'
+                  ? 'Le carillon qui accompagne une médaille ou un trophée gagné.'
+                  : 'Le carillon qui accompagne un trophée ou un palier gagné.'}
+              </p>
               <SoundsToggle user={user} />
             </div>
           </Panel>
