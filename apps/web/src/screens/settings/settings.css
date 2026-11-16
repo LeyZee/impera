@@ -1,0 +1,120 @@
+/*
+ * Réglages as a list (recette visuelle 16/11, GES-04, decided on 16/11): on a computer, the list on the page's left and
+ * the open section on its right; on a phone, the list is Réglages' screen and a section opens on its own, the way back
+ * in the eyebrow. Every line is 44 px to the finger, its group named in sentence case above it.
+ */
+.rgl-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--nv-group-gap);
+  align-items: start;
+}
+.rgl-list {
+  position: sticky;
+  top: var(--nv-space-4);
+  display: grid;
+  min-width: 0;
+}
+.rgl-list__group {
+  padding-inline: var(--nv-space-3);
+  margin-bottom: var(--nv-space-1);
+}
+.rgl-list__items + .rgl-list__group {
+  margin-top: var(--nv-space-4);
+}
+.rgl-list__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rgl-list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-height: 44px;
+  padding: 0 var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  font-weight: 550;
+  text-decoration: none;
+}
+.rgl-list__item:hover {
+  color: var(--nv-ink);
+  background-color: var(--nv-plate-hover);
+}
+.rgl-list__item:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+/* The section open: a neutral light, never the neon (the design system's selection). */
+.rgl-list__item[aria-current='page'] {
+  color: var(--nv-ink);
+  font-weight: 600;
+  background-color: var(--nv-select-strong);
+}
+.rgl-list__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* The chevron says « opens a screen »: a phone's list only, where a line leads away from it. */
+.rgl-list__chevron {
+  display: none;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-inline-end: var(--nv-space-1);
+  border-right: 1.75px solid currentColor;
+  border-bottom: 1.75px solid currentColor;
+  color: var(--nv-ink-faint);
+  transform: rotate(-45deg);
+}
+.rgl-section {
+  display: grid;
+  gap: var(--nv-group-gap);
+  align-content: start;
+  min-width: 0;
+}
+/* The eyebrow says « Réglages » on a computer; on a phone it is the way back to the list. */
+.nv-eyebrow > .rgl-back {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .rgl-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rgl-body[data-open] > .rgl-list,
+  .rgl-body:not([data-open]) > .rgl-section {
+    display: none;
+  }
+  .rgl-list {
+    position: static;
+  }
+  .rgl-list__items > li + li {
+    border-top: 1px solid var(--nv-hairline);
+  }
+  .rgl-list__item {
+    min-height: 52px;
+    transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+    border-radius: var(--nv-radius-xs);
+  }
+  .rgl-list__item[aria-current='page'] {
+    font-weight: 550;
+    background-color: transparent;
+  }
+  .rgl-list__item:active {
+    transform: scale(0.985);
+    transition-duration: var(--nv-dur-instant);
+  }
+  .rgl-list__chevron {
+    display: block;
+  }
+  .rgl-eyebrow {
+    display: none;
+  }
+  .nv-eyebrow > .rgl-back {
+    display: inline-flex;
+  }
+}

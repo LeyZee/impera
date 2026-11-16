@@ -531,6 +531,24 @@ describe('Paie › Quinzaine', () => {
     expect(text(row('Iris'))).toContain('Ton relevé : un autre membre de l’agence le valide.');
   });
 
+  it('counts on its button the reports the reader decides, never a manager’s own (recette visuelle 16/11, GES-19)', async () => {
+    periods[OCT2] = endedOctober({}, false);
+    reports = [
+      { ...report(1, BASILE.id), status: 'submitted' },
+      { ...report(2, LOU.id), status: 'submitted' },
+      { ...report(3, IRIS.id), status: 'submitted', canReview: false },
+    ];
+    renderPage(IRIS_ME);
+    expect(await screen.findByText('3 rapports de la quinzaine attendent leur relecture')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Relire les 2 rapports' })).toBeTruthy();
+    cleanup();
+    reports = [{ ...report(3, IRIS.id), status: 'submitted', canReview: false }];
+    renderPage(IRIS_ME);
+    expect(await screen.findByText('Un rapport de la quinzaine attend sa relecture')).toBeTruthy();
+    const link = screen.getByRole('link', { name: 'Voir les rapports' });
+    expect(link.className).not.toContain('nv-btn--neon');
+  });
+
   it('says that a gap still waiting for its member holds the period too, and that sending it back frees it (ADR 0073)', async () => {
     periods[OCT2] = endedOctober({}, false);
     reports = [

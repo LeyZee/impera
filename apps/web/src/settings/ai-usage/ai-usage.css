@@ -4,10 +4,6 @@
  * recharge. Tokens only. A rule that overrides a design-system class takes two classes.
  */
 
-.cia-body {
-  margin-top: 8px;
-}
-
 /* ── Today: the live dot, the gauge against the cap. */
 .cia-live {
   display: inline-flex;

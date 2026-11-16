@@ -73,15 +73,13 @@ export function PayoutHoldLine({
   );
 }
 
-/** A member's colour, or the swatch's own grey. */
-export function Swatch({ color }: { color: string | null }): JSX.Element {
-  return (
-    <span
-      className="sc-swatch"
-      style={color === null ? undefined : { '--sc-color': color }}
-      aria-hidden="true"
-    />
-  );
+/**
+ * A member's colour; nothing without one: the same grey dot before every name said nothing (recette visuelle 16/11,
+ * GES-19).
+ */
+export function Swatch({ color }: { color: string | null }): JSX.Element | null {
+  if (color === null) return null;
+  return <span className="sc-swatch" style={{ '--sc-color': color }} aria-hidden="true" />;
 }
 
 /** A change against the previous period, better or worse; « nouveau » when there is nothing to compare with. */

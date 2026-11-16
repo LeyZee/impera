@@ -64,6 +64,7 @@ export function GoalsPage({
   const current = useCurrentPeriod();
   const down = useAgencySettingsDown();
   const today = useAgencyToday();
+  // The quinzaine the tabs carry (GES-02); without one, the one under way.
   const period = chosen ?? current;
   const read = usePayPeriod(period);
   const after = usePayPeriod(period === null ? null : followingPeriod(period));
@@ -86,7 +87,7 @@ export function GoalsPage({
       eyebrow="Paie"
       title="Objectifs"
       lead="Ce que l’équipe vise ensemble, et ce que chacun débloque seul."
-      tabs={<PayNav user={user} />}
+      tabs={<PayNav user={user} period={period} />}
       {...(period === null
         ? {}
         : { actions: <PeriodArrows period={period} current={current} onPeriod={onPeriod} named /> })}

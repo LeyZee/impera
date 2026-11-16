@@ -13,7 +13,7 @@ import { usePayPeriod } from '@/payroll/api';
 import '@/payroll/pay.css';
 import { useSchedulingSettings } from '@/reports/api';
 import '@/reports/reports.css';
-import { amountText, periodTitle, previousPeriod } from '@/reports/model';
+import { amountText, previousPeriod } from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
@@ -110,7 +110,22 @@ export function InvoicesPage({
         eyebrow="Paie"
         title="Factures"
         lead="Les factures et avoirs émis au nom de chaque membre : contestations, échéances, quinzaines."
-        tabs={<PayNav user={user} />}
+        tabs={<PayNav user={user} period={period} />}
+        {...(period === null
+          ? {}
+          : {
+              // One period bar for Paie, at one place (recette visuelle 16/11, GES-02): the header's.
+              actions: (
+                <PeriodArrows
+                  period={period}
+                  current={current}
+                  onPeriod={(next) => {
+                    onFilter({ quinzaine: next });
+                  }}
+                  named
+                />
+              ),
+            })}
       />
       <div className="py-board">
         {timeZone === null ? null : (
@@ -136,20 +151,7 @@ export function InvoicesPage({
         {period === null ? null : <AwaitingInvoices period={period} owner={owner} nameOf={nameOf} />}
         <Panel
           className="nv-enter iv-docs"
-          eyebrow="Documents"
-          title={
-            period === null ? (
-              chosenName === null ? (
-                'Quinzaine'
-              ) : (
-                `${chosenName}, sur l’année`
-              )
-            ) : (
-              <span className="nv-swap nv-num" key={period} aria-live="polite">
-                {periodTitle(period)}
-              </span>
-            )
-          }
+          title={chosenName === null ? 'Documents de la quinzaine' : `${chosenName}, sur l’année`}
           actions={
             <div className="iv-filter">
               <label className="sr-only" htmlFor={`${id}-member`}>
@@ -166,15 +168,6 @@ export function InvoicesPage({
                   onFilter(value === '' ? (period === null ? {} : { quinzaine: period }) : { membre: value });
                 }}
               />
-              {period === null ? null : (
-                <PeriodArrows
-                  period={period}
-                  current={current}
-                  onPeriod={(next) => {
-                    onFilter({ quinzaine: next });
-                  }}
-                />
-              )}
             </div>
           }
         >

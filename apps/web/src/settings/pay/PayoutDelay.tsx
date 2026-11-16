@@ -63,6 +63,12 @@ export function PayoutDelay(): JSX.Element {
         )
       ) : (
         <div className="rp-account__now">
+          {/* A chip in the chip's column either way, so that the line starts where every card's does (GES-12). */}
+          {data.payoutDelayBusinessDays === null ? (
+            <span className="rp-chip rp-chip--neutral">Pas encore</span>
+          ) : (
+            <span className="rp-chip rp-chip--ok">En vigueur</span>
+          )}
           <p className="rp-account__rules">
             {data.payoutDelayBusinessDays === null
               ? 'Aucun délai annoncé'

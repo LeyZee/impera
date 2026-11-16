@@ -197,6 +197,16 @@ afterEach(() => {
 });
 
 describe('Paie › Exports', () => {
+  it('lights one neon, the journal’s, and says each export in one sentence (recette visuelle 16/11, GES-06, GES-16)', async () => {
+    renderPage();
+    await waitFor(() => panelOf('Archive des PDF'));
+    expect([...document.querySelectorAll('.nv-btn--neon')].map((button) => button.textContent)).toEqual([
+      'Préparer le journal',
+    ]);
+    // The detail is folded under the sentence.
+    expect(screen.getAllByText('Ce que contient le fichier')).toHaveLength(3);
+  });
+
   it('saves the journal’s ISO 8859-15 bytes one for one, and says in amber what it left aside', async () => {
     renderPage();
     const panel = await waitFor(() => panelOf('Journal des prestataires'));
