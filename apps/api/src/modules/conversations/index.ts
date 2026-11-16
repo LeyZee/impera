@@ -128,10 +128,10 @@ export interface ConversationsDeps {
   /** What her media show (SUIVI-26, `media` module's adapter); without it, Suivi shows a media's kind only. */
   readonly mediaDescriptions?: MediaDescriptions;
   /**
-   * The copilot panel's doors (ADR 0086): the person an extension link names, and every creator the owner's panel looks
-   * in. Without them, `/v1/copilot` is not mounted.
+   * The copilot panel's doors (ADR 0086): the person an extension link names, every creator the owner's panel looks
+   * in, and the read of a conversation none of them holds yet. Without them, `/v1/copilot` is not mounted.
    */
-  readonly copilot?: Pick<CopilotRouteDeps, 'linkUser' | 'allCreatorIds'>;
+  readonly copilot?: Pick<CopilotRouteDeps, 'linkUser' | 'allCreatorIds' | 'askRead'>;
   readonly clock?: Clock;
 }
 
