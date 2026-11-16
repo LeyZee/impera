@@ -67,11 +67,11 @@ export const SAFETY_EVENT_LABELS: Readonly<Record<SafetyEvent, string>> = {
 export function safetyEventReason(event: SafetyEvent): string {
   switch (event) {
     case 'minor':
-      return 'Le fan pourrait être mineur : l’agent s’est arrêté et attend un humain.';
+      return 'Le fan pourrait être mineur : l’agent s’est arrêté et attend un humain.';
     case 'care':
-      return 'Le fan semble aller mal : le mode soin est ouvert, chaque réponse attend la validation d’un humain.';
+      return 'Le fan semble aller mal : le mode soin est ouvert, chaque réponse attend la validation d’un humain.';
     case 'budget':
-      return 'Le budget IA de la créatrice est atteint : l’agent s’est arrêté et attend un humain.';
+      return 'Le budget IA de la créatrice est atteint : l’agent s’est arrêté et attend un humain.';
   }
 }
 

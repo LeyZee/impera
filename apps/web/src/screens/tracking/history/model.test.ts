@@ -18,6 +18,7 @@ import {
   markedLine,
   mergeTriggers,
   reasonAddsSomething,
+  SAFETY_GROUP,
   whenLine,
 } from './model';
 
@@ -143,7 +144,7 @@ describe('when a trigger rang', () => {
 });
 
 describe('the alert filter', () => {
-  it('offers the system’s alerts, the agent’s safety, then hers by name, each once', () => {
+  it('offers the system’s alerts, hers by name, then the agent’s safety under its heading, each once', () => {
     expect(
       alertChoices([
         { groupId: GROUP, name: 'Vidéo perso', creatorId: NORA },
@@ -159,12 +160,17 @@ describe('the alert filter', () => {
       'Demande de service',
       'Doute sur la personne',
       'Prix d’un script changé',
+      'Appel',
+      'Vidéo perso',
       'Âge douteux',
       'Mode soin',
       'Budget IA atteint',
-      'Appel',
-      'Vidéo perso',
     ]);
+    expect(
+      alertChoices([])
+        .filter((one) => one.group !== undefined)
+        .map((one) => [one.group, one.value]),
+    ).toEqual(SAFETY_EVENTS.map((event) => [SAFETY_GROUP, event]));
   });
 
   it('reads its value back, and anything else as every alert', () => {
@@ -199,7 +205,8 @@ describe('the alert filter', () => {
     ]);
     const custom = (creator: string | null, chosen: CustomAlertGroupId | null = null) =>
       alertChoices(known, creator, chosen)
-        .slice(SYSTEM_ALERT_CODES.length + SAFETY_EVENTS.length)
+        .filter((one) => one.group === undefined)
+        .slice(SYSTEM_ALERT_CODES.length)
         .map((one) => one.label);
     expect(custom(null)).toEqual(['Appel', 'Vidéo perso']);
     expect(custom(NORA)).toEqual(['Vidéo perso']);
@@ -234,7 +241,7 @@ describe('the alert filter', () => {
           safety: 'care',
           alertName: 'Mode soin',
           reason:
-            'Le fan semble aller mal : le mode soin est ouvert, chaque réponse attend la validation d’un humain.',
+            'Le fan semble aller mal : le mode soin est ouvert, chaque réponse attend la validation d’un humain.',
         }),
       ),
     ).toBe(true);

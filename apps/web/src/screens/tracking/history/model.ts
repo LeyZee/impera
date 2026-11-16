@@ -106,6 +106,9 @@ export interface KnownAlert {
   readonly creatorId: string;
 }
 
+/** The heading of the agent's safety stops in the alert filter. */
+export const SAFETY_GROUP = 'Sécurité de l’agent';
+
 /**
  * The alerts the filter offers: the system's, the agent's safety, then hers by name; an archived one stays while it has lines. With one
  * creator chosen, only the alerts that watch her: another's would only answer « pas encore sonné ».
@@ -115,16 +118,21 @@ export function alertChoices(
   creator: string | null = null,
   /** The alert chosen now: offered whatever the creator, so that the filter never shows another than it applies. */
   chosen: AlertChoice | null = null,
-): readonly { readonly value: AlertChoice; readonly label: string }[] {
+): readonly { readonly value: AlertChoice; readonly label: string; readonly group?: string }[] {
   const hers =
     creator === null ? known : known.filter((one) => one.creatorId === creator || one.groupId === chosen);
   const custom = [...new Map(hers.map((one) => [one.groupId, one.name])).entries()]
     .map(([value, label]) => ({ value, label }))
     .toSorted((a, b) => a.label.localeCompare(b.label, 'fr'));
+  // The agent's safety stops last, under their own heading: what the agent did, not an alert that rang.
   return [
     ...SYSTEM_ALERT_CODES.map((code) => ({ value: code, label: SYSTEM_ALERT_LABELS[code] })),
-    ...SAFETY_EVENTS.map((event) => ({ value: event, label: SAFETY_EVENT_LABELS[event] })),
     ...custom,
+    ...SAFETY_EVENTS.map((event) => ({
+      value: event,
+      label: SAFETY_EVENT_LABELS[event],
+      group: SAFETY_GROUP,
+    })),
   ];
 }
 
