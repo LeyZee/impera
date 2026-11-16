@@ -450,6 +450,12 @@ describe('database (RLS, constraints, migrations)', () => {
             .where(eq(s.conversationEvents.creatorId, a.creatorId)),
         ),
       ),
+    ).toMatch(/permission denied for table conversation_events/);
+    // The owner of the table has every right: the trigger is what refuses it.
+    expect(
+      await failure(
+        withAdmin(test.admin.db, (tx) => tx.update(s.conversationEvents).set({ correlationId: 'changed' })),
+      ),
     ).toMatch(/append-only/);
     expect(await failure(withAdmin(test.admin.db, (tx) => tx.delete(s.conversationEvents)))).toMatch(
       /append-only/,
