@@ -113,6 +113,13 @@ describe('LevelInsignia (ADR 0104 § 16)', () => {
     expect(`${words?.text ?? ''}${words?.chip ?? ''}`).not.toMatch(/€|\$/u);
     expect(revealWordsOf({ kind: 'level:12' }, period, [])).toBeNull();
   });
+
+  it('no longer promises that a rank is kept for ever (ADR 0118 § 5)', () => {
+    const period = PayPeriodSchema.parse('2026-11-01');
+    for (const kind of ['level:1', 'level:4']) {
+      expect(revealWordsOf({ kind }, period, [])?.text).not.toMatch(/jamais|ne se perd/u);
+    }
+  });
 });
 
 describe('ShiftChallengeCard (ADR 0104 § 14)', () => {
@@ -172,6 +179,11 @@ describe('MyRankCard (ADR 0104 § 16)', () => {
     expect(await screen.findByText('Étincelle')).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('25');
     expect(screen.getByText(/honorifique/u)).toBeTruthy();
+    // ADR 0118 § 5: a rank follows the net, and the card says what may bring it down.
+    expect(
+      screen.getByText(/une vente est remboursée ou\s+un rapport corrigé, il peut redescendre/u),
+    ).toBeTruthy();
+    expect(screen.queryByText(/ne redescend jamais/u)).toBeNull();
   });
 
   it('never fills the bar before the rank is noted, and shows the true net past the threshold', async () => {
@@ -248,6 +260,8 @@ describe('LevelsPanel (ADR 0104 § 16)', () => {
     show(<LevelsPanel />);
     expect(await screen.findByText(/à 500,00\s€/u)).toBeTruthy();
     expect(screen.getAllByText('Pas de seuil')).toHaveLength(7);
+    // ADR 0118 § 7: moving a threshold takes no rank back; a corrected net may.
+    expect(screen.getByText(/pas un changement\s+de seuil/u)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Régler les seuils' }));
     const form = screen.getByLabelText('Net cumulé pour le rang Allumeur').closest('ul');
     expect(form?.querySelectorAll('svg[data-earned="true"]')).toHaveLength(1);
@@ -265,5 +279,16 @@ describe('LevelsPanel (ADR 0104 § 16)', () => {
     await waitFor(() => {
       expect(sent.find((one) => one.method === 'PUT')?.body).toEqual({ thresholdsMinor: [50_000, 200_000] });
     });
+  });
+});
+
+describe('LevelsPanel with no threshold (recette EQU-04, ADR 0118 § 7)', () => {
+  it('says that no new rank opens and that a rank already earned stays', async () => {
+    serve({ ranks: LEVEL_NAMES.map((name, index) => ({ rank: index + 1, name })), thresholdsMinor: [] });
+    show(<LevelsPanel />);
+    expect(
+      await screen.findByText(/Sans seuil, aucun nouveau rang ne s’ouvre ; un rang déjà gagné reste\./u),
+    ).toBeTruthy();
+    expect(screen.queryByText(/aucun chatteur n’a de rang/u)).toBeNull();
   });
 });

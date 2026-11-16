@@ -5,7 +5,11 @@ import { dropsForGameUnscoped } from '../modules/content-drops';
 import { creatorDaysForGameUnscoped } from '../modules/creator-tasks';
 import { payGameFactsUnscoped } from '../modules/payroll';
 import { startRewardsModule, type RewardsModule } from '../modules/rewards';
-import { shiftsForGameUnscoped, type SchedulingModule } from '../modules/scheduling';
+import {
+  shiftsForGameUnscoped,
+  validatedShiftsForGameUnscoped,
+  type SchedulingModule,
+} from '../modules/scheduling';
 
 import type { Routes, Shared, TasksOf } from './shared';
 
@@ -27,6 +31,9 @@ export function wireRewards(shared: Shared, deps: { readonly scheduling: Schedul
     reads: {
       agencyTimeZone: deps.scheduling.pay.agencyTimeZone,
       payFacts: payGameFactsUnscoped,
+      // ADR 0118: the validated reports feed the game's net, read through the planning's door, never its tables.
+      validatedShifts: validatedShiftsForGameUnscoped,
+      ownValidatedShifts: (userId) => deps.scheduling.game.ownValidatedShifts(userId),
       shifts: shiftsForGameUnscoped,
       shiftsBegun: (userId, now) => deps.scheduling.reads.ownShiftsBegun(userId, now),
     },

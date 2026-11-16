@@ -130,3 +130,4 @@ Date : AAAA-MM-JJ
 | 0109 | L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre | accepted (précise 0066 § 7, 0086 § 8, 0085 et 0025) |
 | 0110 | L'agent tient compte des automatisations de Reveal | accepted (remplace la ligne « sans effet sur le bot » de l'inventaire du connecteur ; précise 0006, 0018, P3-10) |
 | 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
+| 0118 | Les rapports validés nourrissent le jeu du chatteur, et un gain que le net corrigé ne justifie plus est repris | accepted (précise 0104 § 12 à § 16 et 0108 ; amende 0104 § 15 et § 16) |

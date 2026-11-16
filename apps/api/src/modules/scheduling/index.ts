@@ -36,6 +36,7 @@ import {
   createDrizzleCreatorOnDuty,
 } from './infra/creator-on-duty';
 import { createDrizzleShiftFeedbackStore } from './infra/feedback-store';
+import { ownValidatedShiftsForGame, type ValidatedShiftForGame } from './infra/game-reads';
 import { createDrizzleLeaveStore } from './infra/leave-store';
 import {
   accessMarginMinutesForPay,
@@ -71,7 +72,7 @@ export { salesCheckReads } from './infra/sales-check-reads';
  */
 export { createShiftAccessReader, type ShiftCreators } from './infra/access-window';
 /** What the game reads of the planning, plugged into it by the composition root (ADR 0104 § 13): read only. */
-export { shiftsForGameUnscoped } from './infra/game-reads';
+export { shiftsForGameUnscoped, validatedShiftsForGameUnscoped } from './infra/game-reads';
 /** @public An account the automatic sales check compares: its platform and its rules' currency. */
 export type { DetectedAccountForCheck } from './domain/sales-checks';
 /** @public What pay's estimate of a report reads of its shift (reco 19). */
@@ -110,6 +111,13 @@ export interface SchedulingModule {
    * (`role_forbidden`). Read only.
    */
   readonly reads: SchedulingReads;
+  /**
+   * What the game reads of an account's own validated reports (ADR 0118): as that account, creator by creator, under
+   * the policies of its reports. Read only.
+   */
+  readonly game: {
+    readonly ownValidatedShifts: (userId: UserId) => Promise<ValidatedShiftForGame[]>;
+  };
   /**
    * What still plans someone on her now (ADR 0071 § 2): her shifts not over and her weekly templates still running,
    * read as the system. She is archived only when both are zero.
@@ -290,6 +298,14 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
     name: 'scheduling',
     onShift: (creatorId, at) => admin.onShiftUnscoped(creatorId, at),
     reads: createSchedulingReads(planning, reportStore, deps.creators, now),
+    game: {
+      ownValidatedShifts: async (userId) =>
+        ownValidatedShiftsForGame(
+          deps.db,
+          userId,
+          (await deps.creators.list()).map((creator) => creator.id),
+        ),
+    },
     planned: async (creatorId) => {
       const at = now();
       const { timeZone } = await admin.settingsUnscoped();

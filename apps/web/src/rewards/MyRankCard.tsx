@@ -36,7 +36,7 @@ export function MyRankCard({ user }: { user: Me }): JSX.Element | null {
         <div className="rw-rank__main">
           <p className="rw-rank__name">{level === null ? 'Pas encore de rang' : level.name}</p>
           {nextLevel === null ? (
-            <p className="rw-rank__note">Le plus haut rang ouvert. Il ne redescend jamais.</p>
+            <p className="rw-rank__note">Le plus haut rang ouvert. Il suit ton net cumulé.</p>
           ) : (
             <>
               <p className="rw-rank__next nv-num">
@@ -56,7 +56,8 @@ export function MyRankCard({ user }: { user: Me }): JSX.Element | null {
               </div>
               <p className="rw-rank__note nv-num">
                 {amountText(nextLevel.currentMinor, nextLevel.currency)} à ce jour. Un rang est honorifique :
-                il ne change ni ton taux ni ta paie, et ne redescend jamais.
+                il ne change ni ton taux ni ta paie. Il suit ton net cumulé : si une vente est remboursée ou
+                un rapport corrigé, il peut redescendre.
               </p>
             </>
           )}
