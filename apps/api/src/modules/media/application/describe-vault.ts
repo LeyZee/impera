@@ -275,7 +275,7 @@ const LEFTOVER_AGE_MS = 15 * 60_000;
  * Removes what a run killed in the middle of a file left in `scratchDir` (the PC is turned off each night): « never
  * kept » holds even then (ADR 0113 § 1). Only folders old enough to be no running run's, of another account included.
  */
-export async function sweepVaultLeftovers(scratchDir: string, now: Date): Promise<number> {
+async function sweepVaultLeftovers(scratchDir: string, now: Date): Promise<number> {
   let removed = 0;
   const names = await readdir(scratchDir).catch(() => []);
   for (const name of names) {
