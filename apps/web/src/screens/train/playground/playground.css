@@ -1116,8 +1116,11 @@
     border-color 160ms ease,
     background-color 160ms ease;
 }
-.pg-bank__item:hover {
-  background: var(--nv-select);
+/* Only where a pointer hovers: on a touch screen the fill would stay on the card after each tap (sa-banque-2). */
+@media (hover: hover) {
+  .pg-bank__item:hover {
+    background: var(--nv-select);
+  }
 }
 .pg-bank__text {
   color: var(--nv-ink);
