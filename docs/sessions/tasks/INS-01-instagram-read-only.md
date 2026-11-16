@@ -1,5 +1,5 @@
 # INS-01 Instagram en lecture seule : branchement, relevés des médias et des stories
-Statut : blocked (ADR 0120 proposée ; compte professionnel de la créatrice ; application Meta de l'agence)
+Statut : todo (le faux, les contrats et le domaine s'écrivent tout de suite ; l'essai réel attend le compte professionnel de la créatrice et l'application Meta de l'agence)
 Phase : Instagram (ADR 0120)
 Dépend de : ADR 0120 acceptée
 Branche : task/ins-01-instagram-read-only

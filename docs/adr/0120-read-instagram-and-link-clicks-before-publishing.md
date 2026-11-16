@@ -1,6 +1,6 @@
 # 0120. Lire avant de publier : les statistiques du compte Instagram et les clics des liens de redirection, le retour sur un Reel, l'entonnoir d'acquisition
 
-Statut : proposed (demande de Charles du 16/11/2026, 2 h 01 : « tu peux commencer déjà à développer, à ajouter le connecteur à Meta » et celui du service de redirection ; fil « Imaginer le système Instagram »)
+Statut : accepted (Charles, 16/11/2026, 2 h 05, « ok 0120 » ; demande de Charles du 16/11/2026, 2 h 01 : « tu peux commencer déjà à développer, à ajouter le connecteur à Meta » et celui du service de redirection ; fil « Imaginer le système Instagram »)
 Date : 2026-11-16
 Précise : l'ADR 0057 (§ 1 : le port du connecteur de publication lit déjà les statistiques ; § 2 : le branchement ; § 3 : les statistiques à 48 h), l'ADR 0060 (§ 2, source 1 : les statistiques du compte de la créatrice), l'ADR 0080 (le lien de redirection), l'ADR 0082 (§ 1 : la médiane du compte), l'ADR 0042 (ce que la créatrice voit), l'ADR 0016 (clés scellées). Amende : l'ADR 0057 § 2, où le branchement d'Instagram demandait d'emblée le droit de publier ; l'ADR 0060 § 2, où la lecture des statistiques attendait la publication (VEI-05 dépendait de PUB-02).
 
