@@ -359,6 +359,7 @@ export function guardContextOf(history: readonly ConversationTurn[]): GuardConte
     previousTurns: previousTurnsOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
+    sentBefore: history.filter((turn) => turn.from === 'creator').map((turn) => turn.text),
   };
 }
 

@@ -404,7 +404,7 @@ describe('playground session, the offer policy and the cursor', () => {
   // His desire score is counted for real here; 0 lets the pace and the cursor be tested on their own.
   const session = (voiceInputs: VoiceInput[], withPace: boolean, minDesire = 0, brief: Brief = FREE_OFFER) =>
     createPlaygroundSession({
-      gateway: fakeGateway({ bubbles: ['Mmh tu me chauffes 😏'] }, voiceInputs, [], brief),
+      gateway: fakeGateway({ bubbles: ['Mmh toi 😏'] }, voiceInputs, [], brief),
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
@@ -552,7 +552,7 @@ describe('playground session, follow-ups (P3-10)', () => {
     const voiceInputs: VoiceInput[] = [];
     const brainInputs: ConversationInput[] = [];
     const session = createPlaygroundSession({
-      gateway: fakeGateway({ bubbles: ['Tu fais quoi de beau ?'] }, voiceInputs, brainInputs),
+      gateway: fakeGateway({ bubbles: ['Tu fais quoi ?'] }, voiceInputs, brainInputs),
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
@@ -571,7 +571,7 @@ describe('playground session, follow-ups (P3-10)', () => {
     expect(await session.followUp()).toMatchObject({ kind: 'later', reason: 'follow_up_quiet_hours' });
     session.advance(9 * HOUR);
     const first = await session.followUp();
-    expect(first).toMatchObject({ kind: 'written', step: 0, turn: { bubbles: ['Tu fais quoi de beau ?'] } });
+    expect(first).toMatchObject({ kind: 'written', step: 0, turn: { bubbles: ['Tu fais quoi ?'] } });
     expect(brainInputs).toHaveLength(1);
     expect(voiceInputs.at(-1)?.brief.replyBrief).toContain('depuis 21 h');
     expect(await session.followUp()).toMatchObject({ kind: 'not_due', step: 1 });
