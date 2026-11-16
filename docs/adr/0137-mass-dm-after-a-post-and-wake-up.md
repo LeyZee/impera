@@ -1,6 +1,6 @@
 # 0137. Le Mass DM part seul : une annonce à tous après chaque publication du feed, un réveil avec un média demandé exprès quand plus personne ne parle
 
-Statut : accepted (Charles, 16/11/2026, 16 h 13 Paris, « ok 0137 » ; demande du même jour, 15 h 50, fil « Publier posts et stories automatiquement »). Amendement du même jour (ses précisions de 17 h 19 et 17 h 20 : annonce à tous, réveil avec un média demandé exprès, Mass DM planifiés avec les publications, équipe prévenue) : proposed, en attente de « ok 0137 bis ».
+Statut : accepted (Charles, 16/11/2026, 16 h 13 Paris, « ok 0137 » ; demande du même jour, 15 h 50, fil « Publier posts et stories automatiquement »). Amendement du même jour (ses précisions de 17 h 19 et 17 h 20 : annonce à tous, réveil avec un média demandé exprès, Mass DM planifiés avec les publications, équipe prévenue) : accepted (« ok 0137 bis », 16 h 22 Paris).
 Date : 2026-11-16
 Amende : ADR 0044 § 5 (le Mass DM ne part plus seulement d'un dépôt Relance : il peut être un texte qui accompagne une publication).
 S'appuie sur : ADR 0140 (demande hebdomadaire des médias de Relance, fil Médias).
