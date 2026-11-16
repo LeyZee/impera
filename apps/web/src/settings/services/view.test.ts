@@ -19,6 +19,7 @@ import {
   quotaText,
   quotaTone,
   troubleTone,
+  troubleToShow,
 } from './view';
 
 function status(provider: ProviderStatus['provider'], state: ProviderStatus['state']): ProviderStatus {
@@ -216,5 +217,25 @@ describe('the health of a service (ADR 0091 § 7)', () => {
     expect(quotaTone(quota)).toBe('warn');
     expect(quotaTone({ ...quota, used: 10_000 })).toBe('bad');
     expect(agoText('2026-11-14T13:00:00Z', now)).toBe('il y a 2 j');
+  });
+});
+
+describe('a service that passes its check but cannot pay (ADR 0091 § 7)', () => {
+  const connected = status('mistral', 'connected');
+  const probe = {
+    at: '2026-11-16T13:58:00Z',
+    outcome: 'no_credit' as const,
+    latencyMs: 300,
+    model: 'Mistral Large 4',
+  };
+  const trouble = { at: '2026-11-16T13:58:00Z', kind: 'no_credit' as const };
+  const activity = { calls: 1, troubled: 1, asFallback: 0, lastSuccessAt: null, lastTrouble: trouble };
+
+  it('turns amber, and says the failure once when the essai is the latest word', () => {
+    expect(dotOf({ ...connected, probe, activity }, false)).toBe('low');
+    expect(troubleToShow({ ...connected, probe, activity })).toBeNull();
+    expect(troubleToShow({ ...connected, activity })).toEqual(trouble);
+    const answered = { ...probe, outcome: 'answers' as const, at: '2026-11-16T13:59:00Z' };
+    expect(dotOf({ ...connected, probe: answered, activity }, false)).toBe('ok');
   });
 });

@@ -81,7 +81,8 @@ export function dotOf(status: ProviderStatus, isVerifying: boolean): Dot {
   if (isFromEnvironment(status)) return 'ok';
   switch (status.state) {
     case 'connected':
-      return 'ok';
+      // The key passes its check, but a real call says the account cannot pay (ADR 0091 § 7): amber, not calm.
+      return isBlockedInUse(status) ? 'low' : 'ok';
     case 'low_credit':
       return 'low';
     case 'needs_reconnect':
@@ -178,6 +179,23 @@ export const TROUBLE_TEXT: Readonly<Record<ProviderTrouble, string>> = {
   timeout: 'trop lent',
   not_answering: 'le service ne répondait pas',
 };
+
+/**
+ * The latest trouble of the agent's calls, unless the last « Essai réel » came after it: the essai is then the fresher
+ * word (and was journaled itself), so the same failure is not said twice.
+ */
+export function troubleToShow(status: ProviderStatus): ProviderActivity['lastTrouble'] {
+  const trouble = status.activity?.lastTrouble ?? null;
+  if (trouble === null) return null;
+  return status.probe !== null && Date.parse(status.probe.at) >= Date.parse(trouble.at) ? null : trouble;
+}
+
+/** The last essai, or else the last trouble, says the account cannot generate until someone acts. */
+function isBlockedInUse(status: ProviderStatus): boolean {
+  const trouble = troubleToShow(status);
+  if (trouble !== null) return troubleTone(trouble.kind) === 'bad';
+  return status.probe !== null && PROBE_CHIP[status.probe.outcome].tone === 'bad';
+}
 
 /** Red for what stops the service until someone acts, amber for what passes on its own. */
 export function troubleTone(kind: ProviderTrouble): Tone {

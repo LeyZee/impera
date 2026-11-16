@@ -15,6 +15,7 @@ import {
   quotaTone,
   TROUBLE_TEXT,
   troubleTone,
+  troubleToShow,
 } from './view';
 
 /**
@@ -39,6 +40,7 @@ export function ServiceHealth({
   const chip = probe === null ? null : PROBE_CHIP[probe.outcome];
   const hint = probe === null ? null : PROBE_HINT[probe.outcome];
   const quotaLine = quota === null ? null : quotaText(quota);
+  const trouble = troubleToShow(status);
   return (
     <div className="sv-health">
       {activity === null ? null : (
@@ -57,12 +59,11 @@ export function ServiceHealth({
         </dl>
       )}
 
-      {activity?.lastTrouble == null ? null : (
-        <p className="sv-trouble" data-tone={troubleTone(activity.lastTrouble.kind)}>
+      {trouble === null ? null : (
+        <p className="sv-trouble" data-tone={troubleTone(trouble.kind)}>
           <TroubleIcon />
           <span>
-            Dernière erreur {agoText(activity.lastTrouble.at, now)} :{' '}
-            {TROUBLE_TEXT[activity.lastTrouble.kind]}.
+            Dernière erreur {agoText(trouble.at, now)} : {TROUBLE_TEXT[trouble.kind]}.
           </span>
         </p>
       )}
