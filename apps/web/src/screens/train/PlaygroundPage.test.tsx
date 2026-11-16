@@ -137,6 +137,62 @@ describe('Playground', () => {
     expect(calls.filter((c) => c === 'GET /v1/playground')).toHaveLength(2);
   });
 
+  it('shows her bubbles one by one, « Elle écrit… » between them, and nothing to rate before the last (Charles, 16/11)', async () => {
+    const answered: PlaygroundState = {
+      ...BASE,
+      history: [
+        { index: 0, from: 'fan', text: 'Salut' },
+        { index: 1, from: 'creator', text: 'Coucou toi\nTu fais quoi ?' },
+      ],
+      pending: { ...ANSWER, bubbles: ['Coucou toi', 'Tu fais quoi ?'], delaysMs: [0, 400], latencyMs: 0 },
+    };
+    answer = (method, path) => {
+      if (method === 'POST' && path === '/v1/playground/messages') return json(200, answered.pending);
+      if (method === 'GET' && path === '/v1/playground')
+        return json(200, calls.includes('POST /v1/playground/messages') ? answered : BASE);
+      return undefined;
+    };
+    open();
+    const box = await screen.findByPlaceholderText(/Écris comme/);
+    fireEvent.change(box, { target: { value: 'Salut' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(await screen.findByText('Coucou toi')).toBeTruthy();
+    expect(screen.queryByText('Tu fais quoi ?')).toBeNull();
+    expect(screen.getByText('Elle écrit…')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Valider/ })).toBeNull();
+    // Nothing to rate yet: the box says she writes, not « Note d’abord la réponse » (avis Design 16/11).
+    expect(screen.getByPlaceholderText('Elle écrit…')).toBeTruthy();
+    expect(await screen.findByText('Tu fais quoi ?')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Valider/ })).toBeTruthy();
+  });
+
+  it('shows the brain’s reading while the voice still writes (two steps)', async () => {
+    const reading = {
+      intent: 'flirt' as const,
+      sentiment: 'positive',
+      risks: [],
+      action: 'reply',
+      replyBrief: '',
+      kycMissing: [],
+    };
+    answer = (method, path) => {
+      // The voice never finishes in this test: the answer stays on its way.
+      if (method === 'POST' && path === '/v1/playground/messages') return undefined;
+      if (method === 'GET' && path === '/v1/playground')
+        return json(200, calls.includes('POST /v1/playground/messages') ? { ...BASE, reading } : BASE);
+      return undefined;
+    };
+    open();
+    const box = await screen.findByPlaceholderText(/Écris comme/);
+    fireEvent.change(box, { target: { value: 'T’es trop belle' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(await screen.findByText('Elle a lu :', undefined, { timeout: 3000 })).toBeTruthy();
+    expect(screen.getByText('Elle écrit…')).toBeTruthy();
+    // His message leaves the box as he sends it and shows in the thread, before the server sends it back.
+    expect(screen.getByText('T’es trop belle')).toBeTruthy();
+    expect(box).toHaveProperty('value', '');
+  });
+
   it('names the fan by his first name only, without repeating the fan type in the header', async () => {
     answer = serve({ ...BASE, fanNotes: ['Prénom : Théo'] });
     open();
