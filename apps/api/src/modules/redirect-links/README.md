@@ -12,6 +12,21 @@ Les liens de redirection d'une créatrice (`redirect_links`) : un nom, une adres
 - **La créatrice** lit ses seuls liens allumés qui ont un endroit, sous forme de cartes (`creatorLinkCards`) : un nom, un endroit, une phrase d'usage, l'adresse à copier. Jamais un chiffre, jamais une écriture.
 - Un chatteur ne lit rien.
 
+## Routes
+
+- `GET` et `POST /v1/creators/:creatorId/redirect-links`, `PUT /v1/creators/:creatorId/redirect-links/:linkId` : propriétaire et manager actif (la créatrice sur sa liste). Tous ses liens, éteints et sans endroit compris. Aucune suppression : un lien s'éteint.
+- `GET /v1/creator-space/links` : la créatrice, ses cartes (`CreatorLinksResponseSchema`, schéma strict), dans l'ordre des endroits, story du jour d'abord.
+
+Refus : `redirect_link_name_conflict` et `redirect_link_url_conflict` (409, un nom ou une adresse déjà pris chez elle), `redirect_links_full_conflict` (409), `redirect_link_not_found` (404), `redirect_link_forbidden` (403). Une phrase d'usage qui contient une adresse est refusée par le contrat (400).
+
+## Règles tenues par le code
+
+- Écriture par `withAdmin` seul, après le contrôle du rôle, sous un verrou par créatrice ; `nirvana_app` ne fait que lire (politiques `creator_read` et `team_read`, `FORCE ROW LEVEL SECURITY`).
+- La politique `creator_read` ne rend que les liens allumés qui ont un endroit : un oubli dans une requête ne montre pas un lien éteint.
+- L'audit (`redirect_link.create`, `redirect_link.update`) note l'endroit, l'état et la présence d'une phrase, jamais une adresse.
+- La phrase d'usage est du texte affiché, elle n'entre dans aucun prompt.
+- `channelLinks(creatorId)` rend au module `telegram` les liens allumés d'une créatrice ; `null` tant qu'elle n'a aucune ligne, et le canal lit alors son ancien réglage.
+
 ## État (INS-03)
 
-Lot a : règles pures et ports. À venir : la table et sa recopie depuis le réglage du canal, les routes, l'écran.
+Table, recopie depuis le réglage du canal, routes et écrans faits. À venir (autres fiches de l'ADR 0121) : rattachement des liens de suivi, paliers, écran « Trafic ».

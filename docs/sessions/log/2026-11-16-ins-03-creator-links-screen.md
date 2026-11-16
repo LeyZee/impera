@@ -1,0 +1,7 @@
+# 2026-11-16 : INS-03, « Mes liens » de la créatrice et onglet « Liens » de l'agence
+
+- **Fiche** : INS-03 (fil Instagram), passée en `in review`.
+- **Fait** : table `redirect_links` (les liens quittent le réglage du canal Telegram, recopie rejouable, l'ancien réglage reste en repli une version) ; module `redirect-links` (règles, magasin, routes de l'agence et de la créatrice) ; le canal Telegram lit les liens par `channelLinks` et refuse de les écrire (`links_moved`) ; écran Moi › « Mes liens » (une carte par lien, bouton Copier) ; onglet « Liens » de la fiche créatrice ; carte Liens du canal en lecture seule. ADR 0080 : ligne de renvoi vers l'ADR 0121 § 1.
+- **Tests** : unitaires (contrats, règles d'écriture, modèle web, écrans), intégration (RLS de la table, routes et isolation entre créatrices, canal Telegram avec un lien éteint).
+- **Reste** : avis Design sur les captures, puis validation de Charles ; numéro de migration fixé au signal de fusion. Lots suivants de l'ADR 0121 : rattachement des liens de suivi, paliers, écran « Trafic », récap, régularité.
+- **Découvertes** : vider `telegram_channels.config->'links'` sera une migration à part, une version après celle-ci.

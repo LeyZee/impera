@@ -606,6 +606,18 @@ sales_feed_stats_calls   (platform, day), calls (appels aux statistiques du jour
                          sur 500 ; fermée à `nirvana_app`)
 ```
 
+## Liens de redirection (module `redirect-links`, ADR 0121 § 1, INS-03)
+
+```
+redirect_links           id, creator_id → creators, name (unique par créatrice, 60 au plus), url (https), destination
+                         (où il mène, en mots, 120 au plus), placement? (story_highlight | story_daily |
+                         telegram_channel | other_network ; nul = « à renseigner », rien n'est compté dessus),
+                         usage_note (120 au plus, jamais une adresse), enabled, updated_by? → user
+                         (écrite par `withAdmin` seul après le contrôle du rôle ; lue par le propriétaire et un
+                         manager actif pour la créatrice en cours, et par la créatrice pour ses seuls liens allumés
+                         qui ont un endroit ; jamais par un chatteur ; aucune suppression)
+```
+
 ## Commercial (phase 6, réservé)
 
 ```
