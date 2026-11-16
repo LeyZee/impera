@@ -1,0 +1,7 @@
+# 2026-11-16 — Équipe : les correctifs qui bloquaient un premier chatteur, sortis de la pile (recette EQU-01, EQU-02, CHT-02, CHT-03, CHT-14)
+Fait : Charles veut ouvrir l'accès aux chatteurs ; Navigation a nommé ce qui bloque un premier vrai chatteur côté Équipe. Ces correctifs étaient déjà faits dans les PR C et D de la recette, empilées derrière d'autres ; ils sont repris ici seuls sur `main`, commit par commit, sans changement de code. Planning : un shift n'est tenu que par un membre actif qui a encore sa créatrice sur sa liste ; sinon il ne couvre rien à partir de maintenant, et le passé reste comme il était planifié (EQU-01, EQU-02, voir `2026-11-16-equipe-shifts-sans-acces.md`). Commissions : « Mes relevés » dit le gagné de la quinzaine en cours, prime comprise, à côté de son net (CHT-02) ; un manager n'a ni palier ni objectif d'équipe à l'écran (CHT-03) ; sans palier ni objectif, la commission suit le net « vente après vente » sur un compte en ventes lues (CHT-14).
+Pas fait : le reste des PR C et D, qui suivent dans l'ordre ; les derniers points chatteur (CHT-06, 23, 29, 30, 31, 35) et le fuseau de la fiche qui suit le téléphone vont dans une PR E.
+Décisions : aucune nouvelle ; l'ordre de fusion est celui du coordinateur (cette PR juste après #807).
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : pnpm check, tests des écrans (Planning, Membres, Commissions, calendrier), du domaine et des lectures du planning, tests d'intégration `scheduling` et `scheduling-calendar` (Postgres local).
