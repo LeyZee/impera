@@ -342,8 +342,8 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       'tu rentres quand de ta garde ?',
     ]);
     const buttons = [...root.querySelectorAll<HTMLButtonElement>('.cp-draft__actions button')];
-    // Charles's word (recette visuelle V-EXT-02): one verb for the gesture, « placer ».
-    expect(buttons.map((b) => b.textContent)).toEqual(['Placer dans Reveal A', 'Retoucher E', 'Refuser R']);
+    // Charles's word (recette visuelle V-EXT-02): the button says what it does, one verb for the gesture, « copier ».
+    expect(buttons.map((b) => b.textContent)).toEqual(['Copier pour Reveal A', 'Retoucher E', 'Refuser R']);
     expect(buttons[0]?.classList.contains('cp-send')).toBe(true);
     expect(root.querySelector('.cp-draft__stop')).toBeNull();
     buttons[0]?.click();
@@ -364,9 +364,9 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     const row = root.querySelector('.cp-draft__actions');
     expect(row?.classList.contains('cp-draft__actions--pair')).toBe(true);
     // « Annuler » first and the gesture on the right, as in the CRM's confirmations (V-EXT-14).
-    expect([...(row?.children ?? [])].map((b) => b.textContent)).toEqual(['Annuler', 'Placer dans Reveal']);
+    expect([...(row?.children ?? [])].map((b) => b.textContent)).toEqual(['Annuler', 'Copier pour Reveal']);
     expect(root.querySelector('.cp-draft__hint')?.textContent).toBe(
-      'Une bulle par ligne. Ctrl+Entrée place le texte.',
+      'Une bulle par ligne. Ctrl+Entrée copie le texte.',
     );
     root.querySelector<HTMLButtonElement>('[data-gesture="place-edited"]')?.click();
     expect(actions.place).toHaveBeenCalledWith(true);
@@ -435,7 +435,7 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       }),
     ).root;
     expect(placed.querySelector('.cp-draft__next')?.textContent).toBe(
-      'Texte placé : colle-le dans Reveal (Ctrl+V), relis, et envoie.',
+      'Texte copié : colle-le dans Reveal (Ctrl+V), relis, et envoie.',
     );
     expect(placed.querySelector('.cp-draft__actions')).toBeNull();
     expect(placed.querySelector('.cp-draft__warn')).toBeNull();
@@ -474,23 +474,23 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       });
     const { root, actions } = draw(onCard(card({}), [], { draft: done(1) }));
     expect(root.querySelector('.cp-draft__next')?.textContent).toBe(
-      'Bulle 1 sur 3 placée : colle-la dans Reveal (Ctrl+V), envoie, puis place la suivante.',
+      'Bulle 1 sur 3 copiée : colle-la dans Reveal (Ctrl+V), envoie, puis copie la suivante.',
     );
     expect([...root.querySelectorAll('.cp-bubble')].map((n) => n.getAttribute('data-copied'))).toEqual([
       'true',
       null,
       null,
     ]);
-    // The placed bubble says so in words, not only by its edge (Design, lot -1).
-    expect(root.querySelector('.cp-bubble[data-copied] .cp-bubble__done')?.textContent).toBe('placée');
+    // The copied bubble says so in words, not only by its edge (Design, lot -1).
+    expect(root.querySelector('.cp-bubble[data-copied] .cp-bubble__done')?.textContent).toBe('copiée');
     expect(root.querySelector('.cp-bubble[data-copied] .cp-bubble__done svg')).not.toBeNull();
     const next = root.querySelector<HTMLButtonElement>('[data-gesture="copy-next"]');
-    expect(next?.textContent).toBe('Placer la bulle 2 A');
+    expect(next?.textContent).toBe('Copier la bulle 2 A');
     next?.click();
     expect(actions.copyNext).toHaveBeenCalledOnce();
     const last = draw(onCard(card({}), [], { draft: done(3) })).root;
     expect(last.querySelector('.cp-draft__next')?.textContent).toBe(
-      'Bulle 3 sur 3 placée : colle-la dans Reveal (Ctrl+V) et envoie. C’était la dernière.',
+      'Bulle 3 sur 3 copiée : colle-la dans Reveal (Ctrl+V) et envoie. C’était la dernière.',
     );
     expect(last.querySelector('[data-gesture="copy-next"]')).toBeNull();
   });

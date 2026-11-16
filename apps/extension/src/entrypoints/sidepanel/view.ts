@@ -443,13 +443,13 @@ function doneLines(done: GestureDone): HTMLElement[] {
         'p',
         { class: 'cp-draft__warn', role: 'status' },
         total > 1
-          ? `La bulle ${String(done.copied)} n’a pas pu être placée : sélectionne-la ci-dessus, colle-la dans Reveal et envoie.`
-          : 'Le texte n’a pas pu être placé : sélectionne-le ci-dessus, colle-le dans Reveal et envoie.',
+          ? `La bulle ${String(done.copied)} n’a pas pu être copiée : sélectionne-la ci-dessus, colle-la dans Reveal et envoie.`
+          : 'Le texte n’a pas pu être copié : sélectionne-le ci-dessus, colle-le dans Reveal et envoie.',
       ),
     );
   else if (total <= 1)
     lines.push(
-      h('p', { class: 'cp-draft__next' }, 'Texte placé : colle-le dans Reveal (Ctrl+V), relis, et envoie.'),
+      h('p', { class: 'cp-draft__next' }, 'Texte copié : colle-le dans Reveal (Ctrl+V), relis, et envoie.'),
     );
   else
     lines.push(
@@ -457,8 +457,8 @@ function doneLines(done: GestureDone): HTMLElement[] {
         'p',
         { class: 'cp-draft__next' },
         done.copied < total
-          ? `Bulle ${String(done.copied)} sur ${String(total)} placée : colle-la dans Reveal (Ctrl+V), envoie, puis place la suivante.`
-          : `Bulle ${String(total)} sur ${String(total)} placée : colle-la dans Reveal (Ctrl+V) et envoie. C’était la dernière.`,
+          ? `Bulle ${String(done.copied)} sur ${String(total)} copiée : colle-la dans Reveal (Ctrl+V), envoie, puis copie la suivante.`
+          : `Bulle ${String(total)} sur ${String(total)} copiée : colle-la dans Reveal (Ctrl+V) et envoie. C’était la dernière.`,
       ),
     );
   if (done.outcome === 'placed' && done.copied < total)
@@ -469,7 +469,7 @@ function doneLines(done: GestureDone): HTMLElement[] {
         h(
           'button',
           { type: 'button', class: 'nv-btn nv-btn--sm cp-send', 'data-gesture': 'copy-next' },
-          `Placer la bulle ${String(done.copied + 1)} `,
+          `Copier la bulle ${String(done.copied + 1)} `,
           key('A'),
         ),
       ),
@@ -556,7 +556,7 @@ function draftPart(
       area,
       noContact
         ? noContactLine()
-        : h('p', { class: 'cp-draft__hint' }, 'Une bulle par ligne. Ctrl+Entrée place le texte.'),
+        : h('p', { class: 'cp-draft__hint' }, 'Une bulle par ligne. Ctrl+Entrée copie le texte.'),
       h(
         'div',
         { class: 'cp-draft__actions cp-draft__actions--pair' },
@@ -576,7 +576,7 @@ function draftPart(
                 'data-gesture': 'place-edited',
                 disabled: empty,
               },
-              'Placer dans Reveal',
+              'Copier pour Reveal',
             ),
       ),
     );
@@ -594,7 +594,7 @@ function draftPart(
         ? h(
             'li',
             { class: 'cp-bubble', 'data-copied': 'true' },
-            h('span', { class: 'cp-bubble__done' }, icon('check', 12), 'placée'),
+            h('span', { class: 'cp-bubble__done' }, icon('check', 12), 'copiée'),
             bubble,
           )
         : h('li', { class: 'cp-bubble' }, bubble),
@@ -662,7 +662,7 @@ function draftPart(
   }
   if (draft.placed) {
     section.append(
-      h('p', { class: 'cp-draft__next' }, 'Placé dans Reveal : il compte quand ton message part.'),
+      h('p', { class: 'cp-draft__next' }, 'Déjà copié pour Reveal : il compte quand le message part.'),
     );
     return section;
   }
@@ -684,7 +684,8 @@ function draftPart(
     h(
       'div',
       { class: 'cp-draft__actions' },
-      // Charles's word (recette visuelle V-EXT-02): the text is placed on the clipboard, the chatter sends in Reveal.
+      // Charles's word (recette visuelle V-EXT-02): it says what it does, the text goes to the clipboard and the chatter
+      // pastes and sends in Reveal himself; one verb for this gesture everywhere.
       h(
         'button',
         {
@@ -692,7 +693,7 @@ function draftPart(
           class: stopped ? 'nv-btn nv-btn--soft nv-btn--sm cp-place' : 'nv-btn nv-btn--sm cp-send cp-place',
           'data-gesture': 'place',
         },
-        'Placer dans Reveal ',
+        'Copier pour Reveal ',
         key('A'),
       ),
       h(
