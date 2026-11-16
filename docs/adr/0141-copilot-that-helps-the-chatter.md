@@ -1,12 +1,12 @@
 # 0141. Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande
 
-Statut : proposed (fil « Extension, connexion Reveal et playground », 16/11/2026 ; choix de Charles sur carte le 16/11 à 15 h 44 : « Gratuit + accroches » ; relu par Agent le 16/11 ; à relire par Design et Sécurité ; attend « ok 0141 »)
+Statut : proposed (fil « Extension, connexion Reveal et playground », 16/11/2026 ; choix de Charles sur carte le 16/11 à 15 h 44 : « Gratuit + accroches » ; relu par Agent et Sécurité le 16/11 ; à relire par Design ; attend « ok 0141 »)
 Date : 2026-11-16
 Précise : ADR 0086 § 3 (ce que montre le panneau) et § 10 (un copilote qui fait gagner du temps). S'appuie sur ADR 0021 (rester en personnage), 0025 (accès pendant le shift), 0063 (la créatrice ne voit pas la fiche), 0098 (le cerveau choisit parmi ce que le code permet), 0112 (scripts à branches). Ne remplace aucun ADR.
 
 ## Contexte
 
-Le 16/11/2026, Charles teste le copilote sur un vrai fan et trouve qu'il « ne fait que répéter les notes ». Il veut que le panneau aide vraiment le chatteur, sans rien de bateau : quoi faire maintenant, des phrases d'accroche et des réponses prêtes dans la voix de la créatrice, des suggestions intelligentes pour la vente.
+À la recette du 16/11/2026, Charles trouve que le copilote se contente de redire la fiche du fan. Il veut que le panneau aide vraiment le chatteur, sans rien de bateau : quoi faire maintenant, des phrases d'accroche et des réponses prêtes dans la voix de la créatrice, des suggestions intelligentes pour la vente.
 
 Aujourd'hui, le panneau montre la fiche du fan, la ligne « Où on en est » (arrêts, précautions, désir en mots) et, quand l'agent en a écrit un, le brouillon de l'agent. Or l'agent calcule déjà bien plus que ce qu'il montre : l'étape de script décidée et son prix, ce que le fan a refusé, les réponses aux objections déjà utilisées, les relances dues, les raisons de chaque décision et les gardes qui ont joué. Rien de cela n'arrive au chatteur.
 
@@ -24,24 +24,24 @@ Charles a choisi, sur carte, d'afficher d'abord ce qui est déjà calculé (sans
 
 4. **Les signaux à ne pas rater**, ajoutés à « Où on en est » : désir qui monte ou retombe depuis le message précédent (sens seulement, le chiffre reste au CRM), relance due (un travail à part, pas un geste du brouillon), offre ouverte sans réponse, disponibilité du fan. Les arrêts et précautions existants restent tels quels (rouge pour ce qui interdit, ambre pour ce qui retient).
 
-5. **Le serveur rend ces données dans la vue du copilote** (la route qui rend déjà le brouillon), recopiées champ par champ, avec un schéma de sortie strict : jamais le texte du prompt, jamais une méthode écrite, jamais un montant autre que le prix de l'étape décidée.
+5. **Le serveur rend ces données dans la vue du copilote** (la route qui rend déjà le brouillon), recopiées champ par champ, avec un schéma de sortie strict : jamais le texte du prompt, jamais une méthode écrite, jamais un montant autre que le prix de l'étape décidée. Les réponses aux objections déjà utilisées sortent par leur libellé ou par le texte déjà envoyé à ce fan, jamais la banque entière. Aucun champ hors de ce que le chatteur lit déjà pendant son shift.
 
 ### B. Deux boutons qui appellent l'IA, au clic seulement
 
 6. **« 3 accroches »** : trois débuts de message différents dans la voix de la créatrice, pour relancer ou ouvrir la conversation. **« Réponse à une objection »** : le chatteur choisit l'objection dans la liste fermée que le code connaît déjà (`OBJECTION_KINDS` : « C'est trop cher », « Pour ce prix j'ai du réel », « Ailleurs c'est gratuit », « Fais-moi un prix », « J'ai déjà payé la dernière fois ») et reçoit une réponse. Une réplique de la banque pas encore utilisée avec ce fan sort d'abord, sans appel d'IA ; l'IA n'écrit que s'il n'y en a pas. « Fais-moi un prix » ne donne jamais de remise. D'autres objections n'entrent dans la liste que sur décision de Charles. Chaque proposition se copie comme un brouillon (« Copier pour Reveal ») ; rien ne part sans le chatteur.
 
-7. **Mêmes gardes que le brouillon** : chaque texte passe par les gardes de sortie du brouillon (rester en personnage, ADR 0021 ; pas de prix ni de remise inventés : un prix ne peut être que celui de l'étape décidée par le code ; pas de rendez-vous concret). Les accroches suivent le curseur de sexualisation de la créatrice (âge non confirmé : rien de sexuel), ne reprennent jamais une réplique déjà envoyée à ce fan, et passent par une réécriture comme le brouillon quand une garde bloque. Un texte encore refusé est retiré, jamais montré. Le message du fan entre dans l'appel comme une donnée, dans un bloc délimité et typé.
+7. **Mêmes gardes que le brouillon** : chaque texte passe par les gardes de sortie du brouillon (rester en personnage, ADR 0021 ; pas de prix ni de remise inventés : un prix ne peut être que celui de l'étape décidée par le code ; pas de rendez-vous concret). Les accroches suivent le curseur de sexualisation de la créatrice (âge non confirmé : rien de sexuel), ne reprennent jamais une réplique déjà envoyée à ce fan, et passent par une réécriture comme le brouillon quand une garde bloque. Un texte encore refusé est retiré, jamais montré. Le corps de l'appel est fermé : la conversation, l'identifiant du message du fan, le bouton et, pour une objection, son type (liste fermée). Aucun texte libre du chatteur, et aucun texte du fan venu de l'extension : le serveur relit le message dans sa base, et ce message entre dans l'appel comme une donnée, dans un bloc délimité et typé. Les réécritures sont bornées comme pour le brouillon et comptées dans le coût.
 
-8. **Coût tenu** : un appel par clic, journalisé dans `llm_calls` comme le reste et compté dans le budget IA du jour. Le même clic sur le même message du fan rend le même résultat (clé d'idempotence par message, par bouton et, pour une objection, par type d'objection), sans nouvel appel. Un plafond de clics par chatteur et par jour est réglable par le propriétaire dans le CRM ; au plafond, le bouton le dit et ne fait rien.
+8. **Coût tenu** : un appel par clic, journalisé dans `llm_calls` avec le membre qui a cliqué, et compté dans le budget IA du jour ; budget du jour épuisé, l'appel est refusé, jamais dépassé. Le même clic sur le même message du fan rend le même résultat sans nouvel appel (clé d'idempotence portée par le tenant, la conversation, le message, le bouton et, pour une objection, son type) ; un résultat gardé n'est rendu qu'après les mêmes contrôles qu'un appel neuf (shift, droits, coupures du § 9) : le cache ne contourne rien. Un plafond de clics par chatteur et par jour, avec une valeur par défaut finie, et une limite par minute sont tenus par le serveur de façon atomique (compteur en base) ; le plafond se règle par le propriétaire seul, dans le CRM, avec une ligne d'audit. Au plafond, le bouton le dit et ne fait rien.
 
 ### C. Ce qui coupe tout cela
 
 9. **Doute d'âge ouvert** : ni accroches, ni objection, ni suggestion de vente ; le panneau dit seulement qu'un humain doit lever le doute (règle du 16/11 : l'IA n'écrit plus rien).
    **Fan en difficulté (mode soin)** : ni accroches de vente, ni objection, ni geste de vente dans « quoi faire maintenant » ; le panneau garde la fiche et dit qu'on ne vend pas. À la **sortie du soin**, pendant la période sans explicite (ADR 0088 § 7), ni accroche coquine ni vente.
    **« Ne plus lui écrire »**, **ventes gelées**, **limites non lues** : les gestes de vente et les boutons sont retirés, comme les gestes de copie aujourd'hui pour « Ne plus lui écrire » et les limites non lues.
-   Ces coupures sont décidées par le serveur (il ne rend ni les données de vente ni les boutons) et redites par le panneau ; un appel aux boutons malgré tout est refusé par le serveur.
+   Ces coupures sont décidées par le serveur (il ne rend ni les données de vente ni les boutons) et redites par le panneau. Elles sont réévaluées au moment de chaque appel aux boutons, rejeu idempotent compris, pas seulement à l'affichage : un appel malgré une coupure est refusé.
 
-10. **Bornes inchangées** : seulement pendant le shift, sur les créatrices du shift (ADR 0025) ; jamais pour la créatrice (ADR 0063) ; les écritures et les appels passent par la liaison de l'extension, jamais par le cookie du CRM (ADR 0086 § 8).
+10. **Bornes inchangées** : seulement pendant le shift, sur les créatrices du shift (ADR 0025), contrôlé à chaque appel ; jamais pour la créatrice (ADR 0063) ; les écritures et les appels passent par la liaison de l'extension, jamais par le cookie du CRM (ADR 0086 § 8). Chaque route nouvelle entre dans les balayages d'authentification et d'origine et dans le test d'isolation. Aucun texte de fan ni de proposition dans les journaux.
 
 ### D. Qui fait quoi
 
