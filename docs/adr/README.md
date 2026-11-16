@@ -146,4 +146,4 @@ Date : AAAA-MM-JJ
 | 0141 | Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande | accepted (précise 0086 § 3 et § 10, amende leur ordre) |
 | 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
 | 0144 | Le MCP suit le CRM de novembre : coffre, branches, Playground, copilote, semaine de la créatrice, trophées et liens, en lecture seule | accepted (précise 0105 § 4) |
-| 0147 | La session Reveal se synchronise seule à l'ouverture du popup, chez le propriétaire, sans appel ni rechargement de Reveal | proposed (précise 0050, 0066 § 7 ; amende la fiche P2-01) |
+| 0147 | La session Reveal se synchronise seule à l'ouverture du popup, chez le propriétaire, sans appel ni rechargement de Reveal | accepted (précise 0050, 0066 § 7 ; amende la fiche P2-01) |

@@ -1,6 +1,6 @@
 # 0147. La session Reveal se synchronise seule à l'ouverture du popup
 
-Statut : proposed (demande de Charles du 16/11/2026, 23 h 04 : « je vais devoir me synchroniser tous les jours. Il n'y a pas un moyen d'éviter ça ? » ; accord sur le principe à 23 h 05 : « si on peut avoir la synchronisation automatique quand on ouvre l'extension, ça peut être vraiment un plus » ; numéro 0147 attribué par le coordinateur ; relecture Sécurité, puis « ok 0147 » de Charles avant le code)
+Statut : accepted (Charles, 16/11/2026, 23 h 14, « ok 0147 » ; relu et approuvé par Sécurité sur le texte, 23 h 11 ; demande de Charles du 16/11/2026, 23 h 04 : « je vais devoir me synchroniser tous les jours. Il n'y a pas un moyen d'éviter ça ? » ; accord sur le principe à 23 h 05 : « si on peut avoir la synchronisation automatique quand on ouvre l'extension, ça peut être vraiment un plus » ; numéro 0147 attribué par le coordinateur)
 Date : 2026-11-16
 Précise : ADR 0050 (le chemin de la session capturée), ADR 0066 § 7 (« Synchroniser » au propriétaire seul, inchangé). Amende la fiche P2-01 sur un point : la session n'est plus lue seulement « le temps du clic », elle l'est aussi à l'ouverture du popup, dans les limites du § 2.
 
