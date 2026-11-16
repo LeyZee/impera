@@ -330,6 +330,10 @@ describe('CommissionsPage', () => {
         'de net à ce jour · prime +30,00 €',
       );
     });
+    // « prime » and its amount never part at a line's end (Design).
+    expect(within(panel('Mes relevés')).getAllByRole('button')[0]?.textContent).toContain(
+      'prime\u00a0+30,00',
+    );
   });
 
   it('says the payout delay the owner announced (PAIE-32)', async () => {

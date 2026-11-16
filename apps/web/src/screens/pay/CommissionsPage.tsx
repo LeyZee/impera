@@ -654,8 +654,9 @@ function MyPeriodRow({
   // What the amount holds besides the commission (a bonus, a penalty…), said beside the net: 30 € earned on 0 € of
   // net is never left to be read as a mistake (Design, recette CHT-02).
   const besides = earning === undefined ? [] : memberFacts(earning).slice(1);
+  // A fact's amount stays with its word: « prime » is never left at a line's end, its « +30,00 € » on the next.
   const sub = `${amountText(summary.netMinor, 'EUR')} de net${summary.ended ? '' : ' à ce jour'}${besides
-    .map((fact) => ` · ${fact}`)
+    .map((fact) => ` · ${fact.replaceAll(/ (?=[+−-])/gu, '\u00a0')}`)
     .join('')}`;
   return (
     <button type="button" className="py-period nv-tap" onClick={onOpen}>
