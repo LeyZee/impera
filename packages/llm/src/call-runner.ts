@@ -12,7 +12,7 @@ import {
 } from 'ai';
 import type { z } from 'zod';
 
-import type { CallOutcome, LlmCallLog } from './call-log';
+import type { CallOutcome, HedgeRole, LlmCallLog } from './call-log';
 import { costUsd } from './catalog';
 import type { LlmConfig, LlmRole, ModelRef, ProviderId } from './config';
 import type { CallTrace, LlmFailure, LlmSuccess } from './gateway-types';
@@ -156,8 +156,11 @@ export interface CallRunnerDeps {
   readonly overBudget: (purpose: LlmPurpose | undefined) => LlmFailure['code'] | undefined;
   /** Waits before a transient retry; a real timer unless a test passes its own. */
   readonly sleep?: (ms: number) => Promise<void>;
-  /** Waits before a hedged request (`hedgeAfterMs`); a real timer unless a test passes its own. */
-  readonly hedgeTimer?: (ms: number) => Promise<void>;
+  /**
+   * Waits before a hedged request (`hedgeAfterMs`), until the signal aborts it; a real timer unless a test passes its
+   * own. Aborted, it never resolves.
+   */
+  readonly hedgeTimer?: HedgeTimer;
 }
 
 /** Waits before the n-th transient retry: 0.5 s, 1 s, 2 s, at most 4 s. */
@@ -174,6 +177,16 @@ function retryDelayMs(retry: number, retryAfter: number | undefined): number | u
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
+  });
+
+export type HedgeTimer = (ms: number, signal: AbortSignal) => Promise<void>;
+
+const realHedgeTimer: HedgeTimer = (ms, signal) =>
+  new Promise((resolve) => {
+    const timeout = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => {
+      clearTimeout(timeout);
+    });
   });
 
 export type CallRunner = <T>(
@@ -205,7 +218,7 @@ type Step<T> =
 export function createCallRunner(deps: CallRunnerDeps): CallRunner {
   const { now, canary } = deps;
   const sleep = deps.sleep ?? realSleep;
-  const hedgeTimer = deps.hedgeTimer ?? realSleep;
+  const hedgeTimer = deps.hedgeTimer ?? realHedgeTimer;
   return async function run<T>(
     role: LlmRole,
     prompt: PromptTemplate,
@@ -282,9 +295,15 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
       };
       type Settled = Awaited<ReturnType<typeof request>>;
 
-      /** Journals a settled request and says what it gave. `mayRetryEmpty`: an empty answer may be asked again. */
-      const judge = (settled: Settled, mayRetryEmpty: boolean): Step<T> => {
+      /**
+       * Journals a settled request and says what it gave. `mayRetryEmpty`: an empty answer may be asked again. `hedge`:
+       * its part in a hedged attempt, written to the journal.
+       */
+      const judge = (settled: Settled, mayRetryEmpty: boolean, hedge?: HedgeRole): Step<T> => {
         const { latencyMs } = settled;
+        const note = (outcome: CallOutcome, ms: number, extra: object = {}): void => {
+          record(outcome, ms, hedge === undefined ? extra : { ...extra, hedge });
+        };
         try {
           if ('error' in settled) throw settled.error;
           const result = settled.answer;
@@ -297,22 +316,22 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
           if (isBlocked) {
             const isEmpty = result.finishReason !== 'content-filter' && result.text.trim() === '';
             if (isEmpty && mayRetryEmpty) {
-              record('invalid_output', latencyMs, {
+              note('invalid_output', latencyMs, {
                 errorMessage: 'empty answer',
                 ...(cost !== undefined && { costUsd: cost }),
               });
               return { kind: 'empty' };
             }
-            record('refused', latencyMs, cost === undefined ? {} : { costUsd: cost });
+            note('refused', latencyMs, cost === undefined ? {} : { costUsd: cost });
             return { kind: 'stop' };
           }
           const output = result.output;
           if (JSON.stringify(output).includes(canary)) {
             // The fan got the model to write its instructions: nothing of this output may go further.
-            record('prompt_leak', latencyMs, cost === undefined ? {} : { costUsd: cost });
+            note('prompt_leak', latencyMs, cost === undefined ? {} : { costUsd: cost });
             return { kind: 'stop' };
           }
-          record('ok', latencyMs, {
+          note('ok', latencyMs, {
             ...(result.usage.inputTokens !== undefined && { inputTokens: result.usage.inputTokens }),
             ...(result.usage.inputTokenDetails.cacheReadTokens !== undefined && {
               cachedInputTokens: result.usage.inputTokenDetails.cacheReadTokens,
@@ -340,13 +359,13 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
           if (refusedStatus !== undefined) deps.reportRefusal(ref.provider, refusedStatus);
           const cost = usage === undefined ? undefined : costUsd(ref, usage);
           if (isEmpty === true && mayRetryEmpty) {
-            record('invalid_output', latencyMs, {
+            note('invalid_output', latencyMs, {
               errorMessage: 'empty answer',
               ...(cost !== undefined && { costUsd: cost }),
             });
             return { kind: 'empty' };
           }
-          record(outcome, latencyMs, {
+          note(outcome, latencyMs, {
             errorMessage: message.slice(0, 200),
             ...(cost !== undefined && { costUsd: cost }),
           });
@@ -357,14 +376,21 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
       /**
        * One attempt, hedged when the role says so: past `hedgeAfterMs`, a second identical request runs beside the
        * first and the first good answer wins. The other one is left to finish and is journaled with its real cost, so
-       * the daily cap and the AI spend count it; aborted, it would be billed all the same and counted blind.
+       * the daily cap and the AI spend count it; aborted, it would be billed all the same and counted blind. It is
+       * journaled as the `loser`, which latency reads and health leave out: nobody waited for it.
        */
       const attempt = async (messages: ModelMessage[], mayRetryEmpty: boolean): Promise<Step<T>> => {
         const first = request(messages);
         // Only the main model: the fallback is there because it was slow, and Charles agreed the extra cost for Grok.
         const hedgeAfterMs = isFallback ? undefined : roleConfig.hedgeAfterMs;
         if (hedgeAfterMs === undefined) return judge(await first, mayRetryEmpty);
-        const early = await Promise.race([first, hedgeTimer(hedgeAfterMs).then(() => undefined)]);
+        const timer = new AbortController();
+        const early = await Promise.race([
+          first,
+          hedgeTimer(hedgeAfterMs, timer.signal).then(() => undefined),
+        ]);
+        // A quick answer leaves no timer behind: it would hold a short script or a stopping worker for 22 s.
+        timer.abort();
         if (early !== undefined) return judge(early, mayRetryEmpty);
         // The second request is a call like any other: the cap may refuse it.
         if (deps.overBudget(trace.purpose) !== undefined) return judge(await first, mayRetryEmpty);
@@ -373,11 +399,14 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
           first.then((settled) => ({ settled, other: second })),
           second.then((settled) => ({ settled, other: first })),
         ]);
-        const step = judge(winner.settled, mayRetryEmpty);
-        if (step.kind !== 'success') return judge(await winner.other, mayRetryEmpty);
-        void winner.other.then((settled) => {
-          judge(settled, false);
-        });
+        const step = judge(winner.settled, mayRetryEmpty, 'winner');
+        if (step.kind !== 'success') return judge(await winner.other, mayRetryEmpty, 'winner');
+        winner.other
+          .then((settled) => {
+            judge(settled, false, 'loser');
+          })
+          // The answer is already given: a journal that fails on the late request must not crash the process.
+          .catch(() => undefined);
         return step;
       };
 

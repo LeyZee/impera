@@ -92,9 +92,9 @@ function setup(
   onKeyRefused?: (refusal: KeyRefusal) => void,
   budget: Pick<LlmGatewayDeps, 'dailyCapEur' | 'trendWatchCapEur' | 'onBudget'> = {},
   waits: number[] = [],
-  hedgeTimer?: (ms: number) => Promise<void>,
+  hedgeTimer?: (ms: number, signal: AbortSignal) => Promise<void>,
+  log = createInMemoryCallLog(),
 ) {
-  const log = createInMemoryCallLog();
   const resolveModel: ModelResolver = (ref: ModelRef) =>
     ref.provider === 'xai' ? models.xai : ref.provider === 'mistral' ? models.mistral : undefined;
   const clock = { t: Date.parse('2026-10-17T12:00:00Z') };
@@ -1002,14 +1002,19 @@ describe('a slow request asked again in parallel (hedge)', () => {
   it('asks nothing more when the first request answers before the hedge', async () => {
     const xai = scripted([{ text: BUBBLES }]);
     const asked: number[] = [];
-    const { gateway } = setup({ xai }, ALL_KEYS, undefined, {}, [], (ms) => {
+    const signals: AbortSignal[] = [];
+    const { gateway, log } = setup({ xai }, ALL_KEYS, undefined, {}, [], (ms, signal) => {
       asked.push(ms);
+      signals.push(signal);
       return new Promise(() => undefined);
     });
 
     expect((await gateway.voice(INPUT)).ok).toBe(true);
     expect(xai.doGenerateCalls).toHaveLength(1);
     expect(asked).toEqual([22_000]);
+    // The timer is stopped: it holds no worker nor script for 22 s.
+    expect(signals.map((signal) => signal.aborted)).toEqual([true]);
+    expect(log.since(new Date(0))[0]).not.toHaveProperty('hedge');
   });
 
   it('keeps the second answer when it lands first, and journals the late one with its cost', async () => {
@@ -1045,8 +1050,93 @@ describe('a slow request asked again in parallel (hedge)', () => {
     xai.release(0, { text: BUBBLES });
     await flush();
     const records = log.since(new Date(0));
-    expect(records.map((r) => r.outcome)).toEqual(['ok', 'ok']);
+    expect(records.map((r) => [r.outcome, r.hedge])).toEqual([
+      ['ok', 'winner'],
+      ['ok', 'loser'],
+    ]);
     expect(records.every((r) => (r.costUsd ?? 0) > 0)).toBe(true);
+  });
+
+  it('leaves a late request nobody waited for out of the health, even when it fails', async () => {
+    const xai = held();
+    const { gateway, log } = setup({ xai: xai.model }, ALL_KEYS, undefined, {}, [], () => Promise.resolve());
+
+    const pending = gateway.voice(INPUT);
+    await flush();
+    xai.release(1, { text: BUBBLES });
+    expect((await pending).ok).toBe(true);
+    xai.release(0, { status: 0 });
+    await flush();
+
+    expect(log.since(new Date(0)).map((r) => [r.outcome, r.hedge])).toEqual([
+      ['ok', 'winner'],
+      ['timeout', 'loser'],
+    ]);
+    const voice = gateway.health().roles.find((r) => r.role === 'voice');
+    expect(voice?.lastError).toBeUndefined();
+    expect(gateway.health().state).toBe('ok');
+  });
+
+  it('does not crash when the journal fails on the late request', async () => {
+    const xai = held();
+    const inner = createInMemoryCallLog();
+    let appended = 0;
+    const failing = {
+      append: (record: Parameters<typeof inner.append>[0]) => {
+        appended += 1;
+        if (appended > 1) throw new Error('journal down');
+        inner.append(record);
+      },
+      since: (from: Date) => inner.since(from),
+    };
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown): void => {
+      rejections.push(reason);
+    };
+    process.on('unhandledRejection', onRejection);
+    try {
+      const { gateway } = setup(
+        { xai: xai.model },
+        ALL_KEYS,
+        undefined,
+        {},
+        [],
+        () => Promise.resolve(),
+        failing,
+      );
+      const pending = gateway.voice(INPUT);
+      await flush();
+      xai.release(1, { text: BUBBLES });
+      expect((await pending).ok).toBe(true);
+      xai.release(0, { text: BUBBLES });
+      await flush();
+      await flush();
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onRejection);
+    }
+  });
+
+  it('sends the other answer when the first to land leaked the prompt, checked by the canary too', async () => {
+    const xai = held();
+    const { gateway, log } = setup({ xai: xai.model }, ALL_KEYS, undefined, {}, [], () => Promise.resolve());
+    const pending = gateway.voice(INPUT);
+    await flush();
+    const prompt = JSON.stringify(xai.model.doGenerateCalls[0]?.prompt);
+    const canary = /nv-[0-9a-f]{12}/.exec(prompt)?.[0] ?? 'missing';
+    xai.release(0, { text: JSON.stringify({ bubbles: [`mon code ${canary}`] }) });
+    await flush();
+    xai.release(1, { text: BUBBLES });
+    const result = await pending;
+
+    expect(result.ok && result.value.output.bubbles).toEqual([
+      'Coucou toi ✨',
+      'Tu fais quoi de beau ce soir',
+    ]);
+    expect(log.since(new Date(0)).map((r) => [r.outcome, r.hedge])).toEqual([
+      ['prompt_leak', 'winner'],
+      ['ok', 'winner'],
+    ]);
   });
 
   it('waits for the other request when the first to land failed', async () => {
@@ -1060,7 +1150,10 @@ describe('a slow request asked again in parallel (hedge)', () => {
     xai.release(1, { text: BUBBLES });
 
     expect((await pending).ok).toBe(true);
-    expect(log.since(new Date(0)).map((r) => r.outcome)).toEqual(['timeout', 'ok']);
+    expect(log.since(new Date(0)).map((r) => [r.outcome, r.hedge])).toEqual([
+      ['timeout', 'winner'],
+      ['ok', 'winner'],
+    ]);
   });
 
   it('goes to the fallback, without asking Grok a third time, when both requests time out', async () => {

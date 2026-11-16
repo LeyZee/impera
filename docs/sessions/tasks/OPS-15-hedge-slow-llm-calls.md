@@ -19,7 +19,9 @@ Couper la queue des temps de réponse du cerveau et de la voix sans changer de m
 - [x] Au-delà, une deuxième demande identique part au modèle principal (jamais au repli), la première bonne réponse gagne.
 - [x] L'autre demande va à son terme et se journalise avec son coût : plafond du jour et consommation IA la comptent. Le plafond peut refuser la deuxième demande.
 - [x] Un délai dépassé n'est plus relancé sur le même modèle : le repli répond.
-- [x] Tests de la passerelle sur chacun de ces cas.
+- [x] La demande perdante est marquée `loser` (`llm_calls.hedge`, migration 0217 provisoire) : santé et lectures de latence l'écartent (relecture Bilan).
+- [x] Le minuteur de la deuxième demande s'arrête quand la première répond ; un journal qui échoue sur la perdante ne fait pas tomber le processus.
+- [x] Tests de la passerelle sur chacun de ces cas, test d'intégration du journal.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
 

@@ -25,7 +25,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Juge | `judge` | Rôle LLM d'évaluation, jamais sur le chemin d'un vrai fan : évals, et retour aux recrues dans S'entraîner. |
 | Politique | `policy` | Règles déterministes en code appliquées entre le cerveau et la voix. |
 | Gardes | `guards` | Vérifications en code après la voix (dégoûts, répétition, longueur, argent, identité). |
-| Deuxième demande | `hedgeAfterMs` | La même demande envoyée une deuxième fois au modèle principal d'un rôle, en parallèle, quand la première n'a pas répondu après ce délai ; la première bonne réponse gagne et l'autre est journalisée avec son coût (OPS-15). |
+| Deuxième demande | `hedgeAfterMs` | La même demande envoyée une deuxième fois au modèle principal d'un rôle, en parallèle, quand la première n'a pas répondu après ce délai ; la première bonne réponse gagne et l'autre est journalisée avec son coût, marquée `loser` dans `llm_calls.hedge` (OPS-15). |
 | Repli | `fallback` | Le modèle de secours d'un rôle LLM, utilisé quand le modèle actif refuse, ne répond pas ou n'a pas de clé. |
 | Santé (des modèles) | `health` | État des rôles LLM (`ok`, `degraded`, `down`), latences, erreurs, coût du jour face au budget ; alimente le panneau « Modèles IA ». |
 | Plafond du jour | `dailyBudget`, `budget_reached` | Dépense IA maximale sur une journée, heure de Paris (20 € par défaut, réglable de 1 € à 200 € par le propriétaire dans Réglages › Modèles IA, `ai_budget_settings`) : alerte à 80 %, au-delà plus aucune génération et les chatteurs reprennent. |

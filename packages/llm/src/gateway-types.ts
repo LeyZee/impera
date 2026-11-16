@@ -392,8 +392,8 @@ export interface LlmGatewayDeps {
   readonly onBudget?: (event: BudgetEvent) => void;
   /** Waits before a transient retry (backoff); a real timer unless a test passes its own. */
   readonly sleep?: (ms: number) => Promise<void>;
-  /** Waits before a hedged second request (`hedgeAfterMs`); a real timer unless a test passes its own. */
-  readonly hedgeTimer?: (ms: number) => Promise<void>;
+  /** Waits before a hedged second request (`hedgeAfterMs`) until the signal aborts it; a real timer unless a test passes its own. */
+  readonly hedgeTimer?: (ms: number, signal: AbortSignal) => Promise<void>;
 }
 
 export interface KeyRefusal {
