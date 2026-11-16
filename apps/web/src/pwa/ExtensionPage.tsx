@@ -89,20 +89,20 @@ const OFFERS: readonly Offer[] = [
   },
 ];
 
-/** What comes later, in one sentence: the trend watch only to those who do it (ADR 0060). */
-function comingFor(watches: boolean): string {
-  const reveal = 'sur Reveal, ce qu’il faut savoir du fan de la conversation ouverte';
-  return watches
-    ? `Bientôt dans l’extension : ${reveal}, et la veille Instagram pendant que tu scrolles.`
-    : `Bientôt dans l’extension : ${reveal}.`;
-}
+const BROWSERS: readonly { readonly key: Exclude<Browser, 'other'>; readonly label: string }[] = [
+  { key: 'chrome', label: 'Chrome' },
+  { key: 'edge', label: 'Edge' },
+];
 
-/** /aide/extension (ADR 0067): what the extension offers, then the steps for Chrome and Edge, this browser's first. */
-export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.Element {
+/**
+ * /aide/extension (ADR 0067): what the extension offers, then one list of steps, Chrome's or Edge's, this browser's
+ * first: the two differ by a few words, and side by side they read twice (recette visuelle 16/11, CHA-15). Nothing
+ * that is not there yet, and no path of the code.
+ */
+export function ExtensionPage(): JSX.Element {
   const browser = browserOf(navigator.userAgent);
   const origin = window.location.origin;
-  const order: readonly Exclude<Browser, 'other'>[] =
-    browser === 'edge' ? ['edge', 'chrome'] : ['chrome', 'edge'];
+  const [shown, setShown] = useState<Exclude<Browser, 'other'>>(browser === 'edge' ? 'edge' : 'chrome');
   return (
     <Page width="narrow">
       <PageHeader
@@ -148,37 +148,52 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
         </Panel>
         <Panel>
           <PanelSection className="nv-help-install__now">
-            <p>
-              {import.meta.env.DEV
-                ? 'Sur ce PC de développement, le fichier n’est pas servi : charge directement le dossier apps/extension/.output/chrome-mv3.'
-                : 'La dernière version, la même pour toute l’équipe.'}
-            </p>
-            <a className="nv-btn nv-btn--neon" href={EXTENSION_ZIP} download="impera-extension.zip">
-              Télécharger l’extension
-            </a>
+            {/* A development build serves no file: it says so without a button that would download nothing. */}
+            {import.meta.env.DEV ? (
+              <p>Sur ce poste de développement, le fichier de l’extension n’est pas servi.</p>
+            ) : (
+              <>
+                <p>La dernière version, la même pour toute l’équipe.</p>
+                <a className="nv-btn nv-btn--neon" href={EXTENSION_ZIP} download="impera-extension.zip">
+                  Télécharger l’extension
+                </a>
+              </>
+            )}
           </PanelSection>
         </Panel>
-        <div className="nv-help-install__cards">
-          {order.map((key) => (
-            <Panel key={key} title={STEPS[key].title}>
-              <PanelSection>
-                <ol className="nv-help-install__steps">
-                  {STEPS[key].steps.map((step) => (
-                    <li key={step}>{step}</li>
-                  ))}
-                  {isLocalCrm(origin) ? (
-                    <li>{LAST_STEP}</li>
-                  ) : (
-                    <>
-                      <AddressStep origin={origin} />
-                      <li>{LAST_STEP_AFTER_ADDRESS}</li>
-                    </>
-                  )}
-                </ol>
-              </PanelSection>
-            </Panel>
-          ))}
-        </div>
+        <Panel title={STEPS[shown].title}>
+          <PanelSection>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Navigateur">
+              {BROWSERS.map((one) => (
+                <button
+                  key={one.key}
+                  type="button"
+                  role="radio"
+                  className="nv-chip"
+                  aria-checked={shown === one.key}
+                  onClick={() => {
+                    setShown(one.key);
+                  }}
+                >
+                  {one.label}
+                </button>
+              ))}
+            </div>
+            <ol className="nv-help-install__steps">
+              {STEPS[shown].steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+              {isLocalCrm(origin) ? (
+                <li>{LAST_STEP}</li>
+              ) : (
+                <>
+                  <AddressStep origin={origin} />
+                  <li>{LAST_STEP_AFTER_ADDRESS}</li>
+                </>
+              )}
+            </ol>
+          </PanelSection>
+        </Panel>
         <Panel title="Quand une nouvelle version sort">
           <PanelSection>
             <ol className="nv-help-install__steps">
@@ -190,7 +205,6 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
             </ol>
           </PanelSection>
         </Panel>
-        <p className="nv-help-install__note">{comingFor(watches)}</p>
         <p className="nv-help-install__note">
           Au démarrage, le navigateur peut rappeler qu’une extension en mode développeur est active : c’est
           normal, garde-la. Elle n’a accès qu’à Reveal et au CRM ; à l’ouverture, elle regarde seulement
