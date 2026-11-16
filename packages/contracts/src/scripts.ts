@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { CreatorIdSchema } from './ids';
+import { PlatformScriptMomentSchema } from './connector';
+import { CreatorIdSchema, PlatformAccountIdSchema } from './ids';
+import { CurrencySchema } from './money';
 
 /**
  * Script structures (ADR 0056 § 1, SC-01): the agency's library of scripts to shoot. A structure is an ordered list of
@@ -627,6 +629,10 @@ export const SCRIPT_ERROR_CODES = [
   'script_cadence_creator_not_found',
   /** The structure has no such segment, or the stage no such variant. */
   'script_card_not_found',
+  /** No native script of hers by this id, or a reader who may not read her. */
+  'platform_script_not_found',
+  /** Not an identity of this script's current version (its texts or media changed since): read the script again. */
+  'script_identity_stale_conflict',
 ] as const;
 export type ScriptErrorCode = (typeof SCRIPT_ERROR_CODES)[number];
 
@@ -687,3 +693,124 @@ export const PLATFORM_SCRIPT_STEPS_MAX = 50;
 export const PLATFORM_SCRIPT_STEP_MEDIA_MAX = 50;
 /** The platform's ids: a script, a step, a media. */
 export const PLATFORM_SCRIPT_REF_MAX = 200;
+
+/**
+ * A script's identity (SC-04 lot c8, ADR 0056 § 6, ADR 0098 § 6): what it is and when it fits, for the brain and the
+ * chatters to choose among the scripts the code allows. One schema, whatever the script's origin (made in the
+ * platform, or shot in the workshop then uploaded): it is about the script as a whole, never a step nor an order of
+ * steps. Written by the brain from the steps' texts and their media's validated descriptions, never a price, or by the
+ * agency by hand; used only once a person validated it. The moment is not in it: the platform's folder says it (ADR
+ * 0098 § 6), the code copies it.
+ */
+export const SCRIPT_ENERGIES = ['soft', 'rising', 'intense'] as const;
+export const ScriptEnergySchema = z.enum(SCRIPT_ENERGIES);
+export type ScriptEnergy = z.infer<typeof ScriptEnergySchema>;
+
+/** Longest text of an identity (ambiance, setting, each cue). */
+export const SCRIPT_IDENTITY_TEXT_MAX = 200;
+/** Most cues of « à utiliser quand » and of « à éviter quand ». */
+export const SCRIPT_IDENTITY_CUES_MAX = 5;
+/** The identity's form; a row keeps the version it was written in, so that fields can come without rewriting rows. */
+export const SCRIPT_IDENTITY_SCHEMA_VERSION = 1;
+
+const IdentityTextSchema = z.string().trim().min(1).max(SCRIPT_IDENTITY_TEXT_MAX);
+
+/** What the brain answers (`brain/script-identity`), and what a person writes by hand. */
+export const ScriptIdentityContentSchema = z.object({
+  /** Its mood, in a few words (« complice et taquine »). */
+  ambiance: IdentityTextSchema,
+  /** How hot it gets: soft all along, rising, or intense from the start. */
+  energy: ScriptEnergySchema,
+  /** Where it is shot and in what, as the descriptions show it. */
+  setting: IdentityTextSchema,
+  /** « À utiliser quand » : the moments of a conversation it fits. */
+  useWhen: z.array(IdentityTextSchema).min(1).max(SCRIPT_IDENTITY_CUES_MAX),
+  /** « À éviter quand » : those it does not. */
+  avoidWhen: z.array(IdentityTextSchema).max(SCRIPT_IDENTITY_CUES_MAX),
+});
+export type ScriptIdentityContent = z.infer<typeof ScriptIdentityContentSchema>;
+
+export const SCRIPT_IDENTITY_AUTHORS = ['brain', 'human'] as const;
+export const ScriptIdentityAuthorSchema = z.enum(SCRIPT_IDENTITY_AUTHORS);
+export type ScriptIdentityAuthor = z.infer<typeof ScriptIdentityAuthorSchema>;
+
+export const ScriptIdentityIdSchema = z.uuid().brand<'ScriptIdentityId'>();
+export type ScriptIdentityId = z.infer<typeof ScriptIdentityIdSchema>;
+
+/** A native script's identity, as the agency reads it: the one of its current version, validated or to validate. */
+export const ScriptIdentityViewSchema = z.object({
+  id: ScriptIdentityIdSchema,
+  /** The script's, from the platform's folder (ADR 0098 § 6); `null` when nothing says it. */
+  moment: PlatformScriptMomentSchema.nullable(),
+  content: ScriptIdentityContentSchema,
+  author: ScriptIdentityAuthorSchema,
+  /** `null` until a person validated it: never used before. */
+  validatedAt: z.iso.datetime().nullable(),
+});
+export type ScriptIdentityView = z.infer<typeof ScriptIdentityViewSchema>;
+
+export const PLATFORM_SCRIPT_WARNING_CODES = ['price_more_than_double', 'price_above_ceiling'] as const;
+export const PLATFORM_SCRIPT_GAPS = [
+  'media_absent',
+  'media_not_described',
+  'identity_not_validated',
+  /** Two steps on the same platform rank: branches a human chooses between, not offered until ADR 0112. */
+  'branched_step',
+] as const;
+
+const PlatformStepMediaViewSchema = z.object({
+  ref: z.string(),
+  kind: MediaSlotKindSchema,
+  /** `false`: absent from the vault, its step is incomplete. */
+  inVault: z.boolean(),
+  mediaAssetId: z.uuid().nullable(),
+  described: z.boolean(),
+});
+
+/**
+ * `GET /v1/creators/:creatorId/platform-scripts`: her native scripts (ADR 0099 § 1 time 2), the owner and the active
+ * managers of her list; each with its price warnings, where its media stand in the vault, its identity and what keeps
+ * it from being offered.
+ */
+export const PlatformScriptViewSchema = z.object({
+  id: PlatformScriptIdSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  ref: z.string(),
+  name: z.string(),
+  moment: PlatformScriptMomentSchema.nullable(),
+  active: z.boolean(),
+  deactivatedAt: z.iso.datetime().nullable(),
+  syncedAt: z.iso.datetime(),
+  steps: z.array(
+    z.object({
+      position: z.number().int().min(0),
+      /** The platform's own rank: two steps on the same are branches (ADR 0112). */
+      platformIndex: z.number().int().min(0),
+      ref: z.string(),
+      name: z.string(),
+      text: z.string(),
+      /** Minor units, VAT included, as the platform gives it; 0 for an offered step. */
+      priceMinor: z.number().int().min(0),
+      currency: CurrencySchema,
+      media: z.array(PlatformStepMediaViewSchema),
+      previewMedia: z.array(PlatformStepMediaViewSchema),
+      complete: z.boolean(),
+    }),
+  ),
+  warnings: z.array(
+    z.object({ code: z.enum(PLATFORM_SCRIPT_WARNING_CODES), position: z.number().int().min(0) }),
+  ),
+  gaps: z.array(z.enum(PLATFORM_SCRIPT_GAPS)),
+  proposable: z.boolean(),
+  identity: ScriptIdentityViewSchema.nullable(),
+});
+export type PlatformScriptViewDto = z.infer<typeof PlatformScriptViewSchema>;
+export const PlatformScriptListSchema = z.array(PlatformScriptViewSchema);
+
+/** `POST …/platform-scripts/:scriptId/identity/validate`: the identity shown, validated as it is. */
+export const ValidateScriptIdentityBodySchema = z.strictObject({ identityId: ScriptIdentityIdSchema });
+
+/** `POST …/platform-scripts/:scriptId/identity/correct`: an identity written by hand, validated by whoever writes it. */
+export const CorrectScriptIdentityBodySchema = z.strictObject({
+  content: ScriptIdentityContentSchema.strict(),
+});

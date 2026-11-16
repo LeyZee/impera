@@ -86,8 +86,9 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
+    identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
-    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
+    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
     brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
     voice: async () => {
       await control.hold;
@@ -382,6 +383,8 @@ describe('/v1/playground', () => {
       media: [{ kind: 'image', factualDescription: 'Un selfie.', flags: ['possible_minor'] }],
     });
     expect(answer.json()).toMatchObject({ handoff: ['possible_minor'], isBlocked: true, bubbles: [] });
+    // « Nécessaire » says the handoff was right: a decision to rate, not a blocked answer (AGE-01).
+    expect((await post('/rating', { verdict: { kind: 'validated' } })).statusCode).toBe(200);
   });
 
   it('asks for the Grok key when no voice model is reachable', async () => {
