@@ -494,6 +494,10 @@ describe('Agenda, recette du 16/11', () => {
     show('day', '2026-11-06');
     // No ring at all: an empty one reads as a box to tick (Design, 16/11).
     expect(await screen.findByText('Une routine se coche le jour même.')).toBeDefined();
+    // Nor a call to start: the glance says what is planned, and why there is nothing to tick yet.
+    expect(screen.getByText('1 chose prévue')).toBeDefined();
+    expect(screen.getByText('Ta routine se coche le jour même.')).toBeDefined();
+    expect(screen.queryByText(/Commence par/u)).toBeNull();
     expect(screen.queryByRole('img', { name: /^Story du matin/u })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Cocher Story du matin' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /^Story du matin/u }));

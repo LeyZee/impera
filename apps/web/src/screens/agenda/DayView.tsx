@@ -271,7 +271,10 @@ export function Glance({
 }): JSX.Element {
   const { done, total } = progressOf(plan);
   const left = total - done;
-  const first = firstOf(plan, nowMinute);
+  // A day to come: nothing yet to do but what is dated, a routine waits for its day (Design, recette 16/11).
+  const ahead = plan.day > agenda.today;
+  const firstAny = firstOf(plan, nowMinute);
+  const first = ahead && firstAny?.task.when.kind === 'routine' ? null : firstAny;
   const proposed = plan.suggestions.length;
   // Nothing of hers but a suggestion waiting: the title says the suggestion, never « Rien à faire » (CRE-05).
   const title =
@@ -281,7 +284,9 @@ export function Glance({
         : 'Rien à faire'
       : left === 0
         ? 'Tout est fait'
-        : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
+        : ahead
+          ? `${String(left)} ${left > 1 ? 'choses prévues' : 'chose prévue'}`
+          : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
   const share = total === 0 ? 0 : done / total;
   // « Plus rien à heure » only when there was something at an hour: an empty day says it once, in the title.
   const moment = nowMinute === null || plan.timed.length === 0 ? null : momentOf(plan, nowMinute);
@@ -329,7 +334,11 @@ export function Glance({
             ) : left === 0 ? (
               `${String(done)} sur ${String(total)}, bravo.`
             ) : first === null ? (
-              `${String(done)} sur ${String(total)} fait.`
+              ahead ? (
+                'Ta routine se coche le jour même.'
+              ) : (
+                `${String(done)} sur ${String(total)} fait.`
+              )
             ) : (
               <>
                 Commence par : <Emoji category={first.task.category} />
