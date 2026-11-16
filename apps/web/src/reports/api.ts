@@ -4,6 +4,7 @@ import {
   ApiErrorSchema,
   PAY_RULES_ERROR_CODES,
   PayRulesSourceRefusalSchema,
+  REAUTHENTICATION_ERROR_CODE,
   ReportGapThresholdSchema,
   SchedulingSettingsSchema,
   SHIFT_REPORT_BATCH_MAX,
@@ -204,6 +205,12 @@ export type ReportRefusal =
 
 export type ReportOutcome<T> = { readonly kind: 'ok'; readonly value: T } | ReportRefusal;
 
+/**
+ * A write behind the recent confirmation (EQ-15, the pay rules): its refusal may also ask for the password and the
+ * code again, nothing written.
+ */
+export type GuardedOutcome<T> = ReportOutcome<T> | { readonly kind: 'reauth' };
+
 const KNOWN: ReadonlySet<string> = new Set<string>([
   ...SHIFT_REPORT_ERROR_CODES,
   ...PAY_RULES_ERROR_CODES,
@@ -219,8 +226,18 @@ const DetailsSchema = z.object({
   reason: PayRulesSourceRefusalSchema.optional().catch(undefined),
 });
 
-async function refusalOf(response: Response): Promise<ReportRefusal> {
-  const parsed = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+const refusalOf = async (response: Response): Promise<ReportRefusal> =>
+  refusalFrom(await response.json().catch(() => null));
+
+async function guardedRefusalOf(response: Response): Promise<ReportRefusal | { readonly kind: 'reauth' }> {
+  const json: unknown = await response.json().catch(() => null);
+  const parsed = ApiErrorSchema.safeParse(json);
+  if (parsed.success && parsed.data.error.code === REAUTHENTICATION_ERROR_CODE) return { kind: 'reauth' };
+  return refusalFrom(json);
+}
+
+function refusalFrom(json: unknown): ReportRefusal {
+  const parsed = ApiErrorSchema.safeParse(json);
   if (!parsed.success || !isKnown(parsed.data.error.code)) return { kind: 'failed' };
   const details = DetailsSchema.safeParse(parsed.data.error.details);
   return {
@@ -232,12 +249,20 @@ async function refusalOf(response: Response): Promise<ReportRefusal> {
   };
 }
 
-async function send<T>(
+const send = <T>(
   method: 'POST' | 'PATCH' | 'PUT',
   url: string,
   body: unknown,
   parse: (json: unknown) => T,
-): Promise<ReportOutcome<T>> {
+): Promise<ReportOutcome<T>> => write(method, url, body, parse, refusalOf);
+
+async function write<T, R>(
+  method: 'POST' | 'PATCH' | 'PUT',
+  url: string,
+  body: unknown,
+  parse: (json: unknown) => T,
+  refuse: (response: Response) => Promise<R>,
+): Promise<{ readonly kind: 'ok'; readonly value: T } | R | { readonly kind: 'failed' }> {
   try {
     const response = await fetch(url, {
       method,
@@ -247,7 +272,7 @@ async function send<T>(
       keepalive: true,
       body: JSON.stringify(body),
     });
-    if (!response.ok) return await refusalOf(response);
+    if (!response.ok) return await refuse(response);
     return { kind: 'ok', value: parse(await response.json()) };
   } catch {
     return { kind: 'failed' };
@@ -301,8 +326,8 @@ export const rejectReport = (
     ShiftReportSchema.parse(json),
   );
 
-export const addPayRules = (body: CreateAccountPayRulesBody): Promise<ReportOutcome<AccountPayRules>> =>
-  send('POST', '/v1/team/pay-rules', body, (json) => AccountPayRulesSchema.parse(json));
+export const addPayRules = (body: CreateAccountPayRulesBody): Promise<GuardedOutcome<AccountPayRules>> =>
+  write('POST', '/v1/team/pay-rules', body, (json) => AccountPayRulesSchema.parse(json), guardedRefusalOf);
 
 /** The owner's threshold, from the next comparisons on; a validation keeps the one it saw. */
 export const saveReportGap = (body: ReportGapThreshold): Promise<ReportOutcome<ReportGapThreshold>> =>

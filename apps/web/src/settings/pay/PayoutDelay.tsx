@@ -4,6 +4,7 @@ import { useId, useState, type JSX } from 'react';
 import { setPayrollSettings, usePayrollSettings, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import { payoutDelayText, payRefusalText } from '@/payroll/model';
 import '@/payroll/pay.css';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 
 /** A whole number of business days the owner may announce, or null for a typo. */
@@ -87,6 +88,7 @@ function DelayDialog({ delay, onClose }: { delay: number | null; onClose: () => 
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
+  const confirm = useConfirmAgain();
   const value = parseDelay(days);
 
   const send = async (next: number | null): Promise<void> => {
@@ -100,69 +102,81 @@ function DelayDialog({ delay, onClose }: { delay: number | null; onClose: () => 
       onClose();
       return;
     }
+    if (outcome.kind === 'reauth') {
+      confirm.ask(() => {
+        void send(next);
+      });
+      return;
+    }
     setRefusal(outcome);
   };
 
   return (
     <Dialog title="Délai de versement" lead="Annoncé à toute l’équipe" busy={busy} onClose={onClose}>
-      <form
-        className="tm-dialog__body"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          setTouched(true);
-          if (value !== null) void send(value);
-        }}
-      >
-        <div className="nv-field" data-invalid={touched && value === null ? 'true' : undefined}>
-          <label className="nv-field__label" htmlFor={`${id}-days`}>
-            Jours ouvrés après la validation
-          </label>
-          <input
-            id={`${id}-days`}
-            className="nv-field__control nv-glass nv-num"
-            inputMode="numeric"
-            autoComplete="off"
-            value={days}
-            data-autofocus
-            aria-invalid={touched && value === null}
-            onChange={(event) => {
-              setDays(event.target.value);
-            }}
-          />
-          <p className={touched && value === null ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-            {touched && value === null
-              ? `Un nombre entier de jours, de 1 à ${String(PAYOUT_DELAY_MAX_BUSINESS_DAYS)}.`
-              : 'Par exemple 3 : le lundi pour un relevé validé le mercredi d’avant.'}
-          </p>
+      {confirm.asking ? (
+        <div className="tm-dialog__body nv-swap">
+          {confirm.prompt({ lead: MONEY_LEAD, onBusyChange: setBusy })}
         </div>
-        {refusal === null ? null : (
-          <p className="tm-warn sc-refusal nv-swap" role="alert">
-            {payRefusalText(refusal, { memberName: () => 'Un membre' })}
-          </p>
-        )}
-        <div className="tm-dialog__foot">
-          {delay === null ? (
-            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-              Annuler
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain"
-              disabled={busy}
-              onClick={() => {
-                void send(null);
+      ) : (
+        <form
+          className="tm-dialog__body"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            setTouched(true);
+            if (value !== null) void send(value);
+          }}
+        >
+          <div className="nv-field" data-invalid={touched && value === null ? 'true' : undefined}>
+            <label className="nv-field__label" htmlFor={`${id}-days`}>
+              Jours ouvrés après la validation
+            </label>
+            <input
+              id={`${id}-days`}
+              className="nv-field__control nv-glass nv-num"
+              inputMode="numeric"
+              autoComplete="off"
+              value={days}
+              data-autofocus
+              aria-invalid={touched && value === null}
+              onChange={(event) => {
+                setDays(event.target.value);
               }}
-            >
-              Ne plus annoncer de délai
-            </button>
+            />
+            <p className={touched && value === null ? 'tm-hint tm-hint--error' : 'tm-hint'}>
+              {touched && value === null
+                ? `Un nombre entier de jours, de 1 à ${String(PAYOUT_DELAY_MAX_BUSINESS_DAYS)}.`
+                : 'Par exemple 3 : le lundi pour un relevé validé le mercredi d’avant.'}
+            </p>
+          </div>
+          {refusal === null ? null : (
+            <p className="tm-warn sc-refusal nv-swap" role="alert">
+              {payRefusalText(refusal, { memberName: () => 'Un membre' })}
+            </p>
           )}
-          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
-            {busy ? 'Enregistrement…' : 'Enregistrer le délai'}
-          </button>
-        </div>
-      </form>
+          <div className="tm-dialog__foot">
+            {delay === null ? (
+              <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+                Annuler
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain"
+                disabled={busy}
+                onClick={() => {
+                  void send(null);
+                }}
+              >
+                Ne plus annoncer de délai
+              </button>
+            )}
+            <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+              {busy ? 'Enregistrement…' : 'Enregistrer le délai'}
+            </button>
+          </div>
+        </form>
+      )}
     </Dialog>
   );
 }
