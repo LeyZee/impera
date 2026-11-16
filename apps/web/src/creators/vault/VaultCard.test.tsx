@@ -17,7 +17,7 @@ import { setMediaBlur } from '@/shell/media-blur';
 const CREATOR = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000c1');
 const ACCOUNT = PlatformAccountIdSchema.parse('0192f3a0-0000-7000-8000-0000000000a1');
 const media = (
-  kind: 'image' | 'video',
+  kind: VaultMediaView['kind'],
   removed = false,
   fields: Partial<VaultMediaView> = {},
 ): VaultMediaView => ({
