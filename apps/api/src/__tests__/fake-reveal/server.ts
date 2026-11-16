@@ -612,6 +612,9 @@ const SendBody = z.object({
     .optional(),
 });
 
+/** `mediaType` of `GET /models/:id/medias` → the type it keeps (`null`: every type). */
+const VAULT_MEDIA_TYPES = { All: null, Photo: 'photo', Video: 'video', Audio: 'audio' } as const;
+
 export interface FakeReveal {
   readonly app: FastifyInstance;
   /** The live state, for assertions without HTTP (same as `GET /__state`). */
@@ -1096,14 +1099,16 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
         take: Take(10),
         cursor: z.string().optional(),
         vaultFolderId: z.string().optional(),
-        mediaType: MediaTypeSchema.optional(),
+        // Required since 2026-11-15, capitalised: missing or lowercase, Reveal answers 400.
+        mediaType: z.enum(['All', 'Photo', 'Video', 'Audio']),
         memberId: z.string().optional(),
       })
       .parse(request.query);
+    const wanted = VAULT_MEDIA_TYPES[query.mediaType];
     const rows = world.state.media
       .filter((m) => m.fromFanId === null && m.folderId !== null)
       .filter((m) => query.vaultFolderId === undefined || m.folderId === query.vaultFolderId)
-      .filter((m) => query.mediaType === undefined || m.type === query.mediaType)
+      .filter((m) => wanted === null || m.type === wanted)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
     const page = pageAfter(rows, (m) => m.id, query.cursor, query.take);
     const memberId = query.memberId;

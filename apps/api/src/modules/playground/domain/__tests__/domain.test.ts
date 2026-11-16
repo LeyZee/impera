@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { guardLabel, trapLabel } from '../labels';
+import { gateMissingLabel, guardLabel, trapLabel } from '../labels';
 import { completeMedia } from '../media';
 
 describe('playground domain', () => {
@@ -22,5 +22,17 @@ describe('playground domain', () => {
       flags: ['weapon'],
     });
     expect(completeMedia({ kind: 'image', factualDescription: 'Un chat.' }).flags).toEqual([]);
+  });
+
+  it('names only what the gate still misses of his availability (ADR 0103 § 14)', () => {
+    const missing = (state: string, seen: string[]) =>
+      gateMissingLabel('availability_unconfirmed', { state, seen });
+    expect(missing('unknown', ['alone', 'at_home'])).toBe('Il n’a pas dit qu’il a du temps');
+    expect(missing('unknown', ['free_now'])).toBe('Il n’a pas dit qu’il est seul');
+    expect(missing('unknown', [])).toBe('Il n’a pas dit être seul et libre');
+    expect(missing('no', [])).toBe('Il a dit ne pas être libre');
+    expect(gateMissingLabel('not_sexualizing', { state: 'unknown', seen: [] })).toBe(
+      'Il ne sexualise pas encore lui-même',
+    );
   });
 });
