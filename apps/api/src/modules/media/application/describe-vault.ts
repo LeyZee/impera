@@ -97,7 +97,10 @@ export interface VaultDescribeDeps {
   readonly tools: Pick<FileMediaTools, 'probe'>;
   /** A vault video's MPEG-TS stream copied into an MP4 at `out`; `false` when it does not read. */
   readonly remux: (path: string, out: string) => Promise<boolean>;
-  /** The content drops' reduced picture of the file (ADR 0030 § 4), its key, or `null` when ffmpeg cannot read it. */
+  /**
+   * The content drops' reduced picture of the file (ADR 0030 § 4), its key, or `null` when ffmpeg cannot read it or no
+   * storage is set; made before the vision, so a storage that fails costs no description.
+   */
   readonly picture: (ask: {
     readonly creatorId: string;
     readonly sha256: string;
@@ -217,6 +220,14 @@ async function describeOne(
         return await toAgency();
       }
     }
+    // The picture before the vision: a storage that fails throws here, before a description is paid and then lost. Its
+    // key is the fingerprint's, so a run stopped after it (the budget, the models) writes the same picture again.
+    const thumbnailKey = await deps.picture({
+      creatorId: job.creatorId,
+      sha256,
+      path: file.path,
+      kind: ref.kind,
+    });
     const described = await deps.describer.describe({
       creatorId: job.creatorId,
       path: file.path,
@@ -231,12 +242,6 @@ async function describeOne(
       await deps.store.failed(ref.refId, 1);
       return 'models';
     }
-    const thumbnailKey = await deps.picture({
-      creatorId: job.creatorId,
-      sha256,
-      path: file.path,
-      kind: ref.kind,
-    });
     const kept = await deps.store.keep(
       job.creatorId,
       ref,

@@ -243,7 +243,12 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       scripts: (creatorId, reader) => creatorScripts(scriptReads, reader, creatorId),
       scriptSteps: (creatorId, reader, dropId) => creatorScriptSteps(scriptReads, reader, creatorId, dropId),
     },
-    picture: (ask) => pictureOf({ storage, thumbnailer: createThumbnailer(), scratchDir }, ask),
+    // No storage set (`S3_*` unset, as on a PC without one): the vault's media are kept described, without a picture.
+    picture: (ask) =>
+      pictureOf(
+        { storage: storage === NO_STORAGE ? null : storage, thumbnailer: createThumbnailer(), scratchDir },
+        ask,
+      ),
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
     scriptRequests: {
       ask: (request) => requestScript(deps.adminDb, request),

@@ -333,13 +333,15 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
     expect(await run()).toMatchObject({ stop: 'budget', described: 0 });
     expect(queued).toEqual([new Date('2027-03-01T13:00:00.000Z')]);
     expect(assets.size).toBe(0);
-    expect(stored.size).toBe(0);
+    // The first file's picture was made before the vision refused; under its fingerprint, the next run writes it again.
+    expect(stored.size).toBe(1);
     expect(await readdir(scratch)).toEqual([]);
 
     vision.answer = 'ok';
     expect(await run()).toMatchObject({ stop: 'done', described: 2 });
     expect(await run()).toMatchObject({ stop: 'done', described: 0, linked: 0 });
     expect(assets.size).toBe(2);
+    expect(stored.size).toBe(2);
     expect(seen).toHaveLength(2);
   });
 
@@ -394,7 +396,7 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
     expect(await readdir(scratch)).toEqual([]);
   });
 
-  it('removes the job’s folder when the storage of the picture fails, and keeps nothing', async () => {
+  it('removes the job’s folder when the storage of the picture fails, keeps nothing, and pays no description', async () => {
     holding(pick('image').ref.id);
     const failing = {
       ...deps(),
@@ -403,7 +405,25 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
     await expect(
       describeVault(failing, { platformAccountId: ACCOUNT, correlationId: 'test' }),
     ).rejects.toThrow('storage unavailable');
+    // The picture comes before the vision: a storage that fails costs no description lost.
+    expect(seen).toHaveLength(0);
     expect(assets.size).toBe(0);
+    expect(await readdir(scratch)).toEqual([]);
+  });
+
+  it('keeps the media described, without a picture, when no storage is set', async () => {
+    holding(pick('image').ref.id);
+    const withoutStorage = {
+      ...deps(),
+      picture: (ask: { creatorId: string; sha256: string; path: string; kind: 'image' | 'video' }) =>
+        pictureOf({ thumbnailer: createThumbnailer(), scratchDir: scratch, storage: null }, ask),
+    };
+    expect(
+      await describeVault(withoutStorage, { platformAccountId: ACCOUNT, correlationId: 'test' }),
+    ).toMatchObject({ stop: 'done', described: 1 });
+    expect([...assets.values()][0]).toMatchObject({ thumbnailKey: null });
+    expect([...assets.values()][0]?.described).not.toBeNull();
+    expect(stored.size).toBe(0);
     expect(await readdir(scratch)).toEqual([]);
   });
 
