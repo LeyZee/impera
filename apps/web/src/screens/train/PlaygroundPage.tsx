@@ -69,6 +69,8 @@ export function PlaygroundPage(): JSX.Element {
   const [shown, setShown] = useState<number | undefined>(undefined);
   /** While the voice writes: the brain's reading of his message, asked of the server as soon as it is done. */
   const [reading, setReading] = useState<PlaygroundBrief | undefined>(undefined);
+  /** His message while she answers it, shown before the server sends the conversation back. */
+  const [sent, setSent] = useState<string | undefined>(undefined);
   const [whyManual, setWhyManual] = useState<boolean | undefined>(undefined);
   /** Where the last lesson went, said until the next message. */
   const [filed, setFiled] = useState<Destination | undefined>(undefined);
@@ -188,12 +190,14 @@ export function PlaygroundPage(): JSX.Element {
     reset();
     const done = await call();
     setWriting(false);
+    setSent(undefined);
     if (done) setRevealFrom(Date.now());
     return done;
   };
 
   const send = (text: string, media: PlaygroundMedia[]): Promise<boolean> => {
     setFiled(undefined);
+    setSent(text);
     return answerTo(() => pg.run((c) => c.send(text, media)));
   };
   const replay = (n: number): void => {
@@ -353,6 +357,7 @@ export function PlaygroundPage(): JSX.Element {
           writing={writing}
           revealing={revealing}
           reading={reading}
+          sent={sent}
           error={pg.error === undefined ? undefined : ERRORS[pg.error]}
           errorTone={pg.error === 'llm_unavailable' ? 'warn' : 'bad'}
           lesson={lesson?.verdict}

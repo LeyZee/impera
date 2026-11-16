@@ -186,6 +186,9 @@ describe('Playground', () => {
     fireEvent.keyDown(box, { key: 'Enter' });
     expect(await screen.findByText('Elle a lu :', undefined, { timeout: 3000 })).toBeTruthy();
     expect(screen.getByText('écrit…')).toBeTruthy();
+    // His message leaves the box as he sends it and shows in the thread, before the server sends it back.
+    expect(screen.getByText('T’es trop belle')).toBeTruthy();
+    expect(box).toHaveProperty('value', '');
   });
 
   it('names the fan by his first name only, without repeating the fan type in the header', async () => {

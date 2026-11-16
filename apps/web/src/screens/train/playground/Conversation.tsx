@@ -43,6 +43,8 @@ export interface ConversationProps {
   readonly revealing?: number | undefined;
   /** While the voice writes: the brain's reading of his message, already done. */
   readonly reading?: PlaygroundBrief | undefined;
+  /** His message while she answers it: shown as soon as he sends it, as a fan sees his own message leave. */
+  readonly sent?: string | undefined;
   readonly error: string | undefined;
   /** A missing setting (no key) is a warning, amber; a failure stays red. */
   readonly errorTone: 'warn' | 'bad';
@@ -123,6 +125,15 @@ export function Conversation(props: ConversationProps): JSX.Element {
         })}
         {pending !== null && draftAt === -1 ? (
           <Draft answer={pending} text={pending.bubbles.join('\n')} {...props} />
+        ) : null}
+        {writing && props.sent !== undefined && props.sent !== '' ? (
+          <div className="pg-m pg-m--fan">
+            {bubblesOf(props.sent).map((line, i) => (
+              <div key={i} className="nv-bubble nv-bubble--fan">
+                {line}
+              </div>
+            ))}
+          </div>
         ) : null}
         {writing && props.reading !== undefined ? (
           <p className="pg-reading">
@@ -618,9 +629,13 @@ export function Composer({
 
   const send = async (): Promise<void> => {
     if (!ready) return;
-    // The message is cleared once it is sent: a failed send keeps it, ready to go again.
-    if (!(await onSend(text.trim(), media))) return;
+    // The message leaves the box as it is sent, as in any chat: a failed send puts it back, ready to go again.
+    const sent = text;
     setText('');
+    if (!(await onSend(sent.trim(), media))) {
+      setText(sent);
+      return;
+    }
     setDescribed('');
     setAttachOpen(false);
   };
