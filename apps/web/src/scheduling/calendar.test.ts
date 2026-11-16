@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 
 import {
+  myPlanningSearch,
   agentRowLabel,
   agentSlotLabel,
   calendarRows,
   cellAgentWords,
   cellWho,
+  cellWhoParts,
   dayWords,
   monthMarks,
   monthMarksKey,
@@ -249,7 +251,7 @@ describe('monthMarks', () => {
       agent: [agentOf('auto', [[1080, 1440]])],
     });
     const now = at(0, '2026-11-01');
-    expect(monthMarks(cellsOf(calendar, now), new Date(now))).toEqual([
+    expect(monthMarks(cellsOf(calendar, now))).toEqual([
       { kind: 'gap', ahead: true },
       { kind: 'shift', memberId: KOFI },
       { kind: 'gap', ahead: true },
@@ -257,7 +259,7 @@ describe('monthMarks', () => {
     ]);
     // Past créneaux are no longer gaps to fill.
     const later = at(0, '2026-11-05');
-    expect(monthMarks(cellsOf(calendar, later), new Date(later))[0]).toEqual({ kind: 'gap', ahead: false });
+    expect(monthMarks(cellsOf(calendar, later))[0]).toEqual({ kind: 'gap', ahead: false });
   });
 
   it('leaves nothing free on an archived creator, ahead or not: her row is her history (ADR 0071 § 2)', () => {
@@ -268,7 +270,7 @@ describe('monthMarks', () => {
     const now = new Date(at(0, '2026-11-01'));
     const cells = cellsOf(calendar, now.toISOString());
     expect(cells.map((cell) => cell.closed)).toEqual([true, true, true, true]);
-    expect(monthMarks(cells, now)).toEqual([
+    expect(monthMarks(cells)).toEqual([
       { kind: 'gap', ahead: false },
       { kind: 'shift', memberId: KOFI },
       { kind: 'gap', ahead: false },
@@ -277,7 +279,7 @@ describe('monthMarks', () => {
     const members = new Map(calendar.members.map((member) => [member.id, member]));
     expect(cells[0] === undefined ? null : cellWho(cells[0], members, null, PARIS, now)).toBe('personne');
     const rows = calendarRows(calendar, [DAY], now);
-    expect(dayWords(rows, DAY, null, now, true).said).toBe('1 shift');
+    expect(dayWords(rows, DAY, null, true).said).toBe('1 shift');
   });
 
   it('shows an archived creator on the days of her shifts alone, any other creator every day (ADR 0071 § 2)', () => {
@@ -297,6 +299,179 @@ describe('monthMarks', () => {
   });
 });
 
+describe('the agency’s month, as its week (recette EQU-01, EQU-02)', () => {
+  const ACCOUNT = id(31);
+  const BEFORE = new Date(at(0, '2026-11-01'));
+  /** A créneau the server counts to fill, `open` its stretches (minutes of the day) ahead with a place free. */
+  const slot = (start: number, open: [number, number][], seats: 1 | 2 = 1, places = 1) => ({
+    platformAccountId: ACCOUNT,
+    creatorId: INES,
+    startsAt: at(start),
+    endsAt: at(start + 360),
+    seats,
+    places,
+    open: open.map(([from, to]) => ({ startsAt: at(from), endsAt: at(to) })),
+  });
+  const wholeDay = [0, 360, 720, 1080].map((start) => slot(start, [[start, start + 360]]));
+  const agencyOf = (
+    patch: Partial<z.input<typeof CalendarSchema>>,
+    toFill: ReturnType<typeof slot>[],
+  ): Calendar =>
+    calendarOf({
+      view: 'agency',
+      agency: { accounts: [], toFill, aiAlone: [], workload: [], coverage: [] },
+      ...patch,
+    });
+  const read = (calendar: Calendar, now: Date = BEFORE) => {
+    const cells = cellsOf(calendar, now.toISOString());
+    const members = new Map(calendar.members.map((member) => [member.id, member]));
+    return {
+      cells,
+      marks: monthMarks(cells),
+      who: cells.map((cell) => words(cellWho(cell, members, null, PARIS, now, true))),
+      said: dayWords(calendarRows(calendar, [DAY], now), DAY, null, true).said,
+    };
+  };
+
+  it('reads a suspended member’s shift « suspendu » and its créneau to fill, marks and words alike', () => {
+    const calendar = agencyOf(
+      {
+        shifts: [{ memberId: KOFI, creatorId: INES, startsAt: at(720), endsAt: at(1080) }],
+        away: [{ memberId: KOFI, status: 'suspended' }],
+      },
+      wholeDay,
+    );
+    const { cells, marks, who, said } = read(calendar);
+    expect(cells.map((cell) => cell.held)).toEqual([false, false, false, false]);
+    expect(marks).toEqual([0, 1, 2, 3].map(() => ({ kind: 'gap', ahead: true })));
+    expect(who).toEqual([
+      'à pourvoir',
+      'à pourvoir',
+      'Kofi, 12 h – 18 h, suspendu ; à pourvoir',
+      'à pourvoir',
+    ]);
+    expect(said).toBe('1 shift, 4 créneaux à pourvoir');
+  });
+
+  it('reads « sans accès » a shift on a creator taken off its member’s list', () => {
+    const calendar = agencyOf(
+      {
+        shifts: [{ memberId: KOFI, creatorId: INES, startsAt: at(720), endsAt: at(1080) }],
+        withoutAccess: [{ memberId: KOFI, creatorId: INES }],
+      },
+      wholeDay,
+    );
+    const { cells, marks, who } = read(calendar);
+    expect(marks[2]).toEqual({ kind: 'gap', ahead: true });
+    expect(who[2]).toBe('Kofi, 12 h – 18 h, sans accès ; à pourvoir');
+    // The day's detail marks the status alone, in amber as the week does (Design, 16/11).
+    const members = new Map(calendar.members.map((member) => [member.id, member]));
+    const cell = cells[2];
+    const parts = cell === undefined ? [] : cellWhoParts(cell, members, null, PARIS, BEFORE, true);
+    expect(parts.map((part) => ({ ...part, text: words(part.text) }))).toEqual([
+      { text: 'Kofi, 12 h – 18 h', unheld: false },
+      { text: ', ', unheld: false },
+      { text: 'sans accès', unheld: true },
+      { text: ' ; à pourvoir', unheld: false },
+    ]);
+  });
+
+  it('keeps a shift gone by as it was planned, whoever left since; the one under way is unheld from now', () => {
+    // Kofi suspended at 15 h: his morning was held, his afternoon is to fill from now on.
+    const now = new Date(at(900));
+    const calendar = agencyOf(
+      {
+        shifts: [
+          { memberId: KOFI, creatorId: INES, startsAt: at(360), endsAt: at(720) },
+          { memberId: KOFI, creatorId: INES, startsAt: at(720), endsAt: at(1080) },
+        ],
+        away: [{ memberId: KOFI, status: 'suspended' }],
+      },
+      [slot(720, [[901, 1080]]), slot(1080, [[1080, 1440]])],
+    );
+    const { cells, marks, who } = read(calendar, now);
+    expect(cells.map((cell) => cell.held)).toEqual([false, true, false, false]);
+    expect(marks[1]).toEqual({ kind: 'shift', memberId: KOFI });
+    expect(marks[2]).toEqual({ kind: 'gap', ahead: true });
+    expect(who[1]).toBe('Kofi, 6 h – 12 h');
+    expect(who[2]).toMatch(/^Kofi, 12 h – 18 h, suspendu ; à pourvoir/u);
+  });
+
+  it('says the hole of a créneau held in part, with its hours, and a second place or two', () => {
+    // Ada 8 h – 14 h: 6 h – 8 h and 14 h – 18 h are left; the evening wants two chatters, Kofi holds one.
+    const calendar = agencyOf(
+      {
+        shifts: [
+          { memberId: ADA, creatorId: INES, startsAt: at(480), endsAt: at(840) },
+          { memberId: KOFI, creatorId: INES, startsAt: at(1080), endsAt: at(1440) },
+        ],
+      },
+      [
+        slot(0, [[0, 360]], 2, 2),
+        slot(360, [[360, 480]]),
+        slot(720, [[840, 1080]]),
+        slot(1080, [[1080, 1440]], 2),
+      ],
+    );
+    const { marks, who, said } = read(calendar);
+    expect(marks.map((mark) => mark.kind)).toEqual(['gap', 'shift', 'shift', 'shift']);
+    expect(who).toEqual([
+      'à pourvoir, 2 places',
+      'Ada, 8 h – 14 h ; à pourvoir de 6 h à 8 h',
+      'Ada, 8 h – 14 h ; à pourvoir de 14 h à 18 h',
+      'Kofi, 18 h – 0 h ; 2e chatteur à pourvoir',
+    ]);
+    expect(said).toBe('2 shifts, 4 créneaux à pourvoir');
+  });
+
+  it('cuts what is left to fill at the minute under way, and drops a hole gone by', () => {
+    // 13 h 20: the server read the afternoon whole a moment ago; its first stretch, 12 h – 13 h, has gone by.
+    const now = new Date(at(800));
+    const calendar = agencyOf(
+      { shifts: [{ memberId: ADA, creatorId: INES, startsAt: at(1080), endsAt: at(1440) }] },
+      [slot(720, [[720, 780]])],
+    );
+    const { who, said } = read(calendar, now);
+    expect(who[2]).toBe('personne');
+    expect(said).toBe('1 shift');
+    const whole = agencyOf({}, [slot(720, [[790, 1080]])]);
+    expect(read(whole, now).who[2]).toBe('à pourvoir');
+  });
+
+  it('never says « à pourvoir » to a member, who reads a créneau free and a colleague’s status nowhere', () => {
+    const calendar = calendarOf({
+      shifts: [{ memberId: KOFI, creatorId: INES, startsAt: at(720), endsAt: at(1080) }],
+    });
+    const cells = cellsOf(calendar, BEFORE.toISOString());
+    const members = new Map(calendar.members.map((member) => [member.id, member]));
+    expect(cells.map((cell) => words(cellWho(cell, members, null, PARIS, BEFORE)))).toEqual([
+      'libre',
+      'libre',
+      'Kofi, 12 h – 18 h',
+      'libre',
+    ]);
+    expect(dayWords(calendarRows(calendar, [DAY], BEFORE), DAY, null).said).toBe(
+      '1 shift, 3 créneaux libres',
+    );
+  });
+});
+
 function never(): never {
   throw new Error('missing');
 }
+
+describe('myPlanningSearch (recette CHT-06)', () => {
+  it('says each of its keys, undefined when the link is broken, so the raw value never reaches the page', () => {
+    const search = myPlanningSearch({ semaine: 'abc', vue: 'autre', affichage: 'an', mois: '2026-13' });
+    expect(Object.keys(search).toSorted()).toEqual(['affichage', 'mois', 'semaine', 'vue']);
+    expect(Object.values(search)).toEqual([undefined, undefined, undefined, undefined]);
+  });
+
+  it('keeps a real day as its week’s Monday, and never a member', () => {
+    expect(
+      myPlanningSearch({ semaine: '2026-11-18', membre: '01a1e1bc-63b4-74fe-bd42-ccd56ee17942' }),
+    ).toEqual({
+      semaine: '2026-11-16',
+    });
+  });
+});

@@ -315,6 +315,19 @@ describe('the form of the file', () => {
       businessId: '732 829 321',
     };
     expect(profileProblems(french, 'FR', false).businessId).toMatch(/n’en est pas un/u);
+    // Recette 16/11, CHT-23: an empty field asks for the number, nine zeros are no SIREN, an emoji is no name.
+    expect(profileProblems({ ...french, businessId: ' ' }, 'FR', false).businessId).toBe(
+      'Indique ton SIREN (9 chiffres) ou ton SIRET (14 chiffres).',
+    );
+    expect(profileProblems({ ...french, businessId: '000 000 000' }, 'FR', false).businessId).toMatch(
+      /n’en est pas un/u,
+    );
+    expect(profileProblems({ ...french, legalName: 'Basile 🎉' }, 'FR', false).legalName).toBe(
+      'Sans emoji ni pictogramme : ce nom s’imprime sur tes factures.',
+    );
+    expect(profileProblems({ ...french, legalName: 'Basile 🎉' }, 'FR', false).businessId).toMatch(
+      /n’en est pas un/u,
+    );
     const valid = { ...french, businessId: '732 829 320', vatNumber: 'FR00732829320' };
     expect(profileProblems(valid, 'FR', false).vatNumber).toBe(
       'Le numéro de TVA de ce SIREN est FR44732829320 : vérifie l’un ou l’autre.',
