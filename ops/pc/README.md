@@ -34,7 +34,7 @@ Le CRM construit écoute comme avant sur cette machine seule : le site sur http:
    }
    ```
 
-   Le programme lance cette commande telle quelle, sans interpréteur entre deux, et la tient pour réussie si elle se termine avec le code 0 dans le temps donné (30 minutes par défaut, 240 au plus). Un champ inconnu ou mal écrit est refusé et le dit dans la fenêtre. Sans ce fichier, ou tant que ta sauvegarde échoue, une mise à jour qui apporte des migrations attend (ambre) ; les autres passent.
+   `command` doit être un programme `.exe` (comme `powershell.exe`) : un `.cmd` ou un `.bat` ne se lance pas sans interpréteur, et la sauvegarde serait alors tenue pour échouée (ambre, sans danger). Le programme lance cette commande telle quelle, sans interpréteur entre deux, et la tient pour réussie si elle se termine avec le code 0 dans le temps donné (30 minutes par défaut, 240 au plus). Un champ inconnu ou mal écrit est refusé et le dit dans la fenêtre. Sans ce fichier, ou tant que ta sauvegarde échoue, une mise à jour qui apporte des migrations attend (ambre) ; les autres passent.
 4. Double-clique **`Installer le démarrage automatique.cmd`** (dans ce dossier) : il crée la tâche planifiée « Démarrer Impera » à ton ouverture de session, pour ton compte seul, sans droit d'administrateur. Si Windows refuse la tâche, il pose un raccourci dans ton dossier Démarrage à la place. Tu peux le relancer : la tâche est remplacée, jamais doublée.
 5. Fais un raccourci de **`Démarrer Impera.cmd`** sur ton Bureau (clic droit › Envoyer vers › Bureau) pour relancer à la main.
 
@@ -42,6 +42,7 @@ Le CRM construit écoute comme avant sur cette machine seule : le site sur http:
 
 - Une fenêtre « Impera » s'ouvre à ta session et le CRM y tourne. **Pour l'arrêter proprement : Ctrl+C dans cette fenêtre** (le worker finit ses tâches en cours). Fermer la fenêtre par la croix coupe sans attendre le worker.
 - Double-cliquer le raccourci alors qu'Impera tourne déjà ne fait rien de plus (« Impera tourne déjà »).
+- Si la fenêtre a été coupée net, l'API s'arrête seule en perdant son superviseur. Dans un cas rare, Windows redonne le numéro du programme coupé à un autre programme, et « Impera tourne déjà » s'affiche à tort : supprime alors `ops/pc/local/running.lock` et relance.
 - La fenêtre dit à la fin du démarrage « Mis à jour le … », « Mise à jour échouée, version précédente », ou ce qui retient la mise à jour.
 
 ## Les fichiers du programme

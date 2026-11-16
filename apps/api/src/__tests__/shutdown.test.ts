@@ -9,15 +9,21 @@ import { LogSink } from './support/log-sink';
 function fakeProcess(): ProcessSignals & {
   readonly signal: (name: 'SIGTERM' | 'SIGINT') => void;
   readonly askToStop: () => void;
+  readonly loseParent: () => void;
   readonly codes: number[];
 } {
   const listeners = new Map<string, (signal: NodeJS.Signals) => void>();
   const stopListeners: (() => void)[] = [];
+  const goneListeners: (() => void)[] = [];
   const codes: number[] = [];
   return {
     once: (name, listener) => listeners.set(name, listener),
     exit: (code) => codes.push(code),
     onStopMessage: (listener) => stopListeners.push(listener),
+    onParentGone: (listener) => goneListeners.push(listener),
+    loseParent: () => {
+      for (const listener of goneListeners) listener();
+    },
     askToStop: () => {
       for (const listener of stopListeners) listener();
     },
@@ -81,5 +87,20 @@ describe('graceful exit (operations.md)', () => {
     await settled();
     expect([stopped, host.codes]).toEqual([['server', 'worker'], [0]]);
     expect(sink.lines[0]).toMatchObject({ msg: 'shutting down', signal: 'stop-message' });
+  });
+
+  it('stops the same way when the supervisor dies without asking: its channel closes (ADR 0125)', async () => {
+    const host = fakeProcess();
+    const sink = new LogSink();
+    const graceful = exitGracefully(createLogger({ LOG_LEVEL: 'info' }, sink), host);
+    const stopped: string[] = [];
+    graceful.stopWith(() => {
+      stopped.push('server', 'worker');
+      return Promise.resolve();
+    });
+    host.loseParent();
+    await settled();
+    expect([stopped, host.codes]).toEqual([['server', 'worker'], [0]]);
+    expect(sink.lines[0]).toMatchObject({ msg: 'shutting down', signal: 'parent-gone' });
   });
 });

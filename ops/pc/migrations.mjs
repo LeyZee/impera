@@ -31,13 +31,21 @@ const DESTRUCTIVE = [
  * The migration tags of a Drizzle journal, in order. Throws on anything else than the journal's own shape: a journal
  * the program cannot read stops the update, it never guesses.
  */
+const TAG = /^[0-9]{4}_[a-z0-9_]+$/;
+
 export function journalTags(text) {
   const journal = JSON.parse(text);
   if (journal === null || typeof journal !== 'object' || !Array.isArray(journal.entries)) {
     throw new Error('journal des migrations illisible');
   }
   return journal.entries.map((entry) => {
-    if (entry === null || typeof entry !== 'object' || typeof entry.tag !== 'string' || entry.tag === '') {
+    // A tag goes into journal.log and a file path: only Drizzle's own shape is read.
+    if (
+      entry === null ||
+      typeof entry !== 'object' ||
+      typeof entry.tag !== 'string' ||
+      !TAG.test(entry.tag)
+    ) {
       throw new Error('journal des migrations illisible');
     }
     return entry.tag;

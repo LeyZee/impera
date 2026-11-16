@@ -14,6 +14,8 @@ test('reads the tags of a Drizzle journal, and refuses anything else', () => {
   assert.deepEqual(journalTags(text), ['0000_core', '0001_more']);
   assert.throws(() => journalTags('{}'));
   assert.throws(() => journalTags(JSON.stringify({ entries: [{ idx: 0 }] })));
+  assert.throws(() => journalTags(JSON.stringify({ entries: [{ tag: '../0001_more' }] })));
+  assert.throws(() => journalTags(JSON.stringify({ entries: [{ tag: '0001_More' }] })));
 });
 
 test('the migrations a commit adds, even several days late at once', () => {

@@ -14,6 +14,8 @@ export interface ProcessSignals {
   readonly exit: (code: number) => void;
   /** Calls `listener` when the parent asks for the stop over the IPC channel, if the process has one. */
   readonly onStopMessage: (listener: () => void) => unknown;
+  /** Calls `listener` when the parent's IPC channel closes (the supervisor died without asking), if there is one. */
+  readonly onParentGone: (listener: () => void) => unknown;
 }
 
 /**
@@ -31,6 +33,11 @@ const NODE_PROCESS: ProcessSignals = {
     process.on('message', (message: unknown) => {
       if (message === STOP_MESSAGE) listener();
     });
+  },
+  onParentGone: (listener) => {
+    // A supervisor killed outright (window closed, task ended) leaves no one to stop the API: it stops itself.
+    if (process.send === undefined) return;
+    process.once('disconnect', listener);
   },
 };
 
@@ -59,7 +66,7 @@ export function exitGracefully(logger: Logger, host: ProcessSignals = NODE_PROCE
       },
     );
   };
-  const onSignal = (signal: NodeJS.Signals | 'stop-message'): void => {
+  const onSignal = (signal: NodeJS.Signals | 'stop-message' | 'parent-gone'): void => {
     if (signalled) return;
     signalled = true;
     logger.info({ signal }, 'shutting down');
@@ -73,6 +80,9 @@ export function exitGracefully(logger: Logger, host: ProcessSignals = NODE_PROCE
   host.once('SIGINT', onSignal);
   host.onStopMessage(() => {
     onSignal('stop-message');
+  });
+  host.onParentGone(() => {
+    onSignal('parent-gone');
   });
   return {
     stopWith: (given) => {
