@@ -120,9 +120,24 @@
   font-variant-numeric: tabular-nums;
 }
 .tc-level {
-  margin: 12px 0 0;
-  color: var(--nv-ink-faint);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 0;
+  color: var(--nv-ink-muted);
   font-size: 13px;
+  text-align: left;
+}
+.tc-level__art {
+  flex: none;
+  display: grid;
+}
+.tc-case__empty {
+  margin: 0;
+  padding: 18px 12px 26px;
+  color: var(--nv-ink-faint);
+  font-size: 14px;
+  text-align: center;
 }
 
 /* The shelves */
@@ -445,6 +460,9 @@
   }
   .tc-hero__pct {
     font-size: 36px;
+  }
+  .tc-level {
+    justify-content: center;
   }
   .tc-chips {
     justify-content: center;
