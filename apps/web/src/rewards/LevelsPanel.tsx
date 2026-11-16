@@ -100,11 +100,8 @@ export function LevelsPanel(): JSX.Element | null {
         </ul>
         <p className="py-quiet">
           {thresholdsMinor.length === 0
-            ? 'Sans seuil, aucun nouveau rang ne s’ouvre ; un rang déjà gagné reste. '
-            : 'Un rang sans seuil reste fermé. '}
-          Un rang est honorifique : il ne change ni un taux, ni un palier, ni la paie. Il suit le net du
-          chatteur : une vente remboursée ou un rapport corrigé peut le faire redescendre, pas un changement
-          de seuil.
+            ? 'Sans seuil, aucun nouveau rang ne s’ouvre ; un rang déjà gagné reste.'
+            : 'Un rang sans seuil reste fermé. Honorifique : ni taux, ni palier, ni paie.'}
         </p>
       </div>
       {editing ? (
@@ -188,7 +185,7 @@ function LevelsDialog({ settings, onClose }: { settings: LevelSettings; onClose:
         <p className={fault === null ? 'tm-hint' : 'tm-hint tm-hint--error'}>
           {fault !== null
             ? FAULT_TEXT[fault.cause]
-            : 'Le seuil est compris. Laisse vides les rangs du haut pour les garder fermés. Monter ou vider un seuil ne reprend pas un rang déjà gagné.'}
+            : 'Le seuil est compris. Laisse vides les rangs du haut pour les garder fermés. Monter ou vider un seuil ne reprend pas un rang déjà gagné. Un rang suit le net du chatteur : une vente remboursée ou un rapport corrigé peut le faire redescendre.'}
         </p>
         {failed ? (
           <p className="tm-warn nv-swap" role="alert">

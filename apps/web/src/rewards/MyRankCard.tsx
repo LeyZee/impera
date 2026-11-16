@@ -40,7 +40,7 @@ export function MyRankCard({ user }: { user: Me }): JSX.Element | null {
           ) : (
             <>
               <p className="rw-rank__next nv-num">
-                {level === null ? 'Premier rang' : 'Rang suivant'} : <b>{nextLevel.name}</b> à{' '}
+                {level === null ? 'Premier rang' : 'Rang suivant'}&nbsp;: <b>{nextLevel.name}</b> à{' '}
                 {amountText(nextLevel.thresholdMinor, nextLevel.currency)} de net cumulé
               </p>
               <div
@@ -55,9 +55,9 @@ export function MyRankCard({ user }: { user: Me }): JSX.Element | null {
                 <span className="nv-gauge__fill" />
               </div>
               <p className="rw-rank__note nv-num">
-                {amountText(nextLevel.currentMinor, nextLevel.currency)} à ce jour. Un rang est honorifique :
-                il ne change ni ton taux ni ta paie. Il suit ton net cumulé : si une vente est remboursée ou
-                un rapport corrigé, il peut redescendre.
+                {amountText(nextLevel.currentMinor, nextLevel.currency)} de net à ce jour. Honorifique&nbsp;:
+                ni ton taux ni ta paie n’en dépendent. Il redescend si une vente est remboursée ou un rapport
+                corrigé.
               </p>
             </>
           )}
