@@ -6,7 +6,15 @@ import {
   type PlatformScriptGap,
   type PlatformScriptWarning,
 } from '../domain/platform-scripts';
-import type { PlatformScriptReadStore, StoredPlatformScript, StoredStepMedia } from '../domain/ports';
+import type {
+  IdentityReview,
+  PlatformScriptReadStore,
+  ScriptIdentityReviewStore,
+  StoredPlatformScript,
+  StoredScriptIdentity,
+  StoredStepMedia,
+} from '../domain/ports';
+import { currentIdentity, identityInputHash, type IdentitySource } from '../domain/script-identity';
 
 /** Who reads her native scripts: the owner and the team; the store then keeps the team's scope and her RLS. */
 export interface PlatformScriptsReader {
@@ -27,6 +35,8 @@ interface PlatformStepMediaView {
 
 interface PlatformStepView {
   readonly position: number;
+  /** The platform's own rank: two steps on the same are branches (ADR 0112). */
+  readonly platformIndex: number;
   /** What `sendScriptStep` names. */
   readonly ref: string;
   readonly name: string;
@@ -41,23 +51,46 @@ interface PlatformStepView {
 }
 
 /** A native script of hers, with what the agency should look at and why it cannot be offered yet. */
-export interface PlatformScriptView extends Omit<StoredPlatformScript, 'steps'> {
+export interface PlatformScriptView extends Omit<StoredPlatformScript, 'steps' | 'identities'> {
   readonly steps: readonly PlatformStepView[];
   readonly warnings: readonly PlatformScriptWarning[];
   readonly gaps: readonly PlatformScriptGap[];
   /** Active, and nothing in `gaps`: the agent may offer it for sale. */
   readonly proposable: boolean;
+  /**
+   * The identity of its current version (SC-04 lot c8): the latest validated, else the latest written, to validate;
+   * `null` while none was written for this version.
+   */
+  readonly identity: StoredScriptIdentity | null;
 }
 
 interface Deps {
   readonly store: PlatformScriptReadStore;
 }
 
-/**
- * Not yet: the script's identity (SC-04 lot c8) is not built, so no native script is proposable for sale until it is.
- * A reward (ADR 0111) does not ask it.
- */
-const IDENTITY_VALIDATED = false;
+/** What the identity of a script is written from, as the base keeps it now (`identityInputHash`). */
+export function identitySourceOf(script: StoredPlatformScript): IdentitySource {
+  const media = (each: StoredStepMedia) => ({
+    ref: each.ref,
+    kind: each.kind,
+    descriptionId: each.vault?.descriptionId ?? null,
+  });
+  return {
+    name: script.name,
+    steps: script.steps.map((step) => ({
+      platformIndex: step.platformIndex,
+      name: step.name,
+      text: step.text,
+      media: step.media.map(media),
+      previewMedia: step.previewMedia.map(media),
+    })),
+  };
+}
+
+/** The version of the script as it is now, for its identity. */
+function currentInputHash(script: StoredPlatformScript): string {
+  return identityInputHash(identitySourceOf(script));
+}
 
 function viewOf(script: StoredPlatformScript): PlatformScriptView {
   const mediaView = (media: StoredStepMedia): PlatformStepMediaView => ({
@@ -65,7 +98,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     kind: media.kind,
     inVault: media.vault !== null,
     mediaAssetId: media.vault?.mediaAssetId ?? null,
-    described: media.vault?.described ?? false,
+    described: (media.vault?.descriptionId ?? null) !== null,
   });
   const steps = script.steps.map((step): PlatformStepView => {
     const media = step.media.map(mediaView);
@@ -77,16 +110,29 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
       complete: [...media, ...previewMedia].every((each) => each.inVault),
     };
   });
+  const identity = currentIdentity(script.identities, currentInputHash(script));
   const gaps = platformScriptGaps(
-    steps.map((step) => ({ media: [...step.media, ...step.previewMedia] })),
-    IDENTITY_VALIDATED,
+    steps.map((step) => ({
+      platformIndex: step.platformIndex,
+      media: [...step.media, ...step.previewMedia],
+    })),
+    identity?.validatedAt != null,
   );
   return {
-    ...script,
+    id: script.id,
+    creatorId: script.creatorId,
+    platformAccountId: script.platformAccountId,
+    ref: script.ref,
+    name: script.name,
+    moment: script.moment,
+    active: script.active,
+    deactivatedAt: script.deactivatedAt,
+    syncedAt: script.syncedAt,
     steps,
     warnings: priceWarnings(script.steps),
     gaps,
     proposable: script.active && gaps.length === 0,
+    identity,
   };
 }
 
@@ -115,4 +161,19 @@ export async function platformScriptForJob(
 ): Promise<PlatformScriptView | null> {
   const script = await deps.store.oneForJob(creatorId, scriptId);
   return script === null ? null : viewOf(script);
+}
+
+/**
+ * The agency validates the identity shown for the script's current version, or writes one by hand (SC-04 lot c8, ADR
+ * 0030 § 3): the owner and the active managers of her list. An identity of another version is `stale`.
+ */
+export async function reviewScriptIdentity(
+  deps: { readonly store: ScriptIdentityReviewStore },
+  reader: PlatformScriptsReader,
+  creatorId: CreatorId,
+  scriptId: string,
+  review: IdentityReview,
+): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'> {
+  if (reader.role !== 'owner' && reader.role !== 'operator') return 'not_found';
+  return deps.store.review(creatorId, scriptId, review, reader.userId, currentInputHash);
 }

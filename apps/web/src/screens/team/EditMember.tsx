@@ -34,6 +34,7 @@ import { MEMBER_PALETTE, shadeOf } from './palette';
 
 import { usePlanning } from '@/scheduling/api';
 import { useAgencyToday } from '@/screens/pay/data';
+import { MEMBER_LEAD, MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
 
@@ -42,13 +43,19 @@ import { Select } from '@/shell/Select';
  * 16th; their status, « Parti » after a confirmation. Each panel writes one thing and the server checks it.
  */
 
-/** A write that reads the team again when it lands, and words a refusal. */
-function useWrite(): {
+/**
+ * A write that reads the team again when it lands, and words a refusal. A write the server sends back for want of a
+ * recent confirmation (EQ-15) waits in `prompt` for the password and the code, then is sent again; it ends `false`
+ * when the prompt is cancelled, nothing written.
+ */
+function useWrite(lead: string): {
   busy: boolean;
   problem: string | null;
+  prompt: JSX.Element | null;
   run: <T>(write: () => Promise<Outcome<T>>) => Promise<boolean>;
 } {
   const client = useQueryClient();
+  const confirm = useConfirmAgain();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const run = async <T,>(write: () => Promise<Outcome<T>>): Promise<boolean> => {
@@ -56,6 +63,18 @@ function useWrite(): {
     setProblem(null);
     const outcome = await write();
     setBusy(false);
+    if (outcome.kind === 'reauth') {
+      return new Promise<boolean>((resolve) => {
+        confirm.ask(
+          () => {
+            void run(write).then(resolve);
+          },
+          () => {
+            resolve(false);
+          },
+        );
+      });
+    }
     if (outcome.kind === 'ok') {
       // A departure ends a removal alert too (ADR 0076 § 5): the server no longer lists a member who left.
       await Promise.all([
@@ -71,7 +90,7 @@ function useWrite(): {
     );
     return false;
   };
-  return { busy, problem, run };
+  return { busy, problem, prompt: confirm.prompt({ lead, onBusyChange: setBusy }), run };
 }
 
 function Foot({
@@ -124,7 +143,7 @@ export function EditMemberPanel({
   onClose: () => void;
 }): JSX.Element {
   const id = useId();
-  const { busy, problem, run } = useWrite();
+  const { busy, problem, prompt, run } = useWrite(MEMBER_LEAD);
   const [displayName, setDisplayName] = useState(member.displayName);
   const [color, setColor] = useState(member.color);
   const [creatorIds, setCreatorIds] = useState<readonly string[]>(member.creatorIds);
@@ -142,69 +161,73 @@ export function EditMemberPanel({
 
   return (
     <Dialog title={`Modifier ${member.displayName}`} busy={busy} onClose={onClose}>
-      <form
-        className="tm-dialog__body"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!ready) return;
-          const change = body.data;
-          void run(() => updateMember(member.id, change)).then((done) => {
-            if (done) onClose();
-          });
-        }}
-      >
-        <div className="nv-field tm-field" data-invalid={name === '' ? 'true' : undefined}>
-          <label className="nv-field__label" htmlFor={`${id}-name`}>
-            Nom dans l’équipe
-          </label>
-          <input
-            id={`${id}-name`}
-            className="nv-field__control nv-glass"
-            value={displayName}
-            maxLength={80}
-            autoComplete="off"
-            data-autofocus
-            aria-invalid={name === ''}
-            onChange={(event) => {
-              setDisplayName(event.target.value);
-            }}
-          />
-          <span className={name === '' ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-            {name === '' ? 'Indique le nom que voit l’équipe.' : 'Celui du planning et des passations.'}
-          </span>
-        </div>
-        <ShadePicker name={`${id}-color`} saved={member.color} color={color} onChange={setColor} />
-        <div className="nv-field tm-field">
-          <span className="nv-field__label">Créatrices</span>
-          {creators.length === 0 ? (
-            <span className="tm-hint">Aucune créatrice pour l’instant.</span>
-          ) : (
-            <div className="tm-choices" role="group" aria-label="Créatrices">
-              {creators.map((creator) => {
-                const on = creatorIds.includes(creator.id);
-                return (
-                  <button
-                    key={creator.id}
-                    type="button"
-                    className="nv-chip"
-                    aria-pressed={on}
-                    onClick={() => {
-                      setCreatorIds(
-                        on ? creatorIds.filter((one) => one !== creator.id) : [...creatorIds, creator.id],
-                      );
-                    }}
-                  >
-                    {creator.displayName}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <span className="tm-hint">Celles de son travail, à partir de maintenant.</span>
-        </div>
-        <Foot busy={busy} problem={problem} ready={ready} label="Enregistrer" onClose={onClose} />
-      </form>
+      {prompt === null ? (
+        <form
+          className="tm-dialog__body"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!ready) return;
+            const change = body.data;
+            void run(() => updateMember(member.id, change)).then((done) => {
+              if (done) onClose();
+            });
+          }}
+        >
+          <div className="nv-field tm-field" data-invalid={name === '' ? 'true' : undefined}>
+            <label className="nv-field__label" htmlFor={`${id}-name`}>
+              Nom dans l’équipe
+            </label>
+            <input
+              id={`${id}-name`}
+              className="nv-field__control nv-glass"
+              value={displayName}
+              maxLength={80}
+              autoComplete="off"
+              data-autofocus
+              aria-invalid={name === ''}
+              onChange={(event) => {
+                setDisplayName(event.target.value);
+              }}
+            />
+            <span className={name === '' ? 'tm-hint tm-hint--error' : 'tm-hint'}>
+              {name === '' ? 'Indique le nom que voit l’équipe.' : 'Celui du planning et des passations.'}
+            </span>
+          </div>
+          <ShadePicker name={`${id}-color`} saved={member.color} color={color} onChange={setColor} />
+          <div className="nv-field tm-field">
+            <span className="nv-field__label">Créatrices</span>
+            {creators.length === 0 ? (
+              <span className="tm-hint">Aucune créatrice pour l’instant.</span>
+            ) : (
+              <div className="tm-choices" role="group" aria-label="Créatrices">
+                {creators.map((creator) => {
+                  const on = creatorIds.includes(creator.id);
+                  return (
+                    <button
+                      key={creator.id}
+                      type="button"
+                      className="nv-chip"
+                      aria-pressed={on}
+                      onClick={() => {
+                        setCreatorIds(
+                          on ? creatorIds.filter((one) => one !== creator.id) : [...creatorIds, creator.id],
+                        );
+                      }}
+                    >
+                      {creator.displayName}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <span className="tm-hint">Celles de son travail, à partir de maintenant.</span>
+          </div>
+          <Foot busy={busy} problem={problem} ready={ready} label="Enregistrer" onClose={onClose} />
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }
@@ -224,7 +247,7 @@ export function RatePanel({
   onClose: () => void;
 }): JSX.Element {
   const id = useId();
-  const { busy, problem, run } = useWrite();
+  const { busy, problem, prompt, run } = useWrite(MONEY_LEAD);
   const today = useAgencyToday();
   const starts = today === null ? [] : periodStartsFrom(today, 4);
   const rates = useRates(member.id);
@@ -262,140 +285,144 @@ export function RatePanel({
       busy={busy}
       onClose={onClose}
     >
-      <form
-        className="tm-dialog__body"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!ready) return;
-          const rateFrom = body.data;
-          void run(() => setCommission(member.id, rateFrom)).then((done) => {
-            if (done) onClose();
-          });
-        }}
-      >
-        <div className="nv-field tm-field">
-          <span className="nv-field__label">Nouveau taux</span>
-          {/* No preset yet: no lone « Autre » to pick, the field straight away (GES-24). */}
-          {presets.length === 0 ? null : (
-            <div className="tm-presets" role="radiogroup" aria-label="Préréglage de commission">
-              {presets.map((preset) => (
+      {prompt === null ? (
+        <form
+          className="tm-dialog__body"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!ready) return;
+            const rateFrom = body.data;
+            void run(() => setCommission(member.id, rateFrom)).then((done) => {
+              if (done) onClose();
+            });
+          }}
+        >
+          <div className="nv-field tm-field">
+            <span className="nv-field__label">Nouveau taux</span>
+            {/* No preset yet: no lone « Autre » to pick, the field straight away (GES-24). */}
+            {presets.length === 0 ? null : (
+              <div className="tm-presets" role="radiogroup" aria-label="Préréglage de commission">
+                {presets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    role="radio"
+                    className="tm-preset"
+                    aria-checked={!byHand && presetId === preset.id}
+                    onClick={() => {
+                      setPresetId(preset.id);
+                      setByHand(false);
+                    }}
+                  >
+                    <span className="tm-preset__name">{preset.name}</span>
+                    <span className="tm-preset__rate">{formatRate(preset.rateBps)}</span>
+                  </button>
+                ))}
                 <button
-                  key={preset.id}
                   type="button"
                   role="radio"
                   className="tm-preset"
-                  aria-checked={!byHand && presetId === preset.id}
+                  aria-checked={byHand}
                   onClick={() => {
-                    setPresetId(preset.id);
-                    setByHand(false);
+                    setByHand(true);
                   }}
                 >
-                  <span className="tm-preset__name">{preset.name}</span>
-                  <span className="tm-preset__rate">{formatRate(preset.rateBps)}</span>
+                  <span className="tm-preset__name">Autre</span>
+                  <span className="tm-preset__rate tm-preset__rate--word">À la main</span>
                 </button>
-              ))}
-              <button
-                type="button"
-                role="radio"
-                className="tm-preset"
-                aria-checked={byHand}
-                onClick={() => {
-                  setByHand(true);
-                }}
-              >
-                <span className="tm-preset__name">Autre</span>
-                <span className="tm-preset__rate tm-preset__rate--word">À la main</span>
-              </button>
+              </div>
+            )}
+            {byHand ? (
+              <span className="tm-percent nv-swap">
+                <input
+                  className="nv-field__control nv-glass"
+                  inputMode="decimal"
+                  placeholder="12,5"
+                  // The field's own name, with its unit: the « % » beside it is hidden from a screen reader (EQP-15).
+                  aria-label="Nouveau taux, en %"
+                  aria-invalid={rate.trim() !== '' && typed === null}
+                  value={rate}
+                  onChange={(event) => {
+                    setRate(event.target.value);
+                  }}
+                />
+                <span aria-hidden="true">%</span>
+              </span>
+            ) : null}
+            {byHand && rate.trim() !== '' && typed === null ? (
+              <span className="tm-hint tm-hint--error">Un taux entre 0 et 100 %, par exemple 12,5.</span>
+            ) : null}
+          </div>
+          {manager ? (
+            <div className="nv-field tm-field" data-invalid={shareOk ? undefined : 'true'}>
+              <label className="nv-field__label" htmlFor={`${id}-share`}>
+                Part du net de l’équipe
+              </label>
+              <span className="tm-percent">
+                <input
+                  id={`${id}-share`}
+                  className="nv-field__control nv-glass"
+                  inputMode="decimal"
+                  placeholder="5"
+                  aria-invalid={!shareOk}
+                  value={shareText}
+                  onChange={(event) => {
+                    setShare(event.target.value);
+                  }}
+                />
+                <span aria-hidden="true">%</span>
+              </span>
+              <span className={shareOk ? 'tm-hint' : 'tm-hint tm-hint--error'}>
+                {shareOk ? 'Vide : pas de part.' : 'Une part entre 0 et 100 %, ou rien.'}
+              </span>
             </div>
-          )}
-          {byHand ? (
-            <span className="tm-percent nv-swap">
-              <input
-                className="nv-field__control nv-glass"
-                inputMode="decimal"
-                placeholder="12,5"
-                // The field's own name, with its unit: the « % » beside it is hidden from a screen reader (EQP-15).
-                aria-label="Nouveau taux, en %"
-                aria-invalid={rate.trim() !== '' && typed === null}
-                value={rate}
-                onChange={(event) => {
-                  setRate(event.target.value);
-                }}
-              />
-              <span aria-hidden="true">%</span>
-            </span>
           ) : null}
-          {byHand && rate.trim() !== '' && typed === null ? (
-            <span className="tm-hint tm-hint--error">Un taux entre 0 et 100 %, par exemple 12,5.</span>
-          ) : null}
-        </div>
-        {manager ? (
-          <div className="nv-field tm-field" data-invalid={shareOk ? undefined : 'true'}>
-            <label className="nv-field__label" htmlFor={`${id}-share`}>
-              Part du net de l’équipe
-            </label>
-            <span className="tm-percent">
-              <input
-                id={`${id}-share`}
-                className="nv-field__control nv-glass"
-                inputMode="decimal"
-                placeholder="5"
-                aria-invalid={!shareOk}
-                value={shareText}
-                onChange={(event) => {
-                  setShare(event.target.value);
-                }}
-              />
-              <span aria-hidden="true">%</span>
-            </span>
-            <span className={shareOk ? 'tm-hint' : 'tm-hint tm-hint--error'}>
-              {shareOk ? 'Vide : pas de part.' : 'Une part entre 0 et 100 %, ou rien.'}
+          <div className="nv-field tm-field">
+            <span className="nv-field__label">À partir du</span>
+            <div className="tm-choices" role="radiogroup" aria-label="À partir du" aria-busy={today === null}>
+              {starts.map((day) => {
+                // A day that already has a rate is said and closed: the server would refuse a second one.
+                const set = rates.data?.find((one) => one.effectiveFrom === day);
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    role="radio"
+                    className="nv-chip"
+                    aria-checked={from === day}
+                    disabled={set !== undefined}
+                    onClick={() => {
+                      setFrom(day);
+                    }}
+                  >
+                    {longDay(day)}
+                    {set === undefined ? null : ` · ${formatRate(set.rateBps)} prévu`}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="tm-hint">
+              Une quinzaine se paie à un seul taux : le nouveau part d’un 1er ou d’un 16, rien n’est recalculé
+              avant.
             </span>
           </div>
-        ) : null}
-        <div className="nv-field tm-field">
-          <span className="nv-field__label">À partir du</span>
-          <div className="tm-choices" role="radiogroup" aria-label="À partir du" aria-busy={today === null}>
-            {starts.map((day) => {
-              // A day that already has a rate is said and closed: the server would refuse a second one.
-              const set = rates.data?.find((one) => one.effectiveFrom === day);
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  role="radio"
-                  className="nv-chip"
-                  aria-checked={from === day}
-                  disabled={set !== undefined}
-                  onClick={() => {
-                    setFrom(day);
-                  }}
-                >
-                  {longDay(day)}
-                  {set === undefined ? null : ` · ${formatRate(set.rateBps)} prévu`}
-                </button>
-              );
-            })}
-          </div>
-          <span className="tm-hint">
-            Une quinzaine se paie à un seul taux : le nouveau part d’un 1er ou d’un 16, rien n’est recalculé
-            avant.
-          </span>
-        </div>
-        {/* Said before it is sent: a rate saved is never changed, a slip would pay a whole period (Équipe, #318). */}
-        {ready && newRate !== null ? (
-          <p className="tm-recap nv-swap" role="status">
-            À partir du {longDay(from)} : <b>{formatRate(newRate)}</b>
-            {manager && shareBps !== null
-              ? `, part de l’équipe ${formatRate(shareBps)}`
-              : ''} (aujourd’hui{' '}
-            {member.commission === null ? 'pas de taux' : formatRate(member.commission.rateBps)}). Un taux
-            enregistré ne se modifie plus.
-          </p>
-        ) : null}
-        <Foot busy={busy} problem={problem} ready={ready} label="Enregistrer le taux" onClose={onClose} />
-      </form>
+          {/* Said before it is sent: a rate saved is never changed, a slip would pay a whole period (Équipe, #318). */}
+          {ready && newRate !== null ? (
+            <p className="tm-recap nv-swap" role="status">
+              À partir du {longDay(from)} : <b>{formatRate(newRate)}</b>
+              {manager && shareBps !== null
+                ? `, part de l’équipe ${formatRate(shareBps)}`
+                : ''} (aujourd’hui{' '}
+              {member.commission === null ? 'pas de taux' : formatRate(member.commission.rateBps)}). Un taux
+              enregistré ne se modifie plus.
+            </p>
+          ) : null}
+          <Foot busy={busy} problem={problem} ready={ready} label="Enregistrer le taux" onClose={onClose} />
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }
@@ -461,7 +488,7 @@ function ShiftsLeft({ member }: { member: TeamMember }): JSX.Element | null {
 /** « Changer le statut »: at work, away (leave, sick, travelling), suspended, or gone for good after a confirmation. */
 export function StatusPanel({ member, onClose }: { member: TeamMember; onClose: () => void }): JSX.Element {
   const id = useId();
-  const { busy, problem, run } = useWrite();
+  const { busy, problem, prompt, run } = useWrite(MEMBER_LEAD);
   const [status, setStatus] = useState<TeamMemberStatus>(member.status);
   const [sure, setSure] = useState(false);
   const leaving = status === 'left';
@@ -474,72 +501,76 @@ export function StatusPanel({ member, onClose }: { member: TeamMember; onClose: 
       busy={busy}
       onClose={onClose}
     >
-      <form
-        className="tm-dialog__body"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!ready) return;
-          void run(() => changeStatus(member.id, status)).then((done) => {
-            if (done) onClose();
-          });
-        }}
-      >
-        {/* Six statuses: a list, not chips, which stop at five choices (recette Équipe 07/11). */}
-        <div className="nv-field tm-field">
-          <label className="nv-field__label" htmlFor={`${id}-status`}>
-            Statut
-          </label>
-          <Select
-            id={`${id}-status`}
-            value={status}
-            autofocus
-            options={TEAM_MEMBER_STATUSES.map((one) => ({ value: one, label: STATUS_LABELS[one] }))}
-            onChange={(one) => {
-              setStatus(one);
-              setSure(false);
-            }}
-          />
-        </div>
-        {status !== 'active' && !leaving ? (
-          <p className="tm-hint nv-swap">{AWAY(member.displayName)}</p>
-        ) : null}
-        {status !== 'active' && !leaving ? <ShiftsLeft member={member} /> : null}
-        {leaving ? (
-          <div className="nv-confirm nv-swap" role="group" aria-label="Confirmer le départ">
-            <div id={`${id}-leaving`} className="sc-confirm__text">
-              <p>{LEAVING(member.displayName)}</p>
-              <p>Impera ne le fait pas encore :</p>
-              <ul className="tm-todo">
-                {LEFT_TO_DO.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </div>
-            <ShiftsLeft member={member} />
-            <label className="tm-sure">
-              <input
-                type="checkbox"
-                className="nv-check"
-                aria-describedby={`${id}-leaving`}
-                checked={sure}
-                onChange={(event) => {
-                  setSure(event.target.checked);
-                }}
-              />
-              {member.displayName} quitte l’équipe
+      {prompt === null ? (
+        <form
+          className="tm-dialog__body"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!ready) return;
+            void run(() => changeStatus(member.id, status)).then((done) => {
+              if (done) onClose();
+            });
+          }}
+        >
+          {/* Six statuses: a list, not chips, which stop at five choices (recette Équipe 07/11). */}
+          <div className="nv-field tm-field">
+            <label className="nv-field__label" htmlFor={`${id}-status`}>
+              Statut
             </label>
+            <Select
+              id={`${id}-status`}
+              value={status}
+              autofocus
+              options={TEAM_MEMBER_STATUSES.map((one) => ({ value: one, label: STATUS_LABELS[one] }))}
+              onChange={(one) => {
+                setStatus(one);
+                setSure(false);
+              }}
+            />
           </div>
-        ) : null}
-        <Foot
-          busy={busy}
-          problem={problem}
-          ready={ready}
-          label={leaving ? 'Confirmer le départ' : 'Enregistrer'}
-          destructive={leaving}
-          onClose={onClose}
-        />
-      </form>
+          {status !== 'active' && !leaving ? (
+            <p className="tm-hint nv-swap">{AWAY(member.displayName)}</p>
+          ) : null}
+          {status !== 'active' && !leaving ? <ShiftsLeft member={member} /> : null}
+          {leaving ? (
+            <div className="nv-confirm nv-swap" role="group" aria-label="Confirmer le départ">
+              <div id={`${id}-leaving`} className="sc-confirm__text">
+                <p>{LEAVING(member.displayName)}</p>
+                <p>Impera ne le fait pas encore :</p>
+                <ul className="tm-todo">
+                  {LEFT_TO_DO.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+              <ShiftsLeft member={member} />
+              <label className="tm-sure">
+                <input
+                  type="checkbox"
+                  className="nv-check"
+                  aria-describedby={`${id}-leaving`}
+                  checked={sure}
+                  onChange={(event) => {
+                    setSure(event.target.checked);
+                  }}
+                />
+                {member.displayName} quitte l’équipe
+              </label>
+            </div>
+          ) : null}
+          <Foot
+            busy={busy}
+            problem={problem}
+            ready={ready}
+            label={leaving ? 'Confirmer le départ' : 'Enregistrer'}
+            destructive={leaving}
+            onClose={onClose}
+          />
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }

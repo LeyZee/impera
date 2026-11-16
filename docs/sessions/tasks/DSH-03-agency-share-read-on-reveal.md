@@ -1,5 +1,5 @@
 # DSH-03 La part de l'agence lue chez Reveal, le pourcentage facultatif
-Statut : review (captures validées le 15/11)
+Statut : done (#758 fusionnée le 15/11) ; suite V-PIL-25 (écart montré sur la fiche) en review
 Phase : pilotage (ADR 0054, amendement du 14/11/2026, § 4 à § 8)
 Dépend de : CR-04 (pourcentage de l'agence), CRM-04 lot d3 (contrôle des pourcentages), registre des ventes (ADR 0050)
 Branche : claude/project-thread-t7tj46

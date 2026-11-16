@@ -12,9 +12,15 @@ import { screenLabel, type ScreenPath } from '@/shell/nav';
 export function MeNav({
   manager = false,
   creator = false,
+  trophies = false,
 }: {
   manager?: boolean;
   creator?: boolean;
+  /**
+   * « Trophées » for one who plays the chatter's game, on the same rule as its route (`playsTheGame`): never for a
+   * manager, on leave or not (recette 16/11, CHT-05). A creator's Moi always has hers.
+   */
+  trophies?: boolean;
 }): JSX.Element {
   const screens: readonly ScreenPath[] = creator
     ? ['/moi/persona', '/moi/trophees', '/moi/securite', '/moi/preferences']
@@ -29,7 +35,7 @@ export function MeNav({
         ]
       : [
           '/moi/profil',
-          '/moi/trophees',
+          ...(trophies ? (['/moi/trophees'] as const) : []),
           '/moi/dossier',
           '/moi/calendrier',
           '/moi/securite',

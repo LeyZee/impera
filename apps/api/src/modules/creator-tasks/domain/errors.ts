@@ -1,5 +1,6 @@
 import {
   AVAILABILITY_NOT_FOUND,
+  CREATOR_DAY_CLOSED_UNPROCESSABLE,
   CREATOR_TASK_CHANGED_CONFLICT,
   CREATOR_TASK_NOT_FOUND,
   CREATOR_TICK_DAY_UNPROCESSABLE,
@@ -52,6 +53,14 @@ export class CreatorTickLateUnprocessable extends DomainError {
       'Une coche compte le jour où tu la fais, et au plus 48 heures après',
       { details: { taskIds } },
     );
+  }
+}
+
+export class CreatorDayClosedUnprocessable extends DomainError {
+  constructor(taskId: string) {
+    super(CREATOR_DAY_CLOSED_UNPROCESSABLE, 'Cette journée est finie : sa coche reste comme elle est', {
+      details: { taskIds: [taskId] },
+    });
   }
 }
 
