@@ -15,6 +15,8 @@ import {
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf } from '@/scheduling/time';
+import { OffRailBack } from '@/shell/OffRailBack';
+import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
 
 /**
@@ -338,17 +340,29 @@ export function NotificationsPage({ creator = false }: { creator?: boolean }): J
   const preferences = useQuery(preferencesQuery);
   return (
     <Page>
-      <PageHeader title="Notifications" lead="Ce qui sonne sur tes appareils, et quand ça se tait." />
+      <PageHeader
+        eyebrow={<OffRailBack />}
+        title="Notifications"
+        lead="Ce qui sonne sur tes appareils, et quand ça se tait."
+      />
       <div className="nv-notif">
         <ThisDevice />
         {preferences.data === undefined ? (
-          <Panel title="Quand ça sonne">
-            <PanelSection>
-              <p className="nv-notif__hint">
-                {preferences.isError ? 'Réglages illisibles pour l’instant.' : 'Lecture…'}
-              </p>
-            </PanelSection>
-          </Panel>
+          preferences.isError ? (
+            // Said as every screen that reads first says it, amber with « Réessayer » (recette 11/11, GES-15).
+            <ServerSilent
+              text="Tes réglages n’ont pas pu être lus."
+              onRetry={() => {
+                void preferences.refetch();
+              }}
+            />
+          ) : (
+            <Panel title="Quand ça sonne">
+              <PanelSection>
+                <p className="nv-notif__hint">Lecture…</p>
+              </PanelSection>
+            </Panel>
+          )
         ) : (
           <QuietHours key={JSON.stringify(preferences.data)} saved={preferences.data} creator={creator} />
         )}

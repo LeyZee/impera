@@ -421,6 +421,8 @@ interface CreatorBubbleGuard {
  */
 export interface GuardReadContext {
   readonly history: readonly { readonly from: 'fan' | 'creator'; readonly text: string }[];
+  /** A care episode is open (ADR 0088 § 3, § 5): the care guard reads the bubbles too, whoever wrote them. */
+  readonly care?: boolean;
 }
 
 /**
@@ -513,6 +515,8 @@ interface FanContext extends FanStats {
   readonly notes: readonly string[];
   /** Those the brain reads alone (ADR 0085 § 9: when he has money, his attachment, his moods); never the voice. */
   readonly brainNotes?: readonly string[];
+  /** The age his card gives, a whole number; under 18, a human answers him (recette AGE-13). */
+  readonly cardAge?: number;
 }
 
 /** A fact as the brief proposes it: its category is the model's word until `conversations` reads it (P3-02). */

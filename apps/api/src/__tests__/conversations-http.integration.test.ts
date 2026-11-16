@@ -185,6 +185,22 @@ describe('/v1/conversations', () => {
     expect(announced.json()).toMatchObject({
       error: { code: 'draft_unprocessable', details: { guards: ['media_not_sent'] } },
     });
+    // While a care episode is open, a chatter's words pass the care guard too (ADR 0088 § 3, § 5).
+    const careSince = new Date('2026-11-12T20:00:00Z');
+    const setCare = (since: Date | null) =>
+      test.admin.db
+        .update(schema.conversations)
+        .set({ careSince: since })
+        .where(eq(schema.conversations.id, id));
+    await setCare(careSince);
+    const inCare = await call('POST', `${base}/approve?creatorId=${creatorId}`, ownerCookie, {
+      bubbles: ['Viens on se change les idées, je suis toute mouillée'],
+    });
+    expect(inCare.statusCode, inCare.body).toBe(422);
+    expect(inCare.json()).toMatchObject({
+      error: { code: 'draft_unprocessable', details: { guards: ['care_breach'] } },
+    });
+    await setCare(null);
     const [stillOpen] = await test.admin.db
       .select({ status: schema.drafts.status })
       .from(schema.drafts)

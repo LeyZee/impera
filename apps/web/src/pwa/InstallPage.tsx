@@ -1,5 +1,6 @@
 import { useSyncExternalStore, type JSX } from 'react';
 
+import { OffRailBack } from '../shell/OffRailBack';
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
 
 import {
@@ -44,6 +45,7 @@ export function InstallPage(): JSX.Element {
   return (
     <Page>
       <PageHeader
+        eyebrow={<OffRailBack />}
         title="Installer Impera"
         lead="Une minute, une seule fois : ensuite Impera s’ouvre depuis son icône, en plein écran, comme une app."
       />

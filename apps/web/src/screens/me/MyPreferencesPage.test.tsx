@@ -79,6 +79,22 @@ describe('Moi › Préférences (D-03)', () => {
     expect(screen.queryByRole('switch', { name: 'Flou des médias' })).toBeNull();
   });
 
+  // Recette 11/11 (CRE-29): once the install card was set aside, nothing led back to the guide.
+  it('keeps the way to install Impera, except in the installed app', async () => {
+    renderPage(vi.fn());
+    const install = await screen.findByRole('link', { name: 'Installer Impera' });
+    expect(install.getAttribute('href')).toBe('/aide/installer');
+    cleanup();
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(display-mode: standalone)',
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    renderPage(vi.fn());
+    await screen.findByRole('heading', { name: 'Préférences', level: 1 });
+    expect(screen.queryByRole('link', { name: 'Installer Impera' })).toBeNull();
+  });
+
   it('gives a chatter « Sons », kept with the account, and nobody who does not play (ADR 0104 § 19)', async () => {
     const calls: [string, unknown][] = [];
     vi.stubGlobal('fetch', (url: string, init?: { body?: string }) => {

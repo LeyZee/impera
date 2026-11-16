@@ -38,6 +38,13 @@ export interface ConversationTurn {
   readonly from: 'fan' | 'creator';
   readonly text: string;
   readonly media?: readonly TurnMedia[];
+  /** When it was written; absent where no clock runs (some evals), and nothing is said of the time then. */
+  readonly at?: Date;
+  /**
+   * The time that passed before this message of his, written by code on her clock (« le lendemain, mardi, 19 h 10 »):
+   * shown in brackets before his block, never inside it.
+   */
+  readonly timeNote?: string;
 }
 
 export interface VideoFrame {
