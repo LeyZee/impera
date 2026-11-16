@@ -134,6 +134,8 @@ export interface PlaygroundSession {
   readonly fanNotes: readonly string[];
   readonly situation: Situation;
   readonly lastExchange: PlaygroundExchange | undefined;
+  /** While an answer is being written: the brain's reading of his message once it has read it, before the voice. */
+  readonly reading: NonNullable<PlaygroundTurn['brief']> | undefined;
 }
 
 export interface PlaygroundDeps {
@@ -210,6 +212,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   const usedObjectionReplies: string[] = [];
   // His last message on the simulated clock, and the follow-ups she wrote since: the next step is their count.
   let lastFanAt: Date | null = null;
+  let brainReading: NonNullable<PlaygroundTurn['brief']> | undefined;
   let followUpsSince = 0;
   // His desire score as `conversations` would store it (P3-12), on the simulated clock.
   let desire: DesireState | undefined;
@@ -265,6 +268,9 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     },
     get lastExchange() {
       return lastExchange;
+    },
+    get reading() {
+      return brainReading;
     },
 
     reset() {
@@ -402,6 +408,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     },
 
     async handleFanMessage(text, media = []) {
+      brainReading = undefined;
       lastFanAt = situation.now;
       followUpsSince = 0;
       desireBefore.push(desire);
@@ -474,7 +481,11 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           // The risk policy as the composer runs it (agent/domain/hold.ts): a possible minor or a dangerous request
           // hands over and the voice does not write; distress is answered with care; without the brain's reading
           // nobody knows the risks, so the voice does not write either (AGE-01).
-          care: (brief) => careForced || (brief !== undefined && holdDecision(brief).kind === 'care'),
+          // Called once the brain has read him, before the voice: the screen shows the reading while she writes.
+          care: (brief) => {
+            brainReading = brief;
+            return careForced || (brief !== undefined && holdDecision(brief).kind === 'care');
+          },
           skipVoice: (brief) => {
             if (brief === undefined) return !careForced;
             const kind = holdDecision(brief).kind;
@@ -488,6 +499,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           },
         },
       );
+      brainReading = undefined;
       const decided = composed.brief === undefined ? undefined : holdDecision(composed.brief);
       const hold: PlaygroundTurn['hold'] =
         decided?.kind === 'handoff' || (decided?.kind === 'care' && !careForced)

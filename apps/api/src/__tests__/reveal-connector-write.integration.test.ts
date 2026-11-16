@@ -135,7 +135,13 @@ describe('Reveal connector: writes on FakeReveal (P2-03)', () => {
     const refusals = await Promise.all([
       outboundSender.sendText(conversation(), 'Coucou', 'off-1').catch((error: unknown) => error),
       writes
-        .sendScriptStep(conversation(), { platform: 'reveal', id: 'sequence_1' }, 0, eur(500), 'off-2')
+        .sendScriptStep(
+          conversation(),
+          { platform: 'reveal', id: 'sequence_1' },
+          { platform: 'reveal', id: 'script_1_1' },
+          eur(500),
+          'off-2',
+        )
         .catch((error: unknown) => error),
       writes
         .setFanNote(conversation(), 'fan_01', 'Prénom : Prénom01', 'off-3')
@@ -181,7 +187,7 @@ describe('Reveal connector: writes on FakeReveal (P2-03)', () => {
     const step = await app.modules.connectors.writes.sendScriptStep(
       conversation(),
       { platform: 'reveal', id: 'sequence_2' },
-      0,
+      { platform: 'reveal', id: 'script_2_1' },
       eur(500),
       'step-1',
     );
@@ -210,7 +216,13 @@ describe('Reveal connector: writes on FakeReveal (P2-03)', () => {
     await scenario([{ type: 'script_changed', scriptId: 'script_4_1', priceCents: 700 }]);
     const before = posts.length;
     const refused: unknown = await app.modules.connectors.writes
-      .sendScriptStep(conversation(), { platform: 'reveal', id: 'sequence_4' }, 0, eur(500), 'price-1')
+      .sendScriptStep(
+        conversation(),
+        { platform: 'reveal', id: 'sequence_4' },
+        { platform: 'reveal', id: 'script_4_1' },
+        eur(500),
+        'price-1',
+      )
       .catch((error: unknown) => error);
     expect(refused).toMatchObject({ code: 'script_price_changed' });
     expect(posts.length).toBe(before);
@@ -218,7 +230,7 @@ describe('Reveal connector: writes on FakeReveal (P2-03)', () => {
     const sent = await app.modules.connectors.writes.sendScriptStep(
       conversation(),
       { platform: 'reveal', id: 'sequence_4' },
-      0,
+      { platform: 'reveal', id: 'script_4_1' },
       eur(700),
       'price-2',
     );

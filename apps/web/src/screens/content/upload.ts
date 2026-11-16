@@ -17,6 +17,12 @@ const MAX_PAUSE_MS = 60_000;
 /** The send cannot go on whatever the network does: the drop was withdrawn, or the file refused or settled. */
 export class UploadStopped extends Error {}
 
+/**
+ * The server or the storage answered, but with an error (a 5xx): the network is fine, the other side is not. The send
+ * tries again by itself, and her line says so in other words than a cut network (recette CRE-10).
+ */
+export class ServerTrouble extends Error {}
+
 /** What a send needs from the outside: the API, the storage and the clock. Tests give their own. */
 export interface UploadDoors {
   /** `POST …/upload`: the parts stored and those still missing. Throws `UploadStopped` on a 4xx. */
@@ -33,10 +39,13 @@ export interface UploadDoors {
   readonly pause: (ms: number, signal: AbortSignal) => Promise<void>;
 }
 
-/** Where a send is: bytes of the file stored or on their way, and whether it is waiting for the network. */
+/**
+ * Where a send is: bytes of the file stored or on their way; `waiting` when the network dropped, `stalled` when the
+ * server keeps answering with an error. Both try again by themselves.
+ */
 export interface SendProgress {
   readonly sent: number;
-  readonly phase: 'sending' | 'waiting';
+  readonly phase: 'sending' | 'waiting' | 'stalled';
 }
 
 /** 1 s, 2 s, 4 s … at most a minute. */
@@ -59,7 +68,7 @@ export async function sendFile(
   let lastError: unknown = null;
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
     if (round > 0) {
-      onProgress({ sent: 0, phase: 'waiting' });
+      onProgress({ sent: 0, phase: lastError instanceof ServerTrouble ? 'stalled' : 'waiting' });
       await doors.pause(pauseOf(round - 1), signal);
     }
     signal.throwIfAborted();
@@ -170,6 +179,7 @@ export function putPart(
     request.onload = () => {
       const etag = request.getResponseHeader('etag');
       if (request.status >= 200 && request.status < 300 && etag !== null) resolve(etag);
+      else if (request.status >= 500) reject(new ServerTrouble(`PUT part: ${String(request.status)}`));
       else reject(new Error(`PUT part: ${String(request.status)}`));
     };
     request.onerror = () => {

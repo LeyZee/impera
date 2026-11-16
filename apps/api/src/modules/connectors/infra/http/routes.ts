@@ -82,6 +82,7 @@ export function createConnectorRoutes(deps: {
           session: request.body.session,
           correlationId: request.id,
           userId,
+          logger: request.log,
         });
         return reply.code(204).send();
       },

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FanInsights } from './FanInsights';
 import { DEMO_INSIGHTS } from './insights-fixture';
-import { arcsOf, heatOf, slotLabel } from './insights-view';
+import { arcsOf, heatOf, shareText, slotLabel, waitingLines } from './insights-view';
 
 function serve(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -58,10 +58,13 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     const cell = screen.getByRole('button', { name: 'Vendredi, 18h–21h : 4\u00a0%' });
     fireEvent.focus(cell);
     expect(cell.getAttribute('aria-pressed')).toBe('true');
-    // A block under ten fans says so in words, with no ring and no number.
-    expect(screen.getByText('Leur situation').closest('article')?.textContent).toContain(
-      'Pas encore assez de fans pour le dire.',
-    );
+    // A block under its threshold is no empty card: one line says what it waits for (recette CRE-04).
+    expect(screen.queryByText('Leur situation')).toBeNull();
+    expect(
+      screen.getByText(
+        'Trop peu de fans t’ont encore dit leur situation : ce chiffre s’affichera dès que dix l’auront dit.',
+      ),
+    ).toBeDefined();
     expect(screen.getByText('Panier moyen sur 30 jours')).toBeDefined();
   });
 
@@ -70,6 +73,66 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     show();
     expect(await screen.findByText('fans en tout')).toBeDefined();
     expect(screen.getAllByText('moins de 10')).toHaveLength(2);
+  });
+
+  it('says it once, in one short card, when every block has too few fans (recette CRE-04)', async () => {
+    const few = { status: 'too_few' } as const;
+    serve(200, {
+      ...DEMO_INSIGHTS,
+      fans: { total: null, newLast30Days: null, wroteLast7Days: null },
+      age: few,
+      place: few,
+      situation: few,
+      job: few,
+      spending: few,
+      activity: few,
+    });
+    show();
+    expect(await screen.findByText(/Encore trop peu de fans pour le dire/u)).toBeDefined();
+    expect(screen.queryByText('moins de 10')).toBeNull();
+    expect(document.querySelectorAll('.fi-card')).toHaveLength(0);
+  });
+
+  it('with enough fans in all, never says there are too few fans: it names what is missing (recette CRE-04)', async () => {
+    const few = { status: 'too_few' } as const;
+    serve(200, {
+      ...DEMO_INSIGHTS,
+      fans: { total: 20, newLast30Days: 20, wroteLast7Days: null },
+      age: few,
+      place: few,
+      situation: few,
+      job: few,
+      spending: few,
+      activity: few,
+    });
+    show();
+    expect(await screen.findByText('fans en tout')).toBeDefined();
+    expect(screen.queryByText(/Encore trop peu de fans pour le dire/u)).toBeNull();
+    expect(
+      screen.getByText(
+        'Trop peu de fans t’ont encore dit leur âge, d’où ils sont, leur situation et leur métier : chacun s’affichera dès que dix l’auront dit.',
+      ),
+    ).toBeDefined();
+    expect(document.querySelectorAll('.fi-card')).toHaveLength(0);
+  });
+
+  it('says in one sentence that nobody unlocked yet, without a ring at 0 % nor a bar at 100 % (recette CRE-04)', async () => {
+    serve(200, {
+      ...DEMO_INSIGHTS,
+      spending: {
+        status: 'enough',
+        payingShare: 0,
+        averageBasketMinor: null,
+        cases: [{ key: 'none', share: 100 }],
+      },
+    });
+    show();
+    const none = await screen.findByText('Aucun de tes fans n’a encore débloqué de message.');
+    // One sentence fills its row: no half-empty line beside a short card.
+    expect(none.closest('article')?.className).toContain('fi-card--full');
+    expect(screen.queryByText('ont déjà débloqué')).toBeNull();
+    expect(screen.queryByText('Rien débloqué')).toBeNull();
+    expect(screen.queryByText('Panier moyen sur 30 jours')).toBeNull();
   });
 
   it('says the figures do not load, with a way to try again', async () => {
@@ -88,6 +151,23 @@ describe('the geometry', () => {
     expect(arcsOf([100], 10)[0]?.dash.startsWith(String(Math.round(2 * Math.PI * 10 * 100) / 100))).toBe(
       true,
     );
+  });
+
+  it('says what each waiting block counts: facts told, fans in all, fans who wrote', () => {
+    expect(waitingLines([])).toEqual([]);
+    expect(waitingLines(['job'])).toEqual([
+      'Trop peu de fans t’ont encore dit leur métier : ce chiffre s’affichera dès que dix l’auront dit.',
+    ]);
+    expect(waitingLines(['age', 'situation', 'spending', 'activity'])).toEqual([
+      'Trop peu de fans t’ont encore dit leur âge et leur situation : chacun s’affichera dès que dix l’auront dit.',
+      'Ce qu’ils débloquent s’affichera à partir de dix fans.',
+      'Moins de dix fans t’ont écrit ces 30 derniers jours : leurs heures s’afficheront à partir de dix.',
+    ]);
+  });
+
+  it('never says « 0 % » for a case that is there', () => {
+    expect(shareText(0)).toBe('moins de 1\u00a0%');
+    expect(shareText(12)).toBe('12\u00a0%');
   });
 
   it('says a slot and the strength of a cell', () => {
