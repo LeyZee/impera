@@ -518,8 +518,10 @@ platform_scripts          id, creator_id, platform_account_id → platform_accou
                           compte, ≤ 200), name (celui de la plateforme, ≤ 200), moment? (day|night), fingerprint, active,
                           deactivated_at? (présent si et seulement si inactif), synced_at, created_at
                           (scripts natifs, ADR 0099 § 1 temps 2, migration 0206 ; jamais supprimés)
-platform_script_steps     platform_script_id, creator_id, position 0–49 (stepIndex), platform_step_ref (≤ 200),
-                          name (≤ 200), text (≤ 4 000), price_minor ≥ 0 (centimes TTC, tel quel), currency
+platform_script_steps     platform_script_id, creator_id, position 0–49 (ordre de stepIndex), platform_index ≥ 0
+                          (stepIndex tel quel : deux étapes au même rang sont des branches, ADR 0112, migration 0211),
+                          platform_step_ref (≤ 200), name (≤ 200), text (≤ 4 000), price_minor ≥ 0 (centimes TTC, tel
+                          quel), currency
                           (clé : platform_script_id, position ; réécrites en entier quand le script change)
 platform_script_step_media platform_script_id, creator_id, position, role (sold|preview), rank 0–49,
                           platform_media_ref (≤ 200), kind
@@ -527,6 +529,13 @@ platform_script_step_media platform_script_id, creator_id, position, role (sold|
                           étrangère)
                           (les trois : RLS forcée de la créatrice, lues par le propriétaire et les managers actifs,
                           fermées à son compte ; écrites par l'import en rôle de service seulement)
+script_identities         id, creator_id, platform_script_id (→ platform_scripts avec creator_id), input_hash (sha256
+                          de la version : textes, médias, descriptions validées, jamais un prix), schema_version ≥ 1,
+                          content jsonb (ScriptIdentityContent), author (brain|human), model?, prompt_hash? (ceux du
+                          brain, nuls pour une main), validated_by? → user, validated_at?, created_at
+                          (SC-04 lot c8, migration 0211 ; une du brain par version et prompt ; une humaine est validée ;
+                          écrite une fois, validée une fois ; RLS forcée, lue et validée par le propriétaire et les
+                          managers actifs, fermée à son compte ; le job écrit en rôle de service)
 ```
 
 La règle 6 de l'ADR 0056 § 1 est tenue en base : la dernière version change sur place tant que `frozen_at` est nul, puis un enregistrement écrit la version suivante (SC-01, migration 0084).

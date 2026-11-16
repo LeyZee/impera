@@ -116,7 +116,17 @@ export const FakeScriptSchema = z.object({
 });
 export type FakeScript = z.infer<typeof FakeScriptSchema>;
 
-export const FakeSequenceSchema = z.object({ id, name: z.string(), scriptIds: z.array(id), createdAt: iso });
+export const FakeSequenceSchema = z.object({
+  id,
+  name: z.string(),
+  scriptIds: z.array(id),
+  /**
+   * « Étape à branches » (ADR 0112, provisional): more steps on the `stepIndex` of one of `scriptIds`, between which a
+   * human chooses. Listed after the ordered steps, with the rank they share.
+   */
+  branches: z.array(z.object({ scriptId: id, stepIndex: z.number().int().min(0) })).optional(),
+  createdAt: iso,
+});
 
 export const FakeTransactionSchema = z.object({
   id,

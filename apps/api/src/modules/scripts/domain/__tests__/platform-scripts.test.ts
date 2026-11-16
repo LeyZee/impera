@@ -28,6 +28,7 @@ function script(id: string, prices: readonly number[] = [0, 1_500, 3_000]): Plat
     steps: prices.map((priceMinor, index) => ({
       ref: reveal(`${id}_step_${String(index)}`),
       index,
+      platformIndex: index,
       name: `Étape ${String(index + 1)}`,
       text: 'Texte inventé',
       media: [{ ref: reveal(`${id}_media_${String(index)}`), kind: 'image' as const }],
@@ -169,19 +170,49 @@ describe('the price warnings of P6-01, never a refusal', () => {
 });
 
 describe('what keeps a native script from being proposable', () => {
-  const inVault = { inVault: true, described: true };
+  const inVault = { kind: 'image' as const, inVault: true, described: true };
+  const step = (
+    platformIndex: number,
+    ...media: (typeof inVault | { kind: 'image' | 'audio'; inVault: boolean; described: boolean })[]
+  ) => ({
+    platformIndex,
+    media,
+  });
 
   it('needs each media in the vault and described, and the identity validated', () => {
-    expect(platformScriptGaps([{ media: [inVault] }, { media: [inVault] }], true)).toEqual([]);
-    expect(platformScriptGaps([{ media: [inVault] }], false)).toEqual(['identity_not_validated']);
+    expect(platformScriptGaps([step(0, inVault), step(1, inVault)], true)).toEqual([]);
+    expect(platformScriptGaps([step(0, inVault)], false)).toEqual(['identity_not_validated']);
     expect(
       platformScriptGaps(
         [
-          { media: [inVault, { inVault: false, described: false }] },
-          { media: [{ inVault: true, described: false }] },
+          step(0, inVault, { kind: 'image', inVault: false, described: false }),
+          step(1, { kind: 'image', inVault: true, described: false }),
         ],
         true,
       ),
     ).toEqual(['media_absent', 'media_not_described']);
+  });
+
+  it('never waits for a voice note to be described: the vision never hears one', () => {
+    expect(platformScriptGaps([step(0, { kind: 'audio', inVault: true, described: false })], true)).toEqual(
+      [],
+    );
+  });
+
+  it('never offers a script whose steps share a platform rank: branches, until ADR 0112', () => {
+    expect(platformScriptGaps([step(0, inVault), step(1, inVault), step(1, inVault)], true)).toEqual([
+      'branched_step',
+    ]);
+  });
+});
+
+describe('the fingerprint of a native script', () => {
+  it('changes with the platform rank of a step, so that branches appearing rewrite the script', () => {
+    const plain = script('s1');
+    const branched: PlatformScript = {
+      ...plain,
+      steps: plain.steps.map((each, index) => ({ ...each, platformIndex: Math.min(index, 1) })),
+    };
+    expect(platformScriptFingerprint(branched)).not.toBe(platformScriptFingerprint(plain));
   });
 });

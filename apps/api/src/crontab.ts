@@ -132,6 +132,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '25 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.ask_scripts'] },
   },
+  // The identities of her native scripts (SC-04 lot c8): those whose media were described and validated since, or
+  // spent the day's budget, asked again; the job writes only what changed. No backfill: the next run finds them.
+  {
+    task: 'scripts.identify_backlog',
+    match: '40 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.identify_backlog'] },
+  },
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
   {
     task: 'fans.purge_facts',
