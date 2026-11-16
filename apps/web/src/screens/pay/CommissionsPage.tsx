@@ -48,6 +48,7 @@ import {
   tierProgress,
 } from '@/payroll/model';
 import '@/payroll/pay.css';
+import { useReports } from '@/reports/api';
 import '@/reports/reports.css';
 import {
   amountText,
@@ -100,6 +101,8 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   const nowRead = usePayPeriod(current);
   const heroNames = usePayNames(hero, false);
   const nowNames = usePayNames(current, false);
+  // Their reports of the hero's period: one sent and not validated yet is said under the amount (CHT-30).
+  const heroReports = useReports(hero, hero !== null);
 
   // The period is the hero's own first word: said twice above the fold, it was read as two periods (D-03).
   const head = (): JSX.Element => (
@@ -241,7 +244,19 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
           ) : (
             <>
               {heroData.blocked ? <MyBlockNotice block={heroData.blocked} /> : null}
-              <Hero statement={statement} period={heroData} now={now} />
+              <Hero
+                statement={statement}
+                period={heroData}
+                now={now}
+                pending={
+                  heroReports.data?.reports.filter(
+                    (report) =>
+                      report.memberId === statement.memberId &&
+                      report.period === hero &&
+                      report.status === 'submitted',
+                  ).length ?? 0
+                }
+              />
               <Panel className="nv-enter" eyebrow="Le parcours de ton argent">
                 <div className="rp-sec">
                   <MoneyPath
@@ -370,15 +385,20 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   );
 }
 
-/** What the member touches for the period: the one lit surface of the screen. */
+/**
+ * What the member touches for the period: the one lit surface of the screen. Under the amount, their reports of the
+ * period sent and not validated yet, which it does not count (recette 16/11, CHT-30).
+ */
 function Hero({
   statement,
   period,
   now,
+  pending,
 }: {
   statement: CommissionStatement;
   period: PayrollPeriod;
   now: Date;
+  pending: number;
 }): JSX.Element {
   const delay = usePayrollSettings().data?.payoutDelayBusinessDays ?? null;
   const words = myStatementWords(statement, period.ended, now, delay);
@@ -406,6 +426,12 @@ function Hero({
           {note}
         </p>
       ))}
+      {pending === 0 ? null : (
+        <p className="py-hero__note nv-num">
+          + {pending} {pending === 1 ? 'rapport' : 'rapports'} en attente de validation, pas encore compté
+          {pending === 1 ? '' : 's'}
+        </p>
+      )}
       {words.hold === null ? null : <MyHoldNotice hold={words.hold} />}
     </section>
   );

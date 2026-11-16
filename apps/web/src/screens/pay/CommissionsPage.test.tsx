@@ -62,6 +62,8 @@ let mySales: Record<string, Record<string, MySales>>;
 /** The member's lines read fail. */
 let mySalesDown: boolean;
 let answer: () => { status: number; body: unknown };
+/** The member's end-of-shift reports, as `/v1/scheduling/shift-reports?period=` gives them (CHT-30). */
+let reports: Record<string, unknown[]>;
 const writes: { path: string; body: unknown }[] = [];
 
 const TIERS = tierSetOf(1, OCT1);
@@ -131,7 +133,12 @@ function serve(): void {
         case '/v1/scheduling/settings':
           return json(SCHEDULING_SETTINGS);
         case '/v1/scheduling/shift-reports':
-          return json({ reports: [], shifts: [], accounts: [NORA_REVEAL], members: [] });
+          return json({
+            reports: reports[url.searchParams.get('period') ?? ''] ?? [],
+            shifts: [],
+            accounts: [NORA_REVEAL],
+            members: [],
+          });
         default:
           return json(null, 404);
       }
@@ -193,6 +200,7 @@ beforeEach(() => {
   mySales = {};
   mySalesDown = false;
   answer = () => ({ status: 200, body: null });
+  reports = {};
   writes.length = 0;
   periods = {
     [OCT1]: periodOf(OCT1, [PAID_OCT1], { closing: CLOSED(OCT1, '2026-10-16T08:41:00.000Z') }),
@@ -357,6 +365,48 @@ describe('CommissionsPage', () => {
     expect(within(panel('Mes relevés')).getAllByRole('button')[0]?.textContent).toContain(
       'prime\u00a0+30,00',
     );
+  });
+
+  it('says under the amount a report sent and not validated yet, which it does not count (recette 16/11, CHT-30)', async () => {
+    const sent = (n: number, status: string, memberId: string = THEO.id) => ({
+      id: payId(400 + n),
+      shiftId: payId(500 + n),
+      creatorId: NORA_REVEAL.creatorId,
+      platformAccountId: NORA_REVEAL.id,
+      memberId,
+      period: OCT2,
+      correctsId: null,
+      amount: { amountMinor: 12_000, currency: 'EUR' },
+      comment: null,
+      incident: null,
+      status,
+      version: 1,
+      byAgency: false,
+      canReview: false,
+      submittedAt: '2026-11-01T00:30:00.000Z',
+      reviewedAt: status === 'submitted' ? null : '2026-11-02T09:00:00.000Z',
+      reviewNote: null,
+      reviewKind: status === 'submitted' ? null : 'human',
+      explanation: null,
+      check: null,
+      earningsSource: 'declared',
+      createdAt: '2026-11-01T00:30:00.000Z',
+    });
+    reports = { [OCT2]: [sent(1, 'submitted'), sent(2, 'validated')] };
+    renderPage();
+    const hero = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await waitFor(() => {
+      expect(text(hero)).toContain('+ 1 rapport en attente de validation, pas encore compté');
+    });
+    cleanup();
+
+    // Two of theirs, and none of another member's (a manager reads the team's list).
+    reports = { [OCT2]: [sent(1, 'submitted'), sent(3, 'submitted'), sent(4, 'submitted', payId(99))] };
+    renderPage();
+    const again = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await waitFor(() => {
+      expect(text(again)).toContain('+ 2 rapports en attente de validation, pas encore comptés');
+    });
   });
 
   it('says the payout delay the owner announced (PAIE-32)', async () => {
