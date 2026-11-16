@@ -1,5 +1,5 @@
 # 2026-11-16 — ADR 0147 Synchronisation de la session Reveal à l'ouverture du popup — proposed
-Fait : ADR 0147 proposée (l'extension synchronise seule la session Reveal quand le propriétaire ouvre le popup sur un onglet Reveal et que la session manque, expire ou a expiré ; sans rechargement ni appel à Reveal ; envoi au seul compte dont la modèle correspond). Index et glossaire (« Synchronisation à l'ouverture »).
+Fait : ADR 0147 proposée (l'extension synchronise seule la session Reveal quand le propriétaire ouvre le popup sur un onglet Reveal et que la session d'un compte déjà synchronisé expire ou a expiré ; sans rechargement ni appel à Reveal ; serveur arbitre, identité du compte de l'IA figée au premier clic, envoi au seul compte dont la modèle correspond ; ajouts de la relecture Sécurité). Index et glossaire (« Synchronisation à l'ouverture »).
 Pas fait : le code (après relecture Sécurité et « ok 0147 » de Charles), l'identifiant de la modèle dans la liste des comptes du connecteur, l'heure d'expiration renvoyée par le serveur (fil Bilan).
 Décisions : ADR 0147 proposée ; amende la fiche P2-01 sur la seule lecture « le temps du clic ».
 Découvertes : aucune.
