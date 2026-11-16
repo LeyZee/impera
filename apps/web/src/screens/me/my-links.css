@@ -2,6 +2,7 @@
 .my-links {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  align-content: start;
   gap: var(--nv-space-4);
   margin: 0;
   padding: 0;
