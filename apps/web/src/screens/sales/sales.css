@@ -13,9 +13,17 @@
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-faint);
 }
+/* The reading side before a fan is chosen: a plate of its own, not a line afloat on the page (recette CRE-04). */
 .vt-hint {
-  padding: var(--nv-space-6) var(--nv-space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-8) var(--nv-space-4);
   text-align: center;
+}
+.vt-hint > p {
+  margin: 0;
 }
 .vt-rows {
   display: flex;
@@ -185,6 +193,11 @@
 @media (min-width: 900px) {
   .vt-cols {
     grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+  }
+  /* The reading side follows the list down the page, so it never leaves an empty column behind. */
+  .vt-side {
+    position: sticky;
+    top: var(--nv-space-5);
   }
   .vt-reader .vt-back {
     display: none;
