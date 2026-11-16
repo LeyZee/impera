@@ -1,8 +1,9 @@
 /*
  * The copilot side panel (ADR 0086). Design system tokens only; `cp-` is local to this page. Top to bottom, the order of
  * the chatter's questions (Design 16/11, lot 0141-3): who he is and whether one may write (the band), what to do and the
- * text (the core), then the sale line and him in brief, the rest folded. Colour lives in the band's badges and the core
- * only: red for a limit that forbids the sale, amber for what holds it back. Nothing blinks.
+ * text (the core), then the sale line and him in brief, the rest folded. Colour says something or is not there (Design
+ * 16/11, lot 0141-5): red for a limit that forbids the sale, amber for what holds it back, the neon for the sale only
+ * (its notches, its step, its button), a tint of it for his desire. Nothing blinks.
  */
 
 html,
@@ -45,6 +46,8 @@ body {
 /* Stuck on top, one line: his name on the left, at most three badges on the right; they wrap under it only if needed. */
 .cp-band {
   flex: none;
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -53,6 +56,16 @@ body {
   box-sizing: border-box;
   padding: 6px var(--cp-gutter);
   border-bottom: 1px solid var(--nv-hairline);
+}
+/* The CRM's light above the page (`.nv-aura`), behind the band; gone as soon as something forbids or holds back. */
+.cp-band[data-halo='true']::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 -28px;
+  pointer-events: none;
+  background: radial-gradient(70% 120% at 50% -30%, var(--nv-aura-neon), transparent 72%);
+  opacity: 0.7;
 }
 .cp-band__fan {
   flex: 0 1 auto;
@@ -100,6 +113,24 @@ body {
 }
 .cp-badge[data-kind='desire'] svg:first-child {
   color: var(--nv-ink-muted);
+}
+/*
+ * His desire as a ramp of tints of the accent (Design 16/11, lot 0141-5): cold when neutral, a soft tint when he plays,
+ * the full tint and a filled flame when he is hot. A surface, never the neon itself, never red or amber; the words
+ * stay in ink.
+ */
+.cp-badge[data-kind='desire'][data-band='playful'] {
+  background: var(--nv-neon-soft);
+}
+.cp-badge[data-kind='desire'][data-band='hot'] {
+  background: color-mix(in srgb, var(--nv-neon) 24%, transparent);
+}
+.cp-badge[data-kind='desire'][data-band='playful'] svg:first-child,
+.cp-badge[data-kind='desire'][data-band='hot'] svg:first-child {
+  color: var(--nv-neon-ink);
+}
+.cp-badge[data-kind='desire'][data-band='hot'] svg:first-child {
+  fill: currentColor;
 }
 /* « +N » (ADR 0141 § 14): a word of the band, its target grown to 44 px around it without moving the line. */
 .cp-badges__more {
@@ -174,6 +205,44 @@ body {
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
   text-wrap: pretty;
+}
+/*
+ * The moment to sell, in place of « pourquoi » (ADR 0141 § 4 bis; Design 16/11, lot 0141-5): one notch per condition,
+ * filled in the neon when it is met, an outline otherwise, then the verdict and what is missing.
+ */
+.cp-moment {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.cp-moment[data-verdict='now'] {
+  color: var(--nv-ink);
+}
+.cp-moment__text {
+  min-width: 0;
+  text-wrap: pretty;
+}
+.cp-notches {
+  flex: none;
+  display: inline-flex;
+  gap: 3px;
+}
+.cp-notch {
+  flex: none;
+  width: 14px;
+  height: 6px;
+  box-sizing: border-box;
+  border-radius: var(--nv-radius-full);
+  border: 1px solid var(--nv-ink-faint);
+}
+.cp-notch[data-met='true'] {
+  border: 0;
+  background: var(--nv-neon);
+  box-shadow: 0 0 6px -1px var(--nv-aura-neon);
 }
 .cp-move[data-tone='amber'] .cp-move__what,
 .cp-move[data-tone='amber'] .cp-move__cut {
@@ -286,7 +355,8 @@ body {
   padding: 7px 12px;
   border-radius: var(--nv-radius-md);
   border-bottom-right-radius: var(--nv-radius-xs);
-  background: var(--nv-glass-fill-strong);
+  /* A light tint of her bubbles in the inbox (Design 16/11, lot 0141-5): hers, not yet sent. */
+  background: color-mix(in oklab, var(--nv-bubble-sent) 55%, transparent);
   outline: 1px dashed var(--nv-ink-faint);
   outline-offset: -1px;
   color: var(--nv-ink);
@@ -538,6 +608,9 @@ body {
   column-gap: var(--nv-space-2);
 }
 .cp-field__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
   font-weight: 500;
@@ -601,8 +674,13 @@ body {
   line-height: var(--nv-text-body-leading);
   color: var(--nv-ink);
 }
+/* The first name in the serif of the CRM's titles, not in colour (Design 16/11, lot 0141-5). */
 .cp-ident__name {
-  font-weight: 600;
+  font-family: var(--nv-font-serif);
+  font-size: 1.3em;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
 }
 .cp-ident__part {
   display: inline-flex;
@@ -805,16 +883,51 @@ body {
   box-sizing: border-box;
   border: 1px solid var(--nv-ink-faint);
 }
+/* Done: filled in the text's ink; in progress: the neon with a light halo; to come: an outline (Design, lot -5). */
 .cp-step[data-step='done'] {
   border: 0;
-  background: var(--nv-ink-muted);
+  background: var(--nv-ink);
 }
 .cp-step[data-step='now'] {
   width: 8px;
   height: 8px;
   border: 0;
-  background: var(--nv-ink);
+  background: var(--nv-neon);
+  box-shadow:
+    0 0 0 3px var(--nv-neon-soft),
+    0 0 8px var(--nv-aura-neon);
 }
 .cp-sale .cp-fields {
   padding: 0 var(--nv-space-1) var(--nv-space-1);
+}
+
+/* A muted icon in front of each line of the card and each fold (Design 16/11, lot 0141-5): found by shape, never coloured. */
+.cp-line-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--nv-ink-faint);
+}
+
+/* The moment's conditions in the sale's detail, each with its state. */
+.cp-conditions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-condition {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink);
+}
+.cp-condition__state {
+  margin-left: auto;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
 }

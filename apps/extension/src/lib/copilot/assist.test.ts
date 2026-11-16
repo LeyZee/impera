@@ -1,7 +1,18 @@
 import { CopilotAssistSchema, type CopilotAssist, type CopilotNextMove } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { CUT_LINES, cutOf, draftNotes, eurosOf, moveLines, saleLine, saleRows, stepDots } from './assist';
+import {
+  CUT_LINES,
+  cutOf,
+  draftNotes,
+  eurosOf,
+  conditionWords,
+  momentLine,
+  moveLines,
+  saleLine,
+  saleRows,
+  stepDots,
+} from './assist';
 import { standingOf } from './standing';
 
 /* Invented data (ADR 0010). */
@@ -198,5 +209,93 @@ describe('what the agent computed, said to the chatter (ADR 0141, lot a)', () =>
       label: 'Prochaine étape',
       value: '«\u00a0Étape 3\u00a0» 15\u00a0€',
     });
+  });
+});
+
+describe('the moment to sell (ADR 0141 § 4 bis)', () => {
+  const noSale = (block: 'low_desire' | 'risk' | 'cooldown') => ({
+    kind: 'no_sale' as const,
+    label: 'Ne rien vendre',
+    priceMinor: null,
+    block,
+  });
+
+  it("says the verdict in the panel's words, then what is missing, one notch per condition", () => {
+    expect(
+      momentLine(
+        {
+          verdict: 'not_yet',
+          conditions: [
+            { code: 'desire_below_threshold', met: false },
+            { code: 'not_sexualizing', met: false },
+            { code: 'availability_unconfirmed', met: true },
+          ],
+        },
+        null,
+      ),
+    ).toEqual({
+      notches: [false, false, true],
+      text: 'Pas encore · il manque\u00a0: son désir est encore bas, il n’a pas encore pris le ton coquin',
+      verdict: 'not_yet',
+    });
+    expect(
+      momentLine({ verdict: 'soon', conditions: [{ code: 'step_waiting', met: false }] }, null).text,
+    ).toBe('Bientôt · il manque\u00a0: une étape attend son achat');
+  });
+
+  it('says why the moment is good when he asks for content himself', () => {
+    expect(
+      momentLine({ verdict: 'good', conditions: [{ code: 'fan_asks_for_paid', met: true }] }, null),
+    ).toEqual({ notches: [true], text: 'Bon moment · il demande du contenu lui-même', verdict: 'good' });
+    expect(momentLine({ verdict: 'good', conditions: [] }, null).text).toBe('Bon moment');
+  });
+
+  it('gives the hour a cooldown ends, the way the CRM writes it', () => {
+    const until = new Date(2026, 10, 16, 18, 20).toISOString();
+    const moment = {
+      verdict: 'not_yet' as const,
+      conditions: [{ code: 'cooldown' as const, met: false, until }],
+    };
+    expect(momentLine(moment, null).text).toBe(
+      'Pas encore · il manque\u00a0: une offre est trop récente, jusqu’à 18\u00a0h\u00a020',
+    );
+    expect(conditionWords({ code: 'cooldown', met: false, until: null })).toBe('Une offre est trop récente');
+  });
+
+  it('counts the messages still needed from him, when the server knows it', () => {
+    expect(conditionWords({ code: 'fan_messages', met: false, remaining: 1 })).toBe(
+      'Il faut encore 1\u00a0message de lui',
+    );
+    expect(conditionWords({ code: 'fan_messages', met: false, remaining: 3 })).toBe(
+      'Il faut encore 3\u00a0messages de lui',
+    );
+    expect(conditionWords({ code: 'fan_messages', met: false, remaining: null })).toBe(
+      'Il faut encore des messages de lui',
+    );
+    expect(conditionWords({ code: 'fan_messages', met: false })).toBe('Il faut encore des messages de lui');
+    expect(
+      momentLine({ verdict: 'soon', conditions: [{ code: 'fan_messages', met: false, remaining: 2 }] }, null)
+        .text,
+    ).toBe('Bientôt · il manque\u00a0: il faut encore 2\u00a0messages de lui');
+  });
+
+  it('adds a block of the code that no condition sent says, never one it already says', () => {
+    const moment = {
+      verdict: 'not_yet' as const,
+      conditions: [
+        { code: 'desire_below_threshold' as const, met: false },
+        { code: 'not_sexualizing' as const, met: true },
+      ],
+    };
+    expect(momentLine(moment, noSale('low_desire')).text).toBe(
+      'Pas encore · il manque\u00a0: son désir est encore bas',
+    );
+    expect(momentLine(moment, noSale('risk')).text).toBe(
+      'Pas encore · Un risque bloque la vente · il manque\u00a0: son désir est encore bas',
+    );
+    // A cooldown the server did not send as a condition is still said.
+    expect(momentLine(moment, noSale('cooldown')).text).toBe(
+      'Pas encore · Offre trop récente · il manque\u00a0: son désir est encore bas',
+    );
   });
 });

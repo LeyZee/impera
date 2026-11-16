@@ -47,7 +47,14 @@ describe('the status band (Design 16/11, lot 0141-3)', () => {
       ['care', 'amber', 'alert'],
       ['desire', 'neutral', 'flame'],
     ]);
-    expect(badges[2]).toMatchObject({ words: 'chaud', trend: 'up', label: 'Désir chaud, en hausse' });
+    expect(badges[2]).toMatchObject({
+      words: 'chaud',
+      trend: 'up',
+      // Next to a stop, his desire is said without its tint (Design 16/11, lot 0141-5).
+      band: null,
+      label: 'Désir chaud, en hausse',
+    });
+    expect(badges[0]?.band).toBeNull();
   });
 
   it('gives his desire its direction only, never a flat one, and none under a cut', () => {
@@ -68,7 +75,8 @@ describe('the status band (Design 16/11, lot 0141-3)', () => {
       null,
       false,
     );
-    expect(flat.badges[0]).toMatchObject({ trend: null, label: 'Désir joueur' });
+    // Nothing forbids: its band carries the ramp of tints (Design 16/11, lot 0141-5).
+    expect(flat.badges[0]).toMatchObject({ trend: null, band: 'playful', label: 'Désir joueur' });
     const cut = bandBadges(
       standingOf({ fragile: true }, 'hot'),
       assist({ signals: { desireTrend: 'up', followUpDue: true } }),

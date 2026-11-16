@@ -1,4 +1,4 @@
-import type { CopilotAssist, CopilotCut } from '@impera/contracts';
+import type { CopilotAssist, CopilotCut, DesireBand } from '@impera/contracts';
 
 import type { IconName } from '../icons';
 
@@ -20,6 +20,8 @@ export interface Badge {
   readonly words: string;
   /** His desire's direction since the message before (§ 4): its sense only, the figure stays in the CRM. */
   readonly trend: 'up' | 'down' | null;
+  /** The desire badge's band, for its ramp of tints (Design 16/11): cold, a soft tint, the full tint. */
+  readonly band: DesireBand | null;
   /** What a screen reader says: the whole badge in words. */
   readonly label: string;
 }
@@ -43,6 +45,7 @@ function desireBadge(standing: Standing, trend: 'up' | 'down' | null): Badge | n
     icon: 'flame',
     words,
     trend,
+    band: standing.band,
     label: capital(trend === null ? label : `${label}, ${TREND_WORDS[trend]}`),
   };
 }
@@ -58,6 +61,7 @@ const badge = (kind: Badge['kind'], tone: BadgeTone, icon: IconName, words: stri
   icon,
   words,
   trend: null,
+  band: null,
   label: words,
 });
 
@@ -74,10 +78,15 @@ export function bandBadges(
   ];
   const lively = cut === null ? assist : null;
   const direction = lively?.signals.desireTrend;
-  const desire =
+  const shownDesire =
     cut === 'age_doubt'
       ? null
       : desireBadge(standing, direction === 'up' || direction === 'down' ? direction : null);
+  // Its tint only while nothing forbids or holds back: next to a stop, a warm badge would read as a second alert.
+  const desire =
+    shownDesire === null || (held.length === 0 && cut === null)
+      ? shownDesire
+      : { ...shownDesire, band: null };
   const parts = desire === null ? held : [...held, desire];
   const signals = [
     ...(lively?.signals.followUpDue === true ? [badge('signal', 'neutral', 'clock', 'Relance due')] : []),

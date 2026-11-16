@@ -6,7 +6,12 @@ import type {
   CopilotSaleBlock,
   CopilotSaleState,
   DesireBand,
+  SaleCondition,
+  SaleMoment,
+  SaleMomentVerdict,
 } from '@impera/contracts';
+
+import { hourOf } from '../hour';
 
 import { DESIRE_WORDS, type Standing } from './standing';
 
@@ -213,4 +218,88 @@ export function saleRows(
     rows.push({ label: 'Objections déjà servies', value: sale.usedObjections.join(', ') });
   if (sale.customOrderOpen) rows.push({ label: 'Commande perso', value: 'Ouverte' });
   return rows;
+}
+
+/** The moment to sell in words (ADR 0141 § 4 bis): a closed list, the panel's. */
+const MOMENT_WORDS: Readonly<Record<SaleMomentVerdict, string>> = {
+  good: 'Bon moment',
+  soon: 'Bientôt',
+  not_yet: 'Pas encore',
+};
+
+/** The conditions in words: the server sends only the code, the panel words it. */
+const CONDITION_WORDS: Readonly<Record<SaleCondition, string>> = {
+  desire_below_threshold: 'Son désir est encore bas',
+  not_sexualizing: 'Il n’a pas encore pris le ton coquin',
+  availability_unconfirmed: 'On ne sait pas s’il est dispo',
+  cooldown: 'Une offre est trop récente',
+  no_budget: 'Il a dit ne pas pouvoir payer',
+  step_waiting: 'Une étape attend son achat',
+  age_unconfirmed: 'Son âge n’est pas encore confirmé',
+  fan_messages: 'Il faut encore des messages de lui',
+  fan_asks_for_paid: 'Il demande du contenu lui-même',
+};
+
+type SaleMomentCondition = SaleMoment['conditions'][number];
+
+/** One condition in the panel's words, with the hour a cooldown ends and the count of messages still needed. */
+export function conditionWords(condition: SaleMomentCondition): string {
+  const { code, remaining, until } = condition;
+  if (code === 'fan_messages' && remaining != null)
+    return `Il faut encore ${String(remaining)}\u00a0${remaining === 1 ? 'message' : 'messages'} de lui`;
+  if (code === 'cooldown' && until != null)
+    return `${CONDITION_WORDS.cooldown}, jusqu’à ${hourOf(new Date(until))}`;
+  return CONDITION_WORDS[code];
+}
+
+/** The sale blocks a condition says when the server sends it (« Désir encore trop bas » is « Son désir est encore bas »). */
+const BLOCK_CONDITIONS: Readonly<Partial<Record<CopilotSaleBlock, SaleCondition>>> = {
+  low_desire: 'desire_below_threshold',
+  cooldown: 'cooldown',
+  no_budget: 'no_budget',
+  age_unconfirmed: 'age_unconfirmed',
+};
+
+const lowerFirst = (words: string): string => words.charAt(0).toLowerCase() + words.slice(1);
+
+export interface MomentLine {
+  /** One notch per condition, filled when it is met. */
+  readonly notches: readonly boolean[];
+  /** « Pas encore · il manque : son désir est encore bas », « Bon moment · il demande du contenu lui-même ». */
+  readonly text: string;
+  readonly verdict: SaleMomentVerdict;
+}
+
+/**
+ * The line under the gesture when the server says the moment to sell (§ 4 bis; Design 16/11): it takes the place of
+ * « pourquoi », the verdict, then what is missing in the panel's words. A block of the code that no condition sent says
+ * (« Un risque bloque la vente ») is said too, so a « Ne rien vendre » never goes without its reason.
+ */
+export function momentLine(moment: SaleMoment, move: CopilotNextMove | null): MomentLine {
+  const sent = new Set(moment.conditions.map(({ code }) => code));
+  const missing = moment.conditions
+    .filter(({ met }) => !met)
+    .map((condition) => lowerFirst(conditionWords(condition)));
+  const block = move?.kind === 'no_sale' ? move.block : null;
+  const covering = block === null ? undefined : BLOCK_CONDITIONS[block];
+  const blockWords =
+    block === null || (covering !== undefined && sent.has(covering))
+      ? null
+      : (move?.blockLabel ?? BLOCK_WORDS[block]);
+  const asks =
+    moment.verdict === 'good' &&
+    moment.conditions.some(({ code, met }) => code === 'fan_asks_for_paid' && met)
+      ? lowerFirst(CONDITION_WORDS.fan_asks_for_paid)
+      : null;
+  const parts = [
+    MOMENT_WORDS[moment.verdict],
+    asks,
+    blockWords,
+    missing.length === 0 ? null : `il manque\u00a0: ${missing.join(', ')}`,
+  ].filter((part): part is string => part !== null);
+  return {
+    notches: moment.conditions.map(({ met }) => met),
+    text: parts.join(' · '),
+    verdict: moment.verdict,
+  };
 }

@@ -4,6 +4,7 @@ import {
   type CopilotCut,
   type DesireBand,
   type FanCardEntry,
+  type FanCardField,
   type FanCardFieldSpec,
   type FanCardGroup,
   type FanCardView,
@@ -12,8 +13,11 @@ import {
 
 import {
   CUT_LINES,
+  type MomentLine,
   cutOf,
   draftNotes,
+  conditionWords,
+  momentLine,
   moveLines,
   saleLine,
   saleRows,
@@ -251,7 +255,7 @@ function field(
     h(
       'span',
       { class: 'cp-field__top' },
-      h('span', { class: 'cp-field__label' }, spec.label),
+      fieldLabel(spec.field, spec.label),
       current !== null && isNew(current.observedAt, marks) ? newMark() : null,
       sayIt ? h('span', { class: 'cp-field__source' }, source) : null,
     ),
@@ -334,12 +338,38 @@ function identity(card: FanCardView, marks: Marks, ageDisputed: boolean): HTMLEl
 /** What is masked while his age is contested (ADR 0141 § 9, Agent 16/11): said the same way on both rows. */
 const MASKED = 'Masqué tant que son âge est contesté.';
 
+/**
+ * A muted icon in front of each line of the card and each fold (Design 16/11, lot 0141-5): found by shape, never
+ * coloured.
+ */
+const FIELD_ICONS: Partial<Record<FanCardField, IconName>> = {
+  desires: 'heart',
+  limits: 'circleMinus',
+  life_events: 'planning',
+};
+const GROUP_ICONS: Readonly<Record<FanCardGroup, IconName>> = {
+  him: 'me',
+  about_her: 'eye',
+  intimate: 'lock',
+};
+
+const lineIcon = (name: IconName): HTMLElement =>
+  h('span', { class: 'cp-line-icon', 'aria-hidden': 'true' }, icon(name, 14));
+
+const groupIcon = (group: FanCardGroup): HTMLElement => lineIcon(GROUP_ICONS[group]);
+
+/** A field's label as a muted overline, its icon in front when it has one. */
+function fieldLabel(field: FanCardField, label: string): HTMLElement {
+  const name = FIELD_ICONS[field];
+  return h('span', { class: 'cp-field__label' }, name === undefined ? null : lineIcon(name), label);
+}
+
 /** « Ses fantasmes » masked: its label, then only why, in the muted ink. Nothing of its value, source or checks. */
 const maskedField = (spec: FanCardFieldSpec): HTMLElement =>
   h(
     'li',
     { class: 'cp-field', 'data-field': spec.field, 'data-masked': 'true' },
-    h('span', { class: 'cp-field__top' }, h('span', { class: 'cp-field__label' }, spec.label)),
+    h('span', { class: 'cp-field__top' }, fieldLabel(spec.field, spec.label)),
     h('span', { class: 'cp-field__masked' }, MASKED),
   );
 
@@ -351,6 +381,7 @@ const maskedGroup = (group: FanCardGroup, title: string): HTMLElement =>
     h(
       'div',
       { class: 'cp-group__row' },
+      groupIcon(group),
       h('span', { class: 'cp-group__title' }, title),
       h('span', { class: 'cp-group__sum' }, MASKED),
     ),
@@ -375,7 +406,7 @@ function briefField(spec: FanCardFieldSpec, entry: FanCardEntry, marks: Marks): 
     h(
       'span',
       { class: 'cp-field__top' },
-      h('span', { class: 'cp-field__label' }, spec.label),
+      fieldLabel(spec.field, spec.label),
       current !== null && isNew(current.observedAt, marks) ? newMark() : null,
       current === null ? null : h('span', { class: 'cp-field__source' }, sourceLine(current, marks.now)),
     ),
@@ -446,6 +477,7 @@ function discoverFold(
     h(
       'summary',
       {},
+      h('span', { class: 'cp-line-icon', 'aria-hidden': 'true' }, icon('search', 16)),
       h('span', { class: 'cp-discover__count' }, `${String(count)} à découvrir`),
       h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
     ),
@@ -491,6 +523,7 @@ function groupFolds(
       h(
         'summary',
         {},
+        groupIcon(group),
         h('span', { class: 'cp-group__title' }, title),
         h(
           'span',
@@ -527,6 +560,7 @@ function badgeNode(badge: Badge): HTMLElement {
       'aria-label': badge.label,
       'data-tone': badge.tone,
       'data-kind': badge.kind,
+      'data-band': badge.band ?? undefined,
     },
     icon(badge.icon, 14),
     h('span', { class: 'cp-badge__words' }, badge.words),
@@ -547,10 +581,13 @@ function statusBand(
   open: boolean,
 ): HTMLElement {
   const badges = h('div', { class: 'cp-badges', 'aria-label': 'Où on en est' });
+  let calm = false;
   if (standing === null) badges.append(h('span', { class: 'cp-badges__wait', 'aria-busy': 'true' }, '…'));
   else {
     const { badges: shown, hidden } = bandBadges(standing, assist, cut, open);
     badges.append(...shown.map(badgeNode));
+    // The CRM's light above the page, behind the band; gone as soon as something forbids or holds back (Design 16/11).
+    calm = cut === null && shown.every(({ kind }) => kind === 'desire' || kind === 'signal');
     if (hidden > 0)
       badges.append(
         h(
@@ -567,7 +604,7 @@ function statusBand(
   }
   return h(
     'header',
-    { class: 'cp-band' },
+    { class: 'cp-band', 'data-halo': calm ? 'true' : undefined },
     fanName === null ? null : h('span', { class: 'cp-band__fan' }, fanName),
     badges,
   );
@@ -593,11 +630,31 @@ function moveBand(
   }
   if (assist?.nextMove == null) return null;
   const { what, why, tone } = moveLines(assist.nextMove, assist.reasons, { band, sale: assist.sale });
+  // The moment to sell takes the place of « pourquoi » when the server says it (§ 4 bis): not one block more.
+  const moment = assist.saleMoment == null ? null : momentLine(assist.saleMoment, assist.nextMove);
   return h(
     'section',
     { class: 'cp-move', 'data-tone': tone, 'data-move': assist.nextMove.kind, 'aria-label': 'Quoi faire' },
     h('p', { class: 'cp-move__what' }, what),
-    why === null ? null : h('p', { class: 'cp-move__why' }, why),
+    moment === null ? (why === null ? null : h('p', { class: 'cp-move__why' }, why)) : momentNode(moment),
+  );
+}
+
+/** One notch per condition, filled in the neon when it is met, an outline otherwise (Design 16/11, lot 0141-5). */
+const notches = (met: readonly boolean[]): HTMLElement =>
+  h(
+    'span',
+    { class: 'cp-notches', 'aria-hidden': 'true' },
+    ...met.map((done) => h('span', { class: 'cp-notch', 'data-met': done ? 'true' : 'false' })),
+  );
+
+/** « Bon moment », or « Pas encore · il manque : … », after its notches: read at a glance, said in words. */
+function momentNode(moment: MomentLine): HTMLElement {
+  return h(
+    'p',
+    { class: 'cp-moment', 'data-verdict': moment.verdict, 'aria-label': `Moment de vendre : ${moment.text}` },
+    notches(moment.notches),
+    h('span', { class: 'cp-moment__text' }, moment.text),
   );
 }
 
@@ -617,6 +674,33 @@ function saleFold(
   const lineSaysNext = assist?.nextMove?.kind !== 'no_sale';
   const rows = saleRows(sale, { withNext: !lineSaysNext });
   const dots = stepDots(sale);
+  const moment = assist?.saleMoment ?? null;
+  // Each condition of the moment with its state, the detail of the notches under the gesture (§ 4 bis).
+  const momentRow =
+    moment === null || moment.conditions.length === 0
+      ? null
+      : h(
+          'li',
+          { class: 'cp-field', 'data-row': 'moment' },
+          h('span', { class: 'cp-field__top' }, h('span', { class: 'cp-field__label' }, 'Moment de vendre')),
+          h(
+            'ul',
+            { class: 'cp-conditions' },
+            ...moment.conditions.map((condition) =>
+              h(
+                'li',
+                { class: 'cp-condition', 'data-met': condition.met ? 'true' : 'false' },
+                h('span', {
+                  class: 'cp-notch',
+                  'data-met': condition.met ? 'true' : 'false',
+                  'aria-hidden': 'true',
+                }),
+                h('span', {}, conditionWords(condition)),
+                h('span', { class: 'cp-condition__state' }, condition.met ? 'acquis' : 'manque'),
+              ),
+            ),
+          ),
+        );
   const details = h(
     'details',
     { class: 'cp-sale', 'data-group': 'sale', open },
@@ -636,6 +720,7 @@ function saleFold(
     h(
       'ul',
       { class: 'cp-fields' },
+      ...(momentRow === null ? [] : [momentRow]),
       ...(rows.length === 0
         ? [
             h(
@@ -800,11 +885,13 @@ interface DraftStops {
   readonly saidAbove: boolean;
   /** Notes on the draft's text recorded with it (« Réécrit une fois par une garde »), in the server's words. */
   readonly notes: readonly string[];
+  /** The gesture is a sale the code proposes: « Copier pour Reveal » takes the brand's neon (Design 16/11, lot -5). */
+  readonly sale: boolean;
 }
 
 function draftPart(
   draft: DraftPart,
-  { withheld, stops, saidAbove, notes }: DraftStops,
+  { withheld, stops, saidAbove, notes, sale }: DraftStops,
   actions: PanelActions,
 ): HTMLElement | null {
   if (draft.kind === 'hidden') return null;
@@ -978,9 +1065,12 @@ function draftPart(
           type: 'button',
           // Under a stop the gesture is the secondary plate (V-EXT-03), outlined so it never reads as off (Design, lot
           // 0141-3): the sentence above asks to reread, the button still works.
+          // A sale proposed takes the brand's neon, the one place of the panel where it shines (Design 16/11, lot -5).
           class: stopped
             ? 'nv-btn nv-btn--soft nv-btn--sm cp-place cp-place--quiet'
-            : 'nv-btn nv-btn--sm cp-send cp-place',
+            : sale
+              ? 'nv-btn nv-btn--neon nv-btn--sm cp-place cp-place--sale'
+              : 'nv-btn nv-btn--sm cp-send cp-place',
           'data-gesture': 'place',
         },
         'Copier pour Reveal ',
@@ -1116,6 +1206,7 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       stops: screen.standing?.stops ?? [],
       saidAbove: cut !== null && !draftSaysCut,
       notes: assist === null ? [] : draftNotes(assist.reasons),
+      sale: cut === null && assist?.nextMove?.kind === 'offer_step',
     };
     const band = statusBand(screen.fanName, screen.standing, assist, cut, screen.signalsOpen);
     const pinned = move === null ? [] : [move];

@@ -9,7 +9,7 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
-import { standingOf } from '../../lib/copilot/standing';
+import { standingOf, type Standing } from '../../lib/copilot/standing';
 
 import { render, type DraftPart, type PanelActions, type PanelScreen } from './view';
 
@@ -789,8 +789,9 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     expect(move?.querySelector('.cp-move__why')?.textContent).toBe('Désir chaud, étape 2 sur 4');
     expect(root.querySelector('.cp-draft__about')?.textContent).toBe('Réécrit une fois par une garde');
     expect(move?.textContent).not.toContain('Réécrit');
-    // « Copier pour Reveal » stays the one strong action; lot b's buttons are not drawn yet.
-    expect(root.querySelectorAll('.cp-send')).toHaveLength(1);
+    // « Copier pour Reveal » stays the one strong action, in the brand's neon on a sale; lot b's buttons are not drawn.
+    expect(root.querySelectorAll('[data-gesture="place"]')).toHaveLength(1);
+    expect(root.querySelector('[data-gesture="place"]')?.className).toContain('nv-btn--neon');
     expect(root.querySelector('[data-assist]')).toBeNull();
   });
 
@@ -1019,5 +1020,136 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     expect(many.querySelectorAll('.cp-badge[data-tone="amber"]')).toHaveLength(3);
     expect(many.querySelector('.cp-badges__more')?.textContent).toBe('+2');
     expect(many.querySelector('[title]')).toBeNull();
+  });
+});
+
+describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 0141-5)', () => {
+  const moment = (
+    verdict: 'good' | 'soon' | 'not_yet',
+    met: [boolean, boolean, boolean],
+  ): NonNullable<CopilotAssist['saleMoment']> => ({
+    verdict,
+    conditions: [
+      { code: 'desire_below_threshold', met: met[0] },
+      { code: 'not_sexualizing', met: met[1] },
+      { code: 'availability_unconfirmed', met: met[2] },
+    ],
+  });
+  const drawn = (assist: CopilotAssist, standing: Standing | null = standingOf({}, 'hot')): HTMLElement =>
+    draw(onCard(card({}), [], { draft: ready(), standing, assist })).root;
+  const place = (root: ParentNode): string => root.querySelector('[data-gesture="place"]')?.className ?? '';
+
+  it('says the moment in place of « pourquoi »: its notches, its verdict, what is missing', () => {
+    const root = drawn(
+      assistOf({
+        nextMove: { kind: 'no_sale', label: 'Ne rien vendre', priceMinor: null, block: 'low_desire' },
+        saleMoment: moment('not_yet', [false, true, true]),
+      }),
+    );
+    expect(root.querySelector('.cp-move__why')).toBeNull();
+    const line = root.querySelector<HTMLElement>('.cp-moment');
+    expect(line?.dataset['verdict']).toBe('not_yet');
+    expect(line?.textContent).toBe('Pas encore · il manque\u00a0: son désir est encore bas');
+    expect(
+      [...(line?.querySelectorAll<HTMLElement>('.cp-notch') ?? [])].map((n) => n.dataset['met']),
+    ).toEqual(['false', 'true', 'true']);
+    // Not a sale: the button keeps its ink.
+    expect(place(root)).toContain('cp-send');
+    expect(place(root)).not.toContain('nv-btn--neon');
+  });
+
+  it.each([
+    ['good', [true, true, true], 'Bon moment'],
+    ['soon', [true, false, true], 'Bientôt · il manque\u00a0: il n’a pas encore pris le ton coquin'],
+  ] as const)("words the verdict %s from the panel's closed list", (verdict, met, text) => {
+    const root = drawn(assistOf({ saleMoment: moment(verdict, [...met]) }));
+    expect(root.querySelector('.cp-moment__text')?.textContent).toBe(text);
+  });
+
+  it('says a block no condition says, so « Ne rien vendre » never goes without its reason', () => {
+    const root = drawn(
+      assistOf({
+        nextMove: { kind: 'no_sale', label: 'Ne rien vendre', priceMinor: null, block: 'no_budget' },
+        saleMoment: moment('not_yet', [true, true, true]),
+      }),
+    );
+    expect(root.querySelector('.cp-moment__text')?.textContent).toBe(
+      'Pas encore · Il a dit ne pas avoir d’argent',
+    );
+  });
+
+  it('keeps « pourquoi » for a server that does not say the moment', () => {
+    const root = drawn(assistOf());
+    expect(root.querySelector('.cp-moment')).toBeNull();
+    expect(root.querySelector('.cp-move__why')?.textContent).toBe('Désir chaud, étape 2 sur 4');
+  });
+
+  it("draws no notch under a cut, the server's or the panel's own, never greyed ones", () => {
+    for (const root of [
+      drawn(assistOf({ cuts: ['sales_frozen'], saleMoment: moment('good', [true, true, true]) })),
+      drawn(
+        assistOf({ saleMoment: moment('good', [true, true, true]) }),
+        standingOf({ doNotContact: true }, 'hot'),
+      ),
+    ]) {
+      expect(root.querySelector('.cp-notch')).toBeNull();
+      expect(place(root)).not.toContain('nv-btn--neon');
+    }
+  });
+
+  it('lists each condition with its state in the sale detail', () => {
+    const root = drawn(assistOf({ saleMoment: moment('soon', [true, false, true]) }));
+    const rows = [...root.querySelectorAll('.cp-sale .cp-condition')].map((row) => row.textContent);
+    expect(rows).toEqual([
+      'Son désir est encore basacquis',
+      'Il n’a pas encore pris le ton coquinmanque',
+      'On ne sait pas s’il est dispoacquis',
+    ]);
+  });
+
+  it('tints the desire badge by its band, never in red or amber', () => {
+    for (const band of ['neutral', 'playful', 'hot'] as const) {
+      const root = draw(onCard(card({}), [], { draft: ready(), standing: standingOf({}, band) })).root;
+      const badge = root.querySelector<HTMLElement>('.cp-badge[data-kind="desire"]');
+      expect(badge?.dataset['band']).toBe(band);
+      expect(badge?.dataset['tone']).toBe('neutral');
+    }
+  });
+
+  it("drops the desire's tint next to a stop, so it never reads as a second alert", () => {
+    const root = drawn(
+      assistOf({ cuts: ['sales_frozen'] }),
+      standingOf({ salesFrozen: { reason: 'distress', since: now.toISOString() } }, 'hot'),
+    );
+    const badge = root.querySelector<HTMLElement>('.cp-badge[data-kind="desire"]');
+    expect(badge?.textContent).toContain('chaud');
+    expect(badge?.dataset['band']).toBeUndefined();
+  });
+
+  it('marks each step dot as done, in progress or to come', () => {
+    const root = drawn(assistOf());
+    expect([...root.querySelectorAll<HTMLElement>('.cp-step')].map((dot) => dot.dataset['step'])).toEqual([
+      'done',
+      'now',
+      'next',
+      'next',
+    ]);
+  });
+
+  it("lights the band with the CRM's halo only while nothing forbids or holds back", () => {
+    expect(drawn(assistOf()).querySelector<HTMLElement>('.cp-band')?.dataset['halo']).toBe('true');
+    const frozen = drawn(assistOf({ cuts: ['sales_frozen'] }));
+    expect(frozen.querySelector<HTMLElement>('.cp-band')?.dataset['halo']).toBeUndefined();
+  });
+
+  it("puts a muted icon in front of the card's lines and folds", () => {
+    const root = draw(
+      onCard(card({ desires: { current: value(['qu’elle prenne les devants']), toCheck: [] } }), [], {
+        draft: ready(),
+        standing: standingOf({}, 'hot'),
+      }),
+    ).root;
+    expect(root.querySelector('[data-field="desires"] .cp-line-icon svg')).not.toBeNull();
+    expect(root.querySelectorAll('.cp-group .cp-line-icon')).toHaveLength(3);
   });
 });
