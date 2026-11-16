@@ -199,12 +199,17 @@ describe('Playground', () => {
     const title = await screen.findByText('Le serveur ne répond pas');
     expect(title.classList.contains('is-warn')).toBe(true);
     expect(screen.queryByText(/Grok/)).toBeNull();
+    expect(screen.getByText('Réessaie dans un instant.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
     cleanup();
     answer = (method, path) =>
       method === 'GET' && path === '/v1/playground' ? failure(503, 'llm_unavailable') : undefined;
     open();
     expect(await screen.findByText('Grok ne répond pas')).toBeTruthy();
+    expect(screen.getByText('Ajoute ou vérifie sa clé dans Réglages, Modèles IA.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Ouvrir Réglages, Modèles IA' }).getAttribute('href')).toBe(
+      '/reglages/modeles-ia',
+    );
   });
 
   it('names the fan by his first name only, without repeating the fan type in the header', async () => {

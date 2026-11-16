@@ -5,6 +5,7 @@ import type {
   PlaygroundMedia,
   Verdict,
 } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { Composer, Conversation, LessonCard, type LocalMode } from './playground/Conversation';
@@ -43,7 +44,7 @@ function fanName(notes: readonly string[]): string {
 
 const ERRORS: Readonly<Record<PlaygroundErrorCode, string>> = {
   llm_unavailable: 'Grok ne répond pas : ajoute ou vérifie sa clé dans Réglages, Modèles IA.',
-  unreachable: 'Le serveur d’Impera n’a pas répondu. Réessaie dans un instant.',
+  unreachable: 'Le serveur ne répond pas. Réessaie dans un instant.',
   not_deployed: 'Le playground n’est pas encore en ligne sur ce serveur.',
   still_writing: 'L’agent rédige encore la réponse précédente.',
   forbidden: 'Le Playground est réservé au propriétaire pour l’instant.',
@@ -52,6 +53,16 @@ const ERRORS: Readonly<Record<PlaygroundErrorCode, string>> = {
 
 /** How often the screen asks for the brain's reading while the voice writes. */
 const READING_POLL_MS = 1500;
+
+/** Under the first screen's title, only what to do: the title already says what went wrong (avis Design 16/11). */
+const LOADING_ACTIONS: Readonly<Record<PlaygroundErrorCode, string>> = {
+  llm_unavailable: 'Ajoute ou vérifie sa clé dans Réglages, Modèles IA.',
+  unreachable: 'Réessaie dans un instant.',
+  not_deployed: 'Il arrive avec la prochaine mise à jour du serveur.',
+  still_writing: 'Attends la fin de la réponse précédente.',
+  forbidden: ERRORS.forbidden,
+  failed: 'Réessaie dans un instant.',
+};
 
 /** The first screen's title: the AI provider is named only when the server said it refused (V-ETA-06). */
 const LOADING_TITLES: Readonly<Record<PlaygroundErrorCode, string>> = {
@@ -266,10 +277,16 @@ export function PlaygroundPage(): JSX.Element {
                 {LOADING_TITLES[pg.error ?? 'failed']}
               </p>
             )}
-            <p>{ERRORS[pg.error ?? 'failed']}</p>
+            <p>{LOADING_ACTIONS[pg.error ?? 'failed']}</p>
             {/* Refused, a retry or the demo would only hide the reason: nothing to try. */}
             {refused ? null : (
               <>
+                {/* The provider refuses: a retry alone settles nothing, the key is where it is fixed. */}
+                {pg.error === 'llm_unavailable' ? (
+                  <Link className="nv-btn nv-btn--soft" to="/reglages/modeles-ia">
+                    Ouvrir Réglages, Modèles IA
+                  </Link>
+                ) : null}
                 <button type="button" className="nv-btn nv-btn--soft" onClick={pg.retry}>
                   Réessayer
                 </button>
