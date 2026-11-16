@@ -544,5 +544,6 @@ it('declares the capabilities a Reveal connector can claim', () => {
     scripts: true,
     scriptHistory: true,
     vault: true,
+    mediaDownload: true,
   });
 });

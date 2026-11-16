@@ -343,6 +343,13 @@ describe('voice guards', () => {
     expect(codes(['Voilà ce que je propose :', '- une photo'])).toEqual(['ai_tic']);
   });
 
+  it('asks for a regeneration on a note-taker’s line (Playground, Charles 16/11)', () => {
+    expect(codes(['Lyon oui 😄 je note ton âge'])).toEqual(['ai_tic']);
+    expect(codes(['31 ans, c’est noté !'])).toEqual(['ai_tic']);
+    expect(codes(['Je retiens, chef de chantier'])).toEqual(['ai_tic']);
+    expect(codes(['Une note de musique dans la tête toute la journée'])).toEqual([]);
+  });
+
   it('only asks for a regeneration when the form is off', () => {
     const violations = checkVoiceOutput(['a', 'b', 'c', 'd', 'x'.repeat(300)], DEFAULT_GUARD_SETTINGS);
     expect(violations.map((v) => v.code).sort()).toEqual(['bubble_too_long', 'too_many_bubbles']);

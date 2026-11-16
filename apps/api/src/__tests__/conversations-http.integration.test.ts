@@ -337,6 +337,35 @@ describe('/v1/conversations', () => {
     expect(audit.map((entry) => entry.action)).toEqual(['conversation.takeover', 'conversation.release']);
   });
 
+  it('keeps the hand with the team while the fan’s age is in doubt (Charles, 16/11)', async () => {
+    const id = conversationIds[1]!;
+    const [conversation] = await test.admin.db
+      .select({ fanId: schema.conversations.fanId })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.id, id));
+    const fanId = conversation?.fanId ?? '';
+    const flagsOf = (flags: object) =>
+      test.admin.db.update(schema.fans).set({ flags }).where(eq(schema.fans.id, fanId));
+    await flagsOf({ ageDisputed: { since: '2026-11-16T10:00:00.000Z', by: 'policy' } });
+    expect(
+      (await call('POST', `/v1/conversations/${id}/takeover?creatorId=${creatorId}`, ownerCookie, {}))
+        .statusCode,
+    ).toBe(204);
+    const refused = await call(
+      'POST',
+      `/v1/conversations/${id}/release?creatorId=${creatorId}`,
+      ownerCookie,
+      {},
+    );
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({ error: { code: 'age_in_doubt_conflict' } });
+    await flagsOf({});
+    expect(
+      (await call('POST', `/v1/conversations/${id}/release?creatorId=${creatorId}`, ownerCookie, {}))
+        .statusCode,
+    ).toBe(204);
+  });
+
   it('closes the care mode for the owner only, « Il va mieux », once (ADR 0088 § 7)', async () => {
     const id = conversationIds[1] ?? newId(ConversationIdSchema);
     const since = new Date('2026-11-12T20:00:00Z');

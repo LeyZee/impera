@@ -25,6 +25,7 @@ import { shiftRangeOf, useRepliesShown } from './replies';
 import { useWide } from './useWide';
 import './agenda.css';
 
+import { lookAgainAtHerCase } from '@/rewards/api';
 import { useCreatorShifts } from '@/scheduling/api';
 import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
 import { ServerSilent } from '@/shell/ServerSilent';
@@ -115,7 +116,11 @@ export function AgendaPage({
   useFlushOnReconnect(onSent);
 
   const tick = (task: CreatorTask, on: boolean, onDayOf: string): void => {
-    void tickTask(client, task, onDayOf, on).then(onSent);
+    void tickTask(client, task, onDayOf, on).then((flushed) => {
+      onSent(flushed);
+      // A tick may earn her something: her case is read again once the game has looked (CRE-06).
+      if (on) lookAgainAtHerCase(client);
+    });
   };
 
   const move = (task: CreatorTask, when: CreatorTaskWhen): void => {

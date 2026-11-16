@@ -39,6 +39,7 @@ import { progressOf, scriptCards } from './script-model';
 import { holds, isSending, queueSend, retryNow, sendAgain, useLiveSends } from './sends';
 
 import { useGrowingArea } from '@/lib/growing-area';
+import { lookAgainAtHerCase } from '@/rewards/api';
 import { dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
@@ -87,6 +88,8 @@ export function ContentPage({
 
   const reread = (): void => {
     void client.invalidateQueries({ queryKey: CONTENT_KEY });
+    // A drop arrived may earn her something: her case is read again once the game has looked (CRE-06).
+    lookAgainAtHerCase(client);
   };
 
   const asked = content.data === undefined ? [] : toShoot(content.data.requests, content.data.drops);
