@@ -206,8 +206,8 @@ describe('Playground', () => {
       method === 'GET' && path === '/v1/playground' ? failure(503, 'llm_unavailable') : undefined;
     open();
     expect(await screen.findByText('Grok ne répond pas')).toBeTruthy();
-    expect(screen.getByText('Ajoute ou vérifie sa clé dans Réglages, Modèles IA.')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Ouvrir Réglages, Modèles IA' }).getAttribute('href')).toBe(
+    expect(screen.getByText('Ajoute ou vérifie sa clé dans Réglages > Modèles IA.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Ouvrir Modèles IA' }).getAttribute('href')).toBe(
       '/reglages/modeles-ia',
     );
   });
