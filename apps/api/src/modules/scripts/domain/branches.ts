@@ -110,7 +110,8 @@ type BranchGap =
  * What keeps a script with branches from being offered (ADR 0112 §§ 2, 13, 14): a branch whose condition is unset; two
  * branches by default in a step; a condition on past spend that leads to a branch cheaper than the default; a
  * condition on the branch taken before that names no branch of an earlier step; the same sold media in two steps or
- * two branches, whichever the path. A script without branches has only the last.
+ * two branches, whichever the path (§ 14, and § 2 between branches of one step). A script without branches has only
+ * the last.
  */
 export function branchGaps(steps: readonly BranchStep[], settings: readonly BranchSetting[]): BranchGap[] {
   const gaps = new Set<BranchGap>();
