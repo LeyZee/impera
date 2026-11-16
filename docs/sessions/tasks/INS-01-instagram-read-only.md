@@ -17,10 +17,13 @@ ADR 0120 § 1 et § 2, ADR 0057 § 1 et § 2, ADR 0016, ADR 0082 § 1, `docs/arc
 - [ ] Branchement dans Réglages › Créatrices par la connexion officielle, droits de lecture seulement ; jeton scellé ; renouvellement par un job ; expiration en ambre.
 - [ ] Table des relevés : unique par média et par âge, FORCE RLS, `GRANT SELECT … TO impera_service`.
 - [ ] Job de nuit rejouable, et relevé une heure après une publication connue.
+- [ ] Âge d'un relevé = palier : première lecture faite après cet âge, heure réelle de la lecture gardée (ADR 0120 § 2).
+- [ ] Quota d'appels de Meta par compte et par heure : à l'approche du quota, le job s'arrête en ambre et reprend plus tard, sans jamais boucler.
+- [ ] Hôtes de sortie écrits dans l'adaptateur, jamais tirés d'un réglage (ADR 0120 § 3, ADR 0113 § 2).
 - [ ] Des nombres seulement : jamais le texte ni le nom d'un commentateur.
 
 ## Critères d'acceptation
-- Tests contre le faux : job rejoué sans doublon, jeton expiré en ambre, compte en lecture seule sans drapeau de publication.
+- Tests contre le faux : job rejoué sans doublon, jeton expiré en ambre, compte en lecture seule sans drapeau de publication, quota atteint en ambre puis reprise, lecture tardive qui ne remplace pas un palier déjà relevé.
 - Route nouvelle : authentication-sweep, origin-sweep, test d'isolation.
 
 ## Hors périmètre

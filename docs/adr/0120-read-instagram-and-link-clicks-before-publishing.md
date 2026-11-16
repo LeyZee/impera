@@ -28,7 +28,7 @@ Vérifié le 16/11/2026 (documentation de Meta, journal des changements mis à j
 
 ### 2. Ce qui est lu, et gardé
 
-- Chaque nuit, et une heure après une publication connue, le connecteur lit les médias du compte et leurs statistiques. Un **relevé** (`media_insight_snapshot`) est gardé par média et par âge : 1 heure, 24 heures, 48 heures, 7 jours. Le couple média et âge est unique : un job rejoué n'écrit rien deux fois.
+- Chaque nuit, et une heure après une publication connue, le connecteur lit les médias du compte et leurs statistiques. Un **relevé** (`media_insight_snapshot`) est gardé par média et par âge : 1 heure, 24 heures, 48 heures, 7 jours. Le couple média et âge est unique : un job rejoué n'écrit rien deux fois. Un âge est un **palier** : le relevé gardé est la première lecture faite après cet âge, avec l'heure réelle de la lecture ; une lecture plus tardive ne le remplace pas.
 - Les stories en ligne sont relevées par leur identifiant, leur heure et leurs nombres, pour savoir si la journée a sa story (les rappels relèvent d'une ADR à venir).
 - **Des nombres seulement.** Jamais le texte ni le nom d'un commentateur (ADR 0010), jamais un message privé. La légende et le format de ses propres médias sont lus.
 - La lecture nourrit la source 1 de l'ADR 0060 § 2 sans attendre la publication : VEI-05 ne dépend plus de PUB-02.
@@ -37,8 +37,9 @@ Vérifié le 16/11/2026 (documentation de Meta, journal des changements mis à j
 
 - Un **connecteur de liens** (`link_stats_connector`) est un adaptateur en **lecture seule** sur l'API du service de redirection, dans le module `connectors`, avec son faux (`FakeLinkStats`) écrit d'abord. Il ne crée, ne modifie ni ne supprime jamais un lien : son port n'a aucune méthode d'écriture.
 - Sa clé est saisie par le propriétaire dans Réglages et scellée comme les autres (ADR 0016).
-- Un lien de redirection (ADR 0080) porte désormais son **endroit** (`placement`), choisi dans une liste fermée : story à la une, story du jour, canal Telegram, autre réseau. C'est l'endroit, et non la provenance, qui attribue un clic ; l'écran recommande un lien par endroit.
-- Le connecteur relève, par lien et par heure, les pages vues et les clics. Les visites marquées « robot » par le service sont **retirées par le code** avant tout calcul, et leur part est montrée à l'agence.
+- **Les hôtes de sortie sont écrits dans le code** (ADR 0113 § 2) : le connecteur de liens et l'adaptateur Instagram n'appellent que les hôtes écrits dans leur adaptateur, jamais un hôte tiré d'un réglage. Seule la clé vient des Réglages. Tout ajout d'hôte passe par une PR relue par Sécurité.
+- Un lien de redirection (ADR 0080) porte désormais son **endroit** (`placement`), choisi dans une liste fermée : story à la une, story du jour, canal Telegram, autre réseau. Un lien enregistré avant cette ADR n'a pas d'endroit : l'écran affiche « à renseigner », et aucune attribution n'est fabriquée. C'est l'endroit, et non la provenance, qui attribue un clic ; l'écran recommande un lien par endroit.
+- Le connecteur relève, par lien et par heure, les pages vues et les clics. Le total d'une heure est unique par lien et par heure UTC : tant que l'heure n'est pas close, une nouvelle lecture le remplace ; une fois close, il est figé. Les visites marquées « robot » par le service sont **retirées par le code** avant tout calcul, et leur part est montrée à l'agence.
 - **Aucune donnée de visiteur n'est gardée** : ni adresse, ni ville, ni appareil d'une visite. Seuls des totaux par heure entrent en base.
 
 ### 4. Le retour sur un Reel

@@ -15,12 +15,14 @@ ADR 0120 § 3 et § 6, ADR 0080 (lien de redirection), ADR 0016, `docs/playbooks
 - [ ] Contrats Zod : endroit d'un lien (liste fermée), total par lien et par heure.
 - [ ] `FakeLinkStats`, puis l'adaptateur ; port sans aucune méthode d'écriture.
 - [ ] Clé saisie dans Réglages, scellée, vérifiée au collage.
-- [ ] Endroit sur le lien de redirection : migration nouvelle, écran de Réglages.
+- [ ] Endroit sur le lien de redirection : migration nouvelle et additive, `NULL` pour les liens déjà enregistrés avec « à renseigner » à l'écran ; écran de Réglages.
+- [ ] Upsert sur (lien, heure UTC) : le total est remplacé tant que l'heure n'est pas close, puis figé.
+- [ ] Hôte de sortie écrit dans l'adaptateur, jamais tiré d'un réglage (ADR 0120 § 3, ADR 0113 § 2).
 - [ ] Robots retirés par le code, leur part montrée à l'agence ; aucune donnée de visiteur en base.
 - [ ] Alerte rouge d'un lien « story » tombé à zéro (ADR 0120 § 6).
 
 ## Critères d'acceptation
-- Tests contre le faux : relevé rejoué sans doublon, robots exclus, service injoignable en ambre.
+- Tests contre le faux : relevé rejoué sans doublon, heure en cours relue puis figée une fois close, robots exclus, service injoignable en ambre.
 - Aucune adresse ni domaine réel dans un test, une fixture ou une doc.
 
 ## Hors périmètre
