@@ -1,6 +1,6 @@
 # 0129. Mesurer les scripts de vente : l'entonnoir par étape, le revenu par fan exposé, ce qui casse et pourquoi
 
-Statut : proposed (fil « Mesurer l'efficacité des scripts », 16/11/2026 ; attend « ok 0129 » de Charles et ses réponses aux questions ouvertes)
+Statut : accepted (Charles, 16/11/2026 12h31 UTC, « ok 0129 », fil « Mesurer l'efficacité des scripts » ; réponses aux trois questions le 16/11 à 12h31 : « fais ce que tu me recommandes »)
 Date : 2026-11-16
 Précise : l'ADR 0112 § 19 (« Mesure : par script, étape et branche, taux d'ouverture, taux d'achat et revenu »), l'ADR 0098 §§ 2 et 16 (le journal du déroulé sert à mesurer), l'ADR 0128 § 14 (achat par passage et par variante), l'ADR 0103 (note de désir 0–100). Ne remplace aucun ADR.
 
@@ -74,7 +74,7 @@ L'ADR 0112 § 19 annonçait la mesure en une ligne. Cet ADR dit ce qui se mesure
 
 ### D. L'écran
 
-14. **Où.** Dans **Créatrices › sa fiche › onglet « Scripts »**, là où l'agence règle déjà ses scripts, une section **« Performances »** en tête de l'onglet. Le Dashboard ne garde qu'une ligne ambre dans « À traiter » quand un script **décroche** (taux d'achat de sa première étape payante sur 14 jours nettement sous celui de ses 60 jours d'avant, au sens du § 8), avec un lien vers son détail. Question ouverte n° 1.
+14. **Où.** Dans **Créatrices › sa fiche › onglet « Scripts »**, là où l'agence règle déjà ses scripts, une section **« Performances »** en tête de l'onglet. Le Dashboard ne garde qu'une ligne ambre dans « À traiter » quand un script **décroche** (taux d'achat de sa première étape payante sur 14 jours nettement sous celui de ses 60 jours d'avant, au sens du § 8), avec un lien vers son détail.
 
 15. **Hiérarchie, du plus utile au plus fin**, une carte par sujet :
    1. **En tête, trois chiffres** sur la période choisie (7, 30 ou 90 jours) : revenu par fan exposé, taux d'achat de la première étape payante, nombre de fans exposés ; chacun avec son évolution sur la période d'avant.
@@ -84,7 +84,7 @@ L'ADR 0112 § 19 annonçait la mesure en une ligne. Cet ADR dit ce qui se mesure
 
 16. **Finition** (exigence de Charles, 16/11) : le niveau du Dashboard. Mêmes motifs (compteurs qui montent, entonnoir animé, infobulles flottantes, cartes), mêmes règles du projet : graphiques faits avec le skill dataviz, une carte par sujet, pas de barre colorée à gauche, aucun contrôle natif, rouge réservé aux urgences (aucune ici), ambre pour « décroche », « l'offre fait fuir » nettement au-dessus des autres, ou sources qui divergent ; Geist et Instrument Serif. Les animations respectent le mouvement réduit. Avant fusion, Charles voit les captures Nuit et Jour, PC et téléphone, **et une vidéo** des animations et des survols, après l'avis de Design.
 
-17. **Qui le voit.** Le propriétaire et les managers actifs (lecture). Jamais la créatrice ni un chatteur : la façon dont un script est construit et vend est une méthode d'agence. Question ouverte n° 2.
+17. **Qui le voit.** Le propriétaire et les managers actifs (lecture). Jamais la créatrice ni un chatteur : la façon dont un script est construit et vend est une méthode d'agence.
 
 18. **Le MCP** (ADR 0105) pourra lire le bilan d'un script plus tard ; hors de cet ADR.
 
@@ -124,8 +124,8 @@ Négatives :
 - **L'écran sur le Dashboard** : le Dashboard sert à agir dans la journée ; il ne garde que l'alerte « décroche ».
 - **Se contenter des totaux de Reveal** : sans fan ni date, ils ne disent ni où ça casse, ni pourquoi, ni ce qui se passe après.
 
-## Questions ouvertes (à trancher par Charles avant « ok 0129 »)
+## Décisions de Charles (16/11/2026)
 
-1. Emplacement : section « Performances » de l'onglet « Scripts » de la fiche créatrice, et une alerte « décroche » dans « À traiter » du Dashboard (recommandé) ; ou un écran « Scripts » à part dans le menu, qui compare toutes les créatrices.
-2. Qui voit : propriétaire et managers (recommandé) ; ou aussi les chatteurs, en lecture.
-3. Minimum avant d'afficher un pourcentage : 20 fans (recommandé) ; ou 30, plus sûr mais plus lent à remplir.
+1. Emplacement : section « Performances » en tête de l'onglet « Scripts » de la fiche créatrice, et l'alerte « décroche » dans « À traiter » du Dashboard (§ 14).
+2. Qui voit : le propriétaire et les managers actifs, jamais la créatrice ni un chatteur (§ 17).
+3. Minimum avant d'afficher un pourcentage : 20 fans (`SCRIPT_STATS_MIN_FANS`, § 8).
