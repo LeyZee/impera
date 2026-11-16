@@ -19,3 +19,28 @@ describe('the team’s calendar (recette 05/11)', () => {
     expect(past).not.toMatch(/opacity/u);
   });
 });
+
+describe('Équipe › Planning (recette visuelle 16/11)', () => {
+  const rule = (selector: string): string =>
+    new RegExp(`^${selector.replace(/[.[\]()]/gu, '\\$&')}\\s*\\{([^}]*)\\}`, 'mu').exec(grid)?.[1] ?? '';
+
+  it('says a place to fill quietly, in amber only within the next day (GES-05)', () => {
+    expect(rule('.sc-slot__fill')).not.toContain('--nv-warning');
+    expect(rule(".sc-slot__fill[data-soon='true']")).toContain('color: var(--nv-warning)');
+  });
+
+  it('draws a shift that goes on as « suite », without a second breathing edge (GES-05)', () => {
+    expect(css).toMatch(/\.cal-chip--cont::after\s*\{\s*display: none;/u);
+    expect(grid).not.toMatch(/\[data-carried='true'\]::after/u);
+  });
+
+  it('breaks a member’s name on two lines rather than cut it, and gives the handles 160 px (GES-22)', () => {
+    const name = rule('.sc-chip__name');
+    expect(name).toContain('-webkit-line-clamp: 2');
+    expect(name).not.toMatch(/ellipsis|nowrap/u);
+    expect(rule('.sc-chip__who')).not.toMatch(/ellipsis|nowrap/u);
+    expect(grid).toMatch(
+      /@media \(min-width: 1280px\) \{\s*\.sc-grid \{\s*grid-template-columns: calc\(160px \+/u,
+    );
+  });
+});
