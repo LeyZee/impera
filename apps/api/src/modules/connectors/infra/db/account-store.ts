@@ -15,9 +15,26 @@ import {
 } from '@impera/contracts';
 import { and, eq, schema, sql, withAdmin, withTenant, type Database, type Transaction } from '@impera/db';
 
+import { SessionOwnerConflict } from '../../domain/errors';
 import type { AccountJobs, AccountStore, ConnectorAccount, EventMeta } from '../../domain/ports';
 
 const POLLABLE_STATES = ['valid', 'warning'];
+
+/** A unique constraint refused the row, raised by the driver directly or wrapped by Drizzle (`cause`). */
+function isUniqueViolation(error: unknown, constraint: string): boolean {
+  return (
+    error instanceof Error &&
+    [error, error.cause].some(
+      (e) =>
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        e.code === '23505' &&
+        'constraint' in e &&
+        e.constraint === constraint,
+    )
+  );
+}
 
 function toAccount(row: typeof schema.platformAccounts.$inferSelect): ConnectorAccount {
   return {
@@ -185,6 +202,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
           .update(schema.platformAccounts)
           .set({
             sessionCiphertext: session.ciphertext,
+            sessionOwner: session.owner,
             ...(renewed ? { sessionUpdatedAt: meta.at } : {}),
             sessionState: 'valid',
             consecutiveErrors: 0,
@@ -238,6 +256,11 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
             meta,
           );
         }
+      }).catch((error: unknown) => {
+        // Another account of the platform already holds this owner (the unique constraint): the session is hers.
+        if (isUniqueViolation(error, 'platform_accounts_platform_session_owner_unique'))
+          throw new SessionOwnerConflict();
+        throw error;
       }),
 
     publish: (creatorId, body, meta) =>

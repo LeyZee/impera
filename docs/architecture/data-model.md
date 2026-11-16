@@ -21,6 +21,8 @@ creators            id, display_name, name_key (creatorNameKey, unique : jamais 
                     agent_hours jsonb (AgentHoursSchema, null = DEFAULT_AGENT_HOURS, P3-14), created_at
 platform_accounts   id, creator_id, platform (reveal|onlyfans|instagram|impera), handle,
                     session_state (none|valid|warning|expired), session_ciphertext bytea, session_updated_at,
+                    session_owner (à qui est la session selon la plateforme, sur Reveal l'identifiant du modèle ; unique par
+                    plateforme : une identité de plateforme n'appartient qu'à un compte, migration 0213, SEC-12),
                     last_poll_at, consecutive_errors, paused_until (coupe-circuit), connector_config jsonb (ConnectorConfigSchema)
 connector_sends     id, creator_id, platform_account_id (FK composite vers platform_accounts (id, creator_id)), idempotency_key
                     (unique par compte), platform_conversation_id, fingerprint (SHA-256 hex), script_ref, state (pending|sent),

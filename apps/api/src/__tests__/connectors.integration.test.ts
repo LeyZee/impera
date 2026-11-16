@@ -450,18 +450,22 @@ describe('connectors module (P0-06)', () => {
 
   it('refuses a session of another creator, or of another member, than the one the account already holds', async () => {
     const id = await account('other-model', 'none');
-    expect((await sync(id, revealSession('reveal-bearer-first-aaaa', 'model-test-a'))).statusCode).toBe(204);
+    expect((await sync(id, revealSession('reveal-bearer-first-aaaa', 'model-test-pinned'))).statusCode).toBe(
+      204,
+    );
     const other = await sync(id, revealSession('reveal-bearer-second-bbb', 'model-test-b'));
     expect([other.statusCode, other.json<{ error: { code: string } }>().error.code]).toEqual([
       409,
       'connector_session_conflict',
     ]);
     // The same creator, a new token: a re-sync, taken.
-    expect((await sync(id, revealSession('reveal-bearer-third-cccc', 'model-test-a'))).statusCode).toBe(204);
+    expect((await sync(id, revealSession('reveal-bearer-third-cccc', 'model-test-pinned'))).statusCode).toBe(
+      204,
+    );
     // The « bot » member is pinned at the first sync (P2-02): the owner's or a chatter's session is refused.
     const member = await sync(
       id,
-      revealSession('reveal-bearer-owner-dddd', 'model-test-a', 'user-owner-test'),
+      revealSession('reveal-bearer-owner-dddd', 'model-test-pinned', 'user-owner-test'),
     );
     expect([member.statusCode, member.json<{ error: { code: string } }>().error.code]).toEqual([
       409,
@@ -484,6 +488,57 @@ describe('connectors module (P0-06)', () => {
     expect((await sync(id, revealSession('reveal-bearer-right-ffff', 'model-test-linked'))).statusCode).toBe(
       204,
     );
+  });
+
+  it('refuses a session another account already holds, whatever its creator, and one the register links elsewhere', async () => {
+    const hers = await account('holds-the-model', 'none');
+    const other = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: other, nameKey: other, displayName: 'Autre', timezone: 'Europe/Paris' });
+    const second = newId(PlatformAccountIdSchema);
+    await test.admin.db.insert(schema.platformAccounts).values({
+      id: second,
+      creatorId: other,
+      platform: 'reveal',
+      handle: 'wrong-click',
+      sessionState: 'none',
+    });
+    expect((await sync(hers, revealSession('reveal-bearer-held-gggg', 'model-test-held'))).statusCode).toBe(
+      204,
+    );
+    // The same Reveal tab, « Sync » pressed on another creator's account: nothing stored to compare with there.
+    const wrong = await sync(second, revealSession('reveal-bearer-held-gggg', 'model-test-held'));
+    expect([wrong.statusCode, wrong.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'connector_session_conflict',
+    ]);
+    expect(await accountRow(second)).toMatchObject({ sessionCiphertext: null, sessionState: 'none' });
+    // Her own account still takes her session, and an expired session keeps the account hers.
+    expect((await sync(hers, revealSession('reveal-bearer-held-hhhh', 'model-test-held'))).statusCode).toBe(
+      204,
+    );
+    await test.admin.db
+      .update(schema.platformAccounts)
+      .set({ sessionState: 'expired' })
+      .where(eq(schema.platformAccounts.id, hers));
+    expect((await sync(second, revealSession('reveal-bearer-held-iiii', 'model-test-held'))).statusCode).toBe(
+      409,
+    );
+
+    // A model the register links to her account, never synced there yet: refused on the other account too.
+    await test.admin.db.insert(schema.salesFeedModels).values({
+      platform: 'reveal',
+      platformModelId: 'model-test-registered',
+      platformAccountId: hers,
+      creatorId,
+    });
+    const registered = await sync(second, revealSession('reveal-bearer-reg-jjjj', 'model-test-registered'));
+    expect([registered.statusCode, registered.json<{ error: { code: string } }>().error.code]).toEqual([
+      409,
+      'connector_session_conflict',
+    ]);
+    expect((await accountRow(second)).sessionCiphertext).toBeNull();
   });
 
   it("lists the accounts to sync for the owner's link only, never a session", async () => {
@@ -511,7 +566,7 @@ describe('connectors module (P0-06)', () => {
   it('dates the session only when it is new: the same one sent again does not hide a late read (recette 28/10)', async () => {
     const id = await account('resent', 'none');
     const send = async (session: string) => {
-      const sent = await sync(id, revealSession(session));
+      const sent = await sync(id, revealSession(session, 'model-test-dated'));
       expect(sent.statusCode, sent.body).toBe(204);
     };
     const longAgo = new Date('2026-01-01T00:00:00.000Z');
