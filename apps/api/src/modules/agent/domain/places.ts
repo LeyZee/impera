@@ -22,9 +22,15 @@ const CITY_WORD = new RegExp(`\\b${CITY}\\b`, 'u');
 const NO_PLACE = /(?<= )(?:en vrai|en personne|un jour|a l occasion)(?= )/gu;
 // A preposition of place (bound 27): « à », « au », « vers », « chez », « près de », « du côté de »…
 const PLACE_PREPOSITION = / (?:a|au|aux|sur|vers|chez|dans|pres de|du cote de|cote de) /u;
-// Where she comes from or lives: « t'es de Lyon ? », « tu viens d'où ? ».
+// Where she comes from or lives: « t'es de Lyon ? », « tu viens d'où ? », « tu habites où ».
 const ORIGIN =
-  / (?:t es de|tu es de|tu viens de|tu viens d|d ou|ou tu (?:habites|vis|es|bosses|travailles)) /u;
+  / (?:t es de|tu es de|t es d|tu es d|tu viens de|tu viens d|d ou|ou tu (?:habites|vis|es|bosses|travailles)|tu habites|t habites|tu vis|tu bosses ou|tu travailles ou) /u;
+// He says he knows something about her, in any form (bound 27): « je sais que », « on m'a dit », « j'ai vu que ».
+const KNOWS = / (?:je sais|j sais|on m a dit|on m a raconte|j ai vu que|j ai vu ou|j ai appris) /u;
+// A place said without naming it (bound 27): « ici », « là-bas », « dans le coin », « pas loin ».
+const PLACE_ADVERB = / (?:ici|par ici|la bas|par la|dans le coin|pas loin|tout pres|a cote) /u;
+// Where she is from, as an adjective after « t'es » or « tu es » (bound 27): « t'es toulousaine », « tu es parisien ».
+const DEMONYM = / (?:t es|tu es) \p{L}{3,}(?:ain|aine|ais|aise|ois|oise|ien|ienne) /u;
 // Pressure, a threat or money (bounds 25, 26): « sinon je te retrouve », « je viens te chercher », « je paie ».
 const PRESSURE =
   / (?:sinon|ou sinon|je te (?:re)?trouve(?:rai)?|te chercher|je (?:te )?(?:paie|paye|paierai|payerai)|combien|euro|euros|balles|eur|prix|tarif) /u;
@@ -52,9 +58,17 @@ export function notPlainAsk(text: string): boolean {
     CITY_WORD.test(read) ||
     PLACE_PREPOSITION.test(prepositions) ||
     ORIGIN.test(read) ||
+    KNOWS.test(read) ||
+    PLACE_ADVERB.test(read) ||
+    DEMONYM.test(read) ||
     PRESSURE.test(read)
   );
 }
+
+// A place or a time even vague (bound 22): « dans le sud », « en région parisienne », « le mois prochain ». « Un jour »,
+// « plus tard », « pas maintenant » stay allowed. « est » only as a direction (« dans l'est »), never the verb.
+const VAGUE_PLACE_OR_DATE =
+  / (?:sud|nord|ouest|l est|region|regions|departement|coin|pas loin|pres de|prochain|prochaine|prochains|prochaines|semaine|semaines|semaine pro|mois|week end|weekend|vacances) /u;
 
 /**
  * Her answer fixes something (bounds 22 and 29), on a turn where he asks to meet or she points him to her practice: a
@@ -69,7 +83,8 @@ export function fixesSomething(
       /[\p{N}€$£]/u.exec(bubble)?.[0] ??
       PLACE_OR_DATE.exec(read)?.[0] ??
       CITY_WORD.exec(read)?.[0] ??
-      / (?:euro|euros|balles|prix|tarif|gratuit) /u.exec(read)?.[0];
+      / (?:euro|euros|balles|prix|tarif|gratuit) /u.exec(read)?.[0] ??
+      VAGUE_PLACE_OR_DATE.exec(read)?.[0];
     if (match !== undefined) return { index, match: match.trim() };
   }
   return null;

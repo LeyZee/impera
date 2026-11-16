@@ -173,12 +173,34 @@ describe('the contact guard on an account (bounds 19 and 29)', () => {
       'c’est 40 €',
       'trente euros la séance',
       'on se voit au parc',
+      'je suis dans le sud',
+      'je suis dans l’est',
+      'en région parisienne',
+      'le mois prochain peut-être',
+      'on verra la semaine pro',
+      'plutôt un week-end',
+      'peut-être pendant les vacances',
+      'je suis pas loin de chez toi',
+      'près de la gare',
+      'dans le coin',
+      'dans le département',
+      'je suis au nord',
+      'à l’ouest',
     ])
       expect(fixedSomething(['coucou', bubble]), bubble).toMatchObject([
         { code: 'meeting_promise', bubbleIndex: 1 },
       ]);
     expect(
       fixedSomething(['trop tôt, j’ai besoin d’être en confiance', 'remplis le questionnaire 😊']),
+    ).toEqual([]);
+    expect(
+      fixedSomething([
+        'un jour peut-être',
+        'plus tard 😊',
+        'pas maintenant',
+        'c’est trop tôt',
+        'il est tard',
+      ]),
     ).toEqual([]);
   });
 });

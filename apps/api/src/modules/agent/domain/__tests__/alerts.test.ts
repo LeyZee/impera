@@ -212,6 +212,30 @@ describe('the plain ask the exception needs (ADR 0143, bounds 25 to 27, relectur
     expect(practiceAskOnly('tu fais du tissu aérien dans quelle salle ?', words, [practice])).toBe(false);
   });
 
+  it('pauses when he says he knows something, asks where she lives, or names a place without naming it (bound 27)', () => {
+    for (const text of [
+      'on peut se voir ? je sais que t’es toulousaine',
+      'on peut se voir ? je sais où tu bosses',
+      'on m’a dit que t’étais pas loin, on peut se voir ?',
+      'j’ai vu que tu étais en ville, on peut se voir ?',
+      'on peut se voir ? tu habites où',
+      'on peut se voir ? t’habites où',
+      'on peut se voir ? tu vis où',
+      'on peut se voir ? tu viens d’où',
+      'on peut se voir ? t’es d’où',
+      'on peut se voir, tu es de quel coin ?',
+      'on peut se voir là-bas',
+      'on peut se voir ici',
+      'on peut se voir par là ?',
+      'on peut se voir dans le coin ?',
+      'on peut se voir ? je suis pas loin',
+      'on peut se voir ? t’es parisienne non',
+      'on peut se voir ? tu es lyonnaise ?',
+      'on peut se voir ? t’es marseillais',
+    ])
+      expect(meetingAskOnly(text, words, []), text).toBe(false);
+  });
+
   it('pauses on pressure or money', () => {
     for (const text of [
       'on peut se voir ? sinon je te retrouve',
