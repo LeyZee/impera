@@ -694,11 +694,11 @@ function OnDutyStrip({
   const known = new Set<string>(planning.shifts.map((shift) => shift.id));
   return (
     <section className="sc-duty" aria-labelledby="sc-duty-title">
-      <h2 id="sc-duty-title" className="sc-duty__title">
+      <p id="sc-duty-title" className="sc-duty__title">
         {/* Fixed: the shift under way on the grid is the page's one moving sign (CR-12, Charles 02/11 17h56). */}
         <span className={`nv-dot${list.length === 0 ? '' : ' nv-tone--ok'}`} />
         En poste maintenant
-      </h2>
+      </p>
       {list.length === 0 ? (
         <p className="sc-duty__none">Personne pour l’instant.</p>
       ) : (
@@ -763,7 +763,7 @@ function Conflicts({
   const known = new Set<string>(planning.shifts.map((shift) => shift.id));
   return (
     <section className="nv-plate sc-conflicts nv-swap" role="status" aria-labelledby="sc-conflicts-title">
-      <h2 id="sc-conflicts-title" className="sc-conflicts__title">
+      <h2 id="sc-conflicts-title" className="nv-h2 sc-conflicts__title">
         {conflictTitle(lines)}
       </h2>
       <ul className="sc-conflicts__list">

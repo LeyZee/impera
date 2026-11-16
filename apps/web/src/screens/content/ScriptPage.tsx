@@ -333,7 +333,7 @@ function CardStep({
         alt={`Carton ${String(number)} : ${card.title}`}
       />
       <div className="sk-card__work">
-        <h2 id="sk-card-title" className="sk-card__title">
+        <h2 id="sk-card-title" className="nv-h2 sk-card__title">
           {card.title}
         </h2>
         {card.detail === null ? null : <p className="sk-card__detail">{card.detail}</p>}
@@ -620,7 +620,7 @@ function Preview({
 }): JSX.Element {
   return (
     <section className="sk-preview nv-enter" aria-labelledby="sk-preview-title">
-      <h2 id="sk-preview-title" className="sk-preview__title">
+      <h2 id="sk-preview-title" className="nv-h2 sk-preview__title">
         Aperçu de ton script
       </h2>
       <p className="sk-preview__lead">

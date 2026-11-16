@@ -197,7 +197,36 @@
   box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
 }
 .nv-plate--pad {
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
+}
+
+/* ───────────── Section titles: three classes, nothing else (COH-05) ───────────── */
+
+/* A section's title, in a card's head (Panel) or above a group. */
+.nv-h2 {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+/* A title inside a card: a block, a group of rows. */
+.nv-h3 {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  letter-spacing: var(--nv-text-headline-tracking);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+/* A quiet label above a title or a block: sentence case, never shouted in capitals. */
+.nv-eyebrow {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
 }
 /* Open: the content sits directly on the page, grouped by space alone. */
 .nv-plate--bare {
@@ -895,7 +924,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 24px;
+  height: var(--nv-pill-info);
   padding: 0 10px 0 8px;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
@@ -1260,7 +1289,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 22px;
+  height: var(--nv-pill-info);
   padding: 0 8px;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
@@ -1278,6 +1307,25 @@
   outline: 1px dashed var(--nv-ink-faint);
   outline-offset: -1px;
   color: var(--nv-ink-muted);
+}
+/* A counter (what waits behind a tab, unread messages, a rank): 18 px, 11 px figures, ink on a quiet fill. Never an
+   alarm by itself: a screen that needs the amber or the red says so with a modifier of its own (COH-08). */
+.nv-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--nv-pill-count);
+  height: var(--nv-pill-count);
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-ink) 16%, transparent);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-caption);
+  line-height: 1;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .nv-conf {
@@ -1542,7 +1590,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: var(--nv-pill-choice);
   padding: 0 13px;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-footnote);
@@ -1946,14 +1994,12 @@
 .nv-sample {
   display: inline-flex;
   align-items: center;
-  height: 22px;
+  height: var(--nv-pill-info);
   padding: 0 9px;
   border-radius: var(--nv-radius-full);
   border: 1px dashed var(--nv-hairline);
-  font: 500 var(--nv-text-caption) / 1 var(--nv-font-sans);
+  font: 600 var(--nv-text-caption) / 1 var(--nv-font-sans);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--nv-ink-faint);
   white-space: nowrap;
 }
@@ -2592,15 +2638,17 @@
   top: 50%;
   left: calc(50% + var(--nv-w, 0%) / 2 + 10px);
   transform: translateY(-50%);
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  height: var(--nv-pill-info);
+  padding: 0 8px;
+  box-sizing: border-box;
   border-radius: var(--nv-radius-full);
   background: var(--nv-warning);
   color: var(--nv-void);
-  font-size: 10.5px;
-  line-height: 14px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
   font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   white-space: nowrap;
   animation: nv-swap var(--nv-dur-slow) 700ms var(--nv-ease-out) both;
 }

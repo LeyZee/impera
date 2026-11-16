@@ -176,7 +176,7 @@ export function AlertsSection(): JSX.Element {
       ) : null}
 
       <section className="al-group" aria-labelledby="al-own-title">
-        <h3 id="al-own-title" className="al-eyebrow">
+        <h3 id="al-own-title" className="nv-eyebrow al-eyebrow">
           Tes alertes
         </h3>
         {custom.length === 0 && editing !== 'new' ? (
@@ -223,7 +223,7 @@ export function AlertsSection(): JSX.Element {
       </section>
 
       <section className="al-group" aria-labelledby="al-system-title">
-        <h3 id="al-system-title" className="al-eyebrow">
+        <h3 id="al-system-title" className="nv-eyebrow al-eyebrow">
           Alertes du système
         </h3>
         <p className="ps-muted al-group__lede">
@@ -566,7 +566,7 @@ function AlertEditor({
       }}
     >
       <FormContext.Provider value={formState}>
-        <p className="al-eyebrow">{saved === null ? 'Nouvelle alerte' : 'Modifier l’alerte'}</p>
+        <p className="nv-eyebrow al-eyebrow">{saved === null ? 'Nouvelle alerte' : 'Modifier l’alerte'}</p>
         <Field label="Nom" id={`${id}-name`} path="name" hint="Ce que l’équipe lira quand elle sonne.">
           <TextInput
             id={`${id}-name`}

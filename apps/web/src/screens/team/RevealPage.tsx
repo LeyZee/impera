@@ -444,7 +444,7 @@ function Section({
   return (
     <section className="nv-plate sf-links sf-import" aria-labelledby={id}>
       <header className="sf-links__head">
-        <h2 id={id} className="sf-links__title">
+        <h2 id={id} className="nv-h2 sf-links__title">
           {title}
         </h2>
         {count === null ? null : (

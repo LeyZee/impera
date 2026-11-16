@@ -835,7 +835,7 @@ function Head({
     <div className="nv-plate ps-head" ref={headRef}>
       <div className="ps-head__top">
         <div className="ps-head__who">
-          <h2 className="ps-title" data-placeholder={name === '' ? 'true' : undefined}>
+          <h2 className="nv-h2 ps-title" data-placeholder={name === '' ? 'true' : undefined}>
             {name === '' ? 'Surnom à remplir' : name}
           </h2>
           <p className="ps-head__meta">
@@ -1119,7 +1119,7 @@ function Tabs({
           >
             {tab.label}
             {errors[tab.id] > 0 ? (
-              <span className="nv-subnav__count" aria-label={`${String(errors[tab.id])} à corriger`}>
+              <span className="nv-count nv-subnav__count" aria-label={`${String(errors[tab.id])} à corriger`}>
                 {errors[tab.id]}
               </span>
             ) : edited(tab.id) ? (

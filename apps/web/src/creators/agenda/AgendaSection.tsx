@@ -211,7 +211,7 @@ function Group({
   if (items.length === 0) return null;
   return (
     <section className="aa-group" aria-labelledby={id}>
-      <h3 className="aa-group__title" id={id}>
+      <h3 className="nv-h3 aa-group__title" id={id}>
         {title} <span className="nv-num">{items.length}</span>
       </h3>
       <ul className="aa-list">

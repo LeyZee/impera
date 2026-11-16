@@ -479,6 +479,9 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Jeton d'agent | `mcp_token` | Le secret d'un accès d'agent, montré une seule fois à la création, stocké haché. Jamais dans l'extension, le dépôt ni un fil de discussion. |
 | Capacité | `mcp_capability` | Un droit nommé d'un accès d'agent (`read:status`, `read:conversation_content`, `write:brakes`…), liste fermée en code. |
 | Action préparée | `prepared_action` | Un geste qu'un agent connecté dépose sans effet (d'abord : inviter un membre) et qu'un humain relit, complète et confirme dans le CRM avec son second facteur, ou refuse ; elle expire au bout de 72 heures (ADR 0105). À ne pas confondre avec la proposition (`draft`), qui est une réponse à un fan. |
+| Carte | `nv-plate`, `Panel`, jeton `--nv-plate-pad` | Un bloc de contenu posé sur une plaque, un seul rayon (26) et une seule marge intérieure (20px, 16px au téléphone) ; une carte ne se pose pas dans une carte (docs/design, recette visuelle du 16/11). |
+| Pastille | `nv-status`, `nv-tag`, `nv-chip`, `nv-count`, jetons `--nv-pill-*` | Une capsule de texte court, de trois sortes seulement : d'information (22px), de choix (32px), compteur (18px). |
+| Titre de section | `nv-h2`, `nv-h3` | Le titre d'une section (22/28) ou d'un bloc dans une carte (17/22), en minuscules, jamais en capitales espacées ; le surtitre au-dessus est `nv-eyebrow`. |
 
 ## Noms à ne pas utiliser
 

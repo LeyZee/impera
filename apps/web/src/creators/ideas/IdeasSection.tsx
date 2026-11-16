@@ -395,7 +395,7 @@ function IdeaCard({
         </form>
       ) : (
         <>
-          <h3 className="iv-title" id={`${id}-title`}>
+          <h3 className="nv-h3 iv-title" id={`${id}-title`}>
             {idea.title}
           </h3>
           <section className="iv-shoot" aria-label="À tourner">

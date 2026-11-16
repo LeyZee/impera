@@ -217,7 +217,7 @@ function Hero({
     return (
       <Panel className="sc-hero sc-hero--none nv-enter">
         <p className="sc-hero__kicker">Aucun shift prévu</p>
-        <h2 className="sc-hero__title">Rien pour l’instant</h2>
+        <h2 className="nv-h2 sc-hero__title">Rien pour l’instant</h2>
         <p className="sc-hero__note">
           Ton responsable te place sur le planning : ton prochain shift s’affichera ici.
         </p>
@@ -258,7 +258,7 @@ function Hero({
         </span>
       </div>
       <div className="sc-hero__who">
-        <h2 className="sc-hero__title">{shift.creatorName}</h2>
+        <h2 className="nv-h2 sc-hero__title">{shift.creatorName}</h2>
         <p className="sc-hero__where">{accountLine(shift)}</p>
       </div>
       <p className="sc-hero__hours nv-num">

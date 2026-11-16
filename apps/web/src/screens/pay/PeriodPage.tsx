@@ -715,7 +715,7 @@ function Summary({
   /** « +12 % par rapport à la quinzaine du 16 au 30 septembre »: a change, and what it is against, in French (EQP-13). */
   const against = (now: number): ReactNode =>
     previous === undefined ? null : previousNet === null ? (
-      'pas de quinzaine avant pour comparer'
+      'Première quinzaine : rien à comparer'
     ) : (
       <>
         <Delta bps={changeBps(now, previousNet)} title={`${amountText(previousNet, 'EUR')} de net`} /> par

@@ -84,7 +84,7 @@ function RingCard({
   const label = (key: string) => labels[key] ?? key;
   return (
     <article className="fi-card nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">{title}</h3>
+      <h3 className="nv-h3 fi-card__title">{title}</h3>
       <div className="fi-ring-row">
         <div
           className={lit === null ? 'fi-ring' : 'fi-ring is-lit'}
@@ -195,7 +195,7 @@ function BarsCard({
   const top = Math.max(1, ...cases.map((c) => c.share));
   return (
     <article className="fi-card nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">{title}</h3>
+      <h3 className="nv-h3 fi-card__title">{title}</h3>
       <ul className={lit === null ? 'fi-bars' : 'fi-bars is-lit'}>
         {cases.map((c, i) => (
           <li key={c.key}>
@@ -257,13 +257,13 @@ function SpendingCard({
   if (spending.payingShare === 0)
     return (
       <article className="fi-card fi-card--full nv-enter" style={{ '--nv-i': index }}>
-        <h3 className="fi-card__title">Ce qu’ils débloquent</h3>
+        <h3 className="nv-h3 fi-card__title">Ce qu’ils débloquent</h3>
         <p className="fi-none">Aucun de tes fans n’a encore débloqué de message.</p>
       </article>
     );
   return (
     <article className="fi-card fi-card--wide nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">Ce qu’ils débloquent</h3>
+      <h3 className="nv-h3 fi-card__title">Ce qu’ils débloquent</h3>
       <div className="fi-spend">
         <div className="fi-spend__lead">
           <div
@@ -377,7 +377,7 @@ function ActivityCard({
   const say = (c: { day: number; slot: number }) => `${DAYS[c.day] ?? ''}, ${slotLabel(c.slot)}`;
   return (
     <article className="fi-card fi-card--full nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">Quand ils t’écrivent</h3>
+      <h3 className="nv-h3 fi-card__title">Quand ils t’écrivent</h3>
       <p className="fi-heat__line" aria-live="polite">
         {lit === null ? (
           peak === null ? null : (
@@ -507,14 +507,7 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
   // its numbers and says block by block what is missing, since each block counts something else (recette CRE-04).
   if (waiting.length === 6 && data.fans.total === null)
     return (
-      <Panel
-        className="fi-panel nv-enter"
-        title={
-          <>
-            Qui sont <em className="fi-serif">tes fans</em>
-          </>
-        }
-      >
+      <Panel className="fi-panel nv-enter" title={<>Qui sont tes fans</>}>
         <PanelSection>
           <p className="fi-few">
             Encore trop peu de fans pour le dire. Ça s’affichera à partir de dix, pour qu’aucun ne s’y
@@ -528,11 +521,7 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
     <Panel
       className="fi-panel nv-enter"
       eyebrow="Sur l’ensemble de tes fans, jamais un seul"
-      title={
-        <>
-          Qui sont <em className="fi-serif">tes fans</em>
-        </>
-      }
+      title={<>Qui sont tes fans</>}
     >
       <PanelSection>
         <div className="fi-stats">

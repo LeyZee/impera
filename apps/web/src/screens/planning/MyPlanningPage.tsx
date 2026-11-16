@@ -513,7 +513,7 @@ function Week({
       aria-labelledby={`sc-day-${day}`}
       data-today={day === today ? 'true' : undefined}
     >
-      <h2 id={`sc-day-${day}`} className="sc-mine__date">
+      <h2 id={`sc-day-${day}`} className="nv-h3 sc-mine__date">
         {day === today ? 'Aujourd’hui' : longDay(day).replace(/^./u, (letter) => letter.toUpperCase())}
       </h2>
       <ul className="sc-mine__list">

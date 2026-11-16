@@ -71,7 +71,7 @@ function Panel({
   });
   return (
     <section className="nv-plate mp-block" aria-label={title}>
-      <h2 className="mp-block__title">{title}</h2>
+      <h2 className="nv-h2 mp-block__title">{title}</h2>
       {written.length === 0 ? (
         <p className="ps-muted">Rien d’écrit pour l’instant.</p>
       ) : (

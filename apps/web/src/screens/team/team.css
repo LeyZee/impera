@@ -181,7 +181,7 @@
   flex: none;
   display: inline-flex;
   align-items: center;
-  height: 18px;
+  height: var(--nv-pill-info);
   padding: 0 7px;
   border-radius: var(--nv-radius-full);
   outline: 1px dashed var(--nv-ink-faint);
@@ -274,7 +274,7 @@
   flex-direction: column;
   gap: var(--nv-space-4);
   min-width: 0;
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 .tm-sheet .tm-back {
   align-self: flex-start;
@@ -309,10 +309,6 @@
 }
 .tm-sheet__who h2 {
   margin: 0;
-  font-size: var(--nv-text-title-2);
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
   text-wrap: balance;
 }
 .tm-sheet__who p {
@@ -331,7 +327,7 @@
 .tm-new {
   display: inline-flex;
   align-items: center;
-  height: 18px;
+  height: var(--nv-pill-info);
   padding: 0 7px;
   border-radius: var(--nv-radius-full);
   background: var(--nv-select-strong);
@@ -456,9 +452,6 @@
 }
 .tm-block h3 {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  font-weight: 650;
-  letter-spacing: -0.01em;
 }
 .tm-hint {
   margin: 0;
@@ -846,7 +839,7 @@
 /* What could not be read: one amber line and « Réessayer », on Planning, Membres and Rapports alike (EQ-22). */
 .tm-unread {
   align-self: start;
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 
 /* Where the member is and what hour it is there, under the name (EQ-08). */

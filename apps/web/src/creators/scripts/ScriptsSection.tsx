@@ -197,7 +197,7 @@ function ScriptCard({
         </span>
       </div>
       <div className="sx-card__body">
-        <h3 id={`${id}-title`} className="sx-title">
+        <h3 id={`${id}-title`} className="nv-h3 sx-title">
           {row.name ?? 'Structure retirée de la bibliothèque'}
         </h3>
         <p className="sx-meta nv-num">

@@ -210,7 +210,7 @@ function Queue({
       <header className="st-queue__head">
         <div>
           <p className="nv-eyebrow">File de {creator.displayName}</p>
-          <h2 className="st-queue__title">Ce qu’on lui demandera, dans l’ordre</h2>
+          <h2 className="nv-h2 st-queue__title">Ce qu’on lui demandera, dans l’ordre</h2>
         </div>
         <span className="st-queue__state" aria-live="polite">
           {saving ? (

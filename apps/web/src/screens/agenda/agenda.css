@@ -167,7 +167,7 @@
 .ag-skeleton {
   display: grid;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 .ag-skeleton i {
   display: block;
@@ -279,7 +279,7 @@
 
 /* ── Where her day stands ──────────────────────────────────────────────────────────────────────────────────────── */
 .ag-glance {
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
@@ -423,8 +423,6 @@
 }
 .ag-sec__head h2 {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
 }
 .ag-count {
   font-size: var(--nv-text-caption);
@@ -1244,7 +1242,7 @@
 
 /* ── The frieze of her day, on a computer: her timed tasks on the hours, now marked ─────────────────────────────── */
 .ag-frieze {
-  padding: var(--nv-space-5) var(--nv-space-4) var(--nv-space-3);
+  padding: var(--nv-plate-pad) var(--nv-plate-pad) var(--nv-space-3);
 }
 .ag-frieze__track {
   position: relative;
@@ -1772,9 +1770,18 @@
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
 .ag-brief__title {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
   font-size: var(--nv-text-footnote);
   font-weight: 600;
   color: var(--nv-ink);
+}
+/* Its pictogram, in the icons' own drawing, in place of the 🎬 that was its icon (CRE-11). */
+.ag-brief__title > .nav-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
 }
 /* Folded, its hidden content still takes the flex gap in Chromium: none until it opens. */
 details.ag-brief:not([open]) {

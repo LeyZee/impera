@@ -245,7 +245,7 @@ function MoneySplit({
     });
   return (
     <article className="nv-plate ins-money nv-enter" style={{ '--nv-i': 6 }}>
-      <h3 className="ins-card__title">
+      <h3 className="nv-h3 ins-card__title">
         Où va l’argent
         {whole > 0 ? <span className="ins-card__total">{euros(revenue)}</span> : null}
       </h3>
@@ -626,7 +626,7 @@ function Ring({
   const litShare = lit === null ? 0 : (shares[lit] ?? 0);
   return (
     <article className="nv-plate ins-ring-card">
-      <h3 className="ins-card__title">{title}</h3>
+      <h3 className="nv-h3 ins-card__title">{title}</h3>
       {total <= 0 ? (
         <p className="ins-empty">Aucune vente sur la période.</p>
       ) : (

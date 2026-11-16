@@ -86,7 +86,7 @@ function HerDay({ now, today }: { now: Date; today: string }): JSX.Element {
       {waiting === 0 ? null : (
         <section className="nv-plate sc-decide nv-enter">
           <div className="sc-decide__text">
-            <h2 className="sc-fans__title">À décider</h2>
+            <h2 className="nv-h2 sc-fans__title">À décider</h2>
             <p className="sc-fans__line">
               {waiting > 1
                 ? `${String(waiting)} propositions de l’agence attendent ta réponse cette semaine`
@@ -117,7 +117,7 @@ function Fans({ now, today }: { now: Date; today: string }): JSX.Element {
   if (onDuty.isError)
     return (
       <Panel className="sc-fans">
-        <h2 className="sc-fans__title">Qui répond à tes fans</h2>
+        <h2 className="nv-h2 sc-fans__title">Qui répond à tes fans</h2>
         <p className="sc-fans__line">Le planning n’a pas pu être lu.</p>
         <button
           type="button"
@@ -145,7 +145,7 @@ function Fans({ now, today }: { now: Date; today: string }): JSX.Element {
   const after = current.length === 0 ? later : next;
   return (
     <Panel className="sc-fans nv-enter">
-      <h2 className="sc-fans__title">Qui répond à tes fans</h2>
+      <h2 className="nv-h2 sc-fans__title">Qui répond à tes fans</h2>
       <p className="sc-fans__line">
         {current.length > 0 ? (
           <>

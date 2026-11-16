@@ -91,7 +91,7 @@ export function RequestsSection({
     return (
       <>
         <section className="rq-group" aria-label="En cours">
-          <h3 className="rq-group__title">
+          <h3 className="nv-h3 rq-group__title">
             En cours <span className="rq-count nv-num">{groups.current.length}</span>
           </h3>
           {groups.current.length === 0 ? (
@@ -116,7 +116,7 @@ export function RequestsSection({
         </section>
         {groups.closed.length === 0 ? null : (
           <section className="rq-group" aria-label="Refusées ou annulées">
-            <h3 className="rq-group__title">
+            <h3 className="nv-h3 rq-group__title">
               Refusées ou annulées <span className="rq-count nv-num">{groups.closed.length}</span>
             </h3>
             <ul className="rq-list">

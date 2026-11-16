@@ -7,7 +7,7 @@
   align-items: center;
   gap: 6px;
   flex: none;
-  min-height: 24px;
+  min-height: var(--nv-pill-info);
   padding: 0 10px;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
@@ -459,7 +459,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  padding: 4px 24px 22px;
+  padding: 4px var(--nv-plate-pad) var(--nv-plate-pad);
 }
 .rp-mine__empty {
   margin: 0;
@@ -1100,7 +1100,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
   border-radius: var(--nv-radius-lg);
 }
 .rp-accounts {
@@ -1115,7 +1115,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-space-4) var(--nv-plate-pad);
   border-radius: var(--nv-radius-lg);
   transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
 }
@@ -1148,9 +1148,6 @@
 }
 .rp-account__name {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  font-weight: 650;
 }
 .rp-account__handle,
 .rp-account__since {

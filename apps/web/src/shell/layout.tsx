@@ -90,7 +90,7 @@ export function Panel({
         <div className="nv-panel__head">
           <div className="min-w-0 flex-1">
             {eyebrow === undefined ? null : <p className="nv-eyebrow">{eyebrow}</p>}
-            {title === undefined ? null : <h2>{title}</h2>}
+            {title === undefined ? null : <h2 className="nv-h2">{title}</h2>}
           </div>
           {actions}
         </div>
@@ -377,10 +377,10 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
           >
             {item.label}
             {item.count === undefined || item.count === 0 ? null : item.countLabel === undefined ? (
-              <span className="nv-subnav__count">{item.count}</span>
+              <span className="nv-count nv-subnav__count">{item.count}</span>
             ) : (
               <>
-                <span className="nv-subnav__count" aria-hidden="true" title={item.countLabel}>
+                <span className="nv-count nv-subnav__count" aria-hidden="true" title={item.countLabel}>
                   {item.count}
                 </span>
                 <span className="sr-only">{`, ${item.countLabel}`}</span>

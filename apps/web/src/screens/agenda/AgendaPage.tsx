@@ -1,5 +1,4 @@
 import {
-  CREATOR_REPLIES_EMOJI,
   type CreatorAccountShift,
   type CreatorAgenda,
   type CreatorSuggestion,
@@ -28,6 +27,7 @@ import './agenda.css';
 import { lookAgainAtHerCase } from '@/rewards/api';
 import { useCreatorShifts } from '@/scheduling/api';
 import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
+import { NavIcon } from '@/shell/NavIcon';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
 
@@ -286,7 +286,7 @@ export function AgendaPage({
                 setRepliesShown(!repliesShown);
               }}
             >
-              {CREATOR_REPLIES_EMOJI}{' '}
+              <NavIcon name="team" />
               {repliesShown ? 'Masquer qui répond à tes fans' : 'Voir qui répond à tes fans'}
             </button>
           )}
@@ -297,7 +297,8 @@ export function AgendaPage({
               setOpen({ kind: 'phone' });
             }}
           >
-            📲 Mon agenda dans mon téléphone
+            <NavIcon name="phone" />
+            Mon agenda dans mon téléphone
           </button>
         </p>
       )}

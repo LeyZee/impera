@@ -62,7 +62,7 @@ export function CreatorReader({
             {initialOf(name)}
           </span>
           <span className="vt-reader__who">
-            <h2>{name}</h2>
+            <h2 className="nv-h3">{name}</h2>
             <span className="nv-meta">Lecture seule</span>
           </span>
         </header>

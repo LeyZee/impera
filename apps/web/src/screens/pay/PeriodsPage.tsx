@@ -153,8 +153,9 @@ function PeriodRow({
         `se valide à partir du ${dayMonthText(opensOn(window))}`,
       ]
     : [
+        // Finished but not closed: the pill says it, the line does not repeat it (GES-20).
         summary.closedAt === null
-          ? 'Finie, pas encore close'
+          ? ''
           : `Close le ${dayAt(summary.closedAt, window.timeZone)}${closedBy === null ? '' : ` par ${closedBy}`}`,
         net,
         counts,

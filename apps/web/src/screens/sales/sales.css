@@ -19,7 +19,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--nv-space-2);
-  padding: var(--nv-space-8) var(--nv-space-4);
+  padding: var(--nv-space-8) var(--nv-plate-pad);
   text-align: center;
 }
 .vt-hint > p {
@@ -110,7 +110,7 @@
   flex-direction: column;
   gap: var(--nv-space-3);
   min-width: 0;
-  padding: var(--nv-space-4);
+  padding: var(--nv-plate-pad);
 }
 .vt-reader__top {
   display: flex;
@@ -133,7 +133,6 @@
 .vt-reader__who h2 {
   margin: 0;
   overflow: hidden;
-  font-size: var(--nv-text-headline);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

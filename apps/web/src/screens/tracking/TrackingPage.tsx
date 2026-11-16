@@ -346,7 +346,7 @@ export function TrackingPage({
                   <div role="group" aria-label="Conversations" className="tr-groups">
                     {groupByHand(shown, selfScope).map((group) => (
                       <section key={group.hand} className="tr-group" aria-label={HAND_TITLES[group.hand]}>
-                        <h3 className="tr-group__title">
+                        <h3 className="nv-eyebrow tr-group__title">
                           {HAND_TITLES[group.hand]}
                           {group.hand === 'yours' ? (
                             <span className="tr-group__count">{group.lines.length}</span>

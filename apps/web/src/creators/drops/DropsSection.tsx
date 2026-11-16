@@ -166,7 +166,7 @@ function DropCard({
         </span>
       </div>
       <div className="sx-card__body">
-        <h3 id={`${id}-title`} className="sx-title">
+        <h3 id={`${id}-title`} className="nv-h3 sx-title">
           {row.label}
         </h3>
         <p className="sx-meta nv-num">

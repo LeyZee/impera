@@ -4,12 +4,6 @@
 .fi-panel {
   margin-bottom: var(--nv-space-4);
 }
-.fi-serif {
-  font-family: var(--nv-font-serif);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: 0;
-}
 
 /* Three numbers, side by side. */
 .fi-stats {
@@ -86,11 +80,6 @@
 }
 .fi-card__title {
   margin: 0;
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  color: var(--nv-ink-muted);
 }
 .fi-card__foot,
 .fi-note,

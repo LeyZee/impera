@@ -145,7 +145,9 @@ function CreateStep({ onNext }: { onNext: () => void }): JSX.Element {
   const username = suggestedUsername(shownName);
   return (
     <>
-      <h2 id="tg-sheet-title">Crée ton bot</h2>
+      <h2 className="nv-h2" id="tg-sheet-title">
+        Crée ton bot
+      </h2>
       <p>Telegram ne laisse créer un bot que par @BotFather. Ça prend une minute.</p>
       <ol className="tg-ol">
         <li>
@@ -258,7 +260,9 @@ function TokenStep({
 
   return (
     <>
-      <h2 id="tg-sheet-title">{bot === null ? 'Colle le jeton' : `Nouveau jeton pour ${bot.displayName}`}</h2>
+      <h2 className="nv-h2" id="tg-sheet-title">
+        {bot === null ? 'Colle le jeton' : `Nouveau jeton pour ${bot.displayName}`}
+      </h2>
       <p>
         {bot === null
           ? 'Impera le vérifie auprès de Telegram, puis le garde chiffré. Personne ne pourra le relire, même toi.'
@@ -406,7 +410,9 @@ function ListenStep({
 
   return (
     <>
-      <h2 id="tg-sheet-title">Ajoute {bot.displayName} à ton groupe</h2>
+      <h2 className="nv-h2" id="tg-sheet-title">
+        Ajoute {bot.displayName} à ton groupe
+      </h2>
       <p>Choisis le groupe dans Telegram. Impera le verra arriver tout seul, rien à recopier.</p>
       {found.length === 0 ? (
         <div className="tg-listen" aria-live="polite">
@@ -536,7 +542,9 @@ function TopicsStep({
 
   return (
     <>
-      <h2 id="tg-sheet-title">Que doit recevoir « {chat.title} » ?</h2>
+      <h2 className="nv-h2" id="tg-sheet-title">
+        Que doit recevoir « {chat.title} » ?
+      </h2>
       <p>Pour toutes les créatrices. Tu affineras ensuite dans chaque onglet.</p>
       {chats.length > 1 ? (
         <div className="tg-scope" role="radiogroup" aria-label="Groupe">

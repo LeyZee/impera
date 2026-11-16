@@ -61,7 +61,7 @@ export function AccessSection({
     const typed = email.trim();
     return (
       <section className="nv-plate ps-panel cr-access nv-enter" aria-label="Accès">
-        <h2 className="ps-title">Accès à son espace</h2>
+        <h2 className="nv-h2 ps-title">Accès à son espace</h2>
         <p className="ps-muted">
           {creatorName} n’a pas encore de compte. Son e-mail crée son compte et un lien d’accès, valable 72
           heures, que tu lui envoies toi-même.
@@ -98,7 +98,7 @@ export function AccessSection({
   const corrected = target.toLowerCase() !== account.email.trim().toLowerCase();
   return (
     <section className="nv-plate ps-panel cr-access nv-enter" aria-label="Accès">
-      <h2 className="ps-title">Accès à son espace</h2>
+      <h2 className="nv-h2 ps-title">Accès à son espace</h2>
       <p className="ps-muted">
         {access.kind === 'signed-in'
           ? `Son mot de passe est choisi. Elle se connecte avec ${account.email}. Si elle l’oublie, crée-lui un lien pour en choisir un nouveau.`

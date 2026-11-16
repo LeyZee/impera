@@ -77,7 +77,7 @@ function OffShift({
           </svg>
         </span>
         <div className="sc-off__text">
-          <h2 className="sc-off__title">Tu n’es pas en poste</h2>
+          <h2 className="nv-h2 sc-off__title">Tu n’es pas en poste</h2>
           <p className="sc-off__lead">
             {next === null
               ? 'Aucun shift prévu pour l’instant.'

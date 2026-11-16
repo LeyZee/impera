@@ -140,7 +140,7 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding: 18px 20px 14px;
+  padding: var(--nv-plate-pad) var(--nv-plate-pad) 14px;
 }
 .cia-credit__head {
   display: flex;
@@ -150,15 +150,12 @@
 }
 .cia-credit__name {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  font-weight: 650;
 }
 .cia-badge {
   display: inline-flex;
   align-items: center;
   flex: none;
-  min-height: 24px;
+  min-height: var(--nv-pill-info);
   padding: 0 10px;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
@@ -318,7 +315,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 14px;
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
 }
 .cia-none p {
   margin: 0;

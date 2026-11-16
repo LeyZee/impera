@@ -403,7 +403,7 @@ function DayDetail({
 }): JSX.Element {
   return (
     <section className="cal-detail nv-swap" key={day} aria-labelledby="cal-detail-title">
-      <h3 id="cal-detail-title" className="cal-detail__title">
+      <h3 id="cal-detail-title" className="nv-h3 cal-detail__title">
         {longDay(day)}
       </h3>
       {rows
@@ -734,7 +734,7 @@ export function AgencyLoad({
   return (
     <div className="cal-agency">
       <section className="nv-plate cal-load" aria-labelledby="cal-load-title">
-        <h2 id="cal-load-title" className="cal-agency__title">
+        <h2 id="cal-load-title" className="nv-h2 cal-agency__title">
           Charge {period}
         </h2>
         {load.length === 0 ? (
@@ -767,7 +767,7 @@ export function AgencyLoad({
         )}
       </section>
       <section className="nv-plate cal-cover" aria-labelledby="cal-cover-title">
-        <h2 id="cal-cover-title" className="cal-agency__title">
+        <h2 id="cal-cover-title" className="nv-h2 cal-agency__title">
           Couverture des comptes {period}
         </h2>
         {/* Its words when there is no account, as the load has its own (recette EQP-12). */}

@@ -41,16 +41,12 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   font-weight: 600;
   color: var(--nv-ink-faint);
 }
 .tg-eyebrow span {
-  letter-spacing: 0;
-  text-transform: none;
   font-weight: 500;
 }
 .tg-hint {
@@ -112,7 +108,7 @@
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  padding: 14px 18px;
+  padding: 14px var(--nv-plate-pad);
 }
 .tg-health__item {
   display: flex;
@@ -249,7 +245,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: 16px;
   align-items: center;
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
 }
 .tg-cover__orb {
   --_c: var(--nv-success);
@@ -584,7 +580,6 @@
 }
 .tg-preview__note h3 {
   margin: 0;
-  font-size: var(--nv-text-headline);
 }
 .tg-preview__note ul {
   margin: 0;
@@ -629,7 +624,7 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 32px 22px;
+  padding: 32px var(--nv-plate-pad);
   text-align: center;
 }
 .tg-bot {
@@ -768,15 +763,16 @@
 }
 .tg-sheet h2 {
   margin: 0;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  letter-spacing: var(--nv-text-title-2-tracking);
-  font-weight: 650;
   text-wrap: balance;
 }
 .tg-sheet > p {
   margin: 0;
   color: var(--nv-ink-muted);
+}
+/* The line under a step's title is a dialog's subtitle: the same type as every other (recette visuelle 16/11). */
+.tg-sheet > h2 + p {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
 }
 .tg-sheet__top {
   display: flex;

@@ -177,7 +177,7 @@ function CreditCard({
   return (
     <article className="nv-plate cia-credit nv-enter" style={{ '--nv-i': index }} data-tone={tone}>
       <header className="cia-credit__head">
-        <h3 className="cia-credit__name">{providerLabel(card.provider)}</h3>
+        <h3 className="nv-h3 cia-credit__name">{providerLabel(card.provider)}</h3>
         <span className={`cia-badge cia-badge--${tone}`}>{CREDIT_BADGE[card.state]}</span>
       </header>
       {card.mode === 'subscription' ? (
@@ -508,7 +508,7 @@ function Ring({
   const litSlice = lit === null ? undefined : slices[lit];
   return (
     <article className="nv-plate ins-ring-card">
-      <h3 className="ins-card__title">
+      <h3 className="nv-h3 ins-card__title">
         {title}
         {total > 0 ? <span className="ins-card__total">{eurText(total)}</span> : null}
       </h3>

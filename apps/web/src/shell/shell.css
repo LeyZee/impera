@@ -592,9 +592,6 @@
 }
 .nv-more__title {
   margin: 4px 12px 6px;
-  color: var(--nv-ink-faint);
-  font-size: 12px;
-  font-weight: 600;
 }
 /* Who is signed in, under the tabs: the desktop's account card, on the phone (NAV-02). */
 .nv-more__account {
@@ -1006,14 +1003,6 @@
   min-width: 0;
   margin-top: 16px;
 }
-/* A quiet label above a title or a block: sentence case, never shouted in capitals. */
-.nv-eyebrow {
-  margin: 0;
-  font-size: 13px;
-  line-height: 18px;
-  font-weight: 600;
-  color: var(--nv-ink-faint);
-}
 /* A way back in the eyebrow (« ← Créatrices », « ← Moi › Préférences ») is a plain button: its padding is pulled back so
    its text starts on the same line as the title below, the padding staying as the pressed and hovered surface. Its
    34 px are pulled back too, to the eyebrow's 18 px line: the title stands where every page has it (COH-01). */
@@ -1023,8 +1012,8 @@
 }
 
 /* ── Panels: content plates, not glass ── */
+/* One radius for every card, the plate's 26 (COH-03): the panel no longer sets a 34 of its own. */
 .nv-panel {
-  --_radius: var(--nv-radius-xl);
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -1035,25 +1024,27 @@
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  padding: 20px 24px 12px;
+  padding: var(--nv-plate-pad) var(--nv-plate-pad) var(--nv-space-4);
 }
-.nv-panel__head h2 {
-  margin: 2px 0 0;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  letter-spacing: var(--nv-text-title-2-tracking);
-  font-weight: 650;
+.nv-panel__head .nv-h2 {
+  margin-top: 2px;
 }
+/* A section of a card: the card's own padding on its sides, a hairline above it. */
 .nv-panel__sec {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 18px 24px;
+  padding: var(--nv-space-4) var(--nv-plate-pad);
   border-top: 1px solid var(--nv-hairline);
 }
 .nv-panel__head + .nv-panel__sec,
 .nv-panel__sec:first-child {
   border-top: 0;
+}
+/* Between a card's title and what follows, 16 px, whatever follows (CHA-13): the head keeps them, the first section
+   adds none of its own. */
+.nv-panel__head + .nv-panel__sec {
+  padding-top: 0;
 }
 .nv-scroll {
   min-height: 0;
@@ -1225,18 +1216,9 @@
     transform var(--nv-dur-morph) var(--nv-ease-spring),
     width var(--nv-dur-morph) var(--nv-ease-spring);
 }
+/* The counter of a tab is the design system's `nv-count` (18 px, 11 px figures, COH-08); nothing of its own. */
 .nv-subnav__count {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  box-sizing: border-box;
-  border-radius: 99px;
-  background: color-mix(in srgb, var(--nv-ink) 16%, transparent);
-  color: var(--nv-ink);
-  font-size: 10px;
-  line-height: 18px;
-  font-weight: 700;
-  text-align: center;
+  flex: none;
 }
 
 /* ── A screen not built yet ── */

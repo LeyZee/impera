@@ -361,7 +361,7 @@ function Loaded({
             {initialOf(name)}
           </span>
           <span className="tr-reader__who">
-            <h2>{name}</h2>
+            <h2 className="nv-h3">{name}</h2>
             <span className="tr-reader__state">
               <span className={`nv-status ${situation.pill}`}>
                 <span className="nv-status__dot" />

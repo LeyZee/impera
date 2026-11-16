@@ -68,7 +68,7 @@ export function BackupsSection(): JSX.Element {
         <StateDot tone={copy.tone} />
         <div className="bk-strip__body">
           <p className="bk-eyebrow">Sauvegarde de chaque nuit</p>
-          <h2 ref={copyTitle} id="bk-copy-title" className="bk-strip__title" tabIndex={-1}>
+          <h2 ref={copyTitle} id="bk-copy-title" className="nv-h2 bk-strip__title" tabIndex={-1}>
             {copy.title}
           </h2>
           <p className="bk-text">{copy.text}</p>
@@ -87,7 +87,7 @@ export function BackupsSection(): JSX.Element {
           <StateDot tone={restore.tone} />
           <p className="bk-eyebrow">Essai de restauration</p>
         </div>
-        <h2 id="bk-restore-title" className="bk-card__title">
+        <h2 id="bk-restore-title" className="nv-h2 bk-card__title">
           {restore.title}
         </h2>
         <p className="bk-text">{restore.text}</p>

@@ -236,7 +236,7 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
         <div className="sf-head">
           <span className="sv-dot sv-dot--big" data-dot={dotOf(status)} />
           <div className="sf-head__text">
-            <h2 className="sv-lead">
+            <h2 className="nv-h2 sv-lead">
               {name} <small className="sf-sub">API CRM</small>
             </h2>
             <p className="sv-muted sf-line" data-state={status.state} aria-live="polite">
@@ -360,7 +360,7 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
         {canWebhook ? (
           <div className="sf-hook" data-kind={webhook.kind}>
             <div className="sf-hook__text">
-              <h3 className="sf-hook__title">Réception instantanée</h3>
+              <h3 className="nv-h3 sf-hook__title">Réception instantanée</h3>
               <p className="sv-muted">
                 {webhook.kind === 'none'
                   ? `Sans webhook, une vente arrive dans la minute. Avec, ${name} la signale en quelques secondes.`
