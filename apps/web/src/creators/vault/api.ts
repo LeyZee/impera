@@ -33,3 +33,10 @@ export async function askVaultSync(creatorId: CreatorId): Promise<number | null>
     return null;
   }
 }
+
+/**
+ * ADR 0138: a media's sharp small picture, read at Reveal by the server when asked and never kept; from our own origin
+ * (the CRM's CSP). Asked only by a gesture: « Voir net », the pointer on a media, its sheet.
+ */
+export const vaultPreviewUrl = (creatorId: CreatorId, platformMediaId: string): string =>
+  `/v1/creators/${encodeURIComponent(creatorId)}/vault/media/${encodeURIComponent(platformMediaId)}/preview`;

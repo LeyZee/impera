@@ -1,7 +1,7 @@
 import type { CreatorId, VaultFolderView, VaultMediaView } from '@impera/contracts';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
-import { askVaultSync, useVault } from './api';
+import { askVaultSync, useVault, vaultPreviewUrl } from './api';
 import {
   SYNC_POLL_MS,
   durationLine,
@@ -30,9 +30,10 @@ import { useNow } from '@/scheduling/useNow';
  * grid of its media in Reveal's order, each with its sheet. For the owner alone « Synchroniser le coffre », the only
  * thing that reads it again (no cron); an active manager reads, never syncs: a sync reads the platform with her session.
  *
- * Each media shows the platform's blurred preview (ADR 0030 § 4), never the image: the sharp one waits for the files
- * to be read (vault-fetch-media). The folder opened lives in the address (`dossier`) when the page passes `folderId`
- * and `onFolder`; without them, in the card.
+ * Each media shows the platform's blurred preview first (ADR 0030 § 4); its sharp small picture comes on a gesture
+ * (ADR 0138): « Voir net » for the whole folder, the pointer on one media, its sheet. Read at Reveal by the server,
+ * never kept. The folder opened lives in the address (`dossier`) when the page passes `folderId` and `onFolder`;
+ * without them, in the card.
  */
 export function VaultCard({
   creatorId,
@@ -112,6 +113,7 @@ export function VaultCard({
       return (
         <FolderView
           key={`${folder.platformAccountId}:${folder.folderRef ?? ''}`}
+          creatorId={creatorId}
           folder={folder}
           onBack={() => {
             goTo(null);
@@ -247,8 +249,18 @@ function FolderButton({ tile, onOpen }: { tile: FolderTile; onOpen: () => void }
 }
 
 /** A folder opened: « Coffre › son nom », then its media in Reveal's order, and the sheet of the one picked. */
-function FolderView({ folder, onBack }: { folder: VaultFolderView; onBack: () => void }): JSX.Element {
+function FolderView({
+  creatorId,
+  folder,
+  onBack,
+}: {
+  creatorId: CreatorId;
+  folder: VaultFolderView;
+  onBack: () => void;
+}): JSX.Element {
   const [picked, setPicked] = useState<string | null>(null);
+  const [sharp, setSharp] = useState(false);
+  const pictured = folder.media.some((each) => each.kind !== 'audio' && !each.removed);
   const title = useRef<HTMLHeadingElement>(null);
   const name = folderName(folder);
   const media = picked === null ? undefined : folder.media.find((each) => each.platformMediaId === picked);
@@ -293,6 +305,19 @@ function FolderView({ folder, onBack }: { folder: VaultFolderView; onBack: () =>
           {name}
         </h3>
         <p className="ps-muted vx-open__line nv-num">{mediaLine(folder.media)}</p>
+        {pictured ? (
+          <button
+            type="button"
+            className={`nv-btn nv-btn--soft nv-btn--sm vx-open__sharp${sharp ? ' vx-open__sharp--on' : ''}`}
+            aria-pressed={sharp}
+            onClick={() => {
+              setSharp((was) => !was);
+            }}
+          >
+            <EyeIcon open={sharp} />
+            {sharp ? 'Flouter' : 'Voir net'}
+          </button>
+        ) : null}
       </div>
       {folder.media.length === 0 ? (
         <div className="vx-empty">
@@ -305,6 +330,8 @@ function FolderView({ folder, onBack }: { folder: VaultFolderView; onBack: () =>
             {folder.media.map((each, at) => (
               <li key={each.platformMediaId} className="vx-media__cell">
                 <MediaButton
+                  creatorId={creatorId}
+                  sharp={sharp}
                   media={each}
                   rank={at + 1}
                   picked={each.platformMediaId === picked}
@@ -318,6 +345,7 @@ function FolderView({ folder, onBack }: { folder: VaultFolderView; onBack: () =>
           {media === undefined ? null : (
             <MediaSheet
               key={media.platformMediaId}
+              creatorId={creatorId}
               media={media}
               onClose={() => {
                 setPicked(null);
@@ -331,16 +359,21 @@ function FolderView({ folder, onBack }: { folder: VaultFolderView; onBack: () =>
 }
 
 function MediaButton({
+  creatorId,
+  sharp,
   media,
   rank,
   picked,
   onPick,
 }: {
+  creatorId: CreatorId;
+  sharp: boolean;
   media: VaultMediaView;
   rank: number;
   picked: boolean;
   onPick: () => void;
 }): JSX.Element {
+  const [pointed, setPointed] = useState(false);
   const what = mediaKindLine(media);
   return (
     <button
@@ -349,8 +382,15 @@ function MediaButton({
       aria-pressed={picked}
       aria-label={`${String(rank)}. ${what}${media.removed ? ', retiré de Reveal' : ''}`}
       onClick={onPick}
+      onPointerEnter={() => {
+        setPointed(true);
+      }}
+      onPointerLeave={() => {
+        setPointed(false);
+      }}
     >
       <Preview hash={media.blurhash} />
+      {sharp || pointed ? <Sharp creatorId={creatorId} media={media} /> : null}
       <span className="vx-tile__kind" aria-hidden="true">
         <KindIcon kind={media.kind} />
       </span>
@@ -369,12 +409,21 @@ function MediaButton({
 }
 
 /** What the CRM knows of one media: what it is, when it came, Reveal's own text and range. Never the image. */
-function MediaSheet({ media, onClose }: { media: VaultMediaView; onClose: () => void }): JSX.Element {
+function MediaSheet({
+  creatorId,
+  media,
+  onClose,
+}: {
+  creatorId: CreatorId;
+  media: VaultMediaView;
+  onClose: () => void;
+}): JSX.Element {
   return (
     <aside className="vx-sheet" aria-label="Fiche du média">
       <div className="vx-sheet__top">
         <div className={`vx-sheet__preview vx-tile--${media.kind}`}>
           <Preview hash={media.blurhash} />
+          <Sharp creatorId={creatorId} media={media} />
           <span className="vx-tile__kind" aria-hidden="true">
             <KindIcon kind={media.kind} />
           </span>
@@ -407,8 +456,36 @@ function MediaSheet({ media, onClose }: { media: VaultMediaView; onClose: () => 
           </div>
         )}
       </dl>
-      <p className="vx-note">Aperçu flouté : l’image nette viendra avec la lecture des fichiers.</p>
+      {media.kind === 'audio' ? null : (
+        <p className="vx-note">Image lue dans Reveal à l’instant, jamais gardée par Impera.</p>
+      )}
     </aside>
+  );
+}
+
+/**
+ * The sharp small picture over the blurred one (ADR 0138), faded in once loaded; on any failure it stays hidden and
+ * the blur shows. Never for a voice note nor a media Reveal removed: there is no picture to read.
+ */
+function Sharp({ creatorId, media }: { creatorId: CreatorId; media: VaultMediaView }): JSX.Element | null {
+  const [state, setState] = useState<'loading' | 'shown' | 'failed'>('loading');
+  if (media.kind === 'audio' || media.removed || state === 'failed') return null;
+  return (
+    <img
+      className="vx-sharp"
+      data-state={state}
+      src={vaultPreviewUrl(creatorId, media.platformMediaId)}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      decoding="async"
+      onLoad={() => {
+        setState('shown');
+      }}
+      onError={() => {
+        setState('failed');
+      }}
+    />
   );
 }
 
@@ -440,6 +517,15 @@ function KindIcon({ kind }: { kind: VaultMediaView['kind'] }): JSX.Element {
       <rect x="2.5" y="3" width="11" height="10" rx="2" />
       <path d="m3.5 11.5 3-3.2 2.2 2.2 1.6-1.5 2.2 2.5" />
       <circle cx="10.5" cy="6" r="1.1" />
+    </svg>
+  );
+}
+
+function EyeIcon({ open }: { open: boolean }): JSX.Element {
+  return (
+    <svg className="vx-eye" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M1.8 8s2.3-4.3 6.2-4.3S14.2 8 14.2 8s-2.3 4.3-6.2 4.3S1.8 8 1.8 8Z" />
+      {open ? <path d="m2.5 13.5 11-11" /> : <circle cx="8" cy="8" r="1.9" />}
     </svg>
   );
 }

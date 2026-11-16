@@ -162,5 +162,32 @@ export function createDrizzleVaultStore(db: Database): VaultStore {
           .where(eq(schema.platformAccounts.creatorId, creatorId));
         return { rows: (await selectRows(tx)).map(rowOf), syncedAt: synced?.at ?? null };
       }),
+
+    previewTarget: (creatorId, userId, platformMediaId) =>
+      withTenantMember(db, creatorId, userId, async (tx, scope) => {
+        if (!readsCreatorFigures(await readerIn(tx, userId, creatorId, scope))) return 'forbidden' as const;
+        // Still listed by the platform: a media it removed has no link to read (ADR 0138 § 4).
+        const [row] = await tx
+          .select({
+            platformAccountId: schema.mediaPlatformRefs.platformAccountId,
+            folderRef: schema.mediaPlatformRefs.folderRef,
+          })
+          .from(schema.mediaPlatformRefs)
+          .where(
+            and(
+              eq(schema.mediaPlatformRefs.creatorId, creatorId),
+              eq(schema.mediaPlatformRefs.platformMediaId, platformMediaId),
+              sql`${schema.mediaPlatformRefs.removedAt} is null`,
+            ),
+          )
+          .orderBy(schema.mediaPlatformRefs.platformAccountId)
+          .limit(1);
+        return row === undefined
+          ? null
+          : {
+              platformAccountId: PlatformAccountIdSchema.parse(row.platformAccountId),
+              folderRef: row.folderRef,
+            };
+      }),
   };
 }

@@ -264,6 +264,8 @@ export const ConnectorCapabilitiesSchema = z.object({
   scriptHistory: z.boolean(),
   /** `listVaultMedia`. */
   vault: z.boolean(),
+  /** `readVaultPreview`: a vault media's small picture read on demand, never kept (ADR 0138). */
+  vaultPreview: z.boolean(),
 });
 export type ConnectorCapabilities = z.infer<typeof ConnectorCapabilitiesSchema>;
 

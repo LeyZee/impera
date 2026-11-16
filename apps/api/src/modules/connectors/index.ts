@@ -28,6 +28,7 @@ import { createConnectorSessions, type ConnectorSessions } from './application/s
 import {
   createAskVaultSync,
   createPlatformReads,
+  createVaultPreview,
   createVaultReads,
   createVaultSyncJob,
   type PlatformReads,
@@ -104,6 +105,7 @@ export { FakeConnector } from './infra/fake/FakeConnector';
 /** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
 export { revealApiConnectors } from './infra/reveal/connector';
 export type { RevealFetch } from './infra/reveal/client';
+export type { RevealFileFetch } from './infra/reveal/preview';
 /** @public The errors `platformReads` throws, for the adapter that reads through it (`reason` says why a read is refused). */
 export { PlatformAccountNotFound, PlatformReadUnavailable } from './domain/errors';
 /** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */
@@ -207,7 +209,7 @@ export interface ConnectorsModule {
    * these creators on that platform, at most once a minute per conversation. How many reads were queued.
    */
   readonly askConversationRead: (ask: ConversationReadAsk) => Promise<number>;
-  readonly vaultRoutes: (options: Omit<VaultRoutesOptions, 'askSync'>) => FastifyPluginAsyncZod;
+  readonly vaultRoutes: (options: Omit<VaultRoutesOptions, 'askSync' | 'preview'>) => FastifyPluginAsyncZod;
   /** Her vault as the last sync read it, as the person reading (the owner, an active manager of her list). */
   readonly vault: VaultReads;
   /**
@@ -396,7 +398,12 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       platforms: resolver.platforms,
       clock,
     }),
-    vaultRoutes: (options) => createVaultRoutes(vaultReads, { ...options, askSync: askVaultSync }),
+    vaultRoutes: (options) =>
+      createVaultRoutes(vaultReads, {
+        ...options,
+        askSync: askVaultSync,
+        preview: createVaultPreview({ accounts, resolver, store: vaultStore, clock }),
+      }),
     vault: vaultReads,
     platformReads: createPlatformReads({ accounts, resolver, clock }),
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),

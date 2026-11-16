@@ -24,6 +24,7 @@ import {
   ScriptStepAlreadySent,
   ScriptStepPriceChanged,
   type PlatformConnector,
+  type VaultPreview,
 } from '../../domain/platform-connector';
 import type { ConnectorRegistry, ConnectorSend, SendJournal } from '../../domain/ports';
 
@@ -46,12 +47,18 @@ import {
   type OwnMessages,
 } from './mapping';
 import { withAgencyBlock } from './note';
+import { REVEAL_MEDIA_ORIGINS, previewLinkOf, readPreviewFile, type RevealFileFetch } from './preview';
 import { fingerprintOf, isSendOf, type SendContent } from './sends';
 import { parseRevealSession, type RevealSession } from './session';
 import { REVEAL_ENDPOINTS, type RevealAnswer } from './wire';
 
 /** Page sizes of the official client (reveal-api-observed.md § Pagination): no heavier than a chatter. */
 const TAKE = { conversations: 20, messages: 10, ppv: 10, scripts: 20, vault: 10, transactions: 10 } as const;
+/**
+ * How long the links of a folder's small pictures are kept in memory (ADR 0138 § 1): never written anywhere, and
+ * shorter than a link's own life, so that a folder opened is listed once for all its pictures.
+ */
+const PREVIEW_LINKS_MS = 3 * 60_000;
 /** A cursor that never ends is a bug or a changed API: stop rather than loop. */
 const MAX_PAGES = 500;
 /** `health` warns this long before a readable expiry (spec § 2): the token lives 24 h only (V1). */
@@ -94,6 +101,7 @@ const CAPABILITIES: ConnectorCapabilities = {
   scripts: true,
   scriptHistory: true,
   vault: true,
+  vaultPreview: true,
 };
 
 export interface RevealApiConnectorOptions {
@@ -113,6 +121,13 @@ export interface RevealApiConnectorOptions {
    * calling Reveal. Without it, every write is refused: a send nobody records could go twice.
    */
   readonly sends?: SendJournal;
+  /**
+   * Reads one small picture of the vault (ADR 0138), never with our headers. Without it, `readVaultPreview` fails
+   * `fatal`.
+   */
+  readonly fetchFile?: RevealFileFetch;
+  /** Where those pictures may come from: `REVEAL_MEDIA_ORIGINS` by default, FakeReveal's in the tests. */
+  readonly mediaOrigins?: readonly string[];
 }
 
 /** `exp` of a JWT bearer, when the token is one (spec § 2, V2); `null` otherwise. */
@@ -161,6 +176,16 @@ export class RevealApiConnector implements PlatformConnector {
   private readonly lastSendIn = new Map<string, number>();
   /** Fan → conversation, as `listConversations` read them: Reveal has one conversation per fan and model. */
   private readonly conversationOfFan = new Map<string, string>();
+  private readonly fetchFile: RevealFileFetch | null;
+  private readonly mediaOrigins: readonly string[];
+  /**
+   * Folder (`''`: the vault's root) → the links of its small pictures by media, read once and shared by the pictures
+   * asked together, until `until` (ADR 0138 § 1). In memory only.
+   */
+  private readonly previewLinks = new Map<
+    string,
+    { readonly until: number; readonly links: Promise<Map<string, string | null>> }
+  >();
 
   constructor(options: RevealApiConnectorOptions) {
     const { session } = options;
@@ -170,6 +195,8 @@ export class RevealApiConnector implements PlatformConnector {
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.botDisplayName = options.botDisplayName ?? null;
     this.sends = options.sends ?? null;
+    this.fetchFile = options.fetchFile ?? null;
+    this.mediaOrigins = options.mediaOrigins ?? REVEAL_MEDIA_ORIGINS;
     this.client =
       session === null
         ? null
@@ -540,6 +567,44 @@ export class RevealApiConnector implements PlatformConnector {
     return media;
   }
 
+  /**
+   * ADR 0138: one small picture, by a link fresh from its folder's listing (shared by the pictures asked within a few
+   * minutes). A link the platform refuses is listed again once; then `not_found`.
+   */
+  async readVaultPreview(input: {
+    mediaRef: ExternalRef;
+    folderRef: ExternalRef | null;
+  }): Promise<VaultPreview> {
+    const fetchFile = this.fetchFile;
+    if (fetchFile === null) throw new ConnectorError('fatal', 'vault preview: no file reader');
+    const folder = input.folderRef?.id ?? '';
+    for (const fresh of [false, true]) {
+      const link = (await this.previewLinksOf(folder, fresh)).get(input.mediaRef.id);
+      if (link === undefined)
+        throw new ConnectorError('not_found', 'vault preview: no such media in the folder');
+      if (link === null) throw new ConnectorError('not_found', 'vault preview: no picture for this media');
+      const read = await readPreviewFile(fetchFile, link, this.mediaOrigins);
+      if (read !== 'expired') return read;
+    }
+    throw new ConnectorError('not_found', 'vault preview: link refused after a fresh listing');
+  }
+
+  private previewLinksOf(folder: string, fresh: boolean): Promise<Map<string, string | null>> {
+    const now = this.now().getTime();
+    for (const [key, kept] of this.previewLinks) if (kept.until <= now) this.previewLinks.delete(key);
+    const kept = this.previewLinks.get(folder);
+    if (!fresh && kept !== undefined) return kept.links;
+    const links = this.vaultPages(folder === '' ? null : folder).then(
+      (items) => new Map(items.map((item) => [item.id, previewLinkOf(item)])),
+    );
+    this.previewLinks.set(folder, { until: now + PREVIEW_LINKS_MS, links });
+    // A failed listing is not kept: the next picture lists again.
+    links.catch(() => {
+      if (this.previewLinks.get(folder)?.links === links) this.previewLinks.delete(folder);
+    });
+    return links;
+  }
+
   private session(): RevealClient {
     if (this.client === null) throw new ConnectorError('session_expired', 'no Reveal session captured');
     return this.client;
@@ -778,6 +843,9 @@ export function revealApiConnectors(options: {
   readonly log?: (platformAccountId: string, entry: RevealCallLog) => void;
   /** Tests only: FakeReveal's clock, so an attempt and the message it made are dated alike. */
   readonly now?: () => Date;
+  /** The vault's small pictures (ADR 0138); FakeReveal's in the tests, with its origin. */
+  readonly fetchFile?: RevealFileFetch;
+  readonly mediaOrigins?: readonly string[];
 }): NonNullable<ConnectorRegistry['reveal']> {
   return (account, session, context) =>
     new RevealApiConnector({
@@ -786,6 +854,8 @@ export function revealApiConnectors(options: {
       fetch: options.fetch,
       ...(options.baseUrl === undefined ? {} : { baseUrl: options.baseUrl }),
       ...(options.now === undefined ? {} : { now: options.now }),
+      ...(options.fetchFile === undefined ? {} : { fetchFile: options.fetchFile }),
+      ...(options.mediaOrigins === undefined ? {} : { mediaOrigins: options.mediaOrigins }),
       ...(options.log === undefined ? {} : { log: (entry) => options.log?.(account.id, entry) }),
     });
 }

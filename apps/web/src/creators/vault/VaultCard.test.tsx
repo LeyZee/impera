@@ -255,4 +255,57 @@ describe('« Son coffre Reveal » (ADR 0099)', () => {
     // The page owns the address: nothing opens until it says so.
     expect(screen.queryByRole('list', { name: 'Médias de Matin ☀️' })).toBeNull();
   });
+
+  it('shows the sharp pictures on « Voir net », on the pointer, in the sheet, and falls back to the blur (ADR 0138)', async () => {
+    const photo = media('image', false, { platformMediaId: 'photo_1' });
+    const video = media('video', false, { platformMediaId: 'video_1' });
+    const gone = media('image', true, { platformMediaId: 'gone_1' });
+    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [photo, video, gone])] })]);
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir Matin ☀️' }));
+    const grid = await screen.findByRole('list', { name: 'Médias de Matin ☀️' });
+    const sharp = () => [...grid.querySelectorAll('img.vx-sharp')].map((img) => img.getAttribute('src'));
+    // Blurred first: nothing asked of Reveal until a gesture.
+    expect(sharp()).toEqual([]);
+    const tile = screen.getByRole('button', { name: '1. Photo' });
+    fireEvent.pointerEnter(tile);
+    expect(sharp()).toEqual([`/v1/creators/${CREATOR}/vault/media/photo_1/preview`]);
+    fireEvent.pointerLeave(tile);
+    expect(sharp()).toEqual([]);
+    const toggle = screen.getByRole('button', { name: 'Voir net' });
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    // The photo and the video's poster; never a media Reveal removed.
+    expect(sharp()).toEqual([
+      `/v1/creators/${CREATOR}/vault/media/photo_1/preview`,
+      `/v1/creators/${CREATOR}/vault/media/video_1/preview`,
+    ]);
+    const first = grid.querySelector('img.vx-sharp');
+    if (first === null) throw new Error('no picture');
+    expect(first.getAttribute('data-state')).toBe('loading');
+    fireEvent.load(first);
+    expect(first.getAttribute('data-state')).toBe('shown');
+    // A picture that does not come: the blur stays, nothing else said.
+    const second = grid.querySelectorAll('img.vx-sharp')[1];
+    if (second === undefined) throw new Error('no second picture');
+    fireEvent.error(second);
+    expect(sharp()).toEqual([`/v1/creators/${CREATOR}/vault/media/photo_1/preview`]);
+    fireEvent.click(screen.getByRole('button', { name: 'Flouter' }));
+    expect(sharp()).toEqual([]);
+    // The sheet always shows it sharp.
+    fireEvent.click(tile);
+    const sheet = screen.getByRole('complementary', { name: 'Fiche du média' });
+    expect(sheet.querySelector('img.vx-sharp')?.getAttribute('src')).toBe(
+      `/v1/creators/${CREATOR}/vault/media/photo_1/preview`,
+    );
+  });
+
+  it('offers no « Voir net » in a folder of voice notes only', async () => {
+    const voice = { ...media('image'), kind: 'audio' as const, durationSeconds: 8, blurhash: null };
+    serve([viewOf({ folders: [folder('f1', 'Vocaux ☀️', 'day', [voice])] })]);
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir Vocaux ☀️' }));
+    expect(await screen.findByRole('button', { name: '1. Vocal · 0:08' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Voir net' })).toBeNull();
+  });
 });

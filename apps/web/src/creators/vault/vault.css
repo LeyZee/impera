@@ -645,3 +645,58 @@
     transform: none;
   }
 }
+
+/* ───────────── The sharp small picture (ADR 0138), over the blur, faded in once loaded ───────────── */
+
+.vx-sharp {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  opacity: 0;
+  filter: blur(12px);
+  transform: scale(1.04);
+  transition:
+    opacity var(--nv-dur-base) var(--nv-ease-out),
+    filter var(--nv-dur-slow) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.vx-sharp[data-state='shown'] {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+.vx-tile:hover .vx-sharp[data-state='shown'] {
+  transform: scale(1.06);
+}
+.vx-open__head {
+  position: relative;
+}
+.vx-open__sharp {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.vx-eye {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vx-sharp,
+  .vx-sharp[data-state='shown'],
+  .vx-tile:hover .vx-sharp[data-state='shown'] {
+    transform: none;
+    transition: opacity var(--nv-dur-fast) linear;
+  }
+}

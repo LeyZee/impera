@@ -8,11 +8,16 @@ import {
 } from '@impera/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createFakeReveal, type FakeReveal } from '../../../../../__tests__/fake-reveal/server';
+import {
+  FAKE_REVEAL_MEDIA_ORIGIN,
+  createFakeReveal,
+  type FakeReveal,
+} from '../../../../../__tests__/fake-reveal/server';
 import { ConnectorError } from '../../../domain/platform-connector';
 import { MemorySendJournal } from '../../__tests__/memory-send-journal';
 import type { RevealCallLog, RevealFetch } from '../client';
 import { RevealApiConnector, revealApiConnectors } from '../connector';
+import type { RevealFileFetch } from '../preview';
 import type { RevealSession } from '../session';
 
 /**
@@ -417,5 +422,123 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       ['ppv', 500],
     ]);
     expect(await connector.listTransactions({ since: new Date(all[1]?.createdAt ?? 0) })).toHaveLength(1);
+  });
+});
+
+describe('RevealApiConnector: a vault media’s sharp preview (ADR 0138)', () => {
+  const FOLDER_1 = { platform: 'reveal', id: 'folder_1' } as const;
+  const ref = (id: string) => ({ platform: 'reveal' as const, id });
+  const PNG = [0x89, 0x50, 0x4e, 0x47];
+
+  function previewer(
+    fake: FakeReveal,
+    extra: { fetchFile?: RevealFileFetch; mediaOrigins?: readonly string[]; listings?: string[] } = {},
+  ): RevealApiConnector {
+    return new RevealApiConnector({
+      session: sessionOf(fake),
+      fetch: fake.fetch,
+      baseUrl: BASE,
+      sleep: () => Promise.resolve(),
+      fetchFile: extra.fetchFile ?? fake.fetchFile,
+      mediaOrigins: extra.mediaOrigins ?? [FAKE_REVEAL_MEDIA_ORIGIN],
+      log: (entry) => {
+        if (entry.route === 'vault.medias') extra.listings?.push(entry.route);
+      },
+    });
+  }
+
+  it('reads a photo’s small picture and a video’s poster, its folder listed once, never with our headers', async () => {
+    const fake = world();
+    const listings: string[] = [];
+    const asked: object[] = [];
+    const spy: RevealFileFetch = (url, init) => {
+      asked.push(init);
+      return fake.fetchFile(url, init);
+    };
+    const connector = previewer(fake, { fetchFile: spy, listings });
+    const [photo, poster] = await Promise.all([
+      connector.readVaultPreview({ mediaRef: ref('media_01'), folderRef: FOLDER_1 }),
+      connector.readVaultPreview({ mediaRef: ref('media_03'), folderRef: FOLDER_1 }),
+    ]);
+    for (const picture of [photo, poster]) {
+      expect(picture.contentType).toBe('image/png');
+      expect([...picture.bytes.slice(0, 4)]).toEqual(PNG);
+    }
+    // Two pictures asked together: one listing of the folder, shared.
+    expect(listings).toHaveLength(1);
+    // No authorization, no cookie, no origin: the session never leaves for the files' host; no redirect followed.
+    for (const init of asked) expect(Object.keys(init).sort()).toEqual(['method', 'redirect', 'signal']);
+    expect(asked[0]).toMatchObject({ method: 'GET', redirect: 'manual' });
+  });
+
+  it('says not_found for a media its folder does not list, and for a voice note', async () => {
+    const fake = createFakeReveal({ fixture: 'quiet' });
+    fakes.push(fake);
+    const connector = previewer(fake);
+    const missing = connector.readVaultPreview({ mediaRef: ref('media_99'), folderRef: FOLDER_1 });
+    expect((await rejection(missing)).code).toBe('not_found');
+    const voice = connector.readVaultPreview({
+      mediaRef: ref('media_voice_01'),
+      folderRef: { platform: 'reveal', id: 'folder_3' },
+    });
+    expect((await rejection(voice)).code).toBe('not_found');
+  });
+
+  it('refuses a picture from an origin the adapter does not name, and anything but an image', async () => {
+    const fake = world();
+    const calls: string[] = [];
+    const counted: RevealFileFetch = (url, init) => {
+      calls.push(url);
+      return fake.fetchFile(url, init);
+    };
+    // No origin written: refused before any call, the origin alone said, never the signed link.
+    const nowhere = previewer(fake, { fetchFile: counted, mediaOrigins: [] });
+    const refused = await rejection(
+      nowhere.readVaultPreview({ mediaRef: ref('media_01'), folderRef: FOLDER_1 }),
+    );
+    expect(refused.code).toBe('fatal');
+    expect(refused.message).toContain(FAKE_REVEAL_MEDIA_ORIGIN);
+    expect(refused.message).not.toContain('sig=');
+    expect(calls).toEqual([]);
+    // A page instead of a picture.
+    const page: RevealFileFetch = () =>
+      Promise.resolve({
+        status: 200,
+        arrayBuffer: () => Promise.resolve(new TextEncoder().encode('<!doctype html><p>non</p>').buffer),
+      });
+    const html = await rejection(
+      previewer(fake, { fetchFile: page }).readVaultPreview({
+        mediaRef: ref('media_01'),
+        folderRef: FOLDER_1,
+      }),
+    );
+    expect(html.code).toBe('fatal');
+    // A server error is transient: counted as any read's.
+    const down: RevealFileFetch = () =>
+      Promise.resolve({ status: 502, arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
+    const failed = await rejection(
+      previewer(fake, { fetchFile: down }).readVaultPreview({
+        mediaRef: ref('media_01'),
+        folderRef: FOLDER_1,
+      }),
+    );
+    expect(failed.code).toBe('transient');
+  });
+
+  it('lists the folder again once when the platform refuses a link kept, then reads it', async () => {
+    const fake = world();
+    const listings: string[] = [];
+    const connector = previewer(fake, { listings });
+    await connector.readVaultPreview({ mediaRef: ref('media_01'), folderRef: FOLDER_1 });
+    // FakeReveal's links live 10 minutes: past them, the link kept in memory is refused.
+    const moved = await fake.app.inject({
+      method: 'POST',
+      url: '/__clock',
+      payload: { advanceMs: 11 * 60_000 },
+    });
+    expect(moved.statusCode).toBe(200);
+    const again = await connector.readVaultPreview({ mediaRef: ref('media_02'), folderRef: FOLDER_1 });
+    expect(again.contentType).toBe('image/png');
+    expect(listings).toHaveLength(2);
   });
 });

@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z, ZodError } from 'zod';
 
-import type { RevealFetch } from '../../modules/connectors';
+import type { RevealFetch, RevealFileFetch } from '../../modules/connectors';
 
 import { FIXTURES, type FixtureName } from './fixtures';
 import {
@@ -36,6 +36,8 @@ import {
 const LINK_TTL_MS = 10 * 60_000;
 const LINK_SECRET = 'fake-reveal-link-secret';
 const PUBLIC_URL = 'http://fake-reveal.test';
+/** Where FakeReveal serves its files: the one origin a connector under test may read a vault picture from. */
+export const FAKE_REVEAL_MEDIA_ORIGIN = PUBLIC_URL;
 /** Invented: the real agency share never enters the repository. Reveal's own 18 % and VAT 20 % are public. */
 const AGENCY_PERCENTAGE = 30;
 /** Seen on every API answer (headers.md); FakeReveal sends them without counting. */
@@ -408,7 +410,14 @@ class FakeRevealWorld {
     };
     // A fan's file carries its sender and none of the vault fields (capture, question 7).
     if (media.fromFanId !== null) return { ...base, incomingMessageMemberId: media.fromFanId };
-    return { ...base, isHls: media.type === 'video', thumbnailUrl: url, moderationStatus: 'approved' };
+    // A video's poster is a picture of its own (ADR 0138), signed like the file.
+    const poster = `${PUBLIC_URL}/files/${media.id}/poster?exp=${String(expiresMs)}&sig=${this.linkSignature(media.id, expiresMs)}`;
+    return {
+      ...base,
+      isHls: media.type === 'video',
+      thumbnailUrl: media.type === 'video' ? poster : url,
+      moderationStatus: 'approved',
+    };
   }
 
   wireConversation(c: FakeConversation): z.infer<(typeof ENDPOINTS)['conversations.read']['shape']> {
@@ -659,6 +668,8 @@ export interface FakeReveal {
   readonly userId: string;
   /** `fetch` for the connector, served by `app.inject` (no port opened); any host reaches FakeReveal. */
   readonly fetch: RevealFetch;
+  /** The same, for one file read (a vault picture, ADR 0138), its body as bytes. */
+  readonly fetchFile: RevealFileFetch;
   /** FakeReveal's clock, moved only by `POST /__clock`: a connector under test reads the same time. */
   now(): Date;
 }
@@ -1212,6 +1223,16 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     return reply.type(file.mimeType).send(file.data);
   });
 
+  app.get('/files/:id/poster', (request, reply) => {
+    const { id } = IdParams.parse(request.params);
+    const { exp, sig } = z.object({ exp: z.coerce.number().int(), sig: z.string() }).parse(request.query);
+    const media = world.state.media.find((m) => m.id === id);
+    if (media?.type !== 'video' || sig !== world.linkSignature(id, exp))
+      throw new HttpFault(403, 'Forbidden');
+    if (exp <= world.nowMs()) throw new HttpFault(403, 'Request has expired');
+    return reply.type(FILES.photo.mimeType).send(FILES.photo.data);
+  });
+
   /* ------------------------------------------------ Sales and notifications ------------------------------------- */
 
   app.get('/transactions/model/:id', (request) => {
@@ -1299,9 +1320,18 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     };
   };
 
+  const fetchFile: RevealFileFetch = async (url, init) => {
+    const target = new URL(url);
+    const response = await app.inject({ method: init.method, url: `${target.pathname}${target.search}` });
+    // A copy in a buffer of its own: never the pool Node's buffers share.
+    const bytes = new Uint8Array(response.rawPayload);
+    return { status: response.statusCode, arrayBuffer: () => Promise.resolve(bytes.buffer) };
+  };
+
   return {
     app,
     fetch,
+    fetchFile,
     state: () => world.state,
     get authorization() {
       return `Bearer ${world.state.sessionToken}`;

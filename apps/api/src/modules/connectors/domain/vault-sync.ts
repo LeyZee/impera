@@ -178,4 +178,20 @@ export interface VaultStore {
     now: Date,
   ): Promise<VaultSyncOutcome | null>;
   read(creatorId: CreatorId, userId: string): Promise<VaultRead | null>;
+  /**
+   * Where one media of her vault is, for its small picture (ADR 0138 § 4), as the person reading: `forbidden` when she
+   * is not theirs to read (the owner, an active manager of her list), `null` when no media of hers still listed by
+   * the platform has this id.
+   */
+  previewTarget(
+    creatorId: CreatorId,
+    userId: string,
+    platformMediaId: string,
+  ): Promise<VaultPreviewTarget | 'forbidden' | null>;
+}
+
+/** A vault media whose small picture may be read: its account and its folder (`null`: the vault's root). */
+export interface VaultPreviewTarget {
+  readonly platformAccountId: PlatformAccountId;
+  readonly folderRef: string | null;
 }

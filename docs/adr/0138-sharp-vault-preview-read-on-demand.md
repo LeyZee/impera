@@ -1,6 +1,6 @@
 # 0138. Aperçu net du coffre : la petite image de Reveal lue à la demande, servie sans être gardée
 
-Statut : proposed (demande de Charles du 16/11/2026, 16 h 25, fil « Médias » : « je veux qu'on mette l'aperçu net, parce que c'est ça qui permet vraiment de me rendre compte de ce qu'on synchronise »)
+Statut : accepted (Charles, 16/11/2026, 16 h 27, « ok 0138 » ; demande de Charles du 16/11/2026, 16 h 25, fil « Médias » : « je veux qu'on mette l'aperçu net, parce que c'est ça qui permet vraiment de me rendre compte de ce qu'on synchronise »)
 Date : 2026-11-16
 Précise : l'ADR 0099 (§ 7 : le téléchargement des octets, fiche à part), l'ADR 0030 (§ 4 : vignette affichée floutée par défaut), l'ADR 0018 (port du connecteur, lectures déclarées par drapeau). Amende : l'ADR 0099, où l'écran du coffre ne montrait aucun fichier tant que `fetchMedia` n'existait pas.
 

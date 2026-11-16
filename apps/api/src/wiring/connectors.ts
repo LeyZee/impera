@@ -71,6 +71,8 @@ export function wireConnectors(
       // Reads only: sends stay off until P2-03, and the write guard (`writes`) refuses them first anyway.
       reveal: revealApiConnectors({
         fetch,
+        // The vault's small pictures (ADR 0138): read on demand, never kept, from the origins written in the adapter.
+        fetchFile: fetch,
         // The route's name, the status and the duration: never the token, a URL or a body (spec § 3).
         log: (platformAccountId, entry) => {
           logger.debug({ platformAccountId, ...entry }, 'reveal: call');
