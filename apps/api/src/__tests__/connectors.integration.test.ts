@@ -628,6 +628,7 @@ describe('connectors module (P0-06)', () => {
       creatorName: 'Test',
       sessionState: 'none',
       sessionUpdatedAt: null,
+      modelId: null,
     });
     expect(listed.body).not.toContain('reveal-bearer-');
   });
@@ -704,6 +705,25 @@ describe('connectors module (P0-06)', () => {
         'invented-signature',
       ].join('.');
 
+    // The extension alone never brings an account's first session (ADR 0147).
+    const alone = await server.inject({
+      method: 'POST',
+      url: '/v1/connector/sessions',
+      remoteAddress: addressOf(id),
+      headers: { origin: 'chrome-extension://abcdef', 'x-extension-link': ownerLink },
+      payload: {
+        platformAccountId: id,
+        session: revealSession(jwt(23.9, 'z'), 'model-test-short'),
+        trigger: 'open',
+      },
+    });
+    expect([alone.statusCode, alone.json<{ error: { code: string } }>().error.code]).toEqual([
+      422,
+      'connector_session_auto_unprocessable',
+    ]);
+    expect((await accountRow(id)).sessionCiphertext).toBeNull();
+    expect(alone.body).not.toContain('invented-signature');
+
     const old = await sync(id, revealSession(jwt(1, 'a'), 'model-test-short'));
     expect(old.statusCode, old.body).toBe(200);
     expect(old.json()).toMatchObject({ sessionState: 'warning', reconnectFirst: true });
@@ -714,8 +734,13 @@ describe('connectors module (P0-06)', () => {
     expect(old.body).not.toContain('invented-signature');
 
     // Logged out and in again: a fresh login's token, valid, nothing more to do.
-    const fresh = await sync(id, revealSession(jwt(23.9, 'b'), 'model-test-short'));
-    expect(fresh.json()).toMatchObject({ sessionState: 'valid', reconnectFirst: false });
+    const freshSession = revealSession(jwt(23.9, 'b'), 'model-test-short');
+    const fresh = await sync(id, freshSession);
+    expect(fresh.json()).toMatchObject({ sessionState: 'valid', reconnectFirst: false, kept: false });
+    // Yesterday's token sent again: the one in place lives longer and stays (ADR 0147 § 7).
+    const again = await sync(id, revealSession(jwt(1, 'a'), 'model-test-short'));
+    expect(again.json()).toMatchObject({ sessionState: 'valid', reconnectFirst: false, kept: true });
+    expect(await app.modules.connectors.sessions.load(creatorId, id)).toBe(freshSession);
     expect((await accountRow(id)).sessionState).toBe('valid');
     for (const to of ['warning', 'valid'])
       expect(

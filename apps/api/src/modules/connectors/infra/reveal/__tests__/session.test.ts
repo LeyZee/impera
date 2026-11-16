@@ -31,6 +31,15 @@ describe('revealSessionShape', () => {
     );
   });
 
+  it('refuses a token that names another member than the session says (ADR 0147 § 4)', () => {
+    const claims = (userId: string) =>
+      `aaaa.${Buffer.from(JSON.stringify({ exp: 1_794_870_000, userId })).toString('base64url')}.cccc`;
+    expect(
+      revealSessionShape(JSON.stringify({ ...session, bearer: claims('user-bot-test') })),
+    ).not.toBeNull();
+    expect(revealSessionShape(JSON.stringify({ ...session, bearer: claims('user-owner-test') }))).toBeNull();
+  });
+
   it.each([
     ['no dots', 'invented-bearer-0123456789'],
     ['a payload that is not JSON', 'aaaa.bm90LWpzb24.cccc'],

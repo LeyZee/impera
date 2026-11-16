@@ -33,24 +33,36 @@ export function parseRevealSession(raw: string): RevealSession | null {
   return parsed.success ? parsed.data : null;
 }
 
-/** `exp` of a JWT bearer, when the token is one (spec § 2, V2); `null` otherwise. Reads the expiry only, never logs. */
-export function revealTokenExpiry(bearer: string): Date | null {
+/** What the claims of a JWT bearer say, as far as we read them (spec § 2, V1: `userId`, `exp`). Never logged. */
+function claimsOf(bearer: string): { readonly exp?: number; readonly userId?: string } {
   const payload = bearer.split('.')[1];
-  if (payload === undefined) return null;
+  if (payload === undefined) return {};
   try {
     const parsed = z
-      .object({ exp: z.number().int().positive() })
+      .object({ exp: z.number().optional(), userId: z.string().optional() })
       .safeParse(JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')));
-    return parsed.success ? new Date(parsed.data.exp * 1_000) : null;
+    if (!parsed.success) return {};
+    const { exp, userId } = parsed.data;
+    return { ...(exp === undefined ? {} : { exp }), ...(userId === undefined ? {} : { userId }) };
   } catch {
-    return null;
+    return {};
   }
 }
 
-/** `null` for anything that is not a Reveal session of this shape: the route refuses it before storing. */
+/** `exp` of a JWT bearer, when the token is one (spec § 2, V2); `null` otherwise. Reads the expiry only, never logs. */
+export function revealTokenExpiry(bearer: string): Date | null {
+  const { exp } = claimsOf(bearer);
+  return exp === undefined ? null : new Date(exp * 1_000);
+}
+
+/**
+ * `null` for anything that is not a Reveal session of this shape: the route refuses it before storing. A token that
+ * names another member than the session says is not one either (ADR 0147 § 4): the member pinned is the token's.
+ */
 export const revealSessionShape: SessionShape = (raw) => {
   const session = parseRevealSession(raw);
-  return session === null
-    ? null
-    : { owner: session.modelId, member: session.userId, expiresAt: revealTokenExpiry(session.bearer) };
+  if (session === null) return null;
+  const { userId } = claimsOf(session.bearer);
+  if (userId !== undefined && userId !== session.userId) return null;
+  return { owner: session.modelId, member: session.userId, expiresAt: revealTokenExpiry(session.bearer) };
 };

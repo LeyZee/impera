@@ -75,6 +75,9 @@ export interface EventMeta {
   readonly at: Date;
 }
 
+/** Who sent a session, and by which gesture (ADR 0147: `click` or `open`), for the audit line. */
+type SessionMeta = EventMeta & { readonly userId: string | null; readonly trigger: 'click' | 'open' };
+
 /** `platform_accounts` and the account-level events. Tenant methods run under RLS. */
 export interface AccountStore {
   /** Every account the dispatcher may poll, all creators (owner role). */
@@ -115,7 +118,7 @@ export interface AccountStore {
       /** What its expiry says now (`session-life.ts`): `warning` when it has under 2 h left. */
       readonly state: 'valid' | 'warning';
     },
-    meta: EventMeta & { readonly userId: string | null },
+    meta: SessionMeta,
   ): Promise<void>;
   /**
    * The audit line of a refused « Sync » (`connector.session_refused`): the account, the reason and who, never a value
@@ -124,8 +127,8 @@ export interface AccountStore {
   recordRefusedSession(
     creatorId: CreatorId,
     id: PlatformAccountId,
-    reason: 'owner_conflict' | 'member_conflict',
-    meta: EventMeta & { readonly userId: string | null },
+    reason: 'owner_conflict' | 'member_conflict' | 'auto_unpinned',
+    meta: SessionMeta,
   ): Promise<void>;
   publish(creatorId: CreatorId, body: EventBody, meta: EventMeta): Promise<void>;
 }
@@ -152,6 +155,8 @@ interface SyncableAccount {
   readonly creatorName: string;
   readonly sessionState: SessionState;
   readonly sessionUpdatedAt: Date | null;
+  /** The platform's id of the model the stored session speaks for (`session_owner`); `null` before the first « Sync ». */
+  readonly modelId: string | null;
 }
 
 /** Owner-role enqueue for jobs that start outside any business transaction (the dispatcher). */

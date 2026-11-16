@@ -1,6 +1,7 @@
 import {
   CONNECTOR_LINK_FORBIDDEN,
   CONNECTOR_SESSION_CONFLICT,
+  CONNECTOR_SESSION_AUTO_UNPROCESSABLE,
   CONNECTOR_SESSION_MEMBER_CONFLICT,
   CONNECTOR_SESSION_UNPROCESSABLE,
   DomainError,
@@ -45,6 +46,19 @@ export class ConnectorLinkForbidden extends DomainError {
 export class SessionShapeUnprocessable extends DomainError {
   constructor() {
     super(CONNECTOR_SESSION_UNPROCESSABLE, 'Cette session ne correspond pas à la plateforme du compte');
+  }
+}
+
+/**
+ * A sync « à l'ouverture » (ADR 0147) on an account that has no session yet, or none whose member is pinned: the
+ * identity of the AI's Reveal account is only ever set by a click, never by the extension alone. 422.
+ */
+export class SessionAutoSyncUnprocessable extends DomainError {
+  constructor() {
+    super(
+      CONNECTOR_SESSION_AUTO_UNPROCESSABLE,
+      'Ce compte se branche d’abord par un clic sur « Synchroniser » : la synchronisation seule ne fixe jamais son membre',
+    );
   }
 }
 

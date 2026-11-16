@@ -87,12 +87,14 @@ export function createConnectorRoutes(deps: {
           session: request.body.session,
           correlationId: request.id,
           userId,
+          trigger: request.body.trigger ?? 'click',
           logger: request.log,
         });
         return {
           sessionState: life.state,
           expiresAt: life.expiresAt?.toISOString() ?? null,
           reconnectFirst: life.reconnectFirst,
+          kept: life.kept,
         };
       },
     );
