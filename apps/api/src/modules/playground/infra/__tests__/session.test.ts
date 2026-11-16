@@ -144,6 +144,84 @@ describe('playground session, when nothing is written', () => {
   });
 });
 
+describe('playground session, the risk policy as production runs it (AGE-01)', () => {
+  const run = async (brief: Brief, text = 'Coucou') => {
+    const voiceInputs: VoiceInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou toi ✨'] }, voiceInputs, [], brief),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+    });
+    const turn = await session.handleFanMessage(text);
+    return { turn, voiceInputs, session };
+  };
+
+  it('hands a possible minor over to a human: the voice writes nothing, even when the brain says to reply', async () => {
+    const { turn, voiceInputs, session } = await run({
+      ...BRIEF,
+      action: 'reply',
+      risks: ['minor_suspected'],
+    });
+    expect(turn.hold).toEqual({ kind: 'handoff', detail: ['minor_suspected'] });
+    expect(voiceInputs).toHaveLength(0);
+    expect(turn.bubbles).toEqual([]);
+    expect(session.history.map((t) => t.from)).toEqual(['fan']);
+  });
+
+  it('answers distress with care, as the composer does (ADR 0088)', async () => {
+    const { turn, voiceInputs } = await run({ ...BRIEF, action: 'offer', risks: ['distress'] });
+    expect(turn.hold).toEqual({ kind: 'care', detail: ['distress'] });
+    expect(voiceInputs).toHaveLength(1);
+    // Nothing is sold in care, whatever the brain suggested.
+    expect(voiceInputs[0]?.brief.action).not.toBe('offer');
+  });
+
+  it('stays quiet when he asks her to wait, and writes nothing without the brain’s reading', async () => {
+    const waiting = await run({ ...BRIEF, action: 'wait', risks: [] });
+    expect(waiting.turn.hold).toEqual({ kind: 'no_reply', detail: ['wait'] });
+    expect(waiting.voiceInputs).toHaveLength(0);
+    const plain = await run(BRIEF);
+    expect(plain.turn.hold).toBeUndefined();
+    expect(plain.voiceInputs).toHaveLength(1);
+  });
+
+  it('reads the safety net before any model, as production does: a plain « 15 ans » is handed over unread', async () => {
+    const brainInputs: ConversationInput[] = [];
+    const voiceInputs: VoiceInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou toi ✨'] }, voiceInputs, brainInputs, BRIEF),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+    });
+    const turn = await session.handleFanMessage('j’ai 15 ans');
+    expect(turn.hold).toEqual({ kind: 'handoff', detail: ['safety_net', 'minor_suspected'] });
+    expect([brainInputs.length, voiceInputs.length]).toEqual([0, 0]);
+    expect(session.history.map((t) => t.from)).toEqual(['fan']);
+  });
+
+  it('reads the safety net on all he wrote since her last answer, as production does', async () => {
+    const voiceInputs: VoiceInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou toi ✨'] }, voiceInputs, [], { ...BRIEF, action: 'wait' }),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+    });
+    expect((await session.handleFanMessage('j’ai')).hold?.kind).toBe('no_reply');
+    const turn = await session.handleFanMessage('15 ans');
+    expect(turn.hold).toEqual({ kind: 'handoff', detail: ['safety_net', 'minor_suspected'] });
+  });
+
+  it('answers with care when he says he wants to end it, even when the brain missed it', async () => {
+    const { turn, voiceInputs } = await run({ ...BRIEF, action: 'offer', risks: [] }, 'je veux en finir');
+    expect(turn.hold).toEqual({ kind: 'care', detail: ['safety_net', 'self_harm'] });
+    expect(voiceInputs).toHaveLength(1);
+    expect(voiceInputs[0]?.brief.action).not.toBe('offer');
+  });
+});
+
 describe('playground session, calibration', () => {
   const make = (deps: Partial<Parameters<typeof createPlaygroundSession>[0]> = {}) =>
     createPlaygroundSession({

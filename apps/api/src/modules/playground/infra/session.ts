@@ -20,6 +20,9 @@ import {
   type GuardViolation,
   type FollowUpDecision,
   measureDesire,
+  holdDecision,
+  safetySigns,
+  type HoldDecision,
   type DesireMeasure,
   type DesireState,
   type FanAvailabilityRecord,
@@ -53,6 +56,11 @@ export interface PlaygroundTurn {
   readonly cursor?: { readonly kind: string; readonly reason?: string };
   /** The brain wanted to offer and the policy said no: the code of why. */
   readonly offerRefused?: string;
+  /**
+   * The brain read a risk, or he asked her to wait: what production does instead of a plain answer (agent/domain/hold.ts,
+   * AGE-01). A handoff or a wait writes nothing; care writes the care brief, a human validating every word (ADR 0088).
+   */
+  readonly hold?: Exclude<HoldDecision, { readonly kind: 'answer' }>;
 }
 
 /** His desire score as one message of his left it, with what moved it (P3-12). */
@@ -405,6 +413,31 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         fanNotes: fanNotes.join('\n'),
         situation,
       };
+      // The safety net in code, read before any model as production does (draft-composer.ts): he says plainly he is a
+      // minor, a human answers him and no model is called; he says he wants to hurt himself, she answers with care
+      // whatever the brain reads.
+      // On all he wrote since her last answer, joined, as production reads it: an age said over two messages counts.
+      const lastAnswer = history.findLastIndex((t) => t.from === 'creator');
+      const signs = safetySigns(
+        history
+          .slice(lastAnswer + 1)
+          .map((t) => t.text)
+          .join('\n'),
+      );
+      if (signs.includes('minor_suspected')) {
+        const held: PlaygroundTurn = {
+          bubbles: [],
+          violations: [],
+          isBlocked: true,
+          costUsd: 0,
+          latencyMs: 0,
+          isFallback: false,
+          hold: { kind: 'handoff', detail: ['safety_net', ...signs] },
+        };
+        lastExchange = { fanMessage: text, turn: held, moment };
+        return held;
+      }
+      const careForced = signs.length > 0;
       const offer = offerAt(situation.now);
       const composed = await composeTurn(
         deps.gateway,
@@ -438,6 +471,15 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
             },
           }),
           availability,
+          // The risk policy as the composer runs it (agent/domain/hold.ts): a possible minor or a dangerous request
+          // hands over and the voice does not write; distress is answered with care; without the brain's reading
+          // nobody knows the risks, so the voice does not write either (AGE-01).
+          care: (brief) => careForced || (brief !== undefined && holdDecision(brief).kind === 'care'),
+          skipVoice: (brief) => {
+            if (brief === undefined) return !careForced;
+            const kind = holdDecision(brief).kind;
+            return kind === 'handoff' || (kind === 'no_reply' && !careForced);
+          },
           desire: {
             ...(desire !== undefined && { previous: desire }),
             measured: measuredOnClock(),
@@ -446,6 +488,18 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           },
         },
       );
+      const decided = composed.brief === undefined ? undefined : holdDecision(composed.brief);
+      const hold: PlaygroundTurn['hold'] =
+        decided?.kind === 'handoff' || (decided?.kind === 'care' && !careForced)
+          ? decided
+          : careForced
+            ? {
+                kind: 'care',
+                detail: ['safety_net', ...signs, ...(decided?.kind === 'care' ? decided.detail : [])],
+              }
+            : decided?.kind === 'no_reply'
+              ? decided
+              : undefined;
       if (composed.desire !== undefined) desire = { score: composed.desire.score, at: situation.now };
       if (composed.availability !== undefined) availability = composed.availability.record;
       if (composed.customOrder?.kind === 'reply' && composed.customOrder.opens) customOrderOpen = true;
@@ -501,6 +555,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           },
         }),
         ...(composed.offerRefused !== undefined && { offerRefused: composed.offerRefused }),
+        ...(hold !== undefined && { hold }),
       };
       lastExchange = {
         fanMessage: text,

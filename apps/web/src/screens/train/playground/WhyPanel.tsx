@@ -6,6 +6,8 @@ import { euros, needsAttention } from './logic';
 import {
   actionLabel,
   handoffReasons,
+  isCare,
+  isWaiting,
   intentLabel,
   isHandoff,
   riskLabel,
@@ -14,11 +16,15 @@ import {
   unansweredReason,
 } from './model';
 
-type Level = 'none' | 'ok' | 'warn' | 'blocked' | 'unanswered' | 'handoff';
+type Level = 'none' | 'ok' | 'warn' | 'blocked' | 'unanswered' | 'handoff' | 'waiting' | 'care';
 
 function levelOf(answer: PlaygroundAnswer | null): Level {
   if (answer === null) return 'none';
   if (isHandoff(answer)) return 'handoff';
+  // Waiting for him is the code's decision, not a failure: nothing was stopped.
+  if (isWaiting(answer)) return 'waiting';
+  // Care is the code's decision too, worth a look since a human validates every word: amber, not red.
+  if (isCare(answer) && !answer.isBlocked) return 'care';
   if (unansweredReason(answer) !== null) return 'unanswered';
   if (answer.isBlocked) return 'blocked';
   return needsAttention(answer) ? 'warn' : 'ok';
@@ -32,6 +38,8 @@ const TITLES: Readonly<Record<Level, string>> = {
   blocked: 'Bloquée avant envoi',
   unanswered: 'Pas de réponse',
   handoff: 'Relayée à un humain',
+  waiting: 'Elle attend',
+  care: 'Mode soin',
 };
 
 const DOTS: Readonly<Record<Level, string>> = {
@@ -41,6 +49,8 @@ const DOTS: Readonly<Record<Level, string>> = {
   blocked: 'bad',
   unanswered: 'warn',
   handoff: 'bad',
+  waiting: 'ok',
+  care: 'warn',
 };
 
 /**
@@ -109,10 +119,13 @@ export function WhyPanel({
               <Sec label="Ce qu’elle a compris">
                 {intentLabel(brief.intent)}, {sentimentLabel(brief.sentiment)}
               </Sec>
-              <Sec label="Décision">
-                <b>{actionLabel(brief.action)}</b>
-                {brief.replyBrief === '' ? null : <p>{brief.replyBrief}</p>}
-              </Sec>
+              {/* When the code decides she waits, « Décision du code » says it once (avis Design 16/11). */}
+              {isWaiting(answer) ? null : (
+                <Sec label="Décision">
+                  <b>{actionLabel(brief.action)}</b>
+                  {brief.replyBrief === '' ? null : <p>{brief.replyBrief}</p>}
+                </Sec>
+              )}
             </>
           )}
           {answer.desire === undefined ? null : (
@@ -127,6 +140,14 @@ export function WhyPanel({
               </p>
             </Sec>
           )}
+          {isCare(answer) ? (
+            <Sec label="Décision du code">
+              Il va mal : elle lui répond avec soin, rien n’est vendu, et en vrai un humain valide chaque mot.
+            </Sec>
+          ) : null}
+          {isWaiting(answer) ? (
+            <Sec label="Décision du code">Elle attend : il a dit qu’il revenait.</Sec>
+          ) : null}
           {answer.cursor === undefined ? null : <Sec label="Curseur">{answer.cursor.label}</Sec>}
           {risks.length > 0 ? (
             <Sec label="Risques">
@@ -153,8 +174,8 @@ export function WhyPanel({
           {(brief?.kycMissing.length ?? 0) > 0 ? (
             <Sec label="Encore à découvrir">{brief?.kycMissing.join(', ')}</Sec>
           ) : null}
-          {/* Handed to a human, or no model answered: nothing was written, there is no answer for the review to pass. */}
-          {level === 'handoff' || level === 'unanswered' ? null : (
+          {/* Handed to a human, waiting for him, or no model answered: nothing was written, there is no answer for the review to pass. */}
+          {level === 'handoff' || level === 'unanswered' || level === 'waiting' ? null : (
             <Sec label="Relecture avant envoi">
               <ul className="pg-list">
                 {answer.violations.length === 0 ? (

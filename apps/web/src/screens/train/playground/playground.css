@@ -699,6 +699,11 @@
   background: color-mix(in srgb, var(--nv-danger) 10%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-danger) 40%, transparent);
 }
+.pg-relay--calm {
+  /* A wait is the code doing its job, not an urgency: no red (DESIGN, rouge = urgences). */
+  background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
 .pg-relay__t {
   margin: 0;
   font-size: 13px;

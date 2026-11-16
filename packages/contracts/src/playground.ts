@@ -187,6 +187,14 @@ export const PlaygroundAnswerSchema = z.object({
   cursor: z.object({ kind: z.string(), label: z.string() }).exactOptional(),
   /** The brain wanted to offer a script and the policy said no: why, in French. She wrote a plain answer. */
   offerRefused: z.object({ code: z.string(), label: z.string() }).exactOptional(),
+  /**
+   * What the risk policy decided instead of a plain answer, as production does (agent/domain/hold.ts): a handoff to a
+   * human (nothing written), care (the care brief, a human validating every word, ADR 0088), or a wait (« je reviens »,
+   * nothing written). `detail`: the brain's risk codes behind it, or `wait`, `brain`.
+   */
+  hold: z
+    .object({ kind: z.enum(['handoff', 'care', 'no_reply']), detail: z.array(z.string()) })
+    .exactOptional(),
   model: z.string().exactOptional(),
   latencyMs: z.number().nonnegative(),
   /** The cost in euros, at the daily budget's rate (ADR 0011); the journal keeps dollars. */
