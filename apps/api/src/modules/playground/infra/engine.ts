@@ -15,6 +15,7 @@ import {
 import type { LlmGateway } from '@impera/llm';
 
 import {
+  bubbleDelays,
   desireSignalPoints,
   guardSettingsOf,
   isNight,
@@ -164,6 +165,8 @@ function toBrief(brief: NonNullable<PlaygroundTurn['brief']>): PlaygroundBrief {
 function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
   return {
     bubbles: [...turn.bubbles],
+    // The same typing time as the real send, so the trainer sees each bubble arrive as the fan would.
+    ...(turn.bubbles.length > 0 && { delaysMs: [...bubbleDelays(turn.bubbles)] }),
     isBlocked: turn.isBlocked,
     violations: turn.violations.map((v) => ({
       code: v.code,
