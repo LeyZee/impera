@@ -179,7 +179,7 @@ const realSleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
-export type HedgeTimer = (ms: number, signal: AbortSignal) => Promise<void>;
+type HedgeTimer = (ms: number, signal: AbortSignal) => Promise<void>;
 
 const realHedgeTimer: HedgeTimer = (ms, signal) =>
   new Promise((resolve) => {
