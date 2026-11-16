@@ -1,6 +1,6 @@
 # 0133. L'agent pose une réaction sur un message du fan, en plus de sa réponse, quand le message la justifie
 
-Statut : proposed (demande de Charles du 16/11/2026 à 15 h 23, fil Adapter ; numéro attribué par le coordinateur le 16/11 ; attend « ok 0133 »)
+Statut : accepted (demande de Charles du 16/11/2026, fil Adapter ; acceptée par Charles le 16/11/2026, « ok 0133 »)
 Date : 2026-11-16
 Précise : ADR 0018 (port connecteur, garde d'écriture, idempotence), ADR 0019 (copilote et automatique), ADR 0021 (rester en personnage), ADR 0086 (panneau copilote), ADR 0088 (mode soin), ADR 0079 (persona, emojis interdits). Ne remplace rien.
 
