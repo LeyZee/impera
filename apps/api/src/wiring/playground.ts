@@ -1,7 +1,12 @@
 import type { AppLlm } from '../llm';
 import type { ActivePersonaSource } from '../modules/agent';
 import type { PersonaModule } from '../modules/persona';
-import { createDbDesireMarkStore, startPlaygroundModule, type PlaygroundModule } from '../modules/playground';
+import {
+  createDbCalibrationStore,
+  createDbDesireMarkStore,
+  startPlaygroundModule,
+  type PlaygroundModule,
+} from '../modules/playground';
 
 import type { Routes, Shared } from './shared';
 
@@ -40,6 +45,14 @@ export async function wirePlayground(
         activePersona: deps.activePersona,
         personaVersion: (creatorId, versionId) => deps.persona.versions.version(creatorId, versionId),
         desireMarks: createDbDesireMarkStore(shared.db),
+        // Her ratings live in the database with its backups (AGE-06); the old JSON lines are imported once, then renamed.
+        ratings: createDbCalibrationStore(shared.db, async () =>
+          (await deps.persona.creators.list('all')).map((creator) => creator.id),
+        ),
+        onImport: (result) => {
+          if (result.read > 0)
+            logger.info({ ratings: result }, 'playground ratings imported from the JSON lines');
+        },
       }).catch((error: unknown) => {
         logger.warn({ err: error }, 'playground not started: persona unreadable');
         return null;

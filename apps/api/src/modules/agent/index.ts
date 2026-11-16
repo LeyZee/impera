@@ -78,7 +78,7 @@ export {
   type CalibrationStore,
   type RatedMoment,
 } from './infra/calibration-record';
-export { createJsonlCalibrationStore } from './infra/jsonl-calibration-store';
+export { CalibrationRecordSchema, createJsonlCalibrationStore } from './infra/jsonl-calibration-store';
 export {
   asSent,
   composeTurn,

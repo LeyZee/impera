@@ -1,6 +1,6 @@
 /** Public entry point of the `playground` module (ADR 0002): the training screen's API (P3-06). */
 import { randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { CreatorId, PersonaVersionId, PlaygroundState, StoredPersona } from '@impera/contracts';
@@ -21,6 +21,7 @@ import {
 import { createMemoryDesireMarkStore, type DesireMarkStore } from './application/desire-marks';
 import { PlaygroundPersonaNotFound } from './application/engine';
 import { createPlaygroundService } from './application/playground-service';
+import { importRatings, type RatingImport } from './infra/db/rating-store';
 import { createPlaygroundEngine } from './infra/engine';
 import { createPlaygroundGateway, createVoiceVariant, type PlaygroundGatewayDeps } from './infra/gateways';
 import { createPlaygroundRoutes, type PlaygroundRoutesOptions } from './infra/routes';
@@ -31,6 +32,7 @@ export { createPlaygroundGateway, createVoiceVariant } from './infra/gateways';
 export { readPersonaFile, withExamples } from '../agent/index';
 export { createPlaygroundSession, type PlaygroundFollowUp, type PlaygroundTurn } from './infra/session';
 export { createDbDesireMarkStore } from './infra/db/desire-mark-store';
+export { createDbCalibrationStore, importRatings, type RatingImport } from './infra/db/rating-store';
 export type { DesireMarkRecord } from './application/desire-marks';
 
 /** One of her stored versions with her name, as `persona.versions.version` answers it (matched by shape). */
@@ -128,8 +130,12 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly gateway: LlmGateway;
   /** A persona YAML (`StoredPersonaSchema`, either format); the real one lives outside the repository (ADR 0010). */
   readonly personaPath: string;
-  /** Where the ratings are kept, outside the repository, until a table exists. */
+  /** Where the ratings were kept before the table, outside the repository: read once to import them (AGE-06). */
   readonly trainingDir: string;
+  /** The ratings' table (ADR 0103); without it, the JSON lines of `trainingDir`, as the terminal playground. */
+  readonly ratings?: CalibrationStore;
+  /** Told how the one-time import of the JSON lines went. */
+  readonly onImport?: (result: RatingImport) => void;
   readonly creatorId?: () => Promise<string | null>;
   readonly activePersona: ActivePersonaSource;
   readonly personaVersion?: PersonaVersionSource;
@@ -140,6 +146,17 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
 export async function startPlaygroundModule(options: PlaygroundStartOptions): Promise<PlaygroundModule> {
   const today = new Date().toISOString().slice(0, 10);
   const persona = readPersonaFile(await readFile(options.personaPath, 'utf8'), 'Messa', today);
-  const store = createJsonlCalibrationStore(join(options.trainingDir, 'ratings.jsonl'));
+  const linesPath = join(options.trainingDir, 'ratings.jsonl');
+  const lines = createJsonlCalibrationStore(linesPath);
+  const store = options.ratings ?? lines;
+  if (options.ratings !== undefined) {
+    const result = await importRatings(lines, options.ratings);
+    options.onImport?.(result);
+    // Imported once, then renamed, never deleted (ADR 0103 § 2): kept as it was while the table refused any.
+    if (result.read > 0 && result.refused === 0) {
+      // A rename that fails changes nothing: the import adds nothing the next time.
+      await rename(linesPath, `${linesPath}.imported-${String(Date.now())}`).catch(() => undefined);
+    }
+  }
   return createPlaygroundModule({ ...options, persona, store, records: [...(await store.list())] });
 }
