@@ -1,7 +1,6 @@
 import {
   FAN_LAPSED_DAYS_DEFAULT,
   type AgencyPeriod,
-  type CreatorSummary,
   type FanListFilter,
   type FanListItem,
   type FanListSort,
@@ -19,7 +18,7 @@ import {
   countLine,
   filterLabel,
   holderLine,
-  paidLine,
+  paidLines,
   shortWhen,
   shownStates,
   STATE_WORDS,
@@ -42,13 +41,33 @@ export function FansPage(): JSX.Element {
   const creators = creatorsQuery.data ?? [];
   const [chosen, setChosen] = useState<string | null>(null);
   const creatorId = chosen ?? creators[0]?.id ?? null;
+  const creator = creators.find((one) => one.id === creatorId);
+  const id = useId();
 
   return (
     <Page className="fa-page">
       <PageHeader
         eyebrow="Chatting"
         title="Fans"
-        lead="Chaque fan que le CRM connaît pour elle, qui le tient et ce qu’il a payé. Une ligne ouvre sa conversation dans Suivi."
+        lead={`Chaque fan que le CRM connaît pour ${creator?.displayName ?? 'elle'}, qui le tient et ce qu’il a payé. Une ligne ouvre sa conversation dans Suivi.`}
+        actions={
+          creators.length > 1 && creatorId !== null ? (
+            <>
+              <label className="sr-only" htmlFor={`${id}-creator`}>
+                Créatrice
+              </label>
+              <Select<string>
+                id={`${id}-creator`}
+                className="fa-select"
+                value={creatorId}
+                options={creators.map((one) => ({ value: one.id, label: one.displayName }))}
+                onChange={(next) => {
+                  setChosen(next);
+                }}
+              />
+            </>
+          ) : undefined
+        }
       />
       {creatorsQuery.isError ? (
         <Panel className="fa-panel">
@@ -76,28 +95,13 @@ export function FansPage(): JSX.Element {
           </p>
         </Panel>
       ) : (
-        <FanList
-          key={creatorId}
-          creators={creators}
-          creatorId={creatorId}
-          onCreator={(next) => {
-            setChosen(next);
-          }}
-        />
+        <FanList key={creatorId} creatorId={creatorId} />
       )}
     </Page>
   );
 }
 
-function FanList({
-  creators,
-  creatorId,
-  onCreator,
-}: {
-  creators: readonly CreatorSummary[];
-  creatorId: string;
-  onCreator: (creatorId: string) => void;
-}): JSX.Element {
+function FanList({ creatorId }: { creatorId: string }): JSX.Element {
   const id = useId();
   const [filter, setFilter] = useState<FanListFilter>('all');
   const [sort, setSort] = useState<FanListSort>('last_message');
@@ -126,20 +130,6 @@ function FanList({
             }}
           />
         </label>
-        {creators.length > 1 ? (
-          <>
-            <label className="sr-only" htmlFor={`${id}-creator`}>
-              Créatrice
-            </label>
-            <Select<string>
-              id={`${id}-creator`}
-              className="fa-select"
-              value={creatorId}
-              options={creators.map((one) => ({ value: one.id, label: one.displayName }))}
-              onChange={onCreator}
-            />
-          </>
-        ) : null}
       </div>
       <div className="fa-chips" role="group" aria-label="Filtres">
         {FILTERS.map((one) => (
@@ -158,7 +148,8 @@ function FanList({
       </div>
       <div className="fa-bar">
         <p className="fa-count" aria-live="polite">
-          {first === undefined ? '' : countLine(first.total)}
+          {/* Its line kept while it reads or fails, so the selectors never jump. */}
+          {first === undefined ? '\u00a0' : countLine(first.total)}
         </p>
         <label className="sr-only" htmlFor={`${id}-period`}>
           Période
@@ -249,22 +240,28 @@ function FanList({
 function Line({ item, creatorId, now }: { item: FanListItem; creatorId: string; now: Date }): JSX.Element {
   const name = item.displayName.trim() === '' ? 'Fan sans nom' : item.displayName;
   const { shown, more } = shownStates(item.states);
+  // On a phone, one state and the count of the others (avis Design 16/11, fans-1).
+  const phoneMore = Math.max(0, item.states.length - 1);
   const cells = (
     <>
       <span className="fa-name">{name}</span>
       <span className="fa-states">
-        {shown.map((state) => (
-          <span key={state} className={`nv-tag fa-tag fa-tag--${STATE_WORDS[state].tone}`}>
+        {shown.map((state, index) => (
+          <span
+            key={state}
+            className={`nv-tag fa-tag fa-tag--${STATE_WORDS[state].tone}${index > 0 ? ' fa-tag--second' : ''}`}
+          >
             {STATE_WORDS[state].label}
           </span>
         ))}
-        {more > 0 ? <span className="nv-tag fa-tag">+{more}</span> : null}
+        {more > 0 ? <span className="nv-tag fa-tag fa-more-wide">+{more}</span> : null}
+        {phoneMore > 0 ? <span className="nv-tag fa-tag fa-more-phone">+{phoneMore}</span> : null}
       </span>
       <span className="fa-holder">{holderLine(item)}</span>
       <span className="fa-when">{shortWhen(item.lastMessageAt, now)}</span>
       <span className="fa-paid-at">{shortWhen(item.lastPaidAt, now)}</span>
-      <span className={paidClass(item.paidPeriod, 'fa-period')}>{paidLine(item.paidPeriod)}</span>
-      <span className={paidClass(item.paidEver, 'fa-ever')}>{paidLine(item.paidEver)}</span>
+      <Paid paid={item.paidPeriod} base="fa-period" />
+      <Paid paid={item.paidEver} base="fa-ever" />
     </>
   );
   return (
@@ -291,8 +288,18 @@ function Line({ item, creatorId, now }: { item: FanListItem; creatorId: string; 
   );
 }
 
-function paidClass(paid: FanListItem['paidEver'], base: string): string {
-  return paid.eurMinor === 0 && paid.usdMinor === 0 ? `fa-num ${base} fa-zero` : `fa-num ${base}`;
+/** One line a currency, aligned right (avis Design 16/11, fans-1); « — » in grey for nothing. */
+function Paid({ paid, base }: { paid: FanListItem['paidEver']; base: string }): JSX.Element {
+  const zero = paid.eurMinor === 0 && paid.usdMinor === 0;
+  return (
+    <span className={zero ? `fa-num ${base} fa-zero` : `fa-num ${base}`}>
+      {paidLines(paid).map((line) => (
+        <span key={line} className="fa-amount">
+          {line}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 function Skeleton(): JSX.Element {

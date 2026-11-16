@@ -47,9 +47,9 @@ export const SORT_LABELS: Readonly<Record<FanListSort, string>> = {
 };
 
 export const PERIOD_LABELS: Readonly<Partial<Record<AgencyPeriod, string>>> = {
-  week: 'Sur 7\u00a0jours',
-  month: 'Sur 30\u00a0jours',
-  quarter: 'Sur 90\u00a0jours',
+  week: '7\u00a0jours',
+  month: '30\u00a0jours',
+  quarter: '90\u00a0jours',
 };
 
 /** His states with Suivi's words, the urgent in red, the warnings in amber (ADR 0124 § 1). */
@@ -86,13 +86,13 @@ export function holderLine(item: Pick<FanListItem, 'holder' | 'holderName'>): st
 const EUROS = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
 const DOLLARS = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD' });
 
-/** What he paid, each currency as it is; « — » for nothing (never a converted guess). */
-export function paidLine(paid: FanPaid): string {
+/** What he paid, one line a currency as it is; « — » for nothing (never a converted guess). */
+export function paidLines(paid: FanPaid): string[] {
   const parts = [
     ...(paid.eurMinor === 0 ? [] : [EUROS.format(paid.eurMinor / 100)]),
     ...(paid.usdMinor === 0 ? [] : [DOLLARS.format(paid.usdMinor / 100)]),
   ];
-  return parts.length === 0 ? '—' : parts.join(' + ');
+  return parts.length === 0 ? ['—'] : parts;
 }
 
 const DAY_MONTH = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });

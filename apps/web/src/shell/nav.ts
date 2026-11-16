@@ -57,7 +57,7 @@ const ICONS: Readonly<Record<Section, NavIconName>> = {
   '/aujourdhui': 'today',
   '/agenda': 'planning',
   '/suivi': 'tracking',
-  '/fans': 'creators',
+  '/fans': 'fans',
   '/entrainer': 'train',
   '/planning': 'planning',
   '/commissions': 'pay',

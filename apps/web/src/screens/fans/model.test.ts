@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { countLine, holderLine, paidLine, shortWhen, shownStates } from './model';
+import { countLine, holderLine, paidLines, shortWhen, shownStates } from './model';
 
 const NOW = new Date('2026-11-16T12:00:00Z');
 const ago = (minutes: number): string => new Date(NOW.getTime() - minutes * 60_000).toISOString();
 
 describe('the words of the list of fans (ADR 0124, avis Design 16/11)', () => {
   it('says each currency as it is, and « — » for nothing', () => {
-    expect(paidLine({ eurMinor: 0, usdMinor: 0 })).toBe('—');
-    expect(paidLine({ eurMinor: 12_050, usdMinor: 0 })).toBe('120,50 €');
-    expect(paidLine({ eurMinor: 1000, usdMinor: 1500 })).toBe('10,00 € + 15,00 $US');
+    expect(paidLines({ eurMinor: 0, usdMinor: 0 })).toEqual(['—']);
+    expect(paidLines({ eurMinor: 12_050, usdMinor: 0 })).toEqual(['120,50\u00a0€']);
+    expect(paidLines({ eurMinor: 1000, usdMinor: 1500 })).toEqual(['10,00\u00a0€', '15,00\u00a0$US']);
   });
 
   it('says a moment short: minutes, hours, days, then the day', () => {
