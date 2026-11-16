@@ -2,7 +2,7 @@
 
 Statut : accepted (« ok 0141 » de Charles, 16/11/2026 à 15 h 54 ; choix « Gratuit + accroches » sur carte à 15 h 44 ; relu par Agent, Sécurité et Design le 16/11)
 Date : 2026-11-16
-Précise : ADR 0086 § 3 (ce que montre le panneau) et § 10 (un copilote qui fait gagner du temps). S'appuie sur ADR 0021 (rester en personnage), 0025 (accès pendant le shift), 0063 (la créatrice ne voit pas la fiche), 0098 (le cerveau choisit parmi ce que le code permet), 0112 (scripts à branches). Ne remplace aucun ADR.
+Précise : ADR 0086 § 3 (ce que montre le panneau) et § 10 (un copilote qui fait gagner du temps) ; l'ordre du panneau est amendé dans l'ADR 0086 (amendement du 16/11/2026, brouillon au-dessus de la fiche). S'appuie sur ADR 0021 (rester en personnage), 0025 (accès pendant le shift), 0063 (la créatrice ne voit pas la fiche), 0098 (le cerveau choisit parmi ce que le code permet), 0112 (scripts à branches). Ne remplace aucun ADR.
 
 ## Contexte
 
@@ -45,7 +45,7 @@ Charles a choisi, sur carte, d'afficher d'abord ce qui est déjà calculé (sans
 
 ### D. La forme (avis de Design, 16/11/2026)
 
-11. **Ce qui se lit sans rien ouvrir** : panneau fermé, à 360 px de large et sans défiler, on lit dans l'ordre le fan, quoi faire, le brouillon et « Copier pour Reveal ». Tout le reste se replie.
+11. **Ce qui se lit sans rien ouvrir** : panneau fermé, à 360 px de large et sans défiler, on lit dans l'ordre la bande d'état (le fan et au plus trois pastilles), quoi faire, le brouillon, « Copier pour Reveal » et la vente en une ligne ; la fiche en bref vient dessous (ADR 0086, amendement du 16/11/2026). Tout le reste se replie.
 12. **« Quoi faire » et « pourquoi » forment un seul bloc de deux lignes** : le geste en gras, verbe d'abord, sur une ligne ; le pourquoi en petit, encre atténuée. Ton neutre, ambre quand la vente est bloquée, rouge seulement pour le doute d'âge, « Ne plus lui écrire » et les ventes gelées (rouges dans l'en-tête depuis l'ADR 0086 : un seul ton par état). Une coupure (§ 9) remplace ce bloc par une seule phrase qui dit pourquoi, dite une seule fois dans le panneau (pas de ligne en plus sous le brouillon) ; les boutons et gestes de vente disparaissent, jamais grisés.
 13. **« Copier pour Reveal » reste la seule action forte.** Les deux boutons d'IA sont discrets, sur une rangée sous le brouillon, jamais néon. Leur résultat s'ouvre sous la rangée, sans remplacer le brouillon ni le pousser hors de l'écran : au plus trois cartes courtes, chacune avec son « Copier pour Reveal », et une croix pour refermer. L'objection se choisit dans des puces à choix unique.
 14. **« Où en est la vente »** est un pli fermé par défaut dont la ligne de résumé dit l'étape en cours et la prochaine avec son prix. **« Où on en est »** montre trois signaux au plus, puis « +N ».

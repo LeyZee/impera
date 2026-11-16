@@ -143,4 +143,4 @@ Date : AAAA-MM-JJ
 | 0128 | Ménager les scripts : une pause après un achat, un script rejoué par une autre variante du teasing, l'IA qui réclame des scripts | accepted (précise 0098 §§ 1, 6, 9 et 12, 0112 §§ 5, 11 et 15, 0103 et 0056) |
 | 0129 | Mesurer les scripts de vente : l'entonnoir par étape, le revenu par fan exposé, ce qui casse et pourquoi | accepted (précise 0112 § 19, 0098 §§ 2 et 16, 0128 § 14 et 0103) |
 | 0131 | Choisir le script qui colle aux goûts du fan : familles de fantasme, goûts des scripts et de la fiche, le code classe et l'IA choisit | accepted (précise 0098 § 6, 0056 § 6, 0085 et 0112 § 5) |
-| 0141 | Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande | accepted (précise 0086 § 3 et § 10) |
+| 0141 | Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande | accepted (précise 0086 § 3 et § 10, amende leur ordre) |
