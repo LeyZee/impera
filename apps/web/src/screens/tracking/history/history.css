@@ -18,59 +18,36 @@
   }
 }
 
-/* The list's header: its filters, then « Tout marquer comme vu » at its end, on the list's own side edges. When both
- * do not fit, the button goes under, still at the end; never alone and off its edge above the filters. */
+/* The list's header, on the list's own side edges: « Non vues » and « Tout marquer comme vu » share the first row,
+ * the chip at the start, the button at the end; the selects come under. A select never shrinks under its words
+ * (« Toutes les créatrices »): on a phone each takes a row, on a computer, where the list is a column of
+ * 440–460 px, they share one in halves (recette 11/11, recette visuelle 16/11). */
 .hi-head {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: var(--nv-space-2) var(--nv-space-3);
   padding: var(--nv-space-3) var(--nv-space-4);
 }
-.hi-head__all {
-  flex: none;
-  margin-inline-start: auto;
-}
-/* The chip and the compact selects share one row; a select never shrinks under its words (« Toutes les
- * créatrices »): on a phone, when they do not fit, they go to the next line whole (recette 11/11). */
 .hi-filters {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--nv-space-2);
+  display: contents;
 }
 .hi-filters .nv-chip {
-  flex: none;
+  grid-area: 1 / 1;
+  justify-self: start;
+}
+.hi-head__all {
+  grid-area: 1 / 2;
+  justify-self: end;
 }
 .hi-filters .hi-select {
-  flex: 1 1 0;
-  min-width: 10.5rem;
-  max-width: 240px;
+  grid-column: 1 / -1;
+  min-width: 0;
 }
-/* On a computer the list is a column of 440–460 px: the chip and « Tout marquer comme vu » take the first row, the
- * two selects share the second in halves, so neither cuts its words (recette visuelle 16/11). */
 @media (min-width: 900px) {
-  .hi-head {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .hi-filters {
-    display: contents;
-  }
-  .hi-filters .nv-chip {
-    grid-area: 1 / 1;
-    justify-self: start;
-  }
-  .hi-head__all {
-    grid-area: 1 / 2;
-    justify-self: end;
-  }
   .hi-filters .hi-select {
+    grid-column: auto;
     grid-row: 2;
-    min-width: 0;
-    max-width: none;
   }
 }
 .hi-filters .hi-select .nv-select__field {
