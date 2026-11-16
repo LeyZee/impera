@@ -196,6 +196,11 @@ export const PlaygroundAnswerSchema = z.object({
     .object({ kind: z.enum(['handoff', 'care', 'no_reply']), detail: z.array(z.string()) })
     .exactOptional(),
   model: z.string().exactOptional(),
+  /**
+   * Her typing time before each bubble, in ms, the first included: the same delays the real send waits between
+   * bubbles (agent `bubbleDelays`), so the playground shows them one by one as a fan would see them.
+   */
+  delaysMs: z.array(z.number().nonnegative()).exactOptional(),
   latencyMs: z.number().nonnegative(),
   /** The cost in euros, at the daily budget's rate (ADR 0011); the journal keeps dollars. */
   costEur: z.number().nonnegative(),

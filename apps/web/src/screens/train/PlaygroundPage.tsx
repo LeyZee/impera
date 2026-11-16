@@ -15,6 +15,7 @@ import {
   stepOf,
 } from './playground/logic';
 import { filedAck, isHandoff, isWaiting, suggestedDestination } from './playground/model';
+import { revealTimes } from './playground/reveal';
 import { usePlayground } from './playground/usePlayground';
 
 import { initialOf } from '@/lib/utils';
@@ -53,6 +54,10 @@ export function PlaygroundPage(): JSX.Element {
   const [lesson, setLesson] = useState<{ verdict: Verdict; destination: Destination } | undefined>(undefined);
   const [comparison, setComparison] = useState<PlaygroundComparison | undefined>(undefined);
   const [writing, setWriting] = useState(false);
+  /** When the last answer arrived, while its bubbles still appear one by one; null once all are shown. */
+  const [revealFrom, setRevealFrom] = useState<number | null>(null);
+  /** How many of its bubbles are shown while they appear; undefined: all of them. */
+  const [shown, setShown] = useState<number | undefined>(undefined);
   const [whyManual, setWhyManual] = useState<boolean | undefined>(undefined);
   /** Where the last lesson went, said until the next message. */
   const [filed, setFiled] = useState<Destination | undefined>(undefined);
@@ -88,6 +93,41 @@ export function PlaygroundPage(): JSX.Element {
     setWhyManual(undefined);
   }, [pending]);
 
+  // Her bubbles one by one, each after her typing time, as a fan sees them (Charles, 16/11).
+  const delays = pending?.delaysMs;
+  const latency = pending?.latencyMs ?? 0;
+  useEffect(() => {
+    if (revealFrom === null || delays === undefined || delays.length < 1) {
+      setShown(undefined);
+      return;
+    }
+    const times = revealTimes(delays, latency);
+    const elapsed = Date.now() - revealFrom;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    setShown(times.filter((t) => t <= elapsed).length);
+    times.forEach((t, i) => {
+      if (t > elapsed)
+        timers.push(
+          setTimeout(() => {
+            setShown(i + 1);
+          }, t - elapsed),
+        );
+    });
+    const last = times.at(-1) ?? 0;
+    timers.push(
+      setTimeout(
+        () => {
+          setRevealFrom(null);
+        },
+        Math.max(0, last - elapsed),
+      ),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [revealFrom, delays, latency]);
+  const revealing = shown !== undefined && delays !== undefined && shown < delays.length ? shown : undefined;
+
   const reset = (): void => {
     setMode('idle');
     setLesson(undefined);
@@ -111,9 +151,11 @@ export function PlaygroundPage(): JSX.Element {
 
   const answerTo = async (call: () => Promise<boolean>): Promise<boolean> => {
     setWriting(true);
+    setRevealFrom(null);
     reset();
     const done = await call();
     setWriting(false);
+    if (done) setRevealFrom(Date.now());
     return done;
   };
 
@@ -146,6 +188,8 @@ export function PlaygroundPage(): JSX.Element {
       }
       const target = event.target;
       if (target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      // While her bubbles still appear, there is nothing to rate yet.
+      if (revealing !== undefined) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const key = event.key.toLowerCase();
       if (event.key === 'Escape' && mode !== 'idle') reset();
@@ -274,6 +318,7 @@ export function PlaygroundPage(): JSX.Element {
           mode={mode}
           busy={pg.busy}
           writing={writing}
+          revealing={revealing}
           error={pg.error === undefined ? undefined : ERRORS[pg.error]}
           errorTone={pg.error === 'llm_unavailable' ? 'warn' : 'bad'}
           lesson={lesson?.verdict}

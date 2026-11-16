@@ -37,6 +37,8 @@ export interface ConversationProps {
   readonly mode: LocalMode;
   readonly busy: boolean;
   readonly writing: boolean;
+  /** While her bubbles appear one by one: how many are shown yet. */
+  readonly revealing?: number | undefined;
   readonly error: string | undefined;
   /** A missing setting (no key) is a warning, amber; a failure stays red. */
   readonly errorTone: 'warn' | 'bad';
@@ -77,7 +79,7 @@ export function Conversation(props: ConversationProps): JSX.Element {
     // The thread scrolls itself, never the page around it (on a phone the Playground's column scrolls too).
     const thread = threadRef.current;
     if (thread !== null) thread.scrollTop = thread.scrollHeight;
-  }, [state.history.length, pending, props.mode, writing]);
+  }, [state.history.length, pending, props.mode, writing, props.revealing]);
 
   return (
     <div className="pg-thread nv-scroll" ref={threadRef}>
@@ -118,16 +120,7 @@ export function Conversation(props: ConversationProps): JSX.Element {
         {pending !== null && draftAt === -1 ? (
           <Draft answer={pending} text={pending.bubbles.join('\n')} {...props} />
         ) : null}
-        {writing ? (
-          <span className="pg-writing">
-            <span className="nv-typing" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-            L’agent rédige
-          </span>
-        ) : null}
+        {writing ? <Typing /> : null}
         {props.error === undefined ? null : (
           <p role="alert" className={`pg-error ${props.errorTone === 'warn' ? 'is-warn' : ''}`}>
             {props.error}
@@ -236,6 +229,20 @@ function MediaCard({
       </span>
       <span className="pg-media__d">{description.factualDescription}</span>
     </div>
+  );
+}
+
+/** She is writing: what a fan sees between two of her bubbles, and while the answer is being written. */
+function Typing(): JSX.Element {
+  return (
+    <span className="pg-writing" role="status">
+      <span className="nv-typing" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      écrit…
+    </span>
   );
 }
 
@@ -398,7 +405,20 @@ function Draft({
     );
   }
 
-  const lines = answer.isBlocked ? answer.bubbles : bubblesOf(text);
+  const all = answer.isBlocked ? answer.bubbles : bubblesOf(text);
+  const revealing = answer.isBlocked ? undefined : props.revealing;
+  const lines = revealing === undefined ? all : all.slice(0, revealing);
+  if (revealing !== undefined)
+    return (
+      <div className="pg-draft">
+        {lines.map((line, i) => (
+          <div key={i} className="nv-bubble nv-bubble--draft nv-enter">
+            {line}
+          </div>
+        ))}
+        <Typing />
+      </div>
+    );
   const blocking = answer.violations.filter((v) => v.severity === 'blocking');
   const verdict = props.mode === 'lesson' ? props.lesson : undefined;
   const why = blocking.length > 0 ? blocking.map((v) => v.label).join(', ') : (answer.failure ?? 'relecture');

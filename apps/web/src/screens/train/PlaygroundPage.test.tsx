@@ -137,6 +137,33 @@ describe('Playground', () => {
     expect(calls.filter((c) => c === 'GET /v1/playground')).toHaveLength(2);
   });
 
+  it('shows her bubbles one by one, « écrit… » between them, and nothing to rate before the last (Charles, 16/11)', async () => {
+    const answered: PlaygroundState = {
+      ...BASE,
+      history: [
+        { index: 0, from: 'fan', text: 'Salut' },
+        { index: 1, from: 'creator', text: 'Coucou toi\nTu fais quoi ?' },
+      ],
+      pending: { ...ANSWER, bubbles: ['Coucou toi', 'Tu fais quoi ?'], delaysMs: [0, 400], latencyMs: 0 },
+    };
+    answer = (method, path) => {
+      if (method === 'POST' && path === '/v1/playground/messages') return json(200, answered.pending);
+      if (method === 'GET' && path === '/v1/playground')
+        return json(200, calls.includes('POST /v1/playground/messages') ? answered : BASE);
+      return undefined;
+    };
+    open();
+    const box = await screen.findByPlaceholderText(/Écris comme/);
+    fireEvent.change(box, { target: { value: 'Salut' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(await screen.findByText('Coucou toi')).toBeTruthy();
+    expect(screen.queryByText('Tu fais quoi ?')).toBeNull();
+    expect(screen.getByText('écrit…')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Valider/ })).toBeNull();
+    expect(await screen.findByText('Tu fais quoi ?')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Valider/ })).toBeTruthy();
+  });
+
   it('names the fan by his first name only, without repeating the fan type in the header', async () => {
     answer = serve({ ...BASE, fanNotes: ['Prénom : Théo'] });
     open();
