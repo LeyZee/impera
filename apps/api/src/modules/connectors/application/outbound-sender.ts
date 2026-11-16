@@ -62,8 +62,8 @@ function capable<T>(
  * The `OutboundSender` port of `conversations` (modules.md, inversion), and the other writes of ADR 0018: resolves the
  * conversation's account and connector, and turns a `ConnectorError` into a `DomainError` (`connector_rate_limited`…)
  * the send job records. An expired session also stops the account, as a poll would. Every write goes through the
- * account's write guard (`config.writes`, off by default) before the connector is even built; reading what was sent
- * does not. A script step the platform already lists as sent is refused for good (`SendRefused`, ADR 0018 § 5), and
+ * account's write guard (`config.writes`, off by default, and `config.writesOnlyTo` when it names conversations) before
+ * the connector is even built; reading what was sent does not. A script step the platform already lists as sent is refused for good (`SendRefused`, ADR 0018 § 5), and
  * so is one whose price changed on the platform since it was validated (`script_price_changed`).
  */
 export function createOutboundSender(deps: {
@@ -80,6 +80,13 @@ export function createOutboundSender(deps: {
     if (account === null) throw new PlatformAccountNotFound();
     if (writes && !account.config.writes) {
       throw new SendRefused('connector_writes_disabled', 'Envoi désactivé pour ce compte (garde d’écriture)');
+    }
+    const only = account.config.writesOnlyTo;
+    if (writes && only !== null && !only.includes(conversation.platformConversationId)) {
+      throw new SendRefused(
+        'connector_writes_not_allowed',
+        'Envoi réservé à d’autres conversations sur ce compte (garde d’écriture)',
+      );
     }
     const connector = await deps.resolver.forAccount(account);
     if (connector === null) throw new ConnectorUnavailable();
