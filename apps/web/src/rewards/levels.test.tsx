@@ -236,7 +236,7 @@ describe('MemberGameBlock (ADR 0104 § 20)', () => {
     ).toEqual(['Série de 5', 'Première vente']);
     // The coin drawn on a trophy aside, no amount is written: the facts hold a streak and a count.
     expect(document.querySelector('.rw-member__facts')?.textContent).toBe(
-      'Série en cours3shifts avec le rapport à l’heure · record 9Paliers atteints1quinzaine',
+      'Série en cours3shifts avec le rapport à l’heureMeilleure : 9Quinzaines avec un palier1',
     );
   });
 });

@@ -44,18 +44,23 @@ export function MemberGameBlock({ memberId, name }: { memberId: string; name: st
         <div>
           <dt>Série en cours</dt>
           <dd>
-            <span className="rw-member__figure nv-num">{streak.current}</span>
+            <span className="rw-member__figure nv-num" data-zero={streak.current === 0}>
+              {streak.current}
+            </span>
             <span className="rw-member__unit">
               {plural(streak.current, 'shift', 'shifts')} avec le rapport à l’heure
-              {streak.best > streak.current ? ` · record ${String(streak.best)}` : ''}
+              {streak.best > streak.current ? (
+                <span className="rw-member__best">Meilleure&nbsp;: {streak.best}</span>
+              ) : null}
             </span>
           </dd>
         </div>
         <div>
-          <dt>Paliers atteints</dt>
+          <dt>Quinzaines avec un palier</dt>
           <dd>
-            <span className="rw-member__figure nv-num">{tiers}</span>
-            <span className="rw-member__unit">{plural(tiers, 'quinzaine', 'quinzaines')}</span>
+            <span className="rw-member__figure nv-num" data-zero={tiers === 0}>
+              {tiers}
+            </span>
           </dd>
         </div>
       </dl>
