@@ -168,6 +168,9 @@ describe('offerSignals', () => {
       fanSexualizes: false,
       fanAsksForPaid: true,
     });
+    // A compliment is a flirt, not a sexual advance: she welcomes it (Charles, 16/11).
+    expect(offerSignals({ intent: 'flirt', sentiment: 'positive' }).fanSexualizes).toBe(false);
+    expect(offerSignals({ intent: 'flirt', sentiment: 'aroused' }).fanSexualizes).toBe(true);
     expect(offerSignals({ intent: 'small_talk', sentiment: 'positive' })).toEqual({
       fanSexualizes: false,
       fanAsksForPaid: false,

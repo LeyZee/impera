@@ -94,14 +94,15 @@ export function maySulk(flags: FanFlags): boolean {
 
 /**
  * What the brain read that the policy needs: he sexualizes now (the cursor follows him there), or asks for paid
- * content himself.
+ * content himself. A flirt is not sexual by itself: a compliment, even an insistent one, is welcomed, never slowed down
+ * (Charles, 16/11); only sexting, or a flirt the brain reads as aroused, is.
  */
 export function offerSignals(brief: { readonly intent: string; readonly sentiment: string }): {
   readonly fanSexualizes: boolean;
   readonly fanAsksForPaid: boolean;
 } {
   return {
-    fanSexualizes: brief.intent === 'flirt' || brief.intent === 'sexting' || brief.sentiment === 'aroused',
+    fanSexualizes: brief.intent === 'sexting' || brief.sentiment === 'aroused',
     fanAsksForPaid: brief.intent === 'asks_for_media',
   };
 }
