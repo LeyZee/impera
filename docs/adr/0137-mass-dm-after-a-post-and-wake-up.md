@@ -1,6 +1,6 @@
 # 0137. Le Mass DM part seul : une annonce à tous après chaque publication du feed, un réveil avec un média demandé exprès quand plus personne ne parle
 
-Statut : accepted (Charles, 16/11/2026, 16 h 13 Paris, « ok 0137 » ; demande du même jour, 15 h 50, fil « Publier posts et stories automatiquement »). Amendement du même jour (ses précisions de 17 h 19 et 17 h 20 : annonce à tous, réveil avec un média demandé exprès, Mass DM planifiés avec les publications, équipe prévenue) : accepted (« ok 0137 bis », 16 h 22 Paris).
+Statut : accepted (Charles, 16/11/2026, 16 h 13 Paris, « ok 0137 » ; demande du même jour, 15 h 50, fil « Publier posts et stories automatiquement »). Amendement du même jour (ses précisions de 17 h 19 et 17 h 20 : annonce à tous, réveil avec un média demandé exprès, Mass DM planifiés avec les publications, équipe prévenue) : accepted (« ok 0137 bis », 16 h 22 Paris). Second amendement (§ 2 bis, après sa réponse de 17 h 24 : trois types de plus, aucun Mass DM payant, ne jamais submerger un fan) : proposed, en attente de « ok 0137 ter ».
 Date : 2026-11-16
 Amende : ADR 0044 § 5 (le Mass DM ne part plus seulement d'un dépôt Relance : il peut être un texte qui accompagne une publication).
 S'appuie sur : ADR 0140 (demande hebdomadaire des médias de Relance, fil Médias).
@@ -30,7 +30,18 @@ Le même jour, à 17 h 19 et 17 h 20, Charles a précisé : l'annonce d'une nouv
 - **Annonce** : tous les **abonnés et anciens abonnés** (selon ce que Reveal permet d'écrire), qu'ils aient parlé récemment ou non. Seuls en sortent ceux qui ont écrit dans les **30 dernières minutes** : un Mass DM au milieu d'une conversation vivante la casserait.
 - **Réveil** : les abonnés et anciens abonnés sans aucun message échangé depuis **72 heures** (réglage par créatrice). Reveal ne sait pas faire ce filtre lui-même.
 - Dans les deux cas, le code en **retire toujours**, en lisant le même état que l'agent et jamais une liste à part : un fan en doute d'âge (âge contesté ou mineur possible signalé) ; un fan en mode soin ou fragile, ou encore en sortie de soin (ADR 0088 § 7) ; un fan aux ventes gelées (dépendance ou difficulté, ADR 0132) ; un fan parti en plein sexto qui n'est pas revenu (l'agent attend son retour après une seule relance) ; un fan marqué « ne plus écrire » ou exclu des Mass DM dans Reveal ; un fan au milieu d'un script ; un fan au rythme économe si l'ADR 0135 est acceptée.
-- **Plafond par fan** : 4 Mass DM automatiques par semaine au plus (3 annonces et un réveil), et jamais deux réveils à moins de 48 h.
+- **Plafond par fan** : voir § 2 bis.
+
+### 2 bis. Trois types de plus, et jamais un fan submergé
+
+- **Réveil « en ligne »** : une variante du réveil, envoyée seulement aux fans silencieux depuis 72 h **et connectés à ce moment** (filtre « en ligne » de Reveal), pendant un shift. Les réponses arrivent tout de suite et un chatteur est là.
+- **Gros dépensier endormi** : les fans au-dessus du seuil de dépense des gros dépensiers (ADR 0132), silencieux depuis 14 jours. Un texte très personnel, sans média et sans vente, le soir. Il démarre sur 10 fans au plus, puis s'élargit si les réponses suivent.
+- **Merci de fidélité** : les abonnés depuis plus de 90 jours, une fois par trimestre au plus pour un même fan. Un merci et une photo de Relance offerte.
+- **Aucun Mass DM payant automatique** (décision de Charles du 16/11 : ça casse le « temps présent »). Un Mass DM payant reste à la main, et aucun prix réduit n'est jamais utilisé.
+- **Plafond, tous types confondus** : **3 Mass DM automatiques par semaine au plus** pour un même fan, et **jamais deux à moins de 36 heures**.
+- **Priorité**, quand plusieurs Mass DM visent le même fan : annonce, puis gros dépensier endormi, puis réveil (en ligne ou non), puis merci de fidélité. Le moins prioritaire saute pour ce fan, sans être reporté.
+- **Lassitude** : un fan qui n'a répondu à aucun de ses 3 derniers Mass DM n'en reçoit plus pendant 14 jours, annonce comprise. Le premier message qu'il écrit lève cette pause.
+- **Au bon moment** : la liste et le Mass DM ne sont créés dans Reveal que **10 minutes avant le départ**, pour que la liste reflète l'instant (un fan qui vient d'écrire en sort). Un Mass DM programmé peut être supprimé dans Reveal avant de partir (vu dans la capture) : le code le supprime si son but tombe (publication retirée, live, « Arrêt »). La suppression d'un Mass DM déjà reçu par les fans n'a pas été vue : on ne la promet pas. Reveal fait déjà disparaître chez le fan un Mass DM resté sans réponse au bout de 7 jours (ADR 0110).
 
 ### 3. Ce qu'il dit
 
