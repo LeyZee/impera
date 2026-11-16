@@ -11,11 +11,14 @@ import {
   activePersonaForModels,
   createAlertTester,
   createJsonlCalibrationStore,
+  guardSettingsOf,
+  pickVoiceExamples,
   readPersonaFile,
   type CalibrationRecord,
   type ActivePersonaSource,
   type CalibrationStore,
   type PersonaForModels,
+  type VoiceExample,
 } from '../agent/index';
 
 import { createMemoryDesireMarkStore, type DesireMarkStore } from './application/desire-marks';
@@ -84,6 +87,14 @@ export interface PlaygroundDeps extends PlaygroundGatewayDeps {
   readonly gatewayForVoice?: (voiceModel: string) => LlmGateway | undefined;
   /** The owner's marks on the desire score (ADR 0103 § 6), in `desire_marks`; in memory without a database. */
   readonly desireMarks?: DesireMarkStore;
+  /**
+   * Her bank of examples, read as her drafts read it (ADR 0102 § 2): what the trainer sees is what a fan receives.
+   * Absent (no database): chosen from the ratings kept in memory.
+   */
+  readonly voiceExamplesOf?: (
+    creatorId: string,
+    personaVersionId: string,
+  ) => Promise<readonly VoiceExample[]>;
 }
 
 export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
@@ -94,7 +105,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
   };
   const now = deps.now ?? (() => new Date());
   const desireMarks = deps.desireMarks ?? createMemoryDesireMarkStore();
-  const engineFor = (persona: PersonaForModels, played?: PlayedVersion) =>
+  const engineFor = (persona: PersonaForModels, played?: PlayedVersion, examples?: readonly string[]) =>
     createPlaygroundEngine({
       gateway,
       gatewayForVoice: deps.gatewayForVoice ?? ((model) => createVoiceVariant(deps, model)),
@@ -106,6 +117,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
       usdPerEur: DEFAULT_LLM_CONFIG.dailyBudget.usdPerEur,
       desireMarks,
       ...(played !== undefined && { played }),
+      ...(examples !== undefined && { voiceExamples: examples }),
       ...(deps.creatorId !== undefined && { creatorId: deps.creatorId }),
       ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
       ...(deps.now !== undefined && { now: deps.now }),
@@ -118,7 +130,10 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
       // Read as her drafts read her active one: her name for a placeholder first name, her day for her age.
       const persona = await activePersonaForModels(() => Promise.resolve(stored), creatorId, now());
       if (persona === null) throw new PlaygroundPersonaNotFound();
-      return engineFor(persona, { creatorId, versionId, version: stored.version });
+      const bank = await deps.voiceExamplesOf?.(creatorId, versionId);
+      const examples =
+        bank === undefined ? undefined : pickVoiceExamples(bank, guardSettingsOf(persona)).map((e) => e.text);
+      return engineFor(persona, { creatorId, versionId, version: stored.version }, examples);
     },
   });
   const alertTester = createAlertTester({
@@ -145,6 +160,7 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly activePersona: ActivePersonaSource;
   readonly personaVersion?: PersonaVersionSource;
   readonly desireMarks?: DesireMarkStore;
+  readonly voiceExamplesOf?: NonNullable<PlaygroundDeps['voiceExamplesOf']>;
 }
 
 /** Reads the persona and the ratings kept so far, then builds the module. Throws when the persona is unreadable. */

@@ -85,6 +85,11 @@ export interface EngineDeps {
    * `creatorId` says. Absent: the invented persona.
    */
   readonly played?: NonNullable<PlaygroundState['persona']['played']>;
+  /**
+   * Her bank of the version played, as her drafts read it (ADR 0102 § 2), already chosen by `pickVoiceExamples`.
+   * Absent: chosen from the ratings kept here, as the terminal playground does.
+   */
+  readonly voiceExamples?: readonly string[];
   readonly timeZone?: string;
   readonly now?: () => Date;
   /** Where the owner's marks on the desire score are kept (ADR 0103 § 6). */
@@ -215,11 +220,12 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     voiceExamples:
       deps.played === undefined
         ? []
-        : voiceExamples(deps.records, {
+        : (deps.voiceExamples ??
+          voiceExamples(deps.records, {
             creatorId: deps.played.creatorId,
             personaVersionId: deps.played.versionId,
             guardSettings: guardSettingsOf(deps.persona),
-          }),
+          })),
     offerLimits: deps.persona.offerLimits,
     sexualizationLimits: deps.persona.sexualizationLimits,
     followUps: deps.persona.followUps,
