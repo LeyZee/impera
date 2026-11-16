@@ -380,6 +380,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
               inArray(schema.conversationEvents.type, [
                 'custom_order_opened',
                 'objection_reply_used',
+                'account_shared',
                 'takeover_started',
               ]),
             ),
@@ -387,12 +388,29 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .orderBy(schema.conversationEvents.seq);
         let customOrderOpen = false;
         const usedObjectionReplies: string[] = [];
-        for (const { body } of rows.map(toStoredEvent)) {
+        let lastOrientationAt: Date | null = null;
+        for (const { body, at } of rows.map(toStoredEvent)) {
           if (body.type === 'custom_order_opened') customOrderOpen = true;
           if (body.type === 'takeover_started') customOrderOpen = false;
           if (body.type === 'objection_reply_used') usedObjectionReplies.push(body.payload.replyId);
+          if (body.type === 'account_shared' && body.payload.orient) lastOrientationAt = at;
         }
-        return { customOrderOpen, usedObjectionReplies };
+        return { customOrderOpen, usedObjectionReplies, lastOrientationAt };
+      },
+      async accountShared(conversationId, draftId) {
+        const rows = await tx
+          .select()
+          .from(schema.conversationEvents)
+          .where(
+            and(
+              eq(schema.conversationEvents.conversationId, conversationId),
+              eq(schema.conversationEvents.type, 'account_shared'),
+              sql`${schema.conversationEvents.payload}->>'draftId' = ${draftId}`,
+            ),
+          )
+          .orderBy(schema.conversationEvents.seq);
+        const last = rows.map(toStoredEvent).findLast(({ body }) => body.type === 'account_shared');
+        return last?.body.type === 'account_shared' ? last.body.payload.usage : null;
       },
       async list(conversationId) {
         const rows = await tx

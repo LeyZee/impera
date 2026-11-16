@@ -50,6 +50,7 @@ import type {
   ScriptStepKind,
   ScriptStepOutcome,
   SendResult,
+  SocialAccountUsage,
   UserId,
   Verdict,
   VerifyResult,
@@ -242,11 +243,15 @@ interface EventWriter {
    * `takeover_started` since), and the replies of her objection bank he already received.
    */
   salesState(conversationId: ConversationId): Promise<SalesState>;
+  /** The use of the account a draft of the agent gave him (`account_shared`, ADR 0143 bound 21); `null`: none. */
+  accountShared(conversationId: ConversationId, draftId: DraftId): Promise<SocialAccountUsage | null>;
 }
 
 interface SalesState {
   readonly customOrderOpen: boolean;
   readonly usedObjectionReplies: readonly string[];
+  /** When the agent last pointed him to her practice's account (`account_shared` with `orient`, ADR 0143 bound 23). */
+  readonly lastOrientationAt: Date | null;
 }
 
 interface JobOptions {
@@ -424,6 +429,12 @@ export interface GuardReadContext {
   readonly history: readonly { readonly from: 'fan' | 'creator'; readonly text: string }[];
   /** A care episode is open (ADR 0088 § 3, § 5): the care guard reads the bubbles too, whoever wrote them. */
   readonly care?: boolean;
+  /**
+   * The account the agent's draft gave him (`account_shared`, ADR 0143 bound 21), by its use; `null` or absent: none
+   * of her user names may leave. Read again at the approval: under a cut, none may leave either, and the owner's
+   * switch is read as it is now.
+   */
+  readonly account?: { readonly usage: SocialAccountUsage; readonly cut: boolean } | null;
 }
 
 /**
@@ -458,8 +469,18 @@ export interface FanDirectory {
     read: FanCardRead,
     sources: readonly { readonly number: number; readonly messageId: MessageId; readonly at: Date }[],
   ): Promise<readonly { readonly id: string; readonly key: string }[]>;
-  /** His limits (`fans.flags`): a hand is never given back to the agent while his age is in doubt. */
-  flags(creatorId: CreatorId, fanId: FanId): Promise<{ readonly ageDisputed?: unknown }>;
+  /**
+   * His limits (`fans.flags`): a hand is never given back to the agent while his age is in doubt, and no account of
+   * hers leaves under a cut (ADR 0143 bound 21).
+   */
+  flags(
+    creatorId: CreatorId,
+    fanId: FanId,
+  ): Promise<{
+    readonly ageDisputed?: unknown;
+    readonly doNotContact?: true;
+    readonly salesFrozen?: unknown;
+  }>;
   /** Her active facts about this fan, as the engine reads them (sorted, 40 at most). */
   activeFacts(
     creatorId: CreatorId,
@@ -580,6 +601,8 @@ export interface ComposeInput {
   readonly customOrderOpen?: boolean;
   /** The replies of her objection bank he already received (ADR 0090 § B). */
   readonly usedObjectionReplies?: readonly string[];
+  /** When she last pointed him to her practice's account (ADR 0143 bound 23); absent: never. */
+  readonly lastOrientationAt?: Date;
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRunState | null;
   /** His availability as last journaled (ADR 0103, amendement du 13/11); `null` before the first. */
@@ -663,6 +686,8 @@ export type ComposeResult =
       readonly customOrderOpened?: true;
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
+      /** The account this draft gives him, by its use: one `account_shared` (ADR 0143 § 13), never its name. */
+      readonly accountShared?: { readonly usage: SocialAccountUsage; readonly orient: boolean };
       readonly scriptRun?: ComposedScriptRun;
       /** Written in the care mode: a human validates it whatever the mode (ADR 0088 § 5). */
       readonly care?: ComposedCare;

@@ -64,7 +64,9 @@ function gateway(brief: Brief, bubbles: readonly string[], seen: VoiceInput[]): 
       seen.push(input);
       return Promise.resolve({ ok: true, value: { output: { bubbles: [...bubbles] }, meta: META } });
     },
-    health: unused,
+    health: () => {
+      throw new Error('not used');
+    },
     judge: unused,
     testConnection: unused,
   };

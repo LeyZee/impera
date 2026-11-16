@@ -368,6 +368,32 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     });
   });
 
+  it('journals the account a draft gives by its use, never its name, and gives the orientation back (ADR 0143)', async () => {
+    const id = await fanWrites('c-account', 'J’aimerais trop essayer, tu donnes des cours ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Postule sur mon compte dédié 😊'],
+      softViolations: [],
+      costUsd: 0,
+      accountShared: { usage: 'practice', orient: true },
+    };
+    await respond(id);
+    const journal = await events(id);
+    expect(journal.map((event) => event.type).slice(-2)).toEqual(['account_shared', 'draft_created']);
+    const [draft] = await drafts(id);
+    expect(journal.at(-2)?.payload).toEqual({
+      conversationId: id,
+      draftId: draft?.id,
+      usage: 'practice',
+      orient: true,
+    });
+
+    await fanWrites('c-account', 'Merci !');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await respond(id);
+    expect(composer.inputs.at(-1)?.lastOrientationAt).toBeInstanceOf(Date);
+  });
+
   it('keeps his script run with the draft, journals each step and the offer, and gives it back (ADR 0098)', async () => {
     const id = await fanWrites('c-script', 'Tu me montres ?');
     const at = new Date('2026-11-12T21:00:00Z');

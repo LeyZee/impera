@@ -1,6 +1,6 @@
 import { normalise, normaliseWords, type SocialAccountUsage } from '@impera/contracts';
 
-import type { GuardViolation } from './guards';
+import { checkVoiceOutput, type GuardSettings, type GuardViolation } from './guards';
 
 /**
  * « Ses comptes » and what she offers around her practice (ADR 0143 § C, D, F, bounds 18 to 23): code decides, never
@@ -157,4 +157,23 @@ export function meetingYes(bubbles: readonly string[]): GuardViolation[] {
   return match === undefined
     ? []
     : [{ code: 'meeting_promise', severity: 'blocking', bubbleIndex: 0, match }];
+}
+
+/**
+ * The contact guard with her accounts (bound 19): on the turn code gives one, its name and the words of its platform
+ * pass and nothing else of a contact does; any other name of hers blocks, given to the agent or not.
+ */
+export function withAccountGuard(
+  violations: readonly GuardViolation[],
+  written: readonly string[],
+  settings: GuardSettings,
+  allowed: ShareableAccount | null,
+  usernames: readonly string[],
+): GuardViolation[] {
+  const others = accountViolations(written, usernames, allowed);
+  if (allowed === null) return [...violations, ...others];
+  const contacts = checkVoiceOutput(withoutAllowedAccount(written, allowed), settings).filter(
+    (violation) => violation.code === 'contact_info',
+  );
+  return [...violations.filter((violation) => violation.code !== 'contact_info'), ...contacts, ...others];
 }

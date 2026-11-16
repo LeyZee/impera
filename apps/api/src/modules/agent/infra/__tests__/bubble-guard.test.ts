@@ -34,4 +34,22 @@ describe('bubble guard (approval of edited bubbles)', () => {
     expect(guard.check(explicit, {}, true)).toEqual({ isBlocked: true, codes: ['care_breach'] });
     expect(guard.check(['Je suis là, parle-moi'], {}, true)).toEqual({ isBlocked: false, codes: [] });
   });
+
+  it('lets only the account a draft gave pass at the approval, and none of her other names (ADR 0143 bounds 19, 21)', () => {
+    const plain = createBubbleGuard(DEFAULT_GUARD_SETTINGS);
+    const practice = { platform: 'instagram', username: 'demo_atelier', usage: 'practice' } as const;
+    const usernames = ['demo_atelier', 'demo_perso'];
+    const given = ['tape @demo_atelier sur insta 😊'];
+    expect(plain.check(given, {}, false, { usernames, allowed: practice })).toEqual({
+      isBlocked: false,
+      codes: [],
+    });
+    expect(plain.check(given, {}, false, { usernames, allowed: null })).toEqual({
+      isBlocked: true,
+      codes: ['contact_info'],
+    });
+    expect(plain.check(['et demo_perso aussi'], {}, false, { usernames, allowed: practice }).codes).toEqual([
+      'contact_info',
+    ]);
+  });
 });

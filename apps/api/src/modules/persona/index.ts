@@ -29,7 +29,7 @@ export interface PersonaModule {
    * the port the agent writes with (her active version, read at each draft), wired by the composition root.
    */
   readonly versions: PersonaVersionStore;
-  /** « Ses comptes » (ADR 0143 § C): `socialAccounts.shareable` is the port the agent reads, wired by the composition root. */
+  /** « Ses comptes » (ADR 0143 § C): `socialAccounts.forAgent` is the port the agent reads, wired by the composition root. */
   readonly socialAccounts: SocialAccountStore;
   /** Mounted under `/v1` by the server: `/creators` and her `/agent-hours`, and each creator's `/persona` with its versions and her corrections. */
   readonly routes: FastifyPluginAsyncZod;

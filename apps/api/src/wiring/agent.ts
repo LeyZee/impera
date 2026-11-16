@@ -53,11 +53,20 @@ export function wireAgent(
   // Each draft is written with her active persona version, read at each message; without one, a human answers
   // (`persona_inactive`). No file is read on this path: the fictional demo never writes to real fans unless an owner
   // activates it as her version (ADR 0010, 0022).
+  // « Ses comptes » as the agent reads them (ADR 0143): the ones it may give, and every name of hers for the guard.
+  const herAccounts = async (creatorId: string) => {
+    const read = await persona.socialAccounts.forAgent(CreatorIdSchema.parse(creatorId));
+    return {
+      shareable: read.shareable.map(({ platform, username, usage }) => ({ platform, username, usage })),
+      usernames: read.usernames,
+    };
+  };
   const composer =
     deps.composer ??
     startDraftComposer({
       gateway: deps.llm.gateway,
       activePersona,
+      socialAccounts: herAccounts,
       fans: deps.fans,
       onDroppedNotes: (event) => {
         logger.warn(event, 'fan notes shaped like an order kept out of the prompt');
@@ -86,7 +95,7 @@ export function wireAgent(
   const followUps = deps.composer !== undefined ? undefined : startFollowUpPlan({ activePersona });
   // Every approval passes the hard guards again (revue 09, G5), her active persona's limits included, read before
   // each approval (recette 28/10, G4). Without an active version nothing is approved: fail closed.
-  const agentGuard = startBubbleGuard({ activePersona });
+  const agentGuard = startBubbleGuard({ activePersona, socialAccounts: herAccounts });
   // Read against what she already sent him (P3-13); an approved draft never carries a media.
   const guard: BubbleGuard = {
     forCreator: async (creatorId) => {
@@ -94,8 +103,8 @@ export function wireAgent(
       return hers === null
         ? null
         : {
-            check: (bubbles, { history, care }) =>
-              hers.check(bubbles, guardContextOf(history), care === true),
+            check: (bubbles, { history, care, account }) =>
+              hers.check(bubbles, guardContextOf(history), care === true, account ?? null),
           };
     },
   };

@@ -1,3 +1,4 @@
+import { withAccountGuard, type ShareableAccount } from '../domain/accounts';
 import { checkCare } from '../domain/care';
 import { checkVoiceOutput, type GuardCode, type GuardContext, type GuardSettings } from '../domain/guards';
 
@@ -14,13 +15,25 @@ export interface AgentBubbleGuard {
     context?: GuardContext,
     /** A care episode is open (ADR 0088 § 3, § 5): what a care answer never carries blocks a chatter's words too. */
     care?: boolean,
+    /**
+     * Her user names, and the account that may leave in these bubbles (ADR 0143 bounds 19, 21): any other name of hers
+     * blocks. Absent, her names are not read and nothing of a contact passes.
+     */
+    accounts?: { readonly usernames: readonly string[]; readonly allowed: ShareableAccount | null },
   ): { readonly isBlocked: boolean; readonly codes: readonly GuardCode[] };
 }
 
 export function createBubbleGuard(settings: GuardSettings): AgentBubbleGuard {
   return {
-    check(bubbles, context = {}, care = false) {
-      const codes = [...checkVoiceOutput(bubbles, settings, context), ...(care ? checkCare(bubbles) : [])]
+    check(bubbles, context = {}, care = false, accounts) {
+      const read = withAccountGuard(
+        checkVoiceOutput(bubbles, settings, context),
+        bubbles,
+        settings,
+        accounts?.allowed ?? null,
+        accounts?.usernames ?? [],
+      );
+      const codes = [...read, ...(care ? checkCare(bubbles) : [])]
         // A line she already sent him blocks the engine's draft only: sending it again is the chatter's call.
         .filter((v) => v.severity === 'blocking' && v.code !== 'repetition')
         .map((v) => v.code);

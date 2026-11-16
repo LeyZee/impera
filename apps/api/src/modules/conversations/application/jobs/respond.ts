@@ -444,6 +444,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       ...(read.sales.usedObjectionReplies.length > 0 && {
         usedObjectionReplies: read.sales.usedObjectionReplies,
       }),
+      ...(read.sales.lastOrientationAt !== null && { lastOrientationAt: read.sales.lastOrientationAt }),
       scriptRun: read.scriptRun?.run ?? null,
       fanAvailability: read.conversation.fanAvailability,
     };
@@ -526,6 +527,23 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
                 conversationId: conversation.id,
                 objection: result.objectionReply.objection,
                 replyId: result.objectionReply.replyId,
+              },
+            },
+            meta,
+          );
+        }
+        // The account this draft gives him, by its use (ADR 0143 § 13): the team reads it, the approval reads it again.
+        if (result.accountShared !== undefined) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            {
+              type: 'account_shared',
+              payload: {
+                conversationId: conversation.id,
+                draftId,
+                usage: result.accountShared.usage,
+                orient: result.accountShared.orient,
               },
             },
             meta,

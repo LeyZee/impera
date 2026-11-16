@@ -6,7 +6,7 @@ import {
   SocialAccountUsageSchema,
   type SocialAccount,
 } from '@impera/contracts';
-import { and, eq, schema, withTenant, withTenantMember, type Database, type Transaction } from '@impera/db';
+import { eq, schema, withTenant, withTenantMember, type Database, type Transaction } from '@impera/db';
 
 import { SocialAccountsForbidden } from '../../domain/errors';
 import { sharingChanges, type SocialAccountStore } from '../../domain/social-accounts';
@@ -86,15 +86,15 @@ export function createDrizzleSocialAccountStore(db: Database): SocialAccountStor
         return after;
       }),
 
-    shareable: (creatorId) =>
-      withTenant(db, creatorId, async (tx) =>
-        (
-          await tx
-            .select(columns)
-            .from(t)
-            .where(and(eq(t.creatorId, creatorId), eq(t.agentMayShare, true)))
-            .orderBy(t.position)
-        ).map(toAccount),
-      ),
+    forAgent: (creatorId) =>
+      withTenant(db, creatorId, async (tx) => {
+        const all = (
+          await tx.select(columns).from(t).where(eq(t.creatorId, creatorId)).orderBy(t.position)
+        ).map(toAccount);
+        return {
+          shareable: all.filter((account) => account.agentMayShare),
+          usernames: all.map((account) => account.username),
+        };
+      }),
   };
 }

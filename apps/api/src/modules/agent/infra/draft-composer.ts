@@ -7,6 +7,7 @@ import type {
   MediaFlag,
   ObjectionReplies,
   Result,
+  SocialAccountUsage,
 } from '@impera/contracts';
 import {
   BRAIN_ALERTS_MAX,
@@ -17,6 +18,7 @@ import {
   type LlmGateway,
 } from '@impera/llm';
 
+import { ORIENTATION_COOLDOWN_DAYS, type ShareableAccount } from '../domain/accounts';
 import {
   briefAlerts,
   keywordAlerts,
@@ -55,6 +57,7 @@ import {
   composeTurn,
   type ComposedTurn,
   type ComposerPersona,
+  type ComposeTurnInput,
   type OfferInput,
   type ScriptsInput,
 } from './compose';
@@ -119,6 +122,8 @@ export interface AgentComposeInput {
   readonly customOrderOpen?: boolean;
   /** The replies of her objection bank he already received (ADR 0090 § B): never twice. */
   readonly usedObjectionReplies?: readonly string[];
+  /** When she last pointed him to her practice's account (ADR 0143 bound 23); absent: never. */
+  readonly lastOrientationAt?: Date;
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRun | null;
   /** His availability as the conversation keeps it (ADR 0103, amendement du 13/11); `null` before the first. */
@@ -214,6 +219,8 @@ type AgentComposeResult = (
   readonly customOrderOpened?: true;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
+  /** The account this draft gives him, by its use (`account_shared`, ADR 0143 § 13): never its name. */
+  readonly accountShared?: { readonly usage: SocialAccountUsage; readonly orient: boolean };
   /**
    * His script runs after this message (ADR 0098): the stored run moved, a run opened, a paid step offered. Without a
    * draft, only what his message and Reveal changed: a step not written was not sent.
@@ -297,6 +304,14 @@ export interface DraftComposerDeps {
    * go to them. Unknown: no.
    */
   readonly chatterOnShift?: (creatorId: string, at: Date) => Promise<boolean>;
+  /**
+   * « Ses comptes » as the agent reads them (ADR 0143): the ones it may give and every name of hers. Absent, or when
+   * the read fails, none is given and none of her names may leave.
+   */
+  readonly socialAccounts?: (creatorId: string) => Promise<{
+    readonly shareable: readonly ShareableAccount[];
+    readonly usernames: readonly string[];
+  }>;
   /** Lines of her notes kept out of the prompt for looking like an order: counted, never their text. */
   readonly onDroppedNotes?: (event: { readonly conversationId: string; readonly count: number }) => void;
   /**
@@ -727,11 +742,16 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
     (order?.kind === 'handoff' && result.kind === 'held' && result.cause === 'custom_order') ||
     (order?.kind === 'reply' && order.opens);
   const reply = composed.objectionReply;
+  const account = composed.account;
   return {
     ...result,
     ...(opened && { customOrderOpened: true }),
     ...(reply !== undefined &&
       result.kind === 'draft' && { objectionReply: { objection: reply.objection, replyId: reply.replyId } }),
+    ...(account?.kind === 'give' &&
+      result.kind === 'draft' && {
+        accountShared: { usage: account.account.usage, orient: account.orient },
+      }),
   };
 }
 
@@ -965,6 +985,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       });
       const offer = await offerInput(withHer, input, stop.flags);
       const scripts = await scriptsInput(deps, input);
+      const accounts = await accountsInput(deps, input, stop.flags, careForced);
       const waited = (input.waited ?? 0) >= 1;
       const composed = await composeTurn(deps.gateway, withHer.persona, {
         history,
@@ -1025,6 +1046,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         }),
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
+        ...(accounts !== undefined && { accounts }),
       });
       const fired = firedWith(coded, composed.brief, asked, settings, chatter);
       const alerts = settleAlerts(fired);
@@ -1050,3 +1072,35 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
     },
   };
 }
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Her accounts for this turn (ADR 0143): what the agent may give, every name of hers, what cuts (§ 16, bound 23) and
+ * whether she pointed him to her practice within the cooldown. A failed read gives nothing and lets no name leave.
+ */
+async function accountsInput(
+  deps: DraftComposerDeps,
+  input: AgentComposeInput,
+  flags: FanFlags | undefined,
+  careForced: boolean,
+): Promise<ComposeTurnInput['accounts']> {
+  if (deps.socialAccounts === undefined) return undefined;
+  const read = await deps.socialAccounts(input.creatorId).catch(() => null);
+  if (read === null) return { shareable: [], usernames: [], cuts: ALL_CUT, orientedRecently: true };
+  const last = input.lastOrientationAt;
+  return {
+    shareable: read.shareable,
+    usernames: read.usernames,
+    cuts: {
+      care: careForced,
+      doNotContact: flags?.doNotContact === true,
+      salesFrozen: flags?.salesFrozen !== undefined,
+      openRisk: false,
+    },
+    orientedRecently:
+      last !== undefined && input.now.getTime() - last.getTime() < ORIENTATION_COOLDOWN_DAYS * DAY_MS,
+  };
+}
+
+const ALL_CUT = { care: true, doNotContact: true, salesFrozen: true, openRisk: true } as const;

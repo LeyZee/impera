@@ -108,8 +108,9 @@ describe('« Ses comptes » (ADR 0143 § C, bounds 18 to 20)', () => {
       ['demo.lives', false],
       ['demo_atelier', true],
     ]);
-    const shareable = await app.modules.persona.socialAccounts.shareable(annaId);
-    expect(shareable.map((a) => a.username)).toEqual(['demo_atelier']);
+    const forAgent = await app.modules.persona.socialAccounts.forAgent(annaId);
+    expect(forAgent.shareable.map((a) => a.username)).toEqual(['demo_atelier']);
+    expect(forAgent.usernames).toEqual(['demo.lives', 'demo_atelier']);
   });
 
   it('audits each change of « l’agent peut le donner », never a user name', async () => {

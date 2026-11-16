@@ -3,7 +3,7 @@ import type { CreatorId, PutSocialAccountsBody, SocialAccount } from '@impera/co
 /**
  * « Ses comptes » (ADR 0143 § C): her accounts elsewhere, in the owner's order. The owner and a manager read them, the
  * owner alone changes them, each change of « l'agent peut le donner » audited (§ 20). The agent reads them through
- * `shareable`, as the service: a job never writes them.
+ * `forAgent`, in her tenant: a job never writes them.
  */
 export interface SocialAccountStore {
   /** Hers, in order, read by the owner or an active manager (`userId`). */
@@ -14,8 +14,16 @@ export interface SocialAccountStore {
     body: PutSocialAccountsBody,
     userId: string,
   ): Promise<readonly SocialAccount[]>;
-  /** The ones the agent may give, in order: marked by the owner, read in her tenant by the jobs. */
-  shareable(creatorId: CreatorId): Promise<readonly SocialAccount[]>;
+  /**
+   * What the agent reads, in her tenant (ADR 0143 bounds 18, 19): the accounts it may give, in order, marked by the
+   * owner; and every user name of hers, so that the guard blocks any it was not given at this turn.
+   */
+  forAgent(creatorId: CreatorId): Promise<SocialAccountsForAgent>;
+}
+
+export interface SocialAccountsForAgent {
+  readonly shareable: readonly SocialAccount[];
+  readonly usernames: readonly string[];
 }
 
 /** What one replacement changed of « l'agent peut le donner », for the audit: ids and uses, never a user name. */

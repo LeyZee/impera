@@ -22,10 +22,9 @@ import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
 import {
   accountAsked,
   accountDecision,
-  accountViolations,
   meetingYes,
   wantsToTry,
-  withoutAllowedAccount,
+  withAccountGuard,
   type AccountCuts,
   type AccountDecision,
   type ShareableAccount,
@@ -976,23 +975,4 @@ function accountTurn(
       ? orientationHint(decision.account, offers, practice.sexual)
       : accountHint(decision.account);
   return { kind: 'give', account: decision.account, hint, decision };
-}
-
-/**
- * The contact guard with her accounts (bound 19): on the turn code gives one, its name and the words of its platform
- * pass and nothing else of a contact does; any other name of hers blocks, given to the agent or not.
- */
-function withAccountGuard(
-  violations: readonly GuardViolation[],
-  written: readonly string[],
-  settings: GuardSettings,
-  allowed: ShareableAccount | null,
-  usernames: readonly string[],
-): GuardViolation[] {
-  const others = accountViolations(written, usernames, allowed);
-  if (allowed === null) return [...violations, ...others];
-  const contacts = checkVoiceOutput(withoutAllowedAccount(written, allowed), settings).filter(
-    (violation) => violation.code === 'contact_info',
-  );
-  return [...violations.filter((violation) => violation.code !== 'contact_info'), ...contacts, ...others];
 }

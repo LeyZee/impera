@@ -401,7 +401,7 @@ describe('conversations module (P0-05)', () => {
     expect(seen).toEqual([
       {
         bubbles: ['Je pense à toi'],
-        context: { history: [{ from: 'fan', text: 'Tu fais quoi ce soir ?' }], care: false },
+        context: { history: [{ from: 'fan', text: 'Tu fais quoi ce soir ?' }], care: false, account: null },
       },
     ]);
   });
