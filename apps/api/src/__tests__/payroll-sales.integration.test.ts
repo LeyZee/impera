@@ -12,6 +12,7 @@ import { and, eq, schema, sql } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
+import { createRequireRecentLogin } from '../auth';
 import { createLogger } from '../logger';
 import { enqueuePayoutCertificateLock } from '../modules/contractors';
 import { invoicesAfterValidation, payoutGate } from '../modules/invoicing';
@@ -225,7 +226,7 @@ describe('Équipe › Paie : les ventes de la plateforme comptées sur leur net 
     const blindServer = await buildServer({
       config,
       logger: createLogger(config),
-      routes: [blind.routes(team.app.requireRole)],
+      routes: [blind.routes(team.app.requireRole, createRequireRecentLogin(team.app.auth, team.app.db.db))],
       readiness: team.app.readiness,
     });
     try {

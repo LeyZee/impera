@@ -11,11 +11,21 @@ import {
   type ScriptSlot,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react';
 
 import { Thumb } from './Thumb';
-import { CONTENT_KEY, Refused, cardUrl, fillSlot, scriptDropKey, submitScript, useScriptDrop } from './api';
-import { UNKNOWN_TYPE, fileLine, mimeOf, type LiveSend } from './model';
+import {
+  CONTENT_KEY,
+  Refused,
+  cardUrl,
+  fillSlot,
+  scriptDropKey,
+  submitScript,
+  useScriptDrop,
+  withdrawDrop,
+} from './api';
+import { durationOf } from './media-length';
+import { UNKNOWN_TYPE, fileLine, isInterrupted, mimeOf, type LiveSend } from './model';
 import {
   acceptOfSlot,
   cardDone,
@@ -27,7 +37,7 @@ import {
   slotLine,
   type ScriptCard,
 } from './script-model';
-import { isSending, queueSend, useLiveSends } from './sends';
+import { holds, isSending, queueSend, retryNow, sendAgain, useLiveSends } from './sends';
 
 import { lookAgainAtHerCase } from '@/rewards/api';
 import { ServerSilent } from '@/shell/ServerSilent';
@@ -35,33 +45,6 @@ import { Page, PageHeader } from '@/shell/layout';
 
 import './content.css';
 import './script.css';
-
-/** How long her phone may take to read a video's length before the server reads it instead (ADR 0070 § 2). */
-const PROBE_MS = 8_000;
-
-/** A video's or a vocal's length, in milliseconds, read on her phone; `null` when it cannot say (the server will). */
-function durationOf(file: File, kind: 'video' | 'audio'): Promise<number | null> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const media = document.createElement(kind);
-    const done = (value: number | null): void => {
-      window.clearTimeout(timer);
-      URL.revokeObjectURL(url);
-      resolve(value);
-    };
-    const timer = window.setTimeout(() => {
-      done(null);
-    }, PROBE_MS);
-    media.preload = 'metadata';
-    media.onloadedmetadata = () => {
-      done(Number.isFinite(media.duration) ? Math.round(media.duration * 1000) : null);
-    };
-    media.onerror = () => {
-      done(null);
-    };
-    media.src = url;
-  });
-}
 
 /**
  * Her script, card by card (SC-02 lot b2, ADR 0056 § 4): one screen per card, its slots under it, then the preview of
@@ -97,9 +80,9 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
   // She comes back where she left: the first card not done, or the preview when every one is.
   useEffect(() => {
     if (step !== null || drop === undefined || segments === undefined) return;
-    const first = cards.findIndex((card) => !cardDone(card, drop.files));
+    const first = cards.findIndex((card) => !cardDone(card, drop.files, sends));
     setStep(first === -1 ? cards.length : first);
-  }, [step, drop, cards, segments]);
+  }, [step, drop, cards, segments, sends]);
 
   const reread = (): void => {
     void client.invalidateQueries({ queryKey: scriptDropKey(dropId) });
@@ -147,11 +130,94 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
     );
   }
 
-  const progress = progressOf(cards, files);
+  const progress = progressOf(cards, files, sends);
   const filling = drop.state === 'filling';
   const card = cards[step];
-  const firstMissing = cards.findIndex((one) => !cardDone(one, files));
+  const firstMissing = cards.findIndex((one) => !cardDone(one, files, sends));
   const percent = progress.required === 0 ? 100 : Math.round((100 * progress.filled) / progress.required);
+  // Précédent / Suivant: beside the slots on a computer (under them on a phone), under the preview.
+  const foot: ReactNode = filling ? (
+    <>
+      <div className="sk-foot">
+        {failed === null ? null : (
+          <p className="sk-foot__alert" role="alert">
+            {failed}
+          </p>
+        )}
+        <div className="sk-foot__row">
+          {/* No « Précédent » on the first card: hidden, never a faded button (relecture Extension). */}
+          {step === 0 ? null : (
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain"
+              onClick={() => {
+                go(step - 1);
+              }}
+            >
+              Précédent
+            </button>
+          )}
+          {card !== undefined ? (
+            <button
+              type="button"
+              className="nv-btn nv-btn--neon"
+              onClick={() => {
+                go(step + 1);
+              }}
+            >
+              {step === cards.length - 1 ? 'Voir l’aperçu' : 'Suivant'}
+            </button>
+          ) : firstMissing !== -1 ? (
+            // A slot is missing: the way to it, never a disabled « Envoyer le script ».
+            <button
+              type="button"
+              className="nv-btn nv-btn--neon"
+              onClick={() => {
+                go(firstMissing);
+              }}
+            >
+              Compléter le carton {firstMissing + 1}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="nv-btn nv-btn--neon"
+              disabled={sending}
+              onClick={() => {
+                setSending(true);
+                setFailed(null);
+                submitScript(dropId)
+                  .then(() => {
+                    reread();
+                    onBack();
+                  })
+                  .catch((error: unknown) => {
+                    setFailed(
+                      error instanceof Refused && error.status === 422
+                        ? 'Il manque encore des médias : l’aperçu te dit lesquels.'
+                        : 'L’envoi n’est pas passé : réessaie dans un instant.',
+                    );
+                    reread();
+                  })
+                  .finally(() => {
+                    setSending(false);
+                  });
+              }}
+            >
+              Envoyer le script
+            </button>
+          )}
+        </div>
+      </div>
+      <Withdraw
+        dropId={dropId}
+        onWithdrawn={() => {
+          void client.invalidateQueries({ queryKey: CONTENT_KEY });
+          onBack();
+        }}
+      />
+    </>
+  ) : null;
 
   return (
     <Page className="ct-page sk-page">
@@ -188,6 +254,7 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
             dropId={dropId}
             cards={cards}
             files={files}
+            sends={sends}
             missing={progress.required - progress.filled}
             onOpen={go}
           />
@@ -196,6 +263,11 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
             key={`${card.segmentKey}:${card.variant ?? ''}`}
             dropId={dropId}
             card={card}
+            number={step + 1}
+            foot={foot}
+            onRetry={(fileId) => {
+              sendAgain([fileId], reread);
+            }}
             files={files}
             sends={sends}
             chosen={chosen}
@@ -211,79 +283,7 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
           />
         )}
 
-        {filling ? (
-          <div className="sk-foot">
-            {failed === null ? null : (
-              <p className="sk-foot__alert" role="alert">
-                {failed}
-              </p>
-            )}
-            <div className="sk-foot__row">
-              {/* No « Précédent » on the first card: hidden, never a faded button (relecture Extension). */}
-              {step === 0 ? null : (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain"
-                  onClick={() => {
-                    go(step - 1);
-                  }}
-                >
-                  Précédent
-                </button>
-              )}
-              {card !== undefined ? (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--neon"
-                  onClick={() => {
-                    go(step + 1);
-                  }}
-                >
-                  {step === cards.length - 1 ? 'Voir l’aperçu' : 'Suivant'}
-                </button>
-              ) : firstMissing !== -1 ? (
-                // A slot is missing: the way to it, never a disabled « Envoyer le script ».
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--neon"
-                  onClick={() => {
-                    go(firstMissing);
-                  }}
-                >
-                  Compléter {cards[firstMissing]?.code}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--neon"
-                  disabled={sending}
-                  onClick={() => {
-                    setSending(true);
-                    setFailed(null);
-                    submitScript(dropId)
-                      .then(() => {
-                        reread();
-                        onBack();
-                      })
-                      .catch((error: unknown) => {
-                        setFailed(
-                          error instanceof Refused && error.status === 422
-                            ? 'Il manque encore des médias : l’aperçu te dit lesquels.'
-                            : 'L’envoi n’est pas passé : réessaie dans un instant.',
-                        );
-                        reread();
-                      })
-                      .finally(() => {
-                        setSending(false);
-                      });
-                  }}
-                >
-                  Envoyer le script
-                </button>
-              )}
-            </div>
-          </div>
-        ) : null}
+        {card === undefined ? foot : null}
       </div>
     </Page>
   );
@@ -301,6 +301,9 @@ function BackBar({ onBack }: { onBack: () => void }): JSX.Element {
 function CardStep({
   dropId,
   card,
+  number,
+  foot,
+  onRetry,
   files,
   sends,
   chosen,
@@ -309,44 +312,112 @@ function CardStep({
 }: {
   dropId: ContentDropId;
   card: ScriptCard;
+  /** Its place in her script, from 1: « Carton 3 », never the agency's code (recette CRE-14). */
+  number: number;
+  foot: ReactNode;
+  onRetry: (fileId: ContentDropFileId) => void;
   files: readonly ContentDropFile[];
   sends: ReadonlyMap<string, LiveSend>;
   chosen: ReadonlyMap<ContentDropFileId, File>;
   onFilled: (file: File, declared: { id: ContentDropFileId }, next: ContentDrop) => void;
   onResumed: (fileId: ContentDropFileId, file: File) => void;
 }): JSX.Element {
+  // On a computer, two columns (recette CRE-13): the card on the left, held in view; what to do on the right.
   return (
     <section className="sk-card nv-enter" aria-labelledby="sk-card-title">
-      <div className="sk-card__titles">
-        <span className="sk-code nv-num">{card.code}</span>
-        <h2 id="sk-card-title" className="sk-card__title">
-          {card.title}
-        </h2>
-      </div>
-      {card.detail === null ? null : <p className="sk-card__detail">{card.detail}</p>}
       <img
         className="sk-card__image"
         src={cardUrl(dropId, card.segmentKey, card.variant)}
         width={1080}
         height={1080}
-        alt={`Carton ${card.code} : ${card.title}`}
+        alt={`Carton ${String(number)} : ${card.title}`}
       />
-      <ul className="sk-slots">
-        {card.slots.map((slot, index) => (
-          <SlotTile
-            key={slot.key}
-            dropId={dropId}
-            slot={slot}
-            rank={index + 1}
-            file={fileOfSlot(files, slot.key)}
-            sends={sends}
-            chosen={chosen}
-            onFilled={onFilled}
-            onResumed={onResumed}
-          />
-        ))}
-      </ul>
+      <div className="sk-card__work">
+        <h2 id="sk-card-title" className="sk-card__title">
+          {card.title}
+        </h2>
+        {card.detail === null ? null : <p className="sk-card__detail">{card.detail}</p>}
+        <ul className="sk-slots">
+          {card.slots.map((slot, index) => (
+            <SlotTile
+              key={slot.key}
+              dropId={dropId}
+              slot={slot}
+              rank={index + 1}
+              file={fileOfSlot(files, slot.key)}
+              sends={sends}
+              chosen={chosen}
+              onFilled={onFilled}
+              onResumed={onResumed}
+              onRetry={onRetry}
+            />
+          ))}
+        </ul>
+        {foot}
+      </div>
     </section>
+  );
+}
+
+/** « Retirer ce script », away from « Continuer » (recette CRE-12), and asked once more before it goes. */
+function Withdraw({ dropId, onWithdrawn }: { dropId: ContentDropId; onWithdrawn: () => void }): JSX.Element {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="sk-withdraw">
+      {asking ? (
+        <>
+          <span className="sk-withdraw__ask">
+            Retirer ce script ? Les médias déjà ajoutés partent avec lui.
+          </span>
+          <span className="sk-withdraw__row">
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain nv-btn--sm"
+              disabled={busy}
+              onClick={() => {
+                setAsking(false);
+              }}
+            >
+              Garder
+            </button>
+            <button
+              type="button"
+              className="nv-btn nv-btn--destructive nv-btn--sm"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                setFailed(false);
+                withdrawDrop(dropId)
+                  .then(onWithdrawn)
+                  .catch(() => {
+                    setFailed(true);
+                    setBusy(false);
+                  });
+              }}
+            >
+              Retirer
+            </button>
+          </span>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="nv-btn nv-btn--plain nv-btn--sm sk-withdraw__open"
+          onClick={() => {
+            setAsking(true);
+          }}
+        >
+          Retirer ce script
+        </button>
+      )}
+      {failed ? (
+        <p className="sk-foot__alert" role="alert">
+          Le retrait n’est pas passé : réessaie dans un instant.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -360,6 +431,7 @@ function SlotTile({
   chosen,
   onFilled,
   onResumed,
+  onRetry,
 }: {
   dropId: ContentDropId;
   slot: ScriptSlot;
@@ -369,20 +441,24 @@ function SlotTile({
   chosen: ReadonlyMap<ContentDropFileId, File>;
   onFilled: (file: File, declared: { id: ContentDropFileId }, next: ContentDrop) => void;
   onResumed: (fileId: ContentDropFileId, file: File) => void;
+  onRetry: (fileId: ContentDropFileId) => void;
 }): JSX.Element {
   const picker = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   const live = file === undefined ? undefined : sends.get(file.id);
   const local = file === undefined ? undefined : chosen.get(file.id);
-  const interrupted = file?.state === 'awaiting' && (live === undefined || live.phase === 'failed');
+  const interrupted = file !== undefined && isInterrupted(file, live);
+  const stalled = file?.state === 'awaiting' && live?.phase === 'stalled';
+  // Cut while this page was open: the phone still holds the file, « Réessayer » sends it again without the gallery.
+  const held = file !== undefined && interrupted && holds(file.id);
   const percent =
     live === undefined || live.total === 0 ? 0 : Math.min(100, Math.floor((100 * live.sent) / live.total));
   const showsBar =
     file?.state === 'awaiting' &&
     live !== undefined &&
-    (live.phase === 'sending' || live.phase === 'waiting');
-  const warn = file?.state === 'refused' || interrupted;
+    (live.phase === 'sending' || live.phase === 'waiting' || live.phase === 'stalled');
+  const warn = file?.state === 'refused' || interrupted || stalled;
 
   const choose = async (picked: File): Promise<void> => {
     setRefusal(null);
@@ -453,7 +529,7 @@ function SlotTile({
       )}
       {showsBar ? (
         <div
-          className={live.phase === 'waiting' ? 'nv-gauge nv-gauge--amber' : 'nv-gauge'}
+          className={live.phase === 'sending' ? 'nv-gauge' : 'nv-gauge nv-gauge--amber'}
           role="progressbar"
           aria-label={`Envoi du média ${String(rank)}`}
           aria-valuemin={0}
@@ -463,24 +539,40 @@ function SlotTile({
           <span className="nv-gauge__fill" style={{ '--nv-gauge-value': `${String(percent)}%` }} />
         </div>
       ) : null}
+      {interrupted && !held ? (
+        <p className="sk-slot__resume">Touche « Reprendre » et rechoisis le même fichier dans ta galerie.</p>
+      ) : null}
       {refusal === null ? null : (
         <p className="sk-slot__refusal" role="alert">
           {refusal}
         </p>
       )}
       <div className="sk-slot__actions">
-        <button
-          type="button"
-          className={
-            file === undefined ? 'nv-btn nv-btn--soft nv-btn--sm' : 'nv-btn nv-btn--plain nv-btn--sm'
-          }
-          disabled={busy}
-          onClick={() => {
-            picker.current?.click();
-          }}
-        >
-          {file === undefined ? chooseWord(slot.slot) : interrupted ? 'Reprendre' : 'Remplacer'}
-        </button>
+        {file !== undefined && (stalled || held) ? (
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            onClick={() => {
+              if (stalled) retryNow(file.id);
+              else onRetry(file.id);
+            }}
+          >
+            Réessayer
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={
+              file === undefined ? 'nv-btn nv-btn--soft nv-btn--sm' : 'nv-btn nv-btn--plain nv-btn--sm'
+            }
+            disabled={busy}
+            onClick={() => {
+              picker.current?.click();
+            }}
+          >
+            {file === undefined ? chooseWord(slot.slot) : interrupted ? 'Reprendre' : 'Remplacer'}
+          </button>
+        )}
         <input
           ref={picker}
           type="file"
@@ -502,12 +594,14 @@ function Preview({
   dropId,
   cards,
   files,
+  sends,
   missing,
   onOpen,
 }: {
   dropId: ContentDropId;
   cards: readonly ScriptCard[];
   files: readonly ContentDropFile[];
+  sends: ReadonlyMap<string, LiveSend>;
   missing: number;
   onOpen: (step: number) => void;
 }): JSX.Element {
@@ -525,10 +619,11 @@ function Preview({
         {/* What is missing first: she sees it without looking for it; then the cards ready, in the script's order. */}
         {cards
           .map((card, index) => ({ card, index }))
-          .toSorted((a, b) => Number(cardDone(a.card, files)) - Number(cardDone(b.card, files)))
+          .toSorted((a, b) => Number(cardDone(a.card, files, sends)) - Number(cardDone(b.card, files, sends)))
           .map(({ card, index }) => {
-            const done = cardDone(card, files);
-            const meta = cardMeta(card, files);
+            const done = cardDone(card, files, sends);
+            const meta = cardMeta(card, files, sends);
+            const refused = card.slots.some((slot) => fileOfSlot(files, slot.key)?.state === 'refused');
             return (
               <li key={`${card.segmentKey}:${card.variant ?? ''}`}>
                 <button
@@ -546,15 +641,24 @@ function Preview({
                     alt=""
                     loading="lazy"
                   />
+                  {/* Its number in her script, its whole title (it wraps), its count: amber is kept for a refusal. */}
                   <span className="sk-row__titles">
                     <span className="sk-row__name">
-                      <span className="sk-code nv-num">{card.code}</span> {card.title}
+                      <span className="sk-row__number nv-num">{index + 1}</span>
+                      {/* The series tell the cards of one stage apart (« Teasing · Série B »). */}
+                      {card.variant === null ? card.title : `${card.title} · Série ${card.variant}`}
                     </span>
-                    <span className="sk-row__meta nv-num">{meta}</span>
+                    <span className={refused ? 'sk-row__meta sk-row__meta--warn' : 'sk-row__meta nv-num'}>
+                      {refused ? `${meta} · un média refusé, à remplacer` : meta}
+                    </span>
                   </span>
-                  <span className={done ? 'sk-pill sk-pill--ok' : 'sk-pill sk-pill--warn'}>
-                    {done ? 'Prêt' : 'À compléter'}
-                  </span>
+                  {done ? (
+                    <span className="sk-row__done" role="img" aria-label="Complet">
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="M5 10.5l3.2 3.2L15 7" />
+                      </svg>
+                    </span>
+                  ) : null}
                 </button>
               </li>
             );

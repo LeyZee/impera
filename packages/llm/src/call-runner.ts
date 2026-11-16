@@ -12,7 +12,7 @@ import {
 } from 'ai';
 import type { z } from 'zod';
 
-import type { CallOutcome, LlmCallLog } from './call-log';
+import type { CallOutcome, HedgeRole, LlmCallLog } from './call-log';
 import { costUsd } from './catalog';
 import type { LlmConfig, LlmRole, ModelRef, ProviderId } from './config';
 import type { CallTrace, LlmFailure, LlmSuccess } from './gateway-types';
@@ -156,6 +156,11 @@ export interface CallRunnerDeps {
   readonly overBudget: (purpose: LlmPurpose | undefined) => LlmFailure['code'] | undefined;
   /** Waits before a transient retry; a real timer unless a test passes its own. */
   readonly sleep?: (ms: number) => Promise<void>;
+  /**
+   * Waits before a hedged request (`hedgeAfterMs`), until the signal aborts it; a real timer unless a test passes its
+   * own. Aborted, it never resolves.
+   */
+  readonly hedgeTimer?: HedgeTimer;
 }
 
 /** Waits before the n-th transient retry: 0.5 s, 1 s, 2 s, at most 4 s. */
@@ -174,6 +179,20 @@ const realSleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
+type HedgeTimer = (ms: number, signal: AbortSignal) => Promise<void>;
+
+const realHedgeTimer: HedgeTimer = (ms, signal) =>
+  new Promise((resolve) => {
+    const timeout = setTimeout(resolve, ms);
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timeout);
+      },
+      { once: true },
+    );
+  });
+
 export type CallRunner = <T>(
   role: LlmRole,
   prompt: PromptTemplate,
@@ -183,13 +202,27 @@ export type CallRunner = <T>(
   trace?: CallTrace,
 ) => Promise<Result<LlmSuccess<T>, LlmFailure>>;
 
+/** What the runner does with one settled request, once it is journaled. */
+type Step<T> =
+  | { readonly kind: 'success'; readonly value: LlmSuccess<T> }
+  /** Grok ended its reasoning with no answer: asked once more on the same model. */
+  | { readonly kind: 'empty' }
+  /** Refused or leaked its prompt: nothing more from this model. */
+  | { readonly kind: 'stop' }
+  | { readonly kind: 'failed'; readonly classified: Classified };
+
 /**
  * One structured call for a role: main model then fallback, transient retries, one repair round on an
  * invalid output, refusals and prompt leaks moved to the next model, every attempt journaled.
+ *
+ * A role with `hedgeAfterMs` asks its main model a second time, in parallel, when the first request is still running after
+ * that long, and keeps the first good answer: a slow request is the exception, and the second one usually lands before
+ * it. A request past its delay is not asked again on the same model: the fallback answers.
  */
 export function createCallRunner(deps: CallRunnerDeps): CallRunner {
   const { now, canary } = deps;
   const sleep = deps.sleep ?? realSleep;
+  const hedgeTimer = deps.hedgeTimer ?? realHedgeTimer;
   return async function run<T>(
     role: LlmRole,
     prompt: PromptTemplate,
@@ -239,16 +272,12 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
         attempts.push({ provider: ref.provider, model: ref.model, outcome: 'unsupported_input' });
         continue;
       }
-      let messages = built;
-      let transientLeft = deps.config.maxTransientRetries;
-      let hasRepaired = false;
-      // Grok sometimes ends its reasoning with no answer at all (11/11, about one judge call in four on a scenario):
-      // asked once more on the same model. Never Gemini, whose empty answer is a block of the media (see below).
-      let hasRetriedEmpty = ref.provider === 'google';
-      for (;;) {
+
+      /** One request to this model: its answer or what it threw, and how long it took; never throws. */
+      const request = async (messages: ModelMessage[]) => {
         const startedAt = now().getTime();
         try {
-          const result = await generateText({
+          const answer = await generateText({
             model,
             system,
             messages,
@@ -263,7 +292,25 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
                 providerOptions: { xai: { reasoningEffort: roleConfig.reasoningEffort } },
               }),
           });
-          const latencyMs = now().getTime() - startedAt;
+          return { latencyMs: now().getTime() - startedAt, answer };
+        } catch (error) {
+          return { latencyMs: now().getTime() - startedAt, error };
+        }
+      };
+      type Settled = Awaited<ReturnType<typeof request>>;
+
+      /**
+       * Journals a settled request and says what it gave. `mayRetryEmpty`: an empty answer may be asked again. `hedge`:
+       * its part in a hedged attempt, written to the journal.
+       */
+      const judge = (settled: Settled, mayRetryEmpty: boolean, hedge?: HedgeRole): Step<T> => {
+        const { latencyMs } = settled;
+        const note = (outcome: CallOutcome, ms: number, extra: object = {}): void => {
+          record(outcome, ms, hedge === undefined ? extra : { ...extra, hedge });
+        };
+        try {
+          if ('error' in settled) throw settled.error;
+          const result = settled.answer;
           const cost = costUsd(ref, result.usage);
           // Gemini blocks a media by stopping with no text (finish « other ») as often as with « content-filter »:
           // both are a refusal, and asking again with the same media would only be refused again.
@@ -272,23 +319,23 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
             (result.finishReason === 'other' && result.text.trim() === '');
           if (isBlocked) {
             const isEmpty = result.finishReason !== 'content-filter' && result.text.trim() === '';
-            if (isEmpty && !hasRetriedEmpty) {
-              hasRetriedEmpty = true;
-              record('invalid_output', latencyMs, {
+            if (isEmpty && mayRetryEmpty) {
+              note('invalid_output', latencyMs, {
                 errorMessage: 'empty answer',
                 ...(cost !== undefined && { costUsd: cost }),
               });
-              continue;
+              return { kind: 'empty' };
             }
-            record('refused', latencyMs, cost === undefined ? {} : { costUsd: cost });
-            break;
+            note('refused', latencyMs, cost === undefined ? {} : { costUsd: cost });
+            return { kind: 'stop' };
           }
-          if (JSON.stringify(result.output).includes(canary)) {
+          const output = result.output;
+          if (JSON.stringify(output).includes(canary)) {
             // The fan got the model to write its instructions: nothing of this output may go further.
-            record('prompt_leak', latencyMs, cost === undefined ? {} : { costUsd: cost });
-            break;
+            note('prompt_leak', latencyMs, cost === undefined ? {} : { costUsd: cost });
+            return { kind: 'stop' };
           }
-          record('ok', latencyMs, {
+          note('ok', latencyMs, {
             ...(result.usage.inputTokens !== undefined && { inputTokens: result.usage.inputTokens }),
             ...(result.usage.inputTokenDetails.cacheReadTokens !== undefined && {
               cachedInputTokens: result.usage.inputTokenDetails.cacheReadTokens,
@@ -296,65 +343,117 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
             ...(result.usage.outputTokens !== undefined && { outputTokens: result.usage.outputTokens }),
             ...(cost !== undefined && { costUsd: cost }),
           });
-          return ok({
-            output: result.output,
-            meta: {
-              provider: ref.provider,
-              model: ref.model,
-              isFallback,
-              latencyMs,
-              promptHash: prompt.hash,
-              ...(cost !== undefined && { costUsd: cost }),
+          return {
+            kind: 'success',
+            value: {
+              output,
+              meta: {
+                provider: ref.provider,
+                model: ref.model,
+                isFallback,
+                latencyMs,
+                promptHash: prompt.hash,
+                ...(cost !== undefined && { costUsd: cost }),
+              },
             },
-          });
+          };
         } catch (error) {
-          const latencyMs = now().getTime() - startedAt;
-          const {
-            outcome,
-            isTransient,
-            message,
-            usage,
-            refusedStatus,
-            retryAfterMs: asked,
-            isEmpty,
-          } = classify(error);
+          const classified = classify(error);
+          const { outcome, message, usage, refusedStatus, isEmpty } = classified;
           if (refusedStatus !== undefined) deps.reportRefusal(ref.provider, refusedStatus);
           const cost = usage === undefined ? undefined : costUsd(ref, usage);
-          if (isEmpty === true && !hasRetriedEmpty) {
-            hasRetriedEmpty = true;
-            record('invalid_output', latencyMs, {
+          if (isEmpty === true && mayRetryEmpty) {
+            note('invalid_output', latencyMs, {
               errorMessage: 'empty answer',
               ...(cost !== undefined && { costUsd: cost }),
             });
-            continue;
+            return { kind: 'empty' };
           }
-          record(outcome, latencyMs, {
+          note(outcome, latencyMs, {
             errorMessage: message.slice(0, 200),
             ...(cost !== undefined && { costUsd: cost }),
           });
-          if (outcome === 'invalid_output' && !hasRepaired) {
-            hasRepaired = true;
-            messages = [
-              ...messages,
-              {
-                role: 'user',
-                content: `Ta réponse précédente ne respectait pas le format demandé (${message.slice(0, 300)}). Réponds de nouveau, uniquement avec l'objet JSON.`,
-              },
-            ];
-            continue;
-          }
-          if (isTransient && transientLeft > 0) {
-            // A 429 or a 5xx asked again at once is refused again: wait, longer each time, or as the provider says.
-            const delay = retryDelayMs(deps.config.maxTransientRetries - transientLeft, asked);
-            if (delay === undefined) break;
-            transientLeft -= 1;
-            const stopped = deps.overBudget(trace.purpose);
-            if (stopped !== undefined) return err({ code: stopped, attempts });
-            await sleep(delay);
-            continue;
-          }
-          break;
+          return { kind: 'failed', classified };
         }
+      };
+
+      /**
+       * One attempt, hedged when the role says so: past `hedgeAfterMs`, a second identical request runs beside the
+       * first and the first good answer wins. The other one is left to finish and is journaled with its real cost, so
+       * the daily cap and the AI spend count it; aborted, it would be billed all the same and counted blind. It is
+       * journaled as the `loser`, which latency reads and health leave out: nobody waited for it.
+       */
+      const attempt = async (messages: ModelMessage[], mayRetryEmpty: boolean): Promise<Step<T>> => {
+        const first = request(messages);
+        // Only the main model: the fallback is there because it was slow, and Charles agreed the extra cost for Grok.
+        const hedgeAfterMs = isFallback ? undefined : roleConfig.hedgeAfterMs;
+        if (hedgeAfterMs === undefined) return judge(await first, mayRetryEmpty);
+        const timer = new AbortController();
+        const early = await Promise.race([
+          first,
+          hedgeTimer(hedgeAfterMs, timer.signal).then(() => undefined),
+        ]);
+        // A quick answer leaves no timer behind: it would hold a short script or a stopping worker for 22 s.
+        timer.abort();
+        if (early !== undefined) return judge(early, mayRetryEmpty);
+        // The second request is a call like any other: the cap may refuse it.
+        if (deps.overBudget(trace.purpose) !== undefined) return judge(await first, mayRetryEmpty);
+        const second = request(messages);
+        const winner = await Promise.race([
+          first.then((settled) => ({ settled, other: second })),
+          second.then((settled) => ({ settled, other: first })),
+        ]);
+        const step = judge(winner.settled, mayRetryEmpty, 'winner');
+        if (step.kind !== 'success') return judge(await winner.other, mayRetryEmpty, 'winner');
+        winner.other
+          .then((settled) => {
+            judge(settled, false, 'loser');
+          })
+          // The answer is already given: a journal that fails on the late request must not crash the process.
+          .catch(() => undefined);
+        return step;
+      };
+
+      let messages = built;
+      let transientLeft = deps.config.maxTransientRetries;
+      let hasRepaired = false;
+      // Grok sometimes ends its reasoning with no answer at all (11/11, about one judge call in four on a scenario):
+      // asked once more on the same model. Never Gemini, whose empty answer is a block of the media (see below).
+      let hasRetriedEmpty = ref.provider === 'google';
+      for (;;) {
+        const step = await attempt(messages, !hasRetriedEmpty);
+        if (step.kind === 'success') return ok(step.value);
+        if (step.kind === 'empty') {
+          hasRetriedEmpty = true;
+          continue;
+        }
+        if (step.kind === 'stop') break;
+        const { outcome, isTransient, message, retryAfterMs: asked } = step.classified;
+        if (outcome === 'invalid_output' && !hasRepaired) {
+          hasRepaired = true;
+          messages = [
+            ...messages,
+            {
+              role: 'user',
+              content: `Ta réponse précédente ne respectait pas le format demandé (${message.slice(0, 300)}). Réponds de nouveau, uniquement avec l'objet JSON.`,
+            },
+          ];
+          continue;
+        }
+        // Past its delay, the model is slow right now: asked again, it would cost another full delay before the
+        // fallback (two minutes per call on 12/11). The fallback answers at once.
+        if (outcome === 'timeout') break;
+        if (isTransient && transientLeft > 0) {
+          // A 429 or a 5xx asked again at once is refused again: wait, longer each time, or as the provider says.
+          const delay = retryDelayMs(deps.config.maxTransientRetries - transientLeft, asked);
+          if (delay === undefined) break;
+          transientLeft -= 1;
+          const stopped = deps.overBudget(trace.purpose);
+          if (stopped !== undefined) return err({ code: stopped, attempts });
+          await sleep(delay);
+          continue;
+        }
+        break;
       }
     }
     return err({ code: 'all_models_failed', attempts });
