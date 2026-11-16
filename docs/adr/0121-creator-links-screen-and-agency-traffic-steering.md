@@ -1,6 +1,6 @@
 # 0121. « Mes liens » chez la créatrice, et le pilotage du trafic côté agence : paliers réglables, entonnoir par endroit, récap du jour
 
-Statut : accepted (Charles, 16/11/2026, 2 h 30, « ok 0121 » ; demandes de Charles du 16/11/2026, 2 h 08, 2 h 22 et 2 h 26 ; fil « Imaginer le système Instagram »)
+Statut : accepted (Charles, 16/11/2026, 2 h 30, « ok 0121 » ; le § 7 et les phrases marquées ◆, demandés à 2 h 31, acceptés à 2 h 32, « ok régularité » ; demandes de Charles du 16/11/2026, 2 h 08, 2 h 22 et 2 h 26 ; fil « Imaginer le système Instagram »)
 Date : 2026-11-16
 Précise : l'ADR 0120 (§ 3 : l'endroit d'un lien ; § 4 : le retour sur un Reel ; § 5 : l'entonnoir d'acquisition ; § 6 : les alertes), l'ADR 0080 § 4 (le lien de redirection), l'ADR 0042 (ce que la créatrice voit).
 
@@ -48,7 +48,8 @@ Le connecteur de plateforme lit déjà les nouveaux abonnés et les ventes par j
 
 - Chaque matin, le code calcule pour chaque créatrice des **faits** : le palier d'hier, l'écart à la moyenne des 7 jours, l'endroit qui a le plus monté ou baissé, le rapport entre clics et abonnés face à sa médiane, le nombre de publications et de stories de la veille, le Reel le plus au-dessus et le plus en dessous de la médiane.
 - Le modèle de langage écrit, à partir de ces seuls faits, un **récap** (`traffic_recap`) : trois lignes au plus (ce qui va, ce qui ne va pas, une chose à faire). Un récap qui cite un chiffre qu'il n'a pas reçu est refusé. Une cause est une piste, jamais une certitude.
-- Le récap est lu dans l'écran « Trafic ». Il n'est envoyé nulle part ailleurs avant qu'une ADR le décide, et la créatrice ne le voit pas.
+- Le récap est lu dans l'écran « Trafic », et une notification de l'application prévient l'agence le matin ◆. Il n'est envoyé nulle part ailleurs avant qu'une ADR le décide, et la créatrice ne le voit pas.
+- Quand une baisse des nouveaux abonnés suit un trou de publication (§ 7), le récap le dit, comme une piste. ◆
 - Un jour sans données (lecture en échec) n'a pas de récap : l'écran le dit en ambre.
 - Appel payant : le récap passe par le plafond du jour et le journal des appels, comme les autres.
 
@@ -56,6 +57,12 @@ Le connecteur de plateforme lit déjà les nouveaux abonnés et les ventes par j
 
 - Ambre : nouveaux abonnés sous le premier palier trois jours de suite.
 - Rouge : aucun nouvel abonné sur un jour entier alors que la semaine passée en comptait chaque jour.
+
+### 7. La régularité ◆
+
+- L'écran « Trafic » porte un bloc **« Régularité »** : le nombre de jours depuis le dernier Reel, la story du jour (oui ou non), les dépôts en retard (ADR 0055), les routines faites cette semaine. Les deux premiers viennent de la lecture du compte (ADR 0120 § 2) et comptent ce qui est en ligne, même publié à la main ; sans compte branché, ils sont dits « non lu », jamais supposés.
+- L'agence règle un **délai sans publication**, en jours. Passé ce délai sans aucun Reel, l'agence reçoit une alerte ambre dans les notifications de l'application ; au double, rouge. Sans délai réglé, aucune alerte. Aucune valeur n'est écrite dans le code (comme le § 3).
+- La créatrice ne reçoit pas cette alerte : ses rappels à elle relèvent d'une ADR à venir. L'agence n'est prévenue que si le silence dure.
 
 ## Ce que cette ADR ne décide pas
 
