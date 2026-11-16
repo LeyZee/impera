@@ -191,7 +191,7 @@ export interface VaultStore {
 }
 
 /** A vault media whose small picture may be read: its account and its folder (`null`: the vault's root). */
-export interface VaultPreviewTarget {
+interface VaultPreviewTarget {
   readonly platformAccountId: PlatformAccountId;
   readonly folderRef: string | null;
 }
