@@ -161,7 +161,8 @@ llm_calls   id, creator_id (nullable), role (sense|brain|voice|judge), provider,
             status (les 12 issues de la passerelle : ok, refused, timeout, rate_limited…), is_fallback,
             conversation_id (nullable), draft_id (nullable, sans clé étrangère : l'appel précède le brouillon),
             trace_id (Langfuse), hedge (nullable : winner|loser d'une deuxième demande, OPS-15 ; loser = encore en
-            cours quand la réponse est partie, son coût compte, pas sa latence), created_at. Journal de la passerelle (LlmCallStore), lu au démarrage pour le
+            cours quand la réponse est partie, son coût compte, pas sa latence), error_code (nullable : où et de quel
+            type une sortie a échoué son schéma, « intent:invalid_value », « json », « truncated » ; jamais le contenu), created_at. Journal de la passerelle (LlmCallStore), lu au démarrage pour le
             plafond quotidien.
 ```
 
