@@ -108,6 +108,8 @@ export const CopilotNextMoveSchema = z.strictObject({
   priceMinor: z.number().int().nonnegative().nullable(),
   /** `no_sale` only. */
   block: CopilotSaleBlockSchema.nullable(),
+  /** `no_sale` only: the block's French label, rendered by the server from one list in contracts. */
+  blockLabel: CopilotLabelSchema.nullable().optional(),
 });
 export type CopilotNextMove = z.infer<typeof CopilotNextMoveSchema>;
 

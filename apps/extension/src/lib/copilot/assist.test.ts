@@ -58,6 +58,13 @@ describe('what the agent computed, said to the chatter (ADR 0141, lot a)', () =>
     // Red only for « Ne plus lui écrire » among the blocks (§ 12); an age not confirmed yet is not a doubt.
     expect(moveLines(move('no_sale', 'Ne rien vendre', 'do_not_contact'), []).tone).toBe('red');
     expect(moveLines(move('no_sale', 'Ne rien vendre', 'age_unconfirmed'), []).tone).toBe('amber');
+    // The server's label wins when it sends one; the local words are only the fallback.
+    expect(
+      moveLines(
+        { ...move('no_sale', 'Ne rien vendre', 'cooldown'), blockLabel: 'Offre faite il y a peu' },
+        [],
+      ).why,
+    ).toBe('Offre faite il y a peu');
     expect(
       moveLines(move('hand_over', 'Rendre la main à un humain'), [
         { code: 'handoff', label: 'Il faut un humain' },

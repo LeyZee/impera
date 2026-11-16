@@ -73,7 +73,8 @@ export interface MoveLines {
 /** « Quoi faire » and « pourquoi », one block of two lines (§ 1, § 2, § 12). */
 export function moveLines(move: CopilotNextMove, reasons: CopilotAssist['reasons']): MoveLines {
   const block = move.kind === 'no_sale' && move.block !== null ? move.block : null;
-  const why = [...(block === null ? [] : [BLOCK_WORDS[block]]), ...reasons.map(({ label }) => label)];
+  const blockWords = block === null ? null : (move.blockLabel ?? BLOCK_WORDS[block]);
+  const why = [...(blockWords === null ? [] : [blockWords]), ...reasons.map(({ label }) => label)];
   return {
     what: move.label,
     why: why.length === 0 ? null : why.join(' · '),
