@@ -4,6 +4,7 @@ import {
   type DesireSignal,
   type MediaDescription,
   type ObjectionReplies,
+  type PersonaPractice,
 } from '@impera/contracts';
 import type { Brief, ConversationTurn, LlmFailure, LlmGateway, VoiceInput } from '@impera/llm';
 
@@ -145,6 +146,8 @@ export interface PlaygroundDeps {
   readonly guardSettings: GuardSettings;
   /** False: her answer is shown as one message, as the fan would get it (`behavior.split_messages`). */
   readonly splitMessages?: boolean;
+  /** Her practices (ADR 0143): given to the models only when he speaks of one, as in production. */
+  readonly practices?: readonly PersonaPractice[];
   /** Answers the team corrected earlier: given to the voice as her examples (they take precedence). */
   readonly voiceExamples?: readonly string[];
   readonly timeZone?: string;
@@ -375,6 +378,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           personaSheet,
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
+          ...(deps.practices !== undefined && { practices: deps.practices }),
         },
         {
           history: dated(),
@@ -453,6 +457,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           personaSheet,
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
+          ...(deps.practices !== undefined && { practices: deps.practices }),
         },
         {
           history: dated(),

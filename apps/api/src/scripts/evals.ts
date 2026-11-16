@@ -308,6 +308,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
       personaSheet: persona.personaSheet,
       guardSettings: guardSettingsOf(persona),
       splitMessages: persona.splitMessages,
+      ...(persona.practices !== undefined && { practices: persona.practices }),
     },
     {
       history,

@@ -4,6 +4,7 @@ import {
   type FanFlags,
   type MediaDescription,
   type ObjectionReplies,
+  type PersonaPractice,
 } from '@impera/contracts';
 import type {
   BrainAlert,
@@ -61,6 +62,7 @@ import {
   type OfferBlock,
   type OfferContext,
 } from '../domain/policy';
+import { PRACTICE_RECENT_FAN_TEXTS, practicesBlock, practicesMentioned } from '../domain/practices';
 import {
   paidWaiting,
   permittedScripts,
@@ -85,6 +87,8 @@ export interface ComposerPersona {
   readonly guardSettings: GuardSettings;
   /** False: her answer goes out as one message (`behavior.split_messages`). Absent: as the voice wrote it. */
   readonly splitMessages?: boolean;
+  /** « Ses pratiques et savoir-faire » (ADR 0143): given to the models only on a turn where he speaks of one. */
+  readonly practices?: readonly PersonaPractice[];
 }
 
 /** What the fan receives: her bubbles, or one message when she does not split hers. */
@@ -547,10 +551,21 @@ export async function composeTurn(
     };
   }
   const notes = screenNotes(input.fanNotes);
+  // Her practice, in its own block, only when he speaks of it and never on a follow-up nor in care (ADR 0143 § 3, 16).
+  const practices =
+    input.followUp !== undefined || input.care === true
+      ? ''
+      : practicesBlock(
+          practicesMentioned(persona.practices ?? [], [
+            ...earlierFanTexts(input.history).slice(-PRACTICE_RECENT_FAN_TEXTS),
+            input.fanText,
+          ]),
+          { ageConfirmed: input.sexualization?.ageConfirmed === true },
+        );
   // The voice's notes are the shared ones only: what is the brain's alone never reaches its prompt (ADR 0085 § 9).
   const base = {
     creatorName: persona.creatorName,
-    personaSheet: persona.personaSheet,
+    personaSheet: practices === '' ? persona.personaSheet : `${persona.personaSheet}\n\n${practices}`,
     fanNotes: notes.kept,
     situation: describeMoment(input.situation, input.history),
     history: withTimeNotes(input.history, input.situation.timeZone),
@@ -794,6 +809,8 @@ export async function composeTurn(
   const budget = bubbleBudget(input.history);
   const voiceInput: VoiceInput = {
     ...base,
+    // In care she only supports him: her practice is not his moment (ADR 0143 § 16).
+    ...(care && { personaSheet: persona.personaSheet }),
     brief: voiceBrief,
     maxBubbles: budget,
     ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),

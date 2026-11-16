@@ -141,6 +141,7 @@ function composerFields(persona: PersonaForModels): ComposerPersonaFields {
       personaSheet: persona.personaSheet,
       guardSettings: guardSettingsOf(persona),
       splitMessages: persona.splitMessages,
+      ...(persona.practices !== undefined && { practices: persona.practices }),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,

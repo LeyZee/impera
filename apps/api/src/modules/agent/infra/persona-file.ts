@@ -9,6 +9,7 @@ import {
   StoredPersonaSchema,
   type KycSlot,
   type ObjectionReplies,
+  type PersonaPractice,
   type PersonaSheet,
   type PersonaStrategies,
   type StoredPersona,
@@ -57,6 +58,11 @@ export interface PersonaForModels {
    * in a prompt.
    */
   readonly objectionReplies: ObjectionReplies;
+  /**
+   * « Ses pratiques et savoir-faire » (ADR 0143): never in `personaSheet`; code gives a practice to the models, in its
+   * own block, only on a turn where the fan speaks of it.
+   */
+  readonly practices?: readonly PersonaPractice[];
 }
 
 const isPlaceholder = (value: string): boolean => value.startsWith('<');
@@ -189,6 +195,7 @@ export function personaForModels(
     forbiddenEmojis: rules.emojis_forbidden,
     kycSlots,
     objectionReplies: agent.objection_replies,
+    practices: sheet.practices.filter((practice) => !isPlaceholder(practice.name)),
   };
 }
 
