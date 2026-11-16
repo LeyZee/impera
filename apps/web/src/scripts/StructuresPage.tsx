@@ -7,7 +7,7 @@ import {
   type ScriptStarter,
   type ScriptStructure,
 } from '@impera/contracts';
-import { useBlocker } from '@tanstack/react-router';
+import { Link, useBlocker } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { Queues } from './Queues';
@@ -203,7 +203,12 @@ export function StructuresPage(): JSX.Element {
   return (
     <Page>
       <PageHeader
-        eyebrow="Créatrices"
+        // The way back to the list, as on a creator's sheet: the same eyebrow on every screen of Créatrices (COH-01).
+        eyebrow={
+          <Link to="/creatrices" className="nv-btn nv-btn--plain nv-btn--sm">
+            ← Créatrices
+          </Link>
+        }
         title="Structures de script"
         lead="Les étapes que tes créatrices tournent, leurs cartons et leur couleur. Une structure se tourne carton par carton."
         actions={

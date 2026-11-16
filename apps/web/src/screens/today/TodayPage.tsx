@@ -66,7 +66,7 @@ export function TodayPage({ user }: { user: Me }): JSX.Element {
   });
 
   return (
-    <Page>
+    <Page width="narrow">
       {/* The title and the day say it all: no sentence under them (D-03). */}
       <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" />
       {mine.isError ? (

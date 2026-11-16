@@ -6,8 +6,8 @@
  */
 
 .ps-page {
-  /* Aligned on the large title, like every page: the eye goes down one edge. The stage scrolls, not the page. */
-  max-width: 820px;
+  /* Aligned on the large title, like every page: the eye goes down one edge. The stage scrolls, not the page. The
+     page's column bounds it (COH-02). */
   width: 100%;
   min-width: 0;
   margin: 0;
@@ -30,7 +30,6 @@
 /* Bounded by the sheet and set right above its head, not across the page (CREA-07). */
 .ps-leave {
   align-self: stretch;
-  max-width: 820px;
   margin: 0;
 }
 .ps-head__state:empty {

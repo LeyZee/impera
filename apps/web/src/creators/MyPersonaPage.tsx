@@ -156,14 +156,12 @@ export function MyPersonaPage(): JSX.Element {
   const own = creators.data?.[0];
 
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Persona"
-        lead={
-          'Ta fiche, panneau par panneau\u00a0: qui tu es, ta vie, tes goûts, ta façon de parler, tes relations, l’intime et tes zones interdites. Quelque chose ne te ressemble pas\u00a0? Propose une correction sous le panneau concerné, l’agence met ta fiche à jour.'
-        }
-        actions={<MeNav creator />}
+        lead={'Ta fiche, panneau par panneau. Une erreur\u00a0? Propose une correction sous le panneau.'}
+        tabs={<MeNav creator />}
       />
       <div className="ps-sheet">
         <section className="ps-page">

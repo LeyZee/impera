@@ -35,7 +35,7 @@ export function CreatorTodayPage(): JSX.Element {
   const now = useNow();
   const today = dayOf(now, readerZone());
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" lead="Ta journée, et qui répond à tes fans." />
       <div className="sc-today">
         <HerDay now={now} today={today} />

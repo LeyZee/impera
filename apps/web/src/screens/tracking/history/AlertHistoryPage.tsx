@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { useId, useRef, useState, type JSX, type ReactNode } from 'react';
 
 import { Reader } from '../Reader';
+import { suiviEyebrow } from '../SuiviNav';
 import '../tracking.css';
 
 import {
@@ -35,6 +36,7 @@ import { useNow } from '@/scheduling/useNow';
 import { useAlerts } from '@/settings/alerts/api';
 import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
 
 /** The conversation a line opened, with its creator: the reader needs both, and the list may change under it. */
 interface Opened {
@@ -91,8 +93,9 @@ export function AlertHistoryPage({
   return (
     <Page className={selected === null ? 'tr-page' : 'tr-page tr-is-reading'}>
       <PageHeader
-        eyebrow={creators.length === 1 ? creators[0]?.displayName : undefined}
-        title="Suivi"
+        // The section above, the open tab as the title (recette visuelle 16/11, T2).
+        eyebrow={suiviEyebrow(creators.length === 1 ? creators[0]?.displayName : undefined)}
+        title={screenLabel('/suivi/alertes')}
         lead={
           <>
             Chaque alerte qui a sonné, la plus récente d’abord. Ce qui demande une main est dans{' '}
@@ -102,7 +105,7 @@ export function AlertHistoryPage({
             .
           </>
         }
-        actions={nav}
+        tabs={nav}
       />
       {creatorsQuery.isError ? (
         <Notice

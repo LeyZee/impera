@@ -147,6 +147,9 @@ const picked = (name: string): Promise<void> =>
     expect(screen.getByRole('link', { name: '← Créatrices' })).toBeDefined();
     const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
     expect(within(views).getByRole('link', { name: 'Persona' }).getAttribute('aria-current')).toBe('page');
+    // Her sheets on the header's row of tabs, never among its buttons (recette visuelle 16/11, T1).
+    expect(views.closest('.nv-page__tabs')).not.toBeNull();
+    expect(views.closest('.nv-page__actions')).toBeNull();
   });
 
 /** The card of a creator in the list. */
@@ -266,6 +269,18 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await waitFor(() => {
       expect(other.state.location.search).toEqual({ creatrice: ANNA.id });
     });
+    // A sheet asked by name and refused says why, as any page that is not his (recette visuelle 16/11, PIL-26).
+    expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+
+    // No sheet asked: his first one, without a word.
+    cleanup();
+    await serve([ANNA]);
+    const plain = renderAt(operator, `/creatrices?creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(plain.state.location.search).toEqual({ creatrice: ANNA.id });
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Anna' });
+    expect(screen.queryByText('Cette page n’est pas dans ton espace.')).toBeNull();
   });
 
   it('gives the owner her Profil, where her name is changed, and keeps it from anyone else (ADR 0071)', async () => {

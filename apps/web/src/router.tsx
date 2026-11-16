@@ -88,7 +88,7 @@ import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegr
 import { AppShell } from './shell/AppShell';
 import { ErrorPage } from './shell/ErrorPage';
 import { NotFoundPage } from './shell/NotFoundPage';
-import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf } from './shell/nav';
+import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf, securityPathOf } from './shell/nav';
 
 /** What every screen can read: who is signed in, and how to sign out. Given by `App` once the session is known. */
 export interface RouterContext {
@@ -98,6 +98,9 @@ export interface RouterContext {
 
 /** What the shell says when the route guard sends someone to the first tab of their rail (NAV-21). */
 export const NOT_YOURS = 'Cette page n’est pas dans ton espace.';
+
+/** What the shell says when an address of Entraîner has no screen yet and leads to the Playground (PIL-17). */
+export const NOT_BUILT_YET = 'Cet écran arrive bientôt : tu es sur le Playground.';
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   // A section outside the account's rail sends it to its first tab (ADR 0024); the server's 403 stays the barrier.
@@ -199,8 +202,9 @@ const creators = createRoute({
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
     if (first !== undefined && !sheets.includes(sheetOf(search))) {
-      // A word brought by an earlier guard (Structures sends here) goes on with this second step.
-      const notice = location.state.notice;
+      // A word brought by an earlier guard (Structures sends here) goes on with this second step. A sheet asked by name
+      // and refused says why, as any page that is not one's (PIL-26); no sheet asked lands on the first one, silently.
+      const notice = location.state.notice ?? (search.onglet === undefined ? undefined : NOT_YOURS);
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({
         to: '/creatrices',
@@ -803,10 +807,19 @@ const mePreferences = createRoute({
   },
 });
 
-// Outside the rail (SEC-04): an operator's or a creator's own sessions and backup codes, from the account's menu.
+// Outside the rail (SEC-04): an operator's own sessions and backup codes, from the account's menu. Whoever has them in
+// a section reads them there, and this address leads to it with its query (recette visuelle 16/11, CHA-16, CRE-07,
+// GES-11): one page, not two.
 const accountSecurity = createRoute({
   getParentRoute: () => rootRoute,
   path: ACCOUNT_SECURITY,
+  beforeLoad: ({ context }) => {
+    const own = securityPathOf(context.user);
+    if (own !== ACCOUNT_SECURITY) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: own, search: true, hash: true, replace: true });
+    }
+  },
   component: AccountSecurityPage,
 });
 
@@ -831,14 +844,15 @@ const channelPost = createRoute({
 });
 /*
  * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
- * to an « à venir » page under its header (recette 05/11, PRO-25). Each comes back with its screen.
+ * to an « à venir » page under its header (recette 05/11, PRO-25), and say so on arrival (recette visuelle 16/11,
+ * PIL-17). Each comes back with its screen.
  */
 const corrections = createRoute({
   getParentRoute: () => train,
   path: '/corrections',
   beforeLoad: () => {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/entrainer/playground', replace: true });
+    throw redirect({ to: '/entrainer/playground', replace: true, state: { notice: NOT_BUILT_YET } });
   },
 });
 const tests = createRoute({
@@ -846,7 +860,7 @@ const tests = createRoute({
   path: '/tests',
   beforeLoad: () => {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/entrainer/playground', replace: true });
+    throw redirect({ to: '/entrainer/playground', replace: true, state: { notice: NOT_BUILT_YET } });
   },
 });
 

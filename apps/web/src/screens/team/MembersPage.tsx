@@ -27,6 +27,7 @@ import './team.css';
 import { useCreators } from '@/creators/api';
 import { countryFlag, countryName } from '@/lib/country';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
 
 const TABS: readonly TeamRole[] = ['chatter', 'manager'];
 
@@ -91,14 +92,11 @@ export function MembersPage({
   return (
     <Page className={open === null ? '' : 'tm-is-reading'}>
       <PageHeader
-        title="Équipe"
+        eyebrow="Équipe"
+        title={screenLabel('/equipe/membres')}
         lead={summary ?? 'Les chatteurs et les managers de l’agence, leurs créatrices et leur taux.'}
-        actions={
-          <>
-            <TeamNav />
-            {all.length === 0 ? null : add}
-          </>
-        }
+        tabs={<TeamNav />}
+        {...(all.length === 0 || add === undefined ? {} : { actions: add })}
       />
       {members.isError ? (
         <Unread

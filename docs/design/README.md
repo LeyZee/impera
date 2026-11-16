@@ -171,6 +171,8 @@ Contraste garanti par le test : `ink`, `ink-muted`, `ink-faint` ≥ 4,5:1 sur `v
 
 - **Geist** pour l'interface (`text-body` 15/21 par défaut), titres serrés et gras (`large-title` en 700 pour le titre de page, `title-1`, `title-2` pour les sections). **Playfair Display italique 600** pour le nom seul (`nv-wordmark`, `font-wordmark`). **Instrument Serif italique** pour les états vides (`whisper`). Ni l'une ni l'autre pour un bouton ou un message. **Geist** à chiffres tabulaires (`nv-num`) pour les chiffres, heures et métadonnées ; **Geist Mono** seulement pour une touche de clavier (`nv-kbd`) ou un identifiant technique replié. Plancher : `caption` 11px.
 - Grille de 4px (`space-1` à `space-12`).
+- Deux largeurs de page, posées par `Page width` (apps/web), une seule par section : `page-wide` 1 128px (tableaux, grilles, Suivi, Dashboard, Paie, Équipe, Créatrices) et `page-narrow` 820px (Réglages, Moi, Aujourd'hui, formulaires, lecture). Aucune autre `max-width` sur un conteneur de page.
+- En-tête de page (`PageHeader`) : surtitre = la section (sur toutes ses pages ou sur aucune), titre = l'onglet ouvert ; les sous-onglets sur leur propre ligne (`tabs`), au bord gauche, 16px sous la ligne de lecture, jamais dans `actions`.
 - Tout ce qui se touche est une capsule (`radius-full`) ; bulles `radius-md`, cartes `radius-lg`, Island et dialogues `radius-xl`. Rayons concentriques : rayon intérieur = rayon extérieur − padding.
 
 ## États

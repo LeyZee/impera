@@ -75,6 +75,7 @@ import {
 import { useNow } from '@/scheduling/useNow';
 import { Answers } from '@/screens/planning/Exchanges';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
 
 type Open =
   | { readonly kind: 'add'; readonly start: ShiftStart }
@@ -246,19 +247,16 @@ export function PlanningPage({
   return (
     <Page>
       <PageHeader
-        title="Équipe"
+        eyebrow="Équipe"
+        title={screenLabel('/equipe/planning')}
         lead={
           agency === null
             ? 'Qui chatte sur quel compte, et quand.'
             : `Qui chatte sur quel compte, et quand. À l’heure ${zone === agency ? `de l’agence (${cityOf(agency)})` : `de ${cityOf(zone)}`}.`
         }
-        actions={
-          <>
-            <TeamNav />
-            {/* No button above a page that could not be read: it would only be greyed out (EQ-22). */}
-            {data === undefined ? null : add}
-          </>
-        }
+        tabs={<TeamNav />}
+        // No button above a page that could not be read: it would only be greyed out (EQ-22).
+        {...(data === undefined ? {} : { actions: add })}
       />
       {shown.isError && data === undefined ? (
         <Unread

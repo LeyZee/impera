@@ -7,7 +7,6 @@
 .bk-page {
   width: 100%;
   min-width: 0;
-  max-width: 760px;
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-5);

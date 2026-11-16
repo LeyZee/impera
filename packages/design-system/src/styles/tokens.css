@@ -210,6 +210,11 @@
   --nv-space-10: 40px;
   --nv-space-12: 48px;
 
+  /* Page widths: the two columns a screen may have, one per section (recette visuelle 16/11, COH-02). Wide holds
+     tables, grids, Suivi and the Dashboard; narrow holds settings, forms and reading. */
+  --nv-page-wide: 1128px;
+  --nv-page-narrow: 820px;
+
   /* Radii: everything you touch is a capsule */
   --nv-radius-xs: 8px;
   --nv-radius-sm: 12px;

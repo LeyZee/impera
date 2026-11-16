@@ -119,7 +119,7 @@ export function ContentPage({
     );
 
   return (
-    <Page className="ct-page">
+    <Page className="ct-page" width="narrow">
       <PageHeader title="Contenu" lead="Ce qu’on te demande, et ce que tu envoies." />
       {content.isError ? (
         <ServerSilent

@@ -280,9 +280,9 @@ export function CreatorsPage({
   ];
 
   const lead = isOwner
-    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, contenu, canal Telegram, heures d’activité, accès, pourcentage et profil.'
+    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche et tous ses réglages.'
     : sheets.includes('agenda')
-      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes, ses scripts et son contenu.'
+      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour sa fiche.'
       : 'Les créatrices qui te sont confiées. Ouvre-en une pour sa persona.';
 
   return (
@@ -323,7 +323,7 @@ export function CreatorsPage({
             </Link>
           }
           title={current.displayName}
-          actions={
+          tabs={
             switchShown ? (
               <SubNav
                 label="Fiche de la créatrice"

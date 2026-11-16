@@ -53,6 +53,7 @@ import { clockAt, dayMonth, dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { PeriodArrows, PeriodHeading } from '@/screens/pay/parts';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
 
 /** The correction panel the agency opens on a validated report, for its shift. */
 interface Correcting {
@@ -212,13 +213,10 @@ export function ReportsPage({
   return (
     <Page>
       <PageHeader
-        title="Équipe"
+        eyebrow="Équipe"
+        title={screenLabel('/equipe/rapports')}
         lead="Les rapports de fin de shift : valide-les en lot, renvoie-en un avec un mot."
-        actions={
-          <>
-            <TeamNav />
-          </>
-        }
+        tabs={<TeamNav />}
       />
       <div className="rp-board">
         <ToValidate

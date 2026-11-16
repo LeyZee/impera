@@ -161,8 +161,8 @@ export function LockIcon(): JSX.Element {
 }
 
 /**
- * A page's title when it shows one period (Quinzaine, Primes et malus, Objectifs): the period itself, the screen's main
- * fact. Its arrows go in the page's actions, out of the heading, so the heading's name is the period alone.
+ * A page's title when it shows one period: the period itself, the screen's main fact. Its arrows go in the page's
+ * actions, out of the heading, so the heading's name is the period alone.
  */
 export function PeriodHeading({ period }: { period: PayPeriod }): JSX.Element {
   return (
@@ -172,15 +172,21 @@ export function PeriodHeading({ period }: { period: PayPeriod }): JSX.Element {
   );
 }
 
-/** The previous and next period around `period`; never past the one under way. */
+/**
+ * The previous and next period around `period`; never past the one under way. With `named`, the period itself between
+ * them, as Planning's week sits between its arrows: a screen that shows one period (Quinzaine, Primes et malus,
+ * Objectifs) says it here, its title being the tab's name (recette visuelle 16/11, GES-03).
+ */
 export function PeriodArrows({
   period,
   current,
   onPeriod,
+  named = false,
 }: {
   period: PayPeriod;
   current: PayPeriod | null;
   onPeriod: (period: PayPeriod) => void;
+  named?: boolean;
 }): JSX.Element {
   return (
     <span className="sc-week" role="group" aria-label="Quinzaine">
@@ -198,6 +204,11 @@ export function PeriodArrows({
           <path d="m10 3.5-4.5 4.5 4.5 4.5" />
         </svg>
       </button>
+      {named ? (
+        <p className="sc-week__label nv-swap" key={period} aria-live="polite">
+          {periodTitle(period)}
+        </p>
+      ) : null}
       <button
         type="button"
         className="sc-arrow"

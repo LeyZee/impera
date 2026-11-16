@@ -339,7 +339,7 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
 export function NotificationsPage({ creator = false }: { creator?: boolean }): JSX.Element {
   const preferences = useQuery(preferencesQuery);
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow={<OffRailBack />}
         title="Notifications"

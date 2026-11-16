@@ -109,8 +109,8 @@ export function InvoicesPage({
       <PageHeader
         eyebrow="Paie"
         title="Factures"
-        lead="Les factures et avoirs émis au nom de chaque membre : les contestations à trancher, les échéances, puis chaque quinzaine."
-        actions={<PayNav user={user} />}
+        lead="Les factures et avoirs émis au nom de chaque membre : contestations, échéances, quinzaines."
+        tabs={<PayNav user={user} />}
       />
       <div className="py-board">
         {timeZone === null ? null : (

@@ -35,7 +35,6 @@ import {
   LockIcon,
   PayoutHoldLine,
   PeriodArrows,
-  PeriodHeading,
   Swatch,
   Unreachable,
 } from './parts';
@@ -326,12 +325,14 @@ function PeriodView({
   const head = (
     <PageHeader
       eyebrow="Paie"
-      title={period === null ? 'Quinzaine' : <PeriodHeading period={period} />}
+      title="Quinzaine"
       lead={leadOf(data, blocked, owner)}
+      tabs={<PayNav user={user} />}
       actions={
         <>
-          {period === null ? null : <PeriodArrows period={period} current={current} onPeriod={onPeriod} />}
-          <PayNav user={user} />
+          {period === null ? null : (
+            <PeriodArrows period={period} current={current} onPeriod={onPeriod} named />
+          )}
           {reread !== undefined ? (
             <button
               type="button"

@@ -906,12 +906,22 @@
   margin-inline: auto;
 }
 .nv-page {
+  /* The page's column (COH-02): wide unless the screen says narrow, one width per section. */
+  --_page-width: var(--nv-page-wide);
   min-height: 100%;
   display: grid;
   /* minmax(0, 1fr): a header wider than a phone (the Réglages sub-nav) scrolls inside itself, never the page. */
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   gap: 28px;
+}
+.nv-page[data-width='narrow'] {
+  --_page-width: var(--nv-page-narrow);
+}
+/* Every block keeps to the column, on the title's left edge; the header too, so its tabs never pass the column's
+   right edge. A screen sets no width of its own on a page-level block (recette visuelle 16/11, COH-02). */
+.nv-page > * {
+  max-width: var(--_page-width);
 }
 /* A screen that holds its own scroller (the Playground thread, composer pinned below) fills the stage instead. */
 .nv-page--fill {
@@ -935,16 +945,31 @@
     filter: blur(4px);
   }
 }
+/* One template for every header (recette visuelle 16/11, COH-01): the title block alone on the first row, the buttons
+   at its right, bottom-aligned; the section's tabs on a row of their own, left edge, 16 px under the lead. The title
+   never moves for what sits beside or under it. */
 .nv-page__head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
   padding-top: 18px;
 }
 .nv-page__title {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
   min-width: 0;
+}
+/* The eyebrow's line is kept on every page, written or not: the title stands at the same height on every screen,
+   with or without a section above it (CHA-10, CRE-09). */
+.nv-page__title:not(:has(> .nv-eyebrow)) {
+  padding-top: 18px;
+}
+/* A section with tabs keeps two lines for its lead, written in one or two: the tabs stand at the same height on every
+   tab of it, and do not jump under the pointer that chose one (COH-01, PIL-13). A lead is one or two lines on a phone,
+   never three. A header whose tabs all go without a lead (a creator's sheet, named by its title) keeps no empty lines. */
+.nv-page__head[data-tabs] > .nv-page__title:has(> .nv-page__lead) {
+  min-height: calc(18px + 2px + var(--nv-text-large-title-leading) + 6px + 2 * 21px);
 }
 /* Large title, bold and left-aligned: the one thing that says where you are. */
 .nv-page__title h1 {
@@ -963,12 +988,23 @@
   color: var(--nv-ink-muted);
 }
 .nv-page__actions {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
   max-width: 100%;
   min-width: 0;
+}
+.nv-page__tabs {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  min-width: 0;
+  margin-top: 16px;
 }
 /* A quiet label above a title or a block: sentence case, never shouted in capitals. */
 .nv-eyebrow {
@@ -979,9 +1015,11 @@
   color: var(--nv-ink-faint);
 }
 /* A way back in the eyebrow (« ← Créatrices », « ← Moi › Préférences ») is a plain button: its padding is pulled back so
-   its text starts on the same line as the title below, the padding staying as the pressed and hovered surface. */
+   its text starts on the same line as the title below, the padding staying as the pressed and hovered surface. Its
+   34 px are pulled back too, to the eyebrow's 18 px line: the title stands where every page has it (COH-01). */
 .nv-eyebrow > .nv-btn--plain {
   margin-inline-start: calc(-1 * var(--nv-space-4));
+  margin-block: calc((18px - 34px) / 2);
 }
 
 /* ── Panels: content plates, not glass ── */
@@ -1423,6 +1461,19 @@
     font-size: 30px;
     line-height: 36px;
   }
+  /* A phone: the title alone, the tabs right under it at a fixed place, the buttons after them. */
+  .nv-page__head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .nv-page__actions {
+    grid-column: 1;
+    grid-row: 3;
+    justify-content: flex-start;
+    margin-top: 16px;
+  }
+  .nv-page__head[data-tabs] > .nv-page__title:has(> .nv-page__lead) {
+    min-height: calc(18px + 2px + 36px + 6px + 2 * 21px);
+  }
   .nv-subnav {
     max-width: 100%;
     overflow-x: auto;
@@ -1674,7 +1725,6 @@
   display: grid;
   align-content: start;
   gap: var(--nv-space-4);
-  max-width: 960px;
 }
 .nv-help-install__cards {
   display: grid;
@@ -1838,7 +1888,6 @@
   display: grid;
   align-content: start;
   gap: var(--nv-space-4);
-  max-width: 720px;
 }
 .nv-notif__device {
   display: grid;

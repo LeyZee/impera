@@ -47,6 +47,7 @@ import { SignInAgain } from '@/settings/services/PasswordPrompt';
 import { isForbidden, type ShownError } from '@/settings/services/api';
 import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
 import '@/settings/services/services.css';
 import '@/settings/sales-feed/sales-feed.css';
 import './team.css';
@@ -104,9 +105,10 @@ export function RevealPage({
 
   const header = (
     <PageHeader
-      title="Équipe"
-      lead={`Chaque compte de l’équipe ${name} se relie à un membre, à l’agent ou à personne. Rien n’est relié sans confirmation.`}
-      actions={<TeamNav />}
+      eyebrow="Équipe"
+      title={screenLabel('/equipe/reveal')}
+      lead={`Relie chaque compte de l’équipe ${name} à un membre, à l’agent ou à personne.`}
+      tabs={<TeamNav />}
     />
   );
 

@@ -13,7 +13,7 @@ import { useSchedulingSettings } from '@/reports/api';
 import '@/reports/reports.css';
 import '@/scheduling/scheduling.css';
 import '@/screens/team/team.css';
-import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Page, PageHeader, Panel, type PageWidth } from '@/shell/layout';
 
 /** What the reader opened on a document: his answer, or its detail. */
 type Opened =
@@ -27,12 +27,16 @@ type Opened =
  */
 export function MyInvoicesPage({
   eyebrow = 'Commissions',
-  actions = <CommissionsNav />,
+  tabs = <CommissionsNav />,
+  width = 'wide',
   memberId,
 }: {
   /** Commissions for a chatter; Moi for a manager, whose commissions are there (ADR 0024). */
   eyebrow?: string;
-  actions?: ReactNode;
+  /** The section's tabs, in the header's row of tabs. */
+  tabs?: ReactNode;
+  /** The section's column: Commissions' wide one, or Moi's narrow one (COH-02). */
+  width?: PageWidth;
   /**
    * A manager's own member: an active manager reads every document of the agency, so his own list asks for his alone.
    * A chatter reads only his, without it.
@@ -46,12 +50,12 @@ export function MyInvoicesPage({
   const [opened, setOpened] = useState<Opened | null>(null);
 
   return (
-    <Page>
+    <Page width={width}>
       <PageHeader
         eyebrow={eyebrow}
         title="Factures"
-        lead="Les factures que l’agence émet en ton nom, et les avoirs qui les corrigent. Tu acceptes ou contestes chacune avant la fin de son délai."
-        actions={actions}
+        lead="Factures et avoirs émis en ton nom : accepte ou conteste chacun avant son délai."
+        tabs={tabs}
       />
       <div className="py-board">
         <Panel className="nv-enter">

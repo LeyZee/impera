@@ -269,7 +269,9 @@ describe('CommissionsPage', () => {
       expect(text(hero)).toContain('≈ 20 466 FCFA, avant frais WorldRemit');
     });
     expect(text(hero)).toContain('L’agence valide, puis le versement suit.');
-    expect(text(document.querySelector('.nv-eyebrow'))).toBe('Mon argent');
+    // The section above, the tab as the title, as on Factures (recette visuelle 16/11, CHA-02).
+    expect(text(document.querySelector('.nv-eyebrow'))).toBe('Commissions');
+    expect(screen.getByRole('heading', { level: 1, name: 'Relevés' })).toBeTruthy();
 
     expect(text(panel('Le parcours de ton argent'))).toContain('Ta commission');
     // One amount, one name: the path ends on the hero's words.

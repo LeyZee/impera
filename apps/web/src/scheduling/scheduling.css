@@ -1018,7 +1018,6 @@ button.sc-duty__one:active {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  max-width: 720px;
 }
 .sc-hero {
   display: flex;
@@ -1180,7 +1179,6 @@ button.sc-duty__one:active {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-5);
-  max-width: 820px;
 }
 .sc-mine__sum {
   margin: 0;

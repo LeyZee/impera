@@ -25,12 +25,13 @@ export function MyProfilePage({ user }: { user: Me }): JSX.Element {
   const manager = user.teamScope === 'agency';
 
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
-        title={me?.displayName ?? 'Profil'}
+        // The tab's name, as on every tab of Moi; his own name is the card's (recette visuelle 16/11, CHA-12).
+        title="Profil"
         lead="Ce que l’agence sait de toi pour ton travail : tes créatrices, ton taux, ton fuseau."
-        actions={<MeNav manager={manager} trophies={playsTheGame(user)} />}
+        tabs={<MeNav manager={manager} trophies={playsTheGame(user)} />}
       />
       <div className="me-profile">
         {me !== null ? (
@@ -68,7 +69,7 @@ function Facts({ member }: { member: TeamMember }): JSX.Element {
   const { commission } = member;
 
   return (
-    <Panel className="nv-enter" title="Profil">
+    <Panel className="nv-enter" title={member.displayName}>
       <dl className="tm-facts">
         <div>
           <dt>Rôle</dt>

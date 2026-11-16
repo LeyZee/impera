@@ -13,6 +13,7 @@ import {
 } from 'react';
 
 import { Reader } from './Reader';
+import { suiviEyebrow } from './SuiviNav';
 import { fetchConversations, fetchSendingStop, todosAcrossQuery } from './api';
 import { todoLabel } from './reader-model';
 import {
@@ -41,6 +42,7 @@ import { useCreators } from '@/creators/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
 
 const REFRESH_MS = 30_000;
 
@@ -176,15 +178,18 @@ export function TrackingPage({
         todos.find((t) => t.conversationId === selected)?.creatorId ??
         null);
 
+  const oneName = creators.length === 1 ? creators[0]?.displayName : undefined;
   return (
     <Page className={selected === null ? 'tr-page' : 'tr-page tr-is-reading'}>
       <PageHeader
-        eyebrow={creators.length === 1 ? creators[0]?.displayName : undefined}
-        title="Suivi"
+        // With its tabs, the section above and the open tab as the title (recette visuelle 16/11, T2); a chatter's Suivi
+        // is one screen, named by the section itself.
+        eyebrow={nav === undefined ? oneName : suiviEyebrow(oneName)}
+        title={nav === undefined ? 'Suivi' : screenLabel('/suivi')}
         // Only what the mode means: the panels say the rest themselves (D-03).
         // Off shift or away, he decides nothing: what the mode asks of him is not his to read (EQ-13).
         lead={mode === null || offShift !== undefined ? undefined : MODE_MEANINGS[mode]}
-        actions={nav}
+        tabs={nav}
       />
       {offShift?.(lines.length > 0)}
       {stoppedNames.length === 0 ? null : (

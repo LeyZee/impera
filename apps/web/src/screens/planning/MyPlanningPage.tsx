@@ -161,7 +161,7 @@ export function MyPlanningPage({
   });
 
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         title="Planning"
         lead={

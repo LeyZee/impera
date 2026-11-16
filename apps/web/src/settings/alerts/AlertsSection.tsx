@@ -128,7 +128,7 @@ export function AlertsSection(): JSX.Element {
       <header className="nv-plate ps-head nv-enter">
         <div className="al-head">
           <div className="al-head__text">
-            <h2 className="ps-title">Alertes</h2>
+            {/* The page's title says « Alertes » already (recette visuelle 16/11, GES-03): no second one here. */}
             <p className="ps-lead">
               Une alerte surveille ce que les fans écrivent. Quand elle sonne, l’équipe est prévenue ; si tu
               le choisis, l’agent se met en pause sur ce fan et passe la main.

@@ -107,10 +107,11 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   // The period is the hero's own first word: said twice above the fold, it was read as two periods (D-03).
   const head = (): JSX.Element => (
     <PageHeader
-      eyebrow="Mon argent"
-      title="Commissions"
+      // The section above, the open tab as the title, as on Factures (recette visuelle 16/11, CHA-02).
+      eyebrow="Commissions"
+      title="Relevés"
       lead="Ce que tu as gagné sur la quinzaine, et comment ta commission se construit."
-      actions={<CommissionsNav />}
+      tabs={<CommissionsNav />}
     />
   );
 
