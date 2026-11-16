@@ -1,4 +1,4 @@
-# 16/11/2026 — Vitrine : correctifs de la recette (PR A)
+# 2026-11-16 — Vitrine : correctifs de la recette (PR A)
 
 - **Tâche** : PROPOSED-trophy-case (suite, recette du 16/11).
 - **Fait** : CHT-18 (silhouette pendant la lecture, message « Le serveur ne répond pas » et « Réessayer » au lieu d'une page blanche, chatteur et créatrice) ; CHT-19 (entrée en cascade une fois par session, drapeau `sessionStorage` dans un try/catch, jamais dépensé par la vue de l'agence) ; CHT-20 (la fenêtre `Dialog` prend elle-même le focus quand elle n'a que sa croix, Échap la ferme, Tab reste dedans) ; CRE-14, partie écran (étagère du téléphone en rangées pleines de trois, « Voir tout » seulement au-delà d'une rangée cachée, cible de 44 px).
