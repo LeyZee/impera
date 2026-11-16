@@ -1,6 +1,7 @@
-import { normalise, normaliseWords, type SocialAccountUsage } from '@impera/contracts';
+import { normalise, normaliseWords, unmask, type SocialAccountUsage } from '@impera/contracts';
 
 import { checkVoiceOutput, type GuardSettings, type GuardViolation } from './guards';
+import { fixesSomething } from './places';
 
 /**
  * « Ses comptes » and what she offers around her practice (ADR 0143 § C, D, F, bounds 18 to 23): code decides, never
@@ -80,15 +81,47 @@ export function accountDecision(input: {
   return { kind: 'give', account, orient };
 }
 
-const nameReading = (text: string): string => ` ${normalise(text).replace(/[^\p{L}\p{N}._-]+/gu, ' ')} `;
+/** Her answer split into words, each without the punctuation at its edges: « nora_demo. » reads « nora_demo ». */
+const nameWords = (text: string): string[] =>
+  normalise(text)
+    .split(/[^\p{L}\p{N}._-]+/u)
+    .map((word) => word.replace(/^[._-]+|[._-]+$/gu, ''))
+    .filter((word) => word !== '');
+
+/** Letters and digits only: « nora_demo », « nora-demo » and « nora demo » all read « norademo ». */
+const compact = (text: string): string => normalise(text).replace(/[^\p{L}\p{N}]+/gu, '');
+
+/** A name this short is only matched as a whole word: glued from her words, it would block on chance. */
+const COMPACT_MIN = 5;
+/** How many neighbouring words one name may be spread over: « nora . demo . 92 ». */
+const NAME_WINDOW = 4;
+
+/** One of her names, as written, or spread over neighbouring words without its separators (bound 19). */
+function nameIn(words: readonly string[], name: string): boolean {
+  const whole = normalise(name).replace(/^@+/u, '');
+  if (words.some((word) => word.replace(/^@+/u, '') === whole)) return true;
+  const target = compact(name);
+  if (target.length < COMPACT_MIN) return false;
+  const pieces = words.map(compact);
+  return pieces.some((_, start) => {
+    let glued = '';
+    for (const piece of pieces.slice(start, start + NAME_WINDOW)) {
+      glued += piece;
+      if (glued === target) return true;
+      if (glued.length >= target.length) return false;
+    }
+    return false;
+  });
+}
 
 /**
- * Every user name of hers in a text (bound 19), as whole words, case, accents, look-alikes and a leading « @ » aside:
- * the guard reads it against the one, if any, code allowed at this turn.
+ * Every user name of hers in a text (bound 19): as a whole word, case, accents, look-alikes, a leading « @ » and the
+ * punctuation around it aside, or spread over neighbouring words (« nora demo », « norademo », « nora-demo »), read
+ * as written and with digits read as letters. The guard reads it against the one, if any, code allowed at this turn.
  */
 export function usernamesIn(text: string, usernames: readonly string[]): string[] {
-  const read = nameReading(text);
-  return usernames.filter((name) => name !== '' && read.includes(` ${normalise(name)} `));
+  const readings = [nameWords(text), nameWords(unmask(text))];
+  return usernames.filter((name) => name !== '' && readings.some((words) => nameIn(words, name)));
 }
 
 // The words that name each platform in her answer: on the turn code gives an account, only its own pass (bound 19).
@@ -142,21 +175,45 @@ export function accountViolations(
   }));
 }
 
-// Her answer opens on a yes (bound 29): « oui », « ok », « avec plaisir », « carrément », « quand tu veux ».
-const MEETING_YES =
-  /^(?:\p{Extended_Pictographic}|\s|[.!,…])*(?:oui|ouais|ouiii+|ok|okay|d'accord|dac|carrement|avec plaisir|volontiers|grave|bien sur|pourquoi pas|quand tu veux|ca marche|vas ?y|go)\b/u;
+// Her answer says yes to a meeting (bound 29): at the head of a bubble, past an interjection (« oh oui carrément »,
+// « mais oui bb »), or anywhere in so many words (« avec grand plaisir », « j'adorerais », « on se cale ça »).
+const INTERJECTION = '(?:(?:oh|ah|oh la|mais|bah|ben|bon|hmm+|hum|alors|euh|eh|oui) )*';
+const YES_AT_HEAD = new RegExp(
+  `^${INTERJECTION}(?:oui|ouais|ouii+|ok|okay|d accord|dac|carrement|bien sur|pourquoi pas|ca marche|vas y|go|grave|evidemment|yes)\\b`,
+  'u',
+);
+const YES_ANYWHERE =
+  /\b(?:yes|evidemment|avec (?:grand |un grand )?plaisir|volontiers|j adorerais|je dis pas non|je ne dis pas non|on se cale|on s organise|on fixe|quand tu veux)\b/u;
+
+/** One bubble read for a yes: words only, apostrophes and punctuation as spaces. */
+const yesReading = (bubble: string): string =>
+  normalise(bubble)
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 
 /**
- * Bound 29: when he asks to see her for real, an answer that says yes blocks, as a promise of a meeting, whatever
- * follows; « trop tôt », « pas encore » and a soft no pass. Read on the first bubble, where a yes is said.
+ * Bound 29: when he asks to see her for real, a bubble that says yes blocks, as a promise of a meeting, whatever
+ * follows; « trop tôt », « pas encore », a soft no and the daydream in the conditional (« un jour peut-être ») pass.
+ * Every bubble is read.
  */
 export function meetingYes(bubbles: readonly string[]): GuardViolation[] {
-  const first = bubbles[0];
-  if (first === undefined) return [];
-  const match = MEETING_YES.exec(normalise(first).trim())?.[0];
-  return match === undefined
+  for (const [bubbleIndex, bubble] of bubbles.entries()) {
+    const read = yesReading(bubble);
+    const match = YES_AT_HEAD.exec(read)?.[0] ?? YES_ANYWHERE.exec(read)?.[0];
+    if (match !== undefined) return [{ code: 'meeting_promise', severity: 'blocking', bubbleIndex, match }];
+  }
+  return [];
+}
+
+/**
+ * Bounds 22 and 29: on a turn where he asks to meet or she points him to her practice, a bubble that fixes something
+ * (a date, a time, a place, a city, a price) blocks and is rewritten; the voice is told so too, but code holds it.
+ */
+export function fixedSomething(bubbles: readonly string[]): GuardViolation[] {
+  const fixed = fixesSomething(bubbles);
+  return fixed === null
     ? []
-    : [{ code: 'meeting_promise', severity: 'blocking', bubbleIndex: 0, match }];
+    : [{ code: 'meeting_promise', severity: 'blocking', bubbleIndex: fixed.index, match: fixed.match }];
 }
 
 /**

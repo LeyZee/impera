@@ -181,6 +181,55 @@ describe('meetingAskOnly (ADR 0143 § 15, bounds 24 to 28)', () => {
   });
 });
 
+describe('the plain ask the exception needs (ADR 0143, bounds 25 to 27, relecture Sécurité 16/11)', () => {
+  const words = ['rencontre', 'se voir', 'rdv', 'tissu aérien'];
+  const practice = PersonaPracticeSchema.parse({
+    name: 'Danse aérienne',
+    terms: ['tissu aérien'],
+    level: null,
+    how_she_talks: null,
+    vocabulary: null,
+    what_she_respects: null,
+    anecdotes: null,
+    offers: null,
+    answers: null,
+    never_says: null,
+  });
+
+  it('pauses on a place, a city, a capital, a preposition of place or a number', () => {
+    for (const text of [
+      'on peut se voir a Lyon ?',
+      'je monte a Marseille on peut se voir',
+      'on peut se voir, t’es de lyon non ?',
+      'on peut se voir vers Bellecour ?',
+      'on peut se voir au parc ?',
+      'rdv le 12 ?',
+      'on peut se voir dans ton coin ?',
+      'on peut se voir près de la fac ?',
+    ])
+      expect(meetingAskOnly(text, words, []), text).toBe(false);
+    expect(practiceAskOnly('tu fais du tissu aérien à Lyon ?', words, [practice])).toBe(false);
+    expect(practiceAskOnly('tu fais du tissu aérien dans quelle salle ?', words, [practice])).toBe(false);
+  });
+
+  it('pauses on pressure or money', () => {
+    for (const text of [
+      'on peut se voir ? sinon je te retrouve',
+      'on peut se voir ou sinon tant pis',
+      'je paie bien si on peut se voir',
+      'combien pour se voir ?',
+      'on peut se voir, je viens te chercher',
+    ])
+      expect(meetingAskOnly(text, words, []), text).toBe(false);
+    expect(practiceAskOnly('combien coûte un cours de tissu aérien ?', words, [practice])).toBe(false);
+  });
+
+  it('keeps the closed phrases that name no place', () => {
+    expect(meetingAskOnly('on pourra se voir en vrai un jour ?', words, [])).toBe(true);
+    expect(meetingAskOnly('tu voudrais qu’on se voir en personne à l’occasion ?', words, [])).toBe(true);
+  });
+});
+
 describe('practiceAskOnly (ADR 0143 § 10, 15, bounds 24 to 27)', () => {
   // A fictional practice (ADR 0010).
   const practice = PersonaPracticeSchema.parse({

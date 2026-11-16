@@ -23,6 +23,8 @@ import {
   accountAsked,
   accountDecision,
   meetingYes,
+  fixedSomething,
+  withoutAllowedAccount,
   wantsToTry,
   withAccountGuard,
   type AccountCuts,
@@ -884,6 +886,11 @@ export async function composeTurn(
         input.accounts?.usernames ?? [],
       ),
       ...(meetingAsked ? meetingYes(written) : []),
+      // Nothing fixed on these turns (bounds 22, 29): read without the account code gives, whose name may hold digits.
+      ...(meetingAsked ||
+      (account?.kind === 'give' && account.decision.kind === 'give' && account.decision.orient)
+        ? fixedSomething(withoutAllowedAccount(written, allowed))
+        : []),
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       ...(care ? checkCare(written) : []),
       ...(customOrder === undefined ? [] : checkNoCommitment(written)),

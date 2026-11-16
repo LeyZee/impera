@@ -51,6 +51,8 @@ describe('safetySigns (recette AGT-01)', () => {
     'j’ai envie de me foutre en l’air',
     'je pense à m’ouvrir les veines',
     'j’ai des idées noires ce soir',
+    'on se voit ou je me tue',
+    'réponds-moi sinon je me fais du mal',
   ])('reads self-harm in « %s »', (text) => {
     expect(safetySigns(text)).toEqual(['self_harm']);
   });

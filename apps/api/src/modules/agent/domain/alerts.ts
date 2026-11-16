@@ -9,6 +9,7 @@ import {
   type SystemAlertCode,
 } from '@impera/contracts';
 
+import { notPlainAsk } from './places';
 import { practicesMentioned } from './practices';
 
 /**
@@ -164,10 +165,6 @@ const MEETING_ASK =
 // The words of her persona that only say « meet »: the exception holds for these, never for another (§ 24).
 const MEETING_WORD =
   /^(?:rencontre|rencontrer|se rencontrer|rencontrons nous|se voir|on se voit|se retrouver|rdv|rendez vous|irl|en vrai|en personne|voir en vrai|boire un verre|un verre|un cafe)$/u;
-// A place, a date, an address, or he hints he knows where she is: always a pause and an alert (§ 27).
-const PLACE_OR_DATE =
-  /\b(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|apres demain|ce soir|cette nuit|ce week end|ce weekend|cette semaine|la semaine prochaine|janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|\d{1,2} ?h|\d{1,2} ?[/.-] ?\d{1,2}|\d{5}|rue|avenue|boulevard|bd|place|gare|aeroport|hotel|bar|restaurant|resto|metro|station|parking|adresse|chez (?:toi|moi|lui)|ta ville|ton quartier|ton immeuble|ton travail|ton taf|ta fac|ta salle|ton studio|j habite|je suis a|je serai a|je passe a|je viens a|je descends a|pres de chez|a cote de chez|je sais ou|je t ai (?:vue|croisee|apercue|reconnue)|je te reconnais|je te trouverai|code postal)\b/u;
-const DATE = /\b\d{1,2} ?[/.-] ?\d{1,2}\b/u;
 /** He already asked her as many times before: one more ask pauses again (§ 28). */
 export const MEETING_INSISTENCE_MAX = 2;
 
@@ -176,8 +173,9 @@ const words = (text: string): string => spaced(normalise(text)).replace(/'/g, ' 
 /**
  * Code knows this message is a plain meeting ask and answers it itself, without the pause her word would set
  * (ADR 0143 § 14, 15 and 24 to 28): every word of her persona he set off says « meet », he asks in so many words, he
- * names no place, date or address, and he has not asked `MEETING_INSISTENCE_MAX` times before. Any doubt: false, and
- * the pause holds. The caller checks the other guards first (age, care, minor).
+ * names no place, date, time or money and does not press her (`notPlainAsk`), and he has not asked
+ * `MEETING_INSISTENCE_MAX` times before. Any doubt: false, and the pause holds. The caller checks the other guards
+ * first (age, care, minor).
  */
 export function meetingAskOnly(
   text: string,
@@ -188,7 +186,7 @@ export function meetingAskOnly(
   if (matched.length === 0) return false;
   if (!matched.every((keyword) => MEETING_WORD.test(alertKeywordKey(keyword)))) return false;
   const read = words(text);
-  if (!MEETING_ASK.test(read) || PLACE_OR_DATE.test(read) || DATE.test(normalise(text))) return false;
+  if (!MEETING_ASK.test(read) || notPlainAsk(text)) return false;
   const asked = earlierFanTexts.filter((earlier) => MEETING_ASK.test(words(earlier))).length;
   return asked < MEETING_INSISTENCE_MAX;
 }
@@ -196,8 +194,8 @@ export function meetingAskOnly(
 /**
  * Code knows this message is about her practice and answers it itself, without the pause her word would set
  * (ADR 0143 § 10, 15 and 24 to 27): every word of her persona he set off is the name or a word of one of her practices,
- * he names that practice, and he names no place, date or address. Any doubt: false, and the pause holds. The caller
- * checks the other guards first (age, care, minor).
+ * he names that practice, and his message is a plain ask (`notPlainAsk`). Any doubt: false, and the pause holds. The
+ * caller checks the other guards first (age, care, minor).
  */
 export function practiceAskOnly(
   text: string,
@@ -215,5 +213,5 @@ export function practiceAskOnly(
   );
   if (!matched.every((keyword) => practiceWords.has(alertKeywordKey(keyword)))) return false;
   const read = words(text);
-  return !MEETING_ASK.test(read) && !PLACE_OR_DATE.test(read) && !DATE.test(normalise(text));
+  return !MEETING_ASK.test(read) && !notPlainAsk(text);
 }

@@ -9,7 +9,7 @@ import {
 import { eq, schema, withTenant, withTenantMember, type Database, type Transaction } from '@impera/db';
 
 import { SocialAccountsForbidden } from '../../domain/errors';
-import { sharingChanges, type SocialAccountStore } from '../../domain/social-accounts';
+import { sharingChanges, sharedAccountEdits, type SocialAccountStore } from '../../domain/social-accounts';
 
 const t = schema.socialAccounts;
 
@@ -82,6 +82,16 @@ export function createDrizzleSocialAccountStore(db: Database): SocialAccountStor
             entity: 'social_account',
             entityId: change.id,
             details: { creatorId, usage: change.usage },
+          });
+        // A given account renamed, moved or put to another use under the same id: what the agent gives changed (§ 20).
+        for (const edit of sharedAccountEdits(before, after))
+          await tx.insert(schema.auditLog).values({
+            id: newId(AuditEntryIdSchema),
+            userId,
+            action: 'social_account.shared_changed',
+            entity: 'social_account',
+            entityId: edit.id,
+            details: { creatorId, usage: edit.usage, fields: edit.fields },
           });
         return after;
       }),

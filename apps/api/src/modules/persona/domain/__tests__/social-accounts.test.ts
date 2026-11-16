@@ -5,7 +5,7 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { sharingChanges } from '../social-accounts';
+import { sharedAccountEdits, sharingChanges } from '../social-accounts';
 
 // Fictive accounts only (ADR 0143 § 7): her real ones live in the CRM.
 const a = {
@@ -27,6 +27,27 @@ describe('sharingChanges (ADR 0143 § 20)', () => {
     expect(sharingChanges([a, b], [a])).toEqual([{ id: b.id, usage: 'practice', agentMayShare: false }]);
     expect(sharingChanges([], [b])).toEqual([{ id: b.id, usage: 'practice', agentMayShare: true }]);
     expect(sharingChanges([a], [a])).toEqual([]);
+  });
+});
+
+describe('sharedAccountEdits (ADR 0143 § 20, relecture Sécurité 16/11)', () => {
+  const given = { ...b, platform: 'instagram', username: 'demo_atelier' } as const;
+
+  it('names a given account renamed, moved or put to another use under the same id, by its fields', () => {
+    expect(sharedAccountEdits([given], [{ ...given, username: 'demo_atelier2' }])).toEqual([
+      { id: b.id, usage: 'practice', fields: ['username'] },
+    ]);
+    expect(sharedAccountEdits([given], [{ ...given, platform: 'tiktok', usage: 'lives' }])).toEqual([
+      { id: b.id, usage: 'lives', fields: ['platform', 'usage'] },
+    ]);
+  });
+
+  it('leaves out an account not given before or after: its switch change is audited on its own', () => {
+    expect(sharedAccountEdits([given], [given])).toEqual([]);
+    expect(
+      sharedAccountEdits([{ ...given, agentMayShare: false }], [{ ...given, username: 'x_demo' }]),
+    ).toEqual([]);
+    expect(sharedAccountEdits([given], [{ ...given, username: 'x_demo', agentMayShare: false }])).toEqual([]);
   });
 });
 

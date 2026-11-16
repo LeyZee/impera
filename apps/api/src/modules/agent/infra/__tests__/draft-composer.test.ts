@@ -1836,6 +1836,44 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
     expect(elsewhere).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['alert_keyword'] });
   });
 
+  it('pauses on a meeting ask with a sign of distress: its own guard holds (ADR 0143 § 25)', async () => {
+    const { draftComposer, seen } = withPersonaOf(() => Promise.resolve(NORA));
+    const result = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'On se donne rendez-vous ? ou je me tue', at: INPUT.now }],
+    });
+    expect(result).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['alert_keyword'] });
+    expect(seen.brainInputs).toHaveLength(0);
+  });
+
+  it('decides no account while his age is in doubt: her accounts are not even read (ADR 0143 § 16)', async () => {
+    const read: string[] = [];
+    const seen: Seen = { voiceCalls: 0, traces: [], brainInputs: [], voiceInputs: [] };
+    const disputed: FanFlags = { ageDisputed: { since: '2026-10-16T09:00:00Z', by: 'policy' } };
+    const draftComposer = createDraftComposer({
+      gateway: gateway({}, seen),
+      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+      limits: limitsOf(disputed).limits,
+      socialAccounts: (creatorId) => {
+        read.push(creatorId);
+        return Promise.resolve({
+          shareable: [{ platform: 'tiktok', username: 'demo.lives', usage: 'lives' }],
+          usernames: ['demo.lives'],
+        });
+      },
+    });
+    const result = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'Tu fais des lives sur tiktok ?', at: INPUT.now }],
+    });
+    expect(result).toMatchObject({ kind: 'held', reason: 'handoff', cause: 'minor' });
+    expect(result).not.toHaveProperty('accountShared');
+    expect(read).toEqual([]);
+    expect(seen.brainInputs).toHaveLength(0);
+  });
+
   it('pauses on her meeting word while he is in care (ADR 0143 § 25)', async () => {
     const { draftComposer } = withPersonaOf(() => Promise.resolve(NORA));
     const result = await draftComposer.compose({

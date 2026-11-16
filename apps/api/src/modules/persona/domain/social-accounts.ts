@@ -43,3 +43,25 @@ export function sharingChanges(
       .map(({ id, usage }) => ({ id, usage, agentMayShare: false })),
   ];
 }
+
+/** What of a shared account may change under the same id and change what the agent gives. */
+type SharedField = 'username' | 'platform' | 'usage';
+
+/**
+ * Bound 20: an account the agent may give, still given after the change, whose name, platform or use changed under the
+ * same id: what the agent gives changed, so it is audited too, by the fields that changed, never with the name.
+ */
+export function sharedAccountEdits(
+  before: readonly Pick<SocialAccount, 'id' | SharedField | 'agentMayShare'>[],
+  after: readonly Pick<SocialAccount, 'id' | SharedField | 'agentMayShare'>[],
+): { readonly id: string; readonly usage: string; readonly fields: readonly SharedField[] }[] {
+  const was = new Map(before.map((account) => [account.id, account]));
+  return after.flatMap((account) => {
+    const old = was.get(account.id);
+    if (old === undefined || !old.agentMayShare || !account.agentMayShare) return [];
+    const fields = (['username', 'platform', 'usage'] as const).filter(
+      (field) => old[field] !== account[field],
+    );
+    return fields.length === 0 ? [] : [{ id: account.id, usage: account.usage, fields }];
+  });
+}

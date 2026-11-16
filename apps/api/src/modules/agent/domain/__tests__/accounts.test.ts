@@ -4,6 +4,7 @@ import {
   accountAsked,
   accountDecision,
   accountViolations,
+  fixedSomething,
   meetingYes,
   usernamesIn,
   wantsToTry,
@@ -82,6 +83,24 @@ describe('usernamesIn (bound 19)', () => {
     ]);
     expect(usernamesIn('demo_atelier2', ['demo_atelier'])).toEqual([]);
   });
+
+  it('finds a name with punctuation around it, or spread over its words (relecture Sécurité, 16/11)', () => {
+    const names = ['nora_demo'];
+    for (const text of [
+      'c’est nora_demo.',
+      'c’est nora_demo…',
+      'tape nora_demo-',
+      '(nora_demo)',
+      'nora demo',
+      'norademo',
+      'nora-demo',
+      'NORA . DEMO',
+      'n0ra_dem0',
+    ])
+      expect(usernamesIn(text, names), text).toEqual(names);
+    expect(usernamesIn('nora est demo', names)).toEqual([]);
+    expect(usernamesIn('noradémoniaque', names)).toEqual([]);
+  });
 });
 
 describe('the contact guard on an account (bounds 19 and 29)', () => {
@@ -97,6 +116,11 @@ describe('the contact guard on an account (bounds 19 and 29)', () => {
     ]);
     expect(accountViolations(answer, names, null)).toHaveLength(1);
     expect(accountViolations(['et mon perso c’est Demo_Perso'], names, practice)).toHaveLength(1);
+    // Another name at the end of a sentence, on the turn an account is allowed (relecture Sécurité, 16/11).
+    expect(
+      accountViolations(['tape @demo_atelier, et mon perso c’est demo_perso.'], names, practice),
+    ).toMatchObject([{ code: 'contact_info', match: 'demo_perso' }]);
+    expect(accountViolations(['mon perso : demo perso'], names, practice)).toHaveLength(1);
   });
 
   it('lets the allowed name and its platform pass the contact guard, and nothing else', () => {
@@ -119,5 +143,42 @@ describe('the contact guard on an account (bounds 19 and 29)', () => {
     expect(meetingYes(['c’est trop tôt pour moi, j’ai besoin d’être en confiance'])).toEqual([]);
     expect(meetingYes(['oula pas si vite 😅'])).toEqual([]);
     expect(meetingYes([])).toEqual([]);
+  });
+
+  it('reads every bubble, a yes past an interjection, and a yes in so many words (relecture Sécurité, 16/11)', () => {
+    for (const bubble of [
+      'Oh oui carrément',
+      'mais oui bb',
+      'avec grand plaisir',
+      'yes !',
+      'évidemment 😘',
+      'j’adorerais',
+      'je dis pas non',
+      'on se cale ça ?',
+      'on s’organise ça',
+      'bah ok',
+    ])
+      expect(meetingYes([bubble]), bubble).toHaveLength(1);
+    expect(meetingYes(['hmm 😏', 'oui'])).toMatchObject([{ bubbleIndex: 1 }]);
+    expect(meetingYes(['un jour peut-être, qui sait 😊'])).toEqual([]);
+    expect(meetingYes(['mais non, c’est trop tôt pour moi'])).toEqual([]);
+  });
+
+  it('refuses an answer that fixes a date, a time, a place, a city or a price (bounds 22, 29)', () => {
+    for (const bubble of [
+      'samedi peut-être',
+      'vers 20h',
+      'à Lyon',
+      'dans ma salle',
+      'c’est 40 €',
+      'trente euros la séance',
+      'on se voit au parc',
+    ])
+      expect(fixedSomething(['coucou', bubble]), bubble).toMatchObject([
+        { code: 'meeting_promise', bubbleIndex: 1 },
+      ]);
+    expect(
+      fixedSomething(['trop tôt, j’ai besoin d’être en confiance', 'remplis le questionnaire 😊']),
+    ).toEqual([]);
   });
 });

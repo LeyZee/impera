@@ -129,6 +129,28 @@ describe('« Ses comptes » (ADR 0143 § C, bounds 18 to 20)', () => {
     expect(JSON.stringify(lines.map((line) => line.details))).not.toContain('demo');
   });
 
+  it('audits a given account renamed or put to another use under the same id, never with its name', async () => {
+    expect((await put(owner, [{ ...lives, agentMayShare: true }])).statusCode).toBe(200);
+    const moved = await put(owner, [
+      { ...lives, username: 'demo.lives2', usage: 'other', agentMayShare: true },
+    ]);
+    expect(moved.statusCode, moved.body).toBe(200);
+    const lines = await test.admin.db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.entity, 'social_account'),
+          eq(schema.auditLog.action, 'social_account.shared_changed'),
+        ),
+      );
+    expect(lines.map((line) => [line.entityId, line.details])).toContainEqual([
+      lives.id,
+      { creatorId: annaId, usage: 'other', fields: ['username', 'usage'] },
+    ]);
+    expect(JSON.stringify(lines.map((line) => line.details))).not.toContain('demo');
+  });
+
   it('lets a manager read, never change; closes them to a chatter and to her own account', async () => {
     expect((await read(manager)).statusCode).toBe(200);
     expect((await put(manager, [lives])).statusCode).toBe(403);
