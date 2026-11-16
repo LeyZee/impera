@@ -154,6 +154,11 @@ export function teamSumsFor(scope: TeamScope, statements: readonly ReadStatement
   return {
     statements: statements.length,
     totalMinor: sumOfSeveral(statements.map((one) => one.totalMinor)),
-    payableMinor: sumOfSeveral(statements.map((one) => one.payableMinor)),
+    // Beside the total, the payable says what the total does not pay: the same rule holds for that difference.
+    payableMinor:
+      sumOfSeveral(statements.map((one) => one.totalMinor - one.payableMinor)) === null &&
+      statements.some((one) => one.totalMinor !== one.payableMinor)
+        ? null
+        : sumOfSeveral(statements.map((one) => one.payableMinor)),
   };
 }

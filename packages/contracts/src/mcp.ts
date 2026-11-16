@@ -542,15 +542,6 @@ export type McpSalesList = z.infer<typeof McpSalesListSchema>;
 /** `commission_statements_list`'s input: the period, by its first day (`2026-11-01` or `2026-11-16`). */
 export const McpPayPeriodInputSchema = z.strictObject({ period: PayPeriodSchema });
 
-/**
- * `commission_statements_list` (ADR 0105 § 3 and § 4, `read:payroll`; Charles's decision A of 14/11): the state of a
- * period, never an amount of a member. Its window, when the team closed it, why pay could not compute it, the payout
- * delay the owner announced; for each statement the person may see, its member, status, revision and dates, whether
- * its transfer waits (without why) and whether it is late (`null` without a delay announced). The team's sums only for
- * a person who sees the whole team, else `null`; the total and the payable each `null` unless two statements at least
- * bring an amount to it. No net, commission, bonus, total nor payable of a member: neither a rate nor a member's pay
- * can be read from it.
- */
 /** Why pay could not compute the period, its own strict copy for the tool: each code with its fields only. */
 const McpPayPeriodBlockSchema = z.discriminatedUnion('code', [
   z.strictObject({
@@ -565,6 +556,15 @@ const McpPayPeriodBlockSchema = z.discriminatedUnion('code', [
   }),
 ]);
 
+/**
+ * `commission_statements_list` (ADR 0105 § 3 and § 4, `read:payroll`; Charles's decision A of 14/11): the state of a
+ * period, never an amount of a member. Its window, when the team closed it, why pay could not compute it, the payout
+ * delay the owner announced; for each statement the person may see, its member, status, revision and dates, whether
+ * its transfer waits (without why) and whether it is late (`null` without a delay announced). The team's sums only for
+ * a person who sees the whole team, else `null`; the total and the payable each `null` unless two statements at least
+ * bring an amount to it. No net, commission, bonus, total nor payable of a member: neither a rate nor a member's pay
+ * can be read from it.
+ */
 export const McpPayPeriodStateSchema = z.strictObject({
   period: PayPeriodSchema,
   window: z

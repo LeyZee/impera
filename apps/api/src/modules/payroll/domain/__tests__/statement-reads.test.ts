@@ -175,6 +175,19 @@ describe('teamSumsFor', () => {
     });
   });
 
+  it('keeps the payable when what the total does not pay comes from a single statement', () => {
+    expect(teamSumsFor('owner', [at(25_300, 25_300), at(1_000, 0), at(9_000, 9_000)])).toEqual({
+      statements: 3,
+      totalMinor: 35_300,
+      payableMinor: null,
+    });
+    expect(teamSumsFor('owner', [at(25_300, 25_300), at(1_000, 0), at(2_000, 0), at(9_000, 9_000)])).toEqual({
+      statements: 4,
+      totalMinor: 37_300,
+      payableMinor: 34_300,
+    });
+  });
+
   it('gives nothing to a member who sees only themselves, nor sums over one statement or none', () => {
     expect(teamSumsFor('self', [at(25_300, 25_300), at(9_000, 9_000)])).toBeNull();
     expect(teamSumsFor('owner', [at(25_300, 25_300)])).toEqual({

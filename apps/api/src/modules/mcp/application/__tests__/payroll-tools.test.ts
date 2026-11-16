@@ -3,6 +3,7 @@ import {
   McpPayPeriodInputSchema,
   McpPayPeriodStateSchema,
   newId,
+  PayPeriodBlockSchema,
   PayPeriodSchema,
   TeamMemberIdSchema,
   UserIdSchema,
@@ -163,6 +164,16 @@ describe('commission_statements_list (ADR 0105 § 3 and § 4, read:payroll, deci
       McpPayPeriodStateSchema.safeParse({ ...parsed, window: { ...parsed.window, closedBy: 'invente' } })
         .success,
     ).toBe(false);
+  });
+
+  it('knows every block pay records, with the same fields', () => {
+    const blocked = McpPayPeriodStateSchema.shape.blocked.unwrap();
+    const shapes = (union: typeof PayPeriodBlockSchema | typeof blocked): string[] =>
+      union.options.map((option) => Object.keys(option.shape).toSorted().join()).toSorted();
+    expect(shapes(blocked)).toEqual(shapes(PayPeriodBlockSchema));
+    expect(blocked.options.map((option) => option.shape.code.value).toSorted()).toEqual(
+      PayPeriodBlockSchema.options.map((option) => option.shape.code.value).toSorted(),
+    );
   });
 
   it('passes on the sums pay withholds, each apart', async () => {
