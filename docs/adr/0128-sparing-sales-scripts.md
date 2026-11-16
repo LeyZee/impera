@@ -1,6 +1,6 @@
 # 0128. Ménager les scripts : une pause après un achat, un script rejoué par une autre variante du teasing, l'IA qui réclame des scripts
 
-Statut : proposed (fil « Économiser les scripts de vente », 16/11/2026 ; attend « ok 0128 » de Charles et ses réponses aux questions ouvertes)
+Statut : proposed (fil « Économiser les scripts de vente », 16/11/2026 ; relu par Médias ; attend « ok 0128 » de Charles et ses réponses aux questions ouvertes)
 Date : 2026-11-16
 Précise : l'ADR 0098 (§ 1 un script ne se rejoue jamais, § 6 média déjà reçu, § 9 pack refusé, § 12 même session), l'ADR 0112 (§ 5 conditions de branche, § 11 média déjà reçu, § 15 « un script ne se rejoue pas »), l'ADR 0103 (porte), l'ADR 0056 (variantes A, B, C d'une étape, cadence de demande des scripts), la politique d'offre (`agent/domain/policy.ts`). Ne remplace aucun ADR en entier.
 
@@ -36,11 +36,14 @@ Ce qui existe déjà et sert : les **variantes** A, B et C d'une étape dans l'a
 
 7. **Ce qui permet le rejeu** : le premier déroulé s'est fermé sur `stalled` (sans réponse), `no_branch`, sur un refus **par silence** (étape payante ignorée deux messages, ADR 0098 § 9) ou sur la fin de session (ADR 0098 § 12), sans achat. **Ce qui l'interdit** : un refus dit (« non », « pas intéressé »), un manque d'argent avoué (`no_budget`, gel `money_trouble`), une reprise par un humain (`closed_by_human`), un risque. Question ouverte n° 2 : la place du refus dit.
 
-8. **Le teasing rejoué est une autre variante, jamais le même média.** La variante de teasing est une **branche** de la première étape (ADR 0112 § A), avec ses propres médias : selfie, miroir, autre pièce, autre cadrage, choisis à la tournée (séries A, B, C de l'atelier, ADR 0056). Une condition structurée nouvelle, **`unseen_variant`** (évaluée par le code seul, ADR 0112 § 5), dit « une branche dont il n'a reçu aucun média ». Au premier passage, c'est la branche par défaut qui part ; au rejeu, la première variante qu'il n'a jamais reçue, dans l'ordre fixé par l'agence. **Plus de variante neuve : plus de rejeu.** Un script a donc au plus autant de passages par fan que de variantes de teasing (trois avec l'atelier).
+8. **Le teasing rejoué est une autre variante, jamais le même média.** La variante de teasing est une **branche** de la première étape (ADR 0112 § A), avec ses propres médias : selfie, miroir, autre pièce, autre cadrage, choisis à la tournée (séries A, B, C de l'atelier, ADR 0056). Une condition structurée nouvelle, **`unseen_variant`** (évaluée par le code seul, ADR 0112 § 5), dit « une branche dont il n'a reçu aucun média ». Au premier passage, c'est la branche par défaut qui part ; au rejeu, la première variante qu'il n'a jamais reçue, dans l'ordre fixé par l'agence.
+   - **Des séries de l'atelier aux branches de Reveal.** Les séries A, B, C vivent dans la structure (scripts demandés par Impera) ; le rejeu tourne sur les scripts natifs de Reveal par leurs branches. Le lien se fait quand l'équipe recopie le script dans Reveal (SC-03) : les séries du teasing y deviennent des branches au même rang que la première étape, dans l'ordre A, B, C. Reveal ne porte aucune lettre : « variante B » se lit par cet ordre de branches. Le guide de copie (fil Médias) le dit.
+   - **L'étape de teasing**, pour le code : la première étape de la structure dont l'accès est offert (`access` gratuit). À ne pas confondre avec la photo d'accroche d'un pont. **Plus de variante neuve : plus de rejeu.** Un script a donc au plus autant de passages par fan que de variantes de teasing (trois avec l'atelier).
 
 9. **« Média reçu jamais renvoyé » reste vrai** (ADR 0098 § 6, ADR 0112 § 11), avec une précision : une étape payante **envoyée et non achetée** ne lui a pas donné ses médias vendus, seulement son **aperçu**. Le calcul du média reçu compte donc, pour une étape payante non achetée, son aperçu et pas ses médias vendus. Conséquences :
    - l'étape payante rejouée peut repartir, avec ses mêmes médias vendus et son même prix (jamais moins cher : ni prix réduit, ni branche « moins cher », ADR 0112 § 8) ;
-   - son **aperçu** compte comme reçu : si l'aperçu est une image lisible, l'étape payante ne se rejoue que si elle a une branche à un autre aperçu, ou si son aperçu est entièrement flouté. Le code le vérifie ; un script dont l'étape payante ne peut pas repartir ne se rejoue pas.
+   - son **aperçu** compte comme reçu : l'étape payante ne se rejoue que si elle a une branche à un autre aperçu. Un aperçu entièrement flouté ne suffira que si la capture du § 13 montre que Reveal expose ce flou dans ce qu'on lit ; sans cette donnée, la règle reste « une branche à un autre aperçu ». Un script dont l'étape payante ne peut pas repartir ne se rejoue pas.
+   - Cette vérification ne passe **jamais par `gaps`**, qui décide `proposable` et bloquerait aussi le premier passage : la vue du script porte un drapeau séparé **`replayable`**, avec sa raison quand il est faux.
 
 10. **Délai avant de rejouer le même script** au même fan : `script_launch.replay_after_days`, dans la persona, réglable par créatrice, de 7 à 60 jours, 14 par défaut. Quand un script **jamais envoyé** à ce fan est jouable, il passe avant un rejeu : le rejeu ne sert qu'à ne pas laisser un fan chaud sans rien.
 
@@ -57,13 +60,14 @@ Ce qui existe déjà et sert : les **variantes** A, B et C d'une étape dans l'a
 15. **Le stock se mesure par fan, pas au total.** Pour chaque **acheteur actif** de la créatrice (au moins un achat de script dans les 30 derniers jours), le code compte les scripts **encore jouables pour lui** : jamais achetés par lui, du bon moment possible, proposables (ADR 0112 § 13), plus ceux qu'il peut encore se voir rejouer (§ 8). Un acheteur actif est **à court** quand il lui en reste moins que le **plancher de stock** (`script_cadences.stock_floor`, réglable par le propriétaire, 2 par défaut).
 
 16. **Quand trop d'acheteurs actifs sont à court**, au-delà d'une **part** réglable par le propriétaire (`script_cadences.stock_share`, 25 % par défaut), le job de la cadence **avance la prochaine demande de script** : il prend la structure suivante de sa file, la fige et la demande comme le fait déjà la cadence (`content_requests`, origine nouvelle `stock`). Elle la voit là où arrivent déjà ses demandes de script, avec ses cartons.
-   - **Une seule demande d'origine `stock` ouverte à la fois** par créatrice ; la suivante attend que celle-ci soit déposée ou annulée.
+   - **Aucune demande `stock` ne part tant qu'une demande de script est ouverte et pas encore déposée**, qu'elle vienne de la cadence ou du stock : elle n'en reçoit jamais deux à la fois.
+   - Elle suit l'**alternance Jour / Nuit** déjà décidée pour les demandes de script (`content_requests.moment`, « ok alternance »).
    - La demande de stock remet le compteur de la cadence à zéro : on ne double pas la demande du calendrier.
    - **File vide** : rien n'est demandé, l'agence est prévenue en ambre (« Stock de scripts bas, file de structures vide ») ; le propriétaire choisit une structure.
 
 17. **L'agence est prévenue** : la demande `stock` entre dans « À traiter » avec le nombre d'acheteurs actifs à court (jamais leurs noms dans la notification), et l'écran de la cadence montre le stock du jour (`stock_short`, `stock_active`).
 
-18. **Les variantes se demandent avec le script.** Une structure dont l'étape de teasing a moins de deux variantes porte un **avertissement** à l'enregistrement (« une seule variante de teasing : ce script ne pourra pas se rejouer »), jamais un refus. La file ne demande pas de variante seule pour un script déjà tourné : un script importé de Reveal reçoit ses variantes comme branches de sa première étape, ajoutées par l'agence (ADR 0112 § 1).
+18. **Les variantes se demandent avec le script.** Une structure dont l'étape de teasing (§ 8) a moins de deux variantes porte un **avertissement** à l'enregistrement (par `saveDecision`, jamais une faute) (« une seule variante de teasing : ce script ne pourra pas se rejouer »), jamais un refus. La file ne demande pas de variante seule pour un script déjà tourné : un script importé de Reveal reçoit ses variantes comme branches de sa première étape, ajoutées par l'agence (ADR 0112 § 1).
 
 ### D. Qui code quoi
 
@@ -71,10 +75,10 @@ Ce qui existe déjà et sert : les **variantes** A, B et C d'une étape dans l'a
 |---|---|
 | **Bilan** | La migration : `after_purchase_hours` et `replay_after_days` dans le schéma de persona (contrat), `attempt` et la sorte du refus (`said` / `silence`) dans `script_runs`, la clé d'idempotence par passage, `stock_floor`, `stock_share` et les deux compteurs dans `script_cadences`, l'origine `stock` dans `content_requests`, `unseen_variant` dans les conditions de branche du contrat. La capture du § 13 sur « test ». |
 | **Agent** | `offerDecision` (§ 5), le rejeu dans `script-run.ts` (§§ 6–12) : liste permise, choix de la branche `unseen_variant`, média reçu d'une étape non achetée, priorité aux scripts neufs ; le calcul du stock par fan, exposé par son `index.ts` (lecture seule) ; les évals : pause après achat, pause levée parce qu'il sexualise, rejeu par la variante B, pas de rejeu après un refus dit ni après un achat. |
-| **Médias** | Le job de la cadence (§ 16) qui lit le stock par l'`index.ts` d'Agent, l'origine `stock`, l'avertissement de variante (§ 18), la vérification de l'aperçu rejouable (§ 9) dans `gaps`. |
+| **Médias** | Le job de la cadence (§ 16) qui lit le stock par l'`index.ts` d'Agent, l'origine `stock`, l'avertissement de variante (§ 18), le drapeau `replayable` (§ 9, hors de `gaps`), le guide de copie des séries en branches (§ 8). |
 | **Design** | Les réglages : pause après achat et délai de rejeu dans Créatrices › persona (stratégies) ; plancher et part du stock dans l'écran de la cadence ; la ligne ambre « file vide » ; « Rejeu, passage n, variante X » dans « Pourquoi » et la conversation. |
 
-Ordre : Bilan (migration et contrat), puis Agent et Médias en parallèle, puis Design. Une PR à la fois par fil.
+Ordre : **d'abord l'évaluation des conditions de branche de l'ADR 0112** (aujourd'hui un script à branches n'est jamais proposable, `branched_step`, depuis #781) : le rejeu par variante en dépend. Puis Bilan (migration et contrat), puis Agent et Médias en parallèle, puis Design. La pause après achat (§ A) ne dépend de rien de cela et peut passer en premier. Une PR à la fois par fil.
 
 ## Conséquences
 
