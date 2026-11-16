@@ -33,6 +33,13 @@ describe('gapNote', () => {
     );
   });
 
+  it('keeps a night past midnight in the same evening: her day starts at 5 a.m.', () => {
+    expect(gapNote(at('2026-11-10T23:10:00'), at('2026-11-11T00:25:00'), TZ)).toBe('1 h plus tard, 0 h 25');
+    expect(gapNote(at('2026-11-11T01:00:00'), at('2026-11-11T09:00:00'), TZ)).toBe(
+      'le lendemain, mercredi, 9 h',
+    );
+  });
+
   it('counts days on her calendar beyond that', () => {
     expect(gapNote(at('2026-11-10T22:00:00'), at('2026-11-14T14:00:00'), TZ)).toBe(
       '4 jours plus tard, samedi, 14 h',
@@ -53,6 +60,23 @@ describe('gapNotes', () => {
       TZ,
     );
     expect(notes).toEqual([null, null, 'le lendemain, mercredi, 19 h 10', null, null]);
+  });
+});
+
+describe('gapNotes, a silence before her answer', () => {
+  it('dates his quick answer to a late answer of hers, so the history never reads as one evening', () => {
+    const notes = gapNotes(
+      [
+        { fromFan: true, at: at('2026-11-10T22:00:00') },
+        { fromFan: false, at: at('2026-11-11T09:00:00') },
+        { fromFan: false, at: at('2026-11-11T09:01:00') },
+        { fromFan: true, at: at('2026-11-11T09:10:00') },
+        { fromFan: false, at: at('2026-11-11T09:12:00') },
+        { fromFan: true, at: at('2026-11-11T09:15:00') },
+      ],
+      TZ,
+    );
+    expect(notes).toEqual([null, null, null, 'mercredi, 9 h 10', null, null]);
   });
 });
 
@@ -87,7 +111,7 @@ describe('timingLines', () => {
       ),
     ).toEqual([
       'Ta dernière réponse date d’il y a 45 h : il ne t’avait pas répondu depuis.',
-      'Il t’a écrit il y a 9 h : tu lui réponds en retard.',
+      'Il t’a écrit il y a 9 h.',
     ]);
   });
 
