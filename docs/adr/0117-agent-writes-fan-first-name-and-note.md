@@ -28,24 +28,25 @@ Choix de Charles du 15/11 (cartes de décision et message) : l'agent écrit **se
    - La seule source est un fait `first_name` actif de source « dit par lui » (`declared`) ou « noté par un chatteur » (`noted`). Un prénom deviné (`inferred`, tiré d'un pseudo ou d'une signature) n'est jamais écrit.
    - L'agent n'écrit que dans un champ vide. Un prénom déjà présent, quel que soit son auteur, n'est jamais remplacé.
    - S'il donne plus tard un autre prénom, l'agent ne change rien dans Reveal : il le signale au chatteur dans le panneau copilote (« il a dit s'appeler X, Reveal dit Y »). Le changement reste un geste humain.
-   - Garde en code avant l'écriture : une à deux parties de lettres (tirets et apostrophes permis), 30 caractères au plus, rien de ce que la fiche ne garde jamais (`neverKept`, ADR 0085 § 8). Une valeur refusée n'est pas écrite et n'est pas signalée au fan.
+   - Garde en code avant l'écriture : une à deux parties de lettres Unicode (`\p{L}`, un prénom accentué passe ; tirets et apostrophes permis), 30 caractères au plus, rien de ce que la fiche ne garde jamais (`neverKept`, ADR 0085 § 8). Une valeur refusée n'est pas écrite et n'est pas signalée au fan.
 
 3. **La note client : la ligne d'un chatteur reste, l'agent la précise ou la corrige seulement sur la parole du fan.**
    - Une ligne vide (libellé seul ou absent) ou écrite par l'agent lui-même est remplie et tenue à jour librement.
-   - Pour savoir qu'une ligne est la sienne, Impera garde, par compte, fan et ligne, l'empreinte SHA-256 de la dernière ligne qu'il a écrite, jamais la ligne elle-même (ADR 0018 § 1 : le contenu de la note n'est pas stocké). Une ligne qui n'a plus cette empreinte a été écrite par un humain.
+   - Pour savoir qu'une ligne est la sienne, Impera garde, par compte, fan et ligne, une marque à clé de la dernière ligne qu'il a écrite (HMAC-SHA-256, clé dérivée des clés de session du serveur et du compte, jamais en base), jamais la ligne elle-même (ADR 0018 § 1 : le contenu de la note n'est pas stocké). Une empreinte simple ne suffit pas : une ligne aussi courte que « Âge : 25 » se retrouverait en essayant les valeurs. Une ligne qui n'a plus cette marque a été écrite par un humain.
    - **Préciser** une ligne d'un humain : l'agent ajoute à la fin ce qui manque, sans rien effacer (une passion de plus, « Lyon » devient « Lyon, Croix-Rousse »). Seulement avec une valeur « dit par lui ».
    - **Corriger** une ligne d'un humain : seulement si le fan a dit lui-même, dans un message des 7 derniers jours, une valeur qui contredit nettement la ligne (autre ville, autre âge, autre métier). Une valeur devinée ne corrige jamais. L'ancienne valeur reste visible sur la même ligne, dans Reveal : « Localisation : Paris (avant : Lyon) », pour que le chatteur voie le changement et puisse revenir dessus.
    - Une ligne qu'un chatteur a modifiée après une correction de l'agent n'est plus corrigée ; l'agent la précise encore, rien de plus.
+   - Le « (avant : …) » d'une correction n'est jamais retiré par l'agent : il reste tant qu'un humain ne l'a pas enlevé, et l'agent ne réécrit pas une ligne qu'il a corrigée.
    - Toutes les autres lignes de la note (hors canevas) restent mot pour mot, comme aujourd'hui.
 
 4. **Ce qui va dans la note.** Une ligne reçoit la valeur active de la case de même code dans la fiche, si sa source est « dit par lui » ou « noté par un chatteur » dans le CRM. Une valeur devinée reste dans la fiche d'Impera et n'entre pas dans Reveal. La ligne Envies suit la même règle (elle n'est jamais demandée au fan, ADR 0085 § 2, mais peut avoir été dite). Une liste s'écrit comme la fiche l'affiche, séparée par des virgules. Ce qui est exclu de la fiche (§ 8 de l'ADR 0085) n'est jamais écrit.
 
-5. **Quand.** Un job par conversation (`connectors.sync_fan_platform_fields`), mis en file après chaque écriture de faits du fan, avec un délai de regroupement de 2 minutes et une seule exécution à la fois par conversation (ADR 0006). Il relit la note et le prénom juste avant d'écrire, calcule ce qui manque, et n'écrit rien quand Reveal dit déjà la même chose. Clé d'idempotence : empreinte du bloc écrit. Le job est rejouable.
+5. **Quand.** Un job par conversation (`connectors.sync_fan_platform_fields`), mis en file après chaque écriture de faits du fan, avec un délai de regroupement de 2 minutes et une seule exécution à la fois par conversation (ADR 0006). Il relit la note et le prénom juste avant d'écrire, calcule ce qui manque, et n'écrit rien quand Reveal dit déjà la même chose. Clé d'idempotence : marque à clé du bloc écrit. Le job est rejouable.
 
-6. **Port connecteur.** Une méthode optionnelle `setFanFirstName?(fanRef, value, key)` s'ajoute au port, annoncée par une capacité `fanFirstNameWrite`, avec les règles de l'ADR 0018 § 1 (erreurs typées, clé d'idempotence, garde d'écriture au même point d'entrée). Le cœur ne connaît ni Reveal ni `%NAME%`. `setFanNote` ne change pas.
+6. **Port connecteur.** Une méthode optionnelle `setFanFirstName?(fanRef, value, key)` s'ajoute au port, annoncée par une capacité `fanFirstNameWrite`, avec les règles de l'ADR 0018 § 1 (erreurs typées, clé d'idempotence, garde d'écriture au même point d'entrée). Le cœur ne connaît ni Reveal ni `%NAME%`. `setFanNote` ne change pas. La capacité est déclarée partout où `ConnectorCapabilities` est construit (`FakeConnector` : non ; FakeReveal : oui), avec le test de contrat qui vérifie la méthode selon le drapeau.
 
 7. **Ordre de livraison.**
-   - Lot a (sans capture) : § 3, 4, 5 pour la note client, tests contre `FakeReveal`, migration de la table des empreintes.
+   - Lot a (sans capture) : § 3, 4, 5 pour la note client, tests contre `FakeReveal`, migration de la table des marques.
    - Lot b (après la capture) : § 2 et § 6 pour le prénom. La capture se fait sur le compte fan test seul, avec l'accord écrit de Charles : le prénom est modifié puis remis comme avant. On y vérifie aussi ce que devient `%NAME%` quand le prénom est vide.
    - Aucune écriture sur un compte réel avant que Charles ouvre la garde d'écriture de ce compte.
 
@@ -71,6 +72,7 @@ Négatives :
 
 - **Proposer chaque ligne au chatteur, qui valide d'un clic** : choix de Charles du 15/11, l'agent écrit seul.
 - **Écrire aussi un prénom deviné** ou **remplacer le prénom par le dernier dit** : un faux prénom part dans tous les Mass DM (choix de Charles du 15/11).
-- **Copier la note client chez nous pour savoir qui a écrit quoi**, ou pour garder l'ancienne valeur d'un chatteur : contraire à l'ADR 0018 § 1 ; une empreinte suffit, et l'ancienne valeur reste dans la note elle-même.
+- **Copier la note client chez nous pour savoir qui a écrit quoi**, ou pour garder l'ancienne valeur d'un chatteur : contraire à l'ADR 0018 § 1 ; une marque à clé suffit, et l'ancienne valeur reste dans la note elle-même.
+- **Une empreinte SHA-256 simple de chaque ligne** : une ligne courte se retrouve en essayant les valeurs, l'empreinte vaudrait presque une copie (relecture de Bilan, #775).
 - **Ne jamais toucher une ligne d'un chatteur** : Charles veut que l'agent fasse gagner du temps, y compris en corrigeant une erreur nette (15/11).
 - **Écrire les valeurs devinées dans Reveal** : un chatteur ne verrait pas qu'elles sont des hypothèses, la fiche d'Impera le montre déjà.
