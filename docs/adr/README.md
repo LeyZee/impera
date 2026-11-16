@@ -131,4 +131,5 @@ Date : AAAA-MM-JJ
 | 0110 | L'agent tient compte des automatisations de Reveal | accepted (remplace la ligne « sans effet sur le bot » de l'inventaire du connecteur ; précise 0006, 0018, P3-10) |
 | 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
 | 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
+| 0128 | Ménager les scripts : une pause après un achat, un script rejoué par une autre variante du teasing, l'IA qui réclame des scripts | proposed (précise 0098 §§ 1, 6, 9 et 12, 0112 §§ 5, 11 et 15, 0103 et 0056) |
 | 0120 | Lire avant de publier : les statistiques du compte Instagram et les clics des liens de redirection, le retour sur un Reel, l'entonnoir d'acquisition | accepted (précise 0057, 0060, 0080, 0082, 0042 ; amende 0057 § 2 et 0060 § 2) |

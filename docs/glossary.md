@@ -118,6 +118,9 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Offre | `offer` | Une proposition commerciale (média + prix + plancher). Phase 6. |
 | Budget nul | `hasNoBudget` | Drapeau posé par le code quand le fan dit ne pas pouvoir payer : plus aucune offre ni bouderie ni relance de vente tant qu'il ne revient pas de lui-même vers le payant. |
 | Délai entre deux scripts | `cooldownHours` | Temps minimum entre deux scripts proposés à un même fan, lu dans la persona (`strategies.script_launch.cooldown_hours`, réglable par créatrice) ; après, un script ne part que si le fan sexualise de nouveau (`offerDecision`). |
+| Pause après achat | `afterPurchaseHours` | Temps après le dernier achat d'une étape de script pendant lequel l'agent n'ouvre ni sexualisation ni script de lui-même (`strategies.script_launch.after_purchase_hours`, réglable par créatrice) ; levée pour la session s'il sexualise de lui-même ou demande du contenu (ADR 0128). |
+| Rejeu | `attempt` | Nouveau passage d'un script à un fan qui n'y a rien acheté, par une variante de teasing qu'il n'a jamais reçue (`unseen_variant`), après le délai de rejeu (`replay_after_days`) (ADR 0128). |
+| Acheteur actif à court | `stock_short` | Fan avec un achat de script dans les 30 derniers jours à qui il reste moins de scripts jouables que le plancher de stock ; au-delà d'une part réglable, la cadence avance la demande de script (origine `stock`, ADR 0128). |
 | Vente | `sale` | Une transaction détectée sur la plateforme. Montant en centimes + devise. |
 | Script | `script` | Séquence d'étapes de vente (structure). Phase 6. |
 | Étape | `script_step` | Une étape d'un script (message, médias, prix, pacing). |
