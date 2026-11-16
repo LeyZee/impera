@@ -1,6 +1,6 @@
 # 0123. Une nouveauté de Reveal n'arrête plus tout le relevé : clés sans danger écartées, élément illisible mis de côté et relu
 
-Statut : proposed (numéro attribué par le coordinateur le 16/11/2026 ; demande de la coordination après les pannes du 15 et du 16/11 ; relecture Sécurité)
+Statut : accepted (« ok 0123 » de Charles le 16/11/2026, 12 h 48 heure de Paris, fil de coordination ; numéro attribué par le coordinateur le 16/11/2026 ; demande de la coordination après les pannes du 15 et du 16/11 ; relecture Sécurité)
 Date : 2026-11-16
 Précise : la spécification du connecteur Reveal (§ erreurs : « réponse qui ne passe pas son schéma → `fatal` shape_changed ») et `docs/reference/fake-reveal.md` (`shape_changed`). Ne remplace aucune ADR.
 
