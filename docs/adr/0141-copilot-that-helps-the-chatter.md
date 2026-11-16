@@ -1,6 +1,6 @@
 # 0141. Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande
 
-Statut : proposed (fil « Extension, connexion Reveal et playground », 16/11/2026 ; choix de Charles sur carte le 16/11 à 15 h 44 : « Gratuit + accroches » ; à relire par Agent, Design et Sécurité ; attend « ok 0141 »)
+Statut : proposed (fil « Extension, connexion Reveal et playground », 16/11/2026 ; choix de Charles sur carte le 16/11 à 15 h 44 : « Gratuit + accroches » ; relu par Agent le 16/11 ; à relire par Design et Sécurité ; attend « ok 0141 »)
 Date : 2026-11-16
 Précise : ADR 0086 § 3 (ce que montre le panneau) et § 10 (un copilote qui fait gagner du temps). S'appuie sur ADR 0021 (rester en personnage), 0025 (accès pendant le shift), 0063 (la créatrice ne voit pas la fiche), 0098 (le cerveau choisit parmi ce que le code permet), 0112 (scripts à branches). Ne remplace aucun ADR.
 
@@ -16,28 +16,28 @@ Charles a choisi, sur carte, d'afficher d'abord ce qui est déjà calculé (sans
 
 ### A. Ce que le panneau montre sans nouvel appel d'IA
 
-1. **Quoi faire maintenant**, en une ligne au-dessus du brouillon, dans une liste fermée de gestes que le code décide déjà : proposer une étape (son nom et son prix, décidés par le code), relancer, attendre sa réponse, rendre la main à un humain, ne rien vendre (une garde joue). Le texte de chaque geste est fixé dans le code (libellés français, un par geste) ; le prix vient de la décision du code, jamais d'un texte d'IA.
+1. **Quoi faire maintenant**, en une ligne au-dessus du brouillon, dans la liste fermée des gestes que le code décide déjà pour chaque brouillon : répondre ; proposer une étape (« Proposer <étape> à <prix> », étape et prix décidés par le code) ; répondre à son objection ; commande perso (accepter, refuser, attendre) ; attendre avant de répondre ; rendre la main à un humain (brouillon tenu, avec sa raison) ; ne rien vendre (avec la raison du blocage, § 2). Le texte de chaque geste est fixé dans le code (libellés français, un par geste) ; le prix vient de la décision du code, jamais d'un texte d'IA. Après un refus final, le geste ne repropose jamais l'étape refusée.
 
-2. **Le pourquoi du brouillon**, en une ligne : les raisons de décision et les gardes qui ont joué, déjà enregistrées avec le brouillon, traduites par une liste fermée de libellés. Une raison sans libellé n'est pas affichée (pas de code brut à l'écran).
+2. **Le pourquoi du brouillon**, en une ligne : les raisons de décision et les gardes qui ont joué, déjà enregistrées avec le brouillon, traduites par une liste fermée de libellés dans `@impera/contracts`. Les blocages de vente gardent les libellés du code : « Ne plus lui écrire », « Un risque bloque la vente », « Ventes gelées », « Âge pas encore confirmé », « Il a dit ne pas avoir d'argent », « Offre trop récente », « Désir encore trop bas ». Une raison sans libellé n'est pas affichée (pas de code brut à l'écran).
 
-3. **Où en est la vente**, dans un pli du panneau : le script en cours et son étape, la prochaine étape et son prix, les étapes refusées, les réponses aux objections déjà utilisées avec ce fan (à ne pas resservir), une commande personnalisée ouverte.
+3. **Où en est la vente**, dans un pli du panneau : le script en cours et son étape, la prochaine étape et son prix, l'offre faite, les étapes refusées (dérivées du script en cours et des événements d'offre), les réponses aux objections déjà utilisées avec ce fan (à ne pas resservir), une commande personnalisée ouverte.
 
-4. **Les signaux à ne pas rater**, ajoutés à « Où on en est » : désir qui monte ou retombe depuis le message précédent (sens seulement, le chiffre reste au CRM), relance due, offre ouverte sans réponse. Les arrêts et précautions existants restent tels quels (rouge pour ce qui interdit, ambre pour ce qui retient).
+4. **Les signaux à ne pas rater**, ajoutés à « Où on en est » : désir qui monte ou retombe depuis le message précédent (sens seulement, le chiffre reste au CRM), relance due (un travail à part, pas un geste du brouillon), offre ouverte sans réponse, disponibilité du fan. Les arrêts et précautions existants restent tels quels (rouge pour ce qui interdit, ambre pour ce qui retient).
 
 5. **Le serveur rend ces données dans la vue du copilote** (la route qui rend déjà le brouillon), recopiées champ par champ, avec un schéma de sortie strict : jamais le texte du prompt, jamais une méthode écrite, jamais un montant autre que le prix de l'étape décidée.
 
 ### B. Deux boutons qui appellent l'IA, au clic seulement
 
-6. **« 3 accroches »** : trois débuts de message différents dans la voix de la créatrice, pour relancer ou ouvrir la conversation. **« Réponse à une objection »** : le chatteur choisit l'objection dans une liste fermée (trop cher, une autre fois, pas le moment, il doute) et reçoit une réponse. Chaque proposition se copie comme un brouillon (« Copier pour Reveal ») ; rien ne part sans le chatteur.
+6. **« 3 accroches »** : trois débuts de message différents dans la voix de la créatrice, pour relancer ou ouvrir la conversation. **« Réponse à une objection »** : le chatteur choisit l'objection dans la liste fermée que le code connaît déjà (`OBJECTION_KINDS` : « C'est trop cher », « Pour ce prix j'ai du réel », « Ailleurs c'est gratuit », « Fais-moi un prix », « J'ai déjà payé la dernière fois ») et reçoit une réponse. Une réplique de la banque pas encore utilisée avec ce fan sort d'abord, sans appel d'IA ; l'IA n'écrit que s'il n'y en a pas. « Fais-moi un prix » ne donne jamais de remise. D'autres objections n'entrent dans la liste que sur décision de Charles. Chaque proposition se copie comme un brouillon (« Copier pour Reveal ») ; rien ne part sans le chatteur.
 
-7. **Mêmes gardes que le brouillon** : chaque texte passe par les gardes de sortie du brouillon (rester en personnage, ADR 0021 ; pas de prix ni de remise inventés : un prix ne peut être que celui de l'étape décidée par le code ; pas de rendez-vous concret). Un texte refusé par une garde est retiré, jamais montré. Le message du fan entre dans l'appel comme une donnée, dans un bloc délimité et typé.
+7. **Mêmes gardes que le brouillon** : chaque texte passe par les gardes de sortie du brouillon (rester en personnage, ADR 0021 ; pas de prix ni de remise inventés : un prix ne peut être que celui de l'étape décidée par le code ; pas de rendez-vous concret). Les accroches suivent le curseur de sexualisation de la créatrice (âge non confirmé : rien de sexuel), ne reprennent jamais une réplique déjà envoyée à ce fan, et passent par une réécriture comme le brouillon quand une garde bloque. Un texte encore refusé est retiré, jamais montré. Le message du fan entre dans l'appel comme une donnée, dans un bloc délimité et typé.
 
-8. **Coût tenu** : un appel par clic, journalisé dans `llm_calls` comme le reste et compté dans le budget IA du jour. Le même clic sur le même message du fan rend le même résultat (clé d'idempotence par message et par bouton), sans nouvel appel. Un plafond de clics par chatteur et par jour est réglable par le propriétaire dans le CRM ; au plafond, le bouton le dit et ne fait rien.
+8. **Coût tenu** : un appel par clic, journalisé dans `llm_calls` comme le reste et compté dans le budget IA du jour. Le même clic sur le même message du fan rend le même résultat (clé d'idempotence par message, par bouton et, pour une objection, par type d'objection), sans nouvel appel. Un plafond de clics par chatteur et par jour est réglable par le propriétaire dans le CRM ; au plafond, le bouton le dit et ne fait rien.
 
 ### C. Ce qui coupe tout cela
 
 9. **Doute d'âge ouvert** : ni accroches, ni objection, ni suggestion de vente ; le panneau dit seulement qu'un humain doit lever le doute (règle du 16/11 : l'IA n'écrit plus rien).
-   **Fan en difficulté (mode soin)** : ni accroches de vente, ni objection, ni geste de vente dans « quoi faire maintenant » ; le panneau garde la fiche et dit qu'on ne vend pas.
+   **Fan en difficulté (mode soin)** : ni accroches de vente, ni objection, ni geste de vente dans « quoi faire maintenant » ; le panneau garde la fiche et dit qu'on ne vend pas. À la **sortie du soin**, pendant la période sans explicite (ADR 0088 § 7), ni accroche coquine ni vente.
    **« Ne plus lui écrire »**, **ventes gelées**, **limites non lues** : les gestes de vente et les boutons sont retirés, comme les gestes de copie aujourd'hui pour « Ne plus lui écrire » et les limites non lues.
    Ces coupures sont décidées par le serveur (il ne rend ni les données de vente ni les boutons) et redites par le panneau ; un appel aux boutons malgré tout est refusé par le serveur.
 
