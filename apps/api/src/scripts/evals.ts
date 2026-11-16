@@ -202,7 +202,7 @@ async function crmPersona(): Promise<PersonaForModels> {
 
 const persona = values['persona-from-crm']
   ? await crmPersona()
-  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.4.0.yaml'), 'utf8'), 'Elena', today);
+  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.5.0.yaml'), 'utf8'), 'Elena', today);
 const { config, isIndependent } = evalsConfig(DEFAULT_LLM_CONFIG, credentials);
 const gateway = createLlmGateway({
   config,
@@ -274,6 +274,13 @@ function scriptOutcome(
   return decision.kind === 'start' || decision.kind === 'send_step'
     ? { decision: decision.kind, step: { script: decision.step.scriptRef, index: decision.step.stepIndex } }
     : { decision: decision.kind };
+}
+
+/** What code decided about her accounts, as a scenario expects it. */
+function accountOutcome(account: ComposedTurn['account']): Outcome['account'] {
+  if (account === undefined) return 'none';
+  if (account.kind === 'stage_name') return 'stage_name';
+  return account.orient ? 'orient' : 'give';
 }
 
 /** One scenario, on the path a real fan's message takes; nothing leaves. */
@@ -368,6 +375,15 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
       ...(alerts.length > 0 && { alerts: alerts.map(({ id, phrase }) => ({ id, phrase })) }),
       // His availability and his sexualizing as stored a few minutes before (ADR 0103 § 9-13).
       availability: availabilityOf(situation, now),
+      // Her made-up accounts as the composer reads them (ADR 0143): the marked ones, every name for the guard.
+      accounts: {
+        shareable: scenario.accounts.flatMap(({ platform, username, usage, shareable }) =>
+          shareable ? [{ platform, username, usage }] : [],
+        ),
+        usernames: scenario.accounts.map(({ username }) => username),
+        cuts: { care: false, doNotContact: false, salesFrozen: situation.sales_frozen, openRisk: false },
+        orientedRecently: situation.oriented_recently,
+      },
       // Her made-up scripts, Reveal's history of his and his run (ADR 0098): a long sale, one message at a time.
       ...(scenario.scripts !== undefined && { scripts: scriptsInputOf(scenario.scripts, now) }),
     },
@@ -396,6 +412,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
     offer,
     desireBand: desireBandOf(composed.desire?.score ?? situation.desire),
     customOrder: composed.customOrder?.kind ?? 'none',
+    account: accountOutcome(composed.account),
     objectionReply: composed.objectionReply?.replyId ?? null,
     ...(composed.scripts !== undefined && { script: scriptOutcome(composed.scripts.decision) }),
     bubbles: composed.bubbles,

@@ -1,0 +1,25 @@
+# Ses comptes (ADR 0143 § 8, 17) : il cherche son compte ; aucun n'est marqué pour cet usage, elle lui dit de taper son nom de scène. Persona, comptes, fan et messages fictifs (ADR 0010).
+description: Il demande son insta ; son compte personnel n'est pas transmissible, elle lui dit de taper son nom de scène, sans aucun nom ni lien.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Théo (fictif)'
+situation:
+  known_hours: 24
+accounts:
+  - { platform: instagram, username: demo_perso, usage: personal, shareable: false }
+history:
+  - from: creator
+    text: Je viens de rentrer de la plage 🌊
+inbound: T'as un insta ? Je veux voir plus de photos
+expect:
+  decision:
+    handoff: false
+    offer: false
+    account: stage_name
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - demo_perso
+      - '@\w+'
+      - https?://
