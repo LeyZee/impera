@@ -5,27 +5,35 @@ import { useCreatorTrophyCase } from './api';
 import { CREATOR_TROPHY_NAMES, CreatorObject, highestMedal, isCreatorTrophy, medalName } from './creator-art';
 import './rewards.css';
 
-const plural = (count: number, one: string, many: string): string =>
-  `${String(count)} ${count > 1 ? many : one}`;
+/** No-break spaces around the middle dot and before the colon (French typography, avis Design 16/11). */
+const BEST = '\u00a0·\u00a0meilleure\u00a0: ';
 
-function StreakFact({
-  label,
-  streak,
-  words,
-}: {
-  label: string;
-  streak: TrophyCaseStreak | undefined;
-  words: (count: number) => string;
-}): JSX.Element {
+/** An empty fact weighs less than a value: muted, normal weight, one turn of phrase for all (avis Design, 16/11). */
+const Empty = ({ words }: { words: string }): JSX.Element => (
+  <span className="rw-member__empty">{words}</span>
+);
+
+function StreakFact({ label, streak }: { label: string; streak: TrophyCaseStreak | undefined }): JSX.Element {
   const current = streak?.current ?? 0;
   const best = streak?.best ?? 0;
   return (
     <div>
       <dt>{label}</dt>
       <dd className="nv-num">
-        {current === 0 ? 'Aucune' : words(current)}
-        {/* A break is never read as a loss: her best stays beside it (ADR 0108 § 3, recette 16/11 CRE-02). */}
-        {best > current ? <span className="tm-muted"> · meilleure : {best}</span> : null}
+        {current === 0 && best === 0 ? (
+          <Empty words="Aucune pour l’instant" />
+        ) : (
+          <>
+            {current}
+            {/* A break is never read as a loss: her best stays beside it (ADR 0108 § 3, recette 16/11 CRE-02). */}
+            {best > current ? (
+              <span className="tm-muted">
+                {BEST}
+                {best}
+              </span>
+            ) : null}
+          </>
+        )}
       </dd>
     </div>
   );
@@ -56,33 +64,24 @@ export function CreatorGameBlock({
     <section className="tm-block nv-enter rw-member" aria-label="Jeu">
       <h3>Jeu</h3>
       <p className="tm-hint">
-        Ce que {name} a gagné dans son jeu. En lecture : ses séries viennent de ses routines et de ses
-        livraisons.
+        Ce que {name} a gagné. Ses séries viennent de ses routines et de ses livraisons, rien ne se règle ici.
       </p>
       <dl className="rw-member__facts">
-        <StreakFact label="Série en cours" streak={day} words={(count) => plural(count, 'jour', 'jours')} />
-        <StreakFact
-          label="Livraisons à l’heure"
-          streak={delivery}
-          words={(count) => `${String(count)} de suite`}
-        />
+        <StreakFact label="Jours de routine d’affilée" streak={day} />
+        <StreakFact label="Livraisons à l’heure d’affilée" streak={delivery} />
         <div>
           <dt>Médaille</dt>
-          <dd className="rw-member__rank">
-            {medal === null ? (
-              <span className="tm-muted">Pas encore de médaille</span>
-            ) : (
-              <>
-                <CreatorObject kind={medal} size={28} earned />
-                {medalName(medal)}
-              </>
-            )}
+          <dd>
+            {/* Its name alone: under 40 px a medal is a bare coin beside drawn trophies (avis Design, 16/11). */}
+            {medal === null ? <Empty words="Aucune pour l’instant" /> : medalName(medal)}
           </dd>
         </div>
       </dl>
       <p className="rw-member__label">Trophées</p>
       {earned.length === 0 ? (
-        <p className="tm-muted rw-member__none">Aucun trophée pour l’instant.</p>
+        <p className="rw-member__none">
+          <Empty words="Aucun pour l’instant" />
+        </p>
       ) : (
         <ul className="rw-member__trophies" aria-label="Trophées gagnés">
           {earned.map((kind) => (

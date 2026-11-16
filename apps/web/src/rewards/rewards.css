@@ -616,6 +616,11 @@
 .rw-member__none {
   margin: 0;
 }
+/* An empty fact weighs less than a value (avis Design, 16/11). */
+.rw-member__empty {
+  font-weight: 400;
+  color: var(--nv-ink-muted);
+}
 
 /* A creator's streak medal (ADR 0107 § 1): her days engraved in Arabic numerals, heavier than a trophy's digits. */
 .rw-engraved {

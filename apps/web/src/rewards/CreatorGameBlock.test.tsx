@@ -60,10 +60,13 @@ describe('her game on her sheet, agency side (ADR 0107 § 12)', () => {
     });
     show();
     const block = await screen.findByRole('region', { name: 'Jeu' });
-    expect(within(block).getByText(/3 jours/u)).toBeDefined();
-    expect(within(block).getByText(/meilleure : 16/u)).toBeDefined();
-    expect(within(block).getByText('2 de suite')).toBeDefined();
-    expect(within(block).getByText('Série de 14 jours')).toBeDefined();
+    // Two series side by side, said alike; no-break spaces around the dot and before the colon.
+    const facts = within(block)
+      .getAllByRole('definition')
+      .map((fact) => fact.textContent);
+    expect(facts).toEqual(['3\u00a0·\u00a0meilleure\u00a0: 16', '2', 'Série de 14 jours']);
+    expect(within(block).getByText('Jours de routine d’affilée')).toBeDefined();
+    expect(within(block).getByText('Livraisons à l’heure d’affilée')).toBeDefined();
     const trophies = within(block).getByRole('list', { name: 'Trophées gagnés' });
     expect(within(trophies).getAllByRole('listitem')).toHaveLength(1);
     expect(within(trophies).getByText('Premier dépôt')).toBeDefined();
@@ -82,9 +85,15 @@ describe('her game on her sheet, agency side (ADR 0107 § 12)', () => {
     });
     show();
     const block = await screen.findByRole('region', { name: 'Jeu' });
-    expect(within(block).getAllByText('Aucune')).toHaveLength(2);
-    expect(within(block).getByText('Pas encore de médaille')).toBeDefined();
-    expect(within(block).getByText('Aucun trophée pour l’instant.')).toBeDefined();
+    // An empty fact weighs less than a value, and every one says it the same way (avis Design, 16/11).
+    const empties = within(block).getAllByText(/^Aucune? pour l’instant$/u);
+    expect(empties.map((one) => one.textContent)).toEqual([
+      'Aucune pour l’instant',
+      'Aucune pour l’instant',
+      'Aucune pour l’instant',
+      'Aucun pour l’instant',
+    ]);
+    expect(empties.every((one) => one.className === 'rw-member__empty')).toBe(true);
   });
 
   it('shows nothing when the server refuses the read', async () => {
