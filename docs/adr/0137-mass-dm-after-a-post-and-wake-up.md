@@ -1,6 +1,6 @@
 # 0137. Le Mass DM part seul : une annonce à tous après chaque publication du feed, un réveil avec un média demandé exprès quand plus personne ne parle
 
-Statut : accepted (Charles, 16/11/2026, 16 h 13 Paris, « ok 0137 » ; demande du même jour, 15 h 50, fil « Publier posts et stories automatiquement »). Amendement du même jour (ses précisions de 17 h 19 et 17 h 20 : annonce à tous, réveil avec un média demandé exprès, Mass DM planifiés avec les publications, équipe prévenue) : accepted (« ok 0137 bis », 16 h 22 Paris). Second amendement (§ 2 bis, après sa réponse de 17 h 24 : trois types de plus, aucun Mass DM payant, ne jamais submerger un fan) : proposed, en attente de « ok 0137 ter ».
+Statut : accepted (Charles, 16/11/2026, 16 h 13 Paris, « ok 0137 » ; demande du même jour, 15 h 50, fil « Publier posts et stories automatiquement »). Amendement du même jour (ses précisions de 17 h 19 et 17 h 20 : annonce à tous, réveil avec un média demandé exprès, Mass DM planifiés avec les publications, équipe prévenue) : accepted (« ok 0137 bis », 16 h 22 Paris). Second amendement (§ 2 bis, après sa réponse de 17 h 24 : trois types de plus, aucun Mass DM payant, ne jamais submerger un fan) : accepted (« ok 0137 ter », 17 h 26 Paris).
 Date : 2026-11-16
 Amende : ADR 0044 § 5 (le Mass DM ne part plus seulement d'un dépôt Relance : il peut être un texte qui accompagne une publication).
 S'appuie sur : ADR 0140 (demande hebdomadaire des médias de Relance, fil Médias).
@@ -71,7 +71,8 @@ Le même jour, à 17 h 19 et 17 h 20, Charles a précisé : l'annonce d'une nouv
 ### 6. Fiabilité
 
 - Clé d'idempotence par Mass DM. Si la réponse de Reveal se perd, le code relit la liste des Mass DM avant toute nouvelle tentative et ne renvoie jamais à l'aveugle : ambre avec sa raison (ADR 0044 § 5).
-- Les listes créées pour un Mass DM sont gardées dans Reveal avec leur nom daté ; leur nettoyage attend que la suppression d'une liste soit vue dans une capture.
+- **Une liste par envoi** : chaque Mass DM part vers une liste statique créée pour lui (nom daté), remplie par le code 10 minutes avant, puis supprimée après l'envoi. Les filtres de Reveal (« en ligne », dépense, ancienneté, listes dynamiques) s'ajoutent seulement quand ils disent exactement ce que veut la règle, par exemple « en ligne » pour le réveil « en ligne ». Nos exclusions (§ 2) passent toujours par la liste du code, jamais par un filtre de Reveal.
+- La suppression d'une liste existe dans Reveal (Charles, 16/11), mais sa requête n'est pas dans la capture du 16/11 : tant qu'elle n'est pas vue, les listes restent avec leur nom daté. Créer, remplir ou supprimer une liste est une écriture sur le compte : rien sur le vrai compte avant le mot de Charles, et les essais se font avec le seul compte fan « test ».
 - Un ajout de fan qui échoue retire ce fan de l'envoi : la liste envoyée est toujours celle que le code a vérifiée.
 
 ### 7. Mesurer
