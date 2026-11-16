@@ -157,6 +157,7 @@ Branche : task/<id>-<slug>
 | OPS-13 | L'essai de restauration connaît les rôles de l'ADR 0087 | exploitation | done | SEC-10 |
 | OPS-14 | Les lectures de connectors pour le MCP | exploitation | review | MCP lot a |
 | OPS-15 | Un appel d'IA lent n'est plus attendu deux minutes | exploitation | done | ADR 0009, OPS-06 |
+| OPS-17 | Démarrer Impera : le PC se met à jour seul au démarrage | exploitation | review | ADR 0125 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
