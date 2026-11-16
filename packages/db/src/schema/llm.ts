@@ -46,6 +46,12 @@ export const LLM_CALL_STATUSES = [
   'error',
 ] as const;
 
+/**
+ * A request's part in a hedged attempt (`HedgeRole` in packages/llm, OPS-15): `loser` was still running when the answer
+ * went out. Its cost counts; latency reads leave it out. `NULL`: not hedged.
+ */
+export const LLM_CALL_HEDGES = ['winner', 'loser'] as const;
+
 export const llmCalls = pgTable(
   'llm_calls',
   {
@@ -70,6 +76,7 @@ export const llmCalls = pgTable(
     costMicroUsd: bigint('cost_micro_usd', { mode: 'number' }),
     isFallback: boolean('is_fallback').notNull().default(false),
     traceId: text('trace_id'),
+    hedge: enumText('hedge'),
     createdAt: createdAt(),
   },
   (t) => [
@@ -77,6 +84,7 @@ export const llmCalls = pgTable(
     enumCheck('llm_calls', t.purpose, LlmPurposeSchema.options),
     enumCheck('llm_calls', t.status, LLM_CALL_STATUSES),
     enumCheck('llm_calls', t.currency, CurrencySchema.options),
+    enumCheck('llm_calls', t.hedge, LLM_CALL_HEDGES),
     index('llm_calls_creator_created_idx').on(t.creatorId, t.createdAt),
     /** A provider's latest answer and its refusals for lack of quota since (ADR 0091 § 6), every five minutes. */
     index('llm_calls_provider_status_created_idx').on(t.provider, t.status, t.createdAt),
