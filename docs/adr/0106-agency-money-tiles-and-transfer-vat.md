@@ -44,9 +44,9 @@ Ce que le registre a déjà, vente par vente (connecteur Reveal) : le TTC, le HT
 
 Design demande un montant pour l'écran « Ventes » de l'espace créatrice. Charles (16/11, 00h43) : transparence totale pour la créatrice sur son argent, et seulement sur le sien ; les secrets de l'agence restent cachés (stratégies de vente, stratégies avec les fans). Ses choix du 16/11 à 11h51 :
 
-15. **Elle voit sa part, et rien d'autre en argent** : le `creatorMinor` de chaque vente (le `modelRevenue` de Reveal), tel que la plateforme le donne, jamais recalculé. Jamais la part de l'agence, le pourcentage, le net, le prix payé, la TVA, le fan, le chatteur ni l'agent qui a vendu.
+15. **Elle voit sa part** : le `creatorMinor` de chaque vente (le `modelRevenue` de Reveal), tel que la plateforme le donne, jamais recalculé. Cette route ne porte que sa part ; jamais le fan, le chatteur ni l'agent qui a vendu (CR-04). Les autres lignes de la chaîne (prix payé, TVA, commission, part de l'agence) restent hors de cette route.
 16. **Deux périodes** : la quinzaine en cours et la précédente, celles de la paie de l'équipe (du 1er au 15, du 16 à la fin du mois).
-17. **Nette des remboursements, comme Reveal la compte** : un remboursement retire sa part du jour où Reveal le lit.
+17. **Nette des remboursements, comme Reveal la compte** : un remboursement retire sa part du jour de la vente remboursée, comme le registre le fait pour les chiffres de l'agence (ADR 0054).
 18. **Le détail des remboursements est replié** : un chevron l'ouvre, si elle le veut. Il donne, par quinzaine et par jour, le nombre de remboursements et ce qu'ils lui ont retiré.
 19. **Un total par quinzaine et par devise**, jamais converti d'une devise à l'autre, puis le détail jour par jour, chaque vente comptée au jour de **son fuseau à elle**.
 20. **Lecture seule, pour son compte seul** : `GET /v1/creator-space/earnings`, rôle `creator`, sur sa seule créatrice ; le propriétaire et les managers ne passent pas par là.
