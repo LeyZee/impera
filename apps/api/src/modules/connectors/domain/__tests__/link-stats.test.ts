@@ -68,4 +68,8 @@ describe('a story link gone silent (ADR 0120 § 6)', () => {
     expect(storyLinkSilent(habit.slice(1), now)).toBe(false);
     expect(storyLinkSilent(habit.slice(0, 6), now)).toBe(false);
   });
+
+  it('raises nothing with three days of history: the job reads at least eight days', () => {
+    expect(storyLinkSilent(habit.slice(0, 3), now)).toBe(false);
+  });
 });

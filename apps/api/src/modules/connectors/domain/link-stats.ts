@@ -77,6 +77,9 @@ export function robotShare(totals: readonly LinkHourTotal[]): number {
 /**
  * Whether a story link went silent (§ 6): not one click in the 24 hours before `now`, while each of the seven days
  * before those had at least one. A link that is new, or that never had the habit, is not an alert.
+ *
+ * The caller passes at least eight days of hours before `now` (the last 24 hours and the seven days of the habit). With
+ * less (a first reading, an emptied base) the habit cannot be seen and nothing is raised.
  */
 export function storyLinkSilent(totals: readonly LinkHourTotal[], now: Date): boolean {
   const end = now.getTime();
