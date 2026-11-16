@@ -124,8 +124,9 @@ export class ScriptStepPriceChanged extends ConnectorError {
 
 /**
  * The step carries a reduced price for a time on the platform (Reveal's « Tarif réduit »): Impera never sells at a
- * discount (méthode : on ne négocie jamais), so nothing is sent, as for a changed price (Charles, recette 16/11).
- * `fatal`, never retried as it is: the step goes again once the agency takes the discount off on the platform.
+ * discount, so nothing is sent, as for a changed price (Charles, recette 16/11). `fatal`: the draft fails for good
+ * and is never retried; once the agency takes the discount off on the platform, the next import makes the script
+ * proposable again and only a new proposal sends the step.
  */
 export class ScriptStepDiscounted extends ConnectorError {
   constructor() {
