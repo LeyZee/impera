@@ -9,6 +9,11 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 /** Below this, two messages read as one exchange: no line is written. */
 const GAP_MS = HOUR_MS;
+/**
+ * Her day starts at 5 a.m. on her clock: 23 h 10 then 0 h 25 is the same evening, not « le lendemain » (relecture de
+ * l'audit sur #774).
+ */
+const DAY_START_MS = 5 * HOUR_MS;
 
 export interface DatedTurn {
   readonly fromFan: boolean;
@@ -16,6 +21,15 @@ export interface DatedTurn {
 }
 
 function localParts(at: Date, timeZone: string): { day: number; weekday: string; clock: string } {
+  const format = (date: Date) =>
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+  const dayParts = format(new Date(at.getTime() - DAY_START_MS));
+  const dayPart = (type: string): number => Number(dayParts.find((p) => p.type === type)?.value ?? '');
   const parts = new Intl.DateTimeFormat('fr-FR', {
     timeZone,
     year: 'numeric',
@@ -29,8 +43,8 @@ function localParts(at: Date, timeZone: string): { day: number; weekday: string;
   const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
   const minute = part('minute');
   return {
-    // Days since the epoch on her calendar: « the next day » is a change of date on her clock, not 24 hours.
-    day: Date.UTC(Number(part('year')), Number(part('month')) - 1, Number(part('day'))) / DAY_MS,
+    // Days since the epoch on her calendar, starting at 5 a.m.: « the next day » is a new day of hers, not 24 hours.
+    day: Date.UTC(dayPart('year'), dayPart('month') - 1, dayPart('day')) / DAY_MS,
     weekday: part('weekday'),
     clock: `${String(Number(part('hour')))} h${minute === '00' ? '' : ` ${minute}`}`,
   };
@@ -64,21 +78,37 @@ export function gapNote(previous: Date, at: Date, timeZone: string): string | nu
   return `${spanLabel(days * DAY_MS)} plus tard, ${now.weekday}, ${now.clock}`;
 }
 
+/** The time of a message on her clock, alone: « mardi, 9 h 10 ». */
+function clockNote(at: Date, timeZone: string): string {
+  const { weekday, clock } = localParts(at, timeZone);
+  return `${weekday}, ${clock}`;
+}
+
 /**
  * The dated line of each turn: only before a message of his that comes an hour or more after the one before it,
- * whoever wrote that one. Hers carry none, so that the voice never learns to write such a line itself.
+ * whoever wrote that one. When the silence came before her answer and he answers her quickly (she answered the next
+ * morning, or followed up two days later), his message carries its time on her clock: the history never reads as one
+ * evening. Hers carry none, so that the voice never learns to write such a line itself.
  */
 export function gapNotes(turns: readonly DatedTurn[], timeZone: string): readonly (string | null)[] {
   return turns.map((turn, index) => {
-    const previous = turns[index - 1]?.at;
-    if (!turn.fromFan || turn.at === undefined || previous === undefined) return null;
-    return gapNote(previous, turn.at, timeZone);
+    const previous = turns[index - 1];
+    if (!turn.fromFan || turn.at === undefined || previous?.at === undefined) return null;
+    const note = gapNote(previous.at, turn.at, timeZone);
+    if (note !== null || previous.fromFan) return note;
+    // Her run just before: was there a silence before it, since his last message?
+    let start = index - 1;
+    while (start > 0 && turns[start - 1]?.fromFan === false) start -= 1;
+    const his = turns[start - 1]?.at;
+    const hers = turns[start]?.at;
+    if (his === undefined || hers === undefined) return null;
+    return hers.getTime() - his.getTime() >= GAP_MS ? clockNote(turn.at, timeZone) : null;
   });
 }
 
 /**
  * What « Le moment » says of the last exchanges, at `now`: how long he took to answer her, or that her answer stayed
- * long without one; and that she answers late. Nothing under the thresholds, nothing for a turn without a date.
+ * long without one; and how long ago he wrote. Facts only: whether that is late is hers to feel. Nothing under the thresholds, nothing for a turn without a date.
  */
 export function timingLines(turns: readonly DatedTurn[], now: Date): readonly string[] {
   const last = turns.at(-1);
@@ -106,6 +136,6 @@ export function timingLines(turns: readonly DatedTurn[], now: Date): readonly st
     );
   }
   const waiting = now.getTime() - first.getTime();
-  if (waiting >= GAP_MS) lines.push(`Il t’a écrit il y a ${spanLabel(waiting)} : tu lui réponds en retard.`);
+  if (waiting >= GAP_MS) lines.push(`Il t’a écrit il y a ${spanLabel(waiting)}.`);
   return lines;
 }
