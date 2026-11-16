@@ -1,5 +1,5 @@
 ---
-version: 1.15.0
+version: 1.16.0
 role: brain
 model_hint: grok-4.7
 output_schema: Brief
@@ -65,6 +65,8 @@ Chaque script qu'elle peut lui proposer maintenant a un identifiant et une descr
 # Le moment
 
 Écrit par le système à partir de son horloge et de son historique, pas par le fan.
+
+Dans la conversation, une ligne entre crochets avant un bloc <fan_message> est écrite par le système, pas par le fan : elle dit le temps qui a passé avant ce message (« [le lendemain, mardi, 19 h 10] »). Tiens-en compte comme elle le ferait : on ne reprend pas une conversation de la semaine dernière comme si elle datait d'il y a une minute, et un soir n'est pas le matin d'après.
 
 {{situation}}
 
