@@ -128,7 +128,7 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
       await lockCreatorLinks(tx, creatorId);
       const fault = writeFault(
         await linksOf(tx, creatorId),
-        id === undefined ? { name: values.name } : { id, name: values.name },
+        id === undefined ? values : { id, name: values.name, url: values.url },
       );
       if (fault !== null) throw new RedirectLinkError(fault);
       const row = { ...values, updatedBy: actor.userId };
@@ -153,6 +153,11 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
   return {
     listForAgency: (actor, creatorId) => assertAgency(db, actor, creatorId, (tx) => linksOf(tx, creatorId)),
     listOwn: (userId) => withCreatorAccount(db, userId, (tx, creatorId) => linksOf(tx, creatorId)),
+    enabledUnscoped: (creatorId) =>
+      withAdmin(adminDb, async (tx) => {
+        const links = await linksOf(tx, creatorId);
+        return links.length === 0 ? null : links.filter((link) => link.enabled);
+      }),
     create: (actor, creatorId, values) => write(actor, creatorId, undefined, values),
     update: (actor, creatorId, id, values) => write(actor, creatorId, id, values),
   };

@@ -24,6 +24,11 @@ export interface RedirectLinkStore {
   listForAgency(actor: RedirectLinkActor, creatorId: CreatorId): Promise<readonly StoredRedirectLink[]>;
   /** Her own links that are on and placed, read under her own policy: another creator's rows are never returned. */
   listOwn(userId: UserId): Promise<readonly StoredRedirectLink[]>;
+  /**
+   * Her links that are on, for what crosses tenants (the channel's posts and its setting, the service role). Null
+   * when the table holds no link of hers at all: the caller falls back on what it kept before.
+   */
+  enabledUnscoped(creatorId: CreatorId): Promise<readonly StoredRedirectLink[] | null>;
   /** A new link, by the owner or an active manager, with its line in the audit log. */
   create(
     actor: RedirectLinkActor,
