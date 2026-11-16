@@ -167,3 +167,4 @@ Date : AAAA-MM-JJ
 | 0159 | Une demande sur mesure passe par l'accord et le prix de la créatrice ; l'IA prend la commande avec un acompte par pourboire et livre depuis un dossier rattaché au fan | accepted (remplace 0090 § A points 1 et 2 ; précise 0145, 0150, 0135, 0018, 0021, 0088) |
 | 0160 | Durée des sessions selon le rôle : le propriétaire 48 heures sans activité, la créatrice 7 jours, les autres 12 heures | accepted (amende 0046 § 6) |
 | 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |
+| 0141 | Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande | proposed (précise 0086 § 3 et § 10) |
