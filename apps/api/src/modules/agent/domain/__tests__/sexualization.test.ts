@@ -121,6 +121,29 @@ describe('declaredAdultAge', () => {
     expect(declaredAdultAge(fact('18'), 'j’ai 18 ans tkt')).toBeNull();
   });
 
+  it('exempts only the number right after a kin word (relecture Sécurité, #798, A)', () => {
+    expect(declaredAdultAge(fact('25'), 'mon frere a 25 ans moi 16')).toBeNull();
+    expect(declaredAdultAge(fact('38'), 'J’ai 38 ans, mon fils de 6 ans dort')).toBe(38);
+  });
+
+  it('confirms only a plain positive clause of his, whatever the age (relecture Sécurité, #798, B)', () => {
+    for (const text of [
+      'je fais 25 ans',
+      'on me donne 25 ans',
+      'je dis que j’ai 25 ans',
+      'si j’avais 25 ans',
+      'j’ai 25 ans ou pas',
+      'j’ai 25 ans non je rigole',
+      'tu as 25 ans ?',
+      'ma copine a 25 ans',
+      '25 ans, 4eme',
+    ])
+      expect(declaredAdultAge(fact('25'), text)).toBeNull();
+    expect(declaredAdultAge(fact('45'), 'mon pere a 45 ans')).toBeNull();
+    expect(declaredAdultAge(fact('18'), 'oui j’ai 18 ans')).toBe(18);
+    expect(declaredAdultAge(fact('18'), 'j’ai 18 ans promis')).toBeNull();
+  });
+
   it('still confirms the plain adults', () => {
     expect(declaredAdultAge(fact('25'), 'j’ai 25 ans')).toBe(25);
     expect(declaredAdultAge(fact('32'), '32 ans, marié depuis 6 ans')).toBe(32);
