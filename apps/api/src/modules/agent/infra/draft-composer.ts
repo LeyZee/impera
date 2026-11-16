@@ -316,10 +316,12 @@ export interface DraftComposerDeps {
  */
 export interface ScriptSource {
   catalogue(creatorId: string, platformAccountId: string): Promise<readonly PlatformScriptView[]>;
+  /** His history on the platform, read for the fan (`fanId`, ours) in this conversation of the account. */
   history(
     creatorId: string,
     platformAccountId: string,
     platformConversationId: string,
+    fanId: string,
   ): Promise<ScriptHistoryView>;
 }
 
@@ -336,10 +338,15 @@ async function scriptsInput(deps: DraftComposerDeps, input: AgentComposeInput): 
   if (deps.scripts === undefined || platformAccountId === undefined || platformConversationId === undefined)
     return closed;
   try {
-    const [catalogue, history] = await Promise.all([
-      deps.scripts.catalogue(input.creatorId, platformAccountId),
-      deps.scripts.history(input.creatorId, platformAccountId, platformConversationId),
-    ]);
+    // Her catalogue first: without a script she may offer, his history is not asked of the platform.
+    const catalogue = await deps.scripts.catalogue(input.creatorId, platformAccountId);
+    if (catalogue.length === 0) return closed;
+    const history = await deps.scripts.history(
+      input.creatorId,
+      platformAccountId,
+      platformConversationId,
+      input.fanId,
+    );
     return { ...closed, catalogue, history };
   } catch {
     return closed;

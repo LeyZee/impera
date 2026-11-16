@@ -313,7 +313,7 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
  * The agency's reads of her native scripts: under her RLS and the team's scopes (the owner, an active manager of her
  * list, `onCreatorList`, as her vault is read); her own account is closed by the base. Anyone else gets the same `null`
  * for a creator who exists and one who does not, never her existence. Her vault links are read in the same
- * transaction, never by the service role. `oneForJob` alone is the service role's, for a job.
+ * transaction, never by the service role. `oneForJob` and `ofAccountForJob` alone are the service role's, for a job.
  */
 export function createDrizzlePlatformScriptReadStore(
   db: Database,
@@ -347,6 +347,16 @@ export function createDrizzlePlatformScriptReadStore(
           .where(and(eq(scripts.id, scriptId), eq(scripts.creatorId, creatorId)));
         const [stored] = await storedOf(tx, rows);
         return stored ?? null;
+      }),
+
+    ofAccountForJob: (creatorId, platformAccountId) =>
+      withAdmin(adminDb, async (tx) => {
+        const rows = await tx
+          .select()
+          .from(scripts)
+          .where(and(eq(scripts.creatorId, creatorId), eq(scripts.platformAccountId, platformAccountId)))
+          .orderBy(scripts.name, scripts.id);
+        return storedOf(tx, rows);
       }),
   };
 }

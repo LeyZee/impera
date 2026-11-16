@@ -299,6 +299,18 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
     );
   });
 
+  it('gives the agent a fan’s script history and his last priced offer, and refuses an unknown account', async () => {
+    const reads = app.modules.connectors.platformReads;
+    const history = await reads.scriptHistory(accountId, 'fan_02');
+    expect(history.length).toBeGreaterThan(0);
+    expect(history.every((step) => step.stepRef.platform === 'reveal')).toBe(true);
+    expect(await reads.lastOfferAt(accountId, 'fan_02')).toBeInstanceOf(Date);
+    expect(await reads.lastOfferAt(accountId, 'fan_04')).toBeNull();
+    expect(await codeOf(reads.scriptHistory(newId(PlatformAccountIdSchema), 'fan_02'))).toBe(
+      'platform_account_not_found',
+    );
+  });
+
   it('reads nothing of an archived creator', async () => {
     await test.admin.db
       .update(schema.creators)

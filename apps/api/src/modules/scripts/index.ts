@@ -16,6 +16,7 @@ import { identifyPlatformScript, type IdentifyOutcome } from './application/iden
 import { importPlatformScripts, type ImportPlatformScriptsRun } from './application/import-platform-scripts';
 import {
   creatorPlatformScripts,
+  accountPlatformScriptsForJob,
   platformScriptForJob,
   type PlatformScriptsReader,
   type PlatformScriptView,
@@ -102,6 +103,14 @@ export interface ScriptsModule {
      * (ADR 0111, the reward). `null` when it is not hers.
      */
     platformScript(creatorId: CreatorId, scriptId: string): Promise<PlatformScriptView | null>;
+    /**
+     * Her native scripts on one account, by the ids of the conversation the agent answers: what it decides a script on
+     * for that fan (ADR 0098), the proposable ones and the others (their steps tell what he already received).
+     */
+    accountScripts(
+      creatorId: CreatorId,
+      platformAccountId: PlatformAccountId,
+    ): Promise<readonly PlatformScriptView[]>;
   };
   /** Mounted under `/v1` by the server: `/script-structures` (and their cards), each creator's `/script-queue` and `/script-cadence`. */
   readonly routes: FastifyPluginAsyncZod;
@@ -210,6 +219,8 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
     },
     forJobs: {
       platformScript: (creatorId, scriptId) => platformScriptForJob(platformReads, creatorId, scriptId),
+      accountScripts: (creatorId, platformAccountId) =>
+        accountPlatformScriptsForJob(platformReads, creatorId, platformAccountId),
     },
     routes: createScriptRoutes(structures, deps.limitsOf, deps.requireRole, rasterize, {
       store: cadences,

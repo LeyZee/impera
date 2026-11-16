@@ -94,7 +94,7 @@ const toSend = (script: PlatformScriptView, stepIndex: number) => ({
   stepRef: script.steps[stepIndex]?.stepRef,
   kind: script.steps[stepIndex]?.kind,
   priceMinor: script.steps[stepIndex]?.priceMinor,
-  idempotencyKey: `script-step:conv-demo:${script.scriptRef}:${String(stepIndex)}`,
+  idempotencyKey: `script-step:conv-demo:${script.scriptRef}:1:${String(stepIndex)}`,
 });
 
 describe('platformScriptFaults', () => {

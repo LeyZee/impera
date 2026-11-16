@@ -14,11 +14,14 @@ import {
   type AgentModule,
 } from '../modules/agent';
 import type { AlertsModule } from '../modules/alerts';
+import type { ConnectorsModule } from '../modules/connectors';
 import type { BubbleGuard, CardReader, DraftComposer } from '../modules/conversations';
 import type { FansModule } from '../modules/fans';
 import type { PersonaModule } from '../modules/persona';
 import type { SchedulingModule } from '../modules/scheduling';
+import type { ScriptsModule } from '../modules/scripts';
 
+import { createAgentScriptSource, createLastOfferAt } from './agent-scripts';
 import type { Shared } from './shared';
 
 export interface WiredAgent {
@@ -44,12 +47,22 @@ export function wireAgent(
     readonly fans: FansModule;
     readonly alerts: AlertsModule;
     readonly scheduling: SchedulingModule;
+    /** Her native scripts as the agency mirrored and validated them (ADR 0098, ADR 0099). */
+    readonly scripts: ScriptsModule;
+    /** His script history and last priced offer, read on the platform at each message (ADR 0018 § 5). */
+    readonly connectors: ConnectorsModule;
     /** Tests plug a composer with fixed bubbles here; the agent's composer otherwise, on the app's gateway. */
     readonly composer?: DraftComposer;
   },
 ): WiredAgent {
   const { logger } = shared;
   const { activePersona, persona, alerts, scheduling } = deps;
+  // Her scripts on the platform and his history there (ADR 0098): without them she sells nothing.
+  const scriptReads = {
+    scripts: deps.scripts.forJobs,
+    reads: deps.connectors.platformReads,
+    fans: deps.fans,
+  };
   // Each draft is written with her active persona version, read at each message; without one, a human answers
   // (`persona_inactive`). No file is read on this path: the fictional demo never writes to real fans unless an owner
   // activates it as her version (ADR 0010, 0022).
@@ -76,6 +89,8 @@ export function wireAgent(
       chatterOnShift: async (creatorId, at) =>
         (await scheduling.onShift(CreatorIdSchema.parse(creatorId), at)).length > 0,
       // Her clock is the creator's (`creators.timezone`); Paris when the row cannot be read.
+      scripts: createAgentScriptSource(scriptReads),
+      lastOfferAt: createLastOfferAt(scriptReads),
       timeZoneOf: async (creatorId) => {
         const [creator] = await persona.creators.list([CreatorIdSchema.parse(creatorId)]);
         return creator?.timezone ?? DEFAULT_LLM_CONFIG.dailyBudget.timeZone;

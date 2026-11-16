@@ -1,4 +1,11 @@
-import type { BranchCondition, CreatorId, Currency, MediaSlotKind, UserRole } from '@impera/contracts';
+import type {
+  BranchCondition,
+  CreatorId,
+  Currency,
+  MediaSlotKind,
+  PlatformAccountId,
+  UserRole,
+} from '@impera/contracts';
 
 import { branchGaps, conditionOf, ranksOf, stepsWithoutDefault } from '../domain/branches';
 import {
@@ -187,6 +194,18 @@ export async function platformScriptForJob(
 ): Promise<PlatformScriptView | null> {
   const script = await deps.store.oneForJob(creatorId, scriptId);
   return script === null ? null : viewOf(script);
+}
+
+/**
+ * Her native scripts on one account, out of any person and as the service role: what the agent decides a script on
+ * for a fan (ADR 0098), each with its `proposable` and its steps by rank. For a job only, like `platformScriptForJob`.
+ */
+export async function accountPlatformScriptsForJob(
+  deps: Deps,
+  creatorId: CreatorId,
+  platformAccountId: PlatformAccountId,
+): Promise<readonly PlatformScriptView[]> {
+  return (await deps.store.ofAccountForJob(creatorId, platformAccountId)).map(viewOf);
 }
 
 /**

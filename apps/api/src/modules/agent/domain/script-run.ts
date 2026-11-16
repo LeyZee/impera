@@ -399,6 +399,9 @@ const later = (a: Date | null, b: Date | null): Date | null => {
   return a.getTime() >= b.getTime() ? a : b;
 };
 
+/** A script is played once with a fan until the replay of ADR 0128: every key is of its first pass. */
+const FIRST_PASS = 1;
+
 function toSend(
   conversationRef: string,
   script: PlatformScriptView,
@@ -412,7 +415,8 @@ function toSend(
     stepRef: step.stepRef,
     kind: step.kind,
     priceMinor: step.priceMinor,
-    idempotencyKey: `script-step:${conversationRef}:${script.scriptRef}:${String(stepIndex)}`,
+    // The script's first pass with him (ADR 0128 brings the replay): a pass and a rank name one send.
+    idempotencyKey: `script-step:${conversationRef}:${script.scriptRef}:${String(FIRST_PASS)}:${String(stepIndex)}`,
   };
 }
 
