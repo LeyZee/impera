@@ -1,8 +1,9 @@
-# 0137. Le Mass DM part seul : une annonce après chaque publication du feed, un réveil quand plus personne ne parle, aux seuls fans silencieux
+# 0137. Le Mass DM part seul : une annonce à tous après chaque publication du feed, un réveil avec un média demandé exprès quand plus personne ne parle
 
-Statut : accepted (Charles, 16/11/2026, 16 h 13 Paris, « ok 0137 » ; demande du même jour, 15 h 50, fil « Publier posts et stories automatiquement »)
+Statut : accepted (Charles, 16/11/2026, 16 h 13 Paris, « ok 0137 » ; demande du même jour, 15 h 50, fil « Publier posts et stories automatiquement »). Amendement du même jour (ses précisions de 17 h 19 et 17 h 20 : annonce à tous, réveil avec un média demandé exprès, Mass DM planifiés avec les publications, équipe prévenue) : proposed, en attente de « ok 0137 bis ».
 Date : 2026-11-16
 Amende : ADR 0044 § 5 (le Mass DM ne part plus seulement d'un dépôt Relance : il peut être un texte qui accompagne une publication).
+S'appuie sur : ADR 0140 (demande hebdomadaire des médias de Relance, fil Médias).
 Précise : ADR 0110 § 5 et § 6 (Mass DM marqué « envoyé à tous », pas de relance de l'agent dans les 6 h), ADR 0136 (publication du feed), ADR 0126 (silence pendant un live).
 
 ## Contexte
@@ -13,27 +14,37 @@ Un Mass DM est un envoi réel à de vrais fans, en nombre. Il passe donc par les
 
 La capture du 16/11 (lue pour sa forme seulement) montre : la création d'un Mass DM programmé (texte, médias, prix, listes incluses et exclues), sa suppression, une estimation de l'audience par filtres (abonnés actifs, dépense, ancienneté, en ligne, renouvellement coupé), et les listes de fans (statiques ou dynamiques, ajout d'un fan à une liste statique). Elle ne montre ni filtre « anciens abonnés », ni filtre « sans échange récent », ni le retrait d'un fan d'une liste.
 
+Le même jour, à 17 h 19 et 17 h 20, Charles a précisé : l'annonce d'une nouvelle publication part à tous les abonnés et anciens abonnés, même ceux qui ont parlé récemment ; le réveil s'appuie sur des photos ou vidéos sexy demandées exprès à la créatrice chaque semaine, hors séances, en quantité que le système calcule ; les Mass DM se planifient avec les publications de la semaine ; et l'équipe doit savoir quand part le prochain Mass DM.
+
 ## Décision
 
-### 1. Deux Mass DM automatiques
+### 1. Deux Mass DM automatiques, planifiés avec la semaine
 
 - **Annonce** : un Mass DM par publication du feed (ADR 0136), jamais pour une story. Il part **30 minutes après que Reveal a confirmé la publication**, jamais avant. Un index unique (publication → Mass DM) garantit qu'une publication n'en a jamais deux.
-- **Réveil** : il part quand, pendant les heures d'activité de la créatrice, **moins de 5 fans ont écrit dans les 3 dernières heures** (seuil et fenêtre réglables par créatrice). Au plus un réveil tous les 3 jours, jamais le jour d'une annonce.
+- **Réveil** : il part quand, pendant les heures d'activité de la créatrice, **moins de 5 fans ont écrit dans les 3 dernières heures** (seuil et fenêtre réglables par créatrice), ou quand aucun Mass DM n'est parti depuis 5 jours. Au plus un réveil tous les 3 jours, jamais le jour d'une annonce.
+- Le plan de la semaine (ADR 0136 § 6) montre les annonces à côté de leurs publications et des créneaux de réveil possibles, et le propriétaire les valide avec elle. Le code place un Mass DM **de préférence sur un créneau où un chatteur est en shift**, puisque les réponses arrivent dans l'heure qui suit.
 
 ### 2. Qui le reçoit : une liste tenue par le code
 
-- Reveal ne sait pas filtrer « sans échange récent » : le code calcule la liste lui-même, puis la donne à Reveal comme **liste statique** créée pour ce Mass DM (`POST /fan-lists`, puis un ajout par fan), avec le nom « Impera · annonce · date » ou « Impera · réveil · date ».
-- Un fan y entre s'il est **abonné ou ancien abonné** (selon ce que Reveal permet d'écrire) **et** qu'aucun message, ni de lui ni de la créatrice, n'a été échangé depuis **72 heures** (réglage par créatrice).
-- Le code en **retire toujours**, en lisant le même état que l'agent et jamais une liste à part : un fan en doute d'âge (âge contesté ou mineur possible signalé) ; un fan en mode soin ou fragile, ou encore en sortie de soin (ADR 0088 § 7) ; un fan aux ventes gelées (dépendance ou difficulté, ADR 0132) ; un fan parti en plein sexto qui n'est pas revenu (l'agent attend son retour après une seule relance) ; un fan marqué « ne plus écrire » ou exclu des Mass DM dans Reveal ; un fan dont une conversation est tenue par un humain ou par l'agent en ce moment ; un fan au milieu d'un script ; un fan qui a reçu un Mass DM (de nous ou de Reveal) dans les 48 dernières heures ; un fan au rythme économe si l'ADR 0135 est acceptée.
-- **Plafond par fan** : 3 Mass DM automatiques par semaine au plus, annonces et réveils compris.
+- Le code calcule la liste lui-même, puis la donne à Reveal comme **liste statique** créée pour ce Mass DM (`POST /fan-lists`, puis un ajout par fan), avec le nom « Impera · annonce · date » ou « Impera · réveil · date ».
+- **Annonce** : tous les **abonnés et anciens abonnés** (selon ce que Reveal permet d'écrire), qu'ils aient parlé récemment ou non. Seuls en sortent ceux qui ont écrit dans les **30 dernières minutes** : un Mass DM au milieu d'une conversation vivante la casserait.
+- **Réveil** : les abonnés et anciens abonnés sans aucun message échangé depuis **72 heures** (réglage par créatrice). Reveal ne sait pas faire ce filtre lui-même.
+- Dans les deux cas, le code en **retire toujours**, en lisant le même état que l'agent et jamais une liste à part : un fan en doute d'âge (âge contesté ou mineur possible signalé) ; un fan en mode soin ou fragile, ou encore en sortie de soin (ADR 0088 § 7) ; un fan aux ventes gelées (dépendance ou difficulté, ADR 0132) ; un fan parti en plein sexto qui n'est pas revenu (l'agent attend son retour après une seule relance) ; un fan marqué « ne plus écrire » ou exclu des Mass DM dans Reveal ; un fan au milieu d'un script ; un fan au rythme économe si l'ADR 0135 est acceptée.
+- **Plafond par fan** : 4 Mass DM automatiques par semaine au plus (3 annonces et un réveil), et jamais deux réveils à moins de 48 h.
 
 ### 3. Ce qu'il dit
 
-- **Texte seul et gratuit**, écrit par le modèle de langage dans la voix de la créatrice, avec les gardes de voix. Annonce : il s'appuie sur la description de la publication (ADR 0083) et finit par une question (« j'ai sorti la lingerie rouge, t'en penses quoi ? »). Réveil : court et doux (« coucou toi, t'es là ? »).
+- Le texte est écrit par le modèle de langage dans la voix de la créatrice. **Annonce** : texte seul, qui s'appuie sur la description de la publication (ADR 0083) et finit par une question (« j'ai sorti la lingerie rouge, t'en penses quoi ? »). Si Reveal refuse un Mass DM sans média, l'annonce prend une photo de la publication qu'elle annonce. **Réveil** : court et doux (« coucou toi, t'es là ? »), avec **un média de Relance** (catégorie `mass_dm`, ADR 0055), décrit avant d'être choisi (ADR 0083). Ce média est gratuit et ne repart jamais : l'index de l'ADR 0044 § 5 s'applique.
 - Le texte reste au plus suggestif, jamais explicite : des destinataires ont un âge non confirmé.
 - Il passe par les mêmes gardes de voix que l'agent (`ai_disclosure` comprise), jamais par une liste propre au Mass DM. Le code refuse en plus : un prix, un lien, un média vendu, une promesse de rencontre, et une phrase déjà envoyée en Mass DM par cette créatrice dans les 30 derniers jours.
-- Si Reveal refuse un Mass DM sans média, l'annonce prend **une photo de la publication qu'elle annonce** (déjà publique, gratuite). Un réveil ne porte jamais de média.
 - Le prix d'un Mass DM automatique est toujours 0 : un Mass DM payant reste à la main (ADR 0044 § 5).
+- **La demande de médias de Relance** : une fonction pure du module des Mass DM, `relanceNeedFor(créatrice, semaine)`, rend le nombre de médias de Relance qu'il faudra la semaine suivante : les réveils probables (moyenne des quatre dernières semaines, au moins 2 et au plus 3), moins le stock de Relance déjà déposé et pas encore envoyé. La semaine de la créatrice (ADR 0140) lit ce nombre au calcul du dimanche et le place après le feed. Sans média de Relance, le réveil part en texte seul.
+
+### 3 bis. L'équipe est prévenue
+
+- Une carte « Prochain Mass DM » apparaît sur Aujourd'hui du chatteur : l'heure dans son fuseau à lui, la sorte (annonce ou réveil) et le sujet, sans le média. Un repère apparaît sur son Planning (fils Équipe et Design).
+- Dans le copilote, la réponse d'un fan à un Mass DM est signalée, avec ce Mass DM (fil Extension).
+- Le propriétaire et les managers voient les Mass DM de la semaine au Dashboard : l'heure, la sorte, le nombre de destinataires.
 
 ### 4. Ce que l'agent en fait
 
@@ -63,8 +74,8 @@ La capture du 16/11 (lue pour sa forme seulement) montre : la création d'un Mas
 ## Conséquences
 
 Positives :
-- Chaque publication relance les fans silencieux, sans travail à la main.
-- Les fans en doute d'âge, fragiles ou déjà en conversation ne reçoivent jamais un message de masse.
+- Chaque publication est annoncée à tous ses abonnés, et chaque réveil apporte un média neuf, sans travail à la main.
+- Les fans en doute d'âge, fragiles ou en pleine conversation ne reçoivent jamais un message de masse, et l'équipe sait quand le prochain part.
 
 Négatives, à surveiller :
 - Un message de masse trop fréquent fait partir des fans : plafond par fan, alerte sur les désabonnements.
