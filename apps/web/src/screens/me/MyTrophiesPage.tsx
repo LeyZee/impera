@@ -7,7 +7,7 @@ import { MeNav } from './MeNav';
 import { useMyFigures, usePayPeriod } from '@/payroll/api';
 import { figuresCurrency, netIn } from '@/payroll/my-figures';
 import { useMarkRevealed, useMyTrophyCase, usePreferences } from '@/rewards/api';
-import { TrophyCaseView } from '@/rewards/case/TrophyCaseView';
+import { TrophyCaseDown, TrophyCaseLoading, TrophyCaseView } from '@/rewards/case/TrophyCaseView';
 import { chatterCase } from '@/rewards/chatter-case';
 import { tiersOf } from '@/screens/pay/MyFigures';
 import { useCurrentPeriod } from '@/screens/pay/data';
@@ -25,7 +25,8 @@ export function MyTrophiesPage({ user }: { user: Me }): JSX.Element {
  * as on Commissions; everything else is the server's trophy case. Nothing here is worked out by the screen.
  */
 function ChatterTrophiesPage({ user }: { user: Me }): JSX.Element {
-  const read = useMyTrophyCase(true).data;
+  const caseRead = useMyTrophyCase(true);
+  const read = caseRead.data;
   const figures = useMyFigures().data;
   const current = useCurrentPeriod();
   const period = usePayPeriod(current).data;
@@ -38,7 +39,13 @@ function ChatterTrophiesPage({ user }: { user: Me }): JSX.Element {
   return (
     <Page>
       <PageHeader eyebrow="Moi" title="Mes trophées" actions={<MeNav />} />
-      {shown === null ? null : (
+      {shown === null ? (
+        caseRead.isError ? (
+          <TrophyCaseDown onRetry={() => void caseRead.refetch()} />
+        ) : (
+          <TrophyCaseLoading />
+        )
+      ) : (
         <TrophyCaseView
           trophyCase={shown.trophyCase}
           entry={shown.entry}
