@@ -90,8 +90,9 @@ describe('the copilot panel’s contract (ADR 0086)', () => {
     const moment = {
       verdict: 'soon',
       conditions: [
-        { code: 'desire', label: 'Désir assez haut', met: true },
-        { code: 'fan_messages', label: '2 messages de lui', met: false },
+        { code: 'cooldown', met: false, until: '2026-11-16T17:20:00.000Z' },
+        { code: 'fan_messages', met: false, remaining: 2 },
+        { code: 'desire_below_threshold', met: true },
       ],
     };
     expect(CopilotAssistSchema.safeParse({ ...assist, saleMoment: moment }).success).toBe(true);
@@ -111,9 +112,16 @@ describe('the copilot panel’s contract (ADR 0086)', () => {
       { ...assist, signals: { desireTrend: 72, followUpDue: false } },
       // § 4 bis: a verdict of a closed list, never a figure.
       { ...assist, saleMoment: { verdict: 62, conditions: [] } },
+      { ...assist, saleMoment: { verdict: 'now', conditions: [] } },
+      { ...assist, saleMoment: { verdict: 'good', conditions: [{ code: 'score', met: true }] } },
+      // The panel words the codes: a label from the server is refused.
       {
         ...assist,
-        saleMoment: { verdict: 'now', conditions: [{ code: 'score', label: 'Désir', met: true }] },
+        saleMoment: { verdict: 'good', conditions: [{ code: 'cooldown', label: 'Offre', met: true }] },
+      },
+      {
+        ...assist,
+        saleMoment: { verdict: 'soon', conditions: [{ code: 'fan_messages', met: false, remaining: 0 }] },
       },
     ])
       expect(CopilotAssistSchema.safeParse(broken).success).toBe(false);

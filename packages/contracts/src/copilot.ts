@@ -154,24 +154,44 @@ export type CopilotCut = z.infer<typeof CopilotCutSchema>;
 
 /**
  * ADR 0141 § 4 bis: the moment to sell, a verdict of the code with the conditions it rests on, derived from the same
- * guards as the paid step. Provisional (Agent's PR is authoritative); no desire figure, ever.
+ * guards as the paid step. Provisional (Agent's PR is authoritative); no desire figure, ever. The panel words the
+ * codes itself: the server sends no label here.
  */
-export const CopilotSaleMomentVerdictSchema = z.enum(['now', 'soon', 'not_yet']);
-export type CopilotSaleMomentVerdict = z.infer<typeof CopilotSaleMomentVerdictSchema>;
+export const SaleMomentVerdictSchema = z.enum(['good', 'soon', 'not_yet']);
+export type SaleMomentVerdict = z.infer<typeof SaleMomentVerdictSchema>;
 
-export const CopilotSaleMomentSchema = z.strictObject({
-  verdict: CopilotSaleMomentVerdictSchema,
+export const SaleConditionSchema = z.enum([
+  'desire_below_threshold',
+  'not_sexualizing',
+  'availability_unconfirmed',
+  'cooldown',
+  'no_budget',
+  'step_waiting',
+  'age_unconfirmed',
+  /** Sent only once the ADR 0112 § 9 counter exists. */
+  'fan_messages',
+  /** Met: the reason for `good`. */
+  'fan_asks_for_paid',
+]);
+export type SaleCondition = z.infer<typeof SaleConditionSchema>;
+
+export const SaleMomentSchema = z.strictObject({
+  verdict: SaleMomentVerdictSchema,
+  /** Missing conditions first. */
   conditions: z
     .array(
       z.strictObject({
-        code: z.enum(['desire', 'fan_messages', 'offer_cooldown']),
-        label: CopilotLabelSchema,
+        code: SaleConditionSchema,
         met: z.boolean(),
+        /** `cooldown` only: when the last offer stops being too recent. */
+        until: z.iso.datetime().nullable().exactOptional(),
+        /** `fan_messages` only: how many messages of his are still needed. */
+        remaining: z.number().int().positive().nullable().exactOptional(),
       }),
     )
     .max(3),
 });
-export type CopilotSaleMoment = z.infer<typeof CopilotSaleMomentSchema>;
+export type SaleMoment = z.infer<typeof SaleMomentSchema>;
 
 export const CopilotAssistSchema = z.strictObject({
   nextMove: CopilotNextMoveSchema.nullable(),
@@ -184,7 +204,7 @@ export const CopilotAssistSchema = z.strictObject({
   buttons: z.array(z.enum(['hooks', 'objection'])).max(2),
   clicksLeftToday: z.number().int().nonnegative(),
   /** § 4 bis; null under a cut, absent from a server that does not send it yet. */
-  saleMoment: CopilotSaleMomentSchema.nullable().exactOptional(),
+  saleMoment: SaleMomentSchema.nullable().exactOptional(),
 });
 export type CopilotAssist = z.infer<typeof CopilotAssistSchema>;
 
