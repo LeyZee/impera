@@ -62,7 +62,8 @@ export function RequestsSection({
 
   const list = (): JSX.Element => {
     if (content.data === undefined) {
-      if (content.isError) return <Failure onRetry={() => void content.refetch()} />;
+      if (content.isError)
+        return <Failure title="Ses demandes ne se chargent pas" onRetry={() => void content.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const groups = requestGroups(content.data, structures.data ?? [], today);

@@ -36,7 +36,8 @@ export function DropsSection({
 
   const list = (): JSX.Element => {
     if (content.data === undefined) {
-      if (content.isError) return <Failure onRetry={() => void content.refetch()} />;
+      if (content.isError)
+        return <Failure title="Son contenu ne se charge pas" onRetry={() => void content.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const rows = herDrops(content.data);

@@ -173,11 +173,7 @@ describe('Créatrices › Scripts (SC-03 c2b)', () => {
     cleanup();
     serve({});
     show();
-    // Her vault, in the same section, says its own read failed in its card: the scripts' failure is the other alert.
-    await waitFor(() => {
-      const said = screen.getAllByRole('alert').map((alert) => alert.textContent);
-      expect(said.some((text) => text.includes('Le serveur ne répond pas'))).toBe(true);
-    });
+    expect(await screen.findByText('Ses scripts ne se chargent pas')).toBeDefined();
   });
 });
 

@@ -126,7 +126,9 @@ export function ContentPage({
           onRetry={() => {
             void content.refetch();
           }}
-        />
+        >
+          Rien ici n’est à jour en attendant.
+        </Failure>
       ) : content.data === undefined ? (
         <div className="ct-skeleton" aria-hidden="true">
           <i />

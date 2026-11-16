@@ -112,7 +112,9 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
             onRetry={() => {
               void script.refetch();
             }}
-          />
+          >
+            Rien n’est perdu : ce que tu as envoyé est gardé.
+          </Failure>
         )}
       </Page>
     );
