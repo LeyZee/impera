@@ -266,6 +266,17 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     );
   });
 
+  it('reads one conversation by its id as the list gives it, `not_found` for one it does not have', async () => {
+    const connector = connect(world());
+    const listed = (await connector.listConversations({})).at(-1);
+    if (listed === undefined) throw new Error('the default world has conversations');
+    const fresh = connect(world());
+    expect(await fresh.getConversation(listed.ref)).toEqual(listed);
+    // Read alone, its fan is found for the fan's own reads (recette du 16/11: the copilot opened it first).
+    expect((await fresh.getFanProfile(listed.fanRef)).fanRef).toEqual(listed.fanRef);
+    expect((await rejection(fresh.getConversation(fan('conv_inconnue')))).code).toBe('not_found');
+  });
+
   it('reads the fan beside his conversation: profile, note, the model’s notes, PPV tab', async () => {
     const connector = connect(world());
     await connector.listConversations({});
