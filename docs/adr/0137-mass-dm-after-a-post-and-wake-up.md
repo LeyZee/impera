@@ -24,13 +24,14 @@ La capture du 16/11 (lue pour sa forme seulement) montre : la création d'un Mas
 
 - Reveal ne sait pas filtrer « sans échange récent » : le code calcule la liste lui-même, puis la donne à Reveal comme **liste statique** créée pour ce Mass DM (`POST /fan-lists`, puis un ajout par fan), avec le nom « Impera · annonce · date » ou « Impera · réveil · date ».
 - Un fan y entre s'il est **abonné ou ancien abonné** (selon ce que Reveal permet d'écrire) **et** qu'aucun message, ni de lui ni de la créatrice, n'a été échangé depuis **72 heures** (réglage par créatrice).
-- Le code en **retire toujours** : un fan en doute d'âge ; un fan en mode soin ou fragile (ADR 0088) ; un fan marqué « ne plus écrire » ou exclu des Mass DM dans Reveal ; un fan dont une conversation est tenue par un humain ou par l'agent en ce moment ; un fan au milieu d'un script ; un fan qui a reçu un Mass DM (de nous ou de Reveal) dans les 48 dernières heures ; un fan au rythme économe si l'ADR 0135 est acceptée.
+- Le code en **retire toujours**, en lisant le même état que l'agent et jamais une liste à part : un fan en doute d'âge (âge contesté ou mineur possible signalé) ; un fan en mode soin ou fragile, ou encore en sortie de soin (ADR 0088 § 7) ; un fan aux ventes gelées (dépendance ou difficulté, ADR 0132) ; un fan parti en plein sexto qui n'est pas revenu (l'agent attend son retour après une seule relance) ; un fan marqué « ne plus écrire » ou exclu des Mass DM dans Reveal ; un fan dont une conversation est tenue par un humain ou par l'agent en ce moment ; un fan au milieu d'un script ; un fan qui a reçu un Mass DM (de nous ou de Reveal) dans les 48 dernières heures ; un fan au rythme économe si l'ADR 0135 est acceptée.
 - **Plafond par fan** : 3 Mass DM automatiques par semaine au plus, annonces et réveils compris.
 
 ### 3. Ce qu'il dit
 
 - **Texte seul et gratuit**, écrit par le modèle de langage dans la voix de la créatrice, avec les gardes de voix. Annonce : il s'appuie sur la description de la publication (ADR 0083) et finit par une question (« j'ai sorti la lingerie rouge, t'en penses quoi ? »). Réveil : court et doux (« coucou toi, t'es là ? »).
-- Le code refuse : un prix, un lien, un média vendu, une promesse de rencontre, un mot qui dit l'IA, et une phrase déjà envoyée en Mass DM par cette créatrice dans les 30 derniers jours.
+- Le texte reste au plus suggestif, jamais explicite : des destinataires ont un âge non confirmé.
+- Il passe par les mêmes gardes de voix que l'agent (`ai_disclosure` comprise), jamais par une liste propre au Mass DM. Le code refuse en plus : un prix, un lien, un média vendu, une promesse de rencontre, et une phrase déjà envoyée en Mass DM par cette créatrice dans les 30 derniers jours.
 - Si Reveal refuse un Mass DM sans média, l'annonce prend **une photo de la publication qu'elle annonce** (déjà publique, gratuite). Un réveil ne porte jamais de média.
 - Le prix d'un Mass DM automatique est toujours 0 : un Mass DM payant reste à la main (ADR 0044 § 5).
 
