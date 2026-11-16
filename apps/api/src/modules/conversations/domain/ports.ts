@@ -715,6 +715,15 @@ export interface FollowUpPlan {
   delaysHours(creatorId: CreatorId): Promise<readonly number[]>;
 }
 
+/**
+ * Her typing rhythm (Charles, 16/11 : never her bubbles at once): how long each bubble takes her to type, the same
+ * figures the playground shows (agent module's adapter), and the wait itself, a real timer outside the tests.
+ */
+export interface TypingRhythm {
+  delaysMs(bubbles: readonly string[]): readonly number[];
+  wait(ms: number): Promise<void>;
+}
+
 /** What a job handler logs through; the composition root passes the job's own logger. */
 export interface JobLogger {
   info(fields: object, message: string): void;

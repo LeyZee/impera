@@ -176,6 +176,8 @@ export interface VoiceInput extends ConversationInput {
   readonly objectionReply?: string;
   /** The script step code decided to send now, in a typed block after the brief. Absent, none. */
   readonly scriptStep?: VoiceScriptStep;
+  /** The most bubbles she may write this turn, decided by code (1 to 3). Absent, the prompt's own rule. */
+  readonly maxBubbles?: number;
 }
 
 /**
