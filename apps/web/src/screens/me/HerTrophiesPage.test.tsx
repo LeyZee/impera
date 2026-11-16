@@ -8,7 +8,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MyTrophiesPage } from './MyTrophiesPage';
@@ -149,5 +149,36 @@ describe('Moi › Trophées, the creator’s', () => {
     const hero = await screen.findByRole('region', { name: '5 livraisons à l’heure' });
     expect(hero.textContent).toContain('Série en cours : 4 jours · meilleure : 16');
     expect(hero.textContent).toContain('Livraisons à l’heure : 0 de suite · meilleure : 6');
+  });
+});
+
+describe('Moi › Trophées while it is read, or when the server does not answer (recette 16/11, CHT-18)', () => {
+  it('shows the shapes of the case while it waits, never a blank page', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+    renderPage(NORA_ME);
+    expect(await screen.findByLabelText('Chargement de la vitrine')).toBeDefined();
+  });
+
+  it('says the server does not answer, and reads again on « Réessayer »', async () => {
+    let answer = (): Response => new Response(null, { status: 503 });
+    const fetch = vi.fn(() => Promise.resolve(answer()));
+    vi.stubGlobal('fetch', fetch);
+    renderPage(NORA_ME);
+    expect((await screen.findByRole('alert')).textContent).toContain('Ta vitrine n’a pas pu être lue.');
+    answer = () => Response.json(HER_CASE);
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+    expect(await screen.findByRole('region', { name: '5 livraisons à l’heure' })).toBeDefined();
+  });
+
+  it('does the same for the chatter', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(null, { status: 503 }))),
+    );
+    renderPage(THEO_ME);
+    expect((await screen.findByRole('alert')).textContent).toContain('Ta vitrine n’a pas pu être lue.');
   });
 });
