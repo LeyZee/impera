@@ -115,12 +115,6 @@
   touch-action: pan-y;
   cursor: crosshair;
 }
-.ins-curve__since {
-  margin: 0;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink-faint);
-}
 @keyframes ins-draw {
   to {
     clip-path: inset(-4px -4px -4px -4px);
@@ -1240,6 +1234,30 @@
   .ins-when__compare {
     flex: 1 1 100%;
     width: auto;
+  }
+  /* The two days share the pastille's whole width. */
+  .ins-when__days {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+  .ins-when .ins-when__day.nv-field__control {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+  }
+}
+
+/* « Perso » where « Personnalisé » would touch the segment's edge. */
+.ins-period__short {
+  display: none;
+}
+@media (max-width: 720px) {
+  .ins-period__long {
+    display: none;
+  }
+  .ins-period__short {
+    display: inline;
   }
 }
 

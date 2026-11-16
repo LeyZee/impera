@@ -26,11 +26,16 @@ export type AgencySelection =
 /** The month running today: the screen's opening, as at Reveal (ADR 0146 § 1). */
 export const DEFAULT_SELECTION: AgencySelection = { unit: 'month' };
 
-export const UNIT_OPTIONS: readonly { readonly id: AgencyUnit; readonly label: string }[] = [
+/** `short`: the word a phone's segment has room for. */
+export const UNIT_OPTIONS: readonly {
+  readonly id: AgencyUnit;
+  readonly label: string;
+  readonly short?: string;
+}[] = [
   { id: 'day', label: 'Jour' },
   { id: 'week', label: 'Semaine' },
   { id: 'month', label: 'Mois' },
-  { id: 'custom', label: 'Personnalisé' },
+  { id: 'custom', label: 'Personnalisé', short: 'Perso' },
 ];
 
 const DAY_MS = 86_400_000;

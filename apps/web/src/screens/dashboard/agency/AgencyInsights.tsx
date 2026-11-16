@@ -174,16 +174,14 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
     last === undefined || line[0] === undefined
       ? ''
       : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(line[0].x)},${String(frame.height)} Z`;
-  const since = insights.registerSince;
-  const shortened = since !== null && since > insights.from && insights.from !== insights.to;
-  const pick = (event: ReactPointerEvent<HTMLDivElement>): number => {
+  const pick = (event: ReactPointerEvent<HTMLDivElement>): { index: number; x: number } => {
     const box = event.currentTarget.getBoundingClientRect();
     const at = Math.round(((event.clientX - box.left) / Math.max(1, box.width)) * (points.length - 1));
     const index = Math.min(points.length - 1, Math.max(0, Number.isFinite(at) ? at : 0));
     setHover(index);
-    return index;
+    return { index, x: box.left + ((line[index]?.x ?? 0) / frame.width) * box.width };
   };
-  const tipAt = (index: number): ReturnType<FloatingTip['bind']> => {
+  const tipAt = ({ index, x }: { index: number; x: number }): ReturnType<FloatingTip['bind']> => {
     const one = points[index];
     if (one === undefined) return tip.bind({ title: '' });
     return tip.bind(
@@ -197,7 +195,7 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
         ],
         rowKeys: one.compared === null ? ['solid'] : ['solid', 'dashed'],
       },
-      { above: true },
+      { marker: x },
     );
   };
   return (
@@ -258,7 +256,6 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
           }}
         />
       </div>
-      {shortened ? <p className="ins-curve__since">registre lu depuis le {shortDate(since)}</p> : null}
     </div>
   );
 }

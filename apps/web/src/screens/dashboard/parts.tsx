@@ -65,6 +65,11 @@ export interface TipOptions {
   readonly above?: boolean;
   readonly around?: boolean;
   readonly beside?: boolean;
+  /**
+   * A curve's marker, in viewport x: the tip stays inside the element's box, beside the marker, and goes to its other
+   * side near the edge, so it never covers the figures over the chart (recette DSH-04).
+   */
+  readonly marker?: number;
 }
 
 export interface FloatingTip {
@@ -103,6 +108,8 @@ interface PlacedTip {
   beside?: Beside;
   /** Under the box, or over it when the window has no room under: never on it (ADR 0106 § 13). */
   around?: Beside;
+  /** Inside the box, beside the marker at this x. */
+  marker?: { readonly box: Beside; readonly x: number };
 }
 
 /**
@@ -111,6 +118,9 @@ interface PlacedTip {
  */
 function placedOn(content: TipContent, box: DOMRect, options: TipOptions | undefined): PlacedTip {
   const sides = { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+  if (options?.marker !== undefined) {
+    return { content, x: options.marker, y: box.top, marker: { box: sides, x: options.marker } };
+  }
   if (options?.around === true) return { content, x: box.left, y: box.bottom, around: sides };
   if (options?.above === true || options?.beside === true) {
     return {
@@ -162,6 +172,24 @@ export function aroundPlacement(
   return { left: Math.max(TIP_MARGIN, left), top };
 }
 
+/**
+ * Beside a curve's marker, inside the chart's box: right of the marker, left of it when the right has no room, its
+ * middle on the box's middle, kept inside the window. Exported for its tests.
+ */
+export function markerPlacement(
+  box: Beside,
+  x: number,
+  tip: { readonly width: number; readonly height: number },
+  view: { readonly width: number; readonly height: number },
+): { left: number; top: number } {
+  const right = x + TIP_GAP;
+  const wanted = right + tip.width <= box.right ? right : x - TIP_GAP - tip.width;
+  const left = Math.min(Math.max(TIP_MARGIN, wanted), view.width - tip.width - TIP_MARGIN);
+  const middle = (box.top + box.bottom) / 2 - tip.height / 2;
+  const top = Math.min(Math.max(TIP_MARGIN, middle), view.height - tip.height - TIP_MARGIN);
+  return { left, top };
+}
+
 /** One floating `nv-tip` for the whole screen, placed under the pointer by `tipPlacement`. */
 export function useFloatingTip(): FloatingTip {
   const [tip, setTip] = useState<PlacedTip | null>(null);
@@ -170,6 +198,17 @@ export function useFloatingTip(): FloatingTip {
   useLayoutEffect(() => {
     const element = ref.current;
     if (element === null || tip === null) return;
+    if (tip.marker !== undefined) {
+      const placed = markerPlacement(
+        tip.marker.box,
+        tip.marker.x,
+        { width: element.offsetWidth, height: element.offsetHeight },
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      element.style.left = `${String(placed.left)}px`;
+      element.style.top = `${String(placed.top)}px`;
+      return;
+    }
     if (tip.around !== undefined) {
       const around = aroundPlacement(
         tip.around,
@@ -236,7 +275,7 @@ export function useFloatingTip(): FloatingTip {
   const bind = useCallback(
     (content: TipContent, options?: TipOptions) => ({
       onPointerMove: (event: React.PointerEvent) => {
-        if (options?.beside === true) {
+        if (options?.beside === true || options?.marker !== undefined) {
           setTip(placedOn(content, event.currentTarget.getBoundingClientRect(), options));
           return;
         }

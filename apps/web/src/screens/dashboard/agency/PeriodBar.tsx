@@ -79,13 +79,21 @@ function UnitControl({
           role="radio"
           className="nv-seg__opt"
           data-unit={one.id}
+          aria-label={one.label}
           aria-checked={one.id === unit}
           tabIndex={one.id === unit ? 0 : -1}
           onClick={() => {
             onChange(one.id);
           }}
         >
-          {one.label}
+          {one.short === undefined ? (
+            one.label
+          ) : (
+            <>
+              <span className="ins-period__long">{one.label}</span>
+              <span className="ins-period__short">{one.short}</span>
+            </>
+          )}
         </button>
       ))}
     </div>

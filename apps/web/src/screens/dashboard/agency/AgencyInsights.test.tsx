@@ -471,6 +471,7 @@ describe('the days read and their comparison (ADR 0146)', () => {
     const first = screen.getByRole('heading', { name: /L’agence en chiffres/u }).closest('section');
     if (first === null) throw new Error('section');
     expect(first.querySelectorAll('.nv-delta')).toHaveLength(0);
-    expect(screen.getByText(/registre lu depuis le 2 nov\./u)).toBeTruthy();
+    // Said once, under the figure: nothing under the curve repeats it.
+    expect(screen.queryByText(/registre lu depuis/u)).toBeNull();
   });
 });
