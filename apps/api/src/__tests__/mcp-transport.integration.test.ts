@@ -510,7 +510,11 @@ describe('/v1/mcp', () => {
       ).result?.structuredContent,
     );
     // No statement in this test's base: no sum either.
-    expect(state).toMatchObject({ period: '2026-11-01', statements: [], team: null });
+    expect(state).toMatchObject({
+      period: '2026-11-01',
+      statements: [],
+      team: { statements: 0, totalMinor: null, payableMinor: null },
+    });
     const notAPeriod = RpcSchema.parse(
       (await rpc(agency.token, callTool('commission_statements_list', { period: '2026-11-02' }))).json(),
     );

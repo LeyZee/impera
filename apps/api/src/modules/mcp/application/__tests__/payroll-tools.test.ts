@@ -13,6 +13,10 @@ import type { ActorView } from '../../domain/access';
 import type { GrantRecord, PayrollReader, PeriodStateEntry } from '../../domain/ports';
 import { payrollTools } from '../payroll-tools';
 
+/** Every number the JSON of a value holds as a value: never digits inside an id, a date or a key. */
+const numbersIn = (value: unknown): number[] =>
+  (JSON.stringify(value).match(/(?<=[:,[])-?\d+(?:\.\d+)?(?=[,\]}])/gu) ?? []).map(Number);
+
 /** Invented members and amounts only (ADR 0010). */
 const P1 = PayPeriodSchema.parse('2026-11-01');
 const [lou, sam] = [newId(TeamMemberIdSchema), newId(TeamMemberIdSchema)].toSorted();
@@ -82,6 +86,7 @@ function source(read: PeriodStateEntry): PayrollReader & { asked: unknown[] } {
             rateBps: 2_000,
           },
         })),
+        blocked: read.blocked === null ? null : { ...read.blocked, ...{ rateBps: 2_000 } },
         team: read.team === null ? null : { ...read.team, ...{ netMinor: 205_000 } },
       });
     },
@@ -115,24 +120,58 @@ describe('commission_statements_list (ADR 0105 § 3 and § 4, read:payroll, deci
   it('gives no amount of a member, nor a rate, nor anything pay adds besides', async () => {
     const out = await toolOf(source(period)).run({ grant, actor: owner, creatorId: null }, { period: P1 });
     const text = JSON.stringify(out);
-    for (const closed of [
-      '100000',
-      '20000',
-      '21000',
-      '19000',
-      '205000',
-      '2000',
-      'rateBps',
-      'netMinor',
-      'invente',
-    ])
+    for (const closed of ['rateBps', 'netMinor', 'commissionMinor', 'closedBy', 'invente'])
       expect(text).not.toContain(closed);
+    for (const amount of [100_000, 20_000, 21_000, 19_000, 205_000, 2_000])
+      expect(numbersIn(out)).not.toContain(amount);
     expect(McpPayPeriodStateSchema.safeParse(out).success).toBe(true);
     // Two members whose pay differs read the same, but for their ids.
     const one = McpPayPeriodStateSchema.parse(out).statements;
     expect(one[0] === undefined ? null : { ...one[0], memberId: sam }).toEqual(
       one[1] === undefined ? null : { ...one[1], payoutBlocked: false, payoutLate: true },
     );
+  });
+
+  it('copies a block by its code, without what pay would add to it', async () => {
+    const since = '2026-11-16T08:00:00.000Z';
+    const rate = McpPayPeriodStateSchema.parse(
+      await toolOf(
+        source({
+          ...period,
+          blocked: {
+            code: 'commission_rate_missing_conflict',
+            memberIds: [TeamMemberIdSchema.parse(sam)],
+            since,
+          },
+        }),
+      ).run({ grant, actor: owner, creatorId: null }, { period: P1 }),
+    );
+    expect(rate.blocked).toEqual({ code: 'commission_rate_missing_conflict', memberIds: [sam], since });
+    const currency = McpPayPeriodStateSchema.parse(
+      await toolOf(
+        source({ ...period, blocked: { code: 'exchange_rate_missing_conflict', currency: 'USD', since } }),
+      ).run({ grant, actor: owner, creatorId: null }, { period: P1 }),
+    );
+    expect(currency.blocked).toEqual({ code: 'exchange_rate_missing_conflict', currency: 'USD', since });
+    // The tool's schema refuses a field in excess in the block and in the window.
+    const parsed = currency;
+    expect(
+      McpPayPeriodStateSchema.safeParse({ ...parsed, blocked: { ...parsed.blocked, rateBps: 2_000 } })
+        .success,
+    ).toBe(false);
+    expect(
+      McpPayPeriodStateSchema.safeParse({ ...parsed, window: { ...parsed.window, closedBy: 'invente' } })
+        .success,
+    ).toBe(false);
+  });
+
+  it('passes on the sums pay withholds, each apart', async () => {
+    const out = McpPayPeriodStateSchema.parse(
+      await toolOf(
+        source({ ...period, team: { statements: 2, totalMinor: 26_300, payableMinor: null } }),
+      ).run({ grant, actor: owner, creatorId: null }, { period: P1 }),
+    );
+    expect(out.team).toEqual({ statements: 2, totalMinor: 26_300, payableMinor: null });
   });
 
   it('says the delay is unknown without one announced, and passes on what pay withholds', async () => {

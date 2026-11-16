@@ -313,8 +313,8 @@ export interface PeriodStateEntry {
   readonly statements: readonly StatementStateEntry[];
   readonly team: {
     readonly statements: number;
-    readonly totalMinor: number;
-    readonly payableMinor: number;
+    readonly totalMinor: number | null;
+    readonly payableMinor: number | null;
   } | null;
 }
 

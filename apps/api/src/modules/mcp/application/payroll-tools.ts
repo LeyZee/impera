@@ -5,9 +5,17 @@ import {
   type McpPayPeriodState,
 } from '@impera/contracts';
 
-import type { PayrollReader } from '../domain/ports';
+import type { PayrollReader, PeriodStateEntry } from '../domain/ports';
 
 import type { ServedTool } from './dispatch';
+
+/** Why pay could not compute the period, copied by its code: only that code's fields, nothing pay adds besides. */
+function blockedOf(blocked: PeriodStateEntry['blocked']): McpPayPeriodState['blocked'] {
+  if (blocked === null) return null;
+  if (blocked.code === 'commission_rate_missing_conflict')
+    return { code: blocked.code, memberIds: [...blocked.memberIds], since: blocked.since };
+  return { code: blocked.code, currency: blocked.currency, since: blocked.since };
+}
 
 /**
  * The pay tools (ADR 0105 § 3 and § 4, `read:payroll`, `agencyOnly`), read through `payroll` as the access's person,
@@ -18,7 +26,7 @@ export function payrollTools(payroll: PayrollReader): Readonly<Record<string, Se
   return {
     commission_statements_list: {
       description:
-        'L’état d’une quinzaine de paie (`period` = son premier jour, le 1er ou le 16 du mois, par exemple `2026-11-01`) : sa fenêtre, quand l’équipe l’a clôturée, pourquoi la paie n’a pas pu la calculer (`blocked`), le délai de versement annoncé en jours ouvrés ; pour chaque relevé que la personne voit, le membre, le statut (brouillon, validé, payé), la révision, les dates, si son versement attend (sans la raison) et s’il est en retard sur le délai annoncé ; les compteurs ; et les sommes d’équipe (nombre de relevés, total, à verser) seulement pour qui voit toute l’équipe, et à partir de deux relevés. Sans délai annoncé, le retard est inconnu (`null`). Jamais un montant d’un membre, ni net, ni commission, ni taux. Les jours fériés ne sont pas connus : un retard compte du lundi au vendredi.',
+        'L’état d’une quinzaine de paie (`period` = son premier jour, le 1er ou le 16 du mois, par exemple `2026-11-01`) : sa fenêtre, quand l’équipe l’a clôturée, pourquoi la paie n’a pas pu la calculer (`blocked`), le délai de versement annoncé en jours ouvrés ; pour chaque relevé que la personne voit, le membre, le statut (brouillon, validé, payé), la révision, les dates, si son versement attend (sans la raison) et s’il est en retard sur le délai annoncé ; les compteurs ; et les sommes d’équipe (nombre de relevés, total, à verser) seulement pour qui voit toute l’équipe, le total et le montant à verser chacun seulement quand au moins deux relevés y apportent un montant. Sans délai annoncé, le retard est inconnu (`null`). Jamais un montant d’un membre, ni net, ni commission, ni taux. Les jours fériés ne sont pas connus : un retard compte du lundi au vendredi.',
       input: McpPayPeriodInputSchema,
       output: McpPayPeriodStateSchema,
       run: async ({ grant, actor }, input): Promise<McpPayPeriodState> => {
@@ -51,7 +59,7 @@ export function payrollTools(payroll: PayrollReader): Readonly<Record<string, Se
                   timeZone: read.window.timeZone,
                 },
           closedAt: read.closedAt,
-          blocked: read.blocked,
+          blocked: blockedOf(read.blocked),
           payoutDelayBusinessDays: read.payoutDelayBusinessDays,
           statements,
           counts: {

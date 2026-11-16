@@ -185,7 +185,7 @@ describe('Lectures pour une autre porte : shifts, rapports et relevés (ADR 0026
     );
     // Théo's is the period's only statement (Lou's report waits): a sum would be his pay, so there is none.
     expect(stored).toHaveLength(1);
-    expect(read.team).toBeNull();
+    expect(read.team).toEqual({ statements: 1, totalMinor: null, payableMinor: null });
     const theos = await pay().periodState(as(theo), P1);
     expect(theos.statements.map((one) => one.memberId)).toEqual([theo.id]);
     expect(theos.team).toBeNull();

@@ -11,6 +11,10 @@ import { describe, expect, it } from 'vitest';
 import type { PayrollReadStore, PeriodView, StoredStatement } from '../../domain/ports';
 import { createPayrollStatementReads, type PayStatementReader } from '../statement-reads';
 
+/** Every number the JSON of a value holds as a value: never digits inside an id, a date or a key. */
+const numbersIn = (value: unknown): number[] =>
+  (JSON.stringify(value).match(/(?<=[:,[])-?\d+(?:\.\d+)?(?=[,\]}])/gu) ?? []).map(Number);
+
 /** Invented members only (ADR 0010). */
 const P1 = PayPeriodSchema.parse('2025-03-01');
 const window = {
@@ -116,8 +120,8 @@ describe('createPayrollStatementReads (ADR 0026 § 1, ADR 0105 § 4, decision A)
       [second, 'validated', true],
     ]);
     expect(read.team).toEqual({ statements: 2, totalMinor: 4_600, payableMinor: 4_600 });
-    const text = JSON.stringify(read.statements);
-    for (const amount of ['1600', '3000', '8000', '15000', '2000']) expect(text).not.toContain(amount);
+    for (const amount of [1_600, 3_000, 8_000, 15_000, 2_000])
+      expect(numbersIn(read.statements)).not.toContain(amount);
   });
 
   it('gives a member in self neither the team’s sums nor a colleague among the blocked', async () => {

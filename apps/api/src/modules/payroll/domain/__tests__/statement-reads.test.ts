@@ -5,6 +5,10 @@ import { isPayoutLate, readsPay, statementStateOf, teamSumsFor, workingDaysSince
 
 import { P1 } from './fixtures';
 
+/** Every number the JSON of a value holds as a value: never digits inside an id, a date or a key. */
+const numbersIn = (value: unknown): number[] =>
+  (JSON.stringify(value).match(/(?<=[:,[])-?\d+(?:\.\d+)?(?=[,\]}])/gu) ?? []).map(Number);
+
 /** A validated statement, and the rest of a statement, which never leaves (decision A of 14/11). Invented (ADR 0010). */
 const validated = {
   memberId: newId(TeamMemberIdSchema),
@@ -75,9 +79,8 @@ describe('statementStateOf (ADR 0105 § 3 and § 4, decision A)', () => {
       rules: { commission: { rateBps: 1_000 } },
     };
     expect(statementStateOf(other, 2, paris('2025-03-18'))).toEqual(read);
-    const text = JSON.stringify(read);
-    for (const amount of ['25300', '100000', '20000', '6000', '1000', '400000', '80000', '2000'])
-      expect(text).not.toContain(amount);
+    for (const amount of [25_300, 100_000, 20_000, 6_000, 1_000, 400_000, 80_000, 2_000])
+      expect(numbersIn(read)).not.toContain(amount);
     expect(Object.keys(read).some((key) => key.endsWith('Minor') || key.endsWith('Bps'))).toBe(false);
   });
 
@@ -143,15 +146,42 @@ describe('isPayoutLate (PAIE-32)', () => {
 });
 
 describe('teamSumsFor', () => {
-  it('sums the team for a person who sees it whole, over two statements at least', () => {
-    const two = [validated, { ...validated, totalMinor: 1_000, payableMinor: 0 }];
-    expect(teamSumsFor('owner', two)).toEqual({ statements: 2, totalMinor: 26_300, payableMinor: 25_300 });
-    expect(teamSumsFor('agency', two)).toEqual({ statements: 2, totalMinor: 26_300, payableMinor: 25_300 });
+  const at = (totalMinor: number, payableMinor: number) => ({ ...validated, totalMinor, payableMinor });
+
+  it('sums the team for a person who sees it whole, when two statements bring an amount', () => {
+    const two = [at(25_300, 25_300), at(9_000, 9_000)];
+    expect(teamSumsFor('owner', two)).toEqual({ statements: 2, totalMinor: 34_300, payableMinor: 34_300 });
+    expect(teamSumsFor('agency', two)).toEqual({ statements: 2, totalMinor: 34_300, payableMinor: 34_300 });
   });
 
-  it('gives nothing where the sum would be one member’s pay: a member in self, or a single statement', () => {
-    expect(teamSumsFor('self', [validated, validated])).toBeNull();
-    expect(teamSumsFor('owner', [validated])).toBeNull();
-    expect(teamSumsFor('owner', [])).toBeNull();
+  it('gives no sum a single member makes: two statements of which one is zero, three of which two are', () => {
+    expect(teamSumsFor('owner', [at(25_300, 25_300), at(0, 0)])).toEqual({
+      statements: 2,
+      totalMinor: null,
+      payableMinor: null,
+    });
+    expect(teamSumsFor('owner', [at(25_300, 25_300), at(0, 0), at(0, 0)])).toEqual({
+      statements: 3,
+      totalMinor: null,
+      payableMinor: null,
+    });
+  });
+
+  it('counts the total and the payable apart: a statement under the minimum has a total, nothing payable', () => {
+    expect(teamSumsFor('owner', [at(25_300, 25_300), at(1_000, 0)])).toEqual({
+      statements: 2,
+      totalMinor: 26_300,
+      payableMinor: null,
+    });
+  });
+
+  it('gives nothing to a member who sees only themselves, nor sums over one statement or none', () => {
+    expect(teamSumsFor('self', [at(25_300, 25_300), at(9_000, 9_000)])).toBeNull();
+    expect(teamSumsFor('owner', [at(25_300, 25_300)])).toEqual({
+      statements: 1,
+      totalMinor: null,
+      payableMinor: null,
+    });
+    expect(teamSumsFor('owner', [])).toEqual({ statements: 0, totalMinor: null, payableMinor: null });
   });
 });

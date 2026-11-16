@@ -44,8 +44,8 @@ export interface StatementState {
 /**
  * A period as another door reads it: its window, its closing's date, why pay could not compute it (as the screen gives
  * it to the person), the delay announced, each statement's state, and the team's sums only for a person who sees the
- * whole team (the owner, an active manager) and over two statements at least: for a member in `self`, or with one
- * statement, the sum would be one member's pay.
+ * whole team (the owner, an active manager), each only when two statements at least bring an amount to it: for a
+ * member in `self`, or with a single statement that is not zero, the sum would be one member's pay.
  */
 export interface PeriodState {
   readonly window: PayPeriodWindow | null;
@@ -56,11 +56,15 @@ export interface PeriodState {
   readonly team: TeamSums | null;
 }
 
-/** The team's sums over the period's statements, in euro cents: never a member's. */
+/**
+ * The team's sums over the period's statements, in euro cents: never a member's. Each sum is `null` unless two
+ * statements at least bring an amount other than zero to it, counted apart for the total and the payable (a statement
+ * under the minimum payout has a total and nothing payable).
+ */
 export interface TeamSums {
   readonly statements: number;
-  readonly totalMinor: number;
-  readonly payableMinor: number;
+  readonly totalMinor: number | null;
+  readonly payableMinor: number | null;
 }
 
 type ReadStatement = Pick<
@@ -110,7 +114,7 @@ export function isPayoutLate(
 ): boolean | null {
   if (delay === null) return null;
   if (statement.status !== 'validated' || statement.validatedAt === null) return false;
-  if (statement.payoutBlock !== null || statement.payableMinor === 0) return false;
+  if (statement.payoutBlock !== null || statement.payableMinor <= 0) return false;
   return (
     workingDaysSince(calendarDayAt(new Date(statement.validatedAt), agency.timeZone), agency.today) > delay
   );
@@ -128,22 +132,28 @@ export const statementStateOf = (
   validatedAt: statement.validatedAt,
   paidAt: statement.paidAt,
   payoutBlocked:
-    statement.status === 'validated' && statement.payableMinor !== 0 && statement.payoutBlock !== null,
+    statement.status === 'validated' && statement.payableMinor > 0 && statement.payoutBlock !== null,
   payoutLate: isPayoutLate(statement, delay, agency),
 });
 
-/** Under two statements, a sum is one member's amount (decision A of 14/11). */
+/** Under two statements bringing an amount, a sum is one member's amount (decision A of 14/11). */
 const TEAM_SUMS_FROM_STATEMENTS = 2;
+
+/** A sum over the amounts, when two of them at least are not zero; else `null`, the amount of one member at most. */
+function sumOfSeveral(amounts: readonly number[]): number | null {
+  if (amounts.filter((amount) => amount !== 0).length < TEAM_SUMS_FROM_STATEMENTS) return null;
+  return amounts.reduce((sum, amount) => sum + amount, 0);
+}
 
 /**
  * The team's sums, for a person who sees every member (`view.reader.scope`, as the store read it under the policies);
- * `null` for one who sees only themselves, and under two statements, where the sum would be one member's pay.
+ * `null` for one who sees only themselves. Each sum alone is `null` unless two statements bring it an amount.
  */
 export function teamSumsFor(scope: TeamScope, statements: readonly ReadStatement[]): TeamSums | null {
-  if (scope === 'self' || statements.length < TEAM_SUMS_FROM_STATEMENTS) return null;
+  if (scope === 'self') return null;
   return {
     statements: statements.length,
-    totalMinor: statements.reduce((sum, one) => sum + one.totalMinor, 0),
-    payableMinor: statements.reduce((sum, one) => sum + one.payableMinor, 0),
+    totalMinor: sumOfSeveral(statements.map((one) => one.totalMinor)),
+    payableMinor: sumOfSeveral(statements.map((one) => one.payableMinor)),
   };
 }
