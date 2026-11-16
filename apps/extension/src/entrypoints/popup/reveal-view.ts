@@ -158,9 +158,9 @@ function accountRow(account: Account, neon: boolean, view: SyncView, actions: Sy
 const named = (account: Account): string => `${account.creatorName} (@${account.handle})`;
 
 /**
- * Before a session leaves: the account it goes to and the model the tab shows, so that a session is never sent to the
- * wrong account. A first sync names what to check and puts « Annuler » first; another model than last time can only be
- * cancelled. The server's own refusal stays the rule.
+ * Before a session leaves (demande de Sécurité): the account it goes to and the model the tab shows. A first sync names
+ * what to check and puts « Annuler » first; another model than last time can only be cancelled. The server's own
+ * refusal stays the rule.
  */
 function confirmRows(account: Account, confirm: Confirm, actions: SyncActions): readonly HTMLElement[] {
   const sentence =
