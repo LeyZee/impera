@@ -6,6 +6,7 @@ import './me.css';
 
 import { countryName } from '@/lib/country';
 import { percentText } from '@/reports/model';
+import { playsTheGame } from '@/rewards/api';
 import { useCalendar } from '@/scheduling/api';
 import { cityOf, fullDay } from '@/scheduling/time';
 import { Loading, Unreachable } from '@/screens/pay/parts';
@@ -32,7 +33,7 @@ export function MyProfilePage({ user }: { user: Me }): JSX.Element {
         eyebrow="Moi"
         title={me?.displayName ?? 'Profil'}
         lead="Ce que l’agence sait de toi pour ton travail : tes créatrices, ton taux, ton fuseau."
-        actions={<MeNav manager={manager} />}
+        actions={<MeNav manager={manager} trophies={playsTheGame(user)} />}
       />
       <div className="me-profile">
         {me !== null ? (

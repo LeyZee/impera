@@ -1,6 +1,6 @@
 # 0126. Les lives de la créatrice : l'agent se tait pendant, en parle après, et se relaie avec les chatteurs
 
-Statut : proposed (demande de Charles du 16/11/2026, 02 h 55 et 02 h 57, heure de Paris)
+Statut : accepted (« ok 0126 » de Charles le 16/11/2026, 12 h 48, heure de Paris ; demande du même jour, 02 h 55 et 02 h 57)
 Date : 2026-11-16
 Précise : ADR 0042 § 3 et § 4 (son agenda : la catégorie « Live » existe déjà), ADR 0048 § 4 (le calendrier ne réglait pas les heures de l'agent), P3-14 (heures d'activité), ADR 0088 (mode soin), ADR 0021 (jamais d'aveu d'IA), ADR 0057 et 0120 (API officielles seulement). Ne remplace rien.
 
@@ -49,8 +49,17 @@ Ce qui existe au 16/11 (main `08ecb4d`) :
 13. **L'agent se planifie comme un membre**, dans le calendrier des shifts (ADR 0045), compte par compte. Ses heures d'activité (P3-14) deviennent ses **shifts récurrents** ; le propriétaire ou un manager y ajoute des **shifts datés** et des **exceptions datées** (« pas d'IA ce soir »). Cela amende l'ADR 0048 § 4 : le calendrier règle désormais les heures de l'agent. Il n'a toujours ni charge, ni rapport, ni paie.
 14. **Un seul tient le compte à la fois.** Quand un chatteur a pris son shift sur le compte, l'agent ne répond pas en Automatique (il redevient Copilote pour ce chatteur). À la fin du shift, l'agent reprend si c'est son shift, avec la même réouverture étalée.
 15. **Passage de relais.** À chaque relais, celui qui arrive voit les conversations actives, les scripts en cours et ce qui a été promis ; un script en cours continue avec celui qui tient le compte. L'agent relit l'historique comme toujours.
-16. **Shift non pris** (EQ-12) : l'alerte existante part ; si le compte autorise l'agent, il prend le relais 15 min après le début prévu.
+16. **Shift non pris** (EQ-12) : l'alerte existante part ; si l'interrupteur « Relais auto » du compte est allumé (éteint par défaut), l'agent prend le relais 15 min après le début prévu.
 17. **Ordre de priorité** : fenêtre de live > arrêt global et mode Arrêt > shift d'un chatteur > shift daté de l'agent > heures d'activité.
+
+### Valeurs par défaut (réversibles, sans réponse de Charles au 16/11)
+
+18. Les cinq questions posées avec l'ADR n'ont pas eu de réponse ; les recommandations valent par défaut, chacune réversible sans migration destructive :
+   - a) pendant un live, les chatteurs sont avertis par le bandeau, sans brouillon de l'agent, jamais bloqués (règle 7) ;
+   - b) l'agent n'annonce jamais un live à venir (règle 8) ;
+   - c) l'agent ne nomme jamais la plateforme du live (règle 9) ;
+   - d) shift non pris : l'agent reprend à +15 min (règle 16), derrière un interrupteur par compte, éteint tant que Charles ne l'a pas confirmé ;
+   - e) pas de détection YouTube dans cette ADR (règle 3).
 
 ### Qui code quoi
 

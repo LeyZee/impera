@@ -57,6 +57,7 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   platform_chatter_daily_stats: ['insert', 'update'],
   platform_daily_stats: ['insert', 'update'],
   platform_script_step_media: ['insert', 'delete'],
+  script_identities: ['insert'],
   platform_script_steps: ['insert', 'delete'],
   platform_scripts: ['insert', 'update'],
   provider_credentials: ['insert', 'update', 'delete'],

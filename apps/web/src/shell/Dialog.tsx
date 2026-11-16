@@ -40,9 +40,11 @@ export function Dialog({
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     // A tall dialog opens at its top, even when the field it focuses is lower down (a statement's « Valider »).
-    dialog.current
-      ?.querySelector<HTMLElement>('[data-autofocus], select, input, button:not(.tm-close)')
-      ?.focus({ preventScroll: true });
+    // With nothing to focus but its ×, the dialog takes the focus itself, so Échap reaches it (recette 16/11, CHT-20).
+    (
+      dialog.current?.querySelector<HTMLElement>('[data-autofocus], select, input, button:not(.tm-close)') ??
+      dialog.current
+    )?.focus({ preventScroll: true });
     return () => {
       opener?.focus();
     };
@@ -66,7 +68,11 @@ export function Dialog({
     ];
     const first = focusable[0];
     const last = focusable.at(-1);
-    if (event.shiftKey && document.activeElement === first) {
+    if (document.activeElement === dialog.current) {
+      // From the glass itself, Tab enters the window at either end, never the page behind it.
+      event.preventDefault();
+      (event.shiftKey ? last : first)?.focus();
+    } else if (event.shiftKey && document.activeElement === first) {
       event.preventDefault();
       last?.focus();
     } else if (!event.shiftKey && document.activeElement === last) {
@@ -88,6 +94,7 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}
+        tabIndex={-1}
         onKeyDown={onKeyDown}
       >
         <div ref={scroller} className="tm-dialog__scroll">

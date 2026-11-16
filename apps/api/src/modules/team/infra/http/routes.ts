@@ -51,9 +51,13 @@ export function createTeamRoutes(
   team: TeamService,
   requireRole: RequireRole,
   platformRemovals: PlatformRemovals,
+  recentLogin: preValidationAsyncHookHandler,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
   const owner = requireRole('owner');
+  // A member, his rate, role and status, and the presets are money and access: the password and the code given on this
+  // session in the last 10 minutes, as for a key (ADR 0016, ADR 0046 § 3, EQ-15). The notes are not.
+  const ownerConfirmed = [owner, recentLogin];
   return (app) => {
     app.get(
       '/team/members',
@@ -72,7 +76,7 @@ export function createTeamRoutes(
     app.post(
       '/team/members',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: { body: CreateTeamMemberBodySchema, response: { 201: TeamMemberSchema } },
       },
       async (request, reply) => reply.code(201).send(await team.addMember(actorOf(request), request.body)),
@@ -90,7 +94,7 @@ export function createTeamRoutes(
     app.patch(
       '/team/members/:memberId',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: MemberParamsSchema,
           body: UpdateTeamMemberBodySchema,
@@ -103,7 +107,7 @@ export function createTeamRoutes(
     app.put(
       '/team/members/:memberId/status',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: MemberParamsSchema,
           body: ChangeTeamMemberStatusBodySchema,
@@ -125,7 +129,7 @@ export function createTeamRoutes(
     app.post(
       '/team/members/:memberId/commission',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: MemberParamsSchema,
           body: SetCommissionRateBodySchema,
@@ -150,7 +154,7 @@ export function createTeamRoutes(
     app.post(
       '/team/members/:memberId/role',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: MemberParamsSchema,
           body: SetTeamRoleBodySchema,
@@ -195,7 +199,7 @@ export function createTeamRoutes(
     app.post(
       '/team/commission-presets',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: { body: CreateCommissionPresetBodySchema, response: { 201: CommissionPresetSchema } },
       },
       async (request, reply) => reply.code(201).send(await team.addPreset(actorOf(request), request.body)),

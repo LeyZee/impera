@@ -33,6 +33,7 @@ import {
 import '@/reports/reports.css';
 import { accountLine } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 import { Select } from '@/shell/Select';
@@ -304,6 +305,8 @@ function RulesPanel({
   const feeBps = netOnly ? (base?.platformFeeBps ?? 0) : parsePercent(fee);
   const ready = fromPeriod !== null && vatBps !== null && feeBps !== null;
 
+  const confirm = useConfirmAgain();
+
   const send = async (): Promise<void> => {
     if (!ready || busy) return;
     setBusy(true);
@@ -318,6 +321,13 @@ function RulesPanel({
       earningsSource: source,
     });
     setBusy(false);
+    if (outcome.kind === 'reauth') {
+      // Nothing was written: the password and the code, then the same rules again.
+      confirm.ask(() => {
+        void send();
+      });
+      return;
+    }
     if (outcome.kind === 'ok') {
       await refresh();
       onClose();
@@ -380,30 +390,32 @@ function RulesPanel({
             Ces règles ne changeront plus. Une erreur se corrige par de nouvelles règles à une quinzaine
             suivante.
           </p>
-          <div className="tm-dialog__foot">
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain"
-              disabled={busy}
-              onClick={() => {
-                setStep('edit');
-              }}
-            >
-              Modifier
-            </button>
-            <button
-              type="button"
-              className="nv-btn nv-btn--neon"
-              data-autofocus
-              disabled={busy}
-              aria-busy={busy}
-              onClick={() => {
-                void send();
-              }}
-            >
-              {busy ? 'Enregistrement…' : 'Poser ces règles'}
-            </button>
-          </div>
+          {confirm.prompt({ lead: MONEY_LEAD, onBusyChange: setBusy }) ?? (
+            <div className="tm-dialog__foot">
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain"
+                disabled={busy}
+                onClick={() => {
+                  setStep('edit');
+                }}
+              >
+                Modifier
+              </button>
+              <button
+                type="button"
+                className="nv-btn nv-btn--neon"
+                data-autofocus
+                disabled={busy}
+                aria-busy={busy}
+                onClick={() => {
+                  void send();
+                }}
+              >
+                {busy ? 'Enregistrement…' : 'Poser ces règles'}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <form

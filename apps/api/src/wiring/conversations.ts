@@ -1,6 +1,7 @@
 import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
+import { bubbleDelays } from '../modules/agent';
 import type { ConnectorsModule } from '../modules/connectors';
 import {
   createConversationsModule,
@@ -49,6 +50,13 @@ export function wireConversations(
     composer: agent.composer,
     cardReader: agent.cardReader,
     ...(agent.followUps !== undefined && { followUps: agent.followUps }),
+    typing: {
+      delaysMs: bubbleDelays,
+      wait: (ms) =>
+        new Promise((resolve) => {
+          setTimeout(resolve, ms);
+        }),
+    },
     replyHours: {
       of: async (creatorId) => {
         const view = await persona.creators.agentHours(creatorId);

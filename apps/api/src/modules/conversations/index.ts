@@ -25,6 +25,7 @@ import type {
   MediaDescriptions,
   OutboundSender,
   ReplyHours,
+  TypingRhythm,
 } from './domain/ports';
 import { createDrizzleAlertHistory } from './infra/db/alert-history';
 import { createDrizzleAwayHolds } from './infra/db/away-holds';
@@ -118,6 +119,8 @@ export interface ConversationsDeps {
   readonly cardReader?: CardReader;
   /** Her follow-up delays (P3-10, agent module's adapter); without it, no follow-up is scheduled. */
   readonly followUps?: FollowUpPlan;
+  /** Her typing rhythm between bubbles (agent module's adapter); without it, her bubbles leave one after the other. */
+  readonly typing?: TypingRhythm;
   /** Her hours (P3-14, `persona`); without them she is always open and quiet from 23:00 to 9:00, as before. */
   readonly replyHours?: ReplyHours;
   /** Her own alerts' names (P4-01, `alerts` module's adapter); without them the history says « Alerte personnalisée ». */
@@ -197,6 +200,7 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         clock,
         sender: deps.sender,
         ...(deps.followUps === undefined ? {} : { followUps: deps.followUps }),
+        ...(deps.typing === undefined ? {} : { typing: deps.typing }),
       }),
       recordFacts: createRecordFactsJob({ uow, clock, fans: deps.fans }),
       readCard:

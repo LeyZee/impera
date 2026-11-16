@@ -130,4 +130,5 @@ Date : AAAA-MM-JJ
 | 0109 | L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre | accepted (précise 0066 § 7, 0086 § 8, 0085 et 0025) |
 | 0110 | L'agent tient compte des automatisations de Reveal | accepted (remplace la ligne « sans effet sur le bot » de l'inventaire du connecteur ; précise 0006, 0018, P3-10) |
 | 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
-| 0126 | Les lives de la créatrice : l'agent se tait pendant, en parle après, et se relaie avec les chatteurs | proposed (précise 0042, 0048 § 4, P3-14, 0088) |
+| 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
+| 0126 | Les lives de la créatrice : l'agent se tait pendant, en parle après, et se relaie avec les chatteurs | accepted (précise 0042, 0048 § 4, P3-14, 0088) |

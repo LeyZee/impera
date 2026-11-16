@@ -135,7 +135,7 @@ const DESCRIBED: DropMediaDescription = {
 const seen: DropSenseInput[] = [];
 const vision = { fails: false };
 const dropVision: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'> = {
-  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
+  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
   describeDrop: (input) => {
     seen.push(input);
     // Every model failing (a refusal of adult content, an outage): the gateway's own error.

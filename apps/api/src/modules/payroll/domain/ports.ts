@@ -250,6 +250,8 @@ export interface PeriodView {
   readonly closing: PayPeriodClosing | null;
   /** Why pay could not compute the period at its last try, as recorded: every member, whoever reads. */
   readonly blocked: PayPeriodBlock | null;
+  /** The agency's zone now and today in it, read once with the period: the day a transfer would be dated. */
+  readonly agency: { readonly timeZone: string; readonly today: string };
   readonly statements: readonly StoredStatement[];
   readonly bonusTierSets: readonly BonusTierSet[];
   readonly collectiveGoals: readonly CollectiveGoal[];
