@@ -144,3 +144,6 @@ Date : AAAA-MM-JJ
 | 0129 | Mesurer les scripts de vente : l'entonnoir par étape, le revenu par fan exposé, ce qui casse et pourquoi | accepted (précise 0112 § 19, 0098 §§ 2 et 16, 0128 § 14 et 0103) |
 | 0131 | Choisir le script qui colle aux goûts du fan : familles de fantasme, goûts des scripts et de la fiche, le code classe et l'IA choisit | accepted (précise 0098 § 6, 0056 § 6, 0085 et 0112 § 5) |
 | 0141 | Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande | accepted (précise 0086 § 3 et § 10, amende leur ordre) |
+| 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
+| 0144 | Le MCP suit le CRM de novembre : coffre, branches, Playground, copilote, semaine de la créatrice, trophées et liens, en lecture seule | accepted (précise 0105 § 4) |
+| 0147 | La session Reveal se synchronise seule à l'ouverture du popup, chez le propriétaire, sans appel ni rechargement de Reveal | proposed (précise 0050, 0066 § 7 ; amende la fiche P2-01) |
