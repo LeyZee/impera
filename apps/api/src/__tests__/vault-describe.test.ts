@@ -18,6 +18,7 @@ import {
 } from '../modules/media/application/describe-drop';
 import {
   describeVault,
+  VaultPictureNotRemoved,
   type VaultAsset,
   type VaultDescribeStore,
   type VaultFileRead,
@@ -187,6 +188,10 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
         },
         ask,
       ),
+    unpicture: (key: string) => {
+      stored.delete(key);
+      return Promise.resolve();
+    },
     scratchDir: scratch,
     now: () => new Date('2027-03-01T12:00:00.000Z'),
   });
@@ -333,8 +338,8 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
     expect(await run()).toMatchObject({ stop: 'budget', described: 0 });
     expect(queued).toEqual([new Date('2027-03-01T13:00:00.000Z')]);
     expect(assets.size).toBe(0);
-    // The first file's picture was made before the vision refused; under its fingerprint, the next run writes it again.
-    expect(stored.size).toBe(1);
+    // The first file's picture, made before the vision refused, is removed: no media carries it (ADR 0113 § 1).
+    expect(stored.size).toBe(0);
     expect(await readdir(scratch)).toEqual([]);
 
     vision.answer = 'ok';
@@ -354,6 +359,7 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
     expect([...refs.values()][0]?.failures).toBe(DESCRIPTION_TRIES);
     expect(await run()).toMatchObject({ stop: 'done', described: 0, toAgency: 0 });
     expect(assets.size).toBe(0);
+    expect(stored.size).toBe(0);
     expect(await readdir(scratch)).toEqual([]);
   });
 
@@ -424,6 +430,53 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
     expect([...assets.values()][0]).toMatchObject({ thumbnailKey: null });
     expect([...assets.values()][0]?.described).not.toBeNull();
     expect(stored.size).toBe(0);
+    expect(await readdir(scratch)).toEqual([]);
+  });
+
+  it('removes the picture of a media the vision cannot read, left to the agency', async () => {
+    holding(pick('image').ref.id);
+    const unreadable = {
+      ...deps(),
+      describer: { describe: () => Promise.resolve(err({ code: 'unreadable' as const })) },
+    };
+    expect(
+      await describeVault(unreadable, { platformAccountId: ACCOUNT, correlationId: 'test' }),
+    ).toMatchObject({ stop: 'done', toAgency: 1 });
+    expect(stored.size).toBe(0);
+    expect(await readdir(scratch)).toEqual([]);
+  });
+
+  it('removes the picture when the store fails after it, and the job fails to be replayed', async () => {
+    holding(pick('image').ref.id);
+    const failing = {
+      ...deps(),
+      store: { ...store, keep: () => Promise.reject(new Error('database gone')) },
+    };
+    await expect(
+      describeVault(failing, { platformAccountId: ACCOUNT, correlationId: 'test' }),
+    ).rejects.toThrow('database gone');
+    expect(stored.size).toBe(0);
+    expect(await readdir(scratch)).toEqual([]);
+  });
+
+  it('keeps the picture a media a fan sent already carries, the same key', async () => {
+    holding(pick('image').ref.id);
+    const fan = { ...deps(), store: { ...store, keep: () => Promise.resolve('fan' as const) } };
+    expect(await describeVault(fan, { platformAccountId: ACCOUNT, correlationId: 'test' })).toMatchObject({
+      stop: 'done',
+      toAgency: 1,
+    });
+    expect(stored.size).toBe(1);
+  });
+
+  it('fails the job, never naming the key, when a picture kept by no media cannot be removed', async () => {
+    holding(pick('image').ref.id);
+    vision.answer = 'budget';
+    const stuck = { ...deps(), unpicture: () => Promise.reject(new Error('storage refused')) };
+    const run = describeVault(stuck, { platformAccountId: ACCOUNT, correlationId: 'test' });
+    await expect(run).rejects.toBeInstanceOf(VaultPictureNotRemoved);
+    await expect(run).rejects.not.toThrow(CREATOR);
+    expect(stored.size).toBe(1);
     expect(await readdir(scratch)).toEqual([]);
   });
 
