@@ -269,7 +269,7 @@ async function describeOne(
 /** The folders a run makes: its own, and the picture's (content-drops), both removed in `finally`. */
 const LEFTOVER_PREFIXES = ['impera-vault-', 'impera-picture-'];
 /** A folder older than this is no run's: a run reads one file at a time, well under this. */
-const LEFTOVER_AGE_MS = 15 * 60_000;
+const LEFTOVER_AGE_MS = 60 * 60_000;
 
 /**
  * Removes what a run killed in the middle of a file left in `scratchDir` (the PC is turned off each night): « never
