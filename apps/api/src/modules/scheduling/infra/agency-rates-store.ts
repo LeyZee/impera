@@ -20,7 +20,7 @@ import {
   AgencyRateForbidden,
   CreatorNotFound,
 } from '../domain/errors';
-import { observedShares } from '../domain/observed-shares';
+import { sharesAgainstRates } from '../domain/observed-shares';
 import type { AgencyRatesStore, StoredAgencyRate } from '../domain/ports';
 import { addDays, calendarDayIn } from '../domain/time';
 
@@ -71,9 +71,10 @@ export function createDrizzleAgencyRatesStore(db: Database, totalsOf: SalesTotal
     creatorId: CreatorId,
     from: string,
     to: string,
+    rates: readonly StoredAgencyRate[],
   ): Promise<CreatorAgencyRateList['observed']['last30Days']> => {
     const totals = await totalsOf(tx, { creatorId, from, to });
-    return { from, to, shares: observedShares(totals.rows) };
+    return { from, to, shares: sharesAgainstRates(totals.rows, rates) };
   };
   return {
     list: (actor, creatorId, now) =>
@@ -87,12 +88,12 @@ export function createDrizzleAgencyRatesStore(db: Database, totalsOf: SalesTotal
           const rates = (await tx.select(rateColumns).from(creatorAgencyRates))
             .map(toRate)
             .toSorted(newestFirst);
-          const last30Days = await windowOf(tx, creatorId, addDays(today, -29), today);
+          const last30Days = await windowOf(tx, creatorId, addDays(today, -29), today, rates);
           const fortnights = [];
           for (const period of lastFortnights(today)) {
             const last = payPeriodLastDay(period);
             // The fortnight in course is read up to today: a day to come has no sale.
-            fortnights.push(await windowOf(tx, creatorId, period, last > today ? today : last));
+            fortnights.push(await windowOf(tx, creatorId, period, last > today ? today : last, rates));
           }
           // An account linked to a sales feed (ADR 0050 § 3): her share is read there, sale or not.
           const feeds = await tx.execute(

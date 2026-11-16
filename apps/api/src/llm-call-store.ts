@@ -1,6 +1,6 @@
 import { LlmCallIdSchema, LlmPurposeSchema, newId } from '@impera/contracts';
 import { schema, sql, type Database } from '@impera/db';
-import { CALL_OUTCOMES, type LlmCallRecord, type LlmCallStore } from '@impera/llm';
+import { CALL_OUTCOMES, HEDGE_ROLES, type LlmCallRecord, type LlmCallStore } from '@impera/llm';
 import { z } from 'zod';
 
 const RowSchema = z.object({
@@ -20,6 +20,7 @@ const RowSchema = z.object({
   cost_micro_usd: z.coerce.number().nullable(),
   conversation_id: z.string().nullable(),
   draft_id: z.string().nullable(),
+  hedge: z.enum(HEDGE_ROLES).nullable(),
 });
 
 function toRecord(row: z.infer<typeof RowSchema>): LlmCallRecord {
@@ -40,6 +41,7 @@ function toRecord(row: z.infer<typeof RowSchema>): LlmCallRecord {
     ...(row.cost_micro_usd === null ? {} : { costUsd: row.cost_micro_usd / 1_000_000 }),
     ...(row.conversation_id === null ? {} : { conversationId: row.conversation_id }),
     ...(row.draft_id === null ? {} : { draftId: row.draft_id }),
+    ...(row.hedge === null ? {} : { hedge: row.hedge }),
   };
 }
 
@@ -67,13 +69,14 @@ export function createDrizzleLlmCallStore(adminDb: Database): LlmCallStore {
         isFallback: record.isFallback,
         conversationId: record.conversationId ?? null,
         draftId: record.draftId ?? null,
+        hedge: record.hedge ?? null,
         createdAt: record.at,
       });
     },
     async listSince(from) {
       const result = await adminDb.execute(sql`
         select created_at, creator_id, role, purpose, provider, model, prompt_hash, status, latency_ms, is_fallback,
-               input_tokens, output_tokens, cost_micro_usd, conversation_id, draft_id
+               input_tokens, output_tokens, cost_micro_usd, conversation_id, draft_id, hedge
         from llm_calls where created_at >= ${from.toISOString()}::timestamptz order by created_at`);
       return z.array(RowSchema).parse(result.rows).map(toRecord);
     },

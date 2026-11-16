@@ -1,4 +1,12 @@
-import type { Currency, ObservedAgencyShare, Platform, PlatformAccountId } from '@impera/contracts';
+import {
+  agencyRateFor,
+  type Currency,
+  type ObservedAgencyShare,
+  type Platform,
+  type PlatformAccountId,
+} from '@impera/contracts';
+
+import { agencyShareGaps, type ShareRate, type ShareTotalsRow } from './agency-shares';
 
 /**
  * The agency's share as the platform reads it (ADR 0054 § 4 and § 5), pure: the sums of the net and of the agency's
@@ -31,8 +39,17 @@ export function shareBps(part: number, whole: number): number | null {
   return scaled - floor * whole >= whole - (scaled - floor * whole) ? floor + 1 : floor;
 }
 
+/** An account's share without its comparison with a percentage. */
+type ShareSums = Omit<ObservedAgencyShare, 'differsFromRate'>;
+
+const keyOf = (row: {
+  readonly platform: Platform;
+  readonly platformAccountId: PlatformAccountId;
+  readonly currency: Currency;
+}): string => `${row.platform}:${row.platformAccountId}:${row.currency}`;
+
 /** Each account and currency of the rows, its sums and its share; ordered by account then currency. */
-export function observedShares(rows: readonly ObservedTotalsRow[]): ObservedAgencyShare[] {
+export function observedShares(rows: readonly ObservedTotalsRow[]): ShareSums[] {
   const sums = new Map<
     string,
     {
@@ -62,6 +79,23 @@ export function observedShares(rows: readonly ObservedTotalsRow[]): ObservedAgen
       (a, b) =>
         a.platformAccountId.localeCompare(b.platformAccountId) || a.currency.localeCompare(b.currency),
     );
+}
+
+/**
+ * The shares of a window (§ 4), each compared with her percentages by the rule of the gap alert (§ 2, § 6:
+ * `agencyShareGaps`), so that the sheet and the alert never disagree: `differsFromRate` is `null` for an account none
+ * of whose days a percentage covers.
+ */
+export function sharesAgainstRates(
+  rows: readonly (ObservedTotalsRow & ShareTotalsRow)[],
+  rates: readonly ShareRate[],
+): ObservedAgencyShare[] {
+  const covered = new Set(rows.filter((row) => agencyRateFor(rates, row.day) !== null).map(keyOf));
+  const gaps = new Set(agencyShareGaps(rows, rates).map(keyOf));
+  return observedShares(rows).map((share) => {
+    const key = keyOf(share);
+    return { ...share, differsFromRate: covered.has(key) ? gaps.has(key) : null };
+  });
 }
 
 /** An account and currency whose share moved by more than a point from one fortnight to the next (§ 5). */

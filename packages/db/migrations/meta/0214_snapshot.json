@@ -1,6 +1,6 @@
 {
-  "id": "4a57b6a9-7f7b-4237-bb5e-06cea17bdccc",
-  "prevId": "cb39cfba-f879-41b6-8f39-3067113b1347",
+  "id": "bb847999-aabc-49b8-ae55-42105ec1b0e0",
+  "prevId": "8611faba-153c-4211-8189-86bf9f83e483",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7414,6 +7414,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "hedge": {
+          "name": "hedge",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7527,6 +7533,10 @@
         "llm_calls_currency_check": {
           "name": "llm_calls_currency_check",
           "value": "\"llm_calls\".\"currency\" in ('EUR', 'USD')"
+        },
+        "llm_calls_hedge_check": {
+          "name": "llm_calls_hedge_check",
+          "value": "\"llm_calls\".\"hedge\" in ('winner', 'loser')"
         }
       },
       "isRLSEnabled": false

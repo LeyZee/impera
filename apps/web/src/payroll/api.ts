@@ -21,6 +21,7 @@ import {
   PaySaleDecisionSchema,
   PaySaleSignalSchema,
   PenaltySchema,
+  REAUTHENTICATION_ERROR_CODE,
   type Bonus,
   type BonusTierSet,
   type CollectiveGoal,
@@ -311,6 +312,8 @@ export type PayRefusalDetails = z.infer<typeof DetailsSchema>;
 /** A refusal the screen words, or a server that does not answer. */
 export type PayRefusal =
   | { readonly kind: 'refused'; readonly code: PayRefusalCode; readonly details: PayRefusalDetails }
+  /** 403 `reauthentication_forbidden` (EQ-15): the password and the code are asked again, then the write runs again. */
+  | { readonly kind: 'reauth' }
   | { readonly kind: 'failed' };
 
 export type PayOutcome<T> = { readonly kind: 'ok'; readonly value: T } | PayRefusal;
@@ -324,6 +327,7 @@ const isKnown = (code: string): code is PayRefusalCode => KNOWN.has(code);
 
 async function refusalOf(response: Response): Promise<PayRefusal> {
   const parsed = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+  if (parsed.success && parsed.data.error.code === REAUTHENTICATION_ERROR_CODE) return { kind: 'reauth' };
   if (!parsed.success || !isKnown(parsed.data.error.code)) return { kind: 'failed' };
   const details = DetailsSchema.safeParse(parsed.data.error.details);
   return { kind: 'refused', code: parsed.data.error.code, details: details.success ? details.data : {} };

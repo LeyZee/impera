@@ -160,7 +160,8 @@ llm_calls   id, creator_id (nullable), role (sense|brain|voice|judge), provider,
             input_tokens, output_tokens, cost_minor, currency, cost_micro_usd (coût exact), latency_ms,
             status (les 12 issues de la passerelle : ok, refused, timeout, rate_limited…), is_fallback,
             conversation_id (nullable), draft_id (nullable, sans clé étrangère : l'appel précède le brouillon),
-            trace_id (Langfuse), created_at. Journal de la passerelle (LlmCallStore), lu au démarrage pour le
+            trace_id (Langfuse), hedge (nullable : winner|loser d'une deuxième demande, OPS-15 ; loser = encore en
+            cours quand la réponse est partie, son coût compte, pas sa latence), created_at. Journal de la passerelle (LlmCallStore), lu au démarrage pour le
             plafond quotidien.
 ```
 

@@ -357,6 +357,13 @@
   color: var(--nv-success);
   background: color-mix(in srgb, var(--nv-success) 14%, transparent);
 }
+/* An island that asks for something is read, not glanced at: an opaque plate, so the list under it never shows
+   through its words (EQ-15 captures, on a phone). */
+.rp-island[data-phase='failed'] {
+  background:
+    linear-gradient(180deg, var(--nv-glass-fill-strong) 0%, var(--nv-glass-fill) 46%),
+    var(--nv-surface-raised);
+}
 .rp-island[data-phase='failed'] .rp-island__mark {
   border-radius: var(--nv-radius-full);
   color: var(--nv-warning);
