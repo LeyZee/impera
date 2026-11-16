@@ -20,6 +20,17 @@ export interface Standing {
   readonly noContact: boolean;
 }
 
+/**
+ * Why the panel offers no text to copy, or null when it may. Closed by default: limits that could not be read, or not
+ * read yet, may hide « Ne plus lui écrire », so nothing is offered until they are (relecture de Bilan, PR du panneau).
+ */
+export type Withheld = 'no_contact' | 'unread';
+
+export function withheldOf(standing: Standing | null): Withheld | null {
+  if (standing === null || standing.unread) return 'unread';
+  return standing.noContact ? 'no_contact' : null;
+}
+
 export const DESIRE_WORDS: Readonly<Record<DesireBand, string>> = {
   neutral: 'neutre',
   playful: 'joueur',

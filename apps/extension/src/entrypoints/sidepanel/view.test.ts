@@ -524,6 +524,23 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     ).not.toBeNull();
   });
 
+  // Bilan's review: limits that could not be read may hide « Ne plus lui écrire »; closed until they are read, in amber.
+  it('offers no text to copy while his limits are not read, and says so in amber', () => {
+    const unread = standingOf('unread', null);
+    const { root } = draw(onCard(card({}), [], { standing: unread, draft: ready() }));
+    expect(root.querySelector('[data-gesture="place"]')).toBeNull();
+    expect(root.querySelector('[data-gesture="edit"]')).toBeNull();
+    expect(root.querySelector('[data-gesture="reject"]')).not.toBeNull();
+    expect(root.querySelector('.cp-draft__stop')).toBeNull();
+    expect(root.querySelector('.cp-draft__warn')?.textContent).toBe(
+      'Ses limites ne se lisent pas : rien à copier tant qu’elles ne sont pas lues.',
+    );
+    const editing = draw(
+      onCard(card({}), [], { standing: unread, draft: ready({ mode: 'editing', text: 'x' }) }),
+    ).root;
+    expect(editing.querySelector('[data-gesture="place-edited"]')).toBeNull();
+  });
+
   // EXT-20: the field is sized on the text's length, not only its lines.
   it('gives the retouched text room for a long bubble', () => {
     const rows = (text: string): string | null | undefined =>

@@ -15,7 +15,7 @@ import { browser } from 'wxt/browser';
 import { readDraftView, readFanCard, readStanding, type CardRead } from '../../lib/copilot/api';
 import { newestOf } from '../../lib/copilot/card';
 import { openConversationOf } from '../../lib/copilot/open-conversation';
-import { standingOf, type Standing } from '../../lib/copilot/standing';
+import { standingOf, withheldOf, type Standing } from '../../lib/copilot/standing';
 import { VerdictSentSchema, type FromPanel } from '../../lib/copilot/verdict';
 import { storedOrigin } from '../../lib/crm-origin-store';
 import { readCrmSession } from '../../lib/session';
@@ -100,10 +100,11 @@ const copy = (text: string): Promise<boolean> =>
 
 /**
  * `a` or `e` (§ 4): the text goes to Reveal, here through the clipboard, and the chatter sends it himself, one bubble at
- * a time as Reveal sends them (EXT-13). Never for a fan he must no longer write to (EXT-05).
+ * a time as Reveal sends them (EXT-13). Never for a fan he must no longer write to (EXT-05), nor while his limits are
+ * not read.
  */
 async function place(edited: boolean): Promise<void> {
-  if (view?.state !== 'ready' || gesture?.done !== null || standing?.noContact === true) return;
+  if (view?.state !== 'ready' || gesture?.done !== null || withheldOf(standing) !== null) return;
   const { draftId } = gesture;
   const bubbles = edited
     ? gesture.text
@@ -126,7 +127,7 @@ async function place(edited: boolean): Promise<void> {
 /** `a` again, after a placing: the next bubble. The gesture was counted once, with the first. */
 async function copyNext(): Promise<void> {
   const done = gesture?.done;
-  if (gesture === null || done?.outcome !== 'placed' || standing?.noContact === true) return;
+  if (gesture === null || done?.outcome !== 'placed' || withheldOf(standing) !== null) return;
   const next = done.bubbles[done.copied];
   if (next === undefined) return;
   const copyFailed = await copy(next);
@@ -146,7 +147,7 @@ const actions = {
   place: (edited: boolean) => void place(edited),
   copyNext: () => void copyNext(),
   edit: () => {
-    if (view?.state !== 'ready' || gesture?.done !== null || standing?.noContact === true) return;
+    if (view?.state !== 'ready' || gesture?.done !== null || withheldOf(standing) !== null) return;
     setGesture({ ...gesture, mode: 'editing', text: view.draft.bubbles.join('\n') });
     document.querySelector<HTMLTextAreaElement>('.cp-draft__area')?.focus();
   },

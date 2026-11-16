@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { standingOf } from './standing';
+import { standingOf, withheldOf } from './standing';
 
 describe('where things stand with him (ADR 0086 § 3.1)', () => {
   // Recette du 16/11, EXT-05: « Ne plus lui écrire » forbids any word, the other stops forbid an offer.
@@ -13,5 +13,16 @@ describe('where things stand with him (ADR 0086 § 3.1)', () => {
       standingOf({ salesFrozen: { reason: 'distress', since: '2026-11-08T18:00:00Z' } }, null).noContact,
     ).toBe(false);
     expect(standingOf('unread', null)).toMatchObject({ unread: true, noContact: false });
+  });
+
+  // Bilan's review: closed by default, nothing to copy until his limits are read.
+  it('withholds the text to copy unless his limits are read and allow a word', () => {
+    expect(withheldOf(null)).toBe('unread');
+    expect(withheldOf(standingOf('unread', null))).toBe('unread');
+    expect(withheldOf(standingOf({ doNotContact: true }, null))).toBe('no_contact');
+    expect(withheldOf(standingOf({}, null))).toBeNull();
+    expect(
+      withheldOf(standingOf({ salesFrozen: { reason: 'distress', since: '2026-11-08T18:00:00Z' } }, null)),
+    ).toBeNull();
   });
 });

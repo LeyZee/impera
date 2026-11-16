@@ -24,7 +24,13 @@ import {
   toCheckCount,
   valueText,
 } from '../../lib/copilot/card';
-import { DESIRE_WORDS, REJECT_WORDS, type Standing } from '../../lib/copilot/standing';
+import {
+  DESIRE_WORDS,
+  REJECT_WORDS,
+  withheldOf,
+  type Standing,
+  type Withheld,
+} from '../../lib/copilot/standing';
 import type { VerdictSent } from '../../lib/copilot/verdict';
 import { h } from '../../lib/dom';
 import { icon, type IconName } from '../../lib/icons';
@@ -494,13 +500,22 @@ function doneLines(done: GestureDone): HTMLElement[] {
 const stopsLine = (stops: readonly string[]): HTMLElement =>
   h('p', { class: 'cp-draft__stop', role: 'status' }, `${stops.join(' · ')} : relis-le avant de l’envoyer.`);
 
-/** « Ne plus lui écrire » (EXT-05): red, the limit forbids; only the refusal is left to the chatter. */
-const noContactLine = (): HTMLElement =>
-  h(
-    'p',
-    { class: 'cp-draft__stop', role: 'status' },
-    'Ne plus lui écrire : rien ne part vers lui. Refuse ce brouillon.',
-  );
+/**
+ * Why nothing is offered to copy: « Ne plus lui écrire » (EXT-05) in red, the limit forbids; limits not read in amber,
+ * they may come back. Only the refusal is left to the chatter.
+ */
+const withheldLine = (withheld: Withheld): HTMLElement =>
+  withheld === 'no_contact'
+    ? h(
+        'p',
+        { class: 'cp-draft__stop', role: 'status' },
+        'Ne plus lui écrire : rien ne part vers lui. Refuse ce brouillon.',
+      )
+    : h(
+        'p',
+        { class: 'cp-draft__warn', role: 'status' },
+        'Ses limites ne se lisent pas : rien à copier tant qu’elles ne sont pas lues.',
+      );
 
 /** Rows for the retouched text, from its length as well as its lines: a long bubble is read whole (EXT-20). */
 const rowsOf = (text: string): number =>
@@ -514,13 +529,13 @@ const rowsOf = (text: string): number =>
 
 /** What « où on en est » forbids, as the draft reads it. */
 interface DraftStops {
-  readonly noContact: boolean;
+  readonly withheld: Withheld | null;
   readonly stops: readonly string[];
 }
 
 function draftPart(
   draft: DraftPart,
-  { noContact, stops }: DraftStops,
+  { withheld, stops }: DraftStops,
   actions: PanelActions,
 ): HTMLElement | null {
   if (draft.kind === 'hidden') return null;
@@ -554,8 +569,8 @@ function draftPart(
     section.append(
       head,
       area,
-      noContact
-        ? noContactLine()
+      withheld !== null
+        ? withheldLine(withheld)
         : h('p', { class: 'cp-draft__hint' }, 'Une bulle par ligne. Ctrl+Entrée copie le texte.'),
       h(
         'div',
@@ -566,7 +581,7 @@ function draftPart(
           { type: 'button', class: 'nv-btn nv-btn--plain nv-btn--sm', 'data-gesture': 'cancel' },
           'Annuler',
         ),
-        noContact
+        withheld !== null
           ? null
           : h(
               'button',
@@ -585,7 +600,7 @@ function draftPart(
   const shown = draft.done?.bubbles ?? draft.bubbles;
   const copied = draft.done?.outcome === 'placed' ? draft.done.copied : 0;
   // A draft he may not or no longer use is put out, so it never looks like one to place (Design, lot -1).
-  const off = noContact || draft.done?.outcome === 'rejected';
+  const off = withheld !== null || draft.done?.outcome === 'rejected';
   const bubbles = h(
     'ol',
     { class: 'cp-bubbles', 'data-off': off ? 'true' : undefined },
@@ -672,10 +687,10 @@ function draftPart(
     'Refuser ',
     key('R'),
   );
-  if (noContact) {
+  if (withheld !== null) {
     // The one action left, on the secondary plate across the width: not a grey text that reads as off.
     refuse.className = 'nv-btn nv-btn--soft nv-btn--sm';
-    section.append(noContactLine(), h('div', { class: 'cp-draft__actions' }, refuse));
+    section.append(withheldLine(withheld), h('div', { class: 'cp-draft__actions' }, refuse));
     return section;
   }
   const stopped = stops.length > 0;
@@ -789,7 +804,7 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
   if (screen.kind === 'conversation') {
     const body = h('div', { class: 'cp-scroll' }, ...cardPart(screen, actions));
     const stops: DraftStops = {
-      noContact: screen.standing?.noContact === true,
+      withheld: withheldOf(screen.standing),
       stops: screen.standing?.stops ?? [],
     };
     const top = [whoBand(screen.fanName), standingLine(screen.standing)].filter(
