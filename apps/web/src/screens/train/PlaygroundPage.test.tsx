@@ -317,7 +317,9 @@ describe('Playground', () => {
     expect(screen.queryByText('Proposée, à noter')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     expect(
-      await screen.findByText('Rangée en Exemple de voix : elle rejoint les exemples donnés à la voix.'),
+      await screen.findByText(
+        'Rangée en Exemple de voix : donnée à sa voix au Playground, pas encore aux vrais fans.',
+      ),
     ).toBeTruthy();
   });
 });

@@ -24,16 +24,20 @@ export const DESTINATION_LABELS: Readonly<Record<Destination, string>> = {
   rule: 'Règle',
   test: 'Test',
 };
+/**
+ * What each destination does today, honestly (Charles, 16/11) : production reads no correction until ADR 0102 is
+ * coded, and nothing takes up a rule or replays a test on its own yet. These words change with that work.
+ */
 export const DESTINATION_HINTS: Readonly<Record<Destination, string>> = {
-  voice_example: 'Rejoint les exemples donnés à la voix.',
-  rule: 'Part au propriétaire pour validation, puis devient du code.',
-  test: 'Rejoué à chaque changement de prompt ou de modèle.',
+  voice_example: 'Donnée en exemple à sa voix, au Playground seulement : pas encore aux vrais fans.',
+  rule: 'Gardée pour être relue : aucun écran ne la reprend encore, elle ne change rien seule.',
+  test: 'Gardé pour être rejoué à la main : pas encore dans les évaluations automatiques.',
 };
 /** Said once the lesson is filed: where it went and what it changes. */
 const DESTINATION_ACKS: Readonly<Record<Destination, string>> = {
-  voice_example: 'Rangée en Exemple de voix : elle rejoint les exemples donnés à la voix.',
-  rule: 'Rangée en Règle : elle part au propriétaire pour validation.',
-  test: 'Rangée en Test : rejouée à chaque changement de prompt ou de modèle.',
+  voice_example: 'Rangée en Exemple de voix : donnée à sa voix au Playground, pas encore aux vrais fans.',
+  rule: 'Rangée en Règle : gardée pour être relue, elle ne change rien seule pour l’instant.',
+  test: 'Rangée en Test : gardée pour être rejouée à la main.',
 };
 
 /** The line under the conversation once a lesson is filed; the demo saves nothing, and says so as its bar does. */
