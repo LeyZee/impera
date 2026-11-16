@@ -85,8 +85,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     const chosen: string[] = [];
     show(() => (
       <AgencyPage
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         onCreator={(id) => chosen.push(id)}
         forOwner
         reviewsReports={false}
@@ -107,8 +107,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     serve();
     show(() => (
       <AgencyPage
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         onCreator={() => undefined}
         forOwner
         reviewsReports={false}
@@ -127,8 +127,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     serve([]);
     show(() => (
       <AgencyPage
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         onCreator={() => undefined}
         forOwner
         reviewsReports={false}
@@ -147,8 +147,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
         onPeriod={() => undefined}
         forOwner
         agency={{
-          period: 'week',
-          onPeriod: () => undefined,
+          selection: { unit: 'week' },
+          onSelection: () => undefined,
           onAgency: () => undefined,
           canOpenSettings: true,
         }}

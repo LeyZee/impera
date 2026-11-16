@@ -137,3 +137,4 @@ Date : AAAA-MM-JJ
 | 0131 | Choisir le script qui colle aux goûts du fan : familles de fantasme, goûts des scripts et de la fiche, le code classe et l'IA choisit | accepted (précise 0098 § 6, 0056 § 6, 0085 et 0112 § 5) |
 | 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
 | 0144 | Le MCP suit le CRM de novembre : coffre, branches, Playground, copilote, semaine de la créatrice, trophées et liens, en lecture seule | accepted (précise 0105 § 4) |
+| 0146 | Le Dashboard de l'agence se lit par jour, semaine, mois ou période choisie, et se compare à la période qu'on choisit | proposed (précise 0078 § 3 et § 5) |

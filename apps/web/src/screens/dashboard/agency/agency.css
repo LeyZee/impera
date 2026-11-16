@@ -39,24 +39,102 @@
   font-size: clamp(40px, 5vw, var(--nv-text-hero));
   line-height: 1.04;
 }
-.ins-spark {
+/* The curve under the lead figure (ADR 0146 § 5): the period's revenue in data ink over a soft fill, the comparison
+   as a quiet dashed line behind, a hairline and a dot following the pointer, the last day's dot at rest. */
+.ins-curve {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.ins-curve__plot {
+  position: relative;
+  height: 96px;
+}
+.ins-curve__plot svg {
   display: block;
   width: 100%;
-  height: 48px;
+  height: 100%;
   overflow: visible;
 }
-.ins-spark__line {
+.ins-curve__line {
   fill: none;
   stroke: var(--nv-data-1);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.ins-curve__compared {
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 4;
+  stroke-linecap: round;
+}
+.ins-curve__area {
+  stroke: none;
+}
 /* Drawn left to right by a clip, never by dashes: a dash is counted on screen under a non-scaling stroke and cut a
    long line short (recette 06/11). */
-.ins-spark {
+.ins-curve__plot svg {
   clip-path: inset(-4px 100% -4px -4px);
   animation: ins-draw var(--nv-dur-data) var(--nv-ease-out) 200ms forwards;
+}
+.ins-curve__hair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--_x);
+  width: 1px;
+  background: var(--nv-plate-edge);
+  pointer-events: none;
+}
+.ins-curve__dot {
+  position: absolute;
+  left: var(--_x);
+  top: var(--_y);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--nv-data-1);
+  box-shadow:
+    0 0 0 2px var(--nv-surface-raised),
+    0 0 12px var(--nv-data-1);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.ins-curve__hits {
+  position: absolute;
+  inset: -8px 0;
+  display: flex;
+}
+.ins-curve__hit {
+  flex: 1 1 0;
+}
+.ins-curve__keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+}
+.ins-curve__key {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--nv-data-1);
+}
+.ins-curve__key--compared {
+  margin-left: 6px;
+  background: repeating-linear-gradient(90deg, var(--nv-ink-faint) 0 3px, transparent 3px 7px);
+}
+.ins-curve__since {
+  margin-left: auto;
+  color: var(--nv-ink-faint);
 }
 @keyframes ins-draw {
   to {
@@ -1053,6 +1131,124 @@
   color: var(--nv-ink-muted);
 }
 
+/* The days read (ADR 0146): the unit, the period between its arrows, the comparison; one row that wraps. */
+.ins-when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.ins-when__nav {
+  --_radius: var(--nv-radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--_radius);
+}
+.ins-when__arrow {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--nv-ink-muted);
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-base) var(--nv-ease-out),
+    color var(--nv-dur-base) var(--nv-ease-out);
+}
+.ins-when__arrow:hover:not(:disabled) {
+  background: var(--nv-plate-hover);
+  color: var(--nv-ink);
+}
+.ins-when__arrow:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 1px;
+}
+.ins-when__arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ins-when__chevron {
+  width: 16px;
+  height: 16px;
+}
+.ins-when__arrow[data-toward='previous'] .ins-when__chevron {
+  transform: rotate(180deg);
+}
+.ins-when__select {
+  min-width: 0;
+}
+.ins-when__nav .ins-when__select {
+  width: 13.5em;
+}
+.ins-when__nav .ins-when__select .nv-select__field {
+  min-height: 34px;
+  padding-block: 6px;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+  text-align: center;
+}
+.ins-when__compare {
+  width: 15em;
+}
+.ins-when__compare .nv-select__field {
+  --_radius: var(--nv-radius-full);
+  min-height: 40px;
+  padding-block: 8px;
+}
+.ins-when__days {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 4px;
+}
+.ins-when__day-label {
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-muted);
+}
+.ins-when__day.nv-field__control {
+  width: 8.2em;
+  min-height: 34px;
+  padding: 6px 10px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.ins-when__wrong {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-warning);
+}
+@media (max-width: 720px) {
+  .ins-when {
+    justify-content: stretch;
+    width: 100%;
+  }
+  .ins-when__nav {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+  .ins-when__nav .ins-when__select {
+    flex: 1 1 auto;
+    width: auto;
+  }
+  .ins-when__arrow {
+    width: 44px;
+    height: 44px;
+  }
+  .ins-when__compare {
+    flex: 1 1 100%;
+    width: auto;
+  }
+}
+
 /* The periods: 38px seen, 44px to the finger, up and down only (ADM-22). */
 .ins-period .nv-seg__opt::after {
   content: '';
@@ -1183,7 +1379,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ins-spark,
+  .ins-curve__plot svg,
   .ins-subs__plot svg,
   .ins-col__part,
   .ins-ring__arc,
@@ -1192,7 +1388,7 @@
   .ins-meter > span {
     animation: none;
   }
-  .ins-spark {
+  .ins-curve__plot svg {
     clip-path: none;
   }
   .ins-ring__arc {

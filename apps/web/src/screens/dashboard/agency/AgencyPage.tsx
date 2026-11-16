@@ -1,4 +1,3 @@
-import type { AgencyPeriod } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { AgencyStrip } from '../AgencyStrip';
@@ -12,6 +11,7 @@ import { useDashboard } from '../useDashboard';
 import '../dashboard.css';
 
 import { AgencyInsightsPanel } from './AgencyInsights';
+import type { AgencySelection } from './period';
 
 /**
  * The Dashboard of the owner and of an active manager, before any creator is chosen (ADR 0078): « Toute l'agence »
@@ -19,15 +19,15 @@ import { AgencyInsightsPanel } from './AgencyInsights';
  * her Dashboard, her figures first and her agent under them.
  */
 export function AgencyPage({
-  period,
-  onPeriod,
+  selection,
+  onSelection,
   onCreator,
   forOwner,
   reviewsReports,
   canAddCreator,
 }: {
-  period: AgencyPeriod;
-  onPeriod: (period: AgencyPeriod) => void;
+  selection: AgencySelection;
+  onSelection: (selection: AgencySelection) => void;
   onCreator: (creatorId: string) => void;
   /** The owner also reads the daily export and the invoices' paperwork, and links the registers. */
   forOwner: boolean;
@@ -53,8 +53,8 @@ export function AgencyPage({
         <AgencyStrip agency={view.data.agency} onAgencyView opensSettings={forOwner} />
       ) : null}
       <AgencyInsightsPanel
-        period={period}
-        onPeriod={onPeriod}
+        selection={selection}
+        onSelection={onSelection}
         creatorId={null}
         onCreator={onCreator}
         canOpenSettings={forOwner}

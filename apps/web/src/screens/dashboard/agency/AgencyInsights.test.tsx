@@ -32,8 +32,8 @@ function Panel({ creatorId, canOpenSettings }: { creatorId: string | null; canOp
   return (
     <>
       <AgencyInsightsPanel
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         creatorId={creatorId}
         creatorName="Lina Test"
         canOpenSettings={canOpenSettings}
@@ -86,7 +86,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     show();
     expect(await screen.findByRole('heading', { name: /D’où vient l’argent/u })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /L’agence en chiffres/u })).toBeTruthy();
-    expect(reads[0]).toBe('/v1/dashboard/agency?period=week');
+    expect(reads[0]).toBe('/v1/dashboard/agency?unit=week');
     for (const title of [
       'D’où vient l’argent',
       'Qui vend',
@@ -272,7 +272,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     show(LINA);
     expect(await screen.findByRole('heading', { name: /Qui vend/u })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Les chiffres de Lina Test/u })).toBeTruthy();
-    expect(reads[0]).toBe(`/v1/dashboard/agency?period=week&creatorId=${LINA}`);
+    expect(reads[0]).toBe(`/v1/dashboard/agency?unit=week&creatorId=${LINA}`);
     expect(screen.queryByRole('heading', { name: /Les créatrices/u })).toBeNull();
     expect(within(screen.getByLabelText('L’argent')).getByText('Part de la créatrice')).toBeTruthy();
   });
@@ -429,5 +429,49 @@ describe('Les abonnés (ADR 0081)', () => {
     serve(200, { ...AGENCY_WEEK, subscribers: null });
     show();
     expect(await screen.findByText(/première lecture des statistiques de Reveal/u)).toBeTruthy();
+  });
+});
+
+describe('the days read and their comparison (ADR 0146)', () => {
+  it('names the week, the days compared, and offers the arrows and the comparison', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const heading = screen.getByRole('heading', { name: /L’agence en chiffres/u });
+    expect(heading.textContent).toContain('comparé aux 24–30 oct.');
+    expect(screen.getByRole('radio', { name: 'Semaine' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Période précédente' })).toBeTruthy();
+    // The next week has begun by the fixture's today: it can be read.
+    expect(screen.getByRole('button', { name: 'Période suivante' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByText('vs semaine précédente')).toBeTruthy();
+  });
+
+  it('draws the curve with its comparison and gives both amounts of a day on hover', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const plot = document.querySelector('.ins-curve__plot');
+    if (plot === null) throw new Error('curve');
+    expect(plot.querySelector('.ins-curve__compared')).not.toBeNull();
+    const hits = plot.querySelectorAll('.ins-curve__hit');
+    expect(hits).toHaveLength(7);
+    const last = hits[6];
+    if (last === undefined) throw new Error('hit');
+    fireEvent.pointerMove(last, { clientX: 10, clientY: 10 });
+    const bubble = await screen.findByRole('tooltip');
+    expect(bubble.textContent).toContain('Chiffre d’affaires');
+    expect(bubble.textContent).toContain('Comparé, 30 oct.');
+    expect(plot.querySelector('.ins-curve__hair')).not.toBeNull();
+  });
+
+  it('shows no percentage when the register starts after the days compared, and says so (§ 4)', async () => {
+    serve(200, { ...AGENCY_WEEK, registerSince: '2026-11-02' });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(screen.getByText(/le registre commence le 2 nov\., rien à comparer/u)).toBeTruthy();
+    const first = screen.getByRole('heading', { name: /L’agence en chiffres/u }).closest('section');
+    if (first === null) throw new Error('section');
+    expect(first.querySelectorAll('.nv-delta')).toHaveLength(0);
+    expect(screen.getByText(/registre lu depuis le 2 nov\./u)).toBeTruthy();
   });
 });

@@ -28,7 +28,7 @@ import { ScriptPage } from './screens/content/ScriptPage';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { AgencyPage } from './screens/dashboard/agency/AgencyPage';
 import {
-  agencyPeriodOf,
+  agencySelectionOf,
   agencySearch,
   agentPeriodOf,
   dashboardSearch,
@@ -136,14 +136,14 @@ const dashboard = createRoute({
     const rail = railOf(user);
     // The agency's figures are the owner's and an active manager's (ADR 0078 § 1): the Dashboard opens on them.
     if (user.role === 'owner' || user.teamScope === 'agency') {
-      const period = agencyPeriodOf(search);
+      const selection = agencySelectionOf(search);
       const openCreator = (id: string): void =>
-        void navigate({ search: agencySearch(period, id), replace: true });
+        void navigate({ search: agencySearch(selection, id), replace: true });
       if (search.creatrice === undefined) {
         return (
           <AgencyPage
-            period={period}
-            onPeriod={(next) => void navigate({ search: agencySearch(next), replace: true })}
+            selection={selection}
+            onSelection={(next) => void navigate({ search: agencySearch(next), replace: true })}
             onCreator={openCreator}
             forOwner={user.role === 'owner'}
             reviewsReports={canOpen(rail, '/equipe')}
@@ -153,7 +153,7 @@ const dashboard = createRoute({
       }
       return (
         <DashboardPage
-          period={agentPeriodOf(period)}
+          period={agentPeriodOf(selection)}
           onPeriod={() => undefined}
           onCreator={openCreator}
           forOwner={user.role === 'owner'}
@@ -162,10 +162,10 @@ const dashboard = createRoute({
           canAddCreator={canOpen(rail, '/creatrices')}
           asked={search.creatrice}
           agency={{
-            period,
-            onPeriod: (next) =>
+            selection,
+            onSelection: (next) =>
               void navigate({ search: agencySearch(next, search.creatrice), replace: true }),
-            onAgency: () => void navigate({ search: agencySearch(period), replace: true }),
+            onAgency: () => void navigate({ search: agencySearch(selection), replace: true }),
             canOpenSettings: user.role === 'owner',
           }}
         />
