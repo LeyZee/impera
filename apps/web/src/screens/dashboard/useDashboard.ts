@@ -11,11 +11,14 @@ import type { AgentMode, AutomaticGate } from '@/agent/mode';
  * - `loading` until the server answers;
  * - `live`, the server's data;
  * - `offline`, the server does not answer: no figure, nothing to act on, only that sentence;
- * - `empty`, no creator exists yet (first launch): the screen asks for one, never a made-up page (DASH-13).
+ * - `empty`, no creator exists yet (first launch): the screen asks for one, never a made-up page (DASH-13);
+ * - `missing`, the link names a creator this account does not list (archived, unknown): the screen says so, with no
+ *   figure and no control of another creator under her address (PIL-01).
  */
 export type DashboardView =
   | { readonly status: 'loading' }
   | { readonly status: 'empty' }
+  | { readonly status: 'missing' }
   | { readonly status: 'offline'; readonly creatorName: string | null }
   | {
       readonly status: 'live';
@@ -31,8 +34,13 @@ export type DashboardView =
     };
 
 /** The one door of the Dashboard to its data: `GET /v1/dashboard` for the period. */
-export function useDashboard(period: Period, reader: DashboardReader = 'owner'): DashboardView {
-  const live = useLiveDashboard(period);
+export function useDashboard(
+  period: Period,
+  reader: DashboardReader = 'owner',
+  /** The creator the address names, when it names one: her Dashboard or none. */
+  asked: string | null = null,
+): DashboardView {
+  const live = useLiveDashboard(period, asked, true);
   const liveData = live.kind === 'live' ? live.data : undefined;
   const data = useMemo(() => (liveData === undefined ? null : fromApi(liveData, reader)), [liveData, reader]);
   switch (live.kind) {
@@ -42,6 +50,8 @@ export function useDashboard(period: Period, reader: DashboardReader = 'owner'):
       return { status: 'offline', creatorName: live.creatorName };
     case 'empty':
       return { status: 'empty' };
+    case 'missing':
+      return { status: 'missing' };
     case 'live':
       // The period's own read carries the mode too: the control follows the page it is on.
       return {
