@@ -93,8 +93,13 @@ export function createPayrollRoutes(
   signals: PayrollSaleSignalStore,
   estimate: ReportEstimate,
   requireRole: RequireRole,
+  recentLogin: preValidationAsyncHookHandler,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
+  // What validates, pays or changes pay (a statement, a bonus, a penalty, an adjustment, a tier, a goal, the minimum,
+  // the delay): the password and the code given on this session in the last 10 minutes (ADR 0046 § 3, EQ-15). A sale
+  // given or shared, a sale signalled and the reads are not.
+  const confirmed = [ownerOrMember, recentLogin];
   return (app) => {
     app.get(
       '/payroll/periods',
@@ -220,7 +225,7 @@ export function createPayrollRoutes(
     app.post(
       '/payroll/statements/:statementId/validate',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: {
           params: StatementParamsSchema,
           body: ValidateCommissionStatementBodySchema,
@@ -233,7 +238,7 @@ export function createPayrollRoutes(
     app.post(
       '/payroll/statements/:statementId/pay',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: {
           params: StatementParamsSchema,
           body: PayCommissionStatementBodySchema,
@@ -246,7 +251,7 @@ export function createPayrollRoutes(
     app.post(
       '/payroll/bonuses',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: { body: CreateBonusBodySchema, response: { 200: BonusSchema, 201: BonusSchema } },
       },
       async (request, reply) => {
@@ -257,14 +262,14 @@ export function createPayrollRoutes(
 
     app.post(
       '/payroll/bonuses/:bonusId/cancel',
-      { preValidation: ownerOrMember, schema: { params: BonusParamsSchema, response: { 200: BonusSchema } } },
+      { preValidation: confirmed, schema: { params: BonusParamsSchema, response: { 200: BonusSchema } } },
       (request) => entries.cancelBonus(actorOf(request), request.params.bonusId),
     );
 
     app.post(
       '/payroll/penalties',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: { body: CreatePenaltyBodySchema, response: { 200: PenaltySchema, 201: PenaltySchema } },
       },
       async (request, reply) => {
@@ -276,7 +281,7 @@ export function createPayrollRoutes(
     app.post(
       '/payroll/penalties/:penaltyId/cancel',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: { params: PenaltyParamsSchema, response: { 200: PenaltySchema } },
       },
       (request) => entries.cancelPenalty(actorOf(request), request.params.penaltyId),
@@ -285,7 +290,7 @@ export function createPayrollRoutes(
     app.post(
       '/payroll/adjustments',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: {
           body: CreatePayAdjustmentBodySchema,
           response: { 200: PayAdjustmentSchema, 201: PayAdjustmentSchema },
@@ -300,7 +305,7 @@ export function createPayrollRoutes(
     app.post(
       '/payroll/bonus-tiers',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: {
           body: CreateBonusTierSetBodySchema,
           response: { 200: BonusTierSetSchema, 201: BonusTierSetSchema },
@@ -315,7 +320,7 @@ export function createPayrollRoutes(
     app.post(
       '/payroll/collective-goals',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: {
           body: CreateCollectiveGoalBodySchema,
           response: { 200: CollectiveGoalSchema, 201: CollectiveGoalSchema },
@@ -330,7 +335,7 @@ export function createPayrollRoutes(
     app.post(
       '/payroll/payout-minimums',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: {
           body: CreatePayoutMinimumBodySchema,
           response: { 200: PayoutMinimumSchema, 201: PayoutMinimumSchema },
@@ -351,7 +356,7 @@ export function createPayrollRoutes(
     app.put(
       '/payroll/settings',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: { body: UpdatePayrollSettingsBodySchema, response: { 200: PayrollSettingsSchema } },
       },
       (request) => rules.setSettings(actorOf(request), request.body),

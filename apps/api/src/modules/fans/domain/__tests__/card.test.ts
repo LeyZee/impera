@@ -64,6 +64,15 @@ describe('a value of the card (ADR 0085 § 3, § 8)', () => {
     expect(() => checkedValue('hobbies', ['x'.repeat(200), 'y'.repeat(200)])).toThrow(FanCardValueInvalid);
   });
 
+  it('keeps his age as a whole number of years, in digits (recette AGE-13)', () => {
+    expect(checkedValue('age', ['25'])).toBe('25');
+    expect(checkedValue('age', [' 32 ans '])).toBe('32');
+    expect(checkedValue('age', ['17'])).toBe('17');
+    for (const value of ['-5', '25,5', '25.5', 'vingt', '0', '120', 'la trentaine']) {
+      expect(() => checkedValue('age', [value]), value).toThrow(FanCardValueInvalid);
+    }
+  });
+
   it('never keeps what finds him outside the platform', () => {
     for (const value of [
       'basile@example.test',

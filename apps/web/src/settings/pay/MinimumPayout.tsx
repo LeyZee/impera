@@ -6,6 +6,7 @@ import { payRefusalText, rulePeriods } from '@/payroll/model';
 import '@/payroll/pay.css';
 import { amountInput, amountText, parseAmount, periodLine, periodTitle } from '@/reports/model';
 import { useAgencyToday } from '@/screens/pay/data';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 
 const STEPS = ['Remplir', 'Relire'] as const;
@@ -123,6 +124,7 @@ function MinimumDialog({
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
+  const confirm = useConfirmAgain();
   const minor = parseAmount(amount, false, PAYOUT_MINIMUM_MAX_MINOR);
   // Well written but past the ceiling: said as such, not as a matter of decimals (recette 05/11, PRO-09).
   const tooLarge = minor === null && parseAmount(amount, false, Number.MAX_SAFE_INTEGER) !== null;
@@ -137,6 +139,12 @@ function MinimumDialog({
     setBusy(false);
     if (outcome.kind === 'ok') {
       onClose();
+      return;
+    }
+    if (outcome.kind === 'reauth') {
+      confirm.ask(() => {
+        void send();
+      });
       return;
     }
     setRefusal(outcome);
@@ -178,30 +186,32 @@ function MinimumDialog({
                 ? 'La quinzaine du jour commence aujourd’hui : elle prend ce minimum. Celles d’avant gardent le leur : une règle de paie ne change pas en cours de route.'
                 : `Les quinzaines déjà commencées gardent leur minimum, ${amountText(minimum, 'EUR')} pour celle en cours : une règle de paie ne change pas en cours de route.`}
             </p>
-            <div className="tm-dialog__foot">
-              <button
-                type="button"
-                className="nv-btn nv-btn--plain"
-                disabled={busy}
-                onClick={() => {
-                  setChecking(false);
-                }}
-              >
-                Modifier
-              </button>
-              <button
-                type="button"
-                className="nv-btn nv-btn--neon"
-                data-autofocus
-                disabled={busy}
-                aria-busy={busy}
-                onClick={() => {
-                  void send();
-                }}
-              >
-                {busy ? 'Enregistrement…' : 'Enregistrer le minimum'}
-              </button>
-            </div>
+            {confirm.prompt({ lead: MONEY_LEAD, onBusyChange: setBusy }) ?? (
+              <div className="tm-dialog__foot">
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--plain"
+                  disabled={busy}
+                  onClick={() => {
+                    setChecking(false);
+                  }}
+                >
+                  Modifier
+                </button>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--neon"
+                  data-autofocus
+                  disabled={busy}
+                  aria-busy={busy}
+                  onClick={() => {
+                    void send();
+                  }}
+                >
+                  {busy ? 'Enregistrement…' : 'Enregistrer le minimum'}
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <form

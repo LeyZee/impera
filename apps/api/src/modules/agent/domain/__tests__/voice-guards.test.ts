@@ -102,12 +102,23 @@ describe('voice guards (P3-13)', () => {
     expect(codes(['j’étais malade hier mais là ça va, tu veux voir mon pack ?'])).toEqual([]);
   });
 
-  it('warns on a bubble sent again or a third same opening, without blocking', () => {
+  it('blocks a bubble sent again, and warns on a third same opening', () => {
     const previousTurns = [['Coucou toi, bien dormi ?'], ['Coucou toi 😘', 'Tu fais quoi de beau ce soir ?']];
     expect(severities(['Coucou toi, ça va ?'], { previousTurns })).toEqual([['repetition', 'soft']]);
     expect(
       severities(['Tu fais quoi de beau ce soir ?'], { previousTurns: [['Hey'], previousTurns[1] ?? []] }),
-    ).toEqual([['repetition', 'soft']]);
+    ).toEqual([['repetition', 'blocking']]);
+    // However far back she sent it.
+    expect(
+      severities(['Tu fais quoi de beau ce soir ?'], {
+        previousTurns: [['Hey']],
+        sentBefore: ['Tu fais quoi de beau ce soir ?', 'Hey'],
+      }),
+    ).toEqual([['repetition', 'blocking']]);
+    // A short ritual sent weeks ago comes back, as anyone's.
+    expect(
+      codes(['Dors bien toi ✨'], { previousTurns: [['Hey']], sentBefore: ['Dors bien toi ✨'] }),
+    ).toEqual([]);
     // Twice is a habit, a short bubble is a « ok ».
     expect(codes(['Coucou toi, ça va ?'], { previousTurns: previousTurns.slice(1) })).toEqual([]);
     expect(codes(['ok 😘'], { previousTurns: [['ok 😘']] })).toEqual([]);

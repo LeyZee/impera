@@ -81,7 +81,7 @@ async function* toAsync(bytes: Uint8Array): AsyncGenerator<Uint8Array> {
 /** The brain that tells her sent script (ADR 0083 § 6), with a fixed answer that tells each step it is given. */
 const told: ScriptSummaryInput[] = [];
 const scriptBrain: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'> = {
-  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1' },
+  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
   summarizeScript: (input) => {
     told.push(input);
     return Promise.resolve(
