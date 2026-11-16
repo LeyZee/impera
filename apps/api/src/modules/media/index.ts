@@ -4,6 +4,7 @@ export { mediaKindOf, sniffMediaType } from './domain/media';
 export { createDrizzleDescriptionReader } from './infra/description-reader';
 export { createDropDescriptions } from './infra/drop-descriptions';
 export { createFfmpegMediaTools } from './infra/ffmpeg-media-tools';
+export { createVaultDescriptions, type VaultDescriptions } from './infra/vault-descriptions';
 /** @public Read once by the composition root at start-up: a missing ffmpeg is said in the log. */
 export { missingMediaBinaries } from './infra/ffmpeg-media-tools';
 export {
