@@ -1,4 +1,5 @@
 import {
+  BranchConditionSchema,
   CreatorIdSchema,
   CurrencySchema,
   MediaSlotKindSchema,
@@ -42,6 +43,7 @@ const scripts = schema.platformScripts;
 const steps = schema.platformScriptSteps;
 const stepMedia = schema.platformScriptStepMedia;
 const identities = schema.scriptIdentities;
+const branches = schema.platformScriptBranches;
 
 /** Its steps and their media, in the platform's order: `index` is the position kept (`stepIndex`, ADR 0099 § 3). */
 async function writeSteps(
@@ -227,7 +229,10 @@ async function vaultLinksOf(
   );
 }
 
-/** Rows of a set of scripts, put back together in the platform's order, with their vault links and identities. */
+/**
+ * Rows of a set of scripts, put back together in the platform's order, with their vault links, the settings of their
+ * branches (ADR 0112) and their identities.
+ */
 export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Promise<StoredPlatformScript[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
@@ -247,6 +252,11 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
     .from(identities)
     .where(inArray(identities.platformScriptId, ids))
     .orderBy(identities.createdAt, identities.id);
+  const branchRows = await tx
+    .select()
+    .from(branches)
+    .where(inArray(branches.platformScriptId, ids))
+    .orderBy(branches.platformScriptId, branches.branchOrder, branches.platformStepRef);
   const accountOf = new Map(rows.map((row) => [row.id, row.platformAccountId]));
   const mediaOf = (step: StepRow, role: 'sold' | 'preview'): StoredStepMedia[] =>
     mediaRows
@@ -286,6 +296,13 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
             : { priceMinor: step.discountPriceMinor, minutes: step.discountMinutes },
         media: mediaOf(step, 'sold'),
         previewMedia: mediaOf(step, 'preview'),
+      })),
+    branches: branchRows
+      .filter((branch) => branch.platformScriptId === row.id)
+      .map((branch) => ({
+        stepRef: branch.platformStepRef,
+        order: branch.branchOrder,
+        condition: BranchConditionSchema.parse(branch.condition),
       })),
     identities: identityRows
       .filter((identity) => identity.platformScriptId === row.id)

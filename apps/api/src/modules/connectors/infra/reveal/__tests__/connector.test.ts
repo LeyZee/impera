@@ -253,6 +253,29 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     await expect(connector.fetchMessages(fan('conv_02'), {})).resolves.not.toHaveLength(0);
   });
 
+  it("reads a fan's answer to one of her stories, in its conversation and in the list (2026-11-16)", async () => {
+    const fake = world();
+    const connector = connect(fake);
+    const newest = fake
+      .state()
+      .messages.filter((m) => m.conversationId === 'conv_02')
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const last = newest[0];
+    if (last === undefined) throw new Error('the default world has messages with fan 02');
+    last.storyReply = {
+      storyId: 'story_01',
+      thumbnailUrl: 'https://reveal.test/story',
+      mediaType: 'video',
+      isExpired: false,
+    };
+    const messages = await connector.fetchMessages(fan('conv_02'), {});
+    expect(messages.map((m) => m.ref.id)).toContain(last.id);
+    await expect(connector.listConversations({})).resolves.toHaveLength(12);
+    await expect(connector.getConversation(fan('conv_02'))).resolves.toMatchObject({
+      ref: { id: 'conv_02' },
+    });
+  });
+
   it('lists conversations, most recent first, with `since` and `limit`', async () => {
     const connector = connect(world());
     const all = await connector.listConversations({});
@@ -264,6 +287,17 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     expect((await connector.listConversations({ since })).map((c) => c.lastMessageAt)).toEqual(
       dates.slice(0, 2),
     );
+  });
+
+  it('reads one conversation by its id as the list gives it, `not_found` for one it does not have', async () => {
+    const connector = connect(world());
+    const listed = (await connector.listConversations({})).at(-1);
+    if (listed === undefined) throw new Error('the default world has conversations');
+    const fresh = connect(world());
+    expect(await fresh.getConversation(listed.ref)).toEqual(listed);
+    // Read alone, its fan is found for the fan's own reads (recette du 16/11: the copilot opened it first).
+    expect((await fresh.getFanProfile(listed.fanRef)).fanRef).toEqual(listed.fanRef);
+    expect((await rejection(fresh.getConversation(fan('conv_inconnue')))).code).toBe('not_found');
   });
 
   it('reads the fan beside his conversation: profile, note, the model’s notes, PPV tab', async () => {

@@ -5,6 +5,7 @@ import {
   PlatformScriptIdSchema,
   PlatformScriptListSchema,
   PlatformScriptViewSchema,
+  SetScriptBranchesBodySchema,
   ValidateScriptIdentityBodySchema,
   type CreatorId,
   type PlatformScriptViewDto,
@@ -17,19 +18,37 @@ import { z } from 'zod';
 import {
   creatorPlatformScripts,
   reviewScriptIdentity,
+  setScriptBranches,
   type PlatformScriptsReader,
   type PlatformScriptView,
 } from '../../application/platform-script-reads';
-import type { IdentityReview, PlatformScriptReadStore, ScriptIdentityReviewStore } from '../../domain/ports';
+import type {
+  IdentityReview,
+  PlatformScriptReadStore,
+  ScriptBranchStore,
+  ScriptIdentityReviewStore,
+} from '../../domain/ports';
 
 import type { RequireRole } from './routes';
 
 const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
 const ScriptParamsSchema = z.object({ creatorId: CreatorIdSchema, scriptId: PlatformScriptIdSchema });
+const StepParamsSchema = ScriptParamsSchema.extend({
+  platformIndex: z.coerce.number().int().min(0).max(10_000),
+});
 
 class PlatformScriptNotFound extends DomainError {
   constructor() {
     super('platform_script_not_found' satisfies ScriptErrorCode, 'Script introuvable');
+  }
+}
+
+class ScriptBranchesStale extends DomainError {
+  constructor() {
+    super(
+      'platform_script_branches_stale_conflict' satisfies ScriptErrorCode,
+      'Les branches de cette étape ont changé dans Reveal depuis ta lecture : recharge le script',
+    );
   }
 }
 
@@ -70,6 +89,8 @@ function dtoOf(view: PlatformScriptView): PlatformScriptViewDto {
       media: [...step.media],
       previewMedia: [...step.previewMedia],
       complete: step.complete,
+      condition: step.condition,
+      branches: step.branches,
     })),
     warnings: [...view.warnings],
     gaps: [...view.gaps],
@@ -96,6 +117,7 @@ function dtoOf(view: PlatformScriptView): PlatformScriptViewDto {
 export function createPlatformScriptRoutes(
   reads: PlatformScriptReadStore,
   reviews: ScriptIdentityReviewStore,
+  branches: ScriptBranchStore,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const listed = async (creatorId: CreatorId, reader: PlatformScriptsReader) => {
@@ -117,7 +139,42 @@ export function createPlatformScriptRoutes(
     return dtoOf(script);
   };
 
+  const one = async (creatorId: CreatorId, scriptId: string, reader: PlatformScriptsReader) => {
+    const script = (await listed(creatorId, reader)).find((each) => each.id === scriptId);
+    if (script === undefined) throw new PlatformScriptNotFound();
+    return dtoOf(script);
+  };
+
   return (app) => {
+    // Every branch of one step, in the agency's order, each with its condition (ADR 0112 §§ 5-6): the script as it
+    // reads now in return, its gaps counted again.
+    app.put(
+      '/creators/:creatorId/platform-scripts/:scriptId/steps/:platformIndex/branches',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: StepParamsSchema,
+          body: SetScriptBranchesBodySchema,
+          response: { 200: PlatformScriptViewSchema },
+        },
+      },
+      async (request) => {
+        const { creatorId, scriptId, platformIndex } = request.params;
+        const reader = readerOf(request.user);
+        const outcome = await setScriptBranches(
+          { store: branches },
+          reader,
+          creatorId,
+          scriptId,
+          platformIndex,
+          request.body.branches,
+        );
+        if (outcome === 'not_found') throw new PlatformScriptNotFound();
+        if (outcome === 'stale') throw new ScriptBranchesStale();
+        return one(creatorId, scriptId, reader);
+      },
+    );
+
     app.get(
       '/creators/:creatorId/platform-scripts',
       {

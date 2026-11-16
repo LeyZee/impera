@@ -84,6 +84,7 @@ function senderOn(writes: boolean, connectorOf?: (fake: FakeReveal) => PlatformC
 }
 
 const scriptRef = { platform: 'reveal' as const, id: 'sequence_1' };
+const stepRef = { platform: 'reveal' as const, id: 'script_1_1' };
 /** The first step's price in the `quiet` world, as validated. */
 const price = { amountMinor: 500, currency: 'EUR' as const };
 
@@ -106,7 +107,7 @@ describe('outbound sender: the write guard before every write (ADR 0018 § 3)', 
             'k2',
           ),
       ],
-      ['sendScriptStep', () => sender.sendScriptStep(conversation, scriptRef, 0, price, 'k3')],
+      ['sendScriptStep', () => sender.sendScriptStep(conversation, scriptRef, stepRef, price, 'k3')],
       ['setFanNote', () => sender.setFanNote(conversation, 'fan_01', 'Prénom : Prénom01', 'k4')],
       ['markRead', () => sender.markRead(conversation)],
       ['setTyping', () => sender.setTyping(conversation, true)],
@@ -125,14 +126,14 @@ describe('outbound sender: the write guard before every write (ADR 0018 § 3)', 
   it('`writes: true` lets each write through; a step already sent is refused for good, without a send', async () => {
     const { sender, calls, fake } = senderOn(true);
     await sender.sendText(conversation, 'Coucou', 'k1');
-    await sender.sendScriptStep(conversation, scriptRef, 0, price, 'k2');
+    await sender.sendScriptStep(conversation, scriptRef, stepRef, price, 'k2');
     await sender.setFanNote(conversation, 'fan_01', 'Prénom : Prénom01', 'k3');
     await sender.markRead(conversation);
     await sender.setTyping(conversation, true);
     expect(fake.state().messages).toHaveLength(2);
     const posts = calls.filter((call) => call.startsWith('POST /conversations/conv_01/messages')).length;
     const error: unknown = await sender
-      .sendScriptStep(conversation, scriptRef, 0, price, 'k4')
+      .sendScriptStep(conversation, scriptRef, stepRef, price, 'k4')
       .catch((reason: unknown) => reason);
     expect(error).toBeInstanceOf(SendRefused);
     expect(error).toMatchObject({ code: 'script_step_already_sent' });
@@ -149,7 +150,7 @@ describe('outbound sender: the write guard before every write (ADR 0018 § 3)', 
       payload: { events: [{ type: 'script_changed', scriptId: 'script_1_1', priceCents: 900 }] },
     });
     const error: unknown = await sender
-      .sendScriptStep(conversation, scriptRef, 0, price, 'k1')
+      .sendScriptStep(conversation, scriptRef, stepRef, price, 'k1')
       .catch((reason: unknown) => reason);
     expect(error).toBeInstanceOf(SendRefused);
     expect(error).toMatchObject({ code: 'script_price_changed' });
@@ -174,7 +175,7 @@ describe('outbound sender: the write guard before every write (ADR 0018 § 3)', 
       },
     });
     const error: unknown = await sender
-      .sendScriptStep(conversation, scriptRef, 0, price, 'k1')
+      .sendScriptStep(conversation, scriptRef, stepRef, price, 'k1')
       .catch((reason: unknown) => reason);
     expect(error).toBeInstanceOf(SendRefused);
     expect(error).toMatchObject({ code: 'script_step_discounted' });
@@ -186,7 +187,7 @@ describe('outbound sender: the write guard before every write (ADR 0018 § 3)', 
     const fakeConnector = new FakeConnector();
     const { sender } = senderOn(true, () => fakeConnector);
     for (const write of [
-      () => sender.sendScriptStep(conversation, scriptRef, 0, price, 'k1'),
+      () => sender.sendScriptStep(conversation, scriptRef, stepRef, price, 'k1'),
       () => sender.setFanNote(conversation, 'fan_01', 'Prénom : Julien', 'k2'),
       () => sender.markRead(conversation),
       () => sender.setTyping(conversation, true),

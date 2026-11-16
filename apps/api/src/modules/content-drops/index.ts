@@ -18,7 +18,7 @@ import {
 } from './application/reads';
 import { eraseOriginals, type RetentionRun } from './application/retention';
 import { summarizeScript, type SummarizeOutcome } from './application/summarize';
-import { makeThumbnail, type ThumbnailOutcome } from './application/thumbnail';
+import { makeThumbnail, pictureOf, type PictureAsk, type ThumbnailOutcome } from './application/thumbnail';
 import { NO_STORAGE, receiveFile } from './application/uploads';
 import type {
   AskedScript,
@@ -91,6 +91,14 @@ export interface ContentDropsModule {
     /** `content_drops.thumbnail_backlog`, each hour: the media never tried enqueued. How many. */
     thumbnailBacklog(correlationId: string): Promise<number>;
   };
+  /**
+   * The reduced picture of a file another module read and never kept (a vault media, ADR 0113 § 1), made and stored as
+   * a dropped medium's (ADR 0030 § 4): its `thumbnail_key`, or `null` when ffmpeg cannot read it. A storage that does
+   * not answer throws.
+   */
+  picture(ask: PictureAsk): Promise<string | null>;
+  /** That picture removed when no media came to carry it (ADR 0113 § 1); nothing when no storage is set. */
+  unpicture(key: string): Promise<void>;
   /**
    * The content request of a shoot she accepted from an idea (VEI-01 d2), written by the trend watch's job: origin
    * `idea`, under the idea's id, replayable.
@@ -237,6 +245,13 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       scripts: (creatorId, reader) => creatorScripts(scriptReads, reader, creatorId),
       scriptSteps: (creatorId, reader, dropId) => creatorScriptSteps(scriptReads, reader, creatorId, dropId),
     },
+    // No storage set (`S3_*` unset, as on a PC without one): the vault's media are kept described, without a picture.
+    picture: (ask) =>
+      pictureOf(
+        { storage: storage === NO_STORAGE ? null : storage, thumbnailer: createThumbnailer(), scratchDir },
+        ask,
+      ),
+    unpicture: (key) => (storage === NO_STORAGE ? Promise.resolve() : storage.remove(key)),
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
     scriptRequests: {
       ask: (request) => requestScript(deps.adminDb, request),

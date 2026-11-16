@@ -10,6 +10,7 @@ import type {
   FanNote,
   FanPpvStats,
   FanProfile,
+  FetchedMedia,
   Money,
   OutboundMedia,
   Platform,
@@ -31,6 +32,11 @@ export interface PlatformConnector {
   readonly capabilities: ConnectorCapabilities;
   health(): Promise<SessionState>;
   listConversations(opts: { since?: Date; limit?: number }): Promise<ConversationSnapshot[]>;
+  /**
+   * One conversation by its id, as the list would give it (recette du 16/11: the copilot opened one no poll read).
+   * One the account does not hold fails with `not_found`.
+   */
+  getConversation(conversationRef: ExternalRef): Promise<ConversationSnapshot>;
   fetchMessages(
     conversationRef: ExternalRef,
     opts: { since?: Date; limit?: number },
@@ -67,12 +73,13 @@ export interface PlatformConnector {
    * again just before: a step already sent in this conversation is refused for good (`ScriptStepAlreadySent`).
    * `expectedPrice` is the step's price as the person or the agent validated it: the platform listing another one
    * just before sends nothing (`ScriptStepPriceChanged`), and so does a reduced price set on the step there
-   * (`ScriptStepDiscounted`).
+   * (`ScriptStepDiscounted`). The step is named by its own ref (`stepRef`), never by its place: the branches of a step
+   * share a rank and come in no stable order (ADR 0112 § 1).
    */
   sendScriptStep?(
     conversationRef: ExternalRef,
     scriptRef: ExternalRef,
-    stepIndex: number,
+    stepRef: ExternalRef,
     expectedPrice: Money,
     idempotencyKey: string,
   ): Promise<SendResult>;
@@ -80,6 +87,15 @@ export interface PlatformConnector {
   getScriptHistory?(fanRef: ExternalRef): Promise<SentScriptStep[]>;
   /** `vault`: every media of the vault, or of one folder. */
   listVaultMedia?(opts: { folderRef?: ExternalRef }): Promise<VaultMedia[]>;
+  /**
+   * `mediaDownload`: reads one vault file to `path` (ADR 0113), the media named by its `ref` and its folder as
+   * `listVaultMedia` gave them (`null` at the vault's root). A link the platform no longer signs is read again from the
+   * folder once. The file at `path` is the caller's to remove, failed or not. Never writes to the platform.
+   */
+  fetchMedia?(
+    mediaRef: ExternalRef,
+    opts: { folderRef: ExternalRef | null; path: string },
+  ): Promise<FetchedMedia>;
 }
 
 /** The only error a connector throws. `retryAfterSeconds` comes with `rate_limited` when the platform says. */

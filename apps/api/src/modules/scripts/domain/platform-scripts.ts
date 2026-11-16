@@ -12,7 +12,7 @@ import {
   type PlatformScript,
 } from '@impera/contracts';
 
-import { hasBranches } from './script-identity';
+import { byRankThenRef } from './branches';
 
 /**
  * The import of the native scripts (ADR 0099 § 1, time 2; P6-01): each script the platform keeps for an account, its
@@ -27,7 +27,7 @@ import { hasBranches } from './script-identity';
  */
 const PLATFORM_SCRIPT_PRICE_CEILING_MINOR = 4000;
 
-type PlatformScriptWarningCode = 'price_more_than_double' | 'price_above_ceiling';
+type PlatformScriptWarningCode = 'price_more_than_double' | 'price_above_ceiling' | 'step_without_default';
 
 /** A step whose price the agency should look at; `position` counts from 0, as the platform's `stepIndex`. */
 export interface PlatformScriptWarning {
@@ -36,27 +36,47 @@ export interface PlatformScriptWarning {
 }
 
 interface PricedStep {
+  /** The platform's rank: steps on the same are branches of one step (ADR 0112), never one after the other. */
+  readonly platformIndex: number;
   readonly priceMinor: number;
   readonly currency: Currency;
 }
 
 /**
- * P6-01: a paid step that costs more than twice the paid step before it (tripling cut the old bot's sales short), or
- * more than the ceiling. Free steps neither warn nor reset the comparison: the step before is the last paid one. A
- * change of currency between two paid steps compares nothing.
+ * P6-01, path by path (ADR 0112 § 14): a paid step that costs more than twice the paid step before it on some path
+ * (tripling cut the old bot's sales short), or more than the ceiling. Free steps neither warn nor reset the comparison:
+ * the step before is the last paid one of the path. A change of currency between two paid steps compares nothing.
+ * Without branches, a path is the script.
  */
 export function priceWarnings(steps: readonly PricedStep[]): PlatformScriptWarning[] {
   const warnings: PlatformScriptWarning[] = [];
-  let previous: PricedStep | null = null;
-  steps.forEach((step, position) => {
-    if (step.priceMinor === 0) return;
-    if (previous !== null && previous.currency === step.currency && step.priceMinor > 2 * previous.priceMinor)
-      warnings.push({ code: 'price_more_than_double', position });
-    if (step.currency === 'EUR' && step.priceMinor > PLATFORM_SCRIPT_PRICE_CEILING_MINOR)
-      warnings.push({ code: 'price_above_ceiling', position });
-    previous = step;
-  });
-  return warnings;
+  const ranks = [...new Set(steps.map((step) => step.platformIndex))].sort((a, b) => a - b);
+  // The last paid step of the paths that reach this rank, each once; `null` for a path with none paid yet.
+  let before: ReadonlySet<PricedStep | null> = new Set([null]);
+  for (const rank of ranks) {
+    const after = new Set<PricedStep | null>();
+    steps.forEach((step, position) => {
+      if (step.platformIndex !== rank) return;
+      if (step.priceMinor === 0) {
+        for (const previous of before) after.add(previous);
+        return;
+      }
+      if (
+        [...before].some(
+          (previous) =>
+            previous !== null &&
+            previous.currency === step.currency &&
+            step.priceMinor > 2 * previous.priceMinor,
+        )
+      )
+        warnings.push({ code: 'price_more_than_double', position });
+      if (step.currency === 'EUR' && step.priceMinor > PLATFORM_SCRIPT_PRICE_CEILING_MINOR)
+        warnings.push({ code: 'price_above_ceiling', position });
+      after.add(step);
+    });
+    before = after;
+  }
+  return warnings.sort((a, b) => a.position - b.position);
 }
 
 /**
@@ -153,9 +173,20 @@ export interface PlatformScriptsPlan {
 }
 
 /**
+ * Its steps by rank, and the branches of a rank by `stepRef` (`byRankThenRef`), each `index` its place in that order:
+ * Reveal lists the branches of a step in no stable order, and two reads of the same script must keep the same.
+ */
+function stableOrder(script: PlatformScript): PlatformScript {
+  return {
+    ...script,
+    steps: byRankThenRef(script.steps).map((step, index) => ({ ...step, index })),
+  };
+}
+
+/**
  * The plan of one import, from the scripts the platform lists now and those the base knows. A script listed twice
- * by the platform is taken once (its first listing). Its steps keep the platform's order: `PlatformScript.steps` is
- * already sorted by `stepIndex` (spec § 6) and its `index` is the position kept. Each is bounded first
+ * by the platform is taken once (its first listing). Its steps keep the platform's order, the branches of a step by
+ * `stepRef` (`stableOrder`), and `index` is the position kept. Each is bounded first
  * (`boundedPlatformScript`): what the plan carries is what the base keeps.
  */
 export function planPlatformScripts(
@@ -171,7 +202,7 @@ export function planPlatformScripts(
   for (const listing of listed) {
     if (seen.has(listing.ref.id)) continue;
     seen.add(listing.ref.id);
-    const script = boundedPlatformScript(listing);
+    const script = boundedPlatformScript(stableOrder(listing));
     if (script === null) {
       refused += 1;
       continue;
@@ -202,17 +233,13 @@ export type PlatformScriptGap = (typeof PLATFORM_SCRIPT_GAPS)[number];
  * What keeps a native script from being proposable (P6-01, ADR 0099 § 1, remark Médias 6): a media of a step (sold or
  * preview) absent from the vault makes its step incomplete; a photo or a video not described with a validated
  * description (a voice note is never described: ADR 0083 § 2); the identity of its current version (SC-04 c8) not
- * validated; two steps on the same platform rank, branches a human chooses between, which nothing offers until the
- * model of branched scripts exists (ADR 0112); a step with a « Tarif réduit » set on the platform, never sold at
- * (recette 16/11, Charles: blocked and said, as a changed price). Empty: it may be offered, when it is active.
+ * validated; what its branches lack (`branchGaps`, ADR 0112); a step with a « Tarif réduit » set on the platform, never
+ * sold at (recette 16/11, Charles: blocked and said, as a changed price). Empty: it may be offered, when it is active.
  */
 export function platformScriptGaps(
-  steps: readonly {
-    readonly platformIndex: number;
-    readonly discounted: boolean;
-    readonly media: readonly StepMediaState[];
-  }[],
+  steps: readonly { readonly discounted: boolean; readonly media: readonly StepMediaState[] }[],
   identityValidated: boolean,
+  branches: readonly PlatformScriptGap[],
 ): PlatformScriptGap[] {
   const media = steps.flatMap((step) => step.media);
   const gaps: PlatformScriptGap[] = [];
@@ -220,7 +247,7 @@ export function platformScriptGaps(
   if (media.some((each) => each.inVault && each.kind !== 'audio' && !each.described))
     gaps.push('media_not_described');
   if (!identityValidated) gaps.push('identity_not_validated');
-  if (hasBranches(steps)) gaps.push('branched_step');
+  gaps.push(...branches);
   if (steps.some((step) => step.discounted)) gaps.push('step_discounted');
   return gaps;
 }

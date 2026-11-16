@@ -32,6 +32,7 @@ import type {
   ScriptStructureStore,
 } from './domain/ports';
 import { createCardRasterizer } from './infra/card-rasterizer';
+import { createDrizzleScriptBranchStore } from './infra/db/branch-store';
 import { createDrizzleCadenceStore } from './infra/db/cadence-store';
 import {
   createDrizzleScriptIdentityJobStore,
@@ -229,6 +230,7 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
     platformScriptRoutes: createPlatformScriptRoutes(
       platformReads.store,
       createDrizzleScriptIdentityReviewStore(deps.db),
+      createDrizzleScriptBranchStore(deps.db),
       deps.requireRole,
     ),
     jobs: {

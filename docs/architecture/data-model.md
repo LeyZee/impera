@@ -161,7 +161,8 @@ llm_calls   id, creator_id (nullable), role (sense|brain|voice|judge), provider,
             status (les 12 issues de la passerelle : ok, refused, timeout, rate_limited…), is_fallback,
             conversation_id (nullable), draft_id (nullable, sans clé étrangère : l'appel précède le brouillon),
             trace_id (Langfuse), hedge (nullable : winner|loser d'une deuxième demande, OPS-15 ; loser = encore en
-            cours quand la réponse est partie, son coût compte, pas sa latence), created_at. Journal de la passerelle (LlmCallStore), lu au démarrage pour le
+            cours quand la réponse est partie, son coût compte, pas sa latence), error_code (nullable : où et de quel
+            type une sortie a échoué son schéma, « intent:invalid_value », « json », « truncated » ; jamais le contenu), created_at. Journal de la passerelle (LlmCallStore), lu au démarrage pour le
             plafond quotidien.
 ```
 
@@ -199,7 +200,7 @@ system_alert_settings  creator_id, code (keyword|service_request|identity_doubt)
 alert_seen      creator_id, event_id → conversation_events, seen_by, seen_at   (clé : creator_id, event_id)
 ```
 
-Une alerte personnalisée a une ligne par créatrice (RLS), et les lignes écrites ensemble partagent `group_id` : l'écran les montre comme une seule alerte. Il faut une phrase ou au moins un mot-clé (contrôle en base comme dans le contrat). Une alerte retirée est archivée (`archived_at`), jamais supprimée, pour que l'historique garde son nom (`nirvana_app` n'a pas `DELETE`). Une alerte système sans ligne dans `system_alert_settings` est active, et `keyword` ne peut pas être désactivée (contrôle en base). `alert_seen` porte le « vu » de l'historique, puisque le journal est en ajout seul : une marque par événement, partagée par l'agence. Elle appartient à `conversations`, qui possède le journal et sert l'historique (`/v1/alerts/triggers`) ; `alerts` lui donne les noms de ses alertes, archivées comprises, par le port `AlertNames`.
+Une alerte personnalisée a une ligne par créatrice (RLS), et les lignes écrites ensemble partagent `group_id` : l'écran les montre comme une seule alerte. Il faut une phrase ou au moins un mot-clé (contrôle en base comme dans le contrat). Une alerte retirée est archivée (`archived_at`), jamais supprimée, pour que l'historique garde son nom (`nirvana_app` n'a pas `DELETE`). Une alerte système sans ligne dans `system_alert_settings` est active, et `keyword` ne peut pas être désactivée (contrôle en base). `alert_seen` porte le « vu » de l'historique, puisque le journal est en ajout seul : une marque par événement, partagée par l'agence. Elle appartient à `conversations`, qui possède le journal et sert l'historique (`/v1/alerts/triggers`, qui montre aussi les `handoff_requested` de cause `minor` ou `budget` et les `care_opened`) ; `alerts` lui donne les noms de ses alertes, archivées comprises, par le port `AlertNames`.
 
 Les approbations et prises en main ne sont pas une table : ce sont des `conversation_events` (`draft_approved`, `takeover_started`, …) et l'état des `drafts`.
 
@@ -520,13 +521,13 @@ script_structure_queue    creator_id, position 1–20, structure_id (unique par 
 platform_scripts          id, creator_id, platform_account_id → platform_accounts, platform_script_ref (unique par
                           compte, ≤ 200), name (celui de la plateforme, ≤ 200), moment? (day|night), fingerprint, active,
                           deactivated_at? (présent si et seulement si inactif), synced_at, version_at (l'import qui a
-                          écrit sa version actuelle, migration 0214), created_at
+                          écrit sa version actuelle, migration 0217), created_at
                           (scripts natifs, ADR 0099 § 1 temps 2, migration 0206 ; jamais supprimés)
 platform_script_steps     platform_script_id, creator_id, position 0–49 (ordre de stepIndex), platform_index ≥ 0
                           (stepIndex tel quel : deux étapes au même rang sont des branches, ADR 0112, migration 0211),
                           platform_step_ref (≤ 200), name (≤ 200), text (≤ 4 000), price_minor ≥ 0 (centimes TTC, tel
                           quel), currency, discount_price_minor?, discount_minutes? (« Tarif réduit » lu tel quel,
-                          migration 0214 : une étape qui en a un n'est jamais envoyée, son script jamais proposé)
+                          migration 0217 : une étape qui en a un n'est jamais envoyée, son script jamais proposé)
                           (clé : platform_script_id, position ; réécrites en entier quand le script change)
 platform_script_step_media platform_script_id, creator_id, position, role (sold|preview), rank 0–49,
                           platform_media_ref (≤ 200), kind
@@ -560,7 +561,7 @@ trend_readings    id, recorded_by → user, watch_session_id, post_code, path (p
                   first_seen_at, seen_at
                   (unique : recorded_by, watch_session_id, post_code ; chacun lit et met à jour les siens, le
                   propriétaire et un manager actif lisent tout ; la créatrice ne marque que pour elle)
-content_ideas     id, creator_id → creators, signal_id → trend_signals, title ≤ 120, category (catégorie de dépôt hors script, migration 0214),
+content_ideas     id, creator_id → creators, signal_id → trend_signals, title ≤ 120, category (catégorie de dépôt hors script, migration 0217),
                   to_shoot ≤ 600, reason ≤ 200, shoot_minutes 1–600, state (proposed|validated|refused|suggested|
                   declined|deposited ; refused = l'agence, declined = elle dans son agenda), proposed_on, refusal_reason? (refus seulement), decided_by?, decided_at?
                   (propriétaire et manager actif ; ni le chatteur ni la créatrice)

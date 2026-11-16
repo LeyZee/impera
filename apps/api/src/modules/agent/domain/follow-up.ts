@@ -28,6 +28,7 @@ export type FollowUpDecision =
       readonly reason:
         | 'follow_up_do_not_contact'
         | 'follow_up_distress'
+        | 'follow_up_age_disputed'
         | 'follow_up_plan_over'
         | 'follow_up_no_allowed_hour';
     }
@@ -38,7 +39,8 @@ export type FollowUpDecision =
     };
 
 /**
- * Whether she follows up on his silence now (P3-10). Never to a fan nobody may write to, nor to one in distress;
+ * Whether she follows up on his silence now (P3-10). Never to a fan nobody may write to, one in distress, nor one
+ * whose age is in doubt;
  * never past her last delay; out of her reply slots or in her quiet hours (a message out of nowhere at night reads
  * as a machine's), at the first minute both allow, on her clock (P3-14). A follow-up never sells: it keeps the link, and
  * a sales follow-up after a refused offer waits for Reveal's script history (P6-01), so none of the two the method
@@ -48,6 +50,8 @@ export function followUpDecision(context: FollowUpMoment): FollowUpDecision {
   const { flags } = context;
   if (flags.doNotContact === true) return { kind: 'skip', reason: 'follow_up_do_not_contact' };
   if (flags.salesFrozen?.reason === 'distress') return { kind: 'skip', reason: 'follow_up_distress' };
+  // His age in doubt: the agent writes nothing to him until the owner or a manager confirms it (Charles, 16/11).
+  if (flags.ageDisputed !== undefined) return { kind: 'skip', reason: 'follow_up_age_disputed' };
   if (context.step < 0 || context.step >= context.steps)
     return { kind: 'skip', reason: 'follow_up_plan_over' };
   const { now, timeZone, hours = DEFAULT_AGENT_HOURS } = context;

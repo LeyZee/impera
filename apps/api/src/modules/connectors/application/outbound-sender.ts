@@ -27,7 +27,7 @@ export interface ConnectorWrites {
   sendScriptStep(
     conversation: ConversationKey,
     scriptRef: ExternalRef,
-    stepIndex: number,
+    stepRef: ExternalRef,
     expectedPrice: Money,
     idempotencyKey: string,
   ): Promise<SendResult>;
@@ -122,11 +122,11 @@ export function createOutboundSender(deps: {
     sendMedia: (conversation, media, key) =>
       run(conversation, (c, ref) => c.sendMedia(ref, media, key), true),
     verifySent: (conversation, key) => run(conversation, (c, ref) => c.verifySent(ref, key), false),
-    sendScriptStep: (conversation, scriptRef, stepIndex, expectedPrice, key) =>
+    sendScriptStep: (conversation, scriptRef, stepRef, expectedPrice, key) =>
       run(
         conversation,
         (c, ref) =>
-          capable(c, 'scripts', (d) => d.sendScriptStep?.(ref, scriptRef, stepIndex, expectedPrice, key)),
+          capable(c, 'scripts', (d) => d.sendScriptStep?.(ref, scriptRef, stepRef, expectedPrice, key)),
         true,
       ),
     setFanNote: (conversation, platformFanId, text, key) =>

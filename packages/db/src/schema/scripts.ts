@@ -463,3 +463,62 @@ export const scriptIdentities = pgTable(
     closedToCreator(),
   ],
 );
+
+/**
+ * What Impera holds of a branch of a native script that Reveal does not give (ADR 0112 § A 3): its place among the
+ * branches of its step and its condition (`BranchCondition`), set by the agency in the CRM. Keyed by the branch's
+ * `stepRef`, so that it outlives the import, which rewrites the steps; a row of a branch Reveal no longer lists is
+ * ignored. Set a whole step at a time (rows of its branches deleted, then written) by the owner and the active managers
+ * of her list, under her RLS, closed to her account.
+ */
+export const platformScriptBranches = pgTable(
+  'platform_script_branches',
+  {
+    platformScriptId: uuid('platform_script_id').notNull(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformStepRef: text('platform_step_ref').notNull(),
+    branchOrder: smallint('branch_order').notNull(),
+    /** `BranchConditionSchema`, read through it. */
+    condition: jsonb('condition').notNull(),
+    updatedBy: text('updated_by')
+      .notNull()
+      .references(() => user.id),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'platform_script_branches_pkey', columns: [t.platformScriptId, t.platformStepRef] }),
+    foreignKey({
+      name: 'platform_script_branches_script_creator_fk',
+      columns: [t.platformScriptId, t.creatorId],
+      foreignColumns: [platformScripts.id, platformScripts.creatorId],
+    }),
+    index('platform_script_branches_creator_idx').on(t.creatorId, t.platformScriptId),
+    check(
+      'platform_script_branches_order_check',
+      sql`${t.branchOrder} >= 0 and ${t.branchOrder} < ${sql.raw(String(PLATFORM_SCRIPT_STEPS_MAX))}`,
+    ),
+    check(
+      'platform_script_branches_ref_check',
+      sql`char_length(${t.platformStepRef}) <= ${sql.raw(String(PLATFORM_SCRIPT_REF_MAX))}`,
+    ),
+    check(
+      'platform_script_branches_condition_check',
+      sql`jsonb_typeof(${t.condition}) = 'object' and ${t.condition}->>'kind' in ('none', 'structured', 'text')`,
+    ),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    pgPolicy('team_write', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.updatedBy} = ${currentUser}`,
+    }),
+    pgPolicy('team_clear', {
+      for: 'delete',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    closedToCreator(),
+  ],
+);
