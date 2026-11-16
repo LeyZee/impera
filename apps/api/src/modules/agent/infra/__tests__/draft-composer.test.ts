@@ -1297,6 +1297,10 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
     const disputed: FanFlags = { ...ADULT, ageDisputed: { since: '2026-10-16T10:00:00Z', by: 'human' } };
     const reset = composer({ brief: OFFER }, undefined, limitsOf(disputed).limits, policy);
     expect(await reset.draftComposer.compose(stored(90, 3))).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['age_disputed'],
       desire: { before: 88, score: 0, signals: ['age_disputed'] },
     });
   });
@@ -1397,7 +1401,7 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(limits.confirmed).toEqual([]);
   });
 
-  it('never confirms an age taken back: explicit stays blocked and nothing is offered', async () => {
+  it('writes nothing while his age is in doubt: a human answers him, his stated age confirms nothing', async () => {
     const disputed: FanFlags = { ageDisputed: { since: '2026-10-16T09:00:00Z', by: 'policy' } };
     const AGE_HOT: Brief = {
       ...HOT,
@@ -1420,8 +1424,14 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
       history: [{ direction: 'inbound', text: 'J’ai 19 ans', at: new Date('2026-10-17T09:59:00Z') }],
     });
     expect(limits.confirmed).toEqual([]);
-    expect(result).toMatchObject({ kind: 'held', reason: 'guard_blocked', detail: ['explicit_before_age'] });
-    expect(written(seen)?.action).toBe('reply');
+    expect(result).toEqual({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['age_disputed'],
+      costUsd: 0,
+    });
+    expect(seen.traces).toHaveLength(0);
   });
 
   it('keeps the answer to his stated age careful: it counts from his next message', async () => {

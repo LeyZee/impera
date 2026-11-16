@@ -30,7 +30,7 @@ import {
 } from '../domain/alerts';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
-import { measureDesire, type DesireReading } from '../domain/desire';
+import { desireMoved, desireScore, measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
 import {
   holdDecision,
@@ -502,6 +502,29 @@ async function stopped(
   }
 }
 
+/**
+ * His age is in doubt (`ageDisputed`, set by the policy on a sign of a minor or by a human): the agent writes nothing to
+ * him until the owner or a manager confirms it (Charles, 16/11), and each new message of his goes to a human, as on
+ * the message the doubt opened on. His score drops to 0, as the brain would have counted it.
+ */
+function ageInDoubt(input: AgentComposeInput, lastFanAt: Date | undefined): AgentComposeResult {
+  const held: Held = { ...HANDOFF, cause: 'minor', detail: ['age_disputed'] };
+  if (input.desire === undefined || (lastFanAt !== undefined && input.desire.at >= lastFanAt)) return held;
+  const reading = desireScore({
+    previous: input.desire,
+    signals: [],
+    intent: '',
+    sentiment: '',
+    measured: measureDesire([]),
+    risks: [],
+    ageDisputed: true,
+    now: input.now,
+  });
+  if (!desireMoved(reading)) return held;
+  const { before, score, signals, weightsVersion } = reading;
+  return { ...held, desire: { before, score, signals, weightsVersion } };
+}
+
 /** What the policy needs to let her offer; any of it unknown, there is no offer to decide on (fail closed). */
 async function offerInput(
   deps: DraftComposerDeps,
@@ -847,6 +870,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const lastAnswer = input.history.findLastIndex((m) => m.direction === 'outbound');
       const sinceAnswer = input.history.slice(lastAnswer + 1);
       const lastFanAt = sinceAnswer.at(-1)?.at;
+      if (stop.flags?.ageDisputed !== undefined) return ageInDoubt(input, lastFanAt);
       const looked = await seeHisMedia(deps.sight, input, sinceAnswer);
       if ('unseen' in looked) return looked.unseen;
       const media = looked.seen.flat();
@@ -942,7 +966,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           measured: measureDesire(
             input.history.map((m) => ({ fromFan: m.direction === 'inbound', text: m.text, at: m.at })),
           ),
-          ageDisputed: stop.flags?.ageDisputed !== undefined,
+          // His age in doubt never comes this far (`ageInDoubt`).
+          ageDisputed: false,
           // Counted once per message of his: a second pass after a wait, or a replay, reads it as stored.
           counted: input.desire !== undefined && lastFanAt !== undefined && input.desire.at >= lastFanAt,
         },
