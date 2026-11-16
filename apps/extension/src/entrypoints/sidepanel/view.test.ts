@@ -233,6 +233,38 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(actions.place).toHaveBeenCalledWith(true);
   });
 
+  // Recette du 16/11, EXT-01: the card read again every 5 s drew the panel anew, and the field lost his keys.
+  it('keeps the field he retouches in place, with its focus, text and caret, when the card is drawn again', () => {
+    const editing = ready({ mode: 'editing', text: 'coucou toi 😘' });
+    const { root, actions } = draw(onCard(card({}), [], { draft: editing }));
+    document.body.append(root);
+    const area = root.querySelector<HTMLTextAreaElement>('textarea');
+    if (area === null) throw new Error('field');
+    area.focus();
+    area.value = 'coucou toi 😘 tu fais quoi';
+    area.setSelectionRange(5, 5);
+    // His text in the state (as main.ts keeps it), and a card read again with a new value.
+    render(
+      root,
+      onCard(card({ first_name: { current: value(['Alpha']), toCheck: [] } }), [], {
+        draft: ready({ mode: 'editing', text: 'coucou toi 😘 tu fais quoi' }),
+      }),
+      actions,
+    );
+    expect(root.querySelector('textarea')).toBe(area);
+    expect(document.activeElement).toBe(area);
+    expect(area.value).toBe('coucou toi 😘 tu fais quoi');
+    expect(area.selectionStart).toBe(5);
+    expect(root.querySelector('.cp-scroll')?.textContent).toContain('Alpha');
+    // Kept in place, it is not wired twice.
+    root.querySelector<HTMLButtonElement>('[data-gesture="place-edited"]')?.click();
+    expect(actions.place).toHaveBeenCalledOnce();
+    // Another state of the draft is drawn anew.
+    render(root, onCard(card({}), [], { draft: ready() }), actions);
+    expect(root.querySelector('textarea')).toBeNull();
+    root.remove();
+  });
+
   it('refuses with a reason of the closed list and an optional note, the button shut until a reason', () => {
     const shut = draw(onCard(card({}), [], { draft: ready({ mode: 'rejecting' }) })).root;
     expect(shut.querySelector<HTMLButtonElement>('[data-gesture="send-reject"]')?.disabled).toBe(true);

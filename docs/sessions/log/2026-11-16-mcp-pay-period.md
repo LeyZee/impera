@@ -1,0 +1,9 @@
+# 2026-11-16 — MCP lot a, l'état de la quinzaine de paie
+
+Fiche : `PROPOSED-mcp-read` (lot a, PR 13). Branche : `claude/project-thread-b38vt4`.
+Fait : `commission_statements_list` (`read:payroll`, `agencyOnly`) par `payroll.reads.periodState`, port `PayrollReader` ; entrée `McpPayPeriodInputSchema` (le premier jour de la quinzaine), sortie `McpPayPeriodStateSchema` stricte. Côté paie (accord d'Équipe) : `reads.statements` et `statementAmountsOf`, qui rendaient des montants par membre, deviennent `reads.periodState` et `statementStateOf` : état de chaque relevé, versement bloqué (sans la raison), versement en retard (`isPayoutLate`, jours ouvrés lundi–vendredi, `null` sans délai annoncé), sommes d'équipe pour qui voit toute l'équipe et à partir de deux relevés. Le câblage traduit aussi `role_forbidden` de la paie en refus journalisé. Terme « Versement en retard » au glossaire. Tests unitaires (aucun montant d'un membre, bords du retard, sommes) et d'intégration (lecture comme la personne, transport).
+Pas fait : `platform_daily_stats_list`, `stats_get`, puis `sales_by_chatter` en compteurs ; conversations après les lectures d'Agent ; ressources, garde-fou, écran.
+Décisions : Charles, 16/11, garde le grain au jour pour les outils d'argent. Équipe et Sécurité : le total et le montant à verser de l'équipe valent chacun `null` tant que moins de deux relevés y apportent un montant non nul (une somme serait la paie d'un membre). Corrigé au passage : les tests de fuite de `content-tools`, `payroll-tools` et `statement-reads` cherchent les montants parmi les nombres de la sortie (`numbersIn`), plus dans son texte, où un identifiant tiré au hasard pouvait les contenir.
+Découvertes : la vue d'une quinzaine (`PeriodView`) porte désormais le fuseau actuel de l'agence et son « aujourd'hui », lus une fois : le versement bloqué et le retard comptent jusqu'au même jour (demande d'Équipe).
+Candidats à suppression : aucun.
+Vérifié : voir la PR.

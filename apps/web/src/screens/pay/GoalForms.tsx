@@ -24,6 +24,7 @@ import {
   signedAmountText,
 } from '@/reports/model';
 import { longDay } from '@/scheduling/time';
+import { MONEY_LEAD, useConfirmAgain, type ConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 
 /** The most tiers a goal and a set keep (`CollectiveTiersSchema`, `BonusTiersSchema`). */
@@ -60,34 +61,40 @@ function Steps({ step }: { step: 0 | 1 }): JSX.Element {
   );
 }
 
-/** The second step's foot: back to the form, or send. */
+/** The second step's foot: back to the form, or send; the password and the code in its place when the server asks. */
 function CheckFoot({
   busy,
   label,
+  confirm,
+  onBusy,
   onBack,
   onSend,
 }: {
   busy: boolean;
   label: string;
+  confirm: ConfirmAgain;
+  onBusy: (busy: boolean) => void;
   onBack: () => void;
   onSend: () => void;
 }): JSX.Element {
   return (
-    <div className="tm-dialog__foot">
-      <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onBack}>
-        Modifier
-      </button>
-      <button
-        type="button"
-        className="nv-btn nv-btn--neon"
-        data-autofocus
-        disabled={busy}
-        aria-busy={busy}
-        onClick={onSend}
-      >
-        {busy ? 'Enregistrement…' : label}
-      </button>
-    </div>
+    confirm.prompt({ lead: MONEY_LEAD, onBusyChange: onBusy }) ?? (
+      <div className="tm-dialog__foot">
+        <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onBack}>
+          Modifier
+        </button>
+        <button
+          type="button"
+          className="nv-btn nv-btn--neon"
+          data-autofocus
+          disabled={busy}
+          aria-busy={busy}
+          onClick={onSend}
+        >
+          {busy ? 'Enregistrement…' : label}
+        </button>
+      </div>
+    )
   );
 }
 
@@ -160,6 +167,8 @@ export function GoalDialog({
   const ready =
     targetMinor !== null && targetMinor > 0 && typed.length === rows.length && rows.length > 0 && !same;
 
+  const confirm = useConfirmAgain();
+
   const send = async (withdraw: boolean): Promise<void> => {
     const targetSent = withdraw ? goal?.targetMinor : targetMinor;
     if (busy || targetSent === undefined || targetSent === null) return;
@@ -173,6 +182,13 @@ export function GoalDialog({
     });
     await refresh();
     setBusy(false);
+    if (outcome.kind === 'reauth') {
+      // Nothing was written: the password and the code, then the same goal again.
+      confirm.ask(() => {
+        void send(withdraw);
+      });
+      return;
+    }
     if (outcome.kind === 'ok') {
       onClose();
       return;
@@ -204,6 +220,8 @@ export function GoalDialog({
             <p className="tm-hint">Les relevés de la quinzaine pas encore validés sont recalculés.</p>
             <CheckFoot
               busy={busy}
+              confirm={confirm}
+              onBusy={setBusy}
               label="Retirer l’objectif"
               onBack={() => {
                 setStep('fill');
@@ -233,6 +251,8 @@ export function GoalDialog({
             </p>
             <CheckFoot
               busy={busy}
+              confirm={confirm}
+              onBusy={setBusy}
               label={goal === null ? 'Poser l’objectif' : 'Changer l’objectif'}
               onBack={() => {
                 setStep('fill');
@@ -424,6 +444,8 @@ export function TiersDialog({
   const same = new Set(typed.map((tier) => tier.thresholdMinor)).size !== typed.length;
   const ready = typed.length === rows.length && !same;
 
+  const confirm = useConfirmAgain();
+
   const send = async (): Promise<void> => {
     if (busy) return;
     setBusy(true);
@@ -431,6 +453,13 @@ export function TiersDialog({
     const outcome = await addBonusTiers({ id: setId, fromPeriod: from, tiers: bonusTiersInOrder(typed) });
     await refresh();
     setBusy(false);
+    if (outcome.kind === 'reauth') {
+      // Nothing was written: the password and the code, then the same tiers again.
+      confirm.ask(() => {
+        void send();
+      });
+      return;
+    }
     if (outcome.kind === 'ok') {
       onClose();
       return;
@@ -475,6 +504,8 @@ export function TiersDialog({
             </p>
             <CheckFoot
               busy={busy}
+              confirm={confirm}
+              onBusy={setBusy}
               label="Enregistrer les paliers"
               onBack={() => {
                 setChecking(false);

@@ -20,6 +20,7 @@ const TurnSchema = z.object({
 const RecordSchema = z.object({
   id: z.string().min(1),
   creatorId: z.string().min(1).exactOptional(),
+  personaVersionId: z.string().min(1).exactOptional(),
   sessionId: z.string().min(1),
   at: z.string().min(1),
   version: z.object({ voicePrompt: z.string(), voiceModel: z.string() }),

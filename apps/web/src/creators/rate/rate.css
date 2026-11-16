@@ -136,3 +136,15 @@
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
 }
+
+/* Locked while the password and the code are asked, or while saving: ink and edge muted, no caret to invite typing. */
+.ar-fields .nv-field__control:disabled {
+  color: var(--nv-ink-muted);
+  -webkit-text-fill-color: var(--nv-ink-muted);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-plate-edge) 50%, transparent);
+  cursor: default;
+  opacity: 1;
+}
+.ar-percent:has(.nv-field__control:disabled) .ar-percent__sign {
+  color: var(--nv-ink-faint);
+}

@@ -22,6 +22,7 @@ import {
   type ScriptStart,
   type ScriptStartBlock,
 } from '../domain/availability';
+import { bubbleBudget, fitBubbles } from '../domain/bubbles';
 import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
 import { checkNoCommitment, customOrderDecision, type CustomOrderDecision } from '../domain/custom-order';
 import {
@@ -32,6 +33,7 @@ import {
   type DesireReading,
   type DesireState,
 } from '../domain/desire';
+import { gapNotes, timingLines } from '../domain/elapsed';
 import {
   checkExplicit,
   checkVoiceOutput,
@@ -359,7 +361,27 @@ export function guardContextOf(history: readonly ConversationTurn[]): GuardConte
     previousTurns: previousTurnsOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
+    sentBefore: history.filter((turn) => turn.from === 'creator').map((turn) => turn.text),
   };
+}
+
+const datedOf = (turn: ConversationTurn) => ({
+  fromFan: turn.from === 'fan',
+  ...(turn.at !== undefined && { at: turn.at }),
+});
+
+/** « Le moment », with what code reads of the last exchanges' times (audit du naturel, A2). */
+function describeMoment(situation: Situation, history: readonly ConversationTurn[]): string {
+  return [describeSituation(situation), ...timingLines(history.map(datedOf), situation.now)].join('\n');
+}
+
+/** Each message of his after a silence carries the time that passed, written by code on her clock. */
+function withTimeNotes(history: readonly ConversationTurn[], timeZone: string): readonly ConversationTurn[] {
+  const notes = gapNotes(history.map(datedOf), timeZone);
+  return history.map((turn, index) => {
+    const timeNote = notes[index];
+    return timeNote === null || timeNote === undefined ? turn : { ...turn, timeNote };
+  });
 }
 
 /** His messages before the ones she is answering: the history without its last run of fan turns. */
@@ -394,9 +416,10 @@ async function writeFollowUp(
   brief: Brief,
   droppedNotes: readonly string[],
 ): Promise<ComposedTurn> {
-  const voiceInput: VoiceInput = { ...base, brief };
+  // A follow-up: nothing of his awaits, one bubble.
+  const voiceInput: VoiceInput = { ...base, brief, maxBubbles: 1 };
   const voice = await gateway.voice(voiceInput);
-  const written = voice.ok ? voice.value.output.bubbles : [];
+  const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(base.history)),
     ...checkExplicit(written),
@@ -457,8 +480,8 @@ export async function composeTurn(
     creatorName: persona.creatorName,
     personaSheet: persona.personaSheet,
     fanNotes: notes.kept,
-    situation: describeSituation(input.situation),
-    history: input.history,
+    situation: describeMoment(input.situation, input.history),
+    history: withTimeNotes(input.history, input.situation.timeZone),
     ...(input.trace !== undefined && { trace: input.trace }),
   };
   if (input.followUp !== undefined)
@@ -675,15 +698,18 @@ export async function composeTurn(
       isSkipped: true,
     };
   }
+  const budget = bubbleBudget(input.history);
   const voiceInput: VoiceInput = {
     ...base,
     brief: voiceBrief,
+    maxBubbles: budget,
     ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
     ...(scriptStep !== undefined && { scriptStep }),
   };
   const voice = await gateway.voice(voiceInput);
-  const written = voice.ok ? voice.value.output.bubbles : [];
-  // Checked as written: the length and count guards read the voice's bubbles, not the joined message.
+  // Past the budget, left out, never glued nor sent at once (Charles 16/11 : « trois rarement »).
+  const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
+  // Checked as kept: the guards read the bubbles that leave.
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
     ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),

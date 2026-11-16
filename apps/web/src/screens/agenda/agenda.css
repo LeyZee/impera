@@ -540,6 +540,20 @@
 .ag-check:active {
   transform: scale(0.88);
 }
+/* A routine's check on a day that is not hers today (CRE-03, CRE-07): drawn, never pressed, a little quieter. */
+.ag-check[data-closed] {
+  cursor: default;
+  opacity: 0.55;
+}
+.ag-check[data-closed]::before {
+  content: none;
+}
+.ag-check[data-closed][data-done] {
+  background: var(--ag-c, var(--nv-ink-muted));
+}
+.ag-check[data-closed][data-done] svg {
+  stroke-dashoffset: 0;
+}
 .ag-check:focus-visible {
   outline: none;
   box-shadow:

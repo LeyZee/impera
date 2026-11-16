@@ -12,6 +12,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AgencyRateSection } from './AgencyRateSection';
 
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
+vi.mock('@/settings/services/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/settings/services/api')>()),
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
+}));
+
 /* An invented creator and percentages: never the agency's own. */
 const CREATOR = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000c1');
 const TODAY = '2026-11-03';
@@ -38,9 +44,14 @@ const NOTHING_READ: CreatorAgencyRateList['observed'] = {
   fortnights: [],
 };
 
+interface Refusal {
+  readonly status: number;
+  readonly code: string;
+}
+
 function serve(
   rates: Rate[],
-  refuse?: { status: number; code: string },
+  refuse?: Refusal | (() => Refusal | undefined),
   observed: object = NOTHING_READ,
 ): unknown[] {
   const posts: unknown[] = [];
@@ -64,7 +75,8 @@ function serve(
         JSON.parse(typeof init.body === 'string' ? init.body : 'null'),
       );
       posts.push(body);
-      if (refuse !== undefined) return json(apiError(refuse.code), refuse.status);
+      const refusal = typeof refuse === 'function' ? refuse() : refuse;
+      if (refusal !== undefined) return json(apiError(refusal.code), refusal.status);
       const stored = { ...body, creatorId: CREATOR, createdAt: '2026-11-03T10:00:00.000Z' };
       rates.push(stored);
       return json(stored, 201);
@@ -146,6 +158,41 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     // The next one starts tomorrow at the earliest.
     type('À partir du', TODAY);
     expect(await screen.findByText('Le 4 novembre 2026 au plus tôt.')).toBeDefined();
+  });
+
+  it('asks the owner for the password and the code when the confirmation is old, then saves the same percentage (EQ-15)', async () => {
+    let fresh = false;
+    const posts = serve([], () => (fresh ? undefined : { status: 403, code: 'reauthentication_forbidden' }));
+    confirmIdentity.mockImplementation(() => {
+      fresh = true;
+      return Promise.resolve('ok');
+    });
+    renderSection();
+    await screen.findByText(/^À régler/u);
+    type('Pourcentage de l’agence', '35');
+    type('À partir du', TODAY);
+    fireEvent.click(screen.getByRole('button', { name: 'Vérifier avant d’enregistrer' }));
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enregistrer' }),
+    );
+    // Never « Seul le compte propriétaire… »: the owner is asked again, nothing written meanwhile.
+    expect(
+      await screen.findByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
+    ).toBeDefined();
+    expect(screen.queryByText(/^Seul le compte propriétaire/u)).toBeNull();
+    // What is sent again is what was read: the percentage and the day are locked meanwhile.
+    expect(screen.getByLabelText('Pourcentage de l’agence')).toHaveProperty('disabled', true);
+    expect(screen.getByLabelText('À partir du')).toHaveProperty('disabled', true);
+    // The same prompt as in the dialogs: « Confirmer » is the one neon.
+    expect(screen.getByRole('button', { name: 'Confirmer' }).className).toContain('nv-btn--neon');
+    type('Mot de passe', 'mot-de-passe-invente');
+    type('Code à 6 chiffres ou de secours', '123456');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
+    expect(
+      await screen.findByText('35 % pour l’agence aujourd’hui, depuis le 3 novembre 2026.'),
+    ).toBeDefined();
+    expect(posts).toHaveLength(2);
+    expect(posts[1]).toEqual(posts[0]);
   });
 
   it('turns « Revenir » into nothing sent, and a refused day into its sentence', async () => {

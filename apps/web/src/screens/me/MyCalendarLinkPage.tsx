@@ -3,6 +3,7 @@ import type { JSX } from 'react';
 
 import { MeNav } from './MeNav';
 
+import { playsTheGame } from '@/rewards/api';
 import { CalendarLinkBody, SHIFT_LINK_WORDS } from '@/scheduling/CalendarLinkBody';
 import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
 
@@ -18,7 +19,7 @@ export function MyCalendarLinkPage({ user }: { user: Me }): JSX.Element {
         eyebrow="Moi"
         title="Calendrier"
         lead="Tes shifts dans le calendrier de ton téléphone, mis à jour tout seuls."
-        actions={<MeNav manager={user.teamScope === 'agency'} />}
+        actions={<MeNav manager={user.teamScope === 'agency'} trophies={playsTheGame(user)} />}
       />
       {/* In a column, as Moi › Sécurité: the panel keeps its own height instead of filling the page. */}
       <div className="flex flex-col gap-4">
