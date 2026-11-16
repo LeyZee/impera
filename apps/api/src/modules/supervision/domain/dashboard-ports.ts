@@ -12,6 +12,7 @@ import type {
   DropCategory,
 } from '@impera/contracts';
 
+import type { AgencyCreatorRead } from './agency-insights';
 import type { UsdRate } from './fan-ranking';
 
 /** The voice version whose live rate the Dashboard shows: the one the composition root gives `conversations` too. */
@@ -97,6 +98,24 @@ export interface DashboardReader {
     /** The last ECB rate known for the dollar, `null` when none is: its sales then do not count. */
     usdRate: UsdRate | null,
   ): Promise<{ readonly facts: DashboardFacts; readonly window: DashboardWindow } | undefined>;
+}
+
+/**
+ * The agency's figures as read creator by creator (ADR 0078 § 1, § 5), in her tenant and with the account's team scope:
+ * `out_of_scope` for a scope of one's own, `not_linked` before a register is linked.
+ */
+export interface AgencyFiguresStore {
+  read(
+    creatorId: CreatorId,
+    userId: UserId,
+    range: { readonly from: string; readonly previousFrom: string; readonly to: string },
+  ): Promise<
+    | { readonly kind: 'out_of_scope' }
+    | { readonly kind: 'not_linked' }
+    | { readonly kind: 'read'; readonly read: AgencyCreatorRead }
+  >;
+  /** Display names of the team, member id to name, read as `userId` through the first creator given. */
+  memberNames(creatorId: CreatorId, userId: UserId): Promise<ReadonlyMap<string, string>>;
 }
 
 /**
