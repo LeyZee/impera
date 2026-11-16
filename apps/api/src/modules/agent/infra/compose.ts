@@ -1,4 +1,10 @@
-import { desireNow, type FanFlags, type MediaDescription, type ObjectionReplies } from '@impera/contracts';
+import {
+  desireNow,
+  normalise,
+  type FanFlags,
+  type MediaDescription,
+  type ObjectionReplies,
+} from '@impera/contracts';
 import type {
   BrainAlert,
   Brief,
@@ -46,6 +52,7 @@ import {
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
+import { paceHints } from '../domain/pace';
 import { offerDecision, offerSignals, type OfferBlock, type OfferContext } from '../domain/policy';
 import {
   paidWaiting,
@@ -256,6 +263,17 @@ const STEER_BACK_BRIEF: Readonly<Record<'age_unconfirmed' | 'too_early', string>
     'Il va trop vite : elle ralentit avec douceur et humour, sans rien d’explicite ni de sous-entendu, sans reproche, et ramène la conversation sur lui ; si ça vient naturellement, elle lui demande son âge.',
 };
 const NO_OPENING_HINT = 'aucune allusion sexuelle, elle n’ouvre pas ce terrain';
+/** He compliments or flirts, nothing sexual: she welcomes it, never dodges it (Charles, 16/11). */
+const FLIRT_HINT =
+  'il la complimente ou flirte : elle le reçoit avec plaisir, taquine, et flirte avec lui en retour, sans allusion sexuelle de sa part';
+
+// She asked his age already in this conversation: « t'as quel âge ? », « tu as quel âge », « et ton âge ? ».
+const ASKED_AGE = /\b(?:quel age|ton age|age as[- ]tu|age t'?as)\b/u;
+
+/** She asked his age already: she never asks it twice in a conversation (audit du 16/11, C2). */
+function askedHisAge(history: readonly ConversationTurn[]): boolean {
+  return history.some((turn) => turn.from === 'creator' && ASKED_AGE.test(normalise(turn.text)));
+}
 /** He is hot and sexualizes, only his availability is unknown: she makes sure in passing, once (ADR 0103 § 13). */
 const ASK_AVAILABILITY_HINT =
   'en passant, elle s’assure qu’il est tranquille (seul, chez lui, pas pressé), naturellement, sans rien proposer';
@@ -286,11 +304,20 @@ function careBrief(read: Brief): Brief {
   return { ...read, action: 'reply', replyBrief: CARE_BRIEF, toneHints: [...CARE_TONE_HINTS] };
 }
 
-/** The brief as the cursor lets the voice write it. */
-function withinCursor(brief: Brief, decision: SexualizationDecision): Brief {
-  if (decision.kind === 'steer_back')
-    return { ...brief, action: 'reply', replyBrief: STEER_BACK_BRIEF[decision.reason] };
-  if (decision.kind === 'no_opening') return { ...brief, toneHints: [...brief.toneHints, NO_OPENING_HINT] };
+/**
+ * The brief as the cursor lets the voice write it. His age is asked at most once, and never right after he gave it
+ * (`ageAsked`): she slows down without asking it again. A flirt she may not take further is still welcomed.
+ */
+function withinCursor(brief: Brief, decision: SexualizationDecision, ageAsked: boolean): Brief {
+  if (decision.kind === 'steer_back') {
+    const reason = decision.reason === 'age_unconfirmed' && ageAsked ? 'too_early' : decision.reason;
+    return { ...brief, action: 'reply', replyBrief: STEER_BACK_BRIEF[reason] };
+  }
+  if (decision.kind === 'no_opening')
+    return {
+      ...brief,
+      toneHints: [...brief.toneHints, ...(brief.intent === 'flirt' ? [FLIRT_HINT] : []), NO_OPENING_HINT],
+    };
   if (decision.kind === 'suggestive_only')
     return { ...brief, toneHints: [...brief.toneHints, SUGGESTIVE_HINT] };
   return brief;
@@ -520,13 +547,13 @@ export async function composeTurn(
           replyBrief: trap.replyBrief,
           toneHints: [...(trap.toneHints ?? [])],
         };
-  // His age as stored: one he states now counts from his next message, so the answer to « j'ai 25 ans » stays
-  // careful. The cursor decides from it, a trap's answer first.
+  // His age: one he states now confirms it at once (Charles, 16/11), no doubt by default and no question again. The
+  // cursor decides from it, a trap's answer first.
   const ageDeclared = brief === undefined ? null : declaredAdultAge(brief.factsProposed, input.fanText);
   // His heat, counted by code from the brain's signals and what it measured (P3-12); read as stored once counted.
   const desire = brief === undefined ? undefined : desireOf(brief, input);
   const heat = desire?.score ?? desireNow(input.desire?.previous, input.situation.now);
-  const ageConfirmed = input.sexualization?.ageConfirmed === true;
+  const ageConfirmed = input.sexualization?.ageConfirmed === true || ageDeclared !== null;
   const noExplicit = input.sexualization?.noExplicit === true;
   const sexualization =
     brief === undefined
@@ -541,7 +568,9 @@ export async function composeTurn(
           limits: input.sexualization?.limits ?? NO_LIMITS,
         });
   const within =
-    sexualization === undefined || trap.replyBrief !== undefined ? read : withinCursor(read, sexualization);
+    sexualization === undefined || trap.replyBrief !== undefined
+      ? read
+      : withinCursor(read, sexualization, ageDeclared !== null || askedHisAge(input.history));
   // She waited once already: no second wait, a light « tu es revenu ? » (P3-11).
   const cursored: Brief =
     input.waited === true && within.action === 'wait'
@@ -663,9 +692,24 @@ export async function composeTurn(
     objectionReply === undefined &&
     trap.replyBrief === undefined &&
     sexualization?.kind !== 'steer_back';
+  // Getting to know him at his pace, never a questionnaire (Playground, Charles 16/11): on an ordinary answer only.
+  const paced =
+    !care &&
+    !asking &&
+    answered.action === 'reply' &&
+    scriptStep === undefined &&
+    customOrder === undefined &&
+    objectionReply === undefined &&
+    trap.replyBrief === undefined &&
+    sexualization?.kind !== 'steer_back'
+      ? paceHints(
+          input.fanText,
+          previousTurnsOf(input.history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text }))),
+        )
+      : [];
   const voiceBrief: Brief = asking
     ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
-    : answered;
+    : { ...answered, toneHints: [...answered.toneHints, ...paced] };
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined
       ? {}

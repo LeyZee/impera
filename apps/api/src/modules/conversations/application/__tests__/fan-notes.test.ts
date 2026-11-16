@@ -27,4 +27,11 @@ describe('her notes about the fan, split by who reads them (ADR 0085 § 9)', () 
     expect(fanNotesOf([{ category: 'identity', key: 'age', value: 'la trentaine' }]).cardAge).toBeUndefined();
     expect(fanNotesOf([{ category: 'operator_note', key: 'note', value: '17' }]).cardAge).toBeUndefined();
   });
+
+  it('says whether his card age was stated or noted, never only guessed (Charles, 16/11)', () => {
+    const age = (kind: string) => fanNotesOf([{ category: 'identity', key: 'age', value: '31', kind }]);
+    expect(age('declared')).toMatchObject({ cardAge: 31, cardAgeStated: true });
+    expect(age('noted')).toMatchObject({ cardAge: 31, cardAgeStated: true });
+    expect(age('inferred')).toMatchObject({ cardAge: 31, cardAgeStated: false });
+  });
 });

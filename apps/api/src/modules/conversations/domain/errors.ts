@@ -35,6 +35,19 @@ export class DraftNotFound extends DomainError {
   }
 }
 
+/**
+ * His age is in doubt: the agent writes nothing to him until the owner or a manager confirms it (Charles, 16/11), so
+ * the hand is not given back to it meanwhile.
+ */
+export class AgeInDoubtConflict extends DomainError {
+  constructor() {
+    super(
+      'age_in_doubt_conflict',
+      'Son âge est en doute : l’IA ne lui écrit plus tant que le propriétaire ou un manager ne l’a pas confirmé',
+    );
+  }
+}
+
 /** Automatique stays locked until its server lock opens (ADR 0019); `details.missing` says what it waits for. */
 export class AutomaticLocked extends DomainError {
   constructor(missing: readonly AutomaticMissing[]) {

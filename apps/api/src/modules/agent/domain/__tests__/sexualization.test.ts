@@ -74,5 +74,18 @@ describe('declaredAdultAge', () => {
     expect(declaredAdultAge(fact('17'), 'J’ai 17 ans')).toBeNull();
     expect(declaredAdultAge(fact('22'), 'J’ai 22 ans… enfin 16 ans en vrai')).toBeNull();
     expect(declaredAdultAge(fact('25'), 'J’ai 125 ans')).toBeNull();
+    expect(declaredAdultAge(fact('25'), 'J’ai 25 ans. Bon ok je suis un mec de 16 ans')).toBeNull();
+    expect(declaredAdultAge(fact('25'), '25 ans, mais en vrai 15 ans et un boulot d’été')).toBeNull();
+    expect(declaredAdultAge(fact('25'), 'J’ai vingt-cinq ans… enfin seize ans')).toBeNull();
+  });
+
+  it('reads his age beside a time or his children’s ages, and in words (audit du 16/11, C4)', () => {
+    expect(declaredAdultAge(fact('34'), 'J’ai 34 ans, marié depuis 6 ans')).toBe(34);
+    expect(declaredAdultAge(fact('40'), '40 ans, deux enfants de 8 et 10 ans')).toBe(40);
+    expect(declaredAdultAge(fact('29'), 'Ça fait 3 ans que je te suis, j’ai 29 ans')).toBe(29);
+    expect(declaredAdultAge(fact('31'), 'J’ai 31 ans et 10 ans d’expérience')).toBe(31);
+    expect(declaredAdultAge(fact('25'), 'J’ai vingt-cinq ans')).toBe(25);
+    expect(declaredAdultAge(fact('vingt et un ans'), 'vingt et un ans et toi')).toBe(21);
+    expect(declaredAdultAge(fact('quatre-vingts'), 'quatre vingts ans')).toBe(80);
   });
 });

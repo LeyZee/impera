@@ -458,11 +458,21 @@ export interface FanDirectory {
     read: FanCardRead,
     sources: readonly { readonly number: number; readonly messageId: MessageId; readonly at: Date }[],
   ): Promise<readonly { readonly id: string; readonly key: string }[]>;
+  /** His limits (`fans.flags`): a hand is never given back to the agent while his age is in doubt. */
+  flags(creatorId: CreatorId, fanId: FanId): Promise<{ readonly ageDisputed?: unknown }>;
   /** Her active facts about this fan, as the engine reads them (sorted, 40 at most). */
   activeFacts(
     creatorId: CreatorId,
     fanId: FanId,
-  ): Promise<readonly { readonly category: FactCategory; readonly key: string; readonly value: string }[]>;
+  ): Promise<
+    readonly {
+      readonly category: FactCategory;
+      readonly key: string;
+      readonly value: string;
+      /** `declared` (he said it), `noted` (a human wrote it) or `inferred` (the brain guessed it). */
+      readonly kind?: string;
+    }[]
+  >;
 }
 
 /**
@@ -518,6 +528,8 @@ interface FanContext extends FanStats {
   readonly brainNotes?: readonly string[];
   /** The age his card gives, a whole number; under 18, a human answers him (recette AGE-13). */
   readonly cardAge?: number;
+  /** His card's age was stated by him or noted by a human, not only guessed: an adult one confirms his age. */
+  readonly cardAgeStated?: boolean;
 }
 
 /** A fact as the brief proposes it: its category is the model's word until `conversations` reads it (P3-02). */

@@ -32,6 +32,15 @@ describe('followUpDecision', () => {
     ).toEqual({ kind: 'skip', reason: 'follow_up_distress' });
   });
 
+  it('never writes to a fan whose age is in doubt, even after a human gave the hand back (Charles, 16/11)', () => {
+    expect(
+      followUpDecision({
+        ...base,
+        flags: { ageDisputed: { since: '2026-10-20T10:00:00.000Z', by: 'policy' } },
+      }),
+    ).toEqual({ kind: 'skip', reason: 'follow_up_age_disputed' });
+  });
+
   it('stops past her last delay', () => {
     expect(followUpDecision({ ...base, step: 2 })).toEqual({ kind: 'skip', reason: 'follow_up_plan_over' });
     expect(followUpDecision({ ...base, steps: 0 })).toEqual({ kind: 'skip', reason: 'follow_up_plan_over' });

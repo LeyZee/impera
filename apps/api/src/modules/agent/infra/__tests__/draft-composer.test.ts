@@ -1252,7 +1252,7 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
         before: 59,
         score: 93,
         signals: ['states_desire', 'intent:sexting', 'sentiment:aroused'],
-        weightsVersion: 'desire-2',
+        weightsVersion: 'desire-3',
       },
     });
     expect(written(seen)?.action).toBe('offer');
@@ -1434,14 +1434,14 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(seen.traces).toHaveLength(0);
   });
 
-  it('keeps the answer to his stated age careful: it counts from his next message', async () => {
+  it('takes the adult age he states as confirmed at once, no doubt left (Charles, 16/11)', async () => {
     const AGE: Brief = {
       ...HOT,
       factsProposed: [{ category: 'identity', key: 'age', value: '25', kind: 'declared', confidence: 0.95 }],
     };
     const limits = limitsOf({});
     const { draftComposer, seen } = composer(
-      { brief: AGE, voice: { bubbles: ['Mmh j’ai envie de te sucer'] } },
+      { brief: AGE, voice: { bubbles: ['Mmh j’ai envie de toi'] } },
       undefined,
       limits.limits,
       cursor,
@@ -1451,8 +1451,60 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
       history: [{ direction: 'inbound', text: 'J’ai 25 ans', at: new Date('2026-10-17T09:59:00Z') }],
     });
     expect(limits.confirmed).toEqual(['fan-1']);
+    expect(written(seen)?.replyBrief).not.toContain('ralentit');
+    expect(written(seen)?.replyBrief).not.toContain('son âge');
+    expect(result.kind).toBe('draft');
+  });
+
+  it('takes an adult age stated on his card as confirmed (Charles, 16/11)', async () => {
+    const limits = limitsOf({});
+    const { draftComposer, seen } = composer({ brief: HOT }, undefined, limits.limits, cursor);
+    await draftComposer.compose({ ...dayOld, fan: { ...dayOld.fan, cardAge: 31, cardAgeStated: true } });
+    expect(limits.confirmed).toEqual(['fan-1']);
+    expect(written(seen)?.replyBrief).not.toContain('ralentit');
+  });
+
+  it('never confirms an age the brain only guessed on his card', async () => {
+    const limits = limitsOf({});
+    const { draftComposer, seen } = composer({ brief: HOT }, undefined, limits.limits, cursor);
+    await draftComposer.compose({ ...dayOld, fan: { ...dayOld.fan, cardAge: 31, cardAgeStated: false } });
+    expect(limits.confirmed).toEqual([]);
     expect(written(seen)?.replyBrief).toContain('ralentit');
-    expect(result).toMatchObject({ reason: 'guard_blocked', detail: ['explicit_before_age'] });
+  });
+
+  it('asks his age once in a conversation, never again (audit du 16/11, C2)', async () => {
+    const { draftComposer, seen } = composer({ brief: HOT }, undefined, limitsOf({}).limits, cursor);
+    await draftComposer.compose({
+      ...dayOld,
+      history: [
+        {
+          direction: 'outbound',
+          text: 'Doucement toi 😅 t’as quel âge au fait ?',
+          at: new Date('2026-10-17T09:50:00Z'),
+        },
+        { direction: 'inbound', text: 'Haha tu veux savoir quoi', at: new Date('2026-10-17T09:59:00Z') },
+      ],
+    });
+    expect(written(seen)?.replyBrief).toContain('ralentit');
+    expect(written(seen)?.replyBrief).not.toContain('son âge');
+  });
+
+  it('welcomes a compliment, never slows it down, before his age is known (Charles, 16/11)', async () => {
+    const COMPLIMENT: Brief = {
+      ...BRIEF,
+      intent: 'flirt',
+      sentiment: 'positive',
+      desireSignals: ['body_compliment'],
+    };
+    const { draftComposer, seen } = composer({ brief: COMPLIMENT }, undefined, limitsOf({}).limits, cursor);
+    await draftComposer.compose(INPUT);
+    expect(written(seen)?.replyBrief).not.toContain('ralentit');
+    expect(written(seen)?.toneHints).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('le reçoit avec plaisir'),
+        expect.stringContaining('aucune allusion sexuelle'),
+      ]),
+    );
   });
 
   it('stays suggestive with a confirmed adult a human set to nothing explicit', async () => {

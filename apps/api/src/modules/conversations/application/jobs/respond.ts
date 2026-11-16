@@ -98,22 +98,32 @@ const noteLine = (fact: {
  * go to the brain only (`brainNotes`), never to the voice; the rest to both.
  */
 export function fanNotesOf(
-  facts: readonly (Parameters<typeof isBrainOnlyFact>[0] & { readonly value: string })[],
+  facts: readonly (Parameters<typeof isBrainOnlyFact>[0] & {
+    readonly value: string;
+    readonly kind?: string;
+  })[],
 ): {
   readonly notes: string[];
   readonly brainNotes: string[];
   readonly cardAge?: number;
+  readonly cardAgeStated?: boolean;
 } {
   // His age on the card, in digits (the card refuses anything else): the youngest when several are active. A guessed
   // age counts as much as a confirmed one: under 18, the doubt goes against him (relecture Bilan, #784).
+  // Only one he stated or a human noted confirms an adult age (Charles, 16/11): never the brain's guess alone.
   const ages = facts.flatMap((fact) => {
     const digits = fact.key === 'age' ? /^\s*(\d{1,2})\s*(?:ans?)?\s*$/u.exec(fact.value)?.[1] : undefined;
-    return digits === undefined ? [] : [Number(digits)];
+    return digits === undefined
+      ? []
+      : [{ years: Number(digits), stated: fact.kind === 'declared' || fact.kind === 'noted' }];
   });
   return {
     notes: facts.filter((fact) => !isBrainOnlyFact(fact)).map(noteLine),
     brainNotes: facts.filter(isBrainOnlyFact).map(noteLine),
-    ...(ages.length > 0 && { cardAge: Math.min(...ages) }),
+    ...(ages.length > 0 && {
+      cardAge: Math.min(...ages.map((age) => age.years)),
+      cardAgeStated: ages.some((age) => age.stated),
+    }),
   };
 }
 

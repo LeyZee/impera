@@ -323,6 +323,10 @@ const AI_TICS: readonly RegExp[] = [
   /\boh la la\b/,
   /\bje suis la pour toi\b/,
   /\bjuste pour toi\b/,
+  // A note-taker's line, never hers (Playground, Charles 16/11): « je note ton âge », « c'est noté ».
+  /\bje (te |le |l'|ca |bien )?(note|retiens)\b/,
+  /\b(c'est|bien) note\b/,
+  /\bje prends note\b/,
   /—/,
   /^\s*([-*•]|\d+[.)])\s/m,
 ];

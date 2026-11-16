@@ -87,6 +87,11 @@ export interface AgentComposeInput {
     readonly notes: readonly string[];
     /** The age his card gives, a whole number (`fans`, field `age`); absent when it gives none. */
     readonly cardAge?: number;
+    /**
+     * His card's age was stated, by him or by a human (`declared` or `noted`), never only guessed by the brain: an
+     * adult one then confirms his age (Charles, 16/11).
+     */
+    readonly cardAgeStated?: boolean;
     /** Read by the brain alone (ADR 0085 § 9): when he has money, his attachment, his moods. */
     readonly brainNotes?: readonly string[];
     readonly spentMinor: number;
@@ -448,6 +453,20 @@ type Held = Extract<AgentComposeResult, { kind: 'held' }>;
 
 /** Under this age on his card, a human answers him (recette AGE-13). */
 const ADULT_AGE = 18;
+
+/**
+ * His card gives an adult age he stated or a human noted, never one only guessed, and no one disputes it: confirmed like an age he states himself (Charles, 16/11). No
+ * question asked again, no doubt by default. A dispute always wins: the doubt stays until a human lifts it.
+ */
+function adultOnCard(
+  input: { readonly fan: { readonly cardAge?: number; readonly cardAgeStated?: boolean } },
+  flags: { readonly ageDisputed?: unknown } | undefined,
+): boolean {
+  if (flags === undefined || flags.ageDisputed !== undefined) return false;
+  return (
+    input.fan.cardAgeStated === true && input.fan.cardAge !== undefined && input.fan.cardAge >= ADULT_AGE
+  );
+}
 
 const HANDOFF: Held = { kind: 'held', reason: 'handoff', detail: [], costUsd: 0 };
 
@@ -814,11 +833,11 @@ async function settle(
   // A custom order with a chatter on shift (ADR 0090 § A): they take it, the voice did not write.
   if (composed.customOrder?.kind === 'handoff')
     return { ...HANDOFF, cause: 'custom_order', detail: ['custom_order'], costUsd };
-  // He stated an adult age himself: confirmed for his next messages (Charles, 27/10), never once his age was
-  // taken back. Not saved, his age stays unconfirmed and she keeps steering back, the safe side: counted.
+  // He stated an adult age himself, or his card gives one: confirmed (Charles, 27/10 and 16/11), never once his age
+  // was taken back. Not saved, his age stays unconfirmed and she keeps steering back, the safe side: counted.
   const his = flags;
   if (
-    composed.ageDeclared !== undefined &&
+    (composed.ageDeclared !== undefined || adultOnCard(input, his)) &&
     his !== undefined &&
     his.ageConfirmedAt === undefined &&
     his.ageDisputed === undefined
@@ -948,7 +967,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         ...(withHer.sexualizationLimits !== undefined && {
           sexualization: {
             limits: withHer.sexualizationLimits,
-            ageConfirmed: stop.flags?.ageConfirmedAt !== undefined,
+            ageConfirmed: stop.flags?.ageConfirmedAt !== undefined || adultOnCard(input, stop.flags),
             noExplicit: stop.flags?.noExplicit === true,
           },
         }),
