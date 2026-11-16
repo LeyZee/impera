@@ -79,7 +79,7 @@ function serve(online: () => boolean, shifts: readonly unknown[] = SHIFTS, agend
   return calls;
 }
 
-function show(view: AgendaView = 'day', day: string = WEDNESDAY): void {
+function show(view: AgendaView = 'day', day: string | null = WEDNESDAY): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <AgendaPage day={day} view={view} onDay={() => undefined} onView={() => undefined} />
@@ -155,6 +155,18 @@ describe('Agenda, the creator’s (CR-05)', () => {
     show();
     expect(await screen.findByText('Soirée photo')).toBeDefined();
     expect(screen.getByText('2 tâches à heure')).toBeDefined();
+  });
+
+  it('opens on her day in her own zone, not the device’s (recette 16/11, CRE-08)', async () => {
+    // Monday 2 November, 4 h in Paris, where the device is (mocked above); she is in New York: Sunday 1st, 22 h.
+    vi.setSystemTime(new Date('2026-11-02T03:00:00Z'));
+    const calls = serve(() => true, [], agendaOf({ timeZone: 'America/New_York', today: '2026-11-01' }));
+    show('day', null);
+    // Her week is the one before the device's: it is read, and her day is the one shown.
+    await waitFor(() => {
+      expect(calls.some(({ url }) => url.includes('from=2026-10-26&to=2026-11-01'))).toBe(true);
+    });
+    expect(await screen.findByText(/dimanche 1er novembre/u)).toBeDefined();
   });
 
   it('ticks offline, keeps it, and sends it when the network comes back', async () => {

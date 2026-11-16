@@ -30,6 +30,7 @@ import {
 } from './model';
 
 import { useCreators } from '@/creators/api';
+import { useSchedulingSettings } from '@/reports/api';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { useAlerts } from '@/settings/alerts/api';
@@ -232,7 +233,8 @@ function History({
 }): JSX.Element {
   const id = useId();
   const now = useNow();
-  const zone = readerZone();
+  // The agency's hour, as on Planning; the device's only while it is not read (recette 16/11, CHT-01).
+  const zone = useSchedulingSettings().data?.timeZone ?? readerZone();
   const refresh = useRefreshHistory();
   const owned = useAlerts({ enabled: isOwner });
   // Her alerts named once read, so that the filter still offers them when it narrows the list to one.

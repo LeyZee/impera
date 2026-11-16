@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AlertHistoryPage } from './AlertHistoryPage';
 
 import { chooseValue, openList } from '@/test/select';
+import { settingsOf } from '@/test/settings';
 
 /* Invented creators and fans: no real person. */
 const NORA = '0192f3a0-0000-7000-8000-0000000000c1';
@@ -299,6 +300,24 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     renderPage();
     await screen.findByRole('group', { name: 'Filtres' });
     expect(screen.queryByText(/Aucune alerte n’a encore sonné/)).toBeNull();
+  });
+
+  it('dates an older line in the agency’s hour, not the device’s (recette 16/11, CHT-01)', async () => {
+    // 23:30 UTC on the 10th is already the 11th, 12 h 30, at an agency in Auckland.
+    serve((call) => {
+      if (call.path === '/v1/scheduling/settings') {
+        return { status: 200, body: settingsOf({ timeZone: 'Pacific/Auckland' }) };
+      }
+      if (call.path !== '/v1/alerts/triggers') return undefined;
+      return page(
+        call.query['creatorId'] === NORA ? [{ ...trigger(1, NORA, 0), at: '2026-01-10T23:30:00.000Z' }] : [],
+      );
+    });
+    renderPage();
+    await waitFor(async () => {
+      const [line] = await lines();
+      expect(line?.textContent.replace(/\s/gu, ' ')).toContain('11 janv. à 12 h 30');
+    });
   });
 
   it('says when nothing rang yet, and when the server does not answer', async () => {

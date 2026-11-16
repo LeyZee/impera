@@ -8,7 +8,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CreatorTodayPage } from './CreatorTodayPage';
@@ -187,6 +187,27 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
     show();
     expect(await screen.findByText(/Ton agenda n’a pas pu être lu/u)).toBeDefined();
     expect(screen.getByText('Personne n’est prévu dans les prochaines 24 heures.')).toBeDefined();
+  });
+});
+
+describe('Aujourd’hui, her own time (recette 16/11, CRE-08)', () => {
+  it('names her day and the hours of who answers her fans in her zone, not the device’s', async () => {
+    // Just after midnight in Paris, where her agenda is; the device (mocked above) reads Paris here, so her zone
+    // is set elsewhere to tell the two apart: in New York it is still Tuesday 3 November, 19 h 10.
+    vi.setSystemTime(new Date('2026-11-04T00:10:00Z'));
+    serve(
+      { current: [shift('Iris', '2026-11-03T22:00:00.000Z', '2026-11-04T04:00:00.000Z')], next: [] },
+      200,
+      agendaOf({ timeZone: 'America/New_York', today: '2026-11-03' }),
+    );
+    show();
+    await screen.findByText(/En ce moment/u);
+    await waitFor(() => {
+      expect([...document.querySelectorAll('.sc-fans__line')].map((line) => line.textContent)).toContain(
+        nb('En ce moment : Iris jusqu’à 23 h.'),
+      );
+    });
+    expect(document.body.textContent).toContain('mardi 3 novembre');
   });
 });
 

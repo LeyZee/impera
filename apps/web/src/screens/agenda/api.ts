@@ -29,6 +29,7 @@ import {
 } from './offline';
 
 import { isOnline } from '@/pwa/online';
+import { addDays, dayOf, mondayOf, readerZone } from '@/scheduling/time';
 
 /*
  * Her agenda's doors (CR-05, `/v1/creator-space`), parsed with the `strict` contracts: a field the server would add by
@@ -74,6 +75,20 @@ export function useAgenda(from: string, to: string): UseQueryResult<CreatorAgend
     retry: 1,
     retryDelay: 400,
   });
+}
+
+/**
+ * Her clock (ADR 0042 § 3): her own zone, the one the server gives with her agenda, and her day in it. The device's
+ * only until her agenda is read: a phone set elsewhere must not move her day nor the hours of who answers her fans
+ * (recette 16/11, CRE-08).
+ */
+export function useHerClock(now: Date): { readonly zone: string; readonly today: string } {
+  const device = readerZone();
+  // The week of the device's day is the same as hers but at a week's edge: enough to read her zone.
+  const monday = mondayOf(dayOf(now, device));
+  const read = useAgenda(monday, addDays(monday, 6));
+  const zone = read.data?.timeZone ?? device;
+  return { zone, today: dayOf(now, zone) };
 }
 
 /* ---- The gestures her phone keeps until they are sent ---- */

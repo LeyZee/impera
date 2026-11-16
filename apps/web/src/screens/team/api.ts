@@ -28,6 +28,8 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import type { TeamRefusalCode } from './model';
 
+import { readerZone } from '@/scheduling/time';
+
 /**
  * `/v1/team` as Équipe › Membres reads it (EQ-01, EQ-10). Every answer is parsed with the contract: a shape the page
  * does not expect is an error, not a guess.
@@ -59,6 +61,15 @@ export const MEMBERS_KEY = ['team', 'members'] as const;
 export function useMembers(enabled = true): UseQueryResult<TeamMember[]> {
   // One retry: a silent server is said in about a second (EQ-22).
   return useQuery({ queryKey: MEMBERS_KEY, queryFn: fetchMembers, enabled, retry: 1 });
+}
+
+/**
+ * The zone a member reads his own screens in: the one of his record, as Planning and Aujourd'hui read it; the
+ * device's only while the record is not read (CHAT-11, EXT-10, CHT-01). A device set elsewhere moves no shift.
+ */
+export function useMyZone(userId: string): string {
+  const members = useMembers();
+  return members.data?.find((member) => member.userId === userId)?.timeZone ?? readerZone();
 }
 
 export const PLATFORM_REMOVALS_KEY = ['team', 'platform-removals'] as const;
