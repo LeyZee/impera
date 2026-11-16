@@ -87,6 +87,25 @@ type RequestRow = typeof contentRequests.$inferSelect;
 /** How many of her latest drops a read returns: her screen shows the recent ones, the rest stays in the base. */
 const DROPS_READ = 100;
 
+/**
+ * `rewards.evaluate_creator` for her, in the transaction of her gesture (ADR 0107 § 14, recette 16/11 CRE-06): the game
+ * looks at once, so that a gain is revealed where she made it. One waiting run per creator, replaced by the next gesture
+ * a few seconds later. The job is the game's (`wiring/rewards.ts`): only its name and attempts are shared, by the
+ * contracts, as for every job a module asks of another.
+ */
+async function askHerGame(tx: Transaction, creatorId: string): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => 'rewards.evaluate_creator',
+      payload => ${JSON.stringify({ creatorId })}::jsonb,
+      run_at => now() + interval '2 seconds',
+      max_attempts => ${JOB_MAX_ATTEMPTS['rewards.evaluate_creator']}::int,
+      job_key => ${`rewards.evaluate_creator:${creatorId}`},
+      job_key_mode => 'replace'
+    )`,
+  );
+}
+
 /** The Postgres error behind a failed query (Drizzle wraps it as `cause`). */
 export function pgErrorOf(error: unknown): { code: string; constraint: string | null } | null {
   for (let current = error; typeof current === 'object' && current !== null;) {
@@ -954,6 +973,8 @@ export async function follow(
       correlationId,
       createdAt: now,
     });
+    // Her game looks at once, so that a gain is revealed where she dropped (ADR 0107 § 14, recette 16/11 CRE-06).
+    await askHerGame(tx, drop.creatorId);
     // A drop answering a request: the trend watch moves the idea that asked it (VEI-01 d3).
     if (drop.requestId !== null)
       await tx.execute(

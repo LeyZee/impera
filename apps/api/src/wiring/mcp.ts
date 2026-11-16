@@ -113,6 +113,8 @@ export function wireMcp(
     sales: {
       sales: (userId, creatorIds, range) =>
         refusedAsMcp(() => connectors.reads.sales(userId, creatorIds, range)),
+      dailyStats: (userId, creatorIds, range) =>
+        refusedAsMcp(() => connectors.reads.dailyStats(userId, creatorIds, range)),
     },
     payroll: {
       periodState: (reader, period) => refusedAsMcp(() => payroll.reads.periodState(reader, period)),
