@@ -10,7 +10,7 @@ Le design system « Liquid Glass » d’Impera : tokens, pont Tailwind v4, class
 | `@impera/design-system/theme.css`      | `src/styles/theme.css`      | Pont Tailwind v4 (`@theme inline`) : utilitaires `bg-void`, `text-ink`, `rounded-lg`, `shadow-glass`…                               |
 | `@impera/design-system/components.css` | `src/styles/components.css` | Classes `nv-*` sans framework.                                                                                                      |
 | `@impera/design-system/base.css`       | `src/styles/base.css`       | Styles de page (`body`, sélection, focus). Jamais dans une page tierce.                                                             |
-| `@impera/design-system/fonts.css`      | `src/styles/fonts.css`      | Geist, Geist Mono, Instrument Serif, Playfair Display italique (le nom), embarquées (Fontsource), sans appel tiers.             |
+| `@impera/design-system/fonts.css`      | `src/styles/fonts.css`      | Geist, Geist Mono, Instrument Serif, Playfair Display italique en latin seul (le nom), embarquées (Fontsource), sans appel tiers.             |
 | `@impera/design-system/styles.css`     | `src/styles/index.css`      | Les quatre précédents (sauf `theme.css`), dans l'ordre.                                                                             |
 | `@impera/design-system`                | `src/index.ts`              | `attachGlassLight`, `playLiquid`, `placeTabBarLens`, `placeSegmentThumb`, `collapseIsland`, `expandIsland`, `prefersReducedMotion`, `countUp` ; géométrie des graphiques `nv-chart` (`chartPoints`, `linePath`, `areaPath`, `niceTicks`, `nearestIndex`, dans `src/chart.ts`) et des pièces du Dashboard (`ringDash`, `funnelSteps`, `tipPlacement`, dans `src/dashboard.ts`). |
 

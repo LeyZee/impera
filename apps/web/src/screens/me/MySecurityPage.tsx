@@ -22,9 +22,8 @@ export function MySecurityPage({ user }: { user: Me }): JSX.Element {
         lead={
           user.role === 'creator'
             ? 'Les appareils où ton compte est ouvert, et tes codes de secours.'
-            : user.teamScope === 'agency'
-              ? 'Les appareils où ton compte est ouvert, tes codes de secours, ton chat Telegram et l’extension de veille.'
-              : 'Les appareils où ton compte est ouvert, tes codes de secours et ton chat Telegram.'
+            : // The Telegram chat shows only when the agency's bot exists: the lead does not promise it (Design).
+              'Les appareils où ton compte est ouvert, tes codes de secours et l’extension.'
         }
         actions={
           <MeNav
@@ -35,7 +34,9 @@ export function MySecurityPage({ user }: { user: Me }): JSX.Element {
         }
       />
       <div className="flex flex-col gap-4">
-        <SecuritySection extensionLinks={user.teamScope === 'agency'} />
+        {/* The whole team links its extension: its copilot gestures count by it (recette 16/11, EXT-02). The watch is
+            the owner's alone (ADR 0024, amendement du 16/11), whose Sécurité is in Réglages. */}
+        <SecuritySection extensionLinks={user.role === 'creator' ? 'none' : 'copilot'} />
         {user.role === 'creator' ? null : (
           <PrivateChat
             owner={false}

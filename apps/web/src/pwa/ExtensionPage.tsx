@@ -1,9 +1,9 @@
-import { useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 
 import { OffRailBack } from '../shell/OffRailBack';
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
 
-import { browserOf, EXTENSION_ZIP, isLocalCrm, type Browser } from './extension';
+import { browserOf, EXTENSION_ZIP, type Browser } from './extension';
 
 interface Steps {
   readonly title: string;
@@ -33,18 +33,20 @@ const STEPS: Record<Exclude<Browser, 'other'>, Steps> = {
   },
 };
 
-const LAST_STEP = 'Clique l’icône Impera : connecté au CRM, tu vois ton nom.';
-const LAST_STEP_AFTER_ADDRESS = 'Connecté au CRM, l’extension affiche alors ton nom.';
+const LAST_STEP = 'Connecté au CRM, l’extension affiche alors ton nom.';
 
-/** The zip carries no CRM address (ADR 0067 § 4): away from localhost, the popup is told this CRM's once (ADR 0066 § 4). */
+/**
+ * The zip carries no CRM address (ADR 0067 § 4): at its first opening the popup asks where the CRM opens (recette du
+ * 16/11, EXT-06, EXT-07), so this CRM's own address is given ready to copy, on localhost as anywhere.
+ */
 function AddressStep({ origin }: { readonly origin: string }): JSX.Element {
   const [state, setState] = useState<'idle' | 'copied' | 'refused'>('idle');
   return (
     <li>
       <span className="nv-help-ext__address">
         <span>
-          Clique l’icône Impera, puis « Changer l’adresse » : colle <code>{origin}</code>, « Enregistrer », et
-          accepte l’autorisation que le navigateur demande pour ce site.
+          Clique l’icône Impera : elle te demande où s’ouvre ton CRM. Colle <code>{origin}</code>, «
+          Enregistrer », et accepte l’autorisation que le navigateur demande pour ce site.
         </span>
         <button
           type="button"
@@ -87,20 +89,55 @@ const OFFERS: readonly Offer[] = [
     title: 'Tes raccourcis',
     text: 'Les pages du CRM qui te servent, depuis n’importe quel onglet.',
   },
+  {
+    title: 'Le copilote sur Reveal',
+    text: 'À côté de la conversation ouverte : la fiche du fan et le brouillon, prêt à copier pour Reveal.',
+  },
 ];
 
-/** What comes later, in one sentence: the trend watch only to those who do it (ADR 0060). */
-function comingFor(watches: boolean): string {
-  const reveal = 'sur Reveal, ce qu’il faut savoir du fan de la conversation ouverte';
-  return watches
-    ? `Bientôt dans l’extension : ${reveal}, et la veille Instagram pendant que tu scrolles.`
-    : `Bientôt dans l’extension : ${reveal}.`;
+/** The trend watch, only to those it belongs to (ADR 0060). */
+const WATCH: Offer = {
+  title: 'La veille Instagram',
+  text: 'Pendant que tu regardes Instagram, elle relève les posts qui marchent pour les idées du matin.',
+};
+
+/** The copilot, which exists (recette du 16/11, EXT-06): how to link, open it, and its three keys. */
+const COPILOT_STEPS: readonly string[] = [
+  'Relie l’extension une fois : dans Moi › Sécurité, « Relier l’extension », puis Copier ; colle le code dans la carte « Copilote » de l’extension et « Relier ». Tes gestes comptent alors à ton nom.',
+  'Ouvre une conversation dans Reveal, clique l’icône Impera, puis « Ouvrir le copilote » : il s’ouvre sur le côté et suit la conversation ouverte, sans clic.',
+  'Trois touches : A copie le brouillon pour Reveal, où tu le colles et l’envoies ; E le retouche ; R le refuse, avec une raison.',
+];
+
+/**
+ * Whether this CRM serves the extension's file (V-CHA, recette du 16/11): a link to a file that is not there downloads
+ * an error page. A server that answers with a page (its own fallback) does not serve it either.
+ */
+function useZipServed(): 'checking' | 'served' | 'missing' {
+  const [state, setState] = useState<'checking' | 'served' | 'missing'>('checking');
+  useEffect(() => {
+    let live = true;
+    fetch(EXTENSION_ZIP, { method: 'HEAD' }).then(
+      (response) => {
+        const page = (response.headers.get('content-type') ?? '').includes('text/html');
+        if (live) setState(response.ok && !page ? 'served' : 'missing');
+      },
+      () => {
+        if (live) setState('missing');
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  return state;
 }
 
 /** /aide/extension (ADR 0067): what the extension offers, then the steps for Chrome and Edge, this browser's first. */
 export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.Element {
   const browser = browserOf(navigator.userAgent);
   const origin = window.location.origin;
+  const zip = useZipServed();
+  const offers = watches ? [...OFFERS, WATCH] : OFFERS;
   const order: readonly Exclude<Browser, 'other'>[] =
     browser === 'edge' ? ['edge', 'chrome'] : ['chrome', 'edge'];
   return (
@@ -137,7 +174,7 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
               />
             </figure>
             <ul className="nv-help-ext__offers">
-              {OFFERS.map((offer) => (
+              {offers.map((offer) => (
                 <li key={offer.title} className="nv-help-ext__offer">
                   <strong>{offer.title}</strong>
                   <span>{offer.text}</span>
@@ -149,13 +186,19 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
         <Panel>
           <PanelSection className="nv-help-install__now">
             <p>
-              {import.meta.env.DEV
-                ? 'Sur ce PC de développement, le fichier n’est pas servi : charge directement le dossier apps/extension/.output/chrome-mv3.'
-                : 'La dernière version, la même pour toute l’équipe.'}
+              {zip === 'served'
+                ? 'La dernière version, la même pour toute l’équipe.'
+                : zip === 'checking'
+                  ? 'Un instant…'
+                  : import.meta.env.DEV
+                    ? 'Sur ce PC de développement, le fichier n’est pas servi : charge directement le dossier apps/extension/.output/chrome-mv3.'
+                    : 'Le fichier n’est pas encore en ligne sur ce CRM : demande-le à ton responsable.'}
             </p>
-            <a className="nv-btn nv-btn--neon" href={EXTENSION_ZIP} download="impera-extension.zip">
-              Télécharger l’extension
-            </a>
+            {zip === 'served' ? (
+              <a className="nv-btn nv-btn--neon" href={EXTENSION_ZIP} download="impera-extension.zip">
+                Télécharger l’extension
+              </a>
+            ) : null}
           </PanelSection>
         </Panel>
         <div className="nv-help-install__cards">
@@ -166,19 +209,22 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
                   {STEPS[key].steps.map((step) => (
                     <li key={step}>{step}</li>
                   ))}
-                  {isLocalCrm(origin) ? (
-                    <li>{LAST_STEP}</li>
-                  ) : (
-                    <>
-                      <AddressStep origin={origin} />
-                      <li>{LAST_STEP_AFTER_ADDRESS}</li>
-                    </>
-                  )}
+                  <AddressStep origin={origin} />
+                  <li>{LAST_STEP}</li>
                 </ol>
               </PanelSection>
             </Panel>
           ))}
         </div>
+        <Panel title="Le copilote sur Reveal">
+          <PanelSection>
+            <ol className="nv-help-install__steps">
+              {COPILOT_STEPS.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          </PanelSection>
+        </Panel>
         <Panel title="Quand une nouvelle version sort">
           <PanelSection>
             <ol className="nv-help-install__steps">
@@ -190,7 +236,6 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
             </ol>
           </PanelSection>
         </Panel>
-        <p className="nv-help-install__note">{comingFor(watches)}</p>
         <p className="nv-help-install__note">
           Au démarrage, le navigateur peut rappeler qu’une extension en mode développeur est active : c’est
           normal, garde-la. Elle n’a accès qu’à Reveal et au CRM ; à l’ouverture, elle regarde seulement
