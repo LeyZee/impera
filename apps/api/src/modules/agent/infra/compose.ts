@@ -20,6 +20,17 @@ import type {
 import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
 
 import {
+  accountAsked,
+  accountDecision,
+  accountViolations,
+  meetingYes,
+  wantsToTry,
+  withoutAllowedAccount,
+  type AccountCuts,
+  type AccountDecision,
+  type ShareableAccount,
+} from '../domain/accounts';
+import {
   asksAvailability,
   availabilityChanged,
   readAvailability,
@@ -174,6 +185,17 @@ export interface ComposeTurnInput {
    * `offer` (her script threshold): the record follows his message and gates the first teaser.
    */
   readonly availability?: FanAvailabilityRecord | null;
+  /**
+   * « Ses comptes » as the agent reads them (ADR 0143 § C, bounds 18 to 23): the ones the owner marked « l'agent peut
+   * le donner », every user name of hers for the guard, what cuts, and whether she pointed him to her practice
+   * within the cooldown. Absent, no account is ever given and none of her names may leave.
+   */
+  readonly accounts?: {
+    readonly shareable: readonly ShareableAccount[];
+    readonly usernames: readonly string[];
+    readonly cuts: AccountCuts;
+    readonly orientedRecently: boolean;
+  };
 }
 
 /** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
@@ -327,6 +349,24 @@ function askedHisAge(history: readonly ConversationTurn[]): boolean {
 const ASK_AVAILABILITY_HINT =
   'en passant, elle s’assure qu’il est tranquille (seul, chez lui, pas pressé), naturellement, sans rien proposer';
 const SUGGESTIVE_HINT = 'suggestive seulement, jamais explicite';
+/** She gives the account code chose (ADR 0143 § 8): its platform and its name, nothing else of hers. */
+const accountHint = (account: ShareableAccount): string =>
+  `il cherche où la suivre : elle lui donne son compte ${account.platform}, « ${account.username} », simplement, sans lien ni autre compte`;
+/** No account for what he looks for: he types her stage name himself (ADR 0143 § 8). */
+const STAGE_NAME_HINT =
+  'il cherche où la suivre : elle lui dit de taper son nom de scène, sans donner de nom de compte ni de lien';
+/**
+ * He really wants to try her practice (ADR 0143 § 10-12): she points him to its account, says what it offers as her
+ * sheet says it, that he applies there with a questionnaire and that applying is not an acceptance.
+ */
+const orientationHint = (account: ShareableAccount, offers: string, sexual: boolean): string =>
+  [
+    `il veut vraiment s’y essayer : elle l’oriente vers son compte ${account.platform} « ${account.username} », où il postule avec un questionnaire`,
+    `ce qu’elle propose, tel que sa fiche le dit : ${offers}`,
+    'elle précise que postuler n’est pas une acceptation',
+    ...(sexual ? [] : ['elle précise que ce n’est pas sexuel']),
+    'jamais de date, de lieu, de ville ni de prix, aucune accroche de vente',
+  ].join(' ; ');
 const MEETING_HINT =
   'il veut la voir en vrai : elle répond elle-même, avec douceur, que c’est trop tôt, qu’elle a besoin d’être en confiance ; jamais oui, ni date, ni lieu, ni promesse';
 
@@ -376,6 +416,11 @@ function withinCursor(brief: Brief, decision: SexualizationDecision, ageAsked: b
 
 /** One answer, from the brain to the guards: the same path for the playground and for a real fan. */
 export interface ComposedTurn {
+  /**
+   * What code decided about her accounts at this turn (ADR 0143): read again before the send (bound 21) and noted for
+   * the team (`account_shared`) once the answer leaves. Absent: nothing about an account.
+   */
+  readonly account?: Exclude<AccountDecision, { readonly kind: 'none' }>;
   /** Safety flags on his media: a human takes over, nothing was written. */
   readonly handoff?: readonly string[];
   readonly trap?: TrapAssessment;
@@ -774,11 +819,16 @@ export async function composeTurn(
         )
       : [];
   // He asks to see her for real: she answers herself, too early, she needs trust, never a yes (ADR 0143 § 14).
-  const meeting =
-    answered.intent === 'asks_to_meet' || answered.risks.includes('meet_request') ? [MEETING_HINT] : [];
+  const meetingAsked = answered.intent === 'asks_to_meet' || answered.risks.includes('meet_request');
+  const meeting = meetingAsked ? [MEETING_HINT] : [];
+  // Her accounts (ADR 0143): code decides whether one leaves and which, never the model (bound 18).
+  const account = care ? undefined : accountTurn(persona, input, answered.risks);
+  const accountHints =
+    account === undefined ? [] : account.kind === 'stage_name' ? [STAGE_NAME_HINT] : [account.hint];
   const voiceBrief: Brief = asking
-    ? { ...answered, toneHints: [...answered.toneHints, ...meeting, ASK_AVAILABILITY_HINT] }
-    : { ...answered, toneHints: [...answered.toneHints, ...meeting, ...paced] };
+    ? { ...answered, toneHints: [...answered.toneHints, ...meeting, ...accountHints, ASK_AVAILABILITY_HINT] }
+    : { ...answered, toneHints: [...answered.toneHints, ...meeting, ...accountHints, ...paced] };
+  const allowed = account?.kind === 'give' ? account.account : null;
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined
       ? {}
@@ -827,7 +877,14 @@ export async function composeTurn(
     const voice = await gateway.voice(asked);
     const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
     const violations = [
-      ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
+      ...withAccountGuard(
+        checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
+        written,
+        persona.guardSettings,
+        allowed,
+        input.accounts?.usernames ?? [],
+      ),
+      ...(meetingAsked ? meetingYes(written) : []),
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       ...(care ? checkCare(written) : []),
       ...(customOrder === undefined ? [] : checkNoCommitment(written)),
@@ -848,6 +905,7 @@ export async function composeTurn(
   const firstCostUsd = retried !== undefined && first.voice.ok ? (first.voice.value.meta.costUsd ?? 0) : 0;
   const bubbles = asSent(written, persona.splitMessages);
   return {
+    ...(account !== undefined && { account: account.decision }),
     ...(customOrder !== undefined && { customOrder }),
     ...(objectionReply !== undefined && { objectionReply }),
     ...(scripts !== undefined && { scripts }),
@@ -878,4 +936,63 @@ export async function composeTurn(
     ...(voice.ok && { model: voice.value.meta.model }),
     isFallback: voice.ok && voice.value.meta.isFallback,
   };
+}
+
+/** The account decision of this turn and the voice's hint for it; `undefined` when nothing about an account. */
+function accountTurn(
+  persona: ComposerPersona,
+  input: ComposeTurnInput,
+  risks: readonly string[],
+):
+  | { readonly kind: 'stage_name'; readonly decision: Exclude<AccountDecision, { readonly kind: 'none' }> }
+  | {
+      readonly kind: 'give';
+      readonly account: ShareableAccount;
+      readonly hint: string;
+      readonly decision: Exclude<AccountDecision, { readonly kind: 'none' }>;
+    }
+  | undefined {
+  const accounts = input.accounts;
+  if (accounts === undefined || input.followUp !== undefined) return undefined;
+  const named = practicesMentioned(persona.practices ?? [], [input.fanText]);
+  const practice = named[0];
+  const cuts: AccountCuts = {
+    ...accounts.cuts,
+    openRisk: accounts.cuts.openRisk || risks.some((risk) => NO_SALE_RISKS.includes(risk)),
+  };
+  const decision = accountDecision({
+    asked: accountAsked(input.fanText, practice !== undefined),
+    interested: practice !== undefined && wantsToTry(input.fanText),
+    offers: (practice?.offers ?? '') !== '',
+    shareable: accounts.shareable,
+    cuts,
+    orientedRecently: accounts.orientedRecently,
+  });
+  if (decision.kind === 'none') return undefined;
+  if (decision.kind === 'stage_name') return { kind: 'stage_name', decision };
+  const offers = practice?.offers ?? '';
+  const hint =
+    decision.orient && practice !== undefined && offers !== ''
+      ? orientationHint(decision.account, offers, practice.sexual)
+      : accountHint(decision.account);
+  return { kind: 'give', account: decision.account, hint, decision };
+}
+
+/**
+ * The contact guard with her accounts (bound 19): on the turn code gives one, its name and the words of its platform
+ * pass and nothing else of a contact does; any other name of hers blocks, given to the agent or not.
+ */
+function withAccountGuard(
+  violations: readonly GuardViolation[],
+  written: readonly string[],
+  settings: GuardSettings,
+  allowed: ShareableAccount | null,
+  usernames: readonly string[],
+): GuardViolation[] {
+  const others = accountViolations(written, usernames, allowed);
+  if (allowed === null) return [...violations, ...others];
+  const contacts = checkVoiceOutput(withoutAllowedAccount(written, allowed), settings).filter(
+    (violation) => violation.code === 'contact_info',
+  );
+  return [...violations.filter((violation) => violation.code !== 'contact_info'), ...contacts, ...others];
 }
