@@ -105,7 +105,7 @@ export function ServiceHealth({
           {isProbing || probe === null || chip === null ? (
             <span className="sv-probe__cost">{PROBE_COST[provider]}</span>
           ) : (
-            <span className="sv-probe__result" key={probe.at}>
+            <span className="sv-probe__result" key={`result-${probe.at}`}>
               <span className="sv-chip" data-tone={chip.tone}>
                 <span className="sv-chip__dot" aria-hidden="true" />
                 {chip.text}
@@ -114,7 +114,7 @@ export function ServiceHealth({
             </span>
           )}
           {isProbing || hint === null ? null : (
-            <p className="sv-probe__hint" key={probe?.at}>
+            <p className="sv-probe__hint" key={`hint-${probe?.at ?? ''}`}>
               {hint}
             </p>
           )}

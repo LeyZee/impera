@@ -115,6 +115,7 @@ describe('Réglages › Modèles IA', () => {
       .mockResolvedValueOnce(before)
       .mockResolvedValue({ ...before, services: [probed] });
     vi.mocked(probeNow).mockResolvedValue(probed);
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     render(<ServicesSection />);
     expect(await screen.findByText('3 appels, sans erreur')).toBeTruthy();
     expect(screen.getByText('En relais de Grok')).toBeTruthy();
@@ -124,6 +125,9 @@ describe('Réglages › Modèles IA', () => {
     expect(vi.mocked(probeNow)).toHaveBeenCalledWith('mistral');
     expect(await screen.findByText('Plus de crédit')).toBeTruthy();
     expect(screen.getByText(/recharge-le dans la console/)).toBeTruthy();
+    // The answer and its hint are siblings: two keys, or React shows the old answer beside the new one.
+    expect(warn.mock.calls.some((args) => String(args[0]).includes('same key'))).toBe(false);
+    warn.mockRestore();
   });
 
   it('shows ElevenLabs’ month and says its free offer, with no « Essai réel » for a key of the environment', async () => {
