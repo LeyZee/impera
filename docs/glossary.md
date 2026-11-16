@@ -118,6 +118,9 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Offre | `offer` | Une proposition commerciale (média + prix + plancher). Phase 6. |
 | Budget nul | `hasNoBudget` | Drapeau posé par le code quand le fan dit ne pas pouvoir payer : plus aucune offre ni bouderie ni relance de vente tant qu'il ne revient pas de lui-même vers le payant. |
 | Délai entre deux scripts | `cooldownHours` | Temps minimum entre deux scripts proposés à un même fan, lu dans la persona (`strategies.script_launch.cooldown_hours`, réglable par créatrice) ; après, un script ne part que si le fan sexualise de nouveau (`offerDecision`). |
+| Fan exposé | `exposed_fan` | Fan qui a reçu la première étape d'un script ; l'unité de la mesure des scripts : tous les taux et le revenu par fan exposé s'y rapportent (ADR 0129). |
+| Envoi d'étape | `script_step_send` | Une étape de script envoyée à un fan, par l'agent ou un chatteur, avec sa branche, sa version, son passage, et quand il l'a lue et achetée ; la base de la mesure des scripts (ADR 0129). |
+| Version d'étape | `script_step_version` | L'état d'une étape (texte, prix, médias, aperçu) entre deux modifications dans la plateforme ; un envoi se rattache à la version en vigueur, pour comparer avant et après (ADR 0129). |
 | Vente | `sale` | Une transaction détectée sur la plateforme. Montant en centimes + devise. |
 | Script | `script` | Séquence d'étapes de vente (structure). Phase 6. |
 | Étape | `script_step` | Une étape d'un script (message, médias, prix, pacing). |
