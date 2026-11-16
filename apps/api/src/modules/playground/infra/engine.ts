@@ -6,6 +6,7 @@ import {
   type Destination,
   type MediaDescription,
   type PlaygroundAnswer,
+  type PlaygroundAvailability,
   type PlaygroundDesire,
   type PlaygroundState,
   type Verdict,
@@ -43,10 +44,22 @@ import {
   type PlaygroundEngine,
 } from '../application/engine';
 import { FAN_PRESETS, findPreset } from '../domain/fan-presets';
-import { cursorLabel, guardLabel, kycSlotWords, offerRefusalLabel, trapLabel } from '../domain/labels';
+import {
+  cursorLabel,
+  gateMissingLabel,
+  guardLabel,
+  kycSlotWords,
+  offerRefusalLabel,
+  trapLabel,
+} from '../domain/labels';
 import { completeMedia } from '../domain/media';
 
-import { createPlaygroundSession, type PlaygroundDesireReading, type PlaygroundTurn } from './session';
+import {
+  createPlaygroundSession,
+  type PlaygroundAvailabilityReading,
+  type PlaygroundDesireReading,
+  type PlaygroundTurn,
+} from './session';
 
 const HOUR_MS = 3_600_000;
 
@@ -113,6 +126,25 @@ function toDesire(reading: PlaygroundDesireReading, mark?: DesireMarkVerdict): P
     signals: reading.signals.map((signal) => ({ signal, points: desireSignalPoints(signal) })),
     weightsVersion: reading.weightsVersion,
     ...(mark !== undefined && { mark }),
+    ...(reading.availability !== undefined && { availability: toAvailability(reading.availability) }),
+  };
+}
+
+/** His availability and the gate, each missing condition with its label: the screen adds nothing (ADR 0103 § 14). */
+function toAvailability({ record, gate, asked }: PlaygroundAvailabilityReading): PlaygroundAvailability {
+  return {
+    state: record.state,
+    signal: record.signal,
+    seen: [...record.seen],
+    expiresAt: record.expiresAt,
+    sexualized: record.sexualizedAt !== null,
+    asked,
+    gate: gate.open
+      ? { open: true }
+      : {
+          open: false,
+          missing: gate.missing.map((code) => ({ code, label: gateMissingLabel(code, record) })),
+        },
   };
 }
 
