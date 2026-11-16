@@ -401,6 +401,10 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     // Another state of the draft is drawn anew.
     render(root, onCard(card({}), [], { draft: ready() }), actions);
     expect(root.querySelector('textarea')).toBeNull();
+    // Only his retouched text is left out of the key: a draft rewritten in the same state shows its new bubbles
+    // (Bilan's question on #783).
+    render(root, onCard(card({}), [], { draft: ready({ bubbles: ['un autre texte'] }) }), actions);
+    expect([...root.querySelectorAll('.cp-bubble')].map((n) => n.textContent)).toEqual(['un autre texte']);
     root.remove();
   });
 
