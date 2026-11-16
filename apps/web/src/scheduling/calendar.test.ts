@@ -364,6 +364,27 @@ describe('the agency’s month, as its week (recette EQU-01, EQU-02)', () => {
     expect(who[2]).toBe('Kofi, 12 h – 18 h, sans accès ; à pourvoir');
   });
 
+  it('keeps a shift gone by as it was planned, whoever left since; the one under way is unheld from now', () => {
+    // Kofi suspended at 15 h: his morning was held, his afternoon is to fill from now on.
+    const now = new Date(at(900));
+    const calendar = agencyOf(
+      {
+        shifts: [
+          { memberId: KOFI, creatorId: INES, startsAt: at(360), endsAt: at(720) },
+          { memberId: KOFI, creatorId: INES, startsAt: at(720), endsAt: at(1080) },
+        ],
+        away: [{ memberId: KOFI, status: 'suspended' }],
+      },
+      [slot(720, [[901, 1080]]), slot(1080, [[1080, 1440]])],
+    );
+    const { cells, marks, who } = read(calendar, now);
+    expect(cells.map((cell) => cell.held)).toEqual([false, true, false, false]);
+    expect(marks[1]).toEqual({ kind: 'shift', memberId: KOFI });
+    expect(marks[2]).toEqual({ kind: 'gap', ahead: true });
+    expect(who[1]).toBe('Kofi, 6 h – 12 h');
+    expect(who[2]).toMatch(/^Kofi, 12 h – 18 h, suspendu ; à pourvoir/u);
+  });
+
   it('says the hole of a créneau held in part, with its hours, and a second place or two', () => {
     // Ada 8 h – 14 h: 6 h – 8 h and 14 h – 18 h are left; the evening wants two chatters, Kofi holds one.
     const calendar = agencyOf(

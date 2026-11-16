@@ -203,7 +203,7 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
   // The creators one plans first, an archived one's history after them (ADR 0071 § 2).
   const creators = [...calendar.creators].sort((a, b) => Number(a.archived) - Number(b.archived));
   // Who holds none of his shifts, for the agency (recette EQU-01, EQU-02): those shifts are drawn, and cover nothing.
-  const unheld = unheldReader(calendar);
+  const unheld = unheldReader(calendar, now);
   return creators.map((creator) => {
     const agent = calendar.agent.find((one) => one.creatorId === creator.id) ?? null;
     const theirs = calendar.shifts

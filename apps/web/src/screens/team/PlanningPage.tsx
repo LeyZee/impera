@@ -869,7 +869,7 @@ function Grid({
   const lined = zone === planning.settings.timeZone;
   // A member away (suspended, on leave, gone), or one whose creator was taken off his list, holds none of those shifts:
   // they stay drawn, and their places are to fill (recette EQP-03, EQU-01).
-  const unheld = unheldReader(planning);
+  const unheld = unheldReader(planning, now);
   const held = planning.shifts.filter((shift) => unheld(shift) === null);
   const slotted = rows.map((row) =>
     lined

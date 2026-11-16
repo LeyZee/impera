@@ -12,6 +12,7 @@ import {
   covers,
   decideUpdate,
   firstStartOf,
+  heldUntil,
   holdsShift,
   myShiftsOf,
   occurrenceKey,
@@ -103,6 +104,40 @@ describe('who plans, who works', () => {
     });
     // A member no shift names is never said away.
     expect(unheldOf(members, [{ memberId: kofi, creatorId: lina }])).toEqual({ away: [], withoutAccess: [] });
+  });
+
+  it('covers with a shift nobody holds what went by only: the past stays as it was planned', () => {
+    const members = new Map([
+      ['kofi', { status: 'active', creatorIds: ['lina'] }],
+      ['noa', { status: 'suspended', creatorIds: ['lina'] }],
+      ['iris', { status: 'active', creatorIds: [] }],
+    ] as const);
+    const shift = (memberId: string, startsAt: string, endsAt: string) => ({
+      memberId,
+      creatorId: 'lina',
+      startsAt: at(startsAt),
+      endsAt: at(endsAt),
+    });
+    const now = at('2026-11-16T15:00:00Z');
+    const covered = heldUntil(
+      members,
+      [
+        shift('kofi', '2026-11-16T17:00:00Z', '2026-11-16T23:00:00Z'),
+        shift('noa', '2026-11-04T09:00:00Z', '2026-11-04T13:00:00Z'),
+        shift('noa', '2026-11-16T13:00:00Z', '2026-11-16T17:00:00Z'),
+        shift('iris', '2026-11-16T17:00:00Z', '2026-11-16T23:00:00Z'),
+        shift('ghost', '2026-11-02T09:00:00Z', '2026-11-02T13:00:00Z'),
+      ],
+      now,
+    );
+    expect(covered.map((one) => [one.memberId, iso(one.startsAt), iso(one.endsAt)])).toEqual([
+      // Held: whole, ahead included.
+      ['kofi', '2026-11-16T17:00:00.000Z', '2026-11-16T23:00:00.000Z'],
+      // Suspended since: his shift of the 4th stays covered, the one under way up to now only.
+      ['noa', '2026-11-04T09:00:00.000Z', '2026-11-04T13:00:00.000Z'],
+      ['noa', '2026-11-16T13:00:00.000Z', '2026-11-16T15:00:00.000Z'],
+      ['ghost', '2026-11-02T09:00:00.000Z', '2026-11-02T13:00:00.000Z'],
+    ]);
   });
 
   it('gives no shift before the member’s first day, read in the agency’s zone, where its report is paid', () => {

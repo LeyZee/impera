@@ -108,7 +108,7 @@ export function ShiftSheet({
   const template = templates.find((one) => one.id === shift.templateId) ?? null;
   const phase = phaseOf(shift, now);
   // His status when he is away, or her taken off his list: nobody holds the shift (recette EQP-03, EQU-01).
-  const unheld = unheldReader(planning)(shift);
+  const unheld = unheldReader(planning, now)(shift);
   // The reader's own shift: a manager who chats (EQP-02). The owner has no record, so never one.
   const mine = record !== null && record.userId === userId;
   const report = reports === null ? null : reportOf(reports, shift.id);

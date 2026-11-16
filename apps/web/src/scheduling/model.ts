@@ -661,15 +661,24 @@ export type Unheld =
 
 /**
  * Who holds none of his shifts, from a planning or a calendar the agency read (`away`, `withoutAccess`; empty for a
- * member): `null` for a shift its member holds. A member away is said by his status first.
+ * member): `null` for a shift its member holds. A member away is said by his status first. Read from `now` on, as the
+ * server counts it (`heldUntil`): a shift gone by stays as it was planned, never emptied by a status changed since.
  */
-export function unheldReader(read: {
-  readonly away: readonly PlanningAway[];
-  readonly withoutAccess: readonly PlanningWithoutAccess[];
-}): (shift: { readonly memberId: string; readonly creatorId: string }) => Unheld | null {
+export function unheldReader(
+  read: {
+    readonly away: readonly PlanningAway[];
+    readonly withoutAccess: readonly PlanningWithoutAccess[];
+  },
+  now: Date,
+): (shift: {
+  readonly memberId: string;
+  readonly creatorId: string;
+  readonly endsAt: string;
+}) => Unheld | null {
   const away = new Map<string, PlanningAway['status']>(read.away.map((one) => [one.memberId, one.status]));
   const cut = new Set(read.withoutAccess.map((one) => `${one.memberId}|${one.creatorId}`));
   return (shift) => {
+    if (Date.parse(shift.endsAt) <= now.getTime()) return null;
     const status = away.get(shift.memberId);
     if (status !== undefined) return { kind: 'away', status };
     return cut.has(`${shift.memberId}|${shift.creatorId}`) ? { kind: 'without_access' } : null;

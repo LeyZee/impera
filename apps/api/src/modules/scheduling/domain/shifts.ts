@@ -119,6 +119,30 @@ export function holdsShift(
 }
 
 /**
+ * What `shifts` cover, as of `now` (recette EQU-01, EQU-02): a shift its member holds, whole; one he no longer holds,
+ * only what went by. The rule is read from now on: the past stays as it was planned, never emptied by a status or a
+ * list changed since.
+ */
+export function heldUntil<
+  T extends {
+    readonly memberId: string;
+    readonly creatorId: string;
+    readonly startsAt: Date;
+    readonly endsAt: Date;
+  },
+>(
+  members: ReadonlyMap<string, Pick<WorkingMember, 'status' | 'creatorIds'>>,
+  shifts: readonly T[],
+  now: Date,
+): T[] {
+  return shifts.flatMap((shift) => {
+    if (holdsShift(members.get(shift.memberId), shift)) return [shift];
+    if (shift.startsAt >= now) return [];
+    return [shift.endsAt <= now ? shift : { ...shift, endsAt: now }];
+  });
+}
+
+/**
  * Why nobody holds some of `shifts`, as Planning and the calendar tell the agency: the members not at work, with their
  * status, and each member with a creator of his shifts no longer on his list (recette EQP-03, EQU-01). A member away
  * may be in both: the screen says his status first.

@@ -26,7 +26,7 @@ import type {
   StoredAccount,
   StoredShift,
 } from '../domain/ports';
-import { assertPlanningRange, holdsShift, plansCreator, unheldOf } from '../domain/shifts';
+import { assertPlanningRange, heldUntil, plansCreator, unheldOf } from '../domain/shifts';
 
 import { toPlanningAccount } from './dto';
 
@@ -153,16 +153,18 @@ export function createCalendarService(
     const accounts = planned.accounts.filter(
       (account) => askedCreator(account.creatorId) && names.get(account.creatorId)?.archived !== true,
     );
-    // A shift its member does not hold covers nothing (recette EQP-03, EQU-01): it stays planned, its créneau to fill.
+    // A shift its member does not hold covers nothing from now on (recette EQP-03, EQU-01): it stays planned, its
+    // créneau to fill; what went by stays covered as it was planned.
+    const at = now();
     const members = new Map<string, PlannedMember>(planned.members.map((member) => [member.id, member]));
-    const held = planned.shifts.filter((shift) => holdsShift(members.get(shift.memberId), shift));
+    const held = heldUntil(members, planned.shifts, at);
     const { toFill, aiAlone } = slotsToFill({
       settings,
       accounts,
       shifts: held,
       agents,
       window,
-      now: now(),
+      now: at,
     });
     const agentOf = new Map(agents.map((agent) => [agent.creatorId, agent]));
     return {
