@@ -133,3 +133,4 @@ Date : AAAA-MM-JJ
 | 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
 | 0113 | Les fichiers du coffre : lus le temps de la description, jamais gardés | accepted (précise 0018, 0030 § 3 et § 4, 0099 § 4, § 5 et § 7) |
 | 0120 | Lire avant de publier : les statistiques du compte Instagram et les clics des liens de redirection, le retour sur un Reel, l'entonnoir d'acquisition | accepted (précise 0057, 0060, 0080, 0082, 0042 ; amende 0057 § 2 et 0060 § 2) |
+| 0131 | Choisir le script qui colle aux goûts du fan : familles de fantasme, goûts des scripts et de la fiche, le code classe et l'IA choisit | accepted (précise 0098 § 6, 0056 § 6, 0085 et 0112 § 5) |

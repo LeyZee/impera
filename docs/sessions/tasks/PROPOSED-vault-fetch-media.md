@@ -14,7 +14,7 @@ ADR 0018 (`fetchMedia`, drapeau `mediaDownload`), ADR 0030 § 3 et § 4, ADR 008
 - [x] `fetchMedia` dans `FakeReveal` d'abord (photo, vidéo simple et vidéo en flux découpé, liens qui expirent), puis dans l'adaptateur Reveal.
 - [x] Description par lots ordonnés (`media.describe_vault`) : d'abord les médias des scripts importés actifs, puis des autres scripts, puis le reste ; arrêt au plafond du jour du budget IA ; reprise chaque heure sans doublon (`media.describe_vault_backlog`).
 - [x] Vidéo : images clés et transcription extraites du flux (recopié en MP4) ; si le flux ne se lit pas, le média attend un texte de l'agence (« À décrire par l'agence »), jamais une description inventée.
-- [x] Octets lus puis effacés dès la fin du job : média né effacé (origine `vault`, migration 0214, numéro provisoire), aucune rétention ADR 0044 ; vignette sous sa clé `thumbnail_key`.
+- [x] Octets lus puis effacés dès la fin du job : média né effacé (origine `vault`, migration 0215, numéro provisoire), aucune rétention ADR 0044 ; vignette sous sa clé `thumbnail_key`.
 - [x] Lien expiré : relire la liste du dossier pour un lien frais, une fois, puis échec typé.
 
 ## Critères d'acceptation
@@ -26,4 +26,4 @@ Validation humaine des descriptions (écran), média envoyé par un fan.
 
 ## Notes de session
 
-- 16/11 (session vault-describe) : migration 0214 (provisoire), job `media.describe_vault` et son rattrapage horaire, lancé à la fin de chaque synchronisation. Reste : les tests d'intégration (`vault-describe.integration.test.ts`) n'ont pas tourné ici (pas de Docker), la CI les passe ; l'écran « décrits / à décrire » par dossier et la saisie du texte de l'agence pour un média sans fichier (hors périmètre) ; la liste d'hôtes et la validité réelle des liens à confirmer sur la première lecture réelle (L14, L15).
+- 16/11 (session vault-describe) : migration 0215 (provisoire), job `media.describe_vault` et son rattrapage horaire, lancé à la fin de chaque synchronisation. Reste : les tests d'intégration (`vault-describe.integration.test.ts`) n'ont pas tourné ici (pas de Docker), la CI les passe ; l'écran « décrits / à décrire » par dossier et la saisie du texte de l'agence pour un média sans fichier (hors périmètre) ; la liste d'hôtes et la validité réelle des liens à confirmer sur la première lecture réelle (L14, L15).
