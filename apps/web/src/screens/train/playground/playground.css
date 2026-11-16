@@ -1400,3 +1400,7 @@
   font-weight: 650;
   color: var(--nv-ink);
 }
+/* An outage is a warning, not an urgency: amber (V-ETA-06). */
+.pg-loading__in .pg-loading__t.is-warn {
+  color: var(--nv-warning);
+}
