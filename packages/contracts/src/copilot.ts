@@ -58,22 +58,133 @@ export const CopilotDraftSchema = z.strictObject({
 });
 
 /**
+ * ADR 0141, lot a: what the agent already computed, shown to the chatter without a new AI call. Provisional copy of
+ * the schema the Agent thread proposed on 16/11; its PR is authoritative. Every label is rendered by the server from a
+ * closed list, never written by the AI.
+ */
+
+/** § 1: the gesture the code decided for this draft. */
+export const CopilotNextMoveKindSchema = z.enum([
+  'reply',
+  'offer_step',
+  'answer_objection',
+  'custom_order_accept',
+  'custom_order_decline',
+  'custom_order_wait',
+  'wait',
+  'hand_over',
+  'no_sale',
+]);
+export type CopilotNextMoveKind = z.infer<typeof CopilotNextMoveKindSchema>;
+
+/** § 2: why the sale is blocked (the code's offer blocks). */
+export const CopilotSaleBlockSchema = z.enum([
+  'do_not_contact',
+  'risk',
+  'sales_frozen',
+  'age_unconfirmed',
+  'no_budget',
+  'cooldown',
+  'low_desire',
+]);
+export type CopilotSaleBlock = z.infer<typeof CopilotSaleBlockSchema>;
+
+/** § 2: why the draft is held or rewritten. */
+export const CopilotDraftReasonSchema = z.enum([
+  'handoff',
+  'care',
+  'age_doubt',
+  'llm_unavailable',
+  'rewritten_once',
+  'media_not_seen',
+]);
+
+const CopilotLabelSchema = z.string().trim().min(1).max(120);
+
+export const CopilotNextMoveSchema = z.strictObject({
+  kind: CopilotNextMoveKindSchema,
+  label: CopilotLabelSchema,
+  /** `offer_step` only: the price the code decided, in minor units. */
+  priceMinor: z.number().int().nonnegative().nullable(),
+  /** `no_sale` only. */
+  block: CopilotSaleBlockSchema.nullable(),
+});
+export type CopilotNextMove = z.infer<typeof CopilotNextMoveSchema>;
+
+/** § 3: where the sale stands. */
+export const CopilotSaleStateSchema = z.strictObject({
+  script: z
+    .strictObject({
+      name: CopilotLabelSchema,
+      stepIndex: z.number().int().nonnegative(),
+      stepCount: z.number().int().positive(),
+    })
+    .nullable(),
+  nextStep: z
+    .strictObject({ name: CopilotLabelSchema, priceMinor: z.number().int().nonnegative() })
+    .nullable(),
+  refusedSteps: z.array(CopilotLabelSchema).max(20),
+  /** Labels of the objection replies already served to this fan. */
+  usedObjections: z.array(CopilotLabelSchema).max(10),
+  customOrderOpen: z.boolean(),
+  /** An offer made, with neither answer nor purchase. */
+  offerPending: z.boolean(),
+});
+export type CopilotSaleState = z.infer<typeof CopilotSaleStateSchema>;
+
+/** § 4: signals, the direction only (the figure stays in the CRM). */
+export const CopilotSignalsSchema = z.strictObject({
+  desireTrend: z.enum(['up', 'down', 'flat']).nullable(),
+  followUpDue: z.boolean(),
+});
+
+/** § 9: what the server cut; the panel says it, and then shows neither sale nor buttons. */
+export const CopilotCutSchema = z.enum([
+  'age_doubt',
+  'care',
+  'care_exit',
+  'do_not_contact',
+  'sales_frozen',
+  'limits_unread',
+]);
+export type CopilotCut = z.infer<typeof CopilotCutSchema>;
+
+export const CopilotAssistSchema = z.strictObject({
+  nextMove: CopilotNextMoveSchema.nullable(),
+  reasons: z.array(z.strictObject({ code: CopilotDraftReasonSchema, label: CopilotLabelSchema })).max(6),
+  /** Null when a cut removes the sale. */
+  sale: CopilotSaleStateSchema.nullable(),
+  signals: CopilotSignalsSchema,
+  cuts: z.array(CopilotCutSchema).max(6),
+  /** Lot b: the buttons offered (empty when a cut removes them or at the cap). */
+  buttons: z.array(z.enum(['hooks', 'objection'])).max(2),
+  clicksLeftToday: z.number().int().nonnegative(),
+});
+export type CopilotAssist = z.infer<typeof CopilotAssistSchema>;
+
+/**
  * What the panel reads every 5 s while it is shown (ADR 0086 § 9):
  * - `unknown`: Impera has not read this conversation yet;
  * - `off`: her drafts are off in the extension, the card may still be on;
  * - `none`: no draft is waiting;
  * - `writing`: the agent is writing one;
  * - `ready`: one is waiting, with its bubbles.
+ * `assist` (ADR 0141) comes with `none` and `ready`; a server that does not send it yet leaves it out.
  */
 export const CopilotDraftViewSchema = z.discriminatedUnion('state', [
   z.strictObject({ state: z.literal('unknown') }),
   z.strictObject({ state: z.literal('off'), conversation: CopilotConversationSchema }),
-  z.strictObject({ state: z.literal('none'), conversation: CopilotConversationSchema }),
+  z.strictObject({
+    state: z.literal('none'),
+    conversation: CopilotConversationSchema,
+    assist: CopilotAssistSchema.nullable().exactOptional(),
+  }),
   z.strictObject({ state: z.literal('writing'), conversation: CopilotConversationSchema }),
   z.strictObject({
     state: z.literal('ready'),
     conversation: CopilotConversationSchema,
     draft: CopilotDraftSchema,
+    assist: CopilotAssistSchema.nullable().exactOptional(),
   }),
 ]);
 export type CopilotDraftView = z.infer<typeof CopilotDraftViewSchema>;
