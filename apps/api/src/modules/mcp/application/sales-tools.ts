@@ -1,6 +1,5 @@
 import {
   CreatorIdSchema,
-  McpDailyStatsInputSchema,
   McpDailyStatsListSchema,
   McpSalesInputSchema,
   McpSalesListSchema,
@@ -106,10 +105,11 @@ export function salesTools(
     platform_daily_stats_list: {
       description:
         'Les statistiques quotidiennes de la plateforme pour la créatrice de cet accès (un accès de l’agence est refusé : il n’en nomme aucune), du jour `from` au jour `to` inclus (93 jours au plus) : par compte de créatrice et par jour, nouveaux abonnés, désabonnements, abonnés actifs, renouvellements, PPV envoyés et achetés, messages envoyés et reçus, tels que la plateforme les compte, et quand ils ont été lus. Un compteur `null` n’a pas encore été calculé par la plateforme ; un jour absent n’a pas été lu. Aucun montant.',
-      input: McpDailyStatsInputSchema,
+      // The same days as `sales_list`: the connectors read the daily statistics within the same bound.
+      input: McpSalesInputSchema,
       output: McpDailyStatsListSchema,
       run: async ({ grant, actor, creatorId }, input): Promise<McpDailyStatsList> => {
-        const { from, to } = McpDailyStatsInputSchema.parse(input);
+        const { from, to } = McpSalesInputSchema.parse(input);
         const ids = await creatorsRead(creators, actor, creatorId);
         const reads = ids.length === 0 ? [] : await sales.dailyStats(grant.userId, ids, { from, to });
         return {

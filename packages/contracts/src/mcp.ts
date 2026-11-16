@@ -541,12 +541,6 @@ export const McpSalesListSchema = z.strictObject({
 export type McpSalesList = z.infer<typeof McpSalesListSchema>;
 
 /**
- * `platform_daily_stats_list`'s input: the same days as `sales_list`, both included, `MCP_SALES_MAX_DAYS` at most (the
- * connectors read the daily statistics within the same bound).
- */
-export const McpDailyStatsInputSchema = McpSalesInputSchema;
-
-/**
  * `platform_daily_stats_list` (ADR 0081, ADR 0105 § 4, `read:status`): each creator account's day as the platform
  * counted it, counters only, `null` while the platform has not computed one. No amount, no fan, no member.
  */
