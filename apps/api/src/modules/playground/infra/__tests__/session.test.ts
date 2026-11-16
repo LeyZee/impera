@@ -83,7 +83,7 @@ describe('playground session', () => {
     expect(session.history).toHaveLength(0);
   });
 
-  it('sends one message when she does not split hers, the guards reading the bubbles as written', async () => {
+  it('leaves out what goes past her bubble budget: one bubble to a short message (Charles 16/11)', async () => {
     const session = createPlaygroundSession({
       gateway: fakeGateway({ bubbles: ['Enchantée Julien ✨', 'Et tu as quel âge'] }),
       creatorName: 'Lina',
@@ -94,8 +94,8 @@ describe('playground session', () => {
 
     const turn = await session.handleFanMessage('Moi c’est Julien');
 
-    expect(turn.bubbles).toEqual(['Enchantée Julien ✨\nEt tu as quel âge']);
-    expect(turn.violations.map((v) => v.code)).toEqual(['too_many_bubbles']);
+    expect(turn.bubbles).toEqual(['Enchantée Julien ✨']);
+    expect(turn.violations.map((v) => v.code)).toEqual([]);
   });
 
   it('shows a blocked answer without adding it to the conversation', async () => {
@@ -405,7 +405,7 @@ describe('playground session, the offer policy and the cursor', () => {
   // His desire score is counted for real here; 0 lets the pace and the cursor be tested on their own.
   const session = (voiceInputs: VoiceInput[], withPace: boolean, minDesire = 0, brief: Brief = FREE_OFFER) =>
     createPlaygroundSession({
-      gateway: fakeGateway({ bubbles: ['Mmh tu me chauffes 😏'] }, voiceInputs, [], brief),
+      gateway: fakeGateway({ bubbles: ['Mmh toi 😏'] }, voiceInputs, [], brief),
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
@@ -460,6 +460,34 @@ describe('playground session, the offer policy and the cursor', () => {
     await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
     await playground.handleFanMessage('Encore');
     expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply']);
+  });
+
+  it('says his availability and the gate under his score, as the gate read them (ADR 0103 § 14)', async () => {
+    const closed = session([], true, 0, OFFER);
+    const first = await closed.handleFanMessage('J’ai 30 ans et t’es trop bonne');
+    expect(first.desire?.availability?.record.state).toBe('unknown');
+    expect(first.desire?.availability?.gate).toEqual({ open: false, missing: ['availability_unconfirmed'] });
+
+    const open = session([], true);
+    const turn = await open.handleFanMessage('J’ai 30 ans et t’es trop bonne');
+    expect(turn.desire?.availability?.record.state).toBe('confirmed');
+    expect(turn.desire?.availability?.record.seen).toEqual(['alone', 'free_now']);
+    expect(turn.desire?.availability?.gate).toEqual({ open: true });
+    expect(open.desireTrail[0]?.availability?.gate.open).toBe(true);
+  });
+
+  it('says she asked whether he is free on the message she asked it only, the clock standing still (ADR 0103 § 13)', async () => {
+    const playground = session([], true, 0, OFFER);
+    // His age is not confirmed yet on his first message: the cursor steers back, she asks nothing.
+    const first = await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
+    expect(first.desire?.availability?.asked).toBe(false);
+    playground.advance(3 * 60_000);
+    const second = await playground.handleFanMessage('Tu me rends fou');
+    const third = await playground.handleFanMessage('Encore');
+    expect(second.desire?.availability?.asked).toBe(true);
+    // Same instant, `askedAt` unchanged: she did not ask again.
+    expect(third.desire?.availability?.record.askedAt).toEqual(second.desire?.availability?.record.askedAt);
+    expect(third.desire?.availability?.asked).toBe(false);
   });
 
   it('counts his reply speed on the simulated clock, as production does (P3-12)', async () => {
@@ -525,7 +553,7 @@ describe('playground session, follow-ups (P3-10)', () => {
     const voiceInputs: VoiceInput[] = [];
     const brainInputs: ConversationInput[] = [];
     const session = createPlaygroundSession({
-      gateway: fakeGateway({ bubbles: ['Tu fais quoi de beau ?'] }, voiceInputs, brainInputs),
+      gateway: fakeGateway({ bubbles: ['Tu fais quoi ?'] }, voiceInputs, brainInputs),
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
@@ -544,7 +572,7 @@ describe('playground session, follow-ups (P3-10)', () => {
     expect(await session.followUp()).toMatchObject({ kind: 'later', reason: 'follow_up_quiet_hours' });
     session.advance(9 * HOUR);
     const first = await session.followUp();
-    expect(first).toMatchObject({ kind: 'written', step: 0, turn: { bubbles: ['Tu fais quoi de beau ?'] } });
+    expect(first).toMatchObject({ kind: 'written', step: 0, turn: { bubbles: ['Tu fais quoi ?'] } });
     expect(brainInputs).toHaveLength(1);
     expect(voiceInputs.at(-1)?.brief.replyBrief).toContain('depuis 21 h');
     expect(await session.followUp()).toMatchObject({ kind: 'not_due', step: 1 });

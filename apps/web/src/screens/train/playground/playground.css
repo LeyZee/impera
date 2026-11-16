@@ -1011,7 +1011,7 @@
   align-items: baseline;
   gap: 6px;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--nv-ink-muted);
 }
 .pg-desire-tag__sum b {
@@ -1031,7 +1031,7 @@
 }
 .pg-desire-tag__none {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--nv-ink-muted);
 }
 .pg-desire-lines {
@@ -1041,7 +1041,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .pg-desire-lines li {
   display: flex;
@@ -1061,7 +1061,7 @@
   margin-top: 4px;
 }
 .pg-desire-mark__q {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--nv-ink-muted);
 }
 .pg-desire-mark__seg {
@@ -1070,7 +1070,7 @@
 .pg-desire-mark__seg .nv-seg__opt {
   height: 28px;
   padding: 0 var(--nv-space-3);
-  font-size: 12px;
+  font-size: 13px;
 }
 .pg-marks {
   list-style: none;
@@ -1079,7 +1079,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .pg-marks li {
   display: flex;
@@ -1105,7 +1105,7 @@
   align-items: baseline;
   gap: 6px;
   color: var(--nv-ink-muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 .pg-desire__head b {
   font-size: 22px;
@@ -1133,10 +1133,48 @@
 .pg-desire__scale,
 .pg-desire__verdict {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--nv-ink-muted);
 }
 .pg-desire__verdict {
+  color: var(--nv-ink);
+}
+/* His availability and the gate (ADR 0103 § 14): one form for every line, the label left and the value right, the
+   gate's value in ink; never a colour of its own. */
+.pg-availability {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--nv-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+  color: var(--nv-ink-muted);
+}
+.pg-availability li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.pg-availability li > span:first-child {
+  flex-shrink: 0;
+}
+.pg-availability b,
+.pg-availability__value {
+  text-align: right;
+}
+.pg-availability b {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.pg-availability__gate {
+  margin-top: 2px;
+  color: var(--nv-ink);
+}
+.pg-availability li.pg-availability__missing {
+  display: block;
   color: var(--nv-ink);
 }
 

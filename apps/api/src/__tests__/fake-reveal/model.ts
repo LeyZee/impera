@@ -69,6 +69,11 @@ export const FakeMessageSchema = z.object({
       teasingMediaIds: z.array(id),
       paidAt: iso.nullable(),
       transactionId: id.nullable(),
+      /** « Tarif réduit » on a paid media (2026-11-16): sent by Reveal both or neither. */
+      discount: z
+        .object({ priceCents: z.number().int().min(0), durationMinutes: z.number().int().min(1) })
+        .nullable()
+        .optional(),
     })
     .nullable(),
   /** Team member display name for an outbound message. */
@@ -78,6 +83,8 @@ export const FakeMessageSchema = z.object({
   /** The fan has not read this outbound message yet (`isUnread`). */
   isUnread: z.boolean(),
   createdAt: iso,
+  /** Deleted on Reveal: still listed, with `deletedAt` (2026-11-16). */
+  deletedAt: iso.nullable().optional(),
 });
 export type FakeMessage = z.infer<typeof FakeMessageSchema>;
 

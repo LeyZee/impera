@@ -75,6 +75,23 @@ export function offerRefusalLabel(code: string): string {
   return OFFER_REFUSAL_LABELS[code] ?? code;
 }
 
+/**
+ * What the gate still misses, naming only what he has not said (Design, lot disponible): under « il est seul », the
+ * gate says he has not said he has time, never « seul et libre » again.
+ */
+export function gateMissingLabel(
+  code: string,
+  availability: { readonly state: string; readonly seen: readonly string[] },
+): string {
+  if (code !== 'availability_unconfirmed') return offerRefusalLabel(code);
+  if (availability.state === 'no') return 'Il a dit ne pas être libre';
+  const alone = availability.seen.includes('alone');
+  const free = availability.seen.includes('free_now');
+  if (alone && !free) return 'Il n’a pas dit qu’il a du temps';
+  if (free && !alone) return 'Il n’a pas dit qu’il est seul';
+  return offerRefusalLabel(code);
+}
+
 export function cursorLabel(kind: string, reason?: string): string {
   const code = reason === undefined ? kind : `${kind}:${reason}`;
   return CURSOR_LABELS[code] ?? code;

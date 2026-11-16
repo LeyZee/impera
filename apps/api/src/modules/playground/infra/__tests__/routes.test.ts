@@ -272,6 +272,21 @@ describe('/v1/playground', () => {
     const { app, headers, post } = await server();
     const first = PlaygroundAnswerSchema.parse((await post('/messages', { text: 'Salut' })).json());
     expect(first.desire).toMatchObject({ before: null, score: 0, band: 'neutral', signals: [] });
+    // Beside it, his availability and the gate, each missing condition in French (ADR 0103 § 14).
+    expect(first.desire?.availability).toMatchObject({
+      state: 'unknown',
+      signal: null,
+      seen: [],
+      sexualized: false,
+    });
+    expect(first.desire?.availability?.gate).toEqual({
+      open: false,
+      missing: [
+        { code: 'desire_below_threshold', label: 'Désir sous le seuil du script' },
+        { code: 'not_sexualizing', label: 'Il ne sexualise pas encore lui-même' },
+        { code: 'availability_unconfirmed', label: 'Il n’a pas dit être seul et libre' },
+      ],
+    });
     // What she still has to learn, in her words, never a slot's code.
     expect(first.brief?.kycMissing).toEqual(['prénom']);
     await post('/rating', { verdict: { kind: 'validated' } });

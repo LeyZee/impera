@@ -6,14 +6,14 @@
 
 /** The ranks, the first first. Their names are the game's own words, shown as they are. */
 export const LEVEL_NAMES = [
-  'Novice',
-  'Complice',
+  'Étincelle',
+  'Allumeur',
   'Charmeur',
   'Séducteur',
   'Envoûteur',
-  'Virtuose',
-  'Maestro',
-  'Légende',
+  'Tentateur',
+  'Brasier',
+  'Incendiaire',
 ] as const;
 
 export interface LevelStep {

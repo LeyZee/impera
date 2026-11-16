@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 import { BriefIntentSchema } from './brief';
 import { DESIRE_SIGNALS_MAX, DesireBandSchema, DesireScoreSchema, DesireSignalSchema } from './desire';
+import {
+  FAN_AVAILABILITY_POSITIVE_SIGNALS,
+  FanAvailabilitySignalSchema,
+  FanAvailabilityStateSchema,
+  ScriptStartBlockSchema,
+} from './fan-availability';
 import { CreatorIdSchema, DesireMarkIdSchema, PersonaVersionIdSchema } from './ids';
 import { MediaDescriptionSchema } from './media';
 
@@ -78,6 +84,35 @@ export const PlaygroundSituationSchema = z.object({
 export type PlaygroundSituation = z.infer<typeof PlaygroundSituationSchema>;
 
 /**
+ * His availability and the gate before the first teaser as one message of his left them (ADR 0103 § 14), shown beside
+ * his desire score: the state with the signal that set it and the positive ones he gave in the session, whether he
+ * sexualized himself in it, whether she asked him this time, and the gate, open or the conditions missing with their
+ * label. Computed by the server (agent/domain/availability.ts), never by the screen.
+ */
+export const PlaygroundAvailabilitySchema = z.object({
+  state: FanAvailabilityStateSchema,
+  /** The signal of his that set the state; `null` when nothing he said holds (none yet, or lapsed). */
+  signal: FanAvailabilitySignalSchema.nullable(),
+  seen: z.array(z.enum(FAN_AVAILABILITY_POSITIVE_SIGNALS)).max(FAN_AVAILABILITY_POSITIVE_SIGNALS.length),
+  /** When what he said lapses (2 hours after he said it). */
+  expiresAt: z.coerce.date().nullable(),
+  sexualized: z.boolean(),
+  /** She asked him, in passing, whether he is free, in her answer to this message (once per session, § 13). */
+  asked: z.boolean(),
+  gate: z.discriminatedUnion('open', [
+    z.object({ open: z.literal(true) }),
+    z.object({
+      open: z.literal(false),
+      missing: z
+        .array(z.object({ code: ScriptStartBlockSchema, label: z.string() }))
+        .min(1)
+        .max(3),
+    }),
+  ]),
+});
+export type PlaygroundAvailability = z.infer<typeof PlaygroundAvailabilitySchema>;
+
+/**
  * His desire score as it stood after one message of his (P3-12, glossary « Note de désir »), shown to calibrate it:
  * the score before and after, and each signal with what it weighed in the counting `weightsVersion`. A signal that
  * resets or freezes the score instead of counting has `points: null`. Computed by the server, never by the screen.
@@ -93,6 +128,8 @@ export const PlaygroundDesireSchema = z.object({
   weightsVersion: z.string(),
   /** The owner's mark on it in this conversation, once he gave one (ADR 0103 § 6). */
   mark: DesireMarkVerdictSchema.exactOptional(),
+  /** His availability and the gate at this message; absent without her script threshold (ADR 0103 § 14). */
+  availability: PlaygroundAvailabilitySchema.exactOptional(),
 });
 export type PlaygroundDesire = z.infer<typeof PlaygroundDesireSchema>;
 
