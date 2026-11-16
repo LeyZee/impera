@@ -32,6 +32,7 @@ const trigger = (n: number, creatorId: string, minutesAgo: number, patch: Record
   fanId: '0192f3a0-0000-7000-8000-0000000000f1',
   fanDisplayName: 'Théo',
   trigger: { alert: { kind: 'system', code: 'service_request' }, matchedBy: 'rule' },
+  safety: null,
   alertGroupId: null,
   alertName: 'Demande de service',
   pausedAgent: false,

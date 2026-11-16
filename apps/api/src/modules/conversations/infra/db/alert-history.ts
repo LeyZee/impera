@@ -5,6 +5,7 @@ import {
   FanIdSchema,
   DomainError,
   type CreatorId,
+  type SafetyEvent,
   type EventId,
   type UserId,
 } from '@impera/contracts';
@@ -16,11 +17,40 @@ import type { AlertHistory, AlertTriggerFilter } from '../../domain/ports';
 const events = schema.conversationEvents;
 const seen = schema.alertSeen;
 
-/** Her triggers: every `alert_triggered`, and a `handoff_requested` that carries one (P4-01). */
+/**
+ * A hand-off the agent's safety made (recette 16/11 AGE-05), by its cause: a fan who might be a minor, her budget
+ * reached. Same names as the causes (`HandoffCause`).
+ */
+const SafetyHandoffSchema = z.enum(['minor', 'budget']);
+
+const isSafetyHandoff = (cause: z.infer<typeof SafetyHandoffSchema>): ReturnType<typeof sql> =>
+  sql`(${events.type} = 'handoff_requested' and ${events.payload} ->> 'cause' = ${cause})`;
+
+const isCareOpened = sql`${events.type} = 'care_opened'`;
+
+/**
+ * Her lines: every `alert_triggered`, a `handoff_requested` that carries one (P4-01), and what the agent's safety did
+ * (recette 16/11 AGE-05): a hand-off for a minor or her budget, a care mode opened.
+ */
 const isTrigger = sql`(${events.type} = 'alert_triggered'
-  or (${events.type} = 'handoff_requested' and ${events.payload} -> 'trigger' is not null))`;
+  or (${events.type} = 'handoff_requested' and ${events.payload} -> 'trigger' is not null)
+  or ${isSafetyHandoff('minor')}
+  or ${isSafetyHandoff('budget')}
+  or ${isCareOpened})`;
 
 const TriggerPayloadSchema = z.object({ trigger: AlertTriggerSchema });
+
+/** What a line is: the alert that rang, or what the agent's safety did. */
+function lineOf(
+  type: string,
+  payload: unknown,
+): { readonly trigger: z.infer<typeof AlertTriggerSchema> | null; readonly safety: SafetyEvent | null } {
+  if (type === 'care_opened') return { trigger: null, safety: 'care' };
+  const withTrigger = TriggerPayloadSchema.safeParse(payload);
+  if (withTrigger.success) return { trigger: withTrigger.data.trigger, safety: null };
+  const { cause } = z.object({ cause: SafetyHandoffSchema }).parse(payload);
+  return { trigger: null, safety: cause };
+}
 
 class CursorInvalid extends DomainError {
   constructor() {
@@ -54,6 +84,9 @@ async function placeOf(tx: Transaction, id: EventId): Promise<ReturnType<typeof 
 
 function alertIs(alert: NonNullable<AlertTriggerFilter['alert']>): ReturnType<typeof sql> {
   if (alert.kind === 'none') return sql`false`;
+  if (alert.kind === 'safety') {
+    return alert.event === 'care' ? isCareOpened : isSafetyHandoff(alert.event);
+  }
   const ref = sql`${events.payload} -> 'trigger' -> 'alert'`;
   return alert.kind === 'custom'
     ? sql`(${ref} ->> 'kind' = 'custom' and ${ref} ->> 'id' = ${alert.id})`
@@ -102,7 +135,7 @@ export function createDrizzleAlertHistory(db: Database): AlertHistory {
           conversationId: ConversationIdSchema.parse(row.conversationId),
           fanId: FanIdSchema.parse(row.fanId),
           fanDisplayName: row.fanDisplayName,
-          trigger: TriggerPayloadSchema.parse(row.payload).trigger,
+          ...lineOf(row.type, row.payload),
           pausedAgent: row.type === 'handoff_requested',
           at: row.at,
           seenAt: row.seenAt,

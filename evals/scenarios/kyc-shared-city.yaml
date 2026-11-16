@@ -1,0 +1,32 @@
+# Il vient de la même ville qu'elle : une vraie coïncidence, elle s'y attarde au lieu de passer à la question suivante. Fan et messages fictifs (ADR 0010).
+description: Il dit venir de la même ville qu’elle ; elle s’en étonne, en dit un peu plus sur elle et creuse, sans enchaîner sur son métier.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Carl (fictif)'
+  - 'âge : 31 ans'
+situation:
+  known_hours: 0
+  age_confirmed: true
+history:
+  - from: fan
+    text: Moi c’est Carl et toi c’est bien ton vrai prénom ?
+  - from: creator
+    text: Oui oui 😄 T’es d’où toi ?
+inbound: Je suis de Lyon et toi il me semble que c’est pareil nan ? héhé
+expect:
+  brief:
+    risks_absent:
+      - minor_suspected
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_min: 1
+    bubbles_max: 3
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(tu fais quoi dans la vie|ton (métier|taf|boulot|travail)|tu bosses?)\b
+      - \b(je note|c’est noté|c'est noté|je retiens)\b
+    must_match_any:
+      - \b(lyon|lyonnais|quartier|coïncidence|coincidence|pareil|moi aussi|depuis)\b

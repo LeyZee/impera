@@ -35,6 +35,19 @@ export class DraftNotFound extends DomainError {
   }
 }
 
+/**
+ * His age is in doubt: the agent writes nothing to him until the owner or a manager confirms it (Charles, 16/11), so
+ * the hand is not given back to it meanwhile.
+ */
+export class AgeInDoubtConflict extends DomainError {
+  constructor() {
+    super(
+      'age_in_doubt_conflict',
+      'Son âge est en doute : l’IA ne lui écrit plus tant que le propriétaire ou un manager ne l’a pas confirmé',
+    );
+  }
+}
+
 /** Automatique stays locked until its server lock opens (ADR 0019); `details.missing` says what it waits for. */
 export class AutomaticLocked extends DomainError {
   constructor(missing: readonly AutomaticMissing[]) {
@@ -143,6 +156,16 @@ export const BLOCKED_EXPIRY_REASONS: Readonly<Record<BlockedReason, string>> = {
 export class CreatorForbidden extends DomainError {
   constructor() {
     super('creator_forbidden', 'Créatrice hors de ton périmètre');
+  }
+}
+
+/**
+ * « Il va mieux » is for whoever reads the whole creator (ADR 0088 § 7): the owner, or a manager she is given; never a
+ * chatter, even with an open access window. He is told so, not that she is out of reach.
+ */
+export class CareCloseForbidden extends DomainError {
+  constructor() {
+    super('care_close_forbidden', 'Seuls le propriétaire et un manager peuvent fermer le mode soin');
   }
 }
 
