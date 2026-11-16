@@ -1088,6 +1088,68 @@
   padding: 0 var(--nv-space-3);
   font-size: 13px;
 }
+.pg-hint--warn {
+  color: var(--nv-warning);
+}
+/* « Sa banque » (ADR 0102 § 5): one card per example, its standing in a quiet line, « Retirer » at the end. */
+.pg-bank {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.pg-bank__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--nv-radius-sm);
+  background: var(--nv-surface-raised);
+  border: 1px solid var(--nv-hairline);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+.pg-bank__item:hover {
+  border-color: var(--nv-ink-muted);
+}
+.pg-bank__text {
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.pg-bank__meta,
+.pg-bank__status {
+  color: var(--nv-ink-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.pg-bank__item[data-state='read'] .pg-bank__status {
+  color: var(--nv-ink);
+}
+.pg-bank__item[data-state='blocked'] .pg-bank__status {
+  color: var(--nv-warning);
+}
+.pg-bank__foot,
+.pg-bank__confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+.pg-bank__confirm {
+  color: var(--nv-ink-muted);
+  font-size: 12px;
+}
+.pg-bank__actions {
+  display: flex;
+  gap: 8px;
+}
 .pg-marks {
   list-style: none;
   margin: 0;

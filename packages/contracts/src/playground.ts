@@ -150,6 +150,7 @@ export const GuardViolationSchema = z.object({
   severity: z.enum(['blocking', 'soft']),
   match: z.string().exactOptional(),
 });
+export type PlaygroundGuardViolation = z.infer<typeof GuardViolationSchema>;
 
 /**
  * A media as the trainer types it: what it shows, in a few words. The server completes the description

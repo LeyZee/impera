@@ -5,3 +5,9 @@
 - **Tests** : unitaires (choix et plafond, ids sur l'appel de voix seulement, textes de l'écran) ; intégration (banque lue en base, exemple retiré et exemple arrêté par une garde exclus, ordre, ids, banque illisible).
 - **Reste** : migration de la colonne `voice_example_ids` à écrire sur `main` au tour de fusion (numéro provisoire 0226) ; b2.
 - **Découvertes** : une note du Playground a pour id `<session>-<n>`, que la table remplace par un id dérivé ; « Retirer » (b2) devra viser l'id de la table.
+
+## Lot b2 : « Sa banque » et « Retirer »
+
+- **Fait** : Entraîner montre « Sa banque » pour la version jouée (texte, date, message du fan, « Lu par sa voix », « En réserve » ou « Arrêté : » et la garde), avec « Retirer » confirmé sur place ; l'exemple retiré sort de ses vrais brouillons tout de suite et du Playground à la conversation suivante, et reste en base. Une correction rangée en Exemple de voix qu'une garde dure arrête est gardée comme correction (`example_state = 'blocked'`) et la ligne sous la conversation dit quelle garde. Routes `GET /v1/playground/bank` et `POST /v1/playground/bank/withdraw`.
+- **Tests** : unitaires (vue de la banque, retrait, réponse de la note, écran) ; intégration (rangée arrêtée, liste, retrait par sa créatrice seule, une fois, table toujours en ajout seul).
+- **Reste** : migration du déclencheur de `calibration_ratings` qui laisse passer le retrait, à écrire sur `main` au tour.
