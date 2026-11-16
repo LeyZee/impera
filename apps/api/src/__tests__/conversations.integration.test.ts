@@ -559,6 +559,30 @@ describe('conversations module (P0-05)', () => {
       'send_verified',
     ]);
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
+
+    // The platform wrote the step: its synced copy fills the empty record once, and is not a new message.
+    const media = [
+      { ref: { platform: 'reveal' as const, id: 'media-1' }, kind: 'image' as const, isLocked: true },
+    ];
+    const synced = await ingest('c-step', {
+      ...fanMessage('c-step', 'Rien que pour toi', 'out-step:c-step:0'),
+      direction: 'outbound',
+      author: 'ai',
+      media,
+      priceMinor: 1_500,
+      currency: 'EUR',
+    });
+    expect(synced.isNew).toBe(false);
+    await ingest('c-step', {
+      ...fanMessage('c-step', 'Autre texte', 'out-step:c-step:0'),
+      direction: 'outbound',
+      author: 'ai',
+    });
+    const [stepRow] = await test.admin.db
+      .select({ text: schema.messages.text, platformMedia: schema.messages.platformMedia })
+      .from(schema.messages)
+      .where(eq(schema.messages.platformMessageId, 'out-step:c-step:0'));
+    expect(stepRow).toEqual({ text: 'Rien que pour toi', platformMedia: media });
   });
 
   it('records a step whose answer was lost once, as the platform shows it, without sending it again', async () => {

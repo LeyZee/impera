@@ -110,7 +110,22 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
             target: [schema.messages.platformAccountId, schema.messages.platformMessageId],
           })
           .returning({ id: schema.messages.id });
-        return inserted.length > 0;
+        if (inserted.length > 0) return true;
+        // A script step is recorded at send with no text (the platform writes it): the synced copy fills it once.
+        if (message.direction === 'outbound' && (message.text !== '' || message.platformMedia.length > 0))
+          await tx
+            .update(schema.messages)
+            .set({ text: message.text, platformMedia: [...message.platformMedia] })
+            .where(
+              and(
+                eq(schema.messages.platformAccountId, message.platformAccountId),
+                eq(schema.messages.platformMessageId, message.platformMessageId),
+                eq(schema.messages.direction, 'outbound'),
+                eq(schema.messages.text, ''),
+                sql`${schema.messages.platformMedia} = '[]'::jsonb`,
+              ),
+            );
+        return false;
       },
       async countForDraft(draftId) {
         const [row] = await tx

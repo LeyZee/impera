@@ -177,7 +177,8 @@ export interface AwayHolds {
 }
 
 interface MessageRepository {
-  /** `false` when the platform message is already known (unique per account): ingestion is idempotent. */
+  /** `false` when the platform message is already known (unique per account): ingestion is idempotent. A known outbound
+   * message still empty (a script step, recorded at send before the platform wrote it) takes the synced text and media. */
   insertIfNew(message: NewMessage): Promise<boolean>;
   /** Bubbles of this draft already on the platform; a retried send resumes after them. */
   countForDraft(draftId: DraftId): Promise<number>;
