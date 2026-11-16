@@ -18,6 +18,7 @@ const idOf = (name: string): CreatorMessage['id'] =>
 const message = (name: string, at: string, over: Partial<CreatorMessage> = {}): CreatorMessage => ({
   id: idOf(name),
   direction: 'inbound',
+  writtenBy: null,
   text: `message ${name}`,
   media: [],
   priceMinor: null,

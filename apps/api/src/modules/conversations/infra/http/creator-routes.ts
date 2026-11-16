@@ -46,7 +46,7 @@ async function asCreator<T>(read: () => Promise<T>): Promise<T> {
 /**
  * `/v1/creator-space` (CR-02, ADR 0042 § 2): what the creator reads of her own account, read only. Her creator is read
  * in her account by the server, never in the request; there is no route that writes to a fan. The response schemas are
- * `strict`: a message never carries its author.
+ * `strict`: of who wrote a message, only `writtenBy` (ADR 0065 § 1), never the agency's own fields.
  */
 export function createCreatorSpaceRoutes(
   reader: CreatorSpaceReader,
