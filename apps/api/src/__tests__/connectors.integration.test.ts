@@ -571,7 +571,11 @@ describe('connectors module (P0-06)', () => {
       204,
     );
     expect(await accountRow(hers)).toMatchObject({ sessionOwner: 'model-test-gone', sessionState: 'valid' });
-    expect(await accountRow(old)).toMatchObject({ sessionOwner: null, sessionState: 'expired' });
+    expect(await accountRow(old)).toMatchObject({
+      sessionOwner: null,
+      sessionCiphertext: null,
+      sessionState: 'expired',
+    });
     const released = await test.admin.db
       .select({ action: schema.auditLog.action })
       .from(schema.auditLog)

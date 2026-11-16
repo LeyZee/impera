@@ -77,7 +77,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
   const byId = (id: string) => eq(schema.platformAccounts.id, id);
   /**
    * The account of an archived creator that holds `owner` on the platform of account `id` gives the identity back: its
-   * owner is emptied and its session is expired, so that it asks for a « Sync » again if she ever comes back (one
+   * owner and its stored session are emptied and its state is expired, so that it asks for a « Sync » again if she ever comes back (one
    * identity, one account). Found on the admin connection (no tenant sees another creator's account), written in the
    * holder's own tenant. `false` when nobody archived holds it.
    */
@@ -111,7 +111,11 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
       const expires = row.sessionState !== 'none' && row.sessionState !== 'expired';
       await tx
         .update(schema.platformAccounts)
-        .set({ sessionOwner: null, ...(expires ? { sessionState: 'expired' as const } : {}) })
+        .set({
+          sessionOwner: null,
+          sessionCiphertext: null,
+          ...(expires ? { sessionState: 'expired' as const } : {}),
+        })
         .where(byId(holder.id));
       if (expires) {
         await insertEvent(
@@ -134,7 +138,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
         action: 'connector.session_released',
         entity: 'platform_account',
         entityId: holder.id,
-        details: { correlationId: meta.correlationId, heldBy: id },
+        details: { correlationId: meta.correlationId, releasedTo: id },
         createdAt: meta.at,
       });
     });
