@@ -10,6 +10,7 @@ import type { PayrollModule } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import type { SchedulingModule, ShiftCreators } from '../modules/scheduling';
 import type { ScriptsModule } from '../modules/scripts';
+import type { SupervisionModule } from '../modules/supervision';
 
 import type { Routes, Shared } from './shared';
 
@@ -73,6 +74,7 @@ export function wireMcp(
   aiUsage: Pick<AiUsageModule, 'read'>,
   connectors: Pick<ConnectorsModule, 'reads'>,
   payroll: Pick<PayrollModule, 'reads'>,
+  supervision: Pick<SupervisionModule, 'reads'>,
 ): WiredMcp {
   const module = createMcpModule({
     db: shared.db,
@@ -107,6 +109,10 @@ export function wireMcp(
         ),
     },
     aiUsage: { read: () => aiUsage.read() },
+    stats: {
+      agencyInsights: (reader, period, creatorId) =>
+        supervision.reads.agencyInsights(reader, period, creatorId),
+    },
     teamImport: {
       teamImport: (userId, platform) => refusedAsMcp(() => connectors.reads.teamImport(userId, platform)),
     },

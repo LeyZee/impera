@@ -9,6 +9,7 @@ import {
   type CreatorId,
   type PlatformAccountId,
   type TeamMemberId,
+  UserIdSchema,
 } from '@impera/contracts';
 import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
@@ -56,6 +57,7 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
   let maya: TeamMemberId;
   type Who = 'owner' | 'manager' | 'chatter' | 'operator' | 'creator';
   const cookies = new Map<Who, string>();
+  const users = new Map<Who, string>();
 
   const get = (who: Who, query = 'period=day') =>
     server.inject({
@@ -81,6 +83,7 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       .set({ role, creatorIds: [...creators] })
       .where(eq(schema.user.id, userId));
     cookies.set(key, await signIn(server, email, PASSWORD));
+    users.set(key, userId);
     return userId;
   }
 
@@ -162,11 +165,12 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       creatorId,
     });
 
-    await createOwner(app.auth, app.db.db, {
+    const owner = await createOwner(app.auth, app.db.db, {
       email: 'owner@example.test',
       name: 'Owner',
       password: PASSWORD,
     });
+    users.set('owner', owner.userId);
     cookies.set('owner', await signIn(server, 'owner@example.test', PASSWORD));
     maya = await member(
       await person('manager', 'operator', [creatorId, unlinkedCreatorId]),
@@ -309,5 +313,72 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     expect((await agency('owner', 'period=day')).subscribers?.current.activeBefore).toBe(120);
     expect((await agency('manager', 'period=week')).subscribers?.current.activeAtEnd).toBe(123);
     expect((await get('creator', 'period=week')).statusCode).toBe(403);
+  });
+
+  it('gives the MCP the same figures by the same rule, a manager his list alone (supervision.reads, ADR 0026 § 1)', async () => {
+    const reads = app.modules.supervision.reads;
+    const reader = (who: Who, role: 'owner' | 'operator' | 'creator', creatorIds: readonly CreatorId[]) => ({
+      userId: UserIdSchema.parse(users.get(who)),
+      role,
+      creatorIds,
+    });
+    // A creator out of the manager's list, with a sale of hers today.
+    const other = newId(CreatorIdSchema);
+    const otherAccount = newId(PlatformAccountIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: other, nameKey: 'autre', displayName: 'Autre', timezone: 'Europe/Paris' });
+    await test.admin.db
+      .insert(schema.platformAccounts)
+      .values({ id: otherAccount, creatorId: other, platform: 'reveal', handle: 'autre_test' });
+    await test.admin.db.insert(schema.salesFeedModels).values({
+      platform: 'reveal',
+      platformModelId: 'model_test_02',
+      platformAccountId: otherAccount,
+      creatorId: other,
+    });
+    position += 1;
+    await test.admin.db.insert(schema.platformSales).values({
+      id: newId(SalesLineIdSchema),
+      creatorId: other,
+      platformAccountId: otherAccount,
+      platform: 'reveal',
+      platformSaleId: 'sale_other',
+      event: 'sale',
+      saleType: 'tip',
+      status: 'paid',
+      occurredAt: new Date(Math.max(Date.now() - 60_000, parisMidnight(new Date()) + 1000)),
+      platformModelId: 'model_test_02',
+      platformChatterId: null,
+      platformFanId: 'fan_test_02',
+      currency: 'EUR',
+      grossInclVatMinor: 9000,
+      grossExclVatMinor: 7500,
+      netMinor: 6000,
+      agencyMinor: 2250,
+      creatorMinor: 3750,
+      position: String(position).padStart(6, '0'),
+      inputsHash: 'hash-sale_other-sale',
+    });
+
+    const screen = await agency('owner');
+    const owner = await reads.agencyInsights(reader('owner', 'owner', []), 'day');
+    expect(owner).toEqual(screen);
+    expect(owner?.creators.map((one) => one.creatorId).sort()).toEqual([creatorId, other].sort());
+
+    // The manager reads his list alone: the other creator's sale is in no figure of his.
+    const manager = await reads.agencyInsights(
+      reader('manager', 'operator', [creatorId, unlinkedCreatorId]),
+      'day',
+    );
+    expect(manager).toEqual(await agency('manager'));
+    expect(manager?.creators).toEqual([{ creatorId, name: 'Nora' }]);
+    expect(manager?.totals.current.revenueMinor).toBe(6000);
+    expect(JSON.stringify(manager)).not.toContain(other);
+
+    // Whoever the screen refuses gets nothing, not even an empty answer.
+    expect(await reads.agencyInsights(reader('chatter', 'operator', [creatorId]), 'day')).toBeNull();
+    expect(await reads.agencyInsights(reader('operator', 'operator', [creatorId]), 'day')).toBeNull();
+    expect(await reads.agencyInsights(reader('creator', 'creator', [creatorId]), 'day')).toBeNull();
   });
 });

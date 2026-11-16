@@ -1,4 +1,6 @@
 import type {
+  AgencyInsights,
+  AgencyPeriod,
   AiUsage,
   CommissionStatementStatus,
   CreatorId,
@@ -265,6 +267,19 @@ export interface ShiftReader {
     creators: 'all' | readonly string[],
     at: Date,
   ): Promise<readonly OnShiftEntry[]>;
+}
+
+/**
+ * The agency's figures as `supervision` reads them for the Dashboard's « Agence » (`reads.agencyInsights`, its
+ * `index.ts`, ADR 0078 § 1): the owner's, and an active manager's for the creators of his list; `null` for anyone else.
+ */
+export interface StatsReader {
+  agencyInsights(
+    reader: { readonly userId: UserId; readonly role: UserRole; readonly creatorIds: readonly CreatorId[] },
+    period: AgencyPeriod,
+    /** The access's creator, when it is bound to one: her figures alone. */
+    creatorId?: CreatorId,
+  ): Promise<AgencyInsights | null>;
 }
 
 /** The AI spend as `ai-usage` reads it for the screen (`AiUsage`, its `index.ts`): agency-wide, the owner's alone. */

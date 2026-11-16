@@ -19,6 +19,7 @@ import type {
   FanReader,
   GrantRecord,
   PayrollReader,
+  StatsReader,
   SalesReader,
   ShiftReader,
   TeamImportReader,
@@ -75,6 +76,8 @@ export interface McpDeps {
   readonly payroll: PayrollReader;
   /** The AI spend (`ai-usage`), for `ai_usage_get`, the owner's alone. */
   readonly aiUsage: AiUsageReader;
+  /** The agency's figures (`supervision.reads.agencyInsights`), for `stats_get`: never a share nor a seller. */
+  readonly stats: StatsReader;
 }
 
 export function createMcpModule(deps: McpDeps): McpModule {
@@ -102,7 +105,7 @@ export function createMcpModule(deps: McpDeps): McpModule {
               ...fanTools(deps.fans),
               ...contentTools(deps.content),
               ...teamTools(deps.shifts, deps.teamImport),
-              ...statusTools(deps.aiUsage),
+              ...statusTools(deps.aiUsage, deps.stats),
               ...salesTools(deps.sales, deps.creators),
               ...payrollTools(deps.payroll),
             },
