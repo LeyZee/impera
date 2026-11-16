@@ -1,10 +1,15 @@
-import { CreatorIdSchema, newId, type CreatorId } from '@impera/contracts';
-import { schema } from '@impera/db';
+import { CreatorIdSchema, newId, PersonaVersionIdSchema, type CreatorId } from '@impera/contracts';
+import { eq, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import type { CalibrationRecord } from '../modules/agent';
-import { createDbCalibrationStore, importRatings } from '../modules/playground';
+import {
+  createDbCalibrationStore,
+  createDbVoiceBankStore,
+  createDbVoiceExampleBank,
+  importRatings,
+} from '../modules/playground';
 
 function record(id: string, creatorId: CreatorId | undefined, minutes: number): CalibrationRecord {
   const at = new Date(Date.UTC(2026, 10, 12, 20, minutes)).toISOString();
@@ -103,5 +108,58 @@ describe('playground ratings in the database (ADR 0103, AGE-06)', () => {
     const from = { append: () => Promise.resolve(), list: () => Promise.resolve([lost]) };
     const table = createDbCalibrationStore(test.app.db, () => Promise.resolve([lina]));
     expect(await importRatings(from, table)).toEqual({ read: 1, kept: 0, withoutCreator: 0, refused: 1 });
+  });
+
+  it('files a blocked correction out of her bank, lists her bank, and withdraws an example everywhere (ADR 0102 § 4, § 5)', async () => {
+    const versionId = newId(PersonaVersionIdSchema);
+    await test.admin.db.insert(schema.personaVersions).values({
+      id: versionId,
+      creatorId: nora,
+      version: 'bank',
+      sourcePath: 'personas/example.yaml',
+      content: {},
+      contentHash: 'bank',
+    });
+    const table = createDbCalibrationStore(test.app.db, () => Promise.resolve([nora]));
+    const kept = { ...record('k', nora, 20), id: newId(CreatorIdSchema), personaVersionId: versionId };
+    const stopped = {
+      ...record('s', nora, 21),
+      id: newId(CreatorIdSchema),
+      personaVersionId: versionId,
+      verdict: { kind: 'corrected' as const, text: 'Je suis une IA' },
+      exampleBlocked: true as const,
+    };
+    await table.append(kept);
+    await table.append(stopped);
+
+    const bank = createDbVoiceBankStore(test.app.db);
+    const examplesOf = createDbVoiceExampleBank(test.app.db);
+    expect((await bank.list(nora, versionId)).map((e) => [e.id, e.state])).toEqual([
+      [stopped.id, 'blocked'],
+      [kept.id, 'active'],
+    ]);
+    // Her drafts read the active one only.
+    expect((await examplesOf(nora, versionId)).map((e) => e.id)).toEqual([kept.id]);
+    expect((await table.list()).find((r) => r.id === stopped.id)?.exampleBlocked).toBe(true);
+
+    // Another creator cannot withdraw it; hers can, once.
+    expect(await bank.withdraw(lina, kept.id, new Date())).toBe(false);
+    expect(await bank.withdraw(nora, kept.id, new Date())).toBe(true);
+    expect(await bank.withdraw(nora, kept.id, new Date())).toBe(false);
+    expect(await examplesOf(nora, versionId)).toEqual([]);
+    expect((await bank.list(nora, versionId)).map((e) => e.id)).toEqual([stopped.id]);
+    // Kept for history, out of her bank.
+    const [row] = await test.admin.db
+      .select()
+      .from(schema.calibrationRatings)
+      .where(eq(schema.calibrationRatings.id, kept.id));
+    expect(row?.exampleState).toBe('withdrawn');
+    // Nothing else changes: the table stays append-only.
+    await expect(
+      test.admin.db
+        .update(schema.calibrationRatings)
+        .set({ fanMessage: 'autre' })
+        .where(eq(schema.calibrationRatings.id, kept.id)),
+    ).rejects.toThrow();
   });
 });

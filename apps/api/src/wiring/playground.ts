@@ -4,6 +4,7 @@ import type { PersonaModule } from '../modules/persona';
 import {
   createDbCalibrationStore,
   createDbDesireMarkStore,
+  createDbVoiceBankStore,
   createDbVoiceExampleBank,
   startPlaygroundModule,
   type PlaygroundModule,
@@ -48,6 +49,7 @@ export async function wirePlayground(
         desireMarks: createDbDesireMarkStore(shared.db),
         // Her bank, read as her drafts read it (ADR 0102 § 2).
         voiceExamplesOf: createDbVoiceExampleBank(shared.db),
+        bank: createDbVoiceBankStore(shared.db),
         // Her ratings live in the database with its backups (AGE-06); the old JSON lines are imported once, then renamed.
         ratings: createDbCalibrationStore(shared.db, async () =>
           (await deps.persona.creators.list('all')).map((creator) => creator.id),

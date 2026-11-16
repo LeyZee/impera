@@ -25,6 +25,8 @@ export interface CalibrationRecord extends RatedAnswer {
   readonly fanMessage: string;
   readonly bubbles: readonly string[];
   readonly destination?: Destination;
+  /** A correction filed as a voice example that a hard guard stopped (ADR 0102 § 4): never one of her examples. */
+  readonly exampleBlocked?: true;
   readonly moment: RatedMoment;
 }
 
@@ -76,6 +78,7 @@ export function voiceExamples(
     .filter(
       (r) =>
         r.destination === 'voice_example' &&
+        r.exampleBlocked !== true &&
         r.creatorId === of.creatorId &&
         r.personaVersionId === of.personaVersionId,
     )

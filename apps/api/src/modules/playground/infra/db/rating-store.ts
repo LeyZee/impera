@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { VerdictSchema } from '@impera/contracts';
-import { and, eq, schema, sql, withTenant, type Database } from '@impera/db';
+import { and, eq, inArray, schema, sql, withTenant, type Database } from '@impera/db';
 
 import {
   CalibrationRecordSchema,
@@ -43,7 +43,7 @@ function rowOf(record: CalibrationRecord, creatorId: string): typeof schema.cali
     bubbles: [...record.bubbles],
     moment: record.moment,
     personaVersionId: record.personaVersionId ?? null,
-    exampleState: isExample ? 'active' : null,
+    exampleState: isExample ? (record.exampleBlocked === true ? 'blocked' : 'active') : null,
     exampleStateAt: isExample ? ratedAt : null,
   };
 }
@@ -104,7 +104,9 @@ export function createDbCalibrationStore(
           });
           // A withdrawn example is no longer one (ADR 0102 § 5): it stays a rating, out of her bank.
           if (!parsed.success) continue;
-          records.push(row.exampleState === 'withdrawn' ? withoutDestination(parsed.data) : parsed.data);
+          if (row.exampleState === 'withdrawn') records.push(withoutDestination(parsed.data));
+          else if (row.exampleState === 'blocked') records.push({ ...parsed.data, exampleBlocked: true });
+          else records.push(parsed.data);
         }
       }
       return records.sort((a, b) => a.at.localeCompare(b.at));
@@ -144,6 +146,84 @@ export function createDbVoiceExampleBank(
         ? [{ id: row.id, text: verdict.data.text }]
         : [];
     });
+  };
+}
+
+/** One correction of her bank as Entraîner lists it (ADR 0102 § 5); withdrawn ones are never listed. */
+export interface BankEntry {
+  readonly id: string;
+  readonly text: string;
+  readonly fanMessage: string;
+  readonly ratedAt: Date;
+  readonly state: 'active' | 'blocked';
+}
+
+/** Her bank as the owner sees it and empties it (ADR 0102 § 5). */
+export interface VoiceBankStore {
+  /** Her examples of one version, active or blocked, newest first. */
+  list(creatorId: string, personaVersionId: string): Promise<readonly BankEntry[]>;
+  /** Out of her bank everywhere, kept for history; false when it is not in her bank. */
+  withdraw(creatorId: string, id: string, at: Date): Promise<boolean>;
+}
+
+/** How many of her examples Entraîner lists: the twelve read, and enough behind them to choose what to withdraw. */
+const BANK_LISTED = 100;
+
+export function createDbVoiceBankStore(db: Database): VoiceBankStore {
+  const ratings = schema.calibrationRatings;
+  return {
+    async list(creatorId, personaVersionId) {
+      const rows = await withTenant(db, creatorId, (tx) =>
+        tx
+          .select({
+            id: ratings.id,
+            verdict: ratings.verdict,
+            fanMessage: ratings.fanMessage,
+            ratedAt: ratings.ratedAt,
+            state: ratings.exampleState,
+          })
+          .from(ratings)
+          .where(
+            and(
+              eq(ratings.creatorId, creatorId),
+              eq(ratings.personaVersionId, personaVersionId),
+              inArray(ratings.exampleState, ['active', 'blocked']),
+            ),
+          )
+          .orderBy(sql`${ratings.ratedAt} desc`)
+          .limit(BANK_LISTED),
+      );
+      return rows.flatMap((row) => {
+        const verdict = VerdictSchema.safeParse(row.verdict);
+        if (!verdict.success || verdict.data.kind !== 'corrected') return [];
+        const state = row.state === 'blocked' ? 'blocked' : 'active';
+        return [
+          {
+            id: row.id,
+            text: verdict.data.text,
+            fanMessage: row.fanMessage ?? '',
+            ratedAt: row.ratedAt,
+            state,
+          },
+        ];
+      });
+    },
+    async withdraw(creatorId, id, at) {
+      const changed = await withTenant(db, creatorId, (tx) =>
+        tx
+          .update(ratings)
+          .set({ exampleState: 'withdrawn', exampleStateAt: at })
+          .where(
+            and(
+              eq(ratings.id, id),
+              eq(ratings.creatorId, creatorId),
+              inArray(ratings.exampleState, ['active', 'blocked']),
+            ),
+          )
+          .returning({ id: ratings.id }),
+      );
+      return changed.length > 0;
+    },
   };
 }
 

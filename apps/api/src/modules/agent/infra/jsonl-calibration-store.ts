@@ -27,6 +27,7 @@ export const CalibrationRecordSchema = z.object({
   version: z.object({ voicePrompt: z.string(), voiceModel: z.string() }),
   verdict: VerdictSchema,
   destination: DestinationSchema.exactOptional(),
+  exampleBlocked: z.literal(true).exactOptional(),
   fanMessage: z.string(),
   bubbles: z.array(z.string()),
   moment: z.object({

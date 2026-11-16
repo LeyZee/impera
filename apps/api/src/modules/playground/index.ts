@@ -3,7 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { readFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { CreatorId, PersonaVersionId, PlaygroundState, StoredPersona } from '@impera/contracts';
+import {
+  CreatorIdSchema,
+  PersonaVersionIdSchema,
+  type CreatorId,
+  type PersonaVersionId,
+  type PlaygroundState,
+  type StoredPersona,
+} from '@impera/contracts';
 import { DEFAULT_LLM_CONFIG, loadPrompt, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -24,7 +31,8 @@ import {
 import { createMemoryDesireMarkStore, type DesireMarkStore } from './application/desire-marks';
 import { PlaygroundPersonaNotFound } from './application/engine';
 import { createPlaygroundService } from './application/playground-service';
-import { importRatings, type RatingImport } from './infra/db/rating-store';
+import { createVoiceBankView } from './infra/bank';
+import { importRatings, type RatingImport, type VoiceBankStore } from './infra/db/rating-store';
 import { createPlaygroundEngine } from './infra/engine';
 import { createPlaygroundGateway, createVoiceVariant, type PlaygroundGatewayDeps } from './infra/gateways';
 import { createPlaygroundRoutes, type PlaygroundRoutesOptions } from './infra/routes';
@@ -37,6 +45,7 @@ export { createPlaygroundSession, type PlaygroundFollowUp, type PlaygroundTurn }
 export { createDbDesireMarkStore } from './infra/db/desire-mark-store';
 export {
   createDbCalibrationStore,
+  createDbVoiceBankStore,
   createDbVoiceExampleBank,
   importRatings,
   type RatingImport,
@@ -95,6 +104,8 @@ export interface PlaygroundDeps extends PlaygroundGatewayDeps {
     creatorId: string,
     personaVersionId: string,
   ) => Promise<readonly VoiceExample[]>;
+  /** Her bank as Entraîner lists it and « Retirer » (ADR 0102 § 5); absent without a database. */
+  readonly bank?: VoiceBankStore;
 }
 
 export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
@@ -140,9 +151,25 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
     gateway,
     personaOf: (creatorId) => activePersonaForModels(deps.activePersona, creatorId, now()),
   });
+  const bank =
+    deps.bank === undefined
+      ? undefined
+      : createVoiceBankView({
+          store: deps.bank,
+          guardsOf: async (creatorId, versionId) => {
+            const stored = await deps.personaVersion?.(
+              CreatorIdSchema.parse(creatorId),
+              PersonaVersionIdSchema.parse(versionId),
+            );
+            if (stored === undefined || stored === null) return null;
+            const persona = await activePersonaForModels(() => Promise.resolve(stored), creatorId, now());
+            return persona === null ? null : guardSettingsOf(persona);
+          },
+          now,
+        });
   return {
     name: 'playground',
-    routes: (options) => createPlaygroundRoutes(service, alertTester, desireMarks, options),
+    routes: (options) => createPlaygroundRoutes(service, alertTester, desireMarks, options, bank),
   };
 }
 
@@ -161,6 +188,7 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly personaVersion?: PersonaVersionSource;
   readonly desireMarks?: DesireMarkStore;
   readonly voiceExamplesOf?: NonNullable<PlaygroundDeps['voiceExamplesOf']>;
+  readonly bank?: VoiceBankStore;
 }
 
 /** Reads the persona and the ratings kept so far, then builds the module. Throws when the persona is unreadable. */

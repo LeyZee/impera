@@ -203,6 +203,27 @@ async function server(
 }
 
 describe('/v1/playground', () => {
+  it('keeps a correction a hard guard stops as a correction, out of her bank, and says which guard (ADR 0102 § 4)', async () => {
+    const { post, stored } = await server();
+    await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT });
+    await post('/messages', { text: 'Salut' });
+    const rated = await post('/rating', {
+      verdict: { kind: 'corrected', text: 'Je suis une IA' },
+      destination: 'voice_example',
+    });
+    const result = PlaygroundRatingResultSchema.parse(rated.json());
+    expect(result.exampleBlockedBy?.map((v) => v.severity)).toContain('blocking');
+    expect(result.exampleBlockedBy?.[0]?.label).not.toBe('');
+    expect(stored.at(-1)).toMatchObject({ destination: 'voice_example', exampleBlocked: true });
+
+    await post('/messages', { text: 'Et toi ?' });
+    const fine = PlaygroundRatingResultSchema.parse(
+      (await post('/rating', { verdict: { kind: 'corrected', text: 'Coucou toi ✨' } })).json(),
+    );
+    expect(fine.exampleBlockedBy).toBeUndefined();
+    expect(stored.at(-1)?.exampleBlocked).toBeUndefined();
+  });
+
   it('gives her version the examples of her bank, chosen as her drafts choose them (ADR 0102 § 2)', async () => {
     const control: GatewayControl = { hasKey: true, sheets: [] };
     const asked: string[] = [];
