@@ -134,7 +134,7 @@
 .ar-alerts {
   display: grid;
   gap: var(--nv-space-2);
-  margin: var(--nv-space-3) 0 0;
+  margin: 0 0 var(--nv-space-2);
   padding: 0;
   list-style: none;
 }
