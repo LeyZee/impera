@@ -13,6 +13,7 @@ import {
   findFolder,
   folderLine,
   folderTiles,
+  tileLine,
   mediaKindLine,
   mediaLine,
   phaseAfterRead,
@@ -204,5 +205,17 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
       expect(bar).toBeGreaterThanOrEqual(0.2);
       expect(bar).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('writes a tile’s line in full for two kinds, as a total beyond', () => {
+    expect(tileLine([mediaOf({ kind: 'image' }), mediaOf({ kind: 'video' })])).toBe('1 photo · 1 vidéo');
+    expect(
+      tileLine([
+        mediaOf({ kind: 'image' }),
+        mediaOf({ kind: 'video' }),
+        mediaOf({ kind: 'audio' }),
+        mediaOf({ kind: 'audio', removed: true }),
+      ]),
+    ).toBe('3 médias');
   });
 });

@@ -75,6 +75,16 @@ export interface CoverItem {
   readonly seed: string;
 }
 
+/**
+ * A tile's one line: the detail while it holds two kinds at most (« 6 photos · 2 vidéos »), the total beyond
+ * (« 12 médias »), so it never runs out of room; the detail is in the folder.
+ */
+export function tileLine(media: VaultFolderView['media']): string {
+  const listed = media.filter((each) => !each.removed);
+  const kinds = new Set(listed.map((each) => each.kind)).size;
+  return kinds <= 2 ? mediaLine(media) : plural(listed.length, 'média', 'médias');
+}
+
 /** How many previews make a folder's cover. */
 const COVER = 4;
 
@@ -85,7 +95,7 @@ export function folderTiles(view: VaultView): FolderTile[] {
     name: folderName(folder),
     moment: folder.moment,
     unmarked: unmarked(folder),
-    line: mediaLine(folder.media),
+    line: tileLine(folder.media),
     removed: folder.media.filter((each) => each.removed).length,
     cover: folder.media
       .filter((each) => !each.removed)

@@ -180,7 +180,7 @@
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
 }
-.vx-cover--3 > .vx-preview:first-child {
+.vx-cover--3 > :first-child {
   grid-row: span 2;
 }
 .vx-cover .vx-preview {
@@ -483,11 +483,11 @@
 }
 /* Gone from Reveal: the theme's own surface, its preview faded, a struck cloud; never a black block. */
 .vx-tile--removed {
-  background: var(--nv-select);
+  background: var(--nv-glass-fill);
   color: var(--nv-ink-muted);
 }
 .vx-tile--removed .vx-preview {
-  opacity: 0.28;
+  opacity: 0.14;
   filter: grayscale(1);
 }
 .vx-tile--removed::after,
@@ -630,6 +630,10 @@
   color: #fff;
   background: var(--nv-select);
   animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+/* A voice note's sheet: a band of its wave, not a large frame that reads as a broken player. */
+.vx-sheet__preview.vx-tile--audio {
+  aspect-ratio: 5 / 2;
 }
 .vx-sheet__preview .vx-preview {
   position: absolute;
