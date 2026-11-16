@@ -770,7 +770,10 @@ export const PLATFORM_SCRIPT_GAPS = [
   'branch_cheaper_on_spend',
   /** A condition on the branch taken before names no branch of an earlier step. */
   'branch_previous_unknown',
-  /** The same sold media in two steps or two branches (ADR 0112 § 14): a fan would pay twice for it. */
+  /**
+   * The same sold media in two steps (ADR 0112 § 14) or in two branches of one step (§ 2: never the same media at two
+   * prices).
+   */
   'media_twice',
 ] as const;
 
