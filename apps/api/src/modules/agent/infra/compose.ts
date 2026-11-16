@@ -87,6 +87,14 @@ export interface ComposerPersona {
   readonly guardSettings: GuardSettings;
   /** False: her answer goes out as one message (`behavior.split_messages`). Absent: as the voice wrote it. */
   readonly splitMessages?: boolean;
+  /** The ids of her examples in `personaSheet` (ADR 0102 § 6): her voice's calls carry them to `llm_calls`. */
+  readonly voiceExampleIds?: readonly string[];
+}
+
+/** A voice call names the examples of hers it received (ADR 0102 § 6); the brain's call, which writes nothing, does not. */
+function voiceTraced<T extends { readonly trace?: CallTrace }>(input: T, persona: ComposerPersona): T {
+  const ids = persona.voiceExampleIds ?? [];
+  return ids.length === 0 ? input : { ...input, trace: { ...input.trace, voiceExampleIds: ids } };
 }
 
 /** What the fan receives: her bubbles, or one message when she does not split hers. */
@@ -512,7 +520,7 @@ async function writeFollowUp(
   droppedNotes: readonly string[],
 ): Promise<ComposedTurn> {
   // A follow-up: nothing of his awaits, one bubble.
-  const voiceInput: VoiceInput = { ...base, brief, maxBubbles: 1 };
+  const voiceInput: VoiceInput = voiceTraced({ ...base, brief, maxBubbles: 1 }, persona);
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
   const violations = [
@@ -819,13 +827,16 @@ export async function composeTurn(
     };
   }
   const budget = bubbleBudget(input.history);
-  const voiceInput: VoiceInput = {
-    ...base,
-    brief: voiceBrief,
-    maxBubbles: budget,
-    ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
-    ...(scriptStep !== undefined && { scriptStep }),
-  };
+  const voiceInput: VoiceInput = voiceTraced(
+    {
+      ...base,
+      brief: voiceBrief,
+      maxBubbles: budget,
+      ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
+      ...(scriptStep !== undefined && { scriptStep }),
+    },
+    persona,
+  );
   // Past the budget, left out, never glued nor sent at once (Charles 16/11 : « trois rarement »). Checked as kept:
   // the guards read the bubbles that leave.
   const attempt = async (asked: VoiceInput) => {

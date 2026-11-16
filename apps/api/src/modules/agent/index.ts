@@ -5,7 +5,9 @@ import type { FansModule } from '../fans';
 
 import { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
 import { createBubbleGuard, type AgentBubbleGuard } from './infra/bubble-guard';
+import { pickVoiceExamples, type VoiceExample } from './infra/calibration-record';
 import { createCardReader, type AgentCardReader } from './infra/card-reader';
+import { withExamples } from './infra/compose';
 import {
   createDraftComposer,
   type AgentDraftComposer,
@@ -72,9 +74,11 @@ export {
   type Verdict,
 } from './domain/calibration';
 export {
+  pickVoiceExamples,
   replayableTests,
   voiceExamples,
   type CalibrationRecord,
+  type VoiceExample,
   type CalibrationStore,
   type RatedMoment,
 } from './infra/calibration-record';
@@ -139,19 +143,35 @@ export interface DraftComposerStartOptions {
   readonly scripts?: ScriptSource;
   /** When a priced bundle was last offered to him (the policy's cooldown); without it, she offers nothing. */
   readonly lastOfferAt?: DraftComposerDeps['lastOfferAt'];
+  /**
+   * Her bank of examples for a version of her persona, newest first, withdrawn ones left out (ADR 0102): the
+   * playground's corrections filed as her voice's examples. Without it, or unreadable, she writes from her sheet alone.
+   */
+  readonly voiceExamplesOf?: (
+    creatorId: string,
+    personaVersionId: string,
+  ) => Promise<readonly VoiceExample[]>;
+  /** Her bank could not be read: she wrote from her sheet alone, the log says so. */
+  readonly onExamplesUnread?: (event: { readonly creatorId: string }) => void;
 }
 
 /**
- * Her fields for the composer, from her persona: her sheet as it is, her own sample replies in it (P5-01). The
- * playground's corrected answers never join it: they were written on its fictional persona, not hers (M13).
+ * Her fields for the composer, from her persona: her sheet, her own sample replies in it (P5-01), and the examples of
+ * her bank chosen as the playground chooses them (ADR 0102 § 2): what the owner sees there is what a fan receives.
  */
-function composerFields(persona: PersonaForModels): ComposerPersonaFields {
+function composerFields(persona: PersonaForModels, bank: readonly VoiceExample[]): ComposerPersonaFields {
+  const guardSettings = guardSettingsOf(persona);
+  const examples = pickVoiceExamples(bank, guardSettings);
   return {
     persona: {
       creatorName: persona.creatorName,
-      personaSheet: persona.personaSheet,
-      guardSettings: guardSettingsOf(persona),
+      personaSheet: withExamples(
+        persona.personaSheet,
+        examples.map((e) => e.text),
+      ),
+      guardSettings,
       splitMessages: persona.splitMessages,
+      ...(examples.length > 0 && { voiceExampleIds: examples.map((e) => e.id) }),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,
@@ -160,6 +180,21 @@ function composerFields(persona: PersonaForModels): ComposerPersonaFields {
     objectionReplies: persona.objectionReplies,
     ...(persona.versionId !== undefined && { personaVersionId: persona.versionId }),
   };
+}
+
+/** Her bank for the version she writes with; none without a version, without a reader, or when it cannot be read. */
+async function bankOf(
+  options: DraftComposerStartOptions,
+  creatorId: string,
+  personaVersionId: string | undefined,
+): Promise<readonly VoiceExample[]> {
+  if (personaVersionId === undefined || options.voiceExamplesOf === undefined) return [];
+  try {
+    return await options.voiceExamplesOf(creatorId, personaVersionId);
+  } catch {
+    options.onExamplesUnread?.({ creatorId });
+    return [];
+  }
 }
 
 /**
@@ -171,7 +206,8 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     gateway: options.gateway,
     personaOf: async (creatorId, now) => {
       const persona = await activePersonaForModels(options.activePersona, creatorId, now);
-      return persona === null ? null : composerFields(persona);
+      if (persona === null) return null;
+      return composerFields(persona, await bankOf(options, creatorId, persona.versionId));
     },
     timeZoneOf: options.timeZoneOf,
     voicePrompt: loadPrompt('voice').header.version,

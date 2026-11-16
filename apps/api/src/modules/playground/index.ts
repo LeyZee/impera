@@ -32,7 +32,12 @@ export { createPlaygroundGateway, createVoiceVariant } from './infra/gateways';
 export { readPersonaFile, withExamples } from '../agent/index';
 export { createPlaygroundSession, type PlaygroundFollowUp, type PlaygroundTurn } from './infra/session';
 export { createDbDesireMarkStore } from './infra/db/desire-mark-store';
-export { createDbCalibrationStore, importRatings, type RatingImport } from './infra/db/rating-store';
+export {
+  createDbCalibrationStore,
+  createDbVoiceExampleBank,
+  importRatings,
+  type RatingImport,
+} from './infra/db/rating-store';
 export type { DesireMarkRecord } from './application/desire-marks';
 
 /** One of her stored versions with her name, as `persona.versions.version` answers it (matched by shape). */

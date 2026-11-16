@@ -25,17 +25,17 @@ export const DESTINATION_LABELS: Readonly<Record<Destination, string>> = {
   test: 'Test',
 };
 /**
- * What each destination does today, honestly (Charles, 16/11) : production reads no correction until ADR 0102 is
- * coded, and nothing takes up a rule or replays a test on its own yet. These words change with that work.
+ * What each destination does today, honestly (Charles, 16/11) : her drafts read her examples of the version she
+ * writes with (ADR 0102), and nothing takes up a rule or replays a test on its own yet. These words change with that work.
  */
 export const DESTINATION_HINTS: Readonly<Record<Destination, string>> = {
-  voice_example: 'Sert d’exemple à sa voix, au Playground seulement pour l’instant.',
+  voice_example: 'Sert d’exemple à sa voix, ici et avec ses vrais fans, sur cette version de sa persona.',
   rule: 'Gardée pour être relue. Elle ne change rien toute seule pour l’instant.',
   test: 'Gardé pour être rejoué à la main, pas encore automatiquement.',
 };
 /** Said once the lesson is filed: where it went and what it changes. */
 const DESTINATION_ACKS: Readonly<Record<Destination, string>> = {
-  voice_example: 'Rangée en Exemple de voix : elle sert au Playground, pas encore aux vrais fans.',
+  voice_example: 'Rangée en Exemple de voix : sa voix s’en sert, ici et avec ses vrais fans.',
   rule: 'Rangée en Règle : gardée pour être relue, elle ne change rien toute seule pour l’instant.',
   test: 'Rangée en Test : gardée pour être rejouée à la main.',
 };

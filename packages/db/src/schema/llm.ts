@@ -79,6 +79,11 @@ export const llmCalls = pgTable(
     hedge: enumText('hedge'),
     /** Why an answer did not fit its schema: field paths and kinds only, never content (16/11, relevé du PC). */
     errorCode: text('error_code'),
+    /**
+     * A voice call only: the ids of her examples it received (ADR 0102 § 6), ratings of `calibration_ratings`. No
+     * foreign key: an example's row stays for history, and the journal never blocks on it. Null: none received.
+     */
+    voiceExampleIds: uuid('voice_example_ids').array(),
     createdAt: createdAt(),
   },
   (t) => [

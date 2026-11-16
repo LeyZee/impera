@@ -1,8 +1,14 @@
 import { createHash } from 'node:crypto';
 
+import { VerdictSchema } from '@impera/contracts';
 import { and, eq, schema, sql, withTenant, type Database } from '@impera/db';
 
-import { CalibrationRecordSchema, type CalibrationRecord, type CalibrationStore } from '../../../agent/index';
+import {
+  CalibrationRecordSchema,
+  type CalibrationRecord,
+  type CalibrationStore,
+  type VoiceExample,
+} from '../../../agent/index';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -103,6 +109,41 @@ export function createDbCalibrationStore(
       }
       return records.sort((a, b) => a.at.localeCompare(b.at));
     },
+  };
+}
+
+/** Read past what her guards may set aside, so twelve remain whenever her bank holds them (ADR 0102 § 2, § 4). */
+const BANK_READ = 48;
+
+/**
+ * Her bank for one version of her persona, newest first (ADR 0102 § 1, § 2): her corrections filed as voice examples
+ * and still `active`, in her tenant only. Withdrawn or blocked ones never leave. The agent chooses among them with her
+ * guards (`pickVoiceExamples`), as the playground does.
+ */
+export function createDbVoiceExampleBank(
+  db: Database,
+): (creatorId: string, personaVersionId: string) => Promise<readonly VoiceExample[]> {
+  return async (creatorId, personaVersionId) => {
+    const rows = await withTenant(db, creatorId, (tx) =>
+      tx
+        .select({ id: schema.calibrationRatings.id, verdict: schema.calibrationRatings.verdict })
+        .from(schema.calibrationRatings)
+        .where(
+          and(
+            eq(schema.calibrationRatings.creatorId, creatorId),
+            eq(schema.calibrationRatings.personaVersionId, personaVersionId),
+            eq(schema.calibrationRatings.exampleState, 'active'),
+          ),
+        )
+        .orderBy(sql`${schema.calibrationRatings.ratedAt} desc`)
+        .limit(BANK_READ),
+    );
+    return rows.flatMap((row) => {
+      const verdict = VerdictSchema.safeParse(row.verdict);
+      return verdict.success && verdict.data.kind === 'corrected'
+        ? [{ id: row.id, text: verdict.data.text }]
+        : [];
+    });
   };
 }
 
