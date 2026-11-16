@@ -150,7 +150,7 @@ const PACK_SOURCE: ScriptSource = {
         scriptRef: 'script-demo',
         moment: null,
         description: 'Pack de démonstration',
-        steps: [{ kind: 'paid', priceMinor: 1_500, mediaRefs: [] }],
+        steps: [{ stepRef: 'step-ref', kind: 'paid', priceMinor: 1_500, mediaRefs: [] }],
         mediaValidated: true,
         descriptionValidated: true,
         touchesLimits: false,
@@ -1957,8 +1957,37 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       scriptRun: {
         opened: { events: [{ type: 'script_started' }, { type: 'script_step_sent', stepIndex: 0 }] },
         offer: { amountMinor: 1_500, currency: 'EUR' },
+        step: { scriptRef: 'script-demo', stepIndex: 0, priceMinor: 1_500 },
       },
     });
+  });
+
+  it('lets her announce the media her step sends, and still refuses one no step carries (ADR 0098, P3-13)', async () => {
+    const withMedia: ScriptSource = {
+      ...PACK_SOURCE,
+      catalogue: async () =>
+        (await PACK_SOURCE.catalogue('creator-1', 'account-1')).map((script) => ({
+          ...script,
+          steps: script.steps.map((step) => ({ ...step, mediaRefs: ['media-1'] })),
+        })),
+    };
+    const announcing = { brief: HOT, voice: { bubbles: ['Je t’envoie une photo 📸'] } };
+    const carried = await composer(
+      announcing,
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(withMedia),
+    ).draftComposer.compose(free(INPUT));
+    expect(carried).toMatchObject({ kind: 'draft', scriptRun: { step: { hasMedia: true } } });
+
+    const bare = await composer(
+      announcing,
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    ).draftComposer.compose(free(INPUT));
+    expect(bare).toMatchObject({ kind: 'held' });
+    expect(bare.kind === 'held' ? bare.detail : []).toContain('media_not_sent');
   });
 
   it('sends no step in the care mode, hot, free and at her threshold: the care brief only (ADR 0088 § 2)', async () => {
@@ -2066,7 +2095,7 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       catalogue: async () =>
         (await PACK_SOURCE.catalogue('creator-1', 'account-1')).map((script) => ({
           ...script,
-          steps: [{ kind: 'paid', priceMinor: 1_900, mediaRefs: [] }],
+          steps: [{ stepRef: 'step-ref', kind: 'paid', priceMinor: 1_900, mediaRefs: [] }],
         })),
     };
     const answers: Brief = { ...BRIEF, scriptReply: 'answers_step' };

@@ -216,6 +216,15 @@ type AgentComposeResult = (
     readonly moved?: ScriptRunChange;
     readonly opened?: ScriptRunChange;
     readonly offer?: { readonly amountMinor: number; readonly currency: 'EUR' };
+    /** The step decided, paid or not: the platform sends it after the bubbles, at this price (0 when offered). */
+    readonly step?: {
+      readonly scriptRef: string;
+      readonly stepIndex: number;
+      readonly stepRef: string;
+      readonly priceMinor: number;
+      readonly hasMedia: boolean;
+      readonly idempotencyKey: string;
+    };
   };
 };
 
@@ -359,10 +368,8 @@ function withScripts(
     return turn.followed === null ? base : { ...base, scriptRun: { moved: turn.followed } };
   }
   const { decision } = turn;
-  const price =
-    (decision.kind === 'start' || decision.kind === 'send_step') && decision.step.priceMinor !== null
-      ? decision.step.priceMinor
-      : null;
+  const decided = decision.kind === 'start' || decision.kind === 'send_step' ? decision.step : null;
+  const price = decided?.priceMinor ?? null;
   // Reveal sells in euros: the catalogue's minor units are cents.
   const offer: NonNullable<AgentComposeResult['scriptRun']>['offer'] =
     price === null ? undefined : { amountMinor: price, currency: 'EUR' };
@@ -370,6 +377,16 @@ function withScripts(
     ...(turn.moved !== null && { moved: turn.moved }),
     ...(turn.opened !== null && { opened: turn.opened }),
     ...(offer !== undefined && { offer }),
+    ...(decided !== null && {
+      step: {
+        scriptRef: decided.scriptRef,
+        stepIndex: decided.stepIndex,
+        stepRef: decided.stepRef,
+        priceMinor: decided.priceMinor ?? 0,
+        hasMedia: (turn.script?.steps[decided.stepIndex]?.mediaRefs.length ?? 0) > 0,
+        idempotencyKey: decided.idempotencyKey,
+      },
+    }),
   };
   return Object.keys(scriptRun).length === 0 ? base : { ...base, scriptRun };
 }

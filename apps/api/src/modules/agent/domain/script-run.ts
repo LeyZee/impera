@@ -20,6 +20,8 @@ import type { DayPart } from './situation';
 
 /** A step of a platform script as the agent reads it: offered (no price), paid, or a bridge (offered). */
 interface PlatformScriptStepView {
+  /** The step as the platform names it: what is sent (ADR 0112, a branch has no stable index). */
+  readonly stepRef: string;
   readonly kind: ScriptStepKind;
   /** The platform's price in minor units, for a paid step only; `null` for an offered step or a bridge. */
   readonly priceMinor: number | null;
@@ -333,6 +335,7 @@ export function permittedScripts(
 export interface ScriptStepToSend {
   readonly scriptRef: string;
   readonly stepIndex: number;
+  readonly stepRef: string;
   readonly kind: ScriptStepKind;
   readonly priceMinor: number | null;
   /** One key per conversation, script and step: a replay never sends twice (ADR 0018 § 5). */
@@ -406,6 +409,7 @@ function toSend(
   return {
     scriptRef: script.scriptRef,
     stepIndex,
+    stepRef: step.stepRef,
     kind: step.kind,
     priceMinor: step.priceMinor,
     idempotencyKey: `script-step:${conversationRef}:${script.scriptRef}:${String(stepIndex)}`,

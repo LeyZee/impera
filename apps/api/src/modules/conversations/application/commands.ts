@@ -375,6 +375,7 @@ export function createConversationCommands({
             text: message.text,
           })),
           care: conversation.careSince !== null,
+          hasMedia: draft.scriptStep?.hasMedia === true,
         });
         if (verdict.isBlocked) throw new DraftGuarded(verdict.codes);
         const meta = humanMeta(input);

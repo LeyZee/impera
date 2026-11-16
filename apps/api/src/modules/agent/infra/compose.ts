@@ -201,6 +201,14 @@ function voiceStepOf(turn: ScriptTurn | undefined): VoiceScriptStep | undefined 
   };
 }
 
+/** The step decided sends a media of her vault: the bubbles that bring it may announce it. */
+function stepSendsMedia(turn: ScriptTurn | undefined): boolean {
+  const { decision, script } = turn ?? {};
+  if (script === undefined || script === null) return false;
+  if (decision?.kind !== 'start' && decision?.kind !== 'send_step') return false;
+  return (script.steps[decision.step.stepIndex]?.mediaRefs.length ?? 0) > 0;
+}
+
 /** A follow-up as the voice writes it: how long he has been silent, and her own way of following up if she wrote one. */
 interface FollowUpTurn {
   readonly silentHours: number;
@@ -352,12 +360,12 @@ export function withExamples(sheet: string, examples: readonly string[]): string
 }
 
 /**
- * What her guards read the draft against (P3-13): an engine draft never carries a media (a media goes out through
- * a script or a human), and her last turns are in the history.
+ * What her guards read the draft against (P3-13): a draft carries a media only through the step of her script that
+ * leaves with it (ADR 0098), and her last turns are in the history.
  */
-export function guardContextOf(history: readonly ConversationTurn[]): GuardContext {
+export function guardContextOf(history: readonly ConversationTurn[], hasMedia = false): GuardContext {
   return {
-    hasMedia: false,
+    hasMedia,
     previousTurns: previousTurnsOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
@@ -711,7 +719,11 @@ export async function composeTurn(
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
   // Checked as kept: the guards read the bubbles that leave.
   const violations = [
-    ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
+    ...checkVoiceOutput(
+      written,
+      persona.guardSettings,
+      guardContextOf(input.history, stepSendsMedia(scripts)),
+    ),
     ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
     ...(care ? checkCare(written) : []),
     ...(customOrder === undefined ? [] : checkNoCommitment(written)),

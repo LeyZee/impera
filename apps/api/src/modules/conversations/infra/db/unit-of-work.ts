@@ -29,7 +29,7 @@ import { z } from 'zod';
 import type { CardReadMessage, Transaction, UnitOfWork } from '../../domain/ports';
 
 import { heldBy } from './holds';
-import { toConversation, toDraft, toStoredBrief, toStoredEvent } from './rows';
+import { toConversation, toDraft, toStoredBrief, toStoredEvent, toStoredPolicyTrace } from './rows';
 import { bindScriptRuns } from './script-runs';
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
@@ -266,10 +266,11 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .for('update');
         return rows.map(toDraft);
       },
-      async insert({ bubbles, softViolations, voice, personaVersionId, facts, ...draft }) {
+      async insert({ bubbles, softViolations, voice, personaVersionId, facts, scriptStep, ...draft }) {
         await tx.insert(schema.drafts).values({
           ...draft,
           creatorId,
+          ...(scriptStep !== undefined && { policyTrace: toStoredPolicyTrace(scriptStep) }),
           ...(facts !== undefined && facts.length > 0 && { brief: toStoredBrief(facts) }),
           bubbles: [...(bubbles ?? [])],
           guardTrace: { softViolations: [...(softViolations ?? [])] },

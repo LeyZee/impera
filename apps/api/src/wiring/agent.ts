@@ -87,15 +87,15 @@ export function wireAgent(
   // Every approval passes the hard guards again (revue 09, G5), her active persona's limits included, read before
   // each approval (recette 28/10, G4). Without an active version nothing is approved: fail closed.
   const agentGuard = startBubbleGuard({ activePersona });
-  // Read against what she already sent him (P3-13); an approved draft never carries a media.
+  // Read against what she already sent him (P3-13); a draft carries a media only through the step of her script.
   const guard: BubbleGuard = {
     forCreator: async (creatorId) => {
       const hers = await agentGuard.forCreator(creatorId);
       return hers === null
         ? null
         : {
-            check: (bubbles, { history, care }) =>
-              hers.check(bubbles, guardContextOf(history), care === true),
+            check: (bubbles, { history, care, hasMedia }) =>
+              hers.check(bubbles, guardContextOf(history, hasMedia === true), care === true),
           };
     },
   };
