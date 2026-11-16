@@ -595,7 +595,10 @@ function MyShiftRow({
   zone: string;
   agency: string;
   phase: Phase;
-  /** His to hold: away from the team, a shift under way is not his « En poste » (CHAT-09). */
+  /**
+   * His to hold: away from the team, a shift under way is not his « En poste » (CHAT-09), and none is his to offer
+   * (CHT-31).
+   */
   held: boolean;
   /** The colleagues an open proposal of this shift waits on. */
   offeredTo: readonly string[];
@@ -614,7 +617,7 @@ function MyShiftRow({
     <li
       className="nv-plate sc-mine__shift"
       data-phase={phase}
-      data-actions={phase === 'later' ? 'true' : undefined}
+      data-actions={phase === 'later' && held ? 'true' : undefined}
     >
       <div className="sc-mine__hours">
         <p className="sc-mine__range nv-num">{rangeAt(shift.startsAt, shift.endsAt, zone)}</p>
@@ -671,7 +674,8 @@ function MyShiftRow({
                 : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
         </button>
       )}
-      {phase === 'later' ? (
+      {/* Away from the team, he holds no shift: none to offer, the agency places them (recette 16/11, CHT-31). */}
+      {phase === 'later' && held ? (
         <button
           type="button"
           className="sc-link sc-mine__swap"

@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MyProfilePage } from './MyProfilePage';
 
-import { IRIS_ME, LEA_ONLYFANS, NORA_REVEAL, SCHEDULING_SETTINGS, THEO, THEO_ME } from '@/test/pay';
+import { IRIS_ME, LEA_ONLYFANS, NORA_REVEAL, THEO, THEO_ME } from '@/test/pay';
 
 const NBSP = /[\u00a0\u202f]/gu;
 
@@ -30,20 +30,15 @@ function serve(members: readonly TeamMember[]): void {
     vi.fn((input: string) => {
       const url = new URL(input, 'http://localhost');
       if (url.pathname === '/v1/team/members') return Promise.resolve(Response.json({ members }));
-      if (url.pathname === '/v1/scheduling/calendar')
+      // The creators of his account, whatever his shifts (recette 16/11, CHT-31): Léa is not on his list.
+      if (url.pathname === '/v1/creators')
         return Promise.resolve(
           Response.json({
-            view: 'team',
-            settings: SCHEDULING_SETTINGS,
             creators: [NORA_REVEAL, LEA_ONLYFANS].map(({ creatorId, creatorName }) => ({
               id: creatorId,
-              name: creatorName,
-              archived: false,
+              displayName: creatorName,
+              timezone: 'Europe/Paris',
             })),
-            members: [],
-            shifts: [],
-            agent: [],
-            agency: null,
           }),
         );
       return Promise.resolve(new Response(null, { status: 404 }));

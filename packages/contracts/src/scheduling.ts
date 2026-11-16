@@ -861,7 +861,8 @@ export type SwapCandidates = z.infer<typeof SwapCandidatesSchema>;
 /**
  * `POST /v1/scheduling/swap-requests` (the member whose shift it is) → 201 `ShiftSwapRequestSchema`, or 200 when the
  * same `id` was already recorded with the same values (`shift_swap_conflict` otherwise). The shift is theirs and has
- * not started (`shift_not_found`, `shift_started_conflict`); the colleague is someone else (`shift_swap_self_invalid`),
+ * not started (`shift_not_found`, `shift_started_conflict`), and they are at work (`active`, 403 `role_forbidden`
+ * otherwise: away, they hold no shift; recette 16/11, CHT-31); the colleague is someone else (`shift_swap_self_invalid`),
  * `active` (`member_left_conflict`) and works on the shift's creator; with `targetShiftId`, that shift is the
  * colleague's, has not started, and its creator is one the requester works on (`member_creator_conflict` otherwise).
  * Nobody would end up on two shifts at once (`shift_member_conflict`): the colleague has no other shift that overlaps
