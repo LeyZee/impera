@@ -533,7 +533,7 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(root.querySelector('[data-gesture="reject"]')).not.toBeNull();
     expect(root.querySelector('.cp-draft__stop')).toBeNull();
     expect(root.querySelector('.cp-draft__warn')?.textContent).toBe(
-      'Ses limites ne se lisent pas : rien à copier tant qu’elles ne sont pas lues.',
+      'Impossible de lire ses limites pour l’instant\u00a0: rien à copier tant que ce n’est pas rétabli. Tu peux refuser ce brouillon.',
     );
     const editing = draw(
       onCard(card({}), [], { standing: unread, draft: ready({ mode: 'editing', text: 'x' }) }),

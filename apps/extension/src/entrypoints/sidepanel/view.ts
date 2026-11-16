@@ -514,7 +514,7 @@ const withheldLine = (withheld: Withheld): HTMLElement =>
     : h(
         'p',
         { class: 'cp-draft__warn', role: 'status' },
-        'Ses limites ne se lisent pas : rien à copier tant qu’elles ne sont pas lues.',
+        'Impossible de lire ses limites pour l’instant\u00a0: rien à copier tant que ce n’est pas rétabli. Tu peux refuser ce brouillon.',
       );
 
 /** Rows for the retouched text, from its length as well as its lines: a long bubble is read whole (EXT-20). */
