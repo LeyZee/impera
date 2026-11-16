@@ -98,6 +98,7 @@ export const CopilotDraftReasonSchema = z.enum([
   'rewritten_once',
   'media_not_seen',
 ]);
+export type CopilotDraftReason = z.infer<typeof CopilotDraftReasonSchema>;
 
 const CopilotLabelSchema = z.string().trim().min(1).max(120);
 

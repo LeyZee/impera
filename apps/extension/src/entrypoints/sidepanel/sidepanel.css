@@ -68,17 +68,26 @@ body {
 
 .cp-standing {
   flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 6px;
-  row-gap: 2px;
   margin: 0;
   padding: var(--cp-gutter) var(--cp-gutter) var(--nv-space-2);
   border-bottom: 1px solid var(--nv-hairline);
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
+}
+/*
+ * Every part carries the dot before it; the flow starts one dot to the left of the line and that strip is clipped, so
+ * the first part of each line shows no dot (Design 16/11: a line never starts with « · »). Clipped across only: the
+ * 44 px target of « +N » still reaches above and below.
+ */
+.cp-standing__flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 2px;
+  margin-left: calc(-1 * var(--cp-dot-room));
+  overflow-x: clip;
+  --cp-dot-room: 18px;
 }
 .cp-standing__stop {
   font-weight: 600;
@@ -169,8 +178,12 @@ body {
 .cp-standing__item {
   display: inline-flex;
   align-items: baseline;
-  gap: 6px;
   white-space: nowrap;
+}
+.cp-standing__dot {
+  display: inline-block;
+  width: var(--cp-dot-room);
+  text-align: center;
 }
 
 /* ───────────── The agent's draft ───────────── */
@@ -197,6 +210,15 @@ body {
 }
 .cp-draft__title {
   font-weight: 600;
+}
+/* A note on the draft's text (« Réécrit une fois par une garde »): with the draft, small and faint. */
+.cp-draft__about {
+  min-width: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  text-align: right;
+  text-wrap: pretty;
 }
 .cp-draft__hint {
   margin: 0;
@@ -568,7 +590,8 @@ body {
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);
 }
-.cp-group > summary {
+.cp-group > summary,
+.cp-group__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -578,6 +601,13 @@ body {
   cursor: pointer;
   list-style: none;
   font-size: var(--nv-text-footnote);
+}
+/* Masked while his age is contested (ADR 0141 § 9): the same row, which does not open. */
+.cp-group__row {
+  cursor: default;
+}
+.cp-field__masked {
+  color: var(--nv-ink-muted);
 }
 .cp-group > summary::-webkit-details-marker {
   display: none;

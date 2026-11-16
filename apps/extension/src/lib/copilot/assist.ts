@@ -1,12 +1,14 @@
 import type {
   CopilotAssist,
   CopilotCut,
+  CopilotDraftReason,
   CopilotNextMove,
   CopilotSaleBlock,
   CopilotSaleState,
+  DesireBand,
 } from '@impera/contracts';
 
-import type { Standing } from './standing';
+import { DESIRE_WORDS, type Standing } from './standing';
 
 /**
  * What the agent already computed, said to the chatter without a new AI call (ADR 0141, lot a): what to do now and why,
@@ -14,16 +16,24 @@ import type { Standing } from './standing';
  * them. A cut (§ 9) is the server's, said again here; the panel adds its own when it cannot read his limits.
  */
 
-/** Red is kept for the age doubt and « Ne plus lui écrire » (§ 12); amber when the sale is blocked. */
+/**
+ * One tone per state (§ 12, Design 16/11): red for what the top line says in red, « Âge contesté », « Ne plus lui
+ * écrire » and « Ventes gelées »; amber when the sale is blocked otherwise.
+ */
 export type AssistTone = 'neutral' | 'amber' | 'red';
 
-/** The one sentence that replaces « quoi faire » under a cut (§ 12): why, never a sale gesture. */
+const REREAD = 'Relis le brouillon avant de l’envoyer.';
+
+/**
+ * The one sentence that replaces « quoi faire » under a cut (§ 12): why, never a sale gesture. Said once: the draft
+ * adds no line of its own under it. The words are the glossary's (« Âge contesté », « fragile »).
+ */
 export const CUT_LINES: Readonly<Record<CopilotCut, { readonly text: string; readonly tone: AssistTone }>> = {
-  age_doubt: { text: 'Doute sur son âge\u00a0: un humain doit le lever avant tout.', tone: 'red' },
+  age_doubt: { text: 'Âge contesté\u00a0: un humain doit le lever avant tout.', tone: 'red' },
   do_not_contact: { text: 'Ne plus lui écrire\u00a0: on ne lui vend rien.', tone: 'red' },
-  care: { text: 'Fan en difficulté\u00a0: on ne vend pas, on prend soin de lui.', tone: 'amber' },
-  care_exit: { text: 'Il sort d’une passe difficile\u00a0: ni vente ni rien de coquin.', tone: 'amber' },
-  sales_frozen: { text: 'Ventes gelées\u00a0: on ne lui vend rien.', tone: 'amber' },
+  care: { text: `Fan fragile\u00a0: on ne lui vend rien. ${REREAD}`, tone: 'amber' },
+  care_exit: { text: `Fan fragile qui va mieux\u00a0: ni vente ni rien de coquin. ${REREAD}`, tone: 'amber' },
+  sales_frozen: { text: `Ventes gelées\u00a0: on ne lui vend rien. ${REREAD}`, tone: 'red' },
   limits_unread: {
     text: 'Limites non lues\u00a0: rien à vendre tant qu’elles ne sont pas lues.',
     tone: 'amber',
@@ -41,13 +51,14 @@ const CUT_ORDER: readonly CopilotCut[] = [
 ];
 
 /**
- * The cut the panel says, or null. Closed by default, as for the draft: limits not read, or « Ne plus lui écrire »
- * read by the panel itself, cut the sale even when the server's view does not say so yet.
+ * The cut the panel says, or null. Closed by default, as for the draft: limits not read, « Ne plus lui écrire » or
+ * « Âge contesté » read by the panel itself cut the sale even when the server's view does not say so yet.
  */
 export function cutOf(assist: CopilotAssist | null, standing: Standing): CopilotCut | null {
   const cuts = new Set(assist?.cuts ?? []);
   if (standing.unread) cuts.add('limits_unread');
   if (standing.noContact) cuts.add('do_not_contact');
+  if (standing.ageDisputed) cuts.add('age_doubt');
   return CUT_ORDER.find((cut) => cuts.has(cut)) ?? null;
 }
 
@@ -62,23 +73,72 @@ const BLOCK_WORDS: Readonly<Record<CopilotSaleBlock, string>> = {
   low_desire: 'Désir encore trop bas',
 };
 
+/**
+ * Notes on the draft, not reasons for the gesture (Design 16/11): they go with the draft, never in « pourquoi ».
+ */
+const DRAFT_NOTES: ReadonlySet<CopilotDraftReason> = new Set([
+  'rewritten_once',
+  'media_not_seen',
+  'llm_unavailable',
+]);
+
+/** The reasons recorded with the draft that are notes on its text, in the server's words. */
+export const draftNotes = (reasons: CopilotAssist['reasons']): readonly string[] =>
+  reasons.filter(({ code }) => DRAFT_NOTES.has(code)).map(({ label }) => label);
+
 export interface MoveLines {
   /** The gesture, verb first, in bold. */
   readonly what: string;
-  /** Why, in small: the block, then the reasons recorded with the draft; null when there is none. */
+  /** Why, in small: the reason to propose, or the block, then the gesture's reasons; null when there is none. */
   readonly why: string | null;
   readonly tone: AssistTone;
 }
 
+/** What the panel knows that says why a step is proposed: his desire and where the script stands. */
+export interface MoveContext {
+  readonly band: DesireBand | null;
+  readonly sale: CopilotSaleState | null;
+}
+
+const capital = (text: string): string => text.charAt(0).toLocaleUpperCase('fr-FR') + text.slice(1);
+
+/** « Désir chaud, étape 2 sur 4 »: why a step is proposed, from what is already known, no number invented. */
+function offerWhy({ band, sale }: MoveContext): string | null {
+  const parts = [
+    band === null ? null : `désir ${DESIRE_WORDS[band]}`,
+    sale?.script == null
+      ? null
+      : `étape ${String(sale.script.stepIndex + 1)} sur ${String(sale.script.stepCount)}`,
+  ].filter((part): part is string => part !== null);
+  return parts.length === 0 ? null : capital(parts.join(', '));
+}
+
 /** « Quoi faire » and « pourquoi », one block of two lines (§ 1, § 2, § 12). */
-export function moveLines(move: CopilotNextMove, reasons: CopilotAssist['reasons']): MoveLines {
+export function moveLines(
+  move: CopilotNextMove,
+  reasons: CopilotAssist['reasons'],
+  context: MoveContext,
+): MoveLines {
   const block = move.kind === 'no_sale' && move.block !== null ? move.block : null;
-  const blockWords = block === null ? null : (move.blockLabel ?? BLOCK_WORDS[block]);
-  const why = [...(blockWords === null ? [] : [blockWords]), ...reasons.map(({ label }) => label)];
+  const lead =
+    block !== null
+      ? (move.blockLabel ?? BLOCK_WORDS[block])
+      : move.kind === 'offer_step'
+        ? offerWhy(context)
+        : null;
+  const why = [
+    ...(lead === null ? [] : [lead]),
+    ...reasons.filter(({ code }) => !DRAFT_NOTES.has(code)).map(({ label }) => label),
+  ];
   return {
     what: move.label,
     why: why.length === 0 ? null : why.join(' · '),
-    tone: move.kind !== 'no_sale' ? 'neutral' : block === 'do_not_contact' ? 'red' : 'amber',
+    tone:
+      move.kind !== 'no_sale'
+        ? 'neutral'
+        : block === 'do_not_contact' || block === 'sales_frozen'
+          ? 'red'
+          : 'amber',
   };
 }
 
@@ -92,6 +152,9 @@ export function eurosOf(minor: number): string {
   return `${text}\u00a0€`;
 }
 
+/** A step's name as the panel says it, between guillemets (Design 16/11): « La suite ». */
+const step = (name: string): string => `«\u00a0${name}\u00a0»`;
+
 /** The fold's summary line (§ 14): the step in progress, and the next one with its price. */
 export function saleSummary(sale: CopilotSaleState): string {
   const now =
@@ -100,7 +163,7 @@ export function saleSummary(sale: CopilotSaleState): string {
       : `${sale.script.name}, étape ${String(sale.script.stepIndex + 1)} sur ${String(sale.script.stepCount)}`;
   return sale.nextStep === null
     ? now
-    : `${now} · ensuite ${sale.nextStep.name} à ${eurosOf(sale.nextStep.priceMinor)}`;
+    : `${now} · ensuite ${step(sale.nextStep.name)} à ${eurosOf(sale.nextStep.priceMinor)}`;
 }
 
 /** The fold's rows (§ 3): what is known of the sale, each said once. */
@@ -114,11 +177,11 @@ export function saleRows(sale: CopilotSaleState): { readonly label: string; read
   if (sale.nextStep !== null)
     rows.push({
       label: 'Prochaine étape',
-      value: `${sale.nextStep.name} à ${eurosOf(sale.nextStep.priceMinor)}`,
+      value: `${step(sale.nextStep.name)} à ${eurosOf(sale.nextStep.priceMinor)}`,
     });
   if (sale.offerPending) rows.push({ label: 'Offre faite', value: 'Pas encore de réponse' });
   if (sale.refusedSteps.length > 0)
-    rows.push({ label: 'Étapes refusées', value: sale.refusedSteps.join(', ') });
+    rows.push({ label: 'Étapes refusées', value: sale.refusedSteps.map(step).join(', ') });
   if (sale.usedObjections.length > 0)
     rows.push({
       label: 'Objections déjà servies, à ne pas resservir',

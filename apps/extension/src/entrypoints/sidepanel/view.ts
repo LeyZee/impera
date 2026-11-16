@@ -2,6 +2,7 @@ import {
   REJECT_REASONS,
   type CopilotAssist,
   type CopilotCut,
+  type DesireBand,
   type FanCardEntry,
   type FanCardFieldSpec,
   type FanCardGroup,
@@ -9,7 +10,15 @@ import {
   type RejectReason,
 } from '@impera/contracts';
 
-import { CUT_LINES, cutOf, moveLines, saleRows, saleSummary, signalWords } from '../../lib/copilot/assist';
+import {
+  CUT_LINES,
+  cutOf,
+  draftNotes,
+  moveLines,
+  saleRows,
+  saleSummary,
+  signalWords,
+} from '../../lib/copilot/assist';
 import {
   entryOf,
   ESSENTIALS,
@@ -309,20 +318,61 @@ function identity(card: FanCardView, marks: Marks): HTMLElement {
   );
 }
 
+/** What is masked while his age is contested (ADR 0141 § 9, Agent 16/11): said the same way on both rows. */
+const MASKED = 'Masqué tant que son âge est contesté.';
+
+/** « Ses fantasmes » masked: its label, then only why, in the muted ink. Nothing of its value, source or checks. */
+const maskedField = (spec: FanCardFieldSpec): HTMLElement =>
+  h(
+    'li',
+    { class: 'cp-field', 'data-field': spec.field, 'data-masked': 'true' },
+    h('span', { class: 'cp-field__top' }, h('span', { class: 'cp-field__label' }, spec.label)),
+    h('span', { class: 'cp-field__masked' }, MASKED),
+  );
+
+/** « Intime » masked: a row that does not open, its title and why. */
+const maskedGroup = (group: FanCardGroup, title: string): HTMLElement =>
+  h(
+    'div',
+    { class: 'cp-group', 'data-group': group, 'data-masked': 'true' },
+    h(
+      'div',
+      { class: 'cp-group__row' },
+      h('span', { class: 'cp-group__title' }, title),
+      h('span', { class: 'cp-group__sum' }, MASKED),
+    ),
+  );
+
+/**
+ * While his age is contested, his fantasies and the intimate group are masked by the panel itself, closed by default:
+ * even if a server still sent their values, none is drawn, and their checks are not counted.
+ */
+const isMasked = (masked: boolean, spec: FanCardFieldSpec): boolean => masked && spec.group === 'intimate';
+
 function cardNodes(
   card: FanCardView,
   openGroups: ReadonlySet<FanCardGroup>,
   marks: Marks,
   actions: PanelActions,
+  masked: boolean,
 ): HTMLElement[] {
-  const checks = toCheckCount(card.fields);
+  const checks = toCheckCount(
+    card.fields.filter((entry) => {
+      const spec = specOf(entry.field);
+      return spec === undefined || !isMasked(masked, spec);
+    }),
+  );
   const said: { last: string | null } = { last: null };
   const essentials = [
     identity(card, marks),
     ...ESSENTIALS.filter((name) => !IDENTITY.some((part) => part === name))
       .map((name) => {
         const spec = specOf(name);
-        return spec === undefined ? null : field(spec, entryOf(card.fields, name), marks, said);
+        if (spec === undefined) return null;
+        // « Ses fantasmes » is masked; « Ce qu'il ne veut pas » stays read: it protects him (Agent 16/11).
+        return spec.field === 'desires' && isMasked(masked, spec)
+          ? maskedField(spec)
+          : field(spec, entryOf(card.fields, name), marks, said);
       })
       .filter((node): node is HTMLElement => node !== null),
   ];
@@ -335,6 +385,7 @@ function cardNodes(
     ),
     h('ul', { class: 'cp-fields cp-fields--essentials', 'aria-label': 'L’essentiel' }, ...essentials),
     ...PANEL_GROUPS.map(({ group, title }) => {
+      if (masked && group === 'intimate') return maskedGroup(group, title);
       const groupSaid: { last: string | null } = { last: null };
       const toCheck = groupChecks(card.fields, group);
       // A group shows what is known or waits for a check; the rest is named on one faint line (V-EXT-29).
@@ -385,31 +436,38 @@ function cardNodes(
 
 /**
  * « Où on en est », one line (§ 3.1): red for what forbids the sale, amber for what holds it back, then his desire and
- * the signals not to miss (ADR 0141 § 4). Nothing to say is said, so a chatter knows it was read. Three parts at most,
- * then « +N » (§ 14): only the new signals fold, what forbids or holds back is always said.
+ * the signals not to miss (ADR 0141 § 4). Nothing to say is said, so a chatter knows it was read, but never next to
+ * something said (Design 16/11). Three parts at most, then « +N » (§ 14): only the new signals fold, what forbids or
+ * holds back is always said. While his age is contested, nothing of his desire is said (§ 9).
  */
-function standingLine(standing: Standing | null, signals: Signals, open: boolean): HTMLElement {
+function standingLine(
+  standing: Standing | null,
+  signals: Signals,
+  open: boolean,
+  ageCut: boolean,
+): HTMLElement {
   if (standing === null) return h('p', { class: 'cp-standing', 'aria-busy': 'true' }, '…');
   const parts: HTMLElement[] = [
     ...standing.stops.map((text) => h('span', { class: 'cp-standing__stop' }, text)),
     ...standing.cares.map((text) => h('span', { class: 'cp-standing__care' }, text)),
   ];
   if (standing.unread) parts.push(h('span', { class: 'cp-standing__care' }, 'Limites non lues'));
-  const calm = parts.length === 0;
-  if (calm) parts.push(h('span', { class: 'cp-standing__calm' }, 'Rien à signaler'));
   // Words of the application, without an emoji (V-EXT-08): the emojis are the creator's voice, in the bubbles.
-  const desire = [standing.band === null ? null : DESIRE_WORDS[standing.band], signals.trend].filter(
-    (word): word is string => word !== null,
-  );
+  const desire = ageCut
+    ? []
+    : [standing.band === null ? null : DESIRE_WORDS[standing.band], signals.trend].filter(
+        (word): word is string => word !== null,
+      );
   if (desire.length > 0) parts.push(h('span', { class: 'cp-standing__band' }, `désir ${desire.join(', ')}`));
   // What forbids, what holds back and his desire are never folded; the new signals fill up to three parts, the rest
-  // waits behind « +N ». « Rien à signaler » is not a signal and takes no place.
-  const room = Math.max(0, 3 - (parts.length - (calm ? 1 : 0)));
+  // waits behind « +N ».
+  const room = Math.max(0, 3 - parts.length);
   const more = signals.more.map((text) => h('span', { class: 'cp-standing__signal' }, text));
   const hidden = open ? 0 : Math.max(0, more.length - room);
   const shown = [...parts, ...(hidden === 0 ? more : more.slice(0, room))];
-  const line = h('p', { class: 'cp-standing', 'aria-label': 'Où on en est' });
-  // Each dot goes with what follows it, never alone at the end of a line (V-EXT-18).
+  if (shown.length === 0) shown.push(h('span', { class: 'cp-standing__calm' }, 'Rien à signaler'));
+  // Each dot goes with what follows it, never alone at the end of a line (V-EXT-18); the dot of the first part of each
+  // line falls outside the clipped flow, so no line starts with « · » (Design 16/11).
   const item = (part: HTMLElement): HTMLElement =>
     h(
       'span',
@@ -417,11 +475,9 @@ function standingLine(standing: Standing | null, signals: Signals, open: boolean
       h('span', { class: 'cp-standing__dot', 'aria-hidden': 'true' }, '·'),
       part,
     );
-  shown.forEach((part, index) => {
-    line.append(index === 0 ? part : item(part));
-  });
+  const flow = h('span', { class: 'cp-standing__flow' }, ...shown.map(item));
   if (hidden > 0)
-    line.append(
+    flow.append(
       item(
         h(
           'button',
@@ -435,7 +491,7 @@ function standingLine(standing: Standing | null, signals: Signals, open: boolean
         ),
       ),
     );
-  return line;
+  return h('p', { class: 'cp-standing', 'aria-label': 'Où on en est' }, flow);
 }
 
 interface Signals {
@@ -448,7 +504,11 @@ interface Signals {
  * code decided, in bold, verb first; why, small and muted. A cut replaces it with one sentence that says why (§ 9):
  * the sale gestures are gone, never greyed.
  */
-function moveBand(assist: CopilotAssist | null, cut: CopilotCut | null): HTMLElement | null {
+function moveBand(
+  assist: CopilotAssist | null,
+  cut: CopilotCut | null,
+  band: DesireBand | null,
+): HTMLElement | null {
   if (cut !== null) {
     const { text, tone } = CUT_LINES[cut];
     return h(
@@ -458,7 +518,7 @@ function moveBand(assist: CopilotAssist | null, cut: CopilotCut | null): HTMLEle
     );
   }
   if (assist?.nextMove == null) return null;
-  const { what, why, tone } = moveLines(assist.nextMove, assist.reasons);
+  const { what, why, tone } = moveLines(assist.nextMove, assist.reasons, { band, sale: assist.sale });
   return h(
     'section',
     { class: 'cp-move', 'data-tone': tone, 'data-move': assist.nextMove.kind, 'aria-label': 'Quoi faire' },
@@ -515,6 +575,7 @@ function saleFold(
 function cardPart(
   screen: Extract<PanelScreen, { kind: 'conversation' }>,
   actions: PanelActions,
+  masked: boolean,
 ): HTMLElement[] {
   if (!screen.cardOn)
     return [
@@ -537,7 +598,13 @@ function cardPart(
     return [h('p', { class: 'cp-loading', 'aria-busy': 'true' }, 'Lecture de la fiche…')];
   if (screen.card === 'forbidden') return [notice('forbidden')];
   if (screen.card === 'down') return [notice('down')];
-  return cardNodes(screen.card, screen.openGroups, { now: screen.now, newSince: screen.newSince }, actions);
+  return cardNodes(
+    screen.card,
+    screen.openGroups,
+    { now: screen.now, newSince: screen.newSince },
+    actions,
+    masked,
+  );
 }
 
 const key = (letter: string): HTMLElement => h('span', { class: 'nv-kbd' }, letter);
@@ -640,11 +707,15 @@ const rowsOf = (text: string): number =>
 interface DraftStops {
   readonly withheld: Withheld | null;
   readonly stops: readonly string[];
+  /** A cut said right above the draft: the draft adds no line of its own (each cut said once, Design 16/11). */
+  readonly saidAbove: boolean;
+  /** Notes on the draft's text recorded with it (« Réécrit une fois par une garde »), in the server's words. */
+  readonly notes: readonly string[];
 }
 
 function draftPart(
   draft: DraftPart,
-  { withheld, stops }: DraftStops,
+  { withheld, stops, saidAbove, notes }: DraftStops,
   actions: PanelActions,
 ): HTMLElement | null {
   if (draft.kind === 'hidden') return null;
@@ -654,10 +725,12 @@ function draftPart(
       { class: 'cp-draft', 'aria-label': 'Brouillon de l’agent', 'data-state': 'writing' },
       h('p', { class: 'cp-draft__writing' }, 'L’agent écrit…'),
     );
+  // A note on the text goes with the draft, never in « pourquoi » (Design 16/11).
   const head = h(
     'header',
     { class: 'cp-draft__head' },
     h('span', { class: 'cp-draft__title' }, 'Brouillon de l’agent'),
+    notes.length === 0 ? null : h('span', { class: 'cp-draft__about' }, notes.join(' · ')),
   );
   const section = h('section', {
     class: 'cp-draft',
@@ -802,8 +875,8 @@ function draftPart(
     section.append(withheldLine(withheld), h('div', { class: 'cp-draft__actions' }, refuse));
     return section;
   }
-  const stopped = stops.length > 0;
-  if (stopped) section.insertBefore(stopsLine(stops), bubbles);
+  const stopped = stops.length > 0 || saidAbove;
+  if (stops.length > 0 && !saidAbove) section.insertBefore(stopsLine(stops), bubbles);
   section.append(
     h(
       'div',
@@ -930,24 +1003,30 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
     const cut = screen.standing === null ? null : cutOf(screen.assist, screen.standing);
     const assist = screen.standing === null ? null : screen.assist;
     const fold = saleFold(assist, cut, screen.saleOpen, actions);
+    // While his age is contested, what is intimate is masked, by the panel itself too (§ 9, closed by default).
+    const ageCut = cut === 'age_doubt';
     const body = h(
       'div',
       { class: 'cp-scroll' },
       ...(fold === null ? [] : [fold]),
-      ...cardPart(screen, actions),
+      ...cardPart(screen, actions, ageCut),
     );
+    const withheld = withheldOf(screen.standing);
+    // Under the card, right above the draft, so fan, what to do, the draft and its copy are read without scrolling.
+    // A cut is said once: by the draft when its own line already says it, otherwise by the sentence above it, and the
+    // draft then adds no line. It never lets the sale gesture through.
+    const draftSaysCut = cut !== null && sameAsDraft(cut, screen.draft, withheld);
+    const move = draftSaysCut ? null : moveBand(assist, cut, screen.standing?.band ?? null);
     const stops: DraftStops = {
-      withheld: withheldOf(screen.standing),
+      withheld,
       stops: screen.standing?.stops ?? [],
+      saidAbove: cut !== null && !draftSaysCut,
+      notes: assist === null ? [] : draftNotes(assist.reasons),
     };
     const top = [
       whoBand(screen.fanName),
-      standingLine(screen.standing, signalWords(assist, cut), screen.signalsOpen),
+      standingLine(screen.standing, signalWords(assist, cut), screen.signalsOpen, ageCut),
     ].filter((node): node is HTMLElement => node !== null);
-    // Under the card, right above the draft, so fan, what to do, the draft and its copy are read without scrolling.
-    // A cut the draft already says is said once, by the draft; it never lets the sale gesture through.
-    const move =
-      cut !== null && sameAsDraft(cut, screen.draft, stops.withheld) ? null : moveBand(assist, cut);
     const pinned = move === null ? [] : [move];
     const key = draftKey(screen.draft, stops);
     const shown = root.querySelector(':scope > .cp-draft');

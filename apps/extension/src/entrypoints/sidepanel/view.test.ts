@@ -100,6 +100,10 @@ const ready = (patch: Partial<Extract<DraftPart, { kind: 'ready' }>> = {}): Draf
   ...patch,
 });
 
+/** « Où on en est » as read: every part carries its dot, the first one is clipped out of the line (Design 16/11). */
+const standingText = (root: ParentNode): string | undefined =>
+  root.querySelector('.cp-standing')?.textContent.replace(/^·/, '');
+
 describe('the copilot side panel (ADR 0086, lot b)', () => {
   it.each([
     ['no_conversation', 'Ouvre une conversation dans Reveal'],
@@ -304,8 +308,7 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
   });
 
   it('says where things stand in one line: red forbids, amber holds back, then his desire', () => {
-    const line = (screen: PanelScreen): string | null | undefined =>
-      draw(screen).root.querySelector('.cp-standing')?.textContent;
+    const line = (screen: PanelScreen): string | undefined => standingText(draw(screen).root);
     const { root } = draw(
       onCard(card({}), [], {
         standing: standingOf(
@@ -317,15 +320,17 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(root.querySelector('.cp-standing__stop')?.textContent).toBe('Ventes gelées');
     expect(root.querySelector('.cp-standing__care')?.textContent).toBe('Fan fragile');
     // No emoji in the interface (V-EXT): his desire is said in words.
-    expect(root.querySelector('.cp-standing')?.textContent).toBe('Ventes gelées·Fan fragile·désir joueur');
-    // A part and the dot before it hold together at a line's end.
+    expect(standingText(root)).toBe('Ventes gelées·Fan fragile·désir joueur');
+    // A part and the dot before it hold together at a line's end; the first part's dot falls in the clipped strip.
     expect([...root.querySelectorAll('.cp-standing__item')].map((n) => n.textContent)).toEqual([
+      '·Ventes gelées',
       '·Fan fragile',
       '·désir joueur',
     ]);
-    expect(line(onCard(card({}), [], { standing: standingOf({}, 'neutral') }))).toBe(
-      'Rien à signaler·désir neutre',
-    );
+    expect(root.querySelector('.cp-standing > .cp-standing__flow')).not.toBeNull();
+    // « Rien à signaler » only when nothing at all is said (Design 16/11).
+    expect(line(onCard(card({}), [], { standing: standingOf({}, 'neutral') }))).toBe('désir neutre');
+    expect(line(onCard(card({}), [], { standing: standingOf({}, null) }))).toBe('Rien à signaler');
     expect(line(onCard(card({}), [], { standing: standingOf('unread', null) }))).toBe('Limites non lues');
     expect(line(onCard(card({}), [], { standing: standingOf({ spendingLimitMinor: 15_000 }, null) }))).toBe(
       'Plafond 150\u00a0€',
@@ -629,7 +634,12 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
 describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
   /* Invented data (ADR 0010). */
   const base = (patch: Partial<CopilotAssist> = {}): CopilotAssist => ({
-    nextMove: { kind: 'offer_step', label: 'Proposer Étape 3 à 15 €', priceMinor: 1500, block: null },
+    nextMove: {
+      kind: 'offer_step',
+      label: 'Proposer «\u00a0Étape 3\u00a0» à 15 €',
+      priceMinor: 1500,
+      block: null,
+    },
     reasons: [{ code: 'rewritten_once', label: 'Réécrit une fois par une garde' }],
     sale: {
       script: { name: 'Soirée d’essai', stepIndex: 1, stepCount: 4 },
@@ -655,7 +665,7 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     const before = draw(onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot') })).root;
     expect(before.querySelector('.cp-move')).toBeNull();
     expect(before.querySelector('.cp-sale')).toBeNull();
-    expect(before.querySelector('.cp-standing')?.textContent).toBe('Rien à signaler·désir chaud');
+    expect(standingText(before)).toBe('désir chaud');
     expect([...before.children].map((node) => node.className)).toEqual([
       'cp-standing',
       'cp-scroll',
@@ -673,8 +683,11 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     ]);
     const move = root.querySelector<HTMLElement>('.cp-move');
     expect(move?.dataset['tone']).toBe('neutral');
-    expect(move?.querySelector('.cp-move__what')?.textContent).toBe('Proposer Étape 3 à 15 €');
-    expect(move?.querySelector('.cp-move__why')?.textContent).toBe('Réécrit une fois par une garde');
+    expect(move?.querySelector('.cp-move__what')?.textContent).toBe('Proposer «\u00a0Étape 3\u00a0» à 15 €');
+    // Why a step is proposed, from what is known (Design 16/11); the note on the text goes with the draft.
+    expect(move?.querySelector('.cp-move__why')?.textContent).toBe('Désir chaud, étape 2 sur 4');
+    expect(root.querySelector('.cp-draft__about')?.textContent).toBe('Réécrit une fois par une garde');
+    expect(move?.textContent).not.toContain('Réécrit');
     // « Copier pour Reveal » stays the one strong action; lot b's buttons are not drawn yet.
     expect(root.querySelectorAll('.cp-send')).toHaveLength(1);
     expect(root.querySelector('[data-assist]')).toBeNull();
@@ -698,14 +711,18 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     }
   });
 
-  it('says « ne rien vendre » in amber with the block, and in red only for « Ne plus lui écrire »', () => {
+  it('says « ne rien vendre » in amber with the block, in red for « Ne plus lui écrire » and « Ventes gelées »', () => {
     const low = with_(
       base({ nextMove: { kind: 'no_sale', label: 'Ne rien vendre', priceMinor: null, block: 'low_desire' } }),
     );
     expect(low.querySelector<HTMLElement>('.cp-move')?.dataset['tone']).toBe('amber');
-    expect(low.querySelector('.cp-move__why')?.textContent).toBe(
-      'Désir encore trop bas · Réécrit une fois par une garde',
+    expect(low.querySelector('.cp-move__why')?.textContent).toBe('Désir encore trop bas');
+    const frozen = with_(
+      base({
+        nextMove: { kind: 'no_sale', label: 'Ne rien vendre', priceMinor: null, block: 'sales_frozen' },
+      }),
     );
+    expect(frozen.querySelector<HTMLElement>('.cp-move')?.dataset['tone']).toBe('red');
     const blocked = with_(
       base({
         nextMove: { kind: 'no_sale', label: 'Ne rien vendre', priceMinor: null, block: 'do_not_contact' },
@@ -715,10 +732,18 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
   });
 
   it.each([
-    ['age_doubt', 'red', 'Doute sur son âge\u00a0: un humain doit le lever avant tout.'],
-    ['care', 'amber', 'Fan en difficulté\u00a0: on ne vend pas, on prend soin de lui.'],
-    ['care_exit', 'amber', 'Il sort d’une passe difficile\u00a0: ni vente ni rien de coquin.'],
-    ['sales_frozen', 'amber', 'Ventes gelées\u00a0: on ne lui vend rien.'],
+    ['age_doubt', 'red', 'Âge contesté\u00a0: un humain doit le lever avant tout.'],
+    ['care', 'amber', 'Fan fragile\u00a0: on ne lui vend rien. Relis le brouillon avant de l’envoyer.'],
+    [
+      'care_exit',
+      'amber',
+      'Fan fragile qui va mieux\u00a0: ni vente ni rien de coquin. Relis le brouillon avant de l’envoyer.',
+    ],
+    [
+      'sales_frozen',
+      'red',
+      'Ventes gelées\u00a0: on ne lui vend rien. Relis le brouillon avant de l’envoyer.',
+    ],
   ] as const)('replaces what to do with one sentence under the cut %s, the sale gone', (cut, tone, text) => {
     const root = with_(
       base({ cuts: [cut], sale: null, buttons: [], signals: { desireTrend: 'up', followUpDue: true } }),
@@ -729,8 +754,64 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     expect(move?.textContent).toBe(text);
     expect(root.querySelector('.cp-move__what')).toBeNull();
     expect(root.querySelector('.cp-sale')).toBeNull();
-    // No signal pushes to write or to sell under a cut.
-    expect(root.querySelector('.cp-standing')?.textContent).toBe('Rien à signaler·désir chaud');
+    // No signal pushes to write or to sell under a cut; a contested age silences his desire too (Design 16/11).
+    expect(standingText(root)).toBe(cut === 'age_doubt' ? 'Rien à signaler' : 'désir chaud');
+  });
+
+  // Design 16/11: each cut said once. Under the sentence, the draft adds no line of its own.
+  it('says a cut once: the sentence above the draft, and no line under « Brouillon de l’agent »', () => {
+    for (const flags of [
+      { salesFrozen: { reason: 'distress', since: now.toISOString() }, fragile: true },
+      { salesFrozen: { reason: 'distress', since: now.toISOString() } },
+    ] as const) {
+      const root = with_(base({ cuts: ['care', 'sales_frozen'], sale: null, buttons: [] }), {
+        standing: standingOf(flags, 'hot'),
+      });
+      expect(root.querySelectorAll('.cp-move')).toHaveLength(1);
+      expect(root.querySelector('.cp-draft__stop')).toBeNull();
+      expect(root.querySelector('.cp-draft__warn')).toBeNull();
+      // The copy is still not the ink button: the sentence above asks to reread.
+      expect(root.querySelector('.cp-place')?.classList.contains('cp-send')).toBe(false);
+    }
+    // Without a cut, a stop still says « relis-le » with the draft, as before.
+    const stopped = with_(base(), {
+      standing: standingOf({ salesFrozen: { reason: 'distress', since: now.toISOString() } }, 'hot'),
+    });
+    expect(stopped.querySelector('.cp-draft__stop')?.textContent).toContain('Ventes gelées');
+  });
+
+  // Agent 16/11: while his age is contested, his fantasies and what is intimate are masked, by the panel itself too.
+  it('masks « Ses fantasmes » and « Intime » while his age is contested, whatever the server sent', () => {
+    const intimate = card({
+      desires: {
+        current: value(['qu’elle prenne les devants']),
+        toCheck: [value(['les talons'], { source: 'inferred' })],
+      },
+      lead: { current: value(['she_leads']), toCheck: [] },
+    });
+    const masked = (patch: Parameters<typeof onCard>[2]): ReturnType<typeof draw>['root'] =>
+      draw(onCard(intimate, [], { draft: { kind: 'hidden' }, assist: base(), ...patch })).root;
+    for (const root of [
+      masked({ standing: standingOf({}, 'hot'), assist: base({ cuts: ['age_doubt'], sale: null }) }),
+      masked({ standing: standingOf({ ageDisputed: { since: now.toISOString(), by: 'policy' } }, 'hot') }),
+    ]) {
+      const desires = root.querySelector<HTMLElement>('[data-field="desires"]');
+      expect(desires?.dataset['masked']).toBe('true');
+      expect(desires?.textContent).toBe('Ses fantasmesMasqué tant que son âge est contesté.');
+      const group = root.querySelector<HTMLElement>('[data-group="intimate"]');
+      expect(group?.tagName).toBe('DIV');
+      expect(group?.textContent).toBe('IntimeMasqué tant que son âge est contesté.');
+      expect(root.textContent).not.toContain('prenne les devants');
+      expect(root.textContent).not.toContain('talons');
+      // Its checks are not counted: the count would send him to what is masked.
+      expect(root.querySelector('.cp-head__check')).toBeNull();
+      expect(root.querySelector('.cp-field__masked')?.getAttribute('style')).toBeNull();
+      // What he does not want stays read: it protects him.
+      expect(root.querySelector<HTMLElement>('[data-field="limits"]')?.dataset['masked']).toBeUndefined();
+    }
+    const open = masked({ standing: standingOf({}, 'hot') });
+    expect(open.querySelector('[data-field="desires"]')?.textContent).toContain('prenne les devants');
+    expect(open.querySelector('[data-group="intimate"]')?.tagName).toBe('DETAILS');
   });
 
   it('cuts the sale on its own when his limits are not read or forbid a word, said once with the draft', () => {
@@ -766,7 +847,7 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     expect(root.querySelector('.cp-scroll')?.firstElementChild).toBe(fold);
     expect(fold?.querySelector('.cp-group__title')?.textContent).toBe('Où en est la vente');
     expect(fold?.querySelector('.cp-group__sum')?.textContent).toBe(
-      'Soirée d’essai, étape 2 sur 4 · ensuite Étape 3 à 15\u00a0€',
+      'Soirée d’essai, étape 2 sur 4 · ensuite «\u00a0Étape 3\u00a0» à 15\u00a0€',
     );
     expect([...(fold?.querySelectorAll('.cp-field__label') ?? [])].map((n) => n.textContent)).toEqual([
       'Script en cours',
@@ -789,9 +870,7 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
       sale: { ...pending.sale, offerPending: true },
     });
     const calm = with_(lively);
-    expect(calm.querySelector('.cp-standing')?.textContent).toBe(
-      'Rien à signaler·désir chaud, en hausse·Relance due·Offre sans réponse',
-    );
+    expect(standingText(calm)).toBe('désir chaud, en hausse·Relance due·Offre sans réponse');
     expect(calm.querySelector('.cp-standing__more')).toBeNull();
     const { root, actions } = draw(
       onCard(card({}), [], {
@@ -800,17 +879,13 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
         assist: lively,
       }),
     );
-    expect(root.querySelector('.cp-standing')?.textContent).toBe(
-      'Fan fragile·désir chaud, en hausse·Relance due·+1',
-    );
+    expect(standingText(root)).toBe('Fan fragile·désir chaud, en hausse·Relance due·+1');
     const more = root.querySelector<HTMLButtonElement>('.cp-standing__more');
     expect(more?.getAttribute('aria-label')).toBe('Voir 1 de plus');
     more?.click();
     expect(actions.showSignals).toHaveBeenCalledOnce();
     const opened = with_(lively, { standing: standingOf({ fragile: true }, 'hot'), signalsOpen: true });
-    expect(opened.querySelector('.cp-standing')?.textContent).toBe(
-      'Fan fragile·désir chaud, en hausse·Relance due·Offre sans réponse',
-    );
+    expect(standingText(opened)).toBe('Fan fragile·désir chaud, en hausse·Relance due·Offre sans réponse');
     // What forbids or holds back is never folded, even past three.
     const many = with_(lively, {
       standing: standingOf({ fragile: true, noExplicit: true, spendingLimitMinor: 5_000 }, 'hot'),
