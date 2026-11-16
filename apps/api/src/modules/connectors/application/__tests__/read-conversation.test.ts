@@ -41,6 +41,7 @@ function storeOf(held: ConnectorAccount): AccountStore & { failures: number } {
     },
     setSessionState: unused,
     storeSession: unused,
+    recordRefusedSession: unused,
     publish: unused,
   };
   return store;

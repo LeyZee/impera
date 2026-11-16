@@ -544,6 +544,7 @@ class FakeRevealWorld {
       content: m.content,
       type: 'default',
       ...(m.deletedAt == null ? {} : { deletedAt: m.deletedAt }),
+      ...(m.storyReply == null ? {} : { replyToStoryId: m.storyReply.storyId }),
     };
   }
 
@@ -617,7 +618,7 @@ class FakeRevealWorld {
           : { displayName: m.author ?? this.state.model.displayName },
       reactions: [],
       replyTo: null,
-      storyReply: null,
+      storyReply: m.storyReply ?? null,
     };
   }
 
