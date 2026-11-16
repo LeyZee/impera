@@ -22,7 +22,7 @@ describe('creatorEntry', () => {
     expect(entry?.reveal.tone).toBe('gold');
   });
 
-  it('counts deliveries on time, in the singular when one is left', () => {
+  it('counts deliveries on time by the count alone, its name saying what it counts (CRE-14)', () => {
     const entry = creatorEntry(
       item({
         kind: 'delivery_streak_5',
@@ -30,12 +30,18 @@ describe('creatorEntry', () => {
         progress: { current: 4, target: 5, unit: 'delivery' },
       }),
     );
-    expect(entry?.left).toBe('Encore 1 livraison à l’heure');
+    expect(entry?.left).toBe('Encore 1');
     expect(entry?.reveal.kicker).toBe('Série de livraisons');
   });
 
   it('writes nothing left for a trophy earned at once, and leaves out a kind it does not know', () => {
     expect(creatorEntry(item({ kind: 'first_drop', family: 'trophy' }))?.left).toBeUndefined();
+    // Still ahead, 0 of 1: how to earn it says it, never « Encore 1 » (CRE-14).
+    expect(
+      creatorEntry(
+        item({ kind: 'first_drop', family: 'trophy', progress: { current: 0, target: 1, unit: 'once' } }),
+      )?.left,
+    ).toBeUndefined();
     expect(creatorEntry(item({ kind: 'tier:500' }))).toBeNull();
   });
 });

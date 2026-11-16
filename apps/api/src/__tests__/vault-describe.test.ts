@@ -306,10 +306,10 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
   it('removes the folders a killed run left behind, and only those old enough to be no running run’s', async () => {
     const at = new Date('2027-03-01T12:00:00.000Z');
     const leftovers = {
-      'impera-vault-old': 20,
-      'impera-picture-old': 30,
-      'impera-vault-busy': 1,
-      'other-old': 60,
+      'impera-vault-old': 90,
+      'impera-picture-old': 120,
+      'impera-vault-busy': 45,
+      'other-old': 180,
     };
     for (const [name, minutes] of Object.entries(leftovers)) {
       await mkdir(join(scratch, name));
