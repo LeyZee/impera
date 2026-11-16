@@ -183,6 +183,8 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     // What is sent again is what was read: the percentage and the day are locked meanwhile.
     expect(screen.getByLabelText('Pourcentage de l’agence')).toHaveProperty('disabled', true);
     expect(screen.getByLabelText('À partir du')).toHaveProperty('disabled', true);
+    // The same prompt as in the dialogs: « Confirmer » is the one neon.
+    expect(screen.getByRole('button', { name: 'Confirmer' }).className).toContain('nv-btn--neon');
     type('Mot de passe', 'mot-de-passe-invente');
     type('Code à 6 chiffres ou de secours', '123456');
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));

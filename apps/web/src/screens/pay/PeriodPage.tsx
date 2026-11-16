@@ -288,7 +288,7 @@ function PeriodView({
             ok: false,
             title:
               done === 0
-                ? 'Rien n’a été validé'
+                ? 'Pas encore validé'
                 : `${String(done)} validé${done > 1 ? 's' : ''}, la suite attend`,
             text: 'Confirme ton mot de passe et ton code pour valider la suite.',
             action: { label: 'Confirmer', run: again },

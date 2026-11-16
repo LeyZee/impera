@@ -323,7 +323,7 @@ function RateSheet({
             </button>
           )}
         </form>
-        {confirm.prompt({ lead: MONEY_LEAD, layout: 'inline', onBusyChange: setSaving })}
+        {confirm.prompt({ lead: MONEY_LEAD, onBusyChange: setSaving })}
 
         {list.rates.length === 0 ? null : (
           <section className="ps-block" aria-labelledby={`${id}-history`}>
