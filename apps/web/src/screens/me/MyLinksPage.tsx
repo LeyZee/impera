@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import { MeNav } from './MeNav';
 import { useMyLinks } from './links-api';
 
-import { middleCut, PLACEMENT_LABELS } from '@/creators/links/model';
+import { middleCut, PLACEMENT_LABELS, sameWords } from '@/creators/links/model';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
 
@@ -57,7 +57,10 @@ function LinkCard({ link }: { link: CreatorLinkCard }): JSX.Element {
     <li className="nv-plate my-links__card">
       <div className="my-links__head">
         <h2 className="my-links__name">{link.name}</h2>
-        <span className="nv-tag nv-tag--declared">{PLACEMENT_LABELS[link.placement]}</span>
+        {/* A name that already says its place needs no chip beside it. */}
+        {sameWords(link.name, PLACEMENT_LABELS[link.placement]) ? null : (
+          <span className="nv-tag nv-tag--declared">{PLACEMENT_LABELS[link.placement]}</span>
+        )}
       </div>
       {link.usageNote === '' ? null : <p className="my-links__note">{link.usageNote}</p>}
       {/* The whole address for a screen reader and for the selection; the eye reads it cut in its middle. */}

@@ -90,6 +90,8 @@ describe('Moi › Mes liens', () => {
     expect(await screen.findByRole('heading', { name: 'Story du jour' })).toBeTruthy();
     expect(screen.getByText('À mettre dans ta story du jour')).toBeTruthy();
     expect(screen.getByText('Canal Telegram')).toBeTruthy();
+    // « Story du jour » placed in the story of the day: the name says it, no chip repeats it.
+    expect(screen.getAllByText('Story du jour')).toHaveLength(1);
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
     // The whole address is what a screen reader hears; the eye reads it cut in its middle.
     expect(screen.getByLabelText(STORY.url).textContent).toContain('…');

@@ -265,9 +265,13 @@ function LinkDialog({
           placeholder: 'https://…',
           mono: true,
         })}
+        {field('destination', 'Où il mène', 'Pour les posts du canal : l’endroit en mots, sans adresse.', {
+          maxLength: LINK_DESTINATION_MAX,
+          placeholder: 'mon Reveal, mon live ce soir 21 h…',
+        })}
         <div className="nv-field tm-field">
           <label className="nv-field__label" htmlFor={`${id}-placement`}>
-            Endroit
+            Où il est posé
           </label>
           <Select
             id={`${id}-placement`}
@@ -280,16 +284,12 @@ function LinkDialog({
             }}
           />
           <p id={`${id}-placement-hint`} className="tm-hint">
-            Où ce lien est posé. Sans endroit, elle ne le voit pas et rien n’est compté dessus.
+            Sans endroit, elle ne le voit pas et rien n’est compté dessus.
           </p>
         </div>
         {field('usageNote', 'Phrase d’usage', 'À quoi il sert et quand le coller, sans adresse.', {
           maxLength: LINK_USAGE_NOTE_MAX,
           placeholder: 'À coller dans ta story du jour',
-        })}
-        {field('destination', 'Où il mène', 'Pour les posts du canal : l’endroit en mots, sans adresse.', {
-          maxLength: LINK_DESTINATION_MAX,
-          placeholder: 'mon Reveal, mon live ce soir 21 h…',
         })}
         {refusal === null ? null : (
           <p className="tm-hint tm-hint--error" role="alert">

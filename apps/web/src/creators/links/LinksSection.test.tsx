@@ -133,7 +133,7 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
     fireEvent.change(within(dialog).getByLabelText('Phrase d’usage'), {
       target: { value: 'À coller dans ta story du jour' },
     });
-    choose(within(dialog).getByRole('combobox', { name: 'Endroit' }), /Story du jour/u);
+    choose(within(dialog).getByRole('combobox', { name: 'Où il est posé' }), /Story du jour/u);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
     await waitFor(() => {
       expect(writes).toHaveLength(1);

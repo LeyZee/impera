@@ -40,3 +40,8 @@ export function linkProblems(draft: {
       : {}),
   };
 }
+
+/** Two labels that read the same, whatever their case and outer spaces. */
+export function sameWords(one: string, other: string): boolean {
+  return one.trim().toLocaleLowerCase('fr') === other.trim().toLocaleLowerCase('fr');
+}
