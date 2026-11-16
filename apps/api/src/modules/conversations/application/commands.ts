@@ -31,6 +31,7 @@ import {
   CreatorNotFound,
   DraftGuarded,
   PersonaInactive,
+  ScriptStepCut,
   SendBlocked,
 } from '../domain/errors';
 import type {
@@ -44,7 +45,7 @@ import type {
   UnitOfWork,
 } from '../domain/ports';
 import { rebuildProjection, type ConversationProjection } from '../domain/projection';
-import { FAN_MEDIA_MAX, boundFanText, fanAwaitsAnswer, respondAt } from '../domain/rules';
+import { FAN_MEDIA_MAX, boundFanText, fanAwaitsAnswer, respondAt, stepCutBy } from '../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../domain/state-machine';
 
 import { closeAutomaticIfLocked, readAutomaticGate, readAutomaticLock } from './automatic';
@@ -379,6 +380,11 @@ export function createConversationCommands({
           hasMedia: draft.scriptStep?.hasMedia === true,
         });
         if (verdict.isBlocked) throw new DraftGuarded(verdict.codes);
+        // A paid step leaves only if his limits, read now, still let it (relecture Sécurité de #812).
+        if (draft.scriptStep !== null) {
+          const cut = stepCutBy(await tx.gate.fanFlags(conversation), conversation.careSince);
+          if (cut !== null) throw new ScriptStepCut(cut);
+        }
         const meta = humanMeta(input);
         await appendEvent(
           tx,

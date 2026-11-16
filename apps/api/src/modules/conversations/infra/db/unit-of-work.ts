@@ -5,6 +5,7 @@ import {
   ConversationIdSchema,
   EventIdSchema,
   ExternalMediaSchema,
+  FanFlagsSchema,
   JOB_MAX_ATTEMPTS,
   KillSwitchIdSchema,
   JOB_PAYLOADS,
@@ -563,6 +564,15 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .from(schema.platformAccounts)
           .where(eq(schema.platformAccounts.id, conversation.platformAccountId));
         return account?.sessionState === 'expired' ? 'session_expired' : null;
+      },
+      async fanFlags(conversation) {
+        const [fan] = await tx
+          .select({ flags: schema.fans.flags })
+          .from(schema.fans)
+          .where(eq(schema.fans.id, conversation.fanId));
+        if (fan === undefined) return null;
+        const parsed = FanFlagsSchema.safeParse(fan.flags ?? {});
+        return parsed.success ? parsed.data : null;
       },
     },
 

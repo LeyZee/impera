@@ -8,7 +8,7 @@ import {
   type SendResult,
 } from '@impera/contracts';
 
-import { BLOCKED_EXPIRY_REASONS, SendRefused } from '../../domain/errors';
+import { BLOCKED_EXPIRY_REASONS, SendRefused, stepCutExpiryReason } from '../../domain/errors';
 import type {
   Clock,
   Conversation,
@@ -21,7 +21,7 @@ import type {
   TypingRhythm,
   UnitOfWork,
 } from '../../domain/ports';
-import { bubbleIdempotencyKey, canSend, fanAwaitsAnswer } from '../../domain/rules';
+import { bubbleIdempotencyKey, canSend, fanAwaitsAnswer, stepCutBy } from '../../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../../domain/state-machine';
 import { scheduleFollowUp } from '../follow-ups';
 import { appendEvent, lockConversation, setDraftStatus } from '../journal';
@@ -102,6 +102,28 @@ export function createSendJob({ uow, clock, sender, followUps, typing }: SendDep
     return null;
   }
 
+  /** Expires the draft when his limits now keep its paid step; `true` when they do. */
+  async function expiredForStep(
+    tx: Transaction,
+    { conversation, draft }: Sendable,
+    payload: JobPayload<'conversation.send'>,
+  ): Promise<boolean> {
+    const cut = stepCutBy(await tx.gate.fanFlags(conversation), conversation.careSince);
+    if (cut === null) return false;
+    const at = meta(payload);
+    await appendEvent(
+      tx,
+      conversation,
+      {
+        type: 'draft_expired',
+        payload: { draftId: draft.id, status: 'expired', reason: stepCutExpiryReason(cut) },
+      },
+      at,
+    );
+    await setDraftStatus(tx, draft, 'expired', { decidedBy: null, at: at.at });
+    return true;
+  }
+
   /** The persona's delays, or none: a follow-up missed is better than a send that fails after it went out. */
   async function followUpDelays(
     payload: JobPayload<'conversation.send'>,
@@ -152,6 +174,9 @@ export function createSendJob({ uow, clock, sender, followUps, typing }: SendDep
       const conversation = await uow.inTenant(payload.creatorId, async (tx) => {
         const sendable = await lockSendable(tx, payload, true);
         if (sendable === null) return null;
+        // His limits, read again before the paid step: one set since the approval keeps it, the bubbles already
+        // gone stay, and the draft expires so no retry sends it (relecture Sécurité de #812).
+        if (isStep && (await expiredForStep(tx, sendable, payload))) return null;
         await appendEvent(
           tx,
           sendable.conversation,

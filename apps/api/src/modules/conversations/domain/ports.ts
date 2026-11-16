@@ -32,6 +32,7 @@ import type {
   FactCategory,
   FactKind,
   FanCardRead,
+  FanFlags,
   FanId,
   GuardCode,
   MediaAssetId,
@@ -294,6 +295,8 @@ export type BlockedReason = 'creator_archived' | 'kill_switch' | 'session_expire
 
 interface RespondGate {
   blockedReason(conversation: ConversationKey): Promise<BlockedReason | null>;
+  /** His limits as they are now (`fans.flags`), read in the transaction; `null` when they cannot be read. */
+  fanFlags(conversation: ConversationKey): Promise<FanFlags | null>;
 }
 
 /** The creator's kill switch and the global one (message-flow.md §6): the latest row of each scope decides. */

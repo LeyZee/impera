@@ -632,6 +632,85 @@ describe('conversations module (P0-05)', () => {
     expect(draft?.status).toBe('failed');
   });
 
+  /** One of his limits, set by a human or by the code after the draft was written. */
+  async function limit(
+    conversationId: ConversationId,
+    cut: 'care' | 'do_not_contact' | 'sales_frozen' | 'age_disputed',
+  ) {
+    const since = new Date().toISOString();
+    if (cut === 'care') {
+      await test.admin.db
+        .update(schema.conversations)
+        .set({ careSince: new Date() })
+        .where(eq(schema.conversations.id, conversationId));
+      return;
+    }
+    const { fanId } = await conversationRow(conversationId);
+    const flags =
+      cut === 'do_not_contact'
+        ? { doNotContact: true }
+        : cut === 'sales_frozen'
+          ? { salesFrozen: { reason: 'distress', since } }
+          : { ageDisputed: { since, by: 'human' } };
+    await test.admin.db.update(schema.fans).set({ flags }).where(eq(schema.fans.id, fanId));
+  }
+
+  async function draftStatus(draftId: DraftId) {
+    const [draft] = await test.admin.db
+      .select({ status: schema.drafts.status })
+      .from(schema.drafts)
+      .where(eq(schema.drafts.id, draftId));
+    return draft?.status;
+  }
+
+  it('approves no paid step his limits keep now: care, not to contact, sales frozen, age in doubt (relecture Sécurité)', async () => {
+    for (const cut of ['care', 'do_not_contact', 'sales_frozen', 'age_disputed'] as const) {
+      const platformId = `c-step-cut-${cut}`;
+      const { conversationId } = await ingest(platformId);
+      const draftId = await respond(conversationId);
+      await withStep(draftId, 1_500, `step:${platformId}:0`);
+      await limit(conversationId, cut);
+      await expect(
+        conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Regarde ça'] }),
+        cut,
+      ).rejects.toMatchObject({ code: 'script_step_cut_unprocessable', details: { cut } });
+      expect(await draftStatus(draftId), cut).toBe('pending');
+    }
+    expect(sender.steps).toEqual([]);
+  });
+
+  it('keeps the paid step of a draft whose limit was set after the approval, sends the bubbles, and never the step on a replay', async () => {
+    const { conversationId } = await ingest('c-step-cut-late');
+    const draftId = await respond(conversationId);
+    await withStep(draftId, 1_500, 'step:c-step-cut-late:0');
+    await conversations.approveDraft({
+      ...command(conversationId),
+      draftId,
+      bubbles: ['J’ai un truc pour toi'],
+    });
+    await limit(conversationId, 'sales_frozen');
+    const payload = { creatorId, conversationId, draftId, correlationId: 'test' };
+    await conversations.jobs.send(payload, NO_LOG, 1);
+    await conversations.jobs.send(payload, NO_LOG, 2);
+
+    expect(sender.sent.map((bubble) => bubble.text)).toEqual(['J’ai un truc pour toi']);
+    expect(sender.steps).toEqual([]);
+    expect(await draftStatus(draftId)).toBe('expired');
+    const [expired] = await test.admin.db
+      .select({ payload: schema.conversationEvents.payload })
+      .from(schema.conversationEvents)
+      .where(
+        and(
+          eq(schema.conversationEvents.conversationId, conversationId),
+          eq(schema.conversationEvents.type, 'draft_expired'),
+        ),
+      );
+    expect(expired?.payload).toMatchObject({
+      reason: 'Étape payante retenue à l’envoi : ses ventes sont gelées',
+    });
+    expect(await events(conversationId)).not.toContain('send_verified');
+  });
+
   it('expires an approved draft when the fan writes again before it leaves', async () => {
     const { conversationId } = await ingest('c-stale');
     const draftId = await respond(conversationId);
