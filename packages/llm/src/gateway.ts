@@ -123,6 +123,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     reportRefusal,
     overBudget,
     ...(deps.sleep !== undefined && { sleep: deps.sleep }),
+    ...(deps.hedgeTimer !== undefined && { hedgeTimer: deps.hedgeTimer }),
   });
 
   return {

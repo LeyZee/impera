@@ -23,6 +23,15 @@ const LlmRoleConfigSchema = ModelRefSchema.extend({
    * role's timeout. Not sent to another provider.
    */
   reasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
+  /**
+   * Past this, a request still running is asked a second time in parallel, and the first good answer wins
+   * (`call-runner.ts`). Set where a slow request is rare and costly to wait for: on 12/11, Grok 4.7 timed out about
+   * once in eight turns. Shorter than `timeoutMs`; absent, no second request.
+   */
+  hedgeAfterMs: z.number().int().positive().optional(),
+}).refine((role) => role.hedgeAfterMs === undefined || role.hedgeAfterMs < role.timeoutMs, {
+  message: 'hedgeAfterMs must be shorter than timeoutMs',
+  path: ['hedgeAfterMs'],
 });
 export type LlmRoleConfig = z.infer<typeof LlmRoleConfigSchema>;
 
@@ -71,6 +80,7 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
       temperature: 0.9,
       maxOutputTokens: 400,
       timeoutMs: 30_000,
+      hedgeAfterMs: 18_000,
       reasoningEffort: 'low',
       fallback: MISTRAL_FALLBACK,
     },
@@ -80,6 +90,7 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
       temperature: 0.3,
       maxOutputTokens: 800,
       timeoutMs: 30_000,
+      hedgeAfterMs: 18_000,
       reasoningEffort: 'low',
       fallback: MISTRAL_FALLBACK,
     },

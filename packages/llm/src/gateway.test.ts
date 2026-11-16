@@ -92,6 +92,7 @@ function setup(
   onKeyRefused?: (refusal: KeyRefusal) => void,
   budget: Pick<LlmGatewayDeps, 'dailyCapEur' | 'trendWatchCapEur' | 'onBudget'> = {},
   waits: number[] = [],
+  hedgeTimer?: (ms: number) => Promise<void>,
 ) {
   const log = createInMemoryCallLog();
   const resolveModel: ModelResolver = (ref: ModelRef) =>
@@ -109,6 +110,7 @@ function setup(
       waits.push(ms);
       return Promise.resolve();
     },
+    ...(hedgeTimer !== undefined && { hedgeTimer }),
   });
   return { gateway, log };
 }
@@ -548,7 +550,7 @@ describe('LlmGateway', () => {
 });
 
 describe('failures and connection tests', () => {
-  it('keeps the real last error when the fallback has no key', async () => {
+  it('keeps the real last error when the fallback has no key, never asking a timed-out model again', async () => {
     const xai = new MockLanguageModelV4({
       doGenerate: () =>
         Promise.reject(Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' })),
@@ -558,7 +560,7 @@ describe('failures and connection tests', () => {
     const result = await gateway.voice(INPUT);
 
     expect(!result.ok && result.error.attempts.at(-1)?.outcome).toBe('missing_key');
-    expect(log.since(new Date(0)).map((r) => r.outcome)).toEqual(['timeout', 'timeout', 'timeout']);
+    expect(log.since(new Date(0)).map((r) => r.outcome)).toEqual(['timeout']);
     expect(gateway.health().roles.find((r) => r.role === 'voice')?.lastError?.outcome).toBe('timeout');
   });
 
@@ -949,5 +951,165 @@ describe('readCard (ADR 0085 § 7)', () => {
     expect(!result.ok && result.error.code).toBe('budget_reached');
     expect(xai.doGenerateCalls).toHaveLength(1);
     expect((await gateway.voice(INPUT)).ok).toBe(true);
+  });
+});
+
+const TIMEOUT = Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' });
+
+/** A model whose requests answer, in order, when the test says: each one waits for its own `release`. */
+function held(): { model: MockLanguageModelV4; release: (index: number, answer: Step) => void } {
+  const pending: ((answer: Step) => void)[] = [];
+  const model = new MockLanguageModelV4({
+    doGenerate: () =>
+      new Promise((resolve, reject) => {
+        pending.push((answer) => {
+          if ('status' in answer) {
+            reject(answer.status === 0 ? TIMEOUT : new Error(`HTTP ${String(answer.status)}`));
+            return;
+          }
+          resolve({
+            content: [{ type: 'text', text: answer.text }],
+            finishReason: { unified: 'stop', raw: 'stop' },
+            usage: USAGE,
+            warnings: [],
+          });
+        });
+      }),
+  });
+  return {
+    model,
+    release: (index, answer) => {
+      pending[index]?.(answer);
+    },
+  };
+}
+
+/** Lets every settled promise run its callbacks. */
+const flush = (): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+
+describe('a slow request asked again in parallel (hedge)', () => {
+  it('sets the hedge on brain and voice only, shorter than their delay', () => {
+    const { brain, voice, sense, judge } = DEFAULT_LLM_CONFIG.roles;
+    expect(brain.hedgeAfterMs).toBe(18_000);
+    expect(voice.hedgeAfterMs).toBe(18_000);
+    expect(sense.hedgeAfterMs).toBeUndefined();
+    expect(judge.hedgeAfterMs).toBeUndefined();
+  });
+
+  it('asks nothing more when the first request answers before the hedge', async () => {
+    const xai = scripted([{ text: BUBBLES }]);
+    const asked: number[] = [];
+    const { gateway } = setup({ xai }, ALL_KEYS, undefined, {}, [], (ms) => {
+      asked.push(ms);
+      return new Promise(() => undefined);
+    });
+
+    expect((await gateway.voice(INPUT)).ok).toBe(true);
+    expect(xai.doGenerateCalls).toHaveLength(1);
+    expect(asked).toEqual([18_000]);
+  });
+
+  it('keeps the second answer when it lands first, and journals the late one with its cost', async () => {
+    const xai = held();
+    const hedge = { fire: (): void => undefined };
+    const { gateway, log } = setup(
+      { xai: xai.model },
+      ALL_KEYS,
+      undefined,
+      {},
+      [],
+      () =>
+        new Promise((resolve) => {
+          hedge.fire = resolve;
+        }),
+    );
+
+    const pending = gateway.voice(INPUT);
+    await flush();
+    hedge.fire();
+    await flush();
+    expect(xai.model.doGenerateCalls).toHaveLength(2);
+    xai.release(1, { text: BUBBLES });
+    const result = await pending;
+
+    expect(result.ok && result.value.output.bubbles).toEqual([
+      'Coucou toi ✨',
+      'Tu fais quoi de beau ce soir',
+    ]);
+    expect(log.since(new Date(0)).map((r) => r.outcome)).toEqual(['ok']);
+
+    // The first one ends later: billed all the same, it counts in the day's spend.
+    xai.release(0, { text: BUBBLES });
+    await flush();
+    const records = log.since(new Date(0));
+    expect(records.map((r) => r.outcome)).toEqual(['ok', 'ok']);
+    expect(records.every((r) => (r.costUsd ?? 0) > 0)).toBe(true);
+  });
+
+  it('waits for the other request when the first to land failed', async () => {
+    const xai = held();
+    const { gateway, log } = setup({ xai: xai.model }, ALL_KEYS, undefined, {}, [], () => Promise.resolve());
+
+    const pending = gateway.voice(INPUT);
+    await flush();
+    xai.release(0, { status: 0 });
+    await flush();
+    xai.release(1, { text: BUBBLES });
+
+    expect((await pending).ok).toBe(true);
+    expect(log.since(new Date(0)).map((r) => r.outcome)).toEqual(['timeout', 'ok']);
+  });
+
+  it('goes to the fallback, without asking Grok a third time, when both requests time out', async () => {
+    const xai = held();
+    const mistral = scripted([{ text: BUBBLES }]);
+    const { gateway, log } = setup({ xai: xai.model, mistral }, ALL_KEYS, undefined, {}, [], () =>
+      Promise.resolve(),
+    );
+
+    const pending = gateway.voice(INPUT);
+    await flush();
+    xai.release(0, { status: 0 });
+    xai.release(1, { status: 0 });
+    const result = await pending;
+
+    expect(result.ok && result.value.meta.isFallback).toBe(true);
+    expect(xai.model.doGenerateCalls).toHaveLength(2);
+    expect(log.since(new Date(0)).map((r) => [r.outcome, r.isFallback])).toEqual([
+      ['timeout', false],
+      ['timeout', false],
+      ['ok', true],
+    ]);
+  });
+
+  it('sends no second request once the daily cap is reached', async () => {
+    const xai = held();
+    const cap = { eur: 20 };
+    const hedge = { fire: (): void => undefined };
+    const { gateway } = setup(
+      { xai: xai.model },
+      ALL_KEYS,
+      undefined,
+      { dailyCapEur: () => cap.eur },
+      [],
+      () =>
+        new Promise((resolve) => {
+          hedge.fire = resolve;
+        }),
+    );
+
+    const pending = gateway.voice(INPUT);
+    await flush();
+    // Spent elsewhere meanwhile: the cap is reached when the hedge would start.
+    cap.eur = 0;
+    hedge.fire();
+    await flush();
+    expect(xai.model.doGenerateCalls).toHaveLength(1);
+    xai.release(0, { text: BUBBLES });
+
+    expect((await pending).ok).toBe(true);
   });
 });
