@@ -82,13 +82,18 @@
   font-weight: 700;
   text-wrap: balance;
 }
-.db-hero h1 em {
+/* The agent's state under the screen's title: a heading of the page, its look the section titles' (`nv-h2`, COH-07). */
+.db-hero h2 {
+  margin: 6px 0 0;
+  text-wrap: balance;
+}
+.db-hero :is(h1, h2) em {
   font-style: normal;
   color: var(--_c);
 }
 /* Only what asks for a hand glows: a calm « tout va bien » stays quiet, and so does an agent at rest. */
-.db-hero[data-tone='warn'] h1 em,
-.db-hero[data-tone='bad'] h1 em {
+.db-hero[data-tone='warn'] :is(h1, h2) em,
+.db-hero[data-tone='bad'] :is(h1, h2) em {
   text-shadow: 0 0 28px color-mix(in srgb, var(--_c) 45%, transparent);
 }
 .db-hero[data-tone='ok'] .db-hero__glow,
@@ -99,7 +104,7 @@
 :root[data-theme='light'] .db-hero__glow {
   opacity: 0.35;
 }
-:root[data-theme='light'] .db-hero h1 em {
+:root[data-theme='light'] .db-hero :is(h1, h2) em {
   text-shadow: none;
 }
 .db-hero__lead {
@@ -116,12 +121,23 @@
   background: var(--nv-plate);
   box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
 }
-/* The agent's health: one quiet line under the list, its tiles folded. */
+/* The agent's health: one quiet line under the list, its tiles folded. In the column, never past its edges, and its
+   summary goes to the line rather than being cut (recette visuelle 16/11, PIL-09). */
 .db-fold {
-  margin: -12px -14px 0;
+  margin: -12px 0 0;
+}
+.db-fold .nv-disclosure > summary {
+  padding-block: 6px;
 }
 .db-fold .nv-disclosure__sum {
   color: var(--nv-ink-muted);
+  white-space: normal;
+  overflow: visible;
+  text-wrap: pretty;
+}
+/* The tiles of the agent's health, the cards' gap of every screen (COH-07). */
+.db-fold .nv-tiles {
+  gap: var(--nv-card-gap);
 }
 
 /* ── Sections ── */
@@ -436,6 +452,11 @@
   .db-hero h1 {
     font-size: 28px;
     line-height: 33px;
+  }
+  /* The light stays inside the page's gutter: never past the screen's left edge (COH-07). */
+  .db-hero__glow {
+    left: 0;
+    width: 100%;
   }
   .db-fold .nv-disclosure__sum {
     display: none;
@@ -762,12 +783,6 @@ div.db-fan {
   gap: var(--nv-space-1);
   min-width: 0;
 }
-.db-agency__title {
-  margin: 0;
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  color: var(--nv-ink-faint);
-}
 .db-agency__line {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(64px, 120px);
@@ -864,9 +879,11 @@ div.db-fan {
 .db .nv-ring {
   --_c: var(--nv-data-1);
 }
+/* A fall is not an alert: on the Dashboard it reads in quiet ink, the amber kept for what asks for a hand and the red
+   for the urgencies (recette visuelle 16/11, PIL-21). */
 .db .nv-delta--worse {
-  color: var(--nv-warning);
-  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  color: var(--nv-ink-muted);
+  background: var(--nv-fill-track);
 }
 /* The others' urgencies could not be read: said under the chips, in amber, not left silent. */
 .db-creators__unread {
