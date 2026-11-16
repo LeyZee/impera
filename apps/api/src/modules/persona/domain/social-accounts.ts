@@ -21,7 +21,7 @@ export interface SocialAccountStore {
   forAgent(creatorId: CreatorId): Promise<SocialAccountsForAgent>;
 }
 
-export interface SocialAccountsForAgent {
+interface SocialAccountsForAgent {
   readonly shareable: readonly SocialAccount[];
   readonly usernames: readonly string[];
 }

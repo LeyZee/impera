@@ -232,7 +232,7 @@ export interface AgentApprovalGuard {
 }
 
 /** One creator's approval guards, with the account a draft gave, read again at the approval (ADR 0143 bound 21). */
-export interface AgentApprovalCheck {
+interface AgentApprovalCheck {
   check(
     bubbles: readonly string[],
     context?: GuardContext,
