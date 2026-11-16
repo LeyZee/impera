@@ -552,6 +552,8 @@
 }
 .pg-m .nv-bubble {
   max-width: 80%;
+  /* No word or emoji left alone on its last line (avis Design 16/11). */
+  text-wrap: pretty;
 }
 .pg-m__re {
   position: absolute;
@@ -611,6 +613,8 @@
 }
 .pg-draft .nv-bubble {
   max-width: 80%;
+  /* No word or emoji left alone on its last line (avis Design 16/11). */
+  text-wrap: pretty;
 }
 .nv-bubble--draft.is-blocked {
   color: var(--nv-ink-muted);
@@ -727,6 +731,8 @@
 }
 .pg-reading {
   align-self: flex-end;
+  /* On her side, like « Elle écrit… », even on two lines on a phone. */
+  text-align: right;
   margin: 0;
   font-size: 13px;
   line-height: 18px;

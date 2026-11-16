@@ -420,11 +420,14 @@ export function PlaygroundPage(): JSX.Element {
             placeholder={
               !state.voice.reachable
                 ? 'Ajoute d’abord une clé'
-                : pending === null
-                  ? `Écris comme ${name === FALLBACK_NAME ? 'le fan' : name}…`
-                  : isWaiting(pending)
-                    ? 'Note d’abord son réflexe'
-                    : 'Note d’abord la réponse'
+                : writing || revealing !== undefined
+                  ? // Nothing to rate yet: « Note d’abord la réponse » waits for her last bubble (avis Design 16/11).
+                    'Elle écrit…'
+                  : pending === null
+                    ? `Écris comme ${name === FALLBACK_NAME ? 'le fan' : name}…`
+                    : isWaiting(pending)
+                      ? 'Note d’abord son réflexe'
+                      : 'Note d’abord la réponse'
             }
             onSend={send}
           />

@@ -261,7 +261,7 @@ function Typing(): JSX.Element {
         <i />
         <i />
       </span>
-      écrit…
+      Elle écrit…
     </span>
   );
 }

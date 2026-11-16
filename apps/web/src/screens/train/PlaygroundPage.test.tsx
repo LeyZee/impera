@@ -137,7 +137,7 @@ describe('Playground', () => {
     expect(calls.filter((c) => c === 'GET /v1/playground')).toHaveLength(2);
   });
 
-  it('shows her bubbles one by one, « écrit… » between them, and nothing to rate before the last (Charles, 16/11)', async () => {
+  it('shows her bubbles one by one, « Elle écrit… » between them, and nothing to rate before the last (Charles, 16/11)', async () => {
     const answered: PlaygroundState = {
       ...BASE,
       history: [
@@ -158,8 +158,10 @@ describe('Playground', () => {
     fireEvent.keyDown(box, { key: 'Enter' });
     expect(await screen.findByText('Coucou toi')).toBeTruthy();
     expect(screen.queryByText('Tu fais quoi ?')).toBeNull();
-    expect(screen.getByText('écrit…')).toBeTruthy();
+    expect(screen.getByText('Elle écrit…')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Valider/ })).toBeNull();
+    // Nothing to rate yet: the box says she writes, not « Note d’abord la réponse » (avis Design 16/11).
+    expect(screen.getByPlaceholderText('Elle écrit…')).toBeTruthy();
     expect(await screen.findByText('Tu fais quoi ?')).toBeTruthy();
     expect(await screen.findByRole('button', { name: /Valider/ })).toBeTruthy();
   });
@@ -185,7 +187,7 @@ describe('Playground', () => {
     fireEvent.change(box, { target: { value: 'T’es trop belle' } });
     fireEvent.keyDown(box, { key: 'Enter' });
     expect(await screen.findByText('Elle a lu :', undefined, { timeout: 3000 })).toBeTruthy();
-    expect(screen.getByText('écrit…')).toBeTruthy();
+    expect(screen.getByText('Elle écrit…')).toBeTruthy();
     // His message leaves the box as he sends it and shows in the thread, before the server sends it back.
     expect(screen.getByText('T’es trop belle')).toBeTruthy();
     expect(box).toHaveProperty('value', '');
