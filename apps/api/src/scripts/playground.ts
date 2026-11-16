@@ -460,6 +460,7 @@ for (;;) {
       ),
       spentCents: preset.spentCents,
     });
+    session.confirmAge(preset.declaredAge === null ? null : session.situation.relationshipStartedAt);
     isRated = true;
     console.log(
       dim(`  ${preset.label} : teste ${preset.tests}. Idée de premier message : « ${preset.opening} »`),
