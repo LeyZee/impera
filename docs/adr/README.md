@@ -136,5 +136,6 @@ Date : AAAA-MM-JJ
 | 0124 | Tous les fans d'une créatrice, listés pour l'agence | accepted (précise 0092 § 3, 0078, 0024, 0025, 0043 § 7, 0063) |
 | 0126 | Les lives de la créatrice : l'agent se tait pendant, en parle après, et se relaie avec les chatteurs | accepted (précise 0042, 0048 § 4, P3-14, 0088) |
 | 0131 | Choisir le script qui colle aux goûts du fan : familles de fantasme, goûts des scripts et de la fiche, le code classe et l'IA choisit | accepted (précise 0098 § 6, 0056 § 6, 0085 et 0112 § 5) |
+| 0133 | L'agent pose une réaction sur un message du fan, en plus de sa réponse, quand le message la justifie | accepted (précise 0018, 0019, 0021, 0086, 0088, 0079) |
 | 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
 | 0144 | Le MCP suit le CRM de novembre : coffre, branches, Playground, copilote, semaine de la créatrice, trophées et liens, en lecture seule | accepted (précise 0105 § 4) |
