@@ -382,11 +382,14 @@ export function TrophyCaseLoading(): JSX.Element {
   );
 }
 
-/** A server that does not answer: said, with a retry, never an empty case that would lie (CHT-18). */
+/**
+ * A read that failed, whatever the cause (a silent server, a refusal, an answer of another shape): said in neutral
+ * words, with a retry, never an empty case that would lie (CHT-18; Design, 16/11).
+ */
 export function TrophyCaseDown({ onRetry }: { onRetry: () => void }): JSX.Element {
   return (
     <div className="tc-down" role="alert">
-      <p>Le serveur ne répond pas : ta vitrine n’a pas pu être lue.</p>
+      <p>Ta vitrine n’a pas pu être lue.</p>
       <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onRetry}>
         Réessayer
       </button>

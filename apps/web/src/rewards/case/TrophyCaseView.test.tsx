@@ -215,7 +215,7 @@ describe('TrophyCaseView, the recette of 16/11', () => {
     cleanup();
     const onRetry = vi.fn();
     render(<TrophyCaseDown onRetry={onRetry} />);
-    expect(screen.getByRole('alert').textContent).toContain('Le serveur ne répond pas');
+    expect(screen.getByRole('alert').textContent).toContain('Ta vitrine n’a pas pu être lue.');
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });

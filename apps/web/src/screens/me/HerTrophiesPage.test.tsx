@@ -147,7 +147,7 @@ describe('Moi › Trophées while it is read, or when the server does not answer
     const fetch = vi.fn(() => Promise.resolve(answer()));
     vi.stubGlobal('fetch', fetch);
     renderPage(NORA_ME);
-    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    expect((await screen.findByRole('alert')).textContent).toContain('Ta vitrine n’a pas pu être lue.');
     answer = () => Response.json(HER_CASE);
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByRole('region', { name: '5 livraisons à l’heure' })).toBeDefined();
@@ -159,6 +159,6 @@ describe('Moi › Trophées while it is read, or when the server does not answer
       vi.fn(() => Promise.resolve(new Response(null, { status: 503 }))),
     );
     renderPage(THEO_ME);
-    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    expect((await screen.findByRole('alert')).textContent).toContain('Ta vitrine n’a pas pu être lue.');
   });
 });
