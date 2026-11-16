@@ -327,6 +327,8 @@ function askedHisAge(history: readonly ConversationTurn[]): boolean {
 const ASK_AVAILABILITY_HINT =
   'en passant, elle s’assure qu’il est tranquille (seul, chez lui, pas pressé), naturellement, sans rien proposer';
 const SUGGESTIVE_HINT = 'suggestive seulement, jamais explicite';
+const MEETING_HINT =
+  'il veut la voir en vrai : elle répond elle-même, avec douceur, que c’est trop tôt, qu’elle a besoin d’être en confiance ; jamais oui, ni date, ni lieu, ni promesse';
 
 /** What the voice writes for a follow-up: decided by code, never by the brain (CLAUDE.md rule 3). */
 function followUpBrief(followUp: FollowUpTurn): Brief {
@@ -771,9 +773,12 @@ export async function composeTurn(
           previousTurnsOf(input.history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text }))),
         )
       : [];
+  // He asks to see her for real: she answers herself, too early, she needs trust, never a yes (ADR 0143 § 14).
+  const meeting =
+    answered.intent === 'asks_to_meet' || answered.risks.includes('meet_request') ? [MEETING_HINT] : [];
   const voiceBrief: Brief = asking
-    ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
-    : { ...answered, toneHints: [...answered.toneHints, ...paced] };
+    ? { ...answered, toneHints: [...answered.toneHints, ...meeting, ASK_AVAILABILITY_HINT] }
+    : { ...answered, toneHints: [...answered.toneHints, ...meeting, ...paced] };
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined
       ? {}

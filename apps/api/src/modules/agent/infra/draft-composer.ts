@@ -20,6 +20,7 @@ import {
 import {
   briefAlerts,
   keywordAlerts,
+  meetingAskOnly,
   noticeOf,
   phraseAlerts,
   settleAlerts,
@@ -931,7 +932,16 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const { settings } = read;
       // Her words, in code and at no cost (P4-01): one that pauses hands him over before any model. The journal names
       // the word she declared, never his.
-      const coded = keywordAlerts(fanText, withHer.alertKeywords ?? [], settings);
+      // A plain meeting ask: she answers it herself, too early, she needs trust; her word only lets the team know
+      // (ADR 0143 § 14, 15). Never past a sign of care, nor when he asked too often or names a place or a date.
+      const meetingOnly =
+        !careForced &&
+        meetingAskOnly(
+          fanText,
+          withHer.alertKeywords ?? [],
+          input.history.slice(0, lastAnswer + 1).flatMap((m) => (m.direction === 'inbound' ? [m.text] : [])),
+        );
+      const coded = keywordAlerts(fanText, withHer.alertKeywords ?? [], settings, meetingOnly);
       const early = settleAlerts(coded);
       if (early.pause !== null)
         return withNotices(

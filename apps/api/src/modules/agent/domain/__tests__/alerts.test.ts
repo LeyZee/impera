@@ -5,6 +5,8 @@ import {
   alertKeywordsIn,
   briefAlerts,
   keywordAlerts,
+  MEETING_INSISTENCE_MAX,
+  meetingAskOnly,
   phraseAlerts,
   settleAlerts,
   type AlertSettings,
@@ -133,5 +135,47 @@ describe('her alerts (P4-01)', () => {
       pause: null,
       notices: [{ trigger: service, notify: false }],
     });
+  });
+});
+
+describe('meetingAskOnly (ADR 0143 § 15, bounds 24 to 28)', () => {
+  const words = ['rencontre', 'se voir', 'adresse'];
+
+  it('lets code answer a plain meeting ask: her word only lets the team know', () => {
+    expect(meetingAskOnly('Tu voudrais qu’on se rencontre un jour ?', words, [])).toBe(true);
+    expect(meetingAskOnly('on pourrait se voir ?', words, ['salut', 'ça va'])).toBe(true);
+    const fired = keywordAlerts('on pourrait se voir ?', words, { custom: [], systemOn: new Set() }, true);
+    expect(fired).toEqual([expect.objectContaining({ notify: true })]);
+    expect(fired[0]?.pauses).toBeUndefined();
+  });
+
+  it('pauses on any other word of hers in the same message', () => {
+    expect(meetingAskOnly('on peut se voir ? donne ton adresse', words, [])).toBe(false);
+  });
+
+  it('pauses when he names a place, a date or an address, or hints he knows where she is', () => {
+    expect(meetingAskOnly('on se voit samedi ?', words, [])).toBe(false);
+    expect(meetingAskOnly('on se rencontre à la gare ?', words, [])).toBe(false);
+    expect(meetingAskOnly('on se voit le 12/05 ?', words, [])).toBe(false);
+    expect(meetingAskOnly('je sais où tu habites, on se voit ?', words, [])).toBe(false);
+    expect(meetingAskOnly('on se voit à 20h ?', words, [])).toBe(false);
+  });
+
+  it('pauses when the code cannot tell it is a meeting ask', () => {
+    expect(meetingAskOnly('j’ai fait une belle rencontre hier', words, [])).toBe(false);
+    expect(meetingAskOnly('bonjour', words, [])).toBe(false);
+  });
+
+  it('pauses again once he insisted', () => {
+    const asked = ['on se voit ?', 'allez on se rencontre'];
+    expect(meetingAskOnly('stp on pourrait se voir', words, asked.slice(0, MEETING_INSISTENCE_MAX - 1))).toBe(
+      true,
+    );
+    expect(meetingAskOnly('stp on pourrait se voir', words, asked)).toBe(false);
+  });
+
+  it('without the exception, her word pauses as before', () => {
+    const fired = keywordAlerts('on pourrait se voir ?', words, { custom: [], systemOn: new Set() });
+    expect(fired[0]?.pauses).toBe('keyword');
   });
 });

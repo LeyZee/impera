@@ -55,13 +55,15 @@ export function keywordAlerts(
   text: string,
   personaKeywords: readonly string[],
   settings: AlertSettings,
+  /** Code knows this message and answers it itself (`meetingAskOnly`, ADR 0143 § 15): her word only lets a human know. */
+  handled = false,
 ): FiredAlert[] {
   const fired: FiredAlert[] = [];
   const [persona] = alertKeywordsIn(text, personaKeywords);
   if (persona !== undefined)
     fired.push({
       trigger: { alert: { kind: 'system', code: 'keyword' }, matchedBy: 'keyword', keyword: persona },
-      pauses: 'keyword',
+      ...(!handled && { pauses: 'keyword' }),
       notify: true,
     });
   for (const alert of settings.custom) {
@@ -152,3 +154,38 @@ export function settleAlerts(fired: readonly FiredAlert[]): {
 
 /** An alert as a notice: what `alert_triggered` carries. */
 export const noticeOf = ({ trigger, notify }: FiredAlert): AlertNotice => ({ trigger, notify });
+
+/** He asks to see her for real, in so many words: « on se voit quand ? », « tu veux qu'on se rencontre ». */
+const MEETING_ASK =
+  /\b(?:se|te|vous|nous) (?:voir|voit|verra|rencontrer|rencontre|rencontrera|retrouver|retrouve)\b|\b(?:rdv|rendez vous|irl|boire un (?:verre|cafe|coup)|prendre un (?:verre|cafe)|en vrai|en personne)\b/u;
+// The words of her persona that only say « meet »: the exception holds for these, never for another (§ 24).
+const MEETING_WORD =
+  /^(?:rencontre|rencontrer|se rencontrer|rencontrons nous|se voir|on se voit|se retrouver|rdv|rendez vous|irl|en vrai|en personne|voir en vrai|boire un verre|un verre|un cafe)$/u;
+// A place, a date, an address, or he hints he knows where she is: always a pause and an alert (§ 27).
+const PLACE_OR_DATE =
+  /\b(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|apres demain|ce soir|cette nuit|ce week end|ce weekend|cette semaine|la semaine prochaine|janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|\d{1,2} ?h|\d{1,2} ?[/.-] ?\d{1,2}|\d{5}|rue|avenue|boulevard|bd|place|gare|aeroport|hotel|bar|restaurant|resto|metro|station|parking|adresse|chez (?:toi|moi|lui)|ta ville|ton quartier|ton immeuble|ton travail|ton taf|ta fac|ta salle|ton studio|j habite|je suis a|je serai a|je passe a|je viens a|je descends a|pres de chez|a cote de chez|je sais ou|je t ai (?:vue|croisee|apercue|reconnue)|je te reconnais|je te trouverai|code postal)\b/u;
+const DATE = /\b\d{1,2} ?[/.-] ?\d{1,2}\b/u;
+/** He already asked her as many times before: one more ask pauses again (§ 28). */
+export const MEETING_INSISTENCE_MAX = 2;
+
+const words = (text: string): string => spaced(normalise(text)).replace(/'/g, ' ');
+
+/**
+ * Code knows this message is a plain meeting ask and answers it itself, without the pause her word would set
+ * (ADR 0143 § 14, 15 and 24 to 28): every word of her persona he set off says « meet », he asks in so many words, he
+ * names no place, date or address, and he has not asked `MEETING_INSISTENCE_MAX` times before. Any doubt: false, and
+ * the pause holds. The caller checks the other guards first (age, care, minor).
+ */
+export function meetingAskOnly(
+  text: string,
+  personaKeywords: readonly string[],
+  earlierFanTexts: readonly string[],
+): boolean {
+  const matched = alertKeywordsIn(text, personaKeywords);
+  if (matched.length === 0) return false;
+  if (!matched.every((keyword) => MEETING_WORD.test(alertKeywordKey(keyword)))) return false;
+  const read = words(text);
+  if (!MEETING_ASK.test(read) || PLACE_OR_DATE.test(read) || DATE.test(normalise(text))) return false;
+  const asked = earlierFanTexts.filter((earlier) => MEETING_ASK.test(words(earlier))).length;
+  return asked < MEETING_INSISTENCE_MAX;
+}

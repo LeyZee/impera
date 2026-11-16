@@ -1779,10 +1779,34 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
     const { draftComposer, seen } = withPersonaOf(() => Promise.resolve(NORA));
     const result = await draftComposer.compose({
       ...INPUT,
-      history: [{ direction: 'inbound', text: 'On se donne rendez-vous ?', at: INPUT.now }],
+      history: [{ direction: 'inbound', text: 'On se donne rendez-vous samedi ?', at: INPUT.now }],
     });
     expect(result).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['alert_keyword'] });
     expect(seen.brainInputs).toHaveLength(0);
+  });
+
+  it('answers a plain meeting ask herself: her word lets the team know, no pause (ADR 0143 § 15)', async () => {
+    const { draftComposer, seen } = withPersonaOf(() => Promise.resolve(NORA));
+    const result = await draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'On se donne rendez-vous ?', at: INPUT.now }],
+    });
+    expect(result).toMatchObject({
+      kind: 'draft',
+      alerts: [{ notify: true, trigger: { keyword: 'rendez-vous' } }],
+    });
+    expect(result).not.toMatchObject({ kind: 'held', detail: ['alert_keyword'] });
+    expect(seen.brainInputs).toHaveLength(1);
+  });
+
+  it('pauses on her meeting word while he is in care (ADR 0143 § 25)', async () => {
+    const { draftComposer } = withPersonaOf(() => Promise.resolve(NORA));
+    const result = await draftComposer.compose({
+      ...INPUT,
+      care: { since: INPUT.now, helpGiven: false },
+      history: [{ direction: 'inbound', text: 'On se donne rendez-vous ?', at: INPUT.now }],
+    });
+    expect(result).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['alert_keyword'] });
   });
 
   it('writes nothing without an active persona, nor on an unreadable one: a human answers, no model is called', async () => {
