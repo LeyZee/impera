@@ -123,8 +123,10 @@ const WireMessageCoreSchema = z.strictObject({
   updatedAt: iso,
   isUnread: z.boolean(),
   content: z.string(),
-  /** Only `default` seen (380 messages). */
+  /** `default` and `tips` seen. */
   type: z.string(),
+  /** Set on a message deleted on Reveal (2026-11-16), absent otherwise: such a message is never read by us. */
+  deletedAt: iso.optional(),
   /** A GIF sent instead of a text (2026-11-15). */
   gif: z
     .strictObject({
@@ -168,6 +170,9 @@ const WireBundleSchema = z.strictObject({
   isPaid: z.boolean().optional(),
   /** Present once bought: links the message to `/transactions`. */
   transactionId: id.optional(),
+  /** A time-limited discount on a paid media (2026-11-16), as on a script step: both or neither. Read, never applied by us. */
+  discountedPrice: z.number().int().min(0).optional(),
+  discountDurationMinutes: z.number().int().min(0).optional(),
   modelId: id,
   memberId: id,
 });
