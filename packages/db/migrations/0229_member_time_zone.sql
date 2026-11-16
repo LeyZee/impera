@@ -7,7 +7,8 @@
 -- this function and nothing else. SECURITY DEFINER, run as the owner of the tables (the migration role, BYPASSRLS,
 -- ADR 0005), like the calendar's (0069): it applies the boundary itself, from the account the transaction names
 -- (`app.user_id`, set by `withMember`) and never from a value the caller passes, touches that one record and only its
--- `time_zone` (and `updated_at`), and never changes `app.team_scope`. `search_path` is pinned so that the caller cannot
+-- `time_zone` (and `updated_at`), and never changes `app.team_scope`. An account has one record at most:
+-- `team_members_user_id_unique` (0015) is what makes the read by `user_id` name a single row. `search_path` is pinned so that the caller cannot
 -- shadow a table or a function; every name is qualified. One argument, the zone: never a member nor an account. No
 -- dynamic SQL: the zone is compared and bound, never interpolated.
 --
