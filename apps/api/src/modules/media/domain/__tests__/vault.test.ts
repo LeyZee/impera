@@ -78,13 +78,13 @@ describe('vaultDescribeOrder (ADR 0113 § 5)', () => {
     expect(ids(order)).toEqual(['c', 'a', 'b']);
   });
 
-  it('describes a media of the root only when a script holds it (Charles, 16/11)', () => {
+  it('never describes a media of the root, even one a script holds (Charles, 16/11)', () => {
     const root = { folderRef: null, folderName: null };
     const order = vaultDescribeOrder(
       [media('loose_root', root), media('in_folder'), media('scripted_root', root)],
       [script('s', false, ['scripted_root'])],
     );
-    expect(ids(order)).toEqual(['scripted_root', 'in_folder']);
+    expect(ids(order)).toEqual(['in_folder']);
   });
 });
 

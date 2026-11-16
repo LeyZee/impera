@@ -301,7 +301,7 @@ describe('vault description on FakeReveal (ADR 0113)', () => {
     const calls = vision.calls;
     await sync();
     for (let lot = 0; lot < 3 && (await queued()).length > 0; lot++) await work();
-    // A photo at the vault's root that no script holds is never described (Charles, 16/11): the hour's catch-up
+    // A photo at the vault's root is never described (Charles, 16/11): the hour's catch-up
     // queues nothing for it.
     await test.admin.db.execute(sql`
       insert into media_platform_refs

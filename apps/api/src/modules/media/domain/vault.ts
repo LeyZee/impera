@@ -1,8 +1,8 @@
 /**
  * The order in which the vault's media are described (ADR 0113 § 5): first the media of the imported scripts that are
  * active, previews included, beginning with the scripts that miss the fewest descriptions (they become proposable
- * first); then those of the other imported scripts; then the media of a folder in the vault's order. A media at the
- * vault's root that no script holds is never described (Charles, 16/11). Pure: the store reads, this decides.
+ * first); then those of the other imported scripts; then the rest of the folders in the vault's order. Only a media
+ * of a folder is ever described, never one at the vault's root (Charles, 16/11). Pure: the store reads, this decides.
  */
 
 /** A media of the vault that has no file yet, as `media_platform_refs` keeps it. */
@@ -63,9 +63,9 @@ const compareRank = (a: Rank, b: Rank): number =>
   a.tier - b.tier || a.missing - b.missing || a.scriptId.localeCompare(b.scriptId) || a.place - b.place;
 
 /**
- * The candidates that are described, in their order (ADR 0113 § 5): those of a folder or of an imported script, never
- * a media of the root that no script holds. A media in several scripts takes its best place. A script's missing
- * descriptions are its media still waiting here: counted once each, a media listed twice in it too.
+ * The candidates that are described, in their order (ADR 0113 § 5): those of a folder, never one at the vault's root,
+ * even when a script holds it. A media in several scripts takes its best place. A script's missing descriptions are its
+ * media still waiting here: counted once each, a media listed twice in it too.
  */
 export function vaultDescribeOrder<T extends VaultCandidate>(
   candidates: readonly T[],
@@ -84,7 +84,7 @@ export function vaultDescribeOrder<T extends VaultCandidate>(
     }
   }
   return candidates
-    .filter((candidate) => candidate.folderRef !== null || best.has(candidate.platformMediaId))
+    .filter((candidate) => candidate.folderRef !== null)
     .sort((a, b) => {
       const ra = best.get(a.platformMediaId);
       const rb = best.get(b.platformMediaId);

@@ -265,13 +265,8 @@ export function createDrizzleVaultDescribeStore(adminDb: Database): VaultDescrib
             join ${creators} c on c.id = r.creator_id
            where r.media_asset_id is null and r.removed_at is null and r.kind in ('image', 'video')
              and r.description_failures < ${DESCRIPTION_TRIES}
-             -- Only what vaultDescribeOrder describes: a media of a folder, or one an imported script holds.
-             and (r.folder_ref is not null or exists (
-                   select 1
-                     from ${schema.platformScripts} s
-                     join ${schema.platformScriptStepMedia} m on m.platform_script_id = s.id
-                    where s.platform_account_id = r.platform_account_id
-                      and m.platform_media_ref = r.platform_media_id))
+             -- Only what vaultDescribeOrder describes: a media of a folder, never one at the vault's root.
+             and r.folder_ref is not null
              and c.archived_at is null and coalesce((c.settings ->> 'describeDrops')::boolean, false)
            order by 1, 2`);
         const accounts = z.array(BacklogRowSchema).parse(result.rows);
