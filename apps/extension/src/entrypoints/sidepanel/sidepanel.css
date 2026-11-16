@@ -255,6 +255,12 @@ body {
   min-height: 4.5em;
   max-height: 15em;
 }
+/* A picked reason is a secondary plate with a marked edge: the one filled shape stays the gesture (Design, lot -2). */
+.cp-draft__reasons .nv-chip[aria-checked='true'] {
+  background: var(--nv-glass-fill-strong);
+  color: var(--nv-ink);
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink);
+}
 .cp-draft__reasons {
   display: flex;
   flex-wrap: wrap;

@@ -16,6 +16,7 @@ import {
   IDENTITY_WORDS,
   identitySources,
   identityText,
+  lowerFirst,
   PANEL_GROUPS,
   restOf,
   sourceLine,
@@ -192,7 +193,6 @@ function quote(text: string | null, part?: string): HTMLElement | null {
 }
 
 const capital = (text: string): string => text.charAt(0).toLocaleUpperCase('fr-FR') + text.slice(1);
-const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr-FR') + text.slice(1);
 
 /** What the card shows of a value: when it is newer than the panel's first reading of the card, it says so (§ 10). */
 interface Marks {
@@ -406,7 +406,8 @@ function cardPart(
       h(
         'section',
         { class: 'cp-notice', 'data-kind': 'card_off' },
-        h('span', { class: 'cp-notice__icon', 'aria-hidden': 'true' }, icon('eye', 18)),
+        // Off, so the eye is struck through (Design, lot -2).
+        h('span', { class: 'cp-notice__icon', 'aria-hidden': 'true' }, icon('eyeOff', 18)),
         h('p', { class: 'cp-notice__title' }, 'La fiche du fan est éteinte pour cette créatrice'),
         h(
           'p',

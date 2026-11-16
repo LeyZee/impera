@@ -45,14 +45,15 @@ export function entryOf(entries: readonly FanCardEntry[], field: FanCardField): 
   return entries.find((one) => one.field === field) ?? { field, current: null, toCheck: [] };
 }
 
+/** A closed value's label is written for a choice (« Coquin »); in the card it reads as the others (Design, lot -2). */
 function closedLabel(field: FanCardField, item: string): string {
   if (field === 'intensity') {
     const value = FanCardIntensitySchema.safeParse(item);
-    return value.success ? FAN_CARD_INTENSITY_LABELS[value.data] : item;
+    return value.success ? lowerFirst(FAN_CARD_INTENSITY_LABELS[value.data]) : item;
   }
   if (field === 'lead') {
     const value = FanCardLeadSchema.safeParse(item);
-    return value.success ? FAN_CARD_LEAD_LABELS[value.data] : item;
+    return value.success ? lowerFirst(FAN_CARD_LEAD_LABELS[value.data]) : item;
   }
   return item;
 }
@@ -122,7 +123,8 @@ export function identityText(field: IdentityField, items: readonly string[]): st
   return field === 'age' && /^\d{1,3}$/u.test(text.trim()) ? `${text.trim()} ans` : text;
 }
 
-const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr-FR') + text.slice(1);
+/** A label as it reads inside a sentence: its first letter in lower case. */
+export const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr-FR') + text.slice(1);
 
 /**
  * Where the identity line comes from, said once (EXT-04): one source when the three parts share it, else one line per

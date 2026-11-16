@@ -47,7 +47,8 @@ describe('the fan’s card in the panel (ADR 0086 § 10)', () => {
   });
 
   it('reads a closed value by its label', () => {
-    expect(valueText('intensity', ['naughty'])).toBe('Coquin');
+    // In lower case, as every other value of the card.
+    expect(valueText('intensity', ['naughty'])).toBe('coquin');
     expect(valueText('outfits', ['lingerie noire', 'cosplay'])).toBe('lingerie noire · cosplay');
   });
 
