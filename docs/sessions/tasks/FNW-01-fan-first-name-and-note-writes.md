@@ -11,9 +11,9 @@ Appliquer l'ADR 0117 : ce que l'agent apprend du fan remonte dans le prénom du 
 ADR 0117, ADR 0018, ADR 0085, `docs/reference/reveal-connector-spec.md`, `docs/reference/reveal-api-observed.md`, `apps/api/src/modules/connectors/infra/reveal/note.ts`, `apps/api/src/modules/connectors/application/outbound-sender.ts`, module `fans`.
 
 ## À faire
-- Lot 0 : ADR 0117 (proposed), en attente de « ok 0117 ».
+- Lot 0 : ADR 0117, acceptée (« ok 0117 » du 16/11).
 - Lot a (sans capture) : table des empreintes de lignes écrites par l'agent (migration, numéro donné au signal), job `connectors.sync_fan_platform_fields`, règles § 3 et § 4 dans un domaine pur testé, tests contre `FakeReveal`.
 - Lot b (après la capture du prénom sur le compte fan test, avec l'accord écrit de Charles) : `setFanFirstName` et la capacité `fanFirstNameWrite`, règle § 2, signalement au chatteur, route observée dans `reveal-api-observed.md`.
 
 ## Résultat
-- Lot 0 : ADR écrite, attend l'accord de Charles.
+- Lot 0 : ADR acceptée le 16/11.

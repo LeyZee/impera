@@ -1,6 +1,6 @@
 # 0117. L'agent écrit le prénom du membre et le canevas de la note client
 
-Statut : proposed (demande de Charles du 15/11/2026 : « que l'IA puisse mettre à jour le prénom du membre dès qu'elle a le nom […] et pouvoir remplir les notes pour aider les chatteurs » ; numéro attribué par le coordinateur le 15/11)
+Statut : accepted (« ok 0117 » de Charles le 16/11/2026, 01 h 03 heure de Paris ; demande de Charles du 15/11/2026 : « que l'IA puisse mettre à jour le prénom du membre dès qu'elle a le nom […] et pouvoir remplir les notes pour aider les chatteurs » ; numéro attribué par le coordinateur le 15/11)
 Date : 2026-11-15
 Précise : ADR 0018 § 1 (la note client reste lue en direct, jamais copiée) et ADR 0085 § 11 (l'écriture dans la note client attendait une ADR à part). Ne remplace rien.
 
