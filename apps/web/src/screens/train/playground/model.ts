@@ -149,12 +149,29 @@ export function unansweredReason(answer: PlaygroundAnswer | null): string | null
 /** A human takes over: a flag on his media, or the brain decided to step back. Nothing was written. */
 export function isHandoff(answer: PlaygroundAnswer | null): boolean {
   if (answer === null) return false;
-  return (answer.handoff?.length ?? 0) > 0 || answer.brief?.action === 'handoff';
+  return (
+    (answer.handoff?.length ?? 0) > 0 || answer.brief?.action === 'handoff' || answer.hold?.kind === 'handoff'
+  );
+}
+
+/** He said he would come back: as in production, she waits and writes nothing (AGE-01). */
+export function isWaiting(answer: PlaygroundAnswer | null): boolean {
+  return answer?.hold?.kind === 'no_reply';
+}
+
+/** She answers his distress with care, as in production: nothing sold, a human validates every word (ADR 0088). */
+export function isCare(answer: PlaygroundAnswer | null): boolean {
+  return answer?.hold?.kind === 'care';
 }
 
 /** Why a human takes over, in words, without repeats. */
 export function handoffReasons(answer: PlaygroundAnswer): string[] {
   const flags = (answer.handoff ?? []).map((f) => MEDIA_FLAG_LABELS[f] ?? f);
   const risks = answer.brief?.action === 'handoff' ? answer.brief.risks.map(riskLabel) : [];
-  return [...new Set([...flags, ...risks])];
+  // The risk policy's own reasons: a risk the brain read even while suggesting a plain reply.
+  const held =
+    answer.hold?.kind === 'handoff'
+      ? answer.hold.detail.filter((d) => d !== 'brain' && d !== 'safety_net').map(riskLabel)
+      : [];
+  return [...new Set([...flags, ...risks, ...held])];
 }

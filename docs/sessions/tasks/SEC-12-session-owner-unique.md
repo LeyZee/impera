@@ -15,7 +15,7 @@ Tenir dès la première « Sync » la règle que `sessions.ts` énonce déjà : 
 
 ## À faire (liste vérifiable)
 
-- [x] Migration 0213 : `platform_accounts.session_owner`, unique par plateforme.
+- [x] Migration 0212 : `platform_accounts.session_owner`, unique par plateforme.
 - [x] `storeSession` écrit `session_owner` à chaque « Sync » ; la contrainte refusée devient `SessionOwnerConflict`.
 - [x] Le compte d'une créatrice archivée rend l'identité au compte qui la synchronise (`connector.session_released`), et redemande une « Sync » si elle revient (relecture Bilan).
 - [x] `sessions.ts` refuse aussi une session dont le relevé des ventes lie le modèle à un autre compte.

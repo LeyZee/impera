@@ -1,5 +1,5 @@
 {
-  "id": "4f32290d-4fbb-4c3c-8b5a-b470d2fd6394",
+  "id": "b9feca79-2523-4108-abd6-0f01de03c7d7",
   "prevId": "ca6b6611-7131-409e-a09a-cf523f93e3bd",
   "version": "7",
   "dialect": "postgresql",
@@ -17567,6 +17567,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "platform_index": {
+          "name": "platform_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
         "name": {
           "name": "name",
           "type": "text",
@@ -17662,6 +17668,10 @@
         "platform_script_steps_position_check": {
           "name": "platform_script_steps_position_check",
           "value": "\"platform_script_steps\".\"position\" >= 0 and \"platform_script_steps\".\"position\" < 50"
+        },
+        "platform_script_steps_platform_index_check": {
+          "name": "platform_script_steps_platform_index_check",
+          "value": "\"platform_script_steps\".\"platform_index\" >= 0"
         },
         "platform_script_steps_text_check": {
           "name": "platform_script_steps_text_check",
@@ -17953,6 +17963,225 @@
         "script_cadences_outcome_check": {
           "name": "script_cadences_outcome_check",
           "value": "\"script_cadences\".\"outcome\" in ('asked', 'reused', 'queue_empty', 'no_persona', 'blocked')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.script_identities": {
+      "name": "script_identities",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_script_id": {
+          "name": "platform_script_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "input_hash": {
+          "name": "input_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author": {
+          "name": "author",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prompt_hash": {
+          "name": "prompt_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "validated_by": {
+          "name": "validated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "validated_at": {
+          "name": "validated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "script_identities_brain_unique": {
+          "name": "script_identities_brain_unique",
+          "columns": [
+            {
+              "expression": "platform_script_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "input_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "prompt_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"script_identities\".\"author\" = 'brain'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "script_identities_script_idx": {
+          "name": "script_identities_script_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_script_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "script_identities_creator_id_creators_id_fk": {
+          "name": "script_identities_creator_id_creators_id_fk",
+          "tableFrom": "script_identities",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "script_identities_validated_by_user_id_fk": {
+          "name": "script_identities_validated_by_user_id_fk",
+          "tableFrom": "script_identities",
+          "tableTo": "user",
+          "columnsFrom": ["validated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "script_identities_script_creator_fk": {
+          "name": "script_identities_script_creator_fk",
+          "tableFrom": "script_identities",
+          "tableTo": "platform_scripts",
+          "columnsFrom": ["platform_script_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"script_identities\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "team_validate": {
+          "name": "team_validate",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"script_identities\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')",
+          "withCheck": "\"script_identities\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_identities\".\"validated_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "team_correct": {
+          "name": "team_correct",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"script_identities\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_identities\".\"author\" = 'human' and \"script_identities\".\"validated_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "script_identities_validated_check": {
+          "name": "script_identities_validated_check",
+          "value": "(\"script_identities\".\"validated_by\" is null) = (\"script_identities\".\"validated_at\" is null)"
+        },
+        "script_identities_input_hash_check": {
+          "name": "script_identities_input_hash_check",
+          "value": "\"script_identities\".\"input_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "script_identities_content_check": {
+          "name": "script_identities_content_check",
+          "value": "jsonb_typeof(\"script_identities\".\"content\") = 'object'"
+        },
+        "script_identities_schema_version_check": {
+          "name": "script_identities_schema_version_check",
+          "value": "\"script_identities\".\"schema_version\" >= 1"
+        },
+        "script_identities_author_check": {
+          "name": "script_identities_author_check",
+          "value": "\"script_identities\".\"author\" in ('brain', 'human')"
+        },
+        "script_identities_writer_check": {
+          "name": "script_identities_writer_check",
+          "value": "case \"script_identities\".\"author\" when 'brain' then \"script_identities\".\"model\" is not null and \"script_identities\".\"prompt_hash\" is not null else \"script_identities\".\"validated_at\" is not null and \"script_identities\".\"model\" is null and \"script_identities\".\"prompt_hash\" is null end"
         }
       },
       "isRLSEnabled": false
@@ -21081,12 +21310,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "session_owner": {
-          "name": "session_owner",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "session_updated_at": {
           "name": "session_updated_at",
           "type": "timestamp with time zone",
@@ -21167,11 +21390,6 @@
           "name": "platform_accounts_platform_handle_unique",
           "nullsNotDistinct": false,
           "columns": ["platform", "handle"]
-        },
-        "platform_accounts_platform_session_owner_unique": {
-          "name": "platform_accounts_platform_session_owner_unique",
-          "nullsNotDistinct": false,
-          "columns": ["platform", "session_owner"]
         },
         "platform_accounts_id_creator_unique": {
           "name": "platform_accounts_id_creator_unique",

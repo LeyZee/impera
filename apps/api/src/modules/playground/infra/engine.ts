@@ -93,6 +93,7 @@ export interface EngineDeps {
 export function ratingRecord(input: {
   readonly id: string;
   readonly creatorId?: string | undefined;
+  readonly personaVersionId?: string | undefined;
   readonly sessionId: string;
   readonly at: Date;
   readonly version: AnswerVersion;
@@ -104,6 +105,7 @@ export function ratingRecord(input: {
   return {
     id: input.id,
     ...(input.creatorId !== undefined && { creatorId: input.creatorId }),
+    ...(input.personaVersionId !== undefined && { personaVersionId: input.personaVersionId }),
     sessionId: input.sessionId,
     at: input.at.toISOString(),
     version: input.version,
@@ -183,6 +185,7 @@ function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
     ...(turn.offerRefused !== undefined && {
       offerRefused: { code: turn.offerRefused, label: offerRefusalLabel(turn.offerRefused) },
     }),
+    ...(turn.hold !== undefined && { hold: { kind: turn.hold.kind, detail: [...turn.hold.detail] } }),
     ...(turn.model !== undefined && { model: turn.model }),
     latencyMs: turn.latencyMs,
     costEur: turn.costUsd / usdPerEur,
@@ -201,7 +204,15 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     personaSheet: deps.persona.personaSheet,
     guardSettings: guardSettingsOf(deps.persona),
     splitMessages: deps.persona.splitMessages,
-    voiceExamples: voiceExamples(deps.records),
+    // Her examples only when her own version is played: never the invented persona's, never another creator's.
+    voiceExamples:
+      deps.played === undefined
+        ? []
+        : voiceExamples(deps.records, {
+            creatorId: deps.played.creatorId,
+            personaVersionId: deps.played.versionId,
+            guardSettings: guardSettingsOf(deps.persona),
+          }),
     offerLimits: deps.persona.offerLimits,
     sexualizationLimits: deps.persona.sexualizationLimits,
     followUps: deps.persona.followUps,
@@ -344,14 +355,17 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       exclusive(async () => {
         const exchange = session.lastExchange;
         if (exchange === undefined || isRated) throw new NothingToRate();
-        // Nothing was written, or the guards stopped it: there is nothing to validate as it stands.
-        if (verdict.kind === 'validated' && exchange.turn.isBlocked) throw new BlockedAnswer();
+        // The guards stopped it, or a model failed: there is nothing to validate as it stands. A handoff, care or a
+        // wait decided by the risk policy is itself the answer: the trainer says it was right (AGE-01).
+        const decided = exchange.turn.handoff !== undefined || exchange.turn.hold !== undefined;
+        if (verdict.kind === 'validated' && exchange.turn.isBlocked && !decided) throw new BlockedAnswer();
         const destination =
           verdict.kind === 'validated' ? undefined : (override ?? suggestDestination(verdict));
         ratings += 1;
         const record = ratingRecord({
           id: `${deps.sessionId}-${String(ratings)}`,
           creatorId: deps.played?.creatorId ?? (await deps.creatorId?.()) ?? undefined,
+          personaVersionId: deps.played?.versionId,
           sessionId: deps.sessionId,
           at: (deps.now ?? (() => new Date()))(),
           // The model that wrote it: an answer of the fallback counts for the fallback, not for Grok.
