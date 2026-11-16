@@ -47,3 +47,40 @@ describe('a refused « Sync » whose audit line cannot be written (SEC-13)', () 
     expect(JSON.stringify(warned)).not.toContain('session-test-value');
   });
 });
+
+describe('a « Sync » of a token with an hour left (16/11)', () => {
+  it('is stored as warning, and says to log in again first', async () => {
+    const stored: { state: string }[] = [];
+    const sessions = createConnectorSessions({
+      accounts: {
+        ...accounts,
+        storeSession: (_creator, _id, session) => {
+          stored.push({ state: session.state });
+          return Promise.resolve();
+        },
+      },
+      vault: { seal: () => Buffer.from('sealed'), open: () => 'never-read' },
+      clock: { now: () => new Date('2026-11-16T22:00:00Z') },
+      shapes: {
+        reveal: () => ({
+          owner: 'model-test-a',
+          member: 'member-test-a',
+          expiresAt: new Date('2026-11-16T22:56:00Z'),
+        }),
+      },
+      modelLinks: () => Promise.resolve(new Map()),
+    });
+    const life = await sessions.store({
+      platformAccountId,
+      session: 'session-test-value',
+      correlationId: 'correlation-test',
+      userId: null,
+    });
+    expect(life).toEqual({
+      state: 'warning',
+      expiresAt: new Date('2026-11-16T22:56:00Z'),
+      reconnectFirst: true,
+    });
+    expect(stored).toEqual([{ state: 'warning' }]);
+  });
+});

@@ -318,6 +318,18 @@ export const ConnectorSessionBodySchema = z.object({
 export type ConnectorSessionBody = z.infer<typeof ConnectorSessionBodySchema>;
 
 /**
+ * What the « Sync » stored: its state and the token's own expiry. Reveal's token lives 24 h from the login to Reveal,
+ * never from the « Sync » (reveal-connector-spec.md § 2): `reconnectFirst` says it has under 20 h left, so the owner
+ * logs out of Reveal and in again, then syncs once more. Never a value of the session.
+ */
+export const ConnectorSessionStoredSchema = z.object({
+  sessionState: z.enum(['valid', 'warning']),
+  expiresAt: z.iso.datetime().nullable(),
+  reconnectFirst: z.boolean(),
+});
+export type ConnectorSessionStored = z.infer<typeof ConnectorSessionStoredSchema>;
+
+/**
  * `GET /v1/connector/accounts?platform=`: the accounts the extension may sync, for the owner's link only (ADR 0066 § 7).
  * Never the session itself, only its state and when it last changed.
  */

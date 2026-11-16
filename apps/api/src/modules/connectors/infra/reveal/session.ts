@@ -33,8 +33,24 @@ export function parseRevealSession(raw: string): RevealSession | null {
   return parsed.success ? parsed.data : null;
 }
 
+/** `exp` of a JWT bearer, when the token is one (spec § 2, V2); `null` otherwise. Reads the expiry only, never logs. */
+export function revealTokenExpiry(bearer: string): Date | null {
+  const payload = bearer.split('.')[1];
+  if (payload === undefined) return null;
+  try {
+    const parsed = z
+      .object({ exp: z.number().int().positive() })
+      .safeParse(JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')));
+    return parsed.success ? new Date(parsed.data.exp * 1_000) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** `null` for anything that is not a Reveal session of this shape: the route refuses it before storing. */
 export const revealSessionShape: SessionShape = (raw) => {
   const session = parseRevealSession(raw);
-  return session === null ? null : { owner: session.modelId, member: session.userId };
+  return session === null
+    ? null
+    : { owner: session.modelId, member: session.userId, expiresAt: revealTokenExpiry(session.bearer) };
 };

@@ -8,13 +8,15 @@ import {
   SessionVaultMissing,
 } from '../domain/errors';
 import type { AccountStore, Clock, JobLogger, SessionShapes, SessionVault } from '../domain/ports';
+import { sessionLife, type SessionLife } from '../domain/session-life';
 
 export interface ConnectorSessions {
   /**
    * Stores the session the extension captured, encrypted; the account becomes `valid` and its breaker closes. Refused
    * when it is not a session of the account's platform, when it belongs to another creator than the one stored or the
    * model the sales register links to the account, when another account already holds or is linked to her, or to
-   * another team member than the one stored (the « bot » member, pinned at the first « Sync »).
+   * another team member than the one stored (the « bot » member, pinned at the first « Sync »). Answers what its
+   * expiry says: `warning` under 2 h left, and `reconnectFirst` when it is not a fresh login's token.
    */
   store(input: {
     platformAccountId: PlatformAccountId;
@@ -24,7 +26,7 @@ export interface ConnectorSessions {
     userId: string | null;
     /** The request's logger: told when the line of a refusal could not be written. */
     logger?: JobLogger;
-  }): Promise<void>;
+  }): Promise<SessionLife>;
   /** The decrypted session, or `null` when none was captured. Never logged, never sent to a client. */
   load(creatorId: CreatorId, platformAccountId: PlatformAccountId): Promise<string | null>;
   markExpired(
@@ -68,7 +70,7 @@ export function createConnectorSessions(deps: {
       correlationId: string;
       userId: string | null;
     },
-  ): Promise<void> => {
+  ): Promise<SessionLife> => {
     const { creatorId } = account;
     const shape = deps.shapes[account.platform];
     const read = shape === undefined ? null : shape(session);
@@ -88,6 +90,10 @@ export function createConnectorSessions(deps: {
     // The member is pinned at the first « Sync » (P2-02): the owner's or a chatter's session is never the bot's.
     if (stored?.member !== undefined && stored.member !== read.member) throw new SessionMemberConflict();
     const sealed = vault().seal(platformAccountId, session);
+    const at = deps.clock.now();
+    // Reveal's token lives 24 h from the login, not from the « Sync » (spec § 2): one copied from a browser logged in
+    // yesterday is stored as it is, but never called valid when it has under 2 h left.
+    const life = sessionLife(read.expiresAt ?? null, at);
     await deps.accounts.storeSession(
       creatorId,
       platformAccountId,
@@ -98,20 +104,18 @@ export function createConnectorSessions(deps: {
         // Compared in clear: GCM seals the same session differently each time. One that no longer opens (a retired
         // key) is not the same.
         isSame: (stored) => openOrNull(vault(), platformAccountId, stored) === session,
+        state: life.state,
       },
-      {
-        correlationId,
-        at: deps.clock.now(),
-        userId,
-      },
+      { correlationId, at, userId },
     );
+    return life;
   };
   return {
     async store(input) {
       const account = await deps.accounts.creatorOf(input.platformAccountId);
       if (account === null) throw new PlatformAccountNotFound();
       try {
-        await accept(account, input);
+        return await accept(account, input);
       } catch (error) {
         // A refused « Sync » leaves its line: who, which account, why. Nothing of the session, nor of the platform.
         const reason =

@@ -277,12 +277,12 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
               sessionCiphertext: session.ciphertext,
               sessionOwner: session.owner,
               ...(renewed ? { sessionUpdatedAt: meta.at } : {}),
-              sessionState: 'valid',
+              sessionState: session.state,
               consecutiveErrors: 0,
               pausedUntil: null,
             })
             .where(byId(id));
-          if (row.sessionState !== 'valid') {
+          if (row.sessionState !== session.state) {
             await insertEvent(
               tx,
               creatorId,
@@ -291,7 +291,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
                 payload: {
                   platformAccountId: id,
                   from: SessionStateSchema.parse(row.sessionState),
-                  to: 'valid',
+                  to: session.state,
                 },
               },
               meta,

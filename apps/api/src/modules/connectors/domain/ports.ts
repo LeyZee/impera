@@ -112,6 +112,8 @@ export interface AccountStore {
       readonly ciphertext: Buffer;
       readonly owner: string;
       readonly isSame: (stored: Buffer) => boolean;
+      /** What its expiry says now (`session-life.ts`): `warning` when it has under 2 h left. */
+      readonly state: 'valid' | 'warning';
     },
     meta: EventMeta & { readonly userId: string | null },
   ): Promise<void>;
@@ -132,7 +134,12 @@ export interface AccountStore {
  * Reads a captured session's shape, platform by platform: `null` when the text is not a session of this platform, else
  * whose it is (`owner`: on Reveal, the creator's model id). Two sessions of one account must have the same owner.
  */
-export type SessionShape = (raw: string) => { readonly owner: string; readonly member?: string } | null;
+export type SessionShape = (raw: string) => {
+  readonly owner: string;
+  readonly member?: string;
+  /** The session's own expiry, when it carries one we can read (Reveal: the JWT's `exp`). */
+  readonly expiresAt?: Date | null;
+} | null;
 
 /** One reader per platform whose sessions the extension captures; a platform without one takes no session. */
 export type SessionShapes = Partial<Record<Platform, SessionShape>>;

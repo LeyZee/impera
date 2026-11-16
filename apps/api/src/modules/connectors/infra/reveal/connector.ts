@@ -18,7 +18,6 @@ import type {
   VaultMedia,
   VerifyResult,
 } from '@impera/contracts';
-import { z } from 'zod';
 
 import {
   ConnectorError,
@@ -27,6 +26,7 @@ import {
   type PlatformConnector,
 } from '../../domain/platform-connector';
 import type { ConnectorRegistry, ConnectorSend, SendJournal } from '../../domain/ports';
+import { SESSION_WARNING_BEFORE_MS } from '../../domain/session-life';
 import {
   downloadVaultFile,
   VaultFileError,
@@ -56,7 +56,7 @@ import {
 } from './mapping';
 import { withAgencyBlock } from './note';
 import { fingerprintOf, isSendOf, type SendContent } from './sends';
-import { parseRevealSession, type RevealSession } from './session';
+import { parseRevealSession, revealTokenExpiry, type RevealSession } from './session';
 import { REVEAL_ENDPOINTS, type RevealAnswer } from './wire';
 
 /** Page sizes of the official client (reveal-api-observed.md § Pagination): no heavier than a chatter. */
@@ -90,8 +90,6 @@ const FILE_FAILURES: Record<VaultFileFailure, ConnectorError['code']> = {
 };
 /** A cursor that never ends is a bug or a changed API: stop rather than loop. */
 const MAX_PAGES = 500;
-/** `health` warns this long before a readable expiry (spec § 2): the token lives 24 h only (V1). */
-const WARNING_BEFORE_MS = 2 * 3_600_000;
 /**
  * `verifySent` reads this many of the newest messages (spec § 5, point 3): two pages of the official client's ten.
  * A watch point (spec § 5): over 20 messages written in the conversation between the attempt and its check, the
@@ -161,20 +159,6 @@ export interface RevealApiConnectorOptions {
   readonly fileHttpForTests?: boolean;
 }
 
-/** `exp` of a JWT bearer, when the token is one (spec § 2, V2); `null` otherwise. */
-function expiryOf(bearer: string): number | null {
-  const payload = bearer.split('.')[1];
-  if (payload === undefined) return null;
-  try {
-    const parsed = z
-      .object({ exp: z.number() })
-      .safeParse(JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')));
-    return parsed.success ? parsed.data.exp * 1_000 : null;
-  } catch {
-    return null;
-  }
-}
-
 /** What `prior` found of a key before a send. */
 interface Prior {
   readonly key: string;
@@ -214,7 +198,7 @@ export class RevealApiConnector implements PlatformConnector {
     const { session } = options;
     this.now = options.now ?? (() => new Date());
     this.modelId = session?.modelId ?? '';
-    this.expiresAt = session === null ? null : expiryOf(session.bearer);
+    this.expiresAt = session === null ? null : (revealTokenExpiry(session.bearer)?.getTime() ?? null);
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.botDisplayName = options.botDisplayName ?? null;
     this.sends = options.sends ?? null;
@@ -250,7 +234,7 @@ export class RevealApiConnector implements PlatformConnector {
       if (error instanceof ConnectorError && error.code === 'session_expired') return 'expired';
       throw error;
     }
-    if (this.expiresAt !== null && this.expiresAt - this.now().getTime() < WARNING_BEFORE_MS)
+    if (this.expiresAt !== null && this.expiresAt - this.now().getTime() < SESSION_WARNING_BEFORE_MS)
       return 'warning';
     return 'valid';
   }

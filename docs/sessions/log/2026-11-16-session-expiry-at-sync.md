@@ -1,0 +1,7 @@
+# 2026-11-16 — session-expiry-at-sync (durée du jeton dite à la synchronisation) — done
+Fait : à la synchronisation, le serveur lit `exp` du jeton Reveal (lecture déplacée de `connector.ts` vers `reveal/session.ts`, `revealTokenExpiry`) ; `domain/session-life.ts` en tire l'état (`warning` à moins de 2 h, comme `health`) et `reconnectFirst` (moins de 20 h). `storeSession` enregistre cet état au lieu de `valid` d'office, avec son `session_state_changed`. `POST /v1/connector/sessions` répond 200 `{ sessionState, expiresAt, reconnectFirst }` (contrat `ConnectorSessionStoredSchema`) au lieu de 204 ; l'extension actuelle accepte déjà une réponse 200 avec corps.
+Pas fait : l'affichage dans le popup de l'extension (« ce jeton expire à HH:MM, déconnecte-toi de Reveal puis reconnecte-toi ») : fil Extension, sa PR.
+Décisions : seuil « se reconnecter » à 20 h (un jeton frais en a 24) ; un jeton déjà expiré à la synchronisation est enregistré en `warning`, le relevé suivant le passe en `expired` ; une expiration illisible ne dit rien (`valid`, `reconnectFirst` faux).
+Découvertes : le 16/11, une synchronisation à 22:00 UTC a repris le jeton de la veille (environ 1 h de vie) et s'est affichée « valide » ; cause : la synchronisation recopie le jeton du navigateur, Reveal ne le renouvelle jamais.
+Candidats à suppression : aucun.
+Vérifié : pnpm check, pnpm test (unitaires connecteurs) ; `pnpm test:integration` non lancé (pas de Docker), test écrit pour la CI.

@@ -2,6 +2,7 @@ import {
   ConnectorAccountsQuerySchema,
   ConnectorAccountsSchema,
   ConnectorSessionBodySchema,
+  ConnectorSessionStoredSchema,
   ExtensionLinkTokenSchema,
 } from '@impera/contracts';
 import type { FastifyRequest } from 'fastify';
@@ -72,19 +73,27 @@ export function createConnectorRoutes(deps: {
         logLevel: 'warn',
         config: { originCheck: false, rateLimit: SYNC_LIMIT },
         onRequest: ownerOnly,
-        schema: { headers: LinkHeadersSchema, body: ConnectorSessionBodySchema },
+        schema: {
+          headers: LinkHeadersSchema,
+          body: ConnectorSessionBodySchema,
+          response: { 200: ConnectorSessionStoredSchema },
+        },
       },
-      async (request, reply) => {
+      async (request) => {
         const userId = owners.get(request);
         if (userId === undefined) throw new ConnectorLinkUnauthenticated();
-        await deps.sessions.store({
+        const life = await deps.sessions.store({
           platformAccountId: request.body.platformAccountId,
           session: request.body.session,
           correlationId: request.id,
           userId,
           logger: request.log,
         });
-        return reply.code(204).send();
+        return {
+          sessionState: life.state,
+          expiresAt: life.expiresAt?.toISOString() ?? null,
+          reconnectFirst: life.reconnectFirst,
+        };
       },
     );
     return Promise.resolve();
