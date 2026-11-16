@@ -62,10 +62,10 @@ export const CREATOR_HOW_TO: Readonly<Record<CreatorMedalKind | CreatorTrophyKin
   delivery_streak_5: 'Livre 5 demandes à l’heure d’affilée.',
   delivery_streak_10: 'Livre 10 demandes à l’heure d’affilée.',
   delivery_streak_25: 'Livre 25 demandes à l’heure d’affilée.',
-  perfect_day: 'Fais toutes tes tâches d’une journée, les essentielles et les tiennes.',
+  perfect_day: 'Coche toutes tes routines du jour, les essentielles et les tiennes.',
   first_script: 'Dépose ton premier script tourné.',
-  full_stock: 'Aie toutes tes catégories actives au-dessus de leur seuil le même jour.',
-  hit_content: 'Une de tes publications devient « à refaire ».',
+  full_stock: 'Un jour où l’agence a assez de chaque sorte de contenu que tu tournes.',
+  hit_content: 'Une de tes publications marche si bien que l’agence veut la refaire.',
 };
 
 /** What her reveal says of each (§ 11). */

@@ -118,6 +118,25 @@ function isOver(when: CreatorTaskWhen, zone: string, now: Date): boolean {
   return false;
 }
 
+/**
+ * `rewards.evaluate_creator` for her, in the transaction of her gesture (ADR 0107 § 14, recette 16/11 CRE-06): the game
+ * looks at once, so that a gain is revealed where she made it. One waiting run per creator, replaced by the next gesture
+ * a few seconds later. The job is the game's (`wiring/rewards.ts`): only its name and attempts are shared, by the
+ * contracts, as for every job a module asks of another.
+ */
+async function askHerGame(tx: Transaction, creatorId: string): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => 'rewards.evaluate_creator',
+      payload => ${JSON.stringify({ creatorId })}::jsonb,
+      run_at => now() + interval '2 seconds',
+      max_attempts => ${JOB_MAX_ATTEMPTS['rewards.evaluate_creator']}::int,
+      job_key => ${`rewards.evaluate_creator:${creatorId}`},
+      job_key_mode => 'replace'
+    )`,
+  );
+}
+
 export async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
   const [creator] = await tx
     .select({ timeZone: schema.creators.timezone })
@@ -132,9 +151,10 @@ function dueOn(row: TaskRow, day: string, zone: string): boolean {
   if (row.kind === 'day') return row.day === day;
   if (row.kind === 'timed') return row.startsAt !== null && calendarDayIn(row.startsAt, zone) === day;
   if (row.weekdays?.includes(isoWeekday(day)) !== true) return false;
-  // A routine counts from the day it entered her agenda to the day before it left it.
+  // A routine counts from the day it entered her agenda to the day she removed it, that day included: removing it
+  // never saves the day it is due (recette 16/11, Charles's choice).
   if (calendarDayIn(row.createdAt, zone) > day) return false;
-  return row.archivedAt === null || calendarDayIn(row.archivedAt, zone) > day;
+  return row.archivedAt === null || calendarDayIn(row.archivedAt, zone) >= day;
 }
 
 /**
@@ -181,7 +201,7 @@ async function streakNow(tx: Transaction, zone: string, now: Date): Promise<Crea
 
 const sameTask = (
   stored: CreatorTask,
-  body: Omit<CreatorTask, 'essential' | 'shootBrief' | 'reelBrief' | 'createdAt'>,
+  body: Omit<CreatorTask, 'essential' | 'shootBrief' | 'reelBrief' | 'createdAt' | 'removedAt'>,
 ): boolean =>
   JSON.stringify({
     ...stored,
@@ -189,6 +209,7 @@ const sameTask = (
     shootBrief: undefined,
     reelBrief: undefined,
     createdAt: undefined,
+    removedAt: undefined,
   }) ===
   JSON.stringify({
     ...body,
@@ -196,6 +217,7 @@ const sameTask = (
     shootBrief: undefined,
     reelBrief: undefined,
     createdAt: undefined,
+    removedAt: undefined,
   });
 
 /** `withCreatorAccount` for every reading and writing of her agenda (CR-05). */
@@ -216,12 +238,15 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
         const zone = await zoneOf(tx, creatorId);
         const from = wallClockToInstant(query.from, 0, zone);
         const to = wallClockToInstant(addDays(query.to, 1), 0, zone);
+        // A routine she removed today is still read: her today keeps it due (recette 16/11).
+        const todayStarts = wallClockToInstant(calendarDayIn(now, zone), 0, zone);
         const taskRows = await tx
           .select()
           .from(tasks)
           .where(
             and(
-              sql`${tasks.archivedAt} is null`,
+              sql`(${tasks.archivedAt} is null
+                or (${tasks.kind} = 'routine' and ${tasks.archivedAt} >= ${todayStarts}))`,
               sql`(${tasks.kind} = 'routine'
                 or (${tasks.kind} = 'day' and ${tasks.day} between ${query.from} and ${query.to})
                 or (${tasks.kind} = 'timed' and ${tasks.startsAt} < ${to} and ${tasks.endsAt} > ${from}))`,
@@ -332,11 +357,8 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
       withCreatorAccount(db, userId, async (tx, creatorId) => {
         const zone = await zoneOf(tx, creatorId);
         const ids = [...new Set(body.ticks.map((tick) => tick.taskId))];
-        const rows = await tx
-          .select()
-          .from(tasks)
-          .where(and(inArray(tasks.id, ids), sql`${tasks.archivedAt} is null`));
-        const byId = new Map(rows.map((row) => [row.id, row]));
+        const rows = await tx.select().from(tasks).where(inArray(tasks.id, ids));
+        const byId = new Map(rows.filter((row) => stillToday(row, now, zone)).map((row) => [row.id, row]));
         const missing = ids.filter((id) => !byId.has(id));
         if (missing.length > 0) throw new CreatorTaskNotFound({ taskIds: missing });
         const offDay = [
@@ -377,13 +399,16 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
                 // Two phones replaying at once: the first one stays.
                 .onConflictDoNothing()
                 .returning({ taskId: ticks.taskId });
+        // Her game looks at once, so that a gain is revealed where she ticked (ADR 0107 § 14, recette 16/11 CRE-06).
+        if (written.length > 0) await askHerGame(tx, creatorId);
         return { added: written.length, streak: await streakNow(tx, zone, now) };
       }),
 
     untick: (userId, taskId, day, now) =>
       withCreatorAccount(db, userId, async (tx, creatorId) => {
         const zone = await zoneOf(tx, creatorId);
-        const task = await liveTask(tx, taskId);
+        const [task] = await tx.select().from(tasks).where(eq(tasks.id, taskId)).for('update');
+        if (task === undefined || !stillToday(task, now, zone)) throw new CreatorTaskNotFound();
         if (!untickTimely(day, task.kind === 'routine', now, zone))
           throw new CreatorDayClosedUnprocessable(taskId);
         await tx.delete(ticks).where(and(eq(ticks.taskId, taskId), eq(ticks.day, day)));
@@ -519,6 +544,16 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
 function dueOnTick(row: TaskRow | undefined, day: string, zone: string): boolean {
   if (row === undefined) return false;
   if (row.kind !== 'routine') return dueOn(row, day, zone);
-  // A routine is ticked on its weekdays, from the day it entered her agenda.
-  return row.weekdays?.includes(isoWeekday(day)) === true && calendarDayIn(row.createdAt, zone) <= day;
+  // A routine is ticked on its weekdays, from the day it entered her agenda to the day she removed it.
+  return (
+    row.weekdays?.includes(isoWeekday(day)) === true &&
+    calendarDayIn(row.createdAt, zone) <= day &&
+    (row.archivedAt === null || calendarDayIn(row.archivedAt, zone) >= day)
+  );
+}
+
+/** A task still hers to tick on her today: in her agenda, or a routine she removed today (it stays due that day). */
+function stillToday(row: TaskRow, now: Date, zone: string): boolean {
+  if (row.archivedAt === null) return true;
+  return row.kind === 'routine' && calendarDayIn(row.archivedAt, zone) === calendarDayIn(now, zone);
 }

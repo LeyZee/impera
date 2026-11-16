@@ -6,6 +6,7 @@ import {
   FanIdSchema,
   McpFanCardGetSchema,
   McpGrantCreatedSchema,
+  McpDailyStatsListSchema,
   McpPayPeriodStateSchema,
   McpSalesListSchema,
   McpWhoamiSchema,
@@ -162,6 +163,7 @@ describe('/v1/mcp', () => {
         'whoami',
         'creators_list',
         'creator_get',
+        'platform_daily_stats_list',
       ]);
       const result = await client.callTool({ name: 'whoami', arguments: {} });
       const whoami = McpWhoamiSchema.parse(result.structuredContent);
@@ -497,6 +499,35 @@ describe('/v1/mcp', () => {
       (await rpc(bound.token, callTool('sales_list', { ...week, creatorId: lea }))).json(),
     );
     expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+  });
+  it('gives the platform’s daily statistics of the access’s creator, over a bounded period', async () => {
+    const week = { from: '2026-11-01', to: '2026-11-07' };
+    const bound = await createGrant();
+    const hers = McpDailyStatsListSchema.parse(
+      RpcSchema.parse((await rpc(bound.token, callTool('platform_daily_stats_list', week))).json()).result
+        ?.structuredContent,
+    );
+    // Nothing was read in this test's base.
+    expect(hers.creators).toEqual([{ creatorId: nora, days: [] }]);
+    const tooLong = RpcSchema.parse(
+      (
+        await rpc(
+          bound.token,
+          callTool('platform_daily_stats_list', { from: '2026-08-01', to: '2026-11-02' }),
+        )
+      ).json(),
+    );
+    expect(tooLong.result?.structuredContent).toEqual({ refusal: 'arguments_invalid' });
+    const other = RpcSchema.parse(
+      (await rpc(bound.token, callTool('platform_daily_stats_list', { ...week, creatorId: lea }))).json(),
+    );
+    expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+    // A tool of one creator (ADR 0105 § 4): an access of the agency names none, and is refused.
+    const agency = await createGrant({ creatorId: null });
+    const refused = RpcSchema.parse(
+      (await rpc(agency.token, callTool('platform_daily_stats_list', week))).json(),
+    );
+    expect(refused.result?.structuredContent).toEqual({ refusal: 'creator_required' });
   });
   it('gives the state of a pay period to an access of the agency, never to one bound to a creator', async () => {
     const agency = await createGrant({ capabilities: ['read:payroll'], creatorId: null });

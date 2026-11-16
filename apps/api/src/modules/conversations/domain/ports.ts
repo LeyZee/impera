@@ -471,6 +471,10 @@ export interface FanDirectory {
       readonly value: string;
       /** `declared` (he said it), `noted` (a human wrote it) or `inferred` (the brain guessed it). */
       readonly kind?: string;
+      /** How sure the brain was; a declared age confirms only when sure (relecture Sécurité, #798). */
+      readonly confidence?: number;
+      /** His message the brain read it in: a declared age confirms only when the number is in it. */
+      readonly sourceMessageId?: string | null;
     }[]
   >;
 }
