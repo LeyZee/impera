@@ -60,11 +60,12 @@ describe('how a percentage and its day are said', () => {
     expect(percentOf(3500)).toBe('35\u00a0%');
     expect(percentOf(3550)).toBe('35,5\u00a0%');
     expect(percentOf(3525)).toBe('35,25\u00a0%');
-    expect(confirmSentence(3500, '2026-11-10')).toBe('35\u00a0% pour l’agence à partir du 10/11/2026.');
+    expect(confirmSentence(3500, '2026-11-10')).toBe('35\u00a0% pour l’agence à partir du 10 novembre 2026.');
   });
 
   it('writes a day the French way and counts the next on the calendar', () => {
-    expect(dayLabel('2026-11-10')).toBe('10/11/2026');
+    expect(dayLabel('2026-11-10')).toBe('10 novembre 2026');
+    expect(dayLabel('2026-10-01')).toBe('1er octobre 2026');
     expect(nextDay('2026-11-30')).toBe('2026-12-01');
     expect(nextDay('2026-12-31')).toBe('2027-01-01');
     expect(nextDay('2028-02-28')).toBe('2028-02-29');
@@ -102,6 +103,7 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
       netMinor: 1800,
       agencyMinor: 700,
       agencyBps: 3889,
+      differsFromRate: null,
       ...patch,
     });
   const A = '0192f3a0-0000-7000-8000-0000000000a1';
@@ -129,7 +131,12 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
   });
 
   it('writes a fortnight short, and puts one share in the head only when it is alone', () => {
-    expect(windowLabel({ from: '2026-11-01', to: '2026-11-15' })).toBe('du 01/11 au 15/11');
+    expect(windowLabel({ from: '2026-11-01', to: '2026-11-15' }, '2026-11-20')).toBe('du 1er au 15 novembre');
+    expect(windowLabel({ from: '2026-10-16', to: '2026-11-03' }, '2026-11-20')).toBe(
+      'du 16 octobre au 3 novembre',
+    );
+    expect(windowLabel({ from: '2026-11-16', to: '2026-11-16' }, '2026-11-16')).toBe('aujourd’hui');
+    expect(windowLabel({ from: '2026-11-16', to: '2026-11-16' }, '2026-11-20')).toBe('le 16 novembre');
     const list = (shares: ObservedAgencyShare[]) => ({
       today: '2026-11-03',
       current: null,
@@ -164,7 +171,7 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
       then: 'Le pourcentage est facultatif.',
     });
     expect(sheet({ current: rateOf, rates: [rateOf] }, read).then).toBe(
-      'Pourcentage réglé : 35\u00a0% depuis le 01/10/2026.',
+      'Pourcentage réglé : 35\u00a0% depuis le 1er octobre 2026.',
     );
     expect(sheet({}, { linked: true })).toEqual({
       dot: 'idle',
@@ -173,7 +180,31 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
     });
     expect(sheet({}).dot).toBe('warn');
     expect(sheet({ current: rateOf, rates: [rateOf] }).lead).toBe(
-      '35\u00a0% pour l’agence aujourd’hui, depuis le 01/10/2026.',
+      '35\u00a0% pour l’agence aujourd’hui, depuis le 1er octobre 2026.',
     );
+  });
+
+  it('warns in amber when the share read differs from her percentage, as the server reads it (V-PIL-25)', () => {
+    const rateOf = rate('0192f3a0-0000-7000-8000-0000000000e1', '2026-10-01', 4000);
+    const head = (shares: ObservedAgencyShare[], current: typeof rateOf | null = rateOf) =>
+      sheetHead(
+        {
+          today: '2026-11-16',
+          current,
+          rates: current === null ? [] : [current],
+          observed: { ...NOTHING_READ, linked: true, last30Days: { ...NOTHING_READ.last30Days, shares } },
+        },
+        'Anna',
+      );
+    expect(head([share(A, { agencyBps: 3750, differsFromRate: true })])).toEqual({
+      dot: 'warn',
+      lead: 'Écart : Reveal donne 37,5\u00a0% du net sur 30 jours, tu as réglé 40\u00a0%.',
+      then: 'Vérifie le partage chez Reveal ou règle un nouveau pourcentage ci-dessous.',
+    });
+    expect(head([share(A, { differsFromRate: true }), share(B, { differsFromRate: false })]).lead).toBe(
+      'Écart : un compte s’écarte des 40\u00a0% réglés, sur 30 jours (détail ci-dessous).',
+    );
+    expect(head([share(A, { agencyBps: 4000, differsFromRate: false })]).dot).toBe('ok');
+    expect(head([share(A, { differsFromRate: null })]).dot).toBe('ok');
   });
 });

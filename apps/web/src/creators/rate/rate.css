@@ -130,3 +130,9 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* A share off her percentage (ADR 0054 § 6): amber, like every warning. */
+.ar-read__gap {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
