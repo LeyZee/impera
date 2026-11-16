@@ -7,7 +7,7 @@ import {
   SessionShapeUnprocessable,
   SessionVaultMissing,
 } from '../domain/errors';
-import type { AccountStore, Clock, SessionShapes, SessionVault } from '../domain/ports';
+import type { AccountStore, Clock, JobLogger, SessionShapes, SessionVault } from '../domain/ports';
 
 export interface ConnectorSessions {
   /**
@@ -22,6 +22,8 @@ export interface ConnectorSessions {
     correlationId: string;
     /** Who synced it (the owner's link), for the audit. */
     userId: string | null;
+    /** The request's logger: told when the line of a refusal could not be written. */
+    logger?: JobLogger;
   }): Promise<void>;
   /** The decrypted session, or `null` when none was captured. Never logged, never sent to a client. */
   load(creatorId: CreatorId, platformAccountId: PlatformAccountId): Promise<string | null>;
@@ -34,7 +36,10 @@ export interface ConnectorSessions {
 
 /** Platform sessions at rest (security.md, ADR 0008): AES-256-GCM bound to the account id. */
 export function createConnectorSessions(deps: {
-  readonly accounts: AccountStore;
+  readonly accounts: Pick<
+    AccountStore,
+    'creatorOf' | 'sessionOf' | 'storeSession' | 'setSessionState' | 'recordRefusedSession'
+  >;
   readonly vault: SessionVault | null;
   readonly clock: Clock;
   /** How each platform's session reads; a platform without a reader takes no session. */
@@ -116,11 +121,19 @@ export function createConnectorSessions(deps: {
               ? 'member_conflict'
               : null;
         if (reason !== null) {
-          await deps.accounts.recordRefusedSession(account.creatorId, input.platformAccountId, reason, {
-            correlationId: input.correlationId,
-            at: deps.clock.now(),
-            userId: input.userId,
-          });
+          // The refusal stays the answer whatever happens to its line: a line that cannot be written is logged.
+          await deps.accounts
+            .recordRefusedSession(account.creatorId, input.platformAccountId, reason, {
+              correlationId: input.correlationId,
+              at: deps.clock.now(),
+              userId: input.userId,
+            })
+            .catch((err: unknown) => {
+              input.logger?.warn(
+                { platformAccountId: input.platformAccountId, reason, err },
+                'connector session: refusal not audited',
+              );
+            });
         }
         throw error;
       }

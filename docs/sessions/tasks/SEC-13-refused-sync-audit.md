@@ -17,6 +17,7 @@ Garder au journal d'audit chaque « Sync » refusée, comme `security.md` le dem
 
 - [x] `recordRefusedSession` : action `connector.session_refused`, le compte, le motif (`owner_conflict` ou `member_conflict`), l'utilisateur.
 - [x] Écrite hors de la transaction refusée, que le refus vienne de l'application ou de la contrainte.
+- [x] Si la ligne ne peut pas être écrite, le refus reste la réponse et le journal applicatif le dit (relecture Bilan).
 - [x] Test d'intégration ; README du module.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
