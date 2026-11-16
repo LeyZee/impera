@@ -28,13 +28,13 @@ import {
   usePayrollSettings,
 } from '@/payroll/api';
 import {
+  besidesLine,
   fcfaText,
   gaugePercent,
   goalSpanBps,
   growthWords,
   heroPeriodOf,
   mainLine,
-  memberFacts,
   memberPeriodAmount,
   memberPhaseChip,
   momentAt,
@@ -275,8 +275,17 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
             {chatter ? (
               <Panel
                 className="nv-enter"
-                eyebrow="Ma performance"
-                title={hero === current ? undefined : `Quinzaine ${periodLine(current)}`}
+                eyebrow={
+                  // One quiet sentence takes no strong title: the period goes with the eyebrow (Design, CHT-14).
+                  hero === current || nowData === undefined || !plainPerformance(nowData)
+                    ? 'Ma performance'
+                    : `Ma performance · quinzaine ${periodLine(current)}`
+                }
+                title={
+                  hero === current || (nowData !== undefined && plainPerformance(nowData))
+                    ? undefined
+                    : `Quinzaine ${periodLine(current)}`
+                }
               >
                 {nowData === undefined ? (
                   nowRead.isError ? (
@@ -433,6 +442,13 @@ function MyHoldNotice({ hold }: { hold: MyPayoutHold }): JSX.Element {
  * What is left to do in the period under way, for a chatter: the next individual tier, in net and roughly in sales on
  * the account that brings the most, then their share of the team's goal, in percent only.
  */
+/** A period with neither tier nor team goal: « Ma performance » is one quiet sentence. */
+function plainPerformance(period: PayrollPeriod): boolean {
+  const statement = period.statements[0];
+  const tiers = statement?.rules.bonusTiers ?? period.bonusTiers?.tiers ?? [];
+  return tiers.length === 0 && (statement?.rules.collectiveGoal ?? period.collectiveGoal) === null;
+}
+
 function Performance({
   period,
   account,
@@ -444,7 +460,7 @@ function Performance({
   const net = statement?.netMinor ?? 0;
   const tiers = statement?.rules.bonusTiers ?? period.bonusTiers?.tiers ?? [];
   const goal = statement?.rules.collectiveGoal ?? period.collectiveGoal;
-  if (tiers.length === 0 && goal === null) {
+  if (plainPerformance(period)) {
     const growth = growthWords(statement?.lines ?? []);
     return (
       <div className="rp-sec">
@@ -655,20 +671,22 @@ function MyPeriodRow({
     earning === undefined || earning.carryOverOutMinor === 0
       ? null
       : `${earning.totalMinor < 0 ? 'sous zéro' : 'sous le minimum'} : reporté si elle finit ainsi`;
-  // What the amount holds besides the commission (a bonus, a penalty…), said beside the net: 30 € earned on 0 € of
+  // What the amount holds besides the commission (a bonus, a penalty…) is said beside the net: 30 € earned on 0 € of
   // net is never left to be read as a mistake (Design, recette CHT-02).
-  const besides = earning === undefined ? [] : memberFacts(earning).slice(1);
-  // A fact's amount stays with its word: « prime » is never left at a line's end, its « +30,00 € » on the next.
-  const sub = `${amountText(summary.netMinor, 'EUR')} de net${summary.ended ? '' : ' à ce jour'}${besides
-    .map((fact) => ` · ${fact.replaceAll(/ (?=[+−-])/gu, '\u00a0')}`)
-    .join('')}`;
+  // Two lines meant as such (Design, recette CHT-02): the net, then what else the amount holds; a fact's amount stays
+  // with its word, « prime » never left at a line's end with its « +30,00 € » on the next.
+  const net = `${amountText(summary.netMinor, 'EUR')} de net${summary.ended ? '' : ' à ce jour'}`;
+  const others = earning === undefined ? null : besidesLine(earning);
   return (
-    <button type="button" className="py-period nv-tap" onClick={onOpen}>
+    <button type="button" className="py-period py-period--mine nv-tap" onClick={onOpen}>
       <span>
-        <span className="py-period__name nv-num">{periodTitle(window.period, false)}</span>
-        <span className="py-period__sub nv-num">{sub}</span>
+        <span className="py-period__head">
+          <span className="py-period__name nv-num">{periodTitle(window.period, false)}</span>
+          <Chip chip={chip} />
+        </span>
+        <span className="py-period__sub nv-num">{net}</span>
+        {others === null ? null : <span className="py-period__sub nv-num">{others}</span>}
       </span>
-      <Chip chip={chip} />
       <span className="py-period__amount nv-num">
         {amountText(amount.minor, 'EUR')}
         <small>{amount.what}</small>

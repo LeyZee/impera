@@ -1110,6 +1110,17 @@ export function memberFacts(statement: CommissionStatement): string[] {
 }
 
 /**
+ * What a statement holds besides its commission, on one line (« prime +30,00 € · malus −5,00 € »), each amount kept
+ * with its word by a non-breaking space; null when it holds nothing else (recette CHT-02).
+ */
+export function besidesLine(statement: CommissionStatement): string | null {
+  const facts = memberFacts(statement).slice(1);
+  return facts.length === 0
+    ? null
+    : facts.map((fact) => fact.replaceAll(/ (?=[+−-])/gu, '\u00a0')).join(' · ');
+}
+
+/**
  * Said after a positive carry-over that is the second in a row, or nothing: the next period pays that amount, under
  * the minimum too, so that the invoice it waits for is paid before its due date (ADR 0038). In the mood of the
  * sentence before: done once validated, certain once the period has ended, conditional while it runs.

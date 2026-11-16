@@ -289,8 +289,8 @@ describe('CommissionsPage', () => {
 
     const rows = within(panel('Mes relevés')).getAllByRole('button');
     expect(rows.map(text)).toEqual([
-      '1er – 15 novembre300,00 € de net à ce jourEn cours21,25 €gagné à ce jour',
-      '1er – 15 octobre85,00 € de netPayé21,25 €touché',
+      '1er – 15 novembreEn cours300,00 € de net à ce jour21,25 €gagné à ce jour',
+      '1er – 15 octobrePayé85,00 € de net21,25 €touché',
     ]);
     // A chatter reads their own line of the team, for their country, and never its rules.
     expect(asked).not.toContain('/v1/team/pay-rules');
@@ -309,9 +309,29 @@ describe('CommissionsPage', () => {
     await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
     await waitFor(() => {
       expect(text(within(panel('Mes relevés')).getAllByRole('button')[0])).toBe(
-        '1er – 15 novembre300,00 € de net à ce jourEn cours8,60 €gagné à ce joursous le minimum : reporté si elle finit ainsi',
+        '1er – 15 novembreEn cours300,00 € de net à ce jour8,60 €gagné à ce joursous le minimum : reporté si elle finit ainsi',
       );
     });
+  });
+
+  it('says a period without tier nor team goal in the eyebrow, never under a strong title (Design, CHT-14)', async () => {
+    const running = periods[NOV1];
+    if (running === undefined) throw new Error('No period under way');
+    const [statement] = running.statements;
+    if (statement === undefined) throw new Error('No statement');
+    periods[NOV1] = {
+      ...running,
+      bonusTiers: null,
+      collectiveGoal: null,
+      statements: [{ ...statement, rules: { ...statement.rules, bonusTiers: [], collectiveGoal: null } }],
+    };
+    renderPage();
+    await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    const performance = await waitFor(() => panel('Ma performance · quinzaine du 1er au 15 novembre'));
+    expect(text(performance)).toContain('Pas de palier ni d’objectif d’équipe sur cette quinzaine');
+    expect(
+      within(performance).queryByRole('heading', { name: 'Quinzaine du 1er au 15 novembre' }),
+    ).toBeNull();
   });
 
   it('says beside the net of the period under way what its amount holds besides the commission (recette CHT-02, Design)', async () => {
@@ -325,10 +345,13 @@ describe('CommissionsPage', () => {
     };
     renderPage();
     await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    // Two lines meant as such, never a line broken where the dots fall (Design): the net, then the rest.
     await waitFor(() => {
-      expect(text(within(panel('Mes relevés')).getAllByRole('button')[0])).toContain(
-        'de net à ce jour · prime +30,00 €',
-      );
+      const row = within(panel('Mes relevés')).getAllByRole('button')[0];
+      expect([...(row?.querySelectorAll('.py-period__sub') ?? [])].map(text)).toEqual([
+        '0,00 € de net à ce jour',
+        'prime +30,00 €',
+      ]);
     });
     // « prime » and its amount never part at a line's end (Design).
     expect(within(panel('Mes relevés')).getAllByRole('button')[0]?.textContent).toContain(
@@ -479,7 +502,9 @@ describe('CommissionsPage', () => {
     expect(text(hero)).toContain('Calculé le lun. 2 nov. à 10 h 07 sur tes rapports validés.');
     expect(text(hero.querySelector('.py-mehero__period'))).toBe('1er – 15 novembre');
     // A manager, on leave too, takes neither a tier nor the team's goal: no card promises one (recette CHT-03).
-    expect(within(panel('Mes relevés')).getAllByRole('button').map(text)[0]).toContain('Payé31,20 €touché');
+    expect(within(panel('Mes relevés')).getAllByRole('button').map(text)[0]).toMatch(
+      /^16 – 31 octobrePayé.*31,20 €touché$/u,
+    );
     expect(screen.queryByText('Ma performance')).toBeNull();
     expect(screen.queryByText(/Palier Bronze/u)).toBeNull();
     expect(screen.queryByText(/Objectif de l’équipe/u)).toBeNull();
@@ -505,7 +530,9 @@ describe('CommissionsPage', () => {
     renderPage();
     const panelOf = await waitFor(() => panel('Mes relevés'));
     const carried = await within(panelOf).findByRole('button', { name: /^1er – 15 octobre/u });
-    expect(text(carried)).toContain('Reporté6,67 €reporté sur la quinzaine du 16 au 31 octobre');
+    expect(text(carried)).toMatch(
+      /^1er – 15 octobreReporté.*6,67 €reporté sur la quinzaine du 16 au 31 octobre$/u,
+    );
     expect(text(carried)).not.toContain('touché');
   });
 
