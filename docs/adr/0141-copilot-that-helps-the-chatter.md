@@ -24,6 +24,8 @@ Charles a choisi, sur carte, d'afficher d'abord ce qui est déjà calculé (sans
 
 4. **Les signaux à ne pas rater**, ajoutés à « Où on en est » : désir qui monte ou retombe depuis le message précédent (sens seulement, le chiffre reste au CRM), relance due (un travail à part, pas un geste du brouillon), offre ouverte sans réponse, disponibilité du fan. Les arrêts et précautions existants restent tels quels (rouge pour ce qui interdit, ambre pour ce qui retient).
 
+4 bis. **Le moment de vendre** (choix « Verdict et raisons » de Charles sur carte, 16/11/2026 à 17 h 44, après sa demande de 17 h 43 : des chatteurs vendent trop tôt). Une jauge en crans dit « Bon moment », « Bientôt » ou « Pas encore », avec les deux ou trois conditions qui manquent, en libellés d'une liste fermée dans `@impera/contracts` (par exemple le désir encore trop bas, des messages de lui encore attendus, une offre trop récente). Le verdict est dérivé des mêmes gardes que celles qui autorisent une étape payante au brouillon, jamais d'un second calcul ni d'un texte d'IA. Le chiffre du désir n'est pas montré (il reste au CRM et au Playground). Sous une coupure (§ 9), il n'y a ni jauge ni verdict ; la jauge ne passe jamais devant un arrêt.
+
 5. **Le serveur rend ces données dans la vue du copilote** (la route qui rend déjà le brouillon), recopiées champ par champ, avec un schéma de sortie strict : jamais le texte du prompt, jamais une méthode écrite, jamais un montant autre que le prix de l'étape décidée. Les réponses aux objections déjà utilisées sortent par leur libellé ou par le texte déjà envoyé à ce fan, jamais la banque entière. Aucun champ hors de ce que le chatteur lit déjà pendant son shift.
 
 ### B. Deux boutons qui appellent l'IA, au clic seulement
@@ -70,4 +72,4 @@ Charles a choisi, sur carte, d'afficher d'abord ce qui est déjà calculé (sans
 
 - **Des accroches à chaque message, sans clic** : un appel d'IA de plus par message pour des textes que le chatteur ne lira souvent pas.
 - **Laisser l'IA écrire « quoi faire »** : le code le décide déjà ; un texte libre pourrait contredire la décision ou inventer un prix.
-- **Montrer le chiffre du désir** : il reste au CRM ; le sens suffit au chatteur et évite qu'il joue le chiffre.
+- **Montrer le chiffre du désir** : il reste au CRM ; le sens et le verdict du § 4 bis suffisent au chatteur et évitent qu'il joue le chiffre (option « Verdict et chiffre » écartée par Charles le 16/11/2026).
