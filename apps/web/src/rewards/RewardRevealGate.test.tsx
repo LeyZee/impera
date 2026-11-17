@@ -77,6 +77,32 @@ describe('RewardRevealGate (ADR 0104 § 12)', () => {
     expect(marked).toEqual([['first_sale'], ['day_record']]);
   });
 
+  it('plays several ranks owed at once as one, the highest, and marks the ones under it with it', async () => {
+    const level = (rank: number, earnedAt: string) => ({
+      ...item(`level:${String(rank)}`, earnedAt),
+      family: 'level' as const,
+    });
+    const { marked } = serve({
+      ...CASE,
+      items: [
+        item('first_sale', '2026-11-10T10:00:00Z'),
+        level(1, '2026-11-12T10:00:00Z'),
+        level(2, '2026-11-12T10:00:01Z'),
+        level(3, '2026-11-12T10:00:02Z'),
+      ],
+      level: { rank: 3, name: 'Charmeur' },
+    });
+    mount({ ...THEO_ME, preferences: { sounds: false } });
+    expect(await screen.findByRole('dialog', { name: 'Première vente' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    expect(await screen.findByRole('dialog', { name: 'Charmeur' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(marked).toEqual([['first_sale'], ['level:3', 'level:1', 'level:2']]);
+  });
+
   it('shows nothing when every gain was already revealed, or none is earned', async () => {
     const { urls } = serve({
       ...CASE,
