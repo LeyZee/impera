@@ -170,6 +170,9 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Relevé d'un média | `media_insight_snapshot` | Les nombres d'une publication Instagram lus à un âge donné (1 h, 24 h, 48 h, 7 j) ; unique par média et par âge (ADR 0120 § 2). |
 | Retour sur un Reel | `reel_review` | Trois lignes et une leçon écrites à partir des seuls faits calculés par le code sur un Reel relevé à 48 h ; la créatrice le lit directement (ADR 0120 § 4). |
 | Entonnoir d'acquisition | `acquisition_funnel` | Par créatrice et par jour : vues, clics par endroit, nouveaux abonnés, ventes ; vu par l'agence seule (ADR 0120 § 5). |
+| Phrase d'usage | `usage_note` | 120 caractères au plus, écrits par l'agence sur un lien de redirection : à quoi il sert et quand l'utiliser ; montrée à la créatrice dans « Mes liens » (ADR 0121 § 1). |
+| Palier de trafic | `traffic_tier` | Un seuil de nouveaux abonnés par jour, nommé et réglé par l'agence dans Réglages ; aucune valeur dans le code (ADR 0121 § 3). |
+| Récap du jour | `traffic_recap` | Trois lignes au plus écrites chaque matin à partir des seuls faits calculés par le code sur le trafic d'une créatrice ; lu par l'agence seule (ADR 0121 § 5). |
 | Mode assisté | `assisted` | Publication Instagram préparée par Impera et postée à la main, pour ajouter un son (ADR 0057). |
 | Signal de tendance | `trend_signal` | Un format, un son, un thème ou une date qui monte, venu d'une des six sources de l'ADR 0060 ; a une péremption (14 jours par défaut). |
 | Capture passive | `passive_capture` | Le relevé par l'extension de ce qu'une personne regarde elle-même sur instagram.com ; ne fait jamais défiler, ne clique jamais, n'envoie aucune requête (ADR 0060). |
