@@ -332,8 +332,30 @@ export type ConnectorConfig = z.infer<typeof ConnectorConfigSchema>;
 export const ConnectorSessionBodySchema = z.object({
   platformAccountId: PlatformAccountIdSchema,
   session: z.string().min(1).max(65_536),
+  /**
+   * The owner's gesture (ADR 0147): `click` on « Synchroniser », or `open`, the extension syncing alone when the popup
+   * opens. `open` only adds refusals: an account with no session yet, or none whose member is pinned.
+   */
+  trigger: z.enum(['click', 'open']).optional(),
 });
 export type ConnectorSessionBody = z.infer<typeof ConnectorSessionBodySchema>;
+
+/**
+ * What the « Sync » stored: its state and the token's own expiry. Reveal's token lives 24 h from the login to Reveal,
+ * never from the « Sync » (reveal-connector-spec.md § 2): `reconnectFirst` says it has under 20 h left, so the owner
+ * logs out of Reveal and in again, then syncs once more. Never a value of the session.
+ */
+export const ConnectorSessionStoredSchema = z.object({
+  sessionState: z.enum(['valid', 'warning']),
+  expiresAt: z.iso.datetime().nullable(),
+  reconnectFirst: z.boolean(),
+  /**
+   * The session in place was kept (ADR 0147 § 7): it still holds and expires later than the one sent. The answer then
+   * speaks of the session kept.
+   */
+  kept: z.boolean(),
+});
+export type ConnectorSessionStored = z.infer<typeof ConnectorSessionStoredSchema>;
 
 /**
  * `GET /v1/connector/accounts?platform=`: the accounts the extension may sync, for the owner's link only (ADR 0066 § 7).
@@ -346,6 +368,11 @@ export const ConnectorAccountChoiceSchema = z.object({
   creatorName: z.string(),
   sessionState: SessionStateSchema,
   sessionUpdatedAt: z.iso.datetime().nullable(),
+  /**
+   * The platform's id of the model the stored session speaks for, `null` before the first « Sync » (ADR 0147 § 4): the
+   * extension sends a session to the one account whose model the tab names. The owner's link only, never logged.
+   */
+  modelId: z.string().nullable().optional(),
 });
 export type ConnectorAccountChoice = z.infer<typeof ConnectorAccountChoiceSchema>;
 
@@ -360,3 +387,5 @@ export const CONNECTOR_SESSION_UNPROCESSABLE = 'connector_session_unprocessable'
 export const CONNECTOR_SESSION_CONFLICT = 'connector_session_conflict';
 /** The session of another team member than the « bot » member the account was first synced with (P2-02). */
 export const CONNECTOR_SESSION_MEMBER_CONFLICT = 'connector_session_member_conflict';
+/** A sync « à l'ouverture » on an account never synced by hand, or whose member is not pinned (ADR 0147 § 1, § 4). */
+export const CONNECTOR_SESSION_AUTO_UNPROCESSABLE = 'connector_session_auto_unprocessable';
