@@ -8,17 +8,23 @@ import { HlsUnsupported, parseHlsPlaylist, variantForDescription } from './hls-p
 
 /**
  * How a vault file is reached (ADR 0113 § 2): the host resolved, then one GET connected to the address that was checked
- * and to no other, with no header at all (never the session's client, its token nor a cookie) and no redirect followed.
- * A test hands FakeReveal over in its place.
+ * and to no other, with no header (never the session's client, its token nor a cookie) but `Referer` to the one host of
+ * `DownloadBounds.referer`, and no redirect followed. A test hands FakeReveal over in its place.
  */
 export interface FileTransport {
   readonly lookup: Lookup;
-  readonly get: (url: string, signal: AbortSignal, pinned: Pinned) => Promise<Response>;
+  readonly get: (
+    url: string,
+    signal: AbortSignal,
+    pinned: Pinned,
+    headers?: Readonly<Record<string, string>>,
+  ) => Promise<Response>;
 }
 
 export const SYSTEM_FILE_TRANSPORT: FileTransport = {
   lookup: systemLookup,
-  get: (url, signal, pinned) => pinnedGet(url, { signal }, pinned),
+  get: (url, signal, pinned, headers) =>
+    pinnedGet(url, { signal, ...(headers === undefined ? {} : { headers }) }, pinned),
 };
 
 /** Why no file: the link is no longer signed (`expired`), the media is gone, or the download broke a bound. */
@@ -42,6 +48,11 @@ export interface DownloadBounds {
   readonly maxKeys: number;
   /** FakeReveal's links only, in the tests: a real link is HTTPS on its default port. */
   readonly allowHttp?: boolean;
+  /**
+   * The one host that expects the dashboard's origin header (ADR 0113 § 2, amendment of 16/11), named in full and also
+   * in `hosts`, and that fixed value: sent to that host over HTTPS only, to no other host and with no other header.
+   */
+  readonly referer?: { readonly host: string; readonly value: string };
 }
 
 /** A link of the vault as the platform gives it: a file, or an HLS playlist. */
@@ -101,7 +112,13 @@ export async function downloadVaultFile(
       if (first === undefined || addresses.some((resolved) => isPrivateAddress(resolved.address))) {
         throw new VaultFileError('host_refused');
       }
-      response = await transport.get(url, signal, { address: first.address, family: first.family });
+      const pinned = { address: first.address, family: first.family };
+      const referer =
+        bounds.referer?.host === host && new URL(url).protocol === 'https:' ? bounds.referer.value : null;
+      response =
+        referer === null
+          ? await transport.get(url, signal, pinned)
+          : await transport.get(url, signal, pinned, { referer });
     } catch (error) {
       if (error instanceof VaultFileError) throw error;
       throw new VaultFileError('failed');
