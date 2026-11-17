@@ -1042,7 +1042,11 @@ const extensionHelp = createRoute({
       throw redirect({ to: railOf(context.user).home, replace: true, state: { notice: NOT_YOURS } });
     }
   },
-  component: ExtensionPage,
+  component: function ExtensionHelp() {
+    const { user } = rootRoute.useRouteContext();
+    // The trend watch is the owner's and the managers' (ADR 0060): a chatter is shown what serves his shift instead.
+    return <ExtensionPage watches={user.role === 'owner' || user.teamScope === 'agency'} />;
+  },
 });
 /** /aide/reveal (P2-01): reconnect Reveal with the extension's « Sync », the owner's alone like the button itself. */
 const revealHelp = createRoute({

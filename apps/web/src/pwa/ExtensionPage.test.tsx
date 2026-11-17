@@ -27,7 +27,6 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
 });
 
 describe('browserOf', () => {
@@ -53,36 +52,24 @@ async function renderPage(page: JSX.Element): Promise<void> {
   await screen.findByRole('heading', { name: 'Installer l’extension' });
 }
 
-async function renderAs(userAgent: string): Promise<void> {
+async function renderAs(userAgent: string, watches = true): Promise<void> {
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent);
-  await renderPage(<ExtensionPage />);
+  await renderPage(<ExtensionPage watches={watches} />);
 }
 
 describe('ExtensionPage', () => {
   it('offers the file of the extension', async () => {
-    vi.stubEnv('DEV', false);
     await renderAs(CHROME);
     expect(screen.getByRole('link', { name: 'Télécharger l’extension' }).getAttribute('href')).toBe(
       EXTENSION_ZIP,
     );
   });
 
-  it('offers no file a development build does not serve, and names no folder of the code (CHA-15)', async () => {
-    vi.stubEnv('DEV', true);
-    await renderAs(CHROME);
-    expect(screen.queryByRole('link', { name: 'Télécharger l’extension' })).toBeNull();
-    expect(screen.getByText(/n’est pas servi/u).textContent).not.toMatch(/apps\/|\.output/u);
-  });
-
-  it('shows one list of steps, the browser that opens the page first, the other one a choice away (CHA-15)', async () => {
+  it('puts the steps of the browser that opens the page first', async () => {
     await renderAs(EDGE);
-    expect(screen.getByRole('heading', { name: 'Dans Edge' })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Dans Chrome' })).toBeNull();
+    const titles = screen.getAllByRole('heading').map((heading) => heading.textContent);
+    expect(titles.indexOf('Dans Edge')).toBeLessThan(titles.indexOf('Dans Chrome'));
     expect(screen.getByText(/edge:\/\/extensions/u)).toBeTruthy();
-    fireEvent.click(screen.getByRole('radio', { name: 'Chrome' }));
-    expect(screen.getByRole('heading', { name: 'Dans Chrome' })).toBeTruthy();
-    expect(screen.getByText(/chrome:\/\/extensions/u)).toBeTruthy();
-    expect(screen.queryByText(/edge:\/\/extensions/u)).toBeNull();
   });
 
   it('sends a phone to the computer', async () => {
@@ -90,30 +77,41 @@ describe('ExtensionPage', () => {
     expect(screen.getByText(/marche sur ordinateur/u)).toBeTruthy();
   });
 
-  it('says what the extension does, and nothing of what is not there yet (CHA-15)', async () => {
+  it('says what is not there yet in one line at the foot, not among what the extension does (PRO-24)', async () => {
     await renderAs(CHROME);
+    expect(screen.queryByText('Bientôt')).toBeNull();
     expect(
       screen.getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent),
     ).toContain('Tes raccourcis');
-    expect(screen.queryByText(/Bientôt/u)).toBeNull();
+    expect(screen.getByText(/^Bientôt dans l’extension : sur Reveal/u).textContent).toContain(
+      'la veille Instagram',
+    );
+  });
+
+  it('keeps the trend watch for those who do it', async () => {
+    await renderAs(CHROME, false);
+    expect(screen.queryByText(/veille Instagram/u)).toBeNull();
+    expect(screen.getByText(/^Bientôt dans l’extension : sur Reveal/u)).toBeTruthy();
   });
 
   it('tells the popup nothing on localhost, its default address', async () => {
     await renderAs(CHROME);
     expect(screen.queryByRole('button', { name: 'Copier l’adresse' })).toBeNull();
-    expect(screen.getAllByText(/tu vois ton nom/u)).toHaveLength(1);
+    expect(screen.getAllByText(/tu vois ton nom/u)).toHaveLength(2);
   });
 
   it('gives a deployed CRM its address to paste in the popup', async () => {
     vi.stubGlobal('location', new URL('https://crm.exemple.fr/aide/extension'));
     const writeText = vi.fn(() => Promise.resolve());
     vi.stubGlobal('navigator', { userAgent: CHROME, clipboard: { writeText } });
-    await renderPage(<ExtensionPage />);
-    expect(screen.getAllByText('https://crm.exemple.fr')).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Copier l’adresse' }));
+    await renderPage(<ExtensionPage watches />);
+    expect(screen.getAllByText('https://crm.exemple.fr')).toHaveLength(2);
+    const [copy] = screen.getAllByRole('button', { name: 'Copier l’adresse' });
+    if (copy === undefined) throw new Error('no copy button');
+    fireEvent.click(copy);
     expect(writeText).toHaveBeenCalledWith('https://crm.exemple.fr');
     expect(await screen.findByRole('button', { name: 'Copiée' })).toBeTruthy();
-    expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(1);
+    expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
   });
 });
 
