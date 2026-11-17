@@ -2,7 +2,7 @@
 
 Statut : proposed (demande de Charles du 17/11/2026, 13 h 28 et 13 h 31, fil « Créer les alertes par créatrice »)
 Date : 2026-11-17
-Précise : P4-01 (Réglages › Alertes), ADR 0020 (notifications Telegram), ADR 0042 § 7 (notifications push), ADR 0091 (dépense IA), ADR 0128 § C (stock de scripts), ADR 0143 § 13 (note quand l'agent oriente vers un compte). S'insère dans la fiche créatrice à sept onglets (amendement du fil Navigation). Ne remplace aucun ADR.
+Précise : P4-01 (Réglages › Alertes), ADR 0020 (notifications Telegram), ADR 0042 § 7 (notifications push), ADR 0091 (dépense IA), ADR 0128 § C (stock de scripts), ADR 0143 § 13 (note quand l'agent oriente vers un compte). S'insère dans la fiche créatrice à sept onglets (ADR 0149, 6e onglet « Alertes », `/creatrices?onglet=alertes&creatrice=<id>`) et prend le choix par sorte des notifications de la créatrice que lui confie l'ADR 0149 § 4. Ne remplace aucun ADR.
 
 ## Contexte
 
@@ -39,7 +39,7 @@ Ce qui manque :
    - **Sourdine** : la cloche du CRM, sans notification.
    - **Rien** : rien pour ce rôle. L'historique des alertes garde toujours la ligne, quel que soit le réglage.
 2. **« Chatteur en shift »** veut dire le ou les chatteurs dont le shift couvre cette créatrice au moment de l'alerte, lus dans le planning. Hors shift, un chatteur ne reçoit rien de cette créatrice.
-3. **Qui voit l'onglet** : le propriétaire le règle ; le manager le lit. Le chatteur et la créatrice ne le voient pas. Le serveur refuse le rôle `creator` sur ces routes ; la table est fermée à la créatrice par la RLS.
+3. **Qui voit l'onglet** : le propriétaire seul (ADR 0149). Le manager, le chatteur et la créatrice ne le voient pas ; ils reçoivent ce qui leur est routé. Le serveur refuse le rôle `creator` sur ces routes ; la table est fermée à la créatrice par la RLS.
 4. **Réglages › Alertes reste** la vue de toutes les créatrices d'un coup, pour ses alertes personnalisées. L'onglet de la fiche montre les mêmes alertes, filtrées sur elle, et y ajoute le routage par rôle. Une alerte personnalisée créée depuis la fiche ne porte que cette créatrice.
 5. **Telegram ne change pas** : c'est un canal de plus, réglé dans Réglages › Telegram. L'onglet le rappelle d'une ligne (« Aussi envoyé au groupe … ») sans le régler.
 
@@ -80,10 +80,15 @@ Ce qui manque :
 
 15. Une notification dit le nom de la créatrice, l'alerte, et ouvre la conversation dans le CRM. Jamais le nom ou le pseudo du fan, jamais ce qu'il a écrit (ADR 0020).
 
+### E bis. Les notifications de la créatrice
+
+16 bis. **Les mots** : « Alertes » pour ce que l'agence surveille, « Notifications » pour ce que reçoit une personne sur son téléphone. Jamais l'un pour l'autre dans l'interface.
+16 ter. **Dans /notifications** (page déjà ouverte à tous pour l'appareil, les heures calmes et le plafond), la créatrice choisit elle-même, par sorte, ce qu'elle reçoit : **demande de l'agence**, **semaine à valider**, **gains** (sa part d'une vente), **lives**. Chaque sorte est allumée par défaut. L'agence ne lit ni ne change ces choix ; ils ne touchent aucune alerte de l'équipe. Une table `notification_kind_preferences` (`user_id`, `kind`, `enabled`) sous RLS `own_rows`, chacun pour lui-même.
+
 ### F. Données et routes
 
 16. **Table `creator_alert_routes`** (`creator_id`, `alert_code`, `role` parmi `owner`, `manager`, `chatter_on_shift`, `mode` parmi `deliver`, `muted`, `off`, `updated_by`, `updated_at`), unique sur (`creator_id`, `alert_code`, `role`). RLS forcée par `creator_id`, fermée à la créatrice, `GRANT SELECT TO impera_service`. Une alerte verrouillée refuse toute ligne autre que `deliver` (contrainte en base et en code).
-17. **Routes** (contrat `packages/contracts/src/creator-alerts.ts`) : `GET /v1/creators/:id/alerts` (propriétaire, manager) et `PUT /v1/creators/:id/alerts/:code` (propriétaire seul, idempotent : le même corps rejoue ce qui est stocké). Chaque écriture ajoute une ligne `creator_alert_route.update` dans `audit_log`. Tests : authentication-sweep, origin-sweep, isolation entre créatrices.
+17. **Routes** (contrat `packages/contracts/src/creator-alerts.ts`) : `GET /v1/creators/:id/alerts` (propriétaire seul) et `PUT /v1/creators/:id/alerts/:code` (propriétaire seul, idempotent : le même corps rejoue ce qui est stocké). Chaque écriture ajoute une ligne `creator_alert_route.update` dans `audit_log`. Tests : authentication-sweep, origin-sweep, isolation entre créatrices.
 18. **Le routeur** lit l'outbox `domain_events`, classe chaque événement en alerte (table du domaine), puis appelle `notify` du module `notifications` pour chaque compte du rôle. Une raison nouvelle `creator_alert` entre dans `NOTIFICATION_REASONS`. La clé d'unicité est l'événement et le compte : un job rejoué ne sonne jamais deux fois.
 
 ### G. Qui code quoi
