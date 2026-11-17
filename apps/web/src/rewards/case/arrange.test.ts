@@ -91,6 +91,18 @@ describe('nextTrophy', () => {
   });
 });
 
+describe('shelvesOf, an empty shelf', () => {
+  it('is left out, unless the role keeps it to say why (CHT-17)', () => {
+    const noMedals: TrophyCase = { ...CASE, items: CASE.items.filter((one) => one.family !== 'medal') };
+    expect(shelvesOf(noMedals).map((shelf) => shelf.family)).toEqual(['streak', 'trophy']);
+    expect(shelvesOf(noMedals, ['medal']).map((shelf) => shelf.family)).toEqual([
+      'medal',
+      'streak',
+      'trophy',
+    ]);
+  });
+});
+
 describe('foldedShelf', () => {
   const shelf = (earned: number, waiting: number): Parameters<typeof foldedShelf>[0] => ({
     family: 'medal',
